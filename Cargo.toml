@@ -1,0 +1,19 @@
+[package]
+name = "insim"
+version = "0.1.0"
+authors = ["Karl Southern <karl@theangryangel.co.uk>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+futures = "0.3"
+bytes = "1"
+tokio = { version = "1.0.0", features = ["full", "tracing"] }
+tokio-util = { version = "0.6.3", features = ["full"] }
+tokio-stream = { version = "0.1" }
+deku = "0.10"
+
+[[insim]]
+name = "insim"
+path = "bin/insim"
