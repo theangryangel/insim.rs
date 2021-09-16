@@ -25,7 +25,7 @@ impl Client {
     }
 
     pub async fn init(&mut self) {
-        let isi = proto::Insim::INIT {
+        let isi = proto::Insim::Init {
             name: self.name.to_owned(),
             password: "".to_string(),
             prefix: b'!',
@@ -47,11 +47,12 @@ impl Client {
         println!("[recv] {:?}", result);
 
         // keep the connection alive
-        if let Some(Ok(proto::Insim::TINY{reqi: 0, ..})) = result {
+        if let Some(Ok(proto::Insim::Tiny {reqi: 0, ..})) = result {
             println!("ping? pong!");
-            let pong = proto::Insim::TINY {reqi: 0, subtype:0};
+            let pong = proto::Insim::Tiny {reqi: 0, subtype:0};
             self.send(pong).await;
         }
+
         result
     }
 

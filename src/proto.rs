@@ -8,7 +8,7 @@ fn lfs_string_read(
 ) -> Result<(&BitSlice<Msb0, u8>, String), DekuError> {
     // TODO tidy up error handling
 
-    let (rest, mut value) = Vec::read(rest, Limit::new_size(bit_size))?;
+    let (rest, value) = Vec::read(rest, Limit::new_size(bit_size))?;
     let mut i = 0;
 
     while i < value.len() {
@@ -78,7 +78,7 @@ pub struct RelayHostInfo {
 #[deku(endian="big", type = "u8")]
 pub enum Insim {
     #[deku(id="1")]
-    INIT {
+    Init {
         #[deku(bytes = "1")]
         reqi: u8,
         #[deku(bytes = "1")]
@@ -106,7 +106,7 @@ pub enum Insim {
     },
 
     #[deku(id="3")]
-    TINY {
+    Tiny {
         #[deku(bytes = "1")]
         reqi: u8,
         #[deku(bytes = "1")]
@@ -114,15 +114,15 @@ pub enum Insim {
     },
 
     #[deku(id="250")]
-    RELAY_ARQ {
-        #[deku(bytes = "1")]
+    RelayAdminRequest {
+        #[deku(bytes = "1", pad_bytes_after = "1")]
         reqi: u8,
-        #[deku(bytes="1")]
-        sp0: u8,
+
+        // sp0 is handled by pad_bytes_after in reqi
     },
 
     #[deku(id="251")]
-    RELAY_ARP {
+    RelayAdminResponse {
         #[deku(bytes = "1")]
         reqi: u8,
         #[deku(bytes="1")]
@@ -130,15 +130,15 @@ pub enum Insim {
     },
 
     #[deku(id="252")]
-    RELAY_HLR {
-        #[deku(bytes = "1")]
+    RelayHostListRequest {
+        #[deku(bytes = "1", pad_bytes_after = "1")]
         reqi: u8,
-        #[deku(bytes="1")]
-        sp0: u8,
+
+        // sp0 is handled by pad_bytes_after in reqi
     },
 
     #[deku(id="253")]
-    RELAY_HOS {
+    RelayHostList {
         #[deku(bytes = "1")]
         reqi: u8,
 
@@ -150,7 +150,7 @@ pub enum Insim {
     },
 
     #[deku(id="254")]
-    RELAY_SEL {
+    RelaySelect {
         #[deku(bytes = "1")]
         reqi: u8,
         #[deku(bytes="1")]
@@ -174,7 +174,7 @@ pub enum Insim {
     },
 
     #[deku(id="255")]
-    RELAY_ERR {
+    RelayErr {
         #[deku(bytes = "1")]
         reqi: u8,
         #[deku(bytes="1")]

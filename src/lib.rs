@@ -1,11 +1,6 @@
-pub mod proto;
 pub mod codec;
-pub mod client;
+mod client;
+mod proto;
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+pub use crate::client::Client;
+pub use crate::proto::Insim as Packets;
