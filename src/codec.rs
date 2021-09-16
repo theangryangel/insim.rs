@@ -2,7 +2,7 @@ use crate::proto;
 
 use std::io;
 use bytes::{Bytes, BytesMut};
-use deku::{DekuContainerRead, DekuContainerWrite};
+use deku::{DekuContainerWrite};
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
 use std::convert::TryFrom;
 

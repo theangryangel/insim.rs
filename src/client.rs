@@ -38,13 +38,17 @@ impl Client {
         };
 
         self.send(isi).await;
+
     }
 
     pub async fn recv(&mut self) -> Option<std::result::Result<proto::Insim, std::io::Error>>{
         // TODO: This should probably be done with a sink and a stream?
         let result = self.inner.next().await;
 
+        // TODO remove
         println!("[recv] {:?}", result);
+
+        // TODO implement unexpected version handling
 
         // keep the connection alive
         if let Some(Ok(proto::Insim::Tiny {reqi: 0, ..})) = result {
@@ -57,7 +61,12 @@ impl Client {
     }
 
     pub async fn send(&mut self, data: proto::Insim) -> std::result::Result<(), std::io::Error> {
+        // TODO remove
         println!("[send] {:?}", data);
         self.inner.send(data).await
     }
+
+    // TODO event handling of some kind.
+    // We could do something like the command macros in
+    // https://github.com/serenity-rs/serenity?
 }

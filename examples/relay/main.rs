@@ -14,6 +14,16 @@ pub async fn main() {
 
     client.send(hlr).await;
 
+    let hs = insim::Packets::RelaySelect{
+        reqi: 0,
+
+        hname: "^0[^7MR^0c] ^7Beginner ^0BMW".to_string(),
+        admin: "".to_string(),
+        spec: "".to_string(),
+    };
+
+    client.send(hs).await;
+
     while let Some(result) = client.recv().await {
         match result {
             Err(e) => println!("{:?}", e),

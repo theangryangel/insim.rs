@@ -2,31 +2,18 @@ use deku::prelude::*;
 use deku::ctx::{Size, Limit};
 use deku::bitvec::{BitSlice, BitVec, Msb0};
 
+use crate::InsimString;
+
 fn lfs_string_read(
     rest: &BitSlice<Msb0, u8>,
     bit_size: Size,
 ) -> Result<(&BitSlice<Msb0, u8>, String), DekuError> {
+
     // TODO tidy up error handling
-
     let (rest, value) = Vec::read(rest, Limit::new_size(bit_size))?;
-    let mut i = 0;
 
-    while i < value.len() {
-        if value[i] == 0 {
-            break;
-        }
-
-        i += 1;
-    }
-
-    // TODO: Handle encoding from codepages to utf-8
-    // This should probably be a custom type and just implement the deku read/write traits.
-
-    Ok((
-        rest,
-        String::from_utf8(
-            value[..i].to_vec()).map_err(|e| DekuError::Parse(e.to_string())
-        )?
+    return Ok((
+        rest, String::from_lfs(value).map_err(|e| DekuError::Parse(e.to_string()))?
     ))
 }
 
@@ -38,22 +25,12 @@ fn lfs_string_write(
 ) -> Result<(), DekuError> {
     let size = bit_size.byte_size().unwrap();
 
-    // TODO we can do this without allocating a buffer, etc.
-    // Fix this.
-    let mut buf = field.as_bytes().to_vec();
-    if buf.len() < size {
-        buf.reserve(size - buf.len());
-        for _i in 0..(size-buf.len()) {
-            buf.push(0);
-        }
-    }
-
-    let value = &buf[0..size];
+    let value = field.to_string().to_lfs(size).map_err(|e| DekuError::Parse(e.to_string()))?;
     value.write(output, ())
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(ctx = "endian: deku::ctx::Endian")]
+#[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct RelayHostInfo {
     #[deku(
         reader = "lfs_string_read(deku::rest, Size::Bytes(32))",
@@ -75,8 +52,53 @@ pub struct RelayHostInfo {
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(ctx = "_endian: deku::ctx::Endian")]
+pub struct MultiCarInfoCompCar {
+    #[deku(bytes = "2")]
+    node: u16,
+
+    #[deku(bytes = "2")]
+    lap: u16,
+
+    #[deku(bytes = "1")]
+    plid: u8,
+
+    #[deku(bytes = "1")]
+    position: u8,
+
+    #[deku(bytes = "1", pad_bytes_after = "1")]
+    info: u8,
+
+    // sp3 handled by pad_bytes_after
+
+    #[deku(bytes = "4")]
+	  x: i32,			// X map (65536 = 1 metre)
+
+    #[deku(bytes = "4")]
+    y: i32,			// Y map (65536 = 1 metre)
+
+    #[deku(bytes = "4")]
+	  z: i32,			// Z alt (65536 = 1 metre)
+
+    #[deku(bytes = "2")]
+	  speed: u16,		// speed (32768 = 100 m/s)
+
+    #[deku(bytes = "2")]
+	  direction: u16,	// direction of car's motion : 0 = world y direction, 32768 = 180 deg
+
+    #[deku(bytes = "2")]
+	  heading: u16,	// direction of forward axis : 0 = world y direction, 32768 = 180 deg
+
+    #[deku(bytes = "2")]
+	  angvel: i16,		// signed, rate of change of heading : (16384 = 360 deg/s)
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian="big", type = "u8")]
 pub enum Insim {
+
+    // TODO The rest of the packets
+
     #[deku(id="1")]
     Init {
         #[deku(bytes = "1")]
@@ -105,12 +127,68 @@ pub enum Insim {
         name: String,
     },
 
+    #[deku(id="2")]
+    Version {
+        #[deku(bytes = "1", pad_bytes_after = "1")]
+        reqi: u8,
+
+        #[deku(
+            reader="lfs_string_read(deku::rest, Size::Bytes(8))",
+            writer="lfs_string_write(deku::output, &version, Size::Bytes(8))"
+        )]
+        version: String,
+
+        #[deku(
+            reader="lfs_string_read(deku::rest, Size::Bytes(8))",
+            writer="lfs_string_write(deku::output, &product, Size::Bytes(8))"
+        )]
+        product: String,
+
+        #[deku(bytes="2")]
+        insimver: u16,
+    },
+
     #[deku(id="3")]
     Tiny {
         #[deku(bytes = "1")]
         reqi: u8,
         #[deku(bytes = "1")]
         subtype: u8,
+    },
+
+    #[deku(id="11")]
+    MessageOut {
+        #[deku(bytes = "1", pad_bytes_after = "1")]
+        reqi: u8,
+
+        #[deku(bytes = "1")]
+        ucid: u8,
+
+        #[deku(bytes = "1")]
+        plid: u8,
+
+        #[deku(bytes = "1")]
+        usertype: u8,
+
+        #[deku(bytes = "1")]
+        textstart: u8,
+
+        #[deku(
+            reader="lfs_string_read(deku::rest, Size::Bytes(128))",
+            writer="lfs_string_write(deku::output, &msg, Size::Bytes(128))"
+        )]
+        msg: String
+    },
+
+    #[deku(id="38")]
+    MultiCarInfo {
+        #[deku(bytes = "1")]
+        reqi: u8,
+        #[deku(bytes = "1")]
+        numc: u8,
+
+        #[deku(count = "numc")]
+        info: Vec<MultiCarInfoCompCar>,
     },
 
     #[deku(id="250")]
@@ -151,10 +229,10 @@ pub enum Insim {
 
     #[deku(id="254")]
     RelaySelect {
-        #[deku(bytes = "1")]
+        #[deku(bytes = "1", pad_bytes_after="1")]
         reqi: u8,
-        #[deku(bytes="1")]
-        zero: u8,
+        
+        // zero handled by pad_bytes_after
 
         #[deku(
             reader="lfs_string_read(deku::rest, Size::Bytes(32))",
