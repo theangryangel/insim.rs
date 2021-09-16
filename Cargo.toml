@@ -12,7 +12,7 @@ bytes = "1"
 tokio = { version = "1.0.0", features = ["full", "tracing"] }
 tokio-util = { version = "0.6.3", features = ["full"] }
 tokio-stream = { version = "0.1" }
-deku = "0.10"
+deku = "0.12"
 
 [[insim]]
 name = "insim"
