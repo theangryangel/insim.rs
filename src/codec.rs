@@ -38,13 +38,12 @@ impl Decoder for InsimCodec {
                 match res {
                     Ok(packet) => Ok(Some(packet)),
                     Err(e) => {
-                        println!("[err] {:?}", e);
-                        panic!(e);
                         Err(
-                        io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            e.to_string(),
-                        ))
+                            io::Error::new(
+                                io::ErrorKind::InvalidInput,
+                                e.to_string(),
+                            )
+                        )
                     }
                 }
             },
