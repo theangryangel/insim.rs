@@ -1,7 +1,7 @@
-pub mod codec;
 mod client;
-mod proto;
+pub mod codec;
 mod impl_string;
+mod proto;
 
 // Public API
 
@@ -11,8 +11,8 @@ pub use crate::proto::Insim as Packets;
 // Traits
 
 // TODO: Use our own errors
-use std::string::FromUtf8Error;
 use std::io;
+use std::string::FromUtf8Error;
 
 pub trait InsimString {
     fn from_lfs(value: Vec<u8>) -> Result<String, FromUtf8Error>;

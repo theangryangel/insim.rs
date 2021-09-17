@@ -1,10 +1,9 @@
-use std::string::FromUtf8Error;
 use std::io;
+use std::string::FromUtf8Error;
 
 use crate::InsimString;
 
 impl InsimString for String {
-
     fn from_lfs(value: Vec<u8>) -> Result<String, FromUtf8Error> {
         let i = value.iter().rposition(|x| *x != 0).unwrap();
 
@@ -22,7 +21,7 @@ impl InsimString for String {
         let mut buf = self.as_bytes().to_vec();
         if buf.len() < max_size {
             buf.reserve(max_size - buf.len());
-            for _i in 0..(max_size-buf.len()) {
+            for _i in 0..(max_size - buf.len()) {
                 buf.push(0);
             }
         }

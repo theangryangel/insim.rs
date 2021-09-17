@@ -1,7 +1,7 @@
+use crate::{codec, proto};
 use futures::prelude::*;
 use tokio::net::TcpStream;
-use tokio_util::codec::{Framed};
-use crate::{codec, proto};
+use tokio_util::codec::Framed;
 
 pub struct Client {
     name: String,
@@ -12,13 +12,11 @@ impl Client {
     pub async fn connect(name: String, dest: String) -> Client {
         let stream = TcpStream::connect(dest).await.unwrap();
 
-        let inner = Framed::new(
-            stream, codec::InsimCodec::new()
-        );
+        let inner = Framed::new(stream, codec::InsimCodec::new());
 
-        let mut client = Client{
+        let mut client = Client {
             name: name.to_owned(),
-            inner: inner
+            inner,
         };
         client.init().await;
         client
@@ -38,10 +36,9 @@ impl Client {
         };
 
         self.send(isi).await;
-
     }
 
-    pub async fn recv(&mut self) -> Option<std::result::Result<proto::Insim, std::io::Error>>{
+    pub async fn recv(&mut self) -> Option<std::result::Result<proto::Insim, std::io::Error>> {
         // TODO: This should probably be done with a sink and a stream?
         let result = self.inner.next().await;
 
@@ -51,9 +48,12 @@ impl Client {
         // TODO implement unexpected version handling
 
         // keep the connection alive
-        if let Some(Ok(proto::Insim::Tiny {reqi: 0, ..})) = result {
+        if let Some(Ok(proto::Insim::Tiny { reqi: 0, .. })) = result {
             println!("ping? pong!");
-            let pong = proto::Insim::Tiny {reqi: 0, subtype:0};
+            let pong = proto::Insim::Tiny {
+                reqi: 0,
+                subtype: 0,
+            };
             self.send(pong).await;
         }
 
