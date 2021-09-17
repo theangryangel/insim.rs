@@ -22,6 +22,12 @@ impl InsimCodec {
     }
 }
 
+impl Default for InsimCodec {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Decoder for InsimCodec {
     type Item = proto::Insim;
     type Error = io::Error;

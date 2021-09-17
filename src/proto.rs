@@ -11,10 +11,10 @@ fn lfs_string_read(
     // TODO tidy up error handling
     let (rest, value) = Vec::read(rest, Limit::new_size(bit_size))?;
 
-    return Ok((
+    Ok((
         rest,
         String::from_lfs(value).map_err(|e| DekuError::Parse(e.to_string()))?,
-    ));
+    ))
 }
 
 /// Parse from String to u8 and write
@@ -37,13 +37,13 @@ fn lfs_string_write(
 pub struct RelayHostInfo {
     #[deku(
         reader = "lfs_string_read(deku::rest, Size::Bytes(32))",
-        writer = "lfs_string_write(deku::output, &hname, Size::Bytes(32))"
+        writer = "lfs_string_write(deku::output, hname, Size::Bytes(32))"
     )]
     hname: String,
 
     #[deku(
         reader = "lfs_string_read(deku::rest, Size::Bytes(6))",
-        writer = "lfs_string_write(deku::output, &track, Size::Bytes(6))"
+        writer = "lfs_string_write(deku::output, track, Size::Bytes(6))"
     )]
     track: String,
 
@@ -117,12 +117,12 @@ pub enum Insim {
         interval: u16,
         #[deku(
             reader = "lfs_string_read(deku::rest, Size::Bytes(16))",
-            writer = "lfs_string_write(deku::output, &password, Size::Bytes(16))"
+            writer = "lfs_string_write(deku::output, password, Size::Bytes(16))"
         )]
         password: String,
         #[deku(
             reader = "lfs_string_read(deku::rest, Size::Bytes(16))",
-            writer = "lfs_string_write(deku::output, &name, Size::Bytes(16))"
+            writer = "lfs_string_write(deku::output, name, Size::Bytes(16))"
         )]
         name: String,
     },
@@ -134,13 +134,13 @@ pub enum Insim {
 
         #[deku(
             reader = "lfs_string_read(deku::rest, Size::Bytes(8))",
-            writer = "lfs_string_write(deku::output, &version, Size::Bytes(8))"
+            writer = "lfs_string_write(deku::output, version, Size::Bytes(8))"
         )]
         version: String,
 
         #[deku(
             reader = "lfs_string_read(deku::rest, Size::Bytes(8))",
-            writer = "lfs_string_write(deku::output, &product, Size::Bytes(8))"
+            writer = "lfs_string_write(deku::output, product, Size::Bytes(8))"
         )]
         product: String,
 
@@ -175,7 +175,7 @@ pub enum Insim {
 
         #[deku(
             reader = "lfs_string_read(deku::rest, Size::Bytes(128))",
-            writer = "lfs_string_write(deku::output, &msg, Size::Bytes(128))"
+            writer = "lfs_string_write(deku::output, msg, Size::Bytes(128))"
         )]
         msg: String,
     },
@@ -233,17 +233,17 @@ pub enum Insim {
         // zero handled by pad_bytes_after
         #[deku(
             reader = "lfs_string_read(deku::rest, Size::Bytes(32))",
-            writer = "lfs_string_write(deku::output, &hname, Size::Bytes(32))"
+            writer = "lfs_string_write(deku::output, hname, Size::Bytes(32))"
         )]
         hname: String,
         #[deku(
             reader = "lfs_string_read(deku::rest, Size::Bytes(16))",
-            writer = "lfs_string_write(deku::output, &admin, Size::Bytes(16))"
+            writer = "lfs_string_write(deku::output, admin, Size::Bytes(16))"
         )]
         admin: String,
         #[deku(
             reader = "lfs_string_read(deku::rest, Size::Bytes(16))",
-            writer = "lfs_string_write(deku::output, &spec, Size::Bytes(16))"
+            writer = "lfs_string_write(deku::output, spec, Size::Bytes(16))"
         )]
         spec: String,
     },
