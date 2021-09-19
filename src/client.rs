@@ -1,9 +1,9 @@
 use crate::{codec, proto};
 use futures::prelude::*;
-use tokio::net::TcpStream;
-use tokio_util::codec::Framed;
-use tokio::time;
 use std::time::Duration;
+use tokio::net::TcpStream;
+use tokio::time;
+use tokio_util::codec::Framed;
 
 pub struct Client {
     name: String,
@@ -16,7 +16,6 @@ fn next_timeout() -> time::Instant {
 }
 
 impl Client {
-
     pub async fn new(name: String, dest: String) -> Client {
         let stream = TcpStream::connect(dest).await.unwrap();
 
