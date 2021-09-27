@@ -1,4 +1,5 @@
-use crate::{codec, proto};
+use crate::packets;
+use crate::protocol;
 use futures::prelude::*;
 use std::time::Duration;
 use tokio::net::TcpStream;
@@ -7,7 +8,8 @@ use tokio_util::codec::Framed;
 
 pub struct Client {
     name: String,
-    inner: Framed<TcpStream, codec::InsimCodec>,
+    // TODO move Framed.. to protocol/tcp.rs and add support for udp
+    inner: Framed<TcpStream, protocol::codec::InsimCodec>,
     timeout: time::Instant,
 }
 
@@ -19,7 +21,7 @@ impl Client {
     pub async fn new(name: String, dest: String) -> Client {
         let stream = TcpStream::connect(dest).await.unwrap();
 
-        let inner = Framed::new(stream, codec::InsimCodec::new());
+        let inner = Framed::new(stream, protocol::codec::InsimCodec::new());
 
         let mut client = Client {
             name: name.to_owned(),
@@ -31,7 +33,7 @@ impl Client {
     }
 
     async fn init(&mut self) {
-        let isi = proto::Insim::Init {
+        let isi = packets::Insim::Init {
             name: self.name.to_owned(),
             password: "".to_string(),
             prefix: b'!',
@@ -57,10 +59,10 @@ impl Client {
 
                     // TODO move this into it's own handler fn of some kind
                     match result {
-                        Ok(proto::Insim::Tiny { reqi: 0, .. }) => {
+                        Ok(packets::Insim::Tiny { reqi: 0, .. }) => {
                             // keep the connection alive
                             println!("ping? pong!");
-                            let pong = proto::Insim::Tiny {
+                            let pong = packets::Insim::Tiny {
                                 reqi: 0,
                                 subtype: 0,
                             };
@@ -99,7 +101,7 @@ impl Client {
         }
     }
 
-    pub async fn send(&mut self, data: proto::Insim) -> std::result::Result<(), std::io::Error> {
+    pub async fn send(&mut self, data: packets::Insim) -> std::result::Result<(), std::io::Error> {
         // TODO remove
         println!("[send] {:?}", data);
         self.inner.send(data).await

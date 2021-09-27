@@ -1,5 +1,4 @@
-use crate::proto;
-
+use crate::packets;
 use bytes::{Bytes, BytesMut};
 use deku::DekuContainerWrite;
 use std::convert::TryFrom;
@@ -29,16 +28,16 @@ impl Default for InsimCodec {
 }
 
 impl Decoder for InsimCodec {
-    type Item = proto::Insim;
+    type Item = packets::Insim;
     type Error = io::Error;
 
-    fn decode(&mut self, src: &mut BytesMut) -> io::Result<Option<proto::Insim>> {
+    fn decode(&mut self, src: &mut BytesMut) -> io::Result<Option<packets::Insim>> {
         let data = self.inner.decode(src);
 
         match data {
             Ok(None) => Ok(None),
             Ok(Some(data)) => {
-                let res = proto::Insim::try_from(data.as_ref());
+                let res = packets::Insim::try_from(data.as_ref());
 
                 match res {
                     Ok(packet) => Ok(Some(packet)),
@@ -50,10 +49,10 @@ impl Decoder for InsimCodec {
     }
 }
 
-impl Encoder<proto::Insim> for InsimCodec {
+impl Encoder<packets::Insim> for InsimCodec {
     type Error = io::Error;
 
-    fn encode(&mut self, msg: proto::Insim, dst: &mut BytesMut) -> Result<(), io::Error> {
+    fn encode(&mut self, msg: packets::Insim, dst: &mut BytesMut) -> Result<(), io::Error> {
         self.inner.encode(Bytes::from(msg.to_bytes().unwrap()), dst)
     }
 }

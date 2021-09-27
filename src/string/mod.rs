@@ -1,7 +1,10 @@
 use std::io;
 use std::string::FromUtf8Error;
 
-use crate::InsimString;
+pub trait InsimString {
+    fn from_lfs(value: Vec<u8>) -> Result<String, FromUtf8Error>;
+    fn to_lfs(&self, max_size: usize) -> Result<Vec<u8>, io::Error>;
+}
 
 impl InsimString for String {
     fn from_lfs(value: Vec<u8>) -> Result<String, FromUtf8Error> {

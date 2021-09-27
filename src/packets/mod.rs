@@ -2,7 +2,7 @@ use deku::bitvec::{BitSlice, BitVec, Msb0};
 use deku::ctx::{Limit, Size};
 use deku::prelude::*;
 
-use crate::InsimString;
+use crate::string::InsimString;
 
 fn lfs_string_read(
     rest: &BitSlice<Msb0, u8>,
