@@ -1,12 +1,15 @@
 use std::io;
 use std::string::FromUtf8Error;
 
-pub trait InsimString {
+pub trait InsimStringReader {
     fn from_lfs(value: Vec<u8>) -> Result<String, FromUtf8Error>;
+}
+
+pub trait InsimStringWriter {
     fn to_lfs(&self, max_size: usize) -> Result<Vec<u8>, io::Error>;
 }
 
-impl InsimString for String {
+impl InsimStringReader for String {
     fn from_lfs(value: Vec<u8>) -> Result<String, FromUtf8Error> {
         let i = value.iter().rposition(|x| *x != 0).unwrap();
 
@@ -15,7 +18,9 @@ impl InsimString for String {
 
         String::from_utf8(value[..=i].to_vec())
     }
+}
 
+impl InsimStringWriter for String {
     fn to_lfs(&self, max_size: usize) -> Result<Vec<u8>, io::Error> {
         // TODO convert utf8 to codepages
 

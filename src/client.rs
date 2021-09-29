@@ -1,27 +1,25 @@
 use crate::packets;
 use crate::protocol;
+
 use futures::prelude::*;
 use std::time::Duration;
-use tokio::net::TcpStream;
 use tokio::time;
-use tokio_util::codec::Framed;
-
-pub struct Client {
-    name: String,
-    // TODO move Framed.. to protocol/tcp.rs and add support for udp
-    inner: Framed<TcpStream, protocol::codec::InsimCodec>,
-    timeout: time::Instant,
-}
 
 fn next_timeout() -> time::Instant {
     time::Instant::now() + Duration::from_secs(30)
 }
 
-impl Client {
-    pub async fn new(name: String, dest: String) -> Client {
-        let stream = TcpStream::connect(dest).await.unwrap();
+pub struct Client {
+    name: String,
+    inner: protocol::stream::InsimPacketStream,
+    timeout: time::Instant,
+}
 
-        let inner = Framed::new(stream, protocol::codec::InsimCodec::new());
+impl Client {
+    // TODO implement some kind of config
+
+    pub async fn new_udp(name: String, dest: String) -> Client {
+        let inner = protocol::stream::InsimPacketStream::new_udp(dest).await;
 
         let mut client = Client {
             name: name.to_owned(),
@@ -32,18 +30,33 @@ impl Client {
         client
     }
 
+    pub async fn new_tcp(name: String, dest: String) -> Client {
+        let inner = protocol::stream::InsimPacketStream::new_tcp(dest).await;
+
+        let mut client = Client {
+            name: name.to_owned(),
+            inner,
+            timeout: next_timeout(),
+        };
+        client.init().await;
+        client
+    }
+
+    pub async fn new_relay(name: String) -> Client {
+        Client::new_tcp(name, "isrelay.lfs.net:47474".to_string()).await
+    }
+
     async fn init(&mut self) {
-        let isi = packets::Insim::Init {
+        let isi = packets::Insim::Init(packets::insim::Init {
             name: self.name.to_owned(),
             password: "".to_string(),
-            prefix: b'!',
+            prefix: 0,
             version: 8,
-            interval: 0,
-            flags: 0,
+            interval: 1000,
+            flags: (1 << 5), // TODO: implement something better here
             udpport: 0,
-            reqi: 0,
-            zero: 0,
-        };
+            reqi: 1,
+        });
 
         self.send(isi).await;
 
@@ -56,28 +69,27 @@ impl Client {
         loop {
             tokio::select! {
                 Some(result) = self.inner.next() => {
+                    self.timeout = next_timeout();
 
                     // TODO move this into it's own handler fn of some kind
                     match result {
-                        Ok(packets::Insim::Tiny { reqi: 0, .. }) => {
+                        Ok(packets::Insim::Tiny(packets::insim::Tiny{ reqi: 0, .. })) => {
                             // keep the connection alive
                             println!("ping? pong!");
-                            let pong = packets::Insim::Tiny {
+                            let pong = packets::Insim::Tiny(packets::insim::Tiny{
                                 reqi: 0,
                                 subtype: 0,
-                            };
+                            });
                             self.send(pong).await;
                         },
 
                         Ok(frame) => {
-                            self.timeout = next_timeout();
-
                             // TODO remove
                             println!("[recv] {:?}", frame);
 
                             // TODO event handling of some kind.
-                            // We could do something like the command macros in
-                            // https://github.com/serenity-rs/serenity?
+                            // Do we throw it out to a channel? or have some highly specific
+                            // handler mapping? Or?
                         },
 
                         // TODO add unknown packet handling to just log an error
@@ -91,12 +103,15 @@ impl Client {
                 tick = interval.tick() => {
                     if tick > self.timeout {
                         println!("Timeout!");
+                        // TODO add a custom error here
                         return
                     }
 
                     // TODO remove
-                    println!("TICK {:?}", tick);
-                }
+                    println!("[tick? tock!] {:?}", tick);
+                },
+
+                // TODO add quit/exit handler
             }
         }
     }

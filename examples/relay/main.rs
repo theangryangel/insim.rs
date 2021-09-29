@@ -2,20 +2,21 @@ extern crate insim;
 
 #[tokio::main]
 pub async fn main() {
-    let mut client =
-        insim::Client::new("insim.rs".to_string(), "isrelay.lfs.net:47474".to_string()).await;
+    let mut client = insim::Client::new_relay("insim.rs".to_string()).await;
 
-    let hlr = insim::Packets::RelayHostListRequest { reqi: 0 };
+    let hlr = insim::packets::Insim::RelayHostListRequest(insim::packets::relay::HostListRequest {
+        reqi: 0,
+    });
 
     client.send(hlr).await;
 
-    let hs = insim::Packets::RelaySelect {
+    let hs = insim::packets::Insim::RelayHostSelect(insim::packets::relay::HostSelect {
         reqi: 0,
 
         hname: "^0[^7MR^0c] ^7Beginner ^0BMW".to_string(),
         admin: "".to_string(),
         spec: "".to_string(),
-    };
+    });
 
     client.send(hs).await;
 

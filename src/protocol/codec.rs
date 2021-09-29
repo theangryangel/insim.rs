@@ -1,6 +1,6 @@
 use crate::packets;
 use bytes::{Bytes, BytesMut};
-use deku::DekuContainerWrite;
+use deku::{DekuContainerWrite, DekuError};
 use std::convert::TryFrom;
 use std::io;
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
@@ -29,22 +29,38 @@ impl Default for InsimCodec {
 
 impl Decoder for InsimCodec {
     type Item = packets::Insim;
+
+    // TODO return custom error
     type Error = io::Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> io::Result<Option<packets::Insim>> {
+        if src.is_empty() {
+            return Ok(None);
+        }
+
         let data = self.inner.decode(src);
 
         match data {
+            Err(e) => Err(e),
             Ok(None) => Ok(None),
             Ok(Some(data)) => {
                 let res = packets::Insim::try_from(data.as_ref());
 
                 match res {
                     Ok(packet) => Ok(Some(packet)),
+                    Err(DekuError::Incomplete(e)) => {
+                        // If we're here, everything is going wonky.
+                        // We could just discard the packet and move on, but thats probably a bad
+                        // thing?
+                        panic!(
+                            "Malformed packet! This is probably a programming error. Error: {:?}, Input: {:?}",
+                            e,
+                            data.to_vec(),
+                        )
+                    }
                     Err(e) => Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string())),
                 }
             }
-            Err(e) => Err(e),
         }
     }
 }
