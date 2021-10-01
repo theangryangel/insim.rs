@@ -48,13 +48,12 @@ impl Client {
 
     async fn init(&mut self) {
         let isi = packets::Insim::Init(packets::insim::Init {
-            name: self.name.to_owned(),
-            password: "".to_string(),
+            name: self.name.to_owned().into(),
+            password: "".into(),
             prefix: 0,
-            version: 8,
+            version: packets::insim::VERSION,
             interval: 1000,
             flags: (1 << 5), // TODO: implement something better here
-            udpport: 0,
             reqi: 1,
         });
 

@@ -1,34 +1,4 @@
-use crate::string::{InsimStringReader, InsimStringWriter};
-use deku::bitvec::{BitSlice, BitVec, Msb0};
-use deku::ctx::{Limit, Size};
 use deku::prelude::*;
-
-// TODO make these a custom type
-pub fn lfs_string_read(
-    rest: &BitSlice<Msb0, u8>,
-    byte_size: usize,
-) -> Result<(&BitSlice<Msb0, u8>, String), DekuError> {
-    // TODO tidy up error handling
-    let (rest, value) = Vec::read(rest, Limit::new_size(Size::Bytes(byte_size)))?;
-
-    Ok((
-        rest,
-        String::from_lfs(value).map_err(|e| DekuError::Parse(e.to_string()))?,
-    ))
-}
-
-/// Parse from String to u8 and write
-pub fn lfs_string_write(
-    output: &mut BitVec<Msb0, u8>,
-    field: &str,
-    byte_size: usize,
-) -> Result<(), DekuError> {
-    let value = field
-        .to_string()
-        .to_lfs(byte_size)
-        .map_err(|e| DekuError::Parse(e.to_string()))?;
-    value.write(output, ())
-}
 
 pub mod insim;
 pub mod relay;

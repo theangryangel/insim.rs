@@ -7,6 +7,8 @@ mod splitx;
 mod tiny;
 mod version;
 
+pub const VERSION: u8 = 8;
+
 pub use init::Init;
 pub use lap::Lap;
 pub use mci::MultiCarInfo;

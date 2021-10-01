@@ -1,4 +1,4 @@
-use crate::packets::{lfs_string_read, lfs_string_write};
+use crate::string::InsimString;
 use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
@@ -7,10 +7,11 @@ pub struct Init {
     #[deku(bytes = "1", pad_bytes_after = "1")]
     pub reqi: u8,
 
-    #[deku(bytes = "2")]
-    pub udpport: u16,
-
-    #[deku(bytes = "2")]
+    // we do not support this feature, using pad_bytes_before
+    // on flags to mask it.
+    //#[deku(bytes = "2")]
+    //pub udpport: u16,
+    #[deku(bytes = "2", pad_bytes_before = "2")]
     pub flags: u16,
 
     #[deku(bytes = "1")]
@@ -22,15 +23,9 @@ pub struct Init {
     #[deku(bytes = "2")]
     pub interval: u16,
 
-    #[deku(
-        reader = "lfs_string_read(deku::rest, 16)",
-        writer = "lfs_string_write(deku::output, password, 16)"
-    )]
-    pub password: String,
+    #[deku(bytes = "16")]
+    pub password: InsimString,
 
-    #[deku(
-        reader = "lfs_string_read(deku::rest, 16)",
-        writer = "lfs_string_write(deku::output, name, 16)"
-    )]
-    pub name: String,
+    #[deku(bytes = "16")]
+    pub name: InsimString,
 }

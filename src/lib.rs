@@ -1,7 +1,7 @@
 mod client;
 pub mod packets;
 pub mod protocol;
-mod string;
+pub mod string;
 
 // Public API
 
