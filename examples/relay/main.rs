@@ -13,9 +13,9 @@ pub async fn main() {
     let hs = insim::packets::Insim::RelayHostSelect(insim::packets::relay::HostSelect {
         reqi: 0,
 
-        hname: insim::string::InsimString::from_string("^0[^7MR^0c] ^7Beginner ^0BMW".to_string()),
-        admin: insim::string::InsimString::new(),
-        spec: insim::string::InsimString::new(),
+        hname: "^0[^7MR^0c] ^7Beginner ^0BMW".into(),
+        admin: "".into(),
+        spec: "".into(),
     });
 
     client.send(hs).await;
