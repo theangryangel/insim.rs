@@ -3,121 +3,141 @@ use crate::protocol;
 
 use futures::prelude::*;
 use std::time::Duration;
+use tokio::sync::mpsc;
 use tokio::time;
 
 fn next_timeout() -> time::Instant {
     time::Instant::now() + Duration::from_secs(30)
 }
 
+// TODO can we reuse the protocol stuff?
+// should we reuse the protocol stuff?
+pub enum ConnectionType {
+    TCP,
+    UDP,
+}
+
 pub struct Client {
+    ctype: ConnectionType,
     name: String,
-    inner: protocol::stream::InsimPacketStream,
-    timeout: time::Instant,
+    dest: String,
 }
 
 impl Client {
-    // TODO implement some kind of config
+    // TODO Client is effectively just a config wrapper at this point
+    // move run function out of here and rename client to something like ClientConfig
 
-    pub async fn new_udp(name: String, dest: String) -> Client {
-        let inner = protocol::stream::InsimPacketStream::new_udp(dest).await;
+    pub fn new_udp(name: String, dest: String) -> Client {
+        Client {
+            ctype: ConnectionType::UDP,
+            name,
+            dest,
+        }
+    }
 
-        let mut client = Client {
-            name: name.to_owned(),
-            inner,
-            timeout: next_timeout(),
+    pub fn new_tcp(name: String, dest: String) -> Client {
+        Client {
+            ctype: ConnectionType::TCP,
+            name,
+            dest,
+        }
+    }
+
+    pub fn new_relay(name: String) -> Client {
+        Client::new_tcp(name, "isrelay.lfs.net:47474".to_string())
+    }
+
+    pub async fn run(
+        &self,
+    ) -> (
+        mpsc::UnboundedSender<bool>,
+        mpsc::UnboundedSender<packets::Insim>,
+        mpsc::UnboundedReceiver<packets::Insim>,
+    ) {
+        // TODO add error handling, infinite reconnects, etc.
+        // TODO break this up
+        // TODO implement unexpected version handling
+
+        let (shutdown_tx, mut shutdown_rx) = mpsc::unbounded_channel();
+        let (send_tx, mut send_rx) = mpsc::unbounded_channel();
+        let (recv_tx, recv_rx) = mpsc::unbounded_channel();
+
+        // TODO move the connection handling into the task runner loop
+        let mut inner = match self.ctype {
+            ConnectionType::UDP => {
+                protocol::stream::InsimPacketStream::new_udp(self.dest.to_owned()).await
+            }
+            ConnectionType::TCP => {
+                protocol::stream::InsimPacketStream::new_tcp(self.dest.to_owned()).await
+            }
         };
-        client.init().await;
-        client
-    }
 
-    pub async fn new_tcp(name: String, dest: String) -> Client {
-        let inner = protocol::stream::InsimPacketStream::new_tcp(dest).await;
-
-        let mut client = Client {
-            name: name.to_owned(),
-            inner,
-            timeout: next_timeout(),
-        };
-        client.init().await;
-        client
-    }
-
-    pub async fn new_relay(name: String) -> Client {
-        Client::new_tcp(name, "isrelay.lfs.net:47474".to_string()).await
-    }
-
-    async fn init(&mut self) {
         let isi = packets::Insim::Init(packets::insim::Init {
             name: self.name.to_owned().into(),
             password: "".into(),
             prefix: 0,
             version: packets::insim::VERSION,
             interval: 1000,
-            flags: (1 << 5), // TODO: implement something better here
+            flags: (1 << 5), // TODO: implement something better here that will eventually pull from ClientConfig
             reqi: 1,
         });
 
-        self.send(isi).await;
+        inner.send(isi).await;
 
-        // TODO implement unexpected version handling
-    }
-
-    pub async fn run(&mut self) {
         let mut interval = time::interval(Duration::from_secs(15));
+        let mut timeout = next_timeout();
 
-        loop {
-            tokio::select! {
-                Some(result) = self.inner.next() => {
-                    self.timeout = next_timeout();
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
 
-                    // TODO move this into it's own handler fn of some kind
-                    match result {
-                        Ok(packets::Insim::Tiny(packets::insim::Tiny{ reqi: 0, .. })) => {
-                            // keep the connection alive
-                            println!("ping? pong!");
-                            let pong = packets::Insim::Tiny(packets::insim::Tiny{
-                                reqi: 0,
-                                subtype: 0,
-                            });
-                            self.send(pong).await;
-                        },
+                    Some(_) = shutdown_rx.recv() => {
+                        println!("Quitting...");
+                        return;
+                    },
 
-                        Ok(frame) => {
-                            // TODO remove
-                            println!("[recv] {:?}", frame);
+                    Some(packet) = send_rx.recv() => {
+                        inner.send(packet).await;
+                    },
 
-                            // TODO event handling of some kind.
-                            // Do we throw it out to a channel? or have some highly specific
-                            // handler mapping? Or?
-                        },
+                    Some(result) = inner.next() => {
+                        timeout = next_timeout();
 
-                        // TODO add unknown packet handling to just log an error
-                        // after that, switch this to return
-                        Err(error) => {
-                            println!("[err] {:?}", error);
-                        },
-                    }
-                },
+                        // TODO move this into it's own handler fn of some kind
+                        match result {
+                            Ok(packets::Insim::Tiny(packets::insim::Tiny{ reqi: 0, .. })) => {
+                                // keep the connection alive
+                                let pong = packets::Insim::Tiny(packets::insim::Tiny{
+                                    reqi: 0,
+                                    subtype: 0,
+                                });
 
-                tick = interval.tick() => {
-                    if tick > self.timeout {
-                        println!("Timeout!");
-                        // TODO add a custom error here
-                        return
-                    }
+                                inner.send(pong).await;
+                            },
 
-                    // TODO remove
-                    println!("[tick? tock!] {:?}", tick);
-                },
+                            Ok(frame) => {
+                                recv_tx.send(frame);
+                            },
 
-                // TODO add quit/exit handler
+                            // TODO add unknown packet handling to just log an error
+                            // after that, switch this to return
+                            Err(error) => {
+                                println!("[err] {:?}", error);
+                            },
+                        }
+                    },
+
+                    tick = interval.tick() => {
+                        if tick > timeout {
+                            println!("Timeout!");
+                            // TODO add a custom error here
+                            return
+                        }
+                    },
+                }
             }
-        }
-    }
+        });
 
-    pub async fn send(&mut self, data: packets::Insim) -> std::result::Result<(), std::io::Error> {
-        // TODO remove
-        println!("[send] {:?}", data);
-        self.inner.send(data).await
+        (shutdown_tx, send_tx, recv_rx)
     }
 }

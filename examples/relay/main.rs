@@ -1,14 +1,17 @@
 extern crate insim;
+use tokio::time;
 
 #[tokio::main]
 pub async fn main() {
-    let mut client = insim::Client::new_relay("insim.rs".to_string()).await;
+    let client = insim::Client::new_relay("insim.rs".to_string());
+
+    let (shutdown, tx, mut rx) = client.run().await;
 
     let hlr = insim::packets::Insim::RelayHostListRequest(insim::packets::relay::HostListRequest {
         reqi: 0,
     });
 
-    client.send(hlr).await;
+    tx.send(hlr);
 
     let hs = insim::packets::Insim::RelayHostSelect(insim::packets::relay::HostSelect {
         reqi: 0,
@@ -18,16 +21,15 @@ pub async fn main() {
         spec: "".into(),
     });
 
-    client.send(hs).await;
+    tx.send(hs);
 
-    client.run().await;
+    tokio::spawn(async move {
+        // shutdown after 10s
+        time::sleep(time::Duration::from_secs(10)).await;
+        shutdown.send(true);
+    });
 
-    /*
-    while let Some(result) = client.recv().await {
-        match result {
-            Err(e) => println!("{:?}", e),
-            _ => (),
-        }
+    while let Some(packet) = rx.recv().await {
+        println!("{:?}", packet);
     }
-    */
 }

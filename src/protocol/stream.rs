@@ -31,7 +31,6 @@ pub enum InsimPacketStream {
         inner: Framed<TcpStream, codec::InsimCodec>,
     },
 
-    // TODO: UDP is untested
     Udp {
         #[pin]
         inner: UdpFramed<codec::InsimCodec, UdpSocket>,
@@ -42,14 +41,14 @@ pub enum InsimPacketStream {
 
 impl InsimPacketStream {
     pub async fn new_tcp(dest: String) -> InsimPacketStream {
+        // TODO connection timeout
+        // TODO handle error
         let stream = TcpStream::connect(dest).await.unwrap();
         let inner = Framed::new(stream, codec::InsimCodec::new());
         InsimPacketStream::Tcp { inner }
     }
 
     pub async fn new_udp(dest: String) -> InsimPacketStream {
-        // TODO: we let the OS just give us a port here.
-        // We should allow it to be configured.
         let socket = UdpSocket::bind("0.0.0.0:0").await.unwrap();
 
         let peer = dest.parse().unwrap();
