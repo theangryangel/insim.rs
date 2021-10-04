@@ -3,7 +3,7 @@ use tokio::time;
 
 #[tokio::main]
 pub async fn main() {
-    let client = insim::Client::new_relay("insim.rs".to_string());
+    let client = insim::Client::default().using_relay();
 
     let (shutdown, tx, mut rx) = client.run().await;
 
@@ -23,13 +23,20 @@ pub async fn main() {
 
     tx.send(hs);
 
-    tokio::spawn(async move {
-        // shutdown after 10s
-        time::sleep(time::Duration::from_secs(10)).await;
-        shutdown.send(true);
-    });
+    // tokio::spawn(async move {
+    //     // shutdown after 10s
+    //     time::sleep(time::Duration::from_secs(10)).await;
+    //     shutdown.send(true);
+    // });
 
-    while let Some(packet) = rx.recv().await {
-        println!("{:?}", packet);
+    while let Some(event) = rx.recv().await {
+        match event {
+            Ok(data) => {
+                println!("{:?}", data);
+            }
+            Err(err) => {
+                println!("{:?}", err);
+            }
+        }
     }
 }

@@ -5,14 +5,14 @@ use deku::prelude::*;
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct Version {
     #[deku(bytes = "1", pad_bytes_after = "1")]
-    reqi: u8,
+    pub reqi: u8,
 
     #[deku(bytes = "8")]
-    version: InsimString,
+    pub version: InsimString,
 
     #[deku(bytes = "6")]
-    product: InsimString,
+    pub product: InsimString,
 
     #[deku(bytes = "1", pad_bytes_after = "1")]
-    insimver: u16,
+    pub insimver: u8,
 }

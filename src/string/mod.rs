@@ -65,7 +65,11 @@ impl InsimString {
         // TODO Split this up
 
         // remove trailing \0
-        let input = &value[..=value.iter().rposition(|x| *x != 0).unwrap()];
+        let input = if let Some(rpos) = value.iter().rposition(|x| *x != 0) {
+            &value[..=rpos]
+        } else {
+            &value
+        };
 
         // empty string
         if input.is_empty() {

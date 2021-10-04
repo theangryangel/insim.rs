@@ -1,5 +1,4 @@
-use crate::packets;
-use crate::protocol;
+use crate::{error, packets, protocol};
 
 use futures::prelude::*;
 use std::time::Duration;
@@ -10,49 +9,102 @@ fn next_timeout() -> time::Instant {
     time::Instant::now() + Duration::from_secs(30)
 }
 
-// TODO can we reuse the protocol stuff?
-// should we reuse the protocol stuff?
-pub enum ConnectionType {
-    TCP,
-    UDP,
+#[derive(Clone, Debug)]
+enum TransportType {
+    Tcp,
+    Udp,
 }
 
+#[derive(Debug)]
+pub enum Event {
+    Connected,
+    Disconnected,
+
+    Raw(packets::Insim),
+}
+
+#[derive(Clone, Debug)]
 pub struct Client {
-    ctype: ConnectionType,
+    ctype: TransportType,
     name: String,
-    dest: String,
+    host: String,
+    password: String,
+    flags: u16,
+    prefix: u8,
+    interval_ms: u16,
+}
+
+impl Default for Client {
+    fn default() -> Client {
+        Client::new()
+    }
 }
 
 impl Client {
-    // TODO Client is effectively just a config wrapper at this point
-    // move run function out of here and rename client to something like ClientConfig
-
-    pub fn new_udp(name: String, dest: String) -> Client {
-        Client {
-            ctype: ConnectionType::UDP,
-            name,
-            dest,
+    // Builder functions
+    pub fn new() -> Self {
+        Self {
+            ctype: TransportType::Tcp,
+            name: "insim.rs".into(),
+            host: "127.0.0.1:29999".into(),
+            password: "".into(),
+            flags: (1 << 5), // TODO make a builder
+            prefix: 0,
+            interval_ms: 1000,
         }
     }
 
-    pub fn new_tcp(name: String, dest: String) -> Client {
-        Client {
-            ctype: ConnectionType::TCP,
-            name,
-            dest,
-        }
+    pub fn using_tcp(mut self, host: String) -> Self {
+        self.ctype = TransportType::Tcp;
+        self.host = host;
+        self
     }
 
-    pub fn new_relay(name: String) -> Client {
-        Client::new_tcp(name, "isrelay.lfs.net:47474".to_string())
+    pub fn using_relay(mut self) -> Self {
+        self.ctype = TransportType::Tcp;
+        self.host = "isrelay.lfs.net:47474".into();
+        self
     }
 
+    pub fn using_udp(mut self, host: String) -> Self {
+        self.ctype = TransportType::Udp;
+        self.host = host;
+        self
+    }
+
+    pub fn named(mut self, name: String) -> Self {
+        self.name = name;
+        self
+    }
+
+    pub fn with_flags(mut self, flags: u16) -> Self {
+        self.flags = flags;
+        self
+    }
+
+    pub fn with_password(mut self, pwd: String) -> Self {
+        self.password = pwd;
+        self
+    }
+
+    pub fn with_prefix(mut self, prefix: u8) -> Self {
+        self.prefix = prefix;
+        self
+    }
+
+    pub fn with_interval(mut self, interval: u16) -> Self {
+        // TODO take a Duration and automatically convert it
+        self.interval_ms = interval;
+        self
+    }
+
+    // Runner
     pub async fn run(
         &self,
     ) -> (
         mpsc::UnboundedSender<bool>,
         mpsc::UnboundedSender<packets::Insim>,
-        mpsc::UnboundedReceiver<packets::Insim>,
+        mpsc::UnboundedReceiver<Result<Event, error::Error>>,
     ) {
         // TODO add error handling, infinite reconnects, etc.
         // TODO break this up
@@ -64,21 +116,21 @@ impl Client {
 
         // TODO move the connection handling into the task runner loop
         let mut inner = match self.ctype {
-            ConnectionType::UDP => {
-                protocol::stream::InsimPacketStream::new_udp(self.dest.to_owned()).await
+            TransportType::Udp => {
+                protocol::stream::InsimPacketStream::new_udp(self.host.to_owned()).await
             }
-            ConnectionType::TCP => {
-                protocol::stream::InsimPacketStream::new_tcp(self.dest.to_owned()).await
+            TransportType::Tcp => {
+                protocol::stream::InsimPacketStream::new_tcp(self.host.to_owned()).await
             }
         };
 
         let isi = packets::Insim::Init(packets::insim::Init {
-            name: self.name.to_owned().into(),
-            password: "".into(),
-            prefix: 0,
+            name: self.name.clone().into(),
+            password: self.password.clone().into(),
+            prefix: self.prefix,
             version: packets::insim::VERSION,
-            interval: 1000,
-            flags: (1 << 5), // TODO: implement something better here that will eventually pull from ClientConfig
+            interval: self.interval_ms,
+            flags: self.flags,
             reqi: 1,
         });
 
@@ -92,7 +144,7 @@ impl Client {
                 tokio::select! {
 
                     Some(_) = shutdown_rx.recv() => {
-                        println!("Quitting...");
+                        recv_tx.send(Ok(Event::Disconnected));
                         return;
                     },
 
@@ -115,8 +167,21 @@ impl Client {
                                 inner.send(pong).await;
                             },
 
+                            Ok(packets::Insim::Version(
+                                packets::insim::Version{ reqi: 1, insimver: version, ..  }
+                            )) => {
+                                if version != packets::insim::VERSION {
+                                    // TODO return a custom Err rather than panic
+                                    panic!("Unsupported Insim Version! Found {:?} expected {:?}", version, packets::insim::VERSION);
+                                }
+
+                                recv_tx.send(Ok(Event::Connected));
+                            },
+
                             Ok(frame) => {
-                                recv_tx.send(frame);
+                                //recv_tx.send(frame);
+
+                                recv_tx.send(Ok(Event::Raw(frame)));
                             },
 
                             // TODO add unknown packet handling to just log an error

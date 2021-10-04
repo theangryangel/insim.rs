@@ -2,7 +2,7 @@ extern crate insim;
 
 #[tokio::main]
 pub async fn main() {
-    let client = insim::Client::new_tcp("insim.rs".to_string(), "192.168.0.250:29999".to_string());
+    let client = insim::Client::default().using_tcp("192.168.0.250:29999".into());
 
     let (shutdown, tx, mut rx) = client.run().await;
 
