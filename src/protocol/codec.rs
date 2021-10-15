@@ -58,6 +58,10 @@ impl Decoder for InsimCodec {
                             data.to_vec(),
                         )
                     }
+                    Err(DekuError::Parse(e)) => {
+                        println!("[err] Unsupported packet {:?} {:?}", e, e.to_string());
+                        Ok(None)
+                    }
                     Err(e) => Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string())),
                 }
             }

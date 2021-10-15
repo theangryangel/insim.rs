@@ -14,7 +14,7 @@ use tokio_util::udp::UdpFramed;
 use pin_project::pin_project;
 
 /*
- * InsimPacketStream papers over the implementation details between UDP and TCP, providing a
+ * Socket papers over the implementation details between UDP and TCP, providing a
  * vaguely unified interface.
  *
  * There's probably a better way to do this, but it'll have to do for now.
@@ -25,7 +25,7 @@ use pin_project::pin_project;
  */
 
 #[pin_project(project = EnumProj)]
-pub enum InsimPacketStream {
+pub enum Socket {
     Tcp {
         #[pin]
         inner: Framed<TcpStream, codec::InsimCodec>,
@@ -39,16 +39,16 @@ pub enum InsimPacketStream {
     },
 }
 
-impl InsimPacketStream {
-    pub async fn new_tcp(dest: String) -> InsimPacketStream {
+impl Socket {
+    pub async fn new_tcp(dest: String) -> Socket {
         // TODO connection timeout
         // TODO handle error
         let stream = TcpStream::connect(dest).await.unwrap();
         let inner = Framed::new(stream, codec::InsimCodec::new());
-        InsimPacketStream::Tcp { inner }
+        Socket::Tcp { inner }
     }
 
-    pub async fn new_udp(dest: String) -> InsimPacketStream {
+    pub async fn new_udp(dest: String) -> Socket {
         let socket = UdpSocket::bind("0.0.0.0:0").await.unwrap();
 
         let peer = dest.parse().unwrap();
@@ -58,18 +58,18 @@ impl InsimPacketStream {
         socket.connect(&peer).await;
 
         let inner = UdpFramed::new(socket, codec::InsimCodec::new());
-        InsimPacketStream::Udp { inner, peer, local }
+        Socket::Udp { inner, peer, local }
     }
 
     pub fn local(&mut self) -> Option<SocketAddr> {
         match *self {
-            InsimPacketStream::Udp { local, .. } => Some(local),
+            Socket::Udp { local, .. } => Some(local),
             _ => None,
         }
     }
 }
 
-impl Stream for InsimPacketStream {
+impl Stream for Socket {
     type Item = Result<packets::Insim, Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
@@ -92,7 +92,7 @@ impl Stream for InsimPacketStream {
     }
 }
 
-impl<I: Into<packets::Insim>> Sink<I> for InsimPacketStream {
+impl<I: Into<packets::Insim>> Sink<I> for Socket {
     type Error = Error;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
