@@ -10,6 +10,7 @@ pub struct Config {
     pub(crate) prefix: u8,
     pub(crate) interval_ms: u16,
     pub(crate) reconnect: bool,
+    pub(crate) max_reconnect_attempts: u16,
 }
 
 impl Default for Config {
@@ -30,6 +31,7 @@ impl Config {
             prefix: 0,
             interval_ms: 1000,
             reconnect: true,
+            max_reconnect_attempts: 1,
         }
     }
 

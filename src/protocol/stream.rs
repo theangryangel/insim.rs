@@ -1,5 +1,4 @@
-use crate::packets;
-use crate::protocol::codec;
+use crate::{error, packets, protocol::codec};
 
 use futures::{Sink, Stream};
 use std::convert::Into;
@@ -40,25 +39,33 @@ pub enum Socket {
 }
 
 impl Socket {
-    pub async fn new_tcp(dest: String) -> Socket {
-        // TODO connection timeout
-        // TODO handle error
-        let stream = TcpStream::connect(dest).await.unwrap();
-        let inner = Framed::new(stream, codec::InsimCodec::new());
-        Socket::Tcp { inner }
+    pub async fn new_tcp(dest: String) -> Result<Socket, error::Error> {
+        let res = TcpStream::connect(dest).await;
+
+        match res {
+            Ok(stream) => {
+                let inner = Framed::new(stream, codec::InsimCodec::new());
+                Ok(Socket::Tcp { inner })
+            }
+            Err(err) => Err(error::Error::IO(err)),
+        }
     }
 
-    pub async fn new_udp(dest: String) -> Socket {
+    pub async fn new_udp(dest: String) -> Result<Socket, error::Error> {
         let socket = UdpSocket::bind("0.0.0.0:0").await.unwrap();
 
         let peer = dest.parse().unwrap();
         let local = socket.local_addr().unwrap();
 
-        // TODO unhandled error
-        socket.connect(&peer).await;
+        let res = socket.connect(&peer).await;
 
-        let inner = UdpFramed::new(socket, codec::InsimCodec::new());
-        Socket::Udp { inner, peer, local }
+        match res {
+            Ok(_) => {
+                let inner = UdpFramed::new(socket, codec::InsimCodec::new());
+                Ok(Socket::Udp { inner, peer, local })
+            }
+            Err(err) => Err(error::Error::IO(err)),
+        }
     }
 
     pub fn local(&mut self) -> Option<SocketAddr> {
