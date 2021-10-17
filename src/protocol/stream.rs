@@ -47,7 +47,7 @@ impl Socket {
                 let inner = Framed::new(stream, codec::InsimCodec::new());
                 Ok(Socket::Tcp { inner })
             }
-            Err(err) => Err(error::Error::IO(err)),
+            Err(err) => Err(err.into()),
         }
     }
 
@@ -64,7 +64,7 @@ impl Socket {
                 let inner = UdpFramed::new(socket, codec::InsimCodec::new());
                 Ok(Socket::Udp { inner, peer, local })
             }
-            Err(err) => Err(error::Error::IO(err)),
+            Err(err) => Err(err.into()),
         }
     }
 

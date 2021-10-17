@@ -7,3 +7,9 @@ pub enum Error {
     IncompatibleVersion,
     IO(IoError),
 }
+
+impl From<IoError> for Error {
+    fn from(err: IoError) -> Self {
+        Error::IO(err)
+    }
+}

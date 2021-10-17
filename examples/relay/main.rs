@@ -4,6 +4,8 @@ extern crate insim;
 pub async fn main() {
     let mut client = insim::Config::default().relay().build().await;
 
+    // This is going to get awful to work with.
+    // Is it better to have some kind of "Sink" or "Handler" thats passed to client?
     while let Some(event) = client.recv().await {
         match event {
             Ok(insim::client::Event::Connected) => {
