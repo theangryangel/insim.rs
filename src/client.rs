@@ -25,44 +25,158 @@ pub enum Event {
     Raw(packets::Insim),
 }
 
-pub struct Client {
-    shutdown: mpsc::UnboundedSender<bool>,
+#[derive(Debug)]
+pub struct Ctx {
     tx: mpsc::UnboundedSender<packets::Insim>,
-    rx: mpsc::UnboundedReceiver<Result<Event, error::Error>>,
+    shutdown: mpsc::UnboundedSender<bool>,
 }
 
-impl Client {
-    pub fn from_config(config: Config) -> Self {
-        // TODO add error handling, infinite reconnects, etc.
-        // TODO break this up - ClientInner? blehasd.
-
-        let (shutdown_tx, shutdown_rx) = mpsc::unbounded_channel();
-        let (send_tx, send_rx) = mpsc::unbounded_channel();
-        let (recv_tx, recv_rx) = mpsc::unbounded_channel();
-
-        let conf = Arc::new(config);
-
-        tokio::spawn(worker(conf, send_rx, recv_tx, shutdown_rx));
-
-        Client {
-            tx: send_tx,
-            rx: recv_rx,
-            shutdown: shutdown_tx,
-        }
-    }
-
+impl Ctx {
     pub fn send(&self, data: packets::Insim) {
         self.tx.send(data);
     }
 
-    pub async fn recv(&mut self) -> Option<Result<Event, error::Error>> {
-        use futures::future::poll_fn;
-
-        poll_fn(|cx| self.rx.poll_recv(cx)).await
-    }
-
     pub fn shutdown(&self) {
         self.shutdown.send(true);
+    }
+}
+
+pub struct Client {
+    config: Arc<Config>,
+
+    shutdown: Option<mpsc::UnboundedSender<bool>>,
+    tx: Option<mpsc::UnboundedSender<packets::Insim>>,
+}
+
+impl Client {
+    pub fn from_config(config: Config) -> Self {
+        let client = Client {
+            config: Arc::new(config),
+            tx: None,
+            shutdown: None,
+        };
+
+        client
+    }
+
+    pub async fn run(mut self) -> Result<(), error::Error> {
+        let (shutdown_tx, mut shutdown_rx) = mpsc::unbounded_channel();
+        let (send_tx, mut send_rx) = mpsc::unbounded_channel();
+
+        self.tx = Some(send_tx.clone());
+        self.shutdown = Some(shutdown_tx.clone());
+
+        let config = self.config.clone();
+
+        let mut i = 0;
+
+        loop {
+            if i > config.max_reconnect_attempts {
+                return Err(error::Error::MaxConnectionAttempts);
+            }
+
+            tracing::info!("Connection attempt {:?}", i);
+
+            let inner = handshake(config.clone()).await;
+
+            if let Err(e) = inner {
+                if !config.reconnect {
+                    return Err(e);
+                }
+
+                i += 1;
+                let delay = tokio::time::sleep(Duration::from_secs((i * 5).into()));
+
+                tokio::select! {
+                    Some(_) = shutdown_rx.recv() => { return Ok(()); },
+                    _ = delay => { continue }
+                }
+            }
+
+            let mut inner = inner.unwrap();
+
+            let mut interval = time::interval(Duration::from_secs(15));
+            let mut timeout = next_timeout();
+
+            if let Some(event_handler) = &config.event_handler {
+                let event_handler = Arc::clone(event_handler);
+                event_handler.connected(Ctx {
+                    tx: send_tx.clone(),
+                    shutdown: shutdown_tx.clone(),
+                });
+            }
+
+            i = 0;
+
+            loop {
+                tokio::select! {
+
+                    Some(_) = shutdown_rx.recv() => {
+                        tracing::debug!("shutdown requested");
+                        return Ok(());
+                    },
+
+                    Some(packet) = send_rx.recv() => {
+                        inner.send(packet).await;
+                    },
+
+                    Some(result) = inner.next() => {
+                        timeout = next_timeout();
+
+                        // TODO move this into it's own handler fn of some kind
+                        match result {
+                            Ok(packets::Insim::Tiny(packets::insim::Tiny{ reqi: 0, .. })) => {
+                                tracing::info!("Ping? Pong!");
+                                // keep the connection alive
+                                let pong = packets::Insim::Tiny(packets::insim::Tiny{
+                                    reqi: 0,
+                                    subtype: 0,
+                                });
+
+                                inner.send(pong).await;
+                            },
+
+                            Ok(packets::Insim::Version(
+                                    packets::insim::Version{ insimver: version, ..  }
+                            )) => {
+                                if version != packets::insim::VERSION {
+                                    return Err(error::Error::IncompatibleVersion);
+                                }
+                            },
+
+                            Ok(frame) => {
+                                if let Some(event_handler) = &config.event_handler {
+                                    let event_handler = Arc::clone(event_handler);
+                                    event_handler.raw(Ctx{tx: send_tx.clone(), shutdown: shutdown_tx.clone()}, frame);
+                                }
+                            },
+
+                            Err(error) => {
+                                return Err(error.into());
+                            },
+                        }
+                    },
+
+                    tick = interval.tick() => {
+                        if tick > timeout {
+                            tracing::error!("Timeout occurred tick={:?}, timeout={:?}", tick, timeout);
+
+                            if let Some(event_handler) = &config.event_handler {
+                                let event_handler = Arc::clone(event_handler);
+                                event_handler.timeout();
+                            }
+
+                            break;
+                        }
+                    },
+                }
+            }
+
+            if let Some(event_handler) = &config.event_handler {
+                let event_handler = Arc::clone(event_handler);
+                event_handler.disconnected();
+            }
+        }
     }
 }
 
@@ -89,112 +203,5 @@ async fn handshake(config: Arc<Config>) -> Result<protocol::stream::Socket, erro
             Ok(inner)
         }
         Err(e) => Err(e),
-    }
-}
-
-async fn worker(
-    config: Arc<Config>,
-
-    mut send_rx: mpsc::UnboundedReceiver<packets::Insim>,
-    recv_tx: mpsc::UnboundedSender<Result<Event, error::Error>>,
-    mut shutdown_rx: mpsc::UnboundedReceiver<bool>,
-) {
-    let mut i = 0;
-
-    loop {
-        if i > config.max_reconnect_attempts {
-            recv_tx.send(Err(error::Error::MaxConnectionAttempts));
-            return;
-        }
-
-        tracing::info!("Connection attempt {:?}", i);
-
-        let inner = handshake(config.clone()).await;
-
-        if let Err(e) = inner {
-            recv_tx.send(Err(e));
-
-            if !config.reconnect {
-                return;
-            }
-
-            i += 1;
-            let delay = tokio::time::sleep(Duration::from_secs((i * 5).into()));
-
-            tokio::select! {
-                Some(_) = shutdown_rx.recv() => { return },
-                _ = delay => { continue }
-            }
-        }
-
-        let mut inner = inner.unwrap();
-
-        let mut interval = time::interval(Duration::from_secs(15));
-        let mut timeout = next_timeout();
-
-        recv_tx.send(Ok(Event::Connected));
-        i = 0;
-
-        loop {
-            tokio::select! {
-
-                Some(_) = shutdown_rx.recv() => {
-                    tracing::debug!("shutdown requested");
-                    recv_tx.send(Ok(Event::Disconnected));
-                    return;
-                },
-
-                Some(packet) = send_rx.recv() => {
-                    inner.send(packet).await;
-                },
-
-                Some(result) = inner.next() => {
-                    timeout = next_timeout();
-
-                    // TODO move this into it's own handler fn of some kind
-                    match result {
-                        Ok(packets::Insim::Tiny(packets::insim::Tiny{ reqi: 0, .. })) => {
-                            // keep the connection alive
-                            let pong = packets::Insim::Tiny(packets::insim::Tiny{
-                                reqi: 0,
-                                subtype: 0,
-                            });
-
-                            inner.send(pong).await;
-                        },
-
-                        Ok(packets::Insim::Version(
-                                packets::insim::Version{ insimver: version, ..  }
-                        )) => {
-                            if version != packets::insim::VERSION {
-                                recv_tx.send(Err(error::Error::IncompatibleVersion));
-                                return;
-                            }
-                        },
-
-                        Ok(frame) => {
-                            recv_tx.send(Ok(Event::Raw(frame)));
-                        },
-
-                        // TODO add unknown packet handling to just log an error
-                        // after that, switch this to return
-                        Err(error) => {
-                            tracing::error!("{:?}", error);
-                            panic!("TODO");
-                        },
-                    }
-                },
-
-                tick = interval.tick() => {
-                    if tick > timeout {
-                        recv_tx.send(Err(error::Error::Timeout));
-                        tracing::error!("Timeout occurred tick={:?}, timeout={:?}", tick, timeout);
-                        break;
-                    }
-                },
-            }
-        }
-
-        recv_tx.send(Ok(Event::Disconnected));
     }
 }

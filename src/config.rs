@@ -1,6 +1,8 @@
 use crate::client::{Client, TransportType};
+use crate::event_handler::EventHandler;
+use std::sync::Arc;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Config {
     pub(crate) ctype: TransportType,
     pub(crate) name: String,
@@ -11,6 +13,7 @@ pub struct Config {
     pub(crate) interval_ms: u16,
     pub(crate) reconnect: bool,
     pub(crate) max_reconnect_attempts: u16,
+    pub(crate) event_handler: Option<Arc<dyn EventHandler>>,
 }
 
 impl Default for Config {
@@ -32,6 +35,7 @@ impl Config {
             interval_ms: 1000,
             reconnect: true,
             max_reconnect_attempts: 1,
+            event_handler: None,
         }
     }
 
@@ -81,6 +85,11 @@ impl Config {
     pub fn interval(mut self, interval: u16) -> Self {
         // TODO take a Duration and automatically convert it
         self.interval_ms = interval;
+        self
+    }
+
+    pub fn event_handler(mut self, event_handler: Arc<dyn EventHandler>) -> Self {
+        self.event_handler = Some(event_handler);
         self
     }
 
