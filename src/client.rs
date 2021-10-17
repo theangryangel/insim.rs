@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time;
+use tracing;
 
 fn next_timeout() -> time::Instant {
     time::Instant::now() + Duration::from_secs(30)
@@ -106,19 +107,24 @@ async fn worker(
             return;
         }
 
-        println!("Connecting...");
+        tracing::info!("Connection attempt {:?}", i);
 
         let inner = handshake(config.clone()).await;
 
         if let Err(e) = inner {
             recv_tx.send(Err(e));
 
-            if config.reconnect {
-                i += 1;
-                continue;
+            if !config.reconnect {
+                return;
             }
 
-            return;
+            i += 1;
+            let delay = tokio::time::sleep(Duration::from_secs((i * 5).into()));
+
+            tokio::select! {
+                Some(_) = shutdown_rx.recv() => { return },
+                _ = delay => { continue }
+            }
         }
 
         let mut inner = inner.unwrap();
@@ -133,7 +139,7 @@ async fn worker(
             tokio::select! {
 
                 Some(_) = shutdown_rx.recv() => {
-                    println!("shutdown");
+                    tracing::debug!("shutdown requested");
                     recv_tx.send(Ok(Event::Disconnected));
                     return;
                 },
@@ -173,17 +179,16 @@ async fn worker(
                         // TODO add unknown packet handling to just log an error
                         // after that, switch this to return
                         Err(error) => {
-                            println!("[err] {:?}", error);
+                            tracing::error!("{:?}", error);
                             panic!("TODO");
                         },
                     }
                 },
 
                 tick = interval.tick() => {
-                    println!("TICK {:?} TIMEOUT {:?}", tick, timeout);
                     if tick > timeout {
                         recv_tx.send(Err(error::Error::Timeout));
-                        println!("TIMEOUT");
+                        tracing::error!("Timeout occurred tick={:?}, timeout={:?}", tick, timeout);
                         break;
                     }
                 },

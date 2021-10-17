@@ -4,6 +4,7 @@ use deku::{DekuContainerWrite, DekuError};
 use std::convert::TryFrom;
 use std::io;
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
+use tracing;
 
 pub struct InsimCodec {
     inner: LengthDelimitedCodec,
@@ -59,7 +60,7 @@ impl Decoder for InsimCodec {
                         )
                     }
                     Err(DekuError::Parse(e)) => {
-                        println!("[err] Unsupported packet {:?} {:?}", e, e.to_string());
+                        tracing::debug!("Unsupported packet {:?} {:?}", e, e.to_string());
                         Ok(None)
                     }
                     Err(e) => Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string())),
