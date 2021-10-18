@@ -25,14 +25,14 @@ pub enum TransportType {
 
 #[derive(Debug, Clone)]
 pub struct Ctx {
-    tx: mpsc::UnboundedSender<protocol::packet::Packet>,
+    tx: mpsc::UnboundedSender<protocol::Packet>,
     shutdown: mpsc::UnboundedSender<bool>,
 }
 
 // TODO remove this allow unused
 #[allow(unused)]
 impl Ctx {
-    pub fn send(&self, data: protocol::packet::Packet) {
+    pub fn send(&self, data: protocol::Packet) {
         self.tx.send(data);
     }
 
@@ -45,7 +45,7 @@ pub struct Client {
     config: Arc<config::Config>,
 
     shutdown: Option<mpsc::UnboundedSender<bool>>,
-    tx: Option<mpsc::UnboundedSender<protocol::packet::Packet>>,
+    tx: Option<mpsc::UnboundedSender<protocol::Packet>>,
 }
 
 impl Client {
@@ -128,23 +128,26 @@ impl Client {
 
                         // TODO move this into it's own handler fn of some kind
                         match result {
-                            Ok(protocol::packet::Packet::Tiny(protocol::insim::Tiny{ reqi: 0, .. })) => {
+                            Ok(protocol::Packet::Tiny(protocol::insim::Tiny{ reqi: 0, .. })) => {
                                 tracing::debug!("ping? pong!");
                                 // keep the connection alive
-                                let pong = protocol::packet::Packet::Tiny(protocol::insim::Tiny{
-                                    reqi: 0,
-                                    subtype: 0,
-                                });
 
-                                let res = inner.send(pong).await;
+                                let res = inner.send(
+                                    protocol::Packet::from(
+                                        protocol::insim::Tiny{
+                                            reqi: 0,
+                                            subtype: 0,
+                                        }
+                                    )
+                                ).await;
                                 if let Err(e) = res {
                                     tracing::error!("failed to send ping response: {:?}", e);
                                     break;
                                 }
                             },
 
-                            Ok(protocol::packet::Packet::Version(
-                                    protocol::insim::Version{ insimver: version, ..  }
+                            Ok(protocol::Packet::Version(
+                                protocol::insim::Version{ insimver: version, ..  }
                             )) => {
                                 if version != protocol::insim::VERSION {
                                     return Err(error::Error::IncompatibleVersion);
@@ -198,7 +201,7 @@ impl Client {
 
         match res {
             Ok(mut inner) => {
-                let isi = protocol::packet::Packet::Init(protocol::insim::Init {
+                let isi = protocol::insim::Init {
                     name: self.config.name.to_owned().into(),
                     password: self.config.password.to_owned().into(),
                     prefix: self.config.prefix,
@@ -206,9 +209,9 @@ impl Client {
                     interval: self.config.interval_ms,
                     flags: self.config.flags,
                     reqi: 1,
-                });
+                };
 
-                let res = inner.send(isi).await;
+                let res = inner.send(protocol::Packet::from(isi)).await;
                 if let Err(e) = res {
                     return Err(e.into());
                 }

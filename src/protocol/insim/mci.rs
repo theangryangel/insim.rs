@@ -1,3 +1,4 @@
+use crate::into_packet_variant;
 use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
@@ -52,3 +53,5 @@ pub struct MultiCarInfo {
     #[deku(count = "numc")]
     info: Vec<CompCar>,
 }
+
+into_packet_variant!(MultiCarInfo, MultiCarInfo);

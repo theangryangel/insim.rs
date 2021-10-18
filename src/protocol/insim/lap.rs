@@ -1,3 +1,4 @@
+use crate::into_packet_variant;
 use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
@@ -27,3 +28,5 @@ pub struct Lap {
     #[deku(bytes = "1", pad_bytes_after = "1")]
     numstops: u8,
 }
+
+into_packet_variant!(Lap, Lap);

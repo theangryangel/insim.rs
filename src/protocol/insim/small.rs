@@ -1,3 +1,4 @@
+use crate::into_packet_variant;
 use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
@@ -12,3 +13,5 @@ pub struct Small {
     #[deku(bytes = "4")]
     pub uval: u32,
 }
+
+into_packet_variant!(Small, Small);

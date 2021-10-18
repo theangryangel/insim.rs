@@ -1,4 +1,4 @@
-use super::packet::Packet;
+use crate::into_packet_variant;
 use crate::string::InsimString;
 use deku::prelude::*;
 
@@ -41,12 +41,7 @@ pub struct HostListRequest {
     pub reqi: u8,
 }
 
-// TODO make this a macro
-impl From<HostListRequest> for Packet {
-    fn from(item: HostListRequest) -> Self {
-        Self::RelayHostListRequest(item)
-    }
-}
+into_packet_variant!(HostListRequest, RelayHostListRequest);
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
@@ -78,11 +73,7 @@ pub struct HostSelect {
     pub spec: InsimString,
 }
 
-impl From<HostSelect> for Packet {
-    fn from(item: HostSelect) -> Self {
-        Self::RelayHostSelect(item)
-    }
-}
+into_packet_variant!(HostSelect, RelayHostSelect);
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]

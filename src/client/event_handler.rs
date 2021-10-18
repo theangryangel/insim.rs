@@ -1,5 +1,5 @@
 use super::Ctx;
-use crate::protocol::packet::Packet;
+use crate::protocol::Packet;
 
 // TODO find a more fun name for EventHandler thats more fitting with racing.
 

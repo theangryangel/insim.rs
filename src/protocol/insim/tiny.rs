@@ -1,3 +1,4 @@
+use crate::into_packet_variant;
 use deku::prelude::*;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
@@ -9,3 +10,5 @@ pub struct Tiny {
     #[deku(bytes = "1")]
     pub subtype: u8,
 }
+
+into_packet_variant!(Tiny, Tiny);

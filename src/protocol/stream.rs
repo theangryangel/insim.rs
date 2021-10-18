@@ -1,6 +1,6 @@
 use crate::{
     error,
-    protocol::{codec, packet},
+    protocol::{codec, Packet},
 };
 
 use futures::{Sink, Stream};
@@ -80,7 +80,7 @@ impl Socket {
 }
 
 impl Stream for Socket {
-    type Item = Result<packet::Packet, Error>;
+    type Item = Result<Packet, Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
         match self.project() {
@@ -102,7 +102,7 @@ impl Stream for Socket {
     }
 }
 
-impl<I: Into<packet::Packet>> Sink<I> for Socket {
+impl<I: Into<Packet>> Sink<I> for Socket {
     type Error = Error;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

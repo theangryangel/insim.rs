@@ -1,3 +1,4 @@
+use crate::into_packet_variant;
 use crate::string::InsimString;
 use deku::prelude::*;
 
@@ -16,3 +17,5 @@ pub struct Version {
     #[deku(bytes = "1", pad_bytes_after = "1")]
     pub insimver: u8,
 }
+
+into_packet_variant!(Version, Version);

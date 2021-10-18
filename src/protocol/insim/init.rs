@@ -1,3 +1,4 @@
+use crate::into_packet_variant;
 use crate::string::InsimString;
 use deku::prelude::*;
 
@@ -29,3 +30,5 @@ pub struct Init {
     #[deku(bytes = "16")]
     pub name: InsimString,
 }
+
+into_packet_variant!(Init, Init);
