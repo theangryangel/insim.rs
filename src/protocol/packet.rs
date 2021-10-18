@@ -1,11 +1,11 @@
 use deku::prelude::*;
 
-pub mod insim;
-pub mod relay;
+use super::insim;
+use super::relay;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "little", type = "u8")]
-pub enum Insim {
+pub enum Packet {
     // TODO The rest of the packets
     //
     // TODO I hate the way we have to split the structs out in order to have sane Impl's.

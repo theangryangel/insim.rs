@@ -1,4 +1,5 @@
 extern crate insim;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tracing::{error, info};
 use tracing_subscriber;
 
@@ -16,15 +17,13 @@ fn setup() {
         .init();
 }
 
-use std::sync::atomic::{AtomicUsize, Ordering};
-
 // Example handler usage that counts the number of packets received and resets on each
 // reconnection.
 struct Counter {
     i: AtomicUsize,
 }
 
-impl insim::EventHandler for Counter {
+impl insim::client::EventHandler for Counter {
     fn on_connect(&self, ctx: insim::client::Ctx) {
         // on connection reset our AtomicUsize back to 0.
         self.i.store(0, Ordering::Relaxed);
@@ -33,14 +32,15 @@ impl insim::EventHandler for Counter {
 
         // TODO: we need a better way to create packets. Impl default probably?
         // Or maybe some kind of factory?
-        let hlr =
-            insim::packets::Insim::RelayHostListRequest(insim::packets::relay::HostListRequest {
-                reqi: 0,
-            });
+        //
+
+        let hlr = insim::protocol::Packet::RelayHostListRequest(
+            insim::protocol::relay::HostListRequest { reqi: 0 },
+        );
 
         ctx.send(hlr);
 
-        let hs = insim::packets::Insim::RelayHostSelect(insim::packets::relay::HostSelect {
+        let hs = insim::protocol::Packet::RelayHostSelect(insim::protocol::relay::HostSelect {
             reqi: 0,
 
             hname: "^0[^7MR^0c] ^7Beginner ^0BMW".into(),
@@ -52,7 +52,7 @@ impl insim::EventHandler for Counter {
     }
 
     #[allow(unused)]
-    fn on_raw(&self, ctx: insim::client::Ctx, data: insim::packets::Insim) {
+    fn on_raw(&self, ctx: insim::client::Ctx, data: insim::protocol::Packet) {
         self.i.fetch_add(1, Ordering::Relaxed);
 
         /*
@@ -75,7 +75,7 @@ use std::sync::Arc;
 pub async fn main() {
     setup();
 
-    let client = insim::Config::default()
+    let client = insim::client::Config::default()
         .relay()
         // TODO: Do we even care if this is an Arc really?
         .event_handler(Arc::new(Counter {

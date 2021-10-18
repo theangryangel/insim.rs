@@ -1,4 +1,4 @@
-use crate::packets;
+use super::packet;
 use bytes::{Bytes, BytesMut};
 use deku::{DekuContainerWrite, DekuError};
 use std::convert::TryFrom;
@@ -29,12 +29,12 @@ impl Default for InsimCodec {
 }
 
 impl Decoder for InsimCodec {
-    type Item = packets::Insim;
+    type Item = packet::Packet;
 
     // TODO return custom error
     type Error = io::Error;
 
-    fn decode(&mut self, src: &mut BytesMut) -> io::Result<Option<packets::Insim>> {
+    fn decode(&mut self, src: &mut BytesMut) -> io::Result<Option<packet::Packet>> {
         if src.is_empty() {
             return Ok(None);
         }
@@ -45,7 +45,7 @@ impl Decoder for InsimCodec {
             Err(e) => Err(e),
             Ok(None) => Ok(None),
             Ok(Some(data)) => {
-                let res = packets::Insim::try_from(data.as_ref());
+                let res = packet::Packet::try_from(data.as_ref());
 
                 match res {
                     Ok(packet) => Ok(Some(packet)),
@@ -70,10 +70,10 @@ impl Decoder for InsimCodec {
     }
 }
 
-impl Encoder<packets::Insim> for InsimCodec {
+impl Encoder<packet::Packet> for InsimCodec {
     type Error = io::Error;
 
-    fn encode(&mut self, msg: packets::Insim, dst: &mut BytesMut) -> Result<(), io::Error> {
+    fn encode(&mut self, msg: packet::Packet, dst: &mut BytesMut) -> Result<(), io::Error> {
         self.inner.encode(Bytes::from(msg.to_bytes().unwrap()), dst)
     }
 }

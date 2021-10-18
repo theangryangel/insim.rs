@@ -1,4 +1,10 @@
-use crate::{error, packets, protocol, Config};
+pub(crate) mod config;
+pub(crate) mod event_handler;
+
+pub use config::Config;
+pub use event_handler::EventHandler;
+
+use super::{error, protocol};
 
 use futures::prelude::*;
 use std::sync::Arc;
@@ -19,14 +25,14 @@ pub enum TransportType {
 
 #[derive(Debug)]
 pub struct Ctx {
-    tx: mpsc::UnboundedSender<packets::Insim>,
+    tx: mpsc::UnboundedSender<protocol::packet::Packet>,
     shutdown: mpsc::UnboundedSender<bool>,
 }
 
 // TODO remove this allow unused
 #[allow(unused)]
 impl Ctx {
-    pub fn send(&self, data: packets::Insim) {
+    pub fn send(&self, data: protocol::packet::Packet) {
         self.tx.send(data);
     }
 
@@ -36,14 +42,14 @@ impl Ctx {
 }
 
 pub struct Client {
-    config: Arc<Config>,
+    config: Arc<config::Config>,
 
     shutdown: Option<mpsc::UnboundedSender<bool>>,
-    tx: Option<mpsc::UnboundedSender<packets::Insim>>,
+    tx: Option<mpsc::UnboundedSender<protocol::packet::Packet>>,
 }
 
 impl Client {
-    pub fn from_config(config: Config) -> Self {
+    pub fn from_config(config: config::Config) -> Self {
         Self {
             config: Arc::new(config),
             tx: None,
@@ -69,7 +75,7 @@ impl Client {
 
             tracing::info!("Connection attempt {:?}", i);
 
-            let inner = handshake(config.clone()).await;
+            let inner = self.handshake().await;
 
             if let Err(e) = inner {
                 if !config.reconnect {
@@ -77,6 +83,8 @@ impl Client {
                 }
 
                 i += 1;
+                // TODO add jitter
+                // TODO add custom retry pattern
                 let delay = tokio::time::sleep(Duration::from_secs((i * 5).into()));
 
                 tokio::select! {
@@ -100,6 +108,7 @@ impl Client {
 
             i = 0;
 
+            // TODO turn this inot an inner loop method
             loop {
                 tokio::select! {
 
@@ -120,10 +129,10 @@ impl Client {
 
                         // TODO move this into it's own handler fn of some kind
                         match result {
-                            Ok(packets::Insim::Tiny(packets::insim::Tiny{ reqi: 0, .. })) => {
+                            Ok(protocol::packet::Packet::Tiny(protocol::insim::Tiny{ reqi: 0, .. })) => {
                                 tracing::info!("Ping? Pong!");
                                 // keep the connection alive
-                                let pong = packets::Insim::Tiny(packets::insim::Tiny{
+                                let pong = protocol::packet::Packet::Tiny(protocol::insim::Tiny{
                                     reqi: 0,
                                     subtype: 0,
                                 });
@@ -134,10 +143,10 @@ impl Client {
                                 }
                             },
 
-                            Ok(packets::Insim::Version(
-                                    packets::insim::Version{ insimver: version, ..  }
+                            Ok(protocol::packet::Packet::Version(
+                                    protocol::insim::Version{ insimver: version, ..  }
                             )) => {
-                                if version != packets::insim::VERSION {
+                                if version != protocol::insim::VERSION {
                                     return Err(error::Error::IncompatibleVersion);
                                 }
                             },
@@ -174,35 +183,35 @@ impl Client {
         }
     }
 
+   async fn handshake(&self) -> Result<protocol::stream::Socket, error::Error> {
+        let res = match self.config.ctype {
+            TransportType::Udp => protocol::stream::Socket::new_udp(self.config.host.to_owned()).await,
+            TransportType::Tcp => protocol::stream::Socket::new_tcp(self.config.host.to_owned()).await,
+        };
+
+        match res {
+            Ok(mut inner) => {
+                let isi = protocol::packet::Packet::Init(protocol::insim::Init {
+                    name: self.config.name.to_owned().into(),
+                    password: self.config.password.to_owned().into(),
+                    prefix: self.config.prefix,
+                    version: protocol::insim::VERSION,
+                    interval: self.config.interval_ms,
+                    flags: self.config.flags,
+                    reqi: 1,
+                });
+
+                let res = inner.send(isi).await;
+                if let Err(e) = res {
+                    return Err(e.into());
+                }
+                Ok(inner)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
     // TODO re-add shutdown and send methods at some point, on the off chance we want them on the
     // client directly?
 }
 
-async fn handshake(config: Arc<Config>) -> Result<protocol::stream::Socket, error::Error> {
-    // connect
-    let res = match config.ctype {
-        TransportType::Udp => protocol::stream::Socket::new_udp(config.host.to_owned()).await,
-        TransportType::Tcp => protocol::stream::Socket::new_tcp(config.host.to_owned()).await,
-    };
-
-    match res {
-        Ok(mut inner) => {
-            let isi = packets::Insim::Init(packets::insim::Init {
-                name: config.name.to_owned().into(),
-                password: config.password.to_owned().into(),
-                prefix: config.prefix,
-                version: packets::insim::VERSION,
-                interval: config.interval_ms,
-                flags: config.flags,
-                reqi: 1,
-            });
-
-            let res = inner.send(isi).await;
-            if let Err(e) = res {
-                return Err(e.into());
-            }
-            Ok(inner)
-        }
-        Err(e) => Err(e),
-    }
-}

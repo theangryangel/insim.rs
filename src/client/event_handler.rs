@@ -1,10 +1,11 @@
-use super::{client::Ctx, packets};
+use super::Ctx;
+use crate::protocol::packet::Packet;
 
 // TODO find a more fun name for EventHandler thats more fitting with racing.
 
 #[allow(unused)]
 pub trait EventHandler: Send + Sync {
-    fn on_raw(&self, ctx: Ctx, data: packets::Insim) {}
+    fn on_raw(&self, ctx: Ctx, data: Packet) {}
 
     fn on_connect(&self, ctx: Ctx) {}
     fn on_disconnect(&self) {}

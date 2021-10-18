@@ -1,5 +1,5 @@
-use crate::client::{Client, TransportType};
-use crate::event_handler::EventHandler;
+use super::EventHandler;
+use super::{Client, TransportType};
 use std::sync::Arc;
 
 #[derive(Clone)]
