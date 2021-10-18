@@ -41,6 +41,7 @@ pub struct HostListRequest {
     pub reqi: u8,
 }
 
+// TODO make this a macro
 impl From<HostListRequest> for Packet {
     fn from(item: HostListRequest) -> Self {
         Self::RelayHostListRequest(item)
