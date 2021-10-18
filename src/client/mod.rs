@@ -23,7 +23,7 @@ pub enum TransportType {
     Udp,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Ctx {
     tx: mpsc::UnboundedSender<protocol::packet::Packet>,
     shutdown: mpsc::UnboundedSender<bool>,
@@ -69,7 +69,7 @@ impl Client {
         let mut i = 0;
 
         loop {
-            if i > config.max_reconnect_attempts {
+            if i >= config.max_reconnect_attempts {
                 return Err(error::Error::MaxConnectionAttempts);
             }
 
@@ -98,8 +98,7 @@ impl Client {
             let mut interval = time::interval(Duration::from_secs(15));
             let mut timeout = next_timeout();
 
-            if let Some(event_handler) = &config.event_handler {
-                let event_handler = event_handler.clone();
+            for event_handler in &config.event_handlers {
                 event_handler.on_connect(Ctx {
                     tx: send_tx.clone(),
                     shutdown: shutdown_tx.clone(),
@@ -130,7 +129,7 @@ impl Client {
                         // TODO move this into it's own handler fn of some kind
                         match result {
                             Ok(protocol::packet::Packet::Tiny(protocol::insim::Tiny{ reqi: 0, .. })) => {
-                                tracing::info!("Ping? Pong!");
+                                tracing::debug!("ping? pong!");
                                 // keep the connection alive
                                 let pong = protocol::packet::Packet::Tiny(protocol::insim::Tiny{
                                     reqi: 0,
@@ -139,7 +138,8 @@ impl Client {
 
                                 let res = inner.send(pong).await;
                                 if let Err(e) = res {
-                                    return Err(e.into());
+                                    tracing::error!("failed to send ping response: {:?}", e);
+                                    break;
                                 }
                             },
 
@@ -152,22 +152,25 @@ impl Client {
                             },
 
                             Ok(frame) => {
-                                if let Some(event_handler) = &config.event_handler {
-                                    event_handler.on_raw(Ctx{tx: send_tx.clone(), shutdown: shutdown_tx.clone()}, frame);
+                                let ctx = Ctx{tx: send_tx.clone(), shutdown: shutdown_tx.clone()};
+
+                                for event_handler in &config.event_handlers {
+                                    event_handler.on_raw(ctx.clone(), &frame);
                                 }
                             },
 
-                            Err(error) => {
-                                return Err(error.into());
+                            Err(e) => {
+                                tracing::error!("unhandled error: {:?}", e);
+                                break;
                             },
                         }
                     },
 
                     tick = interval.tick() => {
                         if tick > timeout {
-                            tracing::error!("Timeout occurred tick={:?}, timeout={:?}", tick, timeout);
+                            tracing::error!("timeout occurred expected by tick {:?}, reached {:?}", tick, timeout);
 
-                            if let Some(event_handler) = &config.event_handler {
+                            for event_handler in &config.event_handlers {
                                 event_handler.on_timeout();
                             }
 
@@ -177,16 +180,20 @@ impl Client {
                 }
             }
 
-            if let Some(event_handler) = &config.event_handler {
+            for event_handler in config.event_handlers.iter() {
                 event_handler.on_disconnect();
             }
         }
     }
 
-   async fn handshake(&self) -> Result<protocol::stream::Socket, error::Error> {
+    async fn handshake(&self) -> Result<protocol::stream::Socket, error::Error> {
         let res = match self.config.ctype {
-            TransportType::Udp => protocol::stream::Socket::new_udp(self.config.host.to_owned()).await,
-            TransportType::Tcp => protocol::stream::Socket::new_tcp(self.config.host.to_owned()).await,
+            TransportType::Udp => {
+                protocol::stream::Socket::new_udp(self.config.host.to_owned()).await
+            }
+            TransportType::Tcp => {
+                protocol::stream::Socket::new_tcp(self.config.host.to_owned()).await
+            }
         };
 
         match res {
@@ -214,4 +221,3 @@ impl Client {
     // TODO re-add shutdown and send methods at some point, on the off chance we want them on the
     // client directly?
 }
-

@@ -1,6 +1,6 @@
 use deku::prelude::*;
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct Tiny {
     #[deku(bytes = "1")]

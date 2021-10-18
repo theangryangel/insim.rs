@@ -19,6 +19,21 @@ fn setup() {
 
 // Example handler usage that counts the number of packets received and resets on each
 // reconnection.
+struct Party {}
+
+#[allow(unused)]
+impl insim::client::EventHandler for Party {
+    fn on_connect(&self, ctx: insim::client::Ctx) {
+        info!("🎉🎉🎉🎉🎉🎉 we're connected!");
+    }
+
+    fn on_disconnect(&self) {
+        info!("💩💩💩💩💩💩 we've lost connection!");
+    }
+}
+
+// Example handler usage that counts the number of packets received and resets on each
+// reconnection.
 struct Counter {
     i: AtomicUsize,
 }
@@ -28,48 +43,30 @@ impl insim::client::EventHandler for Counter {
         // on connection reset our AtomicUsize back to 0.
         self.i.store(0, Ordering::Relaxed);
 
-        info!("CONNECTED! {:?}", self.i);
+        ctx.send(insim::protocol::relay::HostListRequest::default().into());
 
-        // TODO: we need a better way to create packets. Impl default probably?
-        // Or maybe some kind of factory?
-        //
-
-        let hlr = insim::protocol::Packet::RelayHostListRequest(
-            insim::protocol::relay::HostListRequest { reqi: 0 },
+        ctx.send(
+            insim::protocol::relay::HostSelect {
+                hname: "^0[^7MR^0c] ^7Beginner ^0BMW".into(),
+                ..Default::default()
+            }
+            .into(),
         );
-
-        ctx.send(hlr);
-
-        let hs = insim::protocol::Packet::RelayHostSelect(insim::protocol::relay::HostSelect {
-            reqi: 0,
-
-            hname: "^0[^7MR^0c] ^7Beginner ^0BMW".into(),
-            admin: "".into(),
-            spec: "".into(),
-        });
-
-        ctx.send(hs);
     }
 
     #[allow(unused)]
-    fn on_raw(&self, ctx: insim::client::Ctx, data: insim::protocol::Packet) {
+    fn on_raw(&self, ctx: insim::client::Ctx, data: &insim::protocol::Packet) {
         self.i.fetch_add(1, Ordering::Relaxed);
 
         /*
-         * Auto shutdown on 5th packet.
+        * Auto shutdown on 5th packet.
         if self.i.load(Ordering::Relaxed) > 5 {
-            ctx.shutdown();
+        ctx.shutdown();
         }
         */
         info!("got {:?} #={:?}", data, self.i);
     }
-
-    fn on_disconnect(&self) {
-        info!("DISCONNECTED!");
-    }
 }
-
-use std::sync::Arc;
 
 #[tokio::main]
 pub async fn main() {
@@ -77,10 +74,10 @@ pub async fn main() {
 
     let client = insim::client::Config::default()
         .relay()
-        // TODO: Do we even care if this is an Arc really?
-        .event_handler(Arc::new(Counter {
+        .using_event_handler(Counter {
             i: AtomicUsize::new(0),
-        }))
+        })
+        .using_event_handler(Party {})
         .build();
 
     let res = client.run().await;

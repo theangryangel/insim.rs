@@ -1,8 +1,6 @@
 use super::EventHandler;
 use super::{Client, TransportType};
-use std::sync::Arc;
 
-#[derive(Clone)]
 pub struct Config {
     pub(crate) ctype: TransportType,
     pub(crate) name: String,
@@ -13,7 +11,7 @@ pub struct Config {
     pub(crate) interval_ms: u16,
     pub(crate) reconnect: bool,
     pub(crate) max_reconnect_attempts: u16,
-    pub(crate) event_handler: Option<Arc<dyn EventHandler>>,
+    pub(crate) event_handlers: Vec<Box<dyn EventHandler>>,
 }
 
 impl Default for Config {
@@ -35,7 +33,7 @@ impl Config {
             interval_ms: 1000,
             reconnect: true,
             max_reconnect_attempts: 1,
-            event_handler: None,
+            event_handlers: Vec::new(),
         }
     }
 
@@ -88,9 +86,8 @@ impl Config {
         self
     }
 
-    // TODO: Turn this into a Vec of EventHandler's
-    pub fn event_handler<H: EventHandler + 'static>(mut self, event_handler: Arc<H>) -> Self {
-        self.event_handler = Some(event_handler);
+    pub fn using_event_handler<H: EventHandler + 'static>(mut self, event_handler: H) -> Self {
+        self.event_handlers.push(Box::new(event_handler));
         self
     }
 

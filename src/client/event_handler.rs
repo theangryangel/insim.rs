@@ -5,7 +5,7 @@ use crate::protocol::packet::Packet;
 
 #[allow(unused)]
 pub trait EventHandler: Send + Sync {
-    fn on_raw(&self, ctx: Ctx, data: Packet) {}
+    fn on_raw(&self, ctx: Ctx, data: &Packet) {}
 
     fn on_connect(&self, ctx: Ctx) {}
     fn on_disconnect(&self) {}

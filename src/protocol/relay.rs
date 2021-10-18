@@ -1,7 +1,8 @@
+use super::packet::Packet;
 use crate::string::InsimString;
 use deku::prelude::*;
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
 #[deku(endian = "little")]
 pub struct HostInfo {
     #[deku(bytes = "32")]
@@ -17,14 +18,14 @@ pub struct HostInfo {
     pub numconns: u8,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct AdminRequest {
     #[deku(bytes = "1", pad_bytes_after = "1")]
     pub reqi: u8,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct AdminResponse {
     #[deku(bytes = "1")]
@@ -33,14 +34,20 @@ pub struct AdminResponse {
     pub admin: u8,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct HostListRequest {
     #[deku(bytes = "1", pad_bytes_after = "1")]
     pub reqi: u8,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+impl From<HostListRequest> for Packet {
+    fn from(item: HostListRequest) -> Self {
+        Self::RelayHostListRequest(item)
+    }
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct HostList {
     #[deku(bytes = "1")]
@@ -53,7 +60,7 @@ pub struct HostList {
     pub hinfo: Vec<HostInfo>,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct HostSelect {
     #[deku(bytes = "1", pad_bytes_after = "1")]
@@ -70,7 +77,13 @@ pub struct HostSelect {
     pub spec: InsimString,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+impl From<HostSelect> for Packet {
+    fn from(item: HostSelect) -> Self {
+        Self::RelayHostSelect(item)
+    }
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct Error {
     #[deku(bytes = "1")]

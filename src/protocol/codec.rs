@@ -53,14 +53,18 @@ impl Decoder for InsimCodec {
                         // If we're here, everything is going wonky.
                         // We could just discard the packet and move on, but thats probably a bad
                         // thing?
-                        panic!(
-                            "Malformed packet! This is probably a programming error. Error: {:?}, Input: {:?}",
+                        tracing::error!(
+                            "malformed packet! This is probably a programming error. Error: {:?}, Input: {:?}",
                             e,
                             data.to_vec(),
-                        )
+                        );
+                        Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "incomplete or malformed packet",
+                        ))
                     }
                     Err(DekuError::Parse(e)) => {
-                        tracing::debug!("Unsupported packet {:?} {:?}", e, e.to_string());
+                        tracing::warn!("unsupported packet: {:?}", e);
                         Ok(None)
                     }
                     Err(e) => Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string())),

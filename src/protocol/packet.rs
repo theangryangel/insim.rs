@@ -3,7 +3,7 @@ use deku::prelude::*;
 use super::insim;
 use super::relay;
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
 #[deku(endian = "little", type = "u8")]
 pub enum Packet {
     // TODO The rest of the packets
