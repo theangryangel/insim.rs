@@ -18,19 +18,13 @@ pub enum TransportType {
 }
 
 #[derive(Debug)]
-pub enum Event {
-    Connected,
-    Disconnected,
-
-    Raw(packets::Insim),
-}
-
-#[derive(Debug)]
 pub struct Ctx {
     tx: mpsc::UnboundedSender<packets::Insim>,
     shutdown: mpsc::UnboundedSender<bool>,
 }
 
+// TODO remove this allow unused
+#[allow(unused)]
 impl Ctx {
     pub fn send(&self, data: packets::Insim) {
         self.tx.send(data);
@@ -50,13 +44,11 @@ pub struct Client {
 
 impl Client {
     pub fn from_config(config: Config) -> Self {
-        let client = Client {
+        Self {
             config: Arc::new(config),
             tx: None,
             shutdown: None,
-        };
-
-        client
+        }
     }
 
     pub async fn run(mut self) -> Result<(), error::Error> {
@@ -99,8 +91,8 @@ impl Client {
             let mut timeout = next_timeout();
 
             if let Some(event_handler) = &config.event_handler {
-                let event_handler = Arc::clone(event_handler);
-                event_handler.connected(Ctx {
+                let event_handler = event_handler.clone();
+                event_handler.on_connect(Ctx {
                     tx: send_tx.clone(),
                     shutdown: shutdown_tx.clone(),
                 });
@@ -117,7 +109,10 @@ impl Client {
                     },
 
                     Some(packet) = send_rx.recv() => {
-                        inner.send(packet).await;
+                        let res = inner.send(packet).await;
+                        if let Err(e) = res {
+                            return Err(e.into());
+                        }
                     },
 
                     Some(result) = inner.next() => {
@@ -133,7 +128,10 @@ impl Client {
                                     subtype: 0,
                                 });
 
-                                inner.send(pong).await;
+                                let res = inner.send(pong).await;
+                                if let Err(e) = res {
+                                    return Err(e.into());
+                                }
                             },
 
                             Ok(packets::Insim::Version(
@@ -146,8 +144,7 @@ impl Client {
 
                             Ok(frame) => {
                                 if let Some(event_handler) = &config.event_handler {
-                                    let event_handler = Arc::clone(event_handler);
-                                    event_handler.raw(Ctx{tx: send_tx.clone(), shutdown: shutdown_tx.clone()}, frame);
+                                    event_handler.on_raw(Ctx{tx: send_tx.clone(), shutdown: shutdown_tx.clone()}, frame);
                                 }
                             },
 
@@ -162,8 +159,7 @@ impl Client {
                             tracing::error!("Timeout occurred tick={:?}, timeout={:?}", tick, timeout);
 
                             if let Some(event_handler) = &config.event_handler {
-                                let event_handler = Arc::clone(event_handler);
-                                event_handler.timeout();
+                                event_handler.on_timeout();
                             }
 
                             break;
@@ -173,11 +169,13 @@ impl Client {
             }
 
             if let Some(event_handler) = &config.event_handler {
-                let event_handler = Arc::clone(event_handler);
-                event_handler.disconnected();
+                event_handler.on_disconnect();
             }
         }
     }
+
+    // TODO re-add shutdown and send methods at some point, on the off chance we want them on the
+    // client directly?
 }
 
 async fn handshake(config: Arc<Config>) -> Result<protocol::stream::Socket, error::Error> {
@@ -199,7 +197,10 @@ async fn handshake(config: Arc<Config>) -> Result<protocol::stream::Socket, erro
                 reqi: 1,
             });
 
-            inner.send(isi).await;
+            let res = inner.send(isi).await;
+            if let Err(e) = res {
+                return Err(e.into());
+            }
             Ok(inner)
         }
         Err(e) => Err(e),

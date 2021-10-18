@@ -88,12 +88,13 @@ impl Config {
         self
     }
 
-    pub fn event_handler(mut self, event_handler: Arc<dyn EventHandler>) -> Self {
+    // TODO: Turn this into a Vec of EventHandler's
+    pub fn event_handler<H: EventHandler + 'static>(mut self, event_handler: Arc<H>) -> Self {
         self.event_handler = Some(event_handler);
         self
     }
 
-    pub async fn build(self) -> Client {
+    pub fn build(self) -> Client {
         Client::from_config(self)
     }
 }

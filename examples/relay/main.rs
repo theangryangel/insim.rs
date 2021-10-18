@@ -1,5 +1,4 @@
 extern crate insim;
-use tokio::sync::mpsc;
 use tracing::{error, info};
 use tracing_subscriber;
 
@@ -17,14 +16,23 @@ fn setup() {
         .init();
 }
 
-struct Handler {
-    i: u8,
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+// Example handler usage that counts the number of packets received and resets on each
+// reconnection.
+struct Counter {
+    i: AtomicUsize,
 }
 
-impl insim::EventHandler for Handler {
-    fn connected(&self, ctx: insim::client::Ctx) {
-        info!("CONNECTED!");
+impl insim::EventHandler for Counter {
+    fn on_connect(&self, ctx: insim::client::Ctx) {
+        // on connection reset our AtomicUsize back to 0.
+        self.i.store(0, Ordering::Relaxed);
 
+        info!("CONNECTED! {:?}", self.i);
+
+        // TODO: we need a better way to create packets. Impl default probably?
+        // Or maybe some kind of factory?
         let hlr =
             insim::packets::Insim::RelayHostListRequest(insim::packets::relay::HostListRequest {
                 reqi: 0,
@@ -43,12 +51,20 @@ impl insim::EventHandler for Handler {
         ctx.send(hs);
     }
 
-    fn raw(&self, ctx: insim::client::Ctx, data: insim::packets::Insim) {
-        ctx.shutdown();
-        println!("got {:?}", data);
+    #[allow(unused)]
+    fn on_raw(&self, ctx: insim::client::Ctx, data: insim::packets::Insim) {
+        self.i.fetch_add(1, Ordering::Relaxed);
+
+        /*
+         * Auto shutdown on 5th packet.
+        if self.i.load(Ordering::Relaxed) > 5 {
+            ctx.shutdown();
+        }
+        */
+        info!("got {:?} #={:?}", data, self.i);
     }
 
-    fn disconnected(&self) {
+    fn on_disconnect(&self) {
         info!("DISCONNECTED!");
     }
 }
@@ -59,40 +75,22 @@ use std::sync::Arc;
 pub async fn main() {
     setup();
 
-    let mut client = insim::Config::default()
+    let client = insim::Config::default()
         .relay()
-        .event_handler(Arc::new(Handler { i: 0 }))
-        .build()
-        .await;
+        // TODO: Do we even care if this is an Arc really?
+        .event_handler(Arc::new(Counter {
+            i: AtomicUsize::new(0),
+        }))
+        .build();
 
-    client.run().await;
+    let res = client.run().await;
 
-    /*
-    // This is going to get awful to work with.
-    // Is it better to have some kind of "Sink" or "Handler" thats passed to client?
-    while let Some(event) = client.recv().await {
-        match event {
-            Ok(insim::client::Event::Connected) => {
-                info!("Connected");
-
-                let hs =
-                    insim::packets::Insim::RelayHostSelect(insim::packets::relay::HostSelect {
-                        reqi: 0,
-
-                        hname: "^0[^7MR^0c] ^7Beginner ^0BMW".into(),
-                        admin: "".into(),
-                        spec: "".into(),
-                    });
-
-                client.send(hs);
-            }
-            Ok(data) => {
-                info!("{:?}", data);
-            }
-            Err(err) => {
-                error!("{:?}", err);
-            }
+    match res {
+        Ok(()) => {
+            info!("Clean shutdown");
+        }
+        Err(e) => {
+            error!("Unclean shutdown: {:?}", e);
         }
     }
-    */
 }

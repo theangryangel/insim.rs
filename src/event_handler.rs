@@ -1,9 +1,12 @@
 use super::{client::Ctx, packets};
 
-pub trait EventHandler: Send + Sync {
-    fn raw(&self, ctx: Ctx, data: packets::Insim) {}
+// TODO find a more fun name for EventHandler thats more fitting with racing.
 
-    fn connected(&self, ctx: Ctx) {}
-    fn disconnected(&self) {}
-    fn timeout(&self) {}
+#[allow(unused)]
+pub trait EventHandler: Send + Sync {
+    fn on_raw(&self, ctx: Ctx, data: packets::Insim) {}
+
+    fn on_connect(&self, ctx: Ctx) {}
+    fn on_disconnect(&self) {}
+    fn on_timeout(&self) {}
 }

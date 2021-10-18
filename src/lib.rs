@@ -1,3 +1,4 @@
+// TODO: move client, config, event_handler into client directory
 pub mod client;
 pub mod config;
 pub mod error;
