@@ -7,7 +7,7 @@ pub use event_handler::EventHandler;
 use super::{error, protocol};
 
 use futures::prelude::*;
-use std::sync::Arc;
+use rand::{self, Rng};
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time;
@@ -29,7 +29,6 @@ pub struct Ctx {
     shutdown: mpsc::UnboundedSender<bool>,
 }
 
-// TODO remove this allow unused
 #[allow(unused)]
 impl Ctx {
     pub fn send(&self, data: protocol::Packet) {
@@ -42,7 +41,7 @@ impl Ctx {
 }
 
 pub struct Client {
-    config: Arc<config::Config>,
+    config: config::Config,
 
     shutdown: Option<mpsc::UnboundedSender<bool>>,
     tx: Option<mpsc::UnboundedSender<protocol::Packet>>,
@@ -51,45 +50,65 @@ pub struct Client {
 impl Client {
     pub fn from_config(config: config::Config) -> Self {
         Self {
-            config: Arc::new(config),
+            config,
             tx: None,
             shutdown: None,
         }
     }
 
     pub async fn run(mut self) -> Result<(), error::Error> {
-        let (shutdown_tx, mut shutdown_rx) = mpsc::unbounded_channel();
-        let (send_tx, mut send_rx) = mpsc::unbounded_channel();
+        let (shutdown_tx, shutdown_rx) = mpsc::unbounded_channel();
+        let (send_tx, send_rx) = mpsc::unbounded_channel();
 
         self.tx = Some(send_tx.clone());
         self.shutdown = Some(shutdown_tx.clone());
 
-        let config = self.config.clone();
+        for event_handler in self.config.event_handlers.iter() {
+            event_handler.on_startup();
+        }
 
-        let mut i = 0;
+        let res = self
+            .inner_loop(shutdown_rx, shutdown_tx, send_rx, send_tx)
+            .await;
+
+        for event_handler in self.config.event_handlers.iter() {
+            event_handler.on_shutdown();
+        }
+
+        res
+    }
+
+    async fn inner_loop(
+        &self,
+        mut shutdown_rx: mpsc::UnboundedReceiver<bool>,
+        shutdown_tx: mpsc::UnboundedSender<bool>,
+        mut send_rx: mpsc::UnboundedReceiver<protocol::Packet>,
+        send_tx: mpsc::UnboundedSender<protocol::Packet>,
+    ) -> Result<(), error::Error> {
+        let mut connection_attempt = 0;
 
         loop {
-            if i >= config.max_reconnect_attempts {
+            if connection_attempt >= self.config.max_reconnect_attempts {
                 return Err(error::Error::MaxConnectionAttempts);
             }
 
-            tracing::info!("Connection attempt {:?}", i);
+            tracing::debug!("connection attempt {:?}", connection_attempt);
 
             let inner = self.handshake().await;
 
             if let Err(e) = inner {
-                if !config.reconnect {
+                if !self.config.reconnect {
                     return Err(e);
                 }
 
-                i += 1;
-                // TODO add jitter
-                // TODO add custom retry pattern
-                let delay = tokio::time::sleep(Duration::from_secs((i * 5).into()));
+                connection_attempt += 1;
+
+                let retry_in = self.delay_with_jitter(connection_attempt);
+                tracing::debug!("attempting reconnect in {:?}", retry_in);
 
                 tokio::select! {
                     Some(_) = shutdown_rx.recv() => { return Ok(()); },
-                    _ = delay => { continue }
+                    _ = tokio::time::sleep(retry_in) => { continue }
                 }
             }
 
@@ -98,16 +117,16 @@ impl Client {
             let mut interval = time::interval(Duration::from_secs(15));
             let mut timeout = next_timeout();
 
-            for event_handler in &config.event_handlers {
+            for event_handler in self.config.event_handlers.iter() {
                 event_handler.on_connect(Ctx {
                     tx: send_tx.clone(),
                     shutdown: shutdown_tx.clone(),
                 });
             }
 
-            i = 0;
+            connection_attempt = 0;
 
-            // TODO turn this inot an inner loop method
+            // TODO turn this into an inner-inner loop method at some point
             loop {
                 tokio::select! {
 
@@ -126,11 +145,10 @@ impl Client {
                     Some(result) = inner.next() => {
                         timeout = next_timeout();
 
-                        // TODO move this into it's own handler fn of some kind
                         match result {
                             Ok(protocol::Packet::Tiny(protocol::insim::Tiny{ reqi: 0, .. })) => {
-                                tracing::debug!("ping? pong!");
                                 // keep the connection alive
+                                tracing::debug!("ping? pong!");
 
                                 let res = inner.send(
                                     protocol::Packet::from(
@@ -157,7 +175,7 @@ impl Client {
                             Ok(frame) => {
                                 let ctx = Ctx{tx: send_tx.clone(), shutdown: shutdown_tx.clone()};
 
-                                for event_handler in &config.event_handlers {
+                                for event_handler in self.config.event_handlers.iter() {
                                     event_handler.on_raw(ctx.clone(), &frame);
                                 }
                             },
@@ -173,7 +191,7 @@ impl Client {
                         if tick > timeout {
                             tracing::error!("timeout occurred expected by tick {:?}, reached {:?}", tick, timeout);
 
-                            for event_handler in &config.event_handlers {
+                            for event_handler in self.config.event_handlers.iter() {
                                 event_handler.on_timeout();
                             }
 
@@ -183,7 +201,7 @@ impl Client {
                 }
             }
 
-            for event_handler in config.event_handlers.iter() {
+            for event_handler in self.config.event_handlers.iter() {
                 event_handler.on_disconnect();
             }
         }
@@ -219,6 +237,11 @@ impl Client {
             }
             Err(e) => Err(e),
         }
+    }
+
+    fn delay_with_jitter(&self, attempt: u16) -> Duration {
+        let mut rng = rand::thread_rng();
+        Duration::from_millis((rng.gen_range(0..=1000) + (attempt * 5000)).into())
     }
 
     // TODO re-add shutdown and send methods at some point, on the off chance we want them on the

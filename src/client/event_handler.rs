@@ -7,6 +7,9 @@ use crate::protocol::Packet;
 pub trait EventHandler: Send + Sync {
     fn on_raw(&self, ctx: Ctx, data: &Packet) {}
 
+    fn on_startup(&self) {}
+    fn on_shutdown(&self) {}
+
     fn on_connect(&self, ctx: Ctx) {}
     fn on_disconnect(&self) {}
     fn on_timeout(&self) {}

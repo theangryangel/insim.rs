@@ -70,13 +70,6 @@ impl Socket {
             Err(err) => Err(err.into()),
         }
     }
-
-    pub fn local(&mut self) -> Option<SocketAddr> {
-        match *self {
-            Socket::Udp { local, .. } => Some(local),
-            _ => None,
-        }
-    }
 }
 
 impl Stream for Socket {
