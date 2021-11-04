@@ -2,7 +2,7 @@
 name = "insim"
 version = "0.1.0"
 authors = ["Karl Southern <karl@theangryangel.co.uk>"]
-edition = "2018"
+edition = "2021"
 
 [lib]
 bench = false
@@ -20,6 +20,7 @@ itertools = "0.10"
 encoding_rs = "0.8"
 tracing = "0.1"
 rand = "0.8"
+serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
 # used in examples

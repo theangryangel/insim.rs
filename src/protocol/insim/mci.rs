@@ -1,7 +1,8 @@
 use crate::into_packet_variant;
 use deku::prelude::*;
+use serde::Serialize;
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(endian = "little")]
 pub struct CompCar {
     #[deku(bytes = "2")]
@@ -42,7 +43,7 @@ pub struct CompCar {
     angvel: i16, // signed, rate of change of heading : (16384 = 360 deg/s)
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct MultiCarInfo {
     #[deku(bytes = "1")]

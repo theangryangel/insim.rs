@@ -4,15 +4,18 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
-pub struct Small {
+pub struct Cnl {
     #[deku(bytes = "1")]
-    pub reqi: u8,
+    reqi: u8,
 
     #[deku(bytes = "1")]
-    pub subtype: u8,
+    ucid: u8,
 
-    #[deku(bytes = "4")]
-    pub uval: u32,
+    #[deku(bytes = "1")]
+    reason: u8,
+
+    #[deku(bytes = "1", pad_bytes_after = "2")]
+    total: u8,
 }
 
-into_packet_variant!(Small, Small);
+into_packet_variant!(Cnl, Cnl);

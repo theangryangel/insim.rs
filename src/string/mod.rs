@@ -3,6 +3,7 @@ use itertools::Itertools;
 use std::vec::Vec;
 
 mod impl_deku;
+mod impl_serde;
 mod impl_std;
 
 const CODEPAGES: &[u8] = &[b'L', b'G', b'J', b'E', b'T', b'B', b'H', b'S', b'K'];

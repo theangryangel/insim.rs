@@ -2,8 +2,9 @@ use crate::into_packet_variant;
 use crate::string::InsimString;
 use deku::ctx::Size;
 use deku::prelude::*;
+use serde::Serialize;
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct MessageOut {
     #[deku(bytes = "1", pad_bytes_after = "1")]
