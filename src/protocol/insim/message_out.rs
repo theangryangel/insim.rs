@@ -1,4 +1,3 @@
-use crate::into_packet_variant;
 use crate::string::InsimString;
 use deku::ctx::Size;
 use deku::prelude::*;
@@ -25,5 +24,3 @@ pub struct MessageOut {
     #[deku(reader = "InsimString::read(deku::rest, Size::Bytes(deku::rest.len() / 8))")]
     pub msg: InsimString,
 }
-
-into_packet_variant!(MessageOut, MessageOut);

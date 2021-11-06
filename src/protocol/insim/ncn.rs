@@ -1,4 +1,3 @@
-use crate::into_packet_variant;
 use crate::string::InsimString;
 use deku::prelude::*;
 use serde::Serialize;
@@ -27,5 +26,3 @@ pub struct Ncn {
     #[deku(bytes = "1", pad_bytes_after = "1")]
     flags: u8,
 }
-
-into_packet_variant!(Ncn, Ncn);

@@ -1,4 +1,3 @@
-use crate::into_packet_variant;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -20,5 +19,3 @@ pub struct Flg {
     #[deku(bytes = "1", pad_bytes_after = "1")]
     carbehind: u8,
 }
-
-into_packet_variant!(Flg, Flg);

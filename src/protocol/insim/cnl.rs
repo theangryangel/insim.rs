@@ -1,4 +1,3 @@
-use crate::into_packet_variant;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -17,5 +16,3 @@ pub struct Cnl {
     #[deku(bytes = "1", pad_bytes_after = "2")]
     total: u8,
 }
-
-into_packet_variant!(Cnl, Cnl);

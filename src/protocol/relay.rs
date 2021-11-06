@@ -1,4 +1,3 @@
-use crate::into_packet_variant;
 use crate::string::InsimString;
 use deku::prelude::*;
 use serde::Serialize;
@@ -42,8 +41,6 @@ pub struct HostListRequest {
     pub reqi: u8,
 }
 
-into_packet_variant!(HostListRequest, RelayHostListRequest);
-
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct HostList {
@@ -73,8 +70,6 @@ pub struct HostSelect {
     #[deku(bytes = "16")]
     pub spec: InsimString,
 }
-
-into_packet_variant!(HostSelect, RelayHostSelect);
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]

@@ -1,4 +1,3 @@
-use crate::into_packet_variant;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -14,5 +13,3 @@ pub struct Small {
     #[deku(bytes = "4")]
     pub uval: u32,
 }
-
-into_packet_variant!(Small, Small);

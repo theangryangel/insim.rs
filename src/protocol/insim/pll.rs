@@ -1,4 +1,3 @@
-use crate::into_packet_variant;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -11,5 +10,3 @@ pub struct Pll {
     #[deku(bytes = "1")]
     plid: u8,
 }
-
-into_packet_variant!(Pll, Pll);

@@ -1,4 +1,3 @@
-use crate::into_packet_variant;
 use crate::string::InsimString;
 use deku::prelude::*;
 use serde::Serialize;
@@ -51,5 +50,3 @@ pub struct Npl {
     #[deku(bytes = "1", pad_bytes_after = "2")]
     nump: u8,
 }
-
-into_packet_variant!(Npl, Npl);

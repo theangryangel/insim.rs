@@ -35,7 +35,7 @@ impl insim::client::EventHandler for SelectBeginnerBmw {
     fn on_connect(&self, ctx: insim::client::Ctx) {
         ctx.send(
             insim::protocol::relay::HostSelect {
-                hname: "Nubbins AU Demo".into(),
+                hname: "^0[^7MR^0c] ^7Beginner ^0BMW".into(),
                 ..Default::default()
             }
             .into(),
@@ -43,6 +43,7 @@ impl insim::client::EventHandler for SelectBeginnerBmw {
     }
 
     fn on_raw(&self, ctx: insim::client::Ctx, data: &insim::protocol::Packet) {
+        tracing::info!("{:?} {:?}", data, data.name());
         let res = self.tx.send(data.clone());
         if let Err(e) = res {
             tracing::error!("{:?}", e);
@@ -107,6 +108,8 @@ async fn sse_handler(
     let rx = state.rx.clone();
     Sse::new(
         rx.into_stream()
-            .map(|packet| Event::default().json_data(packet)),
+            .map(|packet|
+                 Event::default().event(packet.name()).json_data(packet)
+            ),
     )
 }

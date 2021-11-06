@@ -1,4 +1,3 @@
-use crate::into_packet_variant;
 use crate::string::InsimString;
 use deku::prelude::*;
 use serde::Serialize;
@@ -48,5 +47,3 @@ pub struct Sta {
     #[deku(bytes = "1")]
     wind: u8,
 }
-
-into_packet_variant!(Sta, State);

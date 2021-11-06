@@ -1,4 +1,3 @@
-use crate::into_packet_variant;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -29,5 +28,3 @@ pub struct Lap {
     #[deku(bytes = "1", pad_bytes_after = "1")]
     numstops: u8,
 }
-
-into_packet_variant!(Lap, Lap);
