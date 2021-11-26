@@ -22,8 +22,8 @@ fn setup() {
 struct Party {}
 
 #[allow(unused)]
-impl insim::client::EventHandler for Party {
-    fn on_connect(&self, ctx: insim::client::Ctx) {
+impl insim::framework::EventHandler for Party {
+    fn on_connect(&self, ctx: insim::framework::Ctx) {
         info!("🎉🎉🎉🎉🎉🎉 we're connected!");
     }
 
@@ -38,8 +38,8 @@ struct Counter {
     i: AtomicUsize,
 }
 
-impl insim::client::EventHandler for Counter {
-    fn on_connect(&self, ctx: insim::client::Ctx) {
+impl insim::framework::EventHandler for Counter {
+    fn on_connect(&self, ctx: insim::framework::Ctx) {
         // on connection reset our AtomicUsize back to 0.
         self.i.store(0, Ordering::Relaxed);
 
@@ -47,7 +47,7 @@ impl insim::client::EventHandler for Counter {
 
         ctx.send(
             insim::protocol::relay::HostSelect {
-                hname: "^0[^7MR^0c] ^7Beginner ^0BMW".into(),
+                hname: "^1(^3FM^1) ^4Fox Friday".into(),
                 ..Default::default()
             }
             .into(),
@@ -55,15 +55,13 @@ impl insim::client::EventHandler for Counter {
     }
 
     #[allow(unused)]
-    fn on_raw(&self, ctx: insim::client::Ctx, data: &insim::protocol::Packet) {
+    fn on_raw(&self, ctx: insim::framework::Ctx, data: &insim::protocol::Packet) {
         self.i.fetch_add(1, Ordering::Relaxed);
 
-        /*
-        * Auto shutdown on 5th packet.
+        //* Auto shutdown on 5th packet.
         if self.i.load(Ordering::Relaxed) > 5 {
-        ctx.shutdown();
+            ctx.shutdown();
         }
-        */
         info!("got {:?} #={:?}", data, self.i);
     }
 }
@@ -72,7 +70,7 @@ impl insim::client::EventHandler for Counter {
 pub async fn main() {
     setup();
 
-    let client = insim::client::Config::default()
+    let client = insim::framework::Config::default()
         .relay()
         .using_event_handler(Counter {
             i: AtomicUsize::new(0),

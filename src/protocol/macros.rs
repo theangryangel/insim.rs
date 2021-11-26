@@ -37,4 +37,3 @@ macro_rules! generate_insim_packet {
         )+
     }
 }
-

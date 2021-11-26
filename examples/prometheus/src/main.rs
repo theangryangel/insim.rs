@@ -1,15 +1,18 @@
 use axum;
 use insim;
-use tracing::info;
-use tracing_subscriber;
-use std::net::SocketAddr;
 use lazy_static::lazy_static;
 use prometheus;
 use prometheus::Encoder;
+use std::net::SocketAddr;
+use tracing::info;
+use tracing_subscriber;
 
 lazy_static! {
-    static ref PACKET_COUNTER: prometheus::IntCounter =
-        prometheus::register_int_counter!("insim_packets", "Total number of Insim Packets received").unwrap();
+    static ref PACKET_COUNTER: prometheus::IntCounter = prometheus::register_int_counter!(
+        "insim_packets",
+        "Total number of Insim Packets received"
+    )
+    .unwrap();
 }
 
 fn setup() {
@@ -29,11 +32,11 @@ fn setup() {
 // TODO this is probably common enough that we should turn it into a library feature.
 // it should include error handling.
 struct SelectBeginnerBmw {}
-impl insim::client::EventHandler for SelectBeginnerBmw {
-    fn on_connect(&self, ctx: insim::client::Ctx) {
+impl insim::framework::EventHandler for SelectBeginnerBmw {
+    fn on_connect(&self, ctx: insim::framework::Ctx) {
         ctx.send(
             insim::protocol::relay::HostSelect {
-                hname: "^0[^7MR^0c] ^7Beginner ^0BMW".into(),
+                hname: "^1(^3FM^1) ^4Fox Friday".into(),
                 ..Default::default()
             }
             .into(),
@@ -42,9 +45,9 @@ impl insim::client::EventHandler for SelectBeginnerBmw {
 }
 
 struct PromHandler {}
-impl insim::client::EventHandler for PromHandler {
+impl insim::framework::EventHandler for PromHandler {
     #[allow(unused)]
-    fn on_raw(&self, ctx: insim::client::Ctx, data: &insim::protocol::Packet) {
+    fn on_raw(&self, ctx: insim::framework::Ctx, data: &insim::protocol::Packet) {
         PACKET_COUNTER.inc();
     }
 }
@@ -63,17 +66,14 @@ async fn axum_prom_route() -> String {
 pub async fn main() {
     setup();
 
-    let routes = axum::Router::new()
-        .route("/metrics", axum::handler::get(axum_prom_route));
+    let routes = axum::Router::new().route("/metrics", axum::handler::get(axum_prom_route));
 
-    let web = axum::Server::bind(
-        &SocketAddr::from(([0, 0, 0, 0], 3000))
-    );
+    let web = axum::Server::bind(&SocketAddr::from(([0, 0, 0, 0], 3000)));
 
-    let client = insim::client::Config::default()
+    let client = insim::framework::Config::default()
         .relay()
         .using_event_handler(PromHandler {})
-        .using_event_handler(SelectBeginnerBmw{})
+        .using_event_handler(SelectBeginnerBmw {})
         .build();
 
     // run until insim client or web server completes

@@ -1,13 +1,11 @@
 use deku::prelude::*;
+use serde::Serialize; // TODO make serde support an optional feature
 
-// TODO make serde support an optional feature
-use serde::Serialize;
-
-pub(crate) mod codec;
+pub mod codec;
 pub mod insim;
 mod macros;
 pub mod relay;
-pub(crate) mod stream;
+pub mod transport;
 
 use crate::generate_insim_packet;
 

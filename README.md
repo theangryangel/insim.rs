@@ -4,7 +4,8 @@
 
 ## Example
 
-- `cargo run --example relay`
+- High level "framework" api (WIP): `cargo run --example relay`
+- Low level "transport" api (WPI): `cargo run --example transport`
 
 ## TODO
 
