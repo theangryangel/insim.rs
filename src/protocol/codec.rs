@@ -71,7 +71,7 @@ impl InsimCodec {
             InsimCodecMode::DivFour => n * 4,
         };
 
-        if src.len() < n {
+        if (src.len() - self.length_bytes) < n {
             // We dont have a full packet yet
             return Ok(None);
         }
@@ -80,16 +80,6 @@ impl InsimCodec {
         src.advance(self.length_bytes);
 
         Ok(Some(n))
-    }
-
-    fn decode_data(&self, n: usize, src: &mut BytesMut) -> Option<BytesMut> {
-        // At this point, the buffer has already had the required capacity
-        // reserved. All there is to do is read.
-        if src.len() < n {
-            return None;
-        }
-
-        Some(src.split_to(n))
     }
 }
 
@@ -117,15 +107,7 @@ impl Decoder for InsimCodec {
             }
         };
 
-        let data = match self.decode_data(n, src) {
-            Some(data) => {
-                src.reserve(1);
-                data
-            }
-            None => {
-                return Ok(None);
-            }
-        };
+        let data = src.split_to(n);
 
         let res = Self::Item::try_from(data.as_ref());
 
@@ -133,10 +115,8 @@ impl Decoder for InsimCodec {
             Ok(packet) => Ok(Some(packet)),
             Err(DekuError::Incomplete(e)) => {
                 // If we're here, everything is going wonky.
-                // We could just discard the packet and move on, but thats probably a bad
-                // thing?
                 tracing::error!(
-                    "malformed packet! This is probably a programming error. Error: {:?}, Input: {:?}",
+                    "malformed packet! this is probably a programming error, error: {:?}, input: {:?}",
                     e,
                     data.to_vec(),
                 );
@@ -172,12 +152,15 @@ impl Encoder<Packet> for InsimCodec {
         // Adjust `n` with bounds checking
         let n = n.checked_add(self.length_bytes as usize);
 
-        let n = n.ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "provided length would overflow after adjustment",
-            )
-        })?;
+        let n = match n {
+            Some(n) => n,
+            None => {
+                return Err(Self::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "provided length would overflow after adjustment",
+                ));
+            }
+        };
 
         // Reserve capacity in the destination buffer to fit the frame and
         // length field (plus adjustment).
