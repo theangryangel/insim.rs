@@ -47,7 +47,7 @@ impl insim::framework::EventHandler for Counter {
 
         ctx.send(
             insim::protocol::relay::HostSelect {
-                hname: "^1(^3FM^1) ^4Fox Friday".into(),
+                hname: "^1V^7M^0.^7Mod Test".into(),
                 ..Default::default()
             }
             .into(),
@@ -58,11 +58,23 @@ impl insim::framework::EventHandler for Counter {
     fn on_raw(&self, ctx: insim::framework::Ctx, data: &insim::protocol::Packet) {
         self.i.fetch_add(1, Ordering::Relaxed);
 
-        //* Auto shutdown on 5th packet.
-        if self.i.load(Ordering::Relaxed) > 5 {
-            ctx.shutdown();
+        match data {
+            insim::protocol::Packet::RelayHostList(hostlist) => {
+                for i in hostlist.hinfo.iter() {
+                    if i.numconns > 1 {
+                        info!("{:?}", i);
+                    }
+                }
+            }
+            _ => {
+                info!("got {:?} #={:?}", data, self.i);
+            }
         }
-        info!("got {:?} #={:?}", data, self.i);
+
+        //* Auto shutdown on 5th packet.
+        // if self.i.load(Ordering::Relaxed) > 5 {
+        //     ctx.shutdown();
+        // }
     }
 }
 
