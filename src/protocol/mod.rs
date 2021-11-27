@@ -16,6 +16,7 @@ generate_insim_packet!(
     Tiny => insim::Tiny, "3",
     Small => insim::Small, "4",
     State => insim::Sta, "5",
+    Sch => insim::Sch, "6",
     MessageOut => insim::MessageOut, "11",
     Ncn => insim::Ncn, "18",
     Cnl => insim::Cnl, "19",
