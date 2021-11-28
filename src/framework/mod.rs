@@ -130,6 +130,8 @@ use crate::generate_event_handler;
 use crate::protocol::Packet;
 
 generate_event_handler!(
+    // TODO: Take Packet as a argument incase we support multiple packets at some point in the
+    // future
     #[allow(unused)]
     pub trait EventHandler for Client {
         Tiny(protocol::insim::Tiny) => on_tiny,
