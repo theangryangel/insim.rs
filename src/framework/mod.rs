@@ -1,37 +1,18 @@
 pub(crate) mod config;
-pub(crate) mod event_handler;
+pub(crate) mod macros;
 
 pub use config::Config;
-pub use event_handler::EventHandler;
 
 use super::{error, protocol};
 
 use futures::prelude::*;
+use std::sync::Arc;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tracing;
 
-// TODO: Remove this and replace it with something more idomatic and/or magic macro generating
-// stuff
-#[derive(Debug, Clone)]
-pub struct Ctx {
-    tx: mpsc::UnboundedSender<protocol::Packet>,
-    shutdown: mpsc::UnboundedSender<bool>,
-}
-
-#[allow(unused)]
-impl Ctx {
-    pub fn send(&self, data: protocol::Packet) {
-        self.tx.send(data);
-    }
-
-    pub fn shutdown(&self) {
-        self.shutdown.send(true);
-    }
-}
-
 pub struct Client {
-    config: config::Config,
+    config: Arc<config::Config>,
 
     shutdown: Option<mpsc::UnboundedSender<bool>>,
     tx: Option<mpsc::UnboundedSender<protocol::Packet>>,
@@ -40,9 +21,23 @@ pub struct Client {
 impl Client {
     pub fn from_config(config: config::Config) -> Self {
         Self {
-            config,
+            config: Arc::new(config),
             tx: None,
             shutdown: None,
+        }
+    }
+
+    #[allow(unused_must_use)] // if this fails then the we're probably going to die anyway
+    pub fn send(&self, data: protocol::Packet) {
+        if let Some(tx) = &self.tx {
+            tx.send(data);
+        }
+    }
+
+    #[allow(unused_must_use)] // if this fails then the we're probably going to die anyway
+    pub fn shutdown(&self) {
+        if let Some(shutdown) = &self.shutdown {
+            shutdown.send(true);
         }
     }
 
@@ -50,14 +45,14 @@ impl Client {
         let (shutdown_tx, mut shutdown_rx) = mpsc::unbounded_channel();
         let (send_tx, mut send_rx) = mpsc::unbounded_channel();
 
-        self.tx = Some(send_tx.clone());
-        self.shutdown = Some(shutdown_tx.clone());
+        self.tx = Some(send_tx);
+        self.shutdown = Some(shutdown_tx);
 
         for event_handler in self.config.event_handlers.iter() {
             event_handler.on_startup();
         }
 
-        let hname = self.config.host;
+        let hname = &self.config.host;
         let tcp: TcpStream = TcpStream::connect(hname).await.unwrap();
 
         // TODO handle connection error
@@ -80,13 +75,8 @@ impl Client {
 
         // TODO handle handshake errors
 
-        let ctx = Ctx {
-            tx: send_tx.clone(),
-            shutdown: shutdown_tx.clone(),
-        };
-
         for event_handler in self.config.event_handlers.iter() {
-            event_handler.on_connect(ctx.clone());
+            event_handler.on_connect(&self);
         }
 
         let mut ret: Result<(), error::Error> = Ok(());
@@ -109,11 +99,11 @@ impl Client {
 
                     match result {
                         Ok(frame) => {
-                            let ctx = Ctx{tx: send_tx.clone(), shutdown: shutdown_tx.clone()};
-
                             for event_handler in self.config.event_handlers.iter() {
-                                event_handler.on_raw(ctx.clone(), &frame);
+                                event_handler.on_raw(&self, &frame);
                             }
+
+                            self.on_packet(&frame);
                         },
                         Err(e) => {
                             ret = Err(e);
@@ -129,6 +119,20 @@ impl Client {
             event_handler.on_shutdown();
         }
 
+        self.tx = None;
+        self.shutdown = None;
+
         ret
     }
 }
+
+use crate::generate_event_handler;
+use crate::protocol::Packet;
+
+generate_event_handler!(
+    #[allow(unused)]
+    pub trait EventHandler for Client {
+        Tiny(protocol::insim::Tiny) => on_tiny,
+        MessageOut(protocol::insim::MessageOut) => on_mso,
+    }
+);

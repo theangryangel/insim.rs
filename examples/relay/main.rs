@@ -23,12 +23,16 @@ struct Party {}
 
 #[allow(unused)]
 impl insim::framework::EventHandler for Party {
-    fn on_connect(&self, ctx: insim::framework::Ctx) {
+    fn on_connect(&self, ctx: &insim::framework::Client) {
         info!("🎉🎉🎉🎉🎉🎉 we're connected!");
     }
 
-    fn on_disconnect(&self) {
+    fn on_disconnect(&self, client: &insim::framework::Client) {
         info!("💩💩💩💩💩💩 we've lost connection!");
+    }
+
+    fn on_tiny(&self, client: &insim::framework::Client, data: &insim::protocol::insim::Tiny) {
+        info!("✨✨✨✨✨✨ {:?}", data);
     }
 }
 
@@ -39,7 +43,7 @@ struct Counter {
 }
 
 impl insim::framework::EventHandler for Counter {
-    fn on_connect(&self, ctx: insim::framework::Ctx) {
+    fn on_connect(&self, ctx: &insim::framework::Client) {
         // on connection reset our AtomicUsize back to 0.
         self.i.store(0, Ordering::Relaxed);
 
@@ -55,7 +59,7 @@ impl insim::framework::EventHandler for Counter {
     }
 
     #[allow(unused)]
-    fn on_raw(&self, ctx: insim::framework::Ctx, data: &insim::protocol::Packet) {
+    fn on_raw(&self, ctx: &insim::framework::Client, data: &insim::protocol::Packet) {
         self.i.fetch_add(1, Ordering::Relaxed);
 
         match data {
