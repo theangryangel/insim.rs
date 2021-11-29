@@ -126,7 +126,7 @@ impl Decoder for InsimCodec {
                 ))
             }
             Err(DekuError::Parse(e)) => {
-                tracing::warn!("unsupported packet: {:?}", e);
+                tracing::error!("unsupported packet: {:?}: {:?}", e, data.to_vec());
                 Ok(None)
             }
             Err(e) => Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string())),

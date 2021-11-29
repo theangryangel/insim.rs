@@ -20,7 +20,7 @@ pub struct Npl {
     #[deku(bytes = "24")]
     pname: InsimString,
 
-    #[deku(bytes = "6")]
+    #[deku(bytes = "8")]
     plate: InsimString,
 
     #[deku(bytes = "4")]
@@ -29,7 +29,6 @@ pub struct Npl {
     #[deku(bytes = "16")]
     sname: InsimString,
 
-    #[deku(bytes = "4")]
     tyres: [u8; 4],
 
     #[deku(bytes = "1")]
@@ -41,12 +40,24 @@ pub struct Npl {
     #[deku(bytes = "1")]
     model: u8,
 
-    #[deku(bytes = "1", pad_bytes_after = "4")]
+    #[deku(bytes = "1")]
     pass: u8,
+
+    #[deku(bytes = "1")]
+    rwadj: u8,
+
+    #[deku(bytes = "1", pad_bytes_after = "2")]
+    fwadj: u8,
 
     #[deku(bytes = "1")]
     setf: u8,
 
-    #[deku(bytes = "1", pad_bytes_after = "2")]
+    #[deku(bytes = "1")]
     nump: u8,
+
+    #[deku(bytes = "1")]
+    config: u8,
+
+    #[deku(bytes = "1")]
+    fuel: u8,
 }

@@ -11,6 +11,6 @@ pub struct PlayerRenamed {
     #[deku(bytes = "24")]
     pname: InsimString,
 
-    #[deku(bytes = "6")]
+    #[deku(bytes = "8")]
     plate: InsimString,
 }
