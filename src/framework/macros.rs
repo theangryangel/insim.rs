@@ -1,15 +1,15 @@
 #[macro_export]
-macro_rules! generate_event_handler {
+macro_rules! event_handler {
     (
         $( #[$attr:meta] )*
-        $vis:vis trait $name:ident for $client:ty {
+        $vis:vis trait $name:ident for $client:ty, $enum:ident {
             $($variant:ident($inner:ty) => $fn:ident,)*
         }
     ) => {
         // emit the trait declaration
         $( #[$attr] )*
         $vis trait $name: Send + Sync {
-            fn on_raw(&self, client: &Client, data: &Packet) {}
+            fn on_raw(&self, client: &Client, data: &$enum) {}
 
             fn on_startup(&self) {}
             fn on_shutdown(&self) {}
@@ -24,10 +24,10 @@ macro_rules! generate_event_handler {
         }
 
         impl $client {
-            pub fn on_packet(&self, data: &Packet) {
+            pub fn on_packet(&self, data: &$enum) {
                 match data {
                     $(
-                        Packet::$variant(ref inner) => {
+                        $enum::$variant(ref inner) => {
                             for event_handler in self.config.event_handlers.iter() {
                                 event_handler.$fn(&self, inner);
                             }

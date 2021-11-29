@@ -7,6 +7,10 @@ edition = "2021"
 [lib]
 bench = false
 
+[features]
+default = ["framework"]
+framework = []
+
 [dependencies]
 futures = "0.3"
 futures-core = "0.3"
@@ -20,9 +24,7 @@ pin-project = "1"
 itertools = "0.10"
 encoding_rs = "0.8"
 tracing = "0.1"
-rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
-paste = "1"
 
 [dev-dependencies]
 # used in examples

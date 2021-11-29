@@ -1,0 +1,40 @@
+use deku::prelude::*;
+use serde::Serialize;
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[deku(endian = "little")]
+pub struct CarContact {
+    #[deku(bytes = "1")]
+    direction: u8,
+
+    #[deku(bytes = "1")]
+    heading: u8,
+
+    #[deku(bytes = "1")]
+    speed: u8,
+
+    #[deku(bytes = "1")]
+    z: u8,
+
+    #[deku(bytes = "2")]
+    x: i16,
+
+    #[deku(bytes = "2")]
+    y: i16,
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[deku(ctx = "_endian: deku::ctx::Endian")]
+pub struct Con {
+    #[deku(bytes = "1", pad_bytes_after = "1")]
+    reqi: u8,
+
+    #[deku(bytes = "2")]
+    close: u16,
+
+    #[deku(bytes = "2")]
+    time: u16,
+
+    a: CarContact,
+    b: CarContact,
+}

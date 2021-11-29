@@ -126,14 +126,12 @@ impl Client {
     }
 }
 
-use crate::generate_event_handler;
+use crate::event_handler;
 use crate::protocol::Packet;
 
-generate_event_handler!(
-    // TODO: Take Packet as a argument incase we support multiple packets at some point in the
-    // future
+event_handler!(
     #[allow(unused)]
-    pub trait EventHandler for Client {
+    pub trait EventHandler for Client, Packet {
         Tiny(protocol::insim::Tiny) => on_tiny,
         MessageOut(protocol::insim::MessageOut) => on_mso,
     }

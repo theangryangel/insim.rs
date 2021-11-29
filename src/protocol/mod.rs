@@ -4,34 +4,47 @@ use serde::Serialize; // TODO make serde support an optional feature
 pub mod codec;
 pub mod insim;
 mod macros;
+pub mod position;
 pub mod relay;
 pub mod transport;
 
-use crate::generate_insim_packet;
+use crate::packet;
 
-generate_insim_packet!(
+packet!(
     Packet,
-    Init => insim::Init, "1",
-    Version => insim::Version, "2",
-    Tiny => insim::Tiny, "3",
-    Small => insim::Small, "4",
-    State => insim::Sta, "5",
-    Sch => insim::Sch, "6",
-    MessageOut => insim::MessageOut, "11",
-    Ncn => insim::Ncn, "18",
-    Cnl => insim::Cnl, "19",
-    Npl => insim::Npl, "21",
-    Plp => insim::Plp, "22",
-    Pll => insim::Pll, "23",
-    Lap => insim::Lap, "24",
-    SplitX => insim::SplitX, "25",
-    Flg => insim::Flg, "32",
-    MultiCarInfo => insim::MultiCarInfo, "38",
+    "1" => Init(insim::Init),
+    "2" => Version(insim::Version),
+    "3" => Tiny(insim::Tiny),
+    "4" => Small(insim::Small),
+    "5" => State(insim::Sta),
+    "6" => Sch(insim::Sch),
+    "7" => Sfp(insim::Sfp),
+    "8" => Scc(insim::Scc),
+    "9" => Cpp(insim::Cpp),
+    "10" => Ism(insim::Ism),
+    "11" => MessageOut(insim::MessageOut),
+    "12" => Iii(insim::Iii),
+    "13" => Mst(insim::Mst),
+    "14" => Mtc(insim::Mtc),
+    "15" => ScreenMode(insim::ScreenMode),
+    "16" => VoteNotification(insim::VoteNotification),
+    "17" => RaceStart(insim::RaceStart),
+    "18" => Ncn(insim::Ncn),
+    "19" => Cnl(insim::Cnl),
+    "21" => Npl(insim::Npl),
+    "22" => Plp(insim::Plp),
+    "23" => Pll(insim::Pll),
+    "24" => Lap(insim::Lap),
+    "25" => SplitX(insim::SplitX),
+    "32" => Flg(insim::Flg),
+    "38" => MultiCarInfo(insim::MultiCarInfo),
+    "39" => Msx(insim::Msx),
+    "50" => Con(insim::Con),
 
-    RelayAdminRequest => relay::AdminRequest, "250",
-    RelayAdminResponse => relay::AdminResponse, "251",
-    RelayHostListRequest => relay::HostListRequest, "252",
-    RelayHostList => relay::HostList, "253",
-    RelayHostSelect => relay::HostSelect, "254",
-    RelayError => relay::Error, "255",
+    "250" => RelayAdminRequest(relay::AdminRequest),
+    "251" => RelayAdminResponse(relay::AdminResponse),
+    "252" => RelayHostListRequest(relay::HostListRequest),
+    "253" => RelayHostList(relay::HostList),
+    "254" => RelayHostSelect(relay::HostSelect),
+    "255" => RelayError(relay::Error),
 );

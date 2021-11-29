@@ -1,9 +1,9 @@
 #[macro_export]
-macro_rules! generate_insim_packet {
+macro_rules! packet {
     (
         $name: ident,
 
-        $($variant:ident => $inner:ty, $id:literal,)+
+        $($id:literal => $variant:ident($inner:ty),)+
     ) => {
 
         // Create the enum itself

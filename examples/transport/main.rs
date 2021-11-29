@@ -1,6 +1,4 @@
 extern crate insim;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use tracing::{error, info};
 use tracing_subscriber;
 
 use futures_util::SinkExt;
@@ -22,6 +20,7 @@ fn setup() {
 }
 
 #[tokio::main]
+#[allow(unused_must_use)]
 pub async fn main() {
     setup();
 
@@ -38,7 +37,7 @@ pub async fn main() {
         reqi: 1,
     };
 
-    let res = t.send(isi).await;
+    t.send(isi).await;
 
     t.send(insim::protocol::relay::HostSelect {
         hname: "^1(^3FM^1) ^4Fox Friday".into(),
@@ -47,6 +46,6 @@ pub async fn main() {
     .await;
 
     while let Some(m) = t.next().await {
-        tracing::info!("{:?}", m);
+        tracing::debug!("{:?}", m);
     }
 }
