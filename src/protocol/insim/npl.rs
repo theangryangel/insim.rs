@@ -12,6 +12,9 @@ pub struct Npl {
     plid: u8,
 
     #[deku(bytes = "1")]
+    ucid: u8,
+
+    #[deku(bytes = "1")]
     ptype: u8,
 
     #[deku(bytes = "2")]
@@ -29,7 +32,8 @@ pub struct Npl {
     #[deku(bytes = "16")]
     sname: InsimString,
 
-    tyres: [u8; 4],
+    #[deku(bytes = "1", count = "4")]
+    tyres: Vec<u8>,
 
     #[deku(bytes = "1")]
     h_mass: u8,

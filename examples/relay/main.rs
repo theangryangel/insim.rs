@@ -1,5 +1,8 @@
 extern crate insim;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{
+    io::Write,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 use tracing::{error, info};
 use tracing_subscriber;
 
@@ -34,6 +37,25 @@ impl insim::framework::EventHandler for Party {
     fn on_tiny(&self, client: &insim::framework::Client, data: &insim::protocol::insim::Tiny) {
         info!("✨✨✨✨✨✨ {:?}", data);
     }
+
+    fn on_npl(&self, client: &insim::framework::Client, data: &insim::protocol::insim::Npl) {
+        info!("{:?}", data);
+    }
+
+    fn on_mci(
+        &self,
+        client: &insim::framework::Client,
+        _data: &insim::protocol::insim::MultiCarInfo,
+    ) {
+    }
+
+    fn on_message(
+        &self,
+        client: &insim::framework::Client,
+        data: &insim::protocol::insim::MessageOut,
+    ) {
+        info!("{:?}", data.msg);
+    }
 }
 
 // Example handler usage that counts the number of packets received and resets on each
@@ -51,7 +73,7 @@ impl insim::framework::EventHandler for Counter {
 
         ctx.send(
             insim::protocol::relay::HostSelect {
-                hname: "Nubbins AU Demo".into(),
+                hname: "^1(^3FM^1) ^4GTi Thursday".into(),
                 ..Default::default()
             }
             .into(),
@@ -71,7 +93,7 @@ impl insim::framework::EventHandler for Counter {
                 }
             }
             _ => {
-                info!("got {:?} #={:?}", data, self.i);
+                //info!("got {:?} #={:?}", data, self.i);
             }
         }
 

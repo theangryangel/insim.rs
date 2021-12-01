@@ -133,6 +133,8 @@ event_handler!(
     #[allow(unused)]
     pub trait EventHandler for Client, Packet {
         Tiny(protocol::insim::Tiny) => on_tiny,
-        MessageOut(protocol::insim::MessageOut) => on_mso,
+        MessageOut(protocol::insim::MessageOut) => on_message,
+        Npl(protocol::insim::Npl) => on_npl,
+        MultiCarInfo(protocol::insim::MultiCarInfo) => on_mci,
     }
 );
