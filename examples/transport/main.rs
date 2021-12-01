@@ -26,7 +26,10 @@ pub async fn main() {
 
     let tcp: TcpStream = TcpStream::connect("isrelay.lfs.net:47474").await.unwrap();
 
-    let mut t = insim::protocol::transport::Transport::new(tcp);
+    let mut t = insim::protocol::transport::Transport::new(
+        tcp,
+        insim::protocol::codec::InsimCodecMode::Verbatim,
+    );
     let isi = insim::protocol::insim::Init {
         name: "insim.rs".into(),
         password: "".into(),

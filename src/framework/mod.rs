@@ -57,7 +57,7 @@ impl Client {
 
         // TODO handle connection error
 
-        let mut transport = protocol::transport::Transport::new(tcp);
+        let mut transport = protocol::transport::Transport::new(tcp, self.config.codec_mode);
         let isi = protocol::insim::Init {
             name: self.config.name.to_owned().into(),
             password: self.config.password.to_owned().into(),

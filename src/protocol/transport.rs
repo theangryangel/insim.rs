@@ -11,6 +11,8 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::time;
 use tokio_util::codec::Framed;
 
+use super::codec::InsimCodecMode;
+
 #[derive(Eq, PartialEq)]
 pub enum TransportState {
     Disconnected,
@@ -34,9 +36,9 @@ impl<T> Transport<T>
 where
     T: AsyncRead + AsyncWrite,
 {
-    pub fn new(inner: T) -> Transport<T> {
+    pub fn new(inner: T, codec_mode: InsimCodecMode) -> Transport<T> {
         Transport {
-            inner: Framed::new(inner, codec::InsimCodec::new()),
+            inner: Framed::new(inner, codec::InsimCodec::new(codec_mode)),
             ping_at: time::Instant::now(),
             state: TransportState::Connected,
         }

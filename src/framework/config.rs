@@ -1,3 +1,4 @@
+use super::protocol::codec::InsimCodecMode;
 use super::Client;
 use super::EventHandler;
 
@@ -11,6 +12,7 @@ pub struct Config {
     //pub(crate) reconnect: bool,
     //pub(crate) max_reconnect_attempts: u16,
     pub(crate) event_handlers: Vec<Box<dyn EventHandler>>,
+    pub(crate) codec_mode: InsimCodecMode,
 }
 
 impl Default for Config {
@@ -33,6 +35,7 @@ impl Config {
             //reconnect: true,
             //max_reconnect_attempts: 1,
             event_handlers: Vec::new(),
+            codec_mode: InsimCodecMode::Verbatim,
         }
     }
 
@@ -83,6 +86,11 @@ impl Config {
 
     pub fn using_event_handler<H: EventHandler + 'static>(mut self, event_handler: H) -> Self {
         self.event_handlers.push(Box::new(event_handler));
+        self
+    }
+
+    pub fn narrow_length_byte(mut self) -> Self {
+        self.codec_mode = InsimCodecMode::Narrow;
         self
     }
 

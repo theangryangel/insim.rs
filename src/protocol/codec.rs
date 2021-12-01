@@ -7,12 +7,13 @@ use tracing;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
+#[derive(Clone, Copy)]
 pub enum InsimCodecMode {
     // Insim <= 8 uses verbatim packet sizes
     Verbatim,
     // Insim >= 9 uses the size divided by 4
     // https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info
-    DivFour,
+    Narrow,
 }
 
 pub struct InsimCodec {
@@ -22,9 +23,9 @@ pub struct InsimCodec {
 }
 
 impl InsimCodec {
-    pub fn new() -> InsimCodec {
+    pub fn new(mode: InsimCodecMode) -> InsimCodec {
         InsimCodec {
-            mode: InsimCodecMode::Verbatim,
+            mode,
             max_bytes: 1_024 * 1_024,
             length_bytes: 1,
         }
@@ -68,7 +69,7 @@ impl InsimCodec {
 
         let n = match self.mode {
             InsimCodecMode::Verbatim => n,
-            InsimCodecMode::DivFour => n * 4,
+            InsimCodecMode::Narrow => n * 4,
         };
 
         if (src.len() - self.length_bytes) < n {
@@ -85,7 +86,7 @@ impl InsimCodec {
 
 impl Default for InsimCodec {
     fn default() -> Self {
-        Self::new()
+        Self::new(InsimCodecMode::Verbatim)
     }
 }
 
@@ -168,7 +169,7 @@ impl Encoder<Packet> for InsimCodec {
 
         let n = match self.mode {
             InsimCodecMode::Verbatim => n,
-            InsimCodecMode::DivFour => n / 4,
+            InsimCodecMode::Narrow => n / 4,
         };
 
         dst.put_uint_le(n as u64, self.length_bytes);
