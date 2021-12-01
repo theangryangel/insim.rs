@@ -52,7 +52,7 @@ packet!(
     "38" => MultiCarInfo(insim::MultiCarInfo),
     "39" => Msx(insim::Msx),
     "40" => Msl(insim::Msl),
-    "50" => Con(insim::Con),
+    "50" => Contact(insim::Contact),
 
     "250" => RelayAdminRequest(relay::AdminRequest),
     "251" => RelayAdminResponse(relay::AdminResponse),

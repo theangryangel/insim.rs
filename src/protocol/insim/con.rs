@@ -3,7 +3,7 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(endian = "little")]
-pub struct CarContact {
+pub struct ContactInfo {
     #[deku(bytes = "1")]
     plid: u8,
 
@@ -46,7 +46,7 @@ pub struct CarContact {
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
-pub struct Con {
+pub struct Contact {
     #[deku(bytes = "1", pad_bytes_after = "1")]
     reqi: u8,
 
@@ -56,6 +56,6 @@ pub struct Con {
     #[deku(bytes = "2")]
     time: u16,
 
-    a: CarContact,
-    b: CarContact,
+    a: ContactInfo,
+    b: ContactInfo,
 }

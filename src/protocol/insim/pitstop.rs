@@ -25,8 +25,8 @@ pub struct PitStopStart {
     #[deku(bytes = "1", pad_bytes_after = "1")]
     numstops: u8,
 
-    #[deku(bytes = "4")]
-    tyres: [u8; 4],
+    #[deku(bytes = "1", count = "4")]
+    tyres: Vec<u8>,
 
     #[deku(bytes = "4", pad_bytes_after = "1")]
     work: u32,

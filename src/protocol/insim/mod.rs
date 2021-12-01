@@ -42,7 +42,7 @@ pub const VERSION: u8 = 8;
 
 pub use camera_change::CameraChange;
 pub use cnl::Cnl;
-pub use con::Con;
+pub use con::Contact;
 pub use cpp::Cpp;
 pub use fin::Fin;
 pub use flg::Flg;

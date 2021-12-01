@@ -136,5 +136,6 @@ event_handler!(
         MessageOut(protocol::insim::MessageOut) => on_message,
         Npl(protocol::insim::Npl) => on_npl,
         MultiCarInfo(protocol::insim::MultiCarInfo) => on_mci,
+        Contact(protocol::insim::Contact) => on_contact,
     }
 );

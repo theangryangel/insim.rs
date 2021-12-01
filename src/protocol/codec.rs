@@ -8,7 +8,7 @@ use tracing;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 #[derive(Clone, Copy)]
-pub enum InsimCodecMode {
+pub enum Mode {
     // Insim <= 8 uses verbatim packet sizes
     Verbatim,
     // Insim >= 9 uses the size divided by 4
@@ -16,15 +16,15 @@ pub enum InsimCodecMode {
     Narrow,
 }
 
-pub struct InsimCodec {
-    mode: InsimCodecMode,
+pub struct Codec {
+    mode: Mode,
     max_bytes: usize,
     length_bytes: usize,
 }
 
-impl InsimCodec {
-    pub fn new(mode: InsimCodecMode) -> InsimCodec {
-        InsimCodec {
+impl Codec {
+    pub fn new(mode: Mode) -> Codec {
+        Codec {
             mode,
             max_bytes: 1_024 * 1_024,
             length_bytes: 1,
@@ -68,8 +68,8 @@ impl InsimCodec {
         };
 
         let n = match self.mode {
-            InsimCodecMode::Verbatim => n,
-            InsimCodecMode::Narrow => n * 4,
+            Mode::Verbatim => n,
+            Mode::Narrow => n * 4,
         };
 
         if (src.len() - self.length_bytes) < n {
@@ -84,13 +84,13 @@ impl InsimCodec {
     }
 }
 
-impl Default for InsimCodec {
+impl Default for Codec {
     fn default() -> Self {
-        Self::new(InsimCodecMode::Verbatim)
+        Self::new(Mode::Verbatim)
     }
 }
 
-impl Decoder for InsimCodec {
+impl Decoder for Codec {
     type Item = Packet;
 
     // TODO return custom error
@@ -135,7 +135,7 @@ impl Decoder for InsimCodec {
     }
 }
 
-impl Encoder<Packet> for InsimCodec {
+impl Encoder<Packet> for Codec {
     type Error = io::Error;
 
     fn encode(&mut self, msg: Packet, dst: &mut BytesMut) -> Result<(), io::Error> {
@@ -168,8 +168,8 @@ impl Encoder<Packet> for InsimCodec {
         dst.reserve(self.length_bytes + n);
 
         let n = match self.mode {
-            InsimCodecMode::Verbatim => n,
-            InsimCodecMode::Narrow => n / 4,
+            Mode::Verbatim => n,
+            Mode::Narrow => n / 4,
         };
 
         dst.put_uint_le(n as u64, self.length_bytes);
