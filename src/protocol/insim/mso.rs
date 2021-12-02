@@ -1,29 +1,27 @@
 use crate::string::InsimString;
+use deku::ctx::Size;
 use deku::prelude::*;
 use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
-/// New Connection
-pub struct Ncn {
-    #[deku(bytes = "1")]
+/// Message Out
+pub struct Mso {
+    #[deku(bytes = "1", pad_bytes_after = "1")]
     pub reqi: u8,
 
     #[deku(bytes = "1")]
     pub ucid: u8,
 
-    #[deku(bytes = "24")]
-    pub uname: InsimString,
-
-    #[deku(bytes = "24")]
-    pub pname: InsimString,
+    #[deku(bytes = "1")]
+    pub plid: u8,
 
     #[deku(bytes = "1")]
-    pub admin: u8,
+    pub usertype: u8,
 
     #[deku(bytes = "1")]
-    pub total: u8,
+    pub textstart: u8,
 
-    #[deku(bytes = "1", pad_bytes_after = "1")]
-    pub flags: u8,
+    #[deku(reader = "InsimString::read(deku::rest, Size::Bytes(deku::rest.len() / 8))")]
+    pub msg: InsimString,
 }

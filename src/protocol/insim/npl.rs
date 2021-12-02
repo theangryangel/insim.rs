@@ -1,67 +1,89 @@
+use crate::packet_flags;
 use crate::string::InsimString;
 use deku::prelude::*;
 use serde::Serialize;
 
+packet_flags! {
+    #[derive(Serialize)]
+    pub struct PlayerFlags: u16 {
+        SWAPSIDE => (1 << 0),
+        RESERVED_2 => (1 << 1),
+        RESERVED_4 => (1 << 2),
+        AUTOGEARS => (1 << 3),
+        SHIFTER => (1 << 4),
+        RESERVED_32 => (1 << 5),
+        HELP_B => (1 << 6),
+        AXIS_CLUTCH => (1 << 7),
+        INPITS => (1 << 8),
+        AUTOCLUTCH => (1 << 9),
+        MOUSE => (1 << 10),
+        KB_NO_HELP => (1 << 11),
+        KB_STABILISED => (1 << 12),
+        CUSTOM_VIEW => (1 << 13),
+    }
+}
+
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
+/// New Player
 pub struct Npl {
     #[deku(bytes = "1")]
-    reqi: u8,
+    pub reqi: u8,
 
     #[deku(bytes = "1")]
-    plid: u8,
+    pub plid: u8,
 
     #[deku(bytes = "1")]
-    ucid: u8,
+    pub ucid: u8,
 
     #[deku(bytes = "1")]
-    ptype: u8,
+    pub ptype: u8,
 
     #[deku(bytes = "2")]
-    flags: u16,
+    pub flags: PlayerFlags,
 
     #[deku(bytes = "24")]
-    pname: InsimString,
+    pub pname: InsimString,
 
     #[deku(bytes = "8")]
-    plate: InsimString,
+    pub plate: InsimString,
 
     #[deku(bytes = "4")]
-    cname: InsimString,
+    pub cname: InsimString,
 
     #[deku(bytes = "16")]
-    sname: InsimString,
+    pub sname: InsimString,
 
     #[deku(bytes = "1", count = "4")]
-    tyres: Vec<u8>,
+    pub tyres: Vec<u8>,
 
     #[deku(bytes = "1")]
-    h_mass: u8,
+    pub h_mass: u8,
 
     #[deku(bytes = "1")]
-    h_tres: u8,
+    pub h_tres: u8,
 
     #[deku(bytes = "1")]
-    model: u8,
+    pub model: u8,
 
     #[deku(bytes = "1")]
-    pass: u8,
+    pub pass: u8,
 
     #[deku(bytes = "1")]
-    rwadj: u8,
+    pub rwadj: u8,
 
     #[deku(bytes = "1", pad_bytes_after = "2")]
-    fwadj: u8,
+    pub fwadj: u8,
 
     #[deku(bytes = "1")]
-    setf: u8,
+    pub setf: u8,
 
     #[deku(bytes = "1")]
-    nump: u8,
+    pub nump: u8,
 
     #[deku(bytes = "1")]
-    config: u8,
+    pub config: u8,
 
     #[deku(bytes = "1")]
-    fuel: u8,
+    pub fuel: u8,
 }

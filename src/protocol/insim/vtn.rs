@@ -3,13 +3,14 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
-pub struct VoteNotification {
+/// Vote Notification
+pub struct Vtn {
     #[deku(bytes = "1", pad_bytes_after = "1")]
-    reqi: u8,
+    pub reqi: u8,
 
     #[deku(bytes = "1")]
-    ucid: u8,
+    pub ucid: u8,
 
     #[deku(bytes = "1", pad_bytes_after = "2")]
-    action: u8,
+    pub action: u8,
 }

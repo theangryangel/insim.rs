@@ -1,30 +1,32 @@
+use super::PlayerFlags;
 use deku::prelude::*;
 use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
+/// Lap Time
 pub struct Lap {
     #[deku(bytes = "1")]
-    reqi: u8,
+    pub reqi: u8,
 
     #[deku(bytes = "1")]
-    plid: u8,
+    pub plid: u8,
 
     #[deku(bytes = "4")]
-    ltime: u32, // lap time (ms)
+    pub ltime: u32, // lap time (ms)
 
     #[deku(bytes = "4")]
-    etime: u32,
+    pub etime: u32,
 
     #[deku(bytes = "2")]
-    lapsdone: u16,
+    pub lapsdone: u16,
 
     #[deku(bytes = "2", pad_bytes_after = "1")]
-    flags: u16,
+    pub flags: PlayerFlags,
 
     #[deku(bytes = "1")]
-    penalty: u8,
+    pub penalty: u8,
 
     #[deku(bytes = "1", pad_bytes_after = "1")]
-    numstops: u8,
+    pub numstops: u8,
 }

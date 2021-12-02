@@ -39,26 +39,24 @@ impl insim::framework::EventHandler for Party {
         info!("{:?}", data);
     }
 
-    fn on_mci(
-        &self,
-        client: &insim::framework::Client,
-        _data: &insim::protocol::insim::MultiCarInfo,
-    ) {
+    fn on_mci(&self, client: &insim::framework::Client, data: &insim::protocol::insim::Mci) {
+        for i in data.info.iter() {
+            info!(
+                "{:?} {:?}mph, {:?}kph, {:?}mps, {:?}raw",
+                i.plid,
+                i.mph(),
+                i.kmph(),
+                i.mps(),
+                i.speed
+            );
+        }
     }
 
-    fn on_message(
-        &self,
-        client: &insim::framework::Client,
-        data: &insim::protocol::insim::MessageOut,
-    ) {
+    fn on_message(&self, client: &insim::framework::Client, data: &insim::protocol::insim::Mso) {
         info!("{:?}", data.msg);
     }
 
-    fn on_contact(
-        &self,
-        client: &insim::framework::Client,
-        data: &insim::protocol::insim::Contact,
-    ) {
+    fn on_contact(&self, client: &insim::framework::Client, data: &insim::protocol::insim::Con) {
         info!("💣💣💣💣💣💣💣 bump! {:?}", data);
     }
 }
@@ -91,15 +89,21 @@ impl insim::framework::EventHandler for Counter {
 
         match data {
             insim::protocol::Packet::RelayHostList(hostlist) => {
+                //info!("{:?}", hostlist);
+
                 for i in hostlist.hinfo.iter() {
                     if i.numconns > 1 {
                         info!("{:?}", i);
                     }
+
+                    /*
+                    if i.flags.contains(insim::protocol::relay::HostInfoFlags::LAST) {
+                        ctx.shutdown();
+                    }
+                    */
                 }
             }
-            _ => {
-                info!("got {:?} #={:?}", data, self.i);
-            }
+            _ => {}
         }
 
         //* Auto shutdown on 5th packet.

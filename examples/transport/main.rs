@@ -34,14 +34,14 @@ pub async fn main() {
         prefix: b'!',
         version: insim::protocol::insim::VERSION,
         interval: 1000,
-        flags: 0,
+        flags: insim::protocol::insim::InitFlags::MCI,
         reqi: 1,
     };
 
     t.send(isi).await;
 
     t.send(insim::protocol::relay::HostSelect {
-        hname: "^1(^3FM^1) ^4Fox Friday".into(),
+        hname: "Nubbins AU Demo".into(),
         ..Default::default()
     })
     .await;

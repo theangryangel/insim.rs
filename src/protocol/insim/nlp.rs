@@ -5,27 +5,28 @@ use serde::Serialize;
 #[deku(endian = "little")]
 pub struct NodeLapInfo {
     #[deku(bytes = "2")]
-    node: u16,
+    pub node: u16,
 
     #[deku(bytes = "2")]
-    lap: u16,
+    pub lap: u16,
 
     #[deku(bytes = "1")]
-    plid: u8,
+    pub plid: u8,
 
     #[deku(bytes = "1")]
-    position: u8,
+    pub position: u8,
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
-pub struct NodeLap {
+/// Node and Lap packet - similar to Mci without positional information
+pub struct Nlp {
     #[deku(bytes = "1")]
-    reqi: u8,
+    pub reqi: u8,
 
     #[deku(bytes = "1")]
-    nump: u8,
+    pub nump: u8,
 
     #[deku(count = "nump")]
-    nodelap: Vec<NodeLapInfo>,
+    pub nodelap: Vec<NodeLapInfo>,
 }

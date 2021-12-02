@@ -5,6 +5,7 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
+/// InsIm Info -  a /i message from user to hosts Insim
 pub struct Iii {
     #[deku(bytes = "1", pad_bytes_after = "1")]
     pub reqi: u8,

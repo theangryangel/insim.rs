@@ -4,13 +4,14 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
-pub struct PlayerRenamed {
+/// Connection Player Renamed
+pub struct Cpr {
     #[deku(bytes = "1")]
-    reqi: u8,
+    pub reqi: u8,
 
     #[deku(bytes = "24")]
-    pname: InsimString,
+    pub pname: InsimString,
 
     #[deku(bytes = "8")]
-    plate: InsimString,
+    pub plate: InsimString,
 }

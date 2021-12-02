@@ -5,33 +5,34 @@ use crate::protocol::position::FixedPoint;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
+/// Camera Position Pack
 pub struct Cpp {
     #[deku(bytes = "1", pad_bytes_after = "1")]
-    reqi: u8,
+    pub reqi: u8,
 
-    pos: FixedPoint,
-
-    #[deku(bytes = "2")]
-    h: u16,
+    pub pos: FixedPoint,
 
     #[deku(bytes = "2")]
-    p: u16,
+    pub h: u16,
 
     #[deku(bytes = "2")]
-    r: u16,
+    pub p: u16,
+
+    #[deku(bytes = "2")]
+    pub r: u16,
 
     #[deku(bytes = "1")]
-    viewplid: u8,
+    pub viewplid: u8,
 
     #[deku(bytes = "1")]
-    ingamecam: u8,
+    pub ingamecam: u8,
 
     #[deku(bytes = "4")]
-    fov: f32,
+    pub fov: f32,
 
     #[deku(bytes = "2")]
-    time: u16,
+    pub time: u16,
 
     #[deku(bytes = "2")]
-    flags: u16,
+    pub flags: u16,
 }

@@ -5,6 +5,7 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
+/// Message to Connection - Send a message to a specific connection, restricted to hosts only
 pub struct Mtc {
     #[deku(bytes = "1")]
     pub reqi: u8,

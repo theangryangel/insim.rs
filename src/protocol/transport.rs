@@ -76,7 +76,10 @@ where
         match self.as_mut().project().inner.poll_next(cx) {
             #[allow(unused)]
             Poll::Ready(Some(Ok(frame))) => match frame {
-                Packet::Tiny(insim::Tiny { reqi: 0, .. }) => {
+                Packet::Tiny(insim::Tiny {
+                    reqi: 0,
+                    subtype: insim::TinyType::None,
+                }) => {
                     tracing::debug!("ping? pong!");
                     *self.as_mut().project().ping_at = time::Instant::now();
 
@@ -88,7 +91,7 @@ where
                         .inner
                         .start_send(Packet::from(insim::Tiny {
                             reqi: 0,
-                            subtype: 0,
+                            subtype: insim::TinyType::None,
                         }));
                     self.as_mut().project().inner.poll_flush(cx);
 

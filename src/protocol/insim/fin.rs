@@ -1,31 +1,32 @@
+use super::PlayerFlags;
 use deku::prelude::*;
 use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
+/// Finish
 pub struct Fin {
     #[deku(bytes = "1")]
-    reqi: u8,
+    pub reqi: u8,
 
     #[deku(bytes = "1")]
-    plid: u8,
+    pub plid: u8,
 
     #[deku(bytes = "4")]
-    ttime: u32,
+    pub ttime: u32,
 
     #[deku(bytes = "4", pad_bytes_after = "1")]
-    btime: u32,
+    pub btime: u32,
 
     #[deku(bytes = "1")]
-    numstops: u8,
+    pub numstops: u8,
 
     #[deku(bytes = "1", pad_bytes_after = "1")]
-    confirm: u8,
+    pub confirm: u8,
 
     #[deku(bytes = "2")]
-    lapsdone: u16,
+    pub lapsdone: u16,
 
     #[deku(bytes = "2")]
-    flags: u16,
-    // unsigned * 2
+    pub flags: PlayerFlags,
 }

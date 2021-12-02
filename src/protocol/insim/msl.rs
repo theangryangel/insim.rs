@@ -4,6 +4,7 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
+/// Message Local
 pub struct Msl {
     #[deku(bytes = "1")]
     pub reqi: u8,

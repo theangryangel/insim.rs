@@ -9,7 +9,7 @@ impl DekuWrite<(Endian, Size)> for InsimString {
         output: &mut BitVec<Msb0, u8>,
         (_endian, bit_size): (Endian, Size),
     ) -> Result<(), DekuError> {
-        // TODO we probably should pay attention to the endian here at some point
+        // FIXME: implement endian handling
         let value = self.into_insim(bit_size.byte_size().unwrap());
         value.write(output, ())
     }
@@ -33,14 +33,9 @@ impl DekuRead<'_, Size> for InsimString {
         input: &BitSlice<Msb0, u8>,
         size: Size,
     ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
-        // TODO tidy up error handling
         let (rest, value) = Vec::read(input, Limit::new_size(size))?;
 
-        Ok((
-            rest,
-            //String::from_lfs(value).map_err(|e| DekuError::Parse(e.to_string()))?,
-            InsimString::from_insim(value),
-        ))
+        Ok((rest, InsimString::from_insim(value)))
     }
 }
 
@@ -49,14 +44,9 @@ impl DekuRead<'_, (Endian, Size)> for InsimString {
         input: &BitSlice<Msb0, u8>,
         (_endian, size): (Endian, Size),
     ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
-        // TODO we probably should pay attention to the endian here at some point
-        // TODO implement error handling in from_insim
+        // FIXME: implement endian handling
         let (rest, value) = Vec::read(input, Limit::new_size(size))?;
 
-        Ok((
-            rest,
-            //String::from_lfs(value).map_err(|e| DekuError::Parse(e.to_string()))?,
-            InsimString::from_insim(value),
-        ))
+        Ok((rest, InsimString::from_insim(value)))
     }
 }

@@ -14,6 +14,7 @@ pub struct InsimString {
     inner: String,
 }
 
+// FIXME: See https://github.com/theangryangel/insim.rs/issues/6
 impl InsimString {
     pub const fn new() -> InsimString {
         InsimString {
@@ -22,10 +23,12 @@ impl InsimString {
     }
 
     pub fn drop_colours() -> InsimString {
+        // FIXME
         unimplemented!()
     }
 
     pub fn ascii_colours() -> InsimString {
+        // FIXME
         unimplemented!()
     }
 
@@ -99,7 +102,7 @@ impl InsimString {
         for pair in indices.windows(2) {
             let range = &input[pair[0]..pair[1]];
 
-            // TODO: unescape
+            // FIXME: unescape
 
             if range.len() < 2 {
                 result.push_str(&String::from_utf8(range.to_vec()).unwrap());

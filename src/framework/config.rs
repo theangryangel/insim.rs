@@ -1,4 +1,5 @@
 use super::protocol::codec::Mode;
+use super::protocol::insim::InitFlags;
 use super::Client;
 use super::EventHandler;
 
@@ -6,7 +7,7 @@ pub struct Config {
     pub(crate) name: String,
     pub(crate) host: String,
     pub(crate) password: String,
-    pub(crate) flags: u16,
+    pub(crate) flags: InitFlags,
     pub(crate) prefix: u8,
     pub(crate) interval_ms: u16,
     //pub(crate) reconnect: bool,
@@ -28,7 +29,7 @@ impl Config {
             name: "insim.rs".into(),
             host: "127.0.0.1:29999".into(),
             password: "".into(),
-            flags: (1 << 5), // TODO make a builder
+            flags: InitFlags::MCI | InitFlags::CON | InitFlags::OBH,
             prefix: 0,
             interval_ms: 1000,
             // TODO: Readd support for reconnection attempts
@@ -58,13 +59,13 @@ impl Config {
         self
     }
 
-    pub fn set_flags(mut self, flags: u16) -> Self {
-        self.flags = flags;
+    pub fn set_flag(mut self, flag: InitFlags) -> Self {
+        self.flags |= flag;
         self
     }
 
     pub fn clear_flags(mut self) -> Self {
-        self.flags = 0;
+        self.flags.clear();
         self
     }
 

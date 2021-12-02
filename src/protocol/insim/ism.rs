@@ -4,6 +4,7 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
+/// Insim Multiplayer - LFS sends this when a host is started or joined
 pub struct Ism {
     #[deku(bytes = "1", pad_bytes_after = "1")]
     pub reqi: u8,

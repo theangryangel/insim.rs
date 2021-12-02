@@ -3,25 +3,26 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
-pub struct SplitX {
+/// Split timing
+pub struct Spx {
     #[deku(bytes = "1")]
-    reqi: u8,
+    pub reqi: u8,
 
     #[deku(bytes = "1")]
-    plid: u8,
+    pub plid: u8,
 
     #[deku(bytes = "4")]
-    stime: u32,
+    pub stime: u32,
 
     #[deku(bytes = "4")]
-    etime: u32,
+    pub etime: u32,
 
     #[deku(bytes = "1")]
-    split: u8,
+    pub split: u8,
 
     #[deku(bytes = "1")]
-    penalty: u8,
+    pub penalty: u8,
 
     #[deku(bytes = "1", pad_bytes_after = "1")]
-    numstops: u8,
+    pub numstops: u8,
 }

@@ -3,16 +3,14 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
-pub struct TakeOverCar {
+/// Reorder
+pub struct Reo {
     #[deku(bytes = "1")]
-    reqi: u8,
+    pub reqi: u8,
 
     #[deku(bytes = "1")]
-    plid: u8,
+    pub nump: u8,
 
-    #[deku(bytes = "1")]
-    olducid: u8,
-
-    #[deku(bytes = "1", pad_bytes_after = "2")]
-    newucid: u8,
+    #[deku(bytes = "1", count = "40")]
+    pub plid: Vec<u8>,
 }

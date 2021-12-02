@@ -1,3 +1,4 @@
+pub mod conversion;
 pub mod error;
 pub mod protocol;
 pub mod string;

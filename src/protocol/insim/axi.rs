@@ -4,11 +4,15 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
-/// Message Extended (like MST, but longer)
-pub struct Msx {
-    #[deku(bytes = "1", pad_bytes_after = "1")]
+/// Auto X Info
+pub struct Axi {
+    #[deku(pad_bytes_after = "1")]
     pub reqi: u8,
 
-    #[deku(bytes = "96")]
-    pub msg: InsimString,
+    pub axstart: u8,
+    pub numcp: u8,
+    pub numo: u16,
+
+    #[deku(bytes = "32")]
+    pub lname: InsimString,
 }
