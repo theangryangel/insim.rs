@@ -53,7 +53,7 @@ impl insim::framework::EventHandler for Party {
     }
 
     fn on_message(&self, client: &insim::framework::Client, data: &insim::protocol::insim::Mso) {
-        info!("{:?}", data.msg);
+        info!("{:?}", data.msg.to_string());
     }
 
     fn on_contact(&self, client: &insim::framework::Client, data: &insim::protocol::insim::Con) {
@@ -76,7 +76,7 @@ impl insim::framework::EventHandler for Counter {
 
         ctx.send(
             insim::protocol::relay::HostSelect {
-                hname: "Nubbins AU Demo".into(),
+                hname: "^1(^3FM^1) ^4Fox Friday".into(),
                 ..Default::default()
             }
             .into(),
@@ -93,7 +93,7 @@ impl insim::framework::EventHandler for Counter {
 
                 for i in hostlist.hinfo.iter() {
                     if i.numconns > 1 {
-                        info!("{:?}", i);
+                        info!("{:?}={:?}", i.hname.to_string(), i.numconns);
                     }
 
                     /*
@@ -103,7 +103,9 @@ impl insim::framework::EventHandler for Counter {
                     */
                 }
             }
-            _ => {}
+            d => {
+                info!("{:?}", d);
+            }
         }
 
         //* Auto shutdown on 5th packet.

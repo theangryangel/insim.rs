@@ -1,6 +1,5 @@
-use core::fmt;
-
 use super::InsimString;
+use std::fmt;
 
 impl Clone for InsimString {
     fn clone(&self) -> Self {
@@ -11,20 +10,6 @@ impl Clone for InsimString {
 
     fn clone_from(&mut self, source: &Self) {
         self.inner.clone_from(&source.inner);
-    }
-}
-
-impl fmt::Display for InsimString {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.inner)
-    }
-}
-
-impl fmt::Debug for InsimString {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.inner)
     }
 }
 
@@ -42,4 +27,8 @@ impl From<&str> for InsimString {
     }
 }
 
-// TODO add From InsimString into String, etc.
+impl fmt::Display for InsimString {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.to_lossy_string())
+    }
+}

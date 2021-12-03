@@ -7,6 +7,6 @@ impl Serialize for InsimString {
     where
         S: Serializer,
     {
-        serializer.serialize_str(&self.inner)
+        serializer.serialize_str(&self.to_string())
     }
 }

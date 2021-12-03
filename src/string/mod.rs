@@ -9,27 +9,14 @@ mod impl_std;
 const CODEPAGES: &[u8] = &[b'L', b'G', b'J', b'E', b'T', b'B', b'H', b'S', b'K'];
 const CODEPAGE_MARKER: u8 = b'^';
 
-#[derive(PartialEq, Default)]
+#[derive(PartialEq, Default, Debug)]
 pub struct InsimString {
-    inner: String,
+    inner: Vec<u8>,
 }
 
-// FIXME: See https://github.com/theangryangel/insim.rs/issues/6
 impl InsimString {
     pub const fn new() -> InsimString {
-        InsimString {
-            inner: String::new(),
-        }
-    }
-
-    pub fn drop_colours() -> InsimString {
-        // FIXME
-        unimplemented!()
-    }
-
-    pub fn ascii_colours() -> InsimString {
-        // FIXME
-        unimplemented!()
+        InsimString { inner: Vec::new() }
     }
 
     pub fn len(&self) -> usize {
@@ -37,47 +24,53 @@ impl InsimString {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.inner.len() == 0
+        self.inner.is_empty()
     }
 
+    /// Clear the inner vec
     pub fn clear(&mut self) {
         self.inner.clear()
     }
 
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.inner.into_bytes()
-    }
-
-    pub fn from_string(value: String) -> InsimString {
-        InsimString { inner: value }
-    }
-
-    pub fn into_insim(&self, size: usize) -> Vec<u8> {
-        // TODO we can do this without allocating a buffer, etc.
-        // TODO we need to be able to convert from utf-8 back to LFS' format
-        let mut buf = self.inner.as_bytes().to_vec();
-        if buf.len() < size {
-            buf.reserve(size - buf.len());
-            for _i in 0..(size - buf.len()) {
-                buf.push(0);
-            }
-        }
-        buf[0..size].to_vec()
-    }
-
-    pub fn from_insim(value: Vec<u8>) -> InsimString {
-        // TODO Split this up
-
+    /// Strip any trailing \0 characters from the inner vec.
+    pub fn strip_trailing_nul(&mut self) {
         // remove trailing \0
-        let input = if let Some(rpos) = value.iter().rposition(|x| *x != 0) {
+        let value = &self.inner;
+
+        self.inner = if let Some(rpos) = value.iter().rposition(|x| *x != 0) {
             &value[..=rpos]
         } else {
             &value
-        };
+        }
+        .to_vec();
+    }
+
+    pub fn from_bytes(input: Vec<u8>) -> Self {
+        let mut s = InsimString { inner: input };
+        s.strip_trailing_nul();
+        s
+    }
+
+    pub fn into_bytes(&self) -> &Vec<u8> {
+        &self.inner
+    }
+
+    /// Convert from a String using the default LFS encoding ("Latin1")
+    pub fn from_string(value: String) -> InsimString {
+        let (output, _encoding, _had_errors) = encoding_rs::WINDOWS_1252.encode(&value);
+        InsimString {
+            inner: output.to_vec(),
+        }
+    }
+
+    /// Convert a InsimString into a native rust String, with potential lossy conversion from codepages
+    pub fn to_lossy_string(&self) -> String {
+        // TODO Split this up
+        let input = &self.inner;
 
         // empty string
         if input.is_empty() {
-            return InsimString::new();
+            return "".to_string();
         }
 
         // find the positions in the input for each ^L, ^B...
@@ -109,7 +102,6 @@ impl InsimString {
                 continue;
             }
 
-            // TODO: Turn this into a static/lazy hashmap lookup or something
             let decoded = match range[0..2] {
                 [b'^', b'G'] => {
                     let (cow, _encoding_used, _had_errors) =
@@ -167,7 +159,6 @@ impl InsimString {
                     let (cow, _encoding, _had_errors) =
                         encoding_rs::WINDOWS_1252.decode(&range[2..]);
                     cow.to_string()
-                    //String::from_utf8(range[2..].to_vec()).unwrap()
                 }
 
                 // Latin fallback, no prefix
@@ -182,6 +173,86 @@ impl InsimString {
 
         // TODO: We should implement some error handling in here
 
-        InsimString { inner: result }
+        result
+    }
+
+    /// Builder function to convert a rust native string into Latin1 and push onto inner, prefixed with formatting commands.
+    pub fn l(mut self, value: String) -> Self {
+        self.inner.extend_from_slice(&[b'^', b'L']);
+        let (output, _encoding, _had_errors) = encoding_rs::WINDOWS_1252.encode(&value);
+        self.inner.extend_from_slice(&output);
+        self
+    }
+
+    /// Builder function to convert a rust native string into Greek and push onto inner, prefixed with formatting commands.
+    pub fn g(mut self, value: String) -> Self {
+        self.inner.extend_from_slice(&[b'^', b'G']);
+        let (output, _encoding, _had_errors) = encoding_rs::ISO_8859_7.encode(&value);
+        self.inner.extend_from_slice(&output);
+        self
+    }
+
+    /// Builder function to convert a rust native string into Cyrillic and push onto inner, prefixed with formatting commands.
+    pub fn c(mut self, value: String) -> Self {
+        self.inner.extend_from_slice(&[b'^', b'C']);
+        let (output, _encoding, _had_errors) = encoding_rs::ISO_8859_5.encode(&value);
+        self.inner.extend_from_slice(&output);
+        self
+    }
+
+    /// Builder function to convert a rust native string into SHIFT_JIS and push onto inner, prefixed with formatting commands.
+    pub fn j(mut self, value: String) -> Self {
+        self.inner.extend_from_slice(&[b'^', b'J']);
+        let (output, _encoding, _had_errors) = encoding_rs::SHIFT_JIS.encode(&value);
+        self.inner.extend_from_slice(&output);
+        self
+    }
+
+    /// Builder function to convert a rust native string into ISO_8859_2 and push onto inner, prefixed with formatting commands
+    pub fn e(mut self, value: String) -> Self {
+        self.inner.extend_from_slice(&[b'^', b'E']);
+        let (output, _encoding, _had_errors) = encoding_rs::ISO_8859_2.encode(&value);
+        self.inner.extend_from_slice(&output);
+        self
+    }
+
+    /// Builder function to convert a rust native string into WINDOWS_1254 and push onto inner, prefixed with formatting commands
+    pub fn t(mut self, value: String) -> Self {
+        self.inner.extend_from_slice(&[b'^', b'T']);
+        let (output, _encoding, _had_errors) = encoding_rs::WINDOWS_1254.encode(&value);
+        self.inner.extend_from_slice(&output);
+        self
+    }
+
+    /// Builder function to convert a rust native string into ISO_8859_4 and push onto inner, prefixed with formatting commands
+    pub fn b(mut self, value: String) -> Self {
+        self.inner.extend_from_slice(&[b'^', b'B']);
+        let (output, _encoding, _had_errors) = encoding_rs::ISO_8859_4.encode(&value);
+        self.inner.extend_from_slice(&output);
+        self
+    }
+
+    /// Builder function to convert a rust native string into BIG5 and push onto inner, prefixed with formatting commands
+    pub fn h(mut self, value: String) -> Self {
+        self.inner.extend_from_slice(&[b'^', b'H']);
+        let (output, _encoding, _had_errors) = encoding_rs::BIG5.encode(&value);
+        self.inner.extend_from_slice(&output);
+        self
+    }
+
+    /// Builder function to convert a rust native string into GBK and push onto inner, prefixed with formatting commands
+    pub fn s(mut self, value: String) -> Self {
+        self.inner.extend_from_slice(&[b'^', b'S']);
+        let (output, _encoding, _had_errors) = encoding_rs::GBK.encode(&value);
+        self.inner.extend_from_slice(&output);
+        self
+    }
+
+    /// Builder function to convert a rust native into ISO_8859_7 and push onto inner, prefixed with formatting commands
+    pub fn k(mut self, value: String) -> Self {
+        self.inner.extend_from_slice(&[b'^', b'K']);
+        let (output, _encoding, _had_errors) = encoding_rs::ISO_8859_7.encode(&value);
+        self.inner.extend_from_slice(&output);
+        self
     }
 }
