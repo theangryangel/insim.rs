@@ -1,4 +1,4 @@
-use crate::string::InsimString;
+use crate::string::IString;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -28,5 +28,5 @@ pub struct Ssh {
     pub error: u8,
 
     #[deku(bytes = "32")]
-    pub lname: InsimString,
+    pub lname: IString,
 }

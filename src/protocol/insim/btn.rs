@@ -1,4 +1,4 @@
-use crate::string::InsimString;
+use crate::string::IString;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -47,7 +47,7 @@ pub struct Btn {
     pub height: u8,
 
     #[deku(bytes = "240")]
-    pub text: InsimString, // FIXME: this should be upto 240 characters and always a multiple of 4
+    pub text: IString, // FIXME: this should be upto 240 characters and always a multiple of 4
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
@@ -75,5 +75,5 @@ pub struct Btt {
     pub typein: u8,
 
     #[deku(bytes = "96")]
-    pub text: InsimString,
+    pub text: IString,
 }

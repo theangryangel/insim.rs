@@ -1,4 +1,4 @@
-use crate::string::InsimString;
+use crate::string::IString;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -10,8 +10,8 @@ pub struct Cpr {
     pub reqi: u8,
 
     #[deku(bytes = "24")]
-    pub pname: InsimString,
+    pub pname: IString,
 
     #[deku(bytes = "8")]
-    pub plate: InsimString,
+    pub plate: IString,
 }

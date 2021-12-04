@@ -1,4 +1,4 @@
-use crate::string::InsimString;
+use crate::string::IString;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -13,10 +13,10 @@ pub struct Ncn {
     pub ucid: u8,
 
     #[deku(bytes = "24")]
-    pub uname: InsimString,
+    pub uname: IString,
 
     #[deku(bytes = "24")]
-    pub pname: InsimString,
+    pub pname: IString,
 
     #[deku(bytes = "1")]
     pub admin: u8,

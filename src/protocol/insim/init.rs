@@ -1,5 +1,5 @@
 use crate::packet_flags;
-use crate::string::InsimString;
+use crate::string::IString;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -44,8 +44,8 @@ pub struct Init {
     pub interval: u16,
 
     #[deku(bytes = "16")]
-    pub password: InsimString,
+    pub password: IString,
 
     #[deku(bytes = "16")]
-    pub name: InsimString,
+    pub name: IString,
 }

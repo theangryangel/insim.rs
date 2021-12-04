@@ -1,5 +1,5 @@
 use crate::packet_flags;
-use crate::string::InsimString;
+use crate::string::IString;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -43,16 +43,16 @@ pub struct Npl {
     pub flags: PlayerFlags,
 
     #[deku(bytes = "24")]
-    pub pname: InsimString,
+    pub pname: IString,
 
     #[deku(bytes = "8")]
-    pub plate: InsimString,
+    pub plate: IString,
 
     #[deku(bytes = "4")]
-    pub cname: InsimString,
+    pub cname: IString,
 
     #[deku(bytes = "16")]
-    pub sname: InsimString,
+    pub sname: IString,
 
     #[deku(bytes = "1", count = "4")]
     pub tyres: Vec<u8>,

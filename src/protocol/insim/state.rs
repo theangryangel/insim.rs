@@ -1,4 +1,4 @@
-use crate::string::InsimString;
+use crate::string::IString;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -40,7 +40,7 @@ pub struct Sta {
     pub racelaps: u8,
 
     #[deku(bytes = "6")]
-    pub track: InsimString,
+    pub track: IString,
 
     #[deku(bytes = "1")]
     pub weather: u8,

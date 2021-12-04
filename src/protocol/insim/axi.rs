@@ -1,4 +1,4 @@
-use crate::string::InsimString;
+use crate::string::IString;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -14,5 +14,5 @@ pub struct Axi {
     pub numo: u16,
 
     #[deku(bytes = "32")]
-    pub lname: InsimString,
+    pub lname: IString,
 }

@@ -1,4 +1,4 @@
-use crate::string::InsimString;
+use crate::string::IString;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -58,5 +58,5 @@ pub struct Rip {
     pub ttime: u32,
 
     #[deku(bytes = "64")]
-    pub rname: InsimString,
+    pub rname: IString,
 }

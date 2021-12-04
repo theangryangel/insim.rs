@@ -1,5 +1,5 @@
 use super::PlayerFlags;
-use crate::string::InsimString;
+use crate::string::IString;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -14,16 +14,16 @@ pub struct Res {
     pub plid: u8,
 
     #[deku(bytes = "24")]
-    pub uname: InsimString,
+    pub uname: IString,
 
     #[deku(bytes = "24")]
-    pub pname: InsimString,
+    pub pname: IString,
 
     #[deku(bytes = "8")]
-    pub plate: InsimString,
+    pub plate: IString,
 
     #[deku(bytes = "4")]
-    pub cname: InsimString,
+    pub cname: IString,
 
     #[deku(bytes = "4")]
     pub ttime: u32,

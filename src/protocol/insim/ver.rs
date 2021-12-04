@@ -1,4 +1,4 @@
-use crate::string::InsimString;
+use crate::string::IString;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -10,10 +10,10 @@ pub struct Version {
     pub reqi: u8,
 
     #[deku(bytes = "8")]
-    pub version: InsimString,
+    pub version: IString,
 
     #[deku(bytes = "6")]
-    pub product: InsimString,
+    pub product: IString,
 
     #[deku(bytes = "1", pad_bytes_after = "1")]
     pub insimver: u8,

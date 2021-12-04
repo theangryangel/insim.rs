@@ -9,14 +9,33 @@ mod impl_std;
 const CODEPAGES: &[u8] = &[b'L', b'G', b'J', b'E', b'T', b'B', b'H', b'S', b'K'];
 const CODEPAGE_MARKER: u8 = b'^';
 
+/// Strip any trailing \0 characters
+pub fn strip_trailing_nul(input: &[u8]) -> &[u8] {
+    if let Some(rpos) = input.iter().rposition(|x| *x != 0) {
+        &input[..=rpos]
+    } else {
+        input
+    }
+}
+
+pub fn unescape(_input: &[u8]) -> &[u8] {
+    unimplemented!()
+}
+
 #[derive(PartialEq, Default, Debug)]
-pub struct InsimString {
+pub struct IString {
     inner: Vec<u8>,
 }
 
-impl InsimString {
-    pub const fn new() -> InsimString {
-        InsimString { inner: Vec::new() }
+impl IString {
+    pub const fn new() -> Self {
+        Self { inner: Vec::new() }
+    }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            inner: Vec::with_capacity(capacity),
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -32,33 +51,21 @@ impl InsimString {
         self.inner.clear()
     }
 
-    /// Strip any trailing \0 characters from the inner vec.
-    pub fn strip_trailing_nul(&mut self) {
-        // remove trailing \0
-        let value = &self.inner;
-
-        self.inner = if let Some(rpos) = value.iter().rposition(|x| *x != 0) {
-            &value[..=rpos]
-        } else {
-            &value
+    pub fn from_bytes(input: &[u8]) -> Self {
+        let value = strip_trailing_nul(input);
+        IString {
+            inner: value.to_vec(),
         }
-        .to_vec();
     }
 
-    pub fn from_bytes(input: Vec<u8>) -> Self {
-        let mut s = InsimString { inner: input };
-        s.strip_trailing_nul();
-        s
-    }
-
-    pub fn into_bytes(&self) -> &Vec<u8> {
+    pub fn into_bytes(&self) -> &[u8] {
         &self.inner
     }
 
     /// Convert from a String using the default LFS encoding ("Latin1")
-    pub fn from_string(value: String) -> InsimString {
+    pub fn from_string(value: String) -> IString {
         let (output, _encoding, _had_errors) = encoding_rs::WINDOWS_1252.encode(&value);
-        InsimString {
+        IString {
             inner: output.to_vec(),
         }
     }
@@ -90,7 +97,8 @@ impl InsimString {
             indices.push(input.len());
         }
 
-        let mut result = String::new();
+        // This pre-allocation is the best guess we can make here
+        let mut result = String::with_capacity(self.len());
 
         for pair in indices.windows(2) {
             let range = &input[pair[0]..pair[1]];

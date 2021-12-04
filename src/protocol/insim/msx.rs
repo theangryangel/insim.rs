@@ -1,4 +1,4 @@
-use crate::string::InsimString;
+use crate::string::IString;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -10,5 +10,5 @@ pub struct Msx {
     pub reqi: u8,
 
     #[deku(bytes = "96")]
-    pub msg: InsimString,
+    pub msg: IString,
 }

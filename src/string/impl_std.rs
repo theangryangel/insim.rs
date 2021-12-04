@@ -1,9 +1,9 @@
-use super::InsimString;
+use super::IString;
 use std::fmt;
 
-impl Clone for InsimString {
+impl Clone for IString {
     fn clone(&self) -> Self {
-        InsimString {
+        IString {
             inner: self.inner.clone(),
         }
     }
@@ -13,21 +13,21 @@ impl Clone for InsimString {
     }
 }
 
-impl From<String> for InsimString {
+impl From<String> for IString {
     #[inline]
     fn from(s: String) -> Self {
-        InsimString::from_string(s)
+        IString::from_string(s)
     }
 }
 
-impl From<&str> for InsimString {
+impl From<&str> for IString {
     #[inline]
     fn from(s: &str) -> Self {
-        InsimString::from_string(s.into())
+        IString::from_string(s.into())
     }
 }
 
-impl fmt::Display for InsimString {
+impl fmt::Display for IString {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.to_lossy_string())
     }

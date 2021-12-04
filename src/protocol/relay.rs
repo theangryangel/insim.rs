@@ -1,5 +1,5 @@
 use crate::packet_flags;
-use crate::string::InsimString;
+use crate::string::IString;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -19,10 +19,10 @@ packet_flags! {
 #[deku(endian = "little")]
 pub struct HostInfo {
     #[deku(bytes = "32")]
-    pub hname: InsimString,
+    pub hname: IString,
 
     #[deku(bytes = "6")]
-    pub track: InsimString,
+    pub track: IString,
 
     #[deku(bytes = "1")]
     pub flags: HostInfoFlags,
@@ -74,13 +74,13 @@ pub struct HostSelect {
     pub reqi: u8,
 
     #[deku(bytes = "32")]
-    pub hname: InsimString,
+    pub hname: IString,
 
     #[deku(bytes = "16")]
-    pub admin: InsimString,
+    pub admin: IString,
 
     #[deku(bytes = "16")]
-    pub spec: InsimString,
+    pub spec: IString,
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]

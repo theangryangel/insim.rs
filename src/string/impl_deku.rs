@@ -1,9 +1,9 @@
 use deku::bitvec::{BitSlice, BitVec, Msb0};
 use deku::{ctx::*, DekuError, DekuRead, DekuWrite};
 
-use super::InsimString;
+use super::IString;
 
-impl DekuWrite<(Endian, Size)> for InsimString {
+impl DekuWrite<(Endian, Size)> for IString {
     fn write(
         &self,
         output: &mut BitVec<Msb0, u8>,
@@ -35,7 +35,7 @@ impl DekuWrite<(Endian, Size)> for InsimString {
     }
 }
 
-impl DekuWrite<Size> for InsimString {
+impl DekuWrite<Size> for IString {
     fn write(&self, output: &mut BitVec<Msb0, u8>, bit_size: Size) -> Result<(), DekuError> {
         let orig_size = output.len();
         if self.is_empty() {
@@ -61,25 +61,25 @@ impl DekuWrite<Size> for InsimString {
     }
 }
 
-impl DekuWrite for InsimString {
+impl DekuWrite for IString {
     fn write(&self, output: &mut BitVec<Msb0, u8>, _: ()) -> Result<(), DekuError> {
         let value = self.into_bytes();
         value.write(output, ())
     }
 }
 
-impl DekuRead<'_, Size> for InsimString {
+impl DekuRead<'_, Size> for IString {
     fn read(
         input: &BitSlice<Msb0, u8>,
         size: Size,
     ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
         let (rest, value) = Vec::read(input, Limit::new_size(size))?;
 
-        Ok((rest, InsimString::from_bytes(value)))
+        Ok((rest, IString::from_bytes(&value)))
     }
 }
 
-impl DekuRead<'_, (Endian, Size)> for InsimString {
+impl DekuRead<'_, (Endian, Size)> for IString {
     fn read(
         input: &BitSlice<Msb0, u8>,
         (_endian, size): (Endian, Size),
@@ -87,6 +87,6 @@ impl DekuRead<'_, (Endian, Size)> for InsimString {
         // FIXME: implement endian handling
         let (rest, value) = Vec::read(input, Limit::new_size(size))?;
 
-        Ok((rest, InsimString::from_bytes(value)))
+        Ok((rest, IString::from_bytes(&value)))
     }
 }

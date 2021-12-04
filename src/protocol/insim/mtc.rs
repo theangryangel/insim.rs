@@ -1,4 +1,4 @@
-use crate::string::InsimString;
+use crate::string::IString;
 use deku::ctx::Size;
 use deku::prelude::*;
 use serde::Serialize;
@@ -19,6 +19,6 @@ pub struct Mtc {
     #[deku(bytes = "1", pad_bytes_after = "2")]
     pub plid: u8,
 
-    #[deku(reader = "InsimString::read(deku::rest, Size::Bytes(deku::rest.len() / 8))")]
-    pub msg: InsimString,
+    #[deku(reader = "IString::read(deku::rest, Size::Bytes(deku::rest.len() / 8))")]
+    pub msg: IString,
 }
