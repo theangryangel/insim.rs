@@ -1,7 +1,8 @@
-use crate::string::IString;
+use crate::string::ICodepageString;
 use deku::prelude::*;
 use serde::Serialize;
 
+/// Enum for the result field of [Acr].
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Serialize, Clone)]
 #[deku(type = "u8", endian = "little")]
 pub enum AcrResult {
@@ -18,9 +19,9 @@ pub enum AcrResult {
     UnknownCommand,
 }
 
+/// Admin Command Report
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
-/// Admin Command Report
 pub struct Acr {
     #[deku(pad_bytes_after = "1")]
     pub reqi: u8,
@@ -33,5 +34,5 @@ pub struct Acr {
     pub result: AcrResult,
 
     #[deku(bytes = "64")]
-    pub text: IString,
+    pub text: ICodepageString,
 }

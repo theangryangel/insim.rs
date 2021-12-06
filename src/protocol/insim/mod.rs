@@ -1,3 +1,5 @@
+//! Definitions for Insim Game Server packets.
+
 mod acr;
 mod axi;
 mod axm;
@@ -74,7 +76,7 @@ pub use cpr::Cpr;
 pub use crs::Crs;
 pub use csc::{Csc, CscAction};
 pub use fin::Fin;
-pub use flg::Flg;
+pub use flg::{Flg, FlgType};
 pub use hcp::{Hcp, HcpCarHandicap};
 pub use hlv::{Hlv, Hlvc};
 pub use iii::Iii;
@@ -84,8 +86,8 @@ pub use jrr::{Jrr, JrrAction};
 pub use lap::Lap;
 pub use mci::Mci;
 pub use mode::Mode;
-pub use msl::Msl;
-pub use mso::Mso;
+pub use msl::{Msl, MslSoundType};
+pub use mso::{Mso, MsoUserType};
 pub use mst::Mst;
 pub use msx::Msx;
 pub use mtc::Mtc;

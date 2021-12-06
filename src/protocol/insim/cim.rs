@@ -3,6 +3,7 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Serialize, Clone)]
 #[deku(type = "u8", endian = "little")]
+/// Used within the [Cim] packet to indicate the mode.
 pub enum CimMode {
     #[deku(id = "0")]
     Normal,

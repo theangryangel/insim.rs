@@ -3,20 +3,20 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
-/// Screen Mode (originally IS_MOD)
+/// Screen Mode (referred to as originally IS_MOD within Insim.txt)
 pub struct Mode {
-    #[deku(bytes = "1", pad_bytes_after = "1")]
+    #[deku(pad_bytes_after = "1")]
     pub reqi: u8,
 
-    #[deku(bytes = "1")]
+    /// Set to choose 16-bit
     pub bit16: i8,
 
-    #[deku(bytes = "1")]
+    /// Refresh rate, zero for default
     pub rr: i8,
 
-    #[deku(bytes = "1")]
+    /// Screen width. Zero to switch to windowed mode.
     pub width: i8,
 
-    #[deku(bytes = "1")]
+    /// Screen height. Zero to switch to windowed mode.
     pub height: i8,
 }

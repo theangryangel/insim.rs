@@ -1,3 +1,5 @@
+//! A collection of utilities for converting between LFS world units real world units.
+
 pub mod speed {
     /// Convert a LFS speed to km/h
     pub fn to_kmph(speed: u16) -> f32 {
@@ -34,5 +36,12 @@ pub mod distance {
     /// Convert LFS distance to miles
     pub fn to_miles(distance: u16) -> f32 {
         (distance as f32) / 65536.0 / 1609.344
+    }
+}
+
+pub mod directional {
+    /// Convert a heading to degrees
+    pub fn to_degrees(angle: u16) -> f32 {
+        (angle as f32) / 182.04445
     }
 }

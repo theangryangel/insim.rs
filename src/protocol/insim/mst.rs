@@ -1,4 +1,4 @@
-use crate::string::IString;
+use crate::string::ICodepageString;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -6,9 +6,9 @@ use serde::Serialize;
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Message Type - Send a message to LFS as if typed by a user
 pub struct Mst {
-    #[deku(bytes = "1", pad_bytes_after = "1")]
+    #[deku(pad_bytes_after = "1")]
     pub reqi: u8,
 
     #[deku(bytes = "64")]
-    pub msg: IString,
+    pub msg: ICodepageString,
 }

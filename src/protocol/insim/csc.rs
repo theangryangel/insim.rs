@@ -4,6 +4,7 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Serialize, Clone)]
 #[deku(type = "u8", endian = "little")]
+/// Used within the [Csc] packet to indicate the type of state change.
 pub enum CscAction {
     #[deku(id = "0")]
     Stop,

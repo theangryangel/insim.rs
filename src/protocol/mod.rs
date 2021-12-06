@@ -1,3 +1,5 @@
+//! A lower level API to working with Insim.
+
 use deku::prelude::*;
 use serde::Serialize; // TODO make serde support an optional feature
 

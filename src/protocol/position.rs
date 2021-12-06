@@ -1,6 +1,9 @@
+//! Utility functions for working with positions.
+
 use deku::prelude::*;
 use serde::Serialize;
 
+/// A X, Y, Z position
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 pub struct FixedPoint {
     #[deku(bytes = "4")]
@@ -14,7 +17,9 @@ pub struct FixedPoint {
 }
 
 impl FixedPoint {
+    /// Convert a [FixedPoint] into metres, from world units.
     pub fn metres(&self) -> Self {
+        // FIXME: Prevent duplicate calls to this
         FixedPoint {
             x: (self.x / 65536),
             y: (self.y / 65536),
@@ -22,6 +27,7 @@ impl FixedPoint {
         }
     }
 
+    /// Alias for [FixedPoint::metres].
     pub fn meters(&self) -> Self {
         self.metres()
     }

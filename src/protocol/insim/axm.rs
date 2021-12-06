@@ -1,6 +1,7 @@
 use deku::prelude::*;
 use serde::Serialize;
 
+/// Used within the [Axm] packet.
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(endian = "little")]
 pub struct ObjectInfo {
@@ -12,6 +13,7 @@ pub struct ObjectInfo {
     pub heading: u8,
 }
 
+/// Actions that can be taken as part of [Axm].
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Serialize, Clone)]
 #[deku(type = "u8", endian = "little")]
 pub enum PmoAction {
@@ -43,9 +45,9 @@ pub enum PmoAction {
     GetZ,
 }
 
+/// AutoX Multiple Objects
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
-/// AutoX Multiple Objects
 pub struct Axm {
     pub reqi: u8,
     pub numo: u8,

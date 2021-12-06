@@ -4,6 +4,7 @@ use deku::prelude::*;
 use serde::Serialize;
 
 packet_flags! {
+    /// Flags for the [Init] packet flags field.
     #[derive(Serialize)]
     pub struct InitFlags: u16 {
         //RES0 => (1 << 0),	// bit  0: spare
@@ -23,29 +24,39 @@ packet_flags! {
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
+/// Insim Init, or handshake packet.
+/// Required to be sent to the server before any other packets.
 pub struct Init {
-    #[deku(bytes = "1", pad_bytes_after = "1")]
+    /// When set to a non-zero value the server will send a [Version](super::Version) packet in response.
+    ///packet in response.
+    #[deku(pad_bytes_after = "1")]
     pub reqi: u8,
 
     // we do not support this feature, using pad_bytes_before
     // on flags to mask it.
     //#[deku(bytes = "2")]
     //pub udpport: u16,
-    #[deku(bytes = "2", pad_bytes_before = "2")]
+    /// Options for the Insim Connection. See [InitFlags] for more information.
+    #[deku(pad_bytes_before = "2")]
     pub flags: InitFlags,
 
-    #[deku(bytes = "1")]
+    /// Protocol version of Insim you wish to use.
     pub version: u8,
 
-    #[deku(bytes = "1")]
+    /// Messages typed with this prefix will be sent to your InSim program
+    /// on the host (in IS_MSO) and not displayed on anyone's screen.
+    /// This should be a single ascii character. i.e. b'!'.
     pub prefix: u8,
 
-    #[deku(bytes = "2")]
+    /// Time in milliseconds between each [Nlp](super::Nlp) or [Mci](super::Mci) packet when set to a non-zero value and
+    /// the relevant flags are set.
     pub interval: u16,
 
+    /// Administrative password.
     #[deku(bytes = "16")]
     pub password: IString,
 
+    /// Name of the program.
     #[deku(bytes = "16")]
     pub name: IString,
 }

@@ -3,6 +3,7 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Serialize, Clone)]
 #[deku(type = "u8", endian = "little")]
+/// Used within [Cnl] to indicate the leave reason.
 pub enum CnlReason {
     #[deku(id = "0")]
     Disconnected,

@@ -4,6 +4,7 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Serialize, Clone)]
 #[deku(type = "u8", endian = "little")]
+/// Used within the [Jrr] packet.
 pub enum JrrAction {
     #[deku(id = "0")]
     Reject,

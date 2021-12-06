@@ -35,18 +35,30 @@ impl insim::framework::EventHandler for Party {
         info!("✨✨✨✨✨✨ {:?}", data);
     }
 
-    fn on_npl(&self, client: &insim::framework::Client, data: &insim::protocol::insim::Npl) {
+    fn on_new_connection(
+        &self,
+        client: &insim::framework::Client,
+        data: &insim::protocol::insim::Ncn,
+    ) {
         info!("{:?}", data);
     }
 
-    fn on_mci(&self, client: &insim::framework::Client, data: &insim::protocol::insim::Mci) {
+    fn on_new_player(&self, client: &insim::framework::Client, data: &insim::protocol::insim::Npl) {
+        info!("{:?}", data);
+    }
+
+    fn on_multi_car_info(
+        &self,
+        client: &insim::framework::Client,
+        data: &insim::protocol::insim::Mci,
+    ) {
         for i in data.info.iter() {
             info!(
                 "{:?} {:?}mph, {:?}kph, {:?}mps, {:?}raw",
                 i.plid,
-                i.mph(),
-                i.kmph(),
-                i.mps(),
+                i.speed_as_mph(),
+                i.speed_as_kmph(),
+                i.speed_as_mps(),
                 i.speed
             );
         }
@@ -56,7 +68,11 @@ impl insim::framework::EventHandler for Party {
         info!("{:?}", data.msg.to_string());
     }
 
-    fn on_contact(&self, client: &insim::framework::Client, data: &insim::protocol::insim::Con) {
+    fn on_player_contact(
+        &self,
+        client: &insim::framework::Client,
+        data: &insim::protocol::insim::Con,
+    ) {
         info!("💣💣💣💣💣💣💣 bump! {:?}", data);
     }
 }
@@ -76,7 +92,7 @@ impl insim::framework::EventHandler for Counter {
 
         ctx.send(
             insim::protocol::relay::HostSelect {
-                hname: "Nubbins AU Demo".into(),
+                hname: "^1(^3FM^1) ^4Fox Friday".into(),
                 ..Default::default()
             }
             .into(),

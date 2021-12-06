@@ -1,4 +1,4 @@
-use crate::string::IString;
+use crate::string::{ICodepageString, IString};
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -6,24 +6,24 @@ use serde::Serialize;
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// New Connection
 pub struct Ncn {
-    #[deku(bytes = "1")]
     pub reqi: u8,
 
-    #[deku(bytes = "1")]
     pub ucid: u8,
 
     #[deku(bytes = "24")]
+    /// Username.
     pub uname: IString,
 
     #[deku(bytes = "24")]
-    pub pname: IString,
+    /// Playername.
+    pub pname: ICodepageString,
 
-    #[deku(bytes = "1")]
+    /// 1 if administrative user.
     pub admin: u8,
 
-    #[deku(bytes = "1")]
+    /// Total number of connections now this player has joined.
     pub total: u8,
 
-    #[deku(bytes = "1", pad_bytes_after = "1")]
+    #[deku(pad_bytes_after = "1")]
     pub flags: u8,
 }

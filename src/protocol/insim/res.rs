@@ -1,5 +1,5 @@
 use super::PlayerFlags;
-use crate::string::IString;
+use crate::string::{ICodepageString, IString};
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -17,10 +17,10 @@ pub struct Res {
     pub uname: IString,
 
     #[deku(bytes = "24")]
-    pub pname: IString,
+    pub pname: ICodepageString,
 
     #[deku(bytes = "8")]
-    pub plate: IString,
+    pub plate: ICodepageString,
 
     #[deku(bytes = "4")]
     pub cname: IString,

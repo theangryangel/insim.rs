@@ -82,7 +82,8 @@ pub enum ILanguage {
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
-/// New Connection - with Extra Info
+/// Extra information about the new connection. This is only sent when connected to a game server,
+/// and only if an administrative password has been set and used by Insim.
 pub struct Nci {
     pub reqi: u8,
 

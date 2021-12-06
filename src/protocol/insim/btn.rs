@@ -1,9 +1,10 @@
-use crate::string::IString;
+use crate::string::ICodepageString;
 use deku::prelude::*;
 use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Serialize, Clone)]
 #[deku(type = "u8", endian = "little")]
+/// Used within [Bfn] to specify the action to take.
 pub enum BfnType {
     #[deku(id = "0")]
     DeleteButton,
@@ -47,7 +48,7 @@ pub struct Btn {
     pub height: u8,
 
     #[deku(bytes = "240")]
-    pub text: IString, // FIXME: this should be upto 240 characters and always a multiple of 4
+    pub text: ICodepageString, // FIXME: this should be upto 240 characters and always a multiple of 4
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
@@ -75,5 +76,5 @@ pub struct Btt {
     pub typein: u8,
 
     #[deku(bytes = "96")]
-    pub text: IString,
+    pub text: ICodepageString,
 }

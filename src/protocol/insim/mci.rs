@@ -15,49 +15,81 @@ packet_flags! {
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+/// Used within the [Mci] packet info field.
 pub struct CompCar {
+    /// Index of the last "node" that the player passed through.
     pub node: u16,
 
+    /// The player's current lap.
     pub lap: u16,
 
+    /// The current player's ID.
     pub plid: u8,
 
+    /// Race position
     pub position: u8,
 
     #[deku(pad_bytes_after = "1")]
     pub info: CompCarInfo,
 
+    /// Positional information for the player, in game units.
     pub xyz: FixedPoint,
 
-    pub speed: u16, // speed (32768 = 100 m/s)
+    /// Speed in game world units (32768 = 100 m/s)
+    /// You may use the [mph], [kmph] and [mps] functions to convert to real-world units.
+    pub speed: u16,
 
-    pub direction: u16, // direction of car's motion : 0 = world y direction, 32768 = 180 deg
+    /// Direction of car's motion : 0 = world y direction, 32768 = 180 deg
+    pub direction: u16,
 
-    pub heading: u16, // direction of forward axis : 0 = world y direction, 32768 = 180 deg
+    /// Direction of forward axis : 0 = world y direction, 32768 = 180 deg
+    pub heading: u16,
 
-    pub angvel: i16, // signed, rate of change of heading : (16384 = 360 deg/s)
+    /// Signed, rate of change of heading : (16384 = 360 deg/s)
+    pub angvel: i16,
 }
 
 impl CompCar {
-    pub fn mph(&self) -> f32 {
+    /// Converts game world speed to miles per hour.
+    pub fn speed_as_mph(&self) -> f32 {
         conversion::speed::to_mph(self.speed)
     }
-    pub fn kmph(&self) -> f32 {
+
+    /// Converts gameword speed to kilometers per hour.
+    pub fn speed_as_kmph(&self) -> f32 {
         conversion::speed::to_kmph(self.speed)
     }
-    pub fn mps(&self) -> f32 {
+
+    /// Converts game world speed to meters per second.
+    pub fn speed_as_mps(&self) -> f32 {
         conversion::speed::to_mps(self.speed)
+    }
+
+    /// Converts angvel into degrees per second.
+    pub fn angvel_as_dps(&self) -> f32 {
+        // 16384/360 = 45.511
+        (self.angvel as f32) / 45.511
+    }
+
+    /// Convert direction to degrees.
+    pub fn direction_as_deg(&self) -> f32 {
+        conversion::directional::to_degrees(self.direction)
+    }
+
+    /// Convert heading to degrees.
+    pub fn heading_as_deg(&self) -> f32 {
+        conversion::directional::to_degrees(self.heading)
     }
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
-/// Multi Car Info - positional information for upto 8 vehicles
+/// Multi Car Info - positional information for players/vehicles.
+/// The MCI packet does not contain the positional information for all players. Only some. The
+/// maximum number of players depends on the version of Insim.
 pub struct Mci {
-    #[deku(bytes = "1")]
     pub reqi: u8,
 
-    #[deku(bytes = "1")]
     pub numc: u8,
 
     #[deku(count = "numc")]

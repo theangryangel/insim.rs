@@ -1,12 +1,15 @@
+/// Internal macro to define Insim Packet and conversion implementations.
 #[macro_export]
 macro_rules! packet {
     (
         $name: ident,
 
-        $($id:literal => $variant:ident($inner:ty),)+
+        $(
+            $id:literal => $variant:ident($inner:ty),
+        )+
     ) => {
 
-        // Create the enum itself
+        /// Enum of all possible packet types.
         #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
         #[serde(tag = "type")]
         #[deku(endian = "little", type = "u8")]
@@ -38,6 +41,8 @@ macro_rules! packet {
     }
 }
 
+/// Internal macro to help define packet bit-wise flags and provide a high level API to ensure you
+/// don't accidentally set bits that are not intended to be set.
 #[macro_export]
 macro_rules! packet_flags {
     (

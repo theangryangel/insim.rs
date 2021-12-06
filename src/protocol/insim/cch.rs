@@ -5,12 +5,10 @@ use serde::Serialize;
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 // Camera Change
 pub struct Cch {
-    #[deku(bytes = "1")]
     pub reqi: u8,
 
-    #[deku(bytes = "1")]
     pub plid: u8,
 
-    #[deku(bytes = "1", pad_bytes_after = "3")]
+    #[deku(pad_bytes_after = "3")]
     pub camera: u8,
 }

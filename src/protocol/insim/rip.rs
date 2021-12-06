@@ -51,6 +51,7 @@ pub struct Rip {
 
     pub mpr: u8,
     pub paused: u8,
+
     #[deku(pad_bytes_after = "1")]
     pub options: u8, // FIXME: implement flags
 

@@ -1,3 +1,5 @@
+//! Handles encoding and decoding of [Packets](Packet) from the wire.
+
 use super::Packet;
 use deku::{DekuContainerWrite, DekuError};
 use std::convert::TryFrom;
@@ -10,12 +12,14 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 #[derive(Clone, Copy)]
 pub enum Mode {
     // Insim <= 8 uses verbatim packet sizes
-    Verbatim,
+    Uncompressed,
     // Insim >= 9 uses the size divided by 4
     // https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info
-    Narrow,
+    Compressed,
 }
 
+/// A codec for the Insim protocol.
+/// This codec handles encoding and decoding of to and from raw bytes to [Packet].
 pub struct Codec {
     mode: Mode,
     max_bytes: usize,
@@ -68,8 +72,8 @@ impl Codec {
         };
 
         let n = match self.mode {
-            Mode::Verbatim => n,
-            Mode::Narrow => n * 4,
+            Mode::Uncompressed => n,
+            Mode::Compressed => n * 4,
         };
 
         if (src.len() - self.length_bytes) < n {
@@ -86,7 +90,7 @@ impl Codec {
 
 impl Default for Codec {
     fn default() -> Self {
-        Self::new(Mode::Verbatim)
+        Self::new(Mode::Uncompressed)
     }
 }
 
@@ -168,8 +172,8 @@ impl Encoder<Packet> for Codec {
         dst.reserve(self.length_bytes + n);
 
         let n = match self.mode {
-            Mode::Verbatim => n,
-            Mode::Narrow => n / 4,
+            Mode::Uncompressed => n,
+            Mode::Compressed => n / 4,
         };
 
         dst.put_uint_le(n as u64, self.length_bytes);

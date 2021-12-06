@@ -1,14 +1,14 @@
-use crate::string::IString;
+use crate::string::ICodepageString;
 use deku::prelude::*;
 use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
-/// Message Extended (like MST, but longer)
+/// Extended Message (like [Mst](super::Mst), but longer)
 pub struct Msx {
-    #[deku(bytes = "1", pad_bytes_after = "1")]
+    #[deku(pad_bytes_after = "1")]
     pub reqi: u8,
 
     #[deku(bytes = "96")]
-    pub msg: IString,
+    pub msg: ICodepageString,
 }

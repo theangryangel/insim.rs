@@ -1,5 +1,5 @@
 use crate::packet_flags;
-use crate::string::IString;
+use crate::string::{ICodepageString, IString};
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -25,28 +25,23 @@ packet_flags! {
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
-/// New Player
+/// Sent when a New Player joins.
 pub struct Npl {
-    #[deku(bytes = "1")]
     pub reqi: u8,
 
-    #[deku(bytes = "1")]
     pub plid: u8,
 
-    #[deku(bytes = "1")]
     pub ucid: u8,
 
-    #[deku(bytes = "1")]
     pub ptype: u8,
 
-    #[deku(bytes = "2")]
     pub flags: PlayerFlags,
 
     #[deku(bytes = "24")]
-    pub pname: IString,
+    pub pname: ICodepageString,
 
     #[deku(bytes = "8")]
-    pub plate: IString,
+    pub plate: ICodepageString,
 
     #[deku(bytes = "4")]
     pub cname: IString,
@@ -57,33 +52,24 @@ pub struct Npl {
     #[deku(bytes = "1", count = "4")]
     pub tyres: Vec<u8>,
 
-    #[deku(bytes = "1")]
     pub h_mass: u8,
 
-    #[deku(bytes = "1")]
     pub h_tres: u8,
 
-    #[deku(bytes = "1")]
     pub model: u8,
 
-    #[deku(bytes = "1")]
     pub pass: u8,
 
-    #[deku(bytes = "1")]
     pub rwadj: u8,
 
-    #[deku(bytes = "1", pad_bytes_after = "2")]
+    #[deku(pad_bytes_after = "2")]
     pub fwadj: u8,
 
-    #[deku(bytes = "1")]
     pub setf: u8,
 
-    #[deku(bytes = "1")]
     pub nump: u8,
 
-    #[deku(bytes = "1")]
     pub config: u8,
 
-    #[deku(bytes = "1")]
     pub fuel: u8,
 }

@@ -1,22 +1,32 @@
 use deku::prelude::*;
 use serde::Serialize;
 
+/// Enum for the flag field of [Flg].
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Serialize, Clone)]
+#[deku(type = "u8", endian = "little")]
+pub enum FlgType {
+    #[deku(id = "0")]
+    None,
+
+    #[deku(id = "1")]
+    Blue,
+
+    #[deku(id = "2")]
+    Yellow,
+}
+
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
-/// Race Flag
+/// Race Flag is sent when a flag is waved at a player.
 pub struct Flg {
-    #[deku(bytes = "1")]
     pub reqi: u8,
 
-    #[deku(bytes = "1")]
     pub plid: u8,
 
-    #[deku(bytes = "1")]
     pub offon: u8,
 
-    #[deku(bytes = "1")]
-    pub flag: u8,
+    pub flag: FlgType,
 
-    #[deku(bytes = "1", pad_bytes_after = "1")]
+    #[deku(pad_bytes_after = "1")]
     pub carbehind: u8,
 }
