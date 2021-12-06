@@ -1,11 +1,15 @@
 # insim.rs
 
-:warning: The API is unstable, but moving towards stability.
+:warning: The API is not yet 100% stable.
+
+## docs
+
+Until we're released please run `cargo doc --no-deps --open`
 
 ## Example
 
-- High level "framework" api (WIP): `cargo run --example relay`
-- Low level "transport" api (WIP): `cargo run --example transport`
+- High level "framework" api: `cargo run --example relay`
+- Low level "transport" api: `cargo run --example transport`
 
 ## TODO
 
