@@ -1,4 +1,4 @@
-use crate::string::IString;
+use super::VehicleName;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -10,6 +10,5 @@ pub struct Slc {
 
     pub ucid: u8,
 
-    #[deku(bytes = "4")]
-    pub cname: IString,
+    pub cname: VehicleName,
 }

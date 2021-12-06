@@ -1,6 +1,6 @@
 extern crate insim;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use tracing_subscriber;
 
 fn setup() {
@@ -35,15 +35,20 @@ impl insim::framework::EventHandler for Party {
         info!("✨✨✨✨✨✨ {:?}", data);
     }
 
+    fn on_new_player(&self, client: &insim::framework::Client, data: &insim::protocol::insim::Npl) {
+        debug!(
+            "{:?}, cname={:?} ismod={:?}",
+            data.pname.to_string(),
+            data.cname.to_string(),
+            data.cname.is_mod()
+        );
+    }
+
     fn on_new_connection(
         &self,
         client: &insim::framework::Client,
         data: &insim::protocol::insim::Ncn,
     ) {
-        info!("{:?}", data);
-    }
-
-    fn on_new_player(&self, client: &insim::framework::Client, data: &insim::protocol::insim::Npl) {
         info!("{:?}", data);
     }
 
@@ -97,6 +102,14 @@ impl insim::framework::EventHandler for Counter {
             }
             .into(),
         );
+
+        ctx.send(
+            insim::protocol::insim::Tiny {
+                reqi: 0,
+                subtype: insim::protocol::insim::TinyType::Npl,
+            }
+            .into(),
+        )
     }
 
     #[allow(unused)]
