@@ -1,4 +1,4 @@
-use crate::string::IVehicleString;
+use crate::vehicle::Vehicle;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -10,5 +10,5 @@ pub struct Slc {
 
     pub ucid: u8,
 
-    pub cname: IVehicleString,
+    pub cname: Vehicle,
 }

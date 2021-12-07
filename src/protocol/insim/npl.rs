@@ -1,5 +1,6 @@
 use crate::packet_flags;
-use crate::string::{ICodepageString, IString, IVehicleString};
+use crate::string::{ICodepageString, IString};
+use crate::vehicle::Vehicle;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -43,7 +44,7 @@ pub struct Npl {
     #[deku(bytes = "8")]
     pub plate: ICodepageString,
 
-    pub cname: IVehicleString,
+    pub cname: Vehicle,
 
     #[deku(bytes = "16")]
     pub sname: IString,

@@ -16,7 +16,7 @@ pub enum Error {
     /// Wraps ::std::io::Error.
     IO(IoError),
 
-    /// Describes when a limit has been reached.
+    /// Describes when a given input is too large.
     TooLarge,
 }
 

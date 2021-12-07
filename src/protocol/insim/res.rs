@@ -1,5 +1,6 @@
 use super::PlayerFlags;
-use crate::string::{ICodepageString, IString, IVehicleString};
+use crate::string::{ICodepageString, IString};
+use crate::vehicle::Vehicle;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -20,7 +21,7 @@ pub struct Res {
     #[deku(bytes = "8")]
     pub plate: ICodepageString,
 
-    pub cname: IVehicleString,
+    pub cname: Vehicle,
 
     pub ttime: u32,
 

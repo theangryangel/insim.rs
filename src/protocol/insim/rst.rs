@@ -1,4 +1,4 @@
-use crate::string::IString;
+use crate::track::Track;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -21,8 +21,7 @@ pub struct Rst {
     #[deku(bytes = "1")]
     pub timing: u8,
 
-    #[deku(bytes = "6")]
-    pub track: IString,
+    pub track: Track,
 
     #[deku(bytes = "1")]
     pub weather: u8,

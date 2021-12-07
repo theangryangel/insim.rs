@@ -11,6 +11,3 @@ pub use code_page_string::ICodepageString;
 
 mod i_string;
 pub use i_string::IString;
-
-mod vehicle_string;
-pub use vehicle_string::IVehicleString;

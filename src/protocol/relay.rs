@@ -10,6 +10,7 @@
 
 use crate::packet_flags;
 use crate::string::{ICodepageString, IString};
+use crate::track::Track;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -59,13 +60,11 @@ packet_flags! {
 
 /// Information about a host. Used within the [HostList] packet.
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
-#[deku(endian = "little")]
 pub struct HostInfo {
     #[deku(bytes = "32")]
     pub hname: ICodepageString,
 
-    #[deku(bytes = "6")]
-    pub track: IString,
+    pub track: Track,
 
     #[deku(bytes = "1")]
     pub flags: HostInfoFlags,

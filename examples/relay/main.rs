@@ -57,6 +57,7 @@ impl insim::framework::EventHandler for Party {
         client: &insim::framework::Client,
         data: &insim::protocol::insim::Mci,
     ) {
+        /*
         for i in data.info.iter() {
             info!(
                 "{:?} {:?}mph, {:?}kph, {:?}mps, {:?}raw",
@@ -67,6 +68,7 @@ impl insim::framework::EventHandler for Party {
                 i.speed
             );
         }
+        */
     }
 
     fn on_message(&self, client: &insim::framework::Client, data: &insim::protocol::insim::Mso) {
@@ -97,7 +99,7 @@ impl insim::framework::EventHandler for Counter {
 
         ctx.send(
             insim::protocol::relay::HostSelect {
-                hname: "Nubbins AU Demo".into(),
+                hname: "^2Ronys ^3Tuesdays ^5Fun ^2Race".into(),
                 ..Default::default()
             }
             .into(),
@@ -123,10 +125,13 @@ impl insim::framework::EventHandler for Counter {
                 for i in hostlist.hinfo.iter() {
                     if i.numconns > 1 {
                         tracing::info!(
-                            "{} ({}) ={}",
+                            "{} ({} / {}) {} {:?} {}",
                             insim::string::ansi_colours(i.hname.to_string()),
                             i.hname.to_string(),
-                            i.numconns
+                            i.numconns,
+                            i.track.to_string(),
+                            i.track.track_info(),
+                            i.track.is_open_world(),
                         );
                     }
 
@@ -138,7 +143,7 @@ impl insim::framework::EventHandler for Counter {
                 }
             }
             d => {
-                info!("{:?}", d);
+                //info!("{:?}", d);
             }
         }
 
