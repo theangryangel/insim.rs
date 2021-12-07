@@ -1,4 +1,4 @@
-use super::strip_trailing_nul;
+use super::{escape, strip_trailing_nul, unescape};
 use std::vec::Vec;
 
 /// A representation of the non-format-able wire format of a LFS "string".
@@ -44,9 +44,8 @@ impl IString {
 
     /// Takes a slice of u8, strips any trailing \0 and returns an IString.
     pub fn from_bytes(input: &[u8]) -> Self {
-        let value = strip_trailing_nul(input);
         Self {
-            inner: value.to_vec(),
+            inner: strip_trailing_nul(input).to_vec(),
         }
     }
 
@@ -57,15 +56,14 @@ impl IString {
 
     /// Convert from a String
     pub fn from_string(value: String) -> Self {
-        let output = value.as_bytes();
         Self {
-            inner: output.to_vec(),
+            inner: escape(value.as_bytes()),
         }
     }
 
     /// Convert to a String
     pub fn to_lossy_string(&self) -> String {
-        String::from_utf8_lossy(&self.inner).to_string()
+        String::from_utf8_lossy(&unescape(&self.inner)).to_string()
     }
 }
 

@@ -15,6 +15,9 @@ pub enum Error {
 
     /// Wraps ::std::io::Error.
     IO(IoError),
+
+    /// Describes when a limit has been reached.
+    TooLarge,
 }
 
 impl From<IoError> for Error {

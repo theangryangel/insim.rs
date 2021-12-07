@@ -1,11 +1,11 @@
 //! Utilities for working with strings from Insim.
 
-use super::strip_trailing_nul;
+use super::{escape, strip_trailing_nul, unescape};
 use encoding_rs;
 use itertools::Itertools;
 use std::vec::Vec;
 
-const CODEPAGES: &[u8] = &[b'L', b'G', b'J', b'E', b'T', b'B', b'H', b'S', b'K'];
+const CODEPAGES: &[u8] = &[b'L', b'G', b'J', b'E', b'T', b'B', b'H', b'S', b'K', b'9'];
 const CODEPAGE_MARKER: u8 = b'^';
 
 /// A representation of the format-able wire format of a LFS "codepage string".
@@ -54,9 +54,8 @@ impl ICodepageString {
 
     /// Takes a slice of u8, strips any trailing \0 and returns an IString.
     pub fn from_bytes(input: &[u8]) -> Self {
-        let value = strip_trailing_nul(input);
         ICodepageString {
-            inner: value.to_vec(),
+            inner: strip_trailing_nul(input).to_vec(),
         }
     }
 
@@ -69,13 +68,13 @@ impl ICodepageString {
     pub fn from_string(value: String) -> ICodepageString {
         let (output, _encoding, _had_errors) = encoding_rs::WINDOWS_1252.encode(&value);
         ICodepageString {
-            inner: output.to_vec(),
+            inner: escape(&output.to_vec()),
         }
     }
 
     /// Convert a InsimString into a native rust String, with potential lossy conversion from codepages
     pub fn to_lossy_string(&self) -> String {
-        // TODO Split this up
+        // TODO: Do we want to unescape first? Or do we escape after conversion?
         let input = &self.inner;
 
         // empty string
@@ -106,10 +105,8 @@ impl ICodepageString {
         for pair in indices.windows(2) {
             let range = &input[pair[0]..pair[1]];
 
-            // FIXME: unescape
-
             if range.len() < 2 {
-                result.push_str(&String::from_utf8(range.to_vec()).unwrap());
+                result.push_str(&String::from_utf8(unescape(range).to_vec()).unwrap());
                 continue;
             }
 
@@ -122,7 +119,7 @@ impl ICodepageString {
 
                 [b'^', b'C'] => {
                     let (cow, _encoding_used, _had_errors) =
-                        encoding_rs::ISO_8859_5.decode(&range[2..]);
+                        encoding_rs::WINDOWS_1251.decode(&range[2..]);
                     cow.to_string()
                 }
 
@@ -146,23 +143,23 @@ impl ICodepageString {
 
                 [b'^', b'B'] => {
                     let (cow, _encoding_used, _had_errors) =
-                        encoding_rs::ISO_8859_4.decode(&range[2..]);
+                        encoding_rs::ISO_8859_13.decode(&range[2..]);
                     cow.to_string()
                 }
 
                 [b'^', b'H'] => {
-                    let (cow, _encoding_used, _had_errors) = encoding_rs::BIG5.decode(&range[2..]);
-                    cow.to_string()
-                }
-
-                [b'^', b'S'] => {
                     let (cow, _encoding_used, _had_errors) = encoding_rs::GBK.decode(&range[2..]);
                     cow.to_string()
                 }
 
-                [b'^', b'K'] => {
+                [b'^', b'S'] => {
                     let (cow, _encoding_used, _had_errors) =
-                        encoding_rs::ISO_8859_7.decode(&range[2..]);
+                        encoding_rs::EUC_KR.decode(&range[2..]);
+                    cow.to_string()
+                }
+
+                [b'^', b'K'] => {
+                    let (cow, _encoding_used, _had_errors) = encoding_rs::BIG5.decode(&range[2..]);
                     cow.to_string()
                 }
 
@@ -172,7 +169,14 @@ impl ICodepageString {
                     cow.to_string()
                 }
 
-                // Latin fallback, no prefix
+                [b'^', b'9'] => {
+                    // ^9 is a special case, it represents reset to default codepage, AND also
+                    // reset to default colour. We cannot just strip the ^9.
+                    let (cow, _encoding, _had_errors) = encoding_rs::WINDOWS_1252.decode(range);
+                    cow.to_string()
+                }
+
+                // Latin fallback, include the prefix
                 _ => {
                     let (cow, _encoding, _had_errors) = encoding_rs::WINDOWS_1252.decode(range);
                     cow.to_string()
@@ -182,10 +186,10 @@ impl ICodepageString {
             result.push_str(&decoded);
         }
 
-        // TODO: We should implement some error handling in here
-
-        result
+        String::from_utf8(unescape(result.as_bytes())).unwrap()
     }
+
+    // FIXME: Builder functions should escape the input
 
     /// Builder function to convert a rust native string into Latin1 and push onto inner, prefixed with formatting commands.
     pub fn l(mut self, value: String) -> Self {

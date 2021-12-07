@@ -1,4 +1,4 @@
-use super::VehicleName;
+use crate::string::IVehicleString;
 use deku::prelude::*;
 use serde::Serialize;
 
@@ -10,5 +10,5 @@ pub struct Slc {
 
     pub ucid: u8,
 
-    pub cname: VehicleName,
+    pub cname: IVehicleString,
 }

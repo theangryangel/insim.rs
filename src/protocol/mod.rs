@@ -78,6 +78,7 @@ packet!(
     "62" => SelectedVehicle(insim::Slc),
     "63" => VehicleStateChanged(insim::Csc),
     "64" => ConnectionInterfaceMode(insim::Cim),
+    "65" => ModsAllowed(insim::Mal),
 
     "250" => RelayAdminRequest(relay::AdminRequest),
     "251" => RelayAdminResponse(relay::AdminResponse),
