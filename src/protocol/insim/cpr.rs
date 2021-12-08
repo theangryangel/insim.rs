@@ -8,8 +8,9 @@ use serde::Serialize;
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Connection Player Renamed indicates that a player has changed their name.
 pub struct Cpr {
-    #[deku(bytes = "1")]
     pub reqi: u8,
+
+    pub ucid: u8,
 
     #[deku(bytes = "24")]
     pub pname: ICodepageString,
