@@ -189,86 +189,148 @@ impl ICodepageString {
         String::from_utf8(unescape(result.as_bytes())).unwrap()
     }
 
-    // FIXME: Builder functions should escape the input
-
     /// Builder function to convert a rust native string into Latin1 and push onto inner, prefixed with formatting commands.
-    pub fn l(mut self, value: String) -> Self {
+    pub fn latin1(mut self, value: String) -> Self {
         self.inner.extend_from_slice(&[b'^', b'L']);
         let (output, _encoding, _had_errors) = encoding_rs::WINDOWS_1252.encode(&value);
-        self.inner.extend_from_slice(&output);
+        self.inner.extend_from_slice(&escape(&output));
         self
     }
 
     /// Builder function to convert a rust native string into Greek and push onto inner, prefixed with formatting commands.
-    pub fn g(mut self, value: String) -> Self {
+    pub fn greek(mut self, value: String) -> Self {
         self.inner.extend_from_slice(&[b'^', b'G']);
         let (output, _encoding, _had_errors) = encoding_rs::ISO_8859_7.encode(&value);
-        self.inner.extend_from_slice(&output);
+        self.inner.extend_from_slice(&escape(&output));
         self
     }
 
     /// Builder function to convert a rust native string into Cyrillic and push onto inner, prefixed with formatting commands.
-    pub fn c(mut self, value: String) -> Self {
+    pub fn cyrillic(mut self, value: String) -> Self {
         self.inner.extend_from_slice(&[b'^', b'C']);
         let (output, _encoding, _had_errors) = encoding_rs::ISO_8859_5.encode(&value);
-        self.inner.extend_from_slice(&output);
+        self.inner.extend_from_slice(&escape(&output));
         self
     }
 
     /// Builder function to convert a rust native string into SHIFT_JIS and push onto inner, prefixed with formatting commands.
-    pub fn j(mut self, value: String) -> Self {
+    pub fn japanese(mut self, value: String) -> Self {
         self.inner.extend_from_slice(&[b'^', b'J']);
         let (output, _encoding, _had_errors) = encoding_rs::SHIFT_JIS.encode(&value);
-        self.inner.extend_from_slice(&output);
+        self.inner.extend_from_slice(&escape(&output));
         self
     }
 
     /// Builder function to convert a rust native string into ISO_8859_2 and push onto inner, prefixed with formatting commands
-    pub fn e(mut self, value: String) -> Self {
+    pub fn central_european(mut self, value: String) -> Self {
         self.inner.extend_from_slice(&[b'^', b'E']);
         let (output, _encoding, _had_errors) = encoding_rs::ISO_8859_2.encode(&value);
-        self.inner.extend_from_slice(&output);
+        self.inner.extend_from_slice(&escape(&output));
         self
     }
 
     /// Builder function to convert a rust native string into WINDOWS_1254 and push onto inner, prefixed with formatting commands
-    pub fn t(mut self, value: String) -> Self {
+    pub fn turkish(mut self, value: String) -> Self {
         self.inner.extend_from_slice(&[b'^', b'T']);
         let (output, _encoding, _had_errors) = encoding_rs::WINDOWS_1254.encode(&value);
-        self.inner.extend_from_slice(&output);
+        self.inner.extend_from_slice(&escape(&output));
         self
     }
 
     /// Builder function to convert a rust native string into ISO_8859_4 and push onto inner, prefixed with formatting commands
-    pub fn b(mut self, value: String) -> Self {
+    pub fn baltic(mut self, value: String) -> Self {
         self.inner.extend_from_slice(&[b'^', b'B']);
         let (output, _encoding, _had_errors) = encoding_rs::ISO_8859_4.encode(&value);
-        self.inner.extend_from_slice(&output);
+        self.inner.extend_from_slice(&escape(&output));
         self
     }
 
     /// Builder function to convert a rust native string into BIG5 and push onto inner, prefixed with formatting commands
-    pub fn h(mut self, value: String) -> Self {
+    pub fn traditional_chinese(mut self, value: String) -> Self {
         self.inner.extend_from_slice(&[b'^', b'H']);
         let (output, _encoding, _had_errors) = encoding_rs::BIG5.encode(&value);
-        self.inner.extend_from_slice(&output);
+        self.inner.extend_from_slice(&escape(&output));
         self
     }
 
     /// Builder function to convert a rust native string into GBK and push onto inner, prefixed with formatting commands
-    pub fn s(mut self, value: String) -> Self {
+    pub fn simplified_chinese(mut self, value: String) -> Self {
         self.inner.extend_from_slice(&[b'^', b'S']);
         let (output, _encoding, _had_errors) = encoding_rs::GBK.encode(&value);
-        self.inner.extend_from_slice(&output);
+        self.inner.extend_from_slice(&escape(&output));
         self
     }
 
     /// Builder function to convert a rust native into ISO_8859_7 and push onto inner, prefixed with formatting commands
-    pub fn k(mut self, value: String) -> Self {
+    pub fn korean(mut self, value: String) -> Self {
         self.inner.extend_from_slice(&[b'^', b'K']);
         let (output, _encoding, _had_errors) = encoding_rs::ISO_8859_7.encode(&value);
-        self.inner.extend_from_slice(&output);
+        self.inner.extend_from_slice(&escape(&output));
         self
+    }
+
+    /// Build function to push black onto inner
+    pub fn black(mut self) -> Self {
+        self.inner.extend_from_slice(&[b'^', b'0']);
+        self
+    }
+
+    /// Build function to push red onto inner
+    pub fn red(mut self) -> Self {
+        self.inner.extend_from_slice(&[b'^', b'1']);
+        self
+    }
+
+    /// Build function to push yellow onto inner
+    pub fn yellow(mut self) -> Self {
+        self.inner.extend_from_slice(&[b'^', b'2']);
+        self
+    }
+
+    /// Build function to push blue onto inner
+    pub fn blue(mut self) -> Self {
+        self.inner.extend_from_slice(&[b'^', b'4']);
+        self
+    }
+
+    /// Build function to push purple onto inner
+    pub fn purple(mut self) -> Self {
+        self.inner.extend_from_slice(&[b'^', b'5']);
+        self
+    }
+
+    /// Build function to push light blue onto inner
+    pub fn light_blue(mut self) -> Self {
+        self.inner.extend_from_slice(&[b'^', b'6']);
+        self
+    }
+
+    /// Build function to push white onto inner
+    pub fn white(mut self) -> Self {
+        self.inner.extend_from_slice(&[b'^', b'7']);
+        self
+    }
+
+    /// Build function to push default colour onto inner
+    pub fn default_colour(mut self) -> Self {
+        self.inner.extend_from_slice(&[b'^', b'8']);
+        self
+    }
+
+    /// Americanised version of default_colour
+    pub fn default_color(self) -> Self {
+        self.default_colour()
+    }
+
+    /// Build function to push default colour & codepage onto inner
+    pub fn default_codepage_and_colour(mut self) -> Self {
+        self.inner.extend_from_slice(&[b'^', b'9']);
+        self
+    }
+
+    /// Americanised version of default_codepage_and_colour
+    pub fn default_codepage_and_color(self) -> Self {
+        self.default_codepage_and_colour()
     }
 }
 
