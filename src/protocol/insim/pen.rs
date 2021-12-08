@@ -1,10 +1,11 @@
 use crate::packet_flags;
 use deku::prelude::*;
+#[cfg(feature = "serde")]
 use serde::Serialize;
 
 packet_flags! {
     // *_VALID variation means this was cleared
-    #[derive(Serialize)]
+    #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct PenaltyInfo: u8 {
         DRIVE_THRU => (1 << 0),
         DRIVE_THRU_VALID => (1 << 1),
@@ -16,7 +17,7 @@ packet_flags! {
 }
 
 packet_flags! {
-    #[derive(Serialize)]
+    #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct PenaltyReason: u8 {
         ADMIN => (1 << 0),
         WRONG_WAY => (1 << 1),
@@ -27,7 +28,8 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Penalty
 pub struct Pen {

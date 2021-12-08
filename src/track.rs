@@ -2,6 +2,7 @@
 
 use crate::string::strip_trailing_nul;
 use deku::prelude::*;
+#[cfg(feature = "serde")]
 use serde::Serialize;
 
 pub type TrackInfo<'a> = (&'a str, &'a str, Option<f32>, u8);
@@ -58,7 +59,8 @@ const TRACK_INFO: &[TrackInfo] = &[
 ];
 
 /// Handles parsing a Track name.
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize, Default)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Track {
     pub inner: [u8; 6],
 }

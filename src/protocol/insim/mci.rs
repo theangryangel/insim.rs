@@ -1,10 +1,11 @@
 use crate::packet_flags;
 use crate::{conversion, protocol::position::FixedPoint};
 use deku::prelude::*;
+#[cfg(feature = "serde")]
 use serde::Serialize;
 
 packet_flags! {
-    #[derive(Serialize)]
+    #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct CompCarInfo: u8 {
         BLUE_FLAG => (1 << 0),
         YELLOW_FLAG => (1 << 1),
@@ -14,7 +15,8 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 /// Used within the [Mci] packet info field.
 pub struct CompCar {
     /// Index of the last "node" that the player passed through.
@@ -82,7 +84,8 @@ impl CompCar {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Multi Car Info - positional information for players/vehicles.
 /// The MCI packet does not contain the positional information for all players. Only some. The

@@ -10,8 +10,9 @@ macro_rules! packet {
     ) => {
 
         /// Enum of all possible packet types.
-        #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
-        #[serde(tag = "type")]
+        #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+        #[cfg_attr(feature = "serde", derive(Serialize))]
+        #[cfg_attr(feature = "serde", serde(tag = "type"))]
         #[deku(endian = "little", type = "u8")]
         pub enum $name {
             $(

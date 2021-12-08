@@ -57,7 +57,6 @@ impl insim::framework::EventHandler for Party {
         client: &insim::framework::Client,
         data: &insim::protocol::insim::Mci,
     ) {
-        /*
         for i in data.info.iter() {
             info!(
                 "{:?} {:?}mph, {:?}kph, {:?}mps, {:?}raw",
@@ -68,7 +67,6 @@ impl insim::framework::EventHandler for Party {
                 i.speed
             );
         }
-        */
     }
 
     fn on_message(&self, client: &insim::framework::Client, data: &insim::protocol::insim::Mso) {
@@ -99,7 +97,7 @@ impl insim::framework::EventHandler for Counter {
 
         ctx.send(
             insim::protocol::relay::HostSelect {
-                hname: "^2Ronys ^3Tuesdays ^5Fun ^2Race".into(),
+                hname: "Nubbins AU Demo".into(),
                 ..Default::default()
             }
             .into(),

@@ -1,8 +1,10 @@
 use super::ObjectInfo;
 use deku::prelude::*;
+#[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Serialize, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(type = "u8", endian = "little")]
 /// Used within the [Jrr] packet.
 pub enum JrrAction {
@@ -31,7 +33,8 @@ pub enum JrrAction {
     Unused7,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Join Request Reply
 /// Set the ISF_REQ_JOIN flag in the IS_ISI to receive join requests

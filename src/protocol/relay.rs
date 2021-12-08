@@ -12,11 +12,13 @@ use crate::packet_flags;
 use crate::string::{ICodepageString, IString};
 use crate::track::Track;
 use deku::prelude::*;
+#[cfg(feature = "serde")]
 use serde::Serialize;
 
 /// Ask the relay if we are logged in as an administrative user on the selected host. A
 /// [AdminResponse] is sent back by the relay.
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct AdminRequest {
     #[deku(pad_bytes_after = "1")]
@@ -25,7 +27,8 @@ pub struct AdminRequest {
 
 /// Reponse to a [AdminRequest] packet, indicating if we are logged in as an administrative user on
 /// the selected host.
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct AdminResponse {
     /// Optional request identifier. If a request identifier was sent in the request, it will be
@@ -37,8 +40,9 @@ pub struct AdminResponse {
 
 /// Request a list of available hosts from the Insim Relay. After sending this packet the relay
 /// will respond with a HostList packet.
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct HostListRequest {
     #[deku(pad_bytes_after = "1")]
     pub reqi: u8,
@@ -47,7 +51,7 @@ pub struct HostListRequest {
 packet_flags! {
     /// Bitwise flags used within the [HostInfo] packet, which is in turn used by the [HostList]
     /// packet.
-    #[derive(Serialize)]
+    #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct HostInfoFlags: u8 {
         SPECTATE_PASSWORD_REQUIRED => (1 << 0),
         LICENSED => (1 << 1),
@@ -59,7 +63,8 @@ packet_flags! {
 }
 
 /// Information about a host. Used within the [HostList] packet.
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct HostInfo {
     #[deku(bytes = "32")]
     pub hname: ICodepageString,
@@ -76,7 +81,8 @@ pub struct HostInfo {
 /// The relay will send a list of available hosts using this packet. There may be more than one
 /// HostList packet sent in response to a [HostListRequest]. You may use the [HostInfoFlags] to
 /// determine if the host is the last in the list.
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct HostList {
     pub reqi: u8,
@@ -88,8 +94,9 @@ pub struct HostList {
 }
 
 /// Send a HostSelect to the relay in order to start receiving information about the selected host.
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct HostSelect {
     #[deku(pad_bytes_after = "1")]
     pub reqi: u8,
@@ -105,7 +112,8 @@ pub struct HostSelect {
 }
 
 /// Enum of possible errors  that the Insim Relay can respond with.
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Serialize, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(type = "u8", endian = "little")]
 pub enum ErrorType {
     #[deku(id = "0")]
@@ -137,7 +145,8 @@ pub enum ErrorType {
 }
 
 /// The relay will send this packet when it encounters an error.
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct Error {
     pub reqi: u8,

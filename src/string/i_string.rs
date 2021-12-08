@@ -105,8 +105,10 @@ impl fmt::Display for IString {
     }
 }
 
+#[cfg(feature = "serde")]
 use serde::ser::{Serialize, Serializer};
 
+#[cfg(feature = "serde")]
 impl Serialize for IString {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

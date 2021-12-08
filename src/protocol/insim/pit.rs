@@ -1,10 +1,11 @@
 use super::PlayerFlags;
 use crate::packet_flags;
 use deku::prelude::*;
+#[cfg(feature = "serde")]
 use serde::Serialize;
 
 packet_flags! {
-    #[derive(Serialize)]
+    #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct PitStopWorkFlags: u32 {
         NOTHING => 0,
         STOP => (1 << 0),
@@ -27,7 +28,8 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Pit stop (stop at the garage, not "tele-pit")
 pub struct Pit {
@@ -59,7 +61,8 @@ pub struct Pit {
     pub work: u32,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Pit Stop Finished
 pub struct Psf {
@@ -73,7 +76,8 @@ pub struct Psf {
     pub stime: u32,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Serialize, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(type = "u8", endian = "little")]
 pub enum PitLaneFact {
     #[deku(id = "0")]
@@ -92,7 +96,8 @@ pub enum PitLaneFact {
     EnterStopGo,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// PitLane
 pub struct Pla {

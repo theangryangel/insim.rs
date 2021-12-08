@@ -1,8 +1,10 @@
 use deku::prelude::*;
+#[cfg(feature = "serde")]
 use serde::Serialize;
 
 /// AutoX Object Contact
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct Axo {
     pub reqi: u8,

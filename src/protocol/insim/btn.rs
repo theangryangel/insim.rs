@@ -1,8 +1,10 @@
 use crate::string::ICodepageString;
 use deku::prelude::*;
+#[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Serialize, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(type = "u8", endian = "little")]
 /// Used within [Bfn] to specify the action to take.
 pub enum BfnType {
@@ -19,7 +21,8 @@ pub enum BfnType {
     ButtonsRequested,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Button Function
 pub struct Bfn {
@@ -31,7 +34,8 @@ pub struct Bfn {
     pub inst: u8,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Button
 pub struct Btn {
@@ -51,7 +55,8 @@ pub struct Btn {
     pub text: ICodepageString, // FIXME: this should be upto 240 characters and always a multiple of 4
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Button Click - Sent back when a user clicks a button
 pub struct Btc {
@@ -63,7 +68,8 @@ pub struct Btc {
     pub cflags: u8,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Button Type - Sent back when a user types into a text entry "button"
 pub struct Btt {

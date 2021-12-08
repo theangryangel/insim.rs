@@ -1,9 +1,10 @@
 use crate::packet_flags;
 use deku::prelude::*;
+#[cfg(feature = "serde")]
 use serde::Serialize;
 
 packet_flags! {
-    #[derive(Serialize)]
+    #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct PlcAllowedCars: u32 {
         XF_GTI => (1 << 1),
         XR_GT => (1 << 2),
@@ -28,7 +29,8 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Player Cars
 pub struct Plc {

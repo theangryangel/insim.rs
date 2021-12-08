@@ -2,11 +2,13 @@
 
 use crate::string::{is_ascii_alphanumeric, strip_trailing_nul};
 use deku::prelude::*;
+#[cfg(feature = "serde")]
 use serde::Serialize;
 
 /// Handles parsing a vehicle name according to the Insim v9 rules.
 /// See https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize, Default)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Vehicle {
     pub inner: [u8; 4],
 }

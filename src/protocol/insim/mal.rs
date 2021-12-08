@@ -1,11 +1,13 @@
 use crate::error::Error;
 use deku::prelude::*;
+#[cfg(feature = "serde")]
 use serde::Serialize;
 use std::default::Default;
 
 const MAX_MAL_SIZE: usize = 120;
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize, Default)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Mods Allowed - restrict the mods that can be used
 pub struct Mal {

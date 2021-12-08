@@ -1,9 +1,11 @@
 use crate::string::ICodepageString;
 use deku::prelude::*;
+#[cfg(feature = "serde")]
 use serde::Serialize;
 
 /// Enum for the result field of [Acr].
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Serialize, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(type = "u8", endian = "little")]
 pub enum AcrResult {
     #[deku(id = "0")]
@@ -20,7 +22,8 @@ pub enum AcrResult {
 }
 
 /// Admin Command Report
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct Acr {
     #[deku(pad_bytes_after = "1")]

@@ -1,10 +1,11 @@
 use deku::prelude::*;
+#[cfg(feature = "serde")]
 use serde::Serialize;
 
 use crate::packet_flags;
 
 packet_flags! {
-    #[derive(Serialize)]
+    #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct ObhFlags: u8 {
         LAYOUT => (1 << 0),
         CAN_MOVE => (1 << 1),
@@ -13,7 +14,8 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(endian = "little")]
 pub struct CarContact {
     pub direction: u8,
@@ -24,7 +26,8 @@ pub struct CarContact {
     pub y: i16,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Object Hit
 pub struct Obh {

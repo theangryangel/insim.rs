@@ -1,14 +1,17 @@
 use deku::prelude::*;
+#[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 /// Used within [Hcp] to apply handicaps to a vehicle.
 pub struct HcpCarHandicap {
     pub added_mass: u8,
     pub intake_restriction: u8,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Serialize)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Vehicle Handicaps
 /// You can send a packet to add mass and restrict the intake on each car model

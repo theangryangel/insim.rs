@@ -310,8 +310,10 @@ impl fmt::Display for ICodepageString {
     }
 }
 
+#[cfg(feature = "serde")]
 use serde::ser::{Serialize, Serializer};
 
+#[cfg(feature = "serde")]
 impl Serialize for ICodepageString {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
