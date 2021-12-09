@@ -108,7 +108,7 @@ pub use plp::Plp;
 pub use reo::Reo;
 pub use res::Res;
 pub use rip::{Rip, RipError};
-pub use rst::{HostFacts, Wind, Rst};
+pub use rst::{HostFacts, Rst, Wind};
 pub use scc::Scc;
 pub use sch::Sch;
 pub use sfp::Sfp;

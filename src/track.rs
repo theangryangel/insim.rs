@@ -58,6 +58,17 @@ const TRACK_INFO: &[TrackInfo] = &[
     ("LA2", "Layout Square, Wide Grid", None, 0),
 ];
 
+/// Lookup a [TrackInfo] from a track name
+pub fn lookup(input: &[u8]) -> Option<&TrackInfo> {
+    if let Some(rpos) = input.iter().rposition(|x| ![b'X', b'R', 0].contains(x)) {
+        let short_code = std::str::from_utf8(&input[..=rpos]).unwrap();
+
+        TRACK_INFO.iter().find(|x| x.0 == short_code)
+    } else {
+        None
+    }
+}
+
 /// Handles parsing a Track name.
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -66,26 +77,19 @@ pub struct Track {
 }
 
 impl Track {
+    /// Is this a reversed track?
     pub fn is_reverse(&self) -> bool {
         matches!(strip_trailing_nul(&self.inner).last(), Some(b'R'))
     }
 
+    /// Are we in open world mode?
     pub fn is_open_world(&self) -> bool {
         matches!(strip_trailing_nul(&self.inner).last(), Some(b'X'))
     }
 
+    /// Lookup the [TrackInfo] for this track.
     pub fn track_info(&self) -> Option<&TrackInfo> {
-        if let Some(rpos) = self
-            .inner
-            .iter()
-            .rposition(|x| ![b'X', b'R', 0].contains(x))
-        {
-            let short_code = std::str::from_utf8(&self.inner[..=rpos]).unwrap();
-
-            TRACK_INFO.iter().find(|x| x.0 == short_code)
-        } else {
-            None
-        }
+        lookup(&self.inner)
     }
 }
 

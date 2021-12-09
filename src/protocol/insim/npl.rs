@@ -11,20 +11,30 @@ use serde::Serialize;
 pub enum TyreCompound {
     #[deku(id = "0")]
     R1,
+
     #[deku(id = "1")]
     R2,
+
     #[deku(id = "2")]
     R3,
+
     #[deku(id = "3")]
     R4,
+
     #[deku(id = "4")]
     RoadSuper,
+
     #[deku(id = "5")]
     RoadNormal,
+
     #[deku(id = "6")]
     Hybrid,
+
     #[deku(id = "7")]
     Knobbly,
+
+    #[deku(id = "255")]
+    NoChange,
 }
 
 packet_flags! {
