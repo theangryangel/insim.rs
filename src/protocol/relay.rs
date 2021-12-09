@@ -9,7 +9,7 @@
 //! See [https://en.lfsmanual.net/wiki/InSim_Relay](https://en.lfsmanual.net/wiki/InSim_Relay) for more information.
 
 use crate::packet_flags;
-use crate::string::{ICodepageString, IString};
+use crate::string::{istring, CodepageString};
 use crate::track::Track;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
@@ -67,7 +67,7 @@ packet_flags! {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct HostInfo {
     #[deku(bytes = "32")]
-    pub hname: ICodepageString,
+    pub hname: CodepageString,
 
     pub track: Track,
 
@@ -102,13 +102,19 @@ pub struct HostSelect {
     pub reqi: u8,
 
     #[deku(bytes = "32")]
-    pub hname: ICodepageString,
+    pub hname: CodepageString,
 
-    #[deku(bytes = "16")]
-    pub admin: IString,
+    #[deku(
+        reader = "istring::read(deku::rest, 16)",
+        writer = "istring::write(deku::output, &self.admin, 16)"
+    )]
+    pub admin: String,
 
-    #[deku(bytes = "16")]
-    pub spec: IString,
+    #[deku(
+        reader = "istring::read(deku::rest, 16)",
+        writer = "istring::write(deku::output, &self.spec, 16)"
+    )]
+    pub spec: String,
 }
 
 /// Enum of possible errors  that the Insim Relay can respond with.

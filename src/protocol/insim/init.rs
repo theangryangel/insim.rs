@@ -1,5 +1,5 @@
 use crate::packet_flags;
-use crate::string::IString;
+use crate::string::istring;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -55,10 +55,16 @@ pub struct Init {
     pub interval: u16,
 
     /// Administrative password.
-    #[deku(bytes = "16")]
-    pub password: IString,
+    #[deku(
+        reader = "istring::read(deku::rest, 16)",
+        writer = "istring::write(deku::output, &self.password, 16)"
+    )]
+    pub password: String,
 
     /// Name of the program.
-    #[deku(bytes = "16")]
-    pub name: IString,
+    #[deku(
+        reader = "istring::read(deku::rest, 16)",
+        writer = "istring::write(deku::output, &self.name, 16)"
+    )]
+    pub name: String,
 }

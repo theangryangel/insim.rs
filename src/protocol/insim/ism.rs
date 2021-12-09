@@ -1,4 +1,4 @@
-use crate::string::ICodepageString;
+use crate::string::CodepageString;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -15,5 +15,5 @@ pub struct Ism {
     pub host: u8,
 
     #[deku(bytes = "16")]
-    pub hname: ICodepageString,
+    pub hname: CodepageString,
 }

@@ -128,8 +128,8 @@ impl Client {
 
         let mut transport = protocol::transport::Transport::new(tcp, self.config.codec_mode);
         let isi = protocol::insim::Init {
-            name: self.config.name.to_owned().into(),
-            password: self.config.password.to_owned().into(),
+            name: self.config.name.to_owned(),
+            password: self.config.password.to_owned(),
             prefix: self.config.prefix,
             version: protocol::insim::VERSION,
             interval: self.config.interval_ms,

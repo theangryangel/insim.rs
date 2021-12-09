@@ -70,7 +70,7 @@ impl insim::framework::EventHandler for Party {
     }
 
     fn on_message(&self, client: &insim::framework::Client, data: &insim::protocol::insim::Mso) {
-        info!("{}", insim::string::ansi_colours(data.msg.to_string()));
+        info!("{}", insim::string::colours::to_ansi(data.msg.to_string()));
     }
 
     fn on_player_contact(
@@ -124,7 +124,7 @@ impl insim::framework::EventHandler for Counter {
                     if i.numconns > 1 {
                         tracing::info!(
                             "{} ({} / {}) {} {:?} {}",
-                            insim::string::ansi_colours(i.hname.to_string()),
+                            insim::string::colours::to_ansi(i.hname.to_string()),
                             i.hname.to_string(),
                             i.numconns,
                             i.track.to_string(),
@@ -141,7 +141,7 @@ impl insim::framework::EventHandler for Counter {
                 }
             }
             d => {
-                //info!("{:?}", d);
+                debug!("{:?}", d);
             }
         }
 

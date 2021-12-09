@@ -1,4 +1,4 @@
-use crate::string::ICodepageString;
+use crate::string::CodepageString;
 use deku::ctx::Size;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
@@ -17,6 +17,6 @@ pub struct Iii {
     #[deku(pad_bytes_after = "2")]
     pub plid: u8,
 
-    #[deku(reader = "ICodepageString::read(deku::rest, Size::Bytes(deku::rest.len() / 8))")]
-    pub msg: ICodepageString,
+    #[deku(reader = "CodepageString::read(deku::rest, Size::Bytes(deku::rest.len() / 8))")]
+    pub msg: CodepageString,
 }

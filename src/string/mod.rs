@@ -3,11 +3,9 @@
 mod escaping;
 pub use escaping::*;
 
-mod colours;
-pub use colours::*;
+pub mod colours;
 
-mod code_page_string;
-pub use code_page_string::ICodepageString;
+mod codepage_string;
+pub use codepage_string::CodepageString;
 
-mod i_string;
-pub use i_string::IString;
+pub mod istring;

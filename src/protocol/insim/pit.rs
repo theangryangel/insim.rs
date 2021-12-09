@@ -1,4 +1,4 @@
-use super::PlayerFlags;
+use super::{PlayerFlags, TyreCompound};
 use crate::packet_flags;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
@@ -54,8 +54,8 @@ pub struct Pit {
     #[deku(bytes = "1", pad_bytes_after = "1")]
     pub numstops: u8,
 
-    #[deku(bytes = "1", count = "4")]
-    pub tyres: Vec<u8>,
+    #[deku(count = "4")]
+    pub tyres: Vec<TyreCompound>,
 
     #[deku(bytes = "4", pad_bytes_after = "4")]
     pub work: u32,

@@ -1,5 +1,5 @@
-use super::PlayerFlags;
-use crate::string::{ICodepageString, IString};
+use super::{PlayerFlags, RaceResultFlags};
+use crate::string::{istring, CodepageString};
 use crate::vehicle::Vehicle;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
@@ -14,14 +14,17 @@ pub struct Res {
 
     pub plid: u8,
 
-    #[deku(bytes = "24")]
-    pub uname: IString,
+    #[deku(
+        reader = "istring::read(deku::rest, 24)",
+        writer = "istring::write(deku::output, &self.uname, 24)"
+    )]
+    pub uname: String,
 
     #[deku(bytes = "24")]
-    pub pname: ICodepageString,
+    pub pname: CodepageString,
 
     #[deku(bytes = "8")]
-    pub plate: ICodepageString,
+    pub plate: CodepageString,
 
     pub cname: Vehicle,
 
@@ -33,7 +36,7 @@ pub struct Res {
     pub numstops: u8,
 
     #[deku(pad_bytes_after = "1")]
-    pub confirm: u8,
+    pub confirm: RaceResultFlags,
 
     pub lapsdone: u16,
 

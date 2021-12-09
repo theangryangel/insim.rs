@@ -1,4 +1,4 @@
-use crate::string::IString;
+use crate::string::istring;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -30,6 +30,9 @@ pub struct Ssh {
     #[deku(pad_bytes_after = "4")]
     pub error: u8,
 
-    #[deku(bytes = "32")]
-    pub lname: IString,
+    #[deku(
+        reader = "istring::read(deku::rest, 32)",
+        writer = "istring::write(deku::output, &self.lname, 32)"
+    )]
+    pub lname: String,
 }

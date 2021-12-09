@@ -1,9 +1,31 @@
 use crate::packet_flags;
-use crate::string::{ICodepageString, IString};
+use crate::string::{istring, CodepageString};
 use crate::vehicle::Vehicle;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[deku(type = "u8", endian = "little")]
+pub enum TyreCompound {
+    #[deku(id = "0")]
+    R1,
+    #[deku(id = "1")]
+    R2,
+    #[deku(id = "2")]
+    R3,
+    #[deku(id = "3")]
+    R4,
+    #[deku(id = "4")]
+    RoadSuper,
+    #[deku(id = "5")]
+    RoadNormal,
+    #[deku(id = "6")]
+    Hybrid,
+    #[deku(id = "7")]
+    Knobbly,
+}
 
 packet_flags! {
     #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -41,18 +63,21 @@ pub struct Npl {
     pub flags: PlayerFlags,
 
     #[deku(bytes = "24")]
-    pub pname: ICodepageString,
+    pub pname: CodepageString,
 
     #[deku(bytes = "8")]
-    pub plate: ICodepageString,
+    pub plate: CodepageString,
 
     pub cname: Vehicle,
 
-    #[deku(bytes = "16")]
-    pub sname: IString,
+    #[deku(
+        reader = "istring::read(deku::rest, 16)",
+        writer = "istring::write(deku::output, &self.sname, 16)"
+    )]
+    pub sname: String,
 
-    #[deku(bytes = "1", count = "4")]
-    pub tyres: Vec<u8>,
+    #[deku(count = "4")]
+    pub tyres: Vec<TyreCompound>,
 
     pub h_mass: u8,
 

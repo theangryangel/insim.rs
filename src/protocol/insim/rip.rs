@@ -1,4 +1,4 @@
-use crate::string::IString;
+use crate::string::istring;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -61,6 +61,9 @@ pub struct Rip {
     pub ctime: u32,
     pub ttime: u32,
 
-    #[deku(bytes = "64")]
-    pub rname: IString,
+    #[deku(
+        reader = "istring::read(deku::rest, 64)",
+        writer = "istring::write(deku::output, &self.rname, 64)"
+    )]
+    pub rname: String,
 }

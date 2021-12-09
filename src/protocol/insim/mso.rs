@@ -1,4 +1,4 @@
-use crate::string::ICodepageString;
+use crate::string::CodepageString;
 use deku::ctx::Size;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
@@ -44,6 +44,6 @@ pub struct Mso {
     /// Index of the first character of user entered text, in msg field.
     pub textstart: u8,
 
-    #[deku(reader = "ICodepageString::read(deku::rest, Size::Bytes(deku::rest.len() / 8))")]
-    pub msg: ICodepageString,
+    #[deku(reader = "CodepageString::read(deku::rest, Size::Bytes(deku::rest.len() / 8))")]
+    pub msg: CodepageString,
 }

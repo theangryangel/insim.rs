@@ -1,4 +1,4 @@
-use crate::string::ICodepageString;
+use crate::string::CodepageString;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -16,5 +16,5 @@ pub struct Axi {
     pub numo: u16,
 
     #[deku(bytes = "32")]
-    pub lname: ICodepageString,
+    pub lname: CodepageString,
 }

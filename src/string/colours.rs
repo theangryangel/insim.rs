@@ -1,7 +1,7 @@
 const COLOUR_SEQUENCES: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 /// Strip LFS colours
-pub fn strip_colours(input: String) -> String {
+pub fn strip(input: String) -> String {
     // FIXME: probably should make this a Cow and then return the Cow if nothing needs to be
     // changed?
 
@@ -27,14 +27,13 @@ pub fn strip_colours(input: String) -> String {
     output
 }
 
-/// Americanised version of [strip_colours].
-pub fn strip_colors(input: String) -> String {
-    strip_colours(input)
-}
-
 /// Replace LFS colours with ANSI colours.
-pub fn ansi_colours(input: String) -> String {
+/// Assumes that the input has already been unescaped. This usually happens automatically when
+/// de-serialising from the wire.
+pub fn to_ansi(input: String) -> String {
     let mut has_colours = false;
+
+    // FIXME: Should probably make this a Cow and only attempt to replace if there are any colours.
 
     let mut output = String::with_capacity(input.len());
     let mut iter = input.chars();

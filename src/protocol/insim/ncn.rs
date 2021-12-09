@@ -1,4 +1,4 @@
-use crate::string::{ICodepageString, IString};
+use crate::string::{istring, CodepageString};
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -12,13 +12,16 @@ pub struct Ncn {
 
     pub ucid: u8,
 
-    #[deku(bytes = "24")]
     /// Username.
-    pub uname: IString,
+    #[deku(
+        reader = "istring::read(deku::rest, 24)",
+        writer = "istring::write(deku::output, &self.uname, 24)"
+    )]
+    pub uname: String,
 
     #[deku(bytes = "24")]
     /// Playername.
-    pub pname: ICodepageString,
+    pub pname: CodepageString,
 
     /// 1 if administrative user.
     pub admin: u8,

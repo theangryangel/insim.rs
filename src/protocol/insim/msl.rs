@@ -1,4 +1,4 @@
-use crate::string::ICodepageString;
+use crate::string::CodepageString;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -37,5 +37,5 @@ pub struct Msl {
     pub sound: MslSoundType,
 
     #[deku(bytes = "128")]
-    pub msg: ICodepageString,
+    pub msg: CodepageString,
 }

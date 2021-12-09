@@ -1,4 +1,4 @@
-use crate::string::ICodepageString;
+use crate::string::CodepageString;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -52,7 +52,7 @@ pub struct Btn {
     pub height: u8,
 
     #[deku(bytes = "240")]
-    pub text: ICodepageString, // FIXME: this should be upto 240 characters and always a multiple of 4
+    pub text: CodepageString, // FIXME: this should be upto 240 characters and always a multiple of 4
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
@@ -82,5 +82,5 @@ pub struct Btt {
     pub typein: u8,
 
     #[deku(bytes = "96")]
-    pub text: ICodepageString,
+    pub text: CodepageString,
 }

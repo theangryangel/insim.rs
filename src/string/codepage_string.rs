@@ -1,4 +1,4 @@
-//! Utilities for working with strings from Insim.
+//! Utilities for working with 'Codepage strings' from Insim.
 
 use super::{escape, strip_trailing_nul, unescape};
 use encoding_rs;
@@ -19,18 +19,18 @@ const CODEPAGE_MARKER: u8 = b'^';
 ///
 /// The struct also supports a 'builder' style interface for creating the raw bytes.
 #[derive(PartialEq, Default, Debug)]
-pub struct ICodepageString {
+pub struct CodepageString {
     pub(crate) inner: Vec<u8>,
 }
 
-impl ICodepageString {
-    /// Create a new empty IString.
+impl CodepageString {
+    /// Create a new empty CodepageString.
     /// This will not allocate until elements are pushed onto it.
     pub const fn new() -> Self {
         Self { inner: Vec::new() }
     }
 
-    /// Creates a new emptyy `IString` with the specified capacity.
+    /// Creates a new emptyy `CodepageString` with the specified capacity.
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             inner: Vec::with_capacity(capacity),
@@ -52,9 +52,9 @@ impl ICodepageString {
         self.inner.clear()
     }
 
-    /// Takes a slice of u8, strips any trailing \0 and returns an IString.
+    /// Takes a slice of u8, strips any trailing \0 and returns an CodepageString.
     pub fn from_bytes(input: &[u8]) -> Self {
-        ICodepageString {
+        CodepageString {
             inner: strip_trailing_nul(input).to_vec(),
         }
     }
@@ -65,9 +65,9 @@ impl ICodepageString {
     }
 
     /// Convert from a String using the default LFS encoding ("Latin1")
-    pub fn from_string(value: String) -> ICodepageString {
+    pub fn from_string(value: String) -> CodepageString {
         let (output, _encoding, _had_errors) = encoding_rs::WINDOWS_1252.encode(&value);
-        ICodepageString {
+        CodepageString {
             inner: escape(&output.to_vec()),
         }
     }
@@ -334,15 +334,11 @@ impl ICodepageString {
     }
 }
 
-// XXX: I've left this and the IString impls seperate for now as I suspect there are use cases
-// where implementing them via a common trait may be problematic. I'm not sure what they are
-// *yet*, so I'm leaving them effectively duplicated, for now.
-
 use std::fmt;
 
-impl Clone for ICodepageString {
+impl Clone for CodepageString {
     fn clone(&self) -> Self {
-        ICodepageString {
+        CodepageString {
             inner: self.inner.clone(),
         }
     }
@@ -352,21 +348,21 @@ impl Clone for ICodepageString {
     }
 }
 
-impl From<String> for ICodepageString {
+impl From<String> for CodepageString {
     #[inline]
     fn from(s: String) -> Self {
-        ICodepageString::from_string(s)
+        CodepageString::from_string(s)
     }
 }
 
-impl From<&str> for ICodepageString {
+impl From<&str> for CodepageString {
     #[inline]
     fn from(s: &str) -> Self {
-        ICodepageString::from_string(s.into())
+        CodepageString::from_string(s.into())
     }
 }
 
-impl fmt::Display for ICodepageString {
+impl fmt::Display for CodepageString {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.to_lossy_string())
     }
@@ -376,7 +372,7 @@ impl fmt::Display for ICodepageString {
 use serde::ser::{Serialize, Serializer};
 
 #[cfg(feature = "serde")]
-impl Serialize for ICodepageString {
+impl Serialize for CodepageString {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -389,7 +385,7 @@ impl Serialize for ICodepageString {
 use deku::bitvec::{BitSlice, BitVec, Msb0};
 use deku::{ctx::*, DekuError, DekuRead, DekuWrite};
 
-impl DekuWrite<(Endian, Size)> for ICodepageString {
+impl DekuWrite<(Endian, Size)> for CodepageString {
     fn write(
         &self,
         output: &mut BitVec<Msb0, u8>,
@@ -421,7 +417,7 @@ impl DekuWrite<(Endian, Size)> for ICodepageString {
     }
 }
 
-impl DekuWrite<Size> for ICodepageString {
+impl DekuWrite<Size> for CodepageString {
     fn write(&self, output: &mut BitVec<Msb0, u8>, bit_size: Size) -> Result<(), DekuError> {
         let orig_size = output.len();
         if self.is_empty() {
@@ -447,25 +443,25 @@ impl DekuWrite<Size> for ICodepageString {
     }
 }
 
-impl DekuWrite for ICodepageString {
+impl DekuWrite for CodepageString {
     fn write(&self, output: &mut BitVec<Msb0, u8>, _: ()) -> Result<(), DekuError> {
         let value = self.into_bytes();
         value.write(output, ())
     }
 }
 
-impl DekuRead<'_, Size> for ICodepageString {
+impl DekuRead<'_, Size> for CodepageString {
     fn read(
         input: &BitSlice<Msb0, u8>,
         size: Size,
     ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
         let (rest, value) = Vec::read(input, Limit::new_size(size))?;
 
-        Ok((rest, ICodepageString::from_bytes(&value)))
+        Ok((rest, CodepageString::from_bytes(&value)))
     }
 }
 
-impl DekuRead<'_, (Endian, Size)> for ICodepageString {
+impl DekuRead<'_, (Endian, Size)> for CodepageString {
     fn read(
         input: &BitSlice<Msb0, u8>,
         (_endian, size): (Endian, Size),
@@ -473,6 +469,6 @@ impl DekuRead<'_, (Endian, Size)> for ICodepageString {
         // FIXME: implement endian handling
         let (rest, value) = Vec::read(input, Limit::new_size(size))?;
 
-        Ok((rest, ICodepageString::from_bytes(&value)))
+        Ok((rest, CodepageString::from_bytes(&value)))
     }
 }

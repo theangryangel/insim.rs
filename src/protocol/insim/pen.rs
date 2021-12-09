@@ -16,16 +16,37 @@ packet_flags! {
     }
 }
 
-packet_flags! {
-    #[cfg_attr(feature = "serde", derive(Serialize))]
-    pub struct PenaltyReason: u8 {
-        ADMIN => (1 << 0),
-        WRONG_WAY => (1 << 1),
-        FALSE_START => (1 << 2),
-        SPEEDING => (1 << 3),
-        STOP_SHORT => (1 << 4),
-        STOP_LATE => (1 << 5),
-    }
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[deku(type = "u8", endian = "little")]
+pub enum PenaltyReason {
+    /// Unknown or cleared penalty
+    #[deku(id = "0")]
+    None,
+
+    /// Penalty given by admin
+    #[deku(id = "1")]
+    Admin,
+
+    /// Driving wrong way
+    #[deku(id = "2")]
+    WrongWay,
+
+    /// False start
+    #[deku(id = "3")]
+    FalseStart,
+
+    /// Speeding in pit lane
+    #[deku(id = "4")]
+    Speeding,
+
+    /// Stop-go in pit stop too short
+    #[deku(id = "5")]
+    StopShort,
+
+    /// Compulsory stop is too late
+    #[deku(id = "6")]
+    StopLate,
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
@@ -33,18 +54,14 @@ packet_flags! {
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Penalty
 pub struct Pen {
-    #[deku(bytes = "1")]
     pub reqi: u8,
 
-    #[deku(bytes = "1")]
     pub plid: u8,
 
-    #[deku(bytes = "1")]
     pub oldpen: PenaltyInfo,
 
-    #[deku(bytes = "1")]
     pub newpen: PenaltyInfo,
 
-    #[deku(bytes = "1", pad_bytes_after = "1")]
+    #[deku(pad_bytes_after = "1")]
     pub reason: PenaltyReason,
 }
