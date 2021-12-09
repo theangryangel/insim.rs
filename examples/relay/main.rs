@@ -97,7 +97,7 @@ impl insim::framework::EventHandler for Counter {
 
         ctx.send(
             insim::protocol::relay::HostSelect {
-                hname: "Nubbins AU Demo".into(),
+                hname: "^1(^3FM^1) ^4GTi Thursday".into(),
                 ..Default::default()
             }
             .into(),

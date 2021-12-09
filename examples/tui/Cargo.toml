@@ -1,0 +1,17 @@
+[package]
+name = "example-tui"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+insim = { path = "../../" }
+futures = "0.3"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = "0.2"
+tui = "0.16"
+termion = "1.5"
+rand = "0.8"
+bounded-vec-deque = "0.1"
+chrono = "0.4"
