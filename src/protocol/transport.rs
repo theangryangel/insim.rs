@@ -1,41 +1,4 @@
 //! Lower level transport interface.
-//!
-//! # Example
-//! ```rust
-//! // Connect to the Insim Relay
-//! let tcp: TcpStream = TcpStream::connect("isrelay.lfs.net:47474").await.unwrap();
-//!
-//! // Create a Transport, using the uncompressed packet length mode (insim protocol <= 8 uses this,
-//! // insim >= 9 supports both compressed and uncompressed modes).
-//! let mut t = insim::protocol::transport::Transport::new(
-//!     tcp,
-//!     insim::protocol::codec::Mode::Uncompressed
-//! );
-//!
-//! // Send a Init packet to handshake with the server.
-//! let isi = insim::protocol::insim::Init {
-//!     name: "insim.rs".into(),
-//!     password: "".into(),
-//!     prefix: b'!',
-//!     version: insim::protocol::insim::VERSION,
-//!     interval: 1000,
-//!     flags: insim::protocol::insim::InitFlags::MCI,
-//!     reqi: 1,
-//! };
-//!
-//! t.send(isi).await;
-//!
-//! // Select a host from the relay to receive data from.
-//! t.send(insim::protocol::relay::HostSelect {
-//!     hname: "Nubbins AU Demo".into(),
-//!     ..Default::default()
-//! }).await;
-//!
-//! // Print the data from the relay.
-//! while let Some(m) = t.next().await {
-//!     tracing::debug!("{:?}", m);
-//! }
-//! ````
 
 use crate::{
     error,

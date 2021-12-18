@@ -1,52 +1,34 @@
 //! An optional high level API for working with LFS through Insim.
 //!
-//! # Example
+//! # Example with state
 //! ```rust
-//! // Example handler usage that counts the number of packets received and resets on each
+//! // Example that counts the number of packets received and resets on each
 //! // reconnection.
+//! #[derive(Default, Clone)]
 //! struct Counter {
-//!     i: AtomicUsize,
-//! }
-//!
-//! // We must implement the EventHandler trait. You do not need to implement all the methods as
-//! // the trait provides default implementations for the ones you do not need.
-//! impl insim::framework::EventHandler for Counter {
-//!     // The on_connection function is called when the connection is established.
-//!     fn on_connect(&self, ctx: &insim::framework::Client) {
-//!         // on connection reset our AtomicUsize back to 0.
-//!         self.i.store(0, Ordering::Relaxed);
-//!
-//!         // Select a server to receive packets from.
-//!         ctx.send(
-//!             insim::protocol::relay::HostSelect {
-//!                 hname: "Nubbins AU Demo".into(),
-//!                 ..Default::default()
-//!             }
-//!             .into(),
-//!         );
-//!     }
-//!
-//!     // The on_raw function is called whenever any packet is received.
-//!     // There are many other event functions that can be used. i.e. on_tiny to receive Tiny
-//!     // packets. on_raw is provided as an escape hatch for all packets.
-//!     fn on_raw(&self, ctx: &insim::framework::Client, _data: &insim::protocol::Packet) {
-//!         self.i.fetch_add(1, Ordering::Relaxed);
-//!     }
+//!   pub counter: Arc<AtomicUsize>,
 //! }
 //!
 //! // Create a Config object where we indicate that we want to use the Insim Relay,
-//! // and that we want to use our Counter struct which implements the EventHandler trait.
-//! let client = insim::framework::Config::default()
-//!     .relay()
-//!     .using_event_handler(Counter {
-//!         i: AtomicUsize::new(0),
-//!     })
-//!     .build();
+//! // and that we want to use our Counter struct for storing state.
+//! // If you do not wish to store any state you may use the `build` function instead.
+//! let mut client = insim::framework::Config::default()
+//!   .relay()
+//!   .build_with_state(Counter::default());
+//!
+//! client.on_connect(|ctx| {
+//!   info!("🎉🎉🎉🎉🎉🎉 we've connected!");
+//!   ctx.state.counter.store(0, Ordering::Relaxed);
+//! });
+//!
+//! client.on_any(|ctx, packet| {
+//!   let count = ctx.state.counter.fetch_add(1, Ordering::Relaxed);
+//!   debug!("{:?} #={}", packet, count);
+//! });
 //!
 //! // We instruct the client to make a connection, and then run.
 //! // If you wish to run multiple futures concurrently (i.e. to run a web server in the
 //! // background), you can use `tokio::select!` and a loop.
-//! // See the examples directory of the crate for an example of this.
 //! let res = client.run().await;
 //!
 //! // When run returns, we can look at the result to see what happened.
@@ -73,20 +55,50 @@ use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tracing;
 
+pub type ClientConnHandleFn<S> = Box<dyn Fn(&Client<S>)>;
+pub type ClientPacketHandlerFn<S> = Box<dyn Fn(&Client<S>, &protocol::Packet)>;
+
 /// A high level Client that connects to an Insim server, and handles packet event routing to
-/// registered [EventHandlers](EventHandler).
-pub struct Client {
-    config: Arc<config::Config>,
+/// registered handlers.
+pub struct Client<State> {
+    pub config: Arc<config::Config>,
+    pub state: State,
+
+    on_connect_handlers: Vec<ClientConnHandleFn<State>>,
+    on_disconnect_handlers: Vec<ClientConnHandleFn<State>>,
+    on_packet_handlers: Vec<ClientPacketHandlerFn<State>>,
 
     shutdown: Option<mpsc::UnboundedSender<bool>>,
     tx: Option<mpsc::UnboundedSender<protocol::Packet>>,
 }
 
-impl Client {
+impl Client<()> {
+    /// Create a new Client with the given configuration.
+    pub fn new(config: Config) -> Self {
+        Client {
+            config: Arc::new(config),
+            state: (),
+            on_connect_handlers: Vec::new(),
+            on_disconnect_handlers: Vec::new(),
+            on_packet_handlers: Vec::new(),
+            shutdown: None,
+            tx: None,
+        }
+    }
+}
+
+impl<State> Client<State>
+where
+    State: Clone + Send + Sync + 'static,
+{
     /// Create a new Client with the given [Config].
-    pub fn from_config(config: config::Config) -> Self {
+    pub fn with_state(config: config::Config, state: State) -> Self {
         Self {
             config: Arc::new(config),
+            state,
+            on_connect_handlers: Vec::new(),
+            on_disconnect_handlers: Vec::new(),
+            on_packet_handlers: Vec::new(),
             tx: None,
             shutdown: None,
         }
@@ -117,10 +129,6 @@ impl Client {
         self.tx = Some(send_tx);
         self.shutdown = Some(shutdown_tx);
 
-        for event_handler in self.config.event_handlers.iter() {
-            event_handler.on_startup();
-        }
-
         let hname = &self.config.host;
         let tcp: TcpStream = TcpStream::connect(hname).await.unwrap();
 
@@ -144,8 +152,8 @@ impl Client {
 
         // TODO handle handshake errors
 
-        for event_handler in self.config.event_handlers.iter() {
-            event_handler.on_connect(&self);
+        for on_connect in self.on_connect_handlers.iter() {
+            on_connect(&self);
         }
 
         let mut ret: Result<(), error::Error> = Ok(());
@@ -168,11 +176,7 @@ impl Client {
 
                     match result {
                         Ok(frame) => {
-                            for event_handler in self.config.event_handlers.iter() {
-                                event_handler.on_raw(&self, &frame);
-                            }
-
-                            self.on_packet(&frame);
+                            self.dispatch(&frame);
                         },
                         Err(e) => {
                             ret = Err(e);
@@ -184,8 +188,8 @@ impl Client {
             }
         }
 
-        for event_handler in self.config.event_handlers.iter() {
-            event_handler.on_shutdown();
+        for on_disconnect in self.on_disconnect_handlers.iter() {
+            on_disconnect(&self);
         }
 
         self.tx = None;
@@ -193,14 +197,34 @@ impl Client {
 
         ret
     }
+
+    fn dispatch(&self, packet: &protocol::Packet) {
+        for handler in self.on_packet_handlers.iter() {
+            handler(self, packet);
+        }
+    }
+
+    /// Called when a [Packet::Tiny](super::protocol::Packet::Tiny) is received.
+    pub fn on_connect(&mut self, handler: fn(&Client<State>)) {
+        self.on_connect_handlers.push(Box::new(handler));
+    }
+
+    pub fn on_disconnect(&mut self, handler: fn(&Client<State>)) {
+        self.on_disconnect_handlers.push(Box::new(handler));
+    }
+
+    /// Called when any [Packet](super::protocol::Packet) is received.
+    pub fn on_any(&mut self, handler: fn(&Client<State>, &protocol::Packet)) {
+        self.on_packet_handlers.push(Box::new(handler));
+    }
 }
 
-use crate::event_handler;
+use crate::packet_handlers;
 use crate::protocol::Packet;
 
-event_handler!(
-    #[allow(unused)]
-    pub trait EventHandler for Client, Packet {
+packet_handlers!(
+    Client<State> for Packet {
+
         /// Called when a [Packet::Tiny](super::protocol::Packet::Tiny) is received.
         Tiny(protocol::insim::Tiny) => on_tiny,
 
@@ -281,6 +305,9 @@ event_handler!(
 
         /// Called when a [Packet::HotLapValidity](super::protocol::Packet::HotLapValidity) is received.
         HotLapValidity(protocol::insim::Hlv) => on_player_hot_lap_validity_failure,
+
+        /// Called when a [Packet::RelayHostList](super::protocol::Packet::RelayHostList) is received.
+        RelayHostList(protocol::relay::HostList) => on_relay_host_list,
 
         /// Called when a [Packet::RelayError](super::protocol::Packet::RelayError) is received.
         RelayError(protocol::relay::Error) => on_relay_error,

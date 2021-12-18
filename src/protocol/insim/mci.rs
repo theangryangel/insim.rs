@@ -38,7 +38,7 @@ pub struct CompCar {
     pub xyz: FixedPoint,
 
     /// Speed in game world units (32768 = 100 m/s)
-    /// You may use the [mph], [kmph] and [mps] functions to convert to real-world units.
+    /// You may use the speed_as_mph, speed_as_kmph and speed_as_mps functions to convert to real-world units.
     pub speed: u16,
 
     /// Direction of car's motion : 0 = world y direction, 32768 = 180 deg
