@@ -5,12 +5,13 @@ use crate::util::event::{Event, Events};
 use bounded_vec_deque::BoundedVecDeque;
 use chrono;
 use insim;
+use tokio::sync::mpsc;
 use std::{
     collections::HashMap,
     default::Default,
     error::Error,
     io,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}},
     time::Duration,
 };
 use termion::{event::Key, input::MouseTerminal, raw::IntoRawMode, screen::AlternateScreen};
@@ -23,270 +24,36 @@ use tui::{
     Terminal,
 };
 
-#[derive(Default)]
-pub struct Connection {
-    pub user_name: String,
-    pub player_name: insim::string::CodepageString,
-
-    pub on_track: bool,
-
-    pub finish_position: Option<u8>,
-    pub current_race_lap: Option<u16>,
-
-    pub best_lap_time: Option<u32>,
-    pub last_lap_time: Option<u32>,
-
-    pub flags: Option<insim::protocol::insim::PlayerFlags>,
-    pub vehicle: Option<insim::vehicle::Vehicle>,
-    pub plate: Option<insim::string::CodepageString>,
-    pub tyres: Option<Vec<insim::protocol::insim::TyreCompound>>,
-
-    pub handicap_mass: Option<u8>,
-    pub handicap_intake_restriction: Option<u8>,
-}
-
-#[derive(Clone)]
-pub struct GameState {
-    /// map of connections
-    /// this represents both players and connections
-    connections: Arc<Mutex<HashMap<u8, Connection>>>,
-
-    /// map of plid to connid
-    players: Arc<Mutex<HashMap<u8, u8>>>,
-}
-
-impl GameState {
-    pub fn new() -> Self {
-        GameState {
-            connections: Arc::new(Mutex::new(HashMap::new())),
-            players: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
-
-    pub fn add_connection(&self, data: &insim::protocol::insim::Ncn) {
-        self.connections.lock().unwrap().insert(
-            data.ucid,
-            Connection {
-                user_name: data.uname.clone(),
-                player_name: data.pname.clone(),
-                on_track: false,
-
-                ..Default::default()
-            },
-        );
-    }
-
-    pub fn remove_connection(&self, data: &insim::protocol::insim::Cnl) {
-        self.connections.lock().unwrap().remove(&data.ucid);
-    }
-
-    pub fn add_player(&self, data: &insim::protocol::insim::Npl) {
-        if let Some(conn) = self.connections.lock().unwrap().get_mut(&data.ucid) {
-            conn.on_track = true;
-            conn.player_name = data.pname.clone();
-            conn.finish_position = None;
-            conn.flags = Some(data.flags.clone());
-            conn.vehicle = Some(data.cname.clone());
-            conn.plate = Some(data.plate.clone());
-            conn.tyres = Some(data.tyres.clone());
-            conn.handicap_mass = Some(data.h_mass.clone());
-            conn.handicap_intake_restriction = Some(data.h_tres.clone());
-        }
-
-        self.players.lock().unwrap().insert(data.plid, data.ucid);
-    }
-
-    pub fn remove_player(&self, data: &insim::protocol::insim::Pll) {
-        let ucid = self.players.lock().unwrap().remove(&data.plid);
-
-        if ucid.is_none() {
-            return;
-        }
-
-        let ucid = ucid.unwrap();
-
-        if let Some(conn) = self.connections.lock().unwrap().get_mut(&ucid) {
-            conn.on_track = false;
-            conn.finish_position = None;
-            conn.flags = None;
-            conn.vehicle = None;
-            conn.plate = None;
-            conn.tyres = None;
-            conn.handicap_mass = None;
-            conn.handicap_intake_restriction = None;
-        }
-    }
-
-    pub fn update_player_info(&self, data: &insim::protocol::insim::CompCar) {
-        let ucid = self.players.lock().unwrap().get(&data.plid).cloned();
-
-        if ucid.is_none() {
-            return;
-        }
-
-        let ucid = ucid.unwrap();
-
-        if let Some(player) = self.connections.lock().unwrap().get_mut(&ucid) {
-            player.current_race_lap = Some(data.lap.clone());
-        }
-    }
-
-    pub fn update_player_lap(&self, data: &insim::protocol::insim::Lap) {
-        let ucid = self.players.lock().unwrap().get(&data.plid).cloned();
-
-        if ucid.is_none() {
-            return;
-        }
-
-        let ucid = ucid.unwrap();
-
-        if let Some(player) = self.connections.lock().unwrap().get_mut(&ucid) {
-            player.current_race_lap = Some(data.lapsdone.clone());
-            player.last_lap_time = Some(data.ltime.clone());
-
-            if player.best_lap_time.is_none() || player.best_lap_time.unwrap() > data.ltime {
-                player.best_lap_time = Some(data.ltime.clone());
-            }
-        }
-    }
-
-    pub fn players(&self) -> Arc<Mutex<HashMap<u8, Connection>>> {
-        self.connections.clone()
-    }
+pub struct Player {
+    pub name: String,
+    pub lap: u16,
+    pub vehicle: String,
+    pub position: u8,
 }
 
 pub struct StatefulTable {
     state: TableState,
-
-    pub game: GameState,
-    pub chat: Arc<Mutex<BoundedVecDeque<String>>>,
 }
 
 impl StatefulTable {
     fn new() -> StatefulTable {
         StatefulTable {
             state: TableState::default(),
-            game: GameState::new(),
-            chat: Arc::new(Mutex::new(BoundedVecDeque::new(20))),
         }
     }
 
     pub fn next(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i >= self.game.players().lock().unwrap().len() - 1 {
-                    0
-                } else {
-                    i + 1
-                }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
     }
 
     pub fn previous(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.game.players().lock().unwrap().len() - 1
-                } else {
-                    i - 1
-                }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
     }
 }
 
-struct Party {
-    game: GameState,
+#[derive(Clone)]
+struct ClientState {
+    players: Arc<Mutex<HashMap<u8, Player>>>,
     chat: Arc<Mutex<BoundedVecDeque<String>>>,
-}
-
-impl insim::framework::EventHandler for Party {
-    fn on_connect(&self, ctx: &insim::framework::Client) {
-        ctx.send(insim::protocol::relay::HostListRequest::default().into());
-
-        ctx.send(
-            insim::protocol::relay::HostSelect {
-                hname: "Nubbins AU Demo".into(),
-                ..Default::default()
-            }
-            .into(),
-        );
-
-        ctx.send(
-            insim::protocol::insim::Tiny {
-                reqi: 0,
-                subtype: insim::protocol::insim::TinyType::Ncn,
-            }
-            .into(),
-        );
-
-        ctx.send(
-            insim::protocol::insim::Tiny {
-                reqi: 0,
-                subtype: insim::protocol::insim::TinyType::Npl,
-            }
-            .into(),
-        );
-    }
-
-    fn on_new_player(
-        &self,
-        _client: &insim::framework::Client,
-        data: &insim::protocol::insim::Npl,
-    ) {
-        self.game.add_player(&data);
-    }
-
-    fn on_player_left(
-        &self,
-        _client: &insim::framework::Client,
-        data: &insim::protocol::insim::Pll,
-    ) {
-        self.game.remove_player(&data);
-    }
-
-    fn on_new_connection(
-        &self,
-        _client: &insim::framework::Client,
-        data: &insim::protocol::insim::Ncn,
-    ) {
-        self.game.add_connection(&data);
-    }
-
-    fn on_connection_left(
-        &self,
-        _client: &insim::framework::Client,
-        data: &insim::protocol::insim::Cnl,
-    ) {
-        self.game.remove_connection(&data);
-    }
-
-    fn on_message(&self, _client: &insim::framework::Client, data: &insim::protocol::insim::Mso) {
-        self.chat.lock().unwrap().push_front(format!(
-            "{}: {}",
-            chrono::Local::now().format("%H:%M:%S"),
-            insim::string::colours::strip(data.msg.to_string())
-        ));
-    }
-
-    fn on_multi_car_info(
-        &self,
-        _client: &insim::framework::Client,
-        data: &insim::protocol::insim::Mci,
-    ) {
-        for info in data.info.iter() {
-            self.game.update_player_info(&info);
-        }
-    }
-
-    fn on_lap(&self, _client: &insim::framework::Client, data: &insim::protocol::insim::Lap) {
-        self.game.update_player_lap(&data);
-    }
+    update: mpsc::UnboundedSender<bool>,
 }
 
 #[tokio::main]
@@ -300,21 +67,148 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let events = Events::new();
 
+    let (update_tx, mut update_rx) = mpsc::unbounded_channel();
+
+    let chat = Arc::new(Mutex::new(BoundedVecDeque::new(20)));
+    let players = Arc::new(Mutex::new(HashMap::new()));
     let mut table = StatefulTable::new();
 
-    let client = insim::framework::Config::default()
+    let mut client = insim::framework::Config::default()
         .relay()
-        .using_event_handler(Party {
-            game: table.game.clone(),
-            chat: table.chat.clone(),
-        })
-        .build();
+        .build_with_state(ClientState {
+            players: players.clone(),
+            update: update_tx,
+            chat: chat.clone(),
+        });
 
-    tokio::spawn(client.run());
-    //let res = client.run().await;
+    client.on_connect(|ctx| {
+        ctx.send(insim::protocol::relay::HostListRequest::default().into());
 
-    // Input
+        ctx.send(
+            insim::protocol::relay::HostSelect {
+                hname: "Nubbins AU Demo".into(),
+                ..Default::default()
+            }
+            .into(),
+        );
+
+        ctx.send(
+            insim::protocol::insim::Tiny {
+                reqi: 0,
+                subtype: insim::protocol::insim::TinyType::Npl,
+            }
+            .into(),
+        );
+    });
+
+    client.on_new_player(|ctx, data| {
+        ctx.state.players.lock().unwrap().insert(data.plid, Player {
+            name: data.pname.to_string(),
+            lap: 0,
+            vehicle: data.cname.to_string(),
+            position: 0,
+        });
+
+        ctx.state.update.send(true).unwrap();
+    });
+
+    client.on_player_left(|ctx, data| {
+        if let Some(_) = ctx.state.players.lock().unwrap().remove(&data.plid) {
+            ctx.state.update.send(true).unwrap();
+        }
+    });
+
+    client.on_lap(|ctx, data| {
+        if let Some(player) = ctx.state.players.lock().unwrap().get_mut(&data.plid) {
+            player.lap = data.lapsdone;
+
+            ctx.state.chat.lock().unwrap().push_front(format!(
+                "{}: {} finished lap {}",
+                chrono::Local::now().format("%H:%M:%S"),
+                player.name,
+                data.lapsdone
+            ));
+    
+            ctx.state.update.send(true).unwrap();
+        }
+    });
+
+    client.on_multi_car_info(|ctx, data| {
+        let mut any = false;
+
+        for info in data.info.iter() {
+            if let Some(player) = ctx.state.players.lock().unwrap().get_mut(&info.plid) {
+                player.lap = info.lap;
+                player.position = info.position;
+                any = true;
+            }
+        }
+
+        if any {
+            ctx.state.update.send(true).unwrap();
+        }
+    });
+
+    client.on_split(|ctx, data| {
+        if let Some(player) = ctx.state.players.lock().unwrap().get(&data.plid) {
+            ctx.state.chat.lock().unwrap().push_front(format!(
+                "{}: {} spx {}",
+                chrono::Local::now().format("%H:%M:%S"),
+                player.name,
+                data.etime,
+            ));
+
+            ctx.state.update.send(true).unwrap();
+        }
+    });
+
+    client.on_message(|ctx, data| {
+        ctx.state.chat.lock().unwrap().push_front(format!(
+            "{}: {}", chrono::Local::now().format("%H:%M:%S"),
+            insim::string::colours::strip(data.msg.to_string())
+        ));
+
+        ctx.state.update.send(true).unwrap();
+    });
+
+    // TODO: not handling client shutdown
+    // TODO: discuss if the framework API is actually useful outside of "toy" examples
+    tokio::spawn(async move {
+        client.run().await
+    });
+
     loop {
+        tokio::select! {
+            event = events.next() => {
+                match event? {
+                    Event::Input(key) => {
+                        match key {
+                            Key::Char('q') => {
+                                break;
+                            },
+                            Key::Char('n') => {
+                                table.next();
+                            },
+                            Key::Char('p') => {
+                                table.previous();
+                            },
+                            _ => {
+                                continue;
+                            }
+                        }
+                    },
+                    _ => {
+                        continue;
+                    }
+                }
+            },
+            should_update = update_rx.recv() => {
+                if should_update != Some(true) {
+                    continue;
+                }
+            }
+        };
+
         terminal.draw(|f| {
             let rects = Layout::default()
                 .direction(Direction::Horizontal)
@@ -323,45 +217,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
             // Players
             let selected_style = Style::default().add_modifier(Modifier::REVERSED);
-            let header_cells = ["Player", "Car", "Lap", "Time"]
+            let header_cells = ["#", "Player", "Car", "Lap", "Time"]
                 .iter()
                 .map(|h| Cell::from(*h).style(Style::default().fg(Color::Red)));
             let header = Row::new(header_cells).height(1);
 
-            let rows = if let Ok(players) = table.game.players().lock() {
-                players
-                    .iter()
-                    .map(|(_key, item)| {
-                        let vehicle = if let Some(vehicle) = &item.vehicle {
-                            vehicle.to_string()
-                        } else {
-                            "".to_string()
-                        };
+            let row_data = players.lock().unwrap();
 
-                        let lap = if let Some(lap) = item.current_race_lap {
-                            lap.to_string()
-                        } else {
-                            "".to_string()
-                        };
-
-                        let ltime = if let Some(ltime) = item.last_lap_time {
-                            ltime.to_string()
-                        } else {
-                            "".to_string()
-                        };
-
-                        let cells = vec![
-                            Cell::from(Span::raw(item.player_name.to_string())),
-                            Cell::from(Span::raw(vehicle)),
-                            Cell::from(Span::raw(lap)),
-                            Cell::from(Span::raw(ltime)),
-                        ];
-                        Row::new(cells).height(1 as u16)
-                    })
-                    .collect()
-            } else {
-                Vec::new()
-            };
+            let rows = row_data.iter().map(|(_key, item)| {
+                let cells = vec![
+                    Cell::from(Span::raw(item.position.to_string())),
+                    Cell::from(Span::raw(&item.name)),
+                    Cell::from(Span::raw(&item.vehicle)),
+                    Cell::from(Span::raw(item.lap.to_string())),
+                ];
+                Row::new(cells).height(1)
+            });
 
             let t = Table::new(rows)
                 .header(header)
@@ -369,7 +240,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 .highlight_style(selected_style)
                 .highlight_symbol("* ")
                 .widths(&[
-                    Constraint::Percentage(25),
+                    Constraint::Length(3),
                     Constraint::Percentage(25),
                     Constraint::Percentage(25),
                     Constraint::Percentage(25),
@@ -377,8 +248,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             f.render_stateful_widget(t, rects[0], &mut table.state);
 
             // Chat
-            let chat_items: Vec<ListItem> = table
-                .chat
+            let chat_items: Vec<ListItem> = chat
                 .lock()
                 .unwrap()
                 .iter()
@@ -391,25 +261,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     Style::default()
                         .bg(Color::LightGreen)
                         .add_modifier(Modifier::BOLD),
-                )
-                .highlight_symbol(">");
+                );
             f.render_widget(items, rects[1]);
         })?;
-
-        if let Event::Input(key) = events.next()? {
-            match key {
-                Key::Char('q') => {
-                    break;
-                }
-                Key::Down => {
-                    table.next();
-                }
-                Key::Up => {
-                    table.previous();
-                }
-                _ => {}
-            }
-        };
     }
 
     Ok(())

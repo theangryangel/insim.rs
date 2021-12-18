@@ -51,7 +51,7 @@ pub async fn main() {
                 subtype: insim::protocol::insim::TinyType::Npl,
             }
             .into(),
-        )
+        );
     });
 
     client.on_relay_host_list(|_ctx, list| {

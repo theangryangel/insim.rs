@@ -20,9 +20,9 @@ macro_rules! packet_handlers {
             // handlers this could get out of hand. Is something like a HashMap instead of a Vec
             // something workable? Would that be better or worse? Lets benchmark it.
             $(
-                pub fn $fn(&mut self, inner_func: fn(&$client<$state>, &$inner)) {
+                pub fn $fn(&mut self, inner_func: fn(Ctx<$state>, &$inner)) {
                     self.on_packet_handlers.push(
-                        Box::new(move |ctx: &Self, packet: &$enum| {
+                        Box::new(move |ctx: Ctx<$state>, packet: &$enum| {
                             if let $enum::$variant(inner_packet) = packet {
                                 inner_func(ctx, inner_packet);
                             }

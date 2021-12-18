@@ -55,8 +55,34 @@ use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tracing;
 
-pub type ClientConnHandleFn<S> = Box<dyn Fn(&Client<S>)>;
-pub type ClientPacketHandlerFn<S> = Box<dyn Fn(&Client<S>, &protocol::Packet)>;
+
+pub struct Ctx<State> {
+    pub state: State,
+
+    shutdown: Option<mpsc::UnboundedSender<bool>>,
+    tx: Option<mpsc::UnboundedSender<protocol::Packet>>,
+}
+
+impl<State> Ctx<State> {
+    /// Send a [Packet](super::protocol::Packet).
+    #[allow(unused_must_use)] // if this fails then the we're probably going to die anyway
+    pub fn send(&self, data: protocol::Packet) {
+        if let Some(tx) = &self.tx {
+            tx.send(data);
+        }
+    }
+
+    /// Request shutdown of the client.
+    #[allow(unused_must_use)] // if this fails then the we're probably going to die anyway
+    pub fn shutdown(&self) {
+        if let Some(shutdown) = &self.shutdown {
+            shutdown.send(true);
+        }
+    }
+}
+
+pub type ClientConnHandleFn<S> = Box<dyn Fn(Ctx<S>) + Send + 'static>;
+pub type ClientPacketHandlerFn<S> = Box<dyn Fn(Ctx<S>, &protocol::Packet) + Send + 'static>;
 
 /// A high level Client that connects to an Insim server, and handles packet event routing to
 /// registered handlers.
@@ -66,6 +92,7 @@ pub struct Client<State> {
 
     on_connect_handlers: Vec<ClientConnHandleFn<State>>,
     on_disconnect_handlers: Vec<ClientConnHandleFn<State>>,
+    
     on_packet_handlers: Vec<ClientPacketHandlerFn<State>>,
 
     shutdown: Option<mpsc::UnboundedSender<bool>>,
@@ -122,12 +149,15 @@ where
 
     /// Run the client.
     /// This will not return until either the client is shutdown or an error occurs.
-    pub async fn run(mut self) -> Result<(), error::Error> {
+    pub async fn run(&mut self) -> Result<(), error::Error> {
         let (shutdown_tx, mut shutdown_rx) = mpsc::unbounded_channel();
         let (send_tx, mut send_rx) = mpsc::unbounded_channel();
 
-        self.tx = Some(send_tx);
-        self.shutdown = Some(shutdown_tx);
+        let tx = send_tx.clone();
+        let shutdown = shutdown_tx.clone();
+
+        self.tx = Some(tx);
+        self.shutdown = Some(shutdown);
 
         let hname = &self.config.host;
         let tcp: TcpStream = TcpStream::connect(hname).await.unwrap();
@@ -151,9 +181,13 @@ where
         }
 
         // TODO handle handshake errors
-
-        for on_connect in self.on_connect_handlers.iter() {
-            on_connect(&self);
+        for handler in self.on_connect_handlers.iter() {
+            let ctx = Ctx {
+                state: self.state.clone(),
+                shutdown: Some(shutdown_tx.clone()),
+                tx: Some(send_tx.clone()),
+            };
+            handler(ctx);
         }
 
         let mut ret: Result<(), error::Error> = Ok(());
@@ -176,7 +210,14 @@ where
 
                     match result {
                         Ok(frame) => {
-                            self.dispatch(&frame);
+                            for handler in self.on_packet_handlers.iter() {
+                                let ctx = Ctx {
+                                    state: self.state.clone(),
+                                    shutdown: Some(shutdown_tx.clone()),
+                                    tx: Some(send_tx.clone()),
+                                };
+                                handler(ctx, &frame);
+                            }
                         },
                         Err(e) => {
                             ret = Err(e);
@@ -188,8 +229,13 @@ where
             }
         }
 
-        for on_disconnect in self.on_disconnect_handlers.iter() {
-            on_disconnect(&self);
+        for handler in self.on_disconnect_handlers.iter() {
+            let ctx = Ctx {
+                state: self.state.clone(),
+                shutdown: Some(shutdown_tx.clone()),
+                tx: Some(send_tx.clone()),
+            };
+            handler(ctx);
         }
 
         self.tx = None;
@@ -198,23 +244,18 @@ where
         ret
     }
 
-    fn dispatch(&self, packet: &protocol::Packet) {
-        for handler in self.on_packet_handlers.iter() {
-            handler(self, packet);
-        }
-    }
-
     /// Called when a [Packet::Tiny](super::protocol::Packet::Tiny) is received.
-    pub fn on_connect(&mut self, handler: fn(&Client<State>)) {
+    pub fn on_connect(&mut self, handler: fn(Ctx<State>)) {
         self.on_connect_handlers.push(Box::new(handler));
     }
 
-    pub fn on_disconnect(&mut self, handler: fn(&Client<State>)) {
+
+    pub fn on_disconnect(&mut self, handler: fn(Ctx<State>)) {
         self.on_disconnect_handlers.push(Box::new(handler));
     }
 
     /// Called when any [Packet](super::protocol::Packet) is received.
-    pub fn on_any(&mut self, handler: fn(&Client<State>, &protocol::Packet)) {
+    pub fn on_any(&mut self, handler: fn(Ctx<State>, &protocol::Packet)) {
         self.on_packet_handlers.push(Box::new(handler));
     }
 }
