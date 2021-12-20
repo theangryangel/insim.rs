@@ -43,57 +43,35 @@
 //! ```
 
 pub(crate) mod config;
+pub(crate) mod context;
 pub(crate) mod macros;
 
 pub use config::Config;
+pub use context::Ctx;
 
 use super::{error, protocol};
 
 use futures::prelude::*;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tracing;
 
-
-pub struct Ctx<State> {
-    pub state: State,
-
-    shutdown: Option<mpsc::UnboundedSender<bool>>,
-    tx: Option<mpsc::UnboundedSender<protocol::Packet>>,
-}
-
-impl<State> Ctx<State> {
-    /// Send a [Packet](super::protocol::Packet).
-    #[allow(unused_must_use)] // if this fails then the we're probably going to die anyway
-    pub fn send(&self, data: protocol::Packet) {
-        if let Some(tx) = &self.tx {
-            tx.send(data);
-        }
-    }
-
-    /// Request shutdown of the client.
-    #[allow(unused_must_use)] // if this fails then the we're probably going to die anyway
-    pub fn shutdown(&self) {
-        if let Some(shutdown) = &self.shutdown {
-            shutdown.send(true);
-        }
-    }
-}
-
-pub type ClientConnHandleFn<S> = Box<dyn Fn(Ctx<S>) + Send + 'static>;
-pub type ClientPacketHandlerFn<S> = Box<dyn Fn(Ctx<S>, &protocol::Packet) + Send + 'static>;
+pub type OnConnStateFn<S> = Box<dyn Fn(Ctx<S>) + Send + 'static>;
+pub type OnPacketFn<S> = Box<dyn Fn(Ctx<S>, &protocol::Packet) + Send + 'static>;
 
 /// A high level Client that connects to an Insim server, and handles packet event routing to
 /// registered handlers.
-pub struct Client<State> {
+pub struct Client<State = ()> {
     pub config: Arc<config::Config>,
     pub state: State,
 
-    on_connect_handlers: Vec<ClientConnHandleFn<State>>,
-    on_disconnect_handlers: Vec<ClientConnHandleFn<State>>,
-    
-    on_packet_handlers: Vec<ClientPacketHandlerFn<State>>,
+    on_connect_handlers: Vec<OnConnStateFn<State>>,
+    on_disconnect_handlers: Vec<OnConnStateFn<State>>,
+
+    on_packet_handlers: HashMap<u8, Vec<OnPacketFn<State>>>,
+    on_all_packet_handlers: Vec<OnPacketFn<State>>,
 
     shutdown: Option<mpsc::UnboundedSender<bool>>,
     tx: Option<mpsc::UnboundedSender<protocol::Packet>>,
@@ -107,7 +85,8 @@ impl Client<()> {
             state: (),
             on_connect_handlers: Vec::new(),
             on_disconnect_handlers: Vec::new(),
-            on_packet_handlers: Vec::new(),
+            on_packet_handlers: HashMap::new(),
+            on_all_packet_handlers: Vec::new(),
             shutdown: None,
             tx: None,
         }
@@ -125,7 +104,8 @@ where
             state,
             on_connect_handlers: Vec::new(),
             on_disconnect_handlers: Vec::new(),
-            on_packet_handlers: Vec::new(),
+            on_packet_handlers: HashMap::new(),
+            on_all_packet_handlers: Vec::new(),
             tx: None,
             shutdown: None,
         }
@@ -182,12 +162,7 @@ where
 
         // TODO handle handshake errors
         for handler in self.on_connect_handlers.iter() {
-            let ctx = Ctx {
-                state: self.state.clone(),
-                shutdown: Some(shutdown_tx.clone()),
-                tx: Some(send_tx.clone()),
-            };
-            handler(ctx);
+            handler(self.get_context());
         }
 
         let mut ret: Result<(), error::Error> = Ok(());
@@ -210,13 +185,14 @@ where
 
                     match result {
                         Ok(frame) => {
-                            for handler in self.on_packet_handlers.iter() {
-                                let ctx = Ctx {
-                                    state: self.state.clone(),
-                                    shutdown: Some(shutdown_tx.clone()),
-                                    tx: Some(send_tx.clone()),
-                                };
-                                handler(ctx, &frame);
+                            for handler in self.on_all_packet_handlers.iter() {
+                                handler(self.get_context(), &frame);
+                            }
+
+                            if let Some(handlers) = self.on_packet_handlers.get(&frame.id()) {
+                                for handler in handlers.iter() {
+                                    handler(self.get_context(), &frame);
+                                }
                             }
                         },
                         Err(e) => {
@@ -230,12 +206,7 @@ where
         }
 
         for handler in self.on_disconnect_handlers.iter() {
-            let ctx = Ctx {
-                state: self.state.clone(),
-                shutdown: Some(shutdown_tx.clone()),
-                tx: Some(send_tx.clone()),
-            };
-            handler(ctx);
+            handler(self.get_context());
         }
 
         self.tx = None;
@@ -249,14 +220,22 @@ where
         self.on_connect_handlers.push(Box::new(handler));
     }
 
-
     pub fn on_disconnect(&mut self, handler: fn(Ctx<State>)) {
         self.on_disconnect_handlers.push(Box::new(handler));
     }
 
     /// Called when any [Packet](super::protocol::Packet) is received.
     pub fn on_any(&mut self, handler: fn(Ctx<State>, &protocol::Packet)) {
-        self.on_packet_handlers.push(Box::new(handler));
+        self.on_all_packet_handlers.push(Box::new(handler));
+    }
+
+    /// Retreive the context
+    pub fn get_context(&self) -> Ctx<State> {
+        Ctx {
+            state: self.state.clone(),
+            tx: self.tx.clone(),
+            shutdown: self.shutdown.clone(),
+        }
     }
 }
 

@@ -16,18 +16,22 @@ macro_rules! packet_handlers {
         where
             State: Clone + Send + Sync + 'static,
         {
-            // TODO: Is there anything we can do to speed this up? With large numbers of packet
-            // handlers this could get out of hand. Is something like a HashMap instead of a Vec
-            // something workable? Would that be better or worse? Lets benchmark it.
             $(
                 pub fn $fn(&mut self, inner_func: fn(Ctx<$state>, &$inner)) {
-                    self.on_packet_handlers.push(
-                        Box::new(move |ctx: Ctx<$state>, packet: &$enum| {
-                            if let $enum::$variant(inner_packet) = packet {
-                                inner_func(ctx, inner_packet);
-                            }
-                        }),
-                    );
+                    let boxed_fn = Box::new(move |ctx: Ctx<$state>, packet: &$enum| {
+                        if let $enum::$variant(inner_packet) = packet {
+                            inner_func(ctx, inner_packet);
+                        }
+                    });
+
+                    let key = $enum::name_into_id(stringify!($variant)).unwrap();
+
+                    if let Some(handlers) = self.on_packet_handlers.get_mut(&key) {
+                        handlers.push(boxed_fn);
+                    } else {
+                        self.on_packet_handlers.insert(key, vec![boxed_fn]);
+                    }
+
                 }
             )*
 
