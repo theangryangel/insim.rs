@@ -103,15 +103,6 @@ where
 
                     Poll::Ready(Some(Ok(frame)))
                 }
-                Packet::Version(insim::Version {
-                    insimver: version, ..
-                }) => {
-                    if version != insim::VERSION {
-                        Poll::Ready(Some(Err(error::Error::IncompatibleVersion)))
-                    } else {
-                        Poll::Ready(Some(Ok(frame)))
-                    }
-                }
                 e => Poll::Ready(Some(Ok(e))),
             },
             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e.into()))),
