@@ -18,9 +18,9 @@ futures-util = "0.3"
 bytes = "1"
 tokio = { version = "1.11.0", features = ["full", "tracing"] }
 tokio-util = { version = "0.6.8", features = ["full"] }
-tokio-stream = { version = "0.1" }
+tokio-stream = { version = "0.1", features = ["time"] }
 deku = "0.12"
-pin-project = "1"
+pin-project-lite = "0.2.0"
 itertools = "0.10"
 encoding_rs = "0.8"
 tracing = "0.1"
