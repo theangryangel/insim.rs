@@ -5,7 +5,7 @@ use crate::{
 };
 use futures::Future;
 use futures::{Sink, Stream};
-use pin_project_lite::pin_project;
+use pin_project::pin_project;
 
 use std::io::Error;
 use std::pin::Pin;
@@ -28,23 +28,21 @@ pub enum TransportState {
     Shutdown,
 }
 
-pin_project! {
-    /// A lower-level Stream and Sink based transport layer for the insim protocol.
-    /// Given a `AsyncRead` and `AsyncWrite`, this struct will handle encoding and decoding of
-    /// [Packets](Packet), and ensure that the connection is maintained through keepalive packets.
-    pub struct Transport<T>
-    {
-        #[pin]
-        inner: Framed<T, codec::Codec>,
-        // Cant use pin_project on tokio::time::Sleep because it's !Unpin
-        // meaning we can't then use tokio::select! later.
-        // Lovely.
-        // TODO: Do we bother keeping pin_project in that case?
-        deadline: Pin<Box<time::Sleep>>,
-        duration: Duration,
-        poll_deadline: bool,
-        state: TransportState,
-    }
+/// A lower-level Stream and Sink based transport layer for the insim protocol.
+/// Given a `AsyncRead` and `AsyncWrite`, this struct will handle encoding and decoding of
+/// [Packets](Packet), and ensure that the connection is maintained through
+/// [insim::Tiny] keepalive packets.
+#[pin_project]
+pub struct Transport<T> {
+    #[pin]
+    inner: Framed<T, codec::Codec>,
+    // Cant use pin_project on tokio::time::Sleep because it's !Unpin
+    // meaning we can't then use tokio::select! later. So it needs to be boxed.
+    deadline: Pin<Box<time::Sleep>>,
+    duration: Duration,
+    poll_deadline: bool,
+    state: TransportState,
+    pong: bool,
 }
 
 impl<T> Transport<T>
@@ -64,11 +62,44 @@ where
             duration,
             poll_deadline: true,
             state: TransportState::Connected,
+            pong: false,
         }
     }
 
     pub fn shutdown(&mut self) {
         self.state = TransportState::Shutdown;
+    }
+
+    fn poll_pong(mut self: Pin<&mut Self>, cx: &mut Context) {
+        if !*self.as_mut().project().pong {
+            return;
+        }
+
+        tracing::debug!("ping? pong!");
+
+        let res = self.as_mut().project().inner.poll_ready(cx);
+        if !res.is_ready() {
+            return;
+        }
+
+        let res = self.as_mut().project().inner.start_send(
+            insim::Tiny {
+                reqi: 0,
+                subtype: insim::TinyType::None,
+            }
+            .into(),
+        );
+        if res.is_err() {
+            return;
+        }
+
+        // TODO: docs suggest we don't need to call poll_flush, but if we don't then nothing gets
+        // sent?
+        //
+        let res = self.as_mut().project().inner.poll_flush(cx);
+        if res.is_ready() {
+            *self.as_mut().project().pong = false;
+        }
     }
 }
 
@@ -79,6 +110,8 @@ where
     type Item = Result<Packet, error::Error>;
 
     fn size_hint(&self) -> (usize, Option<usize>) {
+        // This is cribbed from tokio_stream::StreamExt::Timeout.
+
         let (lower, upper) = self.inner.size_hint();
 
         // The timeout stream may insert an error before and after each message
@@ -93,30 +126,29 @@ where
         (lower, twice_plus_one(upper))
     }
 
-    #[allow(unused_must_use)]
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        // TODO: Fixup all the dereferencing and make it coherent rather than Just Make It Compile.
-        // TODO: remove the allow unused
-
-        let this = self.as_mut().project();
-
-        // TODO: Is this really the right way to do this?
-        if *this.state == TransportState::Shutdown {
-            *this.state = TransportState::Disconnected;
+        if *self.as_mut().project().state == TransportState::Shutdown {
+            *self.as_mut().project().state = TransportState::Disconnected;
             return Poll::Ready(None);
         }
 
-        if *this.state == TransportState::Disconnected {
+        if *self.as_mut().project().state == TransportState::Disconnected {
             tracing::error!("polled after disconnect");
             return Poll::Ready(None);
         }
 
-        match this.inner.poll_next(cx) {
+        if *self.as_mut().project().pong {
+            // do we have a pre-existing ping request that couldn't be previously sent for some
+            // reason?
+            self.as_mut().poll_pong(cx);
+        }
+
+        match self.as_mut().project().inner.poll_next(cx) {
             Poll::Pending => {}
             Poll::Ready(v) => {
-                let next = time::Instant::now() + *this.duration;
-                this.deadline.as_mut().reset(next);
-                *this.poll_deadline = true;
+                let next = time::Instant::now() + *self.as_mut().project().duration;
+                self.as_mut().project().deadline.as_mut().reset(next);
+                *self.as_mut().project().poll_deadline = true;
 
                 match v {
                     Some(Ok(frame)) => {
@@ -125,19 +157,9 @@ where
                             subtype: insim::TinyType::None,
                         }) = frame
                         {
-                            tracing::debug!("ping? pong!");
-
-                            // TODO: This is absolutely not the way to do this.
-                            // We either using call start_send or we should at least check the result.
-                            // FIXME.
-                            self.as_mut()
-                                .project()
-                                .inner
-                                .start_send(Packet::from(insim::Tiny {
-                                    reqi: 0,
-                                    subtype: insim::TinyType::None,
-                                }));
-                            self.as_mut().project().inner.poll_flush(cx);
+                            // attempt to send a ping response immediately.
+                            *self.as_mut().project().pong = true;
+                            self.as_mut().poll_pong(cx);
                         }
 
                         return Poll::Ready(Some(Ok(frame)));
@@ -150,13 +172,13 @@ where
             }
         };
 
-        if *this.poll_deadline {
-            match this.deadline.as_mut().poll(cx) {
+        if *self.as_mut().project().poll_deadline {
+            match self.as_mut().project().deadline.as_mut().poll(cx) {
                 Poll::Ready(t) => t,
                 Poll::Pending => return Poll::Pending,
             };
-            *this.poll_deadline = false;
-            *this.state = TransportState::Disconnected;
+            *self.as_mut().project().poll_deadline = false;
+            *self.as_mut().project().state = TransportState::Disconnected;
             return Poll::Ready(Some(Err(error::Error::Timeout)));
         }
 
