@@ -26,10 +26,10 @@ macro_rules! packet_handlers {
 
                     let key = $enum::name_into_id(stringify!($variant)).unwrap();
 
-                    if let Some(handlers) = self.on_packet_handlers.get_mut(&key) {
+                    if let Some(handlers) = self.handlers.on_packet_handlers.lock().unwrap().get_mut(&key) {
                         handlers.push(boxed_fn);
                     } else {
-                        self.on_packet_handlers.insert(key, vec![boxed_fn]);
+                        self.handlers.on_packet_handlers.lock().unwrap().insert(key, vec![boxed_fn]);
                     }
 
                 }

@@ -1,246 +1,240 @@
 //! An optional high level API for working with LFS through Insim.
-//!
-//! # Example with state
-//! ```rust
-//! // Example that counts the number of packets received and resets on each
-//! // reconnection.
-//! #[derive(Default, Clone)]
-//! struct Counter {
-//!   pub counter: Arc<AtomicUsize>,
-//! }
-//!
-//! // Create a Config object where we indicate that we want to use the Insim Relay,
-//! // and that we want to use our Counter struct for storing state.
-//! // If you do not wish to store any state you may use the `build` function instead.
-//! let mut client = insim::framework::Config::default()
-//!   .relay()
-//!   .build_with_state(Counter::default());
-//!
-//! client.on_connect(|ctx| {
-//!   info!("🎉🎉🎉🎉🎉🎉 we've connected!");
-//!   ctx.state.counter.store(0, Ordering::Relaxed);
-//! });
-//!
-//! client.on_any(|ctx, packet| {
-//!   let count = ctx.state.counter.fetch_add(1, Ordering::Relaxed);
-//!   debug!("{:?} #={}", packet, count);
-//! });
-//!
-//! // We instruct the client to make a connection, and then run.
-//! // If you wish to run multiple futures concurrently (i.e. to run a web server in the
-//! // background), you can use `tokio::select!` and a loop.
-//! let res = client.run().await;
-//!
-//! // When run returns, we can look at the result to see what happened.
-//! match res {
-//!     Ok(()) => {
-//!         println!("Clean shutdown");
-//!     }
-//!     Err(e) => {
-//!         println!("Unclean shutdown: {:?}", e);
-//!     }
-//! }
-//! ```
+//! :warning: API is not stable.
 
 pub(crate) mod config;
-pub(crate) mod context;
 pub(crate) mod macros;
 
 pub use config::Config;
-pub use context::Ctx;
 
 use super::{error, protocol};
 
-use futures::prelude::*;
-use std::collections::HashMap;
+// TODO: Split this into Event and Commands
+#[derive(Debug)]
+pub enum Event {
+    Connected,
+    Disconnected,
+    Shutdown,
+    Packet(protocol::Packet),
+    Error(error::Error),
+}
+
 use std::sync::Arc;
 use tokio::net::TcpStream;
-use tokio::sync::mpsc;
-use tracing;
 
-pub type OnConnStateFn<S> = Box<dyn Fn(Ctx<S>) + Send + 'static>;
-pub type OnPacketFn<S> = Box<dyn Fn(Ctx<S>, &protocol::Packet) + Send + 'static>;
+use pin_project::pin_project;
 
-/// A high level Client that connects to an Insim server, and handles packet event routing to
-/// registered handlers.
-pub struct Client<State = ()> {
-    pub config: Arc<config::Config>,
-    pub state: State,
+#[pin_project(project = StateProj)]
+enum State {
+    Disconnected,
 
-    on_connect_handlers: Vec<OnConnStateFn<State>>,
-    on_disconnect_handlers: Vec<OnConnStateFn<State>>,
+    //Connecting {
+    //    inner: Box<Pin<dyn Future<Output=TcpStream>>>,
+    //},
+    Connected {
+        #[pin]
+        inner: protocol::transport::Transport<TcpStream>,
+    },
 
-    on_packet_handlers: HashMap<u8, Vec<OnPacketFn<State>>>,
-    on_all_packet_handlers: Vec<OnPacketFn<State>>,
-
-    shutdown: Option<mpsc::UnboundedSender<bool>>,
-    tx: Option<mpsc::UnboundedSender<protocol::Packet>>,
+    Shutdown,
 }
 
-impl Client<()> {
-    /// Create a new Client with the given configuration.
-    pub fn new(config: Config) -> Self {
-        Client {
-            config: Arc::new(config),
-            state: (),
-            on_connect_handlers: Vec::new(),
-            on_disconnect_handlers: Vec::new(),
-            on_packet_handlers: HashMap::new(),
-            on_all_packet_handlers: Vec::new(),
-            shutdown: None,
-            tx: None,
+impl ::std::fmt::Display for State {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        match *self {
+            State::Disconnected => write!(f, "State: Disconnected"),
+            State::Connected { .. } => write!(f, "State: Connected"),
+            State::Shutdown => write!(f, "State: Shutdown"),
         }
     }
 }
 
-impl<State> Client<State>
-where
-    State: Clone + Send + Sync + 'static,
-{
-    /// Create a new Client with the given [Config].
-    pub fn with_state(config: config::Config, state: State) -> Self {
-        Self {
-            config: Arc::new(config),
-            state,
-            on_connect_handlers: Vec::new(),
-            on_disconnect_handlers: Vec::new(),
-            on_packet_handlers: HashMap::new(),
-            on_all_packet_handlers: Vec::new(),
-            tx: None,
-            shutdown: None,
-        }
-    }
+use futures::{Sink, Stream};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
-    /// Send a [Packet](super::protocol::Packet).
-    #[allow(unused_must_use)] // if this fails then the we're probably going to die anyway
-    pub fn send(&self, data: protocol::Packet) {
-        if let Some(tx) = &self.tx {
-            tx.send(data);
-        }
-    }
+impl Stream for State {
+    type Item = Event;
 
-    /// Request shutdown of the client.
-    #[allow(unused_must_use)] // if this fails then the we're probably going to die anyway
-    pub fn shutdown(&self) {
-        if let Some(shutdown) = &self.shutdown {
-            shutdown.send(true);
-        }
-    }
-
-    /// Run the client.
-    /// This will not return until either the client is shutdown or an error occurs.
-    pub async fn run(&mut self) -> Result<(), error::Error> {
-        let (shutdown_tx, mut shutdown_rx) = mpsc::unbounded_channel();
-        let (send_tx, mut send_rx) = mpsc::unbounded_channel();
-
-        let tx = send_tx.clone();
-        let shutdown = shutdown_tx.clone();
-
-        self.tx = Some(tx);
-        self.shutdown = Some(shutdown);
-
-        let hname = &self.config.host;
-        let tcp: TcpStream = TcpStream::connect(hname).await.unwrap();
-
-        // TODO handle connection error
-
-        let mut transport = protocol::transport::Transport::new(tcp, self.config.codec_mode);
-        let isi = protocol::insim::Init {
-            name: self.config.name.to_owned(),
-            password: self.config.password.to_owned(),
-            prefix: self.config.prefix,
-            version: protocol::insim::VERSION,
-            interval: self.config.interval_ms,
-            flags: self.config.flags,
-            reqi: 1,
-        };
-
-        let res = transport.send(isi).await;
-        if let Err(e) = res {
-            return Err(e.into());
-        }
-
-        // TODO handle handshake errors
-        for handler in self.on_connect_handlers.iter() {
-            handler(self.get_context());
-        }
-
-        let mut ret: Result<(), error::Error> = Ok(());
-
-        loop {
-            tokio::select! {
-                Some(_) = shutdown_rx.recv() => {
-                    tracing::debug!("shutdown requested");
-                    break;
-                },
-
-                Some(frame) = send_rx.recv() => {
-                    if let Err(e) = transport.send(frame).await {
-                        ret = Err(e.into());
-                        break;
-                    }
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
+        match self.as_mut().project() {
+            StateProj::Shutdown => Poll::Ready(None),
+            StateProj::Disconnected => Poll::Pending,
+            StateProj::Connected { inner, .. } => match inner.poll_next(cx) {
+                Poll::Pending => Poll::Pending,
+                Poll::Ready(Some(Ok(frame))) => Poll::Ready(Some(Event::Packet(frame))),
+                Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Event::Error(e))),
+                Poll::Ready(None) => {
+                    self.set(State::Disconnected);
+                    Poll::Ready(Some(Event::Disconnected))
                 }
+            },
+        }
+    }
+}
 
-                Some(result) = transport.next() => {
+impl Sink<Event> for State {
+    type Error = error::Error;
 
-                    match result {
-                        Ok(frame) => {
-                            for handler in self.on_all_packet_handlers.iter() {
-                                handler(self.get_context(), &frame);
-                            }
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        match self.project() {
+            StateProj::Disconnected => Poll::Pending,
+            //State::Connecting{..} => { Poll::Pending },
+            StateProj::Shutdown => Poll::Pending,
+            StateProj::Connected { inner, .. } => match inner.poll_ready(cx) {
+                Poll::Pending => Poll::Pending,
+                Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
+                Poll::Ready(Err(e)) => Poll::Ready(Err(e.into())),
+            },
+        }
+    }
 
-                            if let Some(handlers) = self.on_packet_handlers.get(&frame.id()) {
-                                for handler in handlers.iter() {
-                                    handler(self.get_context(), &frame);
-                                }
-                            }
-                        },
-                        Err(e) => {
-                            ret = Err(e);
-                            break;
-                        }
+    fn start_send(mut self: Pin<&mut Self>, value: Event) -> Result<(), Self::Error> {
+        match self.as_mut().project() {
+            StateProj::Disconnected => Ok(()),
+            StateProj::Shutdown => Ok(()),
+            //State::Connecting{..} => { Ok(()) },
+            StateProj::Connected { inner, .. } => {
+                match value {
+                    Event::Packet(frame) => match inner.start_send(frame) {
+                        Err(e) => Err(e.into()),
+                        _ => Ok(()),
+                    },
+                    Event::Shutdown => {
+                        self.set(State::Shutdown);
+                        Ok(())
                     }
-
+                    _ => {
+                        // TODO: return an error
+                        Ok(())
+                    }
                 }
             }
         }
+    }
 
-        for handler in self.on_disconnect_handlers.iter() {
-            handler(self.get_context());
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        match self.project() {
+            StateProj::Disconnected => Poll::Ready(Ok(())),
+            StateProj::Shutdown => Poll::Ready(Ok(())),
+            //State::Connecting{..} => { Poll::Ready(Ok(())) },
+            StateProj::Connected { inner, .. } => match inner.poll_flush(cx) {
+                Poll::Ready(Err(e)) => Poll::Ready(Err(e.into())),
+                _ => Poll::Ready(Ok(())),
+            },
         }
-
-        self.tx = None;
-        self.shutdown = None;
-
-        ret
     }
 
-    /// Called when a [Packet::Tiny](super::protocol::Packet::Tiny) is received.
-    pub fn on_connect(&mut self, handler: fn(Ctx<State>)) {
-        self.on_connect_handlers.push(Box::new(handler));
-    }
-
-    pub fn on_disconnect(&mut self, handler: fn(Ctx<State>)) {
-        self.on_disconnect_handlers.push(Box::new(handler));
-    }
-
-    /// Called when any [Packet](super::protocol::Packet) is received.
-    pub fn on_any(&mut self, handler: fn(Ctx<State>, &protocol::Packet)) {
-        self.on_all_packet_handlers.push(Box::new(handler));
-    }
-
-    /// Retreive the context
-    pub fn get_context(&self) -> Ctx<State> {
-        Ctx {
-            state: self.state.clone(),
-            tx: self.tx.clone(),
-            shutdown: self.shutdown.clone(),
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        match self.project() {
+            StateProj::Disconnected => Poll::Ready(Ok(())),
+            StateProj::Shutdown => Poll::Ready(Ok(())),
+            //State::Connecting{..} => { Poll::Ready(Ok(())) },
+            StateProj::Connected { inner, .. } => match inner.poll_close(cx) {
+                Poll::Ready(Err(e)) => Poll::Ready(Err(e.into())),
+                _ => Poll::Ready(Ok(())),
+            },
         }
     }
 }
 
-use crate::packet_handlers;
-use crate::protocol::Packet;
+/// A high level Client that connects to an Insim server, and handles packet event routing to
+/// registered handlers.
+#[pin_project]
+pub struct Client {
+    pub config: Arc<config::Config>,
+    #[pin]
+    state: State,
+    attempt: u32,
+}
+
+impl Client {
+    pub fn new(config: Config) -> Self {
+        Self {
+            config: Arc::new(config),
+            state: State::Disconnected,
+            attempt: 0,
+        }
+    }
+}
+
+impl Stream for Client {
+    type Item = Event;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
+        let mut this = self.as_mut().project();
+
+        if let State::Disconnected = *this.state {
+            // TODO: This should be moved to a future and into State(?) so that we can handle the
+            // reconnection in an async manner. Currently this blocks poll_next and worse will
+            // break in a tokio::select! loop.
+            // TODO: this doesn't work correctly as-is.
+            if *this.attempt > 1 && !this.config.reconnect {
+                return Poll::Ready(None);
+            }
+
+            if *this.attempt > this.config.max_reconnect_attempts {
+                return Poll::Ready(None);
+            }
+
+            tracing::debug!(
+                "disconnected... attempting reconnect {}/{}",
+                *this.attempt,
+                this.config.max_reconnect_attempts
+            );
+            let tcp = ::std::net::TcpStream::connect(this.config.host.to_owned());
+            *this.attempt += 1;
+
+            match tcp {
+                Ok(tcp) => {
+                    let _ = tcp.set_nonblocking(true);
+                    let inner = protocol::transport::Transport::new(
+                        TcpStream::from_std(tcp).unwrap(),
+                        this.config.codec_mode,
+                    );
+                    this.state.set(State::Connected { inner });
+                    *this.attempt = 0;
+                    tracing::debug!("connected.");
+                    return Poll::Ready(Some(Event::Connected));
+                }
+                Err(e) => {
+                    tracing::error!("failed to establish connection: {}", e);
+                    // TODO wake after X seconds
+                    // This should exponentially backoff
+                    cx.waker().wake_by_ref();
+                    return Poll::Pending;
+                }
+            }
+        };
+
+        this.state.poll_next(cx)
+    }
+}
+
+impl Sink<Event> for Client {
+    type Error = error::Error;
+
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().state.poll_ready(cx)
+    }
+
+    fn start_send(self: Pin<&mut Self>, value: Event) -> Result<(), Self::Error> {
+        self.project().state.start_send(value)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().state.poll_flush(cx)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().state.poll_close(cx)
+    }
+}
+
+//use crate::packet_handlers;
+//use crate::protocol::Packet;
+//use crate::protocol::transport::Transport;
+
+/*
 
 packet_handlers!(
     Client<State> for Packet {
@@ -333,3 +327,5 @@ packet_handlers!(
         RelayError(protocol::relay::Error) => on_relay_error,
     }
 );
+
+*/

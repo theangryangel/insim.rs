@@ -17,7 +17,7 @@ use tokio_util::codec::Framed;
 
 use super::codec::Mode;
 
-const TIMEOUT_SECS: u64 = 90;
+const TIMEOUT_SECS: u64 = 10;
 
 /// Internal Transport state.
 #[derive(Eq, PartialEq)]
@@ -186,10 +186,9 @@ where
     }
 }
 
-impl<T, I: Into<Packet>> Sink<I> for Transport<T>
+impl<T> Sink<Packet> for Transport<T>
 where
     T: AsyncRead + AsyncWrite,
-    I: std::fmt::Debug,
 {
     type Error = Error;
 
@@ -197,8 +196,8 @@ where
         self.project().inner.poll_ready(cx)
     }
 
-    fn start_send(self: Pin<&mut Self>, value: I) -> Result<(), Self::Error> {
-        self.project().inner.start_send(value.into())
+    fn start_send(self: Pin<&mut Self>, value: Packet) -> Result<(), Self::Error> {
+        self.project().inner.start_send(value)
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

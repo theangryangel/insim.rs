@@ -11,8 +11,8 @@ pub struct Config {
     pub(crate) prefix: u8,
     pub(crate) interval_ms: u16,
     pub(crate) verify_version: bool,
-    //pub(crate) reconnect: bool,
-    //pub(crate) max_reconnect_attempts: u16,
+    pub(crate) reconnect: bool,
+    pub(crate) max_reconnect_attempts: u32,
     pub(crate) codec_mode: Mode,
 }
 
@@ -33,9 +33,8 @@ impl Config {
             prefix: 0,
             interval_ms: 1000,
             verify_version: true,
-            // TODO: Readd support for reconnection attempts
-            //reconnect: true,
-            //max_reconnect_attempts: 1,
+            reconnect: true,
+            max_reconnect_attempts: 2,
             codec_mode: Mode::Compressed,
         }
     }
@@ -109,14 +108,17 @@ impl Config {
         self
     }
 
-    pub fn build(self) -> Client<()> {
-        Client::new(self)
+    pub fn try_reconnect(mut self, value: bool) -> Self {
+        self.reconnect = value;
+        self
     }
 
-    pub fn build_with_state<State>(self, state: State) -> Client<State>
-    where
-        State: Clone + Send + Sync + 'static,
-    {
-        Client::with_state(self, state)
+    pub fn try_reconnect_attempts(mut self, value: u32) -> Self {
+        self.max_reconnect_attempts = value;
+        self
+    }
+
+    pub fn build(self) -> Client {
+        Client::new(self)
     }
 }

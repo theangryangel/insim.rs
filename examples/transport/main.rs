@@ -38,12 +38,15 @@ pub async fn main() {
         reqi: 1,
     };
 
-    t.send(isi).await;
+    t.send(isi.into()).await;
 
-    t.send(insim::protocol::relay::HostSelect {
-        hname: "Nubbins AU Demo".into(),
-        ..Default::default()
-    })
+    t.send(
+        insim::protocol::relay::HostSelect {
+            hname: "Nubbins AU Demo".into(),
+            ..Default::default()
+        }
+        .into(),
+    )
     .await;
 
     while let Some(m) = t.next().await {
