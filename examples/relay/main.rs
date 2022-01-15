@@ -22,18 +22,19 @@ pub async fn main() {
 
     let mut i = 0;
 
-    let mut client = insim::framework::Config::default()
+    let mut client = insim::client::Config::default()
         .relay()
-        .try_reconnect(false)
+        .try_reconnect(true)
+        .try_reconnect_attempts(2000)
         .build();
 
     while let Some(m) = client.next().await {
         i += 1;
 
         match m {
-            insim::framework::Event::Connected => {
+            insim::client::Event::Connected => {
                 let _ = client
-                    .send(insim::framework::Event::Packet(
+                    .send(insim::client::Event::Packet(
                         insim::protocol::relay::HostSelect {
                             hname: "Nubbins AU Demo".into(),
                             ..Default::default()
@@ -47,8 +48,8 @@ pub async fn main() {
 
         tracing::debug!("Event: {:?} {:?}", m, i);
 
-        if i >= 10 {
-            client.shutdown();
-        }
+        // if i >= 10 {
+        //     client.shutdown();
+        // }
     }
 }

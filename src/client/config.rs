@@ -12,7 +12,7 @@ pub struct Config {
     pub(crate) interval_ms: u16,
     pub(crate) verify_version: bool,
     pub(crate) reconnect: bool,
-    pub(crate) max_reconnect_attempts: u32,
+    pub(crate) max_reconnect_attempts: i64,
     pub(crate) codec_mode: Mode,
 }
 
@@ -113,7 +113,7 @@ impl Config {
         self
     }
 
-    pub fn try_reconnect_attempts(mut self, value: u32) -> Self {
+    pub fn try_reconnect_attempts(mut self, value: i64) -> Self {
         self.max_reconnect_attempts = value;
         self
     }

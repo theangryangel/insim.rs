@@ -6,10 +6,10 @@
 //! The library provides both [lower level](protocol) and an optional [higher level](framework) APIs for working with Insim, however at
 //! this time it only supports TCP. As a result Outsim is not supported at this time.
 
+#[cfg(feature = "client")]
+pub mod client;
 pub mod conversion;
 pub mod error;
-#[cfg(feature = "framework")]
-pub mod framework;
 pub mod protocol;
 pub mod string;
 pub mod track;

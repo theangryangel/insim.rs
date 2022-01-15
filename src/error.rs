@@ -4,6 +4,15 @@ use std::io::Error as IoError;
 
 #[derive(Debug)]
 pub enum Error {
+    /// Unimplemented command or action
+    Unimplemented,
+
+    /// Currently shutdown
+    Shutdown,
+
+    /// Currently disconnected
+    Disconnected,
+
     /// Describes when a timeout occurs communicating with the Insim server.
     Timeout,
 
