@@ -20,12 +20,16 @@ fn setup() {
 pub async fn main() {
     setup();
 
+    let mut i = 0;
+
     let mut client = insim::framework::Config::default()
         .relay()
         .try_reconnect(false)
         .build();
 
     while let Some(m) = client.next().await {
+        i += 1;
+
         match m {
             insim::framework::Event::Connected => {
                 let _ = client
@@ -41,6 +45,10 @@ pub async fn main() {
             _ => {}
         }
 
-        tracing::debug!("Event: {:?}", m);
+        tracing::debug!("Event: {:?} {:?}", m, i);
+
+        if i >= 10 {
+            client.shutdown();
+        }
     }
 }

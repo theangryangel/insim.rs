@@ -155,6 +155,10 @@ impl Client {
             attempt: 0,
         }
     }
+
+    pub fn shutdown(&mut self) {
+        self.state = State::Shutdown;
+    }
 }
 
 impl Stream for Client {
@@ -165,14 +169,11 @@ impl Stream for Client {
 
         if let State::Disconnected = *this.state {
             // TODO: This should be moved to a future and into State(?) so that we can handle the
-            // reconnection in an async manner. Currently this blocks poll_next and worse will
-            // break in a tokio::select! loop.
-            // TODO: this doesn't work correctly as-is.
-            if *this.attempt > 1 && !this.config.reconnect {
-                return Poll::Ready(None);
-            }
-
-            if *this.attempt > this.config.max_reconnect_attempts {
+            // reconnection in an async manner. Currently this blocks poll_next and worse may
+            // break in a tokio::select! loop, I guess?
+            if *this.attempt > 0
+                && (!this.config.reconnect || *this.attempt > this.config.max_reconnect_attempts)
+            {
                 return Poll::Ready(None);
             }
 
@@ -181,6 +182,7 @@ impl Stream for Client {
                 *this.attempt,
                 this.config.max_reconnect_attempts
             );
+
             let tcp = ::std::net::TcpStream::connect(this.config.host.to_owned());
             *this.attempt += 1;
 
@@ -192,7 +194,7 @@ impl Stream for Client {
                         this.config.codec_mode,
                     );
                     this.state.set(State::Connected { inner });
-                    *this.attempt = 0;
+                    *this.attempt = 1;
                     tracing::debug!("connected.");
                     return Poll::Ready(Some(Event::Connected));
                 }
