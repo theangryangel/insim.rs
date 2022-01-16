@@ -1,11 +1,58 @@
 //! An optional high level API for working with LFS through Insim.
+//!
 //! :warning: API is not stable.
+//!
+//! [Client] is a wrapper around [Transport](super::protocol::transport::Transport) which is able to
+//! transparently reconnect to the Insim server, with a configurable backoff.
+//!
+//! Rather than a stream of [Packet](super::protocol::Packet) it instead provides a stream of [Event] which
+//! describes the current state of the client.
+//!
+//! You create and configure [Client] through [Config].
+//!
+//! # Example
+//! ```rust
+//! use futures::{SinkExt, StreamExt};
+//! use insim;
+//! use tracing_subscriber;
+//!
+//! #[tokio::main]
+//! pub async fn main() {
+//!
+//!     // Make a connection to the Insim Relay
+//!     let mut client = insim::client::Config::default()
+//!         .relay()
+//!         .build();
+//!
+//!     // We MUST poll the future to ensure that the client stays connected
+//!     // Once the client is shutdown it will output an Event::Shutdown and then return None.
+//!     while let Some(m) = client.next().await {
+//!         match m {
+//!             insim::client::Event::Connected => {
+//!                 let _ = client
+//!                     .send(insim::client::Event::Packet(
+//!                         insim::protocol::relay::HostSelect {
+//!                             hname: "Nubbins AU Demo".into(),
+//!                             ..Default::default()
+//!                         }
+//!                         .into(),
+//!                     ))
+//!                     .await;
+//!             }
+//!             _ => {
+//!               tracing::debug!("Event: {:?}", m);
+//!             }
+//!         }
+//!     }
+//! }
+//! ```
 
 pub(crate) mod config;
-
+use super::{error, protocol};
 pub use config::Config;
 
-use super::{error, protocol};
+const BACKOFF_MIN_INTERVAL_SECS: i64 = 2;
+const BACKOFF_MAX_INTERVAL_SECS: i64 = 60;
 
 // TODO: Split this into Event and Commands
 #[derive(Debug)]
@@ -96,9 +143,15 @@ impl Client {
             return false;
         }
 
-        let duration = time::Duration::new((self.attempt * 2).try_into().unwrap(), 0);
+        // TODO: add random jitter
+        let duration_secs = ::std::cmp::max(
+            self.attempt * BACKOFF_MIN_INTERVAL_SECS,
+            BACKOFF_MAX_INTERVAL_SECS,
+        );
+
+        tracing::debug!("backing off for {}s", duration_secs);
+        let duration = time::Duration::new(duration_secs.try_into().unwrap(), 0);
         let next = time::Instant::now() + duration;
-        tracing::debug!("backing off until {:?}", next);
         let deadline = Box::pin(tokio::time::sleep_until(next));
         self.state = State::Disconnected {
             deadline: Some(deadline),
