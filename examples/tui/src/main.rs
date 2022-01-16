@@ -1,256 +1,321 @@
-#[allow(dead_code)]
-mod util;
+extern crate insim;
 
-use crate::util::event::{Event, Events};
+use std::sync::{Arc, Mutex};
+
 use bounded_vec_deque::BoundedVecDeque;
 use chrono;
-use insim;
-use tokio::sync::mpsc;
-use std::{
-    collections::HashMap,
-    default::Default,
-    error::Error,
-    io,
-    sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}},
-    time::Duration,
+use futures::{SinkExt, StreamExt};
+use tracing_subscriber;
+
+use crossterm::{
+    cursor,
+    event::{Event, EventStream, KeyCode, KeyEvent},
+    execute, terminal,
 };
-use termion::{event::Key, input::MouseTerminal, raw::IntoRawMode, screen::AlternateScreen};
 use tui::{
-    backend::TermionBackend,
-    layout::{Constraint, Direction, Layout},
+    backend::CrosstermBackend,
+    layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    text::Span,
-    widgets::{Block, Borders, Cell, List, ListItem, Row, Table, TableState},
+    text::{Span, Text},
+    widgets::{Block, Borders, Cell, List, ListItem, Paragraph, Row, Table, TableState},
     Terminal,
 };
 
-pub struct Player {
-    pub name: String,
-    pub lap: u16,
-    pub vehicle: String,
-    pub position: u8,
+const DATETIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
+
+fn setup_tracing() {
+    // setup tracing with some defaults if nothing is set
+    if std::env::var("RUST_LIB_BACKTRACE").is_err() {
+        std::env::set_var("RUST_LIB_BACKTRACE", "1")
+    }
+
+    if std::env::var("RUST_LOG").is_err() {
+        std::env::set_var("RUST_LOG", "info")
+    }
+    tracing_subscriber::fmt::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
 }
 
-pub struct StatefulTable {
-    state: TableState,
+fn setup_terminal() {
+    let mut stdout = std::io::stdout();
+
+    execute!(stdout, cursor::Hide).unwrap();
+    execute!(stdout, terminal::EnterAlternateScreen).unwrap();
+
+    execute!(stdout, terminal::Clear(terminal::ClearType::All)).unwrap();
+
+    terminal::enable_raw_mode().unwrap();
 }
 
-impl StatefulTable {
-    fn new() -> StatefulTable {
-        StatefulTable {
-            state: TableState::default(),
+fn cleanup_terminal() {
+    let mut stdout = std::io::stdout();
+
+    execute!(stdout, cursor::MoveTo(0, 0)).unwrap();
+    execute!(stdout, terminal::Clear(terminal::ClearType::All)).unwrap();
+
+    execute!(stdout, terminal::LeaveAlternateScreen).unwrap();
+    execute!(stdout, cursor::Show).unwrap();
+
+    terminal::disable_raw_mode().unwrap();
+}
+
+enum State {
+    Browsing,
+    Selected,
+}
+
+// TODO: start spliting this up once I know where I'm going with this.
+struct App {
+    state: State,
+    servers: Vec<(insim::protocol::relay::HostInfo, String)>,
+    servers_state: TableState,
+
+    insim_connected: bool,
+    chat: BoundedVecDeque<String>,
+}
+
+impl App {
+    pub fn new() -> Self {
+        Self {
+            state: State::Browsing,
+            servers: Vec::new(),
+            servers_state: TableState::default(),
+
+            insim_connected: false,
+
+            chat: BoundedVecDeque::new(20),
         }
     }
 
-    pub fn next(&mut self) {
+    pub fn push_chat(&mut self, data: String) {
+        self.chat.push_front(format!(
+            "{}: {}",
+            chrono::Local::now().format(DATETIME_FORMAT),
+            data,
+        ));
     }
 
-    pub fn previous(&mut self) {
+    pub fn next_server(&mut self) {
+        let i = match self.servers_state.selected() {
+            Some(i) => {
+                if i >= self.servers.len() - 1 {
+                    0
+                } else {
+                    i + 1
+                }
+            }
+            None => 0,
+        };
+        self.servers_state.select(Some(i));
     }
-}
 
-#[derive(Clone)]
-struct ClientState {
-    players: Arc<Mutex<HashMap<u8, Player>>>,
-    chat: Arc<Mutex<BoundedVecDeque<String>>>,
-    update: mpsc::UnboundedSender<bool>,
+    pub fn previous_server(&mut self) {
+        let i = match self.servers_state.selected() {
+            Some(i) => {
+                if i == 0 {
+                    self.servers.len() - 1
+                } else {
+                    i - 1
+                }
+            }
+            None => 0,
+        };
+        self.servers_state.select(Some(i));
+    }
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-    // Terminal initialization
-    let stdout = io::stdout().into_raw_mode()?;
-    let stdout = MouseTerminal::from(stdout);
-    let stdout = AlternateScreen::from(stdout);
-    let backend = TermionBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
+pub async fn main() {
+    setup_tracing();
 
-    let events = Events::new();
+    let backend = CrosstermBackend::new(std::io::stdout());
+    let mut terminal = Terminal::new(backend).unwrap();
+    let mut events = EventStream::new();
 
-    let (update_tx, mut update_rx) = mpsc::unbounded_channel();
+    setup_terminal();
 
-    let chat = Arc::new(Mutex::new(BoundedVecDeque::new(20)));
-    let players = Arc::new(Mutex::new(HashMap::new()));
-    let mut table = StatefulTable::new();
-
-    let mut client = insim::framework::Config::default()
+    let mut client = insim::client::Config::default()
         .relay()
-        .build_with_state(ClientState {
-            players: players.clone(),
-            update: update_tx,
-            chat: chat.clone(),
-        });
+        .try_reconnect(true)
+        .try_reconnect_attempts(2000)
+        .build();
 
-    client.on_connect(|ctx| {
-        ctx.send(insim::protocol::relay::HostListRequest::default().into());
-
-        ctx.send(
-            insim::protocol::relay::HostSelect {
-                hname: "Nubbins AU Demo".into(),
-                ..Default::default()
-            }
-            .into(),
-        );
-
-        ctx.send(
-            insim::protocol::insim::Tiny {
-                reqi: 0,
-                subtype: insim::protocol::insim::TinyType::Npl,
-            }
-            .into(),
-        );
-    });
-
-    client.on_new_player(|ctx, data| {
-        ctx.state.players.lock().unwrap().insert(data.plid, Player {
-            name: data.pname.to_string(),
-            lap: 0,
-            vehicle: data.cname.to_string(),
-            position: 0,
-        });
-
-        ctx.state.update.send(true).unwrap();
-    });
-
-    client.on_player_left(|ctx, data| {
-        if let Some(_) = ctx.state.players.lock().unwrap().remove(&data.plid) {
-            ctx.state.update.send(true).unwrap();
-        }
-    });
-
-    client.on_lap(|ctx, data| {
-        if let Some(player) = ctx.state.players.lock().unwrap().get_mut(&data.plid) {
-            player.lap = data.lapsdone;
-
-            ctx.state.chat.lock().unwrap().push_front(format!(
-                "{}: {} finished lap {}",
-                chrono::Local::now().format("%H:%M:%S"),
-                player.name,
-                data.lapsdone
-            ));
-    
-            ctx.state.update.send(true).unwrap();
-        }
-    });
-
-    client.on_multi_car_info(|ctx, data| {
-        let mut any = false;
-
-        for info in data.info.iter() {
-            if let Some(player) = ctx.state.players.lock().unwrap().get_mut(&info.plid) {
-                player.lap = info.lap;
-                player.position = info.position;
-                any = true;
-            }
-        }
-
-        if any {
-            ctx.state.update.send(true).unwrap();
-        }
-    });
-
-    client.on_split(|ctx, data| {
-        if let Some(player) = ctx.state.players.lock().unwrap().get(&data.plid) {
-            ctx.state.chat.lock().unwrap().push_front(format!(
-                "{}: {} spx {}",
-                chrono::Local::now().format("%H:%M:%S"),
-                player.name,
-                data.etime,
-            ));
-
-            ctx.state.update.send(true).unwrap();
-        }
-    });
-
-    client.on_message(|ctx, data| {
-        ctx.state.chat.lock().unwrap().push_front(format!(
-            "{}: {}", chrono::Local::now().format("%H:%M:%S"),
-            insim::string::colours::strip(data.msg.to_string())
-        ));
-
-        ctx.state.update.send(true).unwrap();
-    });
-
-    // TODO: not handling client shutdown
-    // TODO: discuss if the framework API is actually useful outside of "toy" examples
-    tokio::spawn(async move {
-        client.run().await
-    });
+    let mut app = App::new();
 
     loop {
         tokio::select! {
-            event = events.next() => {
-                match event? {
-                    Event::Input(key) => {
-                        match key {
-                            Key::Char('q') => {
-                                break;
-                            },
-                            Key::Char('n') => {
-                                table.next();
-                            },
-                            Key::Char('p') => {
-                                table.previous();
-                            },
-                            _ => {
-                                continue;
+
+            Some(Ok(e)) = events.next() => match (e, &app.state) {
+                (
+                    Event::Key(KeyEvent{ code: KeyCode::Char('q') | KeyCode::Esc, .. }),
+                    State::Browsing,
+                ) => {
+                    client.shutdown();
+                    break;
+                },
+
+                (
+                    Event::Key(KeyEvent{ code: KeyCode::Char('q') | KeyCode::Esc, .. }),
+                    State::Selected,
+                ) => {
+                    app.state = State::Browsing;
+                },
+
+                (
+                    Event::Key(KeyEvent{ code: KeyCode::Char('r'), .. }),
+                    State::Browsing
+                ) => {
+                    app.servers.clear();
+
+                    let _ = client.send(
+                        insim::client::Event::Packet(
+                            insim::protocol::relay::HostListRequest::default().into()
+                        )
+                    ).await;
+                },
+
+                (
+                    Event::Key(KeyEvent{ code: KeyCode::Up, .. }),
+                    State::Browsing
+                ) => {
+                    app.previous_server();
+                },
+
+                (
+                    Event::Key(KeyEvent{ code: KeyCode::Down, .. }),
+                    State::Browsing
+                ) => {
+                    app.next_server();
+                },
+
+                (
+                    Event::Key(KeyEvent{ code: KeyCode::Enter, .. }),
+                    State::Browsing
+                ) => {
+                    if let Some(selected) = app.servers_state.selected() {
+                        let _ = client
+                        .send(insim::client::Event::Packet(
+                            insim::protocol::relay::HostSelect {
+                                hname: app.servers[selected].0.hname.to_owned(),
+                                ..Default::default()
+                            }
+                            .into(),
+                        ))
+                        .await;
+
+                        app.state = State::Selected;
+                        app.push_chat(format!("Selected {}", app.servers[selected].0.hname));
+                    }
+                },
+
+                (Event::Resize(..), _) => {
+                    let res = terminal.autoresize();
+                    if res.is_err() {
+                        tracing::error!("auto-resize failed: {:?}", res);
+                        break;
+                    }
+                },
+
+                _ => {}
+            },
+
+            Some(e) = client.next() => match e {
+                insim::client::Event::Disconnected => {
+                    app.servers.clear();
+                    app.insim_connected = false;
+                    app.state = State::Browsing;
+                },
+                insim::client::Event::Connected => {
+                    app.servers.clear();
+                    app.insim_connected = true;
+
+                    app.push_chat("Connected".into());
+
+                    let _ = client.send(
+                        insim::client::Event::Packet(
+                            insim::protocol::relay::HostListRequest::default().into()
+                        )
+                    ).await;
+                },
+
+                insim::client::Event::Packet(frame) => match frame {
+                    insim::protocol::Packet::RelayHostList(insim::protocol::relay::HostList { hinfo, .. }) => {
+                        for info in hinfo.iter() {
+                            app.servers.push(
+                                (
+                                    info.to_owned(),
+                                    insim::string::colours::strip(
+                                        info.hname.to_lossy_string()
+                                    )
+                                )
+                            );
+
+                            if info.flags.contains(insim::protocol::relay::HostInfoFlags::LAST) {
+                                app.servers.sort_by(|(a, _), (b, _)| b.numconns.partial_cmp(&a.numconns).unwrap());
                             }
                         }
                     },
-                    _ => {
-                        continue;
-                    }
+
+                    insim::protocol::Packet::MessageOut(data) => {
+                        app.push_chat(
+                            insim::string::colours::strip(data.msg.to_string())
+                        );
+                    },
+
+                    insim::protocol::Packet::Lap(data) => {
+                       app.push_chat(format!(
+                            "lap plid={} lap={}",
+                            data.plid,
+                            data.lapsdone,
+                        ));
+                    },
+
+                    insim::protocol::Packet::SplitX(data) => {
+                       app.push_chat(format!(
+                            "split plid={} split={} etime={}",
+                            data.plid,
+                            data.split,
+                            data.etime,
+                        ));
+                    },
+
+                    _ => { continue; }
                 }
-            },
-            should_update = update_rx.recv() => {
-                if should_update != Some(true) {
-                    continue;
-                }
+
+                _ => { continue; }
             }
+
         };
 
-        terminal.draw(|f| {
-            let rects = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        // draw
+        let res = terminal.draw(|f| {
+            let outer = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Length(3), Constraint::Min(0)].as_ref())
                 .split(f.size());
 
-            // Players
-            let selected_style = Style::default().add_modifier(Modifier::REVERSED);
-            let header_cells = ["#", "Player", "Car", "Lap", "Time"]
-                .iter()
-                .map(|h| Cell::from(*h).style(Style::default().fg(Color::Red)));
-            let header = Row::new(header_cells).height(1);
+            let header = Block::default().borders(Borders::ALL).title("insim.rs");
 
-            let row_data = players.lock().unwrap();
+            let lines = if app.insim_connected {
+                Text::from("Connected ")
+            } else {
+                Text::from("Not Connected ")
+            };
 
-            let rows = row_data.iter().map(|(_key, item)| {
-                let cells = vec![
-                    Cell::from(Span::raw(item.position.to_string())),
-                    Cell::from(Span::raw(&item.name)),
-                    Cell::from(Span::raw(&item.vehicle)),
-                    Cell::from(Span::raw(item.lap.to_string())),
-                ];
-                Row::new(cells).height(1)
-            });
+            let help = Paragraph::new(lines)
+                .block(header)
+                .alignment(Alignment::Right);
+            f.render_widget(help, outer[0]);
 
-            let t = Table::new(rows)
-                .header(header)
-                .block(Block::default().borders(Borders::ALL).title("Players"))
-                .highlight_style(selected_style)
-                .highlight_symbol("* ")
-                .widths(&[
-                    Constraint::Length(3),
-                    Constraint::Percentage(25),
-                    Constraint::Percentage(25),
-                    Constraint::Percentage(25),
-                ]);
-            f.render_stateful_widget(t, rects[0], &mut table.state);
+            let inner = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(0), Constraint::Length(10)].as_ref())
+                .split(outer[1]);
 
             // Chat
-            let chat_items: Vec<ListItem> = chat
-                .lock()
-                .unwrap()
+            let chat_items: Vec<ListItem> = app
+                .chat
                 .iter()
                 .map(|item| ListItem::new(item.to_string()))
                 .collect();
@@ -262,9 +327,49 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         .bg(Color::LightGreen)
                         .add_modifier(Modifier::BOLD),
                 );
-            f.render_widget(items, rects[1]);
-        })?;
+            f.render_widget(items, inner[1]);
+
+            match app.state {
+                State::Browsing => {
+                    let header_cells = ["Server", "Track", "Connections"]
+                        .iter()
+                        .map(|h| Cell::from(*h).style(Style::default().fg(Color::Red)));
+                    let header = Row::new(header_cells).height(1);
+
+                    let rows = app.servers.iter().map(|(hinfo, name)| {
+                        let cells = vec![
+                            Cell::from(Span::raw(name)),
+                            Cell::from(Span::raw(hinfo.track.to_string())),
+                            Cell::from(Span::raw(hinfo.numconns.to_string())),
+                        ];
+                        Row::new(cells).height(1)
+                    });
+
+                    let t = Table::new(rows)
+                        .header(header)
+                        .block(Block::default().borders(Borders::ALL).title("Servers"))
+                        .highlight_symbol("* ")
+                        .widths(&[
+                            Constraint::Min(100),
+                            Constraint::Length(10),
+                            Constraint::Length(15),
+                        ]);
+
+                    f.render_stateful_widget(t, inner[0], &mut app.servers_state);
+                }
+
+                State::Selected => {
+                    let t = Block::default().title("Players");
+                    f.render_widget(t, inner[0]);
+                }
+            }
+        });
+
+        if res.is_err() {
+            tracing::error!("failed to draw terminal");
+            break;
+        }
     }
 
-    Ok(())
+    cleanup_terminal();
 }

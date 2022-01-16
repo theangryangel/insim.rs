@@ -17,7 +17,7 @@ use tokio_util::codec::Framed;
 
 use super::codec::Mode;
 
-const TIMEOUT_SECS: u64 = 10;
+const TIMEOUT_SECS: u64 = 90;
 
 /// Internal Transport state.
 #[derive(Eq, PartialEq)]
