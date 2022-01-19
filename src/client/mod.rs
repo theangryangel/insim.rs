@@ -127,6 +127,14 @@ impl Client {
         }
     }
 
+    pub fn is_connected(&self) -> bool {
+        matches!(self.state, State::Connected { .. })
+    }
+
+    pub fn is_shutdown(&self) -> bool {
+        matches!(self.state, State::Shutdown)
+    }
+
     pub fn shutdown(&mut self) {
         self.state = State::Shutdown;
     }
