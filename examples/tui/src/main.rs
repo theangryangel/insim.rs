@@ -7,6 +7,7 @@ use tracing_subscriber;
 
 mod style;
 mod view;
+mod widgets;
 
 use crossterm::{
     cursor,
@@ -15,10 +16,7 @@ use crossterm::{
 };
 use tui::{
     backend::CrosstermBackend,
-    layout::{Alignment, Constraint, Direction, Layout},
-    style::{Color, Modifier, Style},
-    text::{Span, Spans},
-    widgets::Paragraph,
+    layout::{Constraint, Direction, Layout},
     Terminal,
 };
 
@@ -107,6 +105,7 @@ pub async fn main() {
                         view::ViewState::Browsing
                     ) => {
                         app.servers.clear();
+                        app.players.clear();
 
                         let _ = client.send(
                             insim::client::Event::Packet(
@@ -119,26 +118,53 @@ pub async fn main() {
                         Event::Key(KeyEvent{ code: KeyCode::Up, .. }),
                         view::ViewState::Browsing
                     ) => {
-                        app.previous_server();
+                        app.servers.scroll_prev();
                     },
 
                     (
                         Event::Key(KeyEvent{ code: KeyCode::Down, .. }),
                         view::ViewState::Browsing
                     ) => {
-                        app.next_server();
+                        app.servers.scroll_next();
                     },
+
+                    (
+                        Event::Key(KeyEvent{ code: KeyCode::Up, .. }),
+                        view::ViewState::Selected
+                    ) => {
+                        app.players.scroll_prev();
+                    },
+
+                    (
+                        Event::Key(KeyEvent{ code: KeyCode::Down, .. }),
+                        view::ViewState::Selected
+                    ) => {
+                        app.players.scroll_next();
+                    },
+
 
                     (
                         Event::Key(KeyEvent{ code: KeyCode::Enter, .. }),
                         view::ViewState::Browsing
                     ) => {
                         if let Some(selected) = app.servers.selected() {
+                            app.players.clear();
+
                             let _ = client
                             .send(insim::client::Event::Packet(
                                 insim::protocol::relay::HostSelect {
                                     hname: selected.clone(),
                                     ..Default::default()
+                                }
+                                .into(),
+                            ))
+                            .await;
+
+                            let _ = client
+                            .send(insim::client::Event::Packet(
+                                insim::protocol::insim::Tiny{
+                                    reqi: 0,
+                                    subtype: insim::protocol::insim::TinyType::Npl,
                                 }
                                 .into(),
                             ))
@@ -185,25 +211,28 @@ pub async fn main() {
                 .constraints([Constraint::Length(1), Constraint::Min(0)].as_ref())
                 .split(f.size());
 
-            let lines = if client.is_connected() {
-                Span::styled(
-                    "(CONNECTED)",
-                    Style::default()
-                        .fg(Color::Green)
-                        .add_modifier(Modifier::BOLD),
-                )
-            } else {
-                Span::styled(
-                    "(DISCONNECTED)",
-                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-                )
-            };
+            let connected = widgets::ConnectedWidget::default().connected(client.is_connected());
+            f.render_widget(connected, outer[0]);
 
-            let state = Paragraph::new(Spans::from(vec![Span::raw("Insim Relay: "), lines]))
-                .alignment(Alignment::Left);
-            f.render_widget(state, outer[0]);
+            let inner = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(0), Constraint::Length(10)].as_ref())
+                .split(outer[1]);
 
-            app.render(f, outer[1]);
+            let chat = widgets::ChatWidget::default();
+            f.render_stateful_widget(chat, inner[1], &mut app.chat);
+
+            match app.state {
+                view::ViewState::Browsing => {
+                    let servers = widgets::ServersWidget::default();
+                    f.render_stateful_widget(servers, inner[0], &mut app.servers);
+                }
+
+                view::ViewState::Selected => {
+                    let players = widgets::PlayerListWidget::default();
+                    f.render_stateful_widget(players, inner[0], &mut app.players);
+                }
+            }
         });
 
         if res.is_err() {

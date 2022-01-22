@@ -1,19 +1,16 @@
-use tui::{
-    layout::{Constraint, Direction, Layout},
-    style::{Modifier, Style},
-    text::{Span, Spans, Text},
-    widgets::{Block, Borders, Cell, Paragraph, Row, Table, TableState},
-};
+use std::borrow::Cow;
 
-use crate::style::bold;
+use tui::layout::Rect;
+use tui::style::Color;
+use tui::widgets::TableState;
 
 #[derive(Debug, Default)]
-pub(crate) struct ServersTable {
-    data: Vec<(insim::protocol::relay::HostInfo, String)>,
-    state: TableState,
+pub struct ServersState {
+    pub data: Vec<(insim::protocol::relay::HostInfo, String)>,
+    pub inner: TableState,
 }
 
-impl ServersTable {
+impl ServersState {
     pub fn on_network(&mut self, e: &insim::client::Event) {
         match e {
             insim::client::Event::Packet(frame) => match frame {
@@ -22,10 +19,7 @@ impl ServersTable {
                     ..
                 }) => {
                     for info in hinfo.iter() {
-                        self.push(
-                            info.to_owned(),
-                            insim::string::colours::strip(info.hname.to_lossy_string()),
-                        );
+                        self.push(info.to_owned(), info.hname.to_lossy_string());
 
                         if info
                             .flags
@@ -44,7 +38,7 @@ impl ServersTable {
     }
 
     pub fn selected(&self) -> Option<&insim::string::CodepageString> {
-        if let Some(selected) = self.state.selected() {
+        if let Some(selected) = self.inner.selected() {
             return Some(&self.data[selected].0.hname);
         }
 
@@ -64,11 +58,62 @@ impl ServersTable {
             .sort_by(|(a, _), (b, _)| b.numconns.partial_cmp(&a.numconns).unwrap());
     }
 
-    pub fn render<B: tui::backend::Backend>(
-        &mut self,
-        frame: &mut tui::terminal::Frame<B>,
-        area: tui::layout::Rect,
-    ) {
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
+    pub fn scroll_next(&mut self) {
+        let i = match self.inner.selected() {
+            Some(i) => {
+                if i >= self.len() - 1 {
+                    0
+                } else {
+                    i + 1
+                }
+            }
+            None => 0,
+        };
+        self.inner.select(Some(i));
+    }
+
+    pub fn scroll_prev(&mut self) {
+        let i = match self.inner.selected() {
+            Some(i) => {
+                if i == 0 {
+                    self.len() - 1
+                } else {
+                    i - 1
+                }
+            }
+            None => 0,
+        };
+        self.inner.select(Some(i));
+    }
+}
+
+use tui::widgets::{StatefulWidget, Widget};
+
+use tui::{
+    layout::{Constraint, Direction, Layout},
+    text::{Span, Spans, Text},
+    widgets::{Cell, Paragraph, Row, Table},
+};
+
+use tui::{
+    style::{Modifier, Style},
+    widgets::{Block, Borders},
+};
+
+use crate::style::bold;
+use crate::view::colourify;
+
+#[derive(Default)]
+pub struct ServersWidget {}
+
+impl StatefulWidget for ServersWidget {
+    type State = ServersState;
+
+    fn render(self, area: Rect, buf: &mut tui::buffer::Buffer, state: &mut Self::State) {
         let inner = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(1), Constraint::Min(0)].as_ref())
@@ -88,7 +133,7 @@ impl ServersTable {
         ]));
 
         let help = Paragraph::new(text);
-        frame.render_widget(help, inner[0]);
+        help.render(inner[0], buf);
 
         // table
         let header_cells = ["Server", "Track", "Connections"]
@@ -96,9 +141,9 @@ impl ServersTable {
             .map(|h| Cell::from(*h).style(Style::default().add_modifier(Modifier::BOLD)));
         let header = Row::new(header_cells).height(1);
 
-        let rows = self.data.iter().map(|(hinfo, name)| {
+        let rows = state.data.iter().map(|(hinfo, name)| {
             let cells = vec![
-                Cell::from(Span::raw(name)),
+                Cell::from(colourify(Cow::Borrowed(name))),
                 Cell::from(Span::raw(hinfo.track.to_string())),
                 Cell::from(Span::raw(hinfo.numconns.to_string())),
             ];
@@ -108,45 +153,13 @@ impl ServersTable {
         let t = Table::new(rows)
             .header(header)
             .block(Block::default().borders(Borders::ALL).title("Servers"))
-            .highlight_symbol("* ")
+            .highlight_symbol("> ")
+            .highlight_style(Style::default().add_modifier(Modifier::BOLD))
             .widths(&[
                 Constraint::Min(100),
                 Constraint::Length(10),
                 Constraint::Length(15),
             ]);
-
-        frame.render_stateful_widget(t, inner[1], &mut self.state);
-    }
-
-    pub fn len(&self) -> usize {
-        self.data.len()
-    }
-
-    pub fn scroll_next(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i >= self.len() - 1 {
-                    0
-                } else {
-                    i + 1
-                }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
-    }
-
-    pub fn scroll_prev(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.len() - 1
-                } else {
-                    i - 1
-                }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
+        StatefulWidget::render(t, inner[1], buf, &mut state.inner);
     }
 }

@@ -14,3 +14,4 @@ tui = { version = "0.16.0", features = ["crossterm"], default-features = false }
 crossterm = { version = "0.22.1", features = ["event-stream"] }
 bounded-vec-deque = "0.1"
 chrono = "0.4"
+itertools = "0.10"
