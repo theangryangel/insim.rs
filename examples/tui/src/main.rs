@@ -61,6 +61,7 @@ fn cleanup_terminal() {
 pub async fn main() {
     setup_tracing();
 
+    // ensure we recover the terminal on panic
     panic::set_hook(Box::new(move |x| {
         cleanup_terminal();
         print!("{:?}", x);
@@ -83,6 +84,7 @@ pub async fn main() {
     loop {
         tokio::select! {
 
+            // TODO: clean up
             Some(Ok(e)) = events.next() => {
                 match (e, &app.state) {
                     (
@@ -204,7 +206,8 @@ pub async fn main() {
             }
         };
 
-        // draw
+        // TODO: probably shouldn't draw on every event. if someone holds down a key we get high
+        // cpu usage, duh.
         let res = terminal.draw(|f| {
             let outer = Layout::default()
                 .direction(Direction::Vertical)

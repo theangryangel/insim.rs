@@ -138,7 +138,7 @@ impl StatefulWidget for PlayerListWidget {
         let rows = state
             .inner
             .iter()
-            .sorted_by(|(plida, playera), (plidb, playerb)| {
+            .sorted_by(|(_plida, playera), (_plidb, playerb)| {
                 playera.position.partial_cmp(&playerb.position).unwrap()
             })
             .map(|(plid, player)| {
