@@ -37,6 +37,8 @@ const ESCAPE_SEQUENCES: &[(u8, u8)] = &[
     (b't', b'"'),
     (b'l', b'<'),
     (b'r', b'>'),
+    (b'h', b'#'),
+    (b'^', b'^'),
 ];
 
 /// Escape a u8 slice according to LFS' rules.
