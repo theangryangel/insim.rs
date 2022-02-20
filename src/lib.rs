@@ -8,6 +8,8 @@
 
 #[cfg(feature = "client")]
 pub mod client;
+#[cfg(feature = "client")]
+pub mod client2;
 pub mod conversion;
 pub mod error;
 pub mod protocol;
