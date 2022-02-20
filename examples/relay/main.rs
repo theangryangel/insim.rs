@@ -1,5 +1,4 @@
 extern crate insim;
-use futures::{SinkExt, StreamExt};
 use tracing_subscriber;
 
 fn setup() {
@@ -22,7 +21,7 @@ pub async fn main() {
 
     let mut i = 0;
 
-    let mut client = insim::client::Config::default()
+    let client = insim::client::Config::default()
         .relay()
         .try_reconnect(true)
         .try_reconnect_attempts(2000)
@@ -34,7 +33,7 @@ pub async fn main() {
         match m {
             insim::client::Event::Connected => {
                 let _ = client
-                    .send(insim::client::Event::Packet(
+                    .send(insim::client::Event::Frame(
                         insim::protocol::relay::HostSelect {
                             hname: "Nubbins AU Demo".into(),
                             ..Default::default()

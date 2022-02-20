@@ -119,16 +119,12 @@ impl Decoder for Codec {
         match res {
             Ok(packet) => Ok(Some(packet)),
             Err(DekuError::Incomplete(e)) => {
-                // If we're here, everything is going wonky.
-                tracing::error!(
+                // If we're here, everything has gone very wonky.
+                panic!(
                     "malformed packet! this is probably a programming error, error: {:?}, input: {:?}",
                     e,
                     data.to_vec(),
                 );
-                Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "incomplete or malformed packet",
-                ))
             }
             Err(DekuError::Parse(e)) => {
                 tracing::error!("unsupported packet: {:?}: {:?}", e, data.to_vec());
@@ -160,10 +156,8 @@ impl Encoder<Packet> for Codec {
         let n = match n {
             Some(n) => n,
             None => {
-                return Err(Self::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "provided length would overflow after adjustment",
-                ));
+                // Probably a programming error, lets bail.
+                panic!("provided length would overflow after adjustment");
             }
         };
 

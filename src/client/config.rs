@@ -1,6 +1,5 @@
-use super::protocol::codec::Mode;
-use super::protocol::insim::InitFlags;
 use super::Client;
+use crate::protocol::{codec::Mode, insim::InitFlags};
 
 /// Configuration and [Client] builder.
 pub struct Config {
@@ -12,7 +11,7 @@ pub struct Config {
     pub(crate) interval_ms: u16,
     pub(crate) verify_version: bool,
     pub(crate) reconnect: bool,
-    pub(crate) max_reconnect_attempts: i64,
+    pub(crate) max_reconnect_attempts: u64,
     pub(crate) codec_mode: Mode,
 }
 
@@ -113,12 +112,12 @@ impl Config {
         self
     }
 
-    pub fn try_reconnect_attempts(mut self, value: i64) -> Self {
+    pub fn try_reconnect_attempts(mut self, value: u64) -> Self {
         self.max_reconnect_attempts = value;
         self
     }
 
     pub fn build(self) -> Client {
-        Client::new(self)
+        Client::from_config(self)
     }
 }
