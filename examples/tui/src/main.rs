@@ -205,7 +205,7 @@ pub async fn main() {
                 app.on_network(&e);
 
                 match e {
-                    insim::client::Event::Connected => {
+                    insim::client::Event::State(insim::client::State::Connected) => {
                         let _ = client.send(
                             insim::client::Event::Frame(
                                 insim::protocol::relay::HostListRequest::default().into()

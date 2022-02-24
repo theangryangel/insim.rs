@@ -1,4 +1,4 @@
-use super::{Config, Event};
+use super::{Config, Event, State};
 use crate::{
     error::Error,
     protocol::{insim, transport::Transport, Packet, VERSION},
@@ -23,7 +23,7 @@ pub struct ClientActor {
 impl ClientActor {
     async fn connect(&mut self) -> std::io::Result<TcpStream> {
         self.sender
-            .send(Event::Connecting)
+            .send(Event::State(State::Connecting))
             .expect("failed to send Event::Connecting");
         tracing::debug!("connecting...");
 
@@ -34,7 +34,7 @@ impl ClientActor {
     async fn handshake(&mut self, stream: TcpStream) -> Result<Transport<TcpStream>, Error> {
         tracing::debug!("handshaking...");
         self.sender
-            .send(Event::Handshaking)
+            .send(Event::State(State::Handshaking))
             .expect("failed to send Event::Handshaking");
         let mut inner = Transport::new(stream, self.config.codec_mode);
 
@@ -109,8 +109,8 @@ impl ClientActor {
             let backoff = self.backoff().await;
             if backoff.is_err() {
                 self.sender
-                    .send(Event::Shutdown)
-                    .expect("failed to send Event::Shutdown after backoff");
+                    .send(Event::State(State::Shutdown))
+                    .expect("failed to send Event::State(State::Shutdown) after backoff");
                 return;
             }
 
@@ -138,8 +138,8 @@ impl ClientActor {
             };
 
             self.sender
-                .send(Event::Connected)
-                .expect("failed to send Event::Connected");
+                .send(Event::State(State::Connected))
+                .expect("failed to send Event::State(State::Connected))");
 
             // reset the attempt counter so that if we reconnect later the backoff is reset
             self.attempt = 0;
@@ -164,7 +164,7 @@ impl ClientActor {
                             transport.send(frame).await.expect("failed to transmit frame");
                         },
 
-                        Ok(Event::Shutdown) => {
+                        Ok(Event::State(State::Shutdown)) => {
                             tracing::debug!("received shutdown request");
                             return;
                         },

@@ -54,17 +54,22 @@ pub use config::Config;
 
 use crate::{error, protocol};
 use flume;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::cell::Cell;
 use tokio::task::JoinHandle;
 
-// TODO: Split this into Event and Commands
-#[derive(Debug)]
-pub enum Event {
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum State {
+    Startup,
     Connecting,
     Handshaking,
     Connected,
     Disconnected,
     Shutdown,
+}
+
+#[derive(Debug)]
+pub enum Event {
+    State(State),
     Frame(protocol::Packet),
     Error(error::Error),
 }
@@ -73,10 +78,7 @@ pub struct Client {
     receiver: flume::Receiver<Event>,
     sender: flume::Sender<Event>,
     handle: JoinHandle<()>,
-
-    // TODO: We should probably be storing an Enum here that reflects the current state of the
-    // client, i.e. Connecting, Handshaking, Connected, Disconnected, Shutdown, etc.
-    connected: AtomicBool,
+    state: Cell<State>,
 }
 
 impl Client {
@@ -99,7 +101,7 @@ impl Client {
             receiver: actor_rx,
             sender: client_tx,
             handle,
-            connected: AtomicBool::new(false),
+            state: Cell::new(State::Startup),
         }
     }
 
@@ -113,17 +115,9 @@ impl Client {
 
     pub async fn recv(&self) -> Option<Event> {
         match self.receiver.recv_async().await {
-            Ok(Event::Connected) => {
-                self.connected.store(true, Ordering::SeqCst);
-                Some(Event::Connected)
-            }
-            Ok(Event::Disconnected) => {
-                self.connected.store(false, Ordering::SeqCst);
-                Some(Event::Disconnected)
-            }
-            Ok(Event::Shutdown) => {
-                self.connected.store(false, Ordering::SeqCst);
-                Some(Event::Shutdown)
+            Ok(Event::State(e)) => {
+                self.state.replace(e);
+                Some(Event::State(e))
             }
             Ok(e) => Some(e),
             Err(e) => panic!("unhandled error during recv {}", e),
@@ -131,15 +125,15 @@ impl Client {
     }
 
     pub async fn shutdown(self) {
-        self.send(Event::Shutdown).await;
+        self.send(Event::State(State::Shutdown)).await;
         self.handle.await.expect("failed to join actor handle");
     }
 
     pub fn is_connected(&self) -> bool {
-        self.connected.load(Ordering::SeqCst)
+        self.state.get() == State::Connected
     }
 
     pub fn is_shutdown(&self) -> bool {
-        unimplemented!()
+        self.state.get() == State::Shutdown
     }
 }

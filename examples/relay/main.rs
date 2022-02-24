@@ -31,7 +31,7 @@ pub async fn main() {
         i += 1;
 
         match m {
-            insim::client::Event::Connected => {
+            insim::client::Event::State(insim::client::State::Connected) => {
                 let _ = client
                     .send(insim::client::Event::Frame(
                         insim::protocol::relay::HostSelect {

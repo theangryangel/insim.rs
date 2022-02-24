@@ -33,7 +33,7 @@ impl View {
 
     pub fn on_network(&mut self, e: &insim::client::Event) {
         match e {
-            insim::client::Event::Disconnected => {
+            insim::client::Event::State(insim::client::State::Disconnected) => {
                 self.servers.clear();
                 self.players.clear();
                 self.state = ViewState::Browsing;
@@ -41,7 +41,7 @@ impl View {
                 self.chat.push("Connection to relay lost".into());
             }
 
-            insim::client::Event::Connected => {
+            insim::client::Event::State(insim::client::State::Connected) => {
                 self.servers.clear();
                 self.players.clear();
 
