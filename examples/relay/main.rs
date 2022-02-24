@@ -33,13 +33,13 @@ pub async fn main() {
         match m {
             insim::client::Event::State(insim::client::State::Connected) => {
                 let _ = client
-                    .send(insim::client::Command::Frame(
+                    .send(
                         insim::protocol::relay::HostSelect {
                             hname: "Nubbins AU Demo".into(),
                             ..Default::default()
                         }
                         .into(),
-                    ))
+                    )
                     .await;
             }
 

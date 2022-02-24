@@ -110,9 +110,7 @@ pub async fn main() {
                         app.players.clear();
 
                         let _ = client.send(
-                            insim::client::Command::Frame(
-                                insim::protocol::relay::HostListRequest::default().into()
-                            )
+                            insim::protocol::relay::HostListRequest::default().into()
                         ).await;
                     },
 
@@ -155,33 +153,33 @@ pub async fn main() {
                             app.chat.push(format!("Selected to {}", selected));
 
                             let _ = client
-                            .send(insim::client::Command::Frame(
+                            .send(
                                 insim::protocol::relay::HostSelect {
                                     hname: selected.clone(),
                                     ..Default::default()
                                 }
                                 .into(),
-                            ))
+                            )
                             .await;
 
                             let _ = client
-                            .send(insim::client::Command::Frame(
+                            .send(
                                 insim::protocol::insim::Tiny{
                                     reqi: 0,
                                     subtype: insim::protocol::insim::TinyType::Ncn,
                                 }
                                 .into(),
-                            ))
+                            )
                             .await;
 
                             let _ = client
-                            .send(insim::client::Command::Frame(
+                            .send(
                                 insim::protocol::insim::Tiny{
                                     reqi: 0,
                                     subtype: insim::protocol::insim::TinyType::Npl,
                                 }
                                 .into(),
-                            ))
+                            )
                             .await;
 
                             app.state = view::ViewState::Selected;
@@ -207,9 +205,7 @@ pub async fn main() {
                 match e {
                     insim::client::Event::State(insim::client::State::Connected) => {
                         let _ = client.send(
-                            insim::client::Command::Frame(
-                                insim::protocol::relay::HostListRequest::default().into()
-                            )
+                            insim::protocol::relay::HostListRequest::default().into()
                         ).await;
                     },
 

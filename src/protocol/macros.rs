@@ -66,6 +66,18 @@ macro_rules! packet {
             }
         }
         )+
+
+        #[cfg(feature = "client")]
+        $(
+        impl From<$inner> for crate::client::Command {
+            fn from(item: $inner) -> Self {
+                crate::client::Command::Frame(
+                    $name::$variant(item)
+                )
+            }
+        }
+        )+
+
     }
 }
 

@@ -23,24 +23,26 @@
 //!         .relay()
 //!         .build();
 //!
-//!     // We MUST poll the future to ensure that the client stays connected
 //!     // Once the client is shutdown it will output an Event::State::(State::Shutdown) and then return None.
 //!     while let Some(m) = client.next().await {
+//!         tracing::debug!("Event: {:?}", m);
+//!
 //!         match m {
-//!             insim::client::Event::Connected => {
+//!
+//!             insim::client::Event::State(incim::client::State::Connected) => {
 //!                 let _ = client
-//!                     .send(insim::client::Event::Packet(
+//!                     .send(
 //!                         insim::protocol::relay::HostSelect {
 //!                             hname: "Nubbins AU Demo".into(),
 //!                             ..Default::default()
 //!                         }
 //!                         .into(),
-//!                     ))
+//!                     )
 //!                     .await;
-//!             }
-//!             _ => {
-//!               tracing::debug!("Event: {:?}", m);
-//!             }
+//!             },
+//!
+//!             _ => {},
+//!
 //!         }
 //!     }
 //! }
