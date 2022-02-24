@@ -110,7 +110,7 @@ pub async fn main() {
                         app.players.clear();
 
                         let _ = client.send(
-                            insim::client::Event::Frame(
+                            insim::client::Command::Frame(
                                 insim::protocol::relay::HostListRequest::default().into()
                             )
                         ).await;
@@ -155,7 +155,7 @@ pub async fn main() {
                             app.chat.push(format!("Selected to {}", selected));
 
                             let _ = client
-                            .send(insim::client::Event::Frame(
+                            .send(insim::client::Command::Frame(
                                 insim::protocol::relay::HostSelect {
                                     hname: selected.clone(),
                                     ..Default::default()
@@ -165,7 +165,7 @@ pub async fn main() {
                             .await;
 
                             let _ = client
-                            .send(insim::client::Event::Frame(
+                            .send(insim::client::Command::Frame(
                                 insim::protocol::insim::Tiny{
                                     reqi: 0,
                                     subtype: insim::protocol::insim::TinyType::Ncn,
@@ -175,7 +175,7 @@ pub async fn main() {
                             .await;
 
                             let _ = client
-                            .send(insim::client::Event::Frame(
+                            .send(insim::client::Command::Frame(
                                 insim::protocol::insim::Tiny{
                                     reqi: 0,
                                     subtype: insim::protocol::insim::TinyType::Npl,
@@ -207,7 +207,7 @@ pub async fn main() {
                 match e {
                     insim::client::Event::State(insim::client::State::Connected) => {
                         let _ = client.send(
-                            insim::client::Event::Frame(
+                            insim::client::Command::Frame(
                                 insim::protocol::relay::HostListRequest::default().into()
                             )
                         ).await;
