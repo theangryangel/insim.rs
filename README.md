@@ -1,6 +1,6 @@
 # insim.rs
 
-:warning: The API is not yet 100% stable.
+:warning: The high level API is not yet 100% stable.
 
 ## docs
 
