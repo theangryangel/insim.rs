@@ -1,4 +1,4 @@
-use super::{Config, Event, State};
+use super::{Command, Config, Event, State};
 use crate::{
     error::Error,
     protocol::{insim, transport::Transport, Packet, VERSION},
@@ -16,7 +16,7 @@ pub struct ClientActor {
     pub(crate) config: Config,
     pub(crate) attempt: u64,
 
-    pub(crate) receiver: flume::Receiver<Event>,
+    pub(crate) receiver: flume::Receiver<Command>,
     pub(crate) sender: flume::Sender<Event>,
 }
 
@@ -148,23 +148,26 @@ impl ClientActor {
                 tokio::select! {
 
                     m = transport.next() => match m {
+
                         Some(Ok(m)) => {
                             self.sender.send(Event::Frame(m)).expect("failed to send Event::Frame");
                         },
+
                         None => {
                             tracing::debug!("disconnected");
                             break;
-                        }
+                        },
+
                         _ => {}
                     },
 
                     m = self.receiver.recv_async() => match m {
 
-                        Ok(Event::Frame(frame)) => {
+                        Ok(Command::Frame(frame)) => {
                             transport.send(frame).await.expect("failed to transmit frame");
                         },
 
-                        Ok(Event::State(State::Shutdown)) => {
+                        Ok(Command::Shutdown) => {
                             tracing::debug!("received shutdown request");
                             return;
                         },
@@ -172,10 +175,6 @@ impl ClientActor {
                         Err(e) => {
                             tracing::debug!("flume error: {:?}", e);
                             return
-                        },
-
-                        e => {
-                            unimplemented!("unhandled: {:?}", e);
                         },
 
                     }

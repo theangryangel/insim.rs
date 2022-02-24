@@ -22,6 +22,8 @@ pub mod velocity {
     }
 }
 
+// TODO: Investigate. clippy seems to warn with the into() call, but without it the code wont compile.
+#[allow(clippy::useless_conversion)]
 pub mod angle {
 
     uom::unit! {
@@ -34,6 +36,8 @@ pub mod angle {
     }
 }
 
+// TODO: Investigate. clippy seems to warn with the into() call, but without it the code wont compile.
+#[allow(clippy::useless_conversion)]
 pub mod angular_velocity {
 
     uom::unit! {

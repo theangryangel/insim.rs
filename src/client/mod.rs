@@ -12,7 +12,6 @@
 //!
 //! # Example
 //! ```rust
-//! use futures::{SinkExt, StreamExt};
 //! use insim;
 //! use tracing_subscriber;
 //!
@@ -25,7 +24,7 @@
 //!         .build();
 //!
 //!     // We MUST poll the future to ensure that the client stays connected
-//!     // Once the client is shutdown it will output an Event::Shutdown and then return None.
+//!     // Once the client is shutdown it will output an Event::State::(State::Shutdown) and then return None.
 //!     while let Some(m) = client.next().await {
 //!         match m {
 //!             insim::client::Event::Connected => {
@@ -74,9 +73,15 @@ pub enum Event {
     Error(error::Error),
 }
 
+#[derive(Debug)]
+pub enum Command {
+    Frame(protocol::Packet),
+    Shutdown,
+}
+
 pub struct Client {
     receiver: flume::Receiver<Event>,
-    sender: flume::Sender<Event>,
+    sender: flume::Sender<Command>,
     handle: JoinHandle<()>,
     state: Cell<State>,
 }
@@ -105,7 +110,7 @@ impl Client {
         }
     }
 
-    pub async fn send(&self, e: Event) {
+    pub async fn send(&self, e: Command) {
         self.sender.send_async(e).await.expect("failed to send");
     }
 
@@ -114,6 +119,10 @@ impl Client {
     }
 
     pub async fn recv(&self) -> Option<Event> {
+        if self.state.get() == State::Shutdown {
+            return None;
+        }
+
         match self.receiver.recv_async().await {
             Ok(Event::State(e)) => {
                 self.state.replace(e);
@@ -125,7 +134,7 @@ impl Client {
     }
 
     pub async fn shutdown(self) {
-        self.send(Event::State(State::Shutdown)).await;
+        self.send(Command::Shutdown).await;
         self.handle.await.expect("failed to join actor handle");
     }
 
