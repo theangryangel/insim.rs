@@ -32,7 +32,7 @@ pub async fn main() {
         name: "insim.rs".into(),
         password: "".into(),
         prefix: b'!',
-        version: insim::protocol::insim::VERSION,
+        version: insim::protocol::VERSION,
         interval: 1000,
         flags: insim::protocol::insim::InitFlags::MCI,
         reqi: 1,

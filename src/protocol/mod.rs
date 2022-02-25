@@ -17,7 +17,7 @@
 //!     name: "insim.rs".into(),
 //!     password: "".into(),
 //!     prefix: b'!',
-//!     version: insim::protocol::insim::VERSION,
+//!     version: insim::protocol::VERSION,
 //!     interval: 1000,
 //!     flags: insim::protocol::insim::InitFlags::MCI,
 //!     reqi: 1,
@@ -39,7 +39,7 @@
 
 use deku::prelude::*;
 #[cfg(feature = "serde")]
-use serde::Serialize; // TODO make serde support an optional feature
+use serde::Serialize;
 
 pub mod codec;
 pub mod insim;
@@ -47,6 +47,8 @@ mod macros;
 pub mod position;
 pub mod relay;
 pub mod transport;
+
+pub const VERSION: u8 = 9;
 
 use crate::packet;
 

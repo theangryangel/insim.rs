@@ -1,7 +1,7 @@
 use super::{Config, Event};
 use crate::{
     error::Error,
-    protocol::{insim, transport::Transport, Packet},
+    protocol::{insim, transport::Transport, Packet, VERSION},
 };
 use flume;
 use futures_util::{SinkExt, StreamExt};
@@ -58,7 +58,7 @@ impl ClientActor {
         while let Some(m) = inner.next().await {
             match m {
                 Ok(Packet::Version(insim::Version { insimver, .. })) => {
-                    if insimver != insim::VERSION {
+                    if insimver != VERSION {
                         return Err(Error::IncompatibleVersion);
                     }
 

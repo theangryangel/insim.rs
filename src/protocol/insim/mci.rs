@@ -1,6 +1,9 @@
 use crate::packet_flags;
-use crate::{conversion, protocol::position::FixedPoint};
+use crate::protocol::position::FixedPoint;
+#[cfg(feature = "uom")]
+use crate::units;
 use deku::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
@@ -38,49 +41,45 @@ pub struct CompCar {
     pub xyz: FixedPoint,
 
     /// Speed in game world units (32768 = 100 m/s)
-    /// You may use the speed_as_mph, speed_as_kmph and speed_as_mps functions to convert to real-world units.
+    /// You may use the speed_uom function to convert this to real world units if the uom feature
+    /// is enabled.
     pub speed: u16,
 
     /// Direction of car's motion : 0 = world y direction, 32768 = 180 deg
+    /// You may use the direction_uom function to convert this to real world units if the uom feature is enabled.
     pub direction: u16,
 
     /// Direction of forward axis : 0 = world y direction, 32768 = 180 deg
+    /// You may use the heading_uom function to convert this to real world units if the uom feature is enabled.
     pub heading: u16,
 
     /// Signed, rate of change of heading : (16384 = 360 deg/s)
+    /// You may use the angvel_uom function to convert this to real world units if the uom feature is enabled.
     pub angvel: i16,
 }
 
+#[cfg(feature = "uom")]
 impl CompCar {
-    /// Converts game world speed to miles per hour.
-    pub fn speed_as_mph(&self) -> f32 {
-        conversion::speed::to_mph(self.speed)
-    }
-
-    /// Converts gameword speed to kilometers per hour.
-    pub fn speed_as_kmph(&self) -> f32 {
-        conversion::speed::to_kmph(self.speed)
-    }
-
-    /// Converts game world speed to meters per second.
-    pub fn speed_as_mps(&self) -> f32 {
-        conversion::speed::to_mps(self.speed)
+    /// Converts speed into uom::si::f64::velocity
+    pub fn speed_uom(&self) -> uom::si::f64::Velocity {
+        uom::si::f64::Velocity::new::<units::velocity::game_per_second>(self.speed.into())
     }
 
     /// Converts angvel into degrees per second.
-    pub fn angvel_as_dps(&self) -> f32 {
-        // 16384/360 = 45.511
-        (self.angvel as f32) / 45.511
+    pub fn angvel_uom(&self) -> uom::si::f64::AngularVelocity {
+        uom::si::f64::AngularVelocity::new::<units::angular_velocity::game_heading_per_second>(
+            self.speed.into(),
+        )
     }
 
     /// Convert direction to degrees.
-    pub fn direction_as_deg(&self) -> f32 {
-        conversion::directional::to_degrees(self.direction)
+    pub fn direction_uom(&self) -> uom::si::f64::Angle {
+        uom::si::f64::Angle::new::<units::angle::game_heading>(self.direction.into())
     }
 
-    /// Convert heading to degrees.
-    pub fn heading_as_deg(&self) -> f32 {
-        conversion::directional::to_degrees(self.heading)
+    /// Convert direction to degrees.
+    pub fn heading_uom(&self) -> uom::si::f64::Angle {
+        uom::si::f64::Angle::new::<units::angle::game_heading>(self.heading.into())
     }
 }
 

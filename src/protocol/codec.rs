@@ -11,10 +11,10 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 #[derive(Clone, Copy)]
 pub enum Mode {
-    // Insim <= 8 uses verbatim packet sizes
+    /// Insim <= 8 uses verbatim packet sizes
     Uncompressed,
-    // Insim >= 9 uses the size divided by 4
-    // https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info
+    /// Insim >= 9 optionally supports "compressing" the packet size by dividing by 4
+    /// See https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info
     Compressed,
 }
 
@@ -167,7 +167,14 @@ impl Encoder<Packet> for Codec {
 
         let n = match self.mode {
             Mode::Uncompressed => n,
-            Mode::Compressed => n / 4,
+            Mode::Compressed => {
+                if n % 4 == 0 {
+                    n / 4
+                } else {
+                    // probably a programming error, lets bail.
+                    panic!("provided length would not be divisible by 4");
+                }
+            }
         };
 
         dst.put_uint_le(n as u64, self.length_bytes);

@@ -61,8 +61,6 @@ mod uco;
 mod ver;
 mod vtn;
 
-pub const VERSION: u8 = 9;
-
 pub use acr::{Acr, AcrResult};
 pub use axi::Axi;
 pub use axm::{Axm, ObjectInfo, PmoAction};
