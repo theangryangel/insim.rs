@@ -169,9 +169,14 @@ impl ClientActor {
                             return;
                         },
 
-                        _ => {
-                            unimplemented!()
-                        }
+                        Err(e) => {
+                            tracing::debug!("flume error: {:?}", e);
+                            return
+                        },
+
+                        e => {
+                            unimplemented!("unhandled: {:?}", e);
+                        },
 
                     }
 

@@ -6,41 +6,108 @@ use tui::layout::Rect;
 use tui::widgets::TableState;
 
 #[derive(Default)]
-pub struct Player {
+pub struct Connection {
+    uname: String,
     name: String,
-    lap: u16,
-    position: u8,
+    lap: Option<u16>,
+    position: Option<u8>,
+    lap_time: Option<u32>,
+    elapsed_time: Option<u32>,
+}
+
+impl Connection {
+    pub fn get_lap_string(&self) -> String {
+        if let Some(lap) = self.lap {
+            format!("{}", lap)
+        } else {
+            String::from("-")
+        }
+    }
+
+    pub fn get_position_string(&self) -> String {
+        if let Some(position) = self.position {
+            format!("{}", position)
+        } else {
+            String::from("-")
+        }
+    }
+
+    pub fn get_lap_time_string(&self) -> String {
+        if let Some(lap_time) = &self.lap_time {
+            lap_time.to_string()
+        } else {
+            String::from("-")
+        }
+    }
+
+    pub fn get_elapsed_time_string(&self) -> String {
+        if let Some(elapsed_time) = &self.elapsed_time {
+            elapsed_time.to_string()
+        } else {
+            String::from("-")
+        }
+    }
 }
 
 #[derive(Default)]
-pub struct PlayerListState {
-    pub inner: HashMap<u8, Player>,
+pub struct ConnectionListState {
+    pub inner: HashMap<u8, Connection>,
+    pub plid_ucid: HashMap<u8, u8>,
+
     pub table_state: TableState,
 }
 
-impl PlayerListState {
+impl ConnectionListState {
     pub fn on_network(&mut self, e: &insim::client::Event) {
         match e {
-            insim::client::Event::Packet(insim::protocol::Packet::NewPlayer(frame)) => {
-                self.inner.insert(
-                    frame.plid,
-                    Player {
-                        name: frame.pname.to_lossy_string(),
-                        ..Default::default()
-                    },
-                );
+            insim::client::Event::Frame(insim::protocol::Packet::NewConnection(frame)) => {
+                let connection = Connection {
+                    uname: frame.uname.to_string(),
+                    name: frame.pname.to_string(),
+
+                    ..Default::default()
+                };
+                self.inner.insert(frame.ucid, connection);
             }
 
-            insim::client::Event::Packet(insim::protocol::Packet::PlayerLeave(frame)) => {
-                self.inner.remove(&frame.plid);
+            insim::client::Event::Frame(insim::protocol::Packet::ConnectionLeave(frame)) => {
+                self.inner.remove(&frame.ucid);
             }
 
-            insim::client::Event::Packet(insim::protocol::Packet::MultiCarInfo(frame)) => {
+            insim::client::Event::Frame(insim::protocol::Packet::NewPlayer(frame)) => {
+                self.plid_ucid.insert(frame.plid, frame.ucid);
+            }
+
+            insim::client::Event::Frame(insim::protocol::Packet::PlayerLeave(frame)) => {
+                self.plid_ucid.remove(&frame.plid);
+            }
+
+            insim::client::Event::Frame(insim::protocol::Packet::MultiCarInfo(frame)) => {
                 for player in frame.info.iter() {
-                    if let Some(p) = self.inner.get_mut(&player.plid) {
-                        p.lap = player.lap;
-                        p.position = player.position;
+                    let ucid = self.plid_ucid.get(&player.plid);
+                    if ucid.is_none() {
+                        continue;
                     }
+                    let ucid = ucid.unwrap();
+
+                    if let Some(p) = self.inner.get_mut(ucid) {
+                        p.lap = Some(player.lap);
+                        p.position = Some(player.position);
+                    }
+                }
+            }
+
+            insim::client::Event::Frame(insim::protocol::Packet::Lap(frame)) => {
+                let ucid = self.plid_ucid.get(&frame.plid);
+                if ucid.is_none() {
+                    return;
+                }
+                let ucid = ucid.unwrap();
+
+                if let Some(p) = self.inner.get_mut(ucid) {
+                    p.lap = Some(frame.lapsdone);
+                    p.lap_time = Some(frame.ltime);
+                    p.elapsed_time = Some(frame.etime);
                 }
             }
 
@@ -105,7 +172,7 @@ use crate::view::colourify;
 pub struct PlayerListWidget {}
 
 impl StatefulWidget for PlayerListWidget {
-    type State = PlayerListState;
+    type State = ConnectionListState;
 
     fn render(self, area: Rect, buf: &mut tui::buffer::Buffer, state: &mut Self::State) {
         let inner = Layout::default()
@@ -130,23 +197,40 @@ impl StatefulWidget for PlayerListWidget {
         help.render(inner[0], buf);
 
         // table
-        let header_cells = ["#", "ID", "Player", "Lap"]
-            .iter()
-            .map(|h| Cell::from(*h).style(Style::default().add_modifier(Modifier::BOLD)));
+        let header_cells = [
+            "#",
+            "UCID",
+            "User",
+            "Player",
+            "Lap",
+            "Lap Time",
+            "Elapsed Time",
+        ]
+        .iter()
+        .map(|h| Cell::from(*h).style(Style::default().add_modifier(Modifier::BOLD)));
         let header = Row::new(header_cells).height(1);
 
         let rows = state
             .inner
             .iter()
             .sorted_by(|(_plida, playera), (_plidb, playerb)| {
+                if playerb.position.is_none() {
+                    return std::cmp::Ordering::Less;
+                }
+                if playera.position.is_none() {
+                    return std::cmp::Ordering::Greater;
+                }
                 playera.position.partial_cmp(&playerb.position).unwrap()
             })
-            .map(|(plid, player)| {
+            .map(|(ucid, player)| {
                 let cells = vec![
-                    Cell::from(format!("{}", player.position)),
-                    Cell::from(format!("{}", plid)),
+                    Cell::from(player.get_position_string()),
+                    Cell::from(format!("{}", ucid)),
+                    Cell::from(player.uname.to_owned()),
                     Cell::from(colourify(Cow::Borrowed(&player.name))),
-                    Cell::from(format!("{}", player.lap)),
+                    Cell::from(player.get_lap_string()),
+                    Cell::from(player.get_lap_time_string()),
+                    Cell::from(player.get_elapsed_time_string()),
                 ];
                 Row::new(cells).height(1)
             });
@@ -158,8 +242,11 @@ impl StatefulWidget for PlayerListWidget {
             .highlight_style(Style::default().add_modifier(Modifier::BOLD))
             .widths(&[
                 Constraint::Min(3),
-                Constraint::Min(3),
-                Constraint::Length(20),
+                Constraint::Min(4),
+                Constraint::Length(32),
+                Constraint::Length(32),
+                Constraint::Length(5),
+                Constraint::Length(5),
                 Constraint::Length(5),
             ]);
         StatefulWidget::render(t, inner[1], buf, &mut state.table_state);

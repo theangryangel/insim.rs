@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
 use tui::layout::Rect;
-use tui::style::Color;
 use tui::widgets::TableState;
 
 #[derive(Debug, Default)]
@@ -13,7 +12,7 @@ pub struct ServersState {
 impl ServersState {
     pub fn on_network(&mut self, e: &insim::client::Event) {
         match e {
-            insim::client::Event::Packet(frame) => match frame {
+            insim::client::Event::Frame(frame) => match frame {
                 insim::protocol::Packet::RelayHostList(insim::protocol::relay::HostList {
                     hinfo,
                     ..
@@ -156,7 +155,7 @@ impl StatefulWidget for ServersWidget {
             .highlight_symbol("> ")
             .highlight_style(Style::default().add_modifier(Modifier::BOLD))
             .widths(&[
-                Constraint::Min(100),
+                Constraint::Min(32),
                 Constraint::Length(10),
                 Constraint::Length(15),
             ]);

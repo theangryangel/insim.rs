@@ -6,7 +6,7 @@ use tui::{
     text::{Span, Spans},
 };
 
-use crate::widgets::{ChatState, PlayerListState, ServersState};
+use crate::widgets::{ChatState, ConnectionListState, ServersState};
 
 pub(crate) enum ViewState {
     Browsing,
@@ -17,7 +17,7 @@ pub(crate) enum ViewState {
 pub(crate) struct View {
     pub state: ViewState,
     pub servers: ServersState,
-    pub players: PlayerListState,
+    pub players: ConnectionListState,
     pub chat: ChatState,
 }
 
@@ -26,7 +26,7 @@ impl View {
         Self {
             state: ViewState::Browsing,
             servers: ServersState::default(),
-            players: PlayerListState::default(),
+            players: ConnectionListState::default(),
             chat: ChatState::default(),
         }
     }
@@ -48,7 +48,7 @@ impl View {
                 self.chat.push("Connected to relay".into());
             }
 
-            insim::client::Event::Packet(frame) => match frame {
+            insim::client::Event::Frame(frame) => match frame {
                 insim::protocol::Packet::MessageOut(data) => {
                     self.chat.push(data.msg.to_lossy_string());
                 }

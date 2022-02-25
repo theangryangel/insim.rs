@@ -54,6 +54,7 @@ pub use config::Config;
 
 use crate::{error, protocol};
 use flume;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::task::JoinHandle;
 
 // TODO: Split this into Event and Commands
@@ -72,6 +73,10 @@ pub struct Client {
     receiver: flume::Receiver<Event>,
     sender: flume::Sender<Event>,
     handle: JoinHandle<()>,
+
+    // TODO: We should probably be storing an Enum here that reflects the current state of the
+    // client, i.e. Connecting, Handshaking, Connected, Disconnected, Shutdown, etc.
+    connected: AtomicBool,
 }
 
 impl Client {
@@ -94,6 +99,7 @@ impl Client {
             receiver: actor_rx,
             sender: client_tx,
             handle,
+            connected: AtomicBool::new(false),
         }
     }
 
@@ -107,6 +113,18 @@ impl Client {
 
     pub async fn recv(&self) -> Option<Event> {
         match self.receiver.recv_async().await {
+            Ok(Event::Connected) => {
+                self.connected.store(true, Ordering::SeqCst);
+                Some(Event::Connected)
+            }
+            Ok(Event::Disconnected) => {
+                self.connected.store(false, Ordering::SeqCst);
+                Some(Event::Disconnected)
+            }
+            Ok(Event::Shutdown) => {
+                self.connected.store(false, Ordering::SeqCst);
+                Some(Event::Shutdown)
+            }
             Ok(e) => Some(e),
             Err(e) => panic!("unhandled error during recv {}", e),
         }
@@ -118,7 +136,7 @@ impl Client {
     }
 
     pub fn is_connected(&self) -> bool {
-        unimplemented!()
+        self.connected.load(Ordering::SeqCst)
     }
 
     pub fn is_shutdown(&self) -> bool {

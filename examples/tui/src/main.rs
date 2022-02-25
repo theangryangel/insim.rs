@@ -2,7 +2,7 @@ extern crate insim;
 
 use std::panic;
 
-use futures::{SinkExt, StreamExt};
+use futures::StreamExt;
 use tracing_subscriber;
 
 mod style;
@@ -73,7 +73,7 @@ pub async fn main() {
 
     setup_terminal();
 
-    let mut client = insim::client::Config::default()
+    let client = insim::client::Config::default()
         .relay()
         .try_reconnect(true)
         .try_reconnect_attempts(2000)
@@ -91,7 +91,7 @@ pub async fn main() {
                         Event::Key(KeyEvent{ code: KeyCode::Char('q') | KeyCode::Esc, .. }),
                         view::ViewState::Browsing,
                     ) => {
-                        client.shutdown();
+                        client.shutdown().await;
                         break;
                     },
 
@@ -110,7 +110,7 @@ pub async fn main() {
                         app.players.clear();
 
                         let _ = client.send(
-                            insim::client::Event::Packet(
+                            insim::client::Event::Frame(
                                 insim::protocol::relay::HostListRequest::default().into()
                             )
                         ).await;
@@ -152,8 +152,10 @@ pub async fn main() {
                         if let Some(selected) = app.servers.selected() {
                             app.players.clear();
 
+                            app.chat.push(format!("Selected to {}", selected));
+
                             let _ = client
-                            .send(insim::client::Event::Packet(
+                            .send(insim::client::Event::Frame(
                                 insim::protocol::relay::HostSelect {
                                     hname: selected.clone(),
                                     ..Default::default()
@@ -163,7 +165,17 @@ pub async fn main() {
                             .await;
 
                             let _ = client
-                            .send(insim::client::Event::Packet(
+                            .send(insim::client::Event::Frame(
+                                insim::protocol::insim::Tiny{
+                                    reqi: 0,
+                                    subtype: insim::protocol::insim::TinyType::Ncn,
+                                }
+                                .into(),
+                            ))
+                            .await;
+
+                            let _ = client
+                            .send(insim::client::Event::Frame(
                                 insim::protocol::insim::Tiny{
                                     reqi: 0,
                                     subtype: insim::protocol::insim::TinyType::Npl,
@@ -195,7 +207,7 @@ pub async fn main() {
                 match e {
                     insim::client::Event::Connected => {
                         let _ = client.send(
-                            insim::client::Event::Packet(
+                            insim::client::Event::Frame(
                                 insim::protocol::relay::HostListRequest::default().into()
                             )
                         ).await;
