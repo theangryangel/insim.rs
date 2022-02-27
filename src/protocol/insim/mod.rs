@@ -61,8 +61,6 @@ mod uco;
 mod ver;
 mod vtn;
 
-pub const VERSION: u8 = 8;
-
 pub use acr::{Acr, AcrResult};
 pub use axi::Axi;
 pub use axm::{Axm, ObjectInfo, PmoAction};
@@ -86,7 +84,7 @@ pub use ism::Ism;
 pub use jrr::{Jrr, JrrAction};
 pub use lap::Lap;
 pub use mal::Mal;
-pub use mci::Mci;
+pub use mci::{CompCar, CompCarInfo, Mci};
 pub use mode::Mode;
 pub use msl::{Msl, MslSoundType};
 pub use mso::{Mso, MsoUserType};

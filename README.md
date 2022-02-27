@@ -1,12 +1,14 @@
 # insim.rs
 
-:warning: The API is not yet 100% stable.
+[Live For Speed Insim](https://lfs.net/) (protocol) codec, lower level transport, higher level client and associated utilities for Rust.
 
-## docs
+:warning: The high level API is not yet 100% stable at this time. Use at your own risk.
+
+## Documentation
 
 Until we're released please run `cargo doc --no-deps --open`
 
-## Example
+## Examples
 
 - High level "framework" api: `cargo run --example relay`
 - Low level "transport" api: `cargo run --example transport`

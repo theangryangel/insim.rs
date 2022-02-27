@@ -1,8 +1,45 @@
 //! A lower level API to working with Insim.
+//!
+//! # Example
+//! ```rust
+//! // Connect to the Insim Relay
+//! let tcp: TcpStream = TcpStream::connect("isrelay.lfs.net:47474").await.unwrap();
+//!
+//! // Create a Transport, using the uncompressed packet length mode (insim protocol <= 8 uses this,
+//! // insim >= 9 supports both compressed and uncompressed modes).
+//! let mut t = insim::protocol::transport::Transport::new(
+//!     tcp,
+//!     insim::protocol::codec::Mode::Uncompressed
+//! );
+//!
+//! // Send a Init packet to handshake with the server.
+//! let isi = insim::protocol::insim::Init {
+//!     name: "insim.rs".into(),
+//!     password: "".into(),
+//!     prefix: b'!',
+//!     version: insim::protocol::VERSION,
+//!     interval: 1000,
+//!     flags: insim::protocol::insim::InitFlags::MCI,
+//!     reqi: 1,
+//! };
+//!
+//! t.send(isi).await;
+//!
+//! // Select a host from the relay to receive data from.
+//! t.send(insim::protocol::relay::HostSelect {
+//!     hname: "Nubbins AU Demo".into(),
+//!     ..Default::default()
+//! }).await;
+//!
+//! // Print the data from the relay.
+//! while let Some(m) = t.next().await {
+//!     tracing::debug!("{:?}", m);
+//! }
+//! ````
 
 use deku::prelude::*;
 #[cfg(feature = "serde")]
-use serde::Serialize; // TODO make serde support an optional feature
+use serde::Serialize;
 
 pub mod codec;
 pub mod insim;
@@ -10,6 +47,8 @@ mod macros;
 pub mod position;
 pub mod relay;
 pub mod transport;
+
+pub const VERSION: u8 = 9;
 
 use crate::packet;
 

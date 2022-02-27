@@ -1,7 +1,5 @@
-use super::protocol::codec::Mode;
-use super::protocol::insim::InitFlags;
 use super::Client;
-use super::EventHandler;
+use crate::protocol::{codec::Mode, insim::InitFlags};
 
 /// Configuration and [Client] builder.
 pub struct Config {
@@ -11,9 +9,9 @@ pub struct Config {
     pub(crate) flags: InitFlags,
     pub(crate) prefix: u8,
     pub(crate) interval_ms: u16,
-    //pub(crate) reconnect: bool,
-    //pub(crate) max_reconnect_attempts: u16,
-    pub(crate) event_handlers: Vec<Box<dyn EventHandler>>,
+    pub(crate) verify_version: bool,
+    pub(crate) reconnect: bool,
+    pub(crate) max_reconnect_attempts: u64,
     pub(crate) codec_mode: Mode,
 }
 
@@ -33,11 +31,10 @@ impl Config {
             flags: InitFlags::MCI | InitFlags::CON | InitFlags::OBH,
             prefix: 0,
             interval_ms: 1000,
-            // TODO: Readd support for reconnection attempts
-            //reconnect: true,
-            //max_reconnect_attempts: 1,
-            event_handlers: Vec::new(),
-            codec_mode: Mode::Uncompressed,
+            verify_version: true,
+            reconnect: true,
+            max_reconnect_attempts: 2,
+            codec_mode: Mode::Compressed,
         }
     }
 
@@ -50,12 +47,15 @@ impl Config {
     /// Use the Insim Relay.
     pub fn relay(mut self) -> Self {
         self.host = "isrelay.lfs.net:47474".into();
+        // TODO: Talk to LFS devs, find out if/when relay gets compressed support?
+        self.codec_mode = Mode::Uncompressed;
+        self.verify_version = false;
         self
     }
 
     /// Use a UDP connection.
     pub fn udp(self, _host: String) -> Self {
-        unimplemented!()
+        unimplemented!("UDP support is not yet available.");
     }
 
     /// Name of the client, passed to Insim [Init](super::protocol::insim::Init).
@@ -95,12 +95,6 @@ impl Config {
         self
     }
 
-    /// Add an event handler. This may be called multiple times.
-    pub fn using_event_handler<H: EventHandler + 'static>(mut self, event_handler: H) -> Self {
-        self.event_handlers.push(Box::new(event_handler));
-        self
-    }
-
     /// Set the codec mode to use Insim v9 "compressed" packet lengths.
     pub fn use_compressed_header_byte(mut self) -> Self {
         self.codec_mode = Mode::Compressed;
@@ -113,7 +107,16 @@ impl Config {
         self
     }
 
-    /// Create an instance of [Client] using this configuration.
+    pub fn try_reconnect(mut self, value: bool) -> Self {
+        self.reconnect = value;
+        self
+    }
+
+    pub fn try_reconnect_attempts(mut self, value: u64) -> Self {
+        self.max_reconnect_attempts = value;
+        self
+    }
+
     pub fn build(self) -> Client {
         Client::from_config(self)
     }

@@ -1,3 +1,10 @@
+#[macro_export]
+macro_rules! packet_id {
+    ($id:literal) => {
+        stringify!($id)
+    };
+}
+
 /// Internal macro to define Insim Packet and conversion implementations.
 #[macro_export]
 macro_rules! packet {
@@ -8,6 +15,7 @@ macro_rules! packet {
             $id:literal => $variant:ident($inner:ty),
         )+
     ) => {
+        use std::str::FromStr;
 
         /// Enum of all possible packet types.
         #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
@@ -28,6 +36,25 @@ macro_rules! packet {
                     $($name::$variant{..} => stringify!($variant),)+
                 }
             }
+
+            // Return the numerical id of the packet
+            pub fn id(&self) -> u8 {
+                match &self {
+                    // TODO: hoping the compiler is smart enough to inline this.
+                    // Lets find out.
+                    // Is there a secret Deku fn we can use instead?
+                    $($name::$variant{..} => u8::from_str($id).unwrap(),)+
+                }
+            }
+
+            // Convert a name into the numeric id of the packet
+            pub fn name_into_id(input: &str) -> Option<u8> {
+                match input {
+                    // TODO: See above notes
+                    $(stringify!($variant) => Some(u8::from_str($id).unwrap()),)+
+                    _ => { None }
+                }
+            }
         }
 
         // Implement From for all our variants so that we can use do insim::Init().into() to get a
@@ -39,6 +66,18 @@ macro_rules! packet {
             }
         }
         )+
+
+        #[cfg(feature = "client")]
+        $(
+        impl From<$inner> for crate::client::Command {
+            fn from(item: $inner) -> Self {
+                crate::client::Command::Frame(
+                    $name::$variant(item)
+                )
+            }
+        }
+        )+
+
     }
 }
 

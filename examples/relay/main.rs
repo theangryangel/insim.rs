@@ -1,6 +1,4 @@
 extern crate insim;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use tracing::{debug, error, info};
 use tracing_subscriber;
 
 fn setup() {
@@ -17,161 +15,70 @@ fn setup() {
         .init();
 }
 
-// Example handler usage that counts the number of packets received and resets on each
-// reconnection.
-struct Party {}
-
-#[allow(unused)]
-impl insim::framework::EventHandler for Party {
-    fn on_connect(&self, ctx: &insim::framework::Client) {
-        info!("🎉🎉🎉🎉🎉🎉 we're connected!");
-    }
-
-    fn on_disconnect(&self, client: &insim::framework::Client) {
-        info!("💩💩💩💩💩💩 we've lost connection!");
-    }
-
-    fn on_tiny(&self, client: &insim::framework::Client, data: &insim::protocol::insim::Tiny) {
-        info!("✨✨✨✨✨✨ {:?}", data);
-    }
-
-    fn on_new_player(&self, client: &insim::framework::Client, data: &insim::protocol::insim::Npl) {
-        debug!(
-            "{:?}, cname={:?} ismod={:?}",
-            data.pname.to_string(),
-            data.cname.to_string(),
-            data.cname.is_mod()
-        );
-    }
-
-    fn on_new_connection(
-        &self,
-        client: &insim::framework::Client,
-        data: &insim::protocol::insim::Ncn,
-    ) {
-        info!("{:?}", data);
-    }
-
-    fn on_multi_car_info(
-        &self,
-        client: &insim::framework::Client,
-        data: &insim::protocol::insim::Mci,
-    ) {
-        for i in data.info.iter() {
-            info!(
-                "{:?} {:?}mph, {:?}kph, {:?}mps, {:?}raw",
-                i.plid,
-                i.speed_as_mph(),
-                i.speed_as_kmph(),
-                i.speed_as_mps(),
-                i.speed
-            );
-        }
-    }
-
-    fn on_message(&self, client: &insim::framework::Client, data: &insim::protocol::insim::Mso) {
-        info!("{}", insim::string::colours::to_ansi(data.msg.to_string()));
-    }
-
-    fn on_player_contact(
-        &self,
-        client: &insim::framework::Client,
-        data: &insim::protocol::insim::Con,
-    ) {
-        info!("💣💣💣💣💣💣💣 bump! {:?}", data);
-    }
-}
-
-// Example handler usage that counts the number of packets received and resets on each
-// reconnection.
-struct Counter {
-    i: AtomicUsize,
-}
-
-impl insim::framework::EventHandler for Counter {
-    fn on_connect(&self, ctx: &insim::framework::Client) {
-        // on connection reset our AtomicUsize back to 0.
-        self.i.store(0, Ordering::Relaxed);
-
-        ctx.send(insim::protocol::relay::HostListRequest::default().into());
-
-        ctx.send(
-            insim::protocol::relay::HostSelect {
-                hname: "Nubbins AU Demo".into(),
-                ..Default::default()
-            }
-            .into(),
-        );
-
-        ctx.send(
-            insim::protocol::insim::Tiny {
-                reqi: 0,
-                subtype: insim::protocol::insim::TinyType::Npl,
-            }
-            .into(),
-        )
-    }
-
-    #[allow(unused)]
-    fn on_raw(&self, ctx: &insim::framework::Client, data: &insim::protocol::Packet) {
-        self.i.fetch_add(1, Ordering::Relaxed);
-
-        match data {
-            insim::protocol::Packet::RelayHostList(hostlist) => {
-                //info!("{:?}", hostlist);
-
-                for i in hostlist.hinfo.iter() {
-                    if i.numconns > 1 {
-                        tracing::info!(
-                            "{} ({} / {}) {} {:?} {}",
-                            insim::string::colours::to_ansi(i.hname.to_string()),
-                            i.hname.to_string(),
-                            i.numconns,
-                            i.track.to_string(),
-                            i.track.track_info(),
-                            i.track.is_open_world(),
-                        );
-                    }
-
-                    /*
-                    if i.flags.contains(insim::protocol::relay::HostInfoFlags::LAST) {
-                        ctx.shutdown();
-                    }
-                    */
-                }
-            }
-            d => {
-                debug!("{:?}", d);
-            }
-        }
-
-        //* Auto shutdown on 5th packet.
-        // if self.i.load(Ordering::Relaxed) > 5 {
-        //     ctx.shutdown();
-        // }
-    }
-}
-
 #[tokio::main]
 pub async fn main() {
     setup();
 
-    let client = insim::framework::Config::default()
+    let mut i = 0;
+
+    let client = insim::client::Config::default()
         .relay()
-        .using_event_handler(Counter {
-            i: AtomicUsize::new(0),
-        })
-        .using_event_handler(Party {})
+        .try_reconnect(true)
+        .try_reconnect_attempts(2000)
         .build();
 
-    let res = client.run().await;
+    while let Some(m) = client.next().await {
+        i += 1;
 
-    match res {
-        Ok(()) => {
-            info!("Clean shutdown");
+        match m {
+            insim::client::Event::State(insim::client::State::Connected) => {
+                let _ = client
+                    .send(
+                        insim::protocol::relay::HostSelect {
+                            hname: "Nubbins AU Demo".into(),
+                            ..Default::default()
+                        }
+                        .into(),
+                    )
+                    .await;
+            }
+
+            insim::client::Event::Frame(insim::protocol::Packet::MultiCarInfo(mci)) => {
+                tracing::debug!("MultiCarInfo: {:?}", mci);
+
+                for car in mci.info.iter() {
+                    let (x, y, z) = car.xyz.to_uom();
+
+                    tracing::info!(
+                        "{} = {} = ({}, {}, {})",
+                        car.plid,
+                        car.speed_uom().into_format_args(
+                            uom::si::velocity::mile_per_hour,
+                            uom::fmt::DisplayStyle::Abbreviation
+                        ),
+                        x.into_format_args(
+                            uom::si::length::meter,
+                            uom::fmt::DisplayStyle::Abbreviation
+                        ),
+                        y.into_format_args(
+                            uom::si::length::meter,
+                            uom::fmt::DisplayStyle::Abbreviation
+                        ),
+                        z.into_format_args(
+                            uom::si::length::meter,
+                            uom::fmt::DisplayStyle::Abbreviation
+                        ),
+                    );
+                }
+            }
+
+            _ => {
+                tracing::info!("Event: {:?} {:?}", m, i);
+            }
         }
-        Err(e) => {
-            error!("Unclean shutdown: {:?}", e);
-        }
+
+        // if i >= 10 {
+        //     client.shutdown();
+        // }
     }
 }

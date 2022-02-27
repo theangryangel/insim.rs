@@ -11,10 +11,10 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 #[derive(Clone, Copy)]
 pub enum Mode {
-    // Insim <= 8 uses verbatim packet sizes
+    /// Insim <= 8 uses verbatim packet sizes
     Uncompressed,
-    // Insim >= 9 uses the size divided by 4
-    // https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info
+    /// Insim >= 9 optionally supports "compressing" the packet size by dividing by 4
+    /// See https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info
     Compressed,
 }
 
@@ -119,16 +119,12 @@ impl Decoder for Codec {
         match res {
             Ok(packet) => Ok(Some(packet)),
             Err(DekuError::Incomplete(e)) => {
-                // If we're here, everything is going wonky.
-                tracing::error!(
+                // If we're here, everything has gone very wonky.
+                panic!(
                     "malformed packet! this is probably a programming error, error: {:?}, input: {:?}",
                     e,
                     data.to_vec(),
                 );
-                Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "incomplete or malformed packet",
-                ))
             }
             Err(DekuError::Parse(e)) => {
                 tracing::error!("unsupported packet: {:?}: {:?}", e, data.to_vec());
@@ -160,10 +156,8 @@ impl Encoder<Packet> for Codec {
         let n = match n {
             Some(n) => n,
             None => {
-                return Err(Self::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "provided length would overflow after adjustment",
-                ));
+                // Probably a programming error, lets bail.
+                panic!("provided length would overflow after adjustment");
             }
         };
 
@@ -173,7 +167,14 @@ impl Encoder<Packet> for Codec {
 
         let n = match self.mode {
             Mode::Uncompressed => n,
-            Mode::Compressed => n / 4,
+            Mode::Compressed => {
+                if n % 4 == 0 {
+                    n / 4
+                } else {
+                    // probably a programming error, lets bail.
+                    panic!("provided length would not be divisible by 4");
+                }
+            }
         };
 
         dst.put_uint_le(n as u64, self.length_bytes);
