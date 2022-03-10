@@ -129,7 +129,7 @@ impl Client {
             Ok(Event::State(e)) => {
                 self.state.replace(e);
                 Some(Event::State(e))
-            },
+            }
             Ok(e) => Some(e),
             Err(e) => panic!("unhandled error during recv {}", e),
         }

@@ -28,7 +28,7 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Pit stop (stop at the garage, not "tele-pit")
@@ -61,7 +61,7 @@ pub struct Pit {
     pub work: u32,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Pit Stop Finished
@@ -96,7 +96,13 @@ pub enum PitLaneFact {
     EnterStopGo,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+impl Default for PitLaneFact {
+    fn default() -> Self {
+        PitLaneFact::Exit
+    }
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// PitLane

@@ -2,7 +2,7 @@ use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(endian = "little")]
 /// Used within [Con] packet to give a break down of information about the Contact between the two
@@ -36,7 +36,7 @@ pub struct ConInfo {
     pub y: i16,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Contact

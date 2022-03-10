@@ -31,7 +31,7 @@ impl RaceResultFlags {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Provisional finish notification: This is not a final result, you should use the [Res](super::Res) packet for this instead.

@@ -4,7 +4,7 @@ use deku::prelude::*;
 use serde::Serialize;
 
 /// Auto X Info
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct Axi {

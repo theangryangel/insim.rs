@@ -37,7 +37,13 @@ pub enum SmallType {
     Lcs,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+impl Default for SmallType {
+    fn default() -> Self {
+        SmallType::None
+    }
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// General purpose Small packet

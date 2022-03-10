@@ -37,6 +37,12 @@ pub enum TyreCompound {
     NoChange,
 }
 
+impl Default for TyreCompound {
+    fn default() -> Self {
+        TyreCompound::NoChange
+    }
+}
+
 packet_flags! {
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct PlayerFlags: u16 {
@@ -57,7 +63,7 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Sent when a New Player joins.

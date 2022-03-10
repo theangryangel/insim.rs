@@ -29,7 +29,13 @@ pub enum CimMode {
     ShiftU,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+impl Default for CimMode {
+    fn default() -> Self {
+        Self::Normal
+    }
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Connection Interface Mode

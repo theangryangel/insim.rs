@@ -38,7 +38,13 @@ pub enum CnlReason {
     Hack,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+impl Default for CnlReason {
+    fn default() -> Self {
+        CnlReason::Disconnected
+    }
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 // Connection Leave

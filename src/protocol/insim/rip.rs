@@ -44,7 +44,13 @@ pub enum RipError {
     OOS,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+impl Default for RipError {
+    fn default() -> Self {
+        RipError::Ok
+    }
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Replay Information

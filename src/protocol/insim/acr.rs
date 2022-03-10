@@ -21,8 +21,14 @@ pub enum AcrResult {
     UnknownCommand,
 }
 
+impl Default for AcrResult {
+    fn default() -> Self {
+        AcrResult::None
+    }
+}
+
 /// Admin Command Report
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct Acr {

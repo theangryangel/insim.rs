@@ -3,7 +3,7 @@ use deku::prelude::*;
 use serde::Serialize;
 
 /// Used within the [Axm] packet.
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(endian = "little")]
 pub struct ObjectInfo {
@@ -48,8 +48,14 @@ pub enum PmoAction {
     GetZ,
 }
 
+impl Default for PmoAction {
+    fn default() -> Self {
+        PmoAction::LoadingFile
+    }
+}
+
 /// AutoX Multiple Objects
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct Axm {

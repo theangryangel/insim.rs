@@ -20,7 +20,13 @@ pub enum UcoAction {
     CrossedReverse,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+impl Default for UcoAction {
+    fn default() -> Self {
+        UcoAction::Entered
+    }
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// User Control Object

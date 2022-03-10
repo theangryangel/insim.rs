@@ -17,6 +17,12 @@ pub enum OcoAction {
     LightsUnset,
 }
 
+impl Default for OcoAction {
+    fn default() -> Self {
+        OcoAction::LightsReset
+    }
+}
+
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(type = "u8", endian = "little")]
@@ -26,6 +32,12 @@ pub enum OcoIndex {
 
     #[deku(id = "240")]
     MainLights,
+}
+
+impl Default for OcoIndex {
+    fn default() -> Self {
+        OcoIndex::MainLights
+    }
 }
 
 packet_flags! {
@@ -38,7 +50,7 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Object Control

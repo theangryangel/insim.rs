@@ -82,7 +82,13 @@ pub enum ILanguage {
     Romanian,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+impl Default for ILanguage {
+    fn default() -> Self {
+        ILanguage::English
+    }
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Extra information about the new connection. This is only sent when connected to a game server,
