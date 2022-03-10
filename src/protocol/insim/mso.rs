@@ -26,7 +26,13 @@ pub enum MsoUserType {
     O,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+impl Default for MsoUserType {
+    fn default() -> Self {
+        MsoUserType::System
+    }
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// System messsages and user messages, variable sized.

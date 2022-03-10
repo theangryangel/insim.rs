@@ -88,7 +88,13 @@ pub enum TinyType {
     Slc,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+impl Default for TinyType {
+    fn default() -> Self {
+        TinyType::None
+    }
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// General purpose Tiny packet

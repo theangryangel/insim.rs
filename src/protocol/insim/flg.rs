@@ -17,7 +17,13 @@ pub enum FlgType {
     Yellow,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+impl Default for FlgType {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Race Flag is sent when a flag is waved at a player.

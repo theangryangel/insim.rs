@@ -17,7 +17,7 @@ use serde::Serialize;
 
 /// Ask the relay if we are logged in as an administrative user on the selected host. A
 /// [AdminResponse] is sent back by the relay.
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct AdminRequest {
@@ -27,7 +27,7 @@ pub struct AdminRequest {
 
 /// Reponse to a [AdminRequest] packet, indicating if we are logged in as an administrative user on
 /// the selected host.
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct AdminResponse {
@@ -63,7 +63,7 @@ packet_flags! {
 }
 
 /// Information about a host. Used within the [HostList] packet.
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct HostInfo {
     #[deku(bytes = "32")]
@@ -81,7 +81,7 @@ pub struct HostInfo {
 /// The relay will send a list of available hosts using this packet. There may be more than one
 /// HostList packet sent in response to a [HostListRequest]. You may use the [HostInfoFlags] to
 /// determine if the host is the last in the list.
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct HostList {
@@ -150,8 +150,14 @@ pub enum ErrorType {
     MissingSpectatorPassword,
 }
 
+impl Default for ErrorType {
+    fn default() -> Self {
+        ErrorType::None
+    }
+}
+
 /// The relay will send this packet when it encounters an error.
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 pub struct Error {

@@ -21,7 +21,13 @@ pub enum Hlvc {
     OutOfBounds,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+impl Default for Hlvc {
+    fn default() -> Self {
+        Hlvc::Ground
+    }
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Reports incidents that would violate Hot Lap Validity checks.

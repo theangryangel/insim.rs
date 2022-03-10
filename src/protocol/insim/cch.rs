@@ -31,7 +31,13 @@ pub enum CameraView {
     OtherVehicle,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+impl Default for CameraView {
+    fn default() -> Self {
+        CameraView::Follow
+    }
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 // Camera Change

@@ -49,7 +49,13 @@ pub enum PenaltyReason {
     StopLate,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+impl Default for PenaltyReason {
+    fn default() -> Self {
+        PenaltyReason::None
+    }
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Penalty

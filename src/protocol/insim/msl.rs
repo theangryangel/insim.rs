@@ -26,7 +26,13 @@ pub enum MslSoundType {
     Failure,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+impl Default for MslSoundType {
+    fn default() -> Self {
+        MslSoundType::Silent
+    }
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 /// Send a message to the local computer only. If you are connected to a server this means the

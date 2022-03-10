@@ -11,7 +11,7 @@ use crate::units;
 use uom;
 
 /// A X, Y, Z position
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct FixedPoint {
     x: i32,
