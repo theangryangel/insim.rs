@@ -1,9 +1,6 @@
-extern crate insim;
-
 use std::panic;
 
 use futures::StreamExt;
-use tracing_subscriber;
 
 mod style;
 mod view;
@@ -202,14 +199,10 @@ pub async fn main() {
             Some(e) = client.next() => {
                 app.on_network(&e);
 
-                match e {
-                    insim::client::Event::State(insim::client::State::Connected) => {
-                        let _ = client.send(
-                            insim::protocol::relay::HostListRequest::default().into()
-                        ).await;
-                    },
-
-                    _ => {},
+                if let insim::client::Event::State(insim::client::State::Connected) = e {
+                    let _ = client.send(
+                        insim::protocol::relay::HostListRequest::default().into()
+                    ).await;
                 }
             }
         };

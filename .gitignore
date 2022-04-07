@@ -1,5 +1,4 @@
 /target
-examples/**/target
+**/target
 Cargo.lock
-examples/**/node_modules
-examples/map/assets
+**/node_modules

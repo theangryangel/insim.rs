@@ -26,7 +26,7 @@ impl ChatState {
     pub fn push(&mut self, data: String) {
         self.inner.push_front(format!(
             "{}: {}",
-            chrono::Local::now().format(DATETIME_FORMAT).to_string(),
+            chrono::Local::now().format(DATETIME_FORMAT),
             data,
         ));
     }

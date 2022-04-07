@@ -31,6 +31,13 @@ macro_rules! packet {
 
         impl $name {
             // Allow us to get the packet name from the variant
+            pub fn inner_name(&self) -> &str {
+                match &self {
+                    $($name::$variant{..} => stringify!($inner),)+
+                }
+            }
+
+            // Allow us to get the variant name
             pub fn name(&self) -> &str {
                 match &self {
                     $($name::$variant{..} => stringify!($variant),)+

@@ -48,13 +48,9 @@ impl View {
                 self.chat.push("Connected to relay".into());
             }
 
-            insim::client::Event::Frame(frame) => match frame {
-                insim::protocol::Packet::MessageOut(data) => {
-                    self.chat.push(data.msg.to_lossy_string());
-                }
-
-                _ => {}
-            },
+            insim::client::Event::Frame(insim::protocol::Packet::MessageOut(data)) => {
+                self.chat.push(data.msg.to_lossy_string());
+            }
 
             _ => {}
         };

@@ -11,28 +11,20 @@ pub struct ServersState {
 
 impl ServersState {
     pub fn on_network(&mut self, e: &insim::client::Event) {
-        match e {
-            insim::client::Event::Frame(frame) => match frame {
-                insim::protocol::Packet::RelayHostList(insim::protocol::relay::HostList {
-                    hinfo,
-                    ..
-                }) => {
-                    for info in hinfo.iter() {
-                        self.push(info.to_owned(), info.hname.to_lossy_string());
+        if let insim::client::Event::Frame(insim::protocol::Packet::RelayHostList(
+            insim::protocol::relay::HostList { hinfo, .. },
+        )) = e
+        {
+            for info in hinfo.iter() {
+                self.push(info.to_owned(), info.hname.to_lossy_string());
 
-                        if info
-                            .flags
-                            .contains(insim::protocol::relay::HostInfoFlags::LAST)
-                        {
-                            self.sort();
-                        }
-                    }
+                if info
+                    .flags
+                    .contains(insim::protocol::relay::HostInfoFlags::LAST)
+                {
+                    self.sort();
                 }
-
-                _ => {}
-            },
-
-            _ => {}
+            }
         }
     }
 
