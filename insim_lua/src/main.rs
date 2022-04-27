@@ -1,35 +1,57 @@
 use clap::Parser;
 use convert_case::{Case, Casing};
-use mlua::{Function, Lua, Table};
-use std::fs;
+use mlua::{Function, Lua, LuaSerdeExt, Table, UserData};
+use std::{fs, path};
+
+use serde::{Deserialize, Serialize};
+
+mod config;
 
 /// insim_lua does stuff
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// Script to load
     #[clap(short, long)]
-    script: String,
+    config: path::PathBuf,
+
+    /// Script(s) to load
+    #[clap(short, long, multiple_values = true)]
+    script: Vec<path::PathBuf>,
 }
 
 #[tokio::main]
 pub async fn main() {
     let args = Args::parse();
 
+    let config = config::read(&args.config);
+
+    println!("{:?}", config);
+
+    std::process::exit(0);
+
     let lua = Lua::new();
     lua.load(include_str!("insim.lua"))
         .exec()
         .expect("Error loading core insim.lua");
 
-    let init = fs::read_to_string(args.script);
-    if init.is_err() {
-        println!("Could not read file: {}", init.unwrap_err());
-        return;
-    }
-    let res = lua.load(&init.unwrap()).exec();
-    if res.is_err() {
-        println!("Error loading script: {}", res.unwrap_err());
-        return;
+    for script in &args.script {
+        if !script.exists() {
+            println!("{} does not exist", script.display());
+            return;
+        }
+
+        let init = fs::read_to_string(script);
+
+        if init.is_err() {
+            println!("Could not read file: {}", init.unwrap_err());
+            return;
+        }
+        let res = lua.load(&init.unwrap()).exec();
+
+        if res.is_err() {
+            println!("Error loading script: {}", res.unwrap_err());
+            return;
+        }
     }
 
     let table: Table = lua.globals().get("insim").unwrap();
@@ -60,8 +82,11 @@ pub async fn main() {
             }
 
             insim::client::Event::Frame(frame) => {
-                emit.call::<_, ()>(frame.name().to_case(Case::Snake))
-                    .unwrap();
+                emit.call::<_, ()>((
+                    frame.name().to_case(Case::Snake),
+                    lua.to_value(&frame).unwrap(),
+                ))
+                .unwrap();
             }
 
             _ => {}
