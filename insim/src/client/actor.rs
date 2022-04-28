@@ -1,10 +1,11 @@
 use super::{Command, Config, Event, State};
 use crate::{
     error::Error,
-    protocol::{insim, transport::Transport, Packet, VERSION},
+    protocol::{insim, relay, transport::Transport, Packet, VERSION},
 };
 use flume;
 use futures_util::{SinkExt, StreamExt};
+use std::sync::{Arc, Mutex};
 use tokio::net::TcpStream;
 use tokio::time;
 use tracing;
@@ -18,10 +19,17 @@ pub struct ClientActor {
 
     pub(crate) receiver: flume::Receiver<Command>,
     pub(crate) sender: flume::Sender<Event>,
+
+    pub(crate) state: Arc<Mutex<State>>,
 }
 
 impl ClientActor {
     async fn connect(&mut self) -> std::io::Result<TcpStream> {
+        {
+            let mut state = self.state.lock().unwrap();
+            *state = State::Connecting;
+        }
+
         self.sender
             .send(Event::State(State::Connecting))
             .expect("failed to send Event::Connecting");
@@ -33,48 +41,86 @@ impl ClientActor {
 
     async fn handshake(&mut self, stream: TcpStream) -> Result<Transport<TcpStream>, Error> {
         tracing::debug!("handshaking...");
+
+        {
+            let mut state = self.state.lock().unwrap();
+            *state = State::Handshaking;
+        }
+
         self.sender
             .send(Event::State(State::Handshaking))
             .expect("failed to send Event::Handshaking");
+
         let mut inner = Transport::new(stream, self.config.codec_mode);
 
-        if !self.config.verify_version {
-            return Ok(inner);
-        }
-
-        if let Err(e) = inner
-            .send(
-                insim::Tiny {
-                    reqi: 1,
-                    subtype: insim::TinyType::Version,
-                }
-                .into(),
-            )
-            .await
-        {
-            return Err(e.into());
-        }
-
-        while let Some(m) = inner.next().await {
-            match m {
-                Ok(Packet::Version(insim::Version { insimver, .. })) => {
-                    if insimver != VERSION {
-                        return Err(Error::IncompatibleVersion);
+        if self.config.verify_version {
+            if let Err(e) = inner
+                .send(
+                    insim::Tiny {
+                        reqi: 1,
+                        subtype: insim::TinyType::Version,
                     }
+                    .into(),
+                )
+                .await
+            {
+                return Err(e.into());
+            }
 
-                    return Ok(inner);
-                }
-                Err(e) => {
-                    tracing::debug!("got error {:?} during handshake", e);
-                    return Err(e);
-                }
-                m => {
-                    tracing::debug!("ignoring {:?} until handshake is complete", m);
+            while let Some(m) = inner.next().await {
+                match m {
+                    Ok(Packet::Version(insim::Version { insimver, .. })) => {
+                        if insimver != VERSION {
+                            return Err(Error::IncompatibleVersion);
+                        }
+
+                        return Ok(inner);
+                    }
+                    Err(e) => {
+                        tracing::debug!("got error {:?} during handshake", e);
+                        return Err(e);
+                    }
+                    m => {
+                        tracing::debug!("ignoring {:?} until handshake is complete", m);
+                    }
                 }
             }
         }
 
-        Err(Error::Timeout)
+        // TODO: can we generalise this?
+        if let Some(hname) = self.config.select_relay_host.as_deref() {
+            if let Err(e) = inner
+                .send(
+                    relay::HostSelect {
+                        hname: hname.into(),
+                        ..Default::default()
+                    }
+                    .into(),
+                )
+                .await
+            {
+                return Err(e.into());
+            }
+
+            match inner.next().await {
+                Some(Ok(Packet::RelayError(relay::Error { err: e, .. }))) => {
+                    return Err(Error::RelayError(e));
+                }
+                Some(Ok(_)) => {
+                    // TODO: we're dropping a frame here
+                }
+                Some(Err(e)) => {
+                    tracing::debug!("got error {:?} during relay host selection", e);
+                    return Err(e);
+                }
+                None => {
+                    tracing::debug!("relay host selection timed out");
+                    return Err(Error::Timeout);
+                }
+            }
+        }
+
+        Ok(inner)
     }
 
     async fn backoff(&mut self) -> Result<(), Error> {
@@ -108,6 +154,11 @@ impl ClientActor {
         loop {
             let backoff = self.backoff().await;
             if backoff.is_err() {
+                {
+                    let mut state = self.state.lock().unwrap();
+                    *state = State::Shutdown;
+                }
+
                 self.sender
                     .send(Event::State(State::Shutdown))
                     .expect("failed to send Event::State(State::Shutdown) after backoff");
@@ -136,6 +187,11 @@ impl ClientActor {
                     continue;
                 }
             };
+
+            {
+                let mut state = self.state.lock().unwrap();
+                *state = State::Connected;
+            }
 
             self.sender
                 .send(Event::State(State::Connected))
@@ -169,6 +225,11 @@ impl ClientActor {
 
                         Ok(Command::Shutdown) => {
                             tracing::debug!("received shutdown request");
+                            {
+                                let mut state = self.state.lock().unwrap();
+                                *state = State::Shutdown;
+                            }
+
                             return;
                         },
 
@@ -180,6 +241,11 @@ impl ClientActor {
                     }
 
                 }
+            }
+
+            {
+                let mut state = self.state.lock().unwrap();
+                *state = State::Disconnected;
             }
         }
     }

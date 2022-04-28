@@ -1,6 +1,9 @@
 //! Error types for the library.
 
+use crate::protocol::relay::ErrorType as RelayErrorType;
 use std::io::Error as IoError;
+
+// TODO: use thiserror to simplify this
 
 #[derive(Debug)]
 pub enum Error {
@@ -27,6 +30,9 @@ pub enum Error {
 
     /// Describes when a given input is too large.
     TooLarge,
+
+    /// Insim Relay Error
+    RelayError(RelayErrorType),
 }
 
 impl From<IoError> for Error {

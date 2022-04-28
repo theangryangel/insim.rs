@@ -1,26 +1,8 @@
 server "test" {
-  hostname "123"
-  password "456"
+  hostname "(FM) GTi Thursday"
   relay
 
   scripts {
-    path "asdas.lua"
-    path "hello_world.lua"
-  }
-}
-
-server "test" {
-  hostname "123"
-  password "456"
-  uncompressed
-  no-reconnect
-
-  flags {
-    multicar-info
-  }
-
-  scripts {
-    path "asdas.lua"
     path "hello_world.lua"
   }
 }

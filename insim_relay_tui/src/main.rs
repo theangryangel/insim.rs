@@ -71,7 +71,7 @@ pub async fn main() {
     setup_terminal();
 
     let client = insim::client::Config::default()
-        .relay()
+        .relay(None)
         .try_reconnect(true)
         .try_reconnect_attempts(2000)
         .build();

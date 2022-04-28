@@ -22,7 +22,7 @@ pub async fn main() {
     let mut i = 0;
 
     let client = insim::client::Config::default()
-        .relay()
+        .relay(None)
         .try_reconnect(true)
         .try_reconnect_attempts(2000)
         .build();

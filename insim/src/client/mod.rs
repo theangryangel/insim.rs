@@ -55,7 +55,7 @@ pub use config::Config;
 
 use crate::{error, protocol};
 use flume;
-use std::cell::Cell;
+use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -85,7 +85,7 @@ pub struct Client {
     receiver: flume::Receiver<Event>,
     sender: flume::Sender<Command>,
     handle: JoinHandle<()>,
-    state: Cell<State>,
+    state: Arc<Mutex<State>>,
 }
 
 impl Client {
@@ -93,11 +93,14 @@ impl Client {
         let (actor_tx, actor_rx) = flume::unbounded();
         let (client_tx, client_rx) = flume::unbounded();
 
+        let state = Arc::new(Mutex::new(State::Startup));
+
         let mut actor = actor::ClientActor {
             config,
             receiver: client_rx,
             sender: actor_tx,
             attempt: 0,
+            state: state.clone(),
         };
 
         let handle = tokio::spawn(async move {
@@ -108,7 +111,7 @@ impl Client {
             receiver: actor_rx,
             sender: client_tx,
             handle,
-            state: Cell::new(State::Startup),
+            state,
         }
     }
 
@@ -117,19 +120,15 @@ impl Client {
     }
 
     pub async fn next(&self) -> Option<Event> {
-        return self.recv().await;
+        self.recv().await
     }
 
     pub async fn recv(&self) -> Option<Event> {
-        if self.state.get() == State::Shutdown {
+        if *self.state.lock().unwrap() == State::Shutdown {
             return None;
         }
 
         match self.receiver.recv_async().await {
-            Ok(Event::State(e)) => {
-                self.state.replace(e);
-                Some(Event::State(e))
-            }
             Ok(e) => Some(e),
             Err(e) => panic!("unhandled error during recv {}", e),
         }
@@ -141,10 +140,14 @@ impl Client {
     }
 
     pub fn is_connected(&self) -> bool {
-        self.state.get() == State::Connected
+        *self.state.lock().unwrap() == State::Connected
     }
 
     pub fn is_shutdown(&self) -> bool {
-        self.state.get() == State::Shutdown
+        *self.state.lock().unwrap() == State::Shutdown
+    }
+
+    pub fn state(&self) -> State {
+        *self.state.lock().unwrap()
     }
 }

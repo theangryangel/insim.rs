@@ -13,6 +13,7 @@ pub struct Config {
     pub(crate) reconnect: bool,
     pub(crate) max_reconnect_attempts: u64,
     pub(crate) codec_mode: Mode,
+    pub(crate) select_relay_host: Option<String>,
 }
 
 impl Default for Config {
@@ -35,6 +36,7 @@ impl Config {
             reconnect: true,
             max_reconnect_attempts: 2,
             codec_mode: Mode::Compressed,
+            select_relay_host: None,
         }
     }
 
@@ -45,11 +47,12 @@ impl Config {
     }
 
     /// Use the Insim Relay.
-    pub fn relay(mut self) -> Self {
+    pub fn relay(mut self, host: Option<String>) -> Self {
         self.host = "isrelay.lfs.net:47474".into();
         // TODO: Talk to LFS devs, find out if/when relay gets compressed support?
         self.codec_mode = Mode::Uncompressed;
         self.verify_version = false;
+        self.select_relay_host = host;
         self
     }
 
@@ -61,6 +64,11 @@ impl Config {
     /// Name of the client, passed to Insim [Init](super::protocol::insim::Init).
     pub fn named(mut self, name: String) -> Self {
         self.name = name;
+        self
+    }
+
+    pub fn set_flags(mut self, flags: InitFlags) -> Self {
+        self.flags = flags;
         self
     }
 
@@ -114,6 +122,11 @@ impl Config {
 
     pub fn try_reconnect_attempts(mut self, value: u64) -> Self {
         self.max_reconnect_attempts = value;
+        self
+    }
+
+    pub fn verify_version(mut self, value: bool) -> Self {
+        self.verify_version = value;
         self
     }
 

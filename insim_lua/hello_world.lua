@@ -21,6 +21,6 @@ insim.on_tiny(function()
 end)
 
 insim.on_multi_car_info(function(mci)
-  print("Got a MultiCarInfo!")
-  print(dump(mci))
+  print("Got a MultiCarInfo from " .. insim.instance)
+  --print(dump(mci))
 end)
