@@ -70,11 +70,16 @@ pub async fn main() {
 
     setup_terminal();
 
+    let debug = insim::client::service::DebugService::new();
+
     let client = insim::client::Config::default()
         .relay(None)
         .try_reconnect(true)
         .try_reconnect_attempts(2000)
+        .add_service(Box::new(debug))
         .build();
+
+    println!("Connecting to Insim...");
 
     let mut app = view::View::new();
 

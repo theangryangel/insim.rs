@@ -1,11 +1,18 @@
-use super::{Command, Config, Event, State};
+use super::{service::Service, Command, Config, Event, State};
 use crate::{
     error::Error,
     protocol::{insim, relay, transport::Transport, Packet, VERSION},
 };
-use flume;
 use futures_util::{SinkExt, StreamExt};
-use std::sync::{Arc, Mutex};
+use std::pin::Pin;
+use std::{
+    cell::Cell,
+    ops::Deref,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Mutex,
+    },
+};
 use tokio::net::TcpStream;
 use tokio::time;
 use tracing;
@@ -13,29 +20,47 @@ use tracing;
 const BACKOFF_MIN_INTERVAL_SECS: u64 = 2;
 const BACKOFF_MAX_INTERVAL_SECS: u64 = 60;
 
-pub struct ClientActor {
+pub struct Connection {
     pub(crate) config: Config,
-    pub(crate) attempt: u64,
+    pub(crate) attempt: AtomicU64,
 
-    pub(crate) receiver: flume::Receiver<Command>,
-    pub(crate) sender: flume::Sender<Event>,
+    pub(crate) actor_rx: flume::Receiver<Command>,
 
     pub(crate) state: Arc<Mutex<State>>,
+
+    pub(crate) services: Vec<Box<dyn Service + Sync + Send>>,
+
+    pub(crate) futures: futures::stream::FuturesUnordered<tokio::task::JoinHandle<()>>,
 }
 
-impl ClientActor {
+impl Connection {
+    fn event(&mut self, event: Event) {
+        println!("{:?}", event);
+        for service in &self.services {
+            let service = service.clone();
+            let event = event.clone();
+            let fut = tokio::spawn(async move {
+                service.call(event).await;
+            });
+            self.futures.push(fut);
+        }
+    }
+
     async fn connect(&mut self) -> std::io::Result<TcpStream> {
+        tracing::debug!("connecting...");
+
         {
             let mut state = self.state.lock().unwrap();
             *state = State::Connecting;
         }
 
-        self.sender
-            .send(Event::State(State::Connecting))
-            .expect("failed to send Event::Connecting");
-        tracing::debug!("connecting...");
+        self.event(Event::State(State::Connecting));
 
-        self.attempt += 1;
+        self.attempt
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |attempt| {
+                Some(attempt + 1)
+            });
+
         TcpStream::connect(self.config.host.to_owned()).await
     }
 
@@ -47,9 +72,7 @@ impl ClientActor {
             *state = State::Handshaking;
         }
 
-        self.sender
-            .send(Event::State(State::Handshaking))
-            .expect("failed to send Event::Handshaking");
+        self.event(Event::State(State::Handshaking));
 
         let mut inner = Transport::new(stream, self.config.codec_mode);
 
@@ -102,44 +125,47 @@ impl ClientActor {
                 return Err(e.into());
             }
 
-            match inner.next().await {
+            return match inner.next().await {
                 Some(Ok(Packet::RelayError(relay::Error { err: e, .. }))) => {
-                    return Err(Error::RelayError(e));
+                    Err(Error::RelayError(e))
                 }
                 Some(Ok(_)) => {
                     // TODO: we're dropping a frame here
+                    Ok(inner)
                 }
                 Some(Err(e)) => {
                     tracing::debug!("got error {:?} during relay host selection", e);
-                    return Err(e);
+                    Err(e)
                 }
                 None => {
                     tracing::debug!("relay host selection timed out");
-                    return Err(Error::Timeout);
+                    Err(Error::Timeout)
                 }
-            }
+            };
+        } else {
+            Ok(inner)
         }
-
-        Ok(inner)
     }
 
     async fn backoff(&mut self) -> Result<(), Error> {
-        if self.attempt == 0 {
+        let attempt = self.attempt.load(Ordering::SeqCst);
+
+        if attempt == 0 {
             return Ok(());
         }
 
-        tracing::debug!("backoff, attempt {}", self.attempt);
+        tracing::debug!("backoff, attempt {}", attempt);
 
         if !self.config.reconnect
             || (self.config.max_reconnect_attempts > 0
-                && self.attempt > self.config.max_reconnect_attempts)
+                && attempt > self.config.max_reconnect_attempts)
         {
             tracing::debug!("skipping reconnect, max attempts reached!");
             return Err(Error::MaxConnectionAttempts);
         }
 
         let secs = ::std::cmp::min(
-            self.attempt * BACKOFF_MIN_INTERVAL_SECS,
+            attempt * BACKOFF_MIN_INTERVAL_SECS,
             BACKOFF_MAX_INTERVAL_SECS,
         );
 
@@ -150,7 +176,7 @@ impl ClientActor {
         Ok(())
     }
 
-    pub async fn run(&mut self) {
+    pub async fn run(&mut self) -> Option<()> {
         loop {
             let backoff = self.backoff().await;
             if backoff.is_err() {
@@ -159,31 +185,23 @@ impl ClientActor {
                     *state = State::Shutdown;
                 }
 
-                self.sender
-                    .send(Event::State(State::Shutdown))
-                    .expect("failed to send Event::State(State::Shutdown) after backoff");
-                return;
+                self.event(Event::State(State::Shutdown));
+
+                return None;
             }
 
             let tcp = match self.connect().await {
                 Ok(tcp) => tcp,
-                Err(e) => match self.sender.send(Event::Error(e.into())) {
-                    Ok(_) => {
-                        continue;
-                    }
-                    Err(e) => {
-                        tracing::error!("failed to send error {}", e);
-                        return;
-                    }
-                },
+                Err(e) => {
+                    self.event(Event::Error(e.into()));
+                    continue;
+                }
             };
 
             let mut transport = match self.handshake(tcp).await {
                 Ok(transport) => transport,
                 Err(e) => {
-                    self.sender
-                        .send(Event::Error(e))
-                        .expect("failed to send error after handshake");
+                    self.event(Event::Error(e));
                     continue;
                 }
             };
@@ -193,20 +211,19 @@ impl ClientActor {
                 *state = State::Connected;
             }
 
-            self.sender
-                .send(Event::State(State::Connected))
-                .expect("failed to send Event::State(State::Connected))");
+            self.event(Event::State(State::Connected));
 
             // reset the attempt counter so that if we reconnect later the backoff is reset
-            self.attempt = 0;
+            self.attempt.store(0, Ordering::SeqCst);
 
             loop {
                 tokio::select! {
 
                     m = transport.next() => match m {
 
+
                         Some(Ok(m)) => {
-                            self.sender.send(Event::Frame(m)).expect("failed to send Event::Frame");
+                            self.event(Event::Frame(m));
                         },
 
                         None => {
@@ -217,8 +234,7 @@ impl ClientActor {
                         _ => {}
                     },
 
-                    m = self.receiver.recv_async() => match m {
-
+                    m = self.actor_rx.recv_async() => match m {
                         Ok(Command::Frame(frame)) => {
                             transport.send(frame).await.expect("failed to transmit frame");
                         },
@@ -230,16 +246,18 @@ impl ClientActor {
                                 *state = State::Shutdown;
                             }
 
-                            return;
+                            return None;
                         },
 
                         Err(e) => {
                             tracing::debug!("flume error: {:?}", e);
-                            return
+                            return None
                         },
+                    },
 
-                    }
-
+                    // f = self.futures.next() => {
+                    //     println!("GOT FUTURE {:?}", f);
+                    // }
                 }
             }
 
@@ -247,6 +265,8 @@ impl ClientActor {
                 let mut state = self.state.lock().unwrap();
                 *state = State::Disconnected;
             }
+
+            self.event(Event::State(State::Disconnected));
         }
     }
 }

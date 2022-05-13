@@ -13,3 +13,9 @@ serde = "1.0.136"
 knuffel = "2.0.0"
 miette = { version="4.3.0", features=["fancy"] }
 futures = "0.3"
+pin-project = "1.0"
+
+axum-live-view = { git = "https://github.com/davidpdrsn/axum-live-view", features = ["precompiled-js"] }
+axum = "0.5"
+tower = "0.4"
+tracing-subscriber = "0.2"

@@ -1,42 +1,46 @@
 //! Error types for the library.
 
 use crate::protocol::relay::ErrorType as RelayErrorType;
-use std::io::Error as IoError;
+use std::io::ErrorKind;
+use thiserror::Error as ThisError;
 
 // TODO: use thiserror to simplify this
 
-#[derive(Debug)]
+#[derive(ThisError, Debug, Clone)]
 pub enum Error {
-    /// Unimplemented command or action
+    #[error("Unimplemented command or action")]
     Unimplemented,
 
-    /// Currently shutdown
+    #[error("Shutdown")]
     Shutdown,
 
-    /// Currently disconnected
+    #[error("Disconnected")]
     Disconnected,
 
-    /// Describes when a timeout occurs communicating with the Insim server.
+    #[error("Timeout when communicating with the Insim server")]
     Timeout,
 
-    /// Describes when the maximum number of retries is reached.
+    #[error("Maximum number of retries reached")]
     MaxConnectionAttempts,
 
-    /// Describes when Insim version is not supported.
+    #[error("Unsupported Insim version")]
     IncompatibleVersion,
 
-    /// Wraps ::std::io::Error.
-    IO(IoError),
+    #[error("IO error occurred")]
+    IO { kind: ErrorKind, message: String },
 
-    /// Describes when a given input is too large.
+    #[error("Input is too large")]
     TooLarge,
 
-    /// Insim Relay Error
+    #[error("Insim Relay error")]
     RelayError(RelayErrorType),
 }
 
-impl From<IoError> for Error {
-    fn from(err: IoError) -> Self {
-        Error::IO(err)
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Error::IO {
+            kind: e.kind(),
+            message: e.to_string(),
+        }
     }
 }

@@ -1,19 +1,24 @@
-use super::Client;
+use super::{
+    service::{self, Service},
+    Client,
+};
 use crate::protocol::{codec::Mode, insim::InitFlags};
+
+use std::sync::{Arc, RwLock};
 
 /// Configuration and [Client] builder.
 pub struct Config {
-    pub(crate) name: String,
-    pub(crate) host: String,
-    pub(crate) password: String,
-    pub(crate) flags: InitFlags,
-    pub(crate) prefix: u8,
-    pub(crate) interval_ms: u16,
-    pub(crate) verify_version: bool,
-    pub(crate) reconnect: bool,
-    pub(crate) max_reconnect_attempts: u64,
-    pub(crate) codec_mode: Mode,
-    pub(crate) select_relay_host: Option<String>,
+    pub name: String,
+    pub host: String,
+    pub password: String,
+    pub flags: InitFlags,
+    pub prefix: u8,
+    pub interval_ms: u16,
+    pub verify_version: bool,
+    pub reconnect: bool,
+    pub max_reconnect_attempts: u64,
+    pub codec_mode: Mode,
+    pub select_relay_host: Option<String>,
 }
 
 impl Default for Config {
@@ -37,22 +42,39 @@ impl Config {
             max_reconnect_attempts: 2,
             codec_mode: Mode::Compressed,
             select_relay_host: None,
+            // services: Arc::new(RwLock::new(Vec::new())),
         }
     }
+}
 
+pub struct Builder {
+    pub config: Config,
+    pub services: Vec<Box<dyn Service + Send>>,
+}
+
+impl Default for Builder {
+    fn default() -> Self {
+        Self {
+            config: Config::new(),
+            services: Vec::new(),
+        }
+    }
+}
+
+impl Builder {
     /// Use a TCP connection, to a given "host:port".
     pub fn tcp(mut self, host: String) -> Self {
-        self.host = host;
+        self.config.host = host;
         self
     }
 
     /// Use the Insim Relay.
     pub fn relay(mut self, host: Option<String>) -> Self {
-        self.host = "isrelay.lfs.net:47474".into();
+        self.config.host = "isrelay.lfs.net:47474".into();
         // TODO: Talk to LFS devs, find out if/when relay gets compressed support?
-        self.codec_mode = Mode::Uncompressed;
-        self.verify_version = false;
-        self.select_relay_host = host;
+        self.config.codec_mode = Mode::Uncompressed;
+        self.config.verify_version = false;
+        self.config.select_relay_host = host;
         self
     }
 
@@ -63,74 +85,79 @@ impl Config {
 
     /// Name of the client, passed to Insim [Init](super::protocol::insim::Init).
     pub fn named(mut self, name: String) -> Self {
-        self.name = name;
+        self.config.name = name;
         self
     }
 
     pub fn set_flags(mut self, flags: InitFlags) -> Self {
-        self.flags = flags;
+        self.config.flags = flags;
         self
     }
 
     /// Set a flag to be used in the [Init](super::protocol::insim::Init).
     pub fn set_flag(mut self, flag: InitFlags) -> Self {
-        self.flags |= flag;
+        self.config.flags |= flag;
         self
     }
 
     /// Remove all flags from the [Init](super::protocol::insim::Init).
     pub fn clear_flags(mut self) -> Self {
-        self.flags.clear();
+        self.config.flags.clear();
         self
     }
 
     /// Set the prefix to be used in the [Init](super::protocol::insim::Init).
     pub fn password(mut self, pwd: String) -> Self {
-        self.password = pwd;
+        self.config.password = pwd;
         self
     }
 
     /// Set the prefix to be used in the [Init](super::protocol::insim::Init).
     pub fn prefix(mut self, prefix: u8) -> Self {
-        self.prefix = prefix;
+        self.config.prefix = prefix;
         self
     }
 
     /// Set the interval between MCI or NLP packets, in milliseconds.
     pub fn interval(mut self, interval: u16) -> Self {
         // TODO take a Duration and automatically convert it
-        self.interval_ms = interval;
+        self.config.interval_ms = interval;
         self
     }
 
     /// Set the codec mode to use Insim v9 "compressed" packet lengths.
     pub fn use_compressed_header_byte(mut self) -> Self {
-        self.codec_mode = Mode::Compressed;
+        self.config.codec_mode = Mode::Compressed;
         self
     }
 
     /// Set the codec mode to use Insim <= v8 "uncompressed" packet lengths.
     pub fn use_uncompressed_header_byte(mut self) -> Self {
-        self.codec_mode = Mode::Uncompressed;
+        self.config.codec_mode = Mode::Uncompressed;
         self
     }
 
     pub fn try_reconnect(mut self, value: bool) -> Self {
-        self.reconnect = value;
+        self.config.reconnect = value;
         self
     }
 
     pub fn try_reconnect_attempts(mut self, value: u64) -> Self {
-        self.max_reconnect_attempts = value;
+        self.config.max_reconnect_attempts = value;
         self
     }
 
     pub fn verify_version(mut self, value: bool) -> Self {
-        self.verify_version = value;
+        self.config.verify_version = value;
+        self
+    }
+
+    pub fn add_service(mut self, service: Box<dyn service::Service + Send>) -> Self {
+        // self.services.write().unwrap().push(service);
         self
     }
 
     pub fn build(self) -> Client {
-        Client::from_config(self)
+        Client::from_config(self.config, self.services)
     }
 }

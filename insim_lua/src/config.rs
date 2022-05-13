@@ -1,7 +1,7 @@
 use crate::script_path::ScriptPath;
+use insim::protocol::insim::InitFlags;
 use std::default::Default;
 use std::{fs, path};
-use insim::protocol::insim::InitFlags;
 
 #[derive(knuffel::Decode, Debug, Default)]
 pub(crate) struct ServerFlags {
@@ -66,9 +66,8 @@ pub(crate) struct Server {
     #[knuffel(child, default)]
     pub(crate) flags: ServerFlags,
 
-    // FIXME
-    //#[knuffel(child, unwrap(argument))]
-    //pub(crate) prefix: Option<String>,
+    #[knuffel(child, unwrap(argument))]
+    pub(crate) prefix: Option<String>,
 
     #[knuffel(child, unwrap(argument))]
     pub(crate) interval: Option<u16>,
@@ -78,8 +77,8 @@ pub(crate) struct Server {
 }
 
 impl Server {
-    pub(crate) fn as_insim_client_config(&self) -> insim::client::Config {
-        let mut builder = insim::client::Config::default().tcp(self.hostname.clone());
+    pub(crate) fn as_insim_client_builder(&self) -> insim::client::Builder {
+        let mut builder = insim::client::Builder::default().tcp(self.hostname.clone());
 
         if let Some(password) = &self.password {
             builder = builder.password(password.to_string());
@@ -105,7 +104,22 @@ impl Server {
             builder = builder.interval(*interval);
         }
 
+        if let Some(prefix) = &self.prefix {
+            // TODO: Use let_chains when it's stable
+            if !prefix.is_empty() {
+                let mut chars: [u8; 1] = [0; 1];
+                prefix.chars().nth(0).unwrap().encode_utf8(&mut chars);
+                builder = builder.prefix(chars[0]);
+            }
+        }
+
         builder = builder.set_flags(self.flags.as_init_flags());
+
+        let debug = insim::client::service::DebugService::new();
+        builder = builder.add_service(Box::new(debug));
+
+        let debug = insim::client::service::SleepService::new();
+        builder = builder.add_service(Box::new(debug));
 
         builder
     }

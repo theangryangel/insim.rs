@@ -1,5 +1,5 @@
 server "test" {
-  hostname "(FM) GTi Thursday"
+  hostname "Nubbins AU Demo"
   relay
 
   scripts {
