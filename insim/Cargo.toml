@@ -9,7 +9,7 @@ bench = false
 
 [features]
 default = ["client", "uom"]
-client = ["tower-service", "tower", "futures-core", "futures-sink", "crossbeam"]
+client = []
 
 [dependencies]
 futures = "0.3"
@@ -28,14 +28,6 @@ flume = "0.10"
 uom = { version = "0.32.0", features = ["si", "std"], optional = true }
 async-trait = { version = "0.1.53", optional = true }
 thiserror = "1.0.31"
-
-# client stuff
-tower-service = { version = "0.3", optional = true }
-tower = { version = "0.4", features = ["load"], optional = true }
-futures-core = { version = "0.3", optional = true }
-futures-sink = { version = "0.3", optional = true }
-crossbeam = { version = "0.8", optional = true }
-
 
 [dev-dependencies]
 # used in examples

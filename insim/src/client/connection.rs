@@ -183,6 +183,8 @@ impl Stream for Client {
                                             Error::IncompatibleVersion,
                                         )));
                                     }
+
+                                    // TODO: automatically poll server for connected players, etc.
                                     *state = ConnectedState::Established;
                                     Poll::Ready(Some(Event::Connected))
                                 }
