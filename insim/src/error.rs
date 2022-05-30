@@ -6,7 +6,7 @@ use thiserror::Error as ThisError;
 
 // TODO: use thiserror to simplify this
 
-#[derive(ThisError, Debug, Clone)]
+#[derive(ThisError, Debug, Clone, PartialEq)]
 pub enum Error {
     #[error("Unimplemented command or action")]
     Unimplemented,

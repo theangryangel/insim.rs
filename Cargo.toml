@@ -2,5 +2,4 @@
 members = [
   "insim",
   "insim_lua",
-  "insim_relay_tui"
 ]
