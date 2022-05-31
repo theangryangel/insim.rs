@@ -14,6 +14,7 @@ pub struct Config {
     pub max_reconnect_attempts: usize,
     pub codec_mode: Mode,
     pub select_relay_host: Option<String>,
+    pub connect_timeout_ms: u64,
 }
 
 impl Default for Config {
@@ -37,6 +38,7 @@ impl Config {
             max_reconnect_attempts: 2,
             codec_mode: Mode::Compressed,
             select_relay_host: None,
+            connect_timeout_ms: 10000,
         }
     }
 }

@@ -34,7 +34,7 @@ pub async fn main() {
     let mut client = Config::default()
         .relay(Some("Nubbins AU Demo".into()))
         .try_reconnect(true)
-        .try_reconnect_attempts(2000)
+        .try_reconnect_attempts(2)
         .into_client();
 
     while let Some(d) = client.next().await {
