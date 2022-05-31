@@ -20,6 +20,19 @@ pub enum Event {
     Shutdown,
 }
 
+impl Event {
+    pub fn name(&self) -> &str {
+        match self {
+            Event::Handshaking => "handshaking",
+            Event::Connected => "connected",
+            Event::Disconnected => "disconnected",
+            Event::Data(_) => "data",
+            Event::Error(_) => "error",
+            Event::Shutdown => "shutdown",
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum ConnectedState {
     Handshake,
@@ -40,8 +53,8 @@ impl Display for ConnectedState {
 type TransportConnecting = Pin<
     Box<
         dyn futures::Future<
-            Output = Result<Result<TcpStream, std::io::Error>, tokio::time::error::Elapsed>,
-        >,
+                Output = Result<Result<TcpStream, std::io::Error>, tokio::time::error::Elapsed>,
+            > + Send,
     >,
 >;
 
@@ -101,12 +114,15 @@ impl Stream for Client {
         );
         let this = self.as_mut().project();
 
+        // TODO we can/should possibly delegate some of this to ClientState and call a poll_*
+        // method there to simplify the code here
+
         match this.inner.project() {
             ClientStateProject::Shutdown => Poll::Ready(None),
             ClientStateProject::Disconnected => {
-                if *this.attempts > 0
-                    && (!this.config.reconnect
-                        || *this.attempts >= this.config.max_reconnect_attempts)
+                let attempts = *this.attempts;
+                if attempts > 0
+                    && (!this.config.reconnect || attempts >= this.config.max_reconnect_attempts)
                 {
                     self.project().inner.set(ClientState::Shutdown);
                     return Poll::Ready(Some(Event::Shutdown));
@@ -151,6 +167,10 @@ impl Stream for Client {
                 mut transport,
             } => {
                 if *state == ConnectedState::Handshake {
+                    if transport.poll_ready_unpin(cx).is_pending() {
+                        return Poll::Pending;
+                    }
+
                     let isi = crate::protocol::insim::Init {
                         name: this.config.name.to_owned(),
                         password: this.config.password.to_owned(),
@@ -161,8 +181,15 @@ impl Stream for Client {
                         reqi: 1,
                     };
 
-                    transport.start_send_unpin(isi.into()); // FIXME
-                    transport.poll_flush_unpin(cx); // FIXME
+                    if let Err(e) = transport.start_send_unpin(isi.into()) {
+                        self.project().inner.set(ClientState::Disconnected);
+                        return Poll::Ready(Some(Event::Error(e.into())));
+                    }
+
+                    if let Err(e) = futures::ready!(transport.poll_flush_unpin(cx)) {
+                        self.project().inner.set(ClientState::Disconnected);
+                        return Poll::Ready(Some(Event::Error(e.into())));
+                    }
 
                     if let Some(host) = &this.config.select_relay_host {
                         let select = crate::protocol::relay::HostSelect {
@@ -170,8 +197,15 @@ impl Stream for Client {
                             ..Default::default()
                         };
 
-                        transport.start_send_unpin(select.into()); // FIXME
-                        transport.poll_flush_unpin(cx); // FIXME
+                        if let Err(e) = transport.start_send_unpin(select.into()) {
+                            self.project().inner.set(ClientState::Disconnected);
+                            return Poll::Ready(Some(Event::Error(e.into())));
+                        }
+
+                        if let Err(e) = futures::ready!(transport.poll_flush_unpin(cx)) {
+                            self.project().inner.set(ClientState::Disconnected);
+                            return Poll::Ready(Some(Event::Error(e.into())));
+                        }
                     }
 
                     *state = ConnectedState::Handshaking;
@@ -232,8 +266,17 @@ impl Stream for Client {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        // FIXME
-        (0, None)
+        fn twice_plus_one(value: Option<usize>) -> Option<usize> {
+            value?.checked_mul(2)?.checked_add(1)
+        }
+
+        match &self.inner {
+            ClientState::Connected { transport, .. } => {
+                let (lower, upper) = transport.size_hint();
+                (lower, twice_plus_one(upper))
+            }
+            _ => (0, Some(1)), // there may be at least 1 event pending if we're not connected
+        }
     }
 }
 

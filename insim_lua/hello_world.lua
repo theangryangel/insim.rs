@@ -11,9 +11,12 @@ function dump(o)
    end
 end
 
+insim.on_startup(function()
+  print("HELLO WORLD!")
+end)
 
-insim.on_hello_world(function()
-  print("Hello, world from lua!")
+insim.on_connected(function()
+  print("CONNECTED!")
 end)
 
 insim.on_tiny(function()
@@ -22,5 +25,5 @@ end)
 
 insim.on_multi_car_info(function(mci)
   print("Got a MultiCarInfo from " .. insim.instance)
-  --print(dump(mci))
+  print(dump(mci))
 end)

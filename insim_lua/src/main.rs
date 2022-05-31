@@ -1,6 +1,10 @@
 use clap::Parser;
 use std::path;
 
+mod config;
+mod script_path;
+mod task;
+
 /// insim_lua does stuff
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -8,8 +12,6 @@ struct Args {
     #[clap(short, long)]
     config: path::PathBuf,
 }
-
-use tracing_subscriber;
 
 fn setup() {
     // setup tracing with some defaults if nothing is set
@@ -25,19 +27,22 @@ fn setup() {
         .init();
 }
 
-use insim::client::prelude::*;
-
 #[tokio::main]
 pub async fn main() {
     setup();
 
-    let mut client = Config::default()
-        .relay(Some("Nubbins AU Demo".into()))
-        .try_reconnect(true)
-        .try_reconnect_attempts(2)
-        .into_client();
+    let args = Args::parse();
+    let config = config::read(&args.config);
 
-    while let Some(d) = client.next().await {
-        println!("{:?}", d);
+    let mut handles = Vec::new();
+
+    for server in config.servers.iter() {
+        // TODO lets be more specific about what we want to do here
+        let (task_insim, task_lua) = task::spawn(server).unwrap();
+
+        handles.push(task_insim);
+        handles.push(task_lua);
     }
+
+    futures::future::join_all(handles).await;
 }

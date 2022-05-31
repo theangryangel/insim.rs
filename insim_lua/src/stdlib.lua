@@ -1,3 +1,5 @@
+-- TODO use colon operator?
+
 insim = {}
 insim._events = {}
 
@@ -17,11 +19,14 @@ insim._emit = function(event, ...)
   end
 end
 
--- Dynamically create event handlers for convenience of end users
+--- Dynamically create event handlers for convenience of end users
 for _, event_name in ipairs({
-  "hello_world",
-  "connect",
-  "disconnect",
+  "startup",
+  "handshaking",
+  "connected",
+  "disconnected",
+  "error",
+  "shutdown",
   "new_player",
   "tiny",
   "multi_car_info",
