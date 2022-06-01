@@ -53,15 +53,6 @@ macro_rules! packet {
                     $($name::$variant{..} => u8::from_str($id).unwrap(),)+
                 }
             }
-
-            // Convert a name into the numeric id of the packet
-            pub fn name_into_id(input: &str) -> Option<u8> {
-                match input {
-                    // TODO: See above notes
-                    $(stringify!($variant) => Some(u8::from_str($id).unwrap()),)+
-                    _ => { None }
-                }
-            }
         }
 
         // Implement From for all our variants so that we can use do insim::Init().into() to get a

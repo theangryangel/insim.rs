@@ -11,19 +11,21 @@ function dump(o)
    end
 end
 
-insim.on_startup(function()
-  print("HELLO WORLD!")
+i = 0
+
+k = insim:on('startup', function()
+   tracing.debug('Events Hello World!' .. insim.instance)
 end)
 
-insim.on_connected(function()
-  print("CONNECTED!")
+insim:on("connected", function()
+  tracing.info("CONNECTED to " .. insim.instance)
 end)
 
-insim.on_tiny(function()
-  print("Got a Tiny!")
-end)
-
-insim.on_multi_car_info(function(mci)
-  print("Got a MultiCarInfo from " .. insim.instance)
-  print(dump(mci))
+insim:on("multi_car_info", function(data)
+  tracing.info("MULTI_CAR_INFO: " .. dump(data))
+  i += 1
+  if i >= 10 then
+    tracing.info("Dying. We got to 10!")
+    insim:shutdown()
+  end
 end)

@@ -39,14 +39,15 @@ impl Mal {
         }
 
         self.allowed_mods.push(mod_id);
-        self.update().unwrap();
+        self.update()?;
 
         Ok(())
     }
 
     /// Clear any previously allowed mods.
-    pub fn clear(&mut self) {
+    pub fn clear(&mut self) -> Result<(), Error> {
         self.allowed_mods.clear();
-        self.update().unwrap();
+        self.update()?;
+        Ok(())
     }
 }

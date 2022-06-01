@@ -95,8 +95,8 @@ impl Config {
     }
 
     /// Set the prefix to be used in the [Init](super::protocol::insim::Init).
-    pub fn prefix(mut self, prefix: u8) -> Self {
-        self.prefix = prefix;
+    pub fn prefix(mut self, prefix: char) -> Self {
+        self.prefix = prefix as u8;
         self
     }
 

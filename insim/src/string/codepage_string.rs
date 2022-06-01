@@ -74,6 +74,8 @@ impl CodepageString {
 
     /// Convert a InsimString into a native rust String, with potential lossy conversion from codepages
     pub fn to_lossy_string(&self) -> String {
+        // FIXME this should all be using Cow
+
         // TODO: Do we want to unescape first? Or do we escape after conversion?
         let input = &self.inner;
 
@@ -95,9 +97,14 @@ impl CodepageString {
         }
 
         // make sure we've got the last item in here as well
-        if *indices.last().unwrap() != input.len() {
-            indices.push(input.len());
-        }
+        match indices.last() {
+            Some(last) => {
+                if *last != input.len() {
+                    indices.push(input.len());
+                }
+            }
+            None => indices.push(input.len()),
+        };
 
         // This pre-allocation is the best guess we can make here
         let mut result = String::with_capacity(self.len());
@@ -106,7 +113,7 @@ impl CodepageString {
             let range = &input[pair[0]..pair[1]];
 
             if range.len() < 2 {
-                result.push_str(&String::from_utf8(unescape(range).to_vec()).unwrap());
+                result.push_str(&String::from_utf8_lossy(&unescape(range)));
                 continue;
             }
 
@@ -186,7 +193,7 @@ impl CodepageString {
             result.push_str(&decoded);
         }
 
-        String::from_utf8(unescape(result.as_bytes())).unwrap()
+        String::from_utf8_lossy(&unescape(result.as_bytes())).into()
     }
 
     /// Builder function to convert a rust native string into Latin1 and push onto inner, prefixed with formatting commands.
@@ -398,7 +405,7 @@ impl DekuWrite<(Endian, Size)> for CodepageString {
             return Ok(());
         }
 
-        let max_size = bit_size.byte_size().unwrap();
+        let max_size = bit_size.byte_size()?;
         let input_size = if self.len() < max_size {
             self.len()
         } else {
@@ -424,7 +431,7 @@ impl DekuWrite<Size> for CodepageString {
             output.resize(orig_size + bit_size.bit_size(), false);
             return Ok(());
         }
-        let max_size = bit_size.byte_size().unwrap();
+        let max_size = bit_size.byte_size()?;
         let input_size = if self.len() < max_size {
             self.len()
         } else {

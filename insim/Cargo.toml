@@ -28,6 +28,7 @@ flume = "0.10"
 uom = { version = "0.32.0", features = ["si", "std"], optional = true }
 async-trait = { version = "0.1.53", optional = true }
 thiserror = "1.0.31"
+miette = "4.7.1"
 
 [dev-dependencies]
 # used in examples

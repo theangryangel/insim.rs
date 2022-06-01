@@ -39,7 +39,7 @@ pub fn write(output: &mut BitVec<Msb0, u8>, field: &str, bytes: usize) -> Result
         return Ok(());
     }
 
-    let max_size = size.byte_size().unwrap();
+    let max_size = size.byte_size()?;
     let input_size = if input.len() < max_size {
         input.len()
     } else {

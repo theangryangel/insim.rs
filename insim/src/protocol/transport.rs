@@ -7,7 +7,6 @@ use futures::Future;
 use futures::{Sink, Stream};
 use pin_project::pin_project;
 
-use std::io::Error;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -165,7 +164,7 @@ where
                         return Poll::Ready(Some(Ok(frame)));
                     }
                     Some(Err(e)) => {
-                        return Poll::Ready(Some(Err(e.into())));
+                        return Poll::Ready(Some(Err(e)));
                     }
                     None => {}
                 }
@@ -190,7 +189,7 @@ impl<T> Sink<Packet> for Transport<T>
 where
     T: AsyncRead + AsyncWrite,
 {
-    type Error = Error;
+    type Error = error::Error;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.project().inner.poll_ready(cx)

@@ -1,12 +1,13 @@
 //! Error types for the library.
 
 use crate::protocol::relay::ErrorType as RelayErrorType;
+use miette::Diagnostic;
 use std::io::ErrorKind;
 use thiserror::Error as ThisError;
 
-// TODO: use thiserror to simplify this
+// FIXME - we should probably drop the derive clone here?
 
-#[derive(ThisError, Debug, Clone, PartialEq)]
+#[derive(ThisError, Diagnostic, Debug, Clone, PartialEq)]
 pub enum Error {
     #[error("Unimplemented command or action")]
     Unimplemented,
@@ -34,12 +35,23 @@ pub enum Error {
 
     #[error("Insim Relay error")]
     RelayError(RelayErrorType),
+
+    #[error("Failed to decode packet")]
+    DecodingError { message: String },
 }
 
 impl From<std::io::Error> for Error {
     fn from(e: std::io::Error) -> Self {
         Error::IO {
             kind: e.kind(),
+            message: e.to_string(),
+        }
+    }
+}
+
+impl From<deku::error::DekuError> for Error {
+    fn from(e: deku::error::DekuError) -> Self {
+        Error::DecodingError {
             message: e.to_string(),
         }
     }

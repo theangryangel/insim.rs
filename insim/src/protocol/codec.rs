@@ -1,6 +1,7 @@
 //! Handles encoding and decoding of [Packets](Packet) from the wire.
 
 use super::Packet;
+use crate::error::Error;
 use deku::{DekuContainerWrite, DekuError};
 use std::convert::TryFrom;
 use std::io;
@@ -98,9 +99,9 @@ impl Decoder for Codec {
     type Item = Packet;
 
     // TODO return custom error
-    type Error = io::Error;
+    type Error = Error;
 
-    fn decode(&mut self, src: &mut BytesMut) -> io::Result<Option<Self::Item>> {
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         if src.is_empty() {
             return Ok(None);
         }
@@ -130,24 +131,25 @@ impl Decoder for Codec {
                 tracing::error!("unsupported packet: {:?}: {:?}", e, data.to_vec());
                 Ok(None)
             }
-            Err(e) => Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string())),
+            Err(e) => Err(e.into()),
         }
     }
 }
 
 impl Encoder<Packet> for Codec {
-    type Error = io::Error;
+    type Error = Error;
 
-    fn encode(&mut self, msg: Packet, dst: &mut BytesMut) -> Result<(), io::Error> {
-        let data = Bytes::from(msg.to_bytes().unwrap());
+    fn encode(&mut self, msg: Packet, dst: &mut BytesMut) -> Result<(), Error> {
+        let data = msg.to_bytes()?;
+        let data = Bytes::from(data);
 
         let n = data.len();
 
         if n > self.max_bytes {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "frame exceeds max_bytes",
-            ));
+            return Err(Error::IO {
+                kind: io::ErrorKind::InvalidInput,
+                message: "frame exceeds max_bytes".into(),
+            });
         }
 
         // Adjust `n` with bounds checking
@@ -171,8 +173,10 @@ impl Encoder<Packet> for Codec {
                 if n % 4 == 0 {
                     n / 4
                 } else {
-                    // probably a programming error, lets bail.
-                    panic!("provided length would not be divisible by 4");
+                    return Err(Error::IO {
+                        kind: io::ErrorKind::InvalidInput,
+                        message: "frame is not divisible by 4".into(),
+                    });
                 }
             }
         };

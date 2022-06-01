@@ -37,7 +37,7 @@ impl Event {
 pub enum ConnectedState {
     Handshake,
     Handshaking,
-    Established,
+    Connected,
 }
 
 impl Display for ConnectedState {
@@ -45,7 +45,7 @@ impl Display for ConnectedState {
         match self {
             ConnectedState::Handshake => write!(f, "Handshake"),
             ConnectedState::Handshaking => write!(f, "Handshaking"),
-            ConnectedState::Established => write!(f, "Established"),
+            ConnectedState::Connected => write!(f, "Connected"),
         }
     }
 }
@@ -114,7 +114,7 @@ impl Stream for Client {
         );
         let this = self.as_mut().project();
 
-        // TODO we can/should possibly delegate some of this to ClientState and call a poll_*
+        // FIXME we can/should delegate some of this to ClientState and call a poll_*
         // method there to simplify the code here
 
         match this.inner.project() {
@@ -163,10 +163,10 @@ impl Stream for Client {
                 Poll::Pending => Poll::Pending,
             },
             ClientStateProject::Connected {
+                ref mut transport,
                 state,
-                mut transport,
-            } => {
-                if *state == ConnectedState::Handshake {
+            } => match state {
+                ConnectedState::Handshake => {
                     if transport.poll_ready_unpin(cx).is_pending() {
                         return Poll::Pending;
                     }
@@ -183,12 +183,12 @@ impl Stream for Client {
 
                     if let Err(e) = transport.start_send_unpin(isi.into()) {
                         self.project().inner.set(ClientState::Disconnected);
-                        return Poll::Ready(Some(Event::Error(e.into())));
+                        return Poll::Ready(Some(Event::Error(e)));
                     }
 
                     if let Err(e) = futures::ready!(transport.poll_flush_unpin(cx)) {
                         self.project().inner.set(ClientState::Disconnected);
-                        return Poll::Ready(Some(Event::Error(e.into())));
+                        return Poll::Ready(Some(Event::Error(e)));
                     }
 
                     if let Some(host) = &this.config.select_relay_host {
@@ -199,21 +199,20 @@ impl Stream for Client {
 
                         if let Err(e) = transport.start_send_unpin(select.into()) {
                             self.project().inner.set(ClientState::Disconnected);
-                            return Poll::Ready(Some(Event::Error(e.into())));
+                            return Poll::Ready(Some(Event::Error(e)));
                         }
 
                         if let Err(e) = futures::ready!(transport.poll_flush_unpin(cx)) {
                             self.project().inner.set(ClientState::Disconnected);
-                            return Poll::Ready(Some(Event::Error(e.into())));
+                            return Poll::Ready(Some(Event::Error(e)));
                         }
                     }
 
                     *state = ConnectedState::Handshaking;
 
-                    return Poll::Ready(Some(Event::Handshaking));
+                    Poll::Ready(Some(Event::Handshaking))
                 }
-
-                match transport.try_poll_next_unpin(cx) {
+                ConnectedState::Handshaking => match transport.try_poll_next_unpin(cx) {
                     Poll::Ready(Some(packet)) => {
                         if let Ok(Packet::RelayError(crate::protocol::relay::Error {
                             err, ..
@@ -223,9 +222,8 @@ impl Stream for Client {
                             return Poll::Ready(Some(Event::Error(Error::RelayError(err))));
                         }
 
-                        match (packet, *state, this.config.verify_version) {
-                            (Ok(_), ConnectedState::Handshake, _) => Poll::Pending, // we shouldnt really get any packets yet
-                            (Ok(packet), ConnectedState::Handshaking, true) => match packet {
+                        match (packet, this.config.verify_version) {
+                            (Ok(packet), true) => match packet {
                                 Packet::Version(crate::protocol::insim::Version {
                                     insimver,
                                     ..
@@ -237,19 +235,16 @@ impl Stream for Client {
                                     }
 
                                     // TODO: automatically poll server for connected players, etc.
-                                    *state = ConnectedState::Established;
+                                    *state = ConnectedState::Connected;
                                     Poll::Ready(Some(Event::Connected))
                                 }
                                 _ => Poll::Pending,
                             },
-                            (Ok(_), ConnectedState::Handshaking, false) => {
-                                *state = ConnectedState::Established;
+                            (Ok(_), false) => {
+                                *state = ConnectedState::Connected;
                                 Poll::Ready(Some(Event::Connected))
                             }
-                            (Ok(packet), ConnectedState::Established, _) => {
-                                Poll::Ready(Some(Event::Data(packet)))
-                            }
-                            (Err(e), _, _) => {
+                            (Err(e), _) => {
                                 self.project().inner.set(ClientState::Disconnected);
                                 Poll::Ready(Some(Event::Error(e)))
                             }
@@ -260,8 +255,22 @@ impl Stream for Client {
                         Poll::Ready(Some(Event::Disconnected))
                     }
                     Poll::Pending => Poll::Pending,
-                }
-            }
+                },
+                ConnectedState::Connected => match transport.try_poll_next_unpin(cx) {
+                    Poll::Ready(Some(packet)) => match packet {
+                        Ok(packet) => Poll::Ready(Some(Event::Data(packet))),
+                        Err(e) => {
+                            self.project().inner.set(ClientState::Disconnected);
+                            Poll::Ready(Some(Event::Error(e)))
+                        }
+                    },
+                    Poll::Ready(None) => {
+                        self.project().inner.set(ClientState::Disconnected);
+                        Poll::Ready(Some(Event::Disconnected))
+                    }
+                    Poll::Pending => Poll::Pending,
+                },
+            },
         }
     }
 
@@ -289,7 +298,7 @@ impl Sink<Event> for Client {
             ClientStateProject::Connecting(_) => Poll::Pending,
             ClientStateProject::Connected {
                 ref mut transport, ..
-            } => transport.poll_ready_unpin(cx).map_err(|e| e.into()),
+            } => transport.poll_ready_unpin(cx),
             ClientStateProject::Shutdown => Poll::Ready(Ok(())),
         }
     }
@@ -307,7 +316,7 @@ impl Sink<Event> for Client {
             ClientStateProject::Connected {
                 ref mut transport, ..
             } => match item {
-                Event::Data(packet) => transport.start_send_unpin(packet).map_err(|e| e.into()),
+                Event::Data(packet) => transport.start_send_unpin(packet),
                 Event::Connected => todo!(),
                 Event::Disconnected => todo!(),
                 Event::Error(_) => todo!(),
@@ -327,7 +336,7 @@ impl Sink<Event> for Client {
             ClientStateProject::Connecting(_) => Poll::Pending,
             ClientStateProject::Connected {
                 ref mut transport, ..
-            } => transport.poll_flush_unpin(cx).map_err(|e| e.into()),
+            } => transport.poll_flush_unpin(cx),
             ClientStateProject::Shutdown => Poll::Ready(Ok(())),
         }
     }
@@ -338,7 +347,7 @@ impl Sink<Event> for Client {
             ClientStateProject::Connecting(_) => Poll::Pending,
             ClientStateProject::Connected {
                 ref mut transport, ..
-            } => transport.poll_close_unpin(cx).map_err(|e| e.into()),
+            } => transport.poll_close_unpin(cx),
             ClientStateProject::Shutdown => Poll::Ready(Ok(())),
         }
     }

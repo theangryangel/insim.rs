@@ -61,12 +61,11 @@ const TRACK_INFO: &[TrackInfo] = &[
 /// Lookup a [TrackInfo] from a track name
 pub fn lookup(input: &[u8]) -> Option<&TrackInfo> {
     if let Some(rpos) = input.iter().rposition(|x| ![b'X', b'R', 0].contains(x)) {
-        let short_code = std::str::from_utf8(&input[..=rpos]).unwrap();
-
-        TRACK_INFO.iter().find(|x| x.0 == short_code)
-    } else {
-        None
+        if let Ok(short_code) = std::str::from_utf8(&input[..=rpos]) {
+            return TRACK_INFO.iter().find(|x| x.0 == short_code);
+        }
     }
+    None
 }
 
 /// Handles parsing a Track name.
