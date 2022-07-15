@@ -10,7 +10,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::net::TcpStream;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Event {
     Handshaking,
     Connected,
@@ -307,8 +307,9 @@ impl Sink<Event> for Client {
         let mut this = self.as_mut().project();
 
         if item == Event::Shutdown {
+            tracing::debug!("Fuck?");
             this.inner.set(ClientState::Shutdown);
-        }
+        };
 
         match this.inner.project() {
             ClientStateProject::Disconnected => Err(Error::Disconnected),

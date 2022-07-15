@@ -49,7 +49,7 @@ pub fn to_ansi(input: String) -> String {
                     } else {
                         has_colours = true;
                         // conveniently the colour code + 30 are the same as the ANSI codes
-                        output += &format!("\x1b[0;3{}m", j);
+                        output = format!("{}\x1b[0;3{}m", output, j);
                     }
                     continue;
                 }

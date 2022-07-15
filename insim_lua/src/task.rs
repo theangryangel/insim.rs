@@ -1,18 +1,28 @@
 use crate::config::definition::Server;
 use crate::script;
+use bounded_vec_deque::BoundedVecDeque;
 use convert_case::{Case, Casing};
 use insim::client::prelude::*;
+use insim::protocol::Packet;
 use miette::{Context, IntoDiagnostic, Result};
 use mlua::{Function, Lua, LuaSerdeExt};
+use std::collections::HashMap;
 use std::fs;
-use tokio::sync::mpsc;
+use std::sync::{Arc, Mutex};
+use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
 
-type TaskResult = (JoinHandle<Result<()>>, JoinHandle<Result<()>>);
+pub(crate) type Task = (
+    JoinHandle<Result<()>>,
+    JoinHandle<Result<()>>,
+    crate::state::State,
+);
 
-pub(crate) fn spawn(server: &Server) -> Result<TaskResult> {
+pub(crate) fn spawn(server: &Server) -> Result<Task> {
     let (lua_tx, mut lua_rx) = mpsc::unbounded_channel::<Event>();
     let (insim_tx, mut insim_rx) = mpsc::unbounded_channel::<Event>();
+
+    let state = crate::state::State::new(insim_tx.clone());
 
     let lua = Lua::new();
 
@@ -20,7 +30,7 @@ pub(crate) fn spawn(server: &Server) -> Result<TaskResult> {
         .set("tracing", script::tracing::Tracing {})
         .into_diagnostic()?;
 
-    let events = script::insim::Insim::new(server.name.clone(), insim_tx);
+    let events = script::insim::Insim::new(server.name.clone(), insim_tx, state.clone());
     lua.globals().set("insim", events).into_diagnostic()?;
 
     {
@@ -76,6 +86,7 @@ pub(crate) fn spawn(server: &Server) -> Result<TaskResult> {
                     ))
                     .into_diagnostic()?;
                 }
+
                 event => {
                     emit.call::<_, ()>((event.name().to_case(Case::Snake),))
                         .into_diagnostic()?;
@@ -88,35 +99,52 @@ pub(crate) fn spawn(server: &Server) -> Result<TaskResult> {
 
     let conf = server.as_insim_config().into_diagnostic()?;
 
-    let task_insim = tokio::task::spawn(async move {
-        let mut client = conf.into_client();
+    let task_insim = tokio::task::spawn({
+        let state = state.clone();
+        async move {
+            let mut client = conf.into_client();
 
-        loop {
-            tokio::select! {
-                msg = client.next() => match msg {
-                    Some(msg) => lua_tx.send(msg).into_diagnostic()?,
-                    None => break
-                },
-
-                msg = insim_rx.recv() => match msg {
-                    Some(msg) => match msg {
-                        Event::Shutdown => {
-                            client.shutdown();
-                            break;
+            loop {
+                tokio::select! {
+                    msg = client.next() => match msg {
+                        Some(msg) => {
+                            state.handle_event(msg.clone())?;
+                            lua_tx.send(msg.clone()).into_diagnostic()?;
                         },
-                        Event::Handshaking => unimplemented!(),
-                        Event::Connected => unimplemented!(),
-                        Event::Disconnected => unimplemented!(),
-                        Event::Error(_) => unimplemented!(),
-                        Event::Data(_) => todo!(),
+                        None => {
+                            break;
+                        }
                     },
-                    None => break
+
+                    msg = insim_rx.recv() => match msg {
+                        Some(msg) => match msg {
+                            Event::Shutdown => {
+                                tracing::debug!("shuttingdown?");
+                                client.shutdown();
+                                break;
+                            },
+                            Event::Handshaking => unimplemented!(),
+                            Event::Connected => unimplemented!(),
+                            Event::Disconnected => unimplemented!(),
+                            Event::Error(e) => {
+                                panic!("{}", e)
+                            },
+                            Event::Data(data) => {
+                                client.send(Event::Data(data)).await?;
+                            },
+                        },
+                        None => {
+                            break;
+                        }
+                    }
                 }
             }
-        }
 
-        Ok(())
+            tracing::debug!("loop ended?");
+
+            Ok(())
+        }
     });
 
-    Ok((task_insim, task_lua))
+    Ok((task_insim, task_lua, state))
 }

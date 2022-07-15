@@ -1,10 +1,16 @@
 use clap::Parser;
-use miette::Result;
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
+use miette::{IntoDiagnostic, Result};
+use std::collections::HashMap;
 use std::path;
+use std::sync::{Arc, RwLock};
 
 mod config;
 mod script;
 mod task;
+//mod web;
+mod state;
 
 /// insim_lua does stuff
 #[derive(Parser, Debug)]
@@ -28,6 +34,11 @@ fn setup_tracing() {
         .init();
 }
 
+use axum::{extract::Extension, routing::get, Router};
+use tower::ServiceBuilder;
+
+pub type State = Arc<RwLock<HashMap<String, task::Task>>>;
+
 #[tokio::main]
 pub async fn main() -> Result<()> {
     miette::set_panic_hook();
@@ -36,16 +47,35 @@ pub async fn main() -> Result<()> {
     let args = Args::parse();
     let config = config::read(&args.config)?;
 
-    let mut handles = Vec::new();
+    let mut fut = FuturesUnordered::new();
 
     for server in config.servers.iter() {
         // TODO lets be more specific about what we want to do here
-        let (task_insim, task_lua) = task::spawn(server)?;
+        let (insim_future, lua_future, _state) = task::spawn(server)?;
 
-        handles.push(task_insim);
-        handles.push(task_lua);
+        fut.push(insim_future);
+        fut.push(lua_future);
     }
 
-    futures::future::join_all(handles).await;
+    // let app = Router::new()
+    //     .route("/", get(web::index))
+    //     .route("/s/:server", get(web::server_index))
+    //     // Use a precompiled and minified build of axum-live-view's JavaScript.
+    //     // This is the easiest way to get started. Integration with bundlers
+    //     // is of course also possible.
+    //     .route("/bundle.js", axum_live_view::precompiled_js())
+    //     .layer(
+    //         ServiceBuilder::new()
+    //             .layer(Extension(tasks.clone()))
+    //     );
+    //
+    // // ...that we run like any other axum app
+    // axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
+    //     .serve(app.into_make_service() ).await.into_diagnostic()?;
+
+    while let Some(res) = fut.next().await {
+        res.into_diagnostic()?;
+    }
+
     Ok(())
 }
