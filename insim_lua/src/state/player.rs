@@ -1,11 +1,24 @@
 use insim::protocol::position::FixedPoint;
 
 #[derive(Debug)]
-pub(crate) struct Player {
+pub struct Player {
     pub pname: String,
     pub plate: String,
 
     pub xyz: FixedPoint,
+
+    pub in_pitlane: bool,
+}
+
+impl Default for Player {
+    fn default() -> Self {
+        Self {
+            pname: String::new(),
+            plate: String::new(),
+            xyz: FixedPoint::default(),
+            in_pitlane: false,
+        }
+    }
 }
 
 impl From<&insim::protocol::insim::Npl> for Player {
@@ -13,7 +26,7 @@ impl From<&insim::protocol::insim::Npl> for Player {
         Self {
             pname: data.pname.to_lossy_string(),
             plate: data.plate.to_lossy_string(),
-            xyz: FixedPoint::default(),
+            ..Default::default()
         }
     }
 }

@@ -1,4 +1,4 @@
-use super::{task::Message, State};
+use crate::state::State;
 use axum::{
     async_trait,
     extract::{Extension, Path},
@@ -12,13 +12,13 @@ use axum_live_view::{
     Html, LiveView, LiveViewUpgrade,
 };
 use bounded_vec_deque::BoundedVecDeque;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 
-pub(crate) async fn index(Extension(state): Extension<State>) -> String {
-    let db = &state.read().unwrap();
-
-    db.keys()
+pub(crate) async fn index(Extension(state): Extension<HashMap<String, Arc<State>>>) -> String {
+    state
+        .keys()
         .map(|key| key.to_string())
         .collect::<Vec<String>>()
         .join("\n")
@@ -27,16 +27,14 @@ pub(crate) async fn index(Extension(state): Extension<State>) -> String {
 pub(crate) async fn server_index(
     live: LiveViewUpgrade,
     Path(server): Path<String>,
-    Extension(state): Extension<State>,
+    Extension(state): Extension<HashMap<String, Arc<State>>>,
 ) -> impl IntoResponse {
-    let db = &state.read().unwrap();
-
-    let value = db.get(&server);
+    let value = state.get(&server);
     // TODO throw 404
     let value = value.unwrap();
 
     let messages = MessagesList {
-        messages: value.chat.clone(),
+        state: value.clone(),
         tx: value.change.clone(),
     };
 
@@ -56,7 +54,7 @@ pub(crate) async fn server_index(
 }
 
 struct MessagesList {
-    messages: Arc<Mutex<BoundedVecDeque<Message>>>,
+    state: Arc<State>,
     tx: broadcast::Sender<()>,
 }
 
@@ -92,7 +90,7 @@ impl LiveView for MessagesList {
     }
 
     fn render(&self) -> Html<Self::Message> {
-        let messages = self.messages.lock().unwrap();
+        let messages = self.state.chat();
         html! {
             if messages.is_empty() {
                 <p>"Its quiet, too quiet..."</p>

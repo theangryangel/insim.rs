@@ -1,5 +1,5 @@
-#[derive(Debug)]
-pub(crate) struct Connection {
+#[derive(Debug, Clone)]
+pub struct Connection {
     pub uname: String,
     pub admin: bool,
     pub flags: u8,

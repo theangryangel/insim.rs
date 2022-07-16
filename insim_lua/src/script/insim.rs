@@ -1,21 +1,21 @@
 use crate::state::State;
 use insim::client::Event;
 use mlua::{AnyUserData, Function, Lua, Table, UserData, Value};
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::mpsc;
 
 pub(crate) struct Insim {
     callbacks: HashMap<String, Vec<i32>>,
     instance: String,
     writer: mpsc::UnboundedSender<Event>,
-    state: State,
+    state: Arc<State>,
 }
 
 impl Insim {
     pub(crate) fn new(
         instance: String,
         writer: mpsc::UnboundedSender<Event>,
-        state: State,
+        state: Arc<State>,
     ) -> Self {
         Insim {
             callbacks: HashMap::new(),

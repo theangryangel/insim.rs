@@ -3,26 +3,24 @@ use crate::script;
 use bounded_vec_deque::BoundedVecDeque;
 use convert_case::{Case, Casing};
 use insim::client::prelude::*;
-use insim::protocol::Packet;
 use miette::{Context, IntoDiagnostic, Result};
 use mlua::{Function, Lua, LuaSerdeExt};
-use std::collections::HashMap;
 use std::fs;
-use std::sync::{Arc, Mutex};
-use tokio::sync::{broadcast, mpsc};
+use std::sync::Arc;
+use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
 pub(crate) type Task = (
     JoinHandle<Result<()>>,
     JoinHandle<Result<()>>,
-    crate::state::State,
+    Arc<crate::state::State>,
 );
 
 pub(crate) fn spawn(server: &Server) -> Result<Task> {
     let (lua_tx, mut lua_rx) = mpsc::unbounded_channel::<Event>();
     let (insim_tx, mut insim_rx) = mpsc::unbounded_channel::<Event>();
 
-    let state = crate::state::State::new(insim_tx.clone());
+    let state = Arc::new(crate::state::State::new(insim_tx.clone()));
 
     let lua = Lua::new();
 
