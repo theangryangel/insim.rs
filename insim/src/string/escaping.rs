@@ -20,8 +20,8 @@ pub fn is_ascii_alphanumeric(c: &u8) -> bool {
 
 /// Strip any trailing \0 bytes from a u8 slice.
 pub fn strip_trailing_nul(input: &[u8]) -> &[u8] {
-    if let Some(rpos) = input.iter().rposition(|x| *x != 0) {
-        &input[..=rpos]
+    if let Some(pos) = input.iter().position(|x| *x == 0) {
+        &input[..pos]
     } else {
         input
     }
