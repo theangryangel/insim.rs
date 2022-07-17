@@ -8,20 +8,20 @@ pub(crate) struct Insim {
     callbacks: HashMap<String, Vec<i32>>,
     instance: String,
     writer: mpsc::UnboundedSender<Event>,
-    state: Arc<State>,
+    //state: Arc<State>,
 }
 
 impl Insim {
     pub(crate) fn new(
         instance: String,
         writer: mpsc::UnboundedSender<Event>,
-        state: Arc<State>,
+        _state: Arc<State>,
     ) -> Self {
         Insim {
             callbacks: HashMap::new(),
             instance,
             writer,
-            state,
+            //state,
         }
     }
 }

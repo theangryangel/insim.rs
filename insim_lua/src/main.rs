@@ -1,16 +1,14 @@
 use clap::Parser;
 use futures::stream::FuturesUnordered;
-use futures::StreamExt;
 use miette::{IntoDiagnostic, Result};
 use std::collections::HashMap;
 use std::path;
-use std::sync::{Arc, RwLock};
 
 mod config;
 mod script;
+mod state;
 mod task;
 mod web;
-mod state;
 
 /// insim_lua does stuff
 #[derive(Parser, Debug)]
@@ -66,14 +64,13 @@ pub async fn main() -> Result<()> {
         // This is the easiest way to get started. Integration with bundlers
         // is of course also possible.
         .route("/bundle.js", axum_live_view::precompiled_js())
-        .layer(
-            ServiceBuilder::new()
-                .layer(Extension(tasks))
-        );
+        .layer(ServiceBuilder::new().layer(Extension(tasks)));
 
     // ...that we run like any other axum app
     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
-        .serve(app.into_make_service() ).await.into_diagnostic()?;
+        .serve(app.into_make_service())
+        .await
+        .into_diagnostic()?;
 
     // FIXME
     // while let Some(res) = fut.next().await {

@@ -1,6 +1,5 @@
 use crate::config::definition::Server;
 use crate::script;
-use bounded_vec_deque::BoundedVecDeque;
 use convert_case::{Case, Casing};
 use insim::client::prelude::*;
 use miette::{Context, IntoDiagnostic, Result};

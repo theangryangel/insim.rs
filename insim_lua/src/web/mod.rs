@@ -1,20 +1,13 @@
 use crate::state::State;
 use axum::{
-    async_trait,
     extract::{Extension, Path},
-    http::{HeaderMap, Uri},
     response::IntoResponse,
 };
-use axum_live_view::{
-    event_data::EventData,
-    html,
-    live_view::{Updated, ViewHandle},
-    Html, LiveView, LiveViewUpgrade,
-};
-use bounded_vec_deque::BoundedVecDeque;
+use axum_live_view::{html, live_view, LiveViewUpgrade};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use tokio::sync::broadcast;
+use std::sync::Arc;
+
+mod components;
 
 pub(crate) async fn index(Extension(state): Extension<HashMap<String, Arc<State>>>) -> String {
     state
@@ -33,10 +26,37 @@ pub(crate) async fn server_index(
     // TODO throw 404
     let value = value.unwrap();
 
-    let messages = MessagesList {
+    let connections = components::connections::ConnectionComponent {
         state: value.clone(),
-        tx: value.change.clone(),
+        tx: value.notify_on_connection(),
     };
+
+    let messages = components::chat::ChatComponent {
+        state: value.clone(),
+        tx: value.notify_on_chat(),
+    };
+
+    let players = components::players::PlayersComponent {
+        state: value.clone(),
+        tx: value.notify_on_player(),
+    };
+
+    let combined = live_view::combine(
+        (connections, messages, players),
+        |connections, messages, players| {
+            html! {
+                <div>
+                    <div>{players}</div>
+                    <div>
+                        {connections}
+                    </div>
+                    <div>
+                        {messages}
+                    </div>
+                </div>
+            }
+        },
+    );
 
     live.response(move |embed| {
         html! {
@@ -44,68 +64,11 @@ pub(crate) async fn server_index(
             <html>
                 <head>
                 </head>
-                <body>
-                    { embed.embed(messages) }
+                <body style="display: flex; flex-direction: column">
+                    { embed.embed(combined) }
                     <script src="/bundle.js"></script>
                 </body>
             </html>
         }
     })
-}
-
-struct MessagesList {
-    state: Arc<State>,
-    tx: broadcast::Sender<()>,
-}
-
-#[async_trait]
-impl LiveView for MessagesList {
-    type Message = ();
-    type Error = std::convert::Infallible;
-
-    async fn mount(
-        &mut self,
-        _: Uri,
-        _: &HeaderMap,
-        handle: ViewHandle<Self::Message>,
-    ) -> Result<(), Self::Error> {
-        let mut rx = self.tx.subscribe();
-        tokio::spawn(async move {
-            while let Ok(()) = rx.recv().await {
-                if handle.send(()).await.is_err() {
-                    break;
-                }
-            }
-        });
-
-        Ok(())
-    }
-
-    async fn update(
-        mut self,
-        _msg: (),
-        _data: Option<EventData>,
-    ) -> Result<Updated<Self>, Self::Error> {
-        Ok(Updated::new(self))
-    }
-
-    fn render(&self) -> Html<Self::Message> {
-        let messages = self.state.chat();
-        html! {
-            if messages.is_empty() {
-                <p>"Its quiet, too quiet..."</p>
-            } else {
-                <ul>
-                    for msg in messages.iter() {
-                        <li>
-                            { &msg.at } { &msg.ucid }
-                            <div>
-                                { &msg.body }
-                            </div>
-                        </li>
-                    }
-                </ul>
-            }
-        }
-    }
 }

@@ -1,6 +1,6 @@
 use insim::protocol::position::FixedPoint;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Player {
     pub pname: String,
     pub plate: String,
@@ -8,17 +8,6 @@ pub struct Player {
     pub xyz: FixedPoint,
 
     pub in_pitlane: bool,
-}
-
-impl Default for Player {
-    fn default() -> Self {
-        Self {
-            pname: String::new(),
-            plate: String::new(),
-            xyz: FixedPoint::default(),
-            in_pitlane: false,
-        }
-    }
 }
 
 impl From<&insim::protocol::insim::Npl> for Player {
