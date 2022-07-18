@@ -185,8 +185,6 @@ impl State {
             _ => {}
         };
 
-        println!("{:?}", self);
-
         Ok(())
     }
 }
