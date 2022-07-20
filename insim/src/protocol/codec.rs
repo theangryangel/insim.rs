@@ -118,7 +118,10 @@ impl Decoder for Codec {
         let res = Self::Item::try_from(data.as_ref());
 
         match res {
-            Ok(packet) => Ok(Some(packet)),
+            Ok(packet) => {
+                tracing::debug!("decoded: {:?}", packet);
+                Ok(Some(packet))
+            }
             Err(DekuError::Incomplete(e)) => {
                 // If we're here, everything has gone very wonky.
                 panic!(
@@ -131,7 +134,10 @@ impl Decoder for Codec {
                 tracing::error!("unsupported packet: {:?}: {:?}", e, data.to_vec());
                 Ok(None)
             }
-            Err(e) => Err(e.into()),
+            Err(e) => {
+                tracing::error!("unhandled error: {:?}", e);
+                Err(e.into())
+            }
         }
     }
 }

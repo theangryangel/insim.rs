@@ -1,73 +1,34 @@
-use crate::state::State;
-use axum::{
-    async_trait,
-    http::{HeaderMap, Uri},
-};
-use axum_live_view::{
-    event_data::EventData,
-    html,
-    live_view::{Updated, ViewHandle},
-    Html, LiveView,
-};
-use std::sync::Arc;
-use tokio::sync::Notify;
+use crate::web::hooks::{use_insim, use_insim_chat_future};
 
-pub(crate) struct ChatComponent {
-    pub(crate) state: Arc<State>,
-    pub(crate) tx: Arc<Notify>,
-}
+use dioxus::prelude::*;
 
-#[async_trait]
-impl LiveView for ChatComponent {
-    type Message = ();
-    type Error = std::convert::Infallible;
+#[inline_props]
+pub(crate) fn chat(cx: Scope, server: String) -> Element {
+    let state = use_insim(&cx, server);
+    use_insim_chat_future(&cx, state.clone());
 
-    async fn mount(
-        &mut self,
-        _: Uri,
-        _: &HeaderMap,
-        handle: ViewHandle<Self::Message>,
-    ) -> Result<(), Self::Error> {
-        tokio::spawn({
-            let tx = self.tx.clone();
-            async move {
-                loop {
-                    tx.notified().await;
-                    if handle.send(()).await.is_err() {
-                        break;
+    let messages = state.chat();
+
+    cx.render(if messages.is_empty() {
+        rsx!("It's too quiet.")
+    } else {
+        rsx! {
+            ul {
+                messages.iter().map(|c| {
+                    rsx! {
+                        li {
+                            key: "{c.at}-{c.ucid}",
+                            div {
+                                "{c.at}"
+                            }
+                            div {
+                                "{c.body}"
+                            }
+                        }
                     }
-                }
-            }
-        });
+                })
 
-        Ok(())
-    }
-
-    async fn update(
-        mut self,
-        _msg: (),
-        _data: Option<EventData>,
-    ) -> Result<Updated<Self>, Self::Error> {
-        Ok(Updated::new(self))
-    }
-
-    fn render(&self) -> Html<Self::Message> {
-        let messages = self.state.chat();
-        html! {
-            if messages.is_empty() {
-                <p>"Its quiet, too quiet..."</p>
-            } else {
-                <ul>
-                    for msg in messages.iter() {
-                        <li>
-                            { &msg.at } { &msg.ucid }
-                            <div>
-                                { &msg.body }
-                            </div>
-                        </li>
-                    }
-                </ul>
             }
         }
-    }
+    })
 }

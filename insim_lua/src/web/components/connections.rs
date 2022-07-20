@@ -1,72 +1,22 @@
-use crate::state::State;
-use axum::{
-    async_trait,
-    http::{HeaderMap, Uri},
-};
-use axum_live_view::{
-    event_data::EventData,
-    html,
-    live_view::{Updated, ViewHandle},
-    Html, LiveView,
-};
-use std::sync::Arc;
-use tokio::sync::Notify;
+use crate::web::hooks::{use_insim, use_insim_connection_future};
 
-pub(crate) struct ConnectionComponent {
-    pub(crate) state: Arc<State>,
-    pub(crate) tx: Arc<Notify>,
-}
+use dioxus::prelude::*;
 
-#[async_trait]
-impl LiveView for ConnectionComponent {
-    type Message = ();
-    type Error = std::convert::Infallible;
+#[inline_props]
+pub(crate) fn list(cx: Scope, server: String) -> Element {
+    let state = use_insim(&cx, server);
+    use_insim_connection_future(&cx, state.clone());
 
-    async fn mount(
-        &mut self,
-        _: Uri,
-        _: &HeaderMap,
-        handle: ViewHandle<Self::Message>,
-    ) -> Result<(), Self::Error> {
-        tokio::spawn({
-            let tx = self.tx.clone();
-            async move {
-                loop {
-                    tx.notified().await;
-                    if handle.send(()).await.is_err() {
-                        break;
+    cx.render(rsx! {
+        div {
+            state.get_connections().iter().map(|(ucid, player)| {
+                rsx! {
+                    div {
+                        key: "{ucid}",
+                        "{player:?}"
                     }
                 }
-            }
-        });
-
-        Ok(())
-    }
-
-    async fn update(
-        mut self,
-        _msg: (),
-        _data: Option<EventData>,
-    ) -> Result<Updated<Self>, Self::Error> {
-        Ok(Updated::new(self))
-    }
-
-    fn render(&self) -> Html<Self::Message> {
-        let connections = self.state.get_connections();
-        html! {
-            if connections.is_empty() {
-                <p>"Its quiet, too quiet..."</p>
-            } else {
-                <ul>
-                    for (ucid, connection) in connections.iter() {
-                        <li>
-                            { &ucid }
-                            "="
-                            { format!("{:?}", &connection) }
-                        </li>
-                    }
-                </ul>
-            }
+            })
         }
-    }
+    })
 }

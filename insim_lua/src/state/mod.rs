@@ -56,6 +56,10 @@ impl State {
         self.connections_notify.clone()
     }
 
+    pub fn get_connection_player_id(&self, ucid: u8) -> Option<u8> {
+        self.idx_connection_player.read().get(&ucid).copied()
+    }
+
     pub fn get_players(
         &self,
     ) -> parking_lot::lock_api::RwLockReadGuard<'_, parking_lot::RawRwLock, PlayerMap> {
@@ -64,6 +68,9 @@ impl State {
 
     pub fn notify_on_player(&self) -> Arc<Notify> {
         self.players_notify.clone()
+    }
+    pub fn get_player_connection_id(&self, ucid: u8) -> Option<u8> {
+        self.idx_player_connection.read().get(&ucid).copied()
     }
 
     pub fn chat(
@@ -115,7 +122,7 @@ impl State {
             Packet::PlayerLeave(data) => {
                 self.players.write().remove(&data.plid);
                 if let Some(ucid) = self.idx_player_connection.write().remove(&data.plid) {
-                    self.idx_player_connection.write().remove(&ucid);
+                    self.idx_connection_player.write().remove(&ucid);
                 }
             }
 
@@ -148,10 +155,20 @@ impl State {
                 for info in data.info.iter() {
                     if let Some(player) = players.get_mut(&info.plid) {
                         player.xyz = info.xyz.clone();
+                        player.lap = info.lap;
+                        player.position = info.position;
+                        player.node = info.node;
+                        player.speed = info.speed;
                     }
                 }
 
                 self.players_notify.notify_waiters();
+            }
+
+            Packet::Lap(data) => {
+                if let Some(player) = self.players.write().get_mut(&data.plid) {
+                    player.lap = data.lapsdone;
+                }
             }
 
             _ => {}
@@ -182,7 +199,18 @@ impl State {
                 self.handle_data(packet)?;
             }
 
-            _ => {}
+            Event::Error(data) => {
+                // FIXME
+                panic!("{:?}", data);
+            }
+
+            Event::Shutdown => panic!("shutdown!"),
+
+            Event::Handshaking => {}
+
+            Event::Disconnected => {
+                tracing::debug!("disconnected?!")
+            }
         };
 
         Ok(())
