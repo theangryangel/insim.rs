@@ -1,4 +1,4 @@
-use crate::{vehicle::Vehicle, protocol::identifiers::ConnectionId};
+use crate::{protocol::identifiers::ConnectionId, vehicle::Vehicle};
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;

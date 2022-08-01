@@ -1,4 +1,7 @@
-use crate::{string::{istring, CodepageString}, protocol::identifiers::ConnectionId};
+use crate::{
+    protocol::identifiers::ConnectionId,
+    string::{istring, CodepageString},
+};
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;

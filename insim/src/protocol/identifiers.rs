@@ -1,14 +1,14 @@
 use deku::prelude::*;
-use std::fmt;
 #[cfg(feature = "serde")]
 use serde::Serialize;
+use std::fmt;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
-pub struct ConnectionId{
-    #[deku(bytes="1")]
-    id: u8
+pub struct ConnectionId {
+    #[deku(bytes = "1")]
+    id: u8,
 }
 
 impl fmt::Display for ConnectionId {
@@ -20,9 +20,9 @@ impl fmt::Display for ConnectionId {
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
-pub struct PlayerId{
-    #[deku(bytes="1")]
-    id: u8
+pub struct PlayerId {
+    #[deku(bytes = "1")]
+    id: u8,
 }
 
 impl fmt::Display for PlayerId {
