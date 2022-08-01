@@ -1,3 +1,4 @@
+use crate::protocol::identifiers::ConnectionId;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -49,14 +50,12 @@ impl Default for CnlReason {
 #[deku(ctx = "_endian: deku::ctx::Endian")]
 // Connection Leave
 pub struct Cnl {
-    #[deku(bytes = "1")]
     pub reqi: u8,
 
-    #[deku(bytes = "1")]
-    pub ucid: u8,
+    pub ucid: ConnectionId,
 
     pub reason: CnlReason,
 
-    #[deku(bytes = "1", pad_bytes_after = "2")]
+    #[deku(pad_bytes_after = "2")]
     pub total: u8,
 }

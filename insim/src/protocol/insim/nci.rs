@@ -2,6 +2,8 @@ use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use crate::protocol::identifiers::ConnectionId;
+
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(type = "u8", endian = "little")]
@@ -96,7 +98,7 @@ impl Default for ILanguage {
 pub struct Nci {
     pub reqi: u8,
 
-    pub ucid: u8,
+    pub ucid: ConnectionId,
 
     #[deku(pad_bytes_after = "3")]
     pub language: ILanguage,

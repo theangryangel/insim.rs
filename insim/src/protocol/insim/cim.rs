@@ -1,3 +1,4 @@
+use crate::protocol::identifiers::ConnectionId;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -42,7 +43,7 @@ impl Default for CimMode {
 pub struct Cim {
     pub reqi: u8,
 
-    pub ucid: u8,
+    pub ucid: ConnectionId,
 
     pub mode: CimMode,
 

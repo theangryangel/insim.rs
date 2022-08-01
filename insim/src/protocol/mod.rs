@@ -41,6 +41,7 @@ use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+pub mod identifiers;
 pub mod codec;
 pub mod insim;
 mod macros;

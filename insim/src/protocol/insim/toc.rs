@@ -2,6 +2,8 @@ use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use crate::protocol::identifiers::ConnectionId;
+
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(ctx = "_endian: deku::ctx::Endian")]
@@ -14,8 +16,8 @@ pub struct Toc {
     pub plid: u8,
 
     #[deku(bytes = "1")]
-    pub olducid: u8,
+    pub olducid: ConnectionId,
 
     #[deku(bytes = "1", pad_bytes_after = "2")]
-    pub newucid: u8,
+    pub newucid: ConnectionId,
 }

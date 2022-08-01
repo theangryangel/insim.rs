@@ -4,12 +4,13 @@ pub(crate) mod player;
 
 use bounded_vec_deque::BoundedVecDeque;
 use insim::client::prelude::*;
+use insim::protocol::identifiers::ConnectionId;
 use miette::{IntoDiagnostic, Result};
 use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{mpsc, Notify};
 
-type ConnectionMap = HashMap<u8, connection::Connection>;
+type ConnectionMap = HashMap<ConnectionId, connection::Connection>;
 type PlayerMap = HashMap<u8, player::Player>;
 type ConnectionPlayerMap = HashMap<u8, u8>;
 type ChatHistory = BoundedVecDeque<chat::Chat>;

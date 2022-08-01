@@ -1,4 +1,4 @@
-use crate::vehicle::Vehicle;
+use crate::{vehicle::Vehicle, protocol::identifiers::ConnectionId};
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -10,7 +10,7 @@ use serde::Serialize;
 pub struct Slc {
     pub reqi: u8,
 
-    pub ucid: u8,
+    pub ucid: ConnectionId,
 
     pub cname: Vehicle,
 }

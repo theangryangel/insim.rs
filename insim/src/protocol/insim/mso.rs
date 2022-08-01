@@ -1,3 +1,4 @@
+use crate::protocol::identifiers::ConnectionId;
 use crate::string::CodepageString;
 use deku::ctx::Size;
 use deku::prelude::*;
@@ -40,7 +41,7 @@ pub struct Mso {
     #[deku(pad_bytes_after = "1")]
     pub reqi: u8,
 
-    pub ucid: u8,
+    pub ucid: ConnectionId,
 
     pub plid: u8,
 

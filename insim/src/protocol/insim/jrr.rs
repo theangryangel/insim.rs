@@ -1,3 +1,5 @@
+use crate::protocol::identifiers::ConnectionId;
+
 use super::ObjectInfo;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
@@ -58,7 +60,7 @@ pub struct Jrr {
 
     pub plid: u8,
 
-    pub ucid: u8,
+    pub ucid: ConnectionId,
 
     #[deku(pad_bytes_after = "2")]
     pub action: JrrAction,

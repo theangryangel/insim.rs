@@ -1,4 +1,4 @@
-use crate::string::{istring, CodepageString};
+use crate::{string::{istring, CodepageString}, protocol::identifiers::ConnectionId};
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -10,7 +10,7 @@ use serde::Serialize;
 pub struct Ncn {
     pub reqi: u8,
 
-    pub ucid: u8,
+    pub ucid: ConnectionId,
 
     /// Username.
     #[deku(

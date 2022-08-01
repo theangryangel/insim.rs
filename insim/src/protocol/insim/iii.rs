@@ -1,3 +1,4 @@
+use crate::protocol::identifiers::ConnectionId;
 use crate::string::CodepageString;
 use deku::ctx::Size;
 use deku::prelude::*;
@@ -12,7 +13,7 @@ pub struct Iii {
     #[deku(pad_bytes_after = "1")]
     pub reqi: u8,
 
-    pub ucid: u8,
+    pub ucid: ConnectionId,
 
     #[deku(pad_bytes_after = "2")]
     pub plid: u8,

@@ -1,4 +1,5 @@
 use crate::string::CodepageString;
+use crate::protocol::identifiers::ConnectionId;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -6,7 +7,7 @@ use serde::Serialize;
 /// Enum for the result field of [Acr].
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(type = "u8", endian = "little")]
+#[deku(type = "u8")]
 pub enum AcrResult {
     #[deku(id = "0")]
     None,
@@ -35,7 +36,7 @@ pub struct Acr {
     #[deku(pad_bytes_after = "1")]
     pub reqi: u8,
 
-    pub ucid: u8,
+    pub ucid: ConnectionId,
 
     pub admin: u8,
 

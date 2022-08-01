@@ -1,4 +1,5 @@
 use crate::packet_flags;
+use crate::protocol::identifiers::ConnectionId;
 use crate::string::{istring, CodepageString};
 use crate::vehicle::Vehicle;
 use deku::prelude::*;
@@ -72,7 +73,7 @@ pub struct Npl {
 
     pub plid: u8,
 
-    pub ucid: u8,
+    pub ucid: ConnectionId,
 
     pub ptype: u8,
 

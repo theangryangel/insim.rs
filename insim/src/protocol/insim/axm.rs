@@ -1,3 +1,4 @@
+use crate::protocol::identifiers::ConnectionId;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -61,7 +62,7 @@ impl Default for PmoAction {
 pub struct Axm {
     pub reqi: u8,
     pub numo: u8,
-    pub ucid: u8,
+    pub ucid: ConnectionId,
     pub action: PmoAction,
     pub flags: u8,
 

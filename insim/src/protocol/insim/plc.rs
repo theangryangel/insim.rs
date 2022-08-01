@@ -1,4 +1,4 @@
-use crate::packet_flags;
+use crate::{packet_flags, protocol::identifiers::ConnectionId};
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -37,6 +37,6 @@ pub struct Plc {
     #[deku(pad_bytes_after = "1")]
     pub reqi: u8,
     #[deku(pad_bytes_before = "3")]
-    pub ucid: u8,
+    pub ucid: ConnectionId,
     pub allowed_cars: PlcAllowedCars,
 }

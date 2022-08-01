@@ -1,4 +1,4 @@
-use crate::error::Error;
+use crate::{error::Error, protocol::identifiers::ConnectionId};
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -15,7 +15,7 @@ pub struct Mal {
 
     count: u8,
 
-    pub ucid: u8,
+    pub ucid: ConnectionId,
 
     #[deku(pad_bytes_after = "2")]
     /// Currently unused

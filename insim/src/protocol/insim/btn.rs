@@ -1,4 +1,5 @@
 use crate::string::CodepageString;
+use crate::protocol::identifiers::ConnectionId;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -34,7 +35,7 @@ impl Default for BfnType {
 pub struct Bfn {
     pub reqi: u8,
     pub subt: BfnType,
-    pub ucid: u8,
+    pub ucid: ConnectionId,
     pub clickid: u8,
     pub clickmax: u8,
     pub inst: u8,
@@ -46,7 +47,7 @@ pub struct Bfn {
 /// Button
 pub struct Btn {
     pub reqi: u8,
-    pub ucid: u8,
+    pub ucid: ConnectionId,
     pub clickid: u8,
     pub inst: u8,
     pub bstyle: u8, // FIXME: implement bit flags
@@ -67,7 +68,7 @@ pub struct Btn {
 /// Button Click - Sent back when a user clicks a button
 pub struct Btc {
     pub reqi: u8,
-    pub ucid: u8,
+    pub ucid: ConnectionId,
     pub clickid: u8,
     pub inst: u8,
     #[deku(pad_bytes_after = "1")]
@@ -80,7 +81,7 @@ pub struct Btc {
 /// Button Type - Sent back when a user types into a text entry "button"
 pub struct Btt {
     pub reqi: u8,
-    pub ucid: u8,
+    pub ucid: ConnectionId,
     pub clickid: u8,
     pub inst: u8,
 
