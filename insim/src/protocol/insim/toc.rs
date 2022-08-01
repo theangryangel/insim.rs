@@ -15,9 +15,8 @@ pub struct Toc {
     #[deku(bytes = "1")]
     pub plid: u8,
 
-    #[deku(bytes = "1")]
     pub olducid: ConnectionId,
 
-    #[deku(bytes = "1", pad_bytes_after = "2")]
+    #[deku(pad_bytes_after = "2")]
     pub newucid: ConnectionId,
 }

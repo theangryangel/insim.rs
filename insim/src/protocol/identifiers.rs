@@ -3,30 +3,24 @@ use deku::prelude::*;
 use serde::Serialize;
 use std::fmt;
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, Eq, PartialEq, Hash, DekuRead, DekuWrite, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
-pub struct ConnectionId {
-    #[deku(bytes = "1")]
-    id: u8,
-}
+#[deku(endian = "little")]
+pub struct ConnectionId(u8);
 
 impl fmt::Display for ConnectionId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.id)
+        write!(f, "{}", self.0)
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, Eq, PartialEq, Hash, DekuRead, DekuWrite, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
-pub struct PlayerId {
-    #[deku(bytes = "1")]
-    id: u8,
-}
+#[deku(endian = "little")]
+pub struct PlayerId(u8);
 
 impl fmt::Display for PlayerId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.id)
+        write!(f, "{}", self.0)
     }
 }
