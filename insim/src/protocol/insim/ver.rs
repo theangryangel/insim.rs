@@ -5,10 +5,14 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 /// Version
 pub struct Version {
-    #[deku(bytes = "1", pad_bytes_after = "1")]
+    #[deku(pad_bytes_after = "1")]
     pub reqi: u8,
 
     #[deku(
@@ -23,6 +27,6 @@ pub struct Version {
     )]
     pub product: String,
 
-    #[deku(bytes = "1", pad_bytes_after = "1")]
+    #[deku(pad_bytes_after = "1")]
     pub insimver: u8,
 }

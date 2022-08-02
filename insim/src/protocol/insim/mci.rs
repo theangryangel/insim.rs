@@ -1,4 +1,5 @@
 use crate::packet_flags;
+use crate::protocol::identifiers::PlayerId;
 use crate::protocol::position::FixedPoint;
 #[cfg(feature = "uom")]
 use crate::units;
@@ -20,6 +21,11 @@ packet_flags! {
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 /// Used within the [Mci] packet info field.
 pub struct CompCar {
     /// Index of the last "node" that the player passed through.
@@ -29,7 +35,7 @@ pub struct CompCar {
     pub lap: u16,
 
     /// The current player's ID.
-    pub plid: u8,
+    pub plid: PlayerId,
 
     /// Race position
     pub position: u8,
@@ -85,7 +91,11 @@ impl CompCar {
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 /// Multi Car Info - positional information for players/vehicles.
 /// The MCI packet does not contain the positional information for all players. Only some. The
 /// maximum number of players depends on the version of Insim.

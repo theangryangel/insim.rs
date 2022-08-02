@@ -2,10 +2,17 @@ use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use crate::protocol::identifiers::PlayerId;
+
 /// Enum for the flag field of [Flg].
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(type = "u8", endian = "little")]
+#[deku(
+    type = "u8",
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 pub enum FlgType {
     #[deku(id = "0")]
     None,
@@ -25,12 +32,16 @@ impl Default for FlgType {
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 /// Race Flag is sent when a flag is waved at a player.
 pub struct Flg {
     pub reqi: u8,
 
-    pub plid: u8,
+    pub plid: PlayerId,
 
     pub offon: u8,
 

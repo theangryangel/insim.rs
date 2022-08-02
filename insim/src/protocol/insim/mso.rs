@@ -1,4 +1,4 @@
-use crate::protocol::identifiers::ConnectionId;
+use crate::protocol::identifiers::{ConnectionId, PlayerId};
 use crate::string::CodepageString;
 use deku::ctx::Size;
 use deku::prelude::*;
@@ -8,7 +8,12 @@ use serde::Serialize;
 /// Enum for the sound field of [Mso].
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(type = "u8", endian = "little")]
+#[deku(
+    type = "u8",
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 pub enum MsoUserType {
     #[deku(id = "0")]
     /// System message.
@@ -35,7 +40,11 @@ impl Default for MsoUserType {
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 /// System messsages and user messages, variable sized.
 pub struct Mso {
     #[deku(pad_bytes_after = "1")]
@@ -43,7 +52,7 @@ pub struct Mso {
 
     pub ucid: ConnectionId,
 
-    pub plid: u8,
+    pub plid: PlayerId,
 
     /// Set if typed by a user
     pub usertype: MsoUserType,

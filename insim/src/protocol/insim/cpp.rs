@@ -2,11 +2,15 @@ use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-use crate::protocol::position::FixedPoint;
+use crate::protocol::{identifiers::PlayerId, position::FixedPoint};
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 /// Camera Position Pack reports the current camera position and state. This packet may also be
 /// sent to control the camera.
 pub struct Cpp {
@@ -21,7 +25,7 @@ pub struct Cpp {
 
     pub r: u16,
 
-    pub viewplid: u8,
+    pub viewplid: PlayerId,
 
     pub ingamecam: u8,
 

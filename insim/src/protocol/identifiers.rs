@@ -5,7 +5,11 @@ use std::fmt;
 
 #[derive(Debug, Eq, PartialEq, Hash, DekuRead, DekuWrite, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(endian = "little")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 pub struct ConnectionId(u8);
 
 impl fmt::Display for ConnectionId {
@@ -16,7 +20,11 @@ impl fmt::Display for ConnectionId {
 
 #[derive(Debug, Eq, PartialEq, Hash, DekuRead, DekuWrite, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(endian = "little")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 pub struct PlayerId(u8);
 
 impl fmt::Display for PlayerId {

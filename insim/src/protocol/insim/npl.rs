@@ -1,5 +1,5 @@
 use crate::packet_flags;
-use crate::protocol::identifiers::ConnectionId;
+use crate::protocol::identifiers::{ConnectionId, PlayerId};
 use crate::string::{istring, CodepageString};
 use crate::vehicle::Vehicle;
 use deku::prelude::*;
@@ -8,7 +8,12 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(type = "u8", endian = "little")]
+#[deku(
+    type = "u8",
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 pub enum TyreCompound {
     #[deku(id = "0")]
     R1,
@@ -66,12 +71,16 @@ packet_flags! {
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 /// Sent when a New Player joins.
 pub struct Npl {
     pub reqi: u8,
 
-    pub plid: u8,
+    pub plid: PlayerId,
 
     pub ucid: ConnectionId,
 

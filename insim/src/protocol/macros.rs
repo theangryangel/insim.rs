@@ -120,7 +120,6 @@ macro_rules! packet_flags {
                 value.write(output, ())
             }
         }
-
         impl ::deku::DekuWrite<::deku::ctx::Size> for $name {
             fn write(
                 &self,
@@ -128,6 +127,18 @@ macro_rules! packet_flags {
                 _bit_size: ::deku::ctx::Size
             ) -> Result<(), ::deku::DekuError> {
                 // FIXME: implement size limits
+                let value = self.bits();
+                value.write(output, ())
+            }
+        }
+
+        impl ::deku::DekuWrite<::deku::ctx::Endian> for $name {
+            fn write(
+                &self,
+                output: &mut ::deku::bitvec::BitVec<::deku::bitvec::Msb0, u8>,
+                _endian: ::deku::ctx::Endian
+            ) -> Result<(), ::deku::DekuError> {
+                // FIXME: implement endian
                 let value = self.bits();
                 value.write(output, ())
             }
@@ -185,5 +196,21 @@ macro_rules! packet_flags {
                 ))
             }
         }
+
+        impl ::deku::DekuRead<'_, ::deku::ctx::Endian> for $name {
+            fn read(
+                input: &::deku::bitvec::BitSlice<::deku::bitvec::Msb0, u8>,
+                endian: ::deku::ctx::Endian,
+            ) -> Result<(&::deku::bitvec::BitSlice<::deku::bitvec::Msb0, u8>, Self), ::deku::DekuError> {
+                let size = ::deku::ctx::Size::of::<$T>();
+                let (rest, value) = <$T>::read(input, (endian, size))?;
+
+                Ok((
+                    rest,
+                    $name::from_bits_truncate(value)
+                ))
+            }
+        }
+
     }
 }

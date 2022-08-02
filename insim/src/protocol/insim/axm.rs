@@ -6,7 +6,11 @@ use serde::Serialize;
 /// Used within the [Axm] packet.
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(endian = "little")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 pub struct ObjectInfo {
     pub x: i16,
     pub y: i16,
@@ -19,7 +23,12 @@ pub struct ObjectInfo {
 /// Actions that can be taken as part of [Axm].
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(type = "u8", endian = "little")]
+#[deku(
+    type = "u8",
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 pub enum PmoAction {
     #[deku(id = "0")]
     LoadingFile,
@@ -58,7 +67,11 @@ impl Default for PmoAction {
 /// AutoX Multiple Objects
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 pub struct Axm {
     pub reqi: u8,
     pub numo: u8,

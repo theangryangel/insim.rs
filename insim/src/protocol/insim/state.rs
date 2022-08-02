@@ -1,12 +1,16 @@
 use super::Wind;
-use crate::track::Track;
+use crate::{protocol::identifiers::PlayerId, track::Track};
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 /// State
 pub struct Sta {
     #[deku(pad_bytes_after = "1")]
@@ -18,7 +22,7 @@ pub struct Sta {
 
     pub ingamecam: u8,
 
-    pub viewplid: u8,
+    pub viewplid: PlayerId,
 
     pub nump: u8,
 

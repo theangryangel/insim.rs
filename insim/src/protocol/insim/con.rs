@@ -2,13 +2,19 @@ use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use crate::protocol::identifiers::PlayerId;
+
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(endian = "little")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 /// Used within [Con] packet to give a break down of information about the Contact between the two
 /// players.
 pub struct ConInfo {
-    pub plid: u8,
+    pub plid: PlayerId,
 
     #[deku(pad_bytes_after = "1")]
     pub info: u8,
@@ -38,7 +44,11 @@ pub struct ConInfo {
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 /// Contact
 pub struct Con {
     #[deku(pad_bytes_after = "1")]

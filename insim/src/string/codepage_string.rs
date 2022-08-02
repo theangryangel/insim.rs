@@ -450,6 +450,14 @@ impl DekuWrite<Size> for CodepageString {
     }
 }
 
+impl DekuWrite<Endian> for CodepageString {
+    fn write(&self, output: &mut BitVec<Msb0, u8>, _endian: Endian) -> Result<(), DekuError> {
+        // FIXME endian
+        let value = self.into_bytes();
+        value.write(output, ())
+    }
+}
+
 impl DekuWrite for CodepageString {
     fn write(&self, output: &mut BitVec<Msb0, u8>, _: ()) -> Result<(), DekuError> {
         let value = self.into_bytes();

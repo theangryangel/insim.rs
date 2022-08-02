@@ -1,4 +1,4 @@
-use crate::protocol::identifiers::ConnectionId;
+use crate::protocol::identifiers::{ConnectionId, PlayerId};
 use crate::string::CodepageString;
 use deku::ctx::Size;
 use deku::prelude::*;
@@ -7,7 +7,11 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 /// InsIm Info -  a /i message from user to hosts Insim
 pub struct Iii {
     #[deku(pad_bytes_after = "1")]
@@ -16,7 +20,7 @@ pub struct Iii {
     pub ucid: ConnectionId,
 
     #[deku(pad_bytes_after = "2")]
-    pub plid: u8,
+    pub plid: PlayerId,
 
     #[deku(reader = "CodepageString::read(deku::rest, Size::Bytes(deku::rest.len() / 8))")]
     pub msg: CodepageString,

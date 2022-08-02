@@ -19,7 +19,11 @@ use serde::Serialize;
 /// [AdminResponse] is sent back by the relay.
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 pub struct AdminRequest {
     #[deku(pad_bytes_after = "1")]
     pub reqi: u8,
@@ -29,7 +33,11 @@ pub struct AdminRequest {
 /// the selected host.
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 pub struct AdminResponse {
     /// Optional request identifier. If a request identifier was sent in the request, it will be
     /// included in any relevant response packet.
@@ -41,8 +49,12 @@ pub struct AdminResponse {
 /// Request a list of available hosts from the Insim Relay. After sending this packet the relay
 /// will respond with a HostList packet.
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
 #[cfg_attr(feature = "serde", derive(Serialize))]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 pub struct HostListRequest {
     #[deku(pad_bytes_after = "1")]
     pub reqi: u8,
@@ -65,16 +77,19 @@ packet_flags! {
 /// Information about a host. Used within the [HostList] packet.
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 pub struct HostInfo {
     #[deku(bytes = "32")]
     pub hname: CodepageString,
 
     pub track: Track,
 
-    #[deku(bytes = "1")]
     pub flags: HostInfoFlags,
 
-    #[deku(bytes = "1")]
     pub numconns: u8,
 }
 
@@ -83,7 +98,11 @@ pub struct HostInfo {
 /// determine if the host is the last in the list.
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 pub struct HostList {
     pub reqi: u8,
 
@@ -95,8 +114,12 @@ pub struct HostList {
 
 /// Send a HostSelect to the relay in order to start receiving information about the selected host.
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
 #[cfg_attr(feature = "serde", derive(Serialize))]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 pub struct HostSelect {
     #[deku(pad_bytes_after = "1")]
     pub reqi: u8,
@@ -120,7 +143,12 @@ pub struct HostSelect {
 /// Enum of possible errors  that the Insim Relay can respond with.
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(type = "u8", endian = "little")]
+#[deku(
+    type = "u8",
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 pub enum ErrorType {
     #[deku(id = "0")]
     None,
@@ -159,7 +187,11 @@ impl Default for ErrorType {
 /// The relay will send this packet when it encounters an error.
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 pub struct Error {
     pub reqi: u8,
 

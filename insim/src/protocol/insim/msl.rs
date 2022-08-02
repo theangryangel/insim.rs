@@ -6,7 +6,12 @@ use serde::Serialize;
 /// Enum for the sound field of [Msl].
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(type = "u8", endian = "little")]
+#[deku(
+    type = "u8",
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 pub enum MslSoundType {
     #[deku(id = "0")]
     Silent,
@@ -34,7 +39,11 @@ impl Default for MslSoundType {
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 /// Send a message to the local computer only. If you are connected to a server this means the
 /// console. If you are connected to a client this means to the local client only.
 pub struct Msl {

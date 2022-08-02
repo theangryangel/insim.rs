@@ -1,4 +1,5 @@
 use super::{PlayerFlags, RaceResultFlags};
+use crate::protocol::identifiers::PlayerId;
 use crate::string::{istring, CodepageString};
 use crate::vehicle::Vehicle;
 use deku::prelude::*;
@@ -7,12 +8,16 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 /// Race Result
 pub struct Res {
     pub reqi: u8,
 
-    pub plid: u8,
+    pub plid: PlayerId,
 
     #[deku(
         reader = "istring::read(deku::rest, 24)",

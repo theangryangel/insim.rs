@@ -3,15 +3,15 @@ pub(crate) mod connection;
 pub(crate) mod player;
 
 use bounded_vec_deque::BoundedVecDeque;
-use insim::client::prelude::*;
 use insim::protocol::identifiers::ConnectionId;
+use insim::{client::prelude::*, protocol::identifiers::PlayerId};
 use miette::{IntoDiagnostic, Result};
 use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{mpsc, Notify};
 
 type ConnectionMap = HashMap<ConnectionId, connection::Connection>;
-type PlayerMap = HashMap<u8, player::Player>;
+type PlayerMap = HashMap<PlayerId, player::Player>;
 type ChatHistory = BoundedVecDeque<chat::Chat>;
 
 #[derive(Debug)]
@@ -22,8 +22,8 @@ pub struct State {
     players: RwLock<PlayerMap>,
     players_notify: Arc<Notify>,
 
-    idx_player_connection: RwLock<HashMap<u8, ConnectionId>>,
-    idx_connection_player: RwLock<HashMap<ConnectionId, u8>>,
+    idx_player_connection: RwLock<HashMap<PlayerId, ConnectionId>>,
+    idx_connection_player: RwLock<HashMap<ConnectionId, PlayerId>>,
 
     chat: RwLock<ChatHistory>,
     chat_notify: Arc<Notify>,
@@ -56,7 +56,7 @@ impl State {
         self.connections_notify.clone()
     }
 
-    pub fn get_connection_player_id(&self, ucid: ConnectionId) -> Option<u8> {
+    pub fn get_connection_player_id(&self, ucid: ConnectionId) -> Option<PlayerId> {
         self.idx_connection_player.read().get(&ucid).copied()
     }
 
@@ -69,8 +69,8 @@ impl State {
     pub fn notify_on_player(&self) -> Arc<Notify> {
         self.players_notify.clone()
     }
-    pub fn get_player_connection_id(&self, ucid: u8) -> Option<ConnectionId> {
-        self.idx_player_connection.read().get(&ucid).copied()
+    pub fn get_player_connection_id(&self, plid: PlayerId) -> Option<ConnectionId> {
+        self.idx_player_connection.read().get(&plid).copied()
     }
 
     pub fn chat(

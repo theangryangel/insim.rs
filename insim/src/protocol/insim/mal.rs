@@ -8,7 +8,11 @@ const MAX_MAL_SIZE: usize = 120;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 /// Mods Allowed - restrict the mods that can be used
 pub struct Mal {
     pub reqi: u8,

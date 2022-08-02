@@ -1,4 +1,4 @@
-use crate::protocol::identifiers::ConnectionId;
+use crate::protocol::identifiers::{ConnectionId, PlayerId};
 
 use super::ObjectInfo;
 use deku::prelude::*;
@@ -7,7 +7,12 @@ use serde::Serialize;
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(type = "u8", endian = "little")]
+#[deku(
+    type = "u8",
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 /// Used within the [Jrr] packet.
 pub enum JrrAction {
     #[deku(id = "0")]
@@ -43,7 +48,11 @@ impl Default for JrrAction {
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 /// Join Request Reply
 /// Set the ISF_REQ_JOIN flag in the IS_ISI to receive join requests
 ///
@@ -58,7 +67,7 @@ impl Default for JrrAction {
 pub struct Jrr {
     pub reqi: u8,
 
-    pub plid: u8,
+    pub plid: PlayerId,
 
     pub ucid: ConnectionId,
 

@@ -1,5 +1,5 @@
 use super::{PlayerFlags, TyreCompound};
-use crate::packet_flags;
+use crate::{packet_flags, protocol::identifiers::PlayerId};
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -30,28 +30,26 @@ packet_flags! {
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 /// Pit stop (stop at the garage, not "tele-pit")
 pub struct Pit {
-    #[deku(bytes = "1")]
     pub reqi: u8,
 
-    #[deku(bytes = "1")]
-    pub plid: u8,
+    pub plid: PlayerId,
 
-    #[deku(bytes = "2")]
     pub lapsdone: u16,
 
-    #[deku(bytes = "2")]
     pub flags: PlayerFlags,
 
-    #[deku(bytes = "1")]
     pub fueladd: u8,
 
-    #[deku(bytes = "1")]
     pub penalty: u8,
 
-    #[deku(bytes = "1", pad_bytes_after = "1")]
+    #[deku(pad_bytes_after = "1")]
     pub numstops: u8,
 
     #[deku(count = "4")]
@@ -63,22 +61,29 @@ pub struct Pit {
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 /// Pit Stop Finished
 pub struct Psf {
-    #[deku(bytes = "1")]
     pub reqi: u8,
 
-    #[deku(bytes = "1")]
-    pub plid: u8,
+    pub plid: PlayerId,
 
-    #[deku(bytes = "4", pad_bytes_after = "4")]
+    #[deku(pad_bytes_after = "4")]
     pub stime: u32,
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(type = "u8", endian = "little")]
+#[deku(
+    type = "u8",
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 pub enum PitLaneFact {
     #[deku(id = "0")]
     Exit,
@@ -104,14 +109,16 @@ impl Default for PitLaneFact {
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(ctx = "_endian: deku::ctx::Endian")]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
 /// PitLane
 pub struct Pla {
-    #[deku(bytes = "1")]
     pub reqi: u8,
 
-    #[deku(bytes = "1")]
-    pub plid: u8,
+    pub plid: PlayerId,
 
     #[deku(pad_bytes_after = "3")]
     pub fact: PitLaneFact,
