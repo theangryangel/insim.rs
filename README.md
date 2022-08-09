@@ -8,12 +8,14 @@ For the foreseeable future only TCP is supported for simplicity and time.
 
 ## Documentation
 
-Until we're released please run `cargo doc --no-deps --open`
+Until we're released please run `cd insim && cargo doc --no-deps --open`
 
 ## Examples
 
-- High level "framework" api: `cargo run --example relay`
-- Low level "transport" api: `cargo run --example transport`
+- High level "framework" api: `cd insim && cargo run --example relay`
+- Low level "transport" api: `cd insim && cargo run --example transport`
+- TUI relay browser: `cd insim_relay_tui && cargo run`
+- "luaLFS", but in rust: `cd insim_lua`
 
 ## TODO
 
