@@ -3,4 +3,5 @@ members = [
   "insim",
   "insim_lua",
   "pth2svg",
+  "smx2svg",
 ]

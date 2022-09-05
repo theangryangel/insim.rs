@@ -10,9 +10,20 @@ use deku::prelude::*;
     endian = "endian"
 )]
 pub struct Rgb {
-    pub red: u8,
-    pub green: u8,
-    pub blue: u8,
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+}
+
+#[derive(Debug, DekuRead, DekuWrite)]
+#[deku(
+    ctx = "endian: deku::ctx::Endian",
+    ctx_default = "deku::ctx::Endian::Little",
+    endian = "endian"
+)]
+pub struct Argb {
+    pub a: u8,
+    pub rgb: Rgb,
 }
 
 #[derive(Debug, DekuRead, DekuWrite)]
@@ -23,7 +34,7 @@ pub struct Rgb {
 )]
 pub struct ObjectPoint {
     pub xyz: Point<i32>,
-    pub colour: i32,
+    pub colour: Argb,
 }
 
 #[derive(Debug, DekuRead, DekuWrite)]
@@ -33,8 +44,10 @@ pub struct ObjectPoint {
     endian = "endian"
 )]
 pub struct Triangle {
+    pub a: u16, // index of the objectpoint
+    pub b: u16,
     #[deku(pad_bytes_after = "2")]
-    pub abc: Point<u16>,
+    pub c: u16,
 }
 
 #[derive(Debug, DekuRead, DekuWrite)]
@@ -72,7 +85,7 @@ pub struct Smx {
     pub dimensions: u8,
     pub resolution: u8,
 
-    #[deku(pad_bytes_after = "1")]
+    #[deku(pad_bytes_after = "4")]
     pub vertex_colours: u8,
 
     #[deku(
@@ -81,7 +94,7 @@ pub struct Smx {
     )]
     pub track: String,
 
-    #[deku(pad_bytes_after = "1")]
+    #[deku(pad_bytes_after = "9")]
     pub ground_colour: Rgb,
 
     pub num_objects: i32,
