@@ -18,7 +18,7 @@ macro_rules! packet {
         use std::str::FromStr;
 
         /// Enum of all possible packet types.
-        #[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+        #[derive(Debug, DekuRead, DekuWrite, Clone)]
         #[cfg_attr(feature = "serde", derive(Serialize))]
         #[cfg_attr(feature = "serde", serde(tag = "type"))]
         #[deku(endian = "little", type = "u8")]

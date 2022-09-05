@@ -31,6 +31,7 @@ pub struct State {
     tx: mpsc::UnboundedSender<Event>,
 }
 
+#[allow(unused)]
 impl State {
     pub fn new(tx: mpsc::UnboundedSender<Event>) -> Self {
         Self {
@@ -154,7 +155,7 @@ impl State {
                 let mut players = self.players.write();
                 for info in data.info.iter() {
                     if let Some(player) = players.get_mut(&info.plid) {
-                        player.xyz = info.xyz.clone();
+                        player.xyz = info.xyz;
                         player.lap = info.lap;
                         player.position = info.position;
                         player.node = info.node;

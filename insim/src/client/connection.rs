@@ -1,5 +1,6 @@
 use super::config::Config;
 use crate::error::Error;
+use crate::protocol::identifiers::RequestId;
 use crate::protocol::{transport::Transport, Packet};
 
 use futures::{FutureExt, Sink, Stream, TryStreamExt};
@@ -10,7 +11,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::net::TcpStream;
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub enum Event {
     Handshaking,
     Connected,
@@ -33,7 +34,7 @@ impl Event {
     }
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum ConnectedState {
     Handshake,
     Handshaking,
@@ -178,7 +179,7 @@ impl Stream for Client {
                         version: crate::protocol::VERSION,
                         interval: this.config.interval_ms,
                         flags: this.config.flags,
-                        reqi: 1,
+                        reqi: RequestId(1),
                     };
 
                     if let Err(e) = transport.start_send_unpin(isi.into()) {
@@ -306,7 +307,7 @@ impl Sink<Event> for Client {
     fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
         let mut this = self.as_mut().project();
 
-        if item == Event::Shutdown {
+        if matches!(item, Event::Shutdown) {
             tracing::debug!("Fuck?");
             this.inner.set(ClientState::Shutdown);
         };

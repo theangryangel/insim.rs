@@ -14,7 +14,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::time;
 use tokio_util::codec::Framed;
 
-use super::codec::Mode;
+use super::{codec::Mode, identifiers::RequestId};
 
 const TIMEOUT_SECS: u64 = 90;
 
@@ -83,8 +83,8 @@ where
 
         let res = self.as_mut().project().inner.start_send(
             insim::Tiny {
-                reqi: 0,
                 subtype: insim::TinyType::None,
+                ..Default::default()
             }
             .into(),
         );
@@ -152,7 +152,7 @@ where
                 match v {
                     Some(Ok(frame)) => {
                         if let Packet::Tiny(insim::Tiny {
-                            reqi: 0,
+                            reqi: RequestId(0),
                             subtype: insim::TinyType::None,
                         }) = frame
                         {

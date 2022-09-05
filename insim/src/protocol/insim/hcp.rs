@@ -2,7 +2,9 @@ use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+use crate::protocol::identifiers::RequestId;
+
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Used within [Hcp] to apply handicaps to a vehicle.
 #[deku(
@@ -15,7 +17,7 @@ pub struct HcpCarHandicap {
     pub intake_restriction: u8,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -29,7 +31,7 @@ pub struct HcpCarHandicap {
 /// The info field is indexed by the vehicle. i.e. XF GTI = 0, XR GT = 1, etc.
 pub struct Hcp {
     #[deku(pad_bytes_after = "1")]
-    pub reqi: u8,
+    pub reqi: RequestId,
 
     #[deku(count = "32")]
     pub info: Vec<HcpCarHandicap>,

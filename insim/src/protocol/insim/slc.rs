@@ -1,9 +1,12 @@
-use crate::{protocol::identifiers::ConnectionId, vehicle::Vehicle};
+use crate::{
+    protocol::identifiers::{ConnectionId, RequestId},
+    vehicle::Vehicle,
+};
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -12,7 +15,7 @@ use serde::Serialize;
 )]
 /// User Selected Car
 pub struct Slc {
-    pub reqi: u8,
+    pub reqi: RequestId,
 
     pub ucid: ConnectionId,
 

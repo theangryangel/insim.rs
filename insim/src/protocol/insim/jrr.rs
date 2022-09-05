@@ -1,11 +1,11 @@
-use crate::protocol::identifiers::{ConnectionId, PlayerId};
+use crate::protocol::identifiers::{ConnectionId, PlayerId, RequestId};
 
 use super::ObjectInfo;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, DekuRead, DekuWrite, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     type = "u8",
@@ -46,7 +46,7 @@ impl Default for JrrAction {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -65,7 +65,7 @@ impl Default for JrrAction {
 /// IS_JRR can also be used to move an existing car to a different location
 /// In this case, PLID must be set, JRRAction must be JRR_RESET or higher and StartPos must be set
 pub struct Jrr {
-    pub reqi: u8,
+    pub reqi: RequestId,
 
     pub plid: PlayerId,
 

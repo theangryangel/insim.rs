@@ -86,7 +86,7 @@ pub fn to_html(input: String) -> String {
         .collect();
 
     // make sure we've got at least something in the indices
-    if indices.get(0) != Some(&0) {
+    if indices.first() != Some(&0) {
         indices.insert(0, 0);
     }
 

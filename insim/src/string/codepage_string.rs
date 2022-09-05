@@ -18,7 +18,7 @@ const CODEPAGE_MARKER: u8 = b'^';
 /// String.
 ///
 /// The struct also supports a 'builder' style interface for creating the raw bytes.
-#[derive(PartialEq, Default, Debug)]
+#[derive(PartialEq, Eq, Default, Debug)]
 pub struct CodepageString {
     pub(crate) inner: Vec<u8>,
 }
@@ -68,7 +68,7 @@ impl CodepageString {
     pub fn from_string(value: String) -> CodepageString {
         let (output, _encoding, _had_errors) = encoding_rs::WINDOWS_1252.encode(&value);
         CodepageString {
-            inner: escape(&output.to_vec()),
+            inner: escape(&output),
         }
     }
 
@@ -92,7 +92,7 @@ impl CodepageString {
             .collect();
 
         // make sure we've got at least something in the indices
-        if indices.get(0) != Some(&0) {
+        if indices.first() != Some(&0) {
             indices.insert(0, 0);
         }
 

@@ -2,9 +2,9 @@ use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-use crate::protocol::identifiers::ConnectionId;
+use crate::protocol::identifiers::{ConnectionId, RequestId};
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -14,7 +14,7 @@ use crate::protocol::identifiers::ConnectionId;
 /// Vote Notification
 pub struct Vtn {
     #[deku(pad_bytes_after = "1")]
-    pub reqi: u8,
+    pub reqi: RequestId,
 
     pub ucid: ConnectionId,
 

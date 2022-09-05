@@ -1,5 +1,8 @@
 use super::{PlayerFlags, TyreCompound};
-use crate::{packet_flags, protocol::identifiers::PlayerId};
+use crate::{
+    packet_flags,
+    protocol::identifiers::{PlayerId, RequestId},
+};
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -28,7 +31,7 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -37,7 +40,7 @@ packet_flags! {
 )]
 /// Pit stop (stop at the garage, not "tele-pit")
 pub struct Pit {
-    pub reqi: u8,
+    pub reqi: RequestId,
 
     pub plid: PlayerId,
 
@@ -59,7 +62,7 @@ pub struct Pit {
     pub work: u32,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -68,7 +71,7 @@ pub struct Pit {
 )]
 /// Pit Stop Finished
 pub struct Psf {
-    pub reqi: u8,
+    pub reqi: RequestId,
 
     pub plid: PlayerId,
 
@@ -76,7 +79,7 @@ pub struct Psf {
     pub stime: u32,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, Eq, DekuRead, DekuWrite, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     type = "u8",
@@ -107,7 +110,7 @@ impl Default for PitLaneFact {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -116,7 +119,7 @@ impl Default for PitLaneFact {
 )]
 /// PitLane
 pub struct Pla {
-    pub reqi: u8,
+    pub reqi: RequestId,
 
     pub plid: PlayerId,
 

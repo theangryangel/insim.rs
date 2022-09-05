@@ -1,4 +1,7 @@
-use crate::{error::Error, protocol::identifiers::ConnectionId};
+use crate::{
+    error::Error,
+    protocol::identifiers::{ConnectionId, RequestId},
+};
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -6,7 +9,7 @@ use std::default::Default;
 
 const MAX_MAL_SIZE: usize = 120;
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -15,7 +18,7 @@ const MAX_MAL_SIZE: usize = 120;
 )]
 /// Mods Allowed - restrict the mods that can be used
 pub struct Mal {
-    pub reqi: u8,
+    pub reqi: RequestId,
 
     count: u8,
 

@@ -1,6 +1,6 @@
 use crate::packet_flags;
-use crate::protocol::identifiers::PlayerId;
-use crate::protocol::position::FixedPoint;
+use crate::protocol::identifiers::{PlayerId, RequestId};
+use crate::protocol::position::Point;
 #[cfg(feature = "uom")]
 use crate::units;
 use deku::prelude::*;
@@ -19,7 +19,7 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -44,7 +44,7 @@ pub struct CompCar {
     pub info: CompCarInfo,
 
     /// Positional information for the player, in game units.
-    pub xyz: FixedPoint,
+    pub xyz: Point<i32>,
 
     /// Speed in game world units (32768 = 100 m/s)
     /// You may use the speed_uom function to convert this to real world units if the uom feature
@@ -89,7 +89,7 @@ impl CompCar {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -100,7 +100,7 @@ impl CompCar {
 /// The MCI packet does not contain the positional information for all players. Only some. The
 /// maximum number of players depends on the version of Insim.
 pub struct Mci {
-    pub reqi: u8,
+    pub reqi: RequestId,
 
     pub numc: u8,
 

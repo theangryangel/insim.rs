@@ -1,12 +1,12 @@
 use crate::packet_flags;
-use crate::protocol::identifiers::{ConnectionId, PlayerId};
+use crate::protocol::identifiers::{ConnectionId, PlayerId, RequestId};
 use crate::string::{istring, CodepageString};
 use crate::vehicle::Vehicle;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, DekuRead, DekuWrite, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     type = "u8",
@@ -69,7 +69,7 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -78,7 +78,7 @@ packet_flags! {
 )]
 /// Sent when a New Player joins.
 pub struct Npl {
-    pub reqi: u8,
+    pub reqi: RequestId,
 
     pub plid: PlayerId,
 

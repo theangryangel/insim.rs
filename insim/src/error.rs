@@ -7,7 +7,7 @@ use thiserror::Error as ThisError;
 
 // FIXME - we should probably drop the derive clone here?
 
-#[derive(ThisError, Diagnostic, Debug, Clone, PartialEq)]
+#[derive(ThisError, Diagnostic, Debug, Clone)]
 pub enum Error {
     #[error("Unimplemented command or action")]
     Unimplemented,

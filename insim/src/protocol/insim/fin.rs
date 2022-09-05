@@ -1,5 +1,8 @@
 use super::PlayerFlags;
-use crate::{packet_flags, protocol::identifiers::PlayerId};
+use crate::{
+    packet_flags,
+    protocol::identifiers::{PlayerId, RequestId},
+};
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -31,7 +34,7 @@ impl RaceResultFlags {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -40,7 +43,7 @@ impl RaceResultFlags {
 )]
 /// Provisional finish notification: This is not a final result, you should use the [Res](super::Res) packet for this instead.
 pub struct Fin {
-    pub reqi: u8,
+    pub reqi: RequestId,
 
     pub plid: PlayerId,
 

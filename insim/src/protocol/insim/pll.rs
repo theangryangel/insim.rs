@@ -2,9 +2,9 @@ use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-use crate::protocol::identifiers::PlayerId;
+use crate::protocol::identifiers::{PlayerId, RequestId};
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -13,7 +13,7 @@ use crate::protocol::identifiers::PlayerId;
 )]
 /// Player Leaves race
 pub struct Pll {
-    pub reqi: u8,
+    pub reqi: RequestId,
 
     pub plid: PlayerId,
 }

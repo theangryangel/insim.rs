@@ -1,10 +1,10 @@
-use crate::protocol::identifiers::ConnectionId;
+use crate::protocol::identifiers::{ConnectionId, RequestId};
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 /// Used within the [Axm] packet.
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -21,7 +21,7 @@ pub struct ObjectInfo {
 }
 
 /// Actions that can be taken as part of [Axm].
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, DekuRead, DekuWrite, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     type = "u8",
@@ -65,7 +65,7 @@ impl Default for PmoAction {
 }
 
 /// AutoX Multiple Objects
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -73,7 +73,7 @@ impl Default for PmoAction {
     endian = "endian"
 )]
 pub struct Axm {
-    pub reqi: u8,
+    pub reqi: RequestId,
     pub numo: u8,
     pub ucid: ConnectionId,
     pub action: PmoAction,

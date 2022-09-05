@@ -69,7 +69,7 @@ pub fn lookup(input: &[u8]) -> Option<&TrackInfo> {
 }
 
 /// Handles parsing a Track name.
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, PartialEq, Eq, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",

@@ -1,4 +1,7 @@
-use crate::{packet_flags, protocol::identifiers::ConnectionId};
+use crate::{
+    packet_flags,
+    protocol::identifiers::{ConnectionId, RequestId},
+};
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -29,7 +32,7 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -39,7 +42,7 @@ packet_flags! {
 /// Player Cars
 pub struct Plc {
     #[deku(pad_bytes_after = "1")]
-    pub reqi: u8,
+    pub reqi: RequestId,
     #[deku(pad_bytes_before = "3")]
     pub ucid: ConnectionId,
     pub allowed_cars: PlcAllowedCars,

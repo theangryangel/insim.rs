@@ -2,7 +2,9 @@ use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+use crate::protocol::identifiers::RequestId;
+
+#[derive(Debug, DekuRead, DekuWrite, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     type = "u8",
@@ -48,7 +50,7 @@ impl Default for SmallType {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -57,7 +59,7 @@ impl Default for SmallType {
 )]
 /// General purpose Small packet
 pub struct Small {
-    pub reqi: u8,
+    pub reqi: RequestId,
 
     pub subtype: SmallType,
 

@@ -7,10 +7,10 @@ server "test" {
   }
 }
 
-server "test2" {
-  hostname "[MRc] Beginner BMW"
-  relay
-
-  scripts {
-  }
-}
+/* server "test2" { */
+/*   hostname "[MRc] Beginner BMW" */
+/*   relay */
+/**/
+/*   scripts { */
+/*   } */
+/* } */

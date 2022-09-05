@@ -2,9 +2,9 @@ use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-use crate::protocol::identifiers::ConnectionId;
+use crate::protocol::identifiers::{ConnectionId, RequestId};
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, DekuRead, DekuWrite, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     type = "u8",
@@ -95,7 +95,7 @@ impl Default for ILanguage {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -105,7 +105,7 @@ impl Default for ILanguage {
 /// Extra information about the new connection. This is only sent when connected to a game server,
 /// and only if an administrative password has been set and used by Insim.
 pub struct Nci {
-    pub reqi: u8,
+    pub reqi: RequestId,
 
     pub ucid: ConnectionId,
 

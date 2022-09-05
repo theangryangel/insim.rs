@@ -1,10 +1,10 @@
-use crate::protocol::identifiers::ConnectionId;
+use crate::protocol::identifiers::{ConnectionId, RequestId};
 use crate::string::CodepageString;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, DekuRead, DekuWrite, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     type = "u8",
@@ -33,7 +33,7 @@ impl Default for BfnType {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -42,7 +42,7 @@ impl Default for BfnType {
 )]
 /// Button Function
 pub struct Bfn {
-    pub reqi: u8,
+    pub reqi: RequestId,
     pub subt: BfnType,
     pub ucid: ConnectionId,
     pub clickid: u8,
@@ -50,7 +50,7 @@ pub struct Bfn {
     pub inst: u8,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -59,7 +59,7 @@ pub struct Bfn {
 )]
 /// Button
 pub struct Btn {
-    pub reqi: u8,
+    pub reqi: RequestId,
     pub ucid: ConnectionId,
     pub clickid: u8,
     pub inst: u8,
@@ -75,7 +75,7 @@ pub struct Btn {
     pub text: CodepageString, // FIXME: this should be upto 240 characters and always a multiple of 4
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -84,7 +84,7 @@ pub struct Btn {
 )]
 /// Button Click - Sent back when a user clicks a button
 pub struct Btc {
-    pub reqi: u8,
+    pub reqi: RequestId,
     pub ucid: ConnectionId,
     pub clickid: u8,
     pub inst: u8,
@@ -92,7 +92,7 @@ pub struct Btc {
     pub cflags: u8,
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -101,7 +101,7 @@ pub struct Btc {
 )]
 /// Button Type - Sent back when a user types into a text entry "button"
 pub struct Btt {
-    pub reqi: u8,
+    pub reqi: RequestId,
     pub ucid: ConnectionId,
     pub clickid: u8,
     pub inst: u8,

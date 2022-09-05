@@ -1,4 +1,5 @@
 use crate::packet_flags;
+use crate::protocol::identifiers::RequestId;
 use crate::string::istring;
 use deku::prelude::*;
 #[cfg(feature = "serde")]
@@ -23,7 +24,7 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -36,7 +37,7 @@ pub struct Init {
     /// When set to a non-zero value the server will send a [Version](super::Version) packet in response.
     ///packet in response.
     #[deku(pad_bytes_after = "1")]
-    pub reqi: u8,
+    pub reqi: RequestId,
 
     // we do not support this feature, using pad_bytes_before
     // on flags to mask it.

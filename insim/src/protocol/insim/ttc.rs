@@ -2,9 +2,9 @@ use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-use crate::protocol::identifiers::ConnectionId;
+use crate::protocol::identifiers::{ConnectionId, RequestId};
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, DekuRead, DekuWrite, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     type = "u8",
@@ -32,7 +32,7 @@ impl Default for TtcType {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -41,7 +41,7 @@ impl Default for TtcType {
 )]
 /// General purpose Target To Connection packet
 pub struct Ttc {
-    pub reqi: u8,
+    pub reqi: RequestId,
 
     pub subtype: TtcType,
 

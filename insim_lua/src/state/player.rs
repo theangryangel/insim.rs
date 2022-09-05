@@ -1,11 +1,11 @@
-use insim::protocol::position::FixedPoint;
+use insim::protocol::position::Point;
 
 #[derive(Debug, Default)]
 pub struct Player {
     pub pname: String,
     pub plate: String,
 
-    pub xyz: FixedPoint,
+    pub xyz: Point<i32>,
 
     pub in_pitlane: bool,
 

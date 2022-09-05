@@ -1,4 +1,7 @@
-use crate::{packet_flags, protocol::identifiers::PlayerId};
+use crate::{
+    packet_flags,
+    protocol::identifiers::{PlayerId, RequestId},
+};
 use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -16,7 +19,7 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, DekuRead, DekuWrite, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     type = "u8",
@@ -60,7 +63,7 @@ impl Default for PenaltyReason {
     }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -69,7 +72,7 @@ impl Default for PenaltyReason {
 )]
 /// Penalty
 pub struct Pen {
-    pub reqi: u8,
+    pub reqi: RequestId,
 
     pub plid: PlayerId,
 
