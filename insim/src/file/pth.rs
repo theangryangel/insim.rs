@@ -1,3 +1,8 @@
+use std::fs;
+use std::io::Read;
+use std::path::PathBuf;
+
+use crate::error;
 use crate::protocol::position::Point;
 use deku::prelude::*;
 
@@ -93,4 +98,24 @@ pub struct Pth {
 
     #[deku(count = "num_nodes")]
     pub nodes: Vec<Node>,
+}
+
+impl Pth {
+    pub fn from_file(i: &PathBuf) -> Result<Self, error::Error> {
+        if !i.exists() {
+            return Err(error::Error::IO {
+                kind: std::io::ErrorKind::NotFound,
+                message: format!("Path {:?} does not exist", i),
+            });
+        }
+
+        let mut input = fs::File::open(i).map_err(error::Error::from)?;
+
+        let mut buffer = Vec::new();
+        input.read_to_end(&mut buffer).map_err(error::Error::from)?;
+
+        let pth = Pth::try_from(buffer.as_ref()).map_err(error::Error::from)?;
+
+        Ok(pth)
+    }
 }
