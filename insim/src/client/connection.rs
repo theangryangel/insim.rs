@@ -155,11 +155,14 @@ impl Stream for Client {
                     cx.waker().wake_by_ref();
                     Poll::Ready(Some(Event::Error(e.into())))
                 }
-                Poll::Ready(Err(_)) => {
+                Poll::Ready(Err(e)) => {
                     // connection timed out
                     self.project().inner.set(ClientState::Disconnected);
                     cx.waker().wake_by_ref();
-                    Poll::Ready(Some(Event::Error(Error::Timeout)))
+                    Poll::Ready(Some(Event::Error(Error::IO {
+                        kind: std::io::ErrorKind::TimedOut,
+                        message: format!("Initial connection timeout: {}", e),
+                    })))
                 }
                 Poll::Pending => Poll::Pending,
             },
@@ -215,12 +218,13 @@ impl Stream for Client {
                 }
                 ConnectedState::Handshaking => match transport.try_poll_next_unpin(cx) {
                     Poll::Ready(Some(packet)) => {
-                        if let Ok(Packet::RelayError(crate::protocol::relay::Error {
-                            err, ..
+                        if let Ok(Packet::RelayError(crate::protocol::relay::RelayError {
+                            err,
+                            ..
                         })) = packet
                         {
                             self.project().inner.set(ClientState::Disconnected);
-                            return Poll::Ready(Some(Event::Error(Error::RelayError(err))));
+                            return Poll::Ready(Some(Event::Error(Error::Relay(err))));
                         }
 
                         match (packet, this.config.verify_version) {
@@ -231,7 +235,7 @@ impl Stream for Client {
                                 }) => {
                                     if insimver != crate::protocol::VERSION {
                                         return Poll::Ready(Some(Event::Error(
-                                            Error::IncompatibleVersion,
+                                            Error::IncompatibleVersion(insimver),
                                         )));
                                     }
 

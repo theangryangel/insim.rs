@@ -1,12 +1,14 @@
 //! Error types for the library.
 
-use crate::protocol::relay::ErrorType as RelayErrorType;
+use crate::protocol::relay::{RelayError, RelayErrorKind};
+use deku::DekuError;
 use miette::Diagnostic;
 use std::io::ErrorKind;
 use thiserror::Error as ThisError;
 
 // FIXME - we should probably drop the derive clone here?
 
+#[non_exhaustive]
 #[derive(ThisError, Diagnostic, Debug, Clone)]
 pub enum Error {
     #[error("Unimplemented command or action")]
@@ -18,26 +20,20 @@ pub enum Error {
     #[error("Disconnected")]
     Disconnected,
 
-    #[error("Timeout when communicating with the Insim server")]
-    Timeout,
-
     #[error("Maximum number of retries reached")]
     MaxConnectionAttempts,
 
-    #[error("Unsupported Insim version")]
-    IncompatibleVersion,
+    #[error("Unsupported Insim version: received {0:?}")]
+    IncompatibleVersion(u8),
 
-    #[error("IO error occurred")]
+    #[error("IO error occurred: {kind}: {message}")]
     IO { kind: ErrorKind, message: String },
 
-    #[error("Input is too large")]
-    TooLarge,
+    #[error("Insim Relay error: {0:?}")]
+    Relay(RelayErrorKind),
 
-    #[error("Insim Relay error")]
-    RelayError(RelayErrorType),
-
-    #[error("Failed to decode packet")]
-    DecodingError { message: String },
+    #[error("Failed to decode packet: {0:?}")]
+    Decoding(#[from] DekuError),
 }
 
 impl From<std::io::Error> for Error {
@@ -49,10 +45,8 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<deku::error::DekuError> for Error {
-    fn from(e: deku::error::DekuError) -> Self {
-        Error::DecodingError {
-            message: e.to_string(),
-        }
+impl From<RelayError> for Error {
+    fn from(e: RelayError) -> Self {
+        Error::Relay(e.err)
     }
 }

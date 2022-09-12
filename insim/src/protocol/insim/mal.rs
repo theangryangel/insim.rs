@@ -42,7 +42,11 @@ impl Mal {
     /// and update the count.
     pub fn push(&mut self, mod_id: u32) -> Result<(), Error> {
         if (self.count as usize) >= MAX_MAL_SIZE {
-            return Err(Error::TooLarge);
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "MAL packet count exceeds MAX_MAL_SIZE",
+            )
+            .into());
         }
 
         self.allowed_mods.push(mod_id);
