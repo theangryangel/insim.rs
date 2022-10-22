@@ -1,7 +1,7 @@
 [workspace]
 members = [
   "insim",
-  "insim_lua",
+  "patina",
   "pth2svg",
   "smx2svg",
 ]

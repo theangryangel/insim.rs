@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>2d</title>
+    <style>
+      #main {
+        border: 1px solid red;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="main" width="1024" height="1024"></canvas>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"
+      integrity="sha256-eVNjHw5UeU0jUqPPpZHAkU1z4U+QFBBY488WvueTm88="
+      crossorigin="anonymous"
+    ></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js"></script>
+
+    <script>
+      class WebGLMap {
+        constructor(element) {
+          this.players = [];
+          this.polygon = [];
+
+          this.canvas = element;
+          this.ctx = this.canvas.getContext("2d");
+
+          this.cameraOffset = {
+            x: window.innerWidth / 2,
+            y: window.innerHeight / 2,
+          };
+
+          // TODO make options dict
+          this.cameraZoom = 1;
+          this.MAX_ZOOM = 100;
+          this.MIN_ZOOM = 0.1;
+          this.SCROLL_SENSITIVITY = 0.0005;
+
+          this.isDragging = false;
+          this.dragStart = { x: 0, y: 0 };
+
+          this.initialPinchDistance = null;
+          this.lastZoom = this.cameraZoom;
+
+          this.fps = 60;
+
+          this.fetchGeometry("FE");
+
+          this.canvas.addEventListener("mousedown", (e) =>
+            this.onPointerDown(e)
+          );
+          this.canvas.addEventListener("touchstart", (e) =>
+            this.handleTouch(e, this.onPointerDown)
+          );
+          this.canvas.addEventListener("mouseup", (e) => this.onPointerUp(e));
+          this.canvas.addEventListener("touchend", (e) =>
+            this.handleTouch(e, this.onPointerUp)
+          );
+          this.canvas.addEventListener("mousemove", (e) =>
+            this.onPointerMove(e)
+          );
+          this.canvas.addEventListener("touchmove", (e) =>
+            this.handleTouch(e, this.onPointerMove)
+          );
+          this.canvas.addEventListener("wheel", (e) =>
+            this.adjustZoom(e.deltaY * this.SCROLL_SENSITIVITY)
+          );
+
+          this.draw();
+        }
+
+        fetchGeometry(track) {
+          fetch(`/${track}.json`)
+            .then((response) => response.json())
+            .then((data) => {
+              this.polygon = data.features;
+            })
+            .then(() => {
+              this.players.push({
+                rgba: (100, 100, 255, 1),
+                position:
+                  this.polygon[this.polygon.length - 1].geometry
+                    .coordinates[0][1],
+              });
+            });
+        }
+
+        drawPoly(coordinates, fill) {
+          this.ctx.beginPath();
+          this.ctx.fillStyle = fill;
+
+          for (let i = 0; i < coordinates.length; i++) {
+            let [y, x] = coordinates[i];
+
+            if (i == 0) {
+              this.ctx.moveTo(x, y);
+            } else {
+              this.ctx.lineTo(x, y);
+            }
+          }
+
+          this.ctx.closePath();
+          this.ctx.fill();
+        }
+
+        drawPlayer(i) {
+          const size = 50;
+
+          const duration = 1000;
+          const t = (performance.now() % duration) / duration;
+
+          const radius = (size / 2) * 0.3;
+          const outerRadius = (size / 2) * 0.7 * t + radius;
+
+          // Draw the outer circle.
+          this.ctx.beginPath();
+          this.ctx.arc(
+            i.position[1],
+            i.position[0],
+            outerRadius,
+            0,
+            Math.PI * 2
+          );
+          this.ctx.fillStyle = `rgba(100, 100, 255, ${1 - t})`;
+          this.ctx.fill();
+
+          // Draw the inner circle.
+          this.ctx.beginPath();
+          this.ctx.arc(i.position[1], i.position[0], radius, 0, Math.PI * 2);
+          (this.ctx.fillStyle = `rgba(${i.rgba[0]}, ${i.rgba[1]}, ${i.rgba[2]}, ${i.rgba[3]})`),
+            (this.ctx.strokeStyle = "white");
+          this.ctx.lineWidth = 2 + 4 * (1 - t);
+          this.ctx.fill();
+          this.ctx.stroke();
+        }
+
+        drawTrack() {
+          for (const i of this.polygon) {
+            let fill = "#3D9970";
+            if (i.id == "track") {
+              fill = "#111111";
+            }
+            this.drawPoly(i.geometry.coordinates[0], fill);
+          }
+        }
+
+        draw() {
+          this.canvas.width = window.innerWidth;
+          this.canvas.height = window.innerHeight;
+
+          // Translate to the canvas centre before zooming - so you'll always zoom on what you're looking directly at
+          this.ctx.translate(window.innerWidth / 2, window.innerHeight / 2);
+          this.ctx.scale(this.cameraZoom, this.cameraZoom);
+          this.ctx.translate(
+            -window.innerWidth / 2 + this.cameraOffset.x,
+            -window.innerHeight / 2 + this.cameraOffset.y
+          );
+          this.ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+          //ctx.fillStyle = "#991111"
+
+          this.drawTrack();
+
+          for (const i of this.players) {
+            this.drawPlayer(i);
+          }
+
+          setTimeout(() => {
+            requestAnimationFrame(() => {
+              this.draw();
+            });
+          }, 1000 / this.fps);
+        }
+
+        // Gets the relevant location from a mouse or single touch event
+        getEventLocation(e) {
+          if (e.touches && e.touches.length == 1) {
+            return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+          } else if (e.clientX && e.clientY) {
+            return { x: e.clientX, y: e.clientY };
+          }
+        }
+
+        onPointerDown(e) {
+          this.isDragging = true;
+          this.dragStart.x =
+            this.getEventLocation(e).x / this.cameraZoom - this.cameraOffset.x;
+          this.dragStart.y =
+            this.getEventLocation(e).y / this.cameraZoom - this.cameraOffset.y;
+        }
+
+        onPointerUp(e) {
+          this.isDragging = false;
+          this.initialPinchDistance = null;
+          this.lastZoom = this.cameraZoom;
+        }
+
+        onPointerMove(e) {
+          if (this.isDragging) {
+            this.cameraOffset.x =
+              this.getEventLocation(e).x / this.cameraZoom - this.dragStart.x;
+            this.cameraOffset.y =
+              this.getEventLocation(e).y / this.cameraZoom - this.dragStart.y;
+          }
+        }
+
+        handleTouch(e, singleTouchHandler) {
+          if (e.touches.length == 1) {
+            this.singleTouchHandler(e);
+          } else if (e.type == "touchmove" && e.touches.length == 2) {
+            this.isDragging = false;
+            this.handlePinch(e);
+          }
+        }
+
+        handlePinch(e) {
+          e.preventDefault();
+
+          let touch1 = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+          let touch2 = { x: e.touches[1].clientX, y: e.touches[1].clientY };
+
+          // This is distance squared, but no need for an expensive sqrt as it's only used in ratio
+          let currentDistance =
+            (touch1.x - touch2.x) ** 2 + (touch1.y - touch2.y) ** 2;
+
+          if (this.initialPinchDistance == null) {
+            this.initialPinchDistance = currentDistance;
+          } else {
+            this.adjustZoom(null, currentDistance / this.initialPinchDistance);
+          }
+        }
+
+        adjustZoom(zoomAmount, zoomFactor) {
+          if (!this.isDragging) {
+            if (zoomAmount) {
+              this.cameraZoom += zoomAmount;
+            } else if (zoomFactor) {
+              console.log(zoomFactor);
+              this.cameraZoom = zoomFactor * this.lastZoom;
+            }
+
+            this.cameraZoom = Math.min(this.cameraZoom, this.MAX_ZOOM);
+            this.cameraZoom = Math.max(this.cameraZoom, this.MIN_ZOOM);
+          }
+        }
+      }
+
+      const map = new WebGLMap(document.getElementById("main"));
+    </script>
+  </body>
+</html>

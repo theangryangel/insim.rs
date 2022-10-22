@@ -1,11 +1,10 @@
 [package]
-name = "insim_lua"
+name = "patina"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 insim = { path = "../insim", features = ["serde", "client"] }
-mlua = { git = "https://github.com/khvzak/mlua", tag = "v0.8.0-beta.5", features = ["luau", "vendored", "serialize", "send"] }
 clap = { version = "3.1.8", features = ["derive"] }
 tokio = { version = "1.11.0", features = ["full", "tracing"] }
 convert_case = "0.5.0"
@@ -22,7 +21,5 @@ parking_lot = "0.12"
 
 axum = { version = "0.5", features = ["ws"] }
 tower = "0.4"
-dioxus = { version = "0.2.4", features = ["liveview", "router"] }
-dioxus-html = { features = ["serialize"], version = "0.2.1" }
-dioxus-core = { features = ["serialize"], version = "0.2.1" }
-dioxus-liveview = { version = "0.1.0", features = ["axum"] }
+minijinja = { version = "0.23.0", features = ["source"] }
+minijinja-autoreload = "0.23.0"

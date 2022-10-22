@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use std::path;
 
 mod config;
-mod script;
 mod state;
 mod task;
 mod web;
@@ -46,10 +45,9 @@ pub async fn main() -> Result<()> {
 
     for server in config.servers.iter() {
         // TODO lets be more specific about what we want to do here
-        let (insim_future, lua_future, state) = task::spawn(server)?;
+        let (insim_future, state) = task::spawn(server)?;
 
         fut.push(insim_future);
-        fut.push(lua_future);
 
         tasks.insert(server.name.clone(), state);
     }

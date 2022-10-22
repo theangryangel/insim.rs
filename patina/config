@@ -1,10 +1,6 @@
 server "test" {
   hostname "Nubbins AU Demo"
   relay
-
-  scripts {
-    //path "hello_world.lua"
-  }
 }
 
 /* server "test2" { */

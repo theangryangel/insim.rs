@@ -70,9 +70,8 @@ pub(crate) struct Server {
 
     #[knuffel(child, unwrap(argument))]
     pub(crate) interval: Option<u16>,
-
-    #[knuffel(child, unwrap(children(name = "path")))]
-    pub(crate) scripts: Vec<Script>,
+    //#[knuffel(child, unwrap(children(name = "path")))]
+    //pub(crate) scripts: Vec<Script>,
 }
 
 impl Server {

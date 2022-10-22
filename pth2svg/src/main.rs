@@ -1,4 +1,7 @@
 use clap::Parser;
+use geojson::{
+    feature::Id, Feature, FeatureCollection, GeoJson, Geometry, JsonObject, JsonValue, Value,
+};
 use insim::file::pth::Pth;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use std::path;
@@ -42,6 +45,12 @@ fn main() -> Result<()> {
         err.into_diagnostic()
             .wrap_err(format!("Output path already exists {:?}", &args.output))?;
     }
+
+    let mut collection = FeatureCollection {
+        bbox: None,
+        features: vec![],
+        foreign_members: None,
+    };
 
     let mut document = svg::Document::new();
 
@@ -98,6 +107,22 @@ fn main() -> Result<()> {
             );
 
         document = document.add(poly);
+
+        let geometry = Geometry::new(Value::Polygon(vec![fwd
+            .iter()
+            .map(|i| vec![i.1 as f64, i.0 as f64])
+            .collect::<Vec<Vec<f64>>>()]));
+
+        let geojson = Feature {
+            bbox: None,
+            geometry: Some(geometry),
+            id: Some(Id::String("limit".into())),
+            // See the next section about Feature properties
+            properties: None,
+            foreign_members: None,
+        };
+
+        collection.features.push(geojson);
     }
 
     // draw all the roads next
@@ -123,6 +148,22 @@ fn main() -> Result<()> {
         let poly = svg::node::element::Polygon::new()
             .set("style", format!("fill: {}", args.track_colour))
             .set("points", points);
+
+        let geometry = Geometry::new(Value::Polygon(vec![fwd
+            .iter()
+            .map(|i| vec![i.1 as f64, i.0 as f64])
+            .collect::<Vec<Vec<f64>>>()]));
+
+        let geojson = Feature {
+            bbox: None,
+            geometry: Some(geometry),
+            id: Some(Id::String("track".into())),
+            // See the next section about Feature properties
+            properties: None,
+            foreign_members: None,
+        };
+
+        collection.features.push(geojson);
 
         document = document.add(poly);
     }
@@ -168,6 +209,11 @@ fn main() -> Result<()> {
     svg::save(&args.output, &document)
         .into_diagnostic()
         .wrap_err(format!("Could not save output SVG to '{:?}'", &args.output))?;
+
+    let mut json = args.output.clone();
+    json.set_extension("json");
+
+    std::fs::write(json, GeoJson::from(collection).to_string()).into_diagnostic()?;
 
     Ok(())
 }
