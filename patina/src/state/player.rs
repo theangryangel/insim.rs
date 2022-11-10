@@ -1,7 +1,7 @@
 use insim::protocol::position::Point;
 use serde::Serialize;
 
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct Player {
     pub pname: String,
     pub plate: String,

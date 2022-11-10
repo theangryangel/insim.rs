@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+{% block body %}
+<h1>{{ name }}!!</h1>
+
+<div hx-ext="sse" sse-connect="/s/{{ name }}/live" sse-swap="message">
+
+  {% include "servers_info.html" %}
+
+
+</div>
+
+{% endblock %}
