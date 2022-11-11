@@ -46,11 +46,7 @@ pub fn write(output: &mut BitVec<Msb0, u8>, field: &str, bytes: usize) -> Result
         max_size
     };
 
-    let res = (&input[0..input_size]).write(output, ());
-    if let Err(e) = res {
-        return Err(e);
-    }
-
+    (&input[0..input_size]).write(output, ())?;
     if input_size != max_size {
         output.resize(orig_size + size.bit_size(), false);
     }

@@ -412,10 +412,7 @@ impl DekuWrite<(Endian, Size)> for CodepageString {
             max_size
         };
 
-        let res = (&self.into_bytes()[0..input_size]).write(output, ());
-        if let Err(e) = res {
-            return Err(e);
-        }
+        (&self.into_bytes()[0..input_size]).write(output, ())?;
         if input_size != max_size {
             output.resize(orig_size + bit_size.bit_size(), false);
         }
@@ -438,10 +435,8 @@ impl DekuWrite<Size> for CodepageString {
             max_size
         };
 
-        let res = (&self.into_bytes()[0..input_size]).write(output, ());
-        if let Err(e) = res {
-            return Err(e);
-        }
+        (&self.into_bytes()[0..input_size]).write(output, ())?;
+
         if input_size != max_size {
             output.resize(orig_size + bit_size.bit_size(), false);
         }

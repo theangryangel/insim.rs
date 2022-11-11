@@ -1,15 +1,10 @@
 <table>
-
-  {% for key, player in players|items %}
+  {% for player in players %}
   <tr>
-    <td>
-      {{ player }}
-      </td>
+    <td>{{ player }}</td>
   </tr>
 
-    {% endfor %}
-
-
+  {% endfor %}
 </table>
 
 {{ connections }}

@@ -10,7 +10,7 @@ pub(crate) type Task = (JoinHandle<Result<()>>, Arc<crate::state::State>);
 pub(crate) fn spawn(server: &Server) -> Result<Task> {
     let (insim_tx, mut insim_rx) = mpsc::unbounded_channel::<Event>();
 
-    let state = Arc::new(crate::state::State::new(insim_tx.clone()));
+    let state = Arc::new(crate::state::State::new(insim_tx));
 
     let conf = server.as_insim_config().into_diagnostic()?;
 

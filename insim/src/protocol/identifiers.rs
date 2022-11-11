@@ -4,7 +4,9 @@ use serde::Serialize;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
-#[derive(Debug, PartialEq, Eq, Hash, DekuRead, DekuWrite, Clone, Copy, Default)]
+#[derive(
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, DekuRead, DekuWrite, Clone, Copy, Default,
+)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -19,7 +21,9 @@ impl fmt::Display for ConnectionId {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, DekuRead, DekuWrite, Clone, Copy, Default)]
+#[derive(
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, DekuRead, DekuWrite, Clone, Copy, Default,
+)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -34,7 +38,9 @@ impl fmt::Display for PlayerId {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, DekuRead, DekuWrite, Clone, Copy, Default)]
+#[derive(
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, DekuRead, DekuWrite, Clone, Copy, Default,
+)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",

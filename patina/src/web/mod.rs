@@ -1,27 +1,29 @@
-use crate::state::{State, connection::Connection};
+use crate::state::State;
 use axum::{
-    extract::{ws::{WebSocketUpgrade, Message}, Path},
-    http::StatusCode,
-    response::{Html, IntoResponse, Response, sse},
+    extract::Path,
+    response::{sse, Html, IntoResponse},
     routing::get,
-    Extension, Json, Router,
+    Extension, Router,
 };
 
-use futures::{sink::SinkExt, stream::StreamExt};
-
-use crate::state::player::Player;
-use std::{sync::Arc, task::Poll};
+use std::sync::Arc;
 use std::{collections::HashMap, path::PathBuf};
 
 use miette::{IntoDiagnostic, Result};
 
 use minijinja::context;
 use minijinja::{Environment, Source};
-use minijinja_autoreload::AutoReloader;
+
+fn get_minijinja_env() -> Environment<'static> {
+    let mut env = Environment::new();
+    env.set_source(Source::from_path(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("templates"),
+    ));
+    env
+}
 
 pub(crate) fn spawn(tasks: HashMap<String, Arc<State>>) -> tokio::task::JoinHandle<Result<()>> {
-    let mut env = Environment::new();
-    env.set_source(Source::from_path(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("templates")));
+    let env = get_minijinja_env();
 
     tokio::task::spawn(async move {
         let addr: std::net::SocketAddr = ([0, 0, 0, 0], 3000).into();
@@ -65,24 +67,22 @@ async fn servers_show(
     let tmpl = env.get_template("servers_show.html").unwrap();
     let res = tmpl
         .render(context! {
-            players => (*servers.get_players()).clone(),
-            connections => (*servers.get_connections()).clone(),
+            players => servers.get_players(),
+            connections => servers.get_connections(),
             name => &server,
         })
         .unwrap(); // FIXME
     Html(res)
 }
 
-
 async fn servers_live(
     Path(server): Path<String>,
     env: Extension<Arc<Environment<'static>>>,
-    state: Extension<HashMap<String, Arc<State>>>
+    state: Extension<HashMap<String, Arc<State>>>,
 ) -> sse::Sse<impl futures::stream::Stream<Item = Result<sse::Event, std::convert::Infallible>>> {
     println!("server = {:?}", server);
 
     let s = state.get(&server).unwrap().clone();
-
 
     let stream = async_stream::stream! {
 
@@ -93,8 +93,8 @@ async fn servers_live(
 
                 let res = tmpl
                 .render(context! {
-                    players => (*s.get_players()).clone(),
-                    connections => (*s.get_connections()).clone(),
+                    players => (s.get_players()),
+                    connections => (s.get_connections()),
                     name => "",
                 }).unwrap();
 

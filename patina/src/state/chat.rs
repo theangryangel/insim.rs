@@ -1,7 +1,7 @@
 use chrono::prelude::*;
 use insim::protocol::identifiers::ConnectionId;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Chat {
     pub at: DateTime<Utc>,
     pub ucid: ConnectionId,

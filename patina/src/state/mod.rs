@@ -1,5 +1,4 @@
 pub(crate) mod chat;
-pub(crate) mod connection;
 pub(crate) mod player;
 
 use bounded_vec_deque::BoundedVecDeque;
@@ -10,20 +9,68 @@ use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{mpsc, Notify};
 
-type ConnectionMap = HashMap<ConnectionId, connection::Connection>;
-type PlayerMap = HashMap<PlayerId, player::Player>;
 type ChatHistory = BoundedVecDeque<chat::Chat>;
 
-#[derive(Debug)]
+use indexed_slab::IndexedSlab;
+use insim::protocol::position::Point;
+use serde::Serialize;
+
+#[derive(IndexedSlab, Default, Debug, Clone, Serialize)]
+pub struct Connection {
+    #[indexed_slab(ordered_unique)]
+    pub connection_id: ConnectionId,
+
+    #[indexed_slab(ordered_unique)]
+    pub player_id: Option<PlayerId>,
+
+    /// Connection username
+    pub uname: String,
+
+    /// Connection has admin rights
+    pub admin: bool,
+
+    /// Connection flags
+    pub connection_flags: u8,
+
+    /// player name
+    pub pname: String,
+
+    /// player plate
+    pub plate: Option<String>,
+
+    pub xyz: Option<Point<i32>>,
+
+    pub in_pitlane: bool,
+
+    pub lap: Option<u16>,
+
+    pub position: Option<u8>,
+
+    pub node: u16,
+
+    pub speed: u16,
+}
+
+impl From<&insim::protocol::insim::Ncn> for Connection {
+    fn from(data: &insim::protocol::insim::Ncn) -> Self {
+        Self {
+            uname: data.uname.clone(),
+            admin: data.admin > 0,
+            connection_flags: data.flags,
+            connection_id: data.ucid,
+            player_id: None,
+            pname: data.pname.to_string(),
+            ..Default::default()
+        }
+    }
+}
+
 pub struct State {
-    connections: RwLock<ConnectionMap>,
+    slab: RwLock<IndexedSlabConnection>,
+
     connections_notify: Arc<Notify>,
 
-    players: RwLock<PlayerMap>,
     players_notify: Arc<Notify>,
-
-    idx_player_connection: RwLock<HashMap<PlayerId, ConnectionId>>,
-    idx_connection_player: RwLock<HashMap<ConnectionId, PlayerId>>,
 
     chat: RwLock<ChatHistory>,
     chat_notify: Arc<Notify>,
@@ -35,10 +82,7 @@ pub struct State {
 impl State {
     pub fn new(tx: mpsc::UnboundedSender<Event>) -> Self {
         Self {
-            connections: RwLock::new(HashMap::new()),
-            players: RwLock::new(HashMap::new()),
-            idx_player_connection: RwLock::new(HashMap::new()),
-            idx_connection_player: RwLock::new(HashMap::new()),
+            slab: RwLock::new(IndexedSlabConnection::default()),
             chat: RwLock::new(BoundedVecDeque::new(256)),
             tx,
             chat_notify: Arc::new(Notify::new()),
@@ -47,37 +91,29 @@ impl State {
         }
     }
 
-    pub fn get_connections(
-        &self,
-    ) -> parking_lot::lock_api::RwLockReadGuard<'_, parking_lot::RawRwLock, ConnectionMap> {
-        self.connections.read()
+    pub fn get_connections(&self) -> Vec<Connection> {
+        self.slab.write().iter_by_connection_id().cloned().collect()
     }
 
     pub fn notify_on_connection(&self) -> Arc<Notify> {
         self.connections_notify.clone()
     }
 
-    pub fn get_connection_player_id(&self, ucid: ConnectionId) -> Option<PlayerId> {
-        self.idx_connection_player.read().get(&ucid).copied()
-    }
-
-    pub fn get_players(
-        &self,
-    ) -> parking_lot::lock_api::RwLockReadGuard<'_, parking_lot::RawRwLock, PlayerMap> {
-        self.players.read()
+    pub fn get_players(&self) -> Vec<Connection> {
+        self.slab
+            .write()
+            .iter_by_player_id()
+            .filter(|c| c.player_id.is_some())
+            .cloned()
+            .collect()
     }
 
     pub fn notify_on_player(&self) -> Arc<Notify> {
         self.players_notify.clone()
     }
-    pub fn get_player_connection_id(&self, plid: PlayerId) -> Option<ConnectionId> {
-        self.idx_player_connection.read().get(&plid).copied()
-    }
 
-    pub fn chat(
-        &self,
-    ) -> parking_lot::lock_api::RwLockReadGuard<'_, parking_lot::RawRwLock, ChatHistory> {
-        self.chat.read()
+    pub fn chat(&self) -> ChatHistory {
+        (*self.chat.read()).clone()
     }
 
     pub fn notify_on_chat(&self) -> Arc<Notify> {
@@ -94,82 +130,102 @@ impl State {
             }
 
             Packet::NewConnection(data) => {
-                self.connections.write().insert(data.ucid, (&data).into());
+                self.slab.write().insert((&data).into());
                 self.chat.write().push_back(chat::Chat::new(
                     data.ucid,
                     format!("New player joined: {}", &data.uname),
                 ));
                 self.chat_notify.notify_waiters();
+                self.connections_notify.notify_waiters();
             }
 
             Packet::ConnectionLeave(data) => {
-                self.connections.write().remove(&data.ucid);
-                if let Some(plid) = self.idx_connection_player.write().remove(&data.ucid) {
-                    self.players.write().remove(&plid);
-                    self.idx_player_connection.write().remove(&plid);
-                }
+                self.slab.write().remove_by_connection_id(&data.ucid);
+                self.connections_notify.notify_waiters();
             }
 
             Packet::NewPlayer(data) => {
-                self.players.write().insert(data.plid, (&data).into());
-                self.idx_player_connection
-                    .write()
-                    .insert(data.plid, data.ucid);
-                self.idx_connection_player
-                    .write()
-                    .insert(data.ucid, data.plid);
+                self.slab.write().modify_by_connection_id(&data.ucid, |c| {
+                    c.pname = data.pname.to_string();
+                    c.plate = Some(data.plate.to_string());
+                    c.player_id = Some(data.plid);
+                });
+                self.players_notify.notify_waiters();
             }
 
             Packet::PlayerLeave(data) => {
-                self.players.write().remove(&data.plid);
-                if let Some(ucid) = self.idx_player_connection.write().remove(&data.plid) {
-                    self.idx_connection_player.write().remove(&ucid);
-                }
+                // FIXME
+                self.slab
+                    .write()
+                    .modify_by_player_id(&Some(data.plid), |c| {
+                        c.plate = None;
+                        c.player_id = None;
+                    });
+                self.players_notify.notify_waiters();
             }
 
             Packet::PlayerPits(data) => {
                 // Telepits
-                self.players.write().remove(&data.plid);
-                self.idx_player_connection.write().remove(&data.plid);
-            }
-
-            Packet::TakeOverCar(data) => {
-                self.idx_player_connection.write().remove(&data.plid);
-                self.idx_connection_player.write().remove(&data.olducid);
-
-                self.idx_player_connection
+                self.slab
                     .write()
-                    .insert(data.plid, data.newucid);
-                self.idx_connection_player
-                    .write()
-                    .insert(data.newucid, data.plid);
-            }
-
-            Packet::PitLane(data) => {
-                if let Some(player) = self.players.write().get_mut(&data.plid) {
-                    player.in_pitlane = data.entered();
-                }
-            }
-
-            Packet::MultiCarInfo(data) => {
-                let mut players = self.players.write();
-                for info in data.info.iter() {
-                    if let Some(player) = players.get_mut(&info.plid) {
-                        player.xyz = info.xyz;
-                        player.lap = info.lap;
-                        player.position = info.position;
-                        player.node = info.node;
-                        player.speed = info.speed;
-                    }
-                }
-
+                    .modify_by_player_id(&Some(data.plid), |c| {
+                        c.plate = None;
+                        c.player_id = None;
+                    });
                 self.players_notify.notify_waiters();
             }
 
-            Packet::Lap(data) => {
-                if let Some(player) = self.players.write().get_mut(&data.plid) {
-                    player.lap = data.lapsdone;
+            Packet::TakeOverCar(data) => {
+                self.slab
+                    .write()
+                    .modify_by_player_id(&Some(data.plid), |c| {
+                        c.plate = None;
+                        c.player_id = None;
+                    });
+
+                self.slab
+                    .write()
+                    .modify_by_connection_id(&data.newucid, |c| {
+                        c.player_id = Some(data.plid);
+                    });
+                self.players_notify.notify_waiters();
+            }
+
+            Packet::PitLane(data) => {
+                self.slab
+                    .write()
+                    .modify_by_player_id(&Some(data.plid), |c| c.in_pitlane = data.entered());
+            }
+
+            Packet::MultiCarInfo(data) => {
+                for info in data.info.iter() {
+                    self.slab
+                        .write()
+                        .modify_by_player_id(&Some(info.plid), |c| {
+                            c.xyz = Some(info.xyz);
+                            c.lap = Some(info.lap);
+                            c.position = Some(info.position);
+                            c.node = info.node;
+                            c.speed = info.speed;
+                        });
+
+                    if (info
+                        .info
+                        .contains(insim::protocol::insim::CompCarInfo::LAST))
+                    {
+                        // batch notifications into each set of mci packets
+                        self.players_notify.notify_waiters()
+                    }
                 }
+            }
+
+            Packet::Lap(data) => {
+                self.slab
+                    .write()
+                    .modify_by_player_id(&Some(data.plid), |c| {
+                        c.lap = Some(data.lapsdone);
+                    });
+                self.players_notify.notify_waiters();
             }
 
             _ => {}
