@@ -5,7 +5,7 @@ struct TestNonPrimitiveType(u64);
 
 #[derive(IndexedSlab, Clone)]
 struct TestElement {
-    #[indexed_slab(hashed_unique)]
+    #[indexed_slab(hashed, unique)]
     field1: TestNonPrimitiveType,
     field2: String,
 }

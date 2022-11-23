@@ -2,9 +2,9 @@ use indexed_slab::IndexedSlab;
 
 #[derive(IndexedSlab, Clone)]
 pub struct MultipleOrderedNonUniqueStruct {
-    #[indexed_slab(ordered_non_unique)]
+    #[indexed_slab(ordered)]
     field1: u32,
-    #[indexed_slab(ordered_non_unique)]
+    #[indexed_slab(ordered)]
     field2: u64,
 }
 
@@ -52,9 +52,9 @@ fn test_remove_ordered_non_unique_field2_get_ordered_non_unique_field1() {
 
 #[derive(IndexedSlab, Clone)]
 pub struct OrderedNonUniqueAndHashedNonUniqueStruct {
-    #[indexed_slab(hashed_non_unique)]
+    #[indexed_slab(hashed)]
     field1: u32,
-    #[indexed_slab(ordered_non_unique)]
+    #[indexed_slab(ordered)]
     field2: u64,
 }
 
@@ -102,9 +102,9 @@ fn test_remove_ordered_non_unique_field2_get_hashed_non_unique_field1() {
 
 #[derive(IndexedSlab, Clone)]
 pub struct MultipleHashedNonUniqueStruct {
-    #[indexed_slab(hashed_non_unique)]
+    #[indexed_slab(hashed)]
     field1: u32,
-    #[indexed_slab(ordered_non_unique)]
+    #[indexed_slab(ordered)]
     field2: u64,
 }
 

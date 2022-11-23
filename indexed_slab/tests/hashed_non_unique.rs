@@ -4,16 +4,17 @@ use indexed_slab::IndexedSlab;
 struct TestNonPrimitiveType(u64);
 
 #[derive(IndexedSlab, Clone, Debug)]
+#[indexed_slab(name = "IndexedTestElement")]
 struct TestElement {
-    #[indexed_slab(hashed_non_unique, ignore_none)]
+    #[indexed_slab(hashed, ignore_none, index_type = "::std::collections::HashMap")]
     field1: TestNonPrimitiveType,
-    #[indexed_slab(ordered_unique)]
+    #[indexed_slab(ordered, unique)]
     field3: usize,
 }
 
 #[test]
 fn test_insert_and_get_by_field1() {
-    let mut map = IndexedSlabTestElement::default();
+    let mut map = IndexedTestElement::default();
     let elem1 = TestElement {
         field1: TestNonPrimitiveType(42),
         field3: 0,
@@ -33,7 +34,7 @@ fn test_insert_and_get_by_field1() {
 
 #[test]
 fn test_insert_and_remove_by_field1() {
-    let mut map = IndexedSlabTestElement::default();
+    let mut map = IndexedTestElement::default();
     let elem1 = TestElement {
         field1: TestNonPrimitiveType(42),
         field3: 0,
@@ -53,7 +54,7 @@ fn test_insert_and_remove_by_field1() {
 
 #[test]
 fn test_insert_and_modify_by_field3_and_get_by_field1() {
-    let mut map = IndexedSlabTestElement::default();
+    let mut map = IndexedTestElement::default();
     let elem1 = TestElement {
         field1: TestNonPrimitiveType(42),
         field3: 0,
@@ -75,7 +76,7 @@ fn test_insert_and_modify_by_field3_and_get_by_field1() {
 
 #[test]
 fn test_insert_and_modify_by_field3_and_remove_by_field1() {
-    let mut map = IndexedSlabTestElement::default();
+    let mut map = IndexedTestElement::default();
     let elem1 = TestElement {
         field1: TestNonPrimitiveType(42),
         field3: 0,
@@ -97,7 +98,7 @@ fn test_insert_and_modify_by_field3_and_remove_by_field1() {
 
 #[test]
 fn test_insert_and_iter_by_field1() {
-    let mut map = IndexedSlabTestElement::default();
+    let mut map = IndexedTestElement::default();
     let elem1 = TestElement {
         field1: TestNonPrimitiveType(42),
         field3: 1,

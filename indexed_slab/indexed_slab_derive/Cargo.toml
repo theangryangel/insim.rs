@@ -1,5 +1,5 @@
 [package]
-name = "indexed_slab_proc_macros"
+name = "indexed_slab_derive"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,8 +7,9 @@ edition = "2021"
 syn = { version = "1.0", features = ["full"] }
 quote = { version = "1.0" }
 proc-macro2 = { version = "1.0"}
-proc-macro-error = { version = "1.0" }
+proc-macro-error = "1.0.4"
 convert_case = { version = "0.5" }
+darling = "0.14.2"
 
 [lib]
 proc-macro = true

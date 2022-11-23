@@ -46,6 +46,7 @@ async fn servers_index(
     env: Extension<Arc<Environment<'static>>>,
     state: Extension<HashMap<String, Arc<State>>>,
 ) -> impl IntoResponse {
+    #[allow(clippy::map_clone)]
     let servers = state.keys().map(|e| e.clone()).collect::<Vec<String>>();
 
     let tmpl = env.get_template("hello.html").unwrap();

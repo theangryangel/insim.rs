@@ -10,6 +10,4 @@ edition = "2021"
 slab = { version = "0.4" }
 # Used for the hashed indexes. Provides a faster (non-cryptographically secure) hash function than the standard library.
 rustc-hash = { version = "1.1"}
-# Used for the nohash indexes
-nohash-hasher = "0.2.0"
-indexed_slab_proc_macros = { path = "proc_macros" }
+indexed_slab_derive = { path = "indexed_slab_derive" }

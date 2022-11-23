@@ -6,7 +6,7 @@ use insim::protocol::identifiers::ConnectionId;
 use insim::{client::prelude::*, protocol::identifiers::PlayerId};
 use miette::{IntoDiagnostic, Result};
 use parking_lot::RwLock;
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::{mpsc, Notify};
 
 type ChatHistory = BoundedVecDeque<chat::Chat>;
@@ -17,10 +17,10 @@ use serde::Serialize;
 
 #[derive(IndexedSlab, Default, Debug, Clone, Serialize)]
 pub struct Connection {
-    #[indexed_slab(ordered_unique)]
+    #[indexed_slab(ordered, unique)]
     pub connection_id: ConnectionId,
 
-    #[indexed_slab(ordered_unique)]
+    #[indexed_slab(ordered, unique)]
     pub player_id: Option<PlayerId>,
 
     /// Connection username

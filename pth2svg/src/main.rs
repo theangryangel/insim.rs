@@ -1,7 +1,5 @@
 use clap::Parser;
-use geojson::{
-    feature::Id, Feature, FeatureCollection, GeoJson, Geometry, JsonObject, JsonValue, Value,
-};
+use geojson::{feature::Id, Feature, FeatureCollection, GeoJson, Geometry, Value};
 use insim::file::pth::Pth;
 use miette::{IntoDiagnostic, Result, WrapErr};
 use std::path;
