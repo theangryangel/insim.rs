@@ -24,7 +24,7 @@ impl StructData {
     }
 }
 
-#[derive(Debug, Clone, Copy, FromMeta)]
+#[derive(Debug, Clone, Copy, FromMeta, Eq, PartialEq)]
 #[darling(default)]
 enum How {
     Hashed,
@@ -51,6 +51,7 @@ struct FieldData {
     /// How are we indexed?
     pub how: Option<How>,
 
+    /// Is this unique? Inserting a duplicate will result in a panic!
     #[darling(default)]
     pub unique: bool,
 
@@ -68,7 +69,10 @@ struct FieldData {
 
 #[derive(Debug, FromMeta)]
 struct CustomData {
+    /// The custom type, i.e. ::std::collections::HashMap
     pub ty: String,
+
+    /// The iterator for the custom type, i.e. ::std::collections::hash_map::Iter
     pub iter: String,
 }
 
@@ -92,8 +96,23 @@ impl FieldData {
             ));
         }
 
+        if !self.skip && self.how != Some(How::Custom) && self.custom.is_some() {
+            e.push(darling::Error::custom(
+                "Custom attributes present, but did not specific custom mode",
+            ));
+        }
+
+        if let (false, Some(How::Custom), None) = (self.skip, &self.how, &self.custom) {
+            e.push(darling::Error::custom(
+                "Cannot have mode of custom without custom attributes",
+            ));
+        }
+
         // FIXME
-        if self.ignore_none && !self.ty.to_token_stream().to_string().contains("Option <") {
+        if !self.skip
+            && self.ignore_none
+            && !self.ty.to_token_stream().to_string().contains("Option <")
+        {
             e.push(darling::Error::custom(
                 "Cannot set ignore_none on a non-optional field",
             ));
