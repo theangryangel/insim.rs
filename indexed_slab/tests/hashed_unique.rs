@@ -51,24 +51,6 @@ fn test_insert_and_remove_by_field1() {
 }
 
 #[test]
-fn test_unsafe_mutate_by_field1() {
-    let mut map = IndexedSlabTestElement::default();
-    let elem1 = TestElement {
-        field1: TestNonPrimitiveType(42),
-        field2: "ElementOne".to_string(),
-    };
-    map.insert(elem1);
-
-    let elem1_ref = unsafe { map.get_mut_by_field1(&TestNonPrimitiveType(42)).unwrap() };
-    elem1_ref.field2 = "ModifiedElementOne".to_string();
-
-    let elem1_ref = map.get_by_field1(&TestNonPrimitiveType(42)).unwrap();
-    assert_eq!(elem1_ref.field1.0, 42);
-    assert_eq!(elem1_ref.field2, "ModifiedElementOne");
-    assert_eq!(map.len(), 1);
-}
-
-#[test]
 fn test_modify_by_field1() {
     let mut map = IndexedSlabTestElement::default();
     let elem1 = TestElement {
