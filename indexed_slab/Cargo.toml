@@ -5,4 +5,4 @@ edition = "2021"
 
 [dependencies]
 slab = { version = "0.4" }
-indexed_slab_derive = { path = "indexed_slab_derive" }
+indexed_slab_derive = { path = "../indexed_slab_derive" }
