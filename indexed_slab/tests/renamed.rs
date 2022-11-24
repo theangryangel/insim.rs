@@ -4,7 +4,7 @@ use indexed_slab::IndexedSlab;
 struct TestNonPrimitiveType(u64);
 
 #[derive(IndexedSlab, Clone, Debug)]
-#[indexed_slab(name = "IndexedTestElement")]
+#[indexed_slab(rename = "IndexedTestElement")]
 struct TestElement {
     #[indexed_slab(how = "hashed", rename = "field2")]
     field1: TestNonPrimitiveType,

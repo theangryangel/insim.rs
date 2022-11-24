@@ -7,7 +7,7 @@ use syn::{parse_macro_input, DeriveInput};
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(indexed_slab), supports(struct_any))]
 struct StructData {
-    pub name: Option<String>,
+    pub rename: Option<String>,
     pub vis: syn::Visibility,
     pub ident: syn::Ident,
 
@@ -16,7 +16,7 @@ struct StructData {
 
 impl StructData {
     fn named(&self) -> syn::Ident {
-        if let Some(name) = &self.name {
+        if let Some(name) = &self.rename {
             format_ident!("{}", name)
         } else {
             format_ident!("IndexedSlab{}", self.ident)
@@ -472,76 +472,69 @@ impl FieldData {
 
 impl ToTokens for StructData {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let item = &self.ident;
+        let name = self.named();
+        let vis = &self.vis;
         let fields_to_index = self.data.as_ref().take_struct().unwrap();
 
-        // For each indexed field generate a TokenStream representing the lookup table for that field
-        // Each lookup table maps it's index to a position in the backing storage,
-        // or multiple positions in the backing storage in the non-unique indexes.
-        let lookup_table_fields = fields_to_index
+        // Build the indexes for each index field
+        let indexes = fields_to_index
             .iter()
             .filter_map(|f| f.is_indexable())
             .map(|f| f.index_field_definition());
 
-        // For each indexed field generate a TokenStream representing inserting the position in the backing storage to that field's lookup table
-        // Unique indexed fields just require a simple insert to the map, whereas non-unique fields require appending to the Vec of positions,
-        // creating a new Vec if necessary.
+        // Build the functionality to populate the indexes for each indexed field, when inserting a
+        // new item.
         let inserts: Vec<proc_macro2::TokenStream> = fields_to_index
             .iter()
             .filter_map(|f| f.is_indexable())
             .map(|f| f.insert_definition())
             .collect();
 
-        // For each indexed field generate a TokenStream representing the remove from that field's lookup table.
+        // Build the functionality to remove an item from the indexes for each indexed field, when
+        // removing an item.
         let removes: Vec<proc_macro2::TokenStream> = fields_to_index
             .iter()
             .filter_map(|f| f.is_indexable())
             .map(|f| f.removes_definition())
             .collect();
 
-        // For each indexed field generate a TokenStream representing the combined remove and insert from that field's lookup table.
+        // Build the functionality that updates the indexes when an item is changed.
         let modifies: Vec<proc_macro2::TokenStream> = fields_to_index
             .iter()
             .filter_map(|f| f.is_indexable())
             .map(|f| f.modifies_definition())
             .collect();
 
+        // Build the functionality that clears all field indexes.
         let clears: Vec<proc_macro2::TokenStream> = fields_to_index
             .iter()
             .filter_map(|f| f.is_indexable())
             .map(|f| f.clear_definition())
             .collect();
 
-        let item = &self.ident;
-
-        // Generate the name of the IndexedSlab
-        let map_name = self.named();
-
-        // For each indexed field generate a TokenStream representing all the accessors for the underlying storage via that field's lookup table.
+        // Build the accessors (`get_by_`, etc.) methods for each index field
         let accessors = fields_to_index
             .iter()
             .filter_map(|f| f.is_indexable())
-            .map(|f| f.accessors_definition(&map_name, item, &self.vis, &removes, &modifies));
+            .map(|f| f.accessors_definition(&name, item, &self.vis, &removes, &modifies));
 
-        // For each indexed field generate a TokenStream representing the Iterator over the backing storage via that field,
-        // such that the elements are accessed in an order defined by the index rather than the backing storage.
+        // Build the iterator methods for each indexed field
         let iterators = fields_to_index
             .iter()
             .filter_map(|f| f.is_indexable())
-            .map(|f| f.iter_definition(&map_name, item, &self.vis));
+            .map(|f| f.iter_definition(&name, item, &self.vis));
 
-        let vis = &self.vis;
-
-        // Build the final output using quasi-quoting
         tokens.extend(quote! {
 
             #[derive(Default, Clone)]
-            #vis struct #map_name {
+            #vis struct #name {
                 _store: ::indexed_slab::slab::Slab<#item>,
-                #(#lookup_table_fields)*
+                #(#indexes)*
             }
 
             #[allow(dead_code)]
-            impl #map_name {
+            impl #name {
                 #vis fn len(&self) -> usize {
                     self._store.len()
                 }
@@ -553,9 +546,7 @@ impl ToTokens for StructData {
                 #vis fn insert(&mut self, elem: #item) -> usize {
                     let idx = self._store.insert(elem);
                     let elem = &self._store[idx];
-
                     #(#inserts)*
-
                     idx
                 }
 
@@ -565,9 +556,7 @@ impl ToTokens for StructData {
 
                 #vis fn remove(&mut self, idx: usize) -> #item {
                     let elem_orig = self._store.remove(idx);
-
                     #(#removes)*
-
                     elem_orig
                 }
 
