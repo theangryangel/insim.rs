@@ -1,4 +1,4 @@
-use super::script_path::ScriptPath;
+// use super::script_path::ScriptPath;
 use insim::protocol::insim::InitFlags;
 use std::default::Default;
 
@@ -33,11 +33,11 @@ impl ServerFlags {
     }
 }
 
-#[derive(knuffel::Decode, Debug)]
-pub(crate) struct Script {
-    #[knuffel(argument)]
-    pub(crate) path: ScriptPath,
-}
+// #[derive(knuffel::Decode, Debug)]
+// pub(crate) struct Script {
+//     #[knuffel(argument)]
+//     pub(crate) path: ScriptPath,
+// }
 
 #[derive(knuffel::Decode, Debug)]
 pub(crate) struct Server {
