@@ -6,9 +6,15 @@ struct TestNonPrimitiveType(u64);
 #[derive(IndexedSlab, Clone, Debug)]
 #[indexed_slab(name = "IndexedTestElement")]
 struct TestElement {
-    #[indexed_slab(hashed, index_type = "::std::collections::HashMap")]
+    #[indexed_slab(
+        how = "custom",
+        custom(
+            ty = "::std::collections::HashMap",
+            iter = "::std::collections::hash_map::Iter"
+        )
+    )]
     field1: TestNonPrimitiveType,
-    #[indexed_slab(ordered, unique)]
+    #[indexed_slab(how = "ordered", unique)]
     field3: usize,
 }
 

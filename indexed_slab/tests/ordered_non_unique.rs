@@ -5,9 +5,9 @@ struct TestNonPrimitiveType(u64);
 
 #[derive(IndexedSlab, Clone, Debug)]
 struct TestElement {
-    #[indexed_slab(ordered)]
+    #[indexed_slab(how = "ordered")]
     field1: TestNonPrimitiveType,
-    #[indexed_slab(ordered, unique)]
+    #[indexed_slab(how = "ordered", unique)]
     field3: usize,
 }
 

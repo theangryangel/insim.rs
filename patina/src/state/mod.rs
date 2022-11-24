@@ -17,10 +17,10 @@ use serde::Serialize;
 
 #[derive(IndexedSlab, Default, Debug, Clone, Serialize)]
 pub struct Connection {
-    #[indexed_slab(ordered, unique)]
+    #[indexed_slab(how = "ordered", unique)]
     pub connection_id: ConnectionId,
 
-    #[indexed_slab(ordered, unique)]
+    #[indexed_slab(how = "ordered", unique, ignore_none)]
     pub player_id: Option<PlayerId>,
 
     /// Connection username

@@ -1,5 +1,5 @@
 use convert_case::Casing;
-use darling::{ast, FromDeriveInput, FromField};
+use darling::{ast, FromDeriveInput, FromField, FromMeta};
 use proc_macro_error::proc_macro_error;
 use quote::{format_ident, quote, ToTokens};
 use syn::{parse_macro_input, DeriveInput};
@@ -24,52 +24,86 @@ impl StructData {
     }
 }
 
+#[derive(Debug, Clone, Copy, FromMeta)]
+#[darling(default)]
+enum How {
+    Hashed,
+    Ordered,
+    Custom,
+}
+
+impl Default for How {
+    fn default() -> Self {
+        How::Hashed
+    }
+}
+
 #[derive(Debug, FromField)]
-#[darling(attributes(indexed_slab), and_then = "FieldData::validate")]
+#[darling(attributes(indexed_slab), and_then = "Self::validate")]
 struct FieldData {
+    pub ident: Option<syn::Ident>,
+
+    pub ty: syn::Type,
+
+    /// Rename the field to change function names
     pub rename: Option<String>,
+
+    /// How are we indexed?
+    pub how: Option<How>,
 
     #[darling(default)]
     pub unique: bool,
-
-    #[darling(default)]
-    pub hashed: bool,
-
-    // custom index type
-    pub index_type: Option<String>,
-
-    // custom iter type for given index
-    pub iter_type: Option<String>,
-
-    #[darling(default)]
-    pub ordered: bool,
 
     // escape hatch incase we need to skip
     #[darling(default)]
     pub skip: bool,
 
-    pub ident: Option<syn::Ident>,
+    /// Customise the types used for this field index
+    pub custom: Option<CustomData>,
 
-    pub ty: syn::Type,
+    /// If a field is optional, ignore None
+    #[darling(default)]
+    pub ignore_none: bool,
+}
+
+#[derive(Debug, FromMeta)]
+struct CustomData {
+    pub ty: String,
+    pub iter: String,
+}
+
+impl CustomData {
+    fn ty(&self) -> proc_macro2::TokenStream {
+        syn::parse_str(&self.ty).unwrap()
+    }
+
+    fn iter(&self) -> proc_macro2::TokenStream {
+        syn::parse_str(&self.iter).unwrap()
+    }
 }
 
 impl FieldData {
     fn validate(self) -> darling::Result<Self> {
         let mut e = darling::Error::accumulator();
 
-        if self.hashed && self.ordered {
-            e.push(darling::Error::custom("Cannot be both hashed and ordered"))
+        if let (false, Some(How::Custom), None) = (self.skip, &self.how, &self.custom) {
+            e.push(darling::Error::custom(
+                "Cannot have mode of custom without custom attributes",
+            ));
+        }
+
+        // FIXME
+        if self.ignore_none && !self.ty.to_token_stream().to_string().contains("Option <") {
+            e.push(darling::Error::custom(
+                "Cannot set ignore_none on a non-optional field",
+            ));
         }
 
         e.finish_with(self)
     }
 
-    fn can_be_indexed(&self) -> bool {
-        !self.skip && (self.unique || self.hashed || self.ordered)
-    }
-
     fn is_indexable(&self) -> Option<&Self> {
-        if self.can_be_indexed() {
+        if !self.skip && (self.how.is_some()) {
             Some(self)
         } else {
             None
@@ -93,14 +127,15 @@ impl FieldData {
         let index_name = self.index_ident();
         let ty = &self.ty;
 
-        let field_type = if let Some(t) = &self.index_type {
-            syn::parse_str(t).unwrap()
-        } else if self.hashed {
-            quote! { ::std::collections::HashMap }
-        } else if self.ordered {
-            quote! { ::std::collections::BTreeMap }
-        } else {
-            panic!("Unknown index type on field '{}'", field_name_string)
+        let field_type = match self.how {
+            Some(How::Hashed) => {
+                quote! { ::std::collections::HashMap }
+            }
+            Some(How::Ordered) => {
+                quote! { ::std::collections::BTreeMap }
+            }
+            Some(How::Custom) => self.custom.as_ref().unwrap().ty(),
+            None => panic!("Unknown index type on field '{}'", field_name_string),
         };
 
         if self.unique {
@@ -127,7 +162,7 @@ impl FieldData {
         let field_ident = self.ident.as_ref().unwrap();
         let field_named = self.named().to_string();
 
-        if self.unique {
+        let mut action = if self.unique {
             quote! {
                 let orig_elem_idx = self.#index_name.insert(elem.#field_ident.clone(), idx);
                 if orig_elem_idx.is_some() {
@@ -138,7 +173,17 @@ impl FieldData {
             quote! {
                 self.#index_name.entry(elem.#field_ident.clone()).or_insert(Vec::with_capacity(1)).push(idx);
             }
+        };
+
+        if self.ignore_none {
+            action = quote! {
+                if elem.#field_ident.is_some() {
+                    #action
+                }
+            }
         }
+
+        action
     }
 
     fn removes_definition(&self) -> proc_macro2::TokenStream {
@@ -148,12 +193,13 @@ impl FieldData {
 
         let error_msg = format!("Internal invariants broken, unable to find element in index '{field_named}' despite being present in another");
 
-        match self.unique {
-            true => quote! {
+        let mut action = if self.unique {
+            quote! {
                 // For unique indexes we know that removing an element will not affect any other elements
                 let removed_elem = self.#index_name.remove(&elem_orig.#field_ident);
-            },
-            false => quote! {
+            }
+        } else {
+            quote! {
                 // For non-unique indexes we must verify that we have not affected any other elements
                 if let Some(mut elems) = self.#index_name.remove(&elem_orig.#field_ident) {
                     // If any other elements share the same non-unique index, we must reinsert them into this index
@@ -163,8 +209,18 @@ impl FieldData {
                         self.#index_name.insert(elem_orig.#field_ident.clone(), elems);
                     }
                 }
-            },
+            }
+        };
+
+        if self.ignore_none {
+            action = quote! {
+                if elem_orig.#field_ident.is_some() {
+                    #action
+                }
+            }
         }
+
+        action
     }
 
     fn modifies_definition(&self) -> proc_macro2::TokenStream {
@@ -174,15 +230,38 @@ impl FieldData {
 
         let error_msg = format!("Internal invariants broken, unable to find element in index '{field_named}' despite being present in another");
 
-        match self.unique {
-            true => quote! {
-                let idx = self.#index_name.remove(&elem_orig.#field_ident).expect(#error_msg);
+        match (self.unique, self.ignore_none) {
+            (true, true) => quote! {
+                if elem_orig.#field_ident.is_some() {
+                    self.#index_name.remove(&elem_orig.#field_ident).expect(#error_msg);
+                }
+
+                if elem.#field_ident.is_some() {
+                    let orig_elem_idx = self.#index_name.insert(elem.#field_ident.clone(), idx);
+                    if orig_elem_idx.is_some() {
+                        panic!("Unable to insert element, uniqueness constraint violated on field '{}'", #field_named);
+                    }
+                }
+            },
+            (true, false) => quote! {
+                self.#index_name.remove(&elem_orig.#field_ident).expect(#error_msg);
                 let orig_elem_idx = self.#index_name.insert(elem.#field_ident.clone(), idx);
                 if orig_elem_idx.is_some() {
                     panic!("Unable to insert element, uniqueness constraint violated on field '{}'", #field_named);
                 }
             },
-            false => quote! {
+            (false, true) => quote! {
+                if elem_orig.#field_ident.is_some() {
+                    let idxs = self.#index_name.get_mut(&elem_orig.#field_ident).expect(#error_msg);
+                    let pos = idxs.iter().position(|x| *x == idx).expect(#error_msg);
+                    idxs.remove(pos);
+                }
+
+                if elem.#field_ident.is_some() {
+                    self.#index_name.entry(elem.#field_ident.clone()).or_insert(Vec::with_capacity(1)).push(idx);
+                }
+            },
+            (false, false) => quote! {
                 let idxs = self.#index_name.get_mut(&elem_orig.#field_ident).expect(#error_msg);
                 let pos = idxs.iter().position(|x| *x == idx).expect(#error_msg);
                 idxs.remove(pos);
@@ -326,15 +405,15 @@ impl FieldData {
         let ty = &self.ty;
 
         // TokenStream representing the actual type of the iterator
-        //
-        let iter_field_type = if let Some(t) = &self.iter_type {
-            syn::parse_str(t).unwrap()
-        } else if self.hashed {
-            quote! { ::std::collections::hash_map::Iter }
-        } else if self.ordered {
-            quote! { ::std::collections::btree_map::Iter }
-        } else {
-            panic!("Unknown index type on field '{}'", field_name_string)
+        let iter_field_type = match self.how {
+            Some(How::Hashed) => {
+                quote! { ::std::collections::hash_map::Iter }
+            }
+            Some(How::Ordered) => {
+                quote! { ::std::collections::btree_map::Iter }
+            }
+            Some(How::Custom) => self.custom.as_ref().unwrap().iter(),
+            None => panic!("Unknown index type on field '{}'", field_name_string),
         };
 
         let iter_type = if self.unique {
@@ -461,6 +540,7 @@ impl ToTokens for StructData {
                 #(#lookup_table_fields)*
             }
 
+            #[allow(dead_code)]
             impl #map_name {
                 #vis fn len(&self) -> usize {
                     self._store.len()
@@ -470,13 +550,28 @@ impl ToTokens for StructData {
                     self._store.is_empty()
                 }
 
-                #vis fn insert(&mut self, elem: #item) {
+                #vis fn insert(&mut self, elem: #item) -> usize {
                     let idx = self._store.insert(elem);
                     let elem = &self._store[idx];
 
                     #(#inserts)*
+
+                    idx
                 }
 
+                #vis fn get(&self, idx: usize) -> Option<&#item> {
+                    self._store.get(idx)
+                }
+
+                #vis fn remove(&mut self, idx: usize) -> #item {
+                    let elem_orig = self._store.remove(idx);
+
+                    #(#removes)*
+
+                    elem_orig
+                }
+
+                #[allow(dead_code)]
                 #vis fn clear(&mut self) {
                     self._store.clear();
                     #(#clears)*
