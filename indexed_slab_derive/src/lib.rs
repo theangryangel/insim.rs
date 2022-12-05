@@ -300,6 +300,7 @@ impl FieldData {
         let field_name = self.named();
 
         let index_name = format_ident!("_{}_index", field_name);
+        let count_name = format_ident!("count_by_{}", field_name);
         let getter_name = format_ident!("get_by_{}", field_name);
         let remover_name = format_ident!("remove_by_{}", field_name);
         let modifier_name = format_ident!("modify_by_{}", field_name);
@@ -312,6 +313,20 @@ impl FieldData {
         );
         let iter_getter_name = format_ident!("iter_by_{}", field_name);
         let ty = &self.ty;
+
+        let count = if self.unique {
+            quote! {
+                #vis fn #count_name(&self) -> usize {
+                    self.#index_name.len()
+                }
+            }
+        } else {
+            quote! {
+                #vis fn #count_name(&self) -> usize {
+                    self.#index_name.iter().map(|&(k, v)| v.len() ).sum()
+                }
+            }
+        };
 
         // TokenStream representing the get_by_ accessor for this field.
         // For non-unique indexes we must go through all matching elements and find their positions,
@@ -388,6 +403,8 @@ impl FieldData {
 
         // Put all these TokenStreams together, and put a TokenStream representing the iter_by_ accessor on the end.
         quote! {
+            #count
+
             #getter
 
             #remover

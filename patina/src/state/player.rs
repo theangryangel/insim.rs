@@ -17,6 +17,8 @@ pub struct Player {
     pub node: u16,
 
     pub speed: u16,
+
+    pub colour: String,
 }
 
 impl From<&insim::protocol::insim::Npl> for Player {

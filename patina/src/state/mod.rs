@@ -3,6 +3,8 @@ pub(crate) mod player;
 
 use bounded_vec_deque::BoundedVecDeque;
 use insim::protocol::identifiers::ConnectionId;
+use insim::protocol::insim::Wind;
+use insim::track::TrackInfo;
 use insim::{client::prelude::*, protocol::identifiers::PlayerId};
 use miette::{IntoDiagnostic, Result};
 use parking_lot::RwLock;
@@ -13,7 +15,15 @@ type ChatHistory = BoundedVecDeque<chat::Chat>;
 
 use indexed_slab::IndexedSlab;
 use insim::protocol::position::Point;
+use md5::{Digest, Md5};
 use serde::Serialize;
+
+fn string_to_hex_colour(input: &str) -> String {
+    let mut hasher = Md5::new();
+    hasher.update(input);
+    let result = hasher.finalize();
+    format!("#{:#06.6x}", result)
+}
 
 #[derive(IndexedSlab, Default, Debug, Clone, Serialize)]
 pub struct Connection {
@@ -49,6 +59,8 @@ pub struct Connection {
     pub node: u16,
 
     pub speed: u16,
+
+    pub colour: String,
 }
 
 impl From<&insim::protocol::insim::Ncn> for Connection {
@@ -60,16 +72,29 @@ impl From<&insim::protocol::insim::Ncn> for Connection {
             connection_id: data.ucid,
             player_id: None,
             pname: data.pname.to_string(),
+            colour: string_to_hex_colour(&data.uname),
             ..Default::default()
         }
     }
 }
 
+#[derive(Default, Clone, Serialize)]
+pub struct Game {
+    track: Option<TrackInfo>,
+    weather: u8,
+    wind: Wind,
+
+    racing: bool,
+    lap_count: u8,
+    qualifying_duration: u8,
+}
+
 pub struct State {
     slab: RwLock<IndexedSlabConnection>,
 
-    connections_notify: Arc<Notify>,
+    game: RwLock<Game>,
 
+    connections_notify: Arc<Notify>,
     players_notify: Arc<Notify>,
 
     chat: RwLock<ChatHistory>,
@@ -88,6 +113,7 @@ impl State {
             chat_notify: Arc::new(Notify::new()),
             connections_notify: Arc::new(Notify::new()),
             players_notify: Arc::new(Notify::new()),
+            game: RwLock::new(Game::default()),
         }
     }
 
@@ -108,12 +134,24 @@ impl State {
             .collect()
     }
 
+    pub fn get_player_count(&self) -> usize {
+        self.slab.write().count_by_player_id()
+    }
+
+    pub fn get_connection_count(&self) -> usize {
+        self.slab.write().count_by_connection_id()
+    }
+
     pub fn notify_on_player(&self) -> Arc<Notify> {
         self.players_notify.clone()
     }
 
     pub fn chat(&self) -> ChatHistory {
         (*self.chat.read()).clone()
+    }
+
+    pub fn game(&self) -> Game {
+        (self.game.read()).clone()
     }
 
     pub fn notify_on_chat(&self) -> Arc<Notify> {
@@ -125,16 +163,23 @@ impl State {
             Packet::MessageOut(data) => {
                 self.chat
                     .write()
-                    .push_back(chat::Chat::new(data.ucid, data.msg.to_lossy_string()));
+                    .push_front(chat::Chat::new(data.ucid, data.msg.to_lossy_string()));
                 self.chat_notify.notify_waiters();
             }
 
             Packet::NewConnection(data) => {
-                self.slab.write().insert((&data).into());
-                self.chat.write().push_back(chat::Chat::new(
-                    data.ucid,
-                    format!("New player joined: {}", &data.uname),
-                ));
+                let connection: Connection = (&data).into();
+
+                let mut msg =
+                    chat::Chat::new(data.ucid, format!("New player joined: {}", &data.uname));
+
+                msg.uname = connection.uname.clone();
+                msg.pname = connection.pname.clone();
+                msg.colour = connection.colour.clone();
+
+                self.slab.write().insert(connection);
+
+                self.chat.write().push_front(msg);
                 self.chat_notify.notify_waiters();
                 self.connections_notify.notify_waiters();
             }
@@ -228,6 +273,19 @@ impl State {
                 self.players_notify.notify_waiters();
             }
 
+            Packet::State(data) => {
+                let mut r = self.game.write();
+
+                let track = &data.track;
+
+                r.track = track.track_info();
+                r.weather = data.weather;
+                r.wind = data.wind;
+                r.racing = data.raceinprog > 0;
+                r.lap_count = data.racelaps;
+                r.qualifying_duration = data.qualmins;
+            }
+
             _ => {}
         }
 
@@ -247,6 +305,13 @@ impl State {
                 self.tx
                     .send(Event::Data(Packet::Tiny(insim::protocol::insim::Tiny {
                         subtype: insim::protocol::insim::TinyType::Npl,
+                        ..Default::default()
+                    })))
+                    .into_diagnostic()?;
+
+                self.tx
+                    .send(Event::Data(Packet::Tiny(insim::protocol::insim::Tiny {
+                        subtype: insim::protocol::insim::TinyType::Sst,
                         ..Default::default()
                     })))
                     .into_diagnostic()?;

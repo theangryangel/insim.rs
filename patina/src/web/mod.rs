@@ -1,4 +1,4 @@
-use crate::state::State;
+use crate::state::{chat::Chat, State};
 use axum::{
     extract::Path,
     response::{sse, Html, IntoResponse},
@@ -66,11 +66,16 @@ async fn servers_show(
     let servers = state.get(&server).unwrap();
 
     let tmpl = env.get_template("servers_show.html").unwrap();
+
     let res = tmpl
         .render(context! {
             players => servers.get_players(),
             connections => servers.get_connections(),
             name => &server,
+            chat => servers.chat().iter().map(|c| c.clone()).collect::<Vec<Chat>>(),
+            player_count => servers.get_player_count(),
+            connection_count => servers.get_connection_count(),
+            game => servers.game(),
         })
         .unwrap(); // FIXME
     Html(res)
@@ -86,21 +91,39 @@ async fn servers_live(
     let s = state.get(&server).unwrap().clone();
 
     let stream = async_stream::stream! {
+        loop {
 
-            loop {
+            let notify_on_player = s.notify_on_player();
+            let notify_on_chat = s.notify_on_chat();
 
-                s.notify_on_player().notified().await;
-                let tmpl = env.get_template("servers_info.html").unwrap();
+            tokio::select! {
+                _ = notify_on_player.notified() => {
+                    let tmpl = env.get_template("servers_info.html").unwrap();
 
-                let res = tmpl
-                .render(context! {
-                    players => (s.get_players()),
-                    connections => (s.get_connections()),
-                    name => "",
-                }).unwrap();
+                    let res = tmpl
+                    .render(context! {
+                        players => (s.get_players()),
+                        connections => (s.get_connections()),
+                        name => "",
+                    }).unwrap();
 
-                yield Ok(sse::Event::default().event("message").data(res))
+                    yield Ok(sse::Event::default().event("players").data(res))
+                },
+
+                _ = notify_on_chat.notified() => {
+                    let tmpl = env.get_template("servers_chat.html").unwrap();
+
+                    let res = tmpl
+                    .render(context! {
+                        chat => s.chat().iter().map(|c| c.clone()).collect::<Vec<Chat>>(),
+                    }).unwrap();
+
+                    yield Ok(sse::Event::default().event("message").data(res))
+                }
+
             }
+
+        }
     };
 
     sse::Sse::new(stream)
