@@ -1,14 +1,14 @@
-use indexed_slab::IndexedSlab;
+use multi_index::MultiIndex;
 
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
 struct TestNonPrimitiveType(u64);
 
-#[derive(IndexedSlab, Clone, Debug)]
-#[indexed_slab(rename = "IndexedTestElement")]
+#[derive(MultiIndex, Clone, Debug)]
+#[multi_index(rename = "IndexedTestElement")]
 struct TestElement {
-    #[indexed_slab(how = "hashed")]
+    #[multi_index(how = "hashed")]
     field1: TestNonPrimitiveType,
-    #[indexed_slab(how = "ordered", unique)]
+    #[multi_index(how = "ordered", unique)]
     field3: usize,
 }
 

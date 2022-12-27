@@ -1,5 +1,4 @@
 pub(crate) mod chat;
-pub(crate) mod player;
 
 use bounded_vec_deque::BoundedVecDeque;
 use insim::protocol::identifiers::ConnectionId;
@@ -13,9 +12,9 @@ use tokio::sync::{mpsc, Notify};
 
 type ChatHistory = BoundedVecDeque<chat::Chat>;
 
-use indexed_slab::IndexedSlab;
 use insim::protocol::position::Point;
 use md5::{Digest, Md5};
+use multi_index::MultiIndex;
 use serde::Serialize;
 
 fn string_to_hex_colour(input: &str) -> String {
@@ -25,12 +24,12 @@ fn string_to_hex_colour(input: &str) -> String {
     format!("#{:#06.6x}", result)
 }
 
-#[derive(IndexedSlab, Default, Debug, Clone, Serialize)]
+#[derive(MultiIndex, Default, Debug, Clone, Serialize)]
 pub struct Connection {
-    #[indexed_slab(how = "ordered", unique)]
+    #[multi_index(how = "ordered", unique)]
     pub connection_id: ConnectionId,
 
-    #[indexed_slab(how = "ordered", unique, ignore_none)]
+    #[multi_index(how = "ordered", unique, ignore_none)]
     pub player_id: Option<PlayerId>,
 
     /// Connection username
@@ -80,17 +79,17 @@ impl From<&insim::protocol::insim::Ncn> for Connection {
 
 #[derive(Default, Clone, Serialize)]
 pub struct Game {
-    track: Option<TrackInfo>,
-    weather: u8,
-    wind: Wind,
+    pub track: Option<TrackInfo>,
+    pub weather: u8,
+    pub wind: Wind,
 
-    racing: bool,
-    lap_count: u8,
-    qualifying_duration: u8,
+    pub racing: bool,
+    pub lap_count: u8,
+    pub qualifying_duration: u8,
 }
 
 pub struct State {
-    slab: RwLock<IndexedSlabConnection>,
+    slab: RwLock<MultiIndexConnection>,
 
     game: RwLock<Game>,
 
@@ -107,7 +106,7 @@ pub struct State {
 impl State {
     pub fn new(tx: mpsc::UnboundedSender<Event>) -> Self {
         Self {
-            slab: RwLock::new(IndexedSlabConnection::default()),
+            slab: RwLock::new(MultiIndexConnection::default()),
             chat: RwLock::new(BoundedVecDeque::new(256)),
             tx,
             chat_notify: Arc::new(Notify::new()),
@@ -125,12 +124,20 @@ impl State {
         self.connections_notify.clone()
     }
 
-    pub fn get_players(&self) -> Vec<Connection> {
+    pub fn get_players(&self, flipped: bool) -> Vec<Connection> {
         self.slab
-            .write()
+            .read()
             .iter_by_player_id()
             .filter(|c| c.player_id.is_some())
-            .cloned()
+            .map(|c| {
+                let c = c.clone();
+                if flipped {
+                    if let Some(mut xyz) = c.xyz {
+                        xyz = xyz.flipped();
+                    }
+                }
+                c
+            })
             .collect()
     }
 

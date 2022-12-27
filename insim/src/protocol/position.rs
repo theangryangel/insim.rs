@@ -1,6 +1,7 @@
 //! Utility functions for working with positions.
 
 use deku::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
@@ -11,10 +12,7 @@ use crate::units;
 use uom;
 
 pub trait PointKindTrait:
-    Copy
-    + Into<f64>
-    + for<'a> deku::DekuRead<'a, deku::ctx::Endian>
-    + deku::DekuWrite<deku::ctx::Endian>
+    Copy + for<'a> deku::DekuRead<'a, deku::ctx::Endian> + deku::DekuWrite<deku::ctx::Endian>
 {
 }
 
@@ -39,11 +37,11 @@ where
     pub z: T,
 }
 
+#[cfg(feature = "uom")]
 impl<T> Point<T>
 where
-    T: PointKindTrait,
+    T: PointKindTrait + Into<f64>,
 {
-    #[cfg(feature = "uom")]
     pub fn to_uom(
         &self,
     ) -> (
@@ -56,5 +54,25 @@ where
             uom::si::f64::Length::new::<units::length::game>(self.y.into()),
             uom::si::f64::Length::new::<units::length::game>(self.z.into()),
         )
+    }
+}
+
+impl Point<i32> {
+    pub fn flipped(&self) -> Self {
+        Self {
+            x: self.x,
+            y: -self.y,
+            z: self.z,
+        }
+    }
+}
+
+impl Point<f32> {
+    pub fn flipped(&self) -> Self {
+        Self {
+            x: self.x,
+            y: -self.y,
+            z: self.z,
+        }
     }
 }

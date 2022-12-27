@@ -1,18 +1,18 @@
-use indexed_slab::IndexedSlab;
+use multi_index::MultiIndex;
 
 #[derive(Hash, PartialEq, Eq, Clone)]
 struct TestNonPrimitiveType(u64);
 
-#[derive(IndexedSlab, Clone)]
+#[derive(MultiIndex, Clone)]
 struct TestElement {
-    #[indexed_slab(how = "hashed", unique)]
+    #[multi_index(how = "hashed", unique)]
     field1: TestNonPrimitiveType,
     field2: String,
 }
 
 #[test]
 fn test_insert_and_get() {
-    let mut map = IndexedSlabTestElement::default();
+    let mut map = MultiIndexTestElement::default();
     let elem1 = TestElement {
         field1: TestNonPrimitiveType(42),
         field2: "ElementOne".to_string(),
@@ -27,7 +27,7 @@ fn test_insert_and_get() {
 
 #[test]
 fn test_insert_and_remove_by_field1() {
-    let mut map = IndexedSlabTestElement::default();
+    let mut map = MultiIndexTestElement::default();
     let elem1 = TestElement {
         field1: TestNonPrimitiveType(42),
         field2: "ElementOne".to_string(),
@@ -52,7 +52,7 @@ fn test_insert_and_remove_by_field1() {
 
 #[test]
 fn test_modify_by_field1() {
-    let mut map = IndexedSlabTestElement::default();
+    let mut map = MultiIndexTestElement::default();
     let elem1 = TestElement {
         field1: TestNonPrimitiveType(42),
         field2: "ElementOne".to_string(),
@@ -76,7 +76,7 @@ fn test_modify_by_field1() {
 
 #[test]
 fn test_insert_violate_uniqueness() {
-    let mut map = IndexedSlabTestElement::default();
+    let mut map = MultiIndexTestElement::default();
     let elem1 = TestElement {
         field1: TestNonPrimitiveType(42),
         field2: "ElementOne".into(),
@@ -97,7 +97,7 @@ fn test_insert_violate_uniqueness() {
 
 #[test]
 fn test_modify_violate_uniqueness() {
-    let mut map = IndexedSlabTestElement::default();
+    let mut map = MultiIndexTestElement::default();
     let elem1 = TestElement {
         field1: TestNonPrimitiveType(42),
         field2: "ElementOne".into(),
@@ -122,7 +122,7 @@ fn test_modify_violate_uniqueness() {
 
 #[test]
 fn test_clear() {
-    let mut map = IndexedSlabTestElement::default();
+    let mut map = MultiIndexTestElement::default();
     let elem1 = TestElement {
         field1: TestNonPrimitiveType(42),
         field2: "ElementOne".into(),

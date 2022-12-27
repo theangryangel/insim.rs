@@ -1,10 +1,10 @@
 pub(crate) mod definition;
-pub(crate) mod script_path;
+pub(crate) mod path;
 
 use miette::{IntoDiagnostic, Result};
-use std::{fs, path};
+use std::{fs, path::PathBuf};
 
-pub(crate) fn read(config_path: &path::PathBuf) -> Result<definition::Config> {
+pub(crate) fn read(config_path: &PathBuf) -> Result<definition::Config> {
     if !config_path.exists() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,

@@ -1,8 +1,10 @@
-// use super::script_path::ScriptPath;
 use insim::protocol::insim::InitFlags;
 use std::default::Default;
+use std::path::PathBuf;
 
-#[derive(knuffel::Decode, Debug, Default)]
+use super::path::Path;
+
+#[derive(knuffel::Decode, Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ServerFlags {
     #[knuffel(child)]
     pub(crate) multicar_info: bool,
@@ -40,6 +42,34 @@ impl ServerFlags {
 // }
 
 #[derive(knuffel::Decode, Debug)]
+pub(crate) struct Web {
+    #[knuffel(child, unwrap(argument, str))]
+    pub(crate) listen: std::net::SocketAddr,
+
+    #[knuffel(child, unwrap(argument))]
+    pub(crate) templates: Option<Path>,
+}
+
+impl Web {
+    pub fn templates_to_path_buf(&self) -> PathBuf {
+        if let Some(p) = &self.templates {
+            p.to_path_buf()
+        } else {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("templates")
+        }
+    }
+}
+
+impl Default for Web {
+    fn default() -> Self {
+        Self {
+            listen: ([0, 0, 0, 0], 3000).into(),
+            templates: None,
+        }
+    }
+}
+
+#[derive(knuffel::Decode, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Server {
     #[knuffel(argument)]
     pub(crate) name: String,
@@ -116,6 +146,9 @@ impl Server {
 
 #[derive(knuffel::Decode, Debug)]
 pub(crate) struct Config {
-    #[knuffel(children(name = "server"))]
+    #[knuffel(child)]
+    pub(crate) web: Web,
+
+    #[knuffel(children(name = "insim"))]
     pub(crate) servers: Vec<Server>,
 }

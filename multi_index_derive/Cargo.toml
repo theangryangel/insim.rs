@@ -1,5 +1,5 @@
 [package]
-name = "indexed_slab_derive"
+name = "multi_index_derive"
 version = "0.1.0"
 edition = "2021"
 

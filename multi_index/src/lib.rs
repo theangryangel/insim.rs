@@ -2,4 +2,4 @@
 pub extern crate slab;
 
 #[doc(inline)]
-pub use indexed_slab_derive::IndexedSlab;
+pub use multi_index_derive::MultiIndex;

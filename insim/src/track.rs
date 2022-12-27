@@ -17,6 +17,12 @@ pub struct TrackInfo {
     pub max_players: u8,
 }
 
+impl TrackInfo {
+    pub fn family(&self) -> String {
+        self.code.chars().take(2).collect()
+    }
+}
+
 pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
     let mut m = HashMap::new();
 

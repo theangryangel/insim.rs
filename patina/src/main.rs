@@ -1,12 +1,12 @@
+use axum::{routing::get, Extension, Router};
 use clap::Parser;
-use futures::stream::{FuturesUnordered, StreamExt};
-use miette::Result;
-use std::collections::HashMap;
-use std::path;
+use miette::{IntoDiagnostic, Result};
+use std::{path, sync::Arc};
 
 mod config;
+mod insim_instance;
+mod insim_manager;
 mod state;
-mod task;
 mod web;
 
 /// insim_lua does stuff
@@ -39,26 +39,25 @@ pub async fn main() -> Result<()> {
     let args = Args::parse();
     let config = config::read(&args.config)?;
 
-    let mut tasks = HashMap::new();
+    // FIXME implement config reloading
 
-    let mut fut = FuturesUnordered::new();
+    let mut manager = insim_manager::Manager::new();
+    manager.update_from_config(&config);
 
-    for server in config.servers.iter() {
-        // TODO lets be more specific about what we want to do here
-        let (insim_future, state) = task::spawn(server)?;
+    let templates = web::templating::Engine::new(config.web.templates_to_path_buf(), false);
 
-        fut.push(insim_future);
+    let app = Router::new()
+        .route("/", get(web::servers_index))
+        .route("/s/:server/live", get(web::servers_live))
+        .route("/s/:server/map", get(web::track_map))
+        .route("/s/:server", get(web::servers_show))
+        .layer(Extension(templates))
+        .layer(Extension(Arc::new(manager)));
 
-        tasks.insert(server.name.clone(), state);
-    }
-
-    fut.push(web::spawn(tasks));
-
-    // FIXME
-    while let Some(res) = fut.next().await {
-        panic!("{:?}", res);
-        //res.into_diagnostic()?;
-    }
+    axum::Server::bind(&config.web.listen)
+        .serve(app.into_make_service())
+        .await
+        .into_diagnostic()?;
 
     Ok(())
 }

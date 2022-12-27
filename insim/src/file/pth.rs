@@ -67,7 +67,7 @@ impl Node {
                 + (center.x),
             y: ((self.direction.y * left_cos) + (self.direction.x * left_sin)) * limit.left
                 + (center.y),
-            z: (center.z as f32),
+            z: (center.z),
         };
 
         let right: Point<f32> = Point {
@@ -75,7 +75,7 @@ impl Node {
                 + (center.x),
             y: ((self.direction.y * right_cos) + (self.direction.x * right_sin)) * -limit.right
                 + (center.y),
-            z: (center.z as f32),
+            z: (center.z),
         };
 
         (left, right)

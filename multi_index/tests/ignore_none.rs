@@ -1,14 +1,14 @@
-use indexed_slab::IndexedSlab;
+use multi_index::MultiIndex;
 
-#[derive(IndexedSlab, Clone)]
+#[derive(MultiIndex, Clone)]
 struct TestElement {
-    #[indexed_slab(how = "hashed", unique, ignore_none)]
+    #[multi_index(how = "hashed", unique, ignore_none)]
     field1: Option<usize>,
 }
 
 #[test]
 fn test_insert_and_get() {
-    let mut map = IndexedSlabTestElement::default();
+    let mut map = MultiIndexTestElement::default();
     let elem1 = TestElement { field1: Some(1) };
     map.insert(elem1);
 
@@ -19,7 +19,7 @@ fn test_insert_and_get() {
 
 #[test]
 fn test_insert_and_get_none() {
-    let mut map = IndexedSlabTestElement::default();
+    let mut map = MultiIndexTestElement::default();
     let elem1 = TestElement { field1: None };
     let elem1_idx = map.insert(elem1);
 

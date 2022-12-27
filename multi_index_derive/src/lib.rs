@@ -5,7 +5,7 @@ use quote::{format_ident, quote, ToTokens};
 use syn::{parse_macro_input, DeriveInput};
 
 #[derive(Debug, FromDeriveInput)]
-#[darling(attributes(indexed_slab), supports(struct_any))]
+#[darling(attributes(multi_index), supports(struct_any))]
 struct StructData {
     pub rename: Option<String>,
     pub vis: syn::Visibility,
@@ -19,7 +19,7 @@ impl StructData {
         if let Some(name) = &self.rename {
             format_ident!("{}", name)
         } else {
-            format_ident!("IndexedSlab{}", self.ident)
+            format_ident!("MultiIndex{}", self.ident)
         }
     }
 }
@@ -39,7 +39,7 @@ impl Default for How {
 }
 
 #[derive(Debug, FromField)]
-#[darling(attributes(indexed_slab), and_then = "Self::validate")]
+#[darling(attributes(multi_index), and_then = "Self::validate")]
 struct FieldData {
     pub ident: Option<syn::Ident>,
 
@@ -323,7 +323,7 @@ impl FieldData {
         } else {
             quote! {
                 #vis fn #count_name(&self) -> usize {
-                    self.#index_name.iter().map(|&(k, v)| v.len() ).sum()
+                    self.#index_name.iter().map(|(k, v)| v.len() ).sum()
                 }
             }
         };
@@ -490,7 +490,7 @@ impl FieldData {
         // This is used to iterate through the Vec of matching elements for a given index value.
         quote! {
             #vis struct #iter_name<'a> {
-                _store_ref: &'a ::indexed_slab::slab::Slab<#item>,
+                _store_ref: &'a ::multi_index::slab::Slab<#item>,
                 _iter: #iter_type,
                 _inner_iter: Option<core::slice::Iter<'a, usize>>,
             }
@@ -565,7 +565,7 @@ impl ToTokens for StructData {
 
             #[derive(Default, Clone)]
             #vis struct #name {
-                _store: ::indexed_slab::slab::Slab<#item>,
+                _store: ::multi_index::slab::Slab<#item>,
                 #(#indexes)*
             }
 
@@ -602,7 +602,7 @@ impl ToTokens for StructData {
                     #(#clears)*
                 }
 
-                #vis fn iter(&self) -> ::indexed_slab::slab::Iter<#item> {
+                #vis fn iter(&self) -> ::multi_index::slab::Iter<#item> {
                     self._store.iter()
                 }
 
@@ -614,9 +614,9 @@ impl ToTokens for StructData {
     }
 }
 
-#[proc_macro_derive(IndexedSlab, attributes(indexed_slab))]
+#[proc_macro_derive(MultiIndex, attributes(multi_index))]
 #[proc_macro_error]
-pub fn indexed_slab(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn multi_index(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     // Darling ensures that we only support named structs, and extracts the relevant fields

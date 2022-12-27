@@ -1,7 +1,7 @@
 [workspace]
 members = [
-  "indexed_slab",
-  "indexed_slab_derive",
+  "multi_index",
+  "multi_index_derive",
   "insim",
   "patina",
   "pth2svg",

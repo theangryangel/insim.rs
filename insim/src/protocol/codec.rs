@@ -159,7 +159,7 @@ impl Encoder<Packet> for Codec {
         }
 
         // Adjust `n` with bounds checking
-        let n = n.checked_add(self.length_bytes as usize);
+        let n = n.checked_add(self.length_bytes);
 
         let n = match n {
             Some(n) => n,

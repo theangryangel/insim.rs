@@ -1,16 +1,16 @@
-use indexed_slab::IndexedSlab;
+use multi_index::MultiIndex;
 
-#[derive(IndexedSlab, Clone)]
+#[derive(MultiIndex, Clone)]
 pub struct MultipleOrderedNonUniqueStruct {
-    #[indexed_slab(how = "ordered")]
+    #[multi_index(how = "ordered")]
     field1: u32,
-    #[indexed_slab(how = "ordered")]
+    #[multi_index(how = "ordered")]
     field2: u64,
 }
 
 #[test]
 fn test_remove_ordered_non_unique_field1_get_ordered_non_unique_field2() {
-    let mut map = IndexedSlabMultipleOrderedNonUniqueStruct::default();
+    let mut map = MultiIndexMultipleOrderedNonUniqueStruct::default();
 
     map.insert(MultipleOrderedNonUniqueStruct {
         field1: 1,
@@ -30,7 +30,7 @@ fn test_remove_ordered_non_unique_field1_get_ordered_non_unique_field2() {
 
 #[test]
 fn test_remove_ordered_non_unique_field2_get_ordered_non_unique_field1() {
-    let mut map = IndexedSlabMultipleOrderedNonUniqueStruct::default();
+    let mut map = MultiIndexMultipleOrderedNonUniqueStruct::default();
 
     map.insert(MultipleOrderedNonUniqueStruct {
         field1: 1,
@@ -50,17 +50,17 @@ fn test_remove_ordered_non_unique_field2_get_ordered_non_unique_field1() {
     assert_eq!(c.len(), 0);
 }
 
-#[derive(IndexedSlab, Clone)]
+#[derive(MultiIndex, Clone)]
 pub struct OrderedNonUniqueAndHashedNonUniqueStruct {
-    #[indexed_slab(how = "hashed")]
+    #[multi_index(how = "hashed")]
     field1: u32,
-    #[indexed_slab(how = "ordered")]
+    #[multi_index(how = "ordered")]
     field2: u64,
 }
 
 #[test]
 fn test_remove_hashed_non_unique_field1_get_ordered_non_unique_field2() {
-    let mut map = IndexedSlabOrderedNonUniqueAndHashedNonUniqueStruct::default();
+    let mut map = MultiIndexOrderedNonUniqueAndHashedNonUniqueStruct::default();
 
     map.insert(OrderedNonUniqueAndHashedNonUniqueStruct {
         field1: 1,
@@ -80,7 +80,7 @@ fn test_remove_hashed_non_unique_field1_get_ordered_non_unique_field2() {
 
 #[test]
 fn test_remove_ordered_non_unique_field2_get_hashed_non_unique_field1() {
-    let mut map = IndexedSlabOrderedNonUniqueAndHashedNonUniqueStruct::default();
+    let mut map = MultiIndexOrderedNonUniqueAndHashedNonUniqueStruct::default();
 
     map.insert(OrderedNonUniqueAndHashedNonUniqueStruct {
         field1: 1,
@@ -100,17 +100,17 @@ fn test_remove_ordered_non_unique_field2_get_hashed_non_unique_field1() {
     assert_eq!(c.len(), 0);
 }
 
-#[derive(IndexedSlab, Clone)]
+#[derive(MultiIndex, Clone)]
 pub struct MultipleHashedNonUniqueStruct {
-    #[indexed_slab(how = "hashed")]
+    #[multi_index(how = "hashed")]
     field1: u32,
-    #[indexed_slab(how = "ordered")]
+    #[multi_index(how = "ordered")]
     field2: u64,
 }
 
 #[test]
 fn test_remove_hashed_non_unique_field1_get_hashed_non_unique_field2() {
-    let mut map = IndexedSlabMultipleHashedNonUniqueStruct::default();
+    let mut map = MultiIndexMultipleHashedNonUniqueStruct::default();
 
     map.insert(MultipleHashedNonUniqueStruct {
         field1: 1,
@@ -130,7 +130,7 @@ fn test_remove_hashed_non_unique_field1_get_hashed_non_unique_field2() {
 
 #[test]
 fn test_remove_hashed_non_unique_field2_get_hashed_non_unique_field1() {
-    let mut map = IndexedSlabMultipleHashedNonUniqueStruct::default();
+    let mut map = MultiIndexMultipleHashedNonUniqueStruct::default();
 
     map.insert(MultipleHashedNonUniqueStruct {
         field1: 1,
@@ -152,7 +152,7 @@ fn test_remove_hashed_non_unique_field2_get_hashed_non_unique_field1() {
 
 #[test]
 fn test_clear() {
-    let mut map = IndexedSlabMultipleOrderedNonUniqueStruct::default();
+    let mut map = MultiIndexMultipleOrderedNonUniqueStruct::default();
 
     map.insert(MultipleOrderedNonUniqueStruct {
         field1: 1,

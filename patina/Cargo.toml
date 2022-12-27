@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 insim = { path = "../insim", features = ["serde", "client"] }
-indexed_slab = { path = "../indexed_slab" }
+multi_index = { path = "../multi_index" }
 clap = { version = "3.1.8", features = ["derive"] }
 tokio = { version = "1.11.0", features = ["full", "tracing"] }
 convert_case = "0.5.0"
@@ -22,6 +22,9 @@ parking_lot = "0.12"
 
 axum = { version = "0.5", features = ["ws"] }
 tower = "0.4"
-minijinja = { version = "0.23.0", features = ["source"] }
+minijinja = { version = "0.27.0", features = ["source"] }
+minijinja-autoreload = "0.27.0"
 async-stream = "0.3.3"
 md-5 = "0.10.5"
+svg = "0.13.0"
+glob = "0.3.0"

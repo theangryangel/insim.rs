@@ -10,8 +10,95 @@
       integrity="sha384-wg5Y/JwF7VxGk4zLsJEcAojRtlVp1FKKdGy1qN+OMtdq72WRvX/EdRdqg/LOhYeV"
       crossorigin="anonymous"
     ></script>
-
     <script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
+    <script>
+      (function () {
+        var api;
+
+        htmx.defineExtension("patina-map", {
+          init: function (apiRef) {
+            // store a reference to the internal API.
+            api = apiRef;
+          },
+
+          onEvent: function (name, evt) {
+            if (name != "sse:players_json") {
+              return;
+            }
+
+            const elt = evt.target;
+
+            var map_url = api.getAttributeValue(elt, "patina-map-url");
+
+            if (!map_url) {
+              return;
+            }
+
+            let data = api.getInternalData(elt);
+
+            if (data.fetching) {
+              console.log("fetching");
+              return;
+            }
+
+            let payload = JSON.parse(evt.detail.data);
+
+            if (
+              (!data.track || data.track !== payload?.game?.track?.code) &&
+              !data.fetching
+            ) {
+              data.track = payload?.game?.track?.code;
+              data.fetching = true;
+              fetch(map_url)
+                .then((data) => {
+                  return data.text();
+                })
+                .then((data) => {
+                  elt.innerHTML = data;
+                  api.getInternalData(elt).fetching = false;
+                })
+                .catch((err) => {
+                  alert(err); // FIXME
+                  api.getInternalData(elt).fetching = false;
+                });
+            }
+
+            const tgt = elt.querySelector("svg");
+
+            if (!tgt) {
+              console.log("no svg within elt!");
+              return;
+            }
+
+            for (let i = 0; i < payload.players.length; i++) {
+              let player = payload.players[i];
+              const id = `player-${player.connection_id}`;
+              let e = elt.querySelector(`#${id}`);
+
+              if (!e) {
+                e = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                e.innerHTML = `
+                  <circle cx="10" cy="10" fill="none" r="5" stroke-width="1">
+                    <animate attributeName="stroke" to="white" from="${player.colour}" dur="1s" begin="0s" repeatCount="indefinite" />
+                    <animate attributeName="stroke-width" from="1" to="4" dur="1s" begin="0s" repeatCount="indefinite" />
+                    <animate attributeName="r" from="5" to="15" dur="1s" begin="0s" repeatCount="indefinite"/>
+                    <animate attributeName="opacity" from="1" to="0" dur="1s" begin="0s" repeatCount="indefinite"/>
+                  </circle>
+                  <circle cx="10" cy="10" fill="${player.colour}" stroke="white" stroke-width="1" r="5"/>
+                `;
+                e.setAttribute("id", id);
+                tgt.append(e);
+              }
+
+              const x = player.xyz.x / 65536 - 10;
+              const y = (-1 * player.xyz.y) / 65536 - 10;
+
+              e.setAttribute("transform", `translate(${x}, ${y})`);
+            }
+          },
+        });
+      })();
+    </script>
   </head>
 
   <body class="h-full bg-gray-100">

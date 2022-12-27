@@ -1,4 +1,8 @@
-server "test" {
+web {
+  listen "0.0.0.0:3000"
+}
+
+insim "test" {
   hostname "Nubbins AU Demo"
   relay
 }

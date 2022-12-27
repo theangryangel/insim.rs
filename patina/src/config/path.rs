@@ -1,43 +1,46 @@
 use std::default::Default;
-use std::{
-    io,
-    ops::Deref,
-    path::{Path, PathBuf},
-};
+use std::{io, ops::Deref, path};
 
 #[derive(Debug, Default)]
-pub(crate) struct ScriptPath {
-    pub(crate) inner: PathBuf,
+pub(crate) struct Path {
+    pub(crate) inner: path::PathBuf,
 }
 
-impl Deref for ScriptPath {
-    type Target = PathBuf;
-    fn deref(&self) -> &PathBuf {
+impl Deref for Path {
+    type Target = path::PathBuf;
+    fn deref(&self) -> &path::PathBuf {
         &self.inner
     }
 }
 
-impl From<String> for ScriptPath {
+impl From<String> for Path {
     #[inline]
-    fn from(s: String) -> ScriptPath {
+    fn from(s: String) -> Path {
         Self {
-            inner: PathBuf::from(s),
+            inner: path::PathBuf::from(s),
         }
     }
 }
 
-impl AsRef<Path> for ScriptPath {
+impl From<path::PathBuf> for Path {
     #[inline]
-    fn as_ref(&self) -> &Path {
+    fn from(value: path::PathBuf) -> Self {
+        Self { inner: value }
+    }
+}
+
+impl AsRef<path::Path> for Path {
+    #[inline]
+    fn as_ref(&self) -> &path::Path {
         self.inner.as_ref()
     }
 }
 
-impl<S: knuffel::traits::ErrorSpan> knuffel::traits::DecodeScalar<S> for ScriptPath {
+impl<S: knuffel::traits::ErrorSpan> knuffel::traits::DecodeScalar<S> for Path {
     fn raw_decode(
         val: &knuffel::span::Spanned<knuffel::ast::Literal, S>,
         ctx: &mut knuffel::decode::Context<S>,
-    ) -> Result<ScriptPath, knuffel::errors::DecodeError<S>> {
+    ) -> Result<Path, knuffel::errors::DecodeError<S>> {
         match &**val {
             knuffel::ast::Literal::String(ref s) => {
                 let buf: Self = String::from(s.clone()).into();
