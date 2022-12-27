@@ -1,0 +1,94 @@
+<table class="min-w-full divide-y divide-gray-200">
+  <thead>
+    <tr>
+      <th
+        scope="col"
+        class="text-center truncate text-sm font-medium text-gray-500 p-2"
+      >
+        #
+      </th>
+
+      <th
+        scope="col"
+        class="p-4 pl-0 text-left truncate text-sm font-medium text-gray-500"
+      >
+        Name
+      </th>
+      <th
+        scope="col"
+        class="p-4 text-center truncate text-sm font-medium text-gray-500"
+      >
+        Lap
+      </th>
+
+      <th
+        scope="col"
+        class="p-4 text-center truncate text-sm font-medium text-gray-500"
+      >
+        Time
+      </th>
+    </tr>
+  </thead>
+  <tbody class="divide-y divide-gray-200">
+    {% for player in players %}
+    <tr>
+      <td
+        class="
+          whitespace-nowrap
+          text-1xl
+          font-semibold
+          tracking-tight
+          text-gray-900 text-center
+          p-1
+        "
+      >
+        -
+      </td>
+
+      <td
+        class="
+          whitespace-nowrap
+          p-4
+          text-1xl
+          font-semibold
+          tracking-tight
+          text-gray-900
+          border-l-4
+        "
+        style="border-color: {{ player.colour }}"
+      >
+        {{ player.pname }}
+        <p class="text-sm font-normal text-gray-500">
+          {{ player.uname }} &middot; {{ player.uname }}
+        </p>
+      </td>
+
+      <td
+        class="
+          whitespace-nowrap
+          p-4
+          text-1xl
+          font-semibold
+          tracking-tight
+          text-gray-900 text-center
+        "
+      >
+        {{ player.lap }}
+      </td>
+
+      <td
+        class="
+          whitespace-nowrap
+          p-4
+          text-1xl
+          font-semibold
+          tracking-tight
+          text-gray-900 text-center
+        "
+      >
+        {{ player.speed }}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>

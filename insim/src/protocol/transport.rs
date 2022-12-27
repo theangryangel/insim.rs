@@ -178,7 +178,10 @@ where
             };
             *self.as_mut().project().poll_deadline = false;
             *self.as_mut().project().state = TransportState::Disconnected;
-            return Poll::Ready(Some(Err(error::Error::Timeout)));
+            return Poll::Ready(Some(Err(error::Error::IO {
+                kind: std::io::ErrorKind::TimedOut,
+                message: "Keepalive (ping) timeout".into(),
+            })));
         }
 
         Poll::Pending

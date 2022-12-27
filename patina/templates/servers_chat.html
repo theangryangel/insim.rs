@@ -1,0 +1,22 @@
+<div class="p-4">
+  <ul role="list">
+    {% for item in chat %}
+
+    <li>
+      <div class="flex space-x-3">
+        <div
+          class="py-3 flex-1 space-y-1 pl-4 border-l-4"
+          style="border-color: {{ item.colour }}"
+        >
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-medium">{{ item.pname }}</h3>
+            <p class="text-sm text-gray-500">{{ item.at }}</p>
+          </div>
+          <p class="text-sm text-gray-500">{{ item.body }}</p>
+        </div>
+      </div>
+    </li>
+
+    {% endfor %}
+  </ul>
+</div>

@@ -1,0 +1,77 @@
+{% extends "layout.html" %} {% block body %}
+
+<div
+  class="bg-gray-100 flex-1 flex flex-col md:flex-row"
+  hx-ext="sse"
+  sse-connect="/s/{{ name }}/live"
+>
+  <main class="md:flex-1 p-4">
+    <div class="pb-4">
+      <h2
+        class="
+          text-3xl
+          sm:text-4xl
+          text-slate-900
+          font-extrabold
+          tracking-tight
+        "
+      >
+        {{ game }}
+      </h2>
+      <div class="mt-2 flex items-center text-sm text-gray-500">{{ game }}</div>
+    </div>
+    <div
+      class="border border-red-500"
+      hx-ext="patina-map"
+      hx-trigger="sse:players_json"
+      patina-map-url="/s/{{ name }}/map"
+    />
+  </main>
+
+  <aside class="lg:w-2/5 md:w-3/5 p-4 m-4">
+    <dl class="mb-4 grid grid-cols-1 gap-5 xs:grid-cols-1 sm:grid-cols-2">
+      <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
+        <dt class="truncate text-sm font-medium text-gray-500">Connections</dt>
+        <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900">
+          {{ connection_count }}
+        </dd>
+      </div>
+
+      <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
+        <dt class="truncate text-sm font-medium text-gray-500">Players</dt>
+        <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900">
+          {{ player_count }}
+        </dd>
+      </div>
+
+      <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
+        <dt class="truncate text-sm font-medium text-gray-500">Lap</dt>
+        <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900">
+          12/48
+        </dd>
+      </div>
+
+      <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
+        <dt class="truncate text-sm font-medium text-gray-500">Lap</dt>
+        <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900">
+          12/48
+        </dd>
+      </div>
+    </dl>
+
+    <div
+      sse-swap="players"
+      class="rounded-lg bg-white shadow overflow-x-auto mb-4"
+    >
+      {% include "servers_info.html" %}
+    </div>
+
+    <div
+      sse-swap="message"
+      class="rounded-lg bg-white shadow overflow-x-auto mb-4"
+    >
+      {% include "servers_chat.html" %}
+    </div>
+  </aside>
+</div>
+{% endblock %}

@@ -151,7 +151,7 @@ pub struct HostSelect {
     ctx_default = "deku::ctx::Endian::Little",
     endian = "endian"
 )]
-pub enum ErrorType {
+pub enum RelayErrorKind {
     #[deku(id = "0")]
     None,
 
@@ -180,9 +180,9 @@ pub enum ErrorType {
     MissingSpectatorPassword,
 }
 
-impl Default for ErrorType {
+impl Default for RelayErrorKind {
     fn default() -> Self {
-        ErrorType::None
+        RelayErrorKind::None
     }
 }
 
@@ -194,8 +194,8 @@ impl Default for ErrorType {
     ctx_default = "deku::ctx::Endian::Little",
     endian = "endian"
 )]
-pub struct Error {
+pub struct RelayError {
     pub reqi: RequestId,
 
-    pub err: ErrorType,
+    pub err: RelayErrorKind,
 }

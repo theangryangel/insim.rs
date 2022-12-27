@@ -126,5 +126,5 @@ packet!(
     "252" => RelayHostListRequest(relay::HostListRequest),
     "253" => RelayHostList(relay::HostList),
     "254" => RelayHostSelect(relay::HostSelect),
-    "255" => RelayError(relay::Error),
+    "255" => RelayError(relay::RelayError),
 );

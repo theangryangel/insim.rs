@@ -1,0 +1,16 @@
+web {
+  listen "0.0.0.0:3000"
+}
+
+insim "test" {
+  hostname "Nubbins AU Demo"
+  relay
+}
+
+/* server "test2" { */
+/*   hostname "[MRc] Beginner BMW" */
+/*   relay */
+/**/
+/*   scripts { */
+/*   } */
+/* } */

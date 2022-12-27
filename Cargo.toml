@@ -1,7 +1,9 @@
 [workspace]
 members = [
+  "multi_index",
+  "multi_index_derive",
   "insim",
-  "insim_lua",
+  "patina",
   "pth2svg",
   "smx2svg",
 ]

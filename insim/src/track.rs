@@ -1,68 +1,472 @@
 //! Utility functions and structs for working with track names and fetching track data.
 
+use std::collections::HashMap;
+
 use crate::string::strip_trailing_nul;
 use deku::prelude::*;
+use once_cell::sync::Lazy;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-pub type TrackInfo<'a> = (&'a str, &'a str, Option<f32>, u8);
+#[derive(Clone, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct TrackInfo {
+    pub code: String,
+    pub name: String,
+    pub distance: Option<f32>,
+    pub max_players: u8,
+}
 
-const TRACK_INFO: &[TrackInfo] = &[
-    ("BL1", "Blackwood GP", Some(2.048), 40),
-    ("BL2", "Blackwood Historic", Some(2.047), 40),
-    ("BL3", "Blackwood RallyX", Some(1.142), 40),
-    ("BL4", "Blackwood Carpark", None, 40),
-    ("SO1", "South City Classic", Some(1.263), 30),
-    ("SO2", "South City Sprint 1", Some(1.273), 16),
-    ("SO3", "South City Sprint 2", Some(0.829), 16),
-    ("SO4", "South City City", Some(2.504), 32),
-    ("SO5", "South City Town", Some(1.955), 32),
-    ("SO6", "South City Chicane", Some(1.813), 32),
-    ("FE1", "Fern Bay Club", Some(0.984), 32),
-    ("FE2", "Fern Bay Green", Some(1.918), 32),
-    ("FE3", "Fern Bay Gold", Some(2.183), 32),
-    ("FE4", "Fern Bay Black", Some(4.076), 32),
-    ("FE5", "Fern Bay RallyX", Some(1.254), 32),
-    ("FE6", "Fern Bay RallyX Green", Some(0.463), 32),
-    ("AU1", "AutoX", None, 16),
-    ("AU2", "Skidpad", None, 16),
-    ("AU3", "2 Drag Strip", Some(0.250), 2),
-    ("AU4", "8 Lane Drag Strip", Some(0.250), 8),
-    ("KY1", "Kyoto Ring Oval", Some(1.852), 32),
-    ("KY2", "Kyoto Ring National", Some(3.193), 32),
-    ("KY3", "Kyoto Ring GP Long", Some(4.584), 32),
-    ("WE1", "Westhill National", Some(2.732), 40),
-    ("WE2", "Westhill International", Some(3.573), 40),
-    ("WE3", "Westhill Car Park", None, 40),
-    ("WE4", "Westhill Karting", Some(0.3), 40),
-    ("WE5", "Westhill Karting National", Some(0.818), 40),
-    ("AS1", "Aston Cadet", Some(1.162), 32),
-    ("AS2", "Aston Club", Some(1.912), 32),
-    ("AS3", "Aston National", Some(3.481), 32),
-    ("AS4", "Aston Historic", Some(5.026), 32),
-    ("AS5", "Aston GP", Some(5.469), 32),
-    ("AS6", "Aston Grand Touring", Some(4.972), 32),
-    ("AS7", "Aston North", Some(3.211), 32),
-    ("RO1", "Rockingham ISSC", Some(1.924), 40),
-    ("RO2", "Rockingham National", Some(1.676), 40),
-    ("RO3", "Rockingham Oval", Some(1.468), 40),
-    ("RO4", "Rockingham ISSC Long", Some(2.021), 40),
-    ("RO5", "Rockingham Lake", Some(0.650), 40),
-    ("RO6", "Rockingham Handling", Some(1.559), 40),
-    ("RO7", "Rockingham International", Some(2.407), 40),
-    ("RO8", "Rockingham Historic", Some(2.215), 40),
-    ("RO9", "Rockingham Historic Short", Some(1.365), 40),
-    ("RO10", "Rockingham International Long", Some(2.521), 40),
-    ("RO11", "Rockingham Sports Car", Some(1.674), 40),
-    ("LA1", "Layout Square, Long Grid", None, 0),
-    ("LA2", "Layout Square, Wide Grid", None, 0),
-];
+impl TrackInfo {
+    pub fn family(&self) -> String {
+        self.code.chars().take(2).collect()
+    }
+}
+
+pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
+    let mut m = HashMap::new();
+
+    m.insert(
+        "BL1".into(),
+        TrackInfo {
+            code: "BL1".into(),
+            name: "Blackwood GP".into(),
+            max_players: 40,
+            distance: Some(2.048),
+        },
+    );
+    m.insert(
+        "BL2".into(),
+        TrackInfo {
+            code: "BL2".into(),
+            name: "Blackwood Historic".into(),
+            max_players: 40,
+            distance: Some(2.047),
+        },
+    );
+    m.insert(
+        "BL3".into(),
+        TrackInfo {
+            code: "BL3".into(),
+            name: "Blackwood RallyX".into(),
+            max_players: 40,
+            distance: Some(1.142),
+        },
+    );
+    m.insert(
+        "BL4".into(),
+        TrackInfo {
+            code: "BL4".into(),
+            name: "Blackwood Carpark".into(),
+            max_players: 40,
+            distance: None,
+        },
+    );
+    m.insert(
+        "SO1".into(),
+        TrackInfo {
+            code: "SO1".into(),
+            name: "South City Classic".into(),
+            max_players: 30,
+            distance: Some(1.263),
+        },
+    );
+    m.insert(
+        "SO2".into(),
+        TrackInfo {
+            code: "SO2".into(),
+            name: "South City Sprint 1".into(),
+            max_players: 16,
+            distance: Some(1.273),
+        },
+    );
+    m.insert(
+        "SO3".into(),
+        TrackInfo {
+            code: "SO3".into(),
+            name: "South City Sprint 2".into(),
+            max_players: 16,
+            distance: Some(0.829),
+        },
+    );
+    m.insert(
+        "SO4".into(),
+        TrackInfo {
+            code: "SO4".into(),
+            name: "South City City".into(),
+            max_players: 32,
+            distance: Some(2.504),
+        },
+    );
+    m.insert(
+        "SO5".into(),
+        TrackInfo {
+            code: "SO5".into(),
+            name: "South City Town".into(),
+            max_players: 32,
+            distance: Some(1.955),
+        },
+    );
+    m.insert(
+        "SO6".into(),
+        TrackInfo {
+            code: "SO6".into(),
+            name: "South City Chicane".into(),
+            max_players: 32,
+            distance: Some(1.813),
+        },
+    );
+    m.insert(
+        "FE1".into(),
+        TrackInfo {
+            code: "FE1".into(),
+            name: "Fern Bay Club".into(),
+            max_players: 32,
+            distance: Some(0.984),
+        },
+    );
+    m.insert(
+        "FE2".into(),
+        TrackInfo {
+            code: "FE2".into(),
+            name: "Fern Bay Green".into(),
+            max_players: 32,
+            distance: Some(1.918),
+        },
+    );
+    m.insert(
+        "FE3".into(),
+        TrackInfo {
+            code: "FE3".into(),
+            name: "Fern Bay Gold".into(),
+            max_players: 32,
+            distance: Some(2.183),
+        },
+    );
+    m.insert(
+        "FE4".into(),
+        TrackInfo {
+            code: "FE4".into(),
+            name: "Fern Bay Black".into(),
+            max_players: 32,
+            distance: Some(4.076),
+        },
+    );
+    m.insert(
+        "FE5".into(),
+        TrackInfo {
+            code: "FE5".into(),
+            name: "Fern Bay RallyX".into(),
+            max_players: 32,
+            distance: Some(1.254),
+        },
+    );
+    m.insert(
+        "FE6".into(),
+        TrackInfo {
+            code: "FE6".into(),
+            name: "Fern Bay RallyX Green".into(),
+            max_players: 32,
+            distance: Some(0.463),
+        },
+    );
+    m.insert(
+        "AU1".into(),
+        TrackInfo {
+            code: "AU1".into(),
+            name: "AutoX".into(),
+            max_players: 16,
+            distance: None,
+        },
+    );
+    m.insert(
+        "AU2".into(),
+        TrackInfo {
+            code: "AU2".into(),
+            name: "Skidpad".into(),
+            max_players: 16,
+            distance: None,
+        },
+    );
+    m.insert(
+        "AU3".into(),
+        TrackInfo {
+            code: "AU3".into(),
+            name: "2 Drag Strip".into(),
+            max_players: 2,
+            distance: Some(0.250),
+        },
+    );
+    m.insert(
+        "AU4".into(),
+        TrackInfo {
+            code: "AU4".into(),
+            name: "8 Lane Drag Strip".into(),
+            max_players: 8,
+            distance: Some(0.250),
+        },
+    );
+    m.insert(
+        "KY1".into(),
+        TrackInfo {
+            code: "KY1".into(),
+            name: "Kyoto Ring Oval".into(),
+            max_players: 32,
+            distance: Some(1.852),
+        },
+    );
+    m.insert(
+        "KY2".into(),
+        TrackInfo {
+            code: "KY2".into(),
+            name: "Kyoto Ring National".into(),
+            max_players: 32,
+            distance: Some(3.193),
+        },
+    );
+    m.insert(
+        "KY3".into(),
+        TrackInfo {
+            code: "KY3".into(),
+            name: "Kyoto Ring GP Long".into(),
+            max_players: 32,
+            distance: Some(4.584),
+        },
+    );
+    m.insert(
+        "WE1".into(),
+        TrackInfo {
+            code: "WE1".into(),
+            name: "Westhill National".into(),
+            max_players: 40,
+            distance: Some(2.732),
+        },
+    );
+    m.insert(
+        "WE2".into(),
+        TrackInfo {
+            code: "WE2".into(),
+            name: "Westhill International".into(),
+            max_players: 40,
+            distance: Some(3.573),
+        },
+    );
+    m.insert(
+        "WE3".into(),
+        TrackInfo {
+            code: "WE3".into(),
+            name: "Westhill Car Park".into(),
+            max_players: 40,
+            distance: None,
+        },
+    );
+    m.insert(
+        "WE4".into(),
+        TrackInfo {
+            code: "WE4".into(),
+            name: "Westhill Karting".into(),
+            max_players: 40,
+            distance: Some(0.3),
+        },
+    );
+    m.insert(
+        "WE5".into(),
+        TrackInfo {
+            code: "WE5".into(),
+            name: "Westhill Karting National".into(),
+            max_players: 40,
+            distance: Some(0.818),
+        },
+    );
+    m.insert(
+        "AS1".into(),
+        TrackInfo {
+            code: "AS1".into(),
+            name: "Aston Cadet".into(),
+            max_players: 32,
+            distance: Some(1.162),
+        },
+    );
+    m.insert(
+        "AS2".into(),
+        TrackInfo {
+            code: "AS2".into(),
+            name: "Aston Club".into(),
+            max_players: 32,
+            distance: Some(1.912),
+        },
+    );
+    m.insert(
+        "AS3".into(),
+        TrackInfo {
+            code: "AS3".into(),
+            name: "Aston National".into(),
+            max_players: 32,
+            distance: Some(3.481),
+        },
+    );
+    m.insert(
+        "AS4".into(),
+        TrackInfo {
+            code: "AS4".into(),
+            name: "Aston Historic".into(),
+            max_players: 32,
+            distance: Some(5.026),
+        },
+    );
+    m.insert(
+        "AS5".into(),
+        TrackInfo {
+            code: "AS5".into(),
+            name: "Aston GP".into(),
+            max_players: 32,
+            distance: Some(5.469),
+        },
+    );
+    m.insert(
+        "AS6".into(),
+        TrackInfo {
+            code: "AS6".into(),
+            name: "Aston Grand Touring".into(),
+            max_players: 32,
+            distance: Some(4.972),
+        },
+    );
+    m.insert(
+        "AS7".into(),
+        TrackInfo {
+            code: "AS7".into(),
+            name: "Aston North".into(),
+            max_players: 32,
+            distance: Some(3.211),
+        },
+    );
+    m.insert(
+        "RO1".into(),
+        TrackInfo {
+            code: "RO1".into(),
+            name: "Rockingham ISSC".into(),
+            max_players: 40,
+            distance: Some(1.924),
+        },
+    );
+    m.insert(
+        "RO2".into(),
+        TrackInfo {
+            code: "RO2".into(),
+            name: "Rockingham National".into(),
+            max_players: 40,
+            distance: Some(1.676),
+        },
+    );
+    m.insert(
+        "RO3".into(),
+        TrackInfo {
+            code: "RO3".into(),
+            name: "Rockingham Oval".into(),
+            max_players: 40,
+            distance: Some(1.468),
+        },
+    );
+    m.insert(
+        "RO4".into(),
+        TrackInfo {
+            code: "RO4".into(),
+            name: "Rockingham ISSC Long".into(),
+            max_players: 40,
+            distance: Some(2.021),
+        },
+    );
+    m.insert(
+        "RO5".into(),
+        TrackInfo {
+            code: "RO5".into(),
+            name: "Rockingham Lake".into(),
+            max_players: 40,
+            distance: Some(0.650),
+        },
+    );
+    m.insert(
+        "RO6".into(),
+        TrackInfo {
+            code: "RO6".into(),
+            name: "Rockingham Handling".into(),
+            max_players: 40,
+            distance: Some(1.559),
+        },
+    );
+    m.insert(
+        "RO7".into(),
+        TrackInfo {
+            code: "RO7".into(),
+            name: "Rockingham International".into(),
+            max_players: 40,
+            distance: Some(2.407),
+        },
+    );
+    m.insert(
+        "RO8".into(),
+        TrackInfo {
+            code: "RO8".into(),
+            name: "Rockingham Historic".into(),
+            max_players: 40,
+            distance: Some(2.215),
+        },
+    );
+    m.insert(
+        "RO9".into(),
+        TrackInfo {
+            code: "RO9".into(),
+            name: "Rockingham Historic Short".into(),
+            max_players: 40,
+            distance: Some(1.365),
+        },
+    );
+    m.insert(
+        "RO10".into(),
+        TrackInfo {
+            code: "RO10".into(),
+            name: "Rockingham International Long".into(),
+            max_players: 40,
+            distance: Some(2.521),
+        },
+    );
+    m.insert(
+        "RO11".into(),
+        TrackInfo {
+            code: "RO11".into(),
+            name: "Rockingham Sports Car".into(),
+            max_players: 40,
+            distance: Some(1.674),
+        },
+    );
+    m.insert(
+        "LA1".into(),
+        TrackInfo {
+            code: "LA1".into(),
+            name: "Layout Square, Long Grid".into(),
+            max_players: 40,
+            distance: None,
+        },
+    );
+    m.insert(
+        "LA2".into(),
+        TrackInfo {
+            code: "LA2".into(),
+            name: "Layout Square, Wide Grid".into(),
+            max_players: 40,
+            distance: None,
+        },
+    );
+
+    m
+});
 
 /// Lookup a [TrackInfo] from a track name
-pub fn lookup(input: &[u8]) -> Option<&TrackInfo> {
+pub fn lookup(input: &[u8]) -> Option<TrackInfo> {
     if let Some(rpos) = input.iter().rposition(|x| ![b'X', b'R', 0].contains(x)) {
         if let Ok(short_code) = std::str::from_utf8(&input[..=rpos]) {
-            return TRACK_INFO.iter().find(|x| x.0 == short_code);
+            return TRACK_INFO.get(short_code).cloned();
         }
     }
     None
@@ -92,7 +496,7 @@ impl Track {
     }
 
     /// Lookup the [TrackInfo] for this track.
-    pub fn track_info(&self) -> Option<&TrackInfo> {
+    pub fn track_info(&self) -> Option<TrackInfo> {
         lookup(&self.inner)
     }
 }
