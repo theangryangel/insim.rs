@@ -2,7 +2,7 @@ use chrono::prelude::*;
 use insim::protocol::identifiers::ConnectionId;
 use serde::Serialize;
 
-#[derive(Debug, Default, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Chat {
     pub at: DateTime<Utc>,
     pub ucid: ConnectionId,
@@ -10,6 +10,19 @@ pub struct Chat {
     pub uname: String,
     pub colour: String,
     pub body: String,
+}
+
+impl Default for Chat {
+    fn default() -> Self {
+        Self {
+            at: Utc::now(),
+            ucid: ConnectionId::default(),
+            pname: "".into(),
+            uname: "".into(),
+            colour: "".into(),
+            body: "".into(),
+        }
+    }
 }
 
 impl Chat {

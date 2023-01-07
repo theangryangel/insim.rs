@@ -128,11 +128,11 @@ pub struct Pla {
 }
 
 impl Pla {
-    pub fn entered(self) -> bool {
+    pub fn entered(&self) -> bool {
         self.fact != PitLaneFact::Exit
     }
 
-    pub fn exited(self) -> bool {
+    pub fn exited(&self) -> bool {
         !self.entered()
     }
 }

@@ -4,8 +4,7 @@ use miette::{IntoDiagnostic, Result};
 use std::{path, sync::Arc};
 
 mod config;
-mod insim_instance;
-mod insim_manager;
+mod insim;
 mod state;
 mod web;
 
@@ -41,7 +40,7 @@ pub async fn main() -> Result<()> {
 
     // FIXME implement config reloading
 
-    let mut manager = insim_manager::Manager::new();
+    let mut manager = crate::insim::InsimManager::new();
     manager.update_from_config(&config);
 
     let templates = web::templating::Engine::new(config.web.templates_to_path_buf(), false);

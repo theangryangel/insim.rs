@@ -1,6 +1,6 @@
 pub(crate) mod templating;
 
-use crate::state::{chat::Chat, Connection, Game};
+use crate::state::{Connection, Game};
 use axum::{
     extract::Path,
     response::{sse, Html, IntoResponse, Response},
@@ -13,7 +13,7 @@ use miette::Result;
 use minijinja::context;
 use std::sync::Arc;
 
-use crate::insim_manager::Manager;
+use crate::insim::InsimManager as Manager;
 
 pub(crate) async fn servers_index(
     tmpl: Extension<templating::Engine>,
@@ -42,19 +42,24 @@ pub(crate) async fn servers_show(
     tmpl: Extension<templating::Engine>,
     manager: Extension<Arc<Manager>>,
 ) -> impl IntoResponse {
-    let servers = &manager.instances.get(&server).unwrap().state;
+    let handle = &manager.instances.get(&server).unwrap().handle;
+
+    let players = handle.get_players().await;
+    let connections = handle.get_connections().await;
+    let game = handle.get_game().await;
+    let chat = handle.get_chat().await;
 
     let res = tmpl
         .render(
             "servers_show.html",
             context! {
-                players => servers.get_players(true),
-                connections => servers.get_connections(),
+                players => players,
+                connections => connections,
                 name => &server,
-                chat => servers.chat().iter().cloned().collect::<Vec<Chat>>(),
-                player_count => servers.get_player_count(),
-                connection_count => servers.get_connection_count(),
-                game => servers.game(),
+                chat => chat,
+                player_count => players.len(),
+                connection_count => connections.len(),
+                game => game,
             },
         )
         .unwrap(); // FIXME
@@ -72,29 +77,35 @@ pub(crate) async fn servers_live(
     tmpl: Extension<templating::Engine>,
     manager: Extension<Arc<Manager>>,
 ) -> sse::Sse<impl futures::stream::Stream<Item = Result<sse::Event, std::convert::Infallible>>> {
-    let s = &manager.instances.get(&server).unwrap().state;
-    let s = s.clone();
+    let s = manager.instances.get(&server).unwrap().handle.clone();
 
     let stream = async_stream::stream! {
         loop {
 
-            let notify_on_player = s.notify_on_player();
-            let notify_on_chat = s.notify_on_chat();
+            let notifiers = s.get_notifiers().await;
+
+            let notify_on_player = notifiers.players;
+            let notify_on_chat = notifiers.chat;
 
             tokio::select! {
                 _ = notify_on_player.notified() => {
+
+                    let game = s.get_game().await;
+                    let players = s.get_players().await;
+                    let connections = s.get_connections().await;
+
                     let res = tmpl
                     .render("servers_info.html", context! {
-                        players => (s.get_players(true)),
-                        connections => (s.get_connections()),
+                        players => players,
+                        connections => connections,
                         name => "",
                     }).unwrap();
 
                     yield Ok(sse::Event::default().event("players").data(res));
 
                     let game = Live {
-                        game: s.game(),
-                        players: s.get_players(true),
+                        game: game,
+                        players: players,
                     };
 
                     yield Ok(
@@ -103,10 +114,11 @@ pub(crate) async fn servers_live(
                 },
 
                 _ = notify_on_chat.notified() => {
+                    let chat = s.get_chat().await;
 
                     let res = tmpl
                     .render("servers_chat.html", context! {
-                        chat => s.chat().iter().cloned().collect::<Vec<Chat>>(),
+                        chat => chat,
                     }).unwrap();
 
                     yield Ok(sse::Event::default().event("message").data(res));
@@ -126,7 +138,7 @@ pub(crate) async fn track_map(
     Path(server): Path<String>,
     manager: Extension<Arc<Manager>>,
 ) -> impl IntoResponse {
-    let s = &manager.instances.get(&server).unwrap().state;
+    let s = &manager.instances.get(&server).unwrap().handle;
 
     let mut document = svg::Document::new();
 
@@ -142,7 +154,7 @@ pub(crate) async fn track_map(
 
     // FIXME this is all shit
     //
-    let track = s.game().track.unwrap();
+    let track = s.get_game().await.track.unwrap();
 
     let path_glob = std::path::Path::new(
         // FIXME this should maybe be build time?
