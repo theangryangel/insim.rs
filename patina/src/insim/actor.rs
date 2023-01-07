@@ -133,7 +133,10 @@ pub(crate) async fn run(mut actor: InsimActor) -> Result<()> {
 
             msg = actor.rx.recv() => match msg {
                 Some(msg) => actor.handle_actor_message(msg),
-                None => todo!(),
+                None => {
+                    actor.client.shutdown();
+                    break;
+                }
             },
         }
     }

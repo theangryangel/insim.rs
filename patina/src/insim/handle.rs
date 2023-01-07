@@ -1,38 +1,26 @@
-use std::sync::Arc;
-
 use crate::config::definition::Server as ServerConfig;
 use crate::state::chat::Chat;
 use crate::state::{Connection, Game, Notifiers};
-use miette::Result;
 use tokio::sync::mpsc;
-use tokio::{sync::oneshot, task::JoinHandle};
+use tokio::sync::oneshot;
 
 use super::actor::{InsimActor, InsimActorMessage};
 
 #[derive(Clone)]
 pub(crate) struct InsimHandle {
     pub(crate) tx: mpsc::Sender<InsimActorMessage>,
-
-    pub(crate) handle: Arc<JoinHandle<Result<()>>>, // FIXME, can we get rid of the Arc?
 }
 
 impl InsimHandle {
     pub(crate) fn new(config: &ServerConfig) -> Self {
         let (tx, rx) = mpsc::channel(8);
         let actor = InsimActor::new(rx, config.as_insim_config().unwrap());
-        let handle = tokio::spawn(super::actor::run(actor));
+        tokio::spawn(super::actor::run(actor));
 
-        Self {
-            tx,
-            handle: Arc::new(handle),
-        }
+        Self { tx }
     }
 
-    #[allow(dead_code)]
-    async fn shutdown(&self) {
-        // FIXME this should request a clean shutdown first
-        self.handle.abort()
-    }
+    // FIXME to shutdown we just drop the handle.
 
     async fn request_connections(&self, players_only: bool, flipped: bool) -> Vec<Connection> {
         let (send, recv) = oneshot::channel();
