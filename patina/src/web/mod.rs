@@ -6,7 +6,7 @@ use axum::{
     response::{sse, Html, IntoResponse, Response},
     Extension,
 };
-use insim::file::pth::Pth;
+use insim::file::pth::{Node, Pth};
 use serde::Serialize;
 
 use miette::Result;
@@ -43,6 +43,8 @@ pub(crate) async fn servers_show(
     manager: Extension<Arc<Manager>>,
 ) -> impl IntoResponse {
     let handle = &manager.instances.get(&server).unwrap().handle;
+
+    println!("{:?}", server);
 
     let players = handle.get_players().await;
     let connections = handle.get_connections().await;
@@ -148,9 +150,10 @@ pub(crate) async fn track_map(
     let mut viewbox_y: (f32, f32) = (0.0, 0.0);
 
     let background_colour = String::from("#3D9970");
+    let track_colour_hidden = String::from("#6B7280");
     let track_colour = String::from("#111111");
     let viewbox_padding = 10.0;
-    let resolution = 2.0;
+    let resolution = 4.0;
 
     // FIXME this is all shit
     //
@@ -183,8 +186,15 @@ pub(crate) async fn track_map(
     for i in paths {
         let p = Pth::from_file(&i).unwrap();
 
+        // restrict the number of nodes to our given "resolution"
         // wrap around the nodes to avoid missing "notches" in the track drawing
-        let mut nodes = p.nodes.clone();
+        let mut nodes: Vec<Node> = p
+            .nodes
+            .iter()
+            .enumerate()
+            .filter(|&(i, _)| i as f32 % resolution == 0.0)
+            .map(|(_, i)| *i)
+            .collect();
         nodes.insert(0, *nodes.last().unwrap());
         nodes.iter_mut().for_each(|c| {
             c.center = c.center.flipped();
@@ -199,8 +209,6 @@ pub(crate) async fn track_map(
     for nodes in all_pth_nodes.iter() {
         let mut fwd = Vec::with_capacity(nodes.len() * 2);
         let mut bck = Vec::with_capacity(nodes.len());
-
-        let mut i = 1.0;
 
         for node in nodes.iter() {
             let limits = node.get_outer_limit(Some(DEFAULT_SCALE));
@@ -217,12 +225,8 @@ pub(crate) async fn track_map(
             viewbox_y.1 = viewbox_y.1.max(limits.0.y);
             viewbox_y.1 = viewbox_y.1.max(limits.1.y);
 
-            if i % resolution == 0.0 {
-                fwd.push((limits.0.x, limits.0.y));
-                bck.push((limits.1.x, limits.1.y));
-            }
-
-            i += 1.0;
+            fwd.push((limits.0.x, limits.0.y));
+            bck.push((limits.1.x, limits.1.y));
         }
 
         fwd.extend(bck.iter().rev());
@@ -241,19 +245,15 @@ pub(crate) async fn track_map(
     }
 
     // draw all the roads next
-    for nodes in all_pth_nodes.iter() {
+    let mut peekable = all_pth_nodes.iter().peekable();
+    while let Some(nodes) = peekable.next() {
         let mut fwd = Vec::with_capacity(nodes.len() * 2);
         let mut bck = Vec::with_capacity(nodes.len());
-        let mut i = 1.0;
 
         for node in nodes.iter() {
-            if i % resolution == 0.0 {
-                let limits = node.get_road_limit(Some(DEFAULT_SCALE));
-                fwd.push((limits.0.x, limits.0.y));
-                bck.push((limits.1.x, limits.1.y));
-            }
-
-            i += 1.0;
+            let limits = node.get_road_limit(Some(DEFAULT_SCALE));
+            fwd.push((limits.0.x, limits.0.y));
+            bck.push((limits.1.x, limits.1.y));
         }
 
         fwd.extend(bck.iter().rev());
@@ -264,8 +264,14 @@ pub(crate) async fn track_map(
             .collect::<Vec<String>>()
             .join(" ");
 
+        let style = if peekable.peek().is_none() {
+            &track_colour
+        } else {
+            &track_colour_hidden
+        };
+
         let poly = svg::node::element::Polygon::new()
-            .set("style", format!("fill: {}", track_colour))
+            .set("style", format!("fill: {}", style))
             .set("points", points);
 
         document = document.add(poly);
