@@ -1,41 +1,30 @@
-use deku::prelude::*;
+use insim_core::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 use crate::protocol::identifiers::{PlayerId, RequestId};
 
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 pub enum CameraView {
-    #[deku(id = "0")]
     /// Arcade "follow" view
-    Follow,
+    Follow = 0,
 
-    #[deku(id = "1")]
     /// Helicopter view
-    Helicopter,
+    Helicopter = 1,
 
-    #[deku(id = "2")]
     /// Static TV camera views
-    TvCamera,
+    TvCamera = 2,
 
-    #[deku(id = "3")]
     /// Driver/cockpit view
-    Driver,
+    Driver = 3,
 
-    #[deku(id = "4")]
     /// Custom view
-    Custom,
+    Custom = 4,
 
-    #[deku(id = "255")]
     /// Viewing another player/vehicle
-    OtherVehicle,
+    OtherVehicle = 255,
 }
 
 impl Default for CameraView {
@@ -44,13 +33,8 @@ impl Default for CameraView {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 // Camera Change
 pub struct Cch {
     pub reqi: RequestId,

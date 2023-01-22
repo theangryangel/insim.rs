@@ -1,16 +1,11 @@
-use deku::prelude::*;
+use insim_core::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 use crate::protocol::identifiers::{PlayerId, RequestId};
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Used within [Con] packet to give a break down of information about the Contact between the two
 /// players.
 pub struct ConInfo {
@@ -42,13 +37,8 @@ pub struct ConInfo {
     pub y: i16,
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Contact
 pub struct Con {
     #[deku(pad_bytes_after = "1")]

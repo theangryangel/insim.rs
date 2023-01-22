@@ -1,14 +1,16 @@
-use crate::packet_flags;
-use crate::protocol::identifiers::{PlayerId, RequestId};
-use crate::protocol::position::Point;
 #[cfg(feature = "uom")]
 use crate::units;
-use deku::prelude::*;
+
+use insim_core::prelude::*;
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-packet_flags! {
+use bitflags::bitflags;
+use crate::protocol::identifiers::{PlayerId, RequestId};
+use crate::protocol::position::Point;
+
+bitflags! {
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct CompCarInfo: u8 {
         BLUE_FLAG => (1 << 0),
@@ -19,13 +21,8 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Used within the [Mci] packet info field.
 pub struct CompCar {
     /// Index of the last "node" that the player passed through.
@@ -89,13 +86,8 @@ impl CompCar {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Multi Car Info - positional information for players/vehicles.
 /// The MCI packet does not contain the positional information for all players. Only some. The
 /// maximum number of players depends on the version of Insim.

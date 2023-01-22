@@ -1,19 +1,16 @@
 //! Utility functions for working with vehicles and fetching vehicle data.
 
-use crate::string::{is_ascii_alphanumeric, strip_trailing_nul};
-use deku::prelude::*;
+use insim_core::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use crate::string::{is_ascii_alphanumeric, strip_trailing_nul};
+
 /// Handles parsing a vehicle name according to the Insim v9 rules.
 /// See <https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info>
-#[derive(Debug, PartialEq, Eq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, PartialEq, Eq, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 pub struct Vehicle {
     pub inner: [u8; 4],
 }

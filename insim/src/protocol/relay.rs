@@ -8,38 +8,28 @@
 //!
 //! See [https://en.lfsmanual.net/wiki/InSim_Relay](https://en.lfsmanual.net/wiki/InSim_Relay) for more information.
 
-use crate::packet_flags;
-use crate::string::{istring, CodepageString};
-use crate::track::Track;
-use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
+
+use bitflags::bitflags;
+
+use crate::string::{istring, CodepageString};
+use crate::track::Track;
 
 use super::identifiers::RequestId;
 
 /// Ask the relay if we are logged in as an administrative user on the selected host. A
 /// [AdminResponse] is sent back by the relay.
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[derive(Debug, Clone, Default, InsimEncode, InsimDecode)]
 pub struct AdminRequest {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 }
 
 /// Reponse to a [AdminRequest] packet, indicating if we are logged in as an administrative user on
 /// the selected host.
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, Clone, Default, InsimEncode, InsimDecode)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 pub struct AdminResponse {
     /// Optional request identifier. If a request identifier was sent in the request, it will be
     /// included in any relevant response packet.
@@ -50,19 +40,14 @@ pub struct AdminResponse {
 
 /// Request a list of available hosts from the Insim Relay. After sending this packet the relay
 /// will respond with a HostList packet.
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, Clone, Default, InsimEncode, InsimDecode)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 pub struct HostListRequest {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 }
 
-packet_flags! {
+bitflags! {
     /// Bitwise flags used within the [HostInfo] packet, which is in turn used by the [HostList]
     /// packet.
     #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -77,15 +62,10 @@ packet_flags! {
 }
 
 /// Information about a host. Used within the [HostList] packet.
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, Clone, Default, InsimEncode, InsimDecode)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 pub struct HostInfo {
-    #[deku(bytes = "32")]
+    #[insim(bytes = "32")]
     pub hname: CodepageString,
 
     pub track: Track,
@@ -98,86 +78,56 @@ pub struct HostInfo {
 /// The relay will send a list of available hosts using this packet. There may be more than one
 /// HostList packet sent in response to a [HostListRequest]. You may use the [HostInfoFlags] to
 /// determine if the host is the last in the list.
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, Clone, Default, InsimEncode, InsimDecode)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 pub struct HostList {
     pub reqi: RequestId,
 
     pub numhosts: u8,
 
-    #[deku(count = "numhosts")]
+    #[insim(count = "numhosts")]
     pub hinfo: Vec<HostInfo>,
 }
 
 /// Send a HostSelect to the relay in order to start receiving information about the selected host.
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, Clone, Default, InsimEncode, InsimDecode)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 pub struct HostSelect {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
-    #[deku(bytes = "32")]
+    #[insim(bytes = "32")]
     pub hname: CodepageString,
 
-    #[deku(
-        reader = "istring::read(deku::rest, 16)",
-        writer = "istring::write(deku::output, &self.admin, 16)"
-    )]
     pub admin: String,
 
-    #[deku(
-        reader = "istring::read(deku::rest, 16)",
-        writer = "istring::write(deku::output, &self.spec, 16)"
-    )]
     pub spec: String,
 }
 
 /// Enum of possible errors  that the Insim Relay can respond with.
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, Clone, InsimEncode, InsimDecode)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 pub enum RelayErrorKind {
-    #[deku(id = "0")]
-    None,
+    None = 0,
 
     /// Packet length or structure is invalid.
-    #[deku(id = "1")]
-    InvalidPacketLength,
+    InvalidPacketLength = 1,
 
     /// Packet type cannot be forward to the host.
-    #[deku(id = "2")]
-    InvalidPacketType,
+    InvalidPacketType = 2,
 
     /// Invalid hostname
-    #[deku(id = "3")]
-    InvalidHostname,
+    InvalidHostname = 3,
 
     /// Administrative password was rejected.
-    #[deku(id = "4")]
-    BadAdminPassword,
+    BadAdminPassword = 4,
 
     /// Spectator password was rejected.
-    #[deku(id = "5")]
-    BadSpectatorPassword,
+    BadSpectatorPassword = 5,
 
     /// Spectator password was required but not provided.
-    #[deku(id = "6")]
-    MissingSpectatorPassword,
+    MissingSpectatorPassword = 6,
 }
 
 impl Default for RelayErrorKind {
@@ -187,13 +137,8 @@ impl Default for RelayErrorKind {
 }
 
 /// The relay will send this packet when it encounters an error.
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, Clone, Default, InsimEncode, InsimDecode)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 pub struct RelayError {
     pub reqi: RequestId,
 

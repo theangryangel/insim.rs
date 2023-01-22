@@ -1,25 +1,19 @@
-use crate::{packet_flags, protocol::identifiers::RequestId};
-use deku::prelude::*;
+use insim_core::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+use crate::protocol::identifiers::RequestId;
+
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 pub enum OcoAction {
-    #[deku(id = "4")]
-    LightsReset,
+    LightsReset = 4,
 
-    #[deku(id = "5")]
-    LightsSet,
+    LightsSet = 5,
 
-    #[deku(id = "6")]
-    LightsUnset,
+    LightsUnset = 6,
 }
 
 impl Default for OcoAction {
@@ -28,20 +22,13 @@ impl Default for OcoAction {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 pub enum OcoIndex {
-    #[deku(id = "149")]
-    AxoStartLights,
+    AxoStartLights = 149,
 
-    #[deku(id = "240")]
-    MainLights,
+    MainLights = 240,
 }
 
 impl Default for OcoIndex {
@@ -50,7 +37,7 @@ impl Default for OcoIndex {
     }
 }
 
-packet_flags! {
+bitflags! {
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct OcoLights: u8 {
         RED1 => (1 << 0),
@@ -60,13 +47,8 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Object Control
 /// Used to switch start lights
 pub struct Oco {

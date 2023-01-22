@@ -1,18 +1,15 @@
-use deku::prelude::*;
+use insim_core::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
+
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
 #[derive(
-    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, DekuRead, DekuWrite, Clone, Copy, Default,
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, InsimEncode, InsimDecode, Clone, Copy, Default,
 )]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 pub struct ConnectionId(u8);
 
 impl fmt::Display for ConnectionId {
@@ -22,14 +19,9 @@ impl fmt::Display for ConnectionId {
 }
 
 #[derive(
-    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, DekuRead, DekuWrite, Clone, Copy, Default,
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, InsimEncode, InsimDecode, Clone, Copy, Default,
 )]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 pub struct PlayerId(u8);
 
 impl fmt::Display for PlayerId {
@@ -39,14 +31,9 @@ impl fmt::Display for PlayerId {
 }
 
 #[derive(
-    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, DekuRead, DekuWrite, Clone, Copy, Default,
+    Debug, Ord, PartialOrd, PartialEq, Eq, Hash, InsimEncode, InsimDecode, Clone, Copy, Default,
 )]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 pub struct RequestId(pub u8);
 
 impl fmt::Display for RequestId {

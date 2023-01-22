@@ -2,11 +2,11 @@
 
 use super::Packet;
 use crate::error::Error;
-use deku::{DekuContainerWrite, DekuError};
 use std::convert::TryFrom;
 use std::io;
 use tokio_util::codec::{Decoder, Encoder};
 use tracing;
+use insim_core::{InsimDecodable, InsimEncodable};
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
@@ -97,8 +97,6 @@ impl Default for Codec {
 
 impl Decoder for Codec {
     type Item = Packet;
-
-    // TODO return custom error
     type Error = Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
@@ -113,29 +111,18 @@ impl Decoder for Codec {
             }
         };
 
-        let data = src.split_to(n);
+        let mut data = src.split_to(n);
 
-        let res = Self::Item::try_from(data.as_ref());
+        let res = Self::Item::decode(&mut data, None);
 
         match res {
             Ok(packet) => {
                 tracing::debug!("decoded: {:?}", packet);
                 Ok(Some(packet))
             }
-            Err(DekuError::Incomplete(e)) => {
-                // If we're here, everything has gone very wonky.
-                panic!(
-                    "malformed packet! this is probably a programming error, error: {:?}, input: {:?}",
-                    e,
-                    data.to_vec(),
-                );
-            }
-            Err(DekuError::Parse(e)) => {
-                tracing::error!("unsupported packet: {:?}: {:?}", e, data.to_vec());
-                Ok(None)
-            }
             Err(e) => {
                 tracing::error!("unhandled error: {:?}", e);
+                panic!("unhandled error: {:?}", e);
                 Err(e.into())
             }
         }
@@ -147,7 +134,7 @@ impl Encoder<Packet> for Codec {
 
     fn encode(&mut self, msg: Packet, dst: &mut BytesMut) -> Result<(), Error> {
         let data = msg.to_bytes()?;
-        let data = Bytes::from(data);
+        let data = msg.encode(buf)?;
 
         let n = data.len();
 

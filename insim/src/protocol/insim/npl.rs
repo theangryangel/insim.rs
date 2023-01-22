@@ -1,46 +1,34 @@
-use crate::packet_flags;
-use crate::protocol::identifiers::{ConnectionId, PlayerId, RequestId};
-use crate::string::{istring, CodepageString};
-use crate::vehicle::Vehicle;
-use deku::prelude::*;
+use insim_core::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use bitflags::bitflags;
+use crate::protocol::identifiers::{ConnectionId, PlayerId, RequestId};
+use crate::string::{istring, CodepageString};
+use crate::vehicle::Vehicle;
+
 #[derive(Debug, DekuRead, DekuWrite, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 pub enum TyreCompound {
-    #[deku(id = "0")]
-    R1,
+    R1 = 0,
 
-    #[deku(id = "1")]
-    R2,
+    R2 = 1,
 
-    #[deku(id = "2")]
-    R3,
+    R3 = 2,
 
-    #[deku(id = "3")]
-    R4,
+    R4 = 3,
 
-    #[deku(id = "4")]
-    RoadSuper,
+    RoadSuper = 4,
 
-    #[deku(id = "5")]
-    RoadNormal,
+    RoadNormal = 5,
 
-    #[deku(id = "6")]
-    Hybrid,
+    Hybrid = 6,
 
-    #[deku(id = "7")]
-    Knobbly,
+    Knobbly = 7,
 
-    #[deku(id = "255")]
-    NoChange,
+    NoChange = 255,
 }
 
 impl Default for TyreCompound {
@@ -49,7 +37,7 @@ impl Default for TyreCompound {
     }
 }
 
-packet_flags! {
+bitflags! {
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct PlayerFlags: u16 {
         SWAPSIDE => (1 << 0),
@@ -71,11 +59,6 @@ packet_flags! {
 
 #[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Sent when a New Player joins.
 pub struct Npl {
     pub reqi: RequestId,

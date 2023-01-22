@@ -1,98 +1,67 @@
-use deku::prelude::*;
+use insim_core::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 use crate::protocol::identifiers::RequestId;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 pub enum TinyType {
-    #[deku(id = "0")]
-    None,
+    None = 0,
 
-    #[deku(id = "1")]
-    Version,
+    Version = 1,
 
-    #[deku(id = "2")]
-    Close,
+    Close = 2,
 
-    #[deku(id = "3")]
-    Ping,
+    Ping = 3,
 
-    #[deku(id = "4")]
-    Pong,
+    Pong = 4,
 
-    #[deku(id = "5")]
-    Vtc,
+    Vtc = 5,
 
-    #[deku(id = "6")]
-    Scp,
+    Scp = 6,
 
-    #[deku(id = "7")]
-    Sst,
+    Sst = 7,
 
-    #[deku(id = "8")]
-    Gth,
+    Gth = 8,
 
-    #[deku(id = "9")]
-    Mpe,
+    Mpe = 9,
 
-    #[deku(id = "10")]
-    Ism,
+    Ism = 10,
 
-    #[deku(id = "11")]
-    Ren,
+    Ren = 11,
 
-    #[deku(id = "12")]
-    Clr,
+    Clr = 12,
 
-    #[deku(id = "13")]
-    Ncn,
+    Ncn = 13,
 
-    #[deku(id = "14")]
-    Npl,
+    Npl = 14,
 
-    #[deku(id = "15")]
-    Res,
+    Res = 15,
 
-    #[deku(id = "16")]
-    Nlp,
+    Nlp = 16,
 
-    #[deku(id = "17")]
-    Mci,
+    Mci = 17,
 
-    #[deku(id = "18")]
-    Reo,
+    Reo = 18,
 
-    #[deku(id = "19")]
-    Rst,
+    Rst = 19,
 
-    #[deku(id = "20")]
-    Axi,
+    Axi = 20,
 
-    #[deku(id = "21")]
-    Axc,
+    Axc = 21,
 
-    #[deku(id = "22")]
-    Rip,
+    Rip = 22,
 
-    #[deku(id = "23")]
-    Nci,
+    Nci = 23,
 
-    #[deku(id = "24")]
-    Alc,
+    Alc = 24,
 
-    #[deku(id = "25")]
-    Axm,
+    Axm = 25,
 
-    #[deku(id = "26")]
-    Slc,
+    Slc = 26,
 }
 
 impl Default for TinyType {
@@ -101,13 +70,8 @@ impl Default for TinyType {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// General purpose Tiny packet
 pub struct Tiny {
     pub reqi: RequestId,

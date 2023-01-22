@@ -1,19 +1,16 @@
+use insim_core::prelude::*;
+
+#[cfg(feature = "serde")]
+use serde::Serialize;
+
 use super::Wind;
 use crate::{
     protocol::identifiers::{PlayerId, RequestId},
     track::Track,
 };
-use deku::prelude::*;
-#[cfg(feature = "serde")]
-use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// State
 pub struct Sta {
     #[deku(pad_bytes_after = "1")]

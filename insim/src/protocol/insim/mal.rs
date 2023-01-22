@@ -1,21 +1,18 @@
+use insim_core::prelude::*;
+
+#[cfg(feature = "serde")]
+use serde::Serialize;
+
 use crate::{
     error::Error,
     protocol::identifiers::{ConnectionId, RequestId},
 };
-use deku::prelude::*;
-#[cfg(feature = "serde")]
-use serde::Serialize;
 use std::default::Default;
 
 const MAX_MAL_SIZE: usize = 120;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Mods Allowed - restrict the mods that can be used
 pub struct Mal {
     pub reqi: RequestId,

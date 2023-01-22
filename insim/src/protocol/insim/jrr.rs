@@ -1,43 +1,32 @@
-use crate::protocol::identifiers::{ConnectionId, PlayerId, RequestId};
-
-use super::ObjectInfo;
 use deku::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+use crate::protocol::identifiers::{ConnectionId, PlayerId, RequestId};
+
+use super::ObjectInfo;
+
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 /// Used within the [Jrr] packet.
 pub enum JrrAction {
-    #[deku(id = "0")]
-    Reject,
+    Reject = 0,
 
-    #[deku(id = "1")]
-    Spawn,
+    Spawn = 1,
 
-    #[deku(id = "2")]
-    Unused2,
+    Unused2 = 2,
 
-    #[deku(id = "3")]
-    Unused3,
+    Unused3 = 3,
 
-    #[deku(id = "4")]
-    Reset,
+    Reset = 4,
 
-    #[deku(id = "5")]
-    ResetNoRepair,
+    ResetNoRepair = 5,
 
-    #[deku(id = "6")]
-    Unused6,
+    Unused6 = 6,
 
-    #[deku(id = "7")]
-    Unused7,
+    Unused7 = 7,
 }
 
 impl Default for JrrAction {
@@ -46,13 +35,8 @@ impl Default for JrrAction {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Join Request Reply
 /// Set the ISF_REQ_JOIN flag in the IS_ISI to receive join requests
 ///

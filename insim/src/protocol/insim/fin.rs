@@ -1,13 +1,15 @@
-use super::PlayerFlags;
-use crate::{
-    packet_flags,
-    protocol::identifiers::{PlayerId, RequestId},
-};
-use deku::prelude::*;
+use insim_core::prelude::*;
+use bitflags::bitflags;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-packet_flags! {
+use super::PlayerFlags;
+use crate::{
+    protocol::identifiers::{PlayerId, RequestId},
+};
+
+bitflags! {
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct RaceResultFlags: u8 {
         MENTIONED => (1 << 0),
@@ -34,13 +36,8 @@ impl RaceResultFlags {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Provisional finish notification: This is not a final result, you should use the [Res](super::Res) packet for this instead.
 pub struct Fin {
     pub reqi: RequestId,

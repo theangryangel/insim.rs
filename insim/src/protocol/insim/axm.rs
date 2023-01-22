@@ -1,16 +1,11 @@
 use crate::protocol::identifiers::{ConnectionId, RequestId};
-use deku::prelude::*;
+use insim_core::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 /// Used within the [Axm] packet.
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 pub struct ObjectInfo {
     pub x: i16,
     pub y: i16,
@@ -21,41 +16,27 @@ pub struct ObjectInfo {
 }
 
 /// Actions that can be taken as part of [Axm].
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 pub enum PmoAction {
-    #[deku(id = "0")]
-    LoadingFile,
+    LoadingFile = 0,
 
-    #[deku(id = "1")]
-    AddObjects,
+    AddObjects = 1,
 
-    #[deku(id = "2")]
-    DelObjects,
+    DelObjects = 2,
 
-    #[deku(id = "3")]
-    ClearAll,
+    ClearAll = 3,
 
-    #[deku(id = "4")]
-    TinyAxm,
+    TinyAxm = 4,
 
-    #[deku(id = "5")]
-    TtcSel,
+    TtcSel = 5,
 
-    #[deku(id = "6")]
-    Selection,
+    Selection = 6,
 
-    #[deku(id = "7")]
-    Position,
+    Position = 7,
 
-    #[deku(id = "8")]
-    GetZ,
+    GetZ = 8,
 }
 
 impl Default for PmoAction {
@@ -65,13 +46,8 @@ impl Default for PmoAction {
 }
 
 /// AutoX Multiple Objects
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 pub struct Axm {
     pub reqi: RequestId,
     pub numo: u8,

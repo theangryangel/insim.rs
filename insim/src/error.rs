@@ -1,15 +1,13 @@
 //! Error types for the library.
 
+use insim_core::{DecodableError, EncodableError};
+
 use crate::protocol::relay::{RelayError, RelayErrorKind};
-use deku::DekuError;
 use miette::Diagnostic;
 use std::io::ErrorKind;
 use thiserror::Error as ThisError;
 
-use super::trait;
-
 // FIXME - we should probably drop the derive clone here?
-
 #[non_exhaustive]
 #[derive(ThisError, Diagnostic, Debug, Clone)]
 pub enum Error {
@@ -35,10 +33,10 @@ pub enum Error {
     Relay(RelayErrorKind),
 
     #[error("Failed to decode packet: {0:?}")]
-    Decoding(#[from] trait::DecodeError),
+    Decoding(#[from] DecodableError),
 
     #[error("Failed to encode packet: {0:?}")]
-    Encoding(#[from] trait::EncodeError),
+    Encoding(#[from] EncodableError),
 
 }
 

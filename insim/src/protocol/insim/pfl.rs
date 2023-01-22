@@ -1,17 +1,14 @@
-use crate::protocol::identifiers::{PlayerId, RequestId};
+use insim_core::prelude::*;
 
-use super::PlayerFlags;
-use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+use crate::protocol::identifiers::{PlayerId, RequestId};
+
+use super::PlayerFlags;
+
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Player Flags
 pub struct Pfl {
     pub reqi: RequestId,

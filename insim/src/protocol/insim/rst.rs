@@ -1,18 +1,16 @@
-use crate::packet_flags;
-use crate::protocol::identifiers::RequestId;
-use crate::track::Track;
-use deku::prelude::*;
+use insim_core::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Copy)]
+use bitflags::bitflags;
+
+use crate::protocol::identifiers::RequestId;
+use crate::track::Track;
+
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 pub enum Wind {
     #[deku(id = "0")]
     None,
@@ -28,7 +26,7 @@ impl Default for Wind {
     }
 }
 
-packet_flags! {
+bitflags! {
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct HostFacts: u16 {
         CAN_VOTE => (1 << 0),
@@ -41,13 +39,8 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Race Start
 pub struct Rst {
     #[deku(pad_bytes_after = "1")]

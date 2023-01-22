@@ -1,28 +1,21 @@
-use crate::{protocol::identifiers::RequestId, string::istring};
-use deku::prelude::*;
+use insim_core::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+use crate::{protocol::identifiers::RequestId, string::istring};
+
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 pub enum SshError {
-    #[deku(id = "0")]
-    Ok,
+    Ok = 0,
 
-    #[deku(id = "1")]
-    Dedicated,
+    Dedicated = 1,
 
-    #[deku(id = "2")]
-    Corrupted,
+    Corrupted = 2,
 
-    #[deku(id = "2")]
-    NoSave,
+    NoSave = 2,
 }
 
 impl Default for SshError {
@@ -31,13 +24,8 @@ impl Default for SshError {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Send Screenshot
 pub struct Ssh {
     pub reqi: RequestId,

@@ -1,11 +1,13 @@
-use crate::packet_flags;
-use crate::protocol::identifiers::RequestId;
-use crate::string::istring;
-use deku::prelude::*;
+use insim_core::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-packet_flags! {
+use bitflags::bitflags;
+use crate::protocol::identifiers::RequestId;
+use crate::string::istring;
+
+bitflags! {
     /// Flags for the [Init] packet flags field.
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct InitFlags: u16 {
@@ -24,13 +26,8 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Insim Init, or handshake packet.
 /// Required to be sent to the server before any other packets.
 pub struct Init {

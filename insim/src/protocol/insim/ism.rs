@@ -1,15 +1,12 @@
-use crate::{protocol::identifiers::RequestId, string::CodepageString};
-use deku::prelude::*;
+use insim_core::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+use crate::{protocol::identifiers::RequestId, string::CodepageString};
+
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Insim Multiplayer - LFS sends this when a host is started or joined
 pub struct Ism {
     #[deku(pad_bytes_after = "1")]

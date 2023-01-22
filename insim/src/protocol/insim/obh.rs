@@ -1,13 +1,15 @@
-use deku::prelude::*;
+use insim_core::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use bitflags::bitflags;
+
 use crate::{
-    packet_flags,
     protocol::identifiers::{PlayerId, RequestId},
 };
 
-packet_flags! {
+bitflags! {
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct ObhFlags: u8 {
         LAYOUT => (1 << 0),
@@ -17,13 +19,8 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 pub struct CarContact {
     pub direction: u8,
     pub heading: u8,
@@ -33,13 +30,8 @@ pub struct CarContact {
     pub y: i16,
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Object Hit
 pub struct Obh {
     pub reqi: RequestId,

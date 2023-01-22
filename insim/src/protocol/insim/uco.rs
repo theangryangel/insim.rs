@@ -1,30 +1,23 @@
-use crate::protocol::identifiers::{PlayerId, RequestId};
+use insim_core::prelude::*;
 
-use super::{CarContact, ObjectInfo};
-use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+use crate::protocol::identifiers::{PlayerId, RequestId};
+
+use super::{CarContact, ObjectInfo};
+
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 pub enum UcoAction {
-    #[deku(id = "0")]
-    Entered, // entered a circle
+    Entered = 0, // entered a circle
 
-    #[deku(id = "1")]
-    Left, // left a circle
+    Left = 1, // left a circle
 
-    #[deku(id = "2")]
-    CrossForwards, // crossed cp in forward direction
+    CrossForwards = 2, // crossed cp in forward direction
 
-    #[deku(id = "3")]
-    CrossedReverse,
+    CrossedReverse = 3,
 }
 
 impl Default for UcoAction {
@@ -33,13 +26,8 @@ impl Default for UcoAction {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// User Control Object
 pub struct Uco {
     pub reqi: RequestId,

@@ -4,7 +4,7 @@ members = [
   "multi_index_derive",
   "insim_core",
   "insim_derive",
-  # #"insim",
+  "insim",
   # "patina",
   # "pth2svg",
   # "smx2svg",

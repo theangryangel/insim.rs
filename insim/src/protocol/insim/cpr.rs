@@ -2,17 +2,12 @@ use crate::{
     protocol::identifiers::{ConnectionId, RequestId},
     string::CodepageString,
 };
-use deku::prelude::*;
+use insim_core::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Connection Player Renamed indicates that a player has changed their name.
 pub struct Cpr {
     pub reqi: RequestId,

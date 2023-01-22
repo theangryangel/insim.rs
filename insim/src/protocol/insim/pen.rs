@@ -1,12 +1,15 @@
-use crate::{
-    packet_flags,
-    protocol::identifiers::{PlayerId, RequestId},
-};
-use deku::prelude::*;
+use insim_core::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-packet_flags! {
+use crate::{
+    protocol::identifiers::{PlayerId, RequestId},
+};
+
+use bitflags::bitflags;
+
+bitflags! {
     // *_VALID variation means this was cleared
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct PenaltyInfo: u8 {
@@ -19,42 +22,30 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 pub enum PenaltyReason {
     /// Unknown or cleared penalty
-    #[deku(id = "0")]
-    None,
+    None = 0,
 
     /// Penalty given by admin
-    #[deku(id = "1")]
-    Admin,
+    Admin = 1,
 
     /// Driving wrong way
-    #[deku(id = "2")]
-    WrongWay,
+    WrongWay = 2,
 
     /// False start
-    #[deku(id = "3")]
-    FalseStart,
+    FalseStart = 3,
 
     /// Speeding in pit lane
-    #[deku(id = "4")]
-    Speeding,
+    Speeding = 4,
 
     /// Stop-go in pit stop too short
-    #[deku(id = "5")]
-    StopShort,
+    StopShort = 5,
 
     /// Compulsory stop is too late
-    #[deku(id = "6")]
-    StopLate,
+    StopLate = 6,
 }
 
 impl Default for PenaltyReason {
@@ -63,13 +54,8 @@ impl Default for PenaltyReason {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Penalty
 pub struct Pen {
     pub reqi: RequestId,

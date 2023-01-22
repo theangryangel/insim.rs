@@ -1,12 +1,15 @@
-use crate::{
-    packet_flags,
-    protocol::identifiers::{ConnectionId, RequestId},
-};
-use deku::prelude::*;
+use insim_core::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-packet_flags! {
+use bitflags::bitflags;
+
+use crate::{
+    protocol::identifiers::{ConnectionId, RequestId},
+};
+
+bitflags! {
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct PlcAllowedCars: u32 {
         XF_GTI => (1 << 1),
@@ -32,18 +35,15 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Player Cars
 pub struct Plc {
     #[deku(pad_bytes_after = "1")]
     pub reqi: RequestId,
+
     #[deku(pad_bytes_before = "3")]
     pub ucid: ConnectionId,
+ 
     pub allowed_cars: PlcAllowedCars,
 }

@@ -1,6 +1,6 @@
 //! Utility functions for working with positions.
 
-use deku::prelude::*;
+use insim_core::{point::Pointable, prelude::*};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -10,8 +10,6 @@ use crate::units;
 
 #[cfg(feature = "uom")]
 use uom;
-
-use insim_core::point::Pointable;
 
 pub struct Point<T>
 where
@@ -43,13 +41,8 @@ impl Point<f32> {
 }
 
 /// A X, Y, Z position
-#[derive(Debug, Eq, PartialEq, DekuRead, DekuWrite, Copy, Clone, Default)]
+#[derive(Debug, Eq, PartialEq, InsimEncode, InsimDecode, Copy, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 #[cfg(feature = "uom")]
 impl<T> Point<T>
 where

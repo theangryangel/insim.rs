@@ -1,5 +1,6 @@
 pub mod point;
 pub mod ser;
+pub mod prelude;
 
 pub use ser::decode::{Decodable, DecodableError};
 pub use ser::encode::{Encodable, EncodableError};

@@ -1,12 +1,14 @@
 //! Utility functions and structs for working with track names and fetching track data.
 
+use insim_core::prelude::*;
+
+#[cfg(feature = "serde")]
+use serde::Serialize;
+
 use std::collections::HashMap;
 
 use crate::string::strip_trailing_nul;
-use deku::prelude::*;
 use once_cell::sync::Lazy;
-#[cfg(feature = "serde")]
-use serde::Serialize;
 
 #[derive(Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -473,13 +475,8 @@ pub fn lookup(input: &[u8]) -> Option<TrackInfo> {
 }
 
 /// Handles parsing a Track name.
-#[derive(Debug, PartialEq, Eq, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, PartialEq, Eq, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 pub struct Track {
     pub inner: [u8; 6],
 }

@@ -3,45 +3,30 @@ use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 /// Used within [Cnl] to indicate the leave reason.
 pub enum CnlReason {
-    #[deku(id = "0")]
-    Disconnected,
+    Disconnected = 0,
 
-    #[deku(id = "1")]
-    Timeout,
+    Timeout = 1,
 
-    #[deku(id = "2")]
-    LostConnection,
+    LostConnection = 2,
 
-    #[deku(id = "3")]
-    Kicked,
+    Kicked = 3,
 
-    #[deku(id = "4")]
-    Banned,
+    Banned = 4,
 
-    #[deku(id = "5")]
-    Security,
+    Security = 5,
 
-    #[deku(id = "6")]
-    Cpw,
+    Cpw = 6,
 
-    #[deku(id = "7")]
-    Oos,
+    Oos = 7,
 
-    #[deku(id = "8")]
-    Joos,
+    Joos = 8,
 
-    #[deku(id = "9")]
-    Hack,
+    Hack = 9,
 }
 
 impl Default for CnlReason {
@@ -50,13 +35,8 @@ impl Default for CnlReason {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 // Connection Leave
 pub struct Cnl {
     pub reqi: RequestId,

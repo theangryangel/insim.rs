@@ -1,13 +1,16 @@
-use super::{PlayerFlags, TyreCompound};
-use crate::{
-    packet_flags,
-    protocol::identifiers::{PlayerId, RequestId},
-};
-use deku::prelude::*;
+use insim_core::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-packet_flags! {
+use bitflags::bitflags;
+
+use super::{PlayerFlags, TyreCompound};
+use crate::{
+    protocol::identifiers::{PlayerId, RequestId},
+};
+
+bitflags! {
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct PitStopWorkFlags: u32 {
         NOTHING => 0,
@@ -31,7 +34,7 @@ packet_flags! {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -62,7 +65,7 @@ pub struct Pit {
     pub work: u32,
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     ctx = "endian: deku::ctx::Endian",
@@ -79,7 +82,7 @@ pub struct Psf {
     pub stime: u32,
 }
 
-#[derive(Debug, PartialEq, Eq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, Eq, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[deku(
     type = "u8",
@@ -110,13 +113,8 @@ impl Default for PitLaneFact {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// PitLane
 pub struct Pla {
     pub reqi: RequestId,
