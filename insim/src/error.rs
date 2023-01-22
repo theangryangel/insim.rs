@@ -6,6 +6,8 @@ use miette::Diagnostic;
 use std::io::ErrorKind;
 use thiserror::Error as ThisError;
 
+use super::trait;
+
 // FIXME - we should probably drop the derive clone here?
 
 #[non_exhaustive]
@@ -33,7 +35,11 @@ pub enum Error {
     Relay(RelayErrorKind),
 
     #[error("Failed to decode packet: {0:?}")]
-    Decoding(#[from] DekuError),
+    Decoding(#[from] trait::DecodeError),
+
+    #[error("Failed to encode packet: {0:?}")]
+    Encoding(#[from] trait::EncodeError),
+
 }
 
 impl From<std::io::Error> for Error {
