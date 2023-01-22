@@ -21,9 +21,9 @@ pub struct HcpCarHandicap {
 /// This can be useful for creating multi class hosts.
 /// The info field is indexed by the vehicle. i.e. XF GTI = 0, XR GT = 1, etc.
 pub struct Hcp {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
-    #[deku(count = "32")]
+    #[insim(count = "32")]
     pub info: Vec<HcpCarHandicap>,
 }

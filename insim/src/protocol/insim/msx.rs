@@ -9,9 +9,9 @@ use crate::{protocol::identifiers::RequestId, string::CodepageString};
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Extended Message (like [Mst](super::Mst), but longer)
 pub struct Msx {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
-    #[deku(bytes = "96")]
+    #[insim(bytes = "96")]
     pub msg: CodepageString,
 }

@@ -15,6 +15,6 @@ pub struct Toc {
 
     pub olducid: ConnectionId,
 
-    #[deku(pad_bytes_after = "2")]
+    #[insim(pad_bytes_after = "2")]
     pub newucid: ConnectionId,
 }

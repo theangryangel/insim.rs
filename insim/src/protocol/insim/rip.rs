@@ -50,15 +50,15 @@ pub struct Rip {
     pub mpr: u8,
     pub paused: u8,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub options: u8, // FIXME: implement flags
 
     pub ctime: u32,
     pub ttime: u32,
 
-    #[deku(
-        reader = "istring::read(deku::rest, 64)",
-        writer = "istring::write(deku::output, &self.rname, 64)"
+    #[insim(
+        reader = "istring::read(insim::rest, 64)",
+        writer = "istring::write(insim::output, &self.rname, 64)"
     )]
     pub rname: String,
 }

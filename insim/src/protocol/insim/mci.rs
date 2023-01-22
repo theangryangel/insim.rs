@@ -37,7 +37,7 @@ pub struct CompCar {
     /// Race position
     pub position: u8,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub info: CompCarInfo,
 
     /// Positional information for the player, in game units.
@@ -96,6 +96,6 @@ pub struct Mci {
 
     pub numc: u8,
 
-    #[deku(count = "numc")]
+    #[insim(count = "numc")]
     pub info: Vec<CompCar>,
 }

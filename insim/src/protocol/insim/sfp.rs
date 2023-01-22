@@ -9,11 +9,11 @@ use crate::protocol::identifiers::RequestId;
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// State Flags Pack
 pub struct Sfp {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
     pub flag: u16,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub onoff: u8,
 }

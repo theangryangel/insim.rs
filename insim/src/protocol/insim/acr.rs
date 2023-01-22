@@ -30,16 +30,16 @@ impl Default for AcrResult {
 #[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Acr {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
     pub ucid: ConnectionId,
 
     pub admin: u8,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub result: AcrResult,
 
-    #[deku(bytes = "64")]
+    #[insim(bytes = "64")]
     pub text: CodepageString,
 }

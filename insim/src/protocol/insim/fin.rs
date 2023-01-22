@@ -46,12 +46,12 @@ pub struct Fin {
 
     pub ttime: u32,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub btime: u32,
 
     pub numstops: u8,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub confirm: RaceResultFlags,
 
     pub lapsdone: u16,

@@ -41,6 +41,6 @@ pub struct Cch {
 
     pub plid: PlayerId,
 
-    #[deku(pad_bytes_after = "3")]
+    #[insim(pad_bytes_after = "3")]
     pub camera: CameraView,
 }

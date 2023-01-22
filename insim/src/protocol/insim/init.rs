@@ -33,15 +33,15 @@ bitflags! {
 pub struct Init {
     /// When set to a non-zero value the server will send a [Version](super::Version) packet in response.
     ///packet in response.
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
     // we do not support this feature, using pad_bytes_before
     // on flags to mask it.
-    //#[deku(bytes = "2")]
+    //#[insim(bytes = "2")]
     //pub udpport: u16,
     /// Options for the Insim Connection. See [InitFlags] for more information.
-    #[deku(pad_bytes_before = "2")]
+    #[insim(pad_bytes_before = "2")]
     pub flags: InitFlags,
 
     /// Protocol version of Insim you wish to use.
@@ -57,16 +57,16 @@ pub struct Init {
     pub interval: u16,
 
     /// Administrative password.
-    #[deku(
-        reader = "istring::read(deku::rest, 16)",
-        writer = "istring::write(deku::output, &self.password, 16)"
+    #[insim(
+        reader = "istring::read(insim::rest, 16)",
+        writer = "istring::write(insim::output, &self.password, 16)"
     )]
     pub password: String,
 
     /// Name of the program.
-    #[deku(
-        reader = "istring::read(deku::rest, 16)",
-        writer = "istring::write(deku::output, &self.name, 16)"
+    #[insim(
+        reader = "istring::read(insim::rest, 16)",
+        writer = "istring::write(insim::output, &self.name, 16)"
     )]
     pub name: String,
 }

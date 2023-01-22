@@ -35,6 +35,6 @@ pub struct Flg {
 
     pub flag: FlgType,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub carbehind: u8,
 }

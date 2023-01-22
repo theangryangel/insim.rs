@@ -32,10 +32,10 @@ impl Default for UcoAction {
 pub struct Uco {
     pub reqi: RequestId,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub plid: PlayerId,
 
-    #[deku(pad_bytes_before = "2")]
+    #[insim(pad_bytes_before = "2")]
     pub action: UcoAction,
 
     pub time: u32,

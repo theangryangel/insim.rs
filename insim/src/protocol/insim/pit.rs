@@ -36,9 +36,9 @@ bitflags! {
 
 #[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
+#[insim(
+    ctx = "endian: insim::ctx::Endian",
+    ctx_default = "insim::ctx::Endian::Little",
     endian = "endian"
 )]
 /// Pit stop (stop at the garage, not "tele-pit")
@@ -55,21 +55,21 @@ pub struct Pit {
 
     pub penalty: u8,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub numstops: u8,
 
-    #[deku(count = "4")]
+    #[insim(count = "4")]
     pub tyres: Vec<TyreCompound>,
 
-    #[deku(bytes = "4", pad_bytes_after = "4")]
+    #[insim(bytes = "4", pad_bytes_after = "4")]
     pub work: u32,
 }
 
 #[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
+#[insim(
+    ctx = "endian: insim::ctx::Endian",
+    ctx_default = "insim::ctx::Endian::Little",
     endian = "endian"
 )]
 /// Pit Stop Finished
@@ -78,32 +78,32 @@ pub struct Psf {
 
     pub plid: PlayerId,
 
-    #[deku(pad_bytes_after = "4")]
+    #[insim(pad_bytes_after = "4")]
     pub stime: u32,
 }
 
 #[derive(Debug, PartialEq, Eq, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
+#[insim(
     type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
+    ctx = "endian: insim::ctx::Endian",
+    ctx_default = "insim::ctx::Endian::Little",
     endian = "endian"
 )]
 pub enum PitLaneFact {
-    #[deku(id = "0")]
+    #[insim(id = "0")]
     Exit,
 
-    #[deku(id = "1")]
+    #[insim(id = "1")]
     Enter,
 
-    #[deku(id = "2")]
+    #[insim(id = "2")]
     EnterNoPurpose,
 
-    #[deku(id = "3")]
+    #[insim(id = "3")]
     EnterDriveThru,
 
-    #[deku(id = "4")]
+    #[insim(id = "4")]
     EnterStopGo,
 }
 
@@ -121,7 +121,7 @@ pub struct Pla {
 
     pub plid: PlayerId,
 
-    #[deku(pad_bytes_after = "3")]
+    #[insim(pad_bytes_after = "3")]
     pub fact: PitLaneFact,
 }
 

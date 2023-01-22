@@ -38,6 +38,6 @@ pub struct Msl {
 
     pub sound: MslSoundType,
 
-    #[deku(bytes = "128")]
+    #[insim(bytes = "128")]
     pub msg: CodepageString,
 }

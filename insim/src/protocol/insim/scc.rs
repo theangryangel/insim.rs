@@ -9,11 +9,11 @@ use crate::protocol::identifiers::{PlayerId, RequestId};
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Set Car Camera
 pub struct Scc {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
     pub viewplid: PlayerId,
 
-    #[deku(pad_bytes_after = "2")]
+    #[insim(pad_bytes_after = "2")]
     pub ingamecam: u8,
 }

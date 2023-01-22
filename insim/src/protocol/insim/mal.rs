@@ -21,11 +21,11 @@ pub struct Mal {
 
     pub ucid: ConnectionId,
 
-    #[deku(pad_bytes_after = "2")]
+    #[insim(pad_bytes_after = "2")]
     /// Currently unused
     pub flags: u8,
 
-    #[deku(count = "count")]
+    #[insim(count = "count")]
     allowed_mods: Vec<u32>,
 }
 

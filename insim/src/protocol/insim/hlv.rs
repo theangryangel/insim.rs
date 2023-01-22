@@ -33,7 +33,7 @@ impl Default for Hlvc {
 pub struct Hlv {
     pub reqi: RequestId,
     pub plid: PlayerId,
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub hlvc: Hlvc,
     pub time: u16,
     pub c: CarContact,

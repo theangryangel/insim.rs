@@ -11,7 +11,7 @@ use crate::protocol::identifiers::{PlayerId, RequestId};
 pub struct ConInfo {
     pub plid: PlayerId,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub info: u8,
 
     pub steer: u8,
@@ -41,7 +41,7 @@ pub struct ConInfo {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Contact
 pub struct Con {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
     pub spclose: u16,

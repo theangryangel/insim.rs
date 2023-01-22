@@ -9,11 +9,11 @@ use crate::protocol::identifiers::{ConnectionId, RequestId};
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Vote Notification
 pub struct Vtn {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
     pub ucid: ConnectionId,
 
-    #[deku(pad_bytes_after = "2")]
+    #[insim(pad_bytes_after = "2")]
     pub action: u8,
 }

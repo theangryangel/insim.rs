@@ -12,7 +12,7 @@ use crate::protocol::{
 /// Camera Position Pack reports the current camera position and state. This packet may also be
 /// sent to control the camera.
 pub struct Cpp {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
     pub pos: Point<i32>,

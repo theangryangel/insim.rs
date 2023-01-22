@@ -30,12 +30,12 @@ impl Default for SshError {
 pub struct Ssh {
     pub reqi: RequestId,
 
-    #[deku(pad_bytes_after = "4")]
+    #[insim(pad_bytes_after = "4")]
     pub error: u8,
 
-    #[deku(
-        reader = "istring::read(deku::rest, 32)",
-        writer = "istring::write(deku::output, &self.lname, 32)"
+    #[insim(
+        reader = "istring::read(insim::rest, 32)",
+        writer = "istring::write(insim::output, &self.lname, 32)"
     )]
     pub lname: String,
 }

@@ -63,7 +63,7 @@ pub struct Nci {
 
     pub ucid: ConnectionId,
 
-    #[deku(pad_bytes_after = "3")]
+    #[insim(pad_bytes_after = "3")]
     pub language: ILanguage,
 
     pub user_id: u32,

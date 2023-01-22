@@ -34,7 +34,7 @@ impl Default for MsoUserType {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// System messsages and user messages, variable sized.
 pub struct Mso {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
     pub ucid: ConnectionId,
@@ -47,6 +47,6 @@ pub struct Mso {
     /// Index of the first character of user entered text, in msg field.
     pub textstart: u8,
 
-    #[deku(reader = "CodepageString::read(deku::rest, Size::Bytes(deku::rest.len() / 8))")]
+    #[insim(reader = "CodepageString::read(insim::rest, Size::Bytes(insim::rest.len() / 8))")]
     pub msg: CodepageString,
 }

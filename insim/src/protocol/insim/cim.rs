@@ -41,6 +41,6 @@ pub struct Cim {
 
     pub submode: u8, // FIXME: How do we support this in the same way? LFS has multiple enum types.
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub seltype: u8,
 }

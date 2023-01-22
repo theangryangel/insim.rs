@@ -12,11 +12,11 @@ use crate::track::Track;
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
 pub enum Wind {
-    #[deku(id = "0")]
+    #[insim(id = "0")]
     None,
-    #[deku(id = "1")]
+    #[insim(id = "1")]
     Weak,
-    #[deku(id = "2")]
+    #[insim(id = "2")]
     Strong,
 }
 
@@ -43,7 +43,7 @@ bitflags! {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Race Start
 pub struct Rst {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
     pub racelaps: u8,

@@ -28,10 +28,10 @@ impl Default for CscAction {
 pub struct Csc {
     pub reqi: RequestId,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub plid: PlayerId,
 
-    #[deku(pad_bytes_after = "2")]
+    #[insim(pad_bytes_after = "2")]
     pub action: CscAction,
 
     pub time: u32,

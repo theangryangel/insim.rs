@@ -14,9 +14,9 @@ pub struct Cpr {
 
     pub ucid: ConnectionId,
 
-    #[deku(bytes = "24")]
+    #[insim(bytes = "24")]
     pub pname: CodepageString,
 
-    #[deku(bytes = "8")]
+    #[insim(bytes = "8")]
     pub plate: CodepageString,
 }

@@ -9,11 +9,11 @@ use crate::protocol::identifiers::RequestId;
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Send Single Character
 pub struct Sch {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
     pub charb: u8,
 
-    #[deku(pad_bytes_after = "2")]
+    #[insim(pad_bytes_after = "2")]
     pub flags: u8, // bit 0: SHIFT / bit 1: CTRL
 }

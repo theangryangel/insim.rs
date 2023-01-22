@@ -71,21 +71,21 @@ pub struct Npl {
 
     pub flags: PlayerFlags,
 
-    #[deku(bytes = "24")]
+    #[insim(bytes = "24")]
     pub pname: CodepageString,
 
-    #[deku(bytes = "8")]
+    #[insim(bytes = "8")]
     pub plate: CodepageString,
 
     pub cname: Vehicle,
 
-    #[deku(
-        reader = "istring::read(deku::rest, 16)",
-        writer = "istring::write(deku::output, &self.sname, 16)"
+    #[insim(
+        reader = "istring::read(insim::rest, 16)",
+        writer = "istring::write(insim::output, &self.sname, 16)"
     )]
     pub sname: String,
 
-    #[deku(count = "4")]
+    #[insim(count = "4")]
     pub tyres: Vec<TyreCompound>,
 
     pub h_mass: u8,
@@ -98,7 +98,7 @@ pub struct Npl {
 
     pub rwadj: u8,
 
-    #[deku(pad_bytes_after = "2")]
+    #[insim(pad_bytes_after = "2")]
     pub fwadj: u8,
 
     pub setf: u8,

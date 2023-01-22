@@ -1,4 +1,4 @@
-use deku::prelude::*;
+use insim_core::prelude::*;
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -16,28 +16,28 @@ pub struct Res {
 
     pub plid: PlayerId,
 
-    #[deku(
-        reader = "istring::read(deku::rest, 24)",
-        writer = "istring::write(deku::output, &self.uname, 24)"
+    #[insim(
+        reader = "istring::read(insim::rest, 24)",
+        writer = "istring::write(insim::output, &self.uname, 24)"
     )]
     pub uname: String,
 
-    #[deku(bytes = "24")]
+    #[insim(bytes = "24")]
     pub pname: CodepageString,
 
-    #[deku(bytes = "8")]
+    #[insim(bytes = "8")]
     pub plate: CodepageString,
 
     pub cname: Vehicle,
 
     pub ttime: u32,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub btime: u32,
 
     pub numstops: u8,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub confirm: RaceResultFlags,
 
     pub lapsdone: u16,

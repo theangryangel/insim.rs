@@ -66,6 +66,6 @@ pub struct Pen {
 
     pub newpen: PenaltyInfo,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reason: PenaltyReason,
 }

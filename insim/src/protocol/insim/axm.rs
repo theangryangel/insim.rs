@@ -55,6 +55,6 @@ pub struct Axm {
     pub action: PmoAction,
     pub flags: u8,
 
-    #[deku(count = "numo")]
+    #[insim(count = "numo")]
     pub info: Vec<ObjectInfo>,
 }

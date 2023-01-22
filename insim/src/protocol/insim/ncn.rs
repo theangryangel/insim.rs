@@ -17,13 +17,13 @@ pub struct Ncn {
     pub ucid: ConnectionId,
 
     /// Username.
-    #[deku(
-        reader = "istring::read(deku::rest, 24)",
-        writer = "istring::write(deku::output, &self.uname, 24)"
+    #[insim(
+        reader = "istring::read(insim::rest, 24)",
+        writer = "istring::write(insim::output, &self.uname, 24)"
     )]
     pub uname: String,
 
-    #[deku(bytes = "24")]
+    #[insim(bytes = "24")]
     /// Playername.
     pub pname: CodepageString,
 
@@ -33,6 +33,6 @@ pub struct Ncn {
     /// Total number of connections now this player has joined.
     pub total: u8,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub flags: u8,
 }

@@ -15,6 +15,6 @@ pub struct Pfl {
 
     pub plid: PlayerId,
 
-    #[deku(pad_bytes_after = "2")]
+    #[insim(pad_bytes_after = "2")]
     pub flags: PlayerFlags,
 }

@@ -13,7 +13,7 @@ use crate::{
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// State
 pub struct Sta {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
     pub replayspeed: f32,
@@ -34,7 +34,7 @@ pub struct Sta {
 
     pub qualmins: u8,
 
-    #[deku(pad_bytes_after = "2")]
+    #[insim(pad_bytes_after = "2")]
     pub racelaps: u8,
 
     pub track: Track,

@@ -9,9 +9,9 @@ use crate::{protocol::identifiers::RequestId, string::CodepageString};
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Message Type - Send a message to LFS as if typed by a user
 pub struct Mst {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
-    #[deku(bytes = "64")]
+    #[insim(bytes = "64")]
     pub msg: CodepageString,
 }

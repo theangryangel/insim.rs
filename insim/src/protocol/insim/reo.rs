@@ -13,6 +13,6 @@ pub struct Reo {
 
     pub nump: u8,
 
-    #[deku(count = "40")]
+    #[insim(count = "40")]
     pub plid: Vec<PlayerId>,
 }

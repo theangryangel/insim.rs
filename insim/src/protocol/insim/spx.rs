@@ -21,6 +21,6 @@ pub struct Spx {
 
     pub penalty: u8,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub numstops: u8,
 }

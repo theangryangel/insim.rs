@@ -9,7 +9,7 @@ use crate::protocol::identifiers::RequestId;
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Screen Mode (referred to as originally IS_MOD within Insim.txt)
 pub struct Mode {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
     /// Set to choose 16-bit

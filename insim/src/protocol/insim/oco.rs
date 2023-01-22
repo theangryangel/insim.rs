@@ -52,7 +52,7 @@ bitflags! {
 /// Object Control
 /// Used to switch start lights
 pub struct Oco {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
     pub action: OcoAction,

@@ -52,7 +52,7 @@ pub struct Btn {
     pub width: u8,
     pub height: u8,
 
-    #[deku(bytes = "240")]
+    #[insim(bytes = "240")]
     pub text: CodepageString, // FIXME: this should be upto 240 characters and always a multiple of 4
 }
 
@@ -64,7 +64,7 @@ pub struct Btc {
     pub ucid: ConnectionId,
     pub clickid: u8,
     pub inst: u8,
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub cflags: u8,
 }
 
@@ -77,9 +77,9 @@ pub struct Btt {
     pub clickid: u8,
     pub inst: u8,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub typein: u8,
 
-    #[deku(bytes = "96")]
+    #[insim(bytes = "96")]
     pub text: CodepageString,
 }

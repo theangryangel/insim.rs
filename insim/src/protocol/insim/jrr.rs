@@ -1,4 +1,4 @@
-use deku::prelude::*;
+use insim_core::prelude::*;
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -55,7 +55,7 @@ pub struct Jrr {
 
     pub ucid: ConnectionId,
 
-    #[deku(pad_bytes_after = "2")]
+    #[insim(pad_bytes_after = "2")]
     pub action: JrrAction,
 
     pub startpos: ObjectInfo,

@@ -39,10 +39,10 @@ bitflags! {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Player Cars
 pub struct Plc {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
-    #[deku(pad_bytes_before = "3")]
+    #[insim(pad_bytes_before = "3")]
     pub ucid: ConnectionId,
  
     pub allowed_cars: PlcAllowedCars,

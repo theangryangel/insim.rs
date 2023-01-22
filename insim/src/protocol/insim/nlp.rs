@@ -25,6 +25,6 @@ pub struct Nlp {
 
     pub nump: u8,
 
-    #[deku(count = "nump")]
+    #[insim(count = "nump")]
     pub nodelap: Vec<NodeLapInfo>,
 }
