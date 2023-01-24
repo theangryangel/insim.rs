@@ -98,3 +98,61 @@ where
         Ok(())
     }
 }
+
+// (T1, T2, ..)
+//
+impl<T1, T2> Encodable for (T1, T2)
+where
+    T1: Encodable,
+    T2: Encodable,
+{
+    fn encode(&self, buf: &mut BytesMut) -> Result<(), EncodableError> {
+        self.0.encode(buf)?;
+        self.1.encode(buf)?;
+        Ok(())
+    }
+}
+
+impl<T1, T2, T3> Encodable for (T1, T2, T3)
+where
+    T1: Encodable,
+    T2: Encodable,
+    T3: Encodable,
+{
+    fn encode(&self, buf: &mut BytesMut) -> Result<(), EncodableError> {
+        self.0.encode(buf)?;
+        self.1.encode(buf)?;
+        self.2.encode(buf)?;
+        Ok(())
+    }
+}
+
+impl<T1, T2, T3, T4> Encodable for (T1, T2, T3, T4)
+where
+    T1: Encodable,
+    T2: Encodable,
+    T3: Encodable,
+    T4: Encodable,
+{
+    fn encode(&self, buf: &mut BytesMut) -> Result<(), EncodableError> {
+        self.0.encode(buf)?;
+        self.1.encode(buf)?;
+        self.2.encode(buf)?;
+        self.3.encode(buf)?;
+        Ok(())
+    }
+}
+
+// [T; N]
+
+impl<T, const N: usize> Encodable for [T; N]
+where
+    T: Encodable,
+{
+    fn encode(&self, buf: &mut BytesMut) -> Result<(), EncodableError> {
+        for i in self {
+            i.encode(buf)?;
+        }
+        Ok(())
+    }
+}

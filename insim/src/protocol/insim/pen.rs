@@ -1,24 +1,46 @@
-use insim_core::prelude::*;
+use insim_core::{
+    identifiers::{PlayerId, RequestId},
+    prelude::*,
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
-
-use crate::{
-    protocol::identifiers::{PlayerId, RequestId},
-};
 
 use bitflags::bitflags;
 
 bitflags! {
     // *_VALID variation means this was cleared
+    #[derive(Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct PenaltyInfo: u8 {
-        DRIVE_THRU => (1 << 0),
-        DRIVE_THRU_VALID => (1 << 1),
-        STOP_GO => (1 << 2),
-        STOP_GO_VALID => (1 << 3),
-        SECS_30 => (1 << 4),
-        SECS_45 => (1 << 5),
+        const DRIVE_THRU = (1 << 0);
+        const DRIVE_THRU_VALID = (1 << 1);
+        const STOP_GO = (1 << 2);
+        const STOP_GO_VALID = (1 << 3);
+        const SECS_30 = (1 << 4);
+        const SECS_45 = (1 << 5);
+    }
+}
+
+impl Encodable for PenaltyInfo {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodableError>
+    where
+        Self: Sized,
+    {
+        self.bits().encode(buf)?;
+        Ok(())
+    }
+}
+
+impl Decodable for PenaltyInfo {
+    fn decode(
+        buf: &mut bytes::BytesMut,
+        count: Option<usize>,
+    ) -> Result<Self, insim_core::DecodableError>
+    where
+        Self: Sized,
+    {
+        Ok(Self::from_bits_truncate(u8::decode(buf, count)?))
     }
 }
 

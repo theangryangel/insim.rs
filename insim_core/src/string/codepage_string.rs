@@ -1,6 +1,9 @@
 //! Utilities for working with 'Codepage strings' from Insim.
 
+use crate::{Decodable, DecodableError, Encodable, EncodableError};
+
 use super::{escape, strip_trailing_nul, unescape};
+use bytes::BytesMut;
 use encoding_rs;
 use itertools::Itertools;
 use std::vec::Vec;
@@ -375,110 +378,17 @@ impl fmt::Display for CodepageString {
     }
 }
 
-#[cfg(feature = "serde")]
-use serde::ser::{Serialize, Serializer};
-
-#[cfg(feature = "serde")]
-impl Serialize for CodepageString {
-    #[inline]
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-
-use deku::bitvec::{BitSlice, BitVec, Msb0};
-use deku::{ctx::*, DekuError, DekuRead, DekuWrite};
-
-impl DekuWrite<(Endian, Size)> for CodepageString {
-    fn write(
-        &self,
-        output: &mut BitVec<Msb0, u8>,
-        (_endian, bit_size): (Endian, Size),
-    ) -> Result<(), DekuError> {
-        // FIXME: Handle Endian
-        let orig_size = output.len();
-        if self.is_empty() {
-            output.resize(orig_size + bit_size.bit_size(), false);
-            return Ok(());
-        }
-
-        let max_size = bit_size.byte_size()?;
-        let input_size = if self.len() < max_size {
-            self.len()
-        } else {
-            max_size
-        };
-
-        (&self.into_bytes()[0..input_size]).write(output, ())?;
-        if input_size != max_size {
-            output.resize(orig_size + bit_size.bit_size(), false);
-        }
-
+impl Encodable for CodepageString {
+    fn encode(&self, buf: &mut BytesMut) -> Result<(), EncodableError> {
+        self.inner.encode(buf)?;
         Ok(())
     }
 }
 
-impl DekuWrite<Size> for CodepageString {
-    fn write(&self, output: &mut BitVec<Msb0, u8>, bit_size: Size) -> Result<(), DekuError> {
-        let orig_size = output.len();
-        if self.is_empty() {
-            output.resize(orig_size + bit_size.bit_size(), false);
-            return Ok(());
-        }
-        let max_size = bit_size.byte_size()?;
-        let input_size = if self.len() < max_size {
-            self.len()
-        } else {
-            max_size
-        };
-
-        (&self.into_bytes()[0..input_size]).write(output, ())?;
-
-        if input_size != max_size {
-            output.resize(orig_size + bit_size.bit_size(), false);
-        }
-
-        Ok(())
-    }
-}
-
-impl DekuWrite<Endian> for CodepageString {
-    fn write(&self, output: &mut BitVec<Msb0, u8>, _endian: Endian) -> Result<(), DekuError> {
-        // FIXME endian
-        let value = self.into_bytes();
-        value.write(output, ())
-    }
-}
-
-impl DekuWrite for CodepageString {
-    fn write(&self, output: &mut BitVec<Msb0, u8>, _: ()) -> Result<(), DekuError> {
-        let value = self.into_bytes();
-        value.write(output, ())
-    }
-}
-
-impl DekuRead<'_, Size> for CodepageString {
-    fn read(
-        input: &BitSlice<Msb0, u8>,
-        size: Size,
-    ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
-        let (rest, value) = Vec::read(input, Limit::new_size(size))?;
-
-        Ok((rest, CodepageString::from_bytes(&value)))
-    }
-}
-
-impl DekuRead<'_, (Endian, Size)> for CodepageString {
-    fn read(
-        input: &BitSlice<Msb0, u8>,
-        (_endian, size): (Endian, Size),
-    ) -> Result<(&BitSlice<Msb0, u8>, Self), DekuError> {
-        // FIXME: implement endian handling
-        let (rest, value) = Vec::read(input, Limit::new_size(size))?;
-
-        Ok((rest, CodepageString::from_bytes(&value)))
+impl Decodable for CodepageString {
+    fn decode(buf: &mut BytesMut, count: Option<usize>) -> Result<Self, DecodableError> {
+        let mut data = Self::default();
+        data.inner = Vec::<u8>::decode(buf, count)?;
+        Ok(data)
     }
 }

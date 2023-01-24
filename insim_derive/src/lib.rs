@@ -10,7 +10,7 @@ mod encode;
 
 #[derive(FromDeriveInput)]
 #[darling(attributes(insim), supports(struct_any, enum_any), forward_attrs(repr))]
-pub(crate) struct StructData {
+pub(crate) struct Receiver {
     pub ident: syn::Ident,
     pub attrs: Vec<syn::Attribute>,
     pub data: ast::Data<VariantData, FieldData>,
@@ -96,7 +96,7 @@ pub fn insim_encode(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     // Darling ensures that we only support named structs, and extracts the relevant fields
-    match StructData::from_derive_input(&input) {
+    match Receiver::from_derive_input(&input) {
         Ok(receiver) => {
             let mut tokens = proc_macro2::TokenStream::new();
 
@@ -129,7 +129,7 @@ pub fn insim_decode(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     // Darling ensures that we only support the relevant types
-    match StructData::from_derive_input(&input) {
+    match Receiver::from_derive_input(&input) {
         Ok(receiver) => {
             let mut tokens = proc_macro2::TokenStream::new();
 
@@ -139,7 +139,7 @@ pub fn insim_decode(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             tokens.extend(quote! {
                 impl ::insim_core::Decodable for #ident {
                     fn decode(
-                        buf: &mut BytesMut,
+                        buf: &mut ::bytes::BytesMut,
                         count: Option<usize>,
                     ) -> Result<Self, ::insim_core::DecodableError>
                     {

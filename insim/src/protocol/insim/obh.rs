@@ -1,21 +1,43 @@
-use insim_core::prelude::*;
+use insim_core::{
+    identifiers::{PlayerId, RequestId},
+    prelude::*,
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 use bitflags::bitflags;
 
-use crate::{
-    protocol::identifiers::{PlayerId, RequestId},
-};
-
 bitflags! {
+    #[derive(Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct ObhFlags: u8 {
-        LAYOUT => (1 << 0),
-        CAN_MOVE => (1 << 1),
-        WAS_MOVING => (1 << 2),
-        ON_SPOT => (1 << 3),
+        const LAYOUT = (1 << 0);
+        const CAN_MOVE = (1 << 1);
+        const WAS_MOVING = (1 << 2);
+        const ON_SPOT = (1 << 3);
+    }
+}
+
+impl Encodable for ObhFlags {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodableError>
+    where
+        Self: Sized,
+    {
+        self.bits().encode(buf)?;
+        Ok(())
+    }
+}
+
+impl Decodable for ObhFlags {
+    fn decode(
+        buf: &mut bytes::BytesMut,
+        count: Option<usize>,
+    ) -> Result<Self, insim_core::DecodableError>
+    where
+        Self: Sized,
+    {
+        Ok(Self::from_bits_truncate(u8::decode(buf, count)?))
     }
 }
 

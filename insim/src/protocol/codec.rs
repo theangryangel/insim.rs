@@ -2,11 +2,10 @@
 
 use super::Packet;
 use crate::error::Error;
-use std::convert::TryFrom;
+use insim_core::{Decodable, Encodable};
 use std::io;
 use tokio_util::codec::{Decoder, Encoder};
 use tracing;
-use insim_core::{InsimDecodable, InsimEncodable};
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
@@ -133,10 +132,10 @@ impl Encoder<Packet> for Codec {
     type Error = Error;
 
     fn encode(&mut self, msg: Packet, dst: &mut BytesMut) -> Result<(), Error> {
-        let data = msg.to_bytes()?;
-        let data = msg.encode(buf)?;
+        let mut buf = BytesMut::new();
+        let data = msg.encode(&mut buf)?;
 
-        let n = data.len();
+        let n = buf.len();
 
         if n > self.max_bytes {
             return Err(Error::IO {
@@ -177,7 +176,7 @@ impl Encoder<Packet> for Codec {
         dst.put_uint_le(n as u64, self.length_bytes);
 
         // Write the frame to the buffer
-        dst.extend_from_slice(&data[..]);
+        dst.extend_from_slice(&buf[..]);
 
         Ok(())
     }

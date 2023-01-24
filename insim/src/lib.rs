@@ -10,15 +10,6 @@
 pub mod client;
 pub mod error;
 pub mod protocol;
-pub mod string;
 pub mod track;
 pub mod vehicle;
-
-#[cfg(feature = "uom")]
-#[macro_use]
-extern crate uom;
-
-#[cfg(feature = "uom")]
-pub mod units;
-
-pub mod file;
+//pub mod file;

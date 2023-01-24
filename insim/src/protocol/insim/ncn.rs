@@ -1,14 +1,13 @@
-use insim_core::prelude::*;
+use insim_core::{
+    identifiers::{ConnectionId, RequestId},
+    prelude::*,
+    string::CodepageString,
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-use crate::{
-    protocol::identifiers::{ConnectionId, RequestId},
-    string::{istring, CodepageString},
-};
-
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// New Connection
 pub struct Ncn {
@@ -17,10 +16,7 @@ pub struct Ncn {
     pub ucid: ConnectionId,
 
     /// Username.
-    #[insim(
-        reader = "istring::read(insim::rest, 24)",
-        writer = "istring::write(insim::output, &self.uname, 24)"
-    )]
+    #[insim(bytes = "24")]
     pub uname: String,
 
     #[insim(bytes = "24")]
@@ -28,7 +24,7 @@ pub struct Ncn {
     pub pname: CodepageString,
 
     /// 1 if administrative user.
-    pub admin: u8,
+    pub admin: bool,
 
     /// Total number of connections now this player has joined.
     pub total: u8,

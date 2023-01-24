@@ -5,7 +5,7 @@ use insim_core::{Decodable, Encodable, InsimDecode, InsimEncode};
 struct TestWrapped(u8, u32);
 
 #[test]
-fn test_wrapped_encode() {
+fn test_ser_wrapped_encode() {
     let mut buf = BytesMut::new();
 
     let i = TestWrapped(1, 2);
@@ -20,7 +20,7 @@ fn test_wrapped_encode() {
 }
 
 #[test]
-fn test_wrapped_decode() {
+fn test_ser_wrapped_decode() {
     let i = TestWrapped(2, 3);
 
     let mut comparison = BytesMut::new();

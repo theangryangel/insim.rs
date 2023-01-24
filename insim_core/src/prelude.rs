@@ -1,1 +1,5 @@
-pub use crate::{InsimEncode, Encodable, InsimDecode, Decodable};
+#[allow(unused)]
+pub use bytes::{Buf, BufMut};
+
+#[allow(unused)]
+pub use crate::{Decodable, Encodable, InsimDecode, InsimEncode};

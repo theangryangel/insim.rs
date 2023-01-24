@@ -4,10 +4,7 @@ const COLOUR_SEQUENCES: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8',
 const COLOUR_SEQUENCES_BYTES: &[u8] = &[b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9'];
 
 /// Strip LFS colours
-pub fn strip(input: String) -> String {
-    // FIXME: probably should make this a Cow and then return the Cow if nothing needs to be
-    // changed?
-
+pub fn strip(input: &str) -> String {
     let mut output = String::with_capacity(input.len());
     let mut iter = input.chars();
 
@@ -33,10 +30,8 @@ pub fn strip(input: String) -> String {
 /// Replace LFS colours with ANSI colours.
 /// Assumes that the input has already been unescaped. This usually happens automatically when
 /// de-serialising from the wire.
-pub fn to_ansi(input: String) -> String {
+pub fn to_ansi(input: &str) -> String {
     let mut has_colours = false;
-
-    // FIXME: Should probably make this a Cow and only attempt to replace if there are any colours.
 
     let mut output = String::with_capacity(input.len());
     let mut iter = input.chars();
@@ -73,8 +68,7 @@ pub fn to_ansi(input: String) -> String {
     output
 }
 
-pub fn to_html(input: String) -> String {
-    // FIXME this should probably be using CowString or borrowed value
+pub fn to_html(input: &str) -> String {
     // FIXME this should be operating on characters, not bytes
 
     let input = input.as_bytes();

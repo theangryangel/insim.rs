@@ -1,12 +1,13 @@
-use insim_core::prelude::*;
+use insim_core::{
+    identifiers::{ConnectionId, RequestId},
+    prelude::*,
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-use crate::{
-    error::Error,
-    protocol::identifiers::{ConnectionId, RequestId},
-};
+use crate::error::Error;
+
 use std::default::Default;
 
 const MAX_MAL_SIZE: usize = 120;
@@ -47,7 +48,7 @@ impl Mal {
         }
 
         self.allowed_mods.push(mod_id);
-        self.update()?;
+        self.count = self.allowed_mods.len() as u8;
 
         Ok(())
     }
@@ -55,7 +56,7 @@ impl Mal {
     /// Clear any previously allowed mods.
     pub fn clear(&mut self) -> Result<(), Error> {
         self.allowed_mods.clear();
-        self.update()?;
+        self.count = 0;
         Ok(())
     }
 }

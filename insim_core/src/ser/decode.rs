@@ -101,3 +101,78 @@ where
         Ok(data)
     }
 }
+
+// (T1, T2 ..)
+
+impl<T1, T2> Decodable for (T1, T2)
+where
+    T1: Decodable + Default + std::fmt::Debug,
+    T2: Decodable + Default + std::fmt::Debug,
+{
+    fn decode(buf: &mut BytesMut, count: Option<usize>) -> Result<Self, DecodableError> {
+        let t1 = T1::decode(buf, None)?;
+        let t2 = T2::decode(buf, None)?;
+
+        Ok((t1, t2))
+    }
+}
+
+impl<T1, T2, T3> Decodable for (T1, T2, T3)
+where
+    T1: Decodable + Default + std::fmt::Debug,
+    T2: Decodable + Default + std::fmt::Debug,
+    T3: Decodable + Default + std::fmt::Debug,
+{
+    fn decode(buf: &mut BytesMut, count: Option<usize>) -> Result<Self, DecodableError> {
+        let t1 = T1::decode(buf, None)?;
+        let t2 = T2::decode(buf, None)?;
+        let t3 = T3::decode(buf, None)?;
+
+        Ok((t1, t2, t3))
+    }
+}
+
+impl<T1, T2, T3, T4> Decodable for (T1, T2, T3, T4)
+where
+    T1: Decodable + Default + std::fmt::Debug,
+    T2: Decodable + Default + std::fmt::Debug,
+    T3: Decodable + Default + std::fmt::Debug,
+    T4: Decodable + Default + std::fmt::Debug,
+{
+    fn decode(buf: &mut BytesMut, count: Option<usize>) -> Result<Self, DecodableError> {
+        let t1 = T1::decode(buf, None)?;
+        let t2 = T2::decode(buf, None)?;
+        let t3 = T3::decode(buf, None)?;
+        let t4 = T4::decode(buf, None)?;
+
+        Ok((t1, t2, t3, t4))
+    }
+}
+
+// [T; N]
+
+macro_rules! impl_decode_slice_trait {
+    ($ty:ty; $($count:expr),+ $(,)?) => {
+
+        $(
+            impl Decodable for [$ty; $count] {
+                fn decode(buf: &mut BytesMut, _count: Option<usize>) -> Result<Self, DecodableError> {
+                    let mut slice: [$ty; $count] = Default::default();
+                    for i in 0..$count {
+                        slice[i] = <$ty>::decode(buf, None)?;
+                    }
+
+                    Ok(slice)
+                }
+            }
+        )+
+    };
+}
+
+impl_decode_slice_trait!(i8; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+impl_decode_slice_trait!(i16; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+impl_decode_slice_trait!(i32; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+impl_decode_slice_trait!(u8; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+impl_decode_slice_trait!(u16; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+impl_decode_slice_trait!(u32; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+impl_decode_slice_trait!(f32; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);

@@ -1,9 +1,13 @@
+pub mod identifiers;
 pub mod point;
-pub mod ser;
 pub mod prelude;
+pub mod ser;
+pub mod string;
 
-pub use ser::decode::{Decodable, DecodableError};
-pub use ser::encode::{Encodable, EncodableError};
+pub use ser::{
+    decode::{Decodable, DecodableError},
+    encode::{Encodable, EncodableError},
+};
 
 pub use point::Pointable;
 

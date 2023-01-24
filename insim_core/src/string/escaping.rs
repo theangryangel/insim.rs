@@ -42,10 +42,6 @@ const ESCAPE_SEQUENCES: &[(u8, u8)] = &[
 ];
 
 /// Escape a u8 slice according to LFS' rules.
-// FIXME: Doesn't escape ^ when it needs to be.
-// Temporarily allow_let_on_iterator as I'll be needing peek (probably) for handling the escape of
-// '^'
-#[allow(clippy::while_let_on_iterator)]
 pub fn escape(input: &[u8]) -> Vec<u8> {
     // FIXME: probably should make this a Cow?
 

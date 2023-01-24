@@ -1,14 +1,16 @@
-use insim_core::prelude::*;
+use insim_core::{
+    identifiers::{ConnectionId, PlayerId, RequestId},
+    prelude::*,
+    string::CodepageString,
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-use bitflags::bitflags;
-use crate::protocol::identifiers::{ConnectionId, PlayerId, RequestId};
-use crate::string::{istring, CodepageString};
 use crate::vehicle::Vehicle;
+use bitflags::bitflags;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
 pub enum TyreCompound {
@@ -38,26 +40,49 @@ impl Default for TyreCompound {
 }
 
 bitflags! {
+    #[derive(Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct PlayerFlags: u16 {
-        SWAPSIDE => (1 << 0),
-        RESERVED_2 => (1 << 1),
-        RESERVED_4 => (1 << 2),
-        AUTOGEARS => (1 << 3),
-        SHIFTER => (1 << 4),
-        RESERVED_32 => (1 << 5),
-        HELP_B => (1 << 6),
-        AXIS_CLUTCH => (1 << 7),
-        INPITS => (1 << 8),
-        AUTOCLUTCH => (1 << 9),
-        MOUSE => (1 << 10),
-        KB_NO_HELP => (1 << 11),
-        KB_STABILISED => (1 << 12),
-        CUSTOM_VIEW => (1 << 13),
+         const SWAPSIDE = (1 << 0);
+         const RESERVED_2 = (1 << 1);
+         const RESERVED_4 = (1 << 2);
+         const AUTOGEARS = (1 << 3);
+         const SHIFTER = (1 << 4);
+         const RESERVED_32 = (1 << 5);
+         const HELP_B = (1 << 6);
+         const AXIS_CLUTCH = (1 << 7);
+         const INPITS = (1 << 8);
+         const AUTOCLUTCH = (1 << 9);
+         const MOUSE = (1 << 10);
+         const KB_NO_HELP = (1 << 11);
+         const KB_STABILISED = (1 << 12);
+         const CUSTOM_VIEW = (1 << 13);
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+impl Encodable for PlayerFlags {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodableError>
+    where
+        Self: Sized,
+    {
+        self.bits().encode(buf)?;
+        Ok(())
+    }
+}
+
+impl Decodable for PlayerFlags {
+    fn decode(
+        buf: &mut bytes::BytesMut,
+        count: Option<usize>,
+    ) -> Result<Self, insim_core::DecodableError>
+    where
+        Self: Sized,
+    {
+        Ok(Self::from_bits_truncate(u16::decode(buf, count)?))
+    }
+}
+
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Sent when a New Player joins.
 pub struct Npl {
@@ -79,14 +104,10 @@ pub struct Npl {
 
     pub cname: Vehicle,
 
-    #[insim(
-        reader = "istring::read(insim::rest, 16)",
-        writer = "istring::write(insim::output, &self.sname, 16)"
-    )]
+    #[insim(bytes = "16")]
     pub sname: String,
 
-    #[insim(count = "4")]
-    pub tyres: Vec<TyreCompound>,
+    pub tyres: (TyreCompound, TyreCompound, TyreCompound, TyreCompound),
 
     pub h_mass: u8,
 

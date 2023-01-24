@@ -1,10 +1,10 @@
 use super::config::Config;
 use crate::error::Error;
-use crate::protocol::identifiers::RequestId;
 use crate::protocol::{transport::Transport, Packet};
 
 use futures::{FutureExt, Sink, Stream, TryStreamExt};
 use futures_util::sink::SinkExt;
+use insim_core::identifiers::RequestId;
 use pin_project::pin_project;
 use std::fmt::Display;
 use std::pin::Pin;

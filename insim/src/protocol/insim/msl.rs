@@ -1,9 +1,7 @@
-use insim_core::prelude::*;
+use insim_core::{identifiers::RequestId, prelude::*, string::CodepageString};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
-
-use crate::{protocol::identifiers::RequestId, string::CodepageString};
 
 /// Enum for the sound field of [Msl].
 #[derive(Debug, InsimEncode, InsimDecode, Clone)]

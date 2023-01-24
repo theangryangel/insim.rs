@@ -37,24 +37,22 @@
 //! }
 //! ````
 
-use insim_core::{InsimEncode, InsimDecode, InsimEncodable, InsimDecodable};
+use insim_core::prelude::*;
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-pub mod codec;
-pub mod identifiers;
-pub mod insim;
 mod macros;
+
+pub mod codec;
+pub mod insim;
 pub mod position;
 pub mod relay;
 pub mod transport;
 
 pub const VERSION: u8 = 9;
 
-use crate::packet;
-
-#[derive(InsimEncode, InsimDecode, PartialEq, Eq, Debug)]
+#[derive(InsimEncode, InsimDecode, Debug, Clone)]
 #[repr(u8)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
@@ -139,7 +137,7 @@ impl Default for Packet {
     }
 }
 
-impl_packet_from(
+crate::impl_packet_from! {
     insim::Init => Init,
     insim::Version => Version,
     insim::Tiny => Tiny,
@@ -211,4 +209,4 @@ impl_packet_from(
     relay::HostList => RelayHostList,
     relay::HostSelect => RelayHostSelect,
     relay::RelayError => RelayError
-)
+}

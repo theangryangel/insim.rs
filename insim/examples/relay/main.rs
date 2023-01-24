@@ -49,26 +49,7 @@ pub async fn main() {
                 for car in mci.info.iter() {
                     let (x, y, z) = car.xyz.to_uom();
 
-                    tracing::info!(
-                        "{} = {} = ({}, {}, {})",
-                        car.plid,
-                        car.speed_uom().into_format_args(
-                            uom::si::velocity::mile_per_hour,
-                            uom::fmt::DisplayStyle::Abbreviation
-                        ),
-                        x.into_format_args(
-                            uom::si::length::meter,
-                            uom::fmt::DisplayStyle::Abbreviation
-                        ),
-                        y.into_format_args(
-                            uom::si::length::meter,
-                            uom::fmt::DisplayStyle::Abbreviation
-                        ),
-                        z.into_format_args(
-                            uom::si::length::meter,
-                            uom::fmt::DisplayStyle::Abbreviation
-                        ),
-                    );
+                    tracing::info!("{} = {}", car.plid, car,);
                 }
             }
 

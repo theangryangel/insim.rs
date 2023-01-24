@@ -1,10 +1,12 @@
-use insim_core::prelude::*;
-
-use crate::protocol::identifiers::{PlayerId, RequestId};
-use super::CarContact;
+use insim_core::{
+    identifiers::{PlayerId, RequestId},
+    prelude::*,
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
+
+use super::CarContact;
 
 #[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]

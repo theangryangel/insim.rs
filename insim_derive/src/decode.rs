@@ -1,9 +1,9 @@
-use crate::{extract_repr_type, extract_type, gen_field_name, StructData};
+use crate::{extract_repr_type, extract_type, gen_field_name, Receiver};
 use darling::{ast::Data, ToTokens};
 use proc_macro2::TokenStream;
 use quote::quote;
 
-impl StructData {
+impl Receiver {
     pub fn to_decode_tokens(&self) -> TokenStream {
         match &self.data {
             Data::Enum(_) => self.to_enum_decode_tokens(),
@@ -49,7 +49,12 @@ impl StructData {
                     });
                 }
 
-                let field_name = format_ident!("field_{}", j);
+                let field_name = if v.fields.style == darling::ast::Style::Struct {
+                    format_ident!("{}", f.ident.as_ref().unwrap())
+                } else {
+                    format_ident!("f{}", j)
+                };
+
                 let field_ty = &f.ty.to_token_stream();
 
                 variant_field_names.extend(quote! {
@@ -67,13 +72,33 @@ impl StructData {
                 }
             }
 
-            tokens.extend(quote! {
-                #discriminant => {
-                    #variant_field_tokens
+            match v.fields.style {
+                darling::ast::Style::Tuple => {
+                    tokens.extend(quote! {
+                        #discriminant => {
+                            #variant_field_tokens
 
-                    #ident::#variant_name(#variant_field_names)
-                },
-            });
+                            #ident::#variant_name(#variant_field_names)
+                        },
+                    });
+                }
+                darling::ast::Style::Struct => {
+                    tokens.extend(quote! {
+                        #discriminant => {
+                            #variant_field_tokens
+
+                            #ident::#variant_name{ #variant_field_names }
+                        },
+                    });
+                }
+                darling::ast::Style::Unit => {
+                    tokens.extend(quote! {
+                        #discriminant => {
+                            #ident::#variant_name
+                        },
+                    });
+                }
+            }
         }
 
         quote! {
@@ -122,9 +147,19 @@ impl StructData {
             }
 
             let size = if let Some(count) = &f.count {
-                let count_ident = format_ident!("{}", count);
-                quote! {
-                    Some(data.#count_ident as usize)
+                if count.chars().all(char::is_numeric) {
+                    // FIXME if its a numeric, assume that it's a fixed size.. for now?
+                    // guess we should really split this functionality out of count!
+                    let count = count.parse::<usize>().unwrap();
+
+                    quote! { Some(#count) }
+                } else {
+                    // if not numeric, we're reading from another field
+
+                    let count_ident = format_ident!("{}", count);
+                    quote! {
+                        Some(data.#count_ident as usize)
+                    }
                 }
             } else {
                 quote! {

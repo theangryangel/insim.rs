@@ -1,20 +1,22 @@
 //! Lower level transport interface.
 use crate::{
     error,
-    protocol::{codec, insim, Packet},
+    protocol::{
+        codec::{self, Mode},
+        insim, Packet,
+    },
 };
 use futures::Future;
 use futures::{Sink, Stream};
 use pin_project::pin_project;
 
+use insim_core::identifiers::RequestId;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::time;
 use tokio_util::codec::Framed;
-
-use super::{codec::Mode, identifiers::RequestId};
 
 const TIMEOUT_SECS: u64 = 90;
 

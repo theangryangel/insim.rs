@@ -9,7 +9,7 @@ struct TestPaddingAfter {
 }
 
 #[test]
-fn test_padding_after_encode() {
+fn test_ser_padding_after_encode() {
     let mut buf = BytesMut::new();
 
     let i = TestPaddingAfter { i: 1, j: 99 };
@@ -25,7 +25,7 @@ fn test_padding_after_encode() {
 }
 
 #[test]
-fn test_padding_after_decode() {
+fn test_ser_padding_after_decode() {
     let i = TestPaddingAfter { i: 1, j: 99 };
 
     let mut comparison = BytesMut::new();

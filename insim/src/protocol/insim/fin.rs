@@ -1,24 +1,48 @@
-use insim_core::prelude::*;
-use bitflags::bitflags;
+use insim_core::{
+    identifiers::{PlayerId, RequestId},
+    prelude::*,
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use bitflags::bitflags;
+
 use super::PlayerFlags;
-use crate::{
-    protocol::identifiers::{PlayerId, RequestId},
-};
 
 bitflags! {
+    #[derive(Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct RaceResultFlags: u8 {
-        MENTIONED => (1 << 0),
-        CONFIRMED => (1 << 1),
-        PENALTY_DT => (1 << 2),
-        PENALTY_SG => (1 << 3),
-        PENALTY_30 => (1 << 4),
-        PENALTY_45 => (1 << 5),
-        NO_PIT => (1 << 6),
+        const MENTIONED = (1 << 0);
+        const CONFIRMED = (1 << 1);
+        const PENALTY_DT = (1 << 2);
+        const PENALTY_SG = (1 << 3);
+        const PENALTY_30 = (1 << 4);
+        const PENALTY_45 = (1 << 5);
+        const NO_PIT = (1 << 6);
+    }
+}
+
+impl Encodable for RaceResultFlags {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodableError>
+    where
+        Self: Sized,
+    {
+        self.bits().encode(buf)?;
+        Ok(())
+    }
+}
+
+impl Decodable for RaceResultFlags {
+    fn decode(
+        buf: &mut bytes::BytesMut,
+        count: Option<usize>,
+    ) -> Result<Self, insim_core::DecodableError>
+    where
+        Self: Sized,
+    {
+        Ok(Self::from_bits_truncate(u8::decode(buf, count)?))
     }
 }
 

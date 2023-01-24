@@ -1,23 +1,45 @@
-#[cfg(feature = "uom")]
-use crate::units;
-
-use insim_core::prelude::*;
+use insim_core::{
+    identifiers::{PlayerId, RequestId},
+    point::Point,
+    prelude::*,
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 use bitflags::bitflags;
-use crate::protocol::identifiers::{PlayerId, RequestId};
-use crate::protocol::position::Point;
 
 bitflags! {
+    #[derive(Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct CompCarInfo: u8 {
-        BLUE_FLAG => (1 << 0),
-        YELLOW_FLAG => (1 << 1),
-        LAGGING => (1 << 5),
-        FIRST => (1 << 6),
-        LAST => (1 << 7),
+        const BLUE_FLAG = (1 << 0);
+        const YELLOW_FLAG = (1 << 1);
+        const LAGGING = (1 << 50);
+        const FIRST = (1 << 6);
+        const LAST = (1 << 7);
+    }
+}
+
+impl Encodable for CompCarInfo {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodableError>
+    where
+        Self: Sized,
+    {
+        self.bits().encode(buf)?;
+        Ok(())
+    }
+}
+
+impl Decodable for CompCarInfo {
+    fn decode(
+        buf: &mut bytes::BytesMut,
+        count: Option<usize>,
+    ) -> Result<Self, insim_core::DecodableError>
+    where
+        Self: Sized,
+    {
+        Ok(Self::from_bits_truncate(u8::decode(buf, count)?))
     }
 }
 
@@ -59,31 +81,6 @@ pub struct CompCar {
     /// Signed, rate of change of heading : (16384 = 360 deg/s)
     /// You may use the angvel_uom function to convert this to real world units if the uom feature is enabled.
     pub angvel: i16,
-}
-
-#[cfg(feature = "uom")]
-impl CompCar {
-    /// Converts speed into uom::si::f64::velocity
-    pub fn speed_uom(&self) -> uom::si::f64::Velocity {
-        uom::si::f64::Velocity::new::<units::velocity::game_per_second>(self.speed.into())
-    }
-
-    /// Converts angvel into degrees per second.
-    pub fn angvel_uom(&self) -> uom::si::f64::AngularVelocity {
-        uom::si::f64::AngularVelocity::new::<units::angular_velocity::game_heading_per_second>(
-            self.speed.into(),
-        )
-    }
-
-    /// Convert direction to degrees.
-    pub fn direction_uom(&self) -> uom::si::f64::Angle {
-        uom::si::f64::Angle::new::<units::angle::game_heading>(self.direction.into())
-    }
-
-    /// Convert direction to degrees.
-    pub fn heading_uom(&self) -> uom::si::f64::Angle {
-        uom::si::f64::Angle::new::<units::angle::game_heading>(self.heading.into())
-    }
 }
 
 #[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]

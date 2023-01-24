@@ -3,7 +3,7 @@
 macro_rules! impl_packet_from {
     (
         $(
-            $inner:ty => $variant:ident
+            $inner:ty => $variant:ident$(,)?
         )+
     ) => {
         // Implement From for all our variants so that we can use do insim::Init().into() to get a

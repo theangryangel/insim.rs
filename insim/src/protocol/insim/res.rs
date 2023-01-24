@@ -1,11 +1,13 @@
-use insim_core::prelude::*;
+use insim_core::{
+    identifiers::{PlayerId, RequestId},
+    prelude::*,
+    string::CodepageString,
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 use super::{PlayerFlags, RaceResultFlags};
-use crate::protocol::identifiers::{PlayerId, RequestId};
-use crate::string::{istring, CodepageString};
 use crate::vehicle::Vehicle;
 
 #[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
@@ -16,10 +18,7 @@ pub struct Res {
 
     pub plid: PlayerId,
 
-    #[insim(
-        reader = "istring::read(insim::rest, 24)",
-        writer = "istring::write(insim::output, &self.uname, 24)"
-    )]
+    #[insim(bytes = "24")]
     pub uname: String,
 
     #[insim(bytes = "24")]

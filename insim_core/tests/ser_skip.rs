@@ -13,7 +13,7 @@ struct TestSkip {
 }
 
 #[test]
-fn test_skip_encode() {
+fn test_ser_skip_encode() {
     let mut buf = BytesMut::new();
 
     let i = TestSkip {
@@ -34,7 +34,7 @@ fn test_skip_encode() {
 }
 
 #[test]
-fn test_skip_decode() {
+fn test_ser_skip_decode() {
     let i = TestSkip {
         i: 1,
         j: 99,

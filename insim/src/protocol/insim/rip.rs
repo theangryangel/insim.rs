@@ -1,9 +1,7 @@
-use insim_core::prelude::*;
+use insim_core::{identifiers::RequestId, prelude::*};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
-
-use crate::{protocol::identifiers::RequestId, string::istring};
 
 #[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -56,9 +54,6 @@ pub struct Rip {
     pub ctime: u32,
     pub ttime: u32,
 
-    #[insim(
-        reader = "istring::read(insim::rest, 64)",
-        writer = "istring::write(insim::output, &self.rname, 64)"
-    )]
+    #[insim(bytes = "64")]
     pub rname: String,
 }

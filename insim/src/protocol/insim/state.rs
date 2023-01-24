@@ -1,13 +1,13 @@
-use insim_core::prelude::*;
+use insim_core::{
+    identifiers::{PlayerId, RequestId},
+    prelude::*,
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 use super::Wind;
-use crate::{
-    protocol::identifiers::{PlayerId, RequestId},
-    track::Track,
-};
+use crate::track::Track;
 
 #[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]

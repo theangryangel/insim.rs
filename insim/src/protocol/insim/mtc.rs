@@ -1,10 +1,11 @@
-use insim_core::prelude::*;
+use insim_core::{
+    identifiers::{ConnectionId, PlayerId, RequestId},
+    prelude::*,
+    string::CodepageString,
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
-
-use crate::protocol::identifiers::{ConnectionId, PlayerId, RequestId};
-use crate::string::CodepageString;
 
 #[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -19,6 +20,6 @@ pub struct Mtc {
     #[insim(pad_bytes_after = "2")]
     pub plid: PlayerId,
 
-    #[insim(reader = "CodepageString::read(insim::rest, Size::Bytes(insim::rest.len() / 8))")]
+    #[insim(bytes = "128")]
     pub msg: CodepageString,
 }

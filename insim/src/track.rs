@@ -7,7 +7,7 @@ use serde::Serialize;
 
 use std::collections::HashMap;
 
-use crate::string::strip_trailing_nul;
+use insim_core::string::strip_trailing_nul;
 use once_cell::sync::Lazy;
 
 #[derive(Clone, Debug, Default)]

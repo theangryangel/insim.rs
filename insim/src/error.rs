@@ -37,7 +37,6 @@ pub enum Error {
 
     #[error("Failed to encode packet: {0:?}")]
     Encoding(#[from] EncodableError),
-
 }
 
 impl From<std::io::Error> for Error {

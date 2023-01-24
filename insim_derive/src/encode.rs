@@ -4,9 +4,9 @@ use darling::ast::Data;
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use crate::{extract_repr_type, gen_field_name, StructData};
+use crate::{extract_repr_type, gen_field_name, Receiver};
 
-impl StructData {
+impl Receiver {
     pub fn to_encode_tokens(&self) -> TokenStream {
         match &self.data {
             Data::Enum(_) => self.to_enum_encode_tokens(),
@@ -33,7 +33,11 @@ impl StructData {
             let mut variant_field_names = TokenStream::new();
 
             for (j, f) in v.fields.iter().enumerate() {
-                let field_name = format_ident!("field_{}", j);
+                let field_name = if v.fields.style == darling::ast::Style::Struct {
+                    format_ident!("{}", f.ident.as_ref().unwrap())
+                } else {
+                    format_ident!("f{}", j)
+                };
 
                 variant_field_names.extend(quote! {
                     #field_name,
@@ -70,13 +74,33 @@ impl StructData {
                 }
             }
 
-            tokens.extend(quote! {
-                Self::#ident(#variant_field_names) => {
-                    (#discriminant as #repr_ty).encode(buf)?;
+            match v.fields.style {
+                darling::ast::Style::Tuple => {
+                    tokens.extend(quote! {
+                        Self::#ident(#variant_field_names) => {
+                            (#discriminant as #repr_ty).encode(buf)?;
 
-                    #variant_field_tokens
-                },
-            });
+                            #variant_field_tokens
+                        },
+                    });
+                }
+                darling::ast::Style::Struct => {
+                    tokens.extend(quote! {
+                        Self::#ident{#variant_field_names} => {
+                            (#discriminant as #repr_ty).encode(buf)?;
+
+                            #variant_field_tokens
+                        },
+                    });
+                }
+                darling::ast::Style::Unit => {
+                    tokens.extend(quote! {
+                        Self::#ident => {
+                            (#discriminant as #repr_ty).encode(buf)?;
+                        },
+                    });
+                }
+            }
         }
 
         quote! {
@@ -87,17 +111,15 @@ impl StructData {
     }
 
     fn to_struct_encode_tokens(&self) -> TokenStream {
-        let mut tokens = TokenStream::new();
-        tokens.extend(quote! {
-            use ::std::convert::TryFrom;
-        });
-
         let fields_to_index = self.data.as_ref().take_struct().unwrap();
+
+        let mut tokens = TokenStream::new();
 
         let countable: HashMap<usize, proc_macro2::TokenStream> = fields_to_index
             .iter()
             .enumerate()
             .filter(|(_i, f)| f.count.is_some())
+            .filter(|(_i, f)| !f.count.as_ref().unwrap().chars().all(char::is_numeric))
             .map(|(i, f)| {
                 // f is countable
 
@@ -152,6 +174,8 @@ impl StructData {
                     (self.#update_from.len() as #ty).encode(buf)?;
                 });
             } else {
+                // FIXME add a check for a static size and ensure that we're not overly large
+
                 tokens.extend(quote! {
                     self.#ident.encode(buf)?;
                 });

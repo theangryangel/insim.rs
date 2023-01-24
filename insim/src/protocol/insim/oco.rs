@@ -1,9 +1,9 @@
-use insim_core::prelude::*;
+use insim_core::{identifiers::RequestId, prelude::*};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-use crate::protocol::identifiers::RequestId;
+use bitflags::bitflags;
 
 #[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -38,12 +38,35 @@ impl Default for OcoIndex {
 }
 
 bitflags! {
+    #[derive(Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct OcoLights: u8 {
-        RED1 => (1 << 0),
-        RED2 => (1 << 1),
-        RED3 => (1 << 2),
-        GREEN => (1 << 3),
+        const RED1 = (1 << 0);
+        const RED2 = (1 << 1);
+        const RED3 = (1 << 2);
+        const GREEN = (1 << 3);
+    }
+}
+
+impl Encodable for OcoLights {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodableError>
+    where
+        Self: Sized,
+    {
+        self.bits().encode(buf)?;
+        Ok(())
+    }
+}
+
+impl Decodable for OcoLights {
+    fn decode(
+        buf: &mut bytes::BytesMut,
+        count: Option<usize>,
+    ) -> Result<Self, insim_core::DecodableError>
+    where
+        Self: Sized,
+    {
+        Ok(Self::from_bits_truncate(u8::decode(buf, count)?))
     }
 }
 

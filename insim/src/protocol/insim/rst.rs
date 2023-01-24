@@ -1,23 +1,19 @@
-use insim_core::prelude::*;
+use insim_core::{identifiers::RequestId, prelude::*};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 use bitflags::bitflags;
 
-use crate::protocol::identifiers::RequestId;
 use crate::track::Track;
 
 #[derive(Debug, InsimEncode, InsimDecode, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
 pub enum Wind {
-    #[insim(id = "0")]
-    None,
-    #[insim(id = "1")]
-    Weak,
-    #[insim(id = "2")]
-    Strong,
+    None = 0,
+    Weak = 1,
+    Strong = 2,
 }
 
 impl Default for Wind {
@@ -27,15 +23,39 @@ impl Default for Wind {
 }
 
 bitflags! {
+    #[derive(Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct HostFacts: u16 {
-        CAN_VOTE => (1 << 0),
-        CAN_SELECT => (1 << 1),
-        MID_RACE_JOIN => (1 << 2),
-        MUST_PIT => (1 << 3),
-        CAN_RESET => (1 << 4),
-        FORCE_DRIVER_VIEW => (1 << 5),
-        CRUISE => (1 << 6),
+         const CAN_VOTE = (1 << 0);
+         const CAN_SELECT = (1 << 1);
+         const MID_RACE_JOIN = (1 << 2);
+         const MUST_PIT = (1 << 3);
+         const CAN_RESET = (1 << 4);
+         const FORCE_DRIVER_VIEW = (1 << 5);
+         const CRUISE = (1 << 6);
+    }
+}
+
+impl Decodable for HostFacts {
+    fn decode(
+        buf: &mut bytes::BytesMut,
+        count: Option<usize>,
+    ) -> Result<Self, insim_core::DecodableError>
+    where
+        Self: Default,
+    {
+        let data = Self::default();
+        Ok(Self::from_bits_truncate(u16::decode(buf, count)?))
+    }
+}
+
+impl Encodable for HostFacts {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodableError>
+    where
+        Self: Sized,
+    {
+        self.bits().encode(buf)?;
+        Ok(())
     }
 }
 

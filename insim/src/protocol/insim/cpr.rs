@@ -1,8 +1,9 @@
-use crate::{
-    protocol::identifiers::{ConnectionId, RequestId},
+use insim_core::{
+    identifiers::{ConnectionId, RequestId},
+    prelude::*,
     string::CodepageString,
 };
-use insim_core::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 

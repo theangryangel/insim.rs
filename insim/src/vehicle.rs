@@ -5,7 +5,7 @@ use insim_core::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-use crate::string::{is_ascii_alphanumeric, strip_trailing_nul};
+use insim_core::string::{is_ascii_alphanumeric, strip_trailing_nul};
 
 /// Handles parsing a vehicle name according to the Insim v9 rules.
 /// See <https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info>

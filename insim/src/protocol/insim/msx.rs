@@ -1,9 +1,7 @@
-use insim_core::prelude::*;
+use insim_core::{identifiers::RequestId, prelude::*, string::CodepageString};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
-
-use crate::{protocol::identifiers::RequestId, string::CodepageString};
 
 #[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]

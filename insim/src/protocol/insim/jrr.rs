@@ -1,9 +1,10 @@
-use insim_core::prelude::*;
+use insim_core::{
+    identifiers::{ConnectionId, PlayerId, RequestId},
+    prelude::*,
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
-
-use crate::protocol::identifiers::{ConnectionId, PlayerId, RequestId};
 
 use super::ObjectInfo;
 

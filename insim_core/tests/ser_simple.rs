@@ -7,7 +7,7 @@ struct Testu8 {
 }
 
 #[test]
-fn test_u8_encode() {
+fn test_ser_u8_encode() {
     let mut buf = BytesMut::new();
 
     let i = Testu8 { i: 1 };
@@ -21,7 +21,7 @@ fn test_u8_encode() {
 }
 
 #[test]
-fn test_u8_decode() {
+fn test_ser_u8_decode() {
     let i = Testu8 { i: 1 };
 
     let mut comparison = BytesMut::new();

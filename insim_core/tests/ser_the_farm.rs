@@ -35,7 +35,7 @@ impl Default for TestTheFarmEnum {
 }
 
 #[test]
-fn test_the_farm_encode() {
+fn test_ser_the_farm_encode() {
     let mut buf = BytesMut::new();
 
     let i = TestTheFarmEnum::Moo(TestTheFarm {
@@ -70,7 +70,7 @@ fn test_the_farm_encode() {
 }
 
 #[test]
-fn test_the_farm_decode() {
+fn test_ser_the_farm_decode() {
     let i = TestTheFarmEnum::Moo(TestTheFarm {
         i: 1,
         j: 99,
