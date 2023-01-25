@@ -1,5 +1,5 @@
 use chrono::prelude::*;
-use insim::protocol::identifiers::ConnectionId;
+use insim::core::identifiers::ConnectionId;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]

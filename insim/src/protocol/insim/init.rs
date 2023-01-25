@@ -1,4 +1,4 @@
-use insim_core::{identifiers::RequestId, prelude::*};
+use insim_core::{identifiers::RequestId, prelude::*, ser::Limit};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -25,12 +25,15 @@ bitflags! {
     }
 }
 
+impl InitFlags {
+    pub fn clear(&mut self) {
+        self.bits = 0;
+    }
+}
+
 impl Encodable for InitFlags {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodableError>
-    where
-        Self: Sized,
-    {
-        self.bits().encode(buf)?;
+    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), insim_core::EncodableError> {
+        self.bits().encode(buf, limit)?;
         Ok(())
     }
 }
@@ -38,12 +41,9 @@ impl Encodable for InitFlags {
 impl Decodable for InitFlags {
     fn decode(
         buf: &mut bytes::BytesMut,
-        count: Option<usize>,
-    ) -> Result<Self, insim_core::DecodableError>
-    where
-        Self: Sized,
-    {
-        Ok(Self::from_bits_truncate(u16::decode(buf, count)?))
+        limit: Option<Limit>,
+    ) -> Result<Self, insim_core::DecodableError> {
+        Ok(Self::from_bits_truncate(u16::decode(buf, limit)?))
     }
 }
 

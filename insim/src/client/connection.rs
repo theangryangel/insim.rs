@@ -34,6 +34,12 @@ impl Event {
     }
 }
 
+impl From<Packet> for Event {
+    fn from(value: Packet) -> Self {
+        Self::Data(value)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum ConnectedState {
     Handshake,
@@ -212,9 +218,15 @@ impl Stream for Client {
                         }
                     }
 
-                    *state = ConnectedState::Handshaking;
+                    if !this.config.verify_version {
+                        *state = ConnectedState::Connected;
+                        Poll::Ready(Some(Event::Connected))
 
-                    Poll::Ready(Some(Event::Handshaking))
+                    } else {
+                        *state = ConnectedState::Handshaking;
+                        Poll::Ready(Some(Event::Handshaking))
+                    }
+
                 }
                 ConnectedState::Handshaking => match transport.try_poll_next_unpin(cx) {
                     Poll::Ready(Some(packet)) => {

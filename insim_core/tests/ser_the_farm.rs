@@ -17,7 +17,6 @@ struct TestTheFarm {
     #[insim(skip)]
     #[allow(unused)]
     pub l: u8,
-    #[insim(bytes = "2")]
     pub m: u8,
 }
 
@@ -62,9 +61,8 @@ fn test_ser_the_farm_encode() {
     comparison.put_u8(true as u8);
 
     comparison.put_u8(1);
-    comparison.put_u8(0);
 
-    let res = i.encode(&mut buf);
+    let res = i.encode(&mut buf, None);
     assert!(res.is_ok());
     assert_eq!(&buf[..], &comparison[..]);
 }
@@ -95,9 +93,7 @@ fn test_ser_the_farm_decode() {
     comparison.put_u8(true as u8);
 
     comparison.put_u8(1);
-    comparison.put_u8(0);
 
-    let decoded = TestTheFarmEnum::decode(&mut comparison, None);
-    assert!(decoded.is_ok(), "Expected decode to succeed");
-    assert_eq!(decoded.unwrap(), i, "Expected decoded struct to match");
+    let decoded = TestTheFarmEnum::decode(&mut comparison, None).unwrap();
+    assert_eq!(decoded, i, "Expected decoded struct to match");
 }

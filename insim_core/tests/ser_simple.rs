@@ -15,7 +15,7 @@ fn test_ser_u8_encode() {
     let mut comparison = BytesMut::new();
     comparison.put_u8(i.i);
 
-    let res = i.encode(&mut buf);
+    let res = i.encode(&mut buf, None);
     assert!(res.is_ok());
     assert_eq!(&buf[..], b"\x01");
 }

@@ -1,28 +1,38 @@
 use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
+use std::io::ErrorKind;
+use thiserror::Error;
 
-use crate::error;
-use crate::protocol::position::Point;
-use deku::prelude::*;
+use insim_core::{prelude::*, point::Point, DecodableError};
 
-#[derive(Debug, DekuRead, DekuWrite, Copy, Clone)]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+// FIXME - we should probably drop the derive clone here?
+#[non_exhaustive]
+#[derive(Error, Debug, Clone)]
+pub enum Error {
+    #[error("IO Error: {kind}: {message}")]
+    IO { kind: ErrorKind, message: String },
+
+    #[error("Failed to decode packet: {0:?}")]
+    Decoding(#[from] DecodableError),
+}
+
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Error::IO {
+            kind: e.kind(),
+            message: e.to_string(),
+        }
+    }
+}
+
+#[derive(Debug, InsimDecode, Copy, Clone, Default)]
 pub struct Limit {
     pub left: f32,
     pub right: f32,
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Copy, Clone)]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[derive(Debug, InsimDecode, Copy, Clone, Default)]
 pub struct Node {
     pub center: Point<i32>,
     pub direction: Point<f32>,
@@ -82,13 +92,8 @@ impl Node {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite)]
-#[deku(
-    magic = b"LFSPTH",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[derive(Debug, InsimDecode, Default)]
+#[insim(magic = b"LFSPTH")]
 pub struct Pth {
     pub version: u8,
     pub revision: u8,
@@ -96,26 +101,28 @@ pub struct Pth {
     pub num_nodes: i32,
     pub finish_line_node: i32,
 
-    #[deku(count = "num_nodes")]
+    #[insim(count = "num_nodes")]
     pub nodes: Vec<Node>,
 }
 
 impl Pth {
-    pub fn from_file(i: &PathBuf) -> Result<Self, error::Error> {
+    pub fn from_file(i: &PathBuf) -> Result<Self, Error> {
         if !i.exists() {
-            return Err(error::Error::IO {
+            return Err(Error::IO {
                 kind: std::io::ErrorKind::NotFound,
                 message: format!("Path {:?} does not exist", i),
             });
         }
 
-        let mut input = fs::File::open(i).map_err(error::Error::from)?;
+        let mut input = fs::File::open(i).map_err(Error::from)?;
 
+        // FIXME
         let mut buffer = Vec::new();
-        input.read_to_end(&mut buffer).map_err(error::Error::from)?;
+        input.read_to_end(&mut buffer).map_err(Error::from)?;
 
-        let pth = Pth::try_from(buffer.as_ref()).map_err(error::Error::from)?;
+        let mut data = insim_core::bytes::BytesMut::new();
+        data.extend_from_slice(&buffer);
 
-        Ok(pth)
+        Ok(Pth::decode(&mut data, None)?)
     }
 }

@@ -14,6 +14,16 @@ impl Receiver {
         }
     }
 
+    fn encode_magic_tokens(&self) -> TokenStream {
+        if let Some(magic) = &self.magic {
+            quote! {
+                buf.put_slice(#magic);
+            }
+        } else {
+            quote! {}
+        }
+    }
+
     fn to_enum_encode_tokens(&self) -> TokenStream {
         let mut tokens = TokenStream::new();
 
@@ -64,7 +74,7 @@ impl Receiver {
                 }
 
                 variant_field_tokens.extend(quote! {
-                    #field_name.encode(buf)?;
+                    #field_name.encode(buf, None)?;
                 });
 
                 if let Some(size) = f.pad_bytes_after {
@@ -78,7 +88,7 @@ impl Receiver {
                 darling::ast::Style::Tuple => {
                     tokens.extend(quote! {
                         Self::#ident(#variant_field_names) => {
-                            (#discriminant as #repr_ty).encode(buf)?;
+                            (#discriminant as #repr_ty).encode(buf, None)?;
 
                             #variant_field_tokens
                         },
@@ -87,7 +97,7 @@ impl Receiver {
                 darling::ast::Style::Struct => {
                     tokens.extend(quote! {
                         Self::#ident{#variant_field_names} => {
-                            (#discriminant as #repr_ty).encode(buf)?;
+                            (#discriminant as #repr_ty).encode(buf, None)?;
 
                             #variant_field_tokens
                         },
@@ -96,14 +106,18 @@ impl Receiver {
                 darling::ast::Style::Unit => {
                     tokens.extend(quote! {
                         Self::#ident => {
-                            (#discriminant as #repr_ty).encode(buf)?;
+                            (#discriminant as #repr_ty).encode(buf, None)?;
                         },
                     });
                 }
             }
         }
 
+        let magic = self.encode_magic_tokens();
+
         quote! {
+            #magic
+
             match self {
                 #tokens
             }
@@ -114,6 +128,8 @@ impl Receiver {
         let fields_to_index = self.data.as_ref().take_struct().unwrap();
 
         let mut tokens = TokenStream::new();
+
+        tokens.extend(self.encode_magic_tokens());
 
         let countable: HashMap<usize, proc_macro2::TokenStream> = fields_to_index
             .iter()
@@ -169,15 +185,24 @@ impl Receiver {
             }
 
             if let Some(update_from) = countable.get(&i) {
+                // this field was marked to be used as the count from another field, so we'll just
+                // use that instead of the actual value
+
                 let update_from = quote! { #update_from };
                 tokens.extend(quote! {
-                    (self.#update_from.len() as #ty).encode(buf)?;
+                    (self.#update_from.len() as #ty).encode(buf, None)?;
                 });
             } else {
-                // FIXME add a check for a static size and ensure that we're not overly large
+                // this field was not a count-able field, is there a limit?
+
+                let limit = if let Some(bytes) = f.bytes {
+                    quote! { Some(::insim_core::ser::Limit::Bytes(#bytes)) }
+                } else {
+                    quote! { None }
+                };
 
                 tokens.extend(quote! {
-                    self.#ident.encode(buf)?;
+                    self.#ident.encode(buf, #limit)?;
                 });
             }
 

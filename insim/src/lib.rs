@@ -12,4 +12,7 @@ pub mod error;
 pub mod protocol;
 pub mod track;
 pub mod vehicle;
-//pub mod file;
+
+#[doc(hidden)]
+/// Rexport insim_core
+pub use insim_core as core;

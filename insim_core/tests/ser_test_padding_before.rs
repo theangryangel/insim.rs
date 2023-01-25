@@ -19,7 +19,7 @@ fn test_ser_padding_before_encode() {
     comparison.put_bytes(0, 2);
     comparison.put_u32_le(i.j);
 
-    let res = i.encode(&mut buf);
+    let res = i.encode(&mut buf, None);
     assert!(res.is_ok());
     assert_eq!(&buf[..], &comparison[..]);
 }

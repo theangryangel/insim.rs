@@ -1,6 +1,7 @@
 //! Utility functions and structs for working with track names and fetching track data.
 
-use insim_core::prelude::*;
+use bytes::BytesMut;
+use insim_core::{prelude::*, DecodableError, EncodableError, ser::Limit};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -475,7 +476,7 @@ pub fn lookup(input: &[u8]) -> Option<TrackInfo> {
 }
 
 /// Handles parsing a Track name.
-#[derive(Debug, PartialEq, Eq, InsimEncode, InsimDecode, Clone, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Track {
     pub inner: [u8; 6],
@@ -502,5 +503,34 @@ impl std::fmt::Display for Track {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let stripped = strip_trailing_nul(&self.inner);
         write!(f, "{}", String::from_utf8_lossy(stripped))
+    }
+}
+
+impl Encodable for Track {
+    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), EncodableError> {
+        if let Some(limit) = limit {
+            return Err(EncodableError::UnexpectedLimit(format!("Track does not support limit: {:?}", limit)));
+        }
+
+        for i in self.inner.iter() {
+            i.encode(buf, None)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl Decodable for Track {
+    fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
+        if let Some(limit) = limit {
+            return Err(DecodableError::UnexpectedLimit(format!("Track does not support limit: {:?}", limit)));
+        }
+
+        let mut data: Track = Default::default();
+        for i in 0..6 {
+            data.inner[i] = u8::decode(buf, None)?;
+        }
+
+        Ok(data)
     }
 }

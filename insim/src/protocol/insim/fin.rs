@@ -1,6 +1,7 @@
 use insim_core::{
     identifiers::{PlayerId, RequestId},
     prelude::*,
+    ser::Limit,
 };
 
 #[cfg(feature = "serde")]
@@ -25,11 +26,11 @@ bitflags! {
 }
 
 impl Encodable for RaceResultFlags {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodableError>
+    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), insim_core::EncodableError>
     where
         Self: Sized,
     {
-        self.bits().encode(buf)?;
+        self.bits().encode(buf, limit)?;
         Ok(())
     }
 }
@@ -37,12 +38,10 @@ impl Encodable for RaceResultFlags {
 impl Decodable for RaceResultFlags {
     fn decode(
         buf: &mut bytes::BytesMut,
-        count: Option<usize>,
-    ) -> Result<Self, insim_core::DecodableError>
-    where
-        Self: Sized,
-    {
-        Ok(Self::from_bits_truncate(u8::decode(buf, count)?))
+        limit: Option<Limit>
+    ) -> Result<Self, insim_core::DecodableError> {
+
+        Ok(Self::from_bits_truncate(u8::decode(buf, limit)?))
     }
 }
 

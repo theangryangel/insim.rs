@@ -24,7 +24,7 @@ fn test_ser_count_field_encode() {
         comparison.put_u8(*i);
     }
 
-    let res = i.encode(&mut buf);
+    let res = i.encode(&mut buf, None);
     assert!(res.is_ok());
     assert_eq!(&buf[..], &comparison[..]);
 }
@@ -43,46 +43,6 @@ fn test_ser_count_field_decode() {
     }
 
     let decoded = TestCountField::decode(&mut comparison, None);
-    assert!(decoded.is_ok(), "Expected decode to succeed");
-    assert_eq!(decoded.unwrap(), i, "Expected decoded struct to match");
-}
-
-#[derive(InsimEncode, InsimDecode, Default, PartialEq, Eq, Debug)]
-struct TestFixedCount {
-    #[insim(count = "4")]
-    pub i: Vec<u8>,
-}
-
-#[test]
-fn test_ser_count_encode() {
-    let mut buf = BytesMut::new();
-
-    let i = TestFixedCount {
-        i: vec![1, 2, 3, 4],
-    };
-
-    let mut comparison = BytesMut::new();
-    for i in i.i.iter() {
-        comparison.put_u8(*i);
-    }
-
-    let res = i.encode(&mut buf);
-    assert!(res.is_ok());
-    assert_eq!(&buf[..], &comparison[..]);
-}
-
-#[test]
-fn test_ser_count_decode() {
-    let i = TestFixedCount {
-        i: vec![1, 2, 3, 4],
-    };
-
-    let mut comparison = BytesMut::new();
-    for i in i.i.iter() {
-        comparison.put_u8(*i);
-    }
-
-    let decoded = TestFixedCount::decode(&mut comparison, None);
     assert!(decoded.is_ok(), "Expected decode to succeed");
     assert_eq!(decoded.unwrap(), i, "Expected decoded struct to match");
 }

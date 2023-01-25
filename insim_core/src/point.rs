@@ -4,7 +4,11 @@ impl Pointable for i32 {}
 impl Pointable for f32 {}
 impl Pointable for u16 {}
 
+#[cfg(feature = "serde")]
+use serde::Serialize;
+
 #[derive(Default, Clone, Copy, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Point<T>
 where
     T: Pointable,
@@ -34,17 +38,20 @@ impl Point<f32> {
     }
 }
 
-use crate::{Decodable, DecodableError, Encodable, EncodableError};
+use crate::{Decodable, DecodableError, Encodable, EncodableError, ser::Limit};
 
 impl<T> Decodable for Point<T>
 where
     T: Decodable + Pointable,
 {
-    fn decode(buf: &mut bytes::BytesMut, count: Option<usize>) -> Result<Self, DecodableError> {
+    fn decode(buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
+        if limit.is_some() {
+            return Err(DecodableError::UnexpectedLimit(format!("limit is not supported on Point<T>: {:?}", limit)))
+        }
         let mut data = Self::default();
-        data.x = <T>::decode(buf, count)?;
-        data.y = <T>::decode(buf, count)?;
-        data.z = <T>::decode(buf, count)?;
+        data.x = <T>::decode(buf, None)?;
+        data.y = <T>::decode(buf, None)?;
+        data.z = <T>::decode(buf, None)?;
         Ok(data)
     }
 }
@@ -53,10 +60,13 @@ impl<T> Encodable for Point<T>
 where
     T: Encodable + Pointable,
 {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), EncodableError> {
-        <T>::encode(&self.x, buf)?;
-        <T>::encode(&self.y, buf)?;
-        <T>::encode(&self.z, buf)?;
+    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), EncodableError> {
+        if limit.is_some() {
+            return Err(EncodableError::UnexpectedLimit(format!("limit is not supported on Point<T>: {:?}", limit)))
+        }
+        <T>::encode(&self.x, buf, None)?;
+        <T>::encode(&self.y, buf, None)?;
+        <T>::encode(&self.z, buf, None)?;
 
         Ok(())
     }

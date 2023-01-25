@@ -1,6 +1,8 @@
 extern crate insim;
 use tracing_subscriber;
 
+use futures::{StreamExt, SinkExt};
+
 fn setup() {
     // setup tracing with some defaults if nothing is set
     if std::env::var("RUST_LIB_BACKTRACE").is_err() {
@@ -21,35 +23,34 @@ pub async fn main() {
 
     let mut i = 0;
 
-    let client = insim::client::Config::default()
+    let mut client = insim::client::Config::default()
         .relay(None)
         .try_reconnect(true)
         .try_reconnect_attempts(2000)
-        .build();
+        .into_client();
 
     while let Some(m) = client.next().await {
         i += 1;
 
         match m {
-            insim::client::Event::State(insim::client::State::Connected) => {
+            insim::client::Event::Connected => {
                 let _ = client
                     .send(
-                        insim::protocol::relay::HostSelect {
-                            hname: "Nubbins AU Demo".into(),
-                            ..Default::default()
-                        }
-                        .into(),
+                        insim::protocol::Packet::RelayHostSelect(
+                            insim::protocol::relay::HostSelect {
+                                hname: "Nubbins AU Demo".into(),
+                                ..Default::default()
+                            }
+                        ).into()
                     )
                     .await;
             }
 
-            insim::client::Event::Frame(insim::protocol::Packet::MultiCarInfo(mci)) => {
+            insim::client::Event::Data(insim::protocol::Packet::MultiCarInfo(mci)) => {
                 tracing::debug!("MultiCarInfo: {:?}", mci);
 
                 for car in mci.info.iter() {
-                    let (x, y, z) = car.xyz.to_uom();
-
-                    tracing::info!("{} = {}", car.plid, car,);
+                    tracing::info!("{} = {:?}", car.plid, car);
                 }
             }
 

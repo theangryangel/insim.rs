@@ -14,7 +14,7 @@ fn test_ser_wrapped_encode() {
     comparison.put_u8(i.0);
     comparison.put_u32_le(i.1);
 
-    let res = i.encode(&mut buf);
+    let res = i.encode(&mut buf, None);
     assert!(res.is_ok());
     assert_eq!(&buf[..], &comparison[..]);
 }

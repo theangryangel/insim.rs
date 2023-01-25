@@ -1,9 +1,13 @@
-use crate::{Decodable, Encodable};
+use crate::{Decodable, Encodable, ser::Limit};
 
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
+#[cfg(feature = "serde")]
+use serde::Serialize;
+
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct PlayerId(u8);
 
 impl fmt::Display for PlayerId {
@@ -13,11 +17,11 @@ impl fmt::Display for PlayerId {
 }
 
 impl Encodable for PlayerId {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodableError>
+    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), crate::EncodableError>
     where
         Self: Sized,
     {
-        self.0.encode(buf)?;
+        self.0.encode(buf, limit)?;
         Ok(())
     }
 }
@@ -25,12 +29,12 @@ impl Encodable for PlayerId {
 impl Decodable for PlayerId {
     fn decode(
         buf: &mut bytes::BytesMut,
-        count: Option<usize>,
+        limit: Option<Limit>,
     ) -> Result<Self, crate::DecodableError>
     where
         Self: Default,
     {
-        Ok(Self(u8::decode(buf, count)?))
+        Ok(Self(u8::decode(buf, limit)?))
     }
 }
 

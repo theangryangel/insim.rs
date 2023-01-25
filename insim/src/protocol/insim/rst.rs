@@ -1,4 +1,4 @@
-use insim_core::{identifiers::RequestId, prelude::*};
+use insim_core::{identifiers::RequestId, prelude::*, ser::Limit};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -39,22 +39,21 @@ bitflags! {
 impl Decodable for HostFacts {
     fn decode(
         buf: &mut bytes::BytesMut,
-        count: Option<usize>,
+        limit: Option<Limit>,
     ) -> Result<Self, insim_core::DecodableError>
     where
         Self: Default,
     {
-        let data = Self::default();
-        Ok(Self::from_bits_truncate(u16::decode(buf, count)?))
+        Ok(Self::from_bits_truncate(u16::decode(buf, None)?))
     }
 }
 
 impl Encodable for HostFacts {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodableError>
+    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), insim_core::EncodableError>
     where
         Self: Sized,
     {
-        self.bits().encode(buf)?;
+        self.bits().encode(buf, limit)?;
         Ok(())
     }
 }

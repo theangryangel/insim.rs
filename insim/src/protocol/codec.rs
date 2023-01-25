@@ -112,6 +112,8 @@ impl Decoder for Codec {
 
         let mut data = src.split_to(n);
 
+        tracing::debug!("received {:?}", data);
+
         let res = Self::Item::decode(&mut data, None);
 
         match res {
@@ -120,8 +122,8 @@ impl Decoder for Codec {
                 Ok(Some(packet))
             }
             Err(e) => {
-                tracing::error!("unhandled error: {:?}", e);
-                panic!("unhandled error: {:?}", e);
+                tracing::error!("unhandled error: {:?}, data: {:?}", e, data);
+                panic!("unhandled error: {:?}, data: {:?}", e, data);
                 Err(e.into())
             }
         }
@@ -133,7 +135,7 @@ impl Encoder<Packet> for Codec {
 
     fn encode(&mut self, msg: Packet, dst: &mut BytesMut) -> Result<(), Error> {
         let mut buf = BytesMut::new();
-        let data = msg.encode(&mut buf)?;
+        msg.encode(&mut buf, None)?;
 
         let n = buf.len();
 

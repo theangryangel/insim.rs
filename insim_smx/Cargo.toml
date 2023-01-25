@@ -1,11 +1,11 @@
 [package]
-name = "smx2svg"
+name = "insim_smx"
 version = "0.1.0"
 edition = "2021"
+description = "Insim SMX file implementation"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-insim = { path = "../insim" }
-clap = { version = "3.1.8", features = ["derive"] }
-svg = "0.10.0"
+insim_core = { path = "../insim_core" }
+thiserror = "1"

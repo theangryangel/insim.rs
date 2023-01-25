@@ -11,8 +11,25 @@ impl Receiver {
         }
     }
 
+    fn decode_magic_tokens(&self) -> TokenStream {
+        if let Some(magic) = &self.magic {
+            quote! {
+                let magic = #magic;
+                for expected_magic_byte in magic {
+                    let decoded_magic_byte = u8::decode(buf, None)?;
+                    if *expected_magic_byte != decoded_magic_byte {
+                        return Err(::insim_core::DecodableError::MissingMagic(format!("Expected {:?}", magic)));
+                    }
+                }
+            }
+        } else {
+            quote! {}
+        }
+    }
+
     fn to_enum_decode_tokens(&self) -> TokenStream {
         let mut tokens = TokenStream::new();
+
         let ident = &self.ident;
 
         let repr_ty = extract_repr_type(&self.attrs);
@@ -101,7 +118,11 @@ impl Receiver {
             }
         }
 
+        let magic = self.decode_magic_tokens();
+
         quote! {
+            #magic
+
             let res = match #repr_ty::decode(buf, None)? {
                 #tokens
 
@@ -118,6 +139,9 @@ impl Receiver {
 
     fn to_struct_decode_tokens(&self) -> TokenStream {
         let mut tokens = TokenStream::new();
+
+        tokens.extend(self.decode_magic_tokens());
+
         tokens.extend(quote! {
             let mut data = Self::default();
         });
@@ -147,19 +171,13 @@ impl Receiver {
             }
 
             let size = if let Some(count) = &f.count {
-                if count.chars().all(char::is_numeric) {
-                    // FIXME if its a numeric, assume that it's a fixed size.. for now?
-                    // guess we should really split this functionality out of count!
-                    let count = count.parse::<usize>().unwrap();
-
-                    quote! { Some(#count) }
-                } else {
-                    // if not numeric, we're reading from another field
-
-                    let count_ident = format_ident!("{}", count);
-                    quote! {
-                        Some(data.#count_ident as usize)
-                    }
+                let count_ident = format_ident!("{}", count);
+                quote! {
+                    Some(::insim_core::ser::Limit::Count(data.#count_ident as usize))
+                }
+            } else if let Some(bytes) = &f.bytes {
+                quote! {
+                    Some(::insim_core::ser::Limit::Bytes(#bytes as usize))
                 }
             } else {
                 quote! {

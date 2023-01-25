@@ -8,4 +8,4 @@ pub mod colours;
 mod codepage_string;
 pub use codepage_string::CodepageString;
 
-pub mod istring;
+pub mod string;

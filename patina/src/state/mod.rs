@@ -1,17 +1,20 @@
 pub(crate) mod chat;
 
 use bounded_vec_deque::BoundedVecDeque;
-use insim::protocol::identifiers::ConnectionId;
+use insim::core::{
+    identifiers::ConnectionId,
+    point::Point,
+    identifiers::PlayerId,
+};
 use insim::protocol::insim::Wind;
 use insim::track::TrackInfo;
-use insim::{client::prelude::*, protocol::identifiers::PlayerId};
+use insim::client::prelude::*;
 use miette::Result;
 use std::sync::Arc;
 use tokio::sync::Notify;
 
 type ChatHistory = BoundedVecDeque<chat::Chat>;
 
-use insim::protocol::position::Point;
 use md5::{Digest, Md5};
 use multi_index::MultiIndex;
 use serde::Serialize;
@@ -65,7 +68,7 @@ impl From<&insim::protocol::insim::Ncn> for Connection {
     fn from(data: &insim::protocol::insim::Ncn) -> Self {
         Self {
             uname: data.uname.clone(),
-            admin: data.admin > 0,
+            admin: data.admin,
             connection_flags: data.flags,
             connection_id: data.ucid,
             player_id: None,

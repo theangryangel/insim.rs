@@ -1,4 +1,4 @@
-use insim_core::{identifiers::RequestId, prelude::*, string::CodepageString};
+use insim_core::{identifiers::RequestId, prelude::*, string::CodepageString, ser::Limit};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -25,21 +25,21 @@ bitflags! {
 impl Decodable for HostInfoFlags {
     fn decode(
         buf: &mut bytes::BytesMut,
-        count: Option<usize>,
+        limit: Option<Limit>,
     ) -> Result<Self, insim_core::DecodableError>
     where
         Self: Default,
     {
-        Ok(Self::from_bits_truncate(u8::decode(buf, count)?))
+        Ok(Self::from_bits_truncate(u8::decode(buf, None)?))
     }
 }
 
 impl Encodable for HostInfoFlags {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodableError>
+    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), insim_core::EncodableError>
     where
         Self: Sized,
     {
-        self.bits().encode(buf)?;
+        self.bits().encode(buf, limit)?;
         Ok(())
     }
 }

@@ -5,7 +5,7 @@ members = [
   "insim_core",
   "insim_derive",
   "insim",
-  # "patina",
-  # "pth2svg",
-  # "smx2svg",
+  "insim_pth",
+  "insim_smx",
+  "patina",
 ]

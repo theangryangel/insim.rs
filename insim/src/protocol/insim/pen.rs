@@ -1,6 +1,6 @@
 use insim_core::{
     identifiers::{PlayerId, RequestId},
-    prelude::*,
+    prelude::*, ser::Limit,
 };
 
 #[cfg(feature = "serde")]
@@ -23,11 +23,11 @@ bitflags! {
 }
 
 impl Encodable for PenaltyInfo {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodableError>
+    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), insim_core::EncodableError>
     where
         Self: Sized,
     {
-        self.bits().encode(buf)?;
+        self.bits().encode(buf, limit)?;
         Ok(())
     }
 }
@@ -35,12 +35,12 @@ impl Encodable for PenaltyInfo {
 impl Decodable for PenaltyInfo {
     fn decode(
         buf: &mut bytes::BytesMut,
-        count: Option<usize>,
+        limit: Option<Limit>,
     ) -> Result<Self, insim_core::DecodableError>
     where
         Self: Sized,
     {
-        Ok(Self::from_bits_truncate(u8::decode(buf, count)?))
+        Ok(Self::from_bits_truncate(u8::decode(buf, None)?))
     }
 }
 

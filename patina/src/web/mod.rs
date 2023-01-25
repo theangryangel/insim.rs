@@ -6,7 +6,7 @@ use axum::{
     response::{sse, Html, IntoResponse, Response},
     Extension,
 };
-use insim::file::pth::{Node, Pth};
+use insim_pth::{Node, Pth};
 use serde::Serialize;
 
 use miette::Result;

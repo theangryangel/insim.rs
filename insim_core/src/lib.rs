@@ -14,3 +14,7 @@ pub use point::Pointable;
 #[doc(inline)]
 #[allow(unused)]
 pub use insim_derive::{InsimDecode, InsimEncode};
+
+#[doc(hidden)]
+// reexport bytes for usage in macros
+pub use ::bytes;

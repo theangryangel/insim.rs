@@ -12,8 +12,15 @@ mod encode;
 #[darling(attributes(insim), supports(struct_any, enum_any), forward_attrs(repr))]
 pub(crate) struct Receiver {
     pub ident: syn::Ident,
+
+    /// Forwarding all attrs so that we can find the repr for the enum discriminant type
     pub attrs: Vec<syn::Attribute>,
+
+    /// Field and Variant information
     pub data: ast::Data<VariantData, FieldData>,
+
+    /// A "magic" value that must appear at the start of this struct/enum's data
+    pub magic: Option<syn::LitByteStr>,
 }
 
 #[derive(Debug, FromVariant)]
@@ -107,7 +114,8 @@ pub fn insim_encode(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 impl ::insim_core::Encodable for #ident {
                     fn encode(
                         &self,
-                        buf: &mut ::bytes::BytesMut
+                        buf: &mut ::insim_core::bytes::BytesMut,
+                        limit: Option<::insim_core::ser::Limit>,
                     ) -> Result<(), ::insim_core::EncodableError>
                     {
                         #encode
@@ -139,8 +147,8 @@ pub fn insim_decode(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             tokens.extend(quote! {
                 impl ::insim_core::Decodable for #ident {
                     fn decode(
-                        buf: &mut ::bytes::BytesMut,
-                        count: Option<usize>,
+                        buf: &mut ::insim_core::bytes::BytesMut,
+                        limit: Option<::insim_core::ser::Limit>,
                     ) -> Result<Self, ::insim_core::DecodableError>
                     {
                         #decode

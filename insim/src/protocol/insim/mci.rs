@@ -2,6 +2,7 @@ use insim_core::{
     identifiers::{PlayerId, RequestId},
     point::Point,
     prelude::*,
+    ser::Limit,
 };
 
 #[cfg(feature = "serde")]
@@ -15,18 +16,18 @@ bitflags! {
     pub struct CompCarInfo: u8 {
         const BLUE_FLAG = (1 << 0);
         const YELLOW_FLAG = (1 << 1);
-        const LAGGING = (1 << 50);
+        const LAGGING = (1 << 5);
         const FIRST = (1 << 6);
         const LAST = (1 << 7);
     }
 }
 
 impl Encodable for CompCarInfo {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodableError>
+    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), insim_core::EncodableError>
     where
         Self: Sized,
     {
-        self.bits().encode(buf)?;
+        self.bits().encode(buf, limit)?;
         Ok(())
     }
 }
@@ -34,12 +35,12 @@ impl Encodable for CompCarInfo {
 impl Decodable for CompCarInfo {
     fn decode(
         buf: &mut bytes::BytesMut,
-        count: Option<usize>,
+        limit: Option<Limit>,
     ) -> Result<Self, insim_core::DecodableError>
     where
         Self: Sized,
     {
-        Ok(Self::from_bits_truncate(u8::decode(buf, count)?))
+        Ok(Self::from_bits_truncate(u8::decode(buf, limit)?))
     }
 }
 

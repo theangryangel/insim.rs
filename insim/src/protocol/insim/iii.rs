@@ -3,6 +3,7 @@ use insim_core::{
     identifiers::{ConnectionId, PlayerId, RequestId},
     prelude::*,
     string::CodepageString,
+    ser::Limit, EncodableError, DecodableError
 };
 
 #[cfg(feature = "serde")]
@@ -24,18 +25,24 @@ pub struct Iii {
 }
 
 impl Encodable for Iii {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodableError>
+    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), EncodableError>
     where
         Self: Sized,
     {
-        self.reqi.encode(buf)?;
+        if limit.is_some() {
+            return Err(EncodableError::UnexpectedLimit(
+                format!("III does not support a limit: {:?}", limit)
+            ))
+        }
 
-        buf.put_bytes(0, 1)?;
+        self.reqi.encode(buf, None)?;
 
-        self.ucid.encode(buf)?;
-        self.plid.encode(buf)?;
+        buf.put_bytes(0, 1);
 
-        buf.put_bytes(0, 2)?;
+        self.ucid.encode(buf, None)?;
+        self.plid.encode(buf, None)?;
+
+        buf.put_bytes(0, 2);
 
         let msg = self.msg.into_bytes();
         buf.put(msg);
@@ -52,22 +59,30 @@ impl Encodable for Iii {
 impl Decodable for Iii {
     fn decode(
         buf: &mut bytes::BytesMut,
-        count: Option<usize>,
-    ) -> Result<Self, insim_core::DecodableError>
+        limit: Option<Limit>,
+    ) -> Result<Self, DecodableError>
     where
         Self: Default,
     {
-        let data = Self::default();
+        if limit.is_some() {
+            return Err(DecodableError::UnexpectedLimit(
+                format!("III does not support a limit: {:?}", limit)
+            ))
+        }
 
-        data.reqi = RequestId::decode(buf, count)?;
-        buf.advance(1)?;
+        let mut data = Self::default();
 
-        data.ucid = ConnectionId::decode(buf, count)?;
-        data.plid = PlayerId::decode(buf, count)?;
+        data.reqi = RequestId::decode(buf, None)?;
+        buf.advance(1);
 
-        buf.advance(2)?;
+        data.ucid = ConnectionId::decode(buf, None)?;
+        data.plid = PlayerId::decode(buf, None)?;
 
-        data.msg = CodepageString::decode(buf, count)?;
+        buf.advance(2);
+
+        data.msg = CodepageString::decode(buf, Some(
+            Limit::Bytes(buf.len())
+        ))?;
 
         Ok(data)
     }

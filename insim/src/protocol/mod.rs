@@ -46,7 +46,6 @@ mod macros;
 
 pub mod codec;
 pub mod insim;
-pub mod position;
 pub mod relay;
 pub mod transport;
 

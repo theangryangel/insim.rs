@@ -1,6 +1,7 @@
 use insim_core::{
     identifiers::{PlayerId, RequestId},
     prelude::*,
+    ser::Limit
 };
 
 #[cfg(feature = "serde")]
@@ -8,7 +9,7 @@ use serde::Serialize;
 
 use bitflags::bitflags;
 
-use super::{PlayerFlags, TyreCompound};
+use super::{PlayerFlags, TyreCompoundList};
 
 bitflags! {
     #[derive(Default)]
@@ -38,21 +39,21 @@ bitflags! {
 impl Decodable for PitStopWorkFlags {
     fn decode(
         buf: &mut bytes::BytesMut,
-        count: Option<usize>,
+        limit: Option<Limit>,
     ) -> Result<Self, insim_core::DecodableError>
     where
         Self: Default,
     {
-        Ok(Self::from_bits_truncate(u32::decode(buf, count)?))
+        Ok(Self::from_bits_truncate(u32::decode(buf, None)?))
     }
 }
 
 impl Encodable for PitStopWorkFlags {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodableError>
+    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), insim_core::EncodableError>
     where
         Self: Sized,
     {
-        self.bits().encode(buf)?;
+        self.bits().encode(buf, limit)?;
         Ok(())
     }
 }
@@ -76,9 +77,9 @@ pub struct Pit {
     #[insim(pad_bytes_after = "1")]
     pub numstops: u8,
 
-    pub tyres: (TyreCompound, TyreCompound, TyreCompound, TyreCompound),
+    pub tyres: TyreCompoundList,
 
-    #[insim(bytes = "4", pad_bytes_after = "4")]
+    #[insim(pad_bytes_after = "4")]
     pub work: u32,
 }
 

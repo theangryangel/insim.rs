@@ -1,12 +1,17 @@
 //! Utilities for working with 'Codepage strings' from Insim.
 
-use crate::{Decodable, DecodableError, Encodable, EncodableError};
+use crate::{Decodable, DecodableError, Encodable, EncodableError, ser::Limit};
 
 use super::{escape, strip_trailing_nul, unescape};
 use bytes::BytesMut;
 use encoding_rs;
 use itertools::Itertools;
 use std::vec::Vec;
+
+use tracing;
+
+#[cfg(feature = "serde")]
+use serde::Serialize;
 
 const CODEPAGES: &[u8] = &[b'L', b'G', b'J', b'E', b'T', b'B', b'H', b'S', b'K', b'9'];
 const CODEPAGE_MARKER: u8 = b'^';
@@ -22,6 +27,7 @@ const CODEPAGE_MARKER: u8 = b'^';
 ///
 /// The struct also supports a 'builder' style interface for creating the raw bytes.
 #[derive(PartialEq, Eq, Default, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct CodepageString {
     pub(crate) inner: Vec<u8>,
 }
@@ -379,16 +385,25 @@ impl fmt::Display for CodepageString {
 }
 
 impl Encodable for CodepageString {
-    fn encode(&self, buf: &mut BytesMut) -> Result<(), EncodableError> {
-        self.inner.encode(buf)?;
+    fn encode(&self, buf: &mut BytesMut, limit: Option<Limit>) -> Result<(), EncodableError> {
+        self.inner.encode(buf, limit)?;
         Ok(())
     }
 }
 
 impl Decodable for CodepageString {
-    fn decode(buf: &mut BytesMut, count: Option<usize>) -> Result<Self, DecodableError> {
+    fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
         let mut data = Self::default();
-        data.inner = Vec::<u8>::decode(buf, count)?;
+
+        let limit = if limit.is_none() {
+            tracing::warn!("No limit received, assuming the rest of the buffer: {:?}", &buf);
+            Some(Limit::Bytes(buf.len()))
+        } else {
+            limit
+        };
+
+        let binding = Vec::<u8>::decode(buf, limit)?;
+        data.inner = strip_trailing_nul(&binding).to_vec();
         Ok(data)
     }
 }

@@ -1,14 +1,33 @@
 use bytes::{Buf, BytesMut};
+use std::{error::Error, fmt};
+
+use super::Limit;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DecodableError {
     UnmatchedDiscrimnant(String),
     NotEnoughBytes(String),
-    NeedsCount(String),
+    NeedsLimit(String),
+    MissingMagic(String),
+    UnexpectedLimit(String),
+}
+
+impl Error for DecodableError {}
+
+impl fmt::Display for DecodableError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DecodableError::UnmatchedDiscrimnant(i) => write!(f, "Unmatched Discriminant! {}", i),
+            DecodableError::NotEnoughBytes(i) => write!(f, "Not enough bytes! {}", i),
+            DecodableError::NeedsLimit(i) => write!(f, "Expected byte or count limit! {}", i),
+            DecodableError::MissingMagic(i) => write!(f, "Missing magic: {}", i),
+            DecodableError::UnexpectedLimit(limit) => write!(f, "Unexpected limit: {}", limit),
+        }
+    }
 }
 
 pub trait Decodable {
-    fn decode(buf: &mut BytesMut, count: Option<usize>) -> Result<Self, DecodableError>
+    fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError>
     where
         Self: Default;
 }
@@ -16,7 +35,11 @@ pub trait Decodable {
 // bool
 
 impl Decodable for bool {
-    fn decode(buf: &mut BytesMut, _count: Option<usize>) -> Result<Self, DecodableError> {
+    fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
+        if limit.is_some() {
+            return Err(DecodableError::UnexpectedLimit(format!("bool does not support a decode limit: {:?}", limit)))
+        }
+
         Ok(buf.get_u8() != 0)
     }
 }
@@ -24,7 +47,10 @@ impl Decodable for bool {
 // u8
 
 impl Decodable for u8 {
-    fn decode(buf: &mut BytesMut, _count: Option<usize>) -> Result<Self, DecodableError> {
+    fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
+        if limit.is_some() {
+            return Err(DecodableError::UnexpectedLimit(format!("u8 does not support a decode limit: {:?}", limit)))
+        }
         Ok(buf.get_u8())
     }
 }
@@ -32,7 +58,10 @@ impl Decodable for u8 {
 // u16
 
 impl Decodable for u16 {
-    fn decode(buf: &mut BytesMut, _count: Option<usize>) -> Result<Self, DecodableError> {
+    fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
+        if limit.is_some() {
+            return Err(DecodableError::UnexpectedLimit(format!("u16 does not support a decode limit: {:?}", limit)))
+        }
         Ok(buf.get_u16_le())
     }
 }
@@ -40,7 +69,10 @@ impl Decodable for u16 {
 // u32
 
 impl Decodable for u32 {
-    fn decode(buf: &mut BytesMut, _count: Option<usize>) -> Result<Self, DecodableError> {
+    fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
+        if limit.is_some() {
+            return Err(DecodableError::UnexpectedLimit(format!("u32 does not support a decode limit: {:?}", limit)))
+        }
         Ok(buf.get_u32_le())
     }
 }
@@ -48,7 +80,10 @@ impl Decodable for u32 {
 // i8
 
 impl Decodable for i8 {
-    fn decode(buf: &mut BytesMut, _count: Option<usize>) -> Result<Self, DecodableError> {
+    fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
+        if limit.is_some() {
+            return Err(DecodableError::UnexpectedLimit(format!("i8 does not support a decode limit: {:?}", limit)))
+        }
         Ok(buf.get_i8())
     }
 }
@@ -56,7 +91,10 @@ impl Decodable for i8 {
 // i16
 
 impl Decodable for i16 {
-    fn decode(buf: &mut BytesMut, _count: Option<usize>) -> Result<Self, DecodableError> {
+    fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
+        if limit.is_some() {
+            return Err(DecodableError::UnexpectedLimit(format!("i16 does not support a decode limit: {:?}", limit)))
+        }
         Ok(buf.get_i16_le())
     }
 }
@@ -64,7 +102,10 @@ impl Decodable for i16 {
 // i32
 
 impl Decodable for i32 {
-    fn decode(buf: &mut BytesMut, _count: Option<usize>) -> Result<Self, DecodableError> {
+    fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
+        if limit.is_some() {
+            return Err(DecodableError::UnexpectedLimit(format!("i32 does not support a decode limit: {:?}", limit)))
+        }
         Ok(buf.get_i32_le())
     }
 }
@@ -72,7 +113,10 @@ impl Decodable for i32 {
 // f32
 
 impl Decodable for f32 {
-    fn decode(buf: &mut BytesMut, _count: Option<usize>) -> Result<Self, DecodableError> {
+    fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
+        if limit.is_some() {
+            return Err(DecodableError::UnexpectedLimit(format!("f32 does not support a decode limit: {:?}", limit)))
+        }
         Ok(buf.get_f32_le())
     }
 }
@@ -85,12 +129,19 @@ impl<T> Decodable for Vec<T>
 where
     T: Decodable + Default + std::fmt::Debug,
 {
-    fn decode(buf: &mut BytesMut, count: Option<usize>) -> Result<Self, DecodableError> {
-        if count.is_none() {
-            return Err(DecodableError::NeedsCount("no count provided".to_string()));
-        }
+    fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
 
-        let size = count.unwrap();
+        let size = match limit {
+            Some(Limit::Count(i)) => { i },
+
+            Some(Limit::Bytes(i)) => {
+                i / core::mem::size_of::<T>() 
+            },
+
+            _ => {
+                return Err(DecodableError::NeedsLimit("no count provided".to_string()));
+            }
+        };
 
         let mut data = Self::default();
 
@@ -109,7 +160,7 @@ where
     T1: Decodable + Default + std::fmt::Debug,
     T2: Decodable + Default + std::fmt::Debug,
 {
-    fn decode(buf: &mut BytesMut, count: Option<usize>) -> Result<Self, DecodableError> {
+    fn decode(buf: &mut BytesMut, _limit: Option<Limit>) -> Result<Self, DecodableError> {
         let t1 = T1::decode(buf, None)?;
         let t2 = T2::decode(buf, None)?;
 
@@ -123,7 +174,7 @@ where
     T2: Decodable + Default + std::fmt::Debug,
     T3: Decodable + Default + std::fmt::Debug,
 {
-    fn decode(buf: &mut BytesMut, count: Option<usize>) -> Result<Self, DecodableError> {
+    fn decode(buf: &mut BytesMut, _limit: Option<Limit>) -> Result<Self, DecodableError> {
         let t1 = T1::decode(buf, None)?;
         let t2 = T2::decode(buf, None)?;
         let t3 = T3::decode(buf, None)?;
@@ -139,7 +190,7 @@ where
     T3: Decodable + Default + std::fmt::Debug,
     T4: Decodable + Default + std::fmt::Debug,
 {
-    fn decode(buf: &mut BytesMut, count: Option<usize>) -> Result<Self, DecodableError> {
+    fn decode(buf: &mut BytesMut, _limit: Option<Limit>) -> Result<Self, DecodableError> {
         let t1 = T1::decode(buf, None)?;
         let t2 = T2::decode(buf, None)?;
         let t3 = T3::decode(buf, None)?;
@@ -148,31 +199,3 @@ where
         Ok((t1, t2, t3, t4))
     }
 }
-
-// [T; N]
-
-macro_rules! impl_decode_slice_trait {
-    ($ty:ty; $($count:expr),+ $(,)?) => {
-
-        $(
-            impl Decodable for [$ty; $count] {
-                fn decode(buf: &mut BytesMut, _count: Option<usize>) -> Result<Self, DecodableError> {
-                    let mut slice: [$ty; $count] = Default::default();
-                    for i in 0..$count {
-                        slice[i] = <$ty>::decode(buf, None)?;
-                    }
-
-                    Ok(slice)
-                }
-            }
-        )+
-    };
-}
-
-impl_decode_slice_trait!(i8; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
-impl_decode_slice_trait!(i16; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
-impl_decode_slice_trait!(i32; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
-impl_decode_slice_trait!(u8; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
-impl_decode_slice_trait!(u16; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
-impl_decode_slice_trait!(u32; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
-impl_decode_slice_trait!(f32; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);

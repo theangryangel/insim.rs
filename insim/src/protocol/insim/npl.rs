@@ -1,7 +1,9 @@
+use bytes::BytesMut;
 use insim_core::{
     identifiers::{ConnectionId, PlayerId, RequestId},
     prelude::*,
-    string::CodepageString,
+    string::CodepageString, DecodableError, EncodableError,
+    ser::Limit
 };
 
 #[cfg(feature = "serde")]
@@ -39,6 +41,35 @@ impl Default for TyreCompound {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+// we need to wrap [TyreCompound; 4] in a new type because arrays are always considered "foreign", and the trait Decodable isn't defined within this crate.
+// FIXME: add some extra methods for convenience
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct TyreCompoundList([TyreCompound; 4]);
+
+impl Decodable for TyreCompoundList {
+    fn decode(buf: &mut BytesMut, _limit: Option<Limit>) -> Result<Self, DecodableError> {
+        let mut data: TyreCompoundList = Default::default();
+        for i in 0..4 {
+            data.0[i] = TyreCompound::decode(buf, None)?;
+        }
+
+        Ok(data)
+    }
+}
+
+impl Encodable for TyreCompoundList {
+    fn encode(&self, buf: &mut BytesMut, _limit: Option<Limit>) -> Result<(), EncodableError>
+    where
+        Self: Sized {
+        for i in self.0.iter() {
+            i.encode(buf, None)?;
+        }
+
+        Ok(())
+    }
+}
+
 bitflags! {
     #[derive(Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -61,11 +92,11 @@ bitflags! {
 }
 
 impl Encodable for PlayerFlags {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodableError>
+    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), insim_core::EncodableError>
     where
         Self: Sized,
     {
-        self.bits().encode(buf)?;
+        self.bits().encode(buf, limit)?;
         Ok(())
     }
 }
@@ -73,12 +104,12 @@ impl Encodable for PlayerFlags {
 impl Decodable for PlayerFlags {
     fn decode(
         buf: &mut bytes::BytesMut,
-        count: Option<usize>,
+        limit: Option<Limit>,
     ) -> Result<Self, insim_core::DecodableError>
     where
         Self: Sized,
     {
-        Ok(Self::from_bits_truncate(u16::decode(buf, count)?))
+        Ok(Self::from_bits_truncate(u16::decode(buf, None)?))
     }
 }
 
@@ -107,7 +138,7 @@ pub struct Npl {
     #[insim(bytes = "16")]
     pub sname: String,
 
-    pub tyres: (TyreCompound, TyreCompound, TyreCompound, TyreCompound),
+    pub tyres: TyreCompoundList,
 
     pub h_mass: u8,
 

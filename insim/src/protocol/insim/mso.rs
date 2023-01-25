@@ -3,6 +3,7 @@ use insim_core::{
     identifiers::{ConnectionId, PlayerId, RequestId},
     prelude::*,
     string::CodepageString,
+    ser::Limit, EncodableError,
 };
 
 #[cfg(feature = "serde")]
@@ -52,16 +53,20 @@ pub struct Mso {
 }
 
 impl Encodable for Mso {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodableError>
+    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), EncodableError>
     where
         Self: Sized,
     {
-        self.reqi.encode(buf)?;
-        buf.put_bytes(0, 1)?;
-        self.ucid.encode(buf)?;
-        self.plid.encode(buf)?;
-        self.usertype.encode(buf)?;
-        self.textstart.encode(buf);
+        if limit.is_some() {
+            return Err(EncodableError::UnexpectedLimit(format!("MSO does not support limit! {:?}", limit)));
+        }
+
+        self.reqi.encode(buf, None)?;
+        buf.put_bytes(0, 1);
+        self.ucid.encode(buf, None)?;
+        self.plid.encode(buf, None)?;
+        self.usertype.encode(buf, None)?;
+        self.textstart.encode(buf, None)?;
 
         let msg = self.msg.into_bytes();
         buf.put(msg);
@@ -78,19 +83,21 @@ impl Encodable for Mso {
 impl Decodable for Mso {
     fn decode(
         buf: &mut bytes::BytesMut,
-        count: Option<usize>,
+        limit: Option<Limit>,
     ) -> Result<Self, insim_core::DecodableError>
     where
         Self: Default,
     {
-        let data = Self::default();
+        let mut data = Self::default();
 
-        data.reqi = RequestId::decode(buf, count)?;
-        buf.advance(1)?;
-        data.ucid = ConnectionId::decode(buf, count)?;
-        data.plid = PlayerId::decode(buf, count)?;
-        data.usertype = MsoUserType::decode(buf, count)?;
-        data.msg = CodepageString::decode(buf, count)?;
+        data.reqi = RequestId::decode(buf, None)?;
+        buf.advance(1);
+        data.ucid = ConnectionId::decode(buf, None)?;
+        data.plid = PlayerId::decode(buf, None)?;
+        data.usertype = MsoUserType::decode(buf, None)?;
+        data.msg = CodepageString::decode(buf, Some(
+            Limit::Bytes(buf.len())
+        ))?;
         Ok(data)
     }
 }

@@ -1,6 +1,7 @@
 //! Utility functions for working with vehicles and fetching vehicle data.
 
-use insim_core::prelude::*;
+use bytes::BytesMut;
+use insim_core::{prelude::*, EncodableError, DecodableError, ser::Limit};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -9,7 +10,7 @@ use insim_core::string::{is_ascii_alphanumeric, strip_trailing_nul};
 
 /// Handles parsing a vehicle name according to the Insim v9 rules.
 /// See <https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info>
-#[derive(Debug, PartialEq, Eq, InsimEncode, InsimDecode, Clone, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Vehicle {
     pub inner: [u8; 4],
@@ -54,5 +55,34 @@ impl std::fmt::Display for Vehicle {
         } else {
             write!(f, "{}", self.mod_id_as_string().unwrap())
         }
+    }
+}
+
+impl Encodable for Vehicle {
+    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), EncodableError> {
+        if let Some(limit) = limit {
+            return Err(EncodableError::UnexpectedLimit(format!("Vehicle does not support limit: {:?}", limit)));
+        }
+
+        for i in self.inner.iter() {
+            i.encode(buf, None)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl Decodable for Vehicle {
+    fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
+        if let Some(limit) = limit {
+            return Err(DecodableError::UnexpectedLimit(format!("Vehicle does not support limit: {:?}", limit)));
+        }
+
+        let mut data: Self = Default::default();
+        for i in 0..4 {
+            data.inner[i] = u8::decode(buf, None)?;
+        }
+
+        Ok(data)
     }
 }
