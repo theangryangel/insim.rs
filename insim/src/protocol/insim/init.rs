@@ -32,7 +32,11 @@ impl InitFlags {
 }
 
 impl Encodable for InitFlags {
-    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), insim_core::EncodableError> {
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), insim_core::EncodableError> {
         self.bits().encode(buf, limit)?;
         Ok(())
     }

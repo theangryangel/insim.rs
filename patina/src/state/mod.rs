@@ -1,14 +1,10 @@
 pub(crate) mod chat;
 
 use bounded_vec_deque::BoundedVecDeque;
-use insim::core::{
-    identifiers::ConnectionId,
-    point::Point,
-    identifiers::PlayerId,
-};
+use insim::client::prelude::*;
+use insim::core::{identifiers::ConnectionId, identifiers::PlayerId, point::Point};
 use insim::protocol::insim::Wind;
 use insim::track::TrackInfo;
-use insim::client::prelude::*;
 use miette::Result;
 use std::sync::Arc;
 use tokio::sync::Notify;

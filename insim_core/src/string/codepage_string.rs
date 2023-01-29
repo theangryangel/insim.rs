@@ -1,6 +1,6 @@
 //! Utilities for working with 'Codepage strings' from Insim.
 
-use crate::{Decodable, DecodableError, Encodable, EncodableError, ser::Limit};
+use crate::{ser::Limit, Decodable, DecodableError, Encodable, EncodableError};
 
 use super::{escape, strip_trailing_nul, unescape};
 use bytes::BytesMut;
@@ -396,7 +396,10 @@ impl Decodable for CodepageString {
         let mut data = Self::default();
 
         let limit = if limit.is_none() {
-            tracing::warn!("No limit received, assuming the rest of the buffer: {:?}", &buf);
+            tracing::warn!(
+                "No limit received, assuming the rest of the buffer: {:?}",
+                &buf
+            );
             Some(Limit::Bytes(buf.len()))
         } else {
             limit

@@ -26,7 +26,11 @@ bitflags! {
 }
 
 impl Encodable for RaceResultFlags {
-    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), insim_core::EncodableError>
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), insim_core::EncodableError>
     where
         Self: Sized,
     {
@@ -38,9 +42,8 @@ impl Encodable for RaceResultFlags {
 impl Decodable for RaceResultFlags {
     fn decode(
         buf: &mut bytes::BytesMut,
-        limit: Option<Limit>
+        limit: Option<Limit>,
     ) -> Result<Self, insim_core::DecodableError> {
-
         Ok(Self::from_bits_truncate(u8::decode(buf, limit)?))
     }
 }

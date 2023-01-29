@@ -1,6 +1,7 @@
 use insim_core::{
     identifiers::{PlayerId, RequestId},
-    prelude::*, ser::Limit,
+    prelude::*,
+    ser::Limit,
 };
 
 #[cfg(feature = "serde")]
@@ -20,7 +21,11 @@ bitflags! {
 }
 
 impl Encodable for ObhFlags {
-    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), insim_core::EncodableError>
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), insim_core::EncodableError>
     where
         Self: Sized,
     {

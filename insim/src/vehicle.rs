@@ -1,7 +1,7 @@
 //! Utility functions for working with vehicles and fetching vehicle data.
 
 use bytes::BytesMut;
-use insim_core::{prelude::*, EncodableError, DecodableError, ser::Limit};
+use insim_core::{prelude::*, ser::Limit, DecodableError, EncodableError};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -59,9 +59,16 @@ impl std::fmt::Display for Vehicle {
 }
 
 impl Encodable for Vehicle {
-    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), EncodableError> {
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), EncodableError> {
         if let Some(limit) = limit {
-            return Err(EncodableError::UnexpectedLimit(format!("Vehicle does not support limit: {:?}", limit)));
+            return Err(EncodableError::UnexpectedLimit(format!(
+                "Vehicle does not support limit: {:?}",
+                limit
+            )));
         }
 
         for i in self.inner.iter() {
@@ -75,7 +82,10 @@ impl Encodable for Vehicle {
 impl Decodable for Vehicle {
     fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
         if let Some(limit) = limit {
-            return Err(DecodableError::UnexpectedLimit(format!("Vehicle does not support limit: {:?}", limit)));
+            return Err(DecodableError::UnexpectedLimit(format!(
+                "Vehicle does not support limit: {:?}",
+                limit
+            )));
         }
 
         let mut data: Self = Default::default();

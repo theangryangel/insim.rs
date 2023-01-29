@@ -1,4 +1,4 @@
-use insim_core::{identifiers::RequestId, prelude::*, string::CodepageString, ser::Limit};
+use insim_core::{identifiers::RequestId, prelude::*, ser::Limit, string::CodepageString};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -35,7 +35,11 @@ impl Decodable for HostInfoFlags {
 }
 
 impl Encodable for HostInfoFlags {
-    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), insim_core::EncodableError>
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), insim_core::EncodableError>
     where
         Self: Sized,
     {

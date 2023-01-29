@@ -1,6 +1,7 @@
 use insim_core::{
     identifiers::{ConnectionId, RequestId},
-    prelude::*, ser::Limit,
+    prelude::*,
+    ser::Limit,
 };
 
 #[cfg(feature = "serde")]
@@ -48,7 +49,11 @@ impl Decodable for PlcAllowedCars {
 }
 
 impl Encodable for PlcAllowedCars {
-    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), insim_core::EncodableError>
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), insim_core::EncodableError>
     where
         Self: Sized,
     {

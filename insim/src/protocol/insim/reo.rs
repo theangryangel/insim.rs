@@ -1,7 +1,9 @@
 use bytes::BytesMut;
 use insim_core::{
     identifiers::{PlayerId, RequestId},
-    prelude::*, DecodableError, EncodableError, ser::Limit
+    prelude::*,
+    ser::Limit,
+    DecodableError, EncodableError,
 };
 
 #[cfg(feature = "serde")]
@@ -38,10 +40,13 @@ impl Decodable for ReoPlayerList {
 impl Encodable for ReoPlayerList {
     fn encode(&self, buf: &mut BytesMut, limit: Option<Limit>) -> Result<(), EncodableError>
     where
-        Self: Sized {
-
+        Self: Sized,
+    {
         if limit.is_some() {
-            return Err(EncodableError::UnexpectedLimit(format!("ReoPlayerList does not support a limit: {:?}", limit)));
+            return Err(EncodableError::UnexpectedLimit(format!(
+                "ReoPlayerList does not support a limit: {:?}",
+                limit
+            )));
         }
 
         for i in self.0.iter() {

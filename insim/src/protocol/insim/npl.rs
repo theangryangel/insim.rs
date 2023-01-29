@@ -2,8 +2,9 @@ use bytes::BytesMut;
 use insim_core::{
     identifiers::{ConnectionId, PlayerId, RequestId},
     prelude::*,
-    string::CodepageString, DecodableError, EncodableError,
-    ser::Limit
+    ser::Limit,
+    string::CodepageString,
+    DecodableError, EncodableError,
 };
 
 #[cfg(feature = "serde")]
@@ -61,7 +62,8 @@ impl Decodable for TyreCompoundList {
 impl Encodable for TyreCompoundList {
     fn encode(&self, buf: &mut BytesMut, _limit: Option<Limit>) -> Result<(), EncodableError>
     where
-        Self: Sized {
+        Self: Sized,
+    {
         for i in self.0.iter() {
             i.encode(buf, None)?;
         }
@@ -92,7 +94,11 @@ bitflags! {
 }
 
 impl Encodable for PlayerFlags {
-    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), insim_core::EncodableError>
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), insim_core::EncodableError>
     where
         Self: Sized,
     {

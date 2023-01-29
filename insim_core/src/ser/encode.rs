@@ -39,9 +39,10 @@ impl Encodable for bool {
 impl Encodable for u8 {
     fn encode(&self, buf: &mut BytesMut, limit: Option<Limit>) -> Result<(), EncodableError> {
         if let Some(limit) = limit {
-            return Err(EncodableError::UnexpectedLimit(
-                format!("u8 does not support a limit: {:?}", limit)
-            ))
+            return Err(EncodableError::UnexpectedLimit(format!(
+                "u8 does not support a limit: {:?}",
+                limit
+            )));
         }
 
         buf.put_u8(*self);
@@ -54,9 +55,10 @@ impl Encodable for u8 {
 impl Encodable for u16 {
     fn encode(&self, buf: &mut BytesMut, limit: Option<Limit>) -> Result<(), EncodableError> {
         if let Some(limit) = limit {
-            return Err(EncodableError::UnexpectedLimit(
-                format!("u16 does not support a limit: {:?}", limit)
-            ))
+            return Err(EncodableError::UnexpectedLimit(format!(
+                "u16 does not support a limit: {:?}",
+                limit
+            )));
         }
 
         buf.put_u16_le(*self);
@@ -69,9 +71,10 @@ impl Encodable for u16 {
 impl Encodable for u32 {
     fn encode(&self, buf: &mut BytesMut, limit: Option<Limit>) -> Result<(), EncodableError> {
         if let Some(limit) = limit {
-            return Err(EncodableError::UnexpectedLimit(
-                format!("u32 does not support a limit: {:?}", limit)
-            ))
+            return Err(EncodableError::UnexpectedLimit(format!(
+                "u32 does not support a limit: {:?}",
+                limit
+            )));
         }
 
         buf.put_u32_le(*self);
@@ -84,9 +87,10 @@ impl Encodable for u32 {
 impl Encodable for i8 {
     fn encode(&self, buf: &mut BytesMut, limit: Option<Limit>) -> Result<(), EncodableError> {
         if let Some(limit) = limit {
-            return Err(EncodableError::UnexpectedLimit(
-                format!("i8 does not support a limit: {:?}", limit)
-            ))
+            return Err(EncodableError::UnexpectedLimit(format!(
+                "i8 does not support a limit: {:?}",
+                limit
+            )));
         }
 
         buf.put_i8(*self);
@@ -99,9 +103,10 @@ impl Encodable for i8 {
 impl Encodable for i16 {
     fn encode(&self, buf: &mut BytesMut, limit: Option<Limit>) -> Result<(), EncodableError> {
         if let Some(limit) = limit {
-            return Err(EncodableError::UnexpectedLimit(
-                format!("i16 does not support a limit: {:?}", limit)
-            ))
+            return Err(EncodableError::UnexpectedLimit(format!(
+                "i16 does not support a limit: {:?}",
+                limit
+            )));
         }
 
         buf.put_i16_le(*self);
@@ -114,9 +119,10 @@ impl Encodable for i16 {
 impl Encodable for i32 {
     fn encode(&self, buf: &mut BytesMut, limit: Option<Limit>) -> Result<(), EncodableError> {
         if let Some(limit) = limit {
-            return Err(EncodableError::UnexpectedLimit(
-                format!("i32 does not support a limit: {:?}", limit)
-            ))
+            return Err(EncodableError::UnexpectedLimit(format!(
+                "i32 does not support a limit: {:?}",
+                limit
+            )));
         }
 
         buf.put_i32_le(*self);
@@ -129,9 +135,10 @@ impl Encodable for i32 {
 impl Encodable for f32 {
     fn encode(&self, buf: &mut BytesMut, limit: Option<Limit>) -> Result<(), EncodableError> {
         if let Some(limit) = limit {
-            return Err(EncodableError::UnexpectedLimit(
-                format!("f32 does not support a limit: {:?}", limit)
-            ))
+            return Err(EncodableError::UnexpectedLimit(format!(
+                "f32 does not support a limit: {:?}",
+                limit
+            )));
         }
 
         buf.put_f32_le(*self);
@@ -150,16 +157,16 @@ where
     fn encode(&self, buf: &mut BytesMut, limit: Option<Limit>) -> Result<(), EncodableError> {
         let limit_as_iterations = match limit {
             Some(Limit::Count(i)) => i,
-            Some(Limit::Bytes(i)) => {
-                i / core::mem::size_of::<T>()
-            },
+            Some(Limit::Bytes(i)) => i / core::mem::size_of::<T>(),
             None => self.len(),
         };
 
         if limit_as_iterations < self.len() {
-            return Err(EncodableError::TooLarge(
-                format!("Limit of {}, with {} items in vec", limit_as_iterations, self.len())
-            ));
+            return Err(EncodableError::TooLarge(format!(
+                "Limit of {}, with {} items in vec",
+                limit_as_iterations,
+                self.len()
+            )));
         }
 
         for i in self {
@@ -168,4 +175,3 @@ where
         Ok(())
     }
 }
-

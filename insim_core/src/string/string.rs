@@ -8,7 +8,7 @@
 
 use bytes::BytesMut;
 
-use crate::{Decodable, DecodableError, Encodable, EncodableError, ser::Limit};
+use crate::{ser::Limit, Decodable, DecodableError, Encodable, EncodableError};
 
 use super::strip_trailing_nul;
 
@@ -22,7 +22,10 @@ impl Encodable for String {
 impl Decodable for String {
     fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
         let limit = if limit.is_none() {
-            tracing::warn!("No limit received, assuming the rest of the buffer: {:?}", &buf);
+            tracing::warn!(
+                "No limit received, assuming the rest of the buffer: {:?}",
+                &buf
+            );
             Some(Limit::Bytes(buf.len()))
         } else {
             limit

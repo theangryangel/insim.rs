@@ -2,8 +2,9 @@ use bytes::BufMut;
 use insim_core::{
     identifiers::{ConnectionId, PlayerId, RequestId},
     prelude::*,
+    ser::Limit,
     string::CodepageString,
-    ser::Limit, EncodableError,
+    EncodableError,
 };
 
 #[cfg(feature = "serde")]
@@ -58,7 +59,10 @@ impl Encodable for Mso {
         Self: Sized,
     {
         if limit.is_some() {
-            return Err(EncodableError::UnexpectedLimit(format!("MSO does not support limit! {:?}", limit)));
+            return Err(EncodableError::UnexpectedLimit(format!(
+                "MSO does not support limit! {:?}",
+                limit
+            )));
         }
 
         self.reqi.encode(buf, None)?;
@@ -95,9 +99,7 @@ impl Decodable for Mso {
         data.ucid = ConnectionId::decode(buf, None)?;
         data.plid = PlayerId::decode(buf, None)?;
         data.usertype = MsoUserType::decode(buf, None)?;
-        data.msg = CodepageString::decode(buf, Some(
-            Limit::Bytes(buf.len())
-        ))?;
+        data.msg = CodepageString::decode(buf, Some(Limit::Bytes(buf.len())))?;
         Ok(data)
     }
 }

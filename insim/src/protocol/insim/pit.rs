@@ -1,7 +1,7 @@
 use insim_core::{
     identifiers::{PlayerId, RequestId},
     prelude::*,
-    ser::Limit
+    ser::Limit,
 };
 
 #[cfg(feature = "serde")]
@@ -49,7 +49,11 @@ impl Decodable for PitStopWorkFlags {
 }
 
 impl Encodable for PitStopWorkFlags {
-    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), insim_core::EncodableError>
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), insim_core::EncodableError>
     where
         Self: Sized,
     {

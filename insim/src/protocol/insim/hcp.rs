@@ -1,8 +1,5 @@
 use bytes::BytesMut;
-use insim_core::{
-    identifiers::RequestId, prelude::*,
-    DecodableError, EncodableError, ser::Limit
-};
+use insim_core::{identifiers::RequestId, prelude::*, ser::Limit, DecodableError, EncodableError};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -38,9 +35,10 @@ pub struct Hcp {
 impl Decodable for HcpCarHandicapList {
     fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
         if limit.is_some() {
-            return Err(DecodableError::UnexpectedLimit(
-                format!("HcpCarHandicap does not support a limit: {:?}", limit)
-            ))
+            return Err(DecodableError::UnexpectedLimit(format!(
+                "HcpCarHandicap does not support a limit: {:?}",
+                limit
+            )));
         }
 
         let mut data: HcpCarHandicapList = Default::default();
@@ -55,12 +53,13 @@ impl Decodable for HcpCarHandicapList {
 impl Encodable for HcpCarHandicapList {
     fn encode(&self, buf: &mut BytesMut, limit: Option<Limit>) -> Result<(), EncodableError>
     where
-        Self: Sized {
-
+        Self: Sized,
+    {
         if limit.is_some() {
-            return Err(EncodableError::UnexpectedLimit(
-                format!("HcpCarHandicap does not support a limit: {:?}", limit)
-            ))
+            return Err(EncodableError::UnexpectedLimit(format!(
+                "HcpCarHandicap does not support a limit: {:?}",
+                limit
+            )));
         }
 
         for i in self.0.iter() {

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title></title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        margin: 0;
+        padding: 1em;
+      }
+      #main {
+        border: 1px solid red;
+        width: calc(100vw - 2em);
+        height: calc(100vh - 2em);
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="main" />
+
+    <script src="https://unpkg.com/earcut@2.2.4/dist/earcut.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"
+      integrity="sha256-eVNjHw5UeU0jUqPPpZHAkU1z4U+QFBBY488WvueTm88="
+      crossorigin="anonymous"
+    ></script>
+
+    <script>
+      function resizeCanvasToDisplaySize(canvas) {
+        // look up the size the canvas is being displayed
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
+
+        // If it's resolution does not match change it
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+          return true;
+        }
+
+        return false;
+      }
+
+      const createShader = (gl, type, source) => {
+        let shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        let success = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
+        if (success) {
+          return shader;
+        }
+        console.error(gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+      };
+
+      const createProgram = (gl, vertexShader, fragmentShader) => {
+        let program = gl.createProgram();
+        gl.attachShader(program, vertexShader);
+        gl.attachShader(program, fragmentShader);
+        gl.linkProgram(program);
+        let success = gl.getProgramParameter(program, gl.LINK_STATUS);
+        if (success) {
+          return program;
+        }
+        console.error(gl.getProgramInfoLog(program));
+        gl.deleteProgram(program);
+      };
+
+      //import { mat3, vec3 } from 'gl-matrix';
+
+      //////////////////////
+      // constants
+      //////////////////////
+      //import WASHINGTON from 'FE.json';
+
+      const MIN_ZOOM = -100;
+      const MAX_ZOOM = 100;
+
+      //////////////////////
+      // shaders
+      //////////////////////
+
+      // vertex shader just passes through the position,
+      // no modification to the vertices
+      const vertexShaderSource = `
+  attribute vec2 a_position;
+
+  uniform mat3 u_matrix; // 3 X 3 matrix
+
+  void main() {
+    vec2 position = (u_matrix * vec3(a_position, 1)).xy;
+    gl_Position = vec4(position, 0, 1);
+  }
+`;
+
+      // color is constant for all vertices
+      const fragmentShaderSource = `
+  precision mediump float;
+
+  void main() {
+    gl_FragColor = vec4(1, 0, 0.5, 0.9);
+  }
+`;
+
+      //////////////////////
+      // map state
+      //////////////////////
+      const camera = {
+        x: 0,
+        y: 0,
+        zoom: 0,
+      };
+
+      // initial transformation
+      camera.x = 0.1;
+      camera.y = 0.1;
+      camera.zoom = 1;
+
+      let matrix;
+      function updateMatrix() {
+        const cameraMat = mat3.create();
+
+        // translate
+        mat3.translate(cameraMat, cameraMat, [camera.x, camera.y]);
+
+        // scale
+        const zoomScale = 1 / Math.pow(2, camera.zoom);
+        mat3.scale(cameraMat, cameraMat, [zoomScale, zoomScale]);
+
+        // update matrix
+        matrix = mat3.multiply(
+          [],
+          mat3.create(), // identity matrix
+          mat3.invert([], cameraMat) // invert camera position
+        );
+      }
+      updateMatrix();
+
+      //////////////////////
+      // helpers
+      //////////////////////
+      function getClipSpacePosition(e, canvas) {
+        // handle mouse and touch events
+        const [x, y] = [e.center?.x || e.clientX, e.center?.y || e.clientY];
+
+        // get canvas relative css position
+        const rect = canvas.getBoundingClientRect();
+        const cssX = x - rect.left;
+        const cssY = y - rect.top;
+
+        // get normalized 0 to 1 position across and down canvas
+        const normalizedX = cssX / canvas.clientWidth;
+        const normalizedY = cssY / canvas.clientHeight;
+
+        // convert to clip space
+        const clipX = normalizedX * 2 - 1;
+        const clipY = normalizedY * -2 + 1;
+
+        return [clipX, clipY];
+      }
+
+      // convert a GeoJSON geometry to webgl vertices
+      function geometryToVertices(geometry) {
+        const data = earcut.flatten(geometry.coordinates);
+        const triangles = earcut(data.vertices, data.holes, 2);
+
+        const vertices = new Float32Array(triangles.length * 2);
+        for (let i = 0; i < triangles.length; i++) {
+          const point = triangles[i];
+          const lng = data.vertices[point * 2];
+          const lat = data.vertices[point * 2 + 1];
+          const [x, y] = [lat, lng];
+          vertices[i * 2] = x;
+          vertices[i * 2 + 1] = y;
+        }
+        return vertices;
+      }
+
+      //////////////////////
+      // main program
+      //////////////////////
+      const run = (canvasId) => {
+        // get GL context from canvas
+        const canvas = document.getElementById(canvasId);
+        resizeCanvasToDisplaySize(canvas);
+        const gl = canvas.getContext("webgl");
+
+        // setup viewport
+        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+        // compile shaders
+        const vertexShader = createShader(
+          gl,
+          gl.VERTEX_SHADER,
+          vertexShaderSource
+        );
+        const fragmentShader = createShader(
+          gl,
+          gl.FRAGMENT_SHADER,
+          fragmentShaderSource
+        );
+
+        // init gl program
+        const program = createProgram(gl, vertexShader, fragmentShader);
+        gl.clearColor(0, 0, 0, 0);
+        gl.useProgram(program);
+
+        // create buffer for vertices
+        const positionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+
+        // add vertices to buffer
+
+        let WASHINGTON = {};
+
+        const request = new XMLHttpRequest();
+        request.open("GET", "/FE.json", false); // `false` makes the request synchronous
+        request.send(null);
+
+        if (request.status == 200) {
+          WASHINGTON = JSON.parse(request.responseText);
+        }
+
+        const vertices = geometryToVertices(WASHINGTON.features[0].geometry);
+        gl.bufferData(
+          gl.ARRAY_BUFFER,
+          new Float32Array(vertices),
+          gl.STATIC_DRAW
+        );
+
+        // enable on the position attribute
+        const positionAttributeLocation = gl.getAttribLocation(
+          program,
+          "a_position"
+        );
+        gl.enableVertexAttribArray(positionAttributeLocation);
+
+        const draw = () => {
+          resizeCanvasToDisplaySize(canvas);
+
+          // set matrix as uniform
+          const matrixLocation = gl.getUniformLocation(program, "u_matrix");
+          gl.uniformMatrix3fv(matrixLocation, false, matrix);
+
+          // tell the attribute how to get data out of positionBuffer (ARRAY_BUFFER)
+          const size = 2;
+          const type = gl.FLOAT;
+          const normalize = false;
+          const stride = 0;
+          let offset = 0;
+          gl.vertexAttribPointer(
+            positionAttributeLocation,
+            size,
+            type,
+            normalize,
+            stride,
+            offset
+          );
+
+          // draw
+          const primitiveType = gl.TRIANGLES;
+          offset = 0;
+          const count = vertices.length / 2;
+          gl.drawArrays(primitiveType, offset, count);
+        };
+        draw(); // initial draw
+
+        ////////////////////////
+        // interaction handlers
+        ////////////////////////
+
+        // handle touch events
+        //  const Hammer = require('hammerjs');
+        const hammer = new Hammer(canvas);
+        hammer.get("pan").set({ direction: Hammer.DIRECTION_ALL });
+        hammer.get("pinch").set({ enable: true });
+
+        // handle pan events
+        let startX;
+        let startY;
+
+        // handle drag changes while mouse is still down
+        const handleMove = (moveEvent) => {
+          const [x, y] = getClipSpacePosition(moveEvent, canvas);
+
+          // compute the previous position in world space
+          const [preX, preY] = vec3.transformMat3(
+            [],
+            [startX, startY, 0],
+            mat3.invert([], matrix)
+          );
+
+          // compute the new position in world space
+          const [postX, postY] = vec3.transformMat3(
+            [],
+            [x, y, 0],
+            mat3.invert([], matrix)
+          );
+
+          // move that amount, because how much the position changes depends on the zoom level
+          const deltaX = preX - postX;
+          const deltaY = preY - postY;
+          if (isNaN(deltaX) || isNaN(deltaY)) {
+            return; // abort
+          }
+
+          // only update within world limits
+          camera.x += deltaX;
+          camera.y += deltaY;
+
+          // save current pos for next movement
+          startX = x;
+          startY = y;
+
+          // update matrix with new camera and redraw scene
+          updateMatrix();
+          draw();
+        };
+
+        const handlePan = (startEvent) => {
+          // get position of initial drag
+          [startX, startY] = getClipSpacePosition(startEvent, canvas);
+          canvas.style.cursor = "grabbing";
+
+          window.addEventListener("mousemove", handleMove);
+          hammer.on("pan", handleMove);
+
+          // clear on release
+          const clear = (event) => {
+            canvas.style.cursor = "grab";
+            window.removeEventListener("mousemove", handleMove);
+            window.removeEventListener("mouseup", clear);
+            hammer.off("pan", handleMove);
+            hammer.off("panend", clear);
+          };
+          window.addEventListener("mouseup", clear);
+          hammer.on("panend", clear);
+        };
+        canvas.addEventListener("mousedown", handlePan);
+        hammer.on("panstart", handlePan);
+
+        // handle zoom events
+        const handleZoom = (wheelEvent) => {
+          wheelEvent.preventDefault();
+          const [x, y] = getClipSpacePosition(wheelEvent, canvas);
+
+          // get position before zooming
+          const [preZoomX, preZoomY] = vec3.transformMat3(
+            [],
+            [x, y, 0],
+            mat3.invert([], matrix)
+          );
+
+          // update current zoom state
+          const zoomDelta = -wheelEvent.deltaY * (1 / 300);
+          camera.zoom += zoomDelta;
+          camera.zoom = Math.max(MIN_ZOOM, Math.min(camera.zoom, MAX_ZOOM));
+          updateMatrix();
+
+          // get new position after zooming
+          const [postZoomX, postZoomY] = vec3.transformMat3(
+            [],
+            [x, y, 0],
+            mat3.invert([], matrix)
+          );
+
+          // camera needs to be translated the difference of before and after
+          camera.x += preZoomX - postZoomX;
+          camera.y += preZoomY - postZoomY;
+          updateMatrix();
+          draw();
+        };
+        canvas.addEventListener("wheel", handleZoom);
+        hammer.on("pinch", handleZoom);
+      };
+
+      run("main");
+    </script>
+  </body>
+</html>

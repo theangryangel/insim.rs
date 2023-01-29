@@ -221,12 +221,10 @@ impl Stream for Client {
                     if !this.config.verify_version {
                         *state = ConnectedState::Connected;
                         Poll::Ready(Some(Event::Connected))
-
                     } else {
                         *state = ConnectedState::Handshaking;
                         Poll::Ready(Some(Event::Handshaking))
                     }
-
                 }
                 ConnectedState::Handshaking => match transport.try_poll_next_unpin(cx) {
                     Poll::Ready(Some(packet)) => {

@@ -1,7 +1,7 @@
 //! Utility functions and structs for working with track names and fetching track data.
 
 use bytes::BytesMut;
-use insim_core::{prelude::*, DecodableError, EncodableError, ser::Limit};
+use insim_core::{prelude::*, ser::Limit, DecodableError, EncodableError};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -507,9 +507,16 @@ impl std::fmt::Display for Track {
 }
 
 impl Encodable for Track {
-    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), EncodableError> {
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), EncodableError> {
         if let Some(limit) = limit {
-            return Err(EncodableError::UnexpectedLimit(format!("Track does not support limit: {:?}", limit)));
+            return Err(EncodableError::UnexpectedLimit(format!(
+                "Track does not support limit: {:?}",
+                limit
+            )));
         }
 
         for i in self.inner.iter() {
@@ -523,7 +530,10 @@ impl Encodable for Track {
 impl Decodable for Track {
     fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
         if let Some(limit) = limit {
-            return Err(DecodableError::UnexpectedLimit(format!("Track does not support limit: {:?}", limit)));
+            return Err(DecodableError::UnexpectedLimit(format!(
+                "Track does not support limit: {:?}",
+                limit
+            )));
         }
 
         let mut data: Track = Default::default();

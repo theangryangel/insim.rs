@@ -1,4 +1,4 @@
-use insim_core::{prelude::*, point::Point};
+use insim_core::{point::Point, prelude::*};
 
 #[derive(Debug, InsimDecode, Default, Clone)]
 pub struct Rgb {

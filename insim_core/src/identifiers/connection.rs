@@ -1,4 +1,4 @@
-use crate::{Decodable, Encodable, ser::Limit};
+use crate::{ser::Limit, Decodable, Encodable};
 
 use std::fmt;
 use std::ops::{Deref, DerefMut};
@@ -11,7 +11,11 @@ use serde::Serialize;
 pub struct ConnectionId(u8);
 
 impl Encodable for ConnectionId {
-    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), crate::EncodableError>
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), crate::EncodableError>
     where
         Self: Sized,
     {

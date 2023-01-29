@@ -1,4 +1,4 @@
-use crate::{Decodable, Encodable, ser::Limit};
+use crate::{ser::Limit, Decodable, Encodable};
 
 use std::fmt;
 use std::ops::{Deref, DerefMut};
@@ -17,7 +17,11 @@ impl fmt::Display for PlayerId {
 }
 
 impl Encodable for PlayerId {
-    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), crate::EncodableError>
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), crate::EncodableError>
     where
         Self: Sized,
     {

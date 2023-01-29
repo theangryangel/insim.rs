@@ -4,7 +4,7 @@ use insim_core::{Decodable, Encodable, InsimDecode, InsimEncode};
 #[derive(InsimEncode, InsimDecode, PartialEq, Eq, Debug)]
 #[repr(u8)]
 #[allow(unused)]
-#[insim(magic=b"TEST")]
+#[insim(magic = b"TEST")]
 enum TestEnumMagic {
     U8(u8) = 1,
     U32(u32) = 2,
@@ -22,7 +22,8 @@ fn test_ser_enum_magic_encode() {
     let mut buf = BytesMut::new();
 
     let i = TestEnumMagic::I8(-1);
-    i.encode(&mut buf, None).expect("Expected encoding to succeed");
+    i.encode(&mut buf, None)
+        .expect("Expected encoding to succeed");
 
     let mut comparison = BytesMut::new();
     comparison.put_slice("TEST".as_bytes());

@@ -1,7 +1,7 @@
 extern crate insim;
 use tracing_subscriber;
 
-use futures::{StreamExt, SinkExt};
+use futures::{SinkExt, StreamExt};
 
 fn setup() {
     // setup tracing with some defaults if nothing is set
@@ -40,8 +40,9 @@ pub async fn main() {
                             insim::protocol::relay::HostSelect {
                                 hname: "Nubbins AU Demo".into(),
                                 ..Default::default()
-                            }
-                        ).into()
+                            },
+                        )
+                        .into(),
                     )
                     .await;
             }

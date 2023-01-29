@@ -2,8 +2,9 @@ use bytes::{Buf, BufMut};
 use insim_core::{
     identifiers::{ConnectionId, PlayerId, RequestId},
     prelude::*,
+    ser::Limit,
     string::CodepageString,
-    ser::Limit, EncodableError, DecodableError
+    DecodableError, EncodableError,
 };
 
 #[cfg(feature = "serde")]
@@ -30,9 +31,10 @@ impl Encodable for Iii {
         Self: Sized,
     {
         if limit.is_some() {
-            return Err(EncodableError::UnexpectedLimit(
-                format!("III does not support a limit: {:?}", limit)
-            ))
+            return Err(EncodableError::UnexpectedLimit(format!(
+                "III does not support a limit: {:?}",
+                limit
+            )));
         }
 
         self.reqi.encode(buf, None)?;
@@ -57,17 +59,15 @@ impl Encodable for Iii {
 }
 
 impl Decodable for Iii {
-    fn decode(
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<Self, DecodableError>
+    fn decode(buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError>
     where
         Self: Default,
     {
         if limit.is_some() {
-            return Err(DecodableError::UnexpectedLimit(
-                format!("III does not support a limit: {:?}", limit)
-            ))
+            return Err(DecodableError::UnexpectedLimit(format!(
+                "III does not support a limit: {:?}",
+                limit
+            )));
         }
 
         let mut data = Self::default();
@@ -80,9 +80,7 @@ impl Decodable for Iii {
 
         buf.advance(2);
 
-        data.msg = CodepageString::decode(buf, Some(
-            Limit::Bytes(buf.len())
-        ))?;
+        data.msg = CodepageString::decode(buf, Some(Limit::Bytes(buf.len())))?;
 
         Ok(data)
     }

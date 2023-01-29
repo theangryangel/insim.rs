@@ -1,10 +1,10 @@
 use std::fs;
+use std::io::ErrorKind;
 use std::io::Read;
 use std::path::PathBuf;
-use std::io::ErrorKind;
 use thiserror::Error;
 
-use insim_core::{prelude::*, point::Point, DecodableError};
+use insim_core::{point::Point, prelude::*, DecodableError};
 
 // FIXME - we should probably drop the derive clone here?
 #[non_exhaustive]

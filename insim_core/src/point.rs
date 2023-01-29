@@ -38,7 +38,7 @@ impl Point<f32> {
     }
 }
 
-use crate::{Decodable, DecodableError, Encodable, EncodableError, ser::Limit};
+use crate::{ser::Limit, Decodable, DecodableError, Encodable, EncodableError};
 
 impl<T> Decodable for Point<T>
 where
@@ -46,7 +46,10 @@ where
 {
     fn decode(buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
         if limit.is_some() {
-            return Err(DecodableError::UnexpectedLimit(format!("limit is not supported on Point<T>: {:?}", limit)))
+            return Err(DecodableError::UnexpectedLimit(format!(
+                "limit is not supported on Point<T>: {:?}",
+                limit
+            )));
         }
         let mut data = Self::default();
         data.x = <T>::decode(buf, None)?;
@@ -60,9 +63,16 @@ impl<T> Encodable for Point<T>
 where
     T: Encodable + Pointable,
 {
-    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), EncodableError> {
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), EncodableError> {
         if limit.is_some() {
-            return Err(EncodableError::UnexpectedLimit(format!("limit is not supported on Point<T>: {:?}", limit)))
+            return Err(EncodableError::UnexpectedLimit(format!(
+                "limit is not supported on Point<T>: {:?}",
+                limit
+            )));
         }
         <T>::encode(&self.x, buf, None)?;
         <T>::encode(&self.y, buf, None)?;

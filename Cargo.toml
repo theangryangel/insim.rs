@@ -8,4 +8,5 @@ members = [
   "insim_pth",
   "insim_smx",
   "patina",
+  "pth2triangle",
 ]

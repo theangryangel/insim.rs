@@ -21,7 +21,8 @@ fn test_ser_enum_newtype_encode() {
     let mut buf = BytesMut::new();
 
     let i = TestEnumNewType::I8(-1);
-    i.encode(&mut buf, None).expect("Expected encoding to succeed");
+    i.encode(&mut buf, None)
+        .expect("Expected encoding to succeed");
 
     let mut comparison = BytesMut::new();
     comparison.put_u8(4);
@@ -63,7 +64,8 @@ fn test_ser_enum_unit_encode() {
     let mut buf = BytesMut::new();
 
     let i = TestEnumUnit::Unit;
-    i.encode(&mut buf, None).expect("Expected encoding to succeed");
+    i.encode(&mut buf, None)
+        .expect("Expected encoding to succeed");
 
     let mut comparison = BytesMut::new();
     comparison.put_u8(1);
