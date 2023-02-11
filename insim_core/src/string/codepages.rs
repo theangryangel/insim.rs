@@ -43,10 +43,10 @@ pub fn to_lossy_bytes(input: &str) -> Vec<u8> {
             continue;
         }
 
-        let mut buf = [0; 2];
-        let encoded_char = c.encode_utf8(&mut buf);
+        let mut buf = [0; 4];
+        let char_as_bytes = c.encode_utf8(&mut buf);
 
-        let (cow, _, error) = current_encoding.encode(&encoded_char);
+        let (cow, _, error) = current_encoding.encode(char_as_bytes);
 
         if !error {
             output.extend_from_slice(&cow);
@@ -61,7 +61,7 @@ pub fn to_lossy_bytes(input: &str) -> Vec<u8> {
                 continue;
             }
 
-            let (cow, _, error) = current_encoding.encode(&encoded_char);
+            let (cow, _, error) = current_encoding.encode(char_as_bytes);
             if error {
                 continue;
             }
