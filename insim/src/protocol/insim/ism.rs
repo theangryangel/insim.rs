@@ -1,4 +1,4 @@
-use insim_core::{identifiers::RequestId, prelude::*, string::CodepageString};
+use insim_core::{identifiers::RequestId, prelude::*};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -14,5 +14,5 @@ pub struct Ism {
     pub host: u8,
 
     #[insim(bytes = "16")]
-    pub hname: CodepageString,
+    pub hname: String,
 }

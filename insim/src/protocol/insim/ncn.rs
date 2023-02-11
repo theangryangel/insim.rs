@@ -1,7 +1,6 @@
 use insim_core::{
     identifiers::{ConnectionId, RequestId},
     prelude::*,
-    string::CodepageString,
 };
 
 #[cfg(feature = "serde")]
@@ -21,7 +20,7 @@ pub struct Ncn {
 
     #[insim(bytes = "24")]
     /// Playername.
-    pub pname: CodepageString,
+    pub pname: String,
 
     /// 1 if administrative user.
     pub admin: bool,

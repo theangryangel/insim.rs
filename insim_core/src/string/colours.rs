@@ -1,5 +1,7 @@
 use itertools::Itertools;
 
+use super::MARKER;
+
 const COLOUR_SEQUENCES: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const COLOUR_SEQUENCES_BYTES: &[u8] = &[b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9'];
 
@@ -9,7 +11,7 @@ pub fn strip(input: &str) -> String {
     let mut iter = input.chars();
 
     while let Some(i) = iter.next() {
-        if i == '^' {
+        if i == (MARKER as char) {
             if let Some(j) = iter.next() {
                 if COLOUR_SEQUENCES.contains(&j) {
                     continue;
@@ -37,7 +39,7 @@ pub fn to_ansi(input: &str) -> String {
     let mut iter = input.chars();
 
     while let Some(i) = iter.next() {
-        if i == '^' {
+        if i == (MARKER as char) {
             if let Some(j) = iter.next() {
                 if COLOUR_SEQUENCES.contains(&j) {
                     if j == '9' || j == '8' {
@@ -103,7 +105,7 @@ pub fn to_html(input: &str) -> String {
 
         let range = &input[pair[0]..pair[1]];
 
-        if range[0] != b'^' {
+        if range[0] != MARKER {
             output.push(std::str::from_utf8(range).unwrap().to_string());
             continue;
         }

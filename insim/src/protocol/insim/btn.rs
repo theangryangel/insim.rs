@@ -1,7 +1,6 @@
 use insim_core::{
     identifiers::{ConnectionId, RequestId},
     prelude::*,
-    string::CodepageString,
 };
 
 #[cfg(feature = "serde")]
@@ -56,7 +55,7 @@ pub struct Btn {
     pub height: u8,
 
     #[insim(bytes = "240")]
-    pub text: CodepageString, // FIXME: this should be upto 240 characters and always a multiple of 4
+    pub text: String, // FIXME: this should be upto 240 characters and always a multiple of 4
 }
 
 #[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
@@ -84,5 +83,5 @@ pub struct Btt {
     pub typein: u8,
 
     #[insim(bytes = "96")]
-    pub text: CodepageString,
+    pub text: String,
 }

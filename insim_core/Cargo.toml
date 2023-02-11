@@ -16,3 +16,4 @@ insim_derive = { path = "../insim_derive" }
 thiserror = "1"
 serde = { version = "1", features = ["derive"], optional = true }
 tracing = "0.1"
+once_cell = "1"

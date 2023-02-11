@@ -2,6 +2,7 @@ use bytes::{BufMut, BytesMut};
 use std::{error::Error, fmt};
 
 use super::Limit;
+use crate::string::codepages;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EncodableError {
@@ -172,6 +173,16 @@ where
         for i in self {
             i.encode(buf, None)?;
         }
+        Ok(())
+    }
+}
+
+// String
+
+impl Encodable for String {
+    fn encode(&self, buf: &mut BytesMut, limit: Option<Limit>) -> Result<(), EncodableError> {
+        let data = codepages::to_lossy_bytes(&self);
+        data.encode(buf, limit)?;
         Ok(())
     }
 }

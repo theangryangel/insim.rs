@@ -1,4 +1,4 @@
-use insim_core::{identifiers::RequestId, prelude::*, string::CodepageString};
+use insim_core::{identifiers::RequestId, prelude::*};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -37,5 +37,5 @@ pub struct Msl {
     pub sound: MslSoundType,
 
     #[insim(bytes = "128")]
-    pub msg: CodepageString,
+    pub msg: String,
 }

@@ -91,7 +91,7 @@ fn extract_repr_type(attrs: &[syn::Attribute]) -> Option<syn::Ident> {
 fn gen_field_name(ident: &Option<syn::Ident>, index: usize) -> proc_macro2::TokenStream {
     let name = match ident {
         Some(ident) => ident.to_string(),
-        None => format!("{}", index),
+        None => format!("{index}"),
     };
 
     name.parse().unwrap()

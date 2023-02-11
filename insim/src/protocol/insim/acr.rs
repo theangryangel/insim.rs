@@ -1,7 +1,6 @@
 use insim_core::{
     identifiers::{ConnectionId, RequestId},
     prelude::*,
-    string::CodepageString,
 };
 
 #[cfg(feature = "serde")]
@@ -42,5 +41,5 @@ pub struct Acr {
     pub result: AcrResult,
 
     #[insim(bytes = "64")]
-    pub text: CodepageString,
+    pub text: String,
 }

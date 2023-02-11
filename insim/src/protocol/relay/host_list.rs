@@ -1,4 +1,4 @@
-use insim_core::{identifiers::RequestId, prelude::*, ser::Limit, string::CodepageString};
+use insim_core::{identifiers::RequestId, prelude::*, ser::Limit};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -53,7 +53,7 @@ impl Encodable for HostInfoFlags {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct HostInfo {
     #[insim(bytes = "32")]
-    pub hname: CodepageString,
+    pub hname: String,
 
     pub track: Track,
 

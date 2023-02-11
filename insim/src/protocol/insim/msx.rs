@@ -1,4 +1,4 @@
-use insim_core::{identifiers::RequestId, prelude::*, string::CodepageString};
+use insim_core::{identifiers::RequestId, prelude::*};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -11,5 +11,5 @@ pub struct Msx {
     pub reqi: RequestId,
 
     #[insim(bytes = "96")]
-    pub msg: CodepageString,
+    pub msg: String,
 }

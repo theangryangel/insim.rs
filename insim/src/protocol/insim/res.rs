@@ -1,7 +1,6 @@
 use insim_core::{
     identifiers::{PlayerId, RequestId},
     prelude::*,
-    string::CodepageString,
 };
 
 #[cfg(feature = "serde")]
@@ -22,10 +21,10 @@ pub struct Res {
     pub uname: String,
 
     #[insim(bytes = "24")]
-    pub pname: CodepageString,
+    pub pname: String,
 
     #[insim(bytes = "8")]
-    pub plate: CodepageString,
+    pub plate: String,
 
     pub cname: Vehicle,
 

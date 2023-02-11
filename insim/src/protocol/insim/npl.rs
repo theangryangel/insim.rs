@@ -3,7 +3,6 @@ use insim_core::{
     identifiers::{ConnectionId, PlayerId, RequestId},
     prelude::*,
     ser::Limit,
-    string::CodepageString,
     DecodableError, EncodableError,
 };
 
@@ -134,10 +133,10 @@ pub struct Npl {
     pub flags: PlayerFlags,
 
     #[insim(bytes = "24")]
-    pub pname: CodepageString,
+    pub pname: String,
 
     #[insim(bytes = "8")]
-    pub plate: CodepageString,
+    pub plate: String,
 
     pub cname: Vehicle,
 

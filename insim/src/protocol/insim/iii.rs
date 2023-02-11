@@ -3,7 +3,7 @@ use insim_core::{
     identifiers::{ConnectionId, PlayerId, RequestId},
     prelude::*,
     ser::Limit,
-    string::CodepageString,
+    string::codepages,
     DecodableError, EncodableError,
 };
 
@@ -22,7 +22,7 @@ pub struct Iii {
     // pad_after_bytes = 2
     pub plid: PlayerId,
 
-    pub msg: CodepageString,
+    pub msg: String,
 }
 
 impl Encodable for Iii {
@@ -46,8 +46,8 @@ impl Encodable for Iii {
 
         buf.put_bytes(0, 2);
 
-        let msg = self.msg.into_bytes();
-        buf.put(msg);
+        let msg = codepages::to_lossy_bytes(&self.msg);
+        buf.put_slice(&msg);
 
         // pad so that msg is divisible by 8
         if msg.len() % 8 != 0 {
@@ -80,7 +80,7 @@ impl Decodable for Iii {
 
         buf.advance(2);
 
-        data.msg = CodepageString::decode(buf, Some(Limit::Bytes(buf.len())))?;
+        data.msg = String::decode(buf, Some(Limit::Bytes(buf.len())))?;
 
         Ok(data)
     }

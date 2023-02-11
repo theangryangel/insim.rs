@@ -1,7 +1,6 @@
 use insim_core::{
     identifiers::{ConnectionId, PlayerId, RequestId},
     prelude::*,
-    string::CodepageString,
 };
 
 #[cfg(feature = "serde")]
@@ -21,5 +20,5 @@ pub struct Mtc {
     pub plid: PlayerId,
 
     #[insim(bytes = "128")]
-    pub msg: CodepageString,
+    pub msg: String,
 }

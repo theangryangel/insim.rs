@@ -1,4 +1,4 @@
-use insim_core::{identifiers::RequestId, prelude::*, string::CodepageString};
+use insim_core::{identifiers::RequestId, prelude::*};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -11,7 +11,7 @@ pub struct HostSelect {
     pub reqi: RequestId,
 
     #[insim(bytes = "32")]
-    pub hname: CodepageString,
+    pub hname: String,
 
     #[insim(bytes = "16")]
     pub admin: String,

@@ -1,3 +1,5 @@
+use super::MARKER;
+
 /// Determine if a u8 can represent an A-Za-z0-9 ASCII character.
 pub fn is_ascii_alphanumeric(c: &u8) -> bool {
     // 0-9
@@ -50,7 +52,7 @@ pub fn escape(input: &[u8]) -> Vec<u8> {
 
     while let Some(i) = iter.next() {
         if let Some(k) = ESCAPE_SEQUENCES.iter().find(|x| x.1 == *i) {
-            output.push(b'^');
+            output.push(MARKER);
             output.push(k.0);
             continue;
         }
@@ -80,7 +82,7 @@ pub fn unescape(input: &[u8]) -> Vec<u8> {
     let mut iter = input.iter();
 
     while let Some(i) = iter.next() {
-        if *i == b'^' {
+        if *i == MARKER {
             if let Some(j) = iter.next() {
                 if let Some(k) = ESCAPE_SEQUENCES.iter().find(|x| x.0 == *j) {
                     output.push(k.1);

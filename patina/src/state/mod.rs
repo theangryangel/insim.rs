@@ -155,7 +155,7 @@ impl State {
         match data {
             Packet::MessageOut(data) => {
                 self.chat
-                    .push_front(chat::Chat::new(data.ucid, data.msg.to_lossy_string()));
+                    .push_front(chat::Chat::new(data.ucid, data.msg.to_owned()));
                 self.notifiers.chat.notify_waiters();
             }
 

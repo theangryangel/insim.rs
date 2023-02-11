@@ -1,7 +1,6 @@
 use insim_core::{
     identifiers::{ConnectionId, RequestId},
     prelude::*,
-    string::CodepageString,
 };
 
 #[cfg(feature = "serde")]
@@ -16,8 +15,8 @@ pub struct Cpr {
     pub ucid: ConnectionId,
 
     #[insim(bytes = "24")]
-    pub pname: CodepageString,
+    pub pname: String,
 
     #[insim(bytes = "8")]
-    pub plate: CodepageString,
+    pub plate: String,
 }

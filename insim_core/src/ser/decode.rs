@@ -2,6 +2,7 @@ use bytes::{Buf, BytesMut};
 use std::{error::Error, fmt};
 
 use super::Limit;
+use crate::string::codepages;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DecodableError {
@@ -218,5 +219,26 @@ where
         let t4 = T4::decode(buf, None)?;
 
         Ok((t1, t2, t3, t4))
+    }
+}
+
+// String
+
+impl Decodable for String {
+    fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
+        let limit = if limit.is_none() {
+            tracing::warn!(
+                "No limit received, assuming the rest of the buffer: {:?}",
+                &buf
+            );
+            Some(Limit::Bytes(buf.len()))
+        } else {
+            limit
+        };
+
+        // TODO use copy_to_slice and advance, etc.
+        let binding = Vec::<u8>::decode(buf, limit)?;
+
+        Ok(codepages::to_lossy_string(&binding))
     }
 }

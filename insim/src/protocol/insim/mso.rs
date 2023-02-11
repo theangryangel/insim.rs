@@ -3,7 +3,7 @@ use insim_core::{
     identifiers::{ConnectionId, PlayerId, RequestId},
     prelude::*,
     ser::Limit,
-    string::CodepageString,
+    string::codepages,
     EncodableError,
 };
 
@@ -50,7 +50,7 @@ pub struct Mso {
     /// Index of the first character of user entered text, in msg field.
     pub textstart: u8,
 
-    pub msg: CodepageString,
+    pub msg: String,
 }
 
 impl Encodable for Mso {
@@ -72,8 +72,8 @@ impl Encodable for Mso {
         self.usertype.encode(buf, None)?;
         self.textstart.encode(buf, None)?;
 
-        let msg = self.msg.into_bytes();
-        buf.put(msg);
+        let msg = codepages::to_lossy_bytes(&self.msg);
+        buf.put_slice(&msg);
 
         // pad so that msg is divisible by 8
         if msg.len() % 8 != 0 {
@@ -87,7 +87,7 @@ impl Encodable for Mso {
 impl Decodable for Mso {
     fn decode(
         buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
+        _limit: Option<Limit>,
     ) -> Result<Self, insim_core::DecodableError>
     where
         Self: Default,
@@ -99,7 +99,7 @@ impl Decodable for Mso {
         data.ucid = ConnectionId::decode(buf, None)?;
         data.plid = PlayerId::decode(buf, None)?;
         data.usertype = MsoUserType::decode(buf, None)?;
-        data.msg = CodepageString::decode(buf, Some(Limit::Bytes(buf.len())))?;
+        data.msg = String::decode(buf, Some(Limit::Bytes(buf.len())))?;
         Ok(data)
     }
 }
