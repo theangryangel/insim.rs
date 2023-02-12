@@ -114,7 +114,7 @@ impl Decodable for PlayerFlags {
     where
         Self: Sized,
     {
-        Ok(Self::from_bits_truncate(u16::decode(buf, None)?))
+        Ok(Self::from_bits_truncate(u16::decode(buf, limit)?))
     }
 }
 

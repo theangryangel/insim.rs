@@ -60,8 +60,7 @@ impl Encodable for Mso {
     {
         if limit.is_some() {
             return Err(EncodableError::UnexpectedLimit(format!(
-                "MSO does not support limit! {:?}",
-                limit
+                "MSO does not support limit! {limit:?}",
             )));
         }
 
@@ -92,9 +91,11 @@ impl Decodable for Mso {
     where
         Self: Default,
     {
-        let mut data = Self::default();
+        let mut data = Self {
+            reqi: RequestId::decode(buf, None)?,
+            ..Default::default()
+        };
 
-        data.reqi = RequestId::decode(buf, None)?;
         buf.advance(1);
         data.ucid = ConnectionId::decode(buf, None)?;
         data.plid = PlayerId::decode(buf, None)?;

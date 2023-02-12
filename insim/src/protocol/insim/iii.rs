@@ -32,8 +32,7 @@ impl Encodable for Iii {
     {
         if limit.is_some() {
             return Err(EncodableError::UnexpectedLimit(format!(
-                "III does not support a limit: {:?}",
-                limit
+                "III does not support a limit: {limit:?}",
             )));
         }
 
@@ -70,9 +69,11 @@ impl Decodable for Iii {
             )));
         }
 
-        let mut data = Self::default();
+        let mut data = Self {
+            reqi: RequestId::decode(buf, None)?,
+            ..Default::default()
+        };
 
-        data.reqi = RequestId::decode(buf, None)?;
         buf.advance(1);
 
         data.ucid = ConnectionId::decode(buf, None)?;

@@ -42,7 +42,7 @@ impl Decodable for ObhFlags {
     where
         Self: Sized,
     {
-        Ok(Self::from_bits_truncate(u8::decode(buf, None)?))
+        Ok(Self::from_bits_truncate(u8::decode(buf, limit)?))
     }
 }
 

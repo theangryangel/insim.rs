@@ -30,7 +30,7 @@ impl Decodable for HostInfoFlags {
     where
         Self: Default,
     {
-        Ok(Self::from_bits_truncate(u8::decode(buf, None)?))
+        Ok(Self::from_bits_truncate(u8::decode(buf, limit)?))
     }
 }
 

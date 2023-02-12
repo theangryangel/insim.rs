@@ -36,7 +36,6 @@
 //!     tracing::debug!("{:?}", m);
 //! }
 //! ````
-
 use insim_core::prelude::*;
 
 #[cfg(feature = "serde")]
@@ -52,9 +51,9 @@ pub mod transport;
 pub const VERSION: u8 = 9;
 
 #[derive(InsimEncode, InsimDecode, Debug, Clone)]
-#[repr(u8)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
+#[repr(u8)]
 pub enum Packet {
     Init(insim::Init) = 1,
     Version(insim::Version) = 2,

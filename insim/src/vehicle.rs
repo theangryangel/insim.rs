@@ -66,8 +66,7 @@ impl Encodable for Vehicle {
     ) -> Result<(), EncodableError> {
         if let Some(limit) = limit {
             return Err(EncodableError::UnexpectedLimit(format!(
-                "Vehicle does not support limit: {:?}",
-                limit
+                "Vehicle does not support limit: {limit:?}",
             )));
         }
 
@@ -83,8 +82,7 @@ impl Decodable for Vehicle {
     fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
         if let Some(limit) = limit {
             return Err(DecodableError::UnexpectedLimit(format!(
-                "Vehicle does not support limit: {:?}",
-                limit
+                "Vehicle does not support limit: {limit:?}",
             )));
         }
 

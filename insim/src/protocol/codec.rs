@@ -7,7 +7,7 @@ use std::io;
 use tokio_util::codec::{Decoder, Encoder};
 use tracing;
 
-use bytes::{Buf, BufMut, Bytes, BytesMut};
+use bytes::{Buf, BufMut, BytesMut};
 
 #[derive(Clone, Copy)]
 pub enum Mode {
@@ -124,7 +124,7 @@ impl Decoder for Codec {
             Err(e) => {
                 tracing::error!("unhandled error: {:?}, data: {:?}", e, data);
                 panic!("unhandled error: {:?}, data: {:?}", e, data);
-                Err(e.into())
+                //Err(e.into())
             }
         }
     }

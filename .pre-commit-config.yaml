@@ -19,3 +19,6 @@ repos:
       - id: fmt
       - id: cargo-check
       - id: clippy
+        # XXX: allowing clippy::unnecessary_cast temporarily until I can
+        # understand if the moaning about repr(u8)'s on the enums is a clippy bug
+        args: ["--", "-D", "warnings", "-A", "clippy::unnecessary_cast"]

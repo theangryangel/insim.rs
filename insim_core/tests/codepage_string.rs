@@ -1,6 +1,14 @@
 use insim_core::string::codepages;
 
 #[test]
+fn test_escaping() {
+    let input = codepages::to_lossy_bytes("^|*:\\/?\"<>#123^945");
+    let output = String::from("^^^v^a^c^d^s^q^t^l^r^h123^945");
+
+    assert_eq!(input, output.as_bytes(),);
+}
+
+#[test]
 fn test_codepage_hello_world() {
     let output = codepages::to_lossy_bytes("Hello");
 

@@ -44,7 +44,7 @@ impl Decodable for PlcAllowedCars {
     where
         Self: Default,
     {
-        Ok(Self::from_bits_truncate(u32::decode(buf, None)?))
+        Ok(Self::from_bits_truncate(u32::decode(buf, limit)?))
     }
 }
 

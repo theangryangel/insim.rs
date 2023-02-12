@@ -110,7 +110,7 @@ impl Pth {
         if !i.exists() {
             return Err(Error::IO {
                 kind: std::io::ErrorKind::NotFound,
-                message: format!("Path {:?} does not exist", i),
+                message: format!("Path {i:?} does not exist"),
             });
         }
 

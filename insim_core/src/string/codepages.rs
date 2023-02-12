@@ -6,11 +6,13 @@
 ///
 /// The common practise is to use the function `to_lossy_string` to convert to a standard Rust
 /// String.
-use super::{strip_trailing_nul, unescape, MARKER};
 use encoding_rs;
+use if_chain::if_chain;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, vec::Vec};
+
+use super::{colours::COLOUR_SEQUENCES, strip_trailing_nul, unescape, ESCAPE_SEQUENCES, MARKER};
 
 pub static MAPPING: Lazy<HashMap<u8, &encoding_rs::Encoding>> = Lazy::new(|| {
     let mut m = HashMap::new();
@@ -30,20 +32,54 @@ pub static MAPPING: Lazy<HashMap<u8, &encoding_rs::Encoding>> = Lazy::new(|| {
 
 /// Convert from a String, with potential lossy conversion to an Insim Codepage String
 pub fn to_lossy_bytes(input: &str) -> Vec<u8> {
-    // TODO: escape before encoding?
-
     let mut output = Vec::new();
 
     let mut current_encoding = MAPPING.get(&b'L').unwrap();
 
-    for c in input.chars() {
+    let mut chars = input.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        // is the current char a marker? and do we have a follow up character?
+        // TODO: replace with a let chain when its stable
+        if_chain! {
+            if c == MARKER as char;
+            if let Some(d) = chars.peek();
+            then {
+                // is this a colour?
+                if COLOUR_SEQUENCES.contains(d) {
+                    // just push the colour and move on
+                    output.push(MARKER);
+                    output.push(chars.next().unwrap() as u8);
+                    continue;
+                }
+
+                // question: do we want to allow users to pre-escape themselves?
+                // probably not.
+                // // are we pre-escaped?
+                // if ESCAPE_SEQUENCES.iter().find(|i| i.0 as char == *d).is_some() {
+                //     // just push and move on
+                //     output.push(MARKER);
+                //     output.push(chars.next().unwrap() as u8);
+                //     continue;
+                // }
+            }
+        }
+
+        // do we have a character that needs escaping?
+        if let Some(i) = ESCAPE_SEQUENCES.iter().find(|i| i.1 as char == c) {
+            output.push(MARKER);
+            output.push(i.0);
+            continue;
+        }
+
         // all codepages share ascii values
         if (c as u32) <= 127 {
             output.push(c as u8);
             continue;
         }
 
-        let mut buf = [0; 4];
+        // all utf-8 characters are 3 bytes
+        let mut buf = [0; 3];
         let char_as_bytes = c.encode_utf8(&mut buf);
 
         let (cow, _, error) = current_encoding.encode(char_as_bytes);
@@ -87,14 +123,12 @@ pub fn to_lossy_bytes(input: &str) -> Vec<u8> {
 
 /// Convert a InsimString into a native rust String, with potential lossy conversion from codepages
 pub fn to_lossy_string(input: &[u8]) -> String {
-    // TODO: Do we want to unescape first? Or do we escape after conversion?
-
     // empty string
     if input.is_empty() {
         return "".to_string();
     }
 
-    let input = strip_trailing_nul(input);
+    let input = unescape(strip_trailing_nul(input));
 
     // find the positions in the input for each ^L, ^B...
     let mut indices: Vec<usize> = input
@@ -146,5 +180,5 @@ pub fn to_lossy_string(input: &[u8]) -> String {
         }
     }
 
-    String::from_utf8_lossy(&unescape(result.as_bytes())).into()
+    result
 }

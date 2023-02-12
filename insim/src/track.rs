@@ -514,8 +514,7 @@ impl Encodable for Track {
     ) -> Result<(), EncodableError> {
         if let Some(limit) = limit {
             return Err(EncodableError::UnexpectedLimit(format!(
-                "Track does not support limit: {:?}",
-                limit
+                "Track does not support limit: {limit:?}",
             )));
         }
 
@@ -531,8 +530,7 @@ impl Decodable for Track {
     fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
         if let Some(limit) = limit {
             return Err(DecodableError::UnexpectedLimit(format!(
-                "Track does not support limit: {:?}",
-                limit
+                "Track does not support limit: {limit:?}",
             )));
         }
 

@@ -47,15 +47,15 @@ where
     fn decode(buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
         if limit.is_some() {
             return Err(DecodableError::UnexpectedLimit(format!(
-                "limit is not supported on Point<T>: {:?}",
-                limit
+                "limit is not supported on Point<T>: {limit:?}",
             )));
         }
-        let mut data = Self::default();
-        data.x = <T>::decode(buf, None)?;
-        data.y = <T>::decode(buf, None)?;
-        data.z = <T>::decode(buf, None)?;
-        Ok(data)
+
+        Ok(Point::<T> {
+            x: <T>::decode(buf, None)?,
+            y: <T>::decode(buf, None)?,
+            z: <T>::decode(buf, None)?,
+        })
     }
 }
 
@@ -70,8 +70,7 @@ where
     ) -> Result<(), EncodableError> {
         if limit.is_some() {
             return Err(EncodableError::UnexpectedLimit(format!(
-                "limit is not supported on Point<T>: {:?}",
-                limit
+                "limit is not supported on Point<T>: {limit:?}",
             )));
         }
         <T>::encode(&self.x, buf, None)?;

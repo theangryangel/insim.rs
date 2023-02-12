@@ -18,11 +18,11 @@ impl Error for DecodableError {}
 impl fmt::Display for DecodableError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DecodableError::UnmatchedDiscrimnant(i) => write!(f, "Unmatched Discriminant! {}", i),
-            DecodableError::NotEnoughBytes(i) => write!(f, "Not enough bytes! {}", i),
-            DecodableError::NeedsLimit(i) => write!(f, "Expected byte or count limit! {}", i),
-            DecodableError::MissingMagic(i) => write!(f, "Missing magic: {}", i),
-            DecodableError::UnexpectedLimit(limit) => write!(f, "Unexpected limit: {}", limit),
+            DecodableError::UnmatchedDiscrimnant(i) => write!(f, "Unmatched Discriminant! {i}"),
+            DecodableError::NotEnoughBytes(i) => write!(f, "Not enough bytes! {i}"),
+            DecodableError::NeedsLimit(i) => write!(f, "Expected byte or count limit! {i}"),
+            DecodableError::MissingMagic(i) => write!(f, "Missing magic: {i}"),
+            DecodableError::UnexpectedLimit(limit) => write!(f, "Unexpected limit: {limit:?}"),
         }
     }
 }
@@ -39,8 +39,7 @@ impl Decodable for bool {
     fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
         if limit.is_some() {
             return Err(DecodableError::UnexpectedLimit(format!(
-                "bool does not support a decode limit: {:?}",
-                limit
+                "bool does not support a decode limit: {limit:?}",
             )));
         }
 
@@ -54,8 +53,7 @@ impl Decodable for u8 {
     fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
         if limit.is_some() {
             return Err(DecodableError::UnexpectedLimit(format!(
-                "u8 does not support a decode limit: {:?}",
-                limit
+                "u8 does not support a decode limit: {limit:?}",
             )));
         }
         Ok(buf.get_u8())
@@ -68,8 +66,7 @@ impl Decodable for u16 {
     fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
         if limit.is_some() {
             return Err(DecodableError::UnexpectedLimit(format!(
-                "u16 does not support a decode limit: {:?}",
-                limit
+                "u16 does not support a decode limit: {limit:?}",
             )));
         }
         Ok(buf.get_u16_le())
@@ -82,8 +79,7 @@ impl Decodable for u32 {
     fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
         if limit.is_some() {
             return Err(DecodableError::UnexpectedLimit(format!(
-                "u32 does not support a decode limit: {:?}",
-                limit
+                "u32 does not support a decode limit: {limit:?}",
             )));
         }
         Ok(buf.get_u32_le())
@@ -96,8 +92,7 @@ impl Decodable for i8 {
     fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
         if limit.is_some() {
             return Err(DecodableError::UnexpectedLimit(format!(
-                "i8 does not support a decode limit: {:?}",
-                limit
+                "i8 does not support a decode limit: {limit:?}",
             )));
         }
         Ok(buf.get_i8())
@@ -110,8 +105,7 @@ impl Decodable for i16 {
     fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
         if limit.is_some() {
             return Err(DecodableError::UnexpectedLimit(format!(
-                "i16 does not support a decode limit: {:?}",
-                limit
+                "i16 does not support a decode limit: {limit:?}",
             )));
         }
         Ok(buf.get_i16_le())
@@ -124,8 +118,7 @@ impl Decodable for i32 {
     fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
         if limit.is_some() {
             return Err(DecodableError::UnexpectedLimit(format!(
-                "i32 does not support a decode limit: {:?}",
-                limit
+                "i32 does not support a decode limit: {limit:?}",
             )));
         }
         Ok(buf.get_i32_le())
@@ -138,8 +131,7 @@ impl Decodable for f32 {
     fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
         if limit.is_some() {
             return Err(DecodableError::UnexpectedLimit(format!(
-                "f32 does not support a decode limit: {:?}",
-                limit
+                "f32 does not support a decode limit: {limit:?}",
             )));
         }
         Ok(buf.get_f32_le())

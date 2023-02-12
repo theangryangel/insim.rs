@@ -203,7 +203,7 @@ impl Stream for Client {
 
                     if let Some(host) = &this.config.select_relay_host {
                         let select = crate::protocol::relay::HostSelect {
-                            hname: host.to_owned().into(), // FIXME
+                            hname: host.to_owned(),
                             ..Default::default()
                         };
 

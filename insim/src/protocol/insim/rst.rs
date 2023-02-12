@@ -44,7 +44,7 @@ impl Decodable for HostFacts {
     where
         Self: Default,
     {
-        Ok(Self::from_bits_truncate(u16::decode(buf, None)?))
+        Ok(Self::from_bits_truncate(u16::decode(buf, limit)?))
     }
 }
 

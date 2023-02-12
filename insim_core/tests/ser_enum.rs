@@ -2,8 +2,8 @@ use bytes::{BufMut, BytesMut};
 use insim_core::{Decodable, Encodable, InsimDecode, InsimEncode};
 
 #[derive(InsimEncode, InsimDecode, PartialEq, Eq, Debug)]
-#[repr(u8)]
 #[allow(unused)]
+#[repr(u8)]
 enum TestEnumNewType {
     U8(u8) = 1,
     U32(u32) = 2,
@@ -44,8 +44,8 @@ fn test_ser_enum_newtype_decode() {
 }
 
 #[derive(InsimEncode, InsimDecode, PartialEq, Eq, Debug)]
-#[repr(u8)]
 #[allow(unused)]
+#[repr(u8)]
 enum TestEnumUnit {
     Unit = 1,
     NewType(u32) = 2,

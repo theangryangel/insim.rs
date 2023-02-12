@@ -28,6 +28,12 @@ pub struct Reo {
 
 impl Decodable for ReoPlayerList {
     fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
+        if limit.is_some() {
+            return Err(DecodableError::UnexpectedLimit(format!(
+                "ReoPlayerList does not support a limit: {limit:?}",
+            )));
+        }
+
         let mut data: ReoPlayerList = Default::default();
         for i in 0..32 {
             data.0[i] = PlayerId::decode(buf, None)?;
@@ -44,8 +50,7 @@ impl Encodable for ReoPlayerList {
     {
         if limit.is_some() {
             return Err(EncodableError::UnexpectedLimit(format!(
-                "ReoPlayerList does not support a limit: {:?}",
-                limit
+                "ReoPlayerList does not support a limit: {limit:?}",
             )));
         }
 

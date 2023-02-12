@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use super::MARKER;
 
-const COLOUR_SEQUENCES: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+pub const COLOUR_SEQUENCES: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const COLOUR_SEQUENCES_BYTES: &[u8] = &[b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9'];
 
 /// Strip LFS colours
@@ -36,6 +36,8 @@ pub fn to_ansi(input: &str) -> String {
     let mut has_colours = false;
 
     let mut output = String::with_capacity(input.len());
+
+    // FIXME this should be peekable
     let mut iter = input.chars();
 
     while let Some(i) = iter.next() {
@@ -49,7 +51,7 @@ pub fn to_ansi(input: &str) -> String {
                     } else {
                         has_colours = true;
                         // conveniently the colour code + 30 are the same as the ANSI codes
-                        output = format!("{}\x1b[0;3{}m", output, j);
+                        output = format!("{output}\x1b[0;3{j}m");
                     }
                     continue;
                 }

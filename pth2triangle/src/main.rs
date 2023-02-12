@@ -1,5 +1,4 @@
 use clap::Parser;
-use insim_core::point::Point;
 use insim_pth::Pth;
 use itertools::Itertools;
 use miette::{IntoDiagnostic, Result};
@@ -65,7 +64,7 @@ fn main() -> Result<()> {
             .collect::<Vec<SimplePoint>>()
             .iter()
             .circular_tuple_windows::<(&SimplePoint, &SimplePoint, &SimplePoint)>()
-            .map(|(one, two, three)| (one.clone(), two.clone(), three.clone()))
+            .map(|(one, two, three)| (*one, *two, *three))
             .collect::<Vec<(SimplePoint, SimplePoint, SimplePoint)>>();
 
         output.collection.push(Points {
