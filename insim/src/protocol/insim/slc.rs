@@ -1,12 +1,11 @@
 use insim_core::{
     identifiers::{ConnectionId, RequestId},
     prelude::*,
+    vehicle::Vehicle,
 };
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
-
-use crate::vehicle::Vehicle;
 
 #[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]

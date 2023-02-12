@@ -10,8 +10,6 @@
 pub mod client;
 pub mod error;
 pub mod protocol;
-pub mod track;
-pub mod vehicle;
 
 #[doc(hidden)]
 /// Rexport insim_core

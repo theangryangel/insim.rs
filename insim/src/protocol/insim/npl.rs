@@ -3,13 +3,13 @@ use insim_core::{
     identifiers::{ConnectionId, PlayerId, RequestId},
     prelude::*,
     ser::Limit,
+    vehicle::Vehicle,
     DecodableError, EncodableError,
 };
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-use crate::vehicle::Vehicle;
 use bitflags::bitflags;
 
 #[derive(Debug, InsimEncode, InsimDecode, Clone)]

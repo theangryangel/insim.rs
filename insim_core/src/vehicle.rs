@@ -1,12 +1,14 @@
 //! Utility functions for working with vehicles and fetching vehicle data.
 
+use crate::{
+    ser::Limit,
+    string::{is_ascii_alphanumeric, strip_trailing_nul},
+    Decodable, DecodableError, Encodable, EncodableError,
+};
 use bytes::BytesMut;
-use insim_core::{prelude::*, ser::Limit, DecodableError, EncodableError};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
-
-use insim_core::string::{is_ascii_alphanumeric, strip_trailing_nul};
 
 /// Handles parsing a vehicle name according to the Insim v9 rules.
 /// See <https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info>

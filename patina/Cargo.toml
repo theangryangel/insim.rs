@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 insim = { path = "../insim", features = ["serde", "client"] }
 insim_pth = { path = "../insim_pth" }
+insim_game_data = { path = "../insim_game_data", features = ["serde"] }
 multi_index = { path = "../multi_index" }
 clap = { version = "3.1.8", features = ["derive"] }
 tokio = { version = "1.11.0", features = ["full", "tracing"] }

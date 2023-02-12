@@ -7,6 +7,7 @@ members = [
   "insim",
   "insim_pth",
   "insim_smx",
+  "insim_game_data",
   "patina",
   "pth2triangle",
 ]

@@ -1,13 +1,13 @@
 use insim_core::{
     identifiers::{PlayerId, RequestId},
     prelude::*,
+    vehicle::Vehicle,
 };
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 use super::{PlayerFlags, RaceResultFlags};
-use crate::vehicle::Vehicle;
 
 #[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]

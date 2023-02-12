@@ -1,11 +1,9 @@
-use insim_core::{identifiers::RequestId, prelude::*, ser::Limit};
+use insim_core::{identifiers::RequestId, prelude::*, ser::Limit, track::Track};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 use bitflags::bitflags;
-
-use crate::track::Track;
 
 bitflags! {
     /// Bitwise flags used within the [HostInfo] packet, which is in turn used by the [HostList]

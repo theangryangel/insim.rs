@@ -2,9 +2,8 @@ pub(crate) mod chat;
 
 use bounded_vec_deque::BoundedVecDeque;
 use insim::client::prelude::*;
-use insim::core::{identifiers::ConnectionId, identifiers::PlayerId, point::Point};
-use insim::protocol::insim::Wind;
-use insim::track::TrackInfo;
+use insim::core::{identifiers::ConnectionId, identifiers::PlayerId, point::Point, wind::Wind};
+use insim_game_data::track::TrackInfo;
 use miette::Result;
 use std::sync::Arc;
 use tokio::sync::Notify;
@@ -255,7 +254,7 @@ impl State {
             Packet::State(data) => {
                 let track = &data.track;
 
-                self.game.track = track.track_info();
+                self.game.track = insim_game_data::track::lookup(track).cloned();
                 self.game.weather = data.weather;
                 self.game.wind = data.wind;
                 self.game.racing = data.raceinprog > 0;

@@ -1,26 +1,9 @@
-use insim_core::{identifiers::RequestId, prelude::*, ser::Limit};
+use insim_core::{identifiers::RequestId, prelude::*, ser::Limit, track::Track, wind::Wind};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 use bitflags::bitflags;
-
-use crate::track::Track;
-
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Copy)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
-#[repr(u8)]
-pub enum Wind {
-    None = 0,
-    Weak = 1,
-    Strong = 2,
-}
-
-impl Default for Wind {
-    fn default() -> Self {
-        Wind::None
-    }
-}
 
 bitflags! {
     #[derive(Default)]

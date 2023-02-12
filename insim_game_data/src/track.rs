@@ -1,23 +1,22 @@
 //! Utility functions and structs for working with track names and fetching track data.
 
-use bytes::BytesMut;
-use insim_core::{prelude::*, ser::Limit, DecodableError, EncodableError};
-
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use insim_core::license::License;
+
 use std::collections::HashMap;
 
-use insim_core::string::strip_trailing_nul;
 use once_cell::sync::Lazy;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct TrackInfo {
     pub code: String,
     pub name: String,
     pub distance: Option<f32>,
     pub max_players: u8,
+    pub required_license: License,
 }
 
 impl TrackInfo {
@@ -36,6 +35,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Blackwood GP".into(),
             max_players: 40,
             distance: Some(2.048),
+            required_license: License::Demo,
         },
     );
     m.insert(
@@ -45,6 +45,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Blackwood Historic".into(),
             max_players: 40,
             distance: Some(2.047),
+            required_license: License::Demo,
         },
     );
     m.insert(
@@ -54,6 +55,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Blackwood RallyX".into(),
             max_players: 40,
             distance: Some(1.142),
+            required_license: License::Demo,
         },
     );
     m.insert(
@@ -63,6 +65,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Blackwood Carpark".into(),
             max_players: 40,
             distance: None,
+            required_license: License::Demo,
         },
     );
     m.insert(
@@ -72,6 +75,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "South City Classic".into(),
             max_players: 30,
             distance: Some(1.263),
+            required_license: License::S1,
         },
     );
     m.insert(
@@ -81,6 +85,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "South City Sprint 1".into(),
             max_players: 16,
             distance: Some(1.273),
+            required_license: License::S1,
         },
     );
     m.insert(
@@ -90,6 +95,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "South City Sprint 2".into(),
             max_players: 16,
             distance: Some(0.829),
+            required_license: License::S1,
         },
     );
     m.insert(
@@ -99,6 +105,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "South City City".into(),
             max_players: 32,
             distance: Some(2.504),
+            required_license: License::S1,
         },
     );
     m.insert(
@@ -108,6 +115,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "South City Town".into(),
             max_players: 32,
             distance: Some(1.955),
+            required_license: License::S1,
         },
     );
     m.insert(
@@ -117,6 +125,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "South City Chicane".into(),
             max_players: 32,
             distance: Some(1.813),
+            required_license: License::S1,
         },
     );
     m.insert(
@@ -126,6 +135,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Fern Bay Club".into(),
             max_players: 32,
             distance: Some(0.984),
+            required_license: License::S1,
         },
     );
     m.insert(
@@ -135,6 +145,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Fern Bay Green".into(),
             max_players: 32,
             distance: Some(1.918),
+            required_license: License::S1,
         },
     );
     m.insert(
@@ -144,6 +155,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Fern Bay Gold".into(),
             max_players: 32,
             distance: Some(2.183),
+            required_license: License::S1,
         },
     );
     m.insert(
@@ -153,6 +165,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Fern Bay Black".into(),
             max_players: 32,
             distance: Some(4.076),
+            required_license: License::S1,
         },
     );
     m.insert(
@@ -162,6 +175,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Fern Bay RallyX".into(),
             max_players: 32,
             distance: Some(1.254),
+            required_license: License::S1,
         },
     );
     m.insert(
@@ -171,6 +185,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Fern Bay RallyX Green".into(),
             max_players: 32,
             distance: Some(0.463),
+            required_license: License::S1,
         },
     );
     m.insert(
@@ -180,6 +195,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "AutoX".into(),
             max_players: 16,
             distance: None,
+            required_license: License::S1,
         },
     );
     m.insert(
@@ -189,6 +205,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Skidpad".into(),
             max_players: 16,
             distance: None,
+            required_license: License::S1,
         },
     );
     m.insert(
@@ -198,6 +215,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "2 Drag Strip".into(),
             max_players: 2,
             distance: Some(0.250),
+            required_license: License::S1,
         },
     );
     m.insert(
@@ -207,6 +225,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "8 Lane Drag Strip".into(),
             max_players: 8,
             distance: Some(0.250),
+            required_license: License::S1,
         },
     );
     m.insert(
@@ -216,6 +235,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Kyoto Ring Oval".into(),
             max_players: 32,
             distance: Some(1.852),
+            required_license: License::S2,
         },
     );
     m.insert(
@@ -225,6 +245,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Kyoto Ring National".into(),
             max_players: 32,
             distance: Some(3.193),
+            required_license: License::S2,
         },
     );
     m.insert(
@@ -234,6 +255,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Kyoto Ring GP Long".into(),
             max_players: 32,
             distance: Some(4.584),
+            required_license: License::S2,
         },
     );
     m.insert(
@@ -243,6 +265,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Westhill National".into(),
             max_players: 40,
             distance: Some(2.732),
+            required_license: License::S2,
         },
     );
     m.insert(
@@ -252,6 +275,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Westhill International".into(),
             max_players: 40,
             distance: Some(3.573),
+            required_license: License::S2,
         },
     );
     m.insert(
@@ -261,6 +285,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Westhill Car Park".into(),
             max_players: 40,
             distance: None,
+            required_license: License::S2,
         },
     );
     m.insert(
@@ -270,6 +295,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Westhill Karting".into(),
             max_players: 40,
             distance: Some(0.3),
+            required_license: License::S2,
         },
     );
     m.insert(
@@ -279,6 +305,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Westhill Karting National".into(),
             max_players: 40,
             distance: Some(0.818),
+            required_license: License::S2,
         },
     );
     m.insert(
@@ -288,6 +315,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Aston Cadet".into(),
             max_players: 32,
             distance: Some(1.162),
+            required_license: License::S2,
         },
     );
     m.insert(
@@ -297,6 +325,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Aston Club".into(),
             max_players: 32,
             distance: Some(1.912),
+            required_license: License::S2,
         },
     );
     m.insert(
@@ -306,6 +335,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Aston National".into(),
             max_players: 32,
             distance: Some(3.481),
+            required_license: License::S2,
         },
     );
     m.insert(
@@ -315,6 +345,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Aston Historic".into(),
             max_players: 32,
             distance: Some(5.026),
+            required_license: License::S2,
         },
     );
     m.insert(
@@ -324,6 +355,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Aston GP".into(),
             max_players: 32,
             distance: Some(5.469),
+            required_license: License::S2,
         },
     );
     m.insert(
@@ -333,6 +365,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Aston Grand Touring".into(),
             max_players: 32,
             distance: Some(4.972),
+            required_license: License::S2,
         },
     );
     m.insert(
@@ -342,6 +375,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Aston North".into(),
             max_players: 32,
             distance: Some(3.211),
+            required_license: License::S2,
         },
     );
     m.insert(
@@ -351,6 +385,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Rockingham ISSC".into(),
             max_players: 40,
             distance: Some(1.924),
+            required_license: License::S3,
         },
     );
     m.insert(
@@ -360,6 +395,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Rockingham National".into(),
             max_players: 40,
             distance: Some(1.676),
+            required_license: License::S3,
         },
     );
     m.insert(
@@ -369,6 +405,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Rockingham Oval".into(),
             max_players: 40,
             distance: Some(1.468),
+            required_license: License::S3,
         },
     );
     m.insert(
@@ -378,6 +415,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Rockingham ISSC Long".into(),
             max_players: 40,
             distance: Some(2.021),
+            required_license: License::S3,
         },
     );
     m.insert(
@@ -387,6 +425,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Rockingham Lake".into(),
             max_players: 40,
             distance: Some(0.650),
+            required_license: License::S3,
         },
     );
     m.insert(
@@ -396,6 +435,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Rockingham Handling".into(),
             max_players: 40,
             distance: Some(1.559),
+            required_license: License::S3,
         },
     );
     m.insert(
@@ -405,6 +445,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Rockingham International".into(),
             max_players: 40,
             distance: Some(2.407),
+            required_license: License::S3,
         },
     );
     m.insert(
@@ -414,6 +455,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Rockingham Historic".into(),
             max_players: 40,
             distance: Some(2.215),
+            required_license: License::S3,
         },
     );
     m.insert(
@@ -423,6 +465,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Rockingham Historic Short".into(),
             max_players: 40,
             distance: Some(1.365),
+            required_license: License::S3,
         },
     );
     m.insert(
@@ -432,6 +475,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Rockingham International Long".into(),
             max_players: 40,
             distance: Some(2.521),
+            required_license: License::S3,
         },
     );
     m.insert(
@@ -441,6 +485,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Rockingham Sports Car".into(),
             max_players: 40,
             distance: Some(1.674),
+            required_license: License::S3,
         },
     );
     m.insert(
@@ -450,6 +495,7 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Layout Square, Long Grid".into(),
             max_players: 40,
             distance: None,
+            required_license: License::S3,
         },
     );
     m.insert(
@@ -459,86 +505,20 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
             name: "Layout Square, Wide Grid".into(),
             max_players: 40,
             distance: None,
+            required_license: License::S3,
         },
     );
 
     m
 });
 
-/// Lookup a [TrackInfo] from a track name
-pub fn lookup(input: &[u8]) -> Option<TrackInfo> {
+/// Lookup a [TrackInfo] from a Track
+pub fn lookup(track: &insim_core::track::Track) -> Option<&TrackInfo> {
+    let input = track.inner;
     if let Some(rpos) = input.iter().rposition(|x| ![b'X', b'R', 0].contains(x)) {
         if let Ok(short_code) = std::str::from_utf8(&input[..=rpos]) {
-            return TRACK_INFO.get(short_code).cloned();
+            return TRACK_INFO.get(short_code);
         }
     }
     None
-}
-
-/// Handles parsing a Track name.
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
-pub struct Track {
-    pub inner: [u8; 6],
-}
-
-impl Track {
-    /// Is this a reversed track?
-    pub fn is_reverse(&self) -> bool {
-        matches!(strip_trailing_nul(&self.inner).last(), Some(b'R'))
-    }
-
-    /// Are we in open world mode?
-    pub fn is_open_world(&self) -> bool {
-        matches!(strip_trailing_nul(&self.inner).last(), Some(b'X'))
-    }
-
-    /// Lookup the [TrackInfo] for this track.
-    pub fn track_info(&self) -> Option<TrackInfo> {
-        lookup(&self.inner)
-    }
-}
-
-impl std::fmt::Display for Track {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let stripped = strip_trailing_nul(&self.inner);
-        write!(f, "{}", String::from_utf8_lossy(stripped))
-    }
-}
-
-impl Encodable for Track {
-    fn encode(
-        &self,
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<(), EncodableError> {
-        if let Some(limit) = limit {
-            return Err(EncodableError::UnexpectedLimit(format!(
-                "Track does not support limit: {limit:?}",
-            )));
-        }
-
-        for i in self.inner.iter() {
-            i.encode(buf, None)?;
-        }
-
-        Ok(())
-    }
-}
-
-impl Decodable for Track {
-    fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
-        if let Some(limit) = limit {
-            return Err(DecodableError::UnexpectedLimit(format!(
-                "Track does not support limit: {limit:?}",
-            )));
-        }
-
-        let mut data: Track = Default::default();
-        for i in 0..6 {
-            data.inner[i] = u8::decode(buf, None)?;
-        }
-
-        Ok(data)
-    }
 }
