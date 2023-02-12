@@ -35,7 +35,7 @@ pub async fn main() {
         version: insim::protocol::VERSION,
         interval: 1000,
         flags: insim::protocol::insim::InitFlags::MCI,
-        reqi: 1,
+        reqi: insim_core::identifiers::RequestId(1),
     };
 
     t.send(isi.into()).await;

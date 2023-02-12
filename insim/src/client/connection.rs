@@ -1,10 +1,10 @@
 use super::config::Config;
 use crate::error::Error;
-use crate::protocol::identifiers::RequestId;
 use crate::protocol::{transport::Transport, Packet};
 
 use futures::{FutureExt, Sink, Stream, TryStreamExt};
 use futures_util::sink::SinkExt;
+use insim_core::identifiers::RequestId;
 use pin_project::pin_project;
 use std::fmt::Display;
 use std::pin::Pin;
@@ -31,6 +31,12 @@ impl Event {
             Event::Error(_) => "error",
             Event::Shutdown => "shutdown",
         }
+    }
+}
+
+impl From<Packet> for Event {
+    fn from(value: Packet) -> Self {
+        Self::Data(value)
     }
 }
 
@@ -197,7 +203,7 @@ impl Stream for Client {
 
                     if let Some(host) = &this.config.select_relay_host {
                         let select = crate::protocol::relay::HostSelect {
-                            hname: host.to_owned().into(), // FIXME
+                            hname: host.to_owned(),
                             ..Default::default()
                         };
 
@@ -212,9 +218,13 @@ impl Stream for Client {
                         }
                     }
 
-                    *state = ConnectedState::Handshaking;
-
-                    Poll::Ready(Some(Event::Handshaking))
+                    if !this.config.verify_version {
+                        *state = ConnectedState::Connected;
+                        Poll::Ready(Some(Event::Connected))
+                    } else {
+                        *state = ConnectedState::Handshaking;
+                        Poll::Ready(Some(Event::Handshaking))
+                    }
                 }
                 ConnectedState::Handshaking => match transport.try_poll_next_unpin(cx) {
                     Poll::Ready(Some(packet)) => {

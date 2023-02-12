@@ -1,30 +1,23 @@
-use crate::protocol::identifiers::{ConnectionId, RequestId};
-use crate::string::CodepageString;
-use deku::prelude::*;
+use insim_core::{
+    identifiers::{ConnectionId, RequestId},
+    prelude::*,
+};
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 /// Used within [Bfn] to specify the action to take.
 pub enum BfnType {
-    #[deku(id = "0")]
-    DeleteButton,
+    DeleteButton = 0,
 
-    #[deku(id = "1")]
-    Clear,
+    Clear = 1,
 
-    #[deku(id = "2")]
-    UserClear,
+    UserClear = 2,
 
-    #[deku(id = "3")]
-    ButtonsRequested,
+    ButtonsRequested = 3,
 }
 
 impl Default for BfnType {
@@ -33,13 +26,8 @@ impl Default for BfnType {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Button Function
 pub struct Bfn {
     pub reqi: RequestId,
@@ -50,13 +38,8 @@ pub struct Bfn {
     pub inst: u8,
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Button
 pub struct Btn {
     pub reqi: RequestId,
@@ -71,34 +54,24 @@ pub struct Btn {
     pub width: u8,
     pub height: u8,
 
-    #[deku(bytes = "240")]
-    pub text: CodepageString, // FIXME: this should be upto 240 characters and always a multiple of 4
+    #[insim(bytes = "240")]
+    pub text: String, // FIXME: this should be upto 240 characters and always a multiple of 4
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Button Click - Sent back when a user clicks a button
 pub struct Btc {
     pub reqi: RequestId,
     pub ucid: ConnectionId,
     pub clickid: u8,
     pub inst: u8,
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub cflags: u8,
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Button Type - Sent back when a user types into a text entry "button"
 pub struct Btt {
     pub reqi: RequestId,
@@ -106,9 +79,9 @@ pub struct Btt {
     pub clickid: u8,
     pub inst: u8,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub typein: u8,
 
-    #[deku(bytes = "96")]
-    pub text: CodepageString,
+    #[insim(bytes = "96")]
+    pub text: String,
 }

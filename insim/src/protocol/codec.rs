@@ -2,13 +2,12 @@
 
 use super::Packet;
 use crate::error::Error;
-use deku::{DekuContainerWrite, DekuError};
-use std::convert::TryFrom;
+use insim_core::{Decodable, Encodable};
 use std::io;
 use tokio_util::codec::{Decoder, Encoder};
 use tracing;
 
-use bytes::{Buf, BufMut, Bytes, BytesMut};
+use bytes::{Buf, BufMut, BytesMut};
 
 #[derive(Clone, Copy)]
 pub enum Mode {
@@ -97,8 +96,6 @@ impl Default for Codec {
 
 impl Decoder for Codec {
     type Item = Packet;
-
-    // TODO return custom error
     type Error = Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
@@ -113,29 +110,19 @@ impl Decoder for Codec {
             }
         };
 
-        let data = src.split_to(n);
+        let mut data = src.split_to(n);
 
-        let res = Self::Item::try_from(data.as_ref());
+        tracing::debug!("received {:?}", data);
+
+        let res = Self::Item::decode(&mut data, None);
 
         match res {
             Ok(packet) => {
                 tracing::debug!("decoded: {:?}", packet);
                 Ok(Some(packet))
             }
-            Err(DekuError::Incomplete(e)) => {
-                // If we're here, everything has gone very wonky.
-                panic!(
-                    "malformed packet! this is probably a programming error, error: {:?}, input: {:?}",
-                    e,
-                    data.to_vec(),
-                );
-            }
-            Err(DekuError::Parse(e)) => {
-                tracing::error!("unsupported packet: {:?}: {:?}", e, data.to_vec());
-                Ok(None)
-            }
             Err(e) => {
-                tracing::error!("unhandled error: {:?}", e);
+                tracing::error!("unhandled error: {:?}, data: {:?}", e, data);
                 Err(e.into())
             }
         }
@@ -146,10 +133,10 @@ impl Encoder<Packet> for Codec {
     type Error = Error;
 
     fn encode(&mut self, msg: Packet, dst: &mut BytesMut) -> Result<(), Error> {
-        let data = msg.to_bytes()?;
-        let data = Bytes::from(data);
+        let mut buf = BytesMut::new();
+        msg.encode(&mut buf, None)?;
 
-        let n = data.len();
+        let n = buf.len();
 
         if n > self.max_bytes {
             return Err(Error::IO {
@@ -190,7 +177,7 @@ impl Encoder<Packet> for Codec {
         dst.put_uint_le(n as u64, self.length_bytes);
 
         // Write the frame to the buffer
-        dst.extend_from_slice(&data[..]);
+        dst.extend_from_slice(&buf[..]);
 
         Ok(())
     }

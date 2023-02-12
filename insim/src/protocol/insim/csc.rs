@@ -1,25 +1,21 @@
-use crate::protocol::identifiers::{PlayerId, RequestId};
+use insim_core::{
+    identifiers::{PlayerId, RequestId},
+    prelude::*,
+};
 
-use super::CarContact;
-use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+use super::CarContact;
+
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 /// Used within the [Csc] packet to indicate the type of state change.
 pub enum CscAction {
-    #[deku(id = "0")]
-    Stop,
+    Stop = 0,
 
-    #[deku(id = "1")]
-    Start,
+    Start = 1,
 }
 
 impl Default for CscAction {
@@ -28,21 +24,16 @@ impl Default for CscAction {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Car State Changed
 pub struct Csc {
     pub reqi: RequestId,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub plid: PlayerId,
 
-    #[deku(pad_bytes_after = "2")]
+    #[insim(pad_bytes_after = "2")]
     pub action: CscAction,
 
     pub time: u32,

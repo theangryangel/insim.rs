@@ -1,38 +1,29 @@
-use crate::protocol::identifiers::{ConnectionId, RequestId};
-use deku::prelude::*;
+use insim_core::{
+    identifiers::{ConnectionId, RequestId},
+    prelude::*,
+};
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 /// Used within the [Cim] packet to indicate the mode.
 pub enum CimMode {
-    #[deku(id = "0")]
-    Normal,
+    Normal = 0,
 
-    #[deku(id = "1")]
-    Options,
+    Options = 1,
 
-    #[deku(id = "2")]
-    HostOptions,
+    HostOptions = 2,
 
-    #[deku(id = "3")]
-    Garage,
+    Garage = 3,
 
-    #[deku(id = "4")]
-    VehicleSelect,
+    VehicleSelect = 4,
 
-    #[deku(id = "5")]
-    TrackSelect,
+    TrackSelect = 5,
 
-    #[deku(id = "6")]
-    ShiftU,
+    ShiftU = 6,
 }
 
 impl Default for CimMode {
@@ -41,13 +32,8 @@ impl Default for CimMode {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Connection Interface Mode
 pub struct Cim {
     pub reqi: RequestId,
@@ -58,6 +44,6 @@ pub struct Cim {
 
     pub submode: u8, // FIXME: How do we support this in the same way? LFS has multiple enum types.
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub seltype: u8,
 }

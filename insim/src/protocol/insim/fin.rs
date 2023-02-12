@@ -1,22 +1,50 @@
-use super::PlayerFlags;
-use crate::{
-    packet_flags,
-    protocol::identifiers::{PlayerId, RequestId},
+use insim_core::{
+    identifiers::{PlayerId, RequestId},
+    prelude::*,
+    ser::Limit,
 };
-use deku::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-packet_flags! {
+use bitflags::bitflags;
+
+use super::PlayerFlags;
+
+bitflags! {
+    #[derive(Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct RaceResultFlags: u8 {
-        MENTIONED => (1 << 0),
-        CONFIRMED => (1 << 1),
-        PENALTY_DT => (1 << 2),
-        PENALTY_SG => (1 << 3),
-        PENALTY_30 => (1 << 4),
-        PENALTY_45 => (1 << 5),
-        NO_PIT => (1 << 6),
+        const MENTIONED = (1 << 0);
+        const CONFIRMED = (1 << 1);
+        const PENALTY_DT = (1 << 2);
+        const PENALTY_SG = (1 << 3);
+        const PENALTY_30 = (1 << 4);
+        const PENALTY_45 = (1 << 5);
+        const NO_PIT = (1 << 6);
+    }
+}
+
+impl Encodable for RaceResultFlags {
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), insim_core::EncodableError>
+    where
+        Self: Sized,
+    {
+        self.bits().encode(buf, limit)?;
+        Ok(())
+    }
+}
+
+impl Decodable for RaceResultFlags {
+    fn decode(
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<Self, insim_core::DecodableError> {
+        Ok(Self::from_bits_truncate(u8::decode(buf, limit)?))
     }
 }
 
@@ -34,13 +62,8 @@ impl RaceResultFlags {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Provisional finish notification: This is not a final result, you should use the [Res](super::Res) packet for this instead.
 pub struct Fin {
     pub reqi: RequestId,
@@ -49,12 +72,12 @@ pub struct Fin {
 
     pub ttime: u32,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub btime: u32,
 
     pub numstops: u8,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub confirm: RaceResultFlags,
 
     pub lapsdone: u16,

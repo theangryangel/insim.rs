@@ -1,49 +1,76 @@
-use crate::{
-    packet_flags,
-    protocol::identifiers::{ConnectionId, RequestId},
+use insim_core::{
+    identifiers::{ConnectionId, RequestId},
+    prelude::*,
+    ser::Limit,
 };
-use deku::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-packet_flags! {
+use bitflags::bitflags;
+
+bitflags! {
+    #[derive(Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct PlcAllowedCars: u32 {
-        XF_GTI => (1 << 1),
-        XR_GT => (1 << 2),
-        XR_GT_TURBO => (1 << 3),
-        RB4 => (1 << 4),
-        FXO_TURBO => (1 << 5),
-        LX4 => (1 << 6),
-        LX6 => (1 << 7),
-        MRT5 => (1 << 8),
-        UF_1000 => (1 << 9),
-        RACEABOUT => (1 << 10),
-        FZ50 => (1 << 11),
-        FORMULA_XR => (1 << 12),
-        XF_GTR => (1 << 13),
-        UF_GTR => (1 << 14),
-        FORMULA_V8 => (1 << 15),
-        FXO_GTR => (1 << 16),
-        XR_GTR => (1 << 17),
-        FZ50_GTR => (1 << 18),
-        BWM_SAUBER_F1_06 => (1 << 19),
-        FORMULA_BMW_FB02 => (1 << 20),
+         const XF_GTI = (1 << 1);
+         const XR_GT = (1 << 2);
+         const XR_GT_TURBO = (1 << 3);
+         const RB4 = (1 << 4);
+         const FXO_TURBO = (1 << 5);
+         const LX4 = (1 << 6);
+         const LX6 = (1 << 7);
+         const MRT5 = (1 << 8);
+         const UF_1000 = (1 << 9);
+         const RACEABOUT = (1 << 10);
+         const FZ50 = (1 << 11);
+         const FORMULA_XR = (1 << 12);
+         const XF_GTR = (1 << 13);
+         const UF_GTR = (1 << 14);
+         const FORMULA_V8 = (1 << 15);
+         const FXO_GTR = (1 << 16);
+         const XR_GTR = (1 << 17);
+         const FZ50_GTR = (1 << 18);
+         const BWM_SAUBER_F1_06 = (1 << 19);
+         const FORMULA_BMW_FB02 = (1 << 20);
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+impl Decodable for PlcAllowedCars {
+    fn decode(
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<Self, insim_core::DecodableError>
+    where
+        Self: Default,
+    {
+        Ok(Self::from_bits_truncate(u32::decode(buf, limit)?))
+    }
+}
+
+impl Encodable for PlcAllowedCars {
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), insim_core::EncodableError>
+    where
+        Self: Sized,
+    {
+        self.bits().encode(buf, limit)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Player Cars
 pub struct Plc {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
-    #[deku(pad_bytes_before = "3")]
+
+    #[insim(pad_bytes_before = "3")]
     pub ucid: ConnectionId,
+
     pub allowed_cars: PlcAllowedCars,
 }

@@ -1,34 +1,24 @@
-use crate::{protocol::identifiers::RequestId, string::CodepageString};
-use deku::prelude::*;
+use insim_core::{identifiers::RequestId, prelude::*};
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 /// Enum for the sound field of [Msl].
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 pub enum MslSoundType {
-    #[deku(id = "0")]
-    Silent,
+    Silent = 0,
 
-    #[deku(id = "1")]
-    Message,
+    Message = 1,
 
-    #[deku(id = "2")]
-    SystemMessage,
+    SystemMessage = 2,
 
-    #[deku(id = "3")]
-    InvalidKey,
+    InvalidKey = 3,
 
-    #[deku(id = "4")]
     // This is referred to as "Error" in the Insim documentation, but this is a special word in
     // rust so I'm trying to avoid it.
-    Failure,
+    Failure = 4,
 }
 
 impl Default for MslSoundType {
@@ -37,13 +27,8 @@ impl Default for MslSoundType {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Send a message to the local computer only. If you are connected to a server this means the
 /// console. If you are connected to a client this means to the local client only.
 pub struct Msl {
@@ -51,6 +36,6 @@ pub struct Msl {
 
     pub sound: MslSoundType,
 
-    #[deku(bytes = "128")]
-    pub msg: CodepageString,
+    #[insim(bytes = "128")]
+    pub msg: String,
 }

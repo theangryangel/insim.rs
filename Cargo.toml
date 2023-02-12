@@ -2,8 +2,12 @@
 members = [
   "multi_index",
   "multi_index_derive",
+  "insim_core",
+  "insim_derive",
   "insim",
+  "insim_pth",
+  "insim_smx",
+  "insim_game_data",
   "patina",
-  "pth2svg",
-  "smx2svg",
+  "pth2triangle",
 ]

@@ -1,25 +1,19 @@
-use crate::{packet_flags, protocol::identifiers::RequestId};
-use deku::prelude::*;
+use insim_core::{identifiers::RequestId, prelude::*, ser::Limit};
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+use bitflags::bitflags;
+
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 pub enum OcoAction {
-    #[deku(id = "4")]
-    LightsReset,
+    LightsReset = 4,
 
-    #[deku(id = "5")]
-    LightsSet,
+    LightsSet = 5,
 
-    #[deku(id = "6")]
-    LightsUnset,
+    LightsUnset = 6,
 }
 
 impl Default for OcoAction {
@@ -28,20 +22,13 @@ impl Default for OcoAction {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 pub enum OcoIndex {
-    #[deku(id = "149")]
-    AxoStartLights,
+    AxoStartLights = 149,
 
-    #[deku(id = "240")]
-    MainLights,
+    MainLights = 240,
 }
 
 impl Default for OcoIndex {
@@ -50,27 +37,49 @@ impl Default for OcoIndex {
     }
 }
 
-packet_flags! {
+bitflags! {
+    #[derive(Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct OcoLights: u8 {
-        RED1 => (1 << 0),
-        RED2 => (1 << 1),
-        RED3 => (1 << 2),
-        GREEN => (1 << 3),
+        const RED1 = (1 << 0);
+        const RED2 = (1 << 1);
+        const RED3 = (1 << 2);
+        const GREEN = (1 << 3);
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+impl Encodable for OcoLights {
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), insim_core::EncodableError>
+    where
+        Self: Sized,
+    {
+        self.bits().encode(buf, limit)?;
+        Ok(())
+    }
+}
+
+impl Decodable for OcoLights {
+    fn decode(
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<Self, insim_core::DecodableError>
+    where
+        Self: Sized,
+    {
+        Ok(Self::from_bits_truncate(u8::decode(buf, limit)?))
+    }
+}
+
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Object Control
 /// Used to switch start lights
 pub struct Oco {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
     pub action: OcoAction,

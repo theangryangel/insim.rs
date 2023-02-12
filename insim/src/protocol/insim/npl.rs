@@ -1,46 +1,38 @@
-use crate::packet_flags;
-use crate::protocol::identifiers::{ConnectionId, PlayerId, RequestId};
-use crate::string::{istring, CodepageString};
-use crate::vehicle::Vehicle;
-use deku::prelude::*;
+use bytes::BytesMut;
+use insim_core::{
+    identifiers::{ConnectionId, PlayerId, RequestId},
+    prelude::*,
+    ser::Limit,
+    vehicle::Vehicle,
+    DecodableError, EncodableError,
+};
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+use bitflags::bitflags;
+
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 pub enum TyreCompound {
-    #[deku(id = "0")]
-    R1,
+    R1 = 0,
 
-    #[deku(id = "1")]
-    R2,
+    R2 = 1,
 
-    #[deku(id = "2")]
-    R3,
+    R3 = 2,
 
-    #[deku(id = "3")]
-    R4,
+    R4 = 3,
 
-    #[deku(id = "4")]
-    RoadSuper,
+    RoadSuper = 4,
 
-    #[deku(id = "5")]
-    RoadNormal,
+    RoadNormal = 5,
 
-    #[deku(id = "6")]
-    Hybrid,
+    Hybrid = 6,
 
-    #[deku(id = "7")]
-    Knobbly,
+    Knobbly = 7,
 
-    #[deku(id = "255")]
-    NoChange,
+    NoChange = 255,
 }
 
 impl Default for TyreCompound {
@@ -49,33 +41,85 @@ impl Default for TyreCompound {
     }
 }
 
-packet_flags! {
-    #[cfg_attr(feature = "serde", derive(Serialize))]
-    pub struct PlayerFlags: u16 {
-        SWAPSIDE => (1 << 0),
-        RESERVED_2 => (1 << 1),
-        RESERVED_4 => (1 << 2),
-        AUTOGEARS => (1 << 3),
-        SHIFTER => (1 << 4),
-        RESERVED_32 => (1 << 5),
-        HELP_B => (1 << 6),
-        AXIS_CLUTCH => (1 << 7),
-        INPITS => (1 << 8),
-        AUTOCLUTCH => (1 << 9),
-        MOUSE => (1 << 10),
-        KB_NO_HELP => (1 << 11),
-        KB_STABILISED => (1 << 12),
-        CUSTOM_VIEW => (1 << 13),
+#[derive(Debug, Clone, Default)]
+// we need to wrap [TyreCompound; 4] in a new type because arrays are always considered "foreign", and the trait Decodable isn't defined within this crate.
+// FIXME: add some extra methods for convenience
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct TyreCompoundList([TyreCompound; 4]);
+
+impl Decodable for TyreCompoundList {
+    fn decode(buf: &mut BytesMut, _limit: Option<Limit>) -> Result<Self, DecodableError> {
+        let mut data: TyreCompoundList = Default::default();
+        for i in 0..4 {
+            data.0[i] = TyreCompound::decode(buf, None)?;
+        }
+
+        Ok(data)
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+impl Encodable for TyreCompoundList {
+    fn encode(&self, buf: &mut BytesMut, _limit: Option<Limit>) -> Result<(), EncodableError>
+    where
+        Self: Sized,
+    {
+        for i in self.0.iter() {
+            i.encode(buf, None)?;
+        }
+
+        Ok(())
+    }
+}
+
+bitflags! {
+    #[derive(Default)]
+    #[cfg_attr(feature = "serde", derive(Serialize))]
+    pub struct PlayerFlags: u16 {
+         const SWAPSIDE = (1 << 0);
+         const RESERVED_2 = (1 << 1);
+         const RESERVED_4 = (1 << 2);
+         const AUTOGEARS = (1 << 3);
+         const SHIFTER = (1 << 4);
+         const RESERVED_32 = (1 << 5);
+         const HELP_B = (1 << 6);
+         const AXIS_CLUTCH = (1 << 7);
+         const INPITS = (1 << 8);
+         const AUTOCLUTCH = (1 << 9);
+         const MOUSE = (1 << 10);
+         const KB_NO_HELP = (1 << 11);
+         const KB_STABILISED = (1 << 12);
+         const CUSTOM_VIEW = (1 << 13);
+    }
+}
+
+impl Encodable for PlayerFlags {
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), insim_core::EncodableError>
+    where
+        Self: Sized,
+    {
+        self.bits().encode(buf, limit)?;
+        Ok(())
+    }
+}
+
+impl Decodable for PlayerFlags {
+    fn decode(
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<Self, insim_core::DecodableError>
+    where
+        Self: Sized,
+    {
+        Ok(Self::from_bits_truncate(u16::decode(buf, limit)?))
+    }
+}
+
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Sent when a New Player joins.
 pub struct Npl {
     pub reqi: RequestId,
@@ -88,22 +132,18 @@ pub struct Npl {
 
     pub flags: PlayerFlags,
 
-    #[deku(bytes = "24")]
-    pub pname: CodepageString,
+    #[insim(bytes = "24")]
+    pub pname: String,
 
-    #[deku(bytes = "8")]
-    pub plate: CodepageString,
+    #[insim(bytes = "8")]
+    pub plate: String,
 
     pub cname: Vehicle,
 
-    #[deku(
-        reader = "istring::read(deku::rest, 16)",
-        writer = "istring::write(deku::output, &self.sname, 16)"
-    )]
+    #[insim(bytes = "16")]
     pub sname: String,
 
-    #[deku(count = "4")]
-    pub tyres: Vec<TyreCompound>,
+    pub tyres: TyreCompoundList,
 
     pub h_mass: u8,
 
@@ -115,7 +155,7 @@ pub struct Npl {
 
     pub rwadj: u8,
 
-    #[deku(pad_bytes_after = "2")]
+    #[insim(pad_bytes_after = "2")]
     pub fwadj: u8,
 
     pub setf: u8,

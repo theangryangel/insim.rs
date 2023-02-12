@@ -1,31 +1,55 @@
-use crate::packet_flags;
-use crate::protocol::identifiers::{PlayerId, RequestId};
-use crate::protocol::position::Point;
-#[cfg(feature = "uom")]
-use crate::units;
-use deku::prelude::*;
+use insim_core::{
+    identifiers::{PlayerId, RequestId},
+    point::Point,
+    prelude::*,
+    ser::Limit,
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-packet_flags! {
+use bitflags::bitflags;
+
+bitflags! {
+    #[derive(Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct CompCarInfo: u8 {
-        BLUE_FLAG => (1 << 0),
-        YELLOW_FLAG => (1 << 1),
-        LAGGING => (1 << 5),
-        FIRST => (1 << 6),
-        LAST => (1 << 7),
+        const BLUE_FLAG = (1 << 0);
+        const YELLOW_FLAG = (1 << 1);
+        const LAGGING = (1 << 5);
+        const FIRST = (1 << 6);
+        const LAST = (1 << 7);
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+impl Encodable for CompCarInfo {
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), insim_core::EncodableError>
+    where
+        Self: Sized,
+    {
+        self.bits().encode(buf, limit)?;
+        Ok(())
+    }
+}
+
+impl Decodable for CompCarInfo {
+    fn decode(
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<Self, insim_core::DecodableError>
+    where
+        Self: Sized,
+    {
+        Ok(Self::from_bits_truncate(u8::decode(buf, limit)?))
+    }
+}
+
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Used within the [Mci] packet info field.
 pub struct CompCar {
     /// Index of the last "node" that the player passed through.
@@ -40,7 +64,7 @@ pub struct CompCar {
     /// Race position
     pub position: u8,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub info: CompCarInfo,
 
     /// Positional information for the player, in game units.
@@ -64,38 +88,8 @@ pub struct CompCar {
     pub angvel: i16,
 }
 
-#[cfg(feature = "uom")]
-impl CompCar {
-    /// Converts speed into uom::si::f64::velocity
-    pub fn speed_uom(&self) -> uom::si::f64::Velocity {
-        uom::si::f64::Velocity::new::<units::velocity::game_per_second>(self.speed.into())
-    }
-
-    /// Converts angvel into degrees per second.
-    pub fn angvel_uom(&self) -> uom::si::f64::AngularVelocity {
-        uom::si::f64::AngularVelocity::new::<units::angular_velocity::game_heading_per_second>(
-            self.speed.into(),
-        )
-    }
-
-    /// Convert direction to degrees.
-    pub fn direction_uom(&self) -> uom::si::f64::Angle {
-        uom::si::f64::Angle::new::<units::angle::game_heading>(self.direction.into())
-    }
-
-    /// Convert direction to degrees.
-    pub fn heading_uom(&self) -> uom::si::f64::Angle {
-        uom::si::f64::Angle::new::<units::angle::game_heading>(self.heading.into())
-    }
-}
-
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Multi Car Info - positional information for players/vehicles.
 /// The MCI packet does not contain the positional information for all players. Only some. The
 /// maximum number of players depends on the version of Insim.
@@ -104,6 +98,6 @@ pub struct Mci {
 
     pub numc: u8,
 
-    #[deku(count = "numc")]
+    #[insim(count = "numc")]
     pub info: Vec<CompCar>,
 }

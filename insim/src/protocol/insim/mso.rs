@@ -1,35 +1,31 @@
-use crate::protocol::identifiers::{ConnectionId, PlayerId, RequestId};
-use crate::string::CodepageString;
-use deku::ctx::Size;
-use deku::prelude::*;
+use bytes::BufMut;
+use insim_core::{
+    identifiers::{ConnectionId, PlayerId, RequestId},
+    prelude::*,
+    ser::Limit,
+    string::codepages,
+    EncodableError,
+};
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 /// Enum for the sound field of [Mso].
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 pub enum MsoUserType {
-    #[deku(id = "0")]
     /// System message.
-    System,
+    System = 0,
 
-    #[deku(id = "1")]
     /// Normal, visible, user message.
-    User,
+    User = 1,
 
-    #[deku(id = "2")]
     /// Was this message received with the prefix character from the [Init](super::Init) message?
-    Prefix,
+    Prefix = 2,
 
-    #[deku(id = "3")]
     // FIXME: Due to be retired in Insim v9
-    O,
+    O = 3,
 }
 
 impl Default for MsoUserType {
@@ -38,16 +34,10 @@ impl Default for MsoUserType {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// System messsages and user messages, variable sized.
 pub struct Mso {
-    #[deku(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
     pub ucid: ConnectionId,
@@ -60,6 +50,57 @@ pub struct Mso {
     /// Index of the first character of user entered text, in msg field.
     pub textstart: u8,
 
-    #[deku(reader = "CodepageString::read(deku::rest, Size::Bytes(deku::rest.len() / 8))")]
-    pub msg: CodepageString,
+    pub msg: String,
+}
+
+impl Encodable for Mso {
+    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), EncodableError>
+    where
+        Self: Sized,
+    {
+        if limit.is_some() {
+            return Err(EncodableError::UnexpectedLimit(format!(
+                "MSO does not support limit! {limit:?}",
+            )));
+        }
+
+        self.reqi.encode(buf, None)?;
+        buf.put_bytes(0, 1);
+        self.ucid.encode(buf, None)?;
+        self.plid.encode(buf, None)?;
+        self.usertype.encode(buf, None)?;
+        self.textstart.encode(buf, None)?;
+
+        let msg = codepages::to_lossy_bytes(&self.msg);
+        buf.put_slice(&msg);
+
+        // pad so that msg is divisible by 8
+        if msg.len() % 8 != 0 {
+            buf.put_bytes(0, msg.len() + 8 - (msg.len() - 8));
+        }
+
+        Ok(())
+    }
+}
+
+impl Decodable for Mso {
+    fn decode(
+        buf: &mut bytes::BytesMut,
+        _limit: Option<Limit>,
+    ) -> Result<Self, insim_core::DecodableError>
+    where
+        Self: Default,
+    {
+        let mut data = Self {
+            reqi: RequestId::decode(buf, None)?,
+            ..Default::default()
+        };
+
+        buf.advance(1);
+        data.ucid = ConnectionId::decode(buf, None)?;
+        data.plid = PlayerId::decode(buf, None)?;
+        data.usertype = MsoUserType::decode(buf, None)?;
+        data.msg = String::decode(buf, Some(Limit::Bytes(buf.len())))?;
+        Ok(data)
+    }
 }

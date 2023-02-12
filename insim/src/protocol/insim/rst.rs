@@ -1,56 +1,55 @@
-use crate::packet_flags;
-use crate::protocol::identifiers::RequestId;
-use crate::track::Track;
-use deku::prelude::*;
+use insim_core::{identifiers::RequestId, prelude::*, ser::Limit, track::Track, wind::Wind};
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Copy)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
-pub enum Wind {
-    #[deku(id = "0")]
-    None,
-    #[deku(id = "1")]
-    Weak,
-    #[deku(id = "2")]
-    Strong,
-}
+use bitflags::bitflags;
 
-impl Default for Wind {
-    fn default() -> Self {
-        Wind::None
-    }
-}
-
-packet_flags! {
+bitflags! {
+    #[derive(Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct HostFacts: u16 {
-        CAN_VOTE => (1 << 0),
-        CAN_SELECT => (1 << 1),
-        MID_RACE_JOIN => (1 << 2),
-        MUST_PIT => (1 << 3),
-        CAN_RESET => (1 << 4),
-        FORCE_DRIVER_VIEW => (1 << 5),
-        CRUISE => (1 << 6),
+         const CAN_VOTE = (1 << 0);
+         const CAN_SELECT = (1 << 1);
+         const MID_RACE_JOIN = (1 << 2);
+         const MUST_PIT = (1 << 3);
+         const CAN_RESET = (1 << 4);
+         const FORCE_DRIVER_VIEW = (1 << 5);
+         const CRUISE = (1 << 6);
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+impl Decodable for HostFacts {
+    fn decode(
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<Self, insim_core::DecodableError>
+    where
+        Self: Default,
+    {
+        Ok(Self::from_bits_truncate(u16::decode(buf, limit)?))
+    }
+}
+
+impl Encodable for HostFacts {
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), insim_core::EncodableError>
+    where
+        Self: Sized,
+    {
+        self.bits().encode(buf, limit)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Race Start
 pub struct Rst {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
     pub racelaps: u8,

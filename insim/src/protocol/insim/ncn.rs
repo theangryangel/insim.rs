@@ -1,18 +1,13 @@
-use crate::{
-    protocol::identifiers::{ConnectionId, RequestId},
-    string::{istring, CodepageString},
+use insim_core::{
+    identifiers::{ConnectionId, RequestId},
+    prelude::*,
 };
-use deku::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// New Connection
 pub struct Ncn {
     pub reqi: RequestId,
@@ -20,22 +15,19 @@ pub struct Ncn {
     pub ucid: ConnectionId,
 
     /// Username.
-    #[deku(
-        reader = "istring::read(deku::rest, 24)",
-        writer = "istring::write(deku::output, &self.uname, 24)"
-    )]
+    #[insim(bytes = "24")]
     pub uname: String,
 
-    #[deku(bytes = "24")]
+    #[insim(bytes = "24")]
     /// Playername.
-    pub pname: CodepageString,
+    pub pname: String,
 
     /// 1 if administrative user.
-    pub admin: u8,
+    pub admin: bool,
 
     /// Total number of connections now this player has joined.
     pub total: u8,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub flags: u8,
 }

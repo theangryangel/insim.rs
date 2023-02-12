@@ -1,22 +1,18 @@
-use super::Wind;
-use crate::{
-    protocol::identifiers::{PlayerId, RequestId},
+use insim_core::{
+    identifiers::{PlayerId, RequestId},
+    prelude::*,
     track::Track,
+    wind::Wind,
 };
-use deku::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// State
 pub struct Sta {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
     pub replayspeed: f32,
@@ -37,7 +33,7 @@ pub struct Sta {
 
     pub qualmins: u8,
 
-    #[deku(pad_bytes_after = "2")]
+    #[insim(pad_bytes_after = "2")]
     pub racelaps: u8,
 
     pub track: Track,

@@ -1,30 +1,23 @@
-use crate::protocol::identifiers::{ConnectionId, RequestId};
-use crate::string::CodepageString;
-use deku::prelude::*;
+use insim_core::{
+    identifiers::{ConnectionId, RequestId},
+    prelude::*,
+};
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 /// Enum for the result field of [Acr].
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 pub enum AcrResult {
-    #[deku(id = "0")]
-    None,
+    None = 0,
 
-    #[deku(id = "1")]
-    Processed,
+    Processed = 1,
 
-    #[deku(id = "2")]
-    Rejected,
+    Rejected = 2,
 
-    #[deku(id = "3")]
-    UnknownCommand,
+    UnknownCommand = 3,
 }
 
 impl Default for AcrResult {
@@ -34,24 +27,19 @@ impl Default for AcrResult {
 }
 
 /// Admin Command Report
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 pub struct Acr {
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
     pub ucid: ConnectionId,
 
     pub admin: u8,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub result: AcrResult,
 
-    #[deku(bytes = "64")]
-    pub text: CodepageString,
+    #[insim(bytes = "64")]
+    pub text: String,
 }

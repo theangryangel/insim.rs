@@ -1,21 +1,19 @@
-use crate::{
-    error::Error,
-    protocol::identifiers::{ConnectionId, RequestId},
+use insim_core::{
+    identifiers::{ConnectionId, RequestId},
+    prelude::*,
 };
-use deku::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
+
+use crate::error::Error;
+
 use std::default::Default;
 
 const MAX_MAL_SIZE: usize = 120;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Mods Allowed - restrict the mods that can be used
 pub struct Mal {
     pub reqi: RequestId,
@@ -24,11 +22,11 @@ pub struct Mal {
 
     pub ucid: ConnectionId,
 
-    #[deku(pad_bytes_after = "2")]
+    #[insim(pad_bytes_after = "2")]
     /// Currently unused
     pub flags: u8,
 
-    #[deku(count = "count")]
+    #[insim(count = "count")]
     allowed_mods: Vec<u32>,
 }
 
@@ -50,7 +48,7 @@ impl Mal {
         }
 
         self.allowed_mods.push(mod_id);
-        self.update()?;
+        self.count = self.allowed_mods.len() as u8;
 
         Ok(())
     }
@@ -58,7 +56,7 @@ impl Mal {
     /// Clear any previously allowed mods.
     pub fn clear(&mut self) -> Result<(), Error> {
         self.allowed_mods.clear();
-        self.update()?;
+        self.count = 0;
         Ok(())
     }
 }

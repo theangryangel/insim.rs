@@ -1,46 +1,41 @@
-use super::{PlayerFlags, RaceResultFlags};
-use crate::protocol::identifiers::{PlayerId, RequestId};
-use crate::string::{istring, CodepageString};
-use crate::vehicle::Vehicle;
-use deku::prelude::*;
+use insim_core::{
+    identifiers::{PlayerId, RequestId},
+    prelude::*,
+    vehicle::Vehicle,
+};
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+use super::{PlayerFlags, RaceResultFlags};
+
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Race Result
 pub struct Res {
     pub reqi: RequestId,
 
     pub plid: PlayerId,
 
-    #[deku(
-        reader = "istring::read(deku::rest, 24)",
-        writer = "istring::write(deku::output, &self.uname, 24)"
-    )]
+    #[insim(bytes = "24")]
     pub uname: String,
 
-    #[deku(bytes = "24")]
-    pub pname: CodepageString,
+    #[insim(bytes = "24")]
+    pub pname: String,
 
-    #[deku(bytes = "8")]
-    pub plate: CodepageString,
+    #[insim(bytes = "8")]
+    pub plate: String,
 
     pub cname: Vehicle,
 
     pub ttime: u32,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub btime: u32,
 
     pub numstops: u8,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub confirm: RaceResultFlags,
 
     pub lapsdone: u16,

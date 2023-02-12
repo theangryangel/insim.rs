@@ -1,17 +1,15 @@
 pub(crate) mod chat;
 
 use bounded_vec_deque::BoundedVecDeque;
-use insim::protocol::identifiers::ConnectionId;
-use insim::protocol::insim::Wind;
-use insim::track::TrackInfo;
-use insim::{client::prelude::*, protocol::identifiers::PlayerId};
+use insim::client::prelude::*;
+use insim::core::{identifiers::ConnectionId, identifiers::PlayerId, point::Point, wind::Wind};
+use insim_game_data::track::TrackInfo;
 use miette::Result;
 use std::sync::Arc;
 use tokio::sync::Notify;
 
 type ChatHistory = BoundedVecDeque<chat::Chat>;
 
-use insim::protocol::position::Point;
 use md5::{Digest, Md5};
 use multi_index::MultiIndex;
 use serde::Serialize;
@@ -65,7 +63,7 @@ impl From<&insim::protocol::insim::Ncn> for Connection {
     fn from(data: &insim::protocol::insim::Ncn) -> Self {
         Self {
             uname: data.uname.clone(),
-            admin: data.admin > 0,
+            admin: data.admin,
             connection_flags: data.flags,
             connection_id: data.ucid,
             player_id: None,
@@ -156,7 +154,7 @@ impl State {
         match data {
             Packet::MessageOut(data) => {
                 self.chat
-                    .push_front(chat::Chat::new(data.ucid, data.msg.to_lossy_string()));
+                    .push_front(chat::Chat::new(data.ucid, data.msg.to_owned()));
                 self.notifiers.chat.notify_waiters();
             }
 
@@ -256,7 +254,7 @@ impl State {
             Packet::State(data) => {
                 let track = &data.track;
 
-                self.game.track = track.track_info();
+                self.game.track = insim_game_data::track::lookup(track).cloned();
                 self.game.weather = data.weather;
                 self.game.wind = data.wind;
                 self.game.racing = data.raceinprog > 0;

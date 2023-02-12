@@ -1,18 +1,14 @@
-use crate::{
-    protocol::identifiers::{ConnectionId, RequestId},
+use insim_core::{
+    identifiers::{ConnectionId, RequestId},
+    prelude::*,
     vehicle::Vehicle,
 };
-use deku::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// User Selected Car
 pub struct Slc {
     pub reqi: RequestId,

@@ -1,31 +1,25 @@
-use crate::protocol::identifiers::{PlayerId, RequestId};
+use insim_core::{
+    identifiers::{PlayerId, RequestId},
+    prelude::*,
+};
 
-use super::CarContact;
-use deku::prelude::*;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+use super::CarContact;
+
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 /// Used within [Hlv] to indicate the hotlap validity failure reason.
 pub enum Hlvc {
-    #[deku(id = "0")]
-    Ground,
+    Ground = 0,
 
-    #[deku(id = "1")]
-    Wall,
+    Wall = 1,
 
-    #[deku(id = "4")]
-    Speeding,
+    Speeding = 4,
 
-    #[deku(id = "5")]
-    OutOfBounds,
+    OutOfBounds = 5,
 }
 
 impl Default for Hlvc {
@@ -34,18 +28,13 @@ impl Default for Hlvc {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Reports incidents that would violate Hot Lap Validity checks.
 pub struct Hlv {
     pub reqi: RequestId,
     pub plid: PlayerId,
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub hlvc: Hlvc,
     pub time: u16,
     pub c: CarContact,

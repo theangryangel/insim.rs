@@ -1,52 +1,35 @@
-use crate::{protocol::identifiers::RequestId, string::istring};
-use deku::prelude::*;
+use insim_core::{identifiers::RequestId, prelude::*};
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 pub enum RipError {
-    #[deku(id = "0")]
-    Ok,
+    Ok = 0,
 
-    #[deku(id = "1")]
-    Already,
+    Already = 1,
 
-    #[deku(id = "2")]
-    Dedicated,
+    Dedicated = 2,
 
-    #[deku(id = "3")]
-    WrongMode,
+    WrongMode = 3,
 
-    #[deku(id = "4")]
-    NotReplay,
+    NotReplay = 4,
 
-    #[deku(id = "5")]
-    Corrupted,
+    Corrupted = 5,
 
-    #[deku(id = "6")]
-    NotFound,
+    NotFound = 6,
 
-    #[deku(id = "7")]
-    Unloadable,
+    Unloadable = 7,
 
-    #[deku(id = "8")]
-    DestOOB,
+    DestOOB = 8,
 
-    #[deku(id = "9")]
-    Unknown,
+    Unknown = 9,
 
-    #[deku(id = "10")]
-    User,
+    User = 10,
 
-    #[deku(id = "11")]
-    OOS,
+    OOS = 11,
 }
 
 impl Default for RipError {
@@ -55,13 +38,8 @@ impl Default for RipError {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Replay Information
 pub struct Rip {
     pub reqi: RequestId,
@@ -70,15 +48,12 @@ pub struct Rip {
     pub mpr: u8,
     pub paused: u8,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub options: u8, // FIXME: implement flags
 
     pub ctime: u32,
     pub ttime: u32,
 
-    #[deku(
-        reader = "istring::read(deku::rest, 64)",
-        writer = "istring::write(deku::output, &self.rname, 64)"
-    )]
+    #[insim(bytes = "64")]
     pub rname: String,
 }

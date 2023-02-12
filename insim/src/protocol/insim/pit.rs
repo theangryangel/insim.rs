@@ -1,43 +1,69 @@
-use super::{PlayerFlags, TyreCompound};
-use crate::{
-    packet_flags,
-    protocol::identifiers::{PlayerId, RequestId},
+use insim_core::{
+    identifiers::{PlayerId, RequestId},
+    prelude::*,
+    ser::Limit,
 };
-use deku::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-packet_flags! {
+use bitflags::bitflags;
+
+use super::{PlayerFlags, TyreCompoundList};
+
+bitflags! {
+    #[derive(Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct PitStopWorkFlags: u32 {
-        NOTHING => 0,
-        STOP => (1 << 0),
-        FR_DAM => (1 << 1),
-        FR_WHL => (1 << 2),
-        PSE_LE_FR_DAM => (1 << 3),
-        PSE_LE_FR_WHL => (1 << 4),
-        PSE_RI_FR_DAM => (1 << 5),
-        PSE_RI_FR_WHL => (1 << 6),
-        PSE_RE_DAM => (1 << 7),
-        PSE_RE_WHL => (1 << 8),
-        PSE_LE_RE_DAM => (1 << 9),
-        PSE_LE_RE_WHL => (1 << 10),
-        PSE_RI_RE_DAM => (1 << 11),
-        PSE_RI_RE_WHL => (1 << 12),
-        PSE_BODY_MINOR => (1 << 13),
-        PSE_BODY_MAJOR => (1 << 14),
-        PSE_SETUP => (1 << 15),
-        PSE_REFUEL => (1 << 16),
+         const NOTHING = 0;
+         const STOP = (1 << 0);
+         const FR_DAM = (1 << 1);
+         const FR_WHL = (1 << 2);
+         const PSE_LE_FR_DAM = (1 << 3);
+         const PSE_LE_FR_WHL = (1 << 4);
+         const PSE_RI_FR_DAM = (1 << 5);
+         const PSE_RI_FR_WHL = (1 << 6);
+         const PSE_RE_DAM = (1 << 7);
+         const PSE_RE_WHL = (1 << 8);
+         const PSE_LE_RE_DAM = (1 << 9);
+         const PSE_LE_RE_WHL = (1 << 10);
+         const PSE_RI_RE_DAM = (1 << 11);
+         const PSE_RI_RE_WHL = (1 << 12);
+         const PSE_BODY_MINOR = (1 << 13);
+         const PSE_BODY_MAJOR = (1 << 14);
+         const PSE_SETUP = (1 << 15);
+         const PSE_REFUEL = (1 << 16);
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+impl Decodable for PitStopWorkFlags {
+    fn decode(
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<Self, insim_core::DecodableError>
+    where
+        Self: Default,
+    {
+        Ok(Self::from_bits_truncate(u32::decode(buf, limit)?))
+    }
+}
+
+impl Encodable for PitStopWorkFlags {
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), insim_core::EncodableError>
+    where
+        Self: Sized,
+    {
+        self.bits().encode(buf, limit)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Pit stop (stop at the garage, not "tele-pit")
 pub struct Pit {
     pub reqi: RequestId,
@@ -52,56 +78,40 @@ pub struct Pit {
 
     pub penalty: u8,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub numstops: u8,
 
-    #[deku(count = "4")]
-    pub tyres: Vec<TyreCompound>,
+    pub tyres: TyreCompoundList,
 
-    #[deku(bytes = "4", pad_bytes_after = "4")]
+    #[insim(pad_bytes_after = "4")]
     pub work: u32,
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Pit Stop Finished
 pub struct Psf {
     pub reqi: RequestId,
 
     pub plid: PlayerId,
 
-    #[deku(pad_bytes_after = "4")]
+    #[insim(pad_bytes_after = "4")]
     pub stime: u32,
 }
 
-#[derive(Debug, PartialEq, Eq, DekuRead, DekuWrite, Clone)]
+#[derive(Debug, PartialEq, Eq, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 pub enum PitLaneFact {
-    #[deku(id = "0")]
-    Exit,
+    Exit = 0,
 
-    #[deku(id = "1")]
-    Enter,
+    Enter = 1,
 
-    #[deku(id = "2")]
-    EnterNoPurpose,
+    EnterNoPurpose = 2,
 
-    #[deku(id = "3")]
-    EnterDriveThru,
+    EnterDriveThru = 3,
 
-    #[deku(id = "4")]
-    EnterStopGo,
+    EnterStopGo = 4,
 }
 
 impl Default for PitLaneFact {
@@ -110,20 +120,15 @@ impl Default for PitLaneFact {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// PitLane
 pub struct Pla {
     pub reqi: RequestId,
 
     pub plid: PlayerId,
 
-    #[deku(pad_bytes_after = "3")]
+    #[insim(pad_bytes_after = "3")]
     pub fact: PitLaneFact,
 }
 

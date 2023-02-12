@@ -1,60 +1,78 @@
-use crate::{
-    packet_flags,
-    protocol::identifiers::{PlayerId, RequestId},
+use insim_core::{
+    identifiers::{PlayerId, RequestId},
+    prelude::*,
+    ser::Limit,
 };
-use deku::prelude::*;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-packet_flags! {
+use bitflags::bitflags;
+
+bitflags! {
     // *_VALID variation means this was cleared
+    #[derive(Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct PenaltyInfo: u8 {
-        DRIVE_THRU => (1 << 0),
-        DRIVE_THRU_VALID => (1 << 1),
-        STOP_GO => (1 << 2),
-        STOP_GO_VALID => (1 << 3),
-        SECS_30 => (1 << 4),
-        SECS_45 => (1 << 5),
+        const DRIVE_THRU = (1 << 0);
+        const DRIVE_THRU_VALID = (1 << 1);
+        const STOP_GO = (1 << 2);
+        const STOP_GO_VALID = (1 << 3);
+        const SECS_30 = (1 << 4);
+        const SECS_45 = (1 << 5);
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone)]
+impl Encodable for PenaltyInfo {
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), insim_core::EncodableError>
+    where
+        Self: Sized,
+    {
+        self.bits().encode(buf, limit)?;
+        Ok(())
+    }
+}
+
+impl Decodable for PenaltyInfo {
+    fn decode(
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<Self, insim_core::DecodableError>
+    where
+        Self: Sized,
+    {
+        Ok(Self::from_bits_truncate(u8::decode(buf, limit)?))
+    }
+}
+
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    type = "u8",
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
+#[repr(u8)]
 pub enum PenaltyReason {
     /// Unknown or cleared penalty
-    #[deku(id = "0")]
-    None,
+    None = 0,
 
     /// Penalty given by admin
-    #[deku(id = "1")]
-    Admin,
+    Admin = 1,
 
     /// Driving wrong way
-    #[deku(id = "2")]
-    WrongWay,
+    WrongWay = 2,
 
     /// False start
-    #[deku(id = "3")]
-    FalseStart,
+    FalseStart = 3,
 
     /// Speeding in pit lane
-    #[deku(id = "4")]
-    Speeding,
+    Speeding = 4,
 
     /// Stop-go in pit stop too short
-    #[deku(id = "5")]
-    StopShort,
+    StopShort = 5,
 
     /// Compulsory stop is too late
-    #[deku(id = "6")]
-    StopLate,
+    StopLate = 6,
 }
 
 impl Default for PenaltyReason {
@@ -63,13 +81,8 @@ impl Default for PenaltyReason {
     }
 }
 
-#[derive(Debug, DekuRead, DekuWrite, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[deku(
-    ctx = "endian: deku::ctx::Endian",
-    ctx_default = "deku::ctx::Endian::Little",
-    endian = "endian"
-)]
 /// Penalty
 pub struct Pen {
     pub reqi: RequestId,
@@ -80,6 +93,6 @@ pub struct Pen {
 
     pub newpen: PenaltyInfo,
 
-    #[deku(pad_bytes_after = "1")]
+    #[insim(pad_bytes_after = "1")]
     pub reason: PenaltyReason,
 }

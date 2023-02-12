@@ -154,7 +154,7 @@ impl FieldData {
                 quote! { ::std::collections::BTreeMap }
             }
             Some(How::Custom) => self.custom.as_ref().unwrap().ty(),
-            None => panic!("Unknown index type on field '{}'", field_name_string),
+            None => panic!("Unknown index type on field '{field_name_string}'"),
         };
 
         if self.unique {
@@ -449,7 +449,7 @@ impl FieldData {
                 quote! { ::std::collections::btree_map::Iter }
             }
             Some(How::Custom) => self.custom.as_ref().unwrap().iter(),
-            None => panic!("Unknown index type on field '{}'", field_name_string),
+            None => panic!("Unknown index type on field '{field_name_string}'"),
         };
 
         let iter_type = if self.unique {
