@@ -65,7 +65,7 @@ impl Config {
         unimplemented!("UDP support is not yet available.");
     }
 
-    /// Name of the client, passed to Insim [Init](super::protocol::insim::Init).
+    /// Name of the client, passed to Insim [Init](crate::protocol::insim::Init).
     pub fn named(mut self, name: String) -> Self {
         self.name = name;
         self
@@ -76,25 +76,25 @@ impl Config {
         self
     }
 
-    /// Set a flag to be used in the [Init](super::protocol::insim::Init).
+    /// Set a flag to be used in the [Init](crate::protocol::insim::Init).
     pub fn set_flag(mut self, flag: InitFlags) -> Self {
         self.flags |= flag;
         self
     }
 
-    /// Remove all flags from the [Init](super::protocol::insim::Init).
+    /// Remove all flags from the [Init](crate::protocol::insim::Init).
     pub fn clear_flags(mut self) -> Self {
         self.flags.clear();
         self
     }
 
-    /// Set the prefix to be used in the [Init](super::protocol::insim::Init).
+    /// Set the prefix to be used in the [Init](crate::protocol::insim::Init).
     pub fn password(mut self, pwd: String) -> Self {
         self.password = pwd;
         self
     }
 
-    /// Set the prefix to be used in the [Init](super::protocol::insim::Init).
+    /// Set the prefix to be used in the [Init](crate::protocol::insim::Init).
     pub fn prefix(mut self, prefix: char) -> Self {
         self.prefix = prefix as u8;
         self

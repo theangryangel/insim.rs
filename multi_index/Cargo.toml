@@ -3,6 +3,10 @@ name = "multi_index"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+bench = false
+doctest = false
+
 [dependencies]
 slab = { version = "0.4" }
 multi_index_derive = { path = "../multi_index_derive" }

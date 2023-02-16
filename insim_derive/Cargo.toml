@@ -13,3 +13,5 @@ darling = "0.14.2"
 
 [lib]
 proc-macro = true
+bench = false
+doctest = false

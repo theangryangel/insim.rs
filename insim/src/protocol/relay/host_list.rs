@@ -61,7 +61,7 @@ pub struct HostInfo {
 }
 
 /// The relay will send a list of available hosts using this packet. There may be more than one
-/// HostList packet sent in response to a [HostListRequest]. You may use the [HostInfoFlags] to
+/// HostList packet sent in response to a [super::host_list_request::HostListRequest]. You may use the [HostInfoFlags] to
 /// determine if the host is the last in the list.
 #[derive(Debug, Clone, Default, InsimEncode, InsimDecode)]
 #[cfg_attr(feature = "serde", derive(Serialize))]

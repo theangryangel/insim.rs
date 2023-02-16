@@ -6,6 +6,7 @@ edition = "2021"
 
 [lib]
 bench = false
+doctest = false
 
 [features]
 default = ["client"]
