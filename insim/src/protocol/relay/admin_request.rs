@@ -4,7 +4,7 @@ use insim_core::{identifiers::RequestId, prelude::*};
 use serde::Serialize;
 
 /// Ask the relay if we are logged in as an administrative user on the selected host. A
-/// [AdminResponse] is sent back by the relay.
+/// [super::admin_response::AdminResponse] is sent back by the relay.
 #[derive(Debug, Clone, Default, InsimEncode, InsimDecode)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct AdminRequest {

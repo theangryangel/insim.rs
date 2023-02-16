@@ -3,7 +3,7 @@ use insim_core::{identifiers::RequestId, prelude::*};
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-/// Reponse to a [AdminRequest] packet, indicating if we are logged in as an administrative user on
+/// Reponse to a [super::admin_request::AdminRequest] packet, indicating if we are logged in as an administrative user on
 /// the selected host.
 #[derive(Debug, Clone, Default, InsimEncode, InsimDecode)]
 #[cfg_attr(feature = "serde", derive(Serialize))]

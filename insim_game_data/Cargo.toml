@@ -6,6 +6,10 @@ description = """
 LFS Game Data, such as track information
 """
 
+[lib]
+bench = false
+doctest = false
+
 [features]
 serde = ["dep:serde", "insim_core/serde"]
 

@@ -14,7 +14,7 @@ pub enum Mode {
     /// Insim <= 8 uses verbatim packet sizes
     Uncompressed,
     /// Insim >= 9 optionally supports "compressing" the packet size by dividing by 4
-    /// See https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info
+    /// See <https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info>
     Compressed,
 }
 

@@ -5,6 +5,9 @@ edition = "2021"
 description = "Insim PTH file implementation"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+bench = false
+doctest = false
 
 [dependencies]
 insim_core = { path = "../insim_core" }

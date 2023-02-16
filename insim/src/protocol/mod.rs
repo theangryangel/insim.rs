@@ -2,38 +2,43 @@
 //!
 //! # Example
 //! ```rust
-//! // Connect to the Insim Relay
-//! let tcp: TcpStream = TcpStream::connect("isrelay.lfs.net:47474").await.unwrap();
+//! use tokio::net::TcpStream;
+//! use futures::{SinkExt, StreamExt};
+//! #[tokio::main]
+//! async fn main() {
 //!
-//! // Create a Transport, using the uncompressed packet length mode (insim protocol <= 8 uses this,
-//! // insim >= 9 supports both compressed and uncompressed modes).
-//! let mut t = insim::protocol::transport::Transport::new(
-//!     tcp,
-//!     insim::protocol::codec::Mode::Uncompressed
-//! );
+//!     // Connect to the Insim Relay
+//!     let tcp: TcpStream = TcpStream::connect("isrelay.lfs.net:47474").await.unwrap();
 //!
-//! // Send a Init packet to handshake with the server.
-//! let isi = insim::protocol::insim::Init {
-//!     name: "insim.rs".into(),
-//!     password: "".into(),
-//!     prefix: b'!',
-//!     version: insim::protocol::VERSION,
-//!     interval: 1000,
-//!     flags: insim::protocol::insim::InitFlags::MCI,
-//!     reqi: 1,
-//! };
+//!     // Create a Transport, using the uncompressed packet length mode (insim protocol <= 8 uses this,
+//!     // insim >= 9 supports both compressed and uncompressed modes).
+//!     let mut t = insim::protocol::transport::Transport::new(
+//!         tcp,
+//!         insim::protocol::codec::Mode::Uncompressed
+//!     );
 //!
-//! t.send(isi).await;
+//!     // Send a Init packet to handshake with the server.
+//!     let isi = insim::protocol::insim::Init {
+//!         name: "insim.rs".into(),
+//!         password: "".into(),
+//!         prefix: b'!',
+//!         interval: 1000,
+//!         flags: insim::protocol::insim::InitFlags::MCI,
+//!         ..Default::default()
+//!     };
 //!
-//! // Select a host from the relay to receive data from.
-//! t.send(insim::protocol::relay::HostSelect {
-//!     hname: "Nubbins AU Demo".into(),
-//!     ..Default::default()
-//! }).await;
+//!     t.send(isi.into()).await;
 //!
-//! // Print the data from the relay.
-//! while let Some(m) = t.next().await {
-//!     tracing::debug!("{:?}", m);
+//!     // Select a host from the relay to receive data from.
+//!     t.send(insim::protocol::relay::HostSelect {
+//!         hname: "Nubbins AU Demo".into(),
+//!         ..Default::default()
+//!     }.into()).await;
+//!
+//!     // Print the data from the relay.
+//!     while let Some(m) = t.next().await {
+//!         tracing::debug!("{:?}", m);
+//!     }
 //! }
 //! ````
 use insim_core::prelude::*;
