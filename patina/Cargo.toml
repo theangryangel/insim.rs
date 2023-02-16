@@ -13,7 +13,7 @@ tokio = { version = "1.11.0", features = ["full", "tracing"] }
 convert_case = "0.5.0"
 serde = "1"
 knuffel = "2.0.0"
-miette = { version="4.7.1", features = ["fancy"] }
+miette = { version="5.5.0", features = ["fancy"] }
 futures = "0.3"
 pin-project = "1.0"
 tracing-subscriber = "0.2"
