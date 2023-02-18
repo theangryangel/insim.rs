@@ -106,8 +106,8 @@ pub(crate) async fn servers_live(
                     yield Ok(sse::Event::default().event("players").data(res));
 
                     let game = Live {
-                        game: game,
-                        players: players,
+                        game,
+                        players,
                     };
 
                     yield Ok(
