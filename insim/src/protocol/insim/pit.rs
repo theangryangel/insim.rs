@@ -11,7 +11,7 @@ use serde::Serialize;
 
 use bitflags::bitflags;
 
-use super::{PlayerFlags, TyreCompoundList};
+use super::{PlayerFlags, TyreCompound};
 
 bitflags! {
     #[derive(Default)]
@@ -83,7 +83,7 @@ pub struct Pit {
     #[insim(pad_bytes_after = "1")]
     pub numstops: u8,
 
-    pub tyres: TyreCompoundList,
+    pub tyres: [TyreCompound; 4],
 
     #[insim(pad_bytes_after = "4")]
     pub work: u32,

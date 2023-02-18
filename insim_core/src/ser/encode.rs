@@ -6,7 +6,7 @@ use crate::string::codepages;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EncodableError {
-    TooLarge(String),
+    WrongSize(String),
     UnexpectedLimit(String),
 }
 
@@ -15,7 +15,7 @@ impl Error for EncodableError {}
 impl fmt::Display for EncodableError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            EncodableError::TooLarge(i) => write!(f, "Too large! {i}"),
+            EncodableError::WrongSize(i) => write!(f, "Wrong Size! {i}"),
             EncodableError::UnexpectedLimit(i) => write!(f, "Unexpected limit! {i}"),
         }
     }
@@ -156,7 +156,7 @@ where
         };
 
         if limit_as_iterations < self.len() {
-            return Err(EncodableError::TooLarge(format!(
+            return Err(EncodableError::WrongSize(format!(
                 "Limit of {limit_as_iterations}, with {} items in vec",
                 self.len()
             )));
@@ -169,11 +169,58 @@ where
     }
 }
 
+// Slices
+
+impl<T, const N: usize> Encodable for [T; N]
+where
+    T: Encodable,
+{
+    fn encode(&self, buf: &mut BytesMut, limit: Option<Limit>) -> Result<(), EncodableError>
+    where
+        Self: Sized,
+    {
+        if limit.is_some() {
+            return Err(EncodableError::UnexpectedLimit(format!(
+                "Slices do not support a limit! {limit:?}"
+            )));
+        }
+
+        for i in self {
+            i.encode(buf, None)?;
+        }
+
+        Ok(())
+    }
+}
+
 // String
 
 impl Encodable for String {
     fn encode(&self, buf: &mut BytesMut, limit: Option<Limit>) -> Result<(), EncodableError> {
-        let data = codepages::to_lossy_bytes(self);
+        let mut data = codepages::to_lossy_bytes(self);
+
+        match limit {
+            Some(Limit::Count(_)) => {
+                return Err(EncodableError::UnexpectedLimit(format!(
+                    "String does not support a count limit! {limit:?}"
+                )));
+            }
+            Some(Limit::Bytes(size)) => {
+                if data.len() > size {
+                    return Err(EncodableError::WrongSize(format!(
+                        "Could not fit {} bytes into field with {size} bytes limit",
+                        data.len()
+                    )));
+                }
+
+                if data.len() < size {
+                    // zero pad
+                    data.put_bytes(0, size - data.len());
+                }
+            }
+            _ => {}
+        }
+
         data.encode(buf, limit)?;
         Ok(())
     }

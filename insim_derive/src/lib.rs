@@ -57,6 +57,7 @@ pub(crate) struct FieldData {
 fn extract_type(ty: &syn::Type) -> proc_macro2::TokenStream {
     // converts a Vec<u8> into Vec::<u8> for usage in the decoding calls
     // if it doesnt match that format then just output the original type
+    // wrapped in angled brackets
 
     if let syn::Type::Path(syn::TypePath {
         qself: None,
@@ -72,7 +73,7 @@ fn extract_type(ty: &syn::Type) -> proc_macro2::TokenStream {
         }
     }
 
-    quote! { #ty }
+    quote! { <#ty> }
 }
 
 fn extract_repr_type(attrs: &[syn::Attribute]) -> Option<syn::Ident> {

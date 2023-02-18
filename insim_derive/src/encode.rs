@@ -211,14 +211,15 @@ impl Receiver {
 
                 tokens.extend(quote! {
                     let written_len: usize = (buf.len() - #pad_bytes_before - initial_len);
-                    if #bytes > written_len {
-                        buf.put_bytes(0, #bytes - written_len);
-                    }
-
-                    if #bytes < written_len {
+                    if #bytes != written_len {
                         return Err(
-                            ::insim_core::EncodableError::TooLarge(
-                                format!("Too much data for field {}", #ident_as_string)
+                            ::insim_core::EncodableError::WrongSize(
+                                format!(
+                                    "Expected to write {} bytes, wrote {} for field {}",
+                                    #bytes,
+                                    written_len,
+                                    #ident_as_string
+                                )
                             )
                         )
                     }
