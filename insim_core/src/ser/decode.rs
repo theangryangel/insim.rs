@@ -214,6 +214,35 @@ where
     }
 }
 
+// slices
+
+impl<T, const N: usize> Decodable for [T; N]
+where
+    T: Decodable + Default,
+{
+    fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError>
+    where
+        Self: Default,
+    {
+        if limit.is_some() {
+            return Err(DecodableError::UnexpectedLimit(format!(
+                "Slices do not support a limit! {limit:?}"
+            )));
+        }
+
+        let mut data = Self::default();
+
+        let mut i = 0;
+
+        while i < N {
+            data[i] = T::decode(buf, None)?;
+            i += 1;
+        }
+
+        Ok(data)
+    }
+}
+
 // String
 
 impl Decodable for String {

@@ -1,10 +1,8 @@
-use bytes::BytesMut;
 use insim_core::{
     identifiers::{ConnectionId, PlayerId, RequestId},
     prelude::*,
     ser::Limit,
     vehicle::Vehicle,
-    DecodableError, EncodableError,
 };
 
 #[cfg(feature = "serde")]
@@ -38,36 +36,6 @@ pub enum TyreCompound {
 impl Default for TyreCompound {
     fn default() -> Self {
         TyreCompound::NoChange
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-// we need to wrap [TyreCompound; 4] in a new type because arrays are always considered "foreign", and the trait Decodable isn't defined within this crate.
-// FIXME: add some extra methods for convenience
-#[cfg_attr(feature = "serde", derive(Serialize))]
-pub struct TyreCompoundList([TyreCompound; 4]);
-
-impl Decodable for TyreCompoundList {
-    fn decode(buf: &mut BytesMut, _limit: Option<Limit>) -> Result<Self, DecodableError> {
-        let mut data: TyreCompoundList = Default::default();
-        for i in 0..4 {
-            data.0[i] = TyreCompound::decode(buf, None)?;
-        }
-
-        Ok(data)
-    }
-}
-
-impl Encodable for TyreCompoundList {
-    fn encode(&self, buf: &mut BytesMut, _limit: Option<Limit>) -> Result<(), EncodableError>
-    where
-        Self: Sized,
-    {
-        for i in self.0.iter() {
-            i.encode(buf, None)?;
-        }
-
-        Ok(())
     }
 }
 
@@ -143,7 +111,7 @@ pub struct Npl {
     #[insim(bytes = "16")]
     pub sname: String,
 
-    pub tyres: TyreCompoundList,
+    pub tyres: [TyreCompound; 4],
 
     pub h_mass: u8,
 
