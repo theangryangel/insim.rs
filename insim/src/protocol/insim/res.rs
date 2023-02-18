@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use insim_core::{
     identifiers::{PlayerId, RequestId},
     prelude::*,
@@ -28,10 +30,10 @@ pub struct Res {
 
     pub cname: Vehicle,
 
-    pub ttime: u32,
+    pub ttime: Duration,
 
     #[insim(pad_bytes_after = "1")]
-    pub btime: u32,
+    pub btime: Duration,
 
     pub numstops: u8,
 

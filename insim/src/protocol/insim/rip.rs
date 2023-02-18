@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use insim_core::{identifiers::RequestId, prelude::*};
 
 #[cfg(feature = "serde")]
@@ -51,8 +53,8 @@ pub struct Rip {
     #[insim(pad_bytes_after = "1")]
     pub options: u8, // FIXME: implement flags
 
-    pub ctime: u32,
-    pub ttime: u32,
+    pub ctime: Duration,
+    pub ttime: Duration,
 
     #[insim(bytes = "64")]
     pub rname: String,

@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use insim_core::{
     identifiers::{PlayerId, RequestId},
     prelude::*,
@@ -96,7 +98,7 @@ pub struct Psf {
     pub plid: PlayerId,
 
     #[insim(pad_bytes_after = "4")]
-    pub stime: u32,
+    pub stime: Duration,
 }
 
 #[derive(Debug, PartialEq, Eq, InsimEncode, InsimDecode, Clone)]
