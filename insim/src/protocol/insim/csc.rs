@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use insim_core::{
     identifiers::{PlayerId, RequestId},
     prelude::*,
@@ -36,7 +38,7 @@ pub struct Csc {
     #[insim(pad_bytes_after = "2")]
     pub action: CscAction,
 
-    pub time: u32,
+    pub time: Duration,
 
     pub c: CarContact,
 }

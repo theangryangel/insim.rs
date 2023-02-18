@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use insim_core::{
     identifiers::{PlayerId, RequestId},
     prelude::*,
@@ -16,9 +18,9 @@ pub struct Lap {
 
     pub plid: PlayerId,
 
-    pub ltime: u32, // lap time (ms)
+    pub ltime: Duration, // lap time (ms)
 
-    pub etime: u32,
+    pub etime: Duration,
 
     pub lapsdone: u16,
 

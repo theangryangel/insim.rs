@@ -1,5 +1,5 @@
 use bytes::{Buf, BytesMut};
-use std::{error::Error, fmt};
+use std::{error::Error, fmt, time::Duration};
 
 use super::Limit;
 use crate::string::codepages;
@@ -232,5 +232,15 @@ impl Decodable for String {
         let binding = Vec::<u8>::decode(buf, limit)?;
 
         Ok(codepages::to_lossy_string(&binding))
+    }
+}
+
+// Duration
+
+impl Decodable for Duration {
+    fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
+        let data = u32::decode(buf, limit)?;
+
+        Ok(Duration::from_millis(data as u64))
     }
 }

@@ -1,5 +1,5 @@
 use bytes::{BufMut, BytesMut};
-use std::{error::Error, fmt};
+use std::{error::Error, fmt, time::Duration};
 
 use super::Limit;
 use crate::string::codepages;
@@ -176,5 +176,17 @@ impl Encodable for String {
         let data = codepages::to_lossy_bytes(self);
         data.encode(buf, limit)?;
         Ok(())
+    }
+}
+
+// Duration
+
+impl Encodable for Duration {
+    fn encode(&self, buf: &mut BytesMut, limit: Option<Limit>) -> Result<(), EncodableError>
+    where
+        Self: Sized,
+    {
+        let millis = self.as_millis() as u32;
+        millis.encode(buf, limit)
     }
 }

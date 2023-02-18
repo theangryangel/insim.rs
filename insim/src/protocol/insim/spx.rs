@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use insim_core::{
     identifiers::{PlayerId, RequestId},
     prelude::*,
@@ -14,9 +16,9 @@ pub struct Spx {
 
     pub plid: PlayerId,
 
-    pub stime: u32,
+    pub stime: Duration,
 
-    pub etime: u32,
+    pub etime: Duration,
 
     pub split: u8,
 

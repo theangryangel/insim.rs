@@ -29,6 +29,7 @@ pub struct Cpp {
 
     pub fov: f32,
 
+    // should this be a special duration? do we need a serde-like 'with' annotation?
     pub time: u16,
 
     pub flags: u16,
