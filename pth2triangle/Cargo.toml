@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 insim_core = { path = "../insim_core", features = ["serde"] }
 insim_pth = { path = "../insim_pth" }
-clap = { version = "3.1.8", features = ["derive"] }
+clap = { version = "4.1.6", features = ["derive"] }
 miette = { version="5.5.0", features = ["fancy"] }
 serde_json = "1"
 serde = "1"
