@@ -8,7 +8,7 @@ insim = { path = "../insim", features = ["serde", "client"] }
 insim_pth = { path = "../insim_pth" }
 insim_game_data = { path = "../insim_game_data", features = ["serde"] }
 multi_index = { path = "../multi_index" }
-clap = { version = "3.1.8", features = ["derive"] }
+clap = { version = "4.1.7", features = ["derive"] }
 tokio = { version = "1.11.0", features = ["full", "tracing"] }
 convert_case = "0.5.0"
 serde = "1"
