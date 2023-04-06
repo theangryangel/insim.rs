@@ -9,14 +9,13 @@ Outsim is currently not supported.
 
 | Crate                                  | Usage                                                                                                                                                                                                  |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `insim`                                | High and low level client, transport and protocol implementation. If you are looking to implement something this is likely the crate you want.                                                         |
+| `insim`                                | Transport and protocol implementation. If you are looking to implement something this is likely the crate you want.                                                                                    |
 | `insim_core`                           | Contains core types shared across other crates.                                                                                                                                                        |
 | `insim_derive`                         | Contains proc_macros for insim_core.                                                                                                                                                                   |
 | `insim_game_data`                      | Contains track information.                                                                                                                                                                            |
 | `insim_pth`                            | Implements a PTH file read/writer.                                                                                                                                                                     |
 | `insim_smx`                            | Implements a SMX file reader/writer.                                                                                                                                                                   |
 | `multi_index` and `multi_index_derive` | `multi_index` started out life as a fork of [lun3x/multi_index_map](https://github.com/lun3x/multi_index_map) with the intention to resubmit upstream. See multi_index/README.md for more information. |
-| `patina`                               | An incomplete application that uses `insim` under the hood. Mostly used to test `insim`.                                                                                                               |
 
 ## Documentation
 

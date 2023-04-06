@@ -3,19 +3,14 @@ use crate::{Decodable, DecodableError, Encodable};
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
 pub enum Wind {
+    #[default]
     None = 0,
     Weak = 1,
     Strong = 2,
-}
-
-impl Default for Wind {
-    fn default() -> Self {
-        Wind::None
-    }
 }
 
 impl Encodable for Wind {
