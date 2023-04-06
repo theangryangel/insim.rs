@@ -2,54 +2,34 @@
 
 use insim_core::{DecodableError, EncodableError};
 
-use crate::protocol::relay::{RelayError, RelayErrorKind};
-use miette::Diagnostic;
-use std::io::ErrorKind;
-use thiserror::Error as ThisError;
-
-// FIXME - we should probably drop the derive clone here?
 #[non_exhaustive]
-#[derive(ThisError, Diagnostic, Debug, Clone)]
+#[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("Unimplemented command or action")]
-    Unimplemented,
-
-    #[error("Shutdown")]
-    Shutdown,
-
     #[error("Disconnected")]
     Disconnected,
-
-    #[error("Maximum number of retries reached")]
-    MaxConnectionAttempts,
 
     #[error("Unsupported Insim version: received {0:?}")]
     IncompatibleVersion(u8),
 
-    #[error("IO error occurred: {kind}: {message}")]
-    IO { kind: ErrorKind, message: String },
+    #[error("IO error occurred: {0:?}")]
+    IO(#[from] std::io::Error),
 
+    #[cfg(feature = "relay")]
     #[error("Insim Relay error: {0:?}")]
-    Relay(RelayErrorKind),
+    Relay(#[from] crate::packets::relay::RelayError),
 
     #[error("Failed to decode packet: {0:?}")]
     Decoding(#[from] DecodableError),
 
     #[error("Failed to encode packet: {0:?}")]
     Encoding(#[from] EncodableError),
+
+    #[error("Timeout")]
+    Timeout(String),
 }
 
-impl From<std::io::Error> for Error {
-    fn from(e: std::io::Error) -> Self {
-        Error::IO {
-            kind: e.kind(),
-            message: e.to_string(),
-        }
-    }
-}
-
-impl From<RelayError> for Error {
-    fn from(e: RelayError) -> Self {
-        Error::Relay(e.err)
+impl From<tokio::time::error::Elapsed> for Error {
+    fn from(value: tokio::time::error::Elapsed) -> Self {
+        Error::Timeout(value.to_string())
     }
 }

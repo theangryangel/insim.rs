@@ -1,9 +1,4 @@
-extern crate insim;
-use tracing_subscriber;
-
-use futures_util::SinkExt;
-use futures_util::StreamExt;
-use tokio::net::TcpStream;
+use insim::prelude::*;
 
 fn setup() {
     // setup tracing with some defaults if nothing is set
@@ -20,36 +15,25 @@ fn setup() {
 }
 
 #[tokio::main]
-#[allow(unused_must_use)]
-pub async fn main() {
+pub async fn main() -> Result<(), insim::error::Error> {
     setup();
 
-    let tcp: TcpStream = TcpStream::connect("isrelay.lfs.net:47474").await.unwrap();
+    tracing::info!("connecting!");
 
-    let mut t =
-        insim::protocol::transport::Transport::new(tcp, insim::protocol::codec::Mode::Uncompressed);
-    let isi = insim::protocol::insim::Init {
-        name: "insim.rs".into(),
-        password: "".into(),
-        prefix: b'!',
-        version: insim::protocol::VERSION,
-        interval: 1000,
-        flags: insim::protocol::insim::InitFlags::MCI,
-        reqi: insim_core::identifiers::RequestId(1),
-    };
+    let mut client = Config::default()
+        .relay(Some("Nubbins AU Demo".to_string()))
+        .connect()
+        .await?;
 
-    t.send(isi.into()).await;
+    tracing::info!("Connected!");
 
-    t.send(
-        insim::protocol::relay::HostSelect {
-            hname: "Nubbins AU Demo".into(),
-            ..Default::default()
-        }
-        .into(),
-    )
-    .await;
+    let mut i = 0;
 
-    while let Some(m) = t.next().await {
-        tracing::debug!("{:?}", m);
+    while let Some(m) = client.next().await {
+        i += 1;
+
+        tracing::info!("Event: {:?} {:?}", m, i);
     }
+
+    Ok(())
 }

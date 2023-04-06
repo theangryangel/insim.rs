@@ -24,18 +24,13 @@ impl StructData {
     }
 }
 
-#[derive(Debug, Clone, Copy, FromMeta, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, FromMeta, Eq, PartialEq)]
 #[darling(default)]
 enum How {
+    #[default]
     Hashed,
     Ordered,
     Custom,
-}
-
-impl Default for How {
-    fn default() -> Self {
-        How::Hashed
-    }
 }
 
 #[derive(Debug, FromField)]
