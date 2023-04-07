@@ -1,17 +1,19 @@
 use std::time::Duration;
 
+use futures::SinkExt;
+
 use tokio::{net::TcpStream, time::timeout};
 
 use crate::codec::Mode;
 use crate::core::identifiers::RequestId;
 use crate::packets::insim::{Init, InitFlags};
 use crate::transport::Transport;
+use crate::udp_stream::UdpStream;
 
 #[derive(Debug)]
 /// Configuration and [Client] builder.
 pub struct Config {
     pub name: String,
-    pub host: String,
     pub password: String,
     pub flags: InitFlags,
     pub prefix: Option<char>,
@@ -19,7 +21,6 @@ pub struct Config {
     pub verify_version: bool,
     pub wait_for_initial_pong: bool,
     pub codec_mode: Mode,
-    pub select_relay_host: Option<String>,
     pub connect_timeout: Duration,
 }
 
@@ -34,7 +35,6 @@ impl Config {
     pub fn new() -> Self {
         Self {
             name: "insim.rs".into(),
-            host: "127.0.0.1:29999".into(),
             password: "".into(),
             flags: InitFlags::MCI | InitFlags::CON | InitFlags::OBH,
             prefix: None,
@@ -42,37 +42,12 @@ impl Config {
             verify_version: true,
             wait_for_initial_pong: true,
             codec_mode: Mode::Compressed,
-            select_relay_host: None,
             connect_timeout: Duration::from_secs(10),
         }
     }
 }
 
 impl Config {
-    /// Use a TCP connection, to a given "host:port".
-    pub fn tcp(mut self, host: String) -> Self {
-        self.host = host;
-        self
-    }
-
-    /// Use the Insim Relay.
-    pub fn relay(mut self, host: Option<String>) -> Self {
-        self.host = "isrelay.lfs.net:47474".into();
-        // TODO: Talk to LFS devs, find out if/when relay gets compressed support?
-        self.codec_mode = Mode::Uncompressed;
-        // relay does not respond to version requests until after the host is selected
-        self.verify_version = false;
-        // relay does not respond to ping requests
-        self.wait_for_initial_pong = false;
-        self.select_relay_host = host;
-        self
-    }
-
-    /// Use a UDP connection.
-    pub fn udp(self, _host: String) -> Self {
-        unimplemented!("UDP support is not yet available.");
-    }
-
     /// Name of the client, passed to Insim [Init](crate::protocol::insim::Init).
     pub fn named(mut self, name: String) -> Self {
         self.name = name;
@@ -149,11 +124,66 @@ impl Config {
         }
     }
 
-    /// Create a Transport using this configuration builder
-    pub async fn connect(&self) -> Result<Transport<TcpStream>, crate::error::Error> {
-        let stream = timeout(self.connect_timeout, TcpStream::connect(self.host.clone())).await??;
+    /// Create a TCP Transport using this configuration builder
+    pub async fn connect_tcp(
+        &mut self,
+        remote: String,
+    ) -> Result<Transport<TcpStream>, crate::error::Error> {
+        let stream = timeout(self.connect_timeout, TcpStream::connect(remote)).await??;
 
-        let stream = crate::transport::handshake(stream, self).await?;
+        let mut stream = Transport::new(stream, self.codec_mode);
+        stream.handshake_with_config(self).await?;
+        Ok(stream)
+    }
+
+    /// Create a UDP Transport using this configuration builder
+    pub async fn connect_udp(
+        &mut self,
+        local: String,
+        remote: String,
+    ) -> Result<Transport<UdpStream>, crate::error::Error> {
+        let stream = UdpStream::connect(local, remote).await?;
+        let mut stream = Transport::new(stream, self.codec_mode);
+        stream.handshake_with_config(self).await?;
+        Ok(stream)
+    }
+
+    /// Create a TCP Transport using this configuration builder, via the LFS World Relay
+    pub async fn connect_relay(
+        &mut self,
+        auto_select_host: Option<String>,
+    ) -> Result<Transport<TcpStream>, crate::error::Error> {
+        // TODO: Talk to LFS devs, find out if/when relay gets compressed support?
+        self.codec_mode = Mode::Uncompressed;
+
+        // Relay does not respond to version requests until after the host is selected
+        self.verify_version = false;
+
+        // Relay does not respond to ping requests
+        self.wait_for_initial_pong = false;
+
+        let stream = timeout(
+            self.connect_timeout,
+            TcpStream::connect("isrelay.lfs.net:47474"),
+        )
+        .await??;
+
+        // let mut stream = crate::transport::handshake(stream, &self).await?;
+        let mut stream = Transport::new(stream, self.codec_mode);
+        stream.handshake_with_config(self).await?;
+
+        if let Some(hostname) = auto_select_host {
+            // TODO: We should verify if the host is available for selection on the relay!
+            stream
+                .send(
+                    crate::packets::relay::HostSelect {
+                        hname: hostname.to_owned(),
+                        ..Default::default()
+                    }
+                    .into(),
+                )
+                .await?;
+        }
 
         Ok(stream)
     }

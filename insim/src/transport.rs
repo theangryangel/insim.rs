@@ -47,7 +47,7 @@ pub struct Transport<T> {
 
 impl<T> Transport<T>
 where
-    T: AsyncRead + AsyncWrite,
+    T: AsyncRead + AsyncWrite + std::marker::Unpin,
 {
     pub fn new(inner: T, codec_mode: Mode) -> Transport<T> {
         let inner = Framed::new(inner, codec::Codec::new(codec_mode));
@@ -64,6 +64,88 @@ where
             state: TransportState::Connected,
             pong: false,
         }
+    }
+
+    pub async fn handshake_with_config(
+        &mut self,
+        config: &crate::config::Config,
+    ) -> Result<(), error::Error> {
+        Pin::new(self).poll_handshake(config).await
+    }
+
+    /// Handle the verification of a Transport.
+    /// Is Insim server responding the correct version?
+    /// Have we received an initial ping response?
+    pub(crate) async fn poll_verify(
+        mut self: Pin<&mut Self>,
+        config: &crate::config::Config,
+    ) -> Result<(), error::Error> {
+        let mut received_vers = !config.verify_version;
+        let mut received_tiny = !config.wait_for_initial_pong;
+
+        while !received_tiny && !received_vers {
+            match self.as_mut().project().inner.next().await {
+                None => {
+                    return Err(error::Error::Disconnected);
+                }
+                Some(Err(e)) => {
+                    return Err(e);
+                }
+                Some(Ok(Packet::Tiny(m))) => {
+                    tracing::info!("got {m:?}");
+                    received_tiny = true;
+                }
+                Some(Ok(Packet::Version(insim::Version { insimver, .. }))) => {
+                    if insimver != crate::packets::INSIM_VERSION {
+                        return Err(error::Error::IncompatibleVersion(insimver));
+                    }
+
+                    received_vers = true;
+                }
+                Some(Ok(m)) => {
+                    tracing::info!("received: {m:?}");
+                    /* not the droids we're looking for */
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Perform the initial handshake and verification. Taking an AsyncRead + AsyncWrite and turn it
+    /// into a Transport.
+    pub(crate) async fn poll_handshake(
+        mut self: Pin<&mut Self>,
+        config: &crate::config::Config,
+    ) -> Result<(), error::Error> {
+        let isi = config.as_isi();
+
+        self.send(isi.into()).await?;
+
+        if config.wait_for_initial_pong {
+            // send a ping!
+            self.as_mut()
+                .project()
+                .inner
+                .send(
+                    crate::packets::insim::Tiny {
+                        reqi: RequestId(2),
+                        subtype: crate::packets::insim::TinyType::Ping,
+                    }
+                    .into(),
+                )
+                .await?;
+        }
+
+        if time::timeout(config.connect_timeout, self.poll_verify(config))
+            .await
+            .is_err()
+        {
+            return Err(error::Error::Timeout(
+                "Timeout during initial handshake".to_string(),
+            ));
+        }
+
+        Ok(())
     }
 
     pub fn shutdown(&mut self) {
@@ -104,7 +186,7 @@ where
 
 impl<T> Stream for Transport<T>
 where
-    T: AsyncRead + AsyncWrite,
+    T: AsyncRead + AsyncWrite + std::marker::Unpin,
 {
     type Item = Result<Packet, error::Error>;
 
@@ -189,7 +271,7 @@ where
 
 impl<T> Sink<Packet> for Transport<T>
 where
-    T: AsyncRead + AsyncWrite,
+    T: AsyncRead + AsyncWrite + std::marker::Unpin,
 {
     type Error = error::Error;
 
@@ -209,106 +291,4 @@ where
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.project().inner.poll_close(cx)
     }
-}
-
-/// Handle the verification of a Transport.
-/// Is Insim server responding the correct version?
-/// Have we received an initial ping response?
-pub(crate) async fn verification<T>(
-    stream: &mut Transport<T>,
-    verify_version: bool,
-    verify_pong: bool,
-) -> Result<(), error::Error>
-where
-    T: AsyncRead + AsyncWrite + std::marker::Unpin,
-{
-    let mut received_vers = !verify_version;
-    let mut received_tiny = !verify_pong;
-
-    while !received_tiny && !received_vers {
-        match stream.next().await {
-            None => {
-                return Err(error::Error::Disconnected);
-            }
-            Some(Err(e)) => {
-                return Err(e);
-            }
-            Some(Ok(Packet::Tiny(m))) => {
-                tracing::info!("got {m:?}");
-                received_tiny = true;
-            }
-            Some(Ok(Packet::Version(insim::Version { insimver, .. }))) => {
-                if insimver != crate::packets::INSIM_VERSION {
-                    return Err(error::Error::IncompatibleVersion(insimver));
-                }
-
-                received_vers = true;
-            }
-            Some(Ok(m)) => {
-                tracing::info!("received: {m:?}");
-                /* not the droids we're looking for */
-            }
-        }
-    }
-
-    Ok(())
-}
-
-/// Perform the initial handshake and verification. Taking an AsyncRead + AsyncWrite and turn it
-/// into a Transport.
-pub(crate) async fn handshake<T>(
-    stream: T,
-    config: &crate::config::Config,
-) -> Result<Transport<T>, error::Error>
-where
-    T: AsyncRead + AsyncWrite + std::marker::Unpin,
-{
-    let mut stream = Transport::new(stream, config.codec_mode);
-
-    let isi = config.as_isi();
-
-    stream.send(isi.into()).await?;
-
-    if config.wait_for_initial_pong {
-        // send a ping!
-        stream
-            .send(
-                crate::packets::insim::Tiny {
-                    reqi: RequestId(2),
-                    subtype: crate::packets::insim::TinyType::Ping,
-                }
-                .into(),
-            )
-            .await?;
-    }
-
-    if time::timeout(
-        config.connect_timeout,
-        verification(
-            &mut stream,
-            config.verify_version,
-            config.wait_for_initial_pong,
-        ),
-    )
-    .await
-    .is_err()
-    {
-        return Err(error::Error::Timeout(
-            "Timeout during initial handshake".to_string(),
-        ));
-    }
-
-    if let Some(hostname) = &config.select_relay_host {
-        stream
-            .send(
-                crate::packets::relay::HostSelect {
-                    hname: hostname.to_owned(),
-                    ..Default::default()
-                }
-                .into(),
-            )
-            .await?;
-    }
-
-    Ok(stream)
 }

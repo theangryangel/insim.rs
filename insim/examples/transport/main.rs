@@ -21,8 +21,7 @@ pub async fn main() -> Result<(), insim::error::Error> {
     tracing::info!("connecting!");
 
     let mut client = Config::default()
-        .relay(Some("Nubbins AU Demo".to_string()))
-        .connect()
+        .connect_relay(Some("Nubbins AU Demo".to_string()))
         .await?;
 
     tracing::info!("Connected!");

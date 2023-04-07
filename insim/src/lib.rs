@@ -10,6 +10,7 @@ pub mod config;
 pub mod error;
 pub mod packets;
 pub mod transport;
+pub mod udp_stream;
 
 #[doc(hidden)]
 /// Rexport insim_core
