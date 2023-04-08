@@ -66,22 +66,52 @@ where
         }
     }
 
-    pub async fn handshake_with_config(
+    // Convenience method
+    pub async fn handshake_with_config_unpin(
         &mut self,
         config: &crate::config::Config,
     ) -> Result<(), error::Error> {
-        Pin::new(self).poll_handshake(config).await
+        Pin::new(self).handshake_with_config(config).await
+    }
+
+    pub async fn handshake_with_config(
+        self: Pin<&mut Self>,
+        config: &crate::config::Config,
+    ) -> Result<(), error::Error> {
+        self.handshake(
+            config.connect_timeout,
+            config.as_isi(),
+            config.wait_for_initial_pong,
+            config.verify_version,
+        )
+        .await
     }
 
     /// Handle the verification of a Transport.
     /// Is Insim server responding the correct version?
     /// Have we received an initial ping response?
-    pub(crate) async fn poll_verify(
+    async fn verify(
         mut self: Pin<&mut Self>,
-        config: &crate::config::Config,
+        verify_version: bool,
+        wait_for_pong: bool,
     ) -> Result<(), error::Error> {
-        let mut received_vers = !config.verify_version;
-        let mut received_tiny = !config.wait_for_initial_pong;
+        if wait_for_pong {
+            // send a ping!
+            self.as_mut()
+                .project()
+                .inner
+                .send(
+                    crate::packets::insim::Tiny {
+                        reqi: RequestId(2),
+                        subtype: crate::packets::insim::TinyType::Ping,
+                    }
+                    .into(),
+                )
+                .await?;
+        }
+
+        let mut received_vers = !verify_version;
+        let mut received_tiny = !wait_for_pong;
 
         while !received_tiny && !received_vers {
             match self.as_mut().project().inner.next().await {
@@ -113,30 +143,16 @@ where
 
     /// Perform the initial handshake and verification. Taking an AsyncRead + AsyncWrite and turn it
     /// into a Transport.
-    pub(crate) async fn poll_handshake(
+    pub async fn handshake(
         mut self: Pin<&mut Self>,
-        config: &crate::config::Config,
+        timeout: Duration,
+        isi: crate::packets::insim::Init,
+        wait_for_pong: bool,
+        verify_version: bool,
     ) -> Result<(), error::Error> {
-        let isi = config.as_isi();
+        self.send(isi).await?;
 
-        self.send(isi.into()).await?;
-
-        if config.wait_for_initial_pong {
-            // send a ping!
-            self.as_mut()
-                .project()
-                .inner
-                .send(
-                    crate::packets::insim::Tiny {
-                        reqi: RequestId(2),
-                        subtype: crate::packets::insim::TinyType::Ping,
-                    }
-                    .into(),
-                )
-                .await?;
-        }
-
-        if time::timeout(config.connect_timeout, self.poll_verify(config))
+        if time::timeout(timeout, self.verify(wait_for_pong, verify_version))
             .await
             .is_err()
         {
@@ -269,9 +285,10 @@ where
     }
 }
 
-impl<T> Sink<Packet> for Transport<T>
+impl<T, P> Sink<P> for Transport<T>
 where
     T: AsyncRead + AsyncWrite + std::marker::Unpin,
+    P: std::fmt::Debug + Into<Packet>,
 {
     type Error = error::Error;
 
@@ -279,9 +296,9 @@ where
         self.project().inner.poll_ready(cx)
     }
 
-    fn start_send(self: Pin<&mut Self>, value: Packet) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, value: P) -> Result<(), Self::Error> {
         tracing::info!("asked to send {value:?}");
-        self.project().inner.start_send(value)
+        self.project().inner.start_send(value.into())
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

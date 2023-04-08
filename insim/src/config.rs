@@ -132,7 +132,7 @@ impl Config {
         let stream = timeout(self.connect_timeout, TcpStream::connect(remote)).await??;
 
         let mut stream = Transport::new(stream, self.codec_mode);
-        stream.handshake_with_config(self).await?;
+        stream.handshake_with_config_unpin(self).await?;
         Ok(stream)
     }
 
@@ -144,7 +144,7 @@ impl Config {
     ) -> Result<Transport<UdpStream>, crate::error::Error> {
         let stream = UdpStream::connect(local, remote).await?;
         let mut stream = Transport::new(stream, self.codec_mode);
-        stream.handshake_with_config(self).await?;
+        stream.handshake_with_config_unpin(self).await?;
         Ok(stream)
     }
 
@@ -170,18 +170,15 @@ impl Config {
 
         // let mut stream = crate::transport::handshake(stream, &self).await?;
         let mut stream = Transport::new(stream, self.codec_mode);
-        stream.handshake_with_config(self).await?;
+        stream.handshake_with_config_unpin(self).await?;
 
         if let Some(hostname) = auto_select_host {
             // TODO: We should verify if the host is available for selection on the relay!
             stream
-                .send(
-                    crate::packets::relay::HostSelect {
-                        hname: hostname.to_owned(),
-                        ..Default::default()
-                    }
-                    .into(),
-                )
+                .send(crate::packets::relay::HostSelect {
+                    hname: hostname.to_owned(),
+                    ..Default::default()
+                })
                 .await?;
         }
 
