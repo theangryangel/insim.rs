@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use futures::SinkExt;
 
+use tokio::net::ToSocketAddrs;
 use tokio::{net::TcpStream, time::timeout};
 
 use crate::codec::Mode;
@@ -125,9 +126,9 @@ impl Config {
     }
 
     /// Create a TCP Transport using this configuration builder
-    pub async fn connect_tcp(
+    pub async fn connect_tcp<A: ToSocketAddrs>(
         &mut self,
-        remote: String,
+        remote: A,
     ) -> Result<Transport<TcpStream>, crate::error::Error> {
         let stream = timeout(self.connect_timeout, TcpStream::connect(remote)).await??;
 
@@ -137,10 +138,10 @@ impl Config {
     }
 
     /// Create a UDP Transport using this configuration builder
-    pub async fn connect_udp(
+    pub async fn connect_udp<A: ToSocketAddrs, B: ToSocketAddrs>(
         &mut self,
-        local: String,
-        remote: String,
+        local: A,
+        remote: B,
     ) -> Result<Transport<UdpStream>, crate::error::Error> {
         let stream = UdpStream::connect(local, remote).await?;
         let mut stream = Transport::new(stream, self.codec_mode);
