@@ -5,11 +5,14 @@
 
 pub mod prelude;
 
+pub mod client;
 pub mod codec;
-pub mod config;
 pub mod error;
 pub mod packets;
-pub mod transport;
+pub mod result;
+
+#[cfg(feature = "udp")]
+pub mod udp_stream;
 
 #[doc(hidden)]
 /// Rexport insim_core

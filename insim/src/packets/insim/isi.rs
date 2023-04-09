@@ -11,7 +11,7 @@ bitflags! {
     /// Flags for the [Init] packet flags field.
     #[derive(Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
-    pub struct InitFlags: u16 {
+    pub struct IsiFlags: u16 {
         //RES0 => (1 << 0),	// bit  0: spare
         //RES_1 => (1 << 1),	// bit  1: spare
          const LOCAL = (1 << 2);	// bit  2: guest or single player
@@ -27,13 +27,13 @@ bitflags! {
     }
 }
 
-impl InitFlags {
+impl IsiFlags {
     pub fn clear(&mut self) {
         self.bits = 0;
     }
 }
 
-impl Encodable for InitFlags {
+impl Encodable for IsiFlags {
     fn encode(
         &self,
         buf: &mut bytes::BytesMut,
@@ -44,7 +44,7 @@ impl Encodable for InitFlags {
     }
 }
 
-impl Decodable for InitFlags {
+impl Decodable for IsiFlags {
     fn decode(
         buf: &mut bytes::BytesMut,
         limit: Option<Limit>,
@@ -57,16 +57,16 @@ impl Decodable for InitFlags {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Insim Init, or handshake packet.
 /// Required to be sent to the server before any other packets.
-pub struct Init {
+pub struct Isi {
     /// When set to a non-zero value the server will send a [Version](super::Version) packet in response.
     ///packet in response.
     pub reqi: RequestId,
 
-    // we do not support this feature, using pad_bytes_before
-    // on flags to mask it.
-    //pub udpport: u16,
+    /// UDP Port
+    pub udpport: u16,
+
     /// Options for the Insim Connection. See [InitFlags] for more information.
-    pub flags: InitFlags,
+    pub flags: IsiFlags,
 
     /// Protocol version of Insim you wish to use.
     pub version: u8,
@@ -87,7 +87,7 @@ pub struct Init {
     pub name: String,
 }
 
-impl Encodable for Init {
+impl Encodable for Isi {
     fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), EncodableError>
     where
         Self: Sized,
@@ -105,24 +105,21 @@ impl Encodable for Init {
         // pad_after reqi
         buf.put_bytes(0, 1);
 
-        // mask out udpport
-        buf.put_bytes(0, 2);
+        self.udpport.encode(buf, None)?;
+        self.flags.encode(buf, None)?;
 
         self.version.encode(buf, None)?;
-
         (self.prefix as u8).encode(buf, None)?;
-
         (self.interval.as_millis() as u16).encode(buf, None)?;
 
         self.password.encode(buf, Some(Limit::Bytes(16)))?;
-
         self.name.encode(buf, Some(Limit::Bytes(16)))?;
 
         Ok(())
     }
 }
 
-impl Decodable for Init {
+impl Decodable for Isi {
     fn decode(buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError>
     where
         Self: Default,
@@ -142,13 +139,13 @@ impl Decodable for Init {
         // pad bytes_after reqi
         buf.advance(1);
 
-        // skip over udpport
-        buf.advance(2);
+        data.udpport = u16::decode(buf, None)?;
+        data.flags = IsiFlags::decode(buf, None)?;
 
-        data.flags = InitFlags::decode(buf, None)?;
         data.version = u8::decode(buf, None)?;
         data.prefix = u8::decode(buf, None)? as char;
         data.interval = Duration::from_millis(u16::decode(buf, None)?.into());
+
         data.password = String::decode(buf, Some(Limit::Bytes(16)))?;
         data.name = String::decode(buf, Some(Limit::Bytes(16)))?;
 

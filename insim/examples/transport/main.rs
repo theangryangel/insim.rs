@@ -1,4 +1,4 @@
-use insim::prelude::*;
+use insim::{prelude::*, result::Result};
 
 fn setup() {
     // setup tracing with some defaults if nothing is set
@@ -15,14 +15,15 @@ fn setup() {
 }
 
 #[tokio::main]
-pub async fn main() -> Result<(), insim::error::Error> {
+pub async fn main() -> Result<()> {
     setup();
 
     tracing::info!("connecting!");
 
-    let mut client = Config::default()
-        .relay(Some("Nubbins AU Demo".to_string()))
-        .connect()
+    let mut client = ClientBuilder::default()
+        .connect_tcp("172.20.48.1:29999")
+        // .connect_udp("0.0.0.0:29998", "172.20.48.1:29999")
+        // .connect_relay("Nubbins AU Demo")
         .await?;
 
     tracing::info!("Connected!");
@@ -32,7 +33,9 @@ pub async fn main() -> Result<(), insim::error::Error> {
     while let Some(m) = client.next().await {
         i += 1;
 
-        tracing::info!("Event: {:?} {:?}", m, i);
+        let m = m?;
+
+        tracing::info!("Packet={:?} Index={:?}", m, i);
     }
 
     Ok(())

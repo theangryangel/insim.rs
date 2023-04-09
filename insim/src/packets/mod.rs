@@ -32,14 +32,15 @@ pub mod insim;
 #[cfg(feature = "relay")]
 pub mod relay;
 
-pub const INSIM_VERSION: u8 = 9;
+pub const VERSION: u8 = 9;
 
 #[derive(InsimEncode, InsimDecode, Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
+#[non_exhaustive]
 #[repr(u8)]
 pub enum Packet {
-    Init(insim::Init) = 1,
+    Init(insim::Isi) = 1,
     Version(insim::Version) = 2,
     Tiny(insim::Tiny) = 3,
     Small(insim::Small) = 4,
@@ -53,7 +54,7 @@ pub enum Packet {
     InsimInfo(insim::Iii) = 12,
     MessageType(insim::Mst) = 13,
     MessageToConnection(insim::Mtc) = 14,
-    ScreenMode(insim::Mode) = 15,
+    ScreenMode(insim::Mod) = 15,
     VoteNotification(insim::Vtn) = 16,
     RaceStart(insim::Rst) = 17,
     NewConnection(insim::Ncn) = 18,
@@ -131,7 +132,7 @@ impl Default for Packet {
 }
 
 crate::impl_packet_from! {
-    insim::Init => Init,
+    insim::Isi => Init,
     insim::Version => Version,
     insim::Tiny => Tiny,
     insim::Small => Small,
@@ -145,7 +146,7 @@ crate::impl_packet_from! {
     insim::Iii => InsimInfo,
     insim::Mst => MessageType,
     insim::Mtc => MessageToConnection,
-    insim::Mode => ScreenMode,
+    insim::Mod => ScreenMode,
     insim::Vtn => VoteNotification,
     insim::Rst => RaceStart,
     insim::Ncn => NewConnection,

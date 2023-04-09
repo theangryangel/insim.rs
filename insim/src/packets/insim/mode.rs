@@ -6,7 +6,7 @@ use serde::Serialize;
 #[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Screen Mode (referred to as originally IS_MOD within Insim.txt)
-pub struct Mode {
+pub struct Mod {
     #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 

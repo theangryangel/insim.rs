@@ -2,10 +2,17 @@
 
 A collection of crates to assist working with the [Live For Speed](https://lfs.net/) racing simulator and it's [Insim](https://en.lfsmanual.net/wiki/InSim.txt) (protocol).
 
-For the foreseeable future only TCP is supported for simplicity and time.
-Outsim is currently not supported.
+Support is currently available for:
 
-:warning: The API is not yet 100% stable at this time. Use at your own risk.
+- Insim over TCP
+- Insim over UDP
+- Insim over TCP via LFS World Relay
+
+The sibling protocols, Outsim and Outgauge, are currently not supported. LFS
+World websocket support is being considered.
+
+:warning: The API is not yet stable at this time. Use at your own risk. I am
+currently not touching the version number.
 
 | Crate                                  | Usage                                                                                                                                                                                                  |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -19,7 +26,10 @@ Outsim is currently not supported.
 
 ## Documentation
 
-Until we're released please run `cd insim && cargo doc --no-deps --open`
+Until we're released, either:
+
+- Please run `cd insim && cargo doc --no-deps --open`
+- Or take a look at `insim/examples/transport`
 
 ## TODO
 
