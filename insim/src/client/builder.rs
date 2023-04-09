@@ -114,6 +114,12 @@ impl ClientBuilder {
         self
     }
 
+    /// Should the Client wait for the initial pong?
+    pub fn wait_for_initial_pong(mut self, value: bool) -> Self {
+        self.wait_for_initial_pong = value;
+        self
+    }
+
     /// Create an Insim Init packet
     pub fn as_isi(&self) -> Init {
         Init {

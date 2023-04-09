@@ -18,27 +18,20 @@ pub struct Sta {
     pub replayspeed: f32,
 
     pub flags: u16,
-
     pub ingamecam: u8,
-
     pub viewplid: PlayerId,
 
     pub nump: u8,
-
     pub numconns: u8,
-
     pub numfinished: u8,
-
     pub raceinprog: u8,
 
     pub qualmins: u8,
-
-    #[insim(pad_bytes_after = "2")]
+    #[insim(pad_bytes_after = "1")]
     pub racelaps: u8,
+    pub serverstatus: u8,
 
     pub track: Track,
-
     pub weather: u8,
-
     pub wind: Wind,
 }
