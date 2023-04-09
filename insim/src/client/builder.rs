@@ -5,16 +5,16 @@ use futures::SinkExt;
 use tokio::net::ToSocketAddrs;
 use tokio::{net::TcpStream, time::timeout};
 
+use crate::client::Client;
 use crate::codec::Mode;
 use crate::core::identifiers::RequestId;
 use crate::packets::insim::{Init, InitFlags};
 use crate::result::Result;
-use crate::transport::Transport;
 use crate::udp_stream::UdpStream;
 
 #[derive(Debug)]
 /// Configuration and [Client] builder.
-pub struct Config {
+pub struct ClientBuilder {
     pub name: String,
     pub password: String,
     pub flags: InitFlags,
@@ -26,13 +26,13 @@ pub struct Config {
     pub connect_timeout: Duration,
 }
 
-impl Default for Config {
-    fn default() -> Config {
-        Config::new()
+impl Default for ClientBuilder {
+    fn default() -> ClientBuilder {
+        ClientBuilder::new()
     }
 }
 
-impl Config {
+impl ClientBuilder {
     /// Create a default configuration instance.
     pub fn new() -> Self {
         Self {
@@ -49,7 +49,7 @@ impl Config {
     }
 }
 
-impl Config {
+impl ClientBuilder {
     /// Name of the client, passed to Insim [Init](crate::protocol::insim::Init).
     pub fn named(mut self, name: String) -> Self {
         self.name = name;
@@ -127,14 +127,18 @@ impl Config {
     }
 
     /// Create a TCP Transport using this configuration builder
-    pub async fn connect_tcp<A: ToSocketAddrs>(
-        &mut self,
-        remote: A,
-    ) -> Result<Transport<TcpStream>> {
+    pub async fn connect_tcp<A: ToSocketAddrs>(&mut self, remote: A) -> Result<Client<TcpStream>> {
         let stream = timeout(self.connect_timeout, TcpStream::connect(remote)).await??;
 
-        let mut stream = Transport::new(stream, self.codec_mode);
-        stream.handshake_with_config_unpin(self).await?;
+        let mut stream = Client::new(stream, self.codec_mode);
+        stream
+            .handshake_unpin(
+                self.connect_timeout,
+                self.as_isi(),
+                self.wait_for_initial_pong,
+                self.verify_version,
+            )
+            .await?;
         Ok(stream)
     }
 
@@ -143,18 +147,25 @@ impl Config {
         &mut self,
         local: A,
         remote: B,
-    ) -> Result<Transport<UdpStream>> {
+    ) -> Result<Client<UdpStream>> {
         let stream = UdpStream::connect(local, remote).await?;
-        let mut stream = Transport::new(stream, self.codec_mode);
-        stream.handshake_with_config_unpin(self).await?;
+        let mut stream = Client::new(stream, self.codec_mode);
+        stream
+            .handshake_unpin(
+                self.connect_timeout,
+                self.as_isi(),
+                self.wait_for_initial_pong,
+                self.verify_version,
+            )
+            .await?;
         Ok(stream)
     }
 
     /// Create a TCP Transport using this configuration builder, via the LFS World Relay
-    pub async fn connect_relay(
-        &mut self,
-        auto_select_host: Option<String>,
-    ) -> Result<Transport<TcpStream>> {
+    pub async fn connect_relay<'a, H>(&mut self, auto_select_host: H) -> Result<Client<TcpStream>>
+    where
+        H: Into<Option<&'a str>>,
+    {
         // TODO: Talk to LFS devs, find out if/when relay gets compressed support?
         self.codec_mode = Mode::Uncompressed;
 
@@ -171,14 +182,21 @@ impl Config {
         .await??;
 
         // let mut stream = crate::transport::handshake(stream, &self).await?;
-        let mut stream = Transport::new(stream, self.codec_mode);
-        stream.handshake_with_config_unpin(self).await?;
+        let mut stream = Client::new(stream, self.codec_mode);
+        stream
+            .handshake_unpin(
+                self.connect_timeout,
+                self.as_isi(),
+                self.wait_for_initial_pong,
+                self.verify_version,
+            )
+            .await?;
 
-        if let Some(hostname) = auto_select_host {
+        if let Some(hostname) = auto_select_host.into() {
             // TODO: We should verify if the host is available for selection on the relay!
             stream
                 .send(crate::packets::relay::HostSelect {
-                    hname: hostname.to_owned(),
+                    hname: hostname.to_string(),
                     ..Default::default()
                 })
                 .await?;

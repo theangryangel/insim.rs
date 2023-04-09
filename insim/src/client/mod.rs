@@ -1,4 +1,8 @@
 /// A Stream and Sink based transport layer for the insim protocol.
+pub mod builder;
+
+pub use builder::ClientBuilder;
+
 use crate::{
     codec::{self, Mode},
     error,
@@ -22,10 +26,9 @@ const TIMEOUT_SECS: u64 = 90;
 
 /// Internal Transport state.
 #[derive(Eq, PartialEq)]
-pub enum TransportState {
+pub enum ClientState {
     Disconnected,
     Connected,
-
     Shutdown,
 }
 
@@ -34,7 +37,7 @@ pub enum TransportState {
 /// [Packets](Packet), and ensure that the connection is maintained through
 /// [insim::Tiny] keepalive packets.
 #[pin_project]
-pub struct Transport<T> {
+pub struct Client<T> {
     #[pin]
     inner: Framed<T, codec::Codec>,
     // Cant use pin_project on tokio::time::Sleep because it's !Unpin
@@ -42,50 +45,29 @@ pub struct Transport<T> {
     deadline: Pin<Box<time::Sleep>>,
     duration: Duration,
     poll_deadline: bool,
-    state: TransportState,
+    state: ClientState,
     pong: bool,
 }
 
-impl<T> Transport<T>
+impl<T> Client<T>
 where
     T: AsyncRead + AsyncWrite + std::marker::Unpin,
 {
-    pub fn new(inner: T, codec_mode: Mode) -> Transport<T> {
+    pub fn new(inner: T, codec_mode: Mode) -> Client<T> {
         let inner = Framed::new(inner, codec::Codec::new(codec_mode));
 
         let duration = time::Duration::new(TIMEOUT_SECS, 0);
         let next = time::Instant::now() + duration;
         let deadline = Box::pin(tokio::time::sleep_until(next));
 
-        Transport {
+        Client {
             inner,
             deadline,
             duration,
             poll_deadline: true,
-            state: TransportState::Connected,
+            state: ClientState::Connected,
             pong: false,
         }
-    }
-
-    // Convenience method
-    pub async fn handshake_with_config_unpin(
-        &mut self,
-        config: &crate::config::Config,
-    ) -> Result<()> {
-        Pin::new(self).handshake_with_config(config).await
-    }
-
-    pub async fn handshake_with_config(
-        self: Pin<&mut Self>,
-        config: &crate::config::Config,
-    ) -> Result<()> {
-        self.handshake(
-            config.connect_timeout,
-            config.as_isi(),
-            config.wait_for_initial_pong,
-            config.verify_version,
-        )
-        .await
     }
 
     /// Handle the verification of a Transport.
@@ -165,8 +147,21 @@ where
         Ok(())
     }
 
+    // Convenience method
+    pub async fn handshake_unpin(
+        &mut self,
+        timeout: Duration,
+        isi: crate::packets::insim::Init,
+        wait_for_pong: bool,
+        verify_version: bool,
+    ) -> Result<()> {
+        Pin::new(self)
+            .handshake(timeout, isi, wait_for_pong, verify_version)
+            .await
+    }
+
     pub fn shutdown(&mut self) {
-        self.state = TransportState::Shutdown;
+        self.state = ClientState::Shutdown;
     }
 
     fn poll_pong(mut self: Pin<&mut Self>, cx: &mut Context) {
@@ -201,7 +196,7 @@ where
     }
 }
 
-impl<T> Stream for Transport<T>
+impl<T> Stream for Client<T>
 where
     T: AsyncRead + AsyncWrite + std::marker::Unpin,
 {
@@ -225,12 +220,12 @@ where
     }
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        if *self.as_mut().project().state == TransportState::Shutdown {
-            *self.as_mut().project().state = TransportState::Disconnected;
+        if *self.as_mut().project().state == ClientState::Shutdown {
+            *self.as_mut().project().state = ClientState::Disconnected;
             return Poll::Ready(None);
         }
 
-        if *self.as_mut().project().state == TransportState::Disconnected {
+        if *self.as_mut().project().state == ClientState::Disconnected {
             tracing::error!("polled after disconnect");
             return Poll::Ready(None);
         }
@@ -276,7 +271,7 @@ where
                 Poll::Pending => return Poll::Pending,
             };
             *self.as_mut().project().poll_deadline = false;
-            *self.as_mut().project().state = TransportState::Disconnected;
+            *self.as_mut().project().state = ClientState::Disconnected;
             return Poll::Ready(Some(Err(error::Error::Timeout(
                 "Keepalive (ping) timeout".into(),
             ))));
@@ -286,7 +281,7 @@ where
     }
 }
 
-impl<T, P> Sink<P> for Transport<T>
+impl<T, P> Sink<P> for Client<T>
 where
     T: AsyncRead + AsyncWrite + std::marker::Unpin,
     P: std::fmt::Debug + Into<Packet>,
