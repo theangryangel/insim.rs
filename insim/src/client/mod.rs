@@ -3,7 +3,7 @@ pub mod builder;
 pub use builder::ClientBuilder;
 
 use crate::{
-    codec::{self, Mode},
+    codec::Codec,
     error,
     packets::{insim, Packet},
     result::Result,
@@ -23,6 +23,13 @@ use tokio_util::codec::Framed;
 
 const TIMEOUT_SECS: u64 = 90;
 
+pub trait ClientTransport:
+    Sink<Packet, Error = error::Error> + Stream<Item = Result<Packet>> + std::marker::Unpin
+{
+}
+
+impl<T> ClientTransport for Framed<T, Codec> where T: AsyncRead + AsyncWrite + std::marker::Unpin {}
+
 /// Internal Transport state.
 #[derive(Eq, PartialEq)]
 pub enum ClientState {
@@ -32,13 +39,13 @@ pub enum ClientState {
 }
 
 /// A Stream and Sink based transport layer for the insim protocol.
-/// Given a `AsyncRead` and `AsyncWrite`, this struct will handle encoding and decoding of
-/// [Packets](Packet), and ensure that the connection is maintained through
-/// [insim::Tiny] keepalive packets.
+/// Given something that implements the [ClientTransport] trait, Client will handle
+/// encoding and decoding of [Packets](Packet), and ensure that the connection
+/// is maintained through [insim::Tiny] keepalive packets, and handling any timeout.
 #[pin_project]
 pub struct Client<T> {
     #[pin]
-    inner: Framed<T, codec::Codec>,
+    inner: T,
     // Cant use pin_project on tokio::time::Sleep because it's !Unpin
     // meaning we can't then use tokio::select! later. So it needs to be boxed.
     deadline: Pin<Box<time::Sleep>>,
@@ -50,11 +57,9 @@ pub struct Client<T> {
 
 impl<T> Client<T>
 where
-    T: AsyncRead + AsyncWrite + std::marker::Unpin,
+    T: ClientTransport,
 {
-    pub fn new(inner: T, codec_mode: Mode) -> Client<T> {
-        let inner = Framed::new(inner, codec::Codec::new(codec_mode));
-
+    pub fn new(inner: T) -> Client<T> {
         let duration = time::Duration::new(TIMEOUT_SECS, 0);
         let next = time::Instant::now() + duration;
         let deadline = Box::pin(tokio::time::sleep_until(next));
@@ -197,7 +202,7 @@ where
 
 impl<T> Stream for Client<T>
 where
-    T: AsyncRead + AsyncWrite + std::marker::Unpin,
+    T: ClientTransport,
 {
     type Item = Result<Packet>;
 
@@ -282,10 +287,10 @@ where
 
 impl<T, P> Sink<P> for Client<T>
 where
-    T: AsyncRead + AsyncWrite + std::marker::Unpin,
+    T: ClientTransport,
     P: std::fmt::Debug + Into<Packet>,
 {
-    type Error = error::Error;
+    type Error = <T as futures::Sink<Packet>>::Error;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
         self.project().inner.poll_ready(cx)

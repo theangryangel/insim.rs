@@ -4,9 +4,10 @@ use futures::SinkExt;
 
 use tokio::net::ToSocketAddrs;
 use tokio::{net::TcpStream, time::timeout};
+use tokio_util::codec::Framed;
 
 use crate::client::Client;
-use crate::codec::Mode;
+use crate::codec::{Codec, Mode};
 use crate::core::identifiers::RequestId;
 use crate::packets::insim::{Init, InitFlags};
 use crate::result::Result;
@@ -127,10 +128,15 @@ impl ClientBuilder {
     }
 
     /// Create a TCP Transport using this configuration builder
-    pub async fn connect_tcp<A: ToSocketAddrs>(&mut self, remote: A) -> Result<Client<TcpStream>> {
+    pub async fn connect_tcp<A: ToSocketAddrs>(
+        &mut self,
+        remote: A,
+    ) -> Result<Client<Framed<TcpStream, Codec>>> {
         let stream = timeout(self.connect_timeout, TcpStream::connect(remote)).await??;
 
-        let mut stream = Client::new(stream, self.codec_mode);
+        let stream = Framed::new(stream, Codec::new(self.codec_mode));
+
+        let mut stream = Client::new(stream);
         stream
             .handshake_unpin(
                 self.connect_timeout,
@@ -147,9 +153,12 @@ impl ClientBuilder {
         &mut self,
         local: A,
         remote: B,
-    ) -> Result<Client<UdpStream>> {
+    ) -> Result<Client<Framed<UdpStream, Codec>>> {
         let stream = UdpStream::connect(local, remote).await?;
-        let mut stream = Client::new(stream, self.codec_mode);
+
+        let stream = Framed::new(stream, Codec::new(self.codec_mode));
+
+        let mut stream = Client::new(stream);
         stream
             .handshake_unpin(
                 self.connect_timeout,
@@ -162,7 +171,10 @@ impl ClientBuilder {
     }
 
     /// Create a TCP Transport using this configuration builder, via the LFS World Relay
-    pub async fn connect_relay<'a, H>(&mut self, auto_select_host: H) -> Result<Client<TcpStream>>
+    pub async fn connect_relay<'a, H>(
+        &mut self,
+        auto_select_host: H,
+    ) -> Result<Client<Framed<TcpStream, Codec>>>
     where
         H: Into<Option<&'a str>>,
     {
@@ -175,22 +187,7 @@ impl ClientBuilder {
         // Relay does not respond to ping requests
         self.wait_for_initial_pong = false;
 
-        let stream = timeout(
-            self.connect_timeout,
-            TcpStream::connect("isrelay.lfs.net:47474"),
-        )
-        .await??;
-
-        // let mut stream = crate::transport::handshake(stream, &self).await?;
-        let mut stream = Client::new(stream, self.codec_mode);
-        stream
-            .handshake_unpin(
-                self.connect_timeout,
-                self.as_isi(),
-                self.wait_for_initial_pong,
-                self.verify_version,
-            )
-            .await?;
+        let mut stream = self.connect_tcp("isrelay.lfs.net:47474").await?;
 
         if let Some(hostname) = auto_select_host.into() {
             // TODO: We should verify if the host is available for selection on the relay!
