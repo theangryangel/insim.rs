@@ -7,6 +7,7 @@ use crate::{
     error,
     packets::{insim, Packet},
     result::Result,
+    udp_stream::UdpStream,
 };
 use futures::Future;
 use futures::{Sink, Stream};
@@ -17,8 +18,11 @@ use insim_core::identifiers::RequestId;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::time;
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    net::TcpStream,
+};
 use tokio_util::codec::Framed;
 
 const TIMEOUT_SECS: u64 = 90;
@@ -29,6 +33,9 @@ pub trait ClientTransport:
 }
 
 impl<T> ClientTransport for Framed<T, Codec> where T: AsyncRead + AsyncWrite + std::marker::Unpin {}
+
+pub type TcpClientTransport = Framed<TcpStream, Codec>;
+pub type UdpClientTransport = Framed<UdpStream, Codec>;
 
 /// Internal Transport state.
 #[derive(Eq, PartialEq)]

@@ -13,6 +13,8 @@ use crate::packets::insim::{Init, InitFlags};
 use crate::result::Result;
 use crate::udp_stream::UdpStream;
 
+use super::{TcpClientTransport, UdpClientTransport};
+
 #[derive(Debug)]
 /// Configuration and [Client] builder.
 pub struct ClientBuilder {
@@ -131,7 +133,7 @@ impl ClientBuilder {
     pub async fn connect_tcp<A: ToSocketAddrs>(
         &mut self,
         remote: A,
-    ) -> Result<Client<Framed<TcpStream, Codec>>> {
+    ) -> Result<Client<TcpClientTransport>> {
         let stream = timeout(self.connect_timeout, TcpStream::connect(remote)).await??;
 
         let stream = Framed::new(stream, Codec::new(self.codec_mode));
@@ -153,7 +155,7 @@ impl ClientBuilder {
         &mut self,
         local: A,
         remote: B,
-    ) -> Result<Client<Framed<UdpStream, Codec>>> {
+    ) -> Result<Client<UdpClientTransport>> {
         let stream = UdpStream::connect(local, remote).await?;
 
         let stream = Framed::new(stream, Codec::new(self.codec_mode));
@@ -174,7 +176,7 @@ impl ClientBuilder {
     pub async fn connect_relay<'a, H>(
         &mut self,
         auto_select_host: H,
-    ) -> Result<Client<Framed<TcpStream, Codec>>>
+    ) -> Result<Client<TcpClientTransport>>
     where
         H: Into<Option<&'a str>>,
     {
