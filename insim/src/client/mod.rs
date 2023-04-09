@@ -1,6 +1,5 @@
 /// A Stream and Sink based transport layer for the insim protocol.
 pub mod builder;
-
 pub use builder::ClientBuilder;
 
 use crate::{

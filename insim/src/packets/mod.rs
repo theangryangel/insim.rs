@@ -37,6 +37,7 @@ pub const INSIM_VERSION: u8 = 9;
 #[derive(InsimEncode, InsimDecode, Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
+#[non_exhaustive]
 #[repr(u8)]
 pub enum Packet {
     Init(insim::Init) = 1,
