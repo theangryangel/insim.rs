@@ -9,7 +9,9 @@ bench = false
 doctest = false
 
 [features]
-default = ["relay"]
+default = ["relay", "tcp", "udp"]
+tcp = []
+udp = []
 relay = []
 serde = ["dep:serde", "insim_core/serde"]
 game_data = ["dep:insim_game_data"]

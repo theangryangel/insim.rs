@@ -8,16 +8,20 @@ use tracing;
 
 use bytes::{Buf, BufMut, BytesMut};
 
+/// Describes if Insim packets are in "compressed" or "uncompressed" mode.
 #[derive(Debug, Clone, Copy)]
 pub enum Mode {
     /// Insim <= 8 uses verbatim packet sizes
     Uncompressed,
+
     /// Insim >= 9 optionally supports "compressing" the packet size by dividing by 4
     /// See <https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info>
     Compressed,
 }
 
 impl Mode {
+    /// Given a single packet in dst, encode it's length, and ensure that it does not
+    /// exceed maximum limits
     pub fn encode_length(&self, dst: &mut BytesMut) -> io::Result<usize> {
         // Adjust `n` with bounds checking to include the size of the packet
         let n = match dst.len().checked_add(1) {
@@ -59,6 +63,8 @@ impl Mode {
         Ok(n)
     }
 
+    /// Decode the length of the next packet in the buffer src, ensuring that it does
+    /// not exceed limits.
     pub fn decode_length(&self, src: &mut BytesMut) -> io::Result<Option<usize>> {
         if src.len() < 4 {
             // Not enough data for even the header
@@ -102,6 +108,7 @@ impl Mode {
         Ok(Some(n))
     }
 
+    /// What is the maximum size of a Packet, for a given Mode?
     pub fn max_length(&self) -> usize {
         match self {
             Mode::Uncompressed => 255,

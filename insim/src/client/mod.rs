@@ -1,4 +1,4 @@
-/// A Stream and Sink based transport layer for the insim protocol.
+/// An Insim Client.
 pub mod builder;
 pub use builder::ClientBuilder;
 
@@ -15,9 +15,9 @@ use pin_project::pin_project;
 
 use futures::{SinkExt, StreamExt};
 use insim_core::identifiers::RequestId;
-use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
+use std::{fmt::Display, pin::Pin};
 use tokio::time;
 use tokio::{
     io::{AsyncRead, AsyncWrite},
@@ -34,18 +34,32 @@ pub trait ClientTransport:
 
 impl<T> ClientTransport for Framed<T, Codec> where T: AsyncRead + AsyncWrite + std::marker::Unpin {}
 
+#[cfg(feature = "tcp")]
 pub type TcpClientTransport = Framed<TcpStream, Codec>;
+
+#[cfg(feature = "udp")]
 pub type UdpClientTransport = Framed<UdpStream, Codec>;
 
-/// Internal Transport state.
-#[derive(Eq, PartialEq)]
+/// Internal Client State.
+#[derive(Debug, Default, Eq, PartialEq, Copy, Clone)]
 pub enum ClientState {
+    #[default]
     Disconnected,
     Connected,
     Shutdown,
 }
 
-/// A Stream and Sink based transport layer for the insim protocol.
+impl Display for ClientState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Disconnected => write!(f, "Disconnected"),
+            Self::Connected => write!(f, "Connected"),
+            Self::Shutdown => write!(f, "Shutdown"),
+        }
+    }
+}
+
+/// A Stream and Sink based client for the Insim protocol.
 /// Given something that implements the [ClientTransport] trait, Client will handle
 /// encoding and decoding of [Packets](Packet), and ensure that the connection
 /// is maintained through [insim::Tiny] keepalive packets, and handling any timeout.
@@ -79,6 +93,10 @@ where
             state: ClientState::Connected,
             pong: false,
         }
+    }
+
+    pub fn state(&self) -> ClientState {
+        self.state
     }
 
     /// Handle the verification of a Transport.
@@ -115,32 +133,31 @@ where
                 Some(Err(e)) => {
                     return Err(e);
                 }
-                Some(Ok(Packet::Tiny(m))) => {
-                    tracing::info!("got {m:?}");
+                Some(Ok(Packet::Tiny(_))) => {
                     received_tiny = true;
                 }
                 Some(Ok(Packet::Version(insim::Version { insimver, .. }))) => {
-                    if insimver != crate::packets::INSIM_VERSION {
+                    if insimver != crate::packets::VERSION {
                         return Err(error::Error::IncompatibleVersion(insimver));
                     }
 
                     received_vers = true;
                 }
                 Some(Ok(m)) => {
-                    tracing::info!("received: {m:?}");
                     /* not the droids we're looking for */
+                    tracing::info!("received packet whilst waiting for version and/or ping: {m:?}");
                 }
             }
         }
         Ok(())
     }
 
-    /// Perform the initial handshake and verification. Taking an AsyncRead + AsyncWrite and turn it
-    /// into a Transport.
+    /// Send an Insim Init (ISI) packet, and attempt verification of the connection
+    /// live-ness.
     pub async fn handshake(
         mut self: Pin<&mut Self>,
         timeout: Duration,
-        isi: crate::packets::insim::Init,
+        isi: crate::packets::insim::Isi,
         wait_for_pong: bool,
         verify_version: bool,
     ) -> Result<()> {
@@ -151,11 +168,11 @@ where
         Ok(())
     }
 
-    // Convenience method
+    // Convenience method to call handshake on an unpinned Client.
     pub async fn handshake_unpin(
         &mut self,
         timeout: Duration,
-        isi: crate::packets::insim::Init,
+        isi: crate::packets::insim::Isi,
         wait_for_pong: bool,
         verify_version: bool,
     ) -> Result<()> {

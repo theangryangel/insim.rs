@@ -10,6 +10,8 @@ pub mod codec;
 pub mod error;
 pub mod packets;
 pub mod result;
+
+#[cfg(feature = "udp")]
 pub mod udp_stream;
 
 #[doc(hidden)]

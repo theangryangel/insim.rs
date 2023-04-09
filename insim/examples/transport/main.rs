@@ -1,4 +1,4 @@
-use insim::prelude::*;
+use insim::{prelude::*, result::Result};
 
 fn setup() {
     // setup tracing with some defaults if nothing is set
@@ -15,7 +15,7 @@ fn setup() {
 }
 
 #[tokio::main]
-pub async fn main() -> Result<(), insim::error::Error> {
+pub async fn main() -> Result<()> {
     setup();
 
     tracing::info!("connecting!");

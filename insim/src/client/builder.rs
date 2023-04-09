@@ -9,7 +9,7 @@ use tokio_util::codec::Framed;
 use crate::client::Client;
 use crate::codec::{Codec, Mode};
 use crate::core::identifiers::RequestId;
-use crate::packets::insim::{Init, InitFlags};
+use crate::packets::insim::{Isi, IsiFlags};
 use crate::result::Result;
 use crate::udp_stream::UdpStream;
 
@@ -20,7 +20,7 @@ use super::{TcpClientTransport, UdpClientTransport};
 pub struct ClientBuilder {
     pub name: String,
     pub password: String,
-    pub flags: InitFlags,
+    pub flags: IsiFlags,
     pub prefix: Option<char>,
     pub interval: Duration,
     pub verify_version: bool,
@@ -42,7 +42,7 @@ impl ClientBuilder {
         Self {
             name: "insim.rs".into(),
             password: "".into(),
-            flags: InitFlags::MCI | InitFlags::CON | InitFlags::OBH,
+            flags: IsiFlags::MCI | IsiFlags::CON | IsiFlags::OBH,
             prefix: None,
             interval: Duration::from_millis(1000),
             verify_version: true,
@@ -61,13 +61,13 @@ impl ClientBuilder {
         self
     }
 
-    pub fn set_flags(mut self, flags: InitFlags) -> Self {
+    pub fn set_flags(mut self, flags: IsiFlags) -> Self {
         self.flags = flags;
         self
     }
 
     /// Set a flag to be used in the [Init](crate::protocol::insim::Init).
-    pub fn set_flag(mut self, flag: InitFlags) -> Self {
+    pub fn set_flag(mut self, flag: IsiFlags) -> Self {
         self.flags |= flag;
         self
     }
@@ -121,12 +121,12 @@ impl ClientBuilder {
     }
 
     /// Create an Insim Init packet
-    pub fn as_isi(&self) -> Init {
-        Init {
+    pub fn as_isi(&self) -> Isi {
+        Isi {
             name: self.name.to_owned(),
             password: self.password.to_owned(),
             prefix: self.prefix.unwrap_or(0 as char),
-            version: crate::packets::INSIM_VERSION,
+            version: crate::packets::VERSION,
             interval: self.interval,
             flags: self.flags,
             reqi: if self.verify_version {
@@ -139,6 +139,7 @@ impl ClientBuilder {
     }
 
     /// Create a TCP Transport using this configuration builder
+    #[cfg(feature = "tcp")]
     pub async fn connect_tcp<A: ToSocketAddrs>(
         &mut self,
         remote: A,
@@ -160,6 +161,7 @@ impl ClientBuilder {
     }
 
     /// Create a UDP Transport using this configuration builder
+    #[cfg(feature = "udp")]
     pub async fn connect_udp<A: ToSocketAddrs, B: ToSocketAddrs>(
         &mut self,
         local: A,
@@ -184,6 +186,7 @@ impl ClientBuilder {
     }
 
     /// Create a TCP Transport using this configuration builder, via the LFS World Relay
+    #[cfg(feature = "relay")]
     pub async fn connect_relay<'a, H>(
         &mut self,
         auto_select_host: H,
