@@ -8,6 +8,7 @@ use tokio::{net::TcpStream, time::timeout};
 use crate::codec::Mode;
 use crate::core::identifiers::RequestId;
 use crate::packets::insim::{Init, InitFlags};
+use crate::result::Result;
 use crate::transport::Transport;
 use crate::udp_stream::UdpStream;
 
@@ -129,7 +130,7 @@ impl Config {
     pub async fn connect_tcp<A: ToSocketAddrs>(
         &mut self,
         remote: A,
-    ) -> Result<Transport<TcpStream>, crate::error::Error> {
+    ) -> Result<Transport<TcpStream>> {
         let stream = timeout(self.connect_timeout, TcpStream::connect(remote)).await??;
 
         let mut stream = Transport::new(stream, self.codec_mode);
@@ -142,7 +143,7 @@ impl Config {
         &mut self,
         local: A,
         remote: B,
-    ) -> Result<Transport<UdpStream>, crate::error::Error> {
+    ) -> Result<Transport<UdpStream>> {
         let stream = UdpStream::connect(local, remote).await?;
         let mut stream = Transport::new(stream, self.codec_mode);
         stream.handshake_with_config_unpin(self).await?;
@@ -153,7 +154,7 @@ impl Config {
     pub async fn connect_relay(
         &mut self,
         auto_select_host: Option<String>,
-    ) -> Result<Transport<TcpStream>, crate::error::Error> {
+    ) -> Result<Transport<TcpStream>> {
         // TODO: Talk to LFS devs, find out if/when relay gets compressed support?
         self.codec_mode = Mode::Uncompressed;
 

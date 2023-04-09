@@ -1,6 +1,6 @@
 //! Handles encoding and decoding of [Packets](Packet) from the wire.
 
-use crate::{error::Error, packets::Packet};
+use crate::{error::Error, packets::Packet, result::Result};
 use insim_core::{Decodable, Encodable};
 use std::io;
 use tokio_util::codec::{Decoder, Encoder};
@@ -97,7 +97,7 @@ impl Decoder for Codec {
     type Item = Packet;
     type Error = Error;
 
-    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>> {
         if src.is_empty() {
             return Ok(None);
         }
@@ -131,7 +131,7 @@ impl Decoder for Codec {
 impl Encoder<Packet> for Codec {
     type Error = Error;
 
-    fn encode(&mut self, msg: Packet, dst: &mut BytesMut) -> Result<(), Error> {
+    fn encode(&mut self, msg: Packet, dst: &mut BytesMut) -> Result<()> {
         let mut buf = BytesMut::new();
         msg.encode(&mut buf, None)?;
 

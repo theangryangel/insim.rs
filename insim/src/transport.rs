@@ -3,6 +3,7 @@ use crate::{
     codec::{self, Mode},
     error,
     packets::{insim, Packet},
+    result::Result,
 };
 use futures::Future;
 use futures::{Sink, Stream};
@@ -70,14 +71,14 @@ where
     pub async fn handshake_with_config_unpin(
         &mut self,
         config: &crate::config::Config,
-    ) -> Result<(), error::Error> {
+    ) -> Result<()> {
         Pin::new(self).handshake_with_config(config).await
     }
 
     pub async fn handshake_with_config(
         self: Pin<&mut Self>,
         config: &crate::config::Config,
-    ) -> Result<(), error::Error> {
+    ) -> Result<()> {
         self.handshake(
             config.connect_timeout,
             config.as_isi(),
@@ -94,7 +95,7 @@ where
         mut self: Pin<&mut Self>,
         verify_version: bool,
         wait_for_pong: bool,
-    ) -> Result<(), error::Error> {
+    ) -> Result<()> {
         if wait_for_pong {
             // send a ping!
             self.as_mut()
@@ -149,7 +150,7 @@ where
         isi: crate::packets::insim::Init,
         wait_for_pong: bool,
         verify_version: bool,
-    ) -> Result<(), error::Error> {
+    ) -> Result<()> {
         self.send(isi).await?;
 
         if time::timeout(timeout, self.verify(wait_for_pong, verify_version))
@@ -204,7 +205,7 @@ impl<T> Stream for Transport<T>
 where
     T: AsyncRead + AsyncWrite + std::marker::Unpin,
 {
-    type Item = Result<Packet, error::Error>;
+    type Item = Result<Packet>;
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         // This is cribbed from tokio_stream::StreamExt::Timeout.
@@ -292,20 +293,20 @@ where
 {
     type Error = error::Error;
 
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
         self.project().inner.poll_ready(cx)
     }
 
-    fn start_send(self: Pin<&mut Self>, value: P) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, value: P) -> Result<()> {
         tracing::info!("asked to send {value:?}");
         self.project().inner.start_send(value.into())
     }
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
         self.project().inner.poll_flush(cx)
     }
 
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
         self.project().inner.poll_close(cx)
     }
 }
