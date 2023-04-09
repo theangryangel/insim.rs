@@ -62,9 +62,9 @@ pub struct Init {
     ///packet in response.
     pub reqi: RequestId,
 
-    // we do not support this feature, using pad_bytes_before
-    // on flags to mask it.
-    //pub udpport: u16,
+    /// UDP Port
+    pub udpport: u16,
+
     /// Options for the Insim Connection. See [InitFlags] for more information.
     pub flags: InitFlags,
 
@@ -105,17 +105,14 @@ impl Encodable for Init {
         // pad_after reqi
         buf.put_bytes(0, 1);
 
-        // mask out udpport
-        buf.put_bytes(0, 2);
+        self.udpport.encode(buf, None)?;
+        self.flags.encode(buf, None)?;
 
         self.version.encode(buf, None)?;
-
         (self.prefix as u8).encode(buf, None)?;
-
         (self.interval.as_millis() as u16).encode(buf, None)?;
 
         self.password.encode(buf, Some(Limit::Bytes(16)))?;
-
         self.name.encode(buf, Some(Limit::Bytes(16)))?;
 
         Ok(())
@@ -142,13 +139,13 @@ impl Decodable for Init {
         // pad bytes_after reqi
         buf.advance(1);
 
-        // skip over udpport
-        buf.advance(2);
-
+        data.udpport = u16::decode(buf, None)?;
         data.flags = InitFlags::decode(buf, None)?;
+
         data.version = u8::decode(buf, None)?;
         data.prefix = u8::decode(buf, None)? as char;
         data.interval = Duration::from_millis(u16::decode(buf, None)?.into());
+
         data.password = String::decode(buf, Some(Limit::Bytes(16)))?;
         data.name = String::decode(buf, Some(Limit::Bytes(16)))?;
 

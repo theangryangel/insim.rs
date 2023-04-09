@@ -146,14 +146,7 @@ where
     ) -> Result<()> {
         self.send(isi).await?;
 
-        if time::timeout(timeout, self.verify(wait_for_pong, verify_version))
-            .await
-            .is_err()
-        {
-            return Err(error::Error::Timeout(
-                "Timeout during initial handshake".to_string(),
-            ));
-        }
+        time::timeout(timeout, self.verify(wait_for_pong, verify_version)).await??;
 
         Ok(())
     }

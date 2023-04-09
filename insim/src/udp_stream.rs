@@ -24,11 +24,11 @@ impl UdpStream {
         Ok(Self { inner })
     }
 
-    pub async fn peer_addr(&self) -> tokio::io::Result<SocketAddr> {
+    pub fn peer_addr(&self) -> tokio::io::Result<SocketAddr> {
         self.inner.peer_addr()
     }
 
-    pub async fn local_addr(&self) -> tokio::io::Result<SocketAddr> {
+    pub fn local_addr(&self) -> tokio::io::Result<SocketAddr> {
         self.inner.local_addr()
     }
 }

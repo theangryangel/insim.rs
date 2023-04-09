@@ -27,6 +27,7 @@ pub struct ClientBuilder {
     pub wait_for_initial_pong: bool,
     pub codec_mode: Mode,
     pub connect_timeout: Duration,
+    pub udp_port: Option<u16>,
 }
 
 impl Default for ClientBuilder {
@@ -48,6 +49,7 @@ impl ClientBuilder {
             wait_for_initial_pong: true,
             codec_mode: Mode::Compressed,
             connect_timeout: Duration::from_secs(10),
+            udp_port: None,
         }
     }
 }
@@ -126,6 +128,7 @@ impl ClientBuilder {
             } else {
                 RequestId(0)
             },
+            udpport: self.udp_port.unwrap_or(0),
         }
     }
 
@@ -157,6 +160,8 @@ impl ClientBuilder {
         remote: B,
     ) -> Result<Client<UdpClientTransport>> {
         let stream = UdpStream::connect(local, remote).await?;
+
+        self.udp_port = stream.local_addr()?.port().into();
 
         let stream = Framed::new(stream, Codec::new(self.codec_mode));
 

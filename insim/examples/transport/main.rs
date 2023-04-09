@@ -21,6 +21,7 @@ pub async fn main() -> Result<(), insim::error::Error> {
     tracing::info!("connecting!");
 
     let mut client = ClientBuilder::default()
+        // .connect_udp("0.0.0.0:29991", "localhost:29999")
         .connect_relay("Nubbins AU Demo")
         .await?;
 
