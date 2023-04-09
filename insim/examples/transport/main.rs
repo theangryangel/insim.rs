@@ -21,9 +21,9 @@ pub async fn main() -> Result<()> {
     tracing::info!("connecting!");
 
     let mut client = ClientBuilder::default()
-        .connect_tcp("172.20.48.1:29999")
+        // .connect_tcp("172.20.48.1:29999")
         // .connect_udp("0.0.0.0:29998", "172.20.48.1:29999")
-        // .connect_relay("Nubbins AU Demo")
+        .connect_relay("Nubbins AU Demo")
         .await?;
 
     tracing::info!("Connected!");

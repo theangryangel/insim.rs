@@ -2,6 +2,9 @@
 pub mod builder;
 pub use builder::ClientBuilder;
 
+#[cfg(test)]
+mod tests;
+
 use crate::{
     codec::Codec,
     error,
@@ -194,6 +197,7 @@ where
 
         let res = self.as_mut().project().inner.poll_ready(cx);
         if !res.is_ready() {
+            cx.waker().wake_by_ref();
             return;
         }
 
@@ -205,6 +209,8 @@ where
             .into(),
         );
         if res.is_err() {
+            // TODO: Probably need to fix this.
+            cx.waker().wake_by_ref();
             return;
         }
 

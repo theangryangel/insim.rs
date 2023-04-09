@@ -36,4 +36,5 @@ insim_pth = { path = "../insim_pth", optional = true }
 insim_smx = { path = "../insim_smx", optional = true }
 
 [dev-dependencies]
+tokio-test = "0.4"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

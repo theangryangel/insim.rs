@@ -8,7 +8,7 @@ use serde::Serialize;
 
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-pub struct ConnectionId(u8);
+pub struct ConnectionId(pub u8);
 
 impl Encodable for ConnectionId {
     fn encode(

@@ -8,7 +8,7 @@ use serde::Serialize;
 
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-pub struct PlayerId(u8);
+pub struct PlayerId(pub u8);
 
 impl fmt::Display for PlayerId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
