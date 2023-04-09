@@ -17,25 +17,49 @@ pub enum Mode {
     Compressed,
 }
 
-/// A codec for the Insim protocol.
-/// This codec handles encoding and decoding of to and from raw bytes to [Packet].
-pub struct Codec {
-    mode: Mode,
-}
+impl Mode {
+    pub fn encode_length(&self, dst: &mut BytesMut) -> io::Result<usize> {
+        // Adjust `n` with bounds checking to include the size of the packet
+        let n = match dst.len().checked_add(1) {
+            Some(n) => n,
+            None => {
+                // Probably a programming error, lets bail.
+                panic!(
+                    "Provided length would overflow after adjustment.
+                    This is probably a programming error."
+                );
+            }
+        };
 
-impl Codec {
-    pub fn new(mode: Mode) -> Codec {
-        Codec { mode }
-    }
+        let n = match self {
+            Mode::Uncompressed => n,
+            Mode::Compressed => {
+                if n % 4 == 0 {
+                    n / 4
+                } else {
+                    // probably a programming error, lets bail.
+                    panic!(
+                        "Packet length is not divisible by 4!
+                        This is probably a programming error."
+                    );
+                }
+            }
+        };
 
-    fn max_possible_length(&self) -> usize {
-        match self.mode {
-            Mode::Uncompressed => 255,
-            Mode::Compressed => 2048,
+        if n > self.max_length() {
+            // probably a programming error. lets bail.
+            panic!(
+                "Provided length would overflow the maximum byte size of {}.
+                This is probably a programming error, or a change in the
+                packet definition.",
+                self.max_length()
+            );
         }
+
+        Ok(n)
     }
 
-    fn decode_length(&mut self, src: &mut BytesMut) -> io::Result<Option<usize>> {
+    pub fn decode_length(&self, src: &mut BytesMut) -> io::Result<Option<usize>> {
         if src.len() < 4 {
             // Not enough data for even the header
             // All packets are defined as a minimum of:
@@ -47,35 +71,27 @@ impl Codec {
         }
 
         let n = {
+            // we want a cursor so that we're not fiddling with the internal offset of src
             let mut src = io::Cursor::new(&mut *src);
 
-            // LFS only communicates in LE (likely it just uses the host native format)
+            // get the size of this packet
             let n = src.get_u8() as usize;
 
             // if we're in compressed mode, multiply by 4
-            let n = match self.mode {
+            let n = match self {
                 Mode::Uncompressed => n,
                 Mode::Compressed => n * 4,
             };
 
             // does this exceed the max possible packet?
-            if n > self.max_possible_length() {
+            if n > self.max_length() {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     "frame exceeds max_bytes",
                 ));
             }
 
-            // we need to remove the length of the header
-            match n.checked_sub(1) {
-                Some(n) => n,
-                None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        "provided length would overflow after adjustment",
-                    ));
-                }
-            }
+            n
         };
 
         if src.len() < n {
@@ -83,10 +99,26 @@ impl Codec {
             return Ok(None);
         }
 
-        // skip over the size field now that we know we have a full packet
-        src.advance(1);
-
         Ok(Some(n))
+    }
+
+    pub fn max_length(&self) -> usize {
+        match self {
+            Mode::Uncompressed => 255,
+            Mode::Compressed => 1020,
+        }
+    }
+}
+
+/// A codec for the Insim protocol.
+/// This codec handles encoding and decoding of to and from raw bytes to [Packet].
+pub struct Codec {
+    mode: Mode,
+}
+
+impl Codec {
+    pub fn new(mode: Mode) -> Codec {
+        Codec { mode }
     }
 }
 
@@ -105,7 +137,7 @@ impl Decoder for Codec {
             return Ok(None);
         }
 
-        let n = match self.decode_length(src)? {
+        let n = match self.mode.decode_length(src)? {
             Some(n) => n,
             None => {
                 return Ok(None);
@@ -113,6 +145,10 @@ impl Decoder for Codec {
         };
 
         let mut data = src.split_to(n);
+
+        // skip over the size field now that we know we have a full packet
+        // none of the packet definitions include the size
+        data.advance(1);
 
         let res = Self::Item::decode(&mut data, None);
 
@@ -136,39 +172,11 @@ impl Encoder<Packet> for Codec {
         let mut buf = BytesMut::new();
         msg.encode(&mut buf, None)?;
 
-        let n = buf.len();
-
-        if n > self.max_possible_length() {
-            // probably a programming error. lets bail.
-            panic!("Provided length would overflow the maximum byte size of {}. This is probably a programming error, or a change in the packet definition.", self.max_possible_length());
-        }
-
-        // Adjust `n` with bounds checking to include the size of the packet
-        let n = n.checked_add(1);
-
-        let n = match n {
-            Some(n) => n,
-            None => {
-                // Probably a programming error, lets bail.
-                panic!("Provided length would overflow after adjustment. This is probably a programming error.");
-            }
-        };
+        let n = self.mode.encode_length(&mut buf)?;
 
         // Reserve capacity in the destination buffer to fit the frame and
         // length field (plus adjustment).
         dst.reserve(n + 1);
-
-        let n = match self.mode {
-            Mode::Uncompressed => n,
-            Mode::Compressed => {
-                if n % 4 == 0 {
-                    n / 4
-                } else {
-                    // probably a programming error, lets bail.
-                    panic!("Packet length is not divisible by 4! This is probably a programming error.");
-                }
-            }
-        };
 
         dst.put_u8(n as u8);
 
