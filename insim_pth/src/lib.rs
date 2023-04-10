@@ -1,3 +1,22 @@
+//! # insim_pth
+//!
+//! Parse a Live for Speed pth (path) file.
+//!
+//! A pth file consists of a series points [Node], with direction and width ([Limit]),
+//! that describe the track that you drive along.
+//!
+//! Historically LFS has used the PTH to watch your progress along the track, decides
+//! if you are driving in reverse, the yellow and blue flag systems, the position list,
+//! timing, etc.
+//!
+//! On a standard LFS track the [Node] is communicated via MCI and NLP Insim packets.
+//!
+//! On an open configuration [Node] are not used and are unavaiable via Insim MCI packets.
+//!
+//! The distance between each [Node] is not constant. According to the LFS developers
+//! there is approximately 0.2 seconds of time between passing one node and the next,
+//! when you are "driving at a reasonable speed".
+
 use std::fs;
 use std::io::ErrorKind;
 use std::io::Read;
@@ -6,9 +25,8 @@ use thiserror::Error;
 
 use insim_core::{point::Point, prelude::*, DecodableError};
 
-// FIXME - we should probably drop the derive clone here?
 #[non_exhaustive]
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug)]
 pub enum Error {
     #[error("IO Error: {kind}: {message}")]
     IO { kind: ErrorKind, message: String },
@@ -26,22 +44,31 @@ impl From<std::io::Error> for Error {
     }
 }
 
+/// Describes the Left and Right limit, of a given node.
 #[derive(Debug, InsimDecode, Copy, Clone, Default)]
 pub struct Limit {
     pub left: f32,
     pub right: f32,
 }
 
+/// Node / or point on a track
 #[derive(Debug, InsimDecode, Copy, Clone, Default)]
 pub struct Node {
+    /// Center point of this node
     pub center: Point<i32>,
+
+    /// Expected direction of travel
     pub direction: Point<f32>,
 
+    /// Track outer limit, relative to the center point and direction of travel
     pub outer_limit: Limit,
+
+    /// Road limit, relative to the center point and direction of travel
     pub road_limit: Limit,
 }
 
 impl Node {
+    /// Get the center point of this node, optionally scaled
     pub fn get_center(&self, scale: Option<f32>) -> Point<f32> {
         let scale = scale.unwrap_or(1.0);
 
@@ -52,10 +79,12 @@ impl Node {
         }
     }
 
+    /// Calculate the absolute position of the left and right road limits
     pub fn get_road_limit(&self, scale: Option<f32>) -> (Point<f32>, Point<f32>) {
         self.calculate_limit_position(&self.road_limit, scale)
     }
 
+    /// Calculate the absolute position of the left and right track limits
     pub fn get_outer_limit(&self, scale: Option<f32>) -> (Point<f32>, Point<f32>) {
         self.calculate_limit_position(&self.outer_limit, scale)
     }
@@ -94,6 +123,7 @@ impl Node {
 
 #[derive(Debug, InsimDecode, Default)]
 #[insim(magic = b"LFSPTH")]
+/// PTH file
 pub struct Pth {
     pub version: u8,
     pub revision: u8,
@@ -106,6 +136,7 @@ pub struct Pth {
 }
 
 impl Pth {
+    /// Read and parse a PTH file into a [Pth] struct.
     pub fn from_file(i: &PathBuf) -> Result<Self, Error> {
         if !i.exists() {
             return Err(Error::IO {
@@ -116,13 +147,12 @@ impl Pth {
 
         let mut input = fs::File::open(i).map_err(Error::from)?;
 
-        // FIXME
         let mut buffer = Vec::new();
         input.read_to_end(&mut buffer).map_err(Error::from)?;
 
         let mut data = insim_core::bytes::BytesMut::new();
         data.extend_from_slice(&buffer);
 
-        Ok(Pth::decode(&mut data, None)?)
+        Ok(Self::decode(&mut data, None)?)
     }
 }

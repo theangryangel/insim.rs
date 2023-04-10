@@ -65,7 +65,7 @@ pub struct Isi {
     /// UDP Port
     pub udpport: u16,
 
-    /// Options for the Insim Connection. See [InitFlags] for more information.
+    /// Options for the Insim Connection. See [IsiFlags] for more information.
     pub flags: IsiFlags,
 
     /// Protocol version of Insim you wish to use.

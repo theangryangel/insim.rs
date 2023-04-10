@@ -1,4 +1,4 @@
-//! Handles encoding and decoding of [Packets](Packet) from the wire.
+//! Handles encoding and decoding of [Packets](crate::packets::Packet) from the wire.
 
 use crate::{error::Error, packets::Packet, result::Result};
 use insim_core::{Decodable, Encodable};
@@ -191,5 +191,108 @@ impl Encoder<Packet> for Codec {
         dst.extend_from_slice(&buf[..]);
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::{
+        codec::{Codec, Mode},
+        packets,
+    };
+    use futures::{SinkExt, StreamExt};
+    use insim_core::identifiers::RequestId;
+    use tokio_test::io::Builder;
+    use tokio_util::codec::{FramedRead, FramedWrite};
+
+    #[tokio::test]
+    /// Ensure that Codec can decode a basic small packet
+    async fn framedread_tiny_ping() {
+        let mock = Builder::new()
+            .read(
+                // Packet::Tiny, subtype TinyType::Ping, compressed, reqi=2
+                &[1, 3, 2, 3],
+            )
+            .build();
+
+        let mut framed = FramedRead::new(mock, Codec::new(Mode::Compressed));
+
+        let data = framed.next().await;
+
+        assert!(matches!(
+            data,
+            Some(Ok(packets::Packet::Tiny(packets::insim::Tiny {
+                subtype: packets::insim::TinyType::Ping,
+                reqi: RequestId(2)
+            })))
+        ));
+    }
+
+    #[tokio::test]
+    /// Ensure that Codec can write a basic small packet
+    async fn framedwrite_tiny_ping() {
+        let mock = Builder::new()
+            .write(
+                // Packet::Tiny, subtype TinyType::Ping, compressed, reqi=2
+                &[1, 3, 2, 3],
+            )
+            .build();
+
+        let mut framed = FramedWrite::new(mock, Codec::new(Mode::Compressed));
+
+        let res = framed
+            .send(
+                packets::insim::Tiny {
+                    subtype: packets::insim::TinyType::Ping,
+                    reqi: RequestId(2),
+                }
+                .into(),
+            )
+            .await;
+
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    /// Ensure that Codec can write multiple packets
+    async fn framedwrite_multiple_packets() {
+        let mock = Builder::new()
+            .write(
+                // Packet::Tiny, subtype TinyType::Ping, compressed, reqi=2
+                &[1, 3, 2, 3],
+            )
+            .write(
+                // Packet::Small, subtype SmallType::Alc, compressed, reqi=4, uval=599
+                &[2, 4, 4, 8, 87, 2, 0, 0],
+            )
+            .build();
+
+        let mut framed = FramedWrite::new(mock, Codec::new(Mode::Compressed));
+
+        let res = framed
+            .send(
+                packets::insim::Tiny {
+                    subtype: packets::insim::TinyType::Ping,
+                    reqi: RequestId(2),
+                }
+                .into(),
+            )
+            .await;
+
+        assert!(res.is_ok());
+
+        let res = framed
+            .send(
+                packets::insim::Small {
+                    subtype: packets::insim::SmallType::Alc,
+                    reqi: RequestId(4),
+                    uval: 599,
+                }
+                .into(),
+            )
+            .await;
+
+        assert!(res.is_ok());
     }
 }

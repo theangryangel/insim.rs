@@ -22,7 +22,7 @@ pub enum MsoUserType {
     /// Normal, visible, user message.
     User = 1,
 
-    /// Was this message received with the prefix character from the [Init](super::Init) message?
+    /// Was this message received with the prefix character from the [Isi](super::Isi) message?
     Prefix = 2,
 
     // FIXME: Due to be retired in Insim v9
@@ -70,8 +70,10 @@ impl Encodable for Mso {
         buf.put_slice(&msg);
 
         // pad so that msg is divisible by 8
-        if msg.len() % 8 != 0 {
-            buf.put_bytes(0, msg.len() + 8 - (msg.len() - 8));
+        let round_to = (msg.len() + 7) & !7;
+
+        if round_to != msg.len() {
+            buf.put_bytes(0, round_to - msg.len());
         }
 
         Ok(())
@@ -97,5 +99,43 @@ impl Decodable for Mso {
         data.usertype = MsoUserType::decode(buf, None)?;
         data.msg = String::decode(buf, Some(Limit::Bytes(buf.len())))?;
         Ok(data)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use bytes::{BufMut, BytesMut};
+    use insim_core::Encodable;
+
+    use super::{Mso, MsoUserType};
+    use crate::core::identifiers::{ConnectionId, PlayerId, RequestId};
+
+    #[test]
+    fn dynamic_encodes_to_multiple_of_8() {
+        let data = Mso {
+            reqi: RequestId(1),
+            ucid: ConnectionId(10),
+            plid: PlayerId(74),
+            usertype: MsoUserType::System,
+            textstart: 0,
+            msg: "two".into(),
+        };
+
+        let mut buf = BytesMut::new();
+        let res = data.encode(&mut buf, None);
+        assert!(res.is_ok());
+
+        let mut comparison = BytesMut::new();
+        comparison.put_u8(1);
+        comparison.put_u8(0);
+        comparison.put_u8(10);
+        comparison.put_u8(74);
+        comparison.put_u8(0);
+        comparison.put_u8(0);
+        comparison.extend_from_slice(&"two".to_string().as_bytes());
+        comparison.put_bytes(0, 5);
+
+        assert_eq!(buf.to_vec(), comparison.to_vec());
     }
 }

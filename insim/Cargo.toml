@@ -13,7 +13,11 @@ default = ["relay", "tcp", "udp"]
 tcp = []
 udp = []
 relay = []
-serde = ["dep:serde", "insim_core/serde"]
+serde = [
+  "dep:serde",
+  "insim_core/serde",
+  "insim_game_data?/serde",
+]
 game_data = ["dep:insim_game_data"]
 pth = ["dep:insim_pth"]
 smx = ["dep:insim_smx"]
@@ -36,4 +40,6 @@ insim_pth = { path = "../insim_pth", optional = true }
 insim_smx = { path = "../insim_smx", optional = true }
 
 [dev-dependencies]
+tokio-test = "0.4"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap = { version = "4.2", features = ["derive"] }

@@ -1,4 +1,5 @@
-/// Internal macro to define Insim Packet and conversion implementations.
+/// Internal macro to define conversion implementations between a Packet enum variant and an inner
+/// value of the enum variant.
 #[macro_export]
 macro_rules! impl_packet_from {
     (
