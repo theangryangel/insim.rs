@@ -6,9 +6,8 @@ use thiserror::Error;
 
 use insim_core::{point::Point, prelude::*, DecodableError};
 
-// FIXME - we should probably drop the derive clone here?
 #[non_exhaustive]
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug)]
 pub enum Error {
     #[error("IO Error: {kind}: {message}")]
     IO { kind: ErrorKind, message: String },
@@ -116,13 +115,12 @@ impl Pth {
 
         let mut input = fs::File::open(i).map_err(Error::from)?;
 
-        // FIXME
         let mut buffer = Vec::new();
         input.read_to_end(&mut buffer).map_err(Error::from)?;
 
         let mut data = insim_core::bytes::BytesMut::new();
         data.extend_from_slice(&buffer);
 
-        Ok(Pth::decode(&mut data, None)?)
+        Ok(Self::decode(&mut data, None)?)
     }
 }

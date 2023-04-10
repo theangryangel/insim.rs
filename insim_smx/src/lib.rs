@@ -1,4 +1,29 @@
-use insim_core::{point::Point, prelude::*};
+use std::fs;
+use std::io::ErrorKind;
+use std::io::Read;
+use std::path::PathBuf;
+use thiserror::Error;
+
+use insim_core::{point::Point, prelude::*, DecodableError};
+
+#[non_exhaustive]
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("IO Error: {kind}: {message}")]
+    IO { kind: ErrorKind, message: String },
+
+    #[error("Failed to decode packet: {0:?}")]
+    Decoding(#[from] DecodableError),
+}
+
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Error::IO {
+            kind: e.kind(),
+            message: e.to_string(),
+        }
+    }
+}
 
 #[derive(Debug, InsimDecode, Default, Clone)]
 pub struct Rgb {
@@ -70,4 +95,25 @@ pub struct Smx {
 
     #[insim(count = "num_checkpoints")]
     pub checkpoint_object_index: Vec<i32>,
+}
+
+impl Smx {
+    pub fn from_file(i: &PathBuf) -> Result<Self, Error> {
+        if !i.exists() {
+            return Err(Error::IO {
+                kind: std::io::ErrorKind::NotFound,
+                message: format!("Path {i:?} does not exist"),
+            });
+        }
+
+        let mut input = fs::File::open(i).map_err(Error::from)?;
+
+        let mut buffer = Vec::new();
+        input.read_to_end(&mut buffer).map_err(Error::from)?;
+
+        let mut data = insim_core::bytes::BytesMut::new();
+        data.extend_from_slice(&buffer);
+
+        Ok(Self::decode(&mut data, None)?)
+    }
 }
