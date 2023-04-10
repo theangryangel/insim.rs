@@ -22,7 +22,7 @@ pub enum MsoUserType {
     /// Normal, visible, user message.
     User = 1,
 
-    /// Was this message received with the prefix character from the [Init](super::Init) message?
+    /// Was this message received with the prefix character from the [Isi](super::Isi) message?
     Prefix = 2,
 
     // FIXME: Due to be retired in Insim v9

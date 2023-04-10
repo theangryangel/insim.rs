@@ -9,6 +9,7 @@ use tokio::{
     net::{ToSocketAddrs, UdpSocket},
 };
 
+/// A wrapper around tokio::net::UdpSocket to make it easier to work with.
 pub struct UdpStream {
     inner: UdpSocket,
 }

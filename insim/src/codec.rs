@@ -1,4 +1,4 @@
-//! Handles encoding and decoding of [Packets](Packet) from the wire.
+//! Handles encoding and decoding of [Packets](crate::packets::Packet) from the wire.
 
 use crate::{error::Error, packets::Packet, result::Result};
 use insim_core::{Decodable, Encodable};

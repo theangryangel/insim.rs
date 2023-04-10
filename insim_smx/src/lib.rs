@@ -1,3 +1,14 @@
+//! # insim_smx
+//!
+//! Parse a Live for Speed smx (Simple Mesh) file.
+//!
+//! Historically Live for Speed has made SMX files available for each track.
+//!
+//! For at least Rockingham there is no SMX file and there are no plans to make it
+//! available.
+//!
+//! I would suggest that SMX files should be considered historical at this point.
+
 use std::fs;
 use std::io::ErrorKind;
 use std::io::Read;
@@ -68,6 +79,7 @@ pub struct Object {
 
 #[derive(Debug, InsimDecode, Default, Clone)]
 #[insim(magic = b"LFSSMX")]
+/// Smx file
 pub struct Smx {
     pub game_version: u8,
     pub game_revision: u8,
@@ -98,6 +110,7 @@ pub struct Smx {
 }
 
 impl Smx {
+    /// Read and parse a SMX file into a [Smx] struct.
     pub fn from_file(i: &PathBuf) -> Result<Self, Error> {
         if !i.exists() {
             return Err(Error::IO {

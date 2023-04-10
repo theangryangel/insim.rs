@@ -1,4 +1,6 @@
-/// An Insim Client.
+//! Insim Client that maintains a connection and provides a Stream and Sink of
+//! [Packets](crate::packets::Packet).
+
 pub mod builder;
 pub use builder::ClientBuilder;
 
