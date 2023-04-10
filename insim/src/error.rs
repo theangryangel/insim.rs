@@ -26,6 +26,9 @@ pub enum Error {
 
     #[error("Timeout")]
     Timeout(String),
+
+    #[error("Failed to parse address: {0}")]
+    AddrParseError(#[from] std::net::AddrParseError),
 }
 
 impl From<tokio::time::error::Elapsed> for Error {
