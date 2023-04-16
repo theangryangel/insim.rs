@@ -6,7 +6,7 @@ use serde::Serialize;
 use bitflags::bitflags;
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct HostFacts: u16 {
          const CAN_VOTE = (1 << 0);

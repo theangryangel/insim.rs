@@ -15,7 +15,7 @@ use super::CameraView;
 
 bitflags! {
     /// Bitwise flags used within the [Sta] packet
-    #[derive(Default)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct StaFlags: u16 {
         /// In Game (or Multiplayer Replay)

@@ -8,7 +8,7 @@ use bitflags::bitflags;
 bitflags! {
     /// Bitwise flags used within the [HostInfo] packet, which is in turn used by the [HostList]
     /// packet.
-    #[derive(Default)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct HostInfoFlags: u8 {
          const SPECTATE_PASSWORD_REQUIRED = (1 << 0);

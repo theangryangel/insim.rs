@@ -35,7 +35,7 @@ pub enum TyreCompound {
 }
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct PlayerFlags: u16 {
          const SWAPSIDE = (1 << 0);

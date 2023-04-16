@@ -11,7 +11,7 @@ use serde::Serialize;
 use bitflags::bitflags;
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct CompCarInfo: u8 {
         const BLUE_FLAG = (1 << 0);

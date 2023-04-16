@@ -9,7 +9,7 @@ use bitflags::bitflags;
 
 bitflags! {
     /// Flags for the [Init] packet flags field.
-    #[derive(Default)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct IsiFlags: u16 {
         //RES0 => (1 << 0),	// bit  0: spare
@@ -29,7 +29,7 @@ bitflags! {
 
 impl IsiFlags {
     pub fn clear(&mut self) {
-        self.bits = 0;
+        *self.0.bits_mut() = 0;
     }
 }
 
