@@ -11,7 +11,7 @@ use bitflags::bitflags;
 
 bitflags! {
     // *_VALID variation means this was cleared
-    #[derive(Default)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct PenaltyInfo: u8 {
         const DRIVE_THRU = (1 << 0);

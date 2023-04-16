@@ -28,7 +28,7 @@ pub enum OcoIndex {
 }
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct OcoLights: u8 {
         const RED1 = (1 << 0);

@@ -14,7 +14,7 @@ use bitflags::bitflags;
 use super::{PlayerFlags, TyreCompound};
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct PitStopWorkFlags: u32 {
          const NOTHING = 0;

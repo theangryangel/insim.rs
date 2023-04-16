@@ -10,7 +10,7 @@ use serde::Serialize;
 use bitflags::bitflags;
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct PlcAllowedCars: u32 {
          const XF_GTI = (1 << 1);

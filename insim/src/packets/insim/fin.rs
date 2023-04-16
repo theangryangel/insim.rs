@@ -14,7 +14,7 @@ use bitflags::bitflags;
 use super::PlayerFlags;
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct RaceResultFlags: u8 {
         const MENTIONED = (1 << 0);
