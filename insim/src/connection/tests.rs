@@ -31,7 +31,7 @@ async fn poll_pong_compressed() {
     assert!(matches!(
         data,
         Some(Ok(packets::Packet::Tiny(packets::insim::Tiny {
-            subtype: packets::insim::TinyType::None,
+            subt: packets::insim::TinyType::None,
             reqi: RequestId(0)
         })))
     ));
@@ -60,7 +60,7 @@ async fn poll_pong_uncompressed() {
     assert!(matches!(
         data,
         Some(Ok(packets::Packet::Tiny(packets::insim::Tiny {
-            subtype: packets::insim::TinyType::None,
+            subt: packets::insim::TinyType::None,
             reqi: RequestId(0)
         })))
     ));

@@ -1,5 +1,5 @@
 use bytes::{Buf, BytesMut};
-use std::{error::Error, fmt, time::Duration};
+use std::{error::Error, fmt, net::Ipv4Addr, time::Duration};
 
 use super::Limit;
 use crate::string::codepages;
@@ -30,7 +30,7 @@ impl fmt::Display for DecodableError {
 pub trait Decodable {
     fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError>
     where
-        Self: Default;
+        Self: Sized;
 }
 
 // bool
@@ -220,24 +220,16 @@ impl<T, const N: usize> Decodable for [T; N]
 where
     T: Decodable + Default,
 {
-    fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError>
-    where
-        Self: Default,
-    {
+    fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
         if limit.is_some() {
             return Err(DecodableError::UnexpectedLimit(format!(
                 "Slices do not support a limit! {limit:?}"
             )));
         }
 
-        let mut data = Self::default();
-
-        let mut i = 0;
-
-        while i < N {
-            data[i] = T::decode(buf, None)?;
-            i += 1;
-        }
+        // TODO: deal with the unwrap. for now this lets us remove the Default requirement on the
+        // trait
+        let data: [T; N] = std::array::from_fn(|_i| T::decode(buf, None).unwrap());
 
         Ok(data)
     }
@@ -271,5 +263,13 @@ impl Decodable for Duration {
         let data = u32::decode(buf, limit)?;
 
         Ok(Duration::from_millis(data as u64))
+    }
+}
+
+impl Decodable for Ipv4Addr {
+    fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
+        let data = u32::decode(buf, limit)?;
+
+        Ok(Ipv4Addr::from(data))
     }
 }

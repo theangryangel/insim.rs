@@ -25,7 +25,7 @@ pub enum MsoUserType {
     /// Was this message received with the prefix character from the [Isi](super::Isi) message?
     Prefix = 2,
 
-    // FIXME: Due to be retired in Insim v9
+    // Hidden message (due to be retired in Insim v9)
     O = 3,
 }
 
@@ -36,15 +36,11 @@ pub struct Mso {
     pub reqi: RequestId,
 
     pub ucid: ConnectionId,
-
     pub plid: PlayerId,
-
     /// Set if typed by a user
     pub usertype: MsoUserType,
-
     /// Index of the first character of user entered text, in msg field.
     pub textstart: u8,
-
     pub msg: String,
 }
 
@@ -97,6 +93,7 @@ impl Decodable for Mso {
         data.ucid = ConnectionId::decode(buf, None)?;
         data.plid = PlayerId::decode(buf, None)?;
         data.usertype = MsoUserType::decode(buf, None)?;
+        data.textstart = u8::decode(buf, None)?;
         data.msg = String::decode(buf, Some(Limit::Bytes(buf.len())))?;
         Ok(data)
     }

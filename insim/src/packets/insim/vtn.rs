@@ -3,6 +3,21 @@ use insim_core::{
     prelude::*,
 };
 
+/// Enum for the flag field of [Flg].
+#[derive(Default, Debug, InsimEncode, InsimDecode, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[repr(u8)]
+pub enum VtnAction {
+    #[default]
+    None = 0,
+
+    End = 1,
+
+    Restart = 2,
+
+    Qualify = 3,
+}
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
@@ -16,5 +31,5 @@ pub struct Vtn {
     pub ucid: ConnectionId,
 
     #[insim(pad_bytes_after = "2")]
-    pub action: u8,
+    pub action: VtnAction,
 }

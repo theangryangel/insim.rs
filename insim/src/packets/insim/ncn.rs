@@ -11,21 +11,19 @@ use serde::Serialize;
 /// New Connection
 pub struct Ncn {
     pub reqi: RequestId,
-
     pub ucid: ConnectionId,
 
     /// Username.
     #[insim(bytes = "24")]
     pub uname: String,
-
     #[insim(bytes = "24")]
     /// Playername.
     pub pname: String,
 
-    /// 1 if administrative user.
+    /// true if administrative user.
     pub admin: bool,
 
-    /// Total number of connections now this player has joined.
+    /// Total number of connections now this player has joined, plus host
     pub total: u8,
 
     #[insim(pad_bytes_after = "1")]

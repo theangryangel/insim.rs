@@ -52,29 +52,22 @@ pub struct Rst {
     #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
+    /// Racing laps, 0 if qualifying
     pub racelaps: u8,
-
+    /// Qualifying minutes, 0 if racing
     pub qualmins: u8,
 
     pub nump: u8,
-
     pub timing: u8,
 
     pub track: Track,
-
     pub weather: u8,
-
     pub wind: Wind,
 
     pub flags: HostFacts,
-
     pub numnodes: u16,
-
     pub finish: u16,
-
     pub split1: u16,
-
     pub split2: u16,
-
     pub split3: u16,
 }

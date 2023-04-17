@@ -29,12 +29,9 @@ pub struct Acr {
     pub reqi: RequestId,
 
     pub ucid: ConnectionId,
-
-    pub admin: u8,
-
+    pub admin: bool,
     #[insim(pad_bytes_after = "1")]
     pub result: AcrResult,
-
     #[insim(bytes = "64")]
     pub text: String,
 }
