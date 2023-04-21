@@ -13,7 +13,7 @@ use crate::packets::insim::{Isi, IsiFlags};
 use crate::result::Result;
 use crate::udp_stream::UdpStream;
 
-use super::{TcpClientTransport, UdpClientTransport};
+use super::{ClientTrait, TcpClientTransport, UdpClientTransport};
 
 #[derive(Debug)]
 /// Configuration and [Client] builder.
@@ -155,13 +155,17 @@ impl ClientBuilder {
 
         let mut stream = Client::new(stream);
         stream
-            .handshake_unpin(
+            .handshake(
                 self.connect_timeout,
                 self.as_isi(),
                 self.wait_for_initial_pong,
                 self.verify_version,
             )
             .await?;
+
+        #[cfg(feature = "game_state")]
+        stream.request_game_state().await?;
+
         Ok(stream)
     }
 
@@ -180,13 +184,17 @@ impl ClientBuilder {
 
         let mut stream = Client::new(stream);
         stream
-            .handshake_unpin(
+            .handshake(
                 self.connect_timeout,
                 self.as_isi(),
                 self.wait_for_initial_pong,
                 self.verify_version,
             )
             .await?;
+
+        #[cfg(feature = "game_state")]
+        stream.request_game_state().await?;
+
         Ok(stream)
     }
 
@@ -210,7 +218,24 @@ impl ClientBuilder {
         // Relay does not respond to ping requests
         self.wait_for_initial_pong = false;
 
-        let mut stream = self.connect_tcp("isrelay.lfs.net:47474").await?;
+        // Why not call connect_tcp? purely so we won't call request_game_state multiple times
+        // until we select a host there is no game state to request
+        let stream = timeout(
+            self.connect_timeout,
+            TcpStream::connect("isrelay.lfs.net:47474"),
+        )
+        .await??;
+        let stream = Framed::new(stream, Codec::new(self.codec_mode));
+
+        let mut stream = Client::new(stream);
+        stream
+            .handshake(
+                self.connect_timeout,
+                self.as_isi(),
+                self.wait_for_initial_pong,
+                self.verify_version,
+            )
+            .await?;
 
         if let Some(hostname) = auto_select_host.into() {
             stream
@@ -220,6 +245,9 @@ impl ClientBuilder {
                 })
                 .await?;
         }
+
+        #[cfg(feature = "game_state")]
+        stream.request_game_state().await?;
 
         Ok(stream)
     }

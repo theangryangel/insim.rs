@@ -9,7 +9,7 @@ bench = false
 doctest = false
 
 [features]
-default = ["relay", "tcp", "udp"]
+default = ["relay", "tcp", "udp", "game_state"]
 tcp = []
 udp = []
 relay = []
@@ -17,13 +17,15 @@ serde = [
   "dep:serde",
   "insim_core/serde",
   "insim_game_data?/serde",
+  "bitflags/serde",
 ]
-game_data = ["dep:insim_game_data"]
+game_data = ["dep:insim_game_data", "dep:multi_index"]
+game_state = ["game_data"]
 pth = ["dep:insim_pth"]
 smx = ["dep:insim_smx"]
 
 [dependencies]
-futures = "0.3"
+futures = "0.3.28"
 futures-util = "0.3"
 bytes = "1"
 tokio = { version = "1.11.0", features = ["full", "tracing"] }
@@ -38,8 +40,11 @@ insim_core = { path = "../insim_core" }
 insim_game_data = { path = "../insim_game_data", optional = true }
 insim_pth = { path = "../insim_pth", optional = true }
 insim_smx = { path = "../insim_smx", optional = true }
+multi_index = { path = "../multi_index", optional = true }
+async-trait = "0.1.68"
 
 [dev-dependencies]
 tokio-test = "0.4"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 clap = { version = "4.2", features = ["derive"] }
+if_chain = "1"

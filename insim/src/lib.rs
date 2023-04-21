@@ -15,6 +15,7 @@
 //! - `relay`: Enable LFS World relay support
 //! - `serde`: Enable serde support
 //! - `game_data`: Pull in insim_game_data and re-export
+//! - `game_state`: Track basic game state out of the box
 //! - `pth`: Pull in insim_pth and re-export
 //! - `smx`: Pull in insim_smx and re-export
 //!
@@ -40,6 +41,9 @@ pub use insim_core as core;
 #[cfg(feature = "game_data")]
 /// Report insim_game_data when game_data feature is enabled
 pub use insim_game_data as game_data;
+
+#[cfg(feature = "game_state")]
+pub mod game_state;
 
 #[cfg(feature = "pth")]
 /// Report insim_pth when pth feature is enabled
