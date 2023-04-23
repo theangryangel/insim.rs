@@ -1,6 +1,7 @@
 use insim_core::{
     identifiers::{PlayerId, RequestId},
     prelude::*,
+    racelaps::RaceLaps,
     ser::Limit,
     track::Track,
     wind::Wind,
@@ -134,9 +135,9 @@ pub struct Sta {
     /// Race status
     pub raceinprog: StaRacing,
 
-    pub qualmins: u8, // TODO: Make this a Duration!
+    pub qualmins: u8,
     #[insim(pad_bytes_after = "1")]
-    pub racelaps: u8, // TODO: Make a proper decoder for this!
+    pub racelaps: RaceLaps,
     pub serverstatus: u8, // serverstatus isn't an enum, unfortunately
 
     pub track: Track,

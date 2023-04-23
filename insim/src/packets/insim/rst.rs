@@ -1,4 +1,6 @@
-use insim_core::{identifiers::RequestId, prelude::*, ser::Limit, track::Track, wind::Wind};
+use insim_core::{
+    identifiers::RequestId, prelude::*, racelaps::RaceLaps, ser::Limit, track::Track, wind::Wind,
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -52,8 +54,7 @@ pub struct Rst {
     #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
-    /// Racing laps, 0 if qualifying
-    pub racelaps: u8,
+    pub racelaps: RaceLaps,
     /// Qualifying minutes, 0 if racing
     pub qualmins: u8,
 

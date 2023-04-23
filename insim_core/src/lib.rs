@@ -2,6 +2,7 @@ pub mod identifiers;
 pub mod license;
 pub mod point;
 pub mod prelude;
+pub mod racelaps;
 pub mod ser;
 pub mod string;
 pub mod track;
