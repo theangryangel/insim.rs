@@ -54,7 +54,7 @@ fn setup_tracing_subscriber() {
     }
 
     if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "debug")
+        std::env::set_var("RUST_LOG", "info")
     }
     tracing_subscriber::fmt::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
@@ -69,8 +69,8 @@ pub async fn main() -> Result<()> {
     // Parse our command line arguments, using clap
     let cli = Cli::parse();
 
-    // Use ClientBuilder to create a Client
-    let mut builder = ClientBuilder::default();
+    // Use ConnectionBuilder to create a Connection
+    let mut builder = ConnectionBuilder::default();
 
     // We need to box the output of the builder as connect_udp, connect_tcp, etc. all return
     // different types.
@@ -107,8 +107,6 @@ pub async fn main() -> Result<()> {
 
     tracing::info!("Connected!");
 
-    //let mut client = insim::state::State::new(client);
-
     let mut i = 0;
 
     while let Some(m) = client.next().await {
@@ -116,7 +114,7 @@ pub async fn main() -> Result<()> {
 
         let m = m?;
 
-        tracing::debug!("Packet={:?} Index={:?}", m, i);
+        tracing::info!("Packet={:?} Index={:?}", m, i);
 
         if_chain! {
             if let Commands::Relay{ list_hosts: true, .. } = &cli.command;
@@ -126,9 +124,6 @@ pub async fn main() -> Result<()> {
                 break;
             }
         }
-
-        tracing::info!("Player = {:?}", client.get_players());
-        tracing::info!("Conns = {:?}", client.get_connections());
     }
 
     Ok(())

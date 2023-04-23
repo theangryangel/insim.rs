@@ -1,14 +1,14 @@
-//! Insim Client that maintains a connection and provides a Stream and Sink of
+//! Connection maintains a connection and provides a Stream and Sink of
 //! [Packets](crate::packets::Packet).
 
 mod sink;
 mod state;
 mod stream;
 
-use state::ClientState;
+use state::State;
 
 pub mod builder;
-pub use builder::ClientBuilder;
+pub use builder::ConnectionBuilder;
 
 #[cfg(test)]
 mod tests;
@@ -17,12 +17,11 @@ use crate::{
     codec::Codec,
     error,
     packets::{
-        insim::{self, Tiny, TinyType},
-        Packet,
+        insim::{Isi, Tiny, TinyType, Version},
+        Packet, PacketSinkStream, VERSION,
     },
     result::Result,
 };
-use futures::{Sink, Stream};
 use pin_project::pin_project;
 
 use futures::{SinkExt, StreamExt};
@@ -40,32 +39,25 @@ use tokio_util::codec::Framed;
 #[cfg(feature = "udp")]
 use crate::udp_stream::UdpStream;
 
-#[cfg(feature = "game_state")]
-use crate::game_state::GameState;
-
 const TIMEOUT_SECS: u64 = 90;
 
-pub trait PacketSinkStreamTrait:
-    Sink<Packet, Error = error::Error> + Stream<Item = Result<Packet>> + std::marker::Unpin + Send
-{
-}
-impl<T> PacketSinkStreamTrait for Framed<T, Codec> where
+impl<T> PacketSinkStream for Framed<T, Codec> where
     T: AsyncRead + AsyncWrite + std::marker::Unpin + Send
 {
 }
 
 #[cfg(feature = "tcp")]
-pub type TcpClientTransport = Framed<TcpStream, Codec>;
+pub type TcpConnection = Framed<TcpStream, Codec>;
 
 #[cfg(feature = "udp")]
-pub type UdpClientTransport = Framed<UdpStream, Codec>;
+pub type UdpConnection = Framed<UdpStream, Codec>;
 
-impl<T> PacketSinkStreamTrait for Client<T> where T: PacketSinkStreamTrait {}
+impl<T> PacketSinkStream for Connection<T> where T: PacketSinkStream {}
 
 #[async_trait::async_trait]
-pub trait ClientTrait: PacketSinkStreamTrait {
-    /// Request the ClientState
-    fn state(&self) -> ClientState;
+pub trait ConnectionTrait: PacketSinkStream {
+    /// Request the state of this connection
+    fn state(&self) -> State;
 
     /// Request this client to shutdown
     fn shutdown(&mut self);
@@ -75,27 +67,18 @@ pub trait ClientTrait: PacketSinkStreamTrait {
     async fn handshake(
         &mut self,
         timeout: Duration,
-        isi: crate::packets::insim::Isi,
+        isi: Isi,
         wait_for_pong: bool,
         verify_version: bool,
     ) -> Result<()>;
-
-    #[cfg(feature = "game_state")]
-    async fn request_game_state(&mut self) -> Result<()>;
-
-    #[cfg(feature = "game_state")]
-    fn get_players(&self) -> Vec<crate::game_state::connection::Connection>;
-
-    #[cfg(feature = "game_state")]
-    fn get_connections(&self) -> Vec<crate::game_state::connection::Connection>;
 }
 
 /// A Stream and Sink based client for the Insim protocol.
-/// Given something that implements the [ClientTransport] trait, Client will handle
+/// Given something that implements [PacketSinkStreamTrait], Connection will handle
 /// encoding and decoding of [Packets](Packet), and ensure that the connection
-/// is maintained through [insim::Tiny] keepalive packets, and handling any timeout.
+/// is maintained through [Tiny] keepalive packets, and handling any timeout.
 #[pin_project]
-pub struct Client<T> {
+pub struct Connection<T> {
     #[pin]
     inner: T,
     // Cant use pin_project on tokio::time::Sleep because it's !Unpin
@@ -103,36 +86,30 @@ pub struct Client<T> {
     deadline: Pin<Box<time::Sleep>>,
     duration: Duration,
     poll_deadline: bool,
-    state: ClientState,
+    state: State,
     pong: bool,
-
-    #[cfg(feature = "game_state")]
-    pub game: GameState,
 }
 
-impl<T> Client<T>
+impl<T> Connection<T>
 where
-    T: PacketSinkStreamTrait + Send,
+    T: PacketSinkStream + Send,
 {
-    pub fn new(inner: T) -> Client<T> {
+    pub fn new(inner: T) -> Connection<T> {
         let duration = time::Duration::new(TIMEOUT_SECS, 0);
         let next = time::Instant::now() + duration;
         let deadline = Box::pin(tokio::time::sleep_until(next));
 
-        Client {
+        Connection {
             inner,
             deadline,
             duration,
             poll_deadline: true,
-            state: ClientState::Connected,
+            state: State::Connected,
             pong: false,
-
-            #[cfg(feature = "game_state")]
-            game: GameState::new(),
         }
     }
 
-    pub fn boxed<'a>(self) -> Box<dyn ClientTrait + 'a>
+    pub fn boxed<'a>(self) -> Box<dyn ConnectionTrait + 'a>
     where
         Self: 'a,
     {
@@ -171,8 +148,8 @@ where
                 Some(Ok(Packet::Tiny(_))) => {
                     received_tiny = true;
                 }
-                Some(Ok(Packet::Version(insim::Version { insimver, .. }))) => {
-                    if insimver != crate::packets::VERSION {
+                Some(Ok(Packet::Version(Version { insimver, .. }))) => {
+                    if insimver != VERSION {
                         return Err(error::Error::IncompatibleVersion(insimver));
                     }
 
@@ -225,22 +202,22 @@ where
 }
 
 #[async_trait::async_trait]
-impl<T> ClientTrait for Client<T>
+impl<T> ConnectionTrait for Connection<T>
 where
-    T: PacketSinkStreamTrait + Send,
+    T: PacketSinkStream + Send,
 {
-    fn state(&self) -> ClientState {
+    fn state(&self) -> State {
         self.state
     }
 
     fn shutdown(&mut self) {
-        self.state = ClientState::Shutdown;
+        self.state = State::Shutdown;
     }
 
     async fn handshake(
         &mut self,
         timeout: Duration,
-        isi: crate::packets::insim::Isi,
+        isi: Isi,
         wait_for_pong: bool,
         verify_version: bool,
     ) -> Result<()> {
@@ -249,34 +226,5 @@ where
         time::timeout(timeout, self.verify(wait_for_pong, verify_version)).await??;
 
         Ok(())
-    }
-
-    #[cfg(feature = "game_state")]
-    async fn request_game_state(&mut self) -> Result<()> {
-        let todo = [TinyType::Ncn, TinyType::Npl];
-
-        for (i, p) in todo.iter().enumerate() {
-            <Self as SinkExt<Packet>>::send(
-                self,
-                Tiny {
-                    subtype: p.clone(),
-                    reqi: RequestId(i as u8),
-                }
-                .into(),
-            )
-            .await?;
-        }
-
-        Ok(())
-    }
-
-    #[cfg(feature = "game_state")]
-    fn get_players(&self) -> Vec<crate::game_state::connection::Connection> {
-        self.game.get_players()
-    }
-
-    #[cfg(feature = "game_state")]
-    fn get_connections(&self) -> Vec<crate::game_state::connection::Connection> {
-        self.game.get_connections()
     }
 }

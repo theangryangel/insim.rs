@@ -8,7 +8,7 @@ pub enum Error {
     #[error("Disconnected")]
     Disconnected,
 
-    /// Client has detected in incompatible version
+    /// Connection has detected in incompatible version
     #[error("Unsupported Insim version: received {0:?}")]
     IncompatibleVersion(u8),
 

@@ -1,7 +1,8 @@
-use crate::{core::wind::Wind, game_data::track, packets::Packet};
-pub mod connection;
+use insim::{core::wind::Wind, packets::Packet, result::Result};
+use insim_game_data::track;
+mod connection;
 
-use connection::{Connection, MultiIndexConnection};
+pub use connection::{Connection, MultiIndexConnection};
 
 #[derive(Clone)]
 pub struct GameState {
@@ -11,7 +12,9 @@ pub struct GameState {
     pub weather: Option<u8>,
     pub wind: Option<Wind>,
 
+    // FIXME: after we merge #84 replace this with the right state
     pub racing: bool,
+    // TODO: add Spx and Lap storage for calculating intervals
 }
 
 impl Default for GameState {
@@ -32,6 +35,14 @@ impl GameState {
         }
     }
 
+    pub fn clear(&mut self) {
+        self.slab = MultiIndexConnection::default();
+        self.track = None;
+        self.weather = None;
+        self.wind = None;
+        self.racing = false;
+    }
+
     pub fn get_connections(&self) -> Vec<Connection> {
         self.slab.iter_by_connection_id().cloned().collect()
     }
@@ -44,7 +55,7 @@ impl GameState {
             .collect()
     }
 
-    pub fn handle(&mut self, data: &Packet) {
+    pub fn handle_packet(&mut self, data: &Packet) -> Result<()> {
         match data {
             Packet::NewConnection(data) => {
                 let connection: Connection = (data).into();
@@ -114,9 +125,7 @@ impl GameState {
             }
 
             Packet::State(data) => {
-                let track = &data.track;
-
-                self.track = track::lookup(track).cloned();
+                self.track = track::lookup(&data.track).cloned();
                 self.weather = Some(data.weather);
                 self.wind = Some(data.wind);
                 self.racing = data.raceinprog > 0;
@@ -124,5 +133,7 @@ impl GameState {
 
             _ => {}
         }
+
+        Ok(())
     }
 }

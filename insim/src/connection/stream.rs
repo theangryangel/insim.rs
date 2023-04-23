@@ -5,15 +5,15 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::time;
 
-use super::{Client, ClientState, PacketSinkStreamTrait};
+use super::{Connection, PacketSinkStream, State};
 use crate::error::Error;
 use crate::packets::insim::{Tiny, TinyType};
 use crate::packets::Packet;
 use crate::result::Result;
 
-impl<T> Stream for Client<T>
+impl<T> Stream for Connection<T>
 where
-    T: PacketSinkStreamTrait,
+    T: PacketSinkStream,
 {
     type Item = Result<Packet>;
 
@@ -35,12 +35,12 @@ where
     }
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        if *self.as_mut().project().state == ClientState::Shutdown {
-            *self.as_mut().project().state = ClientState::Disconnected;
+        if *self.as_mut().project().state == State::Shutdown {
+            *self.as_mut().project().state = State::Disconnected;
             return Poll::Ready(None);
         }
 
-        if *self.as_mut().project().state == ClientState::Disconnected {
+        if *self.as_mut().project().state == State::Disconnected {
             tracing::error!("polled after disconnect");
             return Poll::Ready(None);
         }
@@ -70,8 +70,6 @@ where
                             self.as_mut().poll_pong(cx);
                         }
 
-                        self.as_mut().game.handle(&frame);
-
                         return Poll::Ready(Some(Ok(frame)));
                     }
                     Some(Err(e)) => {
@@ -88,7 +86,7 @@ where
                 Poll::Pending => return Poll::Pending,
             };
             *self.as_mut().project().poll_deadline = false;
-            *self.as_mut().project().state = ClientState::Disconnected;
+            *self.as_mut().project().state = State::Disconnected;
             return Poll::Ready(Some(Err(Error::Timeout("Keepalive (ping) timeout".into()))));
         }
 

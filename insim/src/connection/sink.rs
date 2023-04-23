@@ -4,14 +4,14 @@ use std::task::Poll;
 
 use futures::Sink;
 
-use super::Client;
-use super::PacketSinkStreamTrait;
+use super::Connection;
+use super::PacketSinkStream;
 use crate::packets::Packet;
 use crate::result::Result;
 
-impl<T, P> Sink<P> for Client<T>
+impl<T, P> Sink<P> for Connection<T>
 where
-    T: PacketSinkStreamTrait,
+    T: PacketSinkStream,
     P: Into<Packet>,
 {
     type Error = <T as futures::Sink<Packet>>::Error;

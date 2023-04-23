@@ -1,5 +1,5 @@
-use crate::core::{identifiers::ConnectionId, identifiers::PlayerId, point::Point};
-use crate::packets::insim::Ncn;
+use insim::core::{identifiers::ConnectionId, identifiers::PlayerId, point::Point};
+use insim::packets::insim::Ncn;
 
 use multi_index::MultiIndex;
 

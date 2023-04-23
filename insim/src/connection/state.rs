@@ -1,15 +1,15 @@
 use std::fmt::Display;
 
-/// Internal Client State.
+/// Internal Connection State.
 #[derive(Debug, Default, Eq, PartialEq, Copy, Clone)]
-pub enum ClientState {
+pub enum State {
     #[default]
     Disconnected,
     Connected,
     Shutdown,
 }
 
-impl Display for ClientState {
+impl Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Disconnected => write!(f, "Disconnected"),

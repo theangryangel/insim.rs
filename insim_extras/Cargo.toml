@@ -1,0 +1,12 @@
+[package]
+name = "insim_extras"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1.11.0", features = ["full", "tracing"] }
+insim = { path = "../insim" }
+insim_game_data = { path = '../insim_game_data' }
+multi_index = { path = "../multi_index" }
