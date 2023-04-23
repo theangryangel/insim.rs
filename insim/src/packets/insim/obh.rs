@@ -53,6 +53,7 @@ pub struct CarContact {
     pub heading: u8,
     pub speed: u8,
     pub z: u8,
+
     pub x: i16,
     pub y: i16,
 }
@@ -75,6 +76,5 @@ pub struct Obh {
     #[insim(pad_bytes_after = "1")]
     pub z: u8,
     pub index: u8,
-
     pub flags: ObhFlags,
 }

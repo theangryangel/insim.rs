@@ -29,6 +29,7 @@ pub enum Hlvc {
 pub struct Hlv {
     pub reqi: RequestId,
     pub plid: PlayerId,
+
     #[insim(pad_bytes_after = "1")]
     pub hlvc: Hlvc,
     pub time: u16,

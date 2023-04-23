@@ -69,20 +69,16 @@ impl RaceResultFlags {
 /// Provisional finish notification: This is not a final result, you should use the [Res](super::Res) packet for this instead.
 pub struct Fin {
     pub reqi: RequestId,
-
     pub plid: PlayerId,
 
     pub ttime: Duration,
-
     #[insim(pad_bytes_after = "1")]
     pub btime: Duration,
 
     pub numstops: u8,
-
     #[insim(pad_bytes_after = "1")]
     pub confirm: RaceResultFlags,
 
     pub lapsdone: u16,
-
     pub flags: PlayerFlags,
 }

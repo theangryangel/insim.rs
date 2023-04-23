@@ -11,6 +11,5 @@ use serde::Serialize;
 /// Player Tele-pits
 pub struct Plp {
     pub reqi: RequestId,
-
     pub plid: PlayerId,
 }

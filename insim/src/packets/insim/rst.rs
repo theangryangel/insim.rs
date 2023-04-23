@@ -11,11 +11,11 @@ bitflags! {
     pub struct HostFacts: u16 {
          const CAN_VOTE = (1 << 0);
          const CAN_SELECT = (1 << 1);
-         const MID_RACE_JOIN = (1 << 2);
-         const MUST_PIT = (1 << 3);
-         const CAN_RESET = (1 << 4);
-         const FORCE_DRIVER_VIEW = (1 << 5);
-         const CRUISE = (1 << 6);
+         const MID_RACE_JOIN = (1 << 5);
+         const MUST_PIT = (1 << 6);
+         const CAN_RESET = (1 << 7);
+         const FORCE_DRIVER_VIEW = (1 << 8);
+         const CRUISE = (1 << 9);
     }
 }
 

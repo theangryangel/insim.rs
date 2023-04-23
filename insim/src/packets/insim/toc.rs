@@ -11,11 +11,9 @@ use serde::Serialize;
 /// Take Over Car
 pub struct Toc {
     pub reqi: RequestId,
-
     pub plid: PlayerId,
 
     pub olducid: ConnectionId,
-
     #[insim(pad_bytes_after = "2")]
     pub newucid: ConnectionId,
 }
