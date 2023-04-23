@@ -35,7 +35,6 @@ pub enum CameraView {
 // Camera Change
 pub struct Cch {
     pub reqi: RequestId,
-
     pub plid: PlayerId,
 
     #[insim(pad_bytes_after = "3")]

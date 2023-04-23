@@ -12,6 +12,5 @@ use serde::Serialize;
 /// server.
 pub struct Crs {
     pub reqi: RequestId,
-
     pub plid: PlayerId,
 }

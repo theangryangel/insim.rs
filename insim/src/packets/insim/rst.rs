@@ -1,4 +1,6 @@
-use insim_core::{identifiers::RequestId, prelude::*, ser::Limit, track::Track, wind::Wind};
+use insim_core::{
+    identifiers::RequestId, prelude::*, racelaps::RaceLaps, ser::Limit, track::Track, wind::Wind,
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -11,11 +13,11 @@ bitflags! {
     pub struct HostFacts: u16 {
          const CAN_VOTE = (1 << 0);
          const CAN_SELECT = (1 << 1);
-         const MID_RACE_JOIN = (1 << 2);
-         const MUST_PIT = (1 << 3);
-         const CAN_RESET = (1 << 4);
-         const FORCE_DRIVER_VIEW = (1 << 5);
-         const CRUISE = (1 << 6);
+         const MID_RACE_JOIN = (1 << 5);
+         const MUST_PIT = (1 << 6);
+         const CAN_RESET = (1 << 7);
+         const FORCE_DRIVER_VIEW = (1 << 8);
+         const CRUISE = (1 << 9);
     }
 }
 
@@ -52,29 +54,21 @@ pub struct Rst {
     #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
-    pub racelaps: u8,
-
+    pub racelaps: RaceLaps,
+    /// Qualifying minutes, 0 if racing
     pub qualmins: u8,
 
     pub nump: u8,
-
     pub timing: u8,
 
     pub track: Track,
-
     pub weather: u8,
-
     pub wind: Wind,
 
     pub flags: HostFacts,
-
     pub numnodes: u16,
-
     pub finish: u16,
-
     pub split1: u16,
-
     pub split2: u16,
-
     pub split3: u16,
 }

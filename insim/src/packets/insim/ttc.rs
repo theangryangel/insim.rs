@@ -13,26 +13,26 @@ pub enum TtcType {
     #[default]
     None = 0,
 
-    Selection = 1, // Send Axm for the current layout editor selection
+    /// Send Axm for the current layout editor selection
+    Sel = 1,
 
-    SelectionStart = 2, // Send Axm every time the selection changes
+    /// Send Axm every time the selection changes
+    SelStart = 2,
 
-    SelectionStop = 3, // Stop sending Axm's
+    /// Stop sending Axm's
+    SelStop = 3,
 }
 
 #[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// General purpose Target To Connection packet
+/// b1..b3 may be used in various ways, depending on the subtype
 pub struct Ttc {
     pub reqi: RequestId,
-
-    pub subtype: TtcType,
+    pub subt: TtcType,
 
     pub ucid: ConnectionId,
-
     pub b1: u8,
-
     pub b2: u8,
-
     pub b3: u8,
 }

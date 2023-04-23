@@ -62,7 +62,7 @@ where
                     Some(Ok(frame)) => {
                         if let Packet::Tiny(Tiny {
                             reqi: RequestId(0),
-                            subtype: TinyType::None,
+                            subt: TinyType::None,
                         }) = frame
                         {
                             // attempt to send a ping response immediately.

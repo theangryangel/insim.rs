@@ -1,52 +1,26 @@
 use insim_core::{
     identifiers::{PlayerId, RequestId},
     prelude::*,
-    ser::Limit,
 };
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-use bitflags::bitflags;
-
-bitflags! {
-    // *_VALID variation means this was cleared
-    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(Serialize))]
-    pub struct PenaltyInfo: u8 {
-        const DRIVE_THRU = (1 << 0);
-        const DRIVE_THRU_VALID = (1 << 1);
-        const STOP_GO = (1 << 2);
-        const STOP_GO_VALID = (1 << 3);
-        const SECS_30 = (1 << 4);
-        const SECS_45 = (1 << 5);
-    }
-}
-
-impl Encodable for PenaltyInfo {
-    fn encode(
-        &self,
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<(), insim_core::EncodableError>
-    where
-        Self: Sized,
-    {
-        self.bits().encode(buf, limit)?;
-        Ok(())
-    }
-}
-
-impl Decodable for PenaltyInfo {
-    fn decode(
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<Self, insim_core::DecodableError>
-    where
-        Self: Sized,
-    {
-        Ok(Self::from_bits_truncate(u8::decode(buf, limit)?))
-    }
+#[derive(
+    InsimEncode, InsimDecode, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default,
+)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[repr(u8)]
+// *_VALID variation means this was cleared
+pub enum PenaltyInfo {
+    #[default]
+    None = 0,
+    DriveThru = 1,
+    DriveThruValid = 2,
+    StopGo = 3,
+    StopGoValid = 4,
+    Seconds30 = 5,
+    Seconds45 = 6,
 }
 
 #[derive(Debug, Default, InsimEncode, InsimDecode, Clone)]
@@ -55,7 +29,7 @@ impl Decodable for PenaltyInfo {
 pub enum PenaltyReason {
     /// Unknown or cleared penalty
     #[default]
-    None = 0,
+    Unknown = 0,
 
     /// Penalty given by admin
     Admin = 1,
@@ -81,11 +55,9 @@ pub enum PenaltyReason {
 /// Penalty
 pub struct Pen {
     pub reqi: RequestId,
-
     pub plid: PlayerId,
 
     pub oldpen: PenaltyInfo,
-
     pub newpen: PenaltyInfo,
 
     #[insim(pad_bytes_after = "1")]

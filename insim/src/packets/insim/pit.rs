@@ -11,7 +11,7 @@ use serde::Serialize;
 
 use bitflags::bitflags;
 
-use super::{PlayerFlags, TyreCompound};
+use super::{Fuel, PenaltyInfo, PlayerFlags, TyreCompound};
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
@@ -69,24 +69,19 @@ impl Encodable for PitStopWorkFlags {
 /// Pit stop (stop at the garage, not "tele-pit")
 pub struct Pit {
     pub reqi: RequestId,
-
     pub plid: PlayerId,
 
     pub lapsdone: u16,
-
     pub flags: PlayerFlags,
 
-    pub fueladd: u8,
-
-    pub penalty: u8,
-
+    pub fueladd: Fuel,
+    pub penalty: PenaltyInfo,
     #[insim(pad_bytes_after = "1")]
     pub numstops: u8,
 
     pub tyres: [TyreCompound; 4],
-
     #[insim(pad_bytes_after = "4")]
-    pub work: u32,
+    pub work: PitStopWorkFlags,
 }
 
 #[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
@@ -94,7 +89,6 @@ pub struct Pit {
 /// Pit Stop Finished
 pub struct Psf {
     pub reqi: RequestId,
-
     pub plid: PlayerId,
 
     #[insim(pad_bytes_after = "4")]
@@ -106,14 +100,19 @@ pub struct Psf {
 #[repr(u8)]
 pub enum PitLaneFact {
     #[default]
+    /// Left pitlane
     Exit = 0,
 
+    /// Entered pitlane
     Enter = 1,
 
+    /// Entered for no known reason
     EnterNoPurpose = 2,
 
+    /// Entered for Drive-through penalty
     EnterDriveThru = 3,
 
+    /// Entered for a stop-go (time) penalty
     EnterStopGo = 4,
 }
 
@@ -122,7 +121,6 @@ pub enum PitLaneFact {
 /// PitLane
 pub struct Pla {
     pub reqi: RequestId,
-
     pub plid: PlayerId,
 
     #[insim(pad_bytes_after = "3")]

@@ -13,7 +13,6 @@ use super::PlayerFlags;
 /// Player Flags
 pub struct Pfl {
     pub reqi: RequestId,
-
     pub plid: PlayerId,
 
     #[insim(pad_bytes_after = "2")]

@@ -1,4 +1,4 @@
-use insim_core::{identifiers::RequestId, prelude::*};
+use insim_core::{identifiers::RequestId, prelude::*, string::codepages, EncodableError};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -7,7 +7,7 @@ use serde::Serialize;
 #[derive(Debug, Default, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
-pub enum MslSoundType {
+pub enum SoundType {
     #[default]
     Silent = 0,
 
@@ -22,15 +22,71 @@ pub enum MslSoundType {
     Failure = 4,
 }
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[derive(Debug, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Send a message to the local computer only. If you are connected to a server this means the
 /// console. If you are connected to a client this means to the local client only.
 pub struct Msl {
     pub reqi: RequestId,
 
-    pub sound: MslSoundType,
+    pub sound: SoundType,
 
     #[insim(bytes = "128")]
     pub msg: String,
+}
+
+impl Encodable for Msl {
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<insim_core::ser::Limit>,
+    ) -> Result<(), insim_core::EncodableError> {
+        if limit.is_some() {
+            return Err(EncodableError::UnexpectedLimit(format!(
+                "Msl does not support limit! {limit:?}",
+            )));
+        }
+
+        self.reqi.encode(buf, None)?;
+        self.sound.encode(buf, None)?;
+
+        let msg = codepages::to_lossy_bytes(&self.msg);
+        if msg.len() > 127 {
+            return Err(EncodableError::WrongSize(
+                "Msx only supports upto 127 byte long messages".into(),
+            ));
+        }
+        msg.encode(buf, Some(insim_core::ser::Limit::Bytes(127)))?;
+        // last byte must be zero
+        if msg.len() < 128 {
+            buf.put_bytes(0, 128 - msg.len());
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bytes::BytesMut;
+    use insim_core::Encodable;
+
+    use super::{Msl, SoundType};
+    use crate::core::identifiers::RequestId;
+
+    #[test]
+    fn ensure_last_byte_zero_always() {
+        let data = Msl {
+            reqi: RequestId(1),
+            sound: SoundType::Silent,
+            msg: "aaaaaa".into(),
+        };
+
+        let mut buf = BytesMut::new();
+        let res = data.encode(&mut buf, None);
+        assert!(res.is_ok());
+
+        assert_eq!(buf.last(), Some(&0));
+        assert_eq!(buf.len(), 130);
+    }
 }

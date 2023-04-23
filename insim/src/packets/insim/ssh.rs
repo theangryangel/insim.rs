@@ -24,7 +24,7 @@ pub struct Ssh {
     pub reqi: RequestId,
 
     #[insim(pad_bytes_after = "4")]
-    pub error: u8,
+    pub error: SshError,
 
     #[insim(bytes = "32")]
     pub lname: String,

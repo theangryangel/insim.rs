@@ -15,13 +15,13 @@ use super::{CarContact, ObjectInfo};
 #[repr(u8)]
 pub enum UcoAction {
     #[default]
-    Entered = 0, // entered a circle
+    CircleEnter = 0, // entered a circle
 
-    Left = 1, // left a circle
+    CircleLeave = 1, // left a circle
 
-    CrossForwards = 2, // crossed cp in forward direction
+    CpFwd = 2, // crossed cp in forward direction
 
-    CrossedReverse = 3,
+    CpRev = 3,
 }
 
 #[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
@@ -29,11 +29,10 @@ pub enum UcoAction {
 /// User Control Object
 pub struct Uco {
     pub reqi: RequestId,
-
     #[insim(pad_bytes_after = "1")]
     pub plid: PlayerId,
 
-    #[insim(pad_bytes_before = "2")]
+    #[insim(pad_bytes_after = "2")]
     pub action: UcoAction,
 
     pub time: Duration,

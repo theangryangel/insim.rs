@@ -1,6 +1,7 @@
 use insim_core::{
     identifiers::{PlayerId, RequestId},
     prelude::*,
+    racelaps::RaceLaps,
     ser::Limit,
     track::Track,
     wind::Wind,
@@ -13,6 +14,21 @@ use bitflags::bitflags;
 
 use super::CameraView;
 
+#[derive(Debug, Default, InsimEncode, InsimDecode, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[repr(u8)]
+pub enum StaRacing {
+    /// No race in progress
+    #[default]
+    No = 0,
+
+    /// Race in progress
+    Racing = 1,
+
+    /// Qualifying
+    Qualifying = 2,
+}
+
 bitflags! {
     /// Bitwise flags used within the [Sta] packet
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
@@ -23,10 +39,13 @@ bitflags! {
 
         // In Singleplayer Relay
         const REPLAY = (1 << 1);
+
         /// Paused
         const PAUSE = (1 << 2);
+
         /// Shift+U mode
         const SHIFTU = (1 << 3);
+
         /// Dialog
         const DIALOG = (1 << 4);
 
@@ -98,24 +117,31 @@ pub struct Sta {
     #[insim(pad_bytes_after = "1")]
     pub reqi: RequestId,
 
+    /// 1.0 is normal speed
     pub replayspeed: f32,
 
     pub flags: StaFlags,
+    /// Which type of camera is selected
     pub ingamecam: CameraView,
+    /// Currently viewing player
     pub viewplid: PlayerId,
 
+    /// Number of players in race
     pub nump: u8,
+    /// Number of connections, including host
     pub numconns: u8,
+    /// Number of finished or qualifying players
     pub numfinished: u8,
-    pub raceinprog: u8,
+    /// Race status
+    pub raceinprog: StaRacing,
 
     pub qualmins: u8,
     #[insim(pad_bytes_after = "1")]
-    pub racelaps: u8,
+    pub racelaps: RaceLaps,
     pub serverstatus: u8, // serverstatus isn't an enum, unfortunately
 
     pub track: Track,
-    pub weather: u8, // Weather is track dependant?!
+    pub weather: u8, // TODO: Weather is track dependant?!
     pub wind: Wind,
 }
 

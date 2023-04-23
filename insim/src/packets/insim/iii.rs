@@ -14,14 +14,10 @@ use serde::Serialize;
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// InsIm Info -  a /i message from user to hosts Insim
 pub struct Iii {
-    // pad_after_bytes = 1
     pub reqi: RequestId,
 
     pub ucid: ConnectionId,
-
-    // pad_after_bytes = 2
     pub plid: PlayerId,
-
     pub msg: String,
 }
 
@@ -46,11 +42,24 @@ impl Encodable for Iii {
         buf.put_bytes(0, 2);
 
         let msg = codepages::to_lossy_bytes(&self.msg);
+
+        if msg.len() > 63 {
+            return Err(EncodableError::WrongSize(
+                "III packet only supports up to 63 character messages".into(),
+            ));
+        }
+
         buf.put_slice(&msg);
 
-        // pad so that msg is divisible by 8
-        if msg.len() % 8 != 0 {
-            buf.put_bytes(0, msg.len() + 8 - (msg.len() - 8));
+        // last byte is always 0
+        buf.put_bytes(0, 1);
+
+        // pad so that msg is divisible by 4
+        // after the size and type are added later
+        let total = msg.len() + 2;
+        let round_to = (total + 3) & !3;
+        if round_to != total {
+            buf.put_bytes(0, round_to - total);
         }
 
         Ok(())

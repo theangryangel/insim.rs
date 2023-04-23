@@ -11,14 +11,11 @@ pub struct Mod {
     pub reqi: RequestId,
 
     /// Set to choose 16-bit
-    pub bit16: i8,
-
+    pub bit16: i32,
     /// Refresh rate, zero for default
-    pub rr: i8,
-
+    pub rr: i32,
     /// Screen width. Zero to switch to windowed mode.
-    pub width: i8,
-
+    pub width: i32,
     /// Screen height. Zero to switch to windowed mode.
-    pub height: i8,
+    pub height: i32,
 }
