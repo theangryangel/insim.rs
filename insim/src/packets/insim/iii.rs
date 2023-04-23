@@ -43,7 +43,7 @@ impl Encodable for Iii {
 
         let msg = codepages::to_lossy_bytes(&self.msg);
 
-        if msg.len() > 64 {
+        if msg.len() > 63 {
             return Err(EncodableError::WrongSize(
                 "III packet only supports up to 63 character messages".into(),
             ));
@@ -51,11 +51,15 @@ impl Encodable for Iii {
 
         buf.put_slice(&msg);
 
-        // pad so that msg is divisible by 4
-        let round_to = (msg.len() + 3) & !3;
+        // last byte is always 0
+        buf.put_bytes(0, 1);
 
-        if round_to != msg.len() {
-            buf.put_bytes(0, round_to - msg.len());
+        // pad so that msg is divisible by 4
+        // after the size and type are added later
+        let total = msg.len() + 2;
+        let round_to = (total + 3) & !3;
+        if round_to != total {
+            buf.put_bytes(0, round_to - total);
         }
 
         Ok(())

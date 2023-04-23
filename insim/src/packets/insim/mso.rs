@@ -65,11 +65,18 @@ impl Encodable for Mso {
         let msg = codepages::to_lossy_bytes(&self.msg);
         buf.put_slice(&msg);
 
-        // pad so that msg is divisible by 8
-        let round_to = (msg.len() + 7) & !7;
+        if msg.len() > 128 {
+            return Err(EncodableError::WrongSize(
+                "Mso only supports upto 128 characters".into(),
+            ));
+        }
 
-        if round_to != msg.len() {
-            buf.put_bytes(0, round_to - msg.len());
+        // pad so that msg is divisible by 4
+        // after the size and type are added
+        let total = msg.len() + 2;
+        let round_to = (total + 3) & !3;
+        if round_to != total {
+            buf.put_bytes(0, round_to - total);
         }
 
         Ok(())
@@ -131,7 +138,7 @@ mod tests {
         comparison.put_u8(0);
         comparison.put_u8(0);
         comparison.extend_from_slice(&"two".to_string().as_bytes());
-        comparison.put_bytes(0, 5);
+        comparison.put_bytes(0, 3);
 
         assert_eq!(buf.to_vec(), comparison.to_vec());
     }

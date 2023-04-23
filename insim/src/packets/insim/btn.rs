@@ -2,6 +2,8 @@ use insim_core::{
     identifiers::{ClickId, ConnectionId, RequestId},
     prelude::*,
     ser::Limit,
+    string::codepages,
+    EncodableError,
 };
 
 #[cfg(feature = "serde")]
@@ -125,7 +127,7 @@ pub struct Bfn {
     pub inst: u8,
 }
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[derive(Debug, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Button
 pub struct Btn {
@@ -143,7 +145,78 @@ pub struct Btn {
     pub h: u8,
 
     #[insim(bytes = "240")]
-    pub text: String, // FIXME: this should be upto 240 characters and always a multiple of 4
+    pub text: String,
+}
+
+impl Encodable for Btn {
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), EncodableError> {
+        if limit.is_some() {
+            return Err(EncodableError::UnexpectedLimit(format!(
+                "Btn does not support a limit: {limit:?}",
+            )));
+        }
+
+        self.reqi.encode(buf, None)?;
+        self.ucid.encode(buf, None)?;
+
+        self.clickid.encode(buf, None)?;
+        self.inst.encode(buf, None)?;
+        self.bstyle.encode(buf, None)?;
+        self.typein.encode(buf, None)?;
+
+        self.l.encode(buf, None)?;
+        self.t.encode(buf, None)?;
+        self.w.encode(buf, None)?;
+        self.h.encode(buf, None)?;
+
+        let msg = codepages::to_lossy_bytes(&self.text);
+
+        if msg.len() > 240 {
+            return Err(EncodableError::WrongSize(
+                "Btn packet only supports up to 127 character messages".into(),
+            ));
+        }
+
+        buf.put_slice(&msg);
+
+        let total = 12 + msg.len();
+
+        // pad so that msg is divisible by 4 once the size and type are added to the btn
+        let round_to = (total + 3) & !3;
+
+        if round_to != total {
+            buf.put_bytes(0, round_to - total);
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bytes::BytesMut;
+    use insim_core::Encodable;
+
+    use super::Btn;
+
+    #[test]
+    fn ensure_btn_divisible_by_four() {
+        let data = Btn {
+            text: "aaaaa".into(),
+            ..Default::default()
+        };
+
+        let mut buf = BytesMut::new();
+        let res = data.encode(&mut buf, None);
+        assert!(res.is_ok());
+
+        // we need to add the size and type to the buf len
+        assert_eq!(buf.len() + 2, 20);
+    }
 }
 
 #[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
