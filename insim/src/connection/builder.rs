@@ -144,7 +144,7 @@ impl ConnectionBuilder {
         }
     }
 
-    /// Connect to Insim via TCP and return a new [Connection](crate::client::Connection).
+    /// Connect to Insim via TCP and return a new [Connection](crate::connection::Connection).
     #[cfg(feature = "tcp")]
     pub async fn connect_tcp<A: ToSocketAddrs>(
         &mut self,
@@ -167,7 +167,7 @@ impl ConnectionBuilder {
         Ok(stream)
     }
 
-    /// Connect to Insim via UDP and return a new [Connection](crate::client::Connection).
+    /// Connect to Insim via UDP and return a new [Connection](crate::connection::Connection).
     #[cfg(feature = "udp")]
     pub async fn connect_udp<A: ToSocketAddrs, B: ToSocketAddrs>(
         &mut self,
@@ -193,7 +193,7 @@ impl ConnectionBuilder {
         Ok(stream)
     }
 
-    /// Connect to Insim via LFS World Relay and return a new [Connection](crate::client::Connection).
+    /// Connect to Insim via LFS World Relay and return a new [Connection](crate::connection::Connection).
     /// Optionally automatically select a host.
     /// Warning: Several options will be automatically set to maintain compatibility with LFS World.
     #[cfg(feature = "relay")]

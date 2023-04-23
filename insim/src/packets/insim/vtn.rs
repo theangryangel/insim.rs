@@ -3,7 +3,7 @@ use insim_core::{
     prelude::*,
 };
 
-/// Enum for the flag field of [Flg].
+/// Enum for the action field of [Vtn].
 #[derive(Default, Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]

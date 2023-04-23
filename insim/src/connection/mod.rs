@@ -74,7 +74,7 @@ pub trait ConnectionTrait: PacketSinkStream {
 }
 
 /// A Stream and Sink based client for the Insim protocol.
-/// Given something that implements [PacketSinkStreamTrait], Connection will handle
+/// Given something that implements the trait PacketSinkStream, Connection will handle
 /// encoding and decoding of [Packets](Packet), and ensure that the connection
 /// is maintained through [Tiny] keepalive packets, and handling any timeout.
 #[pin_project]
