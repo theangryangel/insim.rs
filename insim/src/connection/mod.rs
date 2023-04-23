@@ -127,7 +127,7 @@ where
                 self,
                 Tiny {
                     reqi: RequestId(2),
-                    subtype: TinyType::Ping,
+                    subt: TinyType::Ping,
                 }
                 .into(),
             )
@@ -180,7 +180,7 @@ where
 
         let res = self.as_mut().project().inner.start_send(
             Tiny {
-                subtype: TinyType::None,
+                subt: TinyType::None,
                 ..Default::default()
             }
             .into(),
