@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use insim_core::{identifiers::RequestId, prelude::*};
+use insim_core::{identifiers::RequestId, prelude::*, ser::Limit};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -8,6 +8,7 @@ use serde::Serialize;
 #[derive(Debug, Default, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
+#[non_exhaustive]
 pub enum RipError {
     #[default]
     Ok = 0,
@@ -35,6 +36,48 @@ pub enum RipError {
     OOS = 11,
 }
 
+bitflags::bitflags! {
+    /// Bitwise flags used within the [Sta] packet
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
+    #[cfg_attr(feature = "serde", derive(Serialize))]
+    pub struct RipOptions: u8 {
+        /// Replay will loop
+        const LOOP = (1 << 0);
+
+        /// Download missing skins
+        const SKINS = (1 << 1);
+
+        /// Use full physics
+        const FULL_PHYS = (1 << 2);
+    }
+}
+
+impl Decodable for RipOptions {
+    fn decode(
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<Self, insim_core::DecodableError>
+    where
+        Self: Default,
+    {
+        Ok(Self::from_bits_truncate(u8::decode(buf, limit)?))
+    }
+}
+
+impl Encodable for RipOptions {
+    fn encode(
+        &self,
+        buf: &mut bytes::BytesMut,
+        limit: Option<Limit>,
+    ) -> Result<(), insim_core::EncodableError>
+    where
+        Self: Sized,
+    {
+        self.bits().encode(buf, limit)?;
+        Ok(())
+    }
+}
+
 #[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Replay Information
@@ -42,11 +85,10 @@ pub struct Rip {
     pub reqi: RequestId,
     pub error: RipError,
 
-    pub mpr: u8,
-    pub paused: u8,
-
+    pub mpr: bool,
+    pub paused: bool,
     #[insim(pad_bytes_after = "1")]
-    pub options: u8, // FIXME: implement flags
+    pub options: RipOptions,
 
     pub ctime: Duration,
     pub ttime: Duration,
