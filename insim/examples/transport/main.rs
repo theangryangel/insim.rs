@@ -1,5 +1,10 @@
 use clap::{Parser, Subcommand};
-use insim::{prelude::*, result::Result};
+use if_chain::if_chain;
+use insim::{
+    packets::{relay::HostListRequest, Packet},
+    prelude::*,
+    result::Result,
+};
 use std::net::SocketAddr;
 
 #[derive(Parser)]
@@ -35,6 +40,10 @@ enum Commands {
         #[arg(long)]
         /// Optional host to automatically select after successful connection to relay
         select_host: Option<String>,
+
+        #[arg(long)]
+        /// List hosts on the relay and then quit
+        list_hosts: bool,
     },
 }
 
@@ -45,7 +54,7 @@ fn setup_tracing_subscriber() {
     }
 
     if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "debug")
+        std::env::set_var("RUST_LOG", "info")
     }
     tracing_subscriber::fmt::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
@@ -60,8 +69,8 @@ pub async fn main() -> Result<()> {
     // Parse our command line arguments, using clap
     let cli = Cli::parse();
 
-    // Use ClientBuilder to create a Client
-    let mut builder = ClientBuilder::default();
+    // Use ConnectionBuilder to create a Connection
+    let mut builder = ConnectionBuilder::default();
 
     // We need to box the output of the builder as connect_udp, connect_tcp, etc. all return
     // different types.
@@ -79,13 +88,19 @@ pub async fn main() -> Result<()> {
             let res = builder.connect_tcp(addr).await?;
             res.boxed()
         }
-        Commands::Relay { select_host } => {
-            let host = match select_host {
-                Some(host) => Some(host.as_str()),
-                _ => None,
+        Commands::Relay {
+            select_host,
+            list_hosts,
+        } => {
+            let host = match (select_host, list_hosts) {
+                (Some(host), false) => Some(host.as_str()),
+                (_, _) => None,
             };
             tracing::info!("Connecting via LFS World Relay!");
-            let res = builder.connect_relay(host).await?;
+            let mut res = builder.connect_relay(host).await?;
+            if *list_hosts {
+                res.send(HostListRequest::default()).await?;
+            }
             res.boxed()
         }
     };
@@ -100,6 +115,15 @@ pub async fn main() -> Result<()> {
         let m = m?;
 
         tracing::info!("Packet={:?} Index={:?}", m, i);
+
+        if_chain! {
+            if let Commands::Relay{ list_hosts: true, .. } = &cli.command;
+            if let Packet::RelayHostList(i) = &m;
+            if i.is_last();
+            then {
+                break;
+            }
+        }
     }
 
     Ok(())

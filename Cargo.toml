@@ -8,4 +8,5 @@ members = [
   "insim_pth",
   "insim_smx",
   "insim_game_data",
+  "insim_extras",
 ]

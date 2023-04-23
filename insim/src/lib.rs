@@ -24,8 +24,8 @@
 
 pub mod prelude;
 
-pub mod client;
 pub mod codec;
+pub mod connection;
 pub mod error;
 pub mod packets;
 pub mod result;

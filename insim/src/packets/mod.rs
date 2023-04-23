@@ -1,4 +1,5 @@
 //! Insim and Insim Relay Packet definitions
+use futures::{Sink, Stream};
 use insim_core::prelude::*;
 
 #[cfg(feature = "serde")]
@@ -11,6 +12,14 @@ pub mod insim;
 #[cfg(feature = "relay")]
 /// Relay packet definitions
 pub mod relay;
+
+pub trait PacketSinkStream:
+    Sink<Packet, Error = crate::error::Error>
+    + Stream<Item = crate::result::Result<Packet>>
+    + std::marker::Unpin
+    + Send
+{
+}
 
 /// This Insim protocol version number
 pub const VERSION: u8 = 9;

@@ -6,18 +6,19 @@ use tokio::net::ToSocketAddrs;
 use tokio::{net::TcpStream, time::timeout};
 use tokio_util::codec::Framed;
 
-use crate::client::Client;
 use crate::codec::{Codec, Mode};
+use crate::connection::Connection;
 use crate::core::identifiers::RequestId;
 use crate::packets::insim::{Isi, IsiFlags};
+use crate::packets::VERSION;
 use crate::result::Result;
 use crate::udp_stream::UdpStream;
 
-use super::{TcpClientTransport, UdpClientTransport};
+use super::{ConnectionTrait, TcpConnection, UdpConnection};
 
 #[derive(Debug)]
-/// Configuration and [Client] builder.
-pub struct ClientBuilder {
+/// Configuration and [Connection] builder.
+pub struct ConnectionBuilder {
     pub name: String,
     pub password: String,
     pub flags: IsiFlags,
@@ -30,13 +31,13 @@ pub struct ClientBuilder {
     pub udp_port: Option<u16>,
 }
 
-impl Default for ClientBuilder {
-    fn default() -> ClientBuilder {
-        ClientBuilder::new()
+impl Default for ConnectionBuilder {
+    fn default() -> ConnectionBuilder {
+        ConnectionBuilder::new()
     }
 }
 
-impl ClientBuilder {
+impl ConnectionBuilder {
     /// Create a default configuration instance.
     pub fn new() -> Self {
         Self {
@@ -54,7 +55,7 @@ impl ClientBuilder {
     }
 }
 
-impl ClientBuilder {
+impl ConnectionBuilder {
     /// Name of the client, passed to Insim [Isi](crate::packets::insim::Isi).
     pub fn named(mut self, name: String) -> Self {
         self.name = name;
@@ -111,14 +112,14 @@ impl ClientBuilder {
         self
     }
 
-    /// Should the Client verify the version of the server?
+    /// Should the Connection verify the version of the server?
     /// If you select to connect to the LFS World Relay this will be overridden for compatibility.
     pub fn verify_version(mut self, value: bool) -> Self {
         self.verify_version = value;
         self
     }
 
-    /// Should the Client wait for the initial pong?
+    /// Should the Connection wait for the initial pong?
     /// If you select to connect to the LFS World Relay this will be overridden for compatibility.
     pub fn wait_for_initial_pong(mut self, value: bool) -> Self {
         self.wait_for_initial_pong = value;
@@ -131,7 +132,7 @@ impl ClientBuilder {
             name: self.name.to_owned(),
             password: self.password.to_owned(),
             prefix: self.prefix.unwrap_or(0 as char),
-            version: crate::packets::VERSION,
+            version: VERSION,
             interval: self.interval,
             flags: self.flags,
             reqi: if self.verify_version {
@@ -143,65 +144,69 @@ impl ClientBuilder {
         }
     }
 
-    /// Connect to Insim via TCP and return a new [Client](crate::client::Client).
+    /// Connect to Insim via TCP and return a new [Connection](crate::client::Connection).
     #[cfg(feature = "tcp")]
     pub async fn connect_tcp<A: ToSocketAddrs>(
         &mut self,
         remote: A,
-    ) -> Result<Client<TcpClientTransport>> {
+    ) -> Result<Connection<TcpConnection>> {
         let stream = timeout(self.connect_timeout, TcpStream::connect(remote)).await??;
 
         let stream = Framed::new(stream, Codec::new(self.codec_mode));
 
-        let mut stream = Client::new(stream);
+        let mut stream = Connection::new(stream);
         stream
-            .handshake_unpin(
+            .handshake(
                 self.connect_timeout,
                 self.as_isi(),
                 self.wait_for_initial_pong,
                 self.verify_version,
             )
             .await?;
+
         Ok(stream)
     }
 
-    /// Connect to Insim via UDP and return a new [Client](crate::client::Client).
+    /// Connect to Insim via UDP and return a new [Connection](crate::client::Connection).
     #[cfg(feature = "udp")]
     pub async fn connect_udp<A: ToSocketAddrs, B: ToSocketAddrs>(
         &mut self,
         local: A,
         remote: B,
-    ) -> Result<Client<UdpClientTransport>> {
+    ) -> Result<Connection<UdpConnection>> {
         let stream = UdpStream::connect(local, remote).await?;
 
         self.udp_port = stream.local_addr()?.port().into();
 
         let stream = Framed::new(stream, Codec::new(self.codec_mode));
 
-        let mut stream = Client::new(stream);
+        let mut stream = Connection::new(stream);
         stream
-            .handshake_unpin(
+            .handshake(
                 self.connect_timeout,
                 self.as_isi(),
                 self.wait_for_initial_pong,
                 self.verify_version,
             )
             .await?;
+
         Ok(stream)
     }
 
-    /// Connect to Insim via LFS World Relay and return a new [Client](crate::client::Client).
+    /// Connect to Insim via LFS World Relay and return a new [Connection](crate::client::Connection).
     /// Optionally automatically select a host.
     /// Warning: Several options will be automatically set to maintain compatibility with LFS World.
     #[cfg(feature = "relay")]
     pub async fn connect_relay<'a, H>(
         &mut self,
         auto_select_host: H,
-    ) -> Result<Client<TcpClientTransport>>
+    ) -> Result<Connection<TcpConnection>>
     where
         H: Into<Option<&'a str>>,
     {
         // TODO: Talk to LFS devs, find out if/when relay gets compressed support?
+
+        use crate::packets::relay::HostSelect;
         self.codec_mode = Mode::Uncompressed;
 
         // Relay does not respond to version requests until after the host is selected
@@ -210,11 +215,28 @@ impl ClientBuilder {
         // Relay does not respond to ping requests
         self.wait_for_initial_pong = false;
 
-        let mut stream = self.connect_tcp("isrelay.lfs.net:47474").await?;
+        // Why not call connect_tcp? purely so we won't call request_game_state multiple times
+        // until we select a host there is no game state to request
+        let stream = timeout(
+            self.connect_timeout,
+            TcpStream::connect("isrelay.lfs.net:47474"),
+        )
+        .await??;
+        let stream = Framed::new(stream, Codec::new(self.codec_mode));
+
+        let mut stream = Connection::new(stream);
+        stream
+            .handshake(
+                self.connect_timeout,
+                self.as_isi(),
+                self.wait_for_initial_pong,
+                self.verify_version,
+            )
+            .await?;
 
         if let Some(hostname) = auto_select_host.into() {
             stream
-                .send(crate::packets::relay::HostSelect {
+                .send(HostSelect {
                     hname: hostname.to_string(),
                     ..Default::default()
                 })

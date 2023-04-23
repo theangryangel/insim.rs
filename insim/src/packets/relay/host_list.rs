@@ -73,3 +73,13 @@ pub struct HostList {
     #[insim(count = "numhosts")]
     pub hinfo: Vec<HostInfo>,
 }
+
+impl HostList {
+    pub fn is_last(&self) -> bool {
+        self.hinfo
+            .iter()
+            .filter(|i| i.flags.contains(HostInfoFlags::LAST))
+            .count()
+            > 0
+    }
+}

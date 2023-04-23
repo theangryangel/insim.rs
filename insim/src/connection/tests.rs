@@ -1,6 +1,6 @@
 use crate::{
-    client::Client,
     codec::{Codec, Mode},
+    connection::Connection,
     packets,
 };
 use futures::StreamExt;
@@ -25,7 +25,7 @@ async fn poll_pong_compressed() {
 
     let framed = Framed::new(mock, Codec::new(Mode::Compressed));
 
-    let mut t = Client::new(framed);
+    let mut t = Connection::new(framed);
 
     let data = t.next().await;
     assert!(matches!(
@@ -54,7 +54,7 @@ async fn poll_pong_uncompressed() {
 
     let framed = Framed::new(mock, Codec::new(Mode::Uncompressed));
 
-    let mut t = Client::new(framed);
+    let mut t = Connection::new(framed);
 
     let data = t.next().await;
     assert!(matches!(
