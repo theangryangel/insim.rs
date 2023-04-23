@@ -36,6 +36,10 @@ pub enum Error {
     /// Failure to parse an address into SocketAddr
     #[error("Failed to parse address: {0}")]
     AddrParseError(#[from] std::net::AddrParseError),
+
+    // FIXME
+    #[error("Websocket error: {0}")]
+    Websocket(#[from] tokio_tungstenite::tungstenite::Error),
 }
 
 impl From<tokio::time::error::Elapsed> for Error {

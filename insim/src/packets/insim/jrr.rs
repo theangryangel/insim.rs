@@ -46,11 +46,9 @@ pub enum JrrAction {
 /// In this case, PLID must be set, JRRAction must be JRR_RESET or higher and StartPos must be set
 pub struct Jrr {
     pub reqi: RequestId,
-
     pub plid: PlayerId,
 
     pub ucid: ConnectionId,
-
     #[insim(pad_bytes_after = "2")]
     pub action: JrrAction,
 

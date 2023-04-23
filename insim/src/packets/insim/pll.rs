@@ -11,6 +11,5 @@ use serde::Serialize;
 /// Player Leaves race
 pub struct Pll {
     pub reqi: RequestId,
-
     pub plid: PlayerId,
 }

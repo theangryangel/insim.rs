@@ -44,6 +44,10 @@ enum Commands {
         #[arg(long)]
         /// List hosts on the relay and then quit
         list_hosts: bool,
+
+        #[arg(long)]
+        /// Use websockets
+        websocket: bool,
     },
 }
 
@@ -91,6 +95,7 @@ pub async fn main() -> Result<()> {
         Commands::Relay {
             select_host,
             list_hosts,
+            websocket: false,
         } => {
             let host = match (select_host, list_hosts) {
                 (Some(host), false) => Some(host.as_str()),
@@ -101,6 +106,19 @@ pub async fn main() -> Result<()> {
             if *list_hosts {
                 res.send(HostListRequest::default()).await?;
             }
+            res.boxed()
+        }
+        Commands::Relay {
+            select_host,
+            websocket: true,
+            ..
+        } => {
+            let host = match select_host {
+                Some(host) => Some(host.as_str()),
+                _ => None,
+            };
+            tracing::info!("Connecting via LFS World Relay Websocket!");
+            let res = builder.connect_relay_websocket(host).await?;
             res.boxed()
         }
     };

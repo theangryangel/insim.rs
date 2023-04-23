@@ -10,22 +10,31 @@ pub enum SmallType {
     #[default]
     None = 0,
 
+    /// Request LFS to start sending positions
     Ssp = 1,
 
+    /// Request LFS to start sending gauges
     Ssg = 2,
 
+    /// Vote action
     Vta = 3,
 
+    /// Time stop
     Tms = 4,
 
+    /// Time step
     Stp = 5,
 
+    /// Race time packet (reply to Gth)
     Rtp = 6,
 
+    /// Set node lap interval
     Nli = 7,
 
+    /// Set or get allowed cars (Tiny, type = Alc)
     Alc = 8,
 
+    /// Set local car switches
     Lcs = 9,
 }
 
@@ -35,7 +44,7 @@ pub enum SmallType {
 pub struct Small {
     pub reqi: RequestId,
 
-    pub subtype: SmallType,
+    pub subt: SmallType,
 
     pub uval: u32,
 }

@@ -1,4 +1,8 @@
-use insim::{core::wind::Wind, packets::Packet, result::Result};
+use insim::{
+    core::wind::Wind,
+    packets::{insim::StaRacing, Packet},
+    result::Result,
+};
 use insim_game_data::track;
 mod connection;
 
@@ -12,8 +16,7 @@ pub struct GameState {
     pub weather: Option<u8>,
     pub wind: Option<Wind>,
 
-    // FIXME: after we merge #84 replace this with the right state
-    pub racing: bool,
+    pub racing: StaRacing,
     // TODO: add Spx and Lap storage for calculating intervals
 }
 
@@ -31,7 +34,7 @@ impl GameState {
             track: None,
             weather: None,
             wind: None,
-            racing: false,
+            racing: StaRacing::No,
         }
     }
 
@@ -40,7 +43,7 @@ impl GameState {
         self.track = None;
         self.weather = None;
         self.wind = None;
-        self.racing = false;
+        self.racing = StaRacing::No;
     }
 
     pub fn get_connections(&self) -> Vec<Connection> {
@@ -128,7 +131,7 @@ impl GameState {
                 self.track = track::lookup(&data.track).cloned();
                 self.weather = Some(data.weather);
                 self.wind = Some(data.wind);
-                self.racing = data.raceinprog > 0;
+                self.racing = data.raceinprog.clone();
             }
 
             _ => {}

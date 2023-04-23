@@ -26,7 +26,6 @@ pub enum CscAction {
 /// Car State Changed
 pub struct Csc {
     pub reqi: RequestId,
-
     #[insim(pad_bytes_after = "1")]
     pub plid: PlayerId,
 

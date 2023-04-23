@@ -84,48 +84,36 @@ impl Decodable for PlayerFlags {
 #[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Sent when a New Player joins.
+// TODO: Implement SetF, Fuel, RW/FWAdj, PType
 pub struct Npl {
     pub reqi: RequestId,
-
     pub plid: PlayerId,
 
     pub ucid: ConnectionId,
-
     pub ptype: u8,
-
     pub flags: PlayerFlags,
 
     #[insim(bytes = "24")]
     pub pname: String,
-
     #[insim(bytes = "8")]
     pub plate: String,
 
     pub cname: Vehicle,
-
     #[insim(bytes = "16")]
     pub sname: String,
-
     pub tyres: [TyreCompound; 4],
 
     pub h_mass: u8,
-
     pub h_tres: u8,
-
     pub model: u8,
-
     pub pass: u8,
 
     pub rwadj: u8,
-
     #[insim(pad_bytes_after = "2")]
     pub fwadj: u8,
 
     pub setf: u8,
-
     pub nump: u8,
-
     pub config: u8,
-
     pub fuel: u8,
 }

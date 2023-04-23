@@ -33,6 +33,9 @@ pub mod result;
 #[cfg(feature = "udp")]
 pub mod udp_stream;
 
+#[cfg(feature = "websocket")]
+pub mod websocket_stream;
+
 #[doc(hidden)]
 /// Rexport insim_core
 pub use insim_core as core;

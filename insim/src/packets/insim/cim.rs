@@ -37,13 +37,10 @@ impl Default for CimMode {
 /// Connection Interface Mode
 pub struct Cim {
     pub reqi: RequestId,
-
     pub ucid: ConnectionId,
 
     pub mode: CimMode,
-
     pub submode: u8, // FIXME: How do we support this in the same way? LFS has multiple enum types.
-
     #[insim(pad_bytes_after = "1")]
     pub seltype: u8,
 }

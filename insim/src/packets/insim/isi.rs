@@ -81,10 +81,10 @@ pub struct Isi {
     pub interval: Duration,
 
     /// Administrative password.
-    pub password: String,
+    pub admin: String,
 
     /// Name of the program.
-    pub name: String,
+    pub iname: String,
 }
 
 impl Encodable for Isi {
@@ -112,8 +112,8 @@ impl Encodable for Isi {
         (self.prefix as u8).encode(buf, None)?;
         (self.interval.as_millis() as u16).encode(buf, None)?;
 
-        self.password.encode(buf, Some(Limit::Bytes(16)))?;
-        self.name.encode(buf, Some(Limit::Bytes(16)))?;
+        self.admin.encode(buf, Some(Limit::Bytes(16)))?;
+        self.iname.encode(buf, Some(Limit::Bytes(16)))?;
 
         Ok(())
     }
@@ -146,8 +146,8 @@ impl Decodable for Isi {
         data.prefix = u8::decode(buf, None)? as char;
         data.interval = Duration::from_millis(u16::decode(buf, None)?.into());
 
-        data.password = String::decode(buf, Some(Limit::Bytes(16)))?;
-        data.name = String::decode(buf, Some(Limit::Bytes(16)))?;
+        data.admin = String::decode(buf, Some(Limit::Bytes(16)))?;
+        data.iname = String::decode(buf, Some(Limit::Bytes(16)))?;
 
         Ok(data)
     }

@@ -8,22 +8,21 @@ use insim_core::{
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use super::{Fuel200, PenaltyInfo};
+
 #[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Split timing
 pub struct Spx {
     pub reqi: RequestId,
-
     pub plid: PlayerId,
 
     pub stime: Duration,
-
     pub etime: Duration,
 
     pub split: u8,
+    pub penalty: PenaltyInfo,
 
-    pub penalty: u8,
-
-    #[insim(pad_bytes_after = "1")]
     pub numstops: u8,
+    pub fuel200: Fuel200,
 }

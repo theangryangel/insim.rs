@@ -11,12 +11,10 @@ use serde::Serialize;
 /// Connection Player Renamed indicates that a player has changed their name.
 pub struct Cpr {
     pub reqi: RequestId,
-
     pub ucid: ConnectionId,
 
     #[insim(bytes = "24")]
     pub pname: String,
-
     #[insim(bytes = "8")]
     pub plate: String,
 }

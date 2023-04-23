@@ -25,7 +25,7 @@ pub enum MsoUserType {
     /// Was this message received with the prefix character from the [Isi](super::Isi) message?
     Prefix = 2,
 
-    // FIXME: Due to be retired in Insim v9
+    // Hidden message (due to be retired in Insim v9)
     O = 3,
 }
 
@@ -36,15 +36,11 @@ pub struct Mso {
     pub reqi: RequestId,
 
     pub ucid: ConnectionId,
-
     pub plid: PlayerId,
-
     /// Set if typed by a user
     pub usertype: MsoUserType,
-
     /// Index of the first character of user entered text, in msg field.
     pub textstart: u8,
-
     pub msg: String,
 }
 
@@ -69,11 +65,18 @@ impl Encodable for Mso {
         let msg = codepages::to_lossy_bytes(&self.msg);
         buf.put_slice(&msg);
 
-        // pad so that msg is divisible by 8
-        let round_to = (msg.len() + 7) & !7;
+        if msg.len() > 128 {
+            return Err(EncodableError::WrongSize(
+                "Mso only supports upto 128 characters".into(),
+            ));
+        }
 
-        if round_to != msg.len() {
-            buf.put_bytes(0, round_to - msg.len());
+        // pad so that msg is divisible by 4
+        // after the size and type are added
+        let total = msg.len() + 2;
+        let round_to = (total + 3) & !3;
+        if round_to != total {
+            buf.put_bytes(0, round_to - total);
         }
 
         Ok(())
@@ -97,6 +100,7 @@ impl Decodable for Mso {
         data.ucid = ConnectionId::decode(buf, None)?;
         data.plid = PlayerId::decode(buf, None)?;
         data.usertype = MsoUserType::decode(buf, None)?;
+        data.textstart = u8::decode(buf, None)?;
         data.msg = String::decode(buf, Some(Limit::Bytes(buf.len())))?;
         Ok(data)
     }
@@ -134,7 +138,7 @@ mod tests {
         comparison.put_u8(0);
         comparison.put_u8(0);
         comparison.extend_from_slice(&"two".to_string().as_bytes());
-        comparison.put_bytes(0, 5);
+        comparison.put_bytes(0, 3);
 
         assert_eq!(buf.to_vec(), comparison.to_vec());
     }

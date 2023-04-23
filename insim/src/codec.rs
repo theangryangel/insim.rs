@@ -223,7 +223,7 @@ mod tests {
         assert!(matches!(
             data,
             Some(Ok(packets::Packet::Tiny(packets::insim::Tiny {
-                subtype: packets::insim::TinyType::Ping,
+                subt: packets::insim::TinyType::Ping,
                 reqi: RequestId(2)
             })))
         ));
@@ -244,7 +244,7 @@ mod tests {
         let res = framed
             .send(
                 packets::insim::Tiny {
-                    subtype: packets::insim::TinyType::Ping,
+                    subt: packets::insim::TinyType::Ping,
                     reqi: RequestId(2),
                 }
                 .into(),
@@ -273,7 +273,7 @@ mod tests {
         let res = framed
             .send(
                 packets::insim::Tiny {
-                    subtype: packets::insim::TinyType::Ping,
+                    subt: packets::insim::TinyType::Ping,
                     reqi: RequestId(2),
                 }
                 .into(),
@@ -285,7 +285,7 @@ mod tests {
         let res = framed
             .send(
                 packets::insim::Small {
-                    subtype: packets::insim::SmallType::Alc,
+                    subt: packets::insim::SmallType::Alc,
                     reqi: RequestId(4),
                     uval: 599,
                 }

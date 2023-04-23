@@ -9,10 +9,11 @@ bench = false
 doctest = false
 
 [features]
-default = ["relay", "tcp", "udp"]
+default = ["relay", "tcp", "udp", "websocket"]
 tcp = []
 udp = []
 relay = []
+websocket = ["tokio-tungstenite", "url"]
 serde = [
   "dep:serde",
   "insim_core/serde",
@@ -40,6 +41,8 @@ insim_game_data = { path = "../insim_game_data", optional = true }
 insim_pth = { path = "../insim_pth", optional = true }
 insim_smx = { path = "../insim_smx", optional = true }
 async-trait = "0.1.68"
+tokio-tungstenite = { version = "*", optional = true }
+url = { version = "2.1", optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"

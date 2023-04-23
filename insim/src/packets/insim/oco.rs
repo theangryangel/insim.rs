@@ -73,10 +73,7 @@ pub struct Oco {
     pub reqi: RequestId,
 
     pub action: OcoAction,
-
     pub index: OcoIndex,
-
     pub identifer: u8,
-
     pub lights: OcoLights,
 }

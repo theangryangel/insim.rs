@@ -12,7 +12,6 @@ use serde::Serialize;
 /// User Selected Car
 pub struct Slc {
     pub reqi: RequestId,
-
     pub ucid: ConnectionId,
 
     pub cname: Vehicle,

@@ -1,5 +1,5 @@
 use bytes::{BufMut, BytesMut};
-use std::{error::Error, fmt, time::Duration};
+use std::{error::Error, fmt, net::Ipv4Addr, time::Duration};
 
 use super::Limit;
 use crate::string::codepages;
@@ -235,5 +235,16 @@ impl Encodable for Duration {
     {
         let millis = self.as_millis() as u32;
         millis.encode(buf, limit)
+    }
+}
+
+// Ipv4Addr
+
+impl Encodable for Ipv4Addr {
+    fn encode(&self, buf: &mut BytesMut, limit: Option<Limit>) -> Result<(), EncodableError>
+    where
+        Self: Sized,
+    {
+        Into::<u32>::into(*self).encode(buf, limit)
     }
 }

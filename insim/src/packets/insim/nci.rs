@@ -1,3 +1,5 @@
+use std::net::Ipv4Addr;
+
 use insim_core::{
     identifiers::{ConnectionId, RequestId},
     prelude::*,
@@ -50,19 +52,29 @@ pub enum ILanguage {
     Romanian = 36,
 }
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Extra information about the new connection. This is only sent when connected to a game server,
 /// and only if an administrative password has been set and used by Insim.
 pub struct Nci {
     pub reqi: RequestId,
-
     pub ucid: ConnectionId,
 
     #[insim(pad_bytes_after = "3")]
     pub language: ILanguage,
 
     pub user_id: u32,
+    pub ip_addr: Ipv4Addr,
+}
 
-    pub ip_addr: u32,
+impl Default for Nci {
+    fn default() -> Self {
+        Self {
+            reqi: RequestId::default(),
+            ucid: ConnectionId::default(),
+            language: ILanguage::default(),
+            user_id: 0,
+            ip_addr: Ipv4Addr::new(0, 0, 0, 0),
+        }
+    }
 }

@@ -11,8 +11,9 @@ pub struct Ism {
     pub reqi: RequestId,
 
     #[insim(pad_bytes_after = "3")]
-    pub host: u8,
+    /// false = guest, true = host
+    pub host: bool,
 
-    #[insim(bytes = "16")]
+    #[insim(bytes = "32")]
     pub hname: String,
 }
