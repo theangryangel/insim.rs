@@ -1,6 +1,6 @@
 //! Insim and Insim Relay Packet definitions
 use futures::{Sink, Stream};
-use insim_core::prelude::*;
+use insim_core::{identifiers::RequestId, prelude::*};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -19,6 +19,12 @@ pub trait PacketSinkStream:
     + std::marker::Unpin
     + Send
 {
+}
+
+pub trait RequestIdentifiable {
+    fn request_identifier(&self) -> RequestId;
+
+    fn set_request_identifier(&mut self, reqi: RequestId);
 }
 
 /// This Insim protocol version number
@@ -122,7 +128,175 @@ impl Default for Packet {
     }
 }
 
-crate::impl_packet_from! {
+impl RequestIdentifiable for Packet {
+    fn request_identifier(&self) -> RequestId {
+        match self {
+            Packet::Init(i) => i.request_identifier(),
+            Packet::Version(i) => i.request_identifier(),
+            Packet::Tiny(i) => i.request_identifier(),
+            Packet::Small(i) => i.request_identifier(),
+            Packet::State(i) => i.request_identifier(),
+            Packet::SingleCharacter(i) => i.request_identifier(),
+            Packet::StateFlagsPack(i) => i.request_identifier(),
+            Packet::SetCarCam(i) => i.request_identifier(),
+            Packet::CamPosPack(i) => i.request_identifier(),
+            Packet::MultiPlayerNotification(i) => i.request_identifier(),
+            Packet::MessageOut(i) => i.request_identifier(),
+            Packet::InsimInfo(i) => i.request_identifier(),
+            Packet::MessageType(i) => i.request_identifier(),
+            Packet::MessageToConnection(i) => i.request_identifier(),
+            Packet::ScreenMode(i) => i.request_identifier(),
+            Packet::VoteNotification(i) => i.request_identifier(),
+            Packet::RaceStart(i) => i.request_identifier(),
+            Packet::NewConnection(i) => i.request_identifier(),
+            Packet::ConnectionLeave(i) => i.request_identifier(),
+            Packet::ConnectionPlayerRenamed(i) => i.request_identifier(),
+            Packet::NewPlayer(i) => i.request_identifier(),
+            Packet::PlayerPits(i) => i.request_identifier(),
+            Packet::PlayerLeave(i) => i.request_identifier(),
+            Packet::Lap(i) => i.request_identifier(),
+            Packet::SplitX(i) => i.request_identifier(),
+            Packet::PitStopStart(i) => i.request_identifier(),
+            Packet::PitStopFinish(i) => i.request_identifier(),
+            Packet::PitLane(i) => i.request_identifier(),
+            Packet::CameraChange(i) => i.request_identifier(),
+            Packet::Penalty(i) => i.request_identifier(),
+            Packet::TakeOverCar(i) => i.request_identifier(),
+            Packet::Flag(i) => i.request_identifier(),
+            Packet::PlayerFlags(i) => i.request_identifier(),
+            Packet::Finished(i) => i.request_identifier(),
+            Packet::Result(i) => i.request_identifier(),
+            Packet::Reorder(i) => i.request_identifier(),
+            Packet::NodeLap(i) => i.request_identifier(),
+            Packet::MultiCarInfo(i) => i.request_identifier(),
+            Packet::MesssageExtended(i) => i.request_identifier(),
+            Packet::MessageLocal(i) => i.request_identifier(),
+            Packet::CarReset(i) => i.request_identifier(),
+            Packet::ButtonFunction(i) => i.request_identifier(),
+            Packet::AutoXInfo(i) => i.request_identifier(),
+            Packet::AutoXObject(i) => i.request_identifier(),
+            Packet::Button(i) => i.request_identifier(),
+            Packet::ButtonClick(i) => i.request_identifier(),
+            Packet::ButtonType(i) => i.request_identifier(),
+            Packet::ReplayInformation(i) => i.request_identifier(),
+            Packet::ScreenShot(i) => i.request_identifier(),
+            Packet::Contact(i) => i.request_identifier(),
+            Packet::ObjectHit(i) => i.request_identifier(),
+            Packet::HotLapValidity(i) => i.request_identifier(),
+            Packet::PlayerAllowedCars(i) => i.request_identifier(),
+            Packet::AutoXMultipleObjects(i) => i.request_identifier(),
+            Packet::AdminCommandReport(i) => i.request_identifier(),
+            Packet::Handicaps(i) => i.request_identifier(),
+            Packet::Nci(i) => i.request_identifier(),
+            Packet::Jrr(i) => i.request_identifier(),
+            Packet::UserControlObject(i) => i.request_identifier(),
+            Packet::ObjectControl(i) => i.request_identifier(),
+            Packet::TargetToConnection(i) => i.request_identifier(),
+            Packet::SelectedVehicle(i) => i.request_identifier(),
+            Packet::VehicleStateChanged(i) => i.request_identifier(),
+            Packet::ConnectionInterfaceMode(i) => i.request_identifier(),
+            Packet::ModsAllowed(i) => i.request_identifier(),
+
+            #[cfg(feature = "relay")]
+            Packet::RelayAdminRequest(i) => i.request_identifier(),
+            #[cfg(feature = "relay")]
+            Packet::RelayAdminResponse(i) => i.request_identifier(),
+            #[cfg(feature = "relay")]
+            Packet::RelayHostListRequest(i) => i.request_identifier(),
+            #[cfg(feature = "relay")]
+            Packet::RelayHostList(i) => i.request_identifier(),
+            #[cfg(feature = "relay")]
+            Packet::RelayHostSelect(i) => i.request_identifier(),
+            #[cfg(feature = "relay")]
+            Packet::RelayError(i) => i.request_identifier(),
+        }
+    }
+
+    fn set_request_identifier(&mut self, reqi: RequestId) {
+        match self {
+            Packet::Init(i) => i.set_request_identifier(reqi),
+            Packet::Version(i) => i.set_request_identifier(reqi),
+            Packet::Tiny(i) => i.set_request_identifier(reqi),
+            Packet::Small(i) => i.set_request_identifier(reqi),
+            Packet::State(i) => i.set_request_identifier(reqi),
+            Packet::SingleCharacter(i) => i.set_request_identifier(reqi),
+            Packet::StateFlagsPack(i) => i.set_request_identifier(reqi),
+            Packet::SetCarCam(i) => i.set_request_identifier(reqi),
+            Packet::CamPosPack(i) => i.set_request_identifier(reqi),
+            Packet::MultiPlayerNotification(i) => i.set_request_identifier(reqi),
+            Packet::MessageOut(i) => i.set_request_identifier(reqi),
+            Packet::InsimInfo(i) => i.set_request_identifier(reqi),
+            Packet::MessageType(i) => i.set_request_identifier(reqi),
+            Packet::MessageToConnection(i) => i.set_request_identifier(reqi),
+            Packet::ScreenMode(i) => i.set_request_identifier(reqi),
+            Packet::VoteNotification(i) => i.set_request_identifier(reqi),
+            Packet::RaceStart(i) => i.set_request_identifier(reqi),
+            Packet::NewConnection(i) => i.set_request_identifier(reqi),
+            Packet::ConnectionLeave(i) => i.set_request_identifier(reqi),
+            Packet::ConnectionPlayerRenamed(i) => i.set_request_identifier(reqi),
+            Packet::NewPlayer(i) => i.set_request_identifier(reqi),
+            Packet::PlayerPits(i) => i.set_request_identifier(reqi),
+            Packet::PlayerLeave(i) => i.set_request_identifier(reqi),
+            Packet::Lap(i) => i.set_request_identifier(reqi),
+            Packet::SplitX(i) => i.set_request_identifier(reqi),
+            Packet::PitStopStart(i) => i.set_request_identifier(reqi),
+            Packet::PitStopFinish(i) => i.set_request_identifier(reqi),
+            Packet::PitLane(i) => i.set_request_identifier(reqi),
+            Packet::CameraChange(i) => i.set_request_identifier(reqi),
+            Packet::Penalty(i) => i.set_request_identifier(reqi),
+            Packet::TakeOverCar(i) => i.set_request_identifier(reqi),
+            Packet::Flag(i) => i.set_request_identifier(reqi),
+            Packet::PlayerFlags(i) => i.set_request_identifier(reqi),
+            Packet::Finished(i) => i.set_request_identifier(reqi),
+            Packet::Result(i) => i.set_request_identifier(reqi),
+            Packet::Reorder(i) => i.set_request_identifier(reqi),
+            Packet::NodeLap(i) => i.set_request_identifier(reqi),
+            Packet::MultiCarInfo(i) => i.set_request_identifier(reqi),
+            Packet::MesssageExtended(i) => i.set_request_identifier(reqi),
+            Packet::MessageLocal(i) => i.set_request_identifier(reqi),
+            Packet::CarReset(i) => i.set_request_identifier(reqi),
+            Packet::ButtonFunction(i) => i.set_request_identifier(reqi),
+            Packet::AutoXInfo(i) => i.set_request_identifier(reqi),
+            Packet::AutoXObject(i) => i.set_request_identifier(reqi),
+            Packet::Button(i) => i.set_request_identifier(reqi),
+            Packet::ButtonClick(i) => i.set_request_identifier(reqi),
+            Packet::ButtonType(i) => i.set_request_identifier(reqi),
+            Packet::ReplayInformation(i) => i.set_request_identifier(reqi),
+            Packet::ScreenShot(i) => i.set_request_identifier(reqi),
+            Packet::Contact(i) => i.set_request_identifier(reqi),
+            Packet::ObjectHit(i) => i.set_request_identifier(reqi),
+            Packet::HotLapValidity(i) => i.set_request_identifier(reqi),
+            Packet::PlayerAllowedCars(i) => i.set_request_identifier(reqi),
+            Packet::AutoXMultipleObjects(i) => i.set_request_identifier(reqi),
+            Packet::AdminCommandReport(i) => i.set_request_identifier(reqi),
+            Packet::Handicaps(i) => i.set_request_identifier(reqi),
+            Packet::Nci(i) => i.set_request_identifier(reqi),
+            Packet::Jrr(i) => i.set_request_identifier(reqi),
+            Packet::UserControlObject(i) => i.set_request_identifier(reqi),
+            Packet::ObjectControl(i) => i.set_request_identifier(reqi),
+            Packet::TargetToConnection(i) => i.set_request_identifier(reqi),
+            Packet::SelectedVehicle(i) => i.set_request_identifier(reqi),
+            Packet::VehicleStateChanged(i) => i.set_request_identifier(reqi),
+            Packet::ConnectionInterfaceMode(i) => i.set_request_identifier(reqi),
+            Packet::ModsAllowed(i) => i.set_request_identifier(reqi),
+
+            #[cfg(feature = "relay")]
+            Packet::RelayAdminRequest(i) => i.set_request_identifier(reqi),
+            #[cfg(feature = "relay")]
+            Packet::RelayAdminResponse(i) => i.set_request_identifier(reqi),
+            #[cfg(feature = "relay")]
+            Packet::RelayHostListRequest(i) => i.set_request_identifier(reqi),
+            #[cfg(feature = "relay")]
+            Packet::RelayHostList(i) => i.set_request_identifier(reqi),
+            #[cfg(feature = "relay")]
+            Packet::RelayHostSelect(i) => i.set_request_identifier(reqi),
+            #[cfg(feature = "relay")]
+            Packet::RelayError(i) => i.set_request_identifier(reqi),
+        }
+    }
+}
+
+crate::impl_packet_traits! {
     insim::Isi => Init,
     insim::Version => Version,
     insim::Tiny => Tiny,
@@ -191,7 +365,7 @@ crate::impl_packet_from! {
 }
 
 #[cfg(feature = "relay")]
-crate::impl_packet_from! {
+crate::impl_packet_traits! {
     relay::AdminRequest => RelayAdminRequest,
     relay::AdminResponse => RelayAdminResponse,
     relay::HostListRequest => RelayHostListRequest,

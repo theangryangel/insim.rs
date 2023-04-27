@@ -53,6 +53,7 @@ pub type TcpConnection = Framed<TcpStream, Codec>;
 pub type UdpConnection = Framed<UdpStream, Codec>;
 
 impl<T> PacketSinkStream for Connection<T> where T: PacketSinkStream {}
+impl<T> PacketSinkStream for Box<T> where T: PacketSinkStream + ?Sized {}
 
 #[async_trait::async_trait]
 pub trait ConnectionTrait: PacketSinkStream {
@@ -226,5 +227,31 @@ where
         time::timeout(timeout, self.verify(wait_for_pong, verify_version)).await??;
 
         Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl<T> ConnectionTrait for Box<T>
+where
+    T: ConnectionTrait + ?Sized,
+{
+    fn state(&self) -> State {
+        (**self).state()
+    }
+
+    fn shutdown(&mut self) {
+        (**self).shutdown()
+    }
+
+    async fn handshake(
+        &mut self,
+        timeout: Duration,
+        isi: Isi,
+        wait_for_pong: bool,
+        verify_version: bool,
+    ) -> Result<()> {
+        (**self)
+            .handshake(timeout, isi, wait_for_pong, verify_version)
+            .await
     }
 }
