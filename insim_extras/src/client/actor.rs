@@ -1,10 +1,15 @@
 use std::collections::HashMap;
 
 use insim::{
-    core::identifiers::RequestId, packets::Packet, packets::RequestIdentifiable, prelude::*,
+    core::identifiers::{ConnectionId, PlayerId, RequestId},
+    packets::Packet,
+    packets::RequestIdentifiable,
+    prelude::*,
 };
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tracing;
+
+use crate::game_state::{Connection, GameState};
 
 pub(crate) struct Actor<T>
 where
@@ -12,11 +17,10 @@ where
 {
     receiver: mpsc::Receiver<Message>,
     connection: T,
-    next_id: u8,
-
+    state: GameState,
     broadcast: broadcast::Sender<Packet>,
-
-    with_reqi: HashMap<u8, oneshot::Sender<Packet>>,
+    next_request_identifier: u8,
+    pending_with_request_identifier: HashMap<u8, oneshot::Sender<Packet>>,
 }
 
 pub(crate) enum Message {
@@ -32,6 +36,21 @@ pub(crate) enum Message {
     },
 
     Shutdown,
+
+    Connection {
+        respond_to: oneshot::Sender<Connection>,
+        ucid: ConnectionId,
+    },
+
+    ConnectionList {
+        players_only: bool,
+        respond_to: oneshot::Sender<Vec<Connection>>,
+    },
+
+    Player {
+        respond_to: oneshot::Sender<Option<Connection>>,
+        ucid: PlayerId,
+    },
 }
 
 impl<T> Actor<T>
@@ -42,16 +61,17 @@ where
         let (broadcast, _) = broadcast::channel(25);
         Actor {
             receiver,
-            next_id: 5,
+            next_request_identifier: 5,
             connection,
             broadcast,
-            with_reqi: HashMap::new(),
+            pending_with_request_identifier: HashMap::new(),
+            state: GameState::new(),
         }
     }
 
     fn next_id(&mut self) -> u8 {
-        let id = self.next_id.wrapping_add(1);
-        self.next_id = id;
+        let id = self.next_request_identifier.wrapping_add(1);
+        self.next_request_identifier = id;
         id
     }
 
@@ -67,7 +87,7 @@ where
             } => {
                 let id = self.next_id();
 
-                self.with_reqi.insert(id, respond_to);
+                self.pending_with_request_identifier.insert(id, respond_to);
 
                 RequestIdentifiable::set_request_identifier(&mut packet, RequestId(id));
 
@@ -81,6 +101,24 @@ where
 
             Message::Shutdown => {
                 self.connection.shutdown();
+            }
+
+            Message::ConnectionList {
+                players_only: true,
+                respond_to,
+            } => {
+                let _ = respond_to.send(self.state.players());
+            }
+
+            Message::ConnectionList {
+                players_only: false,
+                respond_to,
+            } => {
+                let _ = respond_to.send(self.state.connections());
+            }
+
+            Message::Player { respond_to, plid } => {
+                let _ = respond_to.send(self.state.player(plid));
             }
         }
     }
@@ -104,11 +142,13 @@ where
                     break;
                 },
                 Some(Ok(packet)) => {
+                    actor.state.handle_packet(&packet);
+
                     if actor.broadcast.receiver_count() > 0 {
                         actor.broadcast.send(packet.clone()).unwrap();
                     }
 
-                    if let Some(a) = actor.with_reqi.remove(&packet.request_identifier()) {
+                    if let Some(a) = actor.pending_with_request_identifier.remove(&packet.request_identifier()) {
                         a.send(packet);
                     }
                 }

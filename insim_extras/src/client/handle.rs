@@ -66,4 +66,30 @@ impl Handle {
     pub async fn shutdown(&self) {
         self.sender.send(Message::Shutdown).await;
     }
+
+    pub async fn players(&self) -> Vec<crate::game_state::Connection> {
+        let (send, recv) = oneshot::channel();
+
+        self.sender
+            .send(Message::ConnectionList {
+                players_only: true,
+                respond_to: send,
+            })
+            .await;
+
+        recv.await.expect("Actor task has been killed")
+    }
+
+    pub async fn connections(&self) -> Vec<crate::game_state::Connection> {
+        let (send, recv) = oneshot::channel();
+
+        self.sender
+            .send(Message::ConnectionList {
+                players_only: false,
+                respond_to: send,
+            })
+            .await;
+
+        recv.await.expect("Actor task has been killed")
+    }
 }

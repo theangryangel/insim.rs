@@ -1,5 +1,8 @@
 use insim::{
-    core::wind::Wind,
+    core::{
+        identifiers::{ConnectionId, PlayerId},
+        wind::Wind,
+    },
     packets::{insim::StaRacing, Packet},
     result::Result,
 };
@@ -46,11 +49,19 @@ impl GameState {
         self.racing = StaRacing::No;
     }
 
-    pub fn get_connections(&self) -> Vec<Connection> {
+    pub fn connection(&self, ucid: ConnectionId) -> Option<Connection> {
+        self.slab.get_by_connection_id(&ucid).cloned()
+    }
+
+    pub fn player(&self, plid: PlayerId) -> Option<Connection> {
+        self.slab.get_by_player_id(&Some(plid)).cloned()
+    }
+
+    pub fn connections(&self) -> Vec<Connection> {
         self.slab.iter_by_connection_id().cloned().collect()
     }
 
-    pub fn get_players(&self) -> Vec<Connection> {
+    pub fn players(&self) -> Vec<Connection> {
         self.slab
             .iter_by_player_id()
             .filter(|c| c.player_id.is_some())
