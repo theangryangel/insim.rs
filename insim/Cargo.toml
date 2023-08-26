@@ -40,9 +40,9 @@ insim_game_data = { path = "../insim_game_data", optional = true }
 insim_pth = { path = "../insim_pth", optional = true }
 insim_smx = { path = "../insim_smx", optional = true }
 async-trait = "0.1.68"
+if_chain = "1"
 
 [dev-dependencies]
 tokio-test = "0.4"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 clap = { version = "4.2", features = ["derive"] }
-if_chain = "1"

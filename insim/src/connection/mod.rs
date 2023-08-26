@@ -4,6 +4,7 @@
 mod sink;
 mod state;
 mod stream;
+pub mod traits;
 
 use state::State;
 

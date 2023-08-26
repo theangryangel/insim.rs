@@ -3,7 +3,7 @@ use insim_core::{identifiers::RequestId, prelude::*};
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, Default, InsimEncode, InsimDecode, Clone)]
+#[derive(Debug, Default, InsimEncode, InsimDecode, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
 pub enum TinyType {
@@ -99,4 +99,10 @@ pub struct Tiny {
     pub reqi: RequestId,
 
     pub subt: TinyType,
+}
+
+impl Tiny {
+    pub fn is_keepalive(&self) -> bool {
+        self.subt == TinyType::None && self.reqi == RequestId(0)
+    }
 }
