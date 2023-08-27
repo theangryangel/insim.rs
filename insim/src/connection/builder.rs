@@ -1,20 +1,14 @@
 use std::time::Duration;
 
-use futures::SinkExt;
-
-use tokio::net::ToSocketAddrs;
+use tokio::net::{ToSocketAddrs, UdpSocket};
 use tokio::{net::TcpStream, time::timeout};
-use tokio_util::codec::Framed;
 
-use crate::codec::{Codec, Mode};
-use crate::connection::Connection;
+use crate::codec::Mode;
+use crate::connection::{traits::WritePacket, Connection};
 use crate::core::identifiers::RequestId;
 use crate::packets::insim::{Isi, IsiFlags};
 use crate::packets::VERSION;
 use crate::result::Result;
-use crate::udp_stream::UdpStream;
-
-use super::{ConnectionTrait, TcpConnection, UdpConnection};
 
 #[derive(Debug)]
 /// Configuration and [Connection] builder.
@@ -145,14 +139,13 @@ impl ConnectionBuilder {
     }
 
     /// Connect to Insim via TCP and return a new [Connection](crate::connection::Connection).
-    #[cfg(feature = "tcp")]
     pub async fn connect_tcp<A: ToSocketAddrs>(
         &mut self,
         remote: A,
-    ) -> Result<Connection<TcpConnection>> {
+    ) -> Result<Connection<crate::connection::tcp::Tcp>> {
         let stream = timeout(self.connect_timeout, TcpStream::connect(remote)).await??;
 
-        let stream = Framed::new(stream, Codec::new(self.codec_mode));
+        let stream = crate::connection::tcp::Tcp::new(stream, self.codec_mode);
 
         let mut stream = Connection::new(stream);
         stream
@@ -168,17 +161,16 @@ impl ConnectionBuilder {
     }
 
     /// Connect to Insim via UDP and return a new [Connection](crate::connection::Connection).
-    #[cfg(feature = "udp")]
     pub async fn connect_udp<A: ToSocketAddrs, B: ToSocketAddrs>(
         &mut self,
         local: A,
         remote: B,
-    ) -> Result<Connection<UdpConnection>> {
-        let stream = UdpStream::connect(local, remote).await?;
+    ) -> Result<Connection<crate::connection::udp::Udp>> {
+        let stream = UdpSocket::bind(local).await.unwrap();
+        self.udp_port = stream.local_addr().unwrap().port().into();
+        stream.connect(remote).await.unwrap();
 
-        self.udp_port = stream.local_addr()?.port().into();
-
-        let stream = Framed::new(stream, Codec::new(self.codec_mode));
+        let stream = crate::connection::udp::Udp::new(stream, self.codec_mode);
 
         let mut stream = Connection::new(stream);
         stream
@@ -200,7 +192,7 @@ impl ConnectionBuilder {
     pub async fn connect_relay<'a, H>(
         &mut self,
         auto_select_host: H,
-    ) -> Result<Connection<TcpConnection>>
+    ) -> Result<Connection<crate::connection::tcp::Tcp>>
     where
         H: Into<Option<&'a str>>,
     {
@@ -222,7 +214,7 @@ impl ConnectionBuilder {
             TcpStream::connect("isrelay.lfs.net:47474"),
         )
         .await??;
-        let stream = Framed::new(stream, Codec::new(self.codec_mode));
+        let stream = crate::connection::tcp::Tcp::new(stream, self.codec_mode);
 
         let mut stream = Connection::new(stream);
         stream
@@ -236,10 +228,13 @@ impl ConnectionBuilder {
 
         if let Some(hostname) = auto_select_host.into() {
             stream
-                .send(HostSelect {
-                    hname: hostname.to_string(),
-                    ..Default::default()
-                })
+                .write(
+                    HostSelect {
+                        hname: hostname.to_string(),
+                        ..Default::default()
+                    }
+                    .into(),
+                )
                 .await?;
         }
 

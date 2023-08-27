@@ -1,8 +1,9 @@
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
 use insim::{
+    connection::builder::ConnectionBuilder,
+    connection::traits::{ReadPacket, ReadWritePacket, WritePacket},
     packets::{relay::HostListRequest, Packet},
-    prelude::*,
     result::Result,
 };
 use std::net::SocketAddr;
@@ -99,7 +100,7 @@ pub async fn main() -> Result<()> {
             tracing::info!("Connecting via LFS World Relay!");
             let mut res = builder.connect_relay(host).await?;
             if *list_hosts {
-                res.send(HostListRequest::default()).await?;
+                res.write(HostListRequest::default().into()).await?;
             }
             res.boxed()
         }
@@ -109,10 +110,8 @@ pub async fn main() -> Result<()> {
 
     let mut i = 0;
 
-    while let Some(m) = client.next().await {
+    while let Some(m) = client.read().await? {
         i += 1;
-
-        let m = m?;
 
         tracing::info!("Packet={:?} Index={:?}", m, i);
 

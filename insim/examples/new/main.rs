@@ -1,12 +1,12 @@
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
 use insim::{
+    connection::{self, traits},
     packets,
     result::Result,
-    connection::traits,
 };
-use tokio::net::{TcpStream, UdpSocket};
 use std::{net::SocketAddr, time::Duration};
+use tokio::net::{TcpStream, UdpSocket};
 
 fn setup_tracing_subscriber() {
     // setup tracing with some defaults if nothing is set
@@ -49,6 +49,17 @@ enum Commands {
         /// host:port of LFS to connect to
         addr: SocketAddr,
     },
+
+    /// Connect via LFS World Relay
+    Relay {
+        #[arg(long)]
+        /// Optional host to automatically select after successful connection to relay
+        select_host: Option<String>,
+
+        #[arg(long)]
+        /// List hosts on the relay and then quit
+        list_hosts: bool,
+    },
 }
 
 #[tokio::main]
@@ -61,7 +72,9 @@ pub async fn main() -> Result<()> {
     let mut isi = packets::insim::Isi {
         iname: "insim.rs".into(),
         version: packets::VERSION,
-        flags: packets::insim::IsiFlags::MCI | packets::insim::IsiFlags::CON | packets::insim::IsiFlags::OBH,
+        flags: packets::insim::IsiFlags::MCI
+            | packets::insim::IsiFlags::CON
+            | packets::insim::IsiFlags::OBH,
         interval: Duration::from_millis(1000),
         ..Default::default()
     };
@@ -73,21 +86,30 @@ pub async fn main() -> Result<()> {
             isi.udpport = stream.local_addr().unwrap().port().into();
             stream.connect(addr).await.unwrap();
 
-            traits::ReadWritePacket::boxed(
-                traits::Udp::new(
-                    stream, 
-                    insim::codec::Mode::Compressed
-                )
-            )
-        },
+            traits::ReadWritePacket::boxed(connection::udp::Udp::new(
+                stream,
+                insim::codec::Mode::Compressed,
+            ))
+        }
         Commands::Tcp { addr } => {
             let stream = TcpStream::connect(addr).await?;
 
             tracing::info!("Connected to server. Creating client");
 
-            traits::ReadWritePacket::boxed(
-                traits::Tcp::new(stream, insim::codec::Mode::Compressed)
-            )
+            traits::ReadWritePacket::boxed(connection::tcp::Tcp::new(
+                stream,
+                insim::codec::Mode::Compressed,
+            ))
+        }
+        Commands::Relay { .. } => {
+            let stream = TcpStream::connect("isrelay.lfs.net:47474").await?;
+
+            tracing::info!("Connected to LFSW Relay. Creating client");
+
+            traits::ReadWritePacket::boxed(connection::tcp::Tcp::new(
+                stream,
+                insim::codec::Mode::Uncompressed,
+            ))
         }
     };
 
@@ -95,9 +117,27 @@ pub async fn main() -> Result<()> {
 
     client.write(isi.into()).await?;
 
-    // tracing::info!("Sending HLR");
-    // let hlr = packets::relay::HostListRequest::default();
-    // traits::WritePacket::write(&mut client, hlr).await?;
+    if let Commands::Relay {
+        list_hosts: true, ..
+    } = &cli.command
+    {
+        tracing::info!("Sending HLR");
+        let hlr = packets::relay::HostListRequest::default();
+        client.write(hlr.into()).await?;
+    }
+
+    if let Commands::Relay {
+        select_host: Some(hname),
+        ..
+    } = &cli.command
+    {
+        tracing::info!("Sending HS");
+        let hs = packets::relay::HostSelect {
+            hname: hname.into(),
+            ..Default::default()
+        };
+        client.write(hs.into()).await?;
+    }
 
     tracing::info!("Connected!");
 

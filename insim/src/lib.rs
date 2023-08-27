@@ -9,10 +9,6 @@
 //!
 //! ## Feature flags
 //!
-//! - `default`: Enables tcp, udp, relay
-//! - `tcp`: Enable TCP support
-//! - `udp`: Enable UDP support
-//! - `relay`: Enable LFS World relay support
 //! - `serde`: Enable serde support
 //! - `game_data`: Pull in insim_game_data and re-export
 //! - `pth`: Pull in insim_pth and re-export
@@ -22,16 +18,11 @@
 //!
 //! See examples directory.
 
-pub mod prelude;
-
 pub mod codec;
 pub mod connection;
 pub mod error;
 pub mod packets;
 pub mod result;
-
-#[cfg(feature = "udp")]
-pub mod udp_stream;
 
 #[doc(hidden)]
 /// Rexport insim_core
