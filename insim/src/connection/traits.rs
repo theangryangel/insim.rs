@@ -124,15 +124,30 @@ impl ReadPacket for Tcp {
                 }
             }
 
-            if self.inner.read_buf(&mut self.buffer).await? == 0 {
-                // The remote closed the connection. For this to be a clean
-                // shutdown, there should be no data in the read buffer. If
-                // there is, this means that the peer closed the socket while
-                // sending a frame.
-                if self.buffer.is_empty() {
-                    return Ok(None);
-                } else {
+            // Wait for the socket to be readable.
+            // This is cancel safe.
+            self.inner.readable().await?;
+
+            match self.inner.try_read_buf(&mut self.buffer) {
+                Ok(0) => {
+                    // The remote closed the connection. For this to be a clean
+                    // shutdown, there should be no data in the read buffer. If
+                    // there is, this means that the peer closed the socket while
+                    // sending a frame.
+                    if self.buffer.is_empty() {
+                        return Ok(None);
+                    }
+
                     return Err(Error::Disconnected);
+                },
+                Ok(_) => {
+                    continue;
+                },
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    continue;
+                },
+                Err(e) => {
+                    return Err(e.into());
                 }
             }
         }
@@ -183,19 +198,35 @@ impl ReadPacket for Udp {
         // I've picked 1492 because its the effectively a common MTU size across the internet
         // still, and should give some future proofing if any packets insim increase
         // in size
-        let mut buffer = BytesMut::with_capacity(1492);
+        
+        loop {
+            let ready = self.inner.ready(tokio::io::Interest::READABLE).await?;
 
-        self.inner.recv_buf(&mut buffer).await?;
+            if ready.is_readable() {
 
-        if buffer.is_empty() {
-            return Ok(None);
+                let mut buffer = BytesMut::with_capacity(1492);
+
+                match self.inner.try_recv_buf(&mut buffer) {
+                    Ok(_) => {
+                        if buffer.is_empty() {
+                            return Ok(None);
+                        }
+
+                        // skip over the size, we always know we have a full packet
+                        buffer.advance(1);
+
+                        let res = Packet::decode(&mut buffer, None)?;
+                        return Ok(Some(res));
+                    },
+                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        continue;
+                    },
+                    Err(e) => {
+                        return Err(e.into());
+                    }
+                }
+            }
         }
-
-        // skip over the size, we always know we have a full packet
-        buffer.advance(1);
-
-        let res = Packet::decode(&mut buffer, None)?;
-        Ok(Some(res))
     }
 }
 
