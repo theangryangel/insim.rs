@@ -13,7 +13,7 @@ pub trait WritePacket {
     async fn write(&mut self, packet: Packet) -> Result<()>;
 }
 
-pub trait ReadWritePacket: ReadPacket + WritePacket {
+pub trait ReadWritePacket: ReadPacket + WritePacket + Send {
     fn boxed<'a>(self) -> Box<dyn ReadWritePacket + 'a>
     where
         Self: Sized + 'a,
@@ -21,3 +21,19 @@ pub trait ReadWritePacket: ReadPacket + WritePacket {
         Box::new(self)
     }
 }
+
+#[async_trait::async_trait]
+impl<I: ReadPacket + Send + ?Sized> ReadPacket for Box<I> {
+    async fn read(&mut self) -> Result<Option<Packet>> {
+        (**self).read().await
+    }
+}
+
+#[async_trait::async_trait]
+impl<I: WritePacket + Send + ?Sized> WritePacket for Box<I> {
+    async fn write(&mut self, packet: Packet) -> Result<()> {
+        (**self).write(packet).await
+    }
+}
+
+impl<I: ReadWritePacket + Send + ?Sized> ReadWritePacket for Box<I> {}
