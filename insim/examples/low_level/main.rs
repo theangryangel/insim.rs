@@ -1,7 +1,10 @@
+//! Low level example of directly using connection::udp, tcp and relay directly.
+//! In this example you are 100% responsible for managing the state of the connection, 
+//! providing the initial stream/udpsocket, sending keepalive packets, etc.
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
 use insim::{
-    connection::{self, traits},
+    connection::{self, traits::{ReadWritePacket, ReadPacket, WritePacket}},
     packets,
     result::Result,
 };
@@ -86,30 +89,30 @@ pub async fn main() -> Result<()> {
             isi.udpport = stream.local_addr().unwrap().port().into();
             stream.connect(addr).await.unwrap();
 
-            traits::ReadWritePacket::boxed(connection::udp::Udp::new(
+            connection::udp::Udp::new(
                 stream,
                 insim::codec::Mode::Compressed,
-            ))
+            ).boxed()
         }
         Commands::Tcp { addr } => {
             let stream = TcpStream::connect(addr).await?;
 
             tracing::info!("Connected to server. Creating client");
 
-            traits::ReadWritePacket::boxed(connection::tcp::Tcp::new(
+            connection::tcp::Tcp::new(
                 stream,
                 insim::codec::Mode::Compressed,
-            ))
+            ).boxed()
         }
         Commands::Relay { .. } => {
             let stream = TcpStream::connect("isrelay.lfs.net:47474").await?;
 
             tracing::info!("Connected to LFSW Relay. Creating client");
 
-            traits::ReadWritePacket::boxed(connection::tcp::Tcp::new(
+            connection::tcp::Tcp::new(
                 stream,
                 insim::codec::Mode::Uncompressed,
-            ))
+            ).boxed()
         }
     };
 

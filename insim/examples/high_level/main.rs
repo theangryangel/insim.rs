@@ -1,12 +1,14 @@
+//! High level example of using the "actor" based connection.
+//! In this example you do not have to maintain the connection,
+//! manage sending keepalives, or reconnection.
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
 use insim::{
-    connection::builder::ConnectionBuilder,
-    connection::traits::{ReadPacket, ReadWritePacket, WritePacket},
+    connection::{options::ConnectionOptions, Connection},
     packets::{relay::HostListRequest, Packet},
     result::Result,
 };
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::Duration};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -71,53 +73,48 @@ pub async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Use ConnectionBuilder to create a Connection
-    let mut builder = ConnectionBuilder::default();
+    let mut options = ConnectionOptions::default();
 
-    // We need to box the output of the builder as connect_udp, connect_tcp, etc. all return
-    // different types.
-    // If you only call one of these, then you can skip the box'ing.
-    let mut client = match &cli.command {
+    match &cli.command {
         Commands::Udp { bind, addr } => {
             // if the local binding address is not provided, we let the OS decide a port to use
             let local = bind.unwrap_or("0.0.0.0:0".parse()?);
             tracing::info!("Connecting via UDP!");
-            let res = builder.connect_udp(local, addr).await?;
-            res.boxed()
+            options = options.udp(local, *addr, insim::codec::Mode::Compressed, true, true);
         }
         Commands::Tcp { addr } => {
             tracing::info!("Connecting via TCP!");
-            let res = builder.connect_tcp(addr).await?;
-            res.boxed()
+            options = options.tcp(*addr, insim::codec::Mode::Compressed, true, true);
         }
-        Commands::Relay {
-            select_host,
-            list_hosts,
-        } => {
-            let host = match (select_host, list_hosts) {
-                (Some(host), false) => Some(host.as_str()),
-                (_, _) => None,
-            };
+        Commands::Relay { select_host, .. } => {
+            options = options.relay(select_host.clone(), Duration::from_secs(10));
             tracing::info!("Connecting via LFS World Relay!");
-            let mut res = builder.connect_relay(host).await?;
-            if *list_hosts {
-                res.write(HostListRequest::default().into()).await?;
-            }
-            res.boxed()
         }
     };
+
+    let client = Connection::new(options);
+
+    let mut stream = client.stream().await;
+
+    if let Commands::Relay {
+        list_hosts: true, ..
+    } = &cli.command
+    {
+        client.send(HostListRequest::default()).await;
+    }
 
     tracing::info!("Connected!");
 
     let mut i = 0;
 
-    while let Some(m) = client.read().await? {
+    while let Ok(packet) = stream.recv().await {
         i += 1;
 
-        tracing::info!("Packet={:?} Index={:?}", m, i);
+        tracing::info!("Packet={:?} Index={:?}", packet, i);
 
         if_chain! {
             if let Commands::Relay{ list_hosts: true, .. } = &cli.command;
-            if let Packet::RelayHostList(i) = &m;
+            if let Packet::RelayHostList(i) = &packet;
             if i.is_last();
             then {
                 break;

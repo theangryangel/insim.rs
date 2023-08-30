@@ -1,26 +1,25 @@
 use std::net::SocketAddr;
 use std::time::Duration;
 
+use insim_core::identifiers::RequestId;
 use tokio::net::{TcpStream, UdpSocket};
 use tokio::time::timeout;
 
 use crate::codec::Mode;
-use crate::packets::Packet;
-use crate::connection::builder::ConnectionBuilder as Config;
-use crate::packets::insim::{IsiFlags, Isi};
+use crate::packets::insim::Isi;
 
-use super::traits::{ReadWritePacket, ReadPacket, WritePacket};
+use super::traits::{ReadWritePacket, WritePacket};
 
 #[derive(Clone)]
 pub enum Transport {
-    Tcp { 
+    Tcp {
         remote: SocketAddr,
         codec_mode: Mode,
         verify_version: bool,
         wait_for_initial_pong: bool,
     },
-    Udp { 
-        local: Option<SocketAddr>, 
+    Udp {
+        local: Option<SocketAddr>,
         remote: SocketAddr,
         codec_mode: Mode,
         verify_version: bool,
@@ -29,17 +28,40 @@ pub enum Transport {
     Relay {
         select_host: Option<String>,
         connect_timeout: Duration,
+    },
+}
+
+impl Default for Transport {
+    fn default() -> Self {
+        Self::Tcp {
+            remote: "127.0.0.1:29999".parse().unwrap(),
+            codec_mode: Mode::Compressed,
+            verify_version: true,
+            wait_for_initial_pong: true,
+        }
     }
 }
 
 impl Transport {
     pub async fn connect(&self, isi: Isi) -> crate::result::Result<Box<dyn ReadWritePacket>> {
         match self {
-            Transport::Tcp { remote, codec_mode, verify_version, wait_for_initial_pong } => {
-                let stream = timeout(Duration::from_secs(super::TIMEOUT_SECS), TcpStream::connect(remote)).await??;
+            Transport::Tcp {
+                remote,
+                codec_mode,
+                verify_version,
+                wait_for_initial_pong,
+            } => {
+                let stream = timeout(
+                    Duration::from_secs(super::TIMEOUT_SECS),
+                    TcpStream::connect(remote),
+                )
+                .await??;
 
                 let mut stream = super::tcp::Tcp::new(stream, *codec_mode);
-
+                let mut isi = isi.clone();
+                if *verify_version {
+                    isi.reqi = RequestId(1);
+                }
                 super::handshake(
                     &mut stream,
                     Duration::from_secs(super::TIMEOUT_SECS),
@@ -50,14 +72,23 @@ impl Transport {
                 .await?;
 
                 Ok(stream.boxed())
-            },
-            Transport::Udp { local, remote, codec_mode, verify_version, wait_for_initial_pong } => {
+            }
+            Transport::Udp {
+                local,
+                remote,
+                codec_mode,
+                verify_version,
+                wait_for_initial_pong,
+            } => {
                 let local = local.unwrap_or("0.0.0.0:0".parse()?);
 
                 let stream = UdpSocket::bind(local).await?;
                 stream.connect(remote).await.unwrap();
                 let mut isi = isi.clone();
-                isi.udpport = stream.local_addr().unwrap().port().into();
+                if *verify_version {
+                    isi.reqi = RequestId(1);
+                }
+                isi.udpport = stream.local_addr().unwrap().port();
                 let mut stream = crate::connection::udp::Udp::new(stream, *codec_mode);
 
                 super::handshake(
@@ -70,8 +101,11 @@ impl Transport {
                 .await?;
 
                 Ok(stream.boxed())
-            },
-            Transport::Relay { select_host, connect_timeout } => {
+            }
+            Transport::Relay {
+                select_host,
+                connect_timeout,
+            } => {
                 use crate::packets::relay::HostSelect;
 
                 // Why not call connect_tcp? purely so we won't call request_game_state multiple times
@@ -83,16 +117,16 @@ impl Transport {
                 .await??;
 
                 let mut stream = super::tcp::Tcp::new(
-                    stream, 
+                    stream,
                     // TODO: Talk to LFS devs, find out if/when relay gets compressed support?
-                    Mode::Uncompressed
+                    Mode::Uncompressed,
                 );
-                
+
                 super::handshake(
                     &mut stream,
                     Duration::from_secs(super::TIMEOUT_SECS),
                     isi,
-                    false,  // Relay does not respond to ping requests
+                    false, // Relay does not respond to ping requests
                     false, // Relay does not respond to version requests until after the host is selected
                 )
                 .await?;
@@ -112,96 +146,5 @@ impl Transport {
                 Ok(stream.boxed())
             }
         }
-
     }
-    
-}
-
-
-#[derive(Clone)]
-pub struct ConnectionOptions {
-    pub name: String,
-    pub password: String,
-    pub flags: IsiFlags,
-    pub prefix: Option<char>,
-    pub interval: Duration,
-
-    pub transport: Transport,
-}
-
-impl ConnectionOptions{
-
-    pub fn as_isi(&self) -> Isi {
-
-        Isi::default()
-        
-    }
-    
-}
-
-
-// Connection represents the public facing API
-pub struct Connection {}
-
-impl Connection {
-
-    pub fn spawn(config: ConnectionOptions) -> Self {
-        let mut actor = Actor {
-            config: config.clone(),
-        };
-
-        let handle = tokio::spawn(async move { run_actor(actor).await });
-
-        Self {}
-    }
-
-    pub async fn shutdown(&self) {
-        unimplemented!()
-    }
-
-    pub async fn send<T: Into<Packet>>(&self, packet: T) {
-        unimplemented!()
-    }
-}
-
-
-struct Actor {
-    config: ConnectionOptions,
-}
-
-async fn run_actor(mut actor: Actor) {
-
-    loop {
-
-        // connect
-        let isi = actor.config.as_isi();
-        let mut stream: Box<dyn ReadWritePacket> = actor.config.transport.connect(isi).await.unwrap();
-
-        loop {
-            let res = timeout(
-                Duration::from_secs(super::TIMEOUT_SECS), stream.read()
-            ).await;
-
-            if res.is_err() {
-                // Timeout
-                break;
-            }
-
-            match res.unwrap() {
-                Ok(Some(packet)) => {
-                    super::maybe_keepalive(&mut stream, &packet).await;
-
-                },
-                Ok(None) => {
-                    break;  
-                },
-                Err(e) => {
-                    break;
-                }
-
-            }
-
-        }
-    }
-    
 }

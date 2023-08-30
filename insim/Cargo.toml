@@ -9,10 +9,6 @@ bench = false
 doctest = false
 
 [features]
-default = ["relay", "tcp", "udp"]
-tcp = []
-udp = []
-relay = []
 serde = [
   "dep:serde",
   "insim_core/serde",
