@@ -46,7 +46,11 @@ impl Default for ConnectionType {
 }
 
 impl ConnectionType {
-    pub async fn connect(&self, isi: Isi) -> Result<Box<dyn ReadWritePacket>> {
+    pub async fn connect(
+        &self,
+        isi: Isi,
+        timeout_duration: Duration,
+    ) -> Result<Box<dyn ReadWritePacket>> {
         match self {
             ConnectionType::Tcp {
                 remote,
@@ -54,11 +58,7 @@ impl ConnectionType {
                 verify_version,
                 wait_for_initial_pong,
             } => {
-                let stream = timeout(
-                    Duration::from_secs(super::TIMEOUT_SECS),
-                    TcpStream::connect(remote),
-                )
-                .await??;
+                let stream = timeout(timeout_duration, TcpStream::connect(remote)).await??;
 
                 let mut stream = crate::tcp::Tcp::new(stream, *codec_mode);
                 let mut isi = isi.clone();
@@ -67,7 +67,7 @@ impl ConnectionType {
                 }
                 super::handshake(
                     &mut stream,
-                    Duration::from_secs(super::TIMEOUT_SECS),
+                    timeout_duration,
                     isi,
                     *wait_for_initial_pong,
                     *verify_version,
@@ -96,7 +96,7 @@ impl ConnectionType {
 
                 super::handshake(
                     &mut stream,
-                    Duration::from_secs(super::TIMEOUT_SECS),
+                    timeout_duration,
                     isi,
                     *wait_for_initial_pong,
                     *verify_version,
@@ -127,7 +127,7 @@ impl ConnectionType {
 
                 super::handshake(
                     &mut stream,
-                    Duration::from_secs(super::TIMEOUT_SECS),
+                    timeout_duration,
                     isi,
                     false, // Relay does not respond to ping requests
                     false, // Relay does not respond to version requests until after the host is selected

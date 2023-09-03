@@ -1,7 +1,7 @@
 use insim_core::{DecodableError, EncodableError};
 
 #[non_exhaustive]
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, Clone)]
 /// A specialized [`Error`] type for insim.
 pub enum Error {
     /// Connection is disconnected
@@ -13,11 +13,13 @@ pub enum Error {
     IncompatibleVersion(u8),
 
     /// IO Error, i.e. initial connection failed, etc.
-    #[error("IO error occurred: {0:?}")]
-    IO(#[from] std::io::Error),
+    #[error("IO error occurred: {kind:?} {msg:?}")]
+    IO {
+        kind: std::io::ErrorKind,
+        msg: String,
+    },
 
     /// LFS World Relay Error
-    #[cfg(feature = "relay")]
     #[error("Insim Relay error: {0:?}")]
     Relay(#[from] crate::packets::relay::RelayError),
 
@@ -41,5 +43,14 @@ pub enum Error {
 impl From<tokio::time::error::Elapsed> for Error {
     fn from(value: tokio::time::error::Elapsed) -> Self {
         Error::Timeout(value.to_string())
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(value: std::io::Error) -> Self {
+        Error::IO {
+            kind: value.kind(),
+            msg: value.to_string(),
+        }
     }
 }

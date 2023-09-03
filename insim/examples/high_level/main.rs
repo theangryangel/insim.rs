@@ -4,7 +4,7 @@
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
 use insim::{
-    connection::{Connection, ConnectionOptions},
+    connection::{Connection, ConnectionOptions, Event},
     packets::{relay::HostListRequest, Packet},
     result::Result,
 };
@@ -107,15 +107,16 @@ pub async fn main() -> Result<()> {
 
     let mut i = 0;
 
-    while let Ok(packet) = stream.recv().await {
+    while let Ok(event) = stream.recv().await {
         i += 1;
 
-        tracing::info!("Packet={:?} Index={:?}", packet, i);
+        tracing::info!("Evt={:?} Index={:?}", event, i);
 
         if_chain! {
             if let Commands::Relay{ list_hosts: true, .. } = &cli.command;
-            if let Packet::RelayHostList(i) = &packet;
-            if i.is_last();
+            if let Event::Data(packet) = &event;
+            if let Packet::RelayHostList(hostinfo) = &packet;
+            if hostinfo.is_last();
             then {
                 break;
             }
