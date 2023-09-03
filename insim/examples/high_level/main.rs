@@ -92,22 +92,22 @@ pub async fn main() -> Result<()> {
         }
     };
 
-    let client = Connection::new(options);
-
-    let mut stream = client.stream().await;
-
-    if let Commands::Relay {
-        list_hosts: true, ..
-    } = &cli.command
-    {
-        client.send(HostListRequest::default()).await;
-    }
-
-    tracing::info!("Connected!");
+    let mut client = Connection::new(options);
 
     let mut i = 0;
 
-    while let Ok(event) = stream.recv().await {
+    while let Ok(event) = client.poll().await {
+        if matches!(event, Event::Connected) {
+            if let Commands::Relay {
+                list_hosts: true, ..
+            } = &cli.command
+            {
+                client.send(HostListRequest::default()).await?;
+            }
+
+            tracing::info!("Connected!");
+        }
+
         i += 1;
 
         tracing::info!("Evt={:?} Index={:?}", event, i);
