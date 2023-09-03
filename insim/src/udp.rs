@@ -6,7 +6,7 @@ use crate::codec::{Codec, Mode};
 use crate::packets::Packet;
 use crate::result::Result;
 
-use crate::connection::traits::{ReadPacket, ReadWritePacket, WritePacket};
+use crate::traits::{ReadPacket, ReadWritePacket, WritePacket};
 
 pub struct Udp {
     inner: UdpSocket,

@@ -24,6 +24,11 @@ pub mod error;
 pub mod packets;
 pub mod result;
 
+pub mod tcp;
+pub mod tools;
+pub mod traits;
+pub mod udp;
+
 #[doc(hidden)]
 /// Rexport insim_core
 pub use insim_core as core;

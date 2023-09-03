@@ -7,6 +7,9 @@ use tracing;
 
 use bytes::{Buf, BufMut, BytesMut};
 
+#[cfg(test)]
+mod tests;
+
 /// Describes if Insim packets are in "compressed" or "uncompressed" mode.
 #[derive(Debug, Clone, Copy)]
 pub enum Mode {
@@ -169,63 +172,5 @@ impl Codec {
                 Err(e.into())
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-
-    use crate::{
-        codec::{Codec, Mode},
-        packets,
-    };
-    use bytes::BytesMut;
-    use insim_core::identifiers::RequestId;
-
-    #[tokio::test]
-    /// Ensure that Codec can decode a basic small packet
-    async fn framedread_tiny_ping() {
-        let mock = BytesMut::from(
-            // Packet::Tiny, subtype TinyType::Ping, compressed, reqi=2
-            &[1, 3, 2, 3],
-        );
-
-        let codec = Codec {
-            mode: Mode::Compressed,
-        };
-        let data = codec.decode(&mut mock);
-
-        assert!(matches!(
-            data,
-            Some(Ok(packets::Packet::Tiny(packets::insim::Tiny {
-                subt: packets::insim::TinyType::Ping,
-                reqi: RequestId(2)
-            })))
-        ));
-    }
-
-    #[tokio::test]
-    /// Ensure that Codec can write a basic small packet
-    async fn framedwrite_tiny_ping() {
-        let mock = BytesMut::from(
-            // Packet::Tiny, subtype TinyType::Ping, compressed, reqi=2
-            &[1, 3, 2, 3],
-        );
-
-        let mut buf = BytesMut::new();
-
-        let codec = Codec {
-            mode: Mode::Compressed,
-        };
-        let data = codec.encode(
-            packets::insim::Tiny {
-                subt: packets::insim::TinyType::Ping,
-                reqi: RequestId(2),
-            }
-            .into(),
-            &mut buf,
-        );
-
-        assert_eq!(&mock[..], &buf[..])
     }
 }

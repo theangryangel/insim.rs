@@ -4,7 +4,7 @@ use std::time::Duration;
 use crate::codec::Mode;
 use crate::packets::insim::{Isi, IsiFlags};
 
-use super::transport::Transport;
+use super::r#type::ConnectionType;
 
 #[derive(Clone)]
 pub enum ReconnectOptions {
@@ -39,7 +39,7 @@ pub struct ConnectionOptions {
     pub prefix: Option<char>,
     pub interval: Duration,
 
-    pub transport: Transport,
+    pub transport: ConnectionType,
     pub reconnect: ReconnectOptions,
 }
 
@@ -100,7 +100,7 @@ impl ConnectionOptions {
     }
 
     pub fn relay(mut self, select_host: Option<String>, connect_timeout: Duration) -> Self {
-        self.transport = Transport::Relay {
+        self.transport = ConnectionType::Relay {
             select_host,
             connect_timeout,
         };
@@ -114,7 +114,7 @@ impl ConnectionOptions {
         verify_version: bool,
         wait_for_initial_pong: bool,
     ) -> Self {
-        self.transport = Transport::Tcp {
+        self.transport = ConnectionType::Tcp {
             remote: remote.into(),
             codec_mode,
             verify_version,
@@ -131,7 +131,7 @@ impl ConnectionOptions {
         verify_version: bool,
         wait_for_initial_pong: bool,
     ) -> Self {
-        self.transport = Transport::Udp {
+        self.transport = ConnectionType::Udp {
             local: Some(local.into()),
             remote: remote.into(),
             codec_mode,

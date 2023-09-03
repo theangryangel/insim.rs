@@ -4,7 +4,7 @@
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
 use insim::{
-    connection::{options::ConnectionOptions, Connection},
+    connection::{Connection, ConnectionOptions},
     packets::{relay::HostListRequest, Packet},
     result::Result,
 };

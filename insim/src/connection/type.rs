@@ -1,17 +1,20 @@
-use std::net::SocketAddr;
-use std::time::Duration;
+use std::{net::SocketAddr, time::Duration};
 
 use insim_core::identifiers::RequestId;
-use tokio::net::{TcpStream, UdpSocket};
-use tokio::time::timeout;
+use tokio::{
+    net::{TcpStream, UdpSocket},
+    time::timeout,
+};
 
-use crate::codec::Mode;
-use crate::packets::insim::Isi;
-
-use super::traits::{ReadWritePacket, WritePacket};
+use crate::{
+    codec::Mode,
+    packets::insim::Isi,
+    result::Result,
+    traits::{ReadWritePacket, WritePacket},
+};
 
 #[derive(Clone)]
-pub enum Transport {
+pub enum ConnectionType {
     Tcp {
         remote: SocketAddr,
         codec_mode: Mode,
@@ -31,7 +34,7 @@ pub enum Transport {
     },
 }
 
-impl Default for Transport {
+impl Default for ConnectionType {
     fn default() -> Self {
         Self::Tcp {
             remote: "127.0.0.1:29999".parse().unwrap(),
@@ -42,10 +45,10 @@ impl Default for Transport {
     }
 }
 
-impl Transport {
-    pub async fn connect(&self, isi: Isi) -> crate::result::Result<Box<dyn ReadWritePacket>> {
+impl ConnectionType {
+    pub async fn connect(&self, isi: Isi) -> Result<Box<dyn ReadWritePacket>> {
         match self {
-            Transport::Tcp {
+            ConnectionType::Tcp {
                 remote,
                 codec_mode,
                 verify_version,
@@ -57,7 +60,7 @@ impl Transport {
                 )
                 .await??;
 
-                let mut stream = super::tcp::Tcp::new(stream, *codec_mode);
+                let mut stream = crate::tcp::Tcp::new(stream, *codec_mode);
                 let mut isi = isi.clone();
                 if *verify_version {
                     isi.reqi = RequestId(1);
@@ -73,7 +76,7 @@ impl Transport {
 
                 Ok(stream.boxed())
             }
-            Transport::Udp {
+            ConnectionType::Udp {
                 local,
                 remote,
                 codec_mode,
@@ -89,7 +92,7 @@ impl Transport {
                     isi.reqi = RequestId(1);
                 }
                 isi.udpport = stream.local_addr().unwrap().port();
-                let mut stream = crate::connection::udp::Udp::new(stream, *codec_mode);
+                let mut stream = crate::udp::Udp::new(stream, *codec_mode);
 
                 super::handshake(
                     &mut stream,
@@ -102,7 +105,7 @@ impl Transport {
 
                 Ok(stream.boxed())
             }
-            Transport::Relay {
+            ConnectionType::Relay {
                 select_host,
                 connect_timeout,
             } => {
@@ -116,7 +119,7 @@ impl Transport {
                 )
                 .await??;
 
-                let mut stream = super::tcp::Tcp::new(
+                let mut stream = crate::tcp::Tcp::new(
                     stream,
                     // TODO: Talk to LFS devs, find out if/when relay gets compressed support?
                     Mode::Uncompressed,
