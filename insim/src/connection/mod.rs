@@ -2,62 +2,76 @@
 //! [Packets](crate::packets::Packet).
 
 mod event;
+mod inner;
+mod network_options;
 mod options;
-mod r#type;
 
 pub use event::Event;
-
-pub use options::{ConnectionOptions, ReconnectOptions};
+pub use options::ConnectionOptions;
 
 use crate::{
+    connection::inner::ConnectionInner,
     error::Error,
     packets::Packet,
     result::Result,
     tools::{handshake, maybe_keepalive},
-    traits::ReadWritePacket,
+    traits::{ReadPacket, WritePacket},
 };
 
 use std::time::Duration;
 
 pub struct Connection {
     options: ConnectionOptions,
-    network: Option<Box<dyn ReadWritePacket>>,
+    inner: Option<ConnectionInner>,
     shutdown: bool,
+
+    shutdown_notify: tokio::sync::Notify,
 }
 
 impl Connection {
     pub fn new(options: ConnectionOptions) -> Self {
         Self {
-            network: None,
+            inner: None,
             options,
             shutdown: false,
+            shutdown_notify: tokio::sync::Notify::new(),
         }
     }
 
     pub async fn send<P: Into<Packet>>(&mut self, packet: P) -> Result<()> {
-        if self.network.is_none() {
-            return Err(Error::Disconnected);
+        if self.shutdown {
+            return Err(Error::Shutdown);
         }
 
-        let stream = self.network.as_mut().unwrap();
-        stream.write(packet.into()).await
+        match self.inner.as_mut() {
+            None => Err(Error::Disconnected),
+            Some(ref mut inner) => inner.write(packet.into()).await,
+        }
     }
 
-    pub async fn shutdown(&mut self) {
+    pub fn shutdown(&mut self) {
         self.shutdown = true;
+        self.shutdown_notify.notify_one();
     }
 
+    /// Handles establishing the connection, managing the keepalive (ping) and returns the next
+    /// [Event].
+    /// On error, calling again will result in a reconnection attempt.
+    /// Failure to call poll will result in a timeout.
     pub async fn poll(&mut self) -> Result<Event> {
-        // TODO handle ReconnectOptions
-        if self.network.is_none() {
+        if self.shutdown {
+            return Err(Error::Shutdown);
+        }
+
+        if self.inner.is_none() {
             let isi = self.options.as_isi();
             let stream = self
                 .options
-                .transport
+                .network_options
                 .connect(isi, Duration::from_secs(90))
                 .await?;
 
-            self.network = Some(stream);
+            self.inner = Some(stream);
             return Ok(Event::Connected);
         }
 
@@ -65,17 +79,23 @@ impl Connection {
     }
 
     async fn poll_inner(&mut self) -> Result<Event> {
-        let stream = self.network.as_mut().unwrap();
+        let stream = self.inner.as_mut().unwrap();
 
-        match stream.read().await? {
-            Some(packet) => {
-                maybe_keepalive(stream, &packet).await?;
-                Ok(Event::Data(packet))
-            }
-            None => {
-                self.network = None;
-                // TODO: is this really true?
-                Ok(Event::Disconnected)
+        tokio::select! {
+            _ = self.shutdown_notify.notified() => {
+                Ok(Event::Shutdown)
+            },
+
+            res = stream.read() => match res? {
+                Some(packet) => {
+                    maybe_keepalive(stream, &packet).await?;
+                    Ok(Event::Data(packet))
+                }
+                None => {
+                    self.inner = None;
+                    // TODO: is this really true?
+                    Ok(Event::Disconnected)
+                }
             }
         }
     }

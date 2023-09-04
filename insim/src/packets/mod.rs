@@ -167,9 +167,7 @@ crate::impl_packet_from! {
     insim::Csc => VehicleStateChanged,
     insim::Cim => ConnectionInterfaceMode,
     insim::Mal => ModsAllowed,
-}
 
-crate::impl_packet_from! {
     relay::AdminRequest => RelayAdminRequest,
     relay::AdminResponse => RelayAdminResponse,
     relay::HostListRequest => RelayHostListRequest,

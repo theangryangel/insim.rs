@@ -8,7 +8,7 @@ use tokio_test::assert_ok;
 
 #[tokio::test]
 /// Ensure that Codec can decode a basic small packet
-async fn framedread_tiny_ping() {
+async fn read_tiny_ping() {
     let mut mock = BytesMut::new();
     mock.extend_from_slice(
         // Packet::Tiny, subtype TinyType::Ping, compressed, reqi=2
@@ -33,7 +33,7 @@ async fn framedread_tiny_ping() {
 
 #[tokio::test]
 /// Ensure that Codec can write a basic small packet
-async fn framedwrite_tiny_ping() {
+async fn write_tiny_ping() {
     let mut mock = BytesMut::new();
     mock.extend_from_slice(
         // Packet::Tiny, subtype TinyType::Ping, compressed, reqi=2

@@ -7,14 +7,12 @@ use tokio::{
 };
 
 use crate::{
-    codec::Mode,
-    packets::insim::Isi,
-    result::Result,
-    traits::{ReadWritePacket, WritePacket},
+    codec::Mode, connection::inner::ConnectionInner, packets::insim::Isi, result::Result,
+    traits::WritePacket,
 };
 
 #[derive(Clone)]
-pub enum ConnectionType {
+pub enum NetworkOptions {
     Tcp {
         remote: SocketAddr,
         codec_mode: Mode,
@@ -30,11 +28,10 @@ pub enum ConnectionType {
     },
     Relay {
         select_host: Option<String>,
-        connect_timeout: Duration,
     },
 }
 
-impl Default for ConnectionType {
+impl Default for NetworkOptions {
     fn default() -> Self {
         Self::Tcp {
             remote: "127.0.0.1:29999".parse().unwrap(),
@@ -45,14 +42,14 @@ impl Default for ConnectionType {
     }
 }
 
-impl ConnectionType {
-    pub async fn connect(
+impl NetworkOptions {
+    pub(crate) async fn connect(
         &self,
         isi: Isi,
         timeout_duration: Duration,
-    ) -> Result<Box<dyn ReadWritePacket>> {
+    ) -> Result<ConnectionInner> {
         match self {
-            ConnectionType::Tcp {
+            NetworkOptions::Tcp {
                 remote,
                 codec_mode,
                 verify_version,
@@ -74,9 +71,9 @@ impl ConnectionType {
                 )
                 .await?;
 
-                Ok(stream.boxed())
+                Ok(ConnectionInner::Tcp(stream))
             }
-            ConnectionType::Udp {
+            NetworkOptions::Udp {
                 local,
                 remote,
                 codec_mode,
@@ -103,18 +100,13 @@ impl ConnectionType {
                 )
                 .await?;
 
-                Ok(stream.boxed())
+                Ok(ConnectionInner::Udp(stream))
             }
-            ConnectionType::Relay {
-                select_host,
-                connect_timeout,
-            } => {
+            NetworkOptions::Relay { select_host } => {
                 use crate::packets::relay::HostSelect;
 
-                // Why not call connect_tcp? purely so we won't call request_game_state multiple times
-                // until we select a host there is no game state to request
                 let stream = timeout(
-                    *connect_timeout,
+                    timeout_duration,
                     TcpStream::connect("isrelay.lfs.net:47474"),
                 )
                 .await??;
@@ -146,7 +138,7 @@ impl ConnectionType {
                         .await?;
                 }
 
-                Ok(stream.boxed())
+                Ok(ConnectionInner::Tcp(stream))
             }
         }
     }

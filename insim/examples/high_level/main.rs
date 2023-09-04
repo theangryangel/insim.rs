@@ -1,6 +1,7 @@
-//! High level example of using the "actor" based connection.
+//! High level example
 //! In this example you do not have to maintain the connection,
 //! manage sending keepalives, or reconnection.
+//! Just keep calling `poll` on your connection!
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
 use insim::{
@@ -8,7 +9,7 @@ use insim::{
     packets::{relay::HostListRequest, Packet},
     result::Result,
 };
-use std::{net::SocketAddr, time::Duration};
+use std::net::SocketAddr;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -87,16 +88,18 @@ pub async fn main() -> Result<()> {
             options = options.tcp(*addr, insim::codec::Mode::Compressed, true, true);
         }
         Commands::Relay { select_host, .. } => {
-            options = options.relay(select_host.clone(), Duration::from_secs(10));
+            options = options.relay(select_host.clone());
             tracing::info!("Connecting via LFS World Relay!");
         }
     };
 
     let mut client = Connection::new(options);
 
-    let mut i = 0;
+    let mut i: usize = 0;
 
-    while let Ok(event) = client.poll().await {
+    loop {
+        let event = client.poll().await?;
+
         if matches!(event, Event::Connected) {
             if let Commands::Relay {
                 list_hosts: true, ..
@@ -107,8 +110,6 @@ pub async fn main() -> Result<()> {
 
             tracing::info!("Connected!");
         }
-
-        i += 1;
 
         tracing::info!("Evt={:?} Index={:?}", event, i);
 
@@ -121,6 +122,8 @@ pub async fn main() -> Result<()> {
                 break;
             }
         }
+
+        i = i.wrapping_add(1);
     }
 
     Ok(())

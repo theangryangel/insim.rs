@@ -32,12 +32,15 @@ pub enum Error {
     Encoding(#[from] EncodableError),
 
     /// A timeout occured whilst waiting for an operation
-    #[error("Timeout")]
+    #[error("Timeout: {0:?}")]
     Timeout(String),
 
     /// Failure to parse an address into SocketAddr
     #[error("Failed to parse address: {0}")]
     AddrParseError(#[from] std::net::AddrParseError),
+
+    #[error("Shutdown")]
+    Shutdown,
 }
 
 impl From<tokio::time::error::Elapsed> for Error {

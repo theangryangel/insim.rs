@@ -20,23 +20,18 @@ pth = ["dep:insim_pth"]
 smx = ["dep:insim_smx"]
 
 [dependencies]
-futures = "0.3.28"
-futures-util = "0.3"
 bytes = "1"
 tokio = { version = "1.11.0", features = ["full", "tracing"] }
-tokio-util = { version = "0.7.7", features = ["full"] }
-pin-project = "1.0"
 tracing = "0.1"
 serde = { version = "1", features = ["derive"], optional = true }
-bitflags = "2.1"
+bitflags = "2.4"
 thiserror = "1"
-once_cell = "1"
+async-trait = "0.1.68"
+if_chain = "1"
 insim_core = { path = "../insim_core" }
 insim_game_data = { path = "../insim_game_data", optional = true }
 insim_pth = { path = "../insim_pth", optional = true }
 insim_smx = { path = "../insim_smx", optional = true }
-async-trait = "0.1.68"
-if_chain = "1"
 
 [dev-dependencies]
 tokio-test = "0.4"
