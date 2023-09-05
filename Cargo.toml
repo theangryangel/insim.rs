@@ -1,12 +1,11 @@
 [workspace]
 members = [
-  "multi_index",
-  "multi_index_derive",
   "insim_core",
   "insim_derive",
   "insim",
   "insim_pth",
   "insim_smx",
   "insim_game_data",
-  "insim_extras",
 ]
+
+resolver = "2"

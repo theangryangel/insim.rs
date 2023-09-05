@@ -1,8 +1,12 @@
+//! High level example
+//! In this example you do not have to maintain the connection,
+//! manage sending keepalives, or reconnection.
+//! Just keep calling `poll` on your connection!
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
 use insim::{
+    connection::{Connection, ConnectionOptions, Event},
     packets::{relay::HostListRequest, Packet},
-    prelude::*,
     result::Result,
 };
 use std::net::SocketAddr;
@@ -44,6 +48,12 @@ enum Commands {
         #[arg(long)]
         /// List hosts on the relay and then quit
         list_hosts: bool,
+
+        #[arg(long)]
+        websocket: bool,
+
+        #[arg(long)]
+        spectator_password: Option<String>,
     },
 }
 
@@ -70,60 +80,61 @@ pub async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Use ConnectionBuilder to create a Connection
-    let mut builder = ConnectionBuilder::default();
+    let mut options = ConnectionOptions::default();
 
-    // We need to box the output of the builder as connect_udp, connect_tcp, etc. all return
-    // different types.
-    // If you only call one of these, then you can skip the box'ing.
-    let mut client = match &cli.command {
+    match &cli.command {
         Commands::Udp { bind, addr } => {
             // if the local binding address is not provided, we let the OS decide a port to use
             let local = bind.unwrap_or("0.0.0.0:0".parse()?);
             tracing::info!("Connecting via UDP!");
-            let res = builder.connect_udp(local, addr).await?;
-            res.boxed()
+            options = options.udp(local, *addr, insim::codec::Mode::Compressed, true, true);
         }
         Commands::Tcp { addr } => {
             tracing::info!("Connecting via TCP!");
-            let res = builder.connect_tcp(addr).await?;
-            res.boxed()
+            options = options.tcp(*addr, insim::codec::Mode::Compressed, true, true);
         }
         Commands::Relay {
             select_host,
-            list_hosts,
+            websocket,
+            spectator_password,
+            ..
         } => {
-            let host = match (select_host, list_hosts) {
-                (Some(host), false) => Some(host.as_str()),
-                (_, _) => None,
-            };
+            options = options.relay(select_host.clone(), *websocket, spectator_password.clone());
             tracing::info!("Connecting via LFS World Relay!");
-            let mut res = builder.connect_relay(host).await?;
-            if *list_hosts {
-                res.send(HostListRequest::default()).await?;
-            }
-            res.boxed()
         }
     };
 
-    tracing::info!("Connected!");
+    let mut client = Connection::new(options);
 
-    let mut i = 0;
+    let mut i: usize = 0;
 
-    while let Some(m) = client.next().await {
-        i += 1;
+    loop {
+        let event = client.poll().await?;
 
-        let m = m?;
+        if matches!(event, Event::Connected) {
+            if let Commands::Relay {
+                list_hosts: true, ..
+            } = &cli.command
+            {
+                client.send(HostListRequest::default()).await?;
+            }
 
-        tracing::info!("Packet={:?} Index={:?}", m, i);
+            tracing::info!("Connected!");
+        }
+
+        tracing::info!("Evt={:?} Index={:?}", event, i);
 
         if_chain! {
             if let Commands::Relay{ list_hosts: true, .. } = &cli.command;
-            if let Packet::RelayHostList(i) = &m;
-            if i.is_last();
+            if let Event::Data(packet) = &event;
+            if let Packet::RelayHostList(hostinfo) = &packet;
+            if hostinfo.is_last();
             then {
                 break;
             }
         }
+
+        i = i.wrapping_add(1);
     }
 
     Ok(())

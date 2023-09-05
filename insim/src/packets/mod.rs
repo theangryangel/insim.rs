@@ -1,5 +1,4 @@
 //! Insim and Insim Relay Packet definitions
-use futures::{Sink, Stream};
 use insim_core::prelude::*;
 
 #[cfg(feature = "serde")]
@@ -9,17 +8,8 @@ mod macros;
 /// Insim packet definitions
 pub mod insim;
 
-#[cfg(feature = "relay")]
 /// Relay packet definitions
 pub mod relay;
-
-pub trait PacketSinkStream:
-    Sink<Packet, Error = crate::error::Error>
-    + Stream<Item = crate::result::Result<Packet>>
-    + std::marker::Unpin
-    + Send
-{
-}
 
 /// This Insim protocol version number
 pub const VERSION: u8 = 9;
@@ -97,22 +87,11 @@ pub enum Packet {
     ConnectionInterfaceMode(insim::Cim) = 64,
     ModsAllowed(insim::Mal) = 65,
 
-    #[cfg(feature = "relay")]
     RelayAdminRequest(relay::AdminRequest) = 250,
-
-    #[cfg(feature = "relay")]
     RelayAdminResponse(relay::AdminResponse) = 251,
-
-    #[cfg(feature = "relay")]
     RelayHostListRequest(relay::HostListRequest) = 252,
-
-    #[cfg(feature = "relay")]
     RelayHostList(relay::HostList) = 253,
-
-    #[cfg(feature = "relay")]
     RelayHostSelect(relay::HostSelect) = 254,
-
-    #[cfg(feature = "relay")]
     RelayError(relay::RelayError) = 255,
 }
 
@@ -188,16 +167,19 @@ crate::impl_packet_from! {
     insim::Csc => VehicleStateChanged,
     insim::Cim => ConnectionInterfaceMode,
     insim::Mal => ModsAllowed,
-}
 
-#[cfg(feature = "relay")]
-crate::impl_packet_from! {
     relay::AdminRequest => RelayAdminRequest,
     relay::AdminResponse => RelayAdminResponse,
     relay::HostListRequest => RelayHostListRequest,
     relay::HostList => RelayHostList,
     relay::HostSelect => RelayHostSelect,
     relay::RelayError => RelayError,
+}
+
+impl Packet {
+    pub fn is_error(&self) -> bool {
+        matches!(self, Self::RelayError(_))
+    }
 }
 
 #[cfg(test)]
