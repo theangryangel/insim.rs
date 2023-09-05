@@ -21,3 +21,10 @@ it's sibling crates.
 ## Examples
 
 See examples directory.
+
+## Breaking Changes
+
+- :warning: It is now your responsibility to escape and unescape strings
+  For convenience insim re-exports [insim::tools::string::escape] and
+  [insim::tools::string::unescape].
+  See theangryangel/insim.rs#92 for further info.

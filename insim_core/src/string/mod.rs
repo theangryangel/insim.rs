@@ -1,5 +1,7 @@
 //! Utilities for working with various strings from Insim.
 
+use if_chain::if_chain;
+
 pub mod codepages;
 pub mod colours;
 
@@ -48,36 +50,72 @@ pub fn strip_trailing_nul(input: &[u8]) -> &[u8] {
     }
 }
 
+// TODO This should also probably take and return a Cow.
 /// Unescape a u8 slice according to LFS' rules.
-pub fn unescape(input: &[u8]) -> Vec<u8> {
+pub fn unescape(input: &str) -> String {
     let mut maybe_needs_unescaping = false;
 
-    for c in input.iter() {
-        if *c == b'^' {
+    for c in input.chars() {
+        if c == MARKER as char {
             maybe_needs_unescaping = true;
             break;
         }
     }
 
     if !maybe_needs_unescaping {
-        return input.to_vec();
+        return input.to_string();
     }
 
-    let mut output = Vec::with_capacity(input.len());
-    let mut iter = input.iter().peekable();
+    let mut output = String::new();
+    let mut chars = input.chars().peekable();
 
-    while let Some(i) = iter.next() {
-        if *i == MARKER {
-            if let Some(j) = iter.peek() {
-                if let Some(k) = ESCAPE_SEQUENCES.iter().find(|x| x.0 == **j) {
-                    output.push(k.1);
-                    let _ = iter.next(); // advance the iter
+    while let Some(i) = chars.next() {
+        if i == MARKER as char {
+            if let Some(j) = chars.peek() {
+                if let Some(k) = ESCAPE_SEQUENCES.iter().find(|x| x.0 as char == *j) {
+                    output.push(k.1 as char);
+                    let _ = chars.next(); // advance the iter
                     continue;
                 }
             }
         }
 
-        output.push(*i);
+        output.push(i);
+    }
+
+    output
+}
+
+// TODO: This should probably be a Cow
+/// Unescape a string
+pub fn escape(input: &str) -> String {
+    let mut output = String::new();
+    let mut chars = input.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        // is the current char a marker? and do we have a follow up character?
+        // TODO: replace with a let chain when its stable
+        if_chain! {
+            if c == MARKER as char;
+            if let Some(d) = chars.peek();
+            if colours::COLOUR_SEQUENCES.contains(d);
+            then {
+                // is this a colour?
+                // just push the colour and move on
+                output.push(MARKER as char);
+                output.push(chars.next().unwrap());
+                continue;
+            }
+        }
+
+        // do we have a character that needs escaping?
+        if let Some(i) = ESCAPE_SEQUENCES.iter().find(|i| i.1 as char == c) {
+            output.push(MARKER as char);
+            output.push(i.0 as char);
+            continue;
+        }
+
+        output.push(c)
     }
 
     output

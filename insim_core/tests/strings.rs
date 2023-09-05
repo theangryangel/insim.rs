@@ -1,11 +1,14 @@
-use insim_core::string::codepages;
+use insim_core::string::{codepages, escape, unescape};
 
 #[test]
-fn test_escaping() {
-    let input = codepages::to_lossy_bytes("^|*:\\/?\"<>#123^945");
-    let output = String::from("^^^v^a^c^d^s^q^t^l^r^h123^945");
+fn test_escaping_and_unescaping() {
+    let original = "^|*:\\/?\"<>#123^945";
 
-    assert_eq!(input, output.as_bytes(),);
+    let escaped = escape(original);
+    let unescaped = unescape(&escaped);
+
+    assert_eq!(escaped, "^^^v^a^c^d^s^q^t^l^r^h123^945");
+    assert_eq!(unescaped, original);
 }
 
 #[test]
