@@ -7,12 +7,11 @@
 /// The common practise is to use the function `to_lossy_string` to convert to a standard Rust
 /// String.
 use encoding_rs;
-use if_chain::if_chain;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, vec::Vec};
 
-use super::{colours::COLOUR_SEQUENCES, strip_trailing_nul, unescape, ESCAPE_SEQUENCES, MARKER};
+use super::{strip_trailing_nul, MARKER};
 
 pub static MAPPING: Lazy<HashMap<u8, &encoding_rs::Encoding>> = Lazy::new(|| {
     let mut m = HashMap::new();
@@ -36,42 +35,7 @@ pub fn to_lossy_bytes(input: &str) -> Vec<u8> {
 
     let mut current_encoding = MAPPING.get(&b'L').unwrap();
 
-    let mut chars = input.chars().peekable();
-
-    while let Some(c) = chars.next() {
-        // is the current char a marker? and do we have a follow up character?
-        // TODO: replace with a let chain when its stable
-        if_chain! {
-            if c == MARKER as char;
-            if let Some(d) = chars.peek();
-            then {
-                // is this a colour?
-                if COLOUR_SEQUENCES.contains(d) {
-                    // just push the colour and move on
-                    output.push(MARKER);
-                    output.push(chars.next().unwrap() as u8);
-                    continue;
-                }
-
-                // question: do we want to allow users to pre-escape themselves?
-                // probably not.
-                // // are we pre-escaped?
-                // if ESCAPE_SEQUENCES.iter().find(|i| i.0 as char == *d).is_some() {
-                //     // just push and move on
-                //     output.push(MARKER);
-                //     output.push(chars.next().unwrap() as u8);
-                //     continue;
-                // }
-            }
-        }
-
-        // do we have a character that needs escaping?
-        if let Some(i) = ESCAPE_SEQUENCES.iter().find(|i| i.1 as char == c) {
-            output.push(MARKER);
-            output.push(i.0);
-            continue;
-        }
-
+    for c in input.chars() {
         // all codepages share ascii values
         if (c as u32) <= 127 {
             output.push(c as u8);
@@ -128,7 +92,7 @@ pub fn to_lossy_string(input: &[u8]) -> String {
         return "".to_string();
     }
 
-    let input = unescape(strip_trailing_nul(input));
+    let input = strip_trailing_nul(input);
 
     // find the positions in the input for each ^L, ^B...
     let mut indices: Vec<usize> = input
@@ -159,7 +123,7 @@ pub fn to_lossy_string(input: &[u8]) -> String {
         let range = &input[pair[0]..pair[1]];
 
         if range.len() < 2 {
-            result.push_str(&String::from_utf8_lossy(&unescape(range)));
+            result.push_str(&String::from_utf8_lossy(range));
             continue;
         }
 

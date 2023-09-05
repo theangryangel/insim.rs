@@ -11,7 +11,7 @@ use crate::{
     error::Error,
     packets::Packet,
     result::Result,
-    tools::{handshake, maybe_keepalive},
+    tools::net::{handshake, maybe_keepalive},
     traits::{ReadPacket, WritePacket},
 };
 
