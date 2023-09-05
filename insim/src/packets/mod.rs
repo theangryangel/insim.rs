@@ -176,6 +176,12 @@ crate::impl_packet_from! {
     relay::RelayError => RelayError,
 }
 
+impl Packet {
+    pub fn is_error(&self) -> bool {
+        matches!(self, Self::RelayError(_))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     // The majority of packet conversions are tested through insim_core.

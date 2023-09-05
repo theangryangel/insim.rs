@@ -3,6 +3,7 @@ use insim_core::Decodable;
 use tokio::net::UdpSocket;
 
 use crate::codec::{Codec, Mode};
+use crate::error::Error;
 use crate::packets::Packet;
 use crate::result::Result;
 
@@ -28,7 +29,7 @@ impl ReadWritePacket for Udp {}
 
 #[async_trait::async_trait]
 impl ReadPacket for Udp {
-    async fn read(&mut self) -> Result<Option<Packet>> {
+    async fn read(&mut self) -> Result<Packet> {
         // UDP packets from Insim are never fragmented
         // so we can just skip over using the codec to encode/decode.
         // Tokio docs indicates that the buffer must be large enough for any packet.
@@ -45,14 +46,14 @@ impl ReadPacket for Udp {
                 match self.inner.try_recv_buf(&mut buffer) {
                     Ok(_) => {
                         if buffer.is_empty() {
-                            return Ok(None);
+                            return Err(Error::Disconnected);
                         }
 
                         // skip over the size, we always know we have a full packet
+                        // TODO: We should probably verify the length matches
                         buffer.advance(1);
 
-                        let res = Packet::decode(&mut buffer, None)?;
-                        return Ok(Some(res));
+                        return Ok(Packet::decode(&mut buffer, None)?);
                     }
                     Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                         continue;

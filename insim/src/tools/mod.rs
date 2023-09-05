@@ -52,22 +52,21 @@ async fn verify<I: ReadWritePacket>(
 
     while !received_tiny && !received_vers {
         match inner.read().await? {
-            None => {
-                return Err(Error::Disconnected);
-            }
-            Some(Packet::Tiny(_)) => {
+            Packet::Tiny(_) => {
                 received_tiny = true;
             }
-            Some(Packet::Version(Version { insimver, .. })) => {
+            Packet::Version(Version { insimver, .. }) => {
                 if insimver != VERSION {
                     return Err(Error::IncompatibleVersion(insimver));
                 }
 
                 received_vers = true;
             }
-            Some(m) => {
+            packet => {
                 /* not the droids we're looking for */
-                tracing::info!("received packet whilst waiting for version and/or ping: {m:?}");
+                tracing::debug!(
+                    "received packet whilst waiting for version and/or ping: {packet:?}"
+                );
             }
         }
     }

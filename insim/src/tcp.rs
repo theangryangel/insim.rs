@@ -33,13 +33,13 @@ impl ReadWritePacket for Tcp {}
 
 #[async_trait::async_trait]
 impl ReadPacket for Tcp {
-    async fn read(&mut self) -> Result<Option<Packet>> {
+    async fn read(&mut self) -> Result<Packet> {
         loop {
             if_chain! {
                 if !self.buffer.is_empty();
                 if let Some(packet) = self.codec.decode(&mut self.buffer)?;
                 then {
-                    return Ok(Some(packet));
+                    return Ok(packet);
                 }
             }
 
@@ -53,8 +53,11 @@ impl ReadPacket for Tcp {
                     // shutdown, there should be no data in the read buffer. If
                     // there is, this means that the peer closed the socket while
                     // sending a frame.
-                    if self.buffer.is_empty() {
-                        return Ok(None);
+                    if !self.buffer.is_empty() {
+                        tracing::debug!(
+                            "Buffer was not empty when disconnected: {:?}",
+                            self.buffer
+                        );
                     }
 
                     return Err(Error::Disconnected);

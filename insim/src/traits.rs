@@ -4,7 +4,7 @@ use crate::result::Result;
 #[async_trait::async_trait]
 pub trait ReadPacket {
     /// Read a packet
-    async fn read(&mut self) -> Result<Option<Packet>>;
+    async fn read(&mut self) -> Result<Packet>;
 }
 
 #[async_trait::async_trait]
@@ -24,7 +24,7 @@ pub trait ReadWritePacket: ReadPacket + WritePacket + Send {
 
 #[async_trait::async_trait]
 impl<I: ReadPacket + Send + ?Sized> ReadPacket for Box<I> {
-    async fn read(&mut self) -> Result<Option<Packet>> {
+    async fn read(&mut self) -> Result<Packet> {
         (**self).read().await
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "insim"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Karl Southern <karl@theangryangel.co.uk>"]
 edition = "2021"
 
@@ -21,7 +21,7 @@ smx = ["dep:insim_smx"]
 
 [dependencies]
 bytes = "1"
-tokio = { version = "1.11.0", features = ["full", "tracing"] }
+tokio = { version = "1.11.0", features = ["rt", "time", "net", "macros", "sync", "tracing"] }
 tracing = "0.1"
 serde = { version = "1", features = ["derive"], optional = true }
 bitflags = "2.4"
@@ -32,8 +32,11 @@ insim_core = { path = "../insim_core" }
 insim_game_data = { path = "../insim_game_data", optional = true }
 insim_pth = { path = "../insim_pth", optional = true }
 insim_smx = { path = "../insim_smx", optional = true }
+tokio-tungstenite = "0.20.0"
+futures-util = "0.3.28"
 
 [dev-dependencies]
 tokio-test = "0.4"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 clap = { version = "4.2", features = ["derive"] }
+tokio = { version = "1.11.0", features = ["full"] }

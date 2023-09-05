@@ -12,14 +12,16 @@ use crate::{
 pub(crate) enum ConnectionInner {
     Tcp(crate::tcp::Tcp),
     Udp(crate::udp::Udp),
+    WebSocket(crate::websocket::WebSocket),
 }
 
 #[async_trait::async_trait]
 impl ReadPacket for ConnectionInner {
-    async fn read(&mut self) -> Result<Option<Packet>> {
+    async fn read(&mut self) -> Result<Packet> {
         match self {
             Self::Tcp(i) => i.read().await,
             Self::Udp(i) => i.read().await,
+            Self::WebSocket(i) => i.read().await,
         }
     }
 }
@@ -30,6 +32,7 @@ impl WritePacket for ConnectionInner {
         match self {
             Self::Tcp(i) => i.write(packet).await,
             Self::Udp(i) => i.write(packet).await,
+            Self::WebSocket(i) => i.write(packet).await,
         }
     }
 }

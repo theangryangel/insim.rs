@@ -48,6 +48,12 @@ enum Commands {
         #[arg(long)]
         /// List hosts on the relay and then quit
         list_hosts: bool,
+
+        #[arg(long)]
+        websocket: bool,
+
+        #[arg(long)]
+        spectator_password: Option<String>,
     },
 }
 
@@ -87,8 +93,13 @@ pub async fn main() -> Result<()> {
             tracing::info!("Connecting via TCP!");
             options = options.tcp(*addr, insim::codec::Mode::Compressed, true, true);
         }
-        Commands::Relay { select_host, .. } => {
-            options = options.relay(select_host.clone());
+        Commands::Relay {
+            select_host,
+            websocket,
+            spectator_password,
+            ..
+        } => {
+            options = options.relay(select_host.clone(), *websocket, spectator_password.clone());
             tracing::info!("Connecting via LFS World Relay!");
         }
     };

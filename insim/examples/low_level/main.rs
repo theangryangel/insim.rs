@@ -137,7 +137,15 @@ pub async fn main() -> Result<()> {
 
     let mut i = 0;
 
-    while let Some(m) = client.read().await? {
+    loop {
+        let m = client.read().await?;
+
+        if m.is_error() {
+            // Certain packets can be considered as errors
+            // When using lower level API it's your responsibility to handle this
+            return Err(m.into());
+        }
+
         i += 1;
 
         tracing::info!("Packet={:?} Index={:?}", m, i);
@@ -155,7 +163,6 @@ pub async fn main() -> Result<()> {
 
                 println!("ping? pong!");
             }
-
         }
 
         if_chain! {

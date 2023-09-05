@@ -1,6 +1,3 @@
-//! Connection maintains a connection and provides a Stream and Sink of
-//! [Packets](crate::packets::Packet).
-
 mod event;
 mod inner;
 mod network_options;
@@ -17,8 +14,6 @@ use crate::{
     tools::{handshake, maybe_keepalive},
     traits::{ReadPacket, WritePacket},
 };
-
-use std::time::Duration;
 
 pub struct Connection {
     options: ConnectionOptions,
@@ -64,18 +59,19 @@ impl Connection {
         }
 
         if self.inner.is_none() {
-            let isi = self.options.as_isi();
-            let stream = self
-                .options
-                .network_options
-                .connect(isi, Duration::from_secs(90))
-                .await?;
+            let stream = self.options.connect().await?;
 
             self.inner = Some(stream);
             return Ok(Event::Connected);
         }
 
-        self.poll_inner().await
+        match self.poll_inner().await {
+            Ok(inner) => Ok(inner),
+            Err(inner) => {
+                self.inner = None;
+                Err(inner)
+            }
+        }
     }
 
     async fn poll_inner(&mut self) -> Result<Event> {
@@ -86,17 +82,16 @@ impl Connection {
                 Ok(Event::Shutdown)
             },
 
-            res = stream.read() => match res? {
-                Some(packet) => {
-                    maybe_keepalive(stream, &packet).await?;
+            packet = stream.read() => {
+                let packet = packet?;
+                maybe_keepalive(stream, &packet).await?;
+
+                if packet.is_error() {
+                    Err(packet.into())
+                } else {
                     Ok(Event::Data(packet))
                 }
-                None => {
-                    self.inner = None;
-                    // TODO: is this really true?
-                    Ok(Event::Disconnected)
-                }
-            }
+            },
         }
     }
 }
