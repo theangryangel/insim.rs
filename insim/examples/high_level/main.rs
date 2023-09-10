@@ -104,14 +104,14 @@ pub async fn main() -> Result<()> {
         }
     };
 
-    let mut client = Connection::new(options);
+    let mut client = Connection::new(options, None);
 
     let mut i: usize = 0;
 
     loop {
         let event = client.poll().await?;
 
-        if matches!(event, Event::Connected) {
+        if matches!(event, Event::Connected(_)) {
             if let Commands::Relay {
                 list_hosts: true, ..
             } = &cli.command
@@ -126,7 +126,7 @@ pub async fn main() -> Result<()> {
 
         if_chain! {
             if let Commands::Relay{ list_hosts: true, .. } = &cli.command;
-            if let Event::Data(packet) = &event;
+            if let Event::Data(packet, _) = &event;
             if let Packet::RelayHostList(hostinfo) = &packet;
             if hostinfo.is_last();
             then {
