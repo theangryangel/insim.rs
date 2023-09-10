@@ -1,5 +1,7 @@
 //! Utilities for working with various strings from Insim.
 
+use std::borrow::Cow;
+
 use if_chain::if_chain;
 
 pub mod codepages;
@@ -50,20 +52,12 @@ pub fn strip_trailing_nul(input: &[u8]) -> &[u8] {
     }
 }
 
-// TODO This should also probably take and return a Cow.
 /// Unescape a u8 slice according to LFS' rules.
-pub fn unescape(input: &str) -> String {
-    let mut maybe_needs_unescaping = false;
-
-    for c in input.chars() {
-        if c == MARKER as char {
-            maybe_needs_unescaping = true;
-            break;
-        }
-    }
+pub fn unescape(input: Cow<str>) -> Cow<str> {
+    let maybe_needs_unescaping = input.chars().any(|c| c == MARKER as char);
 
     if !maybe_needs_unescaping {
-        return input.to_string();
+        return input;
     }
 
     let mut output = String::new();
@@ -83,12 +77,25 @@ pub fn unescape(input: &str) -> String {
         output.push(i);
     }
 
-    output
+    output.into()
 }
 
-// TODO: This should probably be a Cow
 /// Unescape a string
-pub fn escape(input: &str) -> String {
+pub fn escape(input: Cow<str>) -> Cow<str> {
+    let mut maybe_needs_unescaping = false;
+
+    // TODO: We can probably do this better
+    for c in input.chars() {
+        if ESCAPE_SEQUENCES.iter().any(|i| i.1 as char == c) {
+            maybe_needs_unescaping = true;
+            break;
+        }
+    }
+
+    if !maybe_needs_unescaping {
+        return input;
+    }
+
     let mut output = String::new();
     let mut chars = input.chars().peekable();
 
@@ -118,5 +125,5 @@ pub fn escape(input: &str) -> String {
         output.push(c)
     }
 
-    output
+    output.into()
 }

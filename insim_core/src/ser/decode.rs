@@ -239,20 +239,26 @@ where
 
 impl Decodable for String {
     fn decode(buf: &mut BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError> {
-        let limit = if limit.is_none() {
-            tracing::warn!(
-                "No limit received, assuming the rest of the buffer: {:?}",
-                &buf
-            );
-            Some(Limit::Bytes(buf.len()))
-        } else {
-            limit
+        let length = match limit {
+            Some(Limit::Bytes(count)) => count,
+            Some(Limit::Count(_)) => {
+                return Err(DecodableError::NeedsLimit(
+                    "Count is not a supported option when decoding a String".to_string(),
+                ));
+            }
+            None => {
+                tracing::warn!(
+                    "No limit received, assuming the rest of the buffer: {:?}",
+                    &buf
+                );
+                buf.remaining()
+            }
         };
 
-        // TODO use copy_to_slice and advance, etc.
-        let binding = Vec::<u8>::decode(buf, limit)?;
-
-        Ok(codepages::to_lossy_string(&binding))
+        let inner = buf.take(length);
+        let result = codepages::to_lossy_string(inner.into_inner()).to_string();
+        buf.advance(length);
+        Ok(result)
     }
 }
 
