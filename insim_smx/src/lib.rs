@@ -25,6 +25,9 @@ pub enum Error {
 
     #[error("Failed to decode packet: {0:?}")]
     Decoding(#[from] DecodableError),
+
+    #[error("Remaining bytes after decoding, possibly broken file?")]
+    UnexpectedRemainingBytes,
 }
 
 impl From<std::io::Error> for Error {
@@ -127,6 +130,12 @@ impl Smx {
         let mut data = insim_core::bytes::BytesMut::new();
         data.extend_from_slice(&buffer);
 
-        Ok(Self::decode(&mut data, None)?)
+        let result = Self::decode(&mut data, None)?;
+
+        if data.remaining() > 0 {
+            return Err(Error::UnexpectedRemainingBytes);
+        }
+
+        Ok(result)
     }
 }

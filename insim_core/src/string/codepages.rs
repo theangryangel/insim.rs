@@ -9,7 +9,7 @@
 use encoding_rs;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
-use std::{collections::HashMap, vec::Vec};
+use std::{borrow::Cow, collections::HashMap, vec::Vec};
 
 use super::{strip_trailing_nul, MARKER};
 
@@ -30,7 +30,15 @@ pub static MAPPING: Lazy<HashMap<u8, &encoding_rs::Encoding>> = Lazy::new(|| {
 });
 
 /// Convert from a String, with potential lossy conversion to an Insim Codepage String
-pub fn to_lossy_bytes(input: &str) -> Vec<u8> {
+pub fn to_lossy_bytes(input: &str) -> Cow<[u8]> {
+    let all_ascii = !input.chars().any(|c| c as u32 > 127);
+
+    if all_ascii {
+        // all codepages share ascii values
+        // therefore if it's all ascii, we can just dump it.
+        return input.as_bytes().into();
+    }
+
     let mut output = Vec::new();
 
     let mut current_encoding = MAPPING.get(&b'L').unwrap();
@@ -82,14 +90,14 @@ pub fn to_lossy_bytes(input: &str) -> Vec<u8> {
         }
     }
 
-    output
+    output.into()
 }
 
 /// Convert a InsimString into a native rust String, with potential lossy conversion from codepages
-pub fn to_lossy_string(input: &[u8]) -> String {
+pub fn to_lossy_string(input: &[u8]) -> Cow<str> {
     // empty string
     if input.is_empty() {
-        return "".to_string();
+        return "".into();
     }
 
     let input = strip_trailing_nul(input);
@@ -100,6 +108,12 @@ pub fn to_lossy_string(input: &[u8]) -> String {
         .tuple_windows()
         .positions(|(elem, next)| *elem == MARKER && MAPPING.contains_key(next))
         .collect();
+
+    if indices.is_empty() {
+        // no mappings at all, just encode it all as LATIN1
+        let (cow, _encoding, _had_errors) = encoding_rs::WINDOWS_1252.decode(input);
+        return cow;
+    }
 
     // make sure we've got at least something in the indices
     if indices.first() != Some(&0) {
@@ -144,5 +158,5 @@ pub fn to_lossy_string(input: &[u8]) -> String {
         }
     }
 
-    result
+    result.into()
 }

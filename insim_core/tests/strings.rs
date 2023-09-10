@@ -1,11 +1,13 @@
+use std::borrow::Cow;
+
 use insim_core::string::{codepages, escape, unescape};
 
 #[test]
 fn test_escaping_and_unescaping() {
-    let original = "^|*:\\/?\"<>#123^945";
+    let original: Cow<str> = "^|*:\\/?\"<>#123^945".into();
 
-    let escaped = escape(original);
-    let unescaped = unescape(&escaped);
+    let escaped = escape(original.clone());
+    let unescaped = unescape(escaped.clone());
 
     assert_eq!(escaped, "^^^v^a^c^d^s^q^t^l^r^h123^945");
     assert_eq!(unescaped, original);

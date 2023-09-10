@@ -197,9 +197,9 @@ where
 
 impl Encodable for String {
     fn encode(&self, buf: &mut BytesMut, limit: Option<Limit>) -> Result<(), EncodableError> {
-        let mut data = codepages::to_lossy_bytes(self);
+        let data: &[u8] = &codepages::to_lossy_bytes(self);
 
-        match limit {
+        let padding = match limit {
             Some(Limit::Count(_)) => {
                 return Err(EncodableError::UnexpectedLimit(format!(
                     "String does not support a count limit! {limit:?}"
@@ -214,14 +214,19 @@ impl Encodable for String {
                 }
 
                 if data.len() < size {
-                    // zero pad
-                    data.put_bytes(0, size - data.len());
+                    size - data.len()
+                } else {
+                    0
                 }
             }
-            _ => {}
-        }
+            _ => 0,
+        };
 
-        data.encode(buf, limit)?;
+        buf.extend_from_slice(data);
+        // zero pad
+        if padding > 0 {
+            buf.put_bytes(0, padding);
+        }
         Ok(())
     }
 }

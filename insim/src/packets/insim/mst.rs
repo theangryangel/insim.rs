@@ -29,18 +29,19 @@ impl Encodable for Mst {
         self.reqi.encode(buf, None)?;
         buf.put_bytes(0, 1);
 
-        let msg = codepages::to_lossy_bytes(&self.msg);
+        let msg: &[u8] = &codepages::to_lossy_bytes(&self.msg);
         if msg.len() > 63 {
             return Err(EncodableError::WrongSize(
                 "Mst only supports upto 63 byte long messages".into(),
             ));
         }
-        msg.encode(buf, Some(insim_core::ser::Limit::Bytes(63)))?;
-        // last byte must be zero
-        if msg.len() < 64 {
-            buf.put_bytes(0, 64 - msg.len());
-        }
 
+        let padding = 64 - msg.len();
+        buf.extend_from_slice(msg);
+
+        if padding > 0 {
+            buf.put_bytes(0, padding);
+        }
         Ok(())
     }
 }

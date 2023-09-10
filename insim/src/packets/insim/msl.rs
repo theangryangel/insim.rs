@@ -50,16 +50,18 @@ impl Encodable for Msl {
         self.reqi.encode(buf, None)?;
         self.sound.encode(buf, None)?;
 
-        let msg = codepages::to_lossy_bytes(&self.msg);
+        let msg: &[u8] = &codepages::to_lossy_bytes(&self.msg);
         if msg.len() > 127 {
             return Err(EncodableError::WrongSize(
                 "Msx only supports upto 127 byte long messages".into(),
             ));
         }
-        msg.encode(buf, Some(insim_core::ser::Limit::Bytes(127)))?;
+
         // last byte must be zero
-        if msg.len() < 128 {
-            buf.put_bytes(0, 128 - msg.len());
+        let padding = 128 - msg.len();
+        buf.extend_from_slice(msg);
+        if padding > 0 {
+            buf.put_bytes(0, padding);
         }
 
         Ok(())
