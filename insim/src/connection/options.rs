@@ -149,6 +149,7 @@ impl ConnectionOptions {
                 wait_for_initial_pong,
             } => {
                 let stream = timeout(timeout_duration, TcpStream::connect(remote)).await??;
+                stream.set_nodelay(true)?;
 
                 let mut stream = crate::tcp::Tcp::new(stream, *codec_mode);
                 let mut isi = self.as_isi();
@@ -207,6 +208,7 @@ impl ConnectionOptions {
                     TcpStream::connect("isrelay.lfs.net:47474"),
                 )
                 .await??;
+                stream.set_nodelay(true)?;
 
                 let mut stream = crate::tcp::Tcp::new(
                     stream,

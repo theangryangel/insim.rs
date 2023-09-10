@@ -1,9 +1,11 @@
 mod event;
+mod identifier;
 mod inner;
 mod network_options;
 mod options;
 
 pub use event::Event;
+pub use identifier::ConnectionIdentifier;
 pub use options::ConnectionOptions;
 
 use crate::{
@@ -16,6 +18,8 @@ use crate::{
 };
 
 pub struct Connection {
+    id: Option<ConnectionIdentifier>,
+
     options: ConnectionOptions,
     inner: Option<ConnectionInner>,
     shutdown: bool,
@@ -24,8 +28,9 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub fn new(options: ConnectionOptions) -> Self {
+    pub fn new<I: Into<Option<ConnectionIdentifier>>>(options: ConnectionOptions, id: I) -> Self {
         Self {
+            id: id.into(),
             inner: None,
             options,
             shutdown: false,
@@ -62,7 +67,7 @@ impl Connection {
             let stream = self.options.connect().await?;
 
             self.inner = Some(stream);
-            return Ok(Event::Connected);
+            return Ok(Event::Connected(self.id));
         }
 
         match self.poll_inner().await {
@@ -79,7 +84,7 @@ impl Connection {
 
         tokio::select! {
             _ = self.shutdown_notify.notified() => {
-                Ok(Event::Shutdown)
+                Ok(Event::Shutdown(self.id))
             },
 
             packet = stream.read() => {
@@ -89,7 +94,7 @@ impl Connection {
                 if packet.is_error() {
                     Err(packet.into())
                 } else {
-                    Ok(Event::Data(packet))
+                    Ok(Event::Data(packet, self.id))
                 }
             },
         }
