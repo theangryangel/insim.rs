@@ -6,13 +6,13 @@ use crate::codec::Mode;
 pub enum NetworkOptions {
     Tcp {
         remote: SocketAddr,
-        codec_mode: Mode,
+        mode: Mode,
         verify_version: bool,
     },
     Udp {
         local: Option<SocketAddr>,
         remote: SocketAddr,
-        codec_mode: Mode,
+        mode: Mode,
         verify_version: bool,
     },
     Relay {
@@ -26,7 +26,7 @@ impl Default for NetworkOptions {
     fn default() -> Self {
         Self::Tcp {
             remote: "127.0.0.1:29999".parse().unwrap(),
-            codec_mode: Mode::Compressed,
+            mode: Mode::Compressed,
             verify_version: true,
         }
     }

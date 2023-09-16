@@ -2,9 +2,12 @@ use bytes::{BytesMut, BufMut, Buf};
 use insim_core::{Encodable, Decodable};
 use crate::result::Result;
 
+use super::Mode;
+
 pub trait Codec {
     type Item: super::Packets;
 
+    fn new(mode: Mode) -> Self;
     fn set_mode(&mut self, mode: crate::codec::Mode);
     fn mode(&self) -> crate::codec::Mode;
 

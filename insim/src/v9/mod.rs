@@ -217,6 +217,12 @@ pub struct Codec {
 impl codec::Codec for Codec {
     type Item = Packet;
 
+    fn new(mode: codec::Mode) -> Self {
+        Self {
+            mode
+        }
+    }
+
     fn mode(&self) -> codec::Mode {
         self.mode
     }

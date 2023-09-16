@@ -4,107 +4,126 @@ mod inner;
 mod network_options;
 mod options;
 
-use std::{net::SocketAddr, time::Duration};
+use std::{net::{SocketAddr}, time::Duration, marker::PhantomData};
 
 pub use event::Event;
 pub use identifier::ConnectionIdentifier;
 pub use options::ConnectionOptions;
-use tokio::{time::timeout, net::TcpStream};
+use tokio::{time::timeout, net::{TcpStream, UdpSocket}};
 
 use crate::{
     connection::inner::ConnectionInner,
     error::Error,
-    result::Result, codec::{Codec, Mode}, network::{Network, Framed},
+    result::Result, codec::{Codec, Mode}, network::{Network, Framed}, relay::HostSelect,
 };
 
 use self::network_options::NetworkOptions;
 
-pub fn relay<
-    C: Codec,
-    H: Into<Option<String>>, 
-    P: Into<Option<String>>
-> (
-    select_host: H,
-    websocket: bool,
-    spectator_password: P,
-) -> Connection<C, Framed<C, TcpStream>> {
-    let network_options = NetworkOptions::Relay {
-        select_host: select_host.into(),
-        spectator_password: spectator_password.into(),
-        websocket,
-    };
-    Connection<C, Framed {
-
-        codec: C,
-    }
-}
-
-pub struct Connection<C: Codec, N: Network> {
+pub struct Connection<C: Codec> {
     id: Option<ConnectionIdentifier>,
 
-    codec: C,
     network_options: NetworkOptions,
-    inner: Option<Framed<C, N>>,
+    inner: Option<ConnectionInner<C>>,
     shutdown: bool,
 
     shutdown_notify: tokio::sync::Notify,
 }
 
-impl<C: Codec, N: Network> Connection<C, N> {
-
-
-    pub fn tcp<R: Into<SocketAddr>>(
-        mut self,
+impl<C: Codec> Connection<C> {
+    pub fn tcp<
+        R: Into<SocketAddr>
+    >(
+        mode: Mode,
         remote: R,
-        codec_mode: Mode,
         verify_version: bool,
     ) -> Self {
-        self.network_options = NetworkOptions::Tcp {
-            remote: remote.into(),
-            codec_mode,
-            verify_version,
-        };
-        self
+        Connection {
+            id: None,
+            inner: None,
+            network_options: NetworkOptions::Tcp {
+                remote: remote.into(),
+                verify_version,
+                mode,
+            },
+            shutdown: false,
+            shutdown_notify: tokio::sync::Notify::new(),
+        }
     }
 
-    pub fn udp<L: Into<Option<SocketAddr>>, R: Into<SocketAddr>>(
-        mut self,
+    pub fn udp<
+        L: Into<Option<SocketAddr>>,
+        R: Into<SocketAddr>
+    >(
         local: L,
         remote: R,
-        codec_mode: Mode,
+        mode: Mode,
         verify_version: bool,
     ) -> Self {
-        self.network_options = NetworkOptions::Udp {
-            local: local.into(),
-            remote: remote.into(),
-            codec_mode,
-            verify_version,
-        };
-        self
+        Connection {
+            id: None,
+            inner: None,
+            network_options: NetworkOptions::Udp {
+                local: local.into(),
+                remote: remote.into(),
+                verify_version,
+                mode,
+            },
+            shutdown: false,
+            shutdown_notify: tokio::sync::Notify::new(),
+        }
     }
 
+    pub fn relay<
+        H: Into<Option<String>>, 
+        P: Into<Option<String>>
+    > (
+        select_host: H,
+        websocket: bool,
+        spectator_password: P,
+    ) -> Self {
+        Connection {
+            id: None,
+            inner: None,
+            network_options: NetworkOptions::Relay { 
+                select_host: select_host.into(), 
+                spectator_password: spectator_password.into(), 
+                websocket
+            },
+            shutdown: false,
+            shutdown_notify: tokio::sync::Notify::new(),
+        }
+    }
+
+
     pub(crate) async fn connect(
-        &self, mut codec: C,
+        &mut self,
     ) -> Result<ConnectionInner<C>> {
         let timeout_duration = Duration::from_secs(90);
 
         match &self.network_options {
             NetworkOptions::Tcp {
-                remote, ..
+                remote, mode, ..
             } => {
                 let stream = timeout(timeout_duration, tokio::net::TcpStream::connect(remote)).await??;
                 stream.set_nodelay(true)?;
-                Ok(ConnectionInner::Tcp(Framed::new(stream, codec)))
+                let codec = C::new(*mode);
+                return Ok(
+                    ConnectionInner::Tcp(Framed::new(stream, codec))
+                );
             }
             NetworkOptions::Udp {
                 local,
-                remote, ..
+                remote, 
+                mode,
+                ..
             } => {
                 let local = local.unwrap_or("0.0.0.0:0".parse()?);
 
                 let stream = tokio::net::UdpSocket::bind(local).await?;
                 stream.connect(remote).await.unwrap();
-                Ok(ConnectionInner::Udp(Framed::new(stream, codec)))
+                return Ok(ConnectionInner::Udp(
+                    Framed::new(stream, C::new(*mode))
+                ));
             }
             NetworkOptions::Relay {
                 select_host,
@@ -117,9 +136,12 @@ impl<C: Codec, N: Network> Connection<C, N> {
                 )
                 .await??;
                 stream.set_nodelay(true)?;
-                codec.set_mode(crate::codec::Mode::Uncompressed);
 
-                Ok(ConnectionInner::Tcp(Framed::new(stream, codec)))
+                return Ok(
+                    ConnectionInner::Tcp(
+                        Framed::new(stream, C::new(Mode::Uncompressed))
+                    )
+                );
 
                 // if let Some(hostname) = select_host {
                 //     stream
@@ -148,40 +170,28 @@ impl<C: Codec, N: Network> Connection<C, N> {
             } => {
 
                 let stream = crate::network::websocket::connect_to_relay().await?;
-                codec.set_mode(crate::codec::Mode::Uncompressed);
 
-                Ok(ConnectionInner::WebSocket(Framed::new(stream, codec)))
+                let stream = ConnectionInner::WebSocket(
+                    Framed::new(stream, C::new(Mode::Uncompressed))
+                );
 
-                // if let Some(hostname) = select_host {
-                //     stream
-                //         .write(
-                //             HostSelect {
-                //                 hname: hostname.to_string(),
-                //                 admin: self.password.clone(),
-                //                 spec: match spectator_password {
-                //                     None => "".into(),
-                //                     Some(i) => i.clone(),
-                //                 },
-                //                 ..Default::default()
-                //             }
-                //             .into(),
-                //         )
-                //         .await?;
-                // }
-                //
-                // Ok(ConnectionInner::WebSocket(stream))
+                if let Some(hostname) = select_host {
+
+                    let packet: C::Item = HostSelect {
+                        hname: hostname.to_string(),
+                        admin: "".into(),
+                        spec: match spectator_password {
+                            None => "".into(),
+                            Some(i) => i.clone(),
+                        },
+                        ..Default::default()
+                    }.into();
+
+                    stream.write(packet).await?;
+                }
+
+                Ok(stream)
             }
-        }
-    }
-
-
-    pub fn new<I: Into<Option<ConnectionIdentifier>>>(network_options: NetworkOptions, id: I) -> Self {
-        Self {
-            id: id.into(),
-            inner: None,
-            network_options,
-            shutdown: false,
-            shutdown_notify: tokio::sync::Notify::new(),
         }
     }
 
@@ -211,9 +221,7 @@ impl<C: Codec, N: Network> Connection<C, N> {
         }
 
         if self.inner.is_none() {
-            let stream = self.connect().await?;
-
-            self.inner = Some(stream);
+            self.inner = Some(self.connect().await?);
             return Ok(Event::Connected(self.id));
         }
 
