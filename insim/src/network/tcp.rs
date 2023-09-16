@@ -2,10 +2,10 @@ use bytes::{BytesMut, Bytes};
 use tokio::{net::TcpStream, io::AsyncWriteExt};
 use crate::{error::Error, result::Result};
 
-use super::transport::Transport;
+use super::Network;
 
 #[async_trait::async_trait]
-impl Transport for TcpStream {
+impl Network for TcpStream {
     async fn try_read_bytes(&mut self, buf: &mut BytesMut) -> Result<usize> {
         loop {
             self.readable().await?;

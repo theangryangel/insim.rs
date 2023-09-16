@@ -1,12 +1,9 @@
-use std::fmt::Debug;
-
 use bytes::{BytesMut, BufMut, Buf};
 use insim_core::{Encodable, Decodable};
 use crate::result::Result;
 
 pub trait Codec {
-    type Item: Encodable + Decodable + Debug + Sized;
-    const VERSION: u8 = 0;
+    type Item: super::Packets;
 
     fn mode(&self) -> crate::codec::Mode;
 
@@ -57,25 +54,6 @@ pub trait Codec {
                 tracing::error!("unhandled error: {:?}, data: {:?}", e, data);
                 Err(e.into())
             }
-        }
-    }
-}
-
-pub mod v9 {
-
-    pub use crate::packets::Packet;
-    pub use crate::packets::{insim, relay};
-
-    pub struct Codec {
-        pub mode: crate::codec::Mode,
-    }
-
-    impl super::Codec for Codec {
-        type Item = Packet;
-        const VERSION: u8 = 9;
-
-        fn mode(&self) -> crate::codec::Mode {
-            self.mode
         }
     }
 }

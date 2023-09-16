@@ -1,29 +1,30 @@
-use bytes::{BytesMut, Bytes};
+use std::time::Duration;
+use tokio::time;
+
+use bytes::BytesMut;
 use if_chain::if_chain;
-use insim_core::{Encodable, Decodable};
-use crate::{error::Error, result::Result};
+use crate::{error::Error, result::Result, codec::Packets};
 
-pub mod codec;
-pub mod transport;
-pub mod tcp;
-pub mod websocket;
+use crate::{
+    network::Network, codec::Codec
+};
 
-pub struct Framed<C, I>
+pub struct Framed<C, N>
 where
-    C: codec::Codec,
-    I: transport::Transport,
+    C: Codec,
+    N: Network,
 {
-    inner: I,
+    inner: N,
     codec: C,
     buffer: BytesMut,
 }
 
-impl<C, I> Framed<C, I>
+impl<C, N> Framed<C, N>
 where
-    C: codec::Codec,
-    I: transport::Transport,
+    C: Codec,
+    N: Network,
 {
-    pub fn new(inner: I, codec: C) -> Self {
+    pub fn new(inner: N, codec: C) -> Self {
         let buffer = BytesMut::new();
 
         Self {
@@ -33,8 +34,15 @@ where
         }
     }
 
-    pub fn version(&self) -> u8 {
-        C::VERSION
+    pub async fn handshake(
+        &mut self, 
+        isi: C::Item,
+        timeout: Duration,
+    ) -> Result<()> {
+        time::timeout(
+            timeout, 
+            self.write(isi)
+        ).await?
     }
 
     pub async fn read(&mut self) -> Result<C::Item> {
@@ -43,6 +51,15 @@ where
                 if !self.buffer.is_empty();
                 if let Some(packet) = self.codec.decode(&mut self.buffer)?;
                 then {
+                    // maybe verify version
+                    packet.maybe_verify_version()?;
+
+                    // keepalive
+                    if packet.is_ping() {
+                        tracing::debug!("ping? pong!");
+                        self.write(<C::Item>::pong(None)).await?;
+                    }
+
                     return Ok(packet);
                 }
             }

@@ -1,18 +1,16 @@
 //! Insim and Insim Relay Packet definitions
+use insim_core::identifiers::RequestId;
 use insim_core::prelude::*;
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
-mod macros;
 
 /// Insim packet definitions
 pub mod insim;
 
-/// Relay packet definitions
-pub mod relay;
+const VERSION: u8 = 9;
 
-/// This Insim protocol version number
-pub const VERSION: u8 = 9;
+use crate::relay;
 
 #[derive(InsimEncode, InsimDecode, Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -179,6 +177,48 @@ crate::impl_packet_from! {
 impl Packet {
     pub fn is_error(&self) -> bool {
         matches!(self, Self::RelayError(_))
+    }
+}
+
+use crate::codec;
+
+impl codec::Packets for Packet {
+    fn is_ping(&self) -> bool {
+        matches!(self, Packet::Tiny(_))
+    }
+
+    fn pong(reqi: Option<RequestId>) -> Self {
+        insim::Tiny {
+            reqi: reqi.unwrap_or(RequestId(0)),
+            subt: insim::TinyType::None,
+        }.into()
+    }
+
+    fn maybe_verify_version(&self) -> crate::result::Result<bool> {
+        match self {
+            Packet::Version(insim::Version { insimver, .. }) => {
+                if *insimver != VERSION {
+                    return Err(crate::error::Error::IncompatibleVersion(*insimver));
+                }
+
+                Ok(true)
+            }, 
+            _ => {
+                return Ok(false)
+            }
+        }
+    }
+}
+
+pub struct Codec {
+    pub mode: codec::Mode,
+}
+
+impl codec::Codec for Codec {
+    type Item = Packet;
+
+    fn mode(&self) -> codec::Mode {
+        self.mode
     }
 }
 

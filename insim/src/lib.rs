@@ -3,16 +3,16 @@
 pub mod codec;
 // pub mod connection;
 pub mod error;
-pub mod packets;
+pub mod v9;
 pub mod result;
+pub mod network;
 
-pub mod framed;
+#[doc(hidden)]
+pub mod macros;
 
-pub mod tcp;
-pub mod tools;
-pub mod traits;
-pub mod udp;
-pub mod websocket;
+pub mod relay;
+
+// pub mod tools;
 
 #[doc(hidden)]
 /// Rexport insim_core

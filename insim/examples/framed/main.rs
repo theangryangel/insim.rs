@@ -2,14 +2,11 @@
 //! In this example you are 100% responsible for managing the state of the connection,
 //! providing the initial stream/udpsocket, sending keepalive packets, etc.
 use clap::{Parser, Subcommand};
-use if_chain::if_chain;
 use insim::{
-    packets,
     result::Result,
-    traits::{ReadPacket, ReadWritePacket, WritePacket}, framed::Framed,
+    network::Framed,
 };
 use std::{net::SocketAddr, time::Duration};
-use tokio::net::{TcpStream, UdpSocket};
 
 fn setup_tracing_subscriber() {
     // setup tracing with some defaults if nothing is set
@@ -71,11 +68,11 @@ pub async fn main() -> Result<()> {
     setup_tracing_subscriber();
 
     // let stream = TcpStream::connect("isrelay.lfs.net:47474").await?;
-    let stream = insim::framed::websocket::connect_to_relay().await?;
+    let stream = insim::network::websocket::connect_to_relay().await?;
 
     tracing::info!("Connected to LFSW Relay. Creating client");
 
-    use insim::framed::codec::v9;
+    use insim::{v9, relay};
 
     let codec = v9::Codec { 
         mode: insim::codec::Mode::Uncompressed 
@@ -85,7 +82,6 @@ pub async fn main() -> Result<()> {
 
     let isi = v9::insim::Isi {
         iname: "insim.rs".into(),
-        version: client.version(),
         flags: v9::insim::IsiFlags::MCI
             | v9::insim::IsiFlags::CON
             | v9::insim::IsiFlags::OBH,
@@ -98,7 +94,7 @@ pub async fn main() -> Result<()> {
     client.write(isi).await?;
 
     tracing::info!("Sending HLR");
-    let hlr = v9::relay::HostListRequest::default();
+    let hlr = relay::HostListRequest::default();
     client.write(hlr).await?;
 
     tracing::info!("Connected!");

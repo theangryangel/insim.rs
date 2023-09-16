@@ -68,9 +68,6 @@ pub struct Isi {
     /// Options for the Insim Connection. See [IsiFlags] for more information.
     pub flags: IsiFlags,
 
-    /// Protocol version of Insim you wish to use.
-    pub version: u8,
-
     /// Messages typed with this prefix will be sent to your InSim program
     /// on the host (in IS_MSO) and not displayed on anyone's screen.
     /// This should be a single ascii character. i.e. '!'.
@@ -108,7 +105,9 @@ impl Encodable for Isi {
         self.udpport.encode(buf, None)?;
         self.flags.encode(buf, None)?;
 
-        self.version.encode(buf, None)?;
+        // version
+        (super::super::VERSION).encode(buf, None)?;
+
         (self.prefix as u8).encode(buf, None)?;
         (self.interval.as_millis() as u16).encode(buf, None)?;
 
@@ -142,7 +141,6 @@ impl Decodable for Isi {
         data.udpport = u16::decode(buf, None)?;
         data.flags = IsiFlags::decode(buf, None)?;
 
-        data.version = u8::decode(buf, None)?;
         data.prefix = u8::decode(buf, None)? as char;
         data.interval = Duration::from_millis(u16::decode(buf, None)?.into());
 
@@ -152,3 +150,5 @@ impl Decodable for Isi {
         Ok(data)
     }
 }
+
+impl crate::codec::Init for Isi {}
