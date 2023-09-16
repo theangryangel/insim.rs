@@ -6,7 +6,7 @@ use if_chain::if_chain;
 use insim::{
     packets,
     result::Result,
-    traits::{ReadPacket, ReadWritePacket, WritePacket},
+    traits::{ReadPacket, ReadWritePacket, WritePacket}, framed::Framed,
 };
 use std::{net::SocketAddr, time::Duration};
 use tokio::net::{TcpStream, UdpSocket};
@@ -70,18 +70,18 @@ pub async fn main() -> Result<()> {
     // Setup tracing_subcriber with some sane defaults
     setup_tracing_subscriber();
 
-    let stream = TcpStream::connect("isrelay.lfs.net:47474").await?;
+    // let stream = TcpStream::connect("isrelay.lfs.net:47474").await?;
+    let stream = insim::framed::websocket::connect_to_relay().await?;
 
     tracing::info!("Connected to LFSW Relay. Creating client");
 
     use insim::framed::codec::v9;
-    use insim::framed::transport::IntoFramed;
 
     let codec = v9::Codec { 
         mode: insim::codec::Mode::Uncompressed 
     };
 
-    let mut client = Into::<insim::framed::tcp::Tcp>::into(stream).into_framed(codec);
+    let mut client = Framed::new(stream, codec);
 
     let isi = v9::insim::Isi {
         iname: "insim.rs".into(),

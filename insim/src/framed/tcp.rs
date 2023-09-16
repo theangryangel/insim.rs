@@ -2,19 +2,15 @@ use bytes::{BytesMut, Bytes};
 use tokio::{net::TcpStream, io::AsyncWriteExt};
 use crate::{error::Error, result::Result};
 
-use super::transport::{Transport, IntoFramed};
-
-pub struct Tcp {
-    pub inner: TcpStream
-}
+use super::transport::Transport;
 
 #[async_trait::async_trait]
-impl Transport for Tcp {
-    async fn read(&mut self, buf: &mut BytesMut) -> Result<usize> {
+impl Transport for TcpStream {
+    async fn try_read_bytes(&mut self, buf: &mut BytesMut) -> Result<usize> {
         loop {
-            self.inner.readable().await?;
+            self.readable().await?;
 
-            match self.inner.try_read_buf(buf) {
+            match self.try_read_buf(buf) {
                 Ok(0) => {
                     return Err(Error::Disconnected);
                 }
@@ -32,16 +28,23 @@ impl Transport for Tcp {
 
     }
 
-    async fn write(&mut self, src: &mut BytesMut) -> Result<()> {
-        self.inner.write_buf(src).await?;
-        Ok(())
-    }
-}
+    async fn try_write_bytes(&mut self, src: &[u8]) -> Result<usize> {
 
-impl IntoFramed for Tcp {}
+        loop {
+            self.writable().await?;
 
-impl From<TcpStream> for Tcp {
-    fn from(inner: TcpStream) -> Self {
-        Self { inner }
+            match self.try_write(src) {
+                Ok(n) => {
+                    return Ok(n);
+                }
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    continue
+                }
+                Err(e) => {
+                    return Err(e.into());
+                }
+            }
+        }
+
     }
 }

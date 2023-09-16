@@ -6,6 +6,7 @@ use crate::{error::Error, result::Result};
 pub mod codec;
 pub mod transport;
 pub mod tcp;
+pub mod websocket;
 
 pub struct Framed<C, I>
 where
@@ -46,7 +47,7 @@ where
                 }
             }
 
-            match self.inner.read(&mut self.buffer).await {
+            match self.inner.try_read_bytes(&mut self.buffer).await {
                 Ok(0) => {
                     // The remote closed the connection. For this to be a clean
                     // shutdown, there should be no data in the read buffer. If
@@ -77,7 +78,7 @@ where
 
         self.codec.encode(&packet.into(), &mut buf)?;
         if !buf.is_empty() {
-            self.inner.write(&mut buf).await?;
+            self.inner.try_write_bytes(&buf).await?;
         }
 
         Ok(())

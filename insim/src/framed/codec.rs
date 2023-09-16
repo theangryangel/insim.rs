@@ -1,12 +1,11 @@
 use std::fmt::Debug;
 
-use bytes::{BytesMut, Bytes, BufMut, Buf};
-use if_chain::if_chain;
+use bytes::{BytesMut, BufMut, Buf};
 use insim_core::{Encodable, Decodable};
-use crate::{error::Error, result::Result};
+use crate::result::Result;
 
 pub trait Codec {
-    type Item: Encodable + Decodable + Debug;
+    type Item: Encodable + Decodable + Debug + Sized;
     const VERSION: u8 = 0;
 
     fn mode(&self) -> crate::codec::Mode;
