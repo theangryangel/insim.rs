@@ -1,7 +1,8 @@
+use tokio::net::{TcpStream, UdpSocket};
+
 use crate::{
-    packets::Packet,
     result::Result,
-    traits::{ReadPacket, ReadWritePacket, WritePacket},
+    codec::Codec, network::{Framed, websocket::TungsteniteWebSocket},
 };
 
 // The "Inner" connection for Connection, so that we can avoid Box'ing
@@ -9,26 +10,22 @@ use crate::{
 // I think this fine.
 // i.e. if we add a Websocket option down the line, then ConnectionOptions needs to understand it
 // therefore we cannot just box stuff magically anyway.
-pub(crate) enum ConnectionInner {
-    Tcp(crate::tcp::Tcp),
-    Udp(crate::udp::Udp),
-    WebSocket(crate::websocket::WebSocket),
+pub(crate) enum ConnectionInner<C: Codec> {
+    Tcp(Framed<C, TcpStream>),
+    Udp(Framed<C, UdpSocket>),
+    WebSocket(Framed<C, TungsteniteWebSocket>),
 }
 
-#[async_trait::async_trait]
-impl ReadPacket for ConnectionInner {
-    async fn read(&mut self) -> Result<Packet> {
+impl<C: Codec> ConnectionInner<C> {
+    pub async fn read(&mut self) -> Result<C::Item> {
         match self {
             Self::Tcp(i) => i.read().await,
             Self::Udp(i) => i.read().await,
             Self::WebSocket(i) => i.read().await,
         }
     }
-}
 
-#[async_trait::async_trait]
-impl WritePacket for ConnectionInner {
-    async fn write(&mut self, packet: Packet) -> Result<()> {
+    pub async fn write<P: Into<C::Item>>(&mut self, packet: P) -> Result<()> {
         match self {
             Self::Tcp(i) => i.write(packet).await,
             Self::Udp(i) => i.write(packet).await,
@@ -36,5 +33,3 @@ impl WritePacket for ConnectionInner {
         }
     }
 }
-
-impl ReadWritePacket for ConnectionInner {}

@@ -8,14 +8,12 @@ pub enum NetworkOptions {
         remote: SocketAddr,
         codec_mode: Mode,
         verify_version: bool,
-        wait_for_initial_pong: bool,
     },
     Udp {
         local: Option<SocketAddr>,
         remote: SocketAddr,
         codec_mode: Mode,
         verify_version: bool,
-        wait_for_initial_pong: bool,
     },
     Relay {
         select_host: Option<String>,
@@ -30,7 +28,6 @@ impl Default for NetworkOptions {
             remote: "127.0.0.1:29999".parse().unwrap(),
             codec_mode: Mode::Compressed,
             verify_version: true,
-            wait_for_initial_pong: true,
         }
     }
 }

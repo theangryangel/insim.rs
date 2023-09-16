@@ -1,11 +1,11 @@
 #![doc = include_str!("../README.md")]
 
 pub mod codec;
-// pub mod connection;
 pub mod error;
 pub mod v9;
 pub mod result;
 pub mod network;
+pub mod connection;
 
 #[doc(hidden)]
 pub mod macros;

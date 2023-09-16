@@ -3,6 +3,7 @@ use tokio::time;
 
 use bytes::BytesMut;
 use if_chain::if_chain;
+use crate::codec::Init;
 use crate::{error::Error, result::Result, codec::Packets};
 
 use crate::{
@@ -17,6 +18,8 @@ where
     inner: N,
     codec: C,
     buffer: BytesMut,
+
+    verify_version: bool,
 }
 
 impl<C, N> Framed<C, N>
@@ -30,13 +33,18 @@ where
         Self {
             inner,
             codec,
-            buffer,           
+            buffer,
+            verify_version: false
         }
     }
 
-    pub async fn handshake(
+    pub fn set_verify_version(&mut self, verify_version: bool) {
+        self.verify_version = verify_version;
+    }
+
+    pub async fn handshake<I: Into<C::Item> + Init>(
         &mut self, 
-        isi: C::Item,
+        isi: I,
         timeout: Duration,
     ) -> Result<()> {
         time::timeout(
@@ -51,8 +59,10 @@ where
                 if !self.buffer.is_empty();
                 if let Some(packet) = self.codec.decode(&mut self.buffer)?;
                 then {
-                    // maybe verify version
-                    packet.maybe_verify_version()?;
+                    if self.verify_version {
+                        // maybe verify version
+                        packet.maybe_verify_version()?;
+                    }
 
                     // keepalive
                     if packet.is_ping() {

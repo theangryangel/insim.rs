@@ -5,6 +5,7 @@ use crate::result::Result;
 pub trait Codec {
     type Item: super::Packets;
 
+    fn set_mode(&mut self, mode: crate::codec::Mode);
     fn mode(&self) -> crate::codec::Mode;
 
     fn encode(&self, msg: &Self::Item, dst: &mut BytesMut) -> Result<()> {

@@ -220,6 +220,10 @@ impl codec::Codec for Codec {
     fn mode(&self) -> codec::Mode {
         self.mode
     }
+
+    fn set_mode(&mut self, mode: codec::Mode) {
+        self.mode = mode;
+    }
 }
 
 #[cfg(test)]
