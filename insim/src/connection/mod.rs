@@ -92,6 +92,14 @@ impl<P: Packets + std::convert::From<HostSelect>> Connection<P> {
         }
     }
 
+    pub fn isi(&self) -> &P::Init {
+        &self.isi
+    }
+
+    pub fn isi_mut(&mut self) -> &mut P::Init {
+        &mut self.isi
+    }
+
     pub(crate) async fn connect(&mut self) -> Result<FramedWrapped<P>> {
         let timeout_duration = Duration::from_secs(90);
 
