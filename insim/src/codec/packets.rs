@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use insim_core::{Encodable, Decodable, identifiers::RequestId};
 use crate::result::Result;
 
-pub trait Packets: Encodable + Decodable + Debug + Clone + Sized {
+pub trait Packets: Encodable + Decodable + Debug + Clone + Sized + Send + Sync {
     fn is_ping(&self) -> bool;
 
     /// Create a pong
@@ -12,4 +12,4 @@ pub trait Packets: Encodable + Decodable + Debug + Clone + Sized {
     fn maybe_verify_version(&self) -> Result<bool>;
 }
 
-pub trait Init: Encodable + Decodable + Debug + Clone + Sized {}
+pub trait Init: Encodable + Decodable + Debug + Clone + Sized + Send + Sync {}

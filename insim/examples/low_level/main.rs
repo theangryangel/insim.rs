@@ -4,9 +4,11 @@
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
 use insim::{
-    packets,
     result::Result,
-    traits::{ReadPacket, ReadWritePacket, WritePacket},
+    relay,
+    v9::{Packet, insim::{Isi, IsiFlags, Tiny, TinyType}}, 
+    network::{Framed, websocket::TungsteniteWebSocket, FramedWrapped}, 
+    codec::{Codec, Mode},
 };
 use std::{net::SocketAddr, time::Duration};
 use tokio::net::{TcpStream, UdpSocket};
@@ -72,52 +74,51 @@ pub async fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
-    let mut isi = packets::insim::Isi {
+    let mut isi = Isi {
         iname: "insim.rs".into(),
-        version: packets::VERSION,
-        flags: packets::insim::IsiFlags::MCI
-            | packets::insim::IsiFlags::CON
-            | packets::insim::IsiFlags::OBH,
+        flags: IsiFlags::MCI
+            | IsiFlags::CON
+            | IsiFlags::OBH,
         interval: Duration::from_millis(1000),
         ..Default::default()
     };
 
-    let mut client = match &cli.command {
+    let mut client: FramedWrapped<Packet> = match &cli.command {
         Commands::Udp { bind, addr } => {
             let local = bind.unwrap_or("0.0.0.0:0".parse()?);
             let stream = UdpSocket::bind(local).await.unwrap();
             isi.udpport = stream.local_addr().unwrap().port().into();
             stream.connect(addr).await.unwrap();
 
-            insim::udp::Udp::new(stream, insim::codec::Mode::Compressed).boxed()
+            FramedWrapped::Udp(Framed::new(stream, Codec::new(Mode::Compressed)))
         }
         Commands::Tcp { addr } => {
             let stream = TcpStream::connect(addr).await?;
 
             tracing::info!("Connected to server. Creating client");
 
-            insim::tcp::Tcp::new(stream, insim::codec::Mode::Compressed).boxed()
+            FramedWrapped::Tcp(Framed::new(stream, Codec::new(Mode::Compressed)))
         }
         Commands::Relay { .. } => {
             let stream = TcpStream::connect("isrelay.lfs.net:47474").await?;
 
             tracing::info!("Connected to LFSW Relay. Creating client");
 
-            insim::tcp::Tcp::new(stream, insim::codec::Mode::Uncompressed).boxed()
+            FramedWrapped::Tcp(Framed::new(stream, Codec::new(Mode::Uncompressed)))
         }
     };
 
     tracing::info!("Sending ISI");
 
-    client.write(isi.into()).await?;
+    client.write(isi).await?;
 
     if let Commands::Relay {
         list_hosts: true, ..
     } = &cli.command
     {
         tracing::info!("Sending HLR");
-        let hlr = packets::relay::HostListRequest::default();
-        client.write(hlr.into()).await?;
+        let hlr = relay::HostListRequest::default();
+        client.write(hlr).await?;
     }
 
     if let Commands::Relay {
@@ -126,11 +127,11 @@ pub async fn main() -> Result<()> {
     } = &cli.command
     {
         tracing::info!("Sending HS");
-        let hs = packets::relay::HostSelect {
+        let hs = relay::HostSelect {
             hname: hname.into(),
             ..Default::default()
         };
-        client.write(hs.into()).await?;
+        client.write(hs).await?;
     }
 
     tracing::info!("Connected!");
@@ -140,33 +141,12 @@ pub async fn main() -> Result<()> {
     loop {
         let m = client.read().await?;
 
-        if m.is_error() {
-            // Certain packets can be considered as errors
-            // When using lower level API it's your responsibility to handle this
-            return Err(m.into());
-        }
-
         i += 1;
 
         tracing::info!("Packet={:?} Index={:?}", m, i);
 
         if_chain! {
-            if let packets::Packet::Tiny(i) = &m;
-            if i.is_keepalive();
-            then {
-                let pong = packets::insim::Tiny{
-                    subt: packets::insim::TinyType::None,
-                    ..Default::default()
-                };
-
-                client.write(pong.into()).await?;
-
-                println!("ping? pong!");
-            }
-        }
-
-        if_chain! {
-            if let packets::Packet::RelayHostList(i) = &m;
+            if let Packet::RelayHostList(i) = &m;
             if i.is_last();
             then {
                 break;

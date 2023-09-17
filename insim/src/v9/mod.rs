@@ -210,28 +210,6 @@ impl codec::Packets for Packet {
     }
 }
 
-pub struct Codec {
-    pub mode: codec::Mode,
-}
-
-impl codec::Codec for Codec {
-    type Item = Packet;
-
-    fn new(mode: codec::Mode) -> Self {
-        Self {
-            mode
-        }
-    }
-
-    fn mode(&self) -> codec::Mode {
-        self.mode
-    }
-
-    fn set_mode(&mut self, mode: codec::Mode) {
-        self.mode = mode;
-    }
-}
-
 #[cfg(test)]
 mod tests {
     // The majority of packet conversions are tested through insim_core.

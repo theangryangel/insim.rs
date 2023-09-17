@@ -72,11 +72,9 @@ pub async fn main() -> Result<()> {
 
     tracing::info!("Connected to LFSW Relay. Creating client");
 
-    use insim::{v9, relay};
+    use insim::{v9, relay, codec::Codec, codec::Mode};
 
-    let codec = v9::Codec { 
-        mode: insim::codec::Mode::Uncompressed 
-    };
+    let codec = Codec::<v9::Packet>::new(Mode::Uncompressed);
 
     let mut client = Framed::new(stream, codec);
 

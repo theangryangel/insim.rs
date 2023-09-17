@@ -7,7 +7,7 @@ use if_chain::if_chain;
 use insim::{
     connection::{Connection, Event},
     relay::HostListRequest,
-    result::Result, v9::{Codec, Packet},
+    result::Result, v9::{Packet},
 };
 use std::net::SocketAddr;
 
@@ -79,7 +79,7 @@ pub async fn main() -> Result<()> {
     // Parse our command line arguments, using clap
     let cli = Cli::parse();
 
-    let mut client: Connection<Codec> = match &cli.command {
+    let mut client: Connection<Packet> = match &cli.command {
         Commands::Udp { bind, addr } => {
             // if the local binding address is not provided, we let the OS decide a port to use
             let local = bind.unwrap_or("0.0.0.0:0".parse()?);

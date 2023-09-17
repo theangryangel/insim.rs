@@ -1,17 +1,29 @@
+use std::marker::PhantomData;
+
 use bytes::{BytesMut, BufMut, Buf};
 use insim_core::{Encodable, Decodable};
 use crate::result::Result;
 
-use super::Mode;
+use super::{Mode, Packets};
 
-pub trait Codec {
-    type Item: super::Packets;
+pub struct Codec<P: Packets> {
+    mode: Mode,
+    marker: PhantomData<P>
+}
 
-    fn new(mode: Mode) -> Self;
-    fn set_mode(&mut self, mode: crate::codec::Mode);
-    fn mode(&self) -> crate::codec::Mode;
+impl<P: Packets> Codec<P> {
+    pub fn new(mode: Mode) -> Self {
+        Self {
+            mode,
+            marker: PhantomData
+        }
+    }
 
-    fn encode(&self, msg: &Self::Item, dst: &mut BytesMut) -> Result<()> {
+    pub fn mode(&self) -> crate::codec::Mode {
+        self.mode
+    }
+
+    pub fn encode(&self, msg: &P, dst: &mut BytesMut) -> Result<()> {
         let mut buf = BytesMut::new();
         msg.encode(&mut buf, None)?;
 
@@ -29,7 +41,7 @@ pub trait Codec {
         Ok(())
     }
 
-    fn decode(&self, src: &mut BytesMut) -> Result<Option<Self::Item>> {
+    pub fn decode(&self, src: &mut BytesMut) -> Result<Option<P>> {
         if src.is_empty() {
             return Ok(None);
         }
@@ -47,7 +59,7 @@ pub trait Codec {
         // none of the packet definitions include the size
         data.advance(1);
 
-        let res = Self::Item::decode(&mut data, None);
+        let res = P::decode(&mut data, None);
 
         match res {
             Ok(packet) => {

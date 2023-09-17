@@ -1,6 +1,5 @@
 mod event;
 mod identifier;
-mod inner;
 mod network_options;
 mod options;
 
@@ -12,24 +11,26 @@ pub use options::ConnectionOptions;
 use tokio::{time::timeout, net::{TcpStream, UdpSocket}};
 
 use crate::{
-    connection::inner::ConnectionInner,
     error::Error,
-    result::Result, codec::{Codec, Mode}, network::{Network, Framed}, relay::HostSelect,
+    result::Result, 
+    codec::{Codec, Mode, Packets}, 
+    network::{Network, Framed, FramedWrapped}, 
+    relay::HostSelect,
 };
 
 use self::network_options::NetworkOptions;
 
-pub struct Connection<C: Codec> {
+pub struct Connection<P: Packets + std::convert::From<HostSelect>> {
     id: Option<ConnectionIdentifier>,
 
     network_options: NetworkOptions,
-    inner: Option<ConnectionInner<C>>,
+    inner: Option<FramedWrapped<P>>,
     shutdown: bool,
 
     shutdown_notify: tokio::sync::Notify,
 }
 
-impl<C: Codec> Connection<C> {
+impl<P: Packets + std::convert::From<HostSelect>> Connection<P> {
     pub fn tcp<
         R: Into<SocketAddr>
     >(
@@ -75,11 +76,11 @@ impl<C: Codec> Connection<C> {
 
     pub fn relay<
         H: Into<Option<String>>, 
-        P: Into<Option<String>>
+        S: Into<Option<String>>
     > (
         select_host: H,
         websocket: bool,
-        spectator_password: P,
+        spectator_password: S,
     ) -> Self {
         Connection {
             id: None,
@@ -97,7 +98,7 @@ impl<C: Codec> Connection<C> {
 
     pub(crate) async fn connect(
         &mut self,
-    ) -> Result<ConnectionInner<C>> {
+    ) -> Result<FramedWrapped<P>> {
         let timeout_duration = Duration::from_secs(90);
 
         match &self.network_options {
@@ -106,9 +107,9 @@ impl<C: Codec> Connection<C> {
             } => {
                 let stream = timeout(timeout_duration, tokio::net::TcpStream::connect(remote)).await??;
                 stream.set_nodelay(true)?;
-                let codec = C::new(*mode);
+                let codec = Codec::new(*mode);
                 return Ok(
-                    ConnectionInner::Tcp(Framed::new(stream, codec))
+                    FramedWrapped::Tcp(Framed::new(stream, codec))
                 );
             }
             NetworkOptions::Udp {
@@ -121,71 +122,45 @@ impl<C: Codec> Connection<C> {
 
                 let stream = tokio::net::UdpSocket::bind(local).await?;
                 stream.connect(remote).await.unwrap();
-                return Ok(ConnectionInner::Udp(
-                    Framed::new(stream, C::new(*mode))
+                return Ok(FramedWrapped::Udp(
+                    Framed::new(stream, Codec::new(*mode))
                 ));
             }
             NetworkOptions::Relay {
                 select_host,
                 spectator_password,
-                websocket: false,
+                websocket,
             } => {
-                let stream = timeout(
-                    timeout_duration,
-                    tokio::net::TcpStream::connect("isrelay.lfs.net:47474"),
-                )
-                .await??;
-                stream.set_nodelay(true)?;
 
-                return Ok(
-                    ConnectionInner::Tcp(
-                        Framed::new(stream, C::new(Mode::Uncompressed))
+                let mut stream = if *websocket {
+                    let stream = crate::network::websocket::connect_to_relay().await?;
+
+                    FramedWrapped::WebSocket(
+                        Framed::new(stream, Codec::new(Mode::Uncompressed))
                     )
-                );
+                } else {
+                    let stream = timeout(
+                        timeout_duration,
+                        tokio::net::TcpStream::connect("isrelay.lfs.net:47474"),
+                    )
+                    .await??;
+                    stream.set_nodelay(true)?;
 
-                // if let Some(hostname) = select_host {
-                //     stream
-                //         .write(
-                //             HostSelect {
-                //                 hname: hostname.to_string(),
-                //                 admin: self.password.clone(),
-                //                 spec: match spectator_password {
-                //                     None => "".into(),
-                //                     Some(i) => i.clone(),
-                //                 },
-                //                 ..Default::default()
-                //             }
-                //             .into(),
-                //         )
-                //         .await?;
-                // }
-                //
-                // Ok(ConnectionInner::Tcp(stream))
-            }
-
-            NetworkOptions::Relay {
-                select_host,
-                spectator_password,
-                websocket: true,
-            } => {
-
-                let stream = crate::network::websocket::connect_to_relay().await?;
-
-                let stream = ConnectionInner::WebSocket(
-                    Framed::new(stream, C::new(Mode::Uncompressed))
-                );
+                    FramedWrapped::Tcp(
+                        Framed::new(stream, Codec::new(Mode::Uncompressed))
+                    )
+                };
 
                 if let Some(hostname) = select_host {
-
-                    let packet: C::Item = HostSelect {
+                    let packet = HostSelect {
                         hname: hostname.to_string(),
-                        admin: "".into(),
+                        admin: "".to_string(),
                         spec: match spectator_password {
                             None => "".into(),
                             Some(i) => i.clone(),
                         },
                         ..Default::default()
-                    }.into();
+                    };
 
                     stream.write(packet).await?;
                 }
@@ -195,7 +170,7 @@ impl<C: Codec> Connection<C> {
         }
     }
 
-    pub async fn send<P: Into<C::Item>>(&mut self, packet: P) -> Result<()> {
+    pub async fn send<I: Into<P>>(&mut self, packet: I) -> Result<()> {
         if self.shutdown {
             return Err(Error::Shutdown);
         }
@@ -215,7 +190,7 @@ impl<C: Codec> Connection<C> {
     /// [Event].
     /// On error, calling again will result in a reconnection attempt.
     /// Failure to call poll will result in a timeout.
-    pub async fn poll(&mut self) -> Result<Event<C::Item>> {
+    pub async fn poll(&mut self) -> Result<Event<P>> {
         if self.shutdown {
             return Err(Error::Shutdown);
         }
@@ -234,7 +209,7 @@ impl<C: Codec> Connection<C> {
         }
     }
 
-    async fn poll_inner(&mut self) -> Result<Event<C::Item>> {
+    async fn poll_inner(&mut self) -> Result<Event<P>> {
         let stream = self.inner.as_mut().unwrap();
 
         tokio::select! {
