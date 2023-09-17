@@ -150,5 +150,3 @@ impl Decodable for Isi {
         Ok(data)
     }
 }
-
-impl crate::codec::Init for Isi {}

@@ -19,8 +19,9 @@ use crate::{
 use self::network_options::NetworkOptions;
 
 pub struct Connection<P: Packets + std::convert::From<HostSelect>> {
-    id: Option<ConnectionIdentifier>,
+    pub id: Option<ConnectionIdentifier>,
 
+    pub isi: P::Init,
     network_options: NetworkOptions,
     inner: Option<FramedWrapped<P>>,
     shutdown: bool,
@@ -29,10 +30,16 @@ pub struct Connection<P: Packets + std::convert::From<HostSelect>> {
 }
 
 impl<P: Packets + std::convert::From<HostSelect>> Connection<P> {
-    pub fn tcp<R: Into<SocketAddr>>(mode: Mode, remote: R, verify_version: bool) -> Self {
+    pub fn tcp<R: Into<SocketAddr>>(
+        mode: Mode,
+        remote: R,
+        verify_version: bool,
+        options: P::Init,
+    ) -> Self {
         Connection {
             id: None,
             inner: None,
+            isi: options,
             network_options: NetworkOptions::Tcp {
                 remote: remote.into(),
                 verify_version,
@@ -48,10 +55,12 @@ impl<P: Packets + std::convert::From<HostSelect>> Connection<P> {
         remote: R,
         mode: Mode,
         verify_version: bool,
+        options: P::Init,
     ) -> Self {
         Connection {
             id: None,
             inner: None,
+            isi: options,
             network_options: NetworkOptions::Udp {
                 local: local.into(),
                 remote: remote.into(),
@@ -67,10 +76,12 @@ impl<P: Packets + std::convert::From<HostSelect>> Connection<P> {
         select_host: H,
         websocket: bool,
         spectator_password: S,
+        options: P::Init,
     ) -> Self {
         Connection {
             id: None,
             inner: None,
+            isi: options,
             network_options: NetworkOptions::Relay {
                 select_host: select_host.into(),
                 spectator_password: spectator_password.into(),
@@ -89,7 +100,13 @@ impl<P: Packets + std::convert::From<HostSelect>> Connection<P> {
                 let stream =
                     timeout(timeout_duration, tokio::net::TcpStream::connect(remote)).await??;
                 stream.set_nodelay(true)?;
-                Ok(FramedWrapped::Tcp(Framed::new(stream, Codec::new(*mode))))
+
+                let mut stream = Framed::new(stream, Codec::new(*mode));
+                stream
+                    .handshake(self.isi.clone(), Duration::from_secs(30))
+                    .await?;
+
+                Ok(FramedWrapped::Tcp(stream))
             }
             NetworkOptions::Udp {
                 local,
@@ -101,7 +118,13 @@ impl<P: Packets + std::convert::From<HostSelect>> Connection<P> {
 
                 let stream = tokio::net::UdpSocket::bind(local).await?;
                 stream.connect(remote).await.unwrap();
-                Ok(FramedWrapped::Udp(Framed::new(stream, Codec::new(*mode))))
+
+                let mut stream = Framed::new(stream, Codec::new(*mode));
+                stream
+                    .handshake(self.isi.clone(), Duration::from_secs(30))
+                    .await?;
+
+                Ok(FramedWrapped::Udp(stream))
             }
             NetworkOptions::Relay {
                 select_host,
@@ -135,6 +158,10 @@ impl<P: Packets + std::convert::From<HostSelect>> Connection<P> {
                     };
 
                     stream.write(packet).await?;
+
+                    stream
+                        .handshake(self.isi.clone(), Duration::from_secs(30))
+                        .await?;
                 }
 
                 Ok(stream)

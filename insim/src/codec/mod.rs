@@ -2,11 +2,11 @@ mod mode;
 mod packets;
 
 pub use mode::Mode;
-pub use packets::{Init, Packets};
+pub use packets::Packets;
 
+use crate::result::Result;
 use bytes::{Buf, BufMut, BytesMut};
 use std::marker::PhantomData;
-use crate::result::Result;
 
 pub struct Codec<P: Packets> {
     mode: Mode,
@@ -75,4 +75,3 @@ impl<P: Packets> Codec<P> {
         }
     }
 }
-

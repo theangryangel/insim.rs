@@ -175,6 +175,8 @@ crate::impl_packet_from! {
 }
 
 impl Packets for Packet {
+    type Init = insim::Isi;
+
     fn is_ping(&self) -> bool {
         matches!(self, Packet::Tiny(_))
     }
@@ -196,7 +198,7 @@ impl Packets for Packet {
 
                 Ok(true)
             }
-            _ => Ok(false)
+            _ => Ok(false),
         }
     }
 }

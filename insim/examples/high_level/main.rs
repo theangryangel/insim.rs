@@ -5,10 +5,11 @@
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
 use insim::{
+    codec::Mode,
     connection::{Connection, Event},
     relay::HostListRequest,
     result::Result,
-    v9::Packet,
+    v9::{insim::Isi, Packet},
 };
 use std::net::SocketAddr;
 
@@ -85,11 +86,11 @@ pub async fn main() -> Result<()> {
             // if the local binding address is not provided, we let the OS decide a port to use
             let local = bind.unwrap_or("0.0.0.0:0".parse()?);
             tracing::info!("Connecting via UDP!");
-            Connection::udp(local, *addr, insim::codec::Mode::Compressed, true)
+            Connection::udp(local, *addr, Mode::Compressed, true, Isi::default())
         }
         Commands::Tcp { addr } => {
             tracing::info!("Connecting via TCP!");
-            Connection::tcp(insim::codec::Mode::Compressed, *addr, true)
+            Connection::tcp(Mode::Compressed, *addr, true, Isi::default())
         }
         Commands::Relay {
             select_host,
@@ -98,7 +99,12 @@ pub async fn main() -> Result<()> {
             ..
         } => {
             tracing::info!("Connecting via LFS World Relay!");
-            Connection::relay(select_host.clone(), *websocket, spectator_password.clone())
+            Connection::relay(
+                select_host.clone(),
+                *websocket,
+                spectator_password.clone(),
+                Isi::default(),
+            )
         }
     };
 

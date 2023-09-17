@@ -1,5 +1,8 @@
-use std::marker::PhantomData;
-use tokio::net::{TcpStream, UdpSocket};
+use std::{marker::PhantomData, time::Duration};
+use tokio::{
+    net::{TcpStream, UdpSocket},
+    time,
+};
 
 use crate::{codec::Packets, error::Error, result::Result};
 use bytes::BytesMut;
@@ -17,9 +20,7 @@ where
     inner: N,
     codec: Codec<P>,
     buffer: BytesMut,
-
     verify_version: bool,
-
     marker: PhantomData<P>,
 }
 
@@ -44,17 +45,11 @@ where
         self.verify_version = verify_version;
     }
 
-    // FIXME - this should probably be in Connection
-    // async fn handshake<I: Into<P> + Init + Send>(
-    //     &mut self,
-    //     isi: I,
-    //     timeout: Duration,
-    // ) -> Result<()> {
-    //     time::timeout(
-    //         timeout,
-    //         self.write(isi)
-    //     ).await?
-    // }
+    pub async fn handshake(&mut self, isi: P::Init, timeout: Duration) -> Result<()> {
+        time::timeout(timeout, self.write(isi.into())).await??;
+
+        Ok(())
+    }
 
     pub async fn read(&mut self) -> Result<P> {
         loop {
@@ -126,6 +121,14 @@ pub enum FramedWrapped<P: Packets> {
 }
 
 impl<P: Packets> FramedWrapped<P> {
+    pub async fn handshake(&mut self, isi: P::Init, timeout: Duration) -> Result<()> {
+        match self {
+            Self::Tcp(i) => i.handshake(isi, timeout).await,
+            Self::Udp(i) => i.handshake(isi, timeout).await,
+            Self::WebSocket(i) => i.handshake(isi, timeout).await,
+        }
+    }
+
     pub async fn read(&mut self) -> Result<P> {
         match self {
             Self::Tcp(i) => i.read().await,
