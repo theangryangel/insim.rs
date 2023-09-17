@@ -7,7 +7,8 @@ use if_chain::if_chain;
 use insim::{
     connection::{Connection, Event},
     relay::HostListRequest,
-    result::Result, v9::{Packet},
+    result::Result,
+    v9::Packet,
 };
 use std::net::SocketAddr;
 

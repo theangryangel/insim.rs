@@ -1,6 +1,6 @@
-use std::fmt::Debug;
-use insim_core::{Encodable, Decodable, identifiers::RequestId};
 use crate::result::Result;
+use insim_core::{identifiers::RequestId, Decodable, Encodable};
+use std::fmt::Debug;
 
 pub trait Packets: Encodable + Decodable + Debug + Clone + Sized + Send + Sync {
     fn is_ping(&self) -> bool;

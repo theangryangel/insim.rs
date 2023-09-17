@@ -10,7 +10,7 @@ pub mod insim;
 
 const VERSION: u8 = 9;
 
-use crate::relay;
+use crate::{codec::Packets, relay};
 
 #[derive(InsimEncode, InsimDecode, Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -174,15 +174,7 @@ crate::impl_packet_from! {
     relay::RelayError => RelayError,
 }
 
-impl Packet {
-    pub fn is_error(&self) -> bool {
-        matches!(self, Self::RelayError(_))
-    }
-}
-
-use crate::codec;
-
-impl codec::Packets for Packet {
+impl Packets for Packet {
     fn is_ping(&self) -> bool {
         matches!(self, Packet::Tiny(_))
     }
@@ -191,7 +183,8 @@ impl codec::Packets for Packet {
         insim::Tiny {
             reqi: reqi.unwrap_or(RequestId(0)),
             subt: insim::TinyType::None,
-        }.into()
+        }
+        .into()
     }
 
     fn maybe_verify_version(&self) -> crate::result::Result<bool> {
@@ -202,10 +195,8 @@ impl codec::Packets for Packet {
                 }
 
                 Ok(true)
-            }, 
-            _ => {
-                return Ok(false)
             }
+            _ => Ok(false)
         }
     }
 }

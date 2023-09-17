@@ -1,4 +1,4 @@
-use bytes::{Buf, BytesMut};
+use bytes::BytesMut;
 use tokio::net::TcpStream;
 
 use crate::error::Error;

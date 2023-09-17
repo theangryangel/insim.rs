@@ -1,5 +1,5 @@
-use bytes::BytesMut;
 use crate::result::Result;
+use bytes::BytesMut;
 
 pub mod framed;
 pub mod tcp;

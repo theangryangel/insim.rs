@@ -9,12 +9,10 @@ use super::Network;
 #[async_trait::async_trait]
 impl Network for UdpSocket {
     async fn try_read_bytes(&mut self, buf: &mut BytesMut) -> Result<usize> {
-
         loop {
             let ready = self.ready(tokio::io::Interest::READABLE).await?;
 
             if ready.is_readable() {
-
                 // Tokio docs indicates that the buffer must be large enough for any packet.
                 // I've picked 1492 because its the effectively a common MTU size across the internet
                 // still, and should give some future proofing if any packets insim increase
@@ -53,9 +51,7 @@ impl Network for UdpSocket {
                 Ok(n) => {
                     return Ok(n);
                 }
-                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    continue
-                }
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => continue,
                 Err(e) => {
                     return Err(e.into());
                 }

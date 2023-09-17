@@ -1,4 +1,4 @@
-use crate::{error::Error, codec::{Codec, Packets}};
+use crate::{codec::Packets, error::Error};
 
 use super::ConnectionIdentifier;
 

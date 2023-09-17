@@ -1,23 +1,18 @@
 use std::marker::PhantomData;
-use std::time::Duration;
 use tokio::net::{TcpStream, UdpSocket};
-use tokio::time;
 
+use crate::{codec::Packets, error::Error, result::Result};
 use bytes::BytesMut;
 use if_chain::if_chain;
-use crate::codec::Init;
-use crate::{error::Error, result::Result, codec::Packets};
 
-use crate::{
-    network::Network, codec::Codec
-};
+use crate::{codec::Codec, network::Network};
 
 use super::websocket::TungsteniteWebSocket;
 
 pub struct Framed<N, P>
 where
     N: Network,
-    P: Packets
+    P: Packets,
 {
     inner: N,
     codec: Codec<P>,
@@ -31,7 +26,7 @@ where
 impl<N, P> Framed<N, P>
 where
     N: Network,
-    P: Packets
+    P: Packets,
 {
     pub fn new(inner: N, codec: Codec<P>) -> Self {
         let buffer = BytesMut::new();
@@ -49,13 +44,14 @@ where
         self.verify_version = verify_version;
     }
 
+    // FIXME - this should probably be in Connection
     // async fn handshake<I: Into<P> + Init + Send>(
-    //     &mut self, 
+    //     &mut self,
     //     isi: I,
     //     timeout: Duration,
     // ) -> Result<()> {
     //     time::timeout(
-    //         timeout, 
+    //         timeout,
     //         self.write(isi)
     //     ).await?
     // }
@@ -100,17 +96,16 @@ where
                     continue;
                 }
                 Err(e) => {
-                    return Err(e.into());
+                    return Err(e);
                 }
             }
-
         }
     }
 
     pub async fn write(&mut self, packet: P) -> Result<()> {
         let mut buf = BytesMut::new();
 
-        self.codec.encode(&packet.into(), &mut buf)?;
+        self.codec.encode(&packet, &mut buf)?;
         if !buf.is_empty() {
             self.inner.try_write_bytes(&buf).await?;
         }
@@ -147,4 +142,3 @@ impl<P: Packets> FramedWrapped<P> {
         }
     }
 }
-

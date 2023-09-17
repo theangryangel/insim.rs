@@ -1,6 +1,6 @@
-use bytes::{BytesMut, Bytes};
-use tokio::{net::TcpStream, io::AsyncWriteExt};
 use crate::{error::Error, result::Result};
+use bytes::BytesMut;
+use tokio::net::TcpStream;
 
 use super::Network;
 
@@ -25,11 +25,9 @@ impl Network for TcpStream {
                 }
             }
         }
-
     }
 
     async fn try_write_bytes(&mut self, src: &[u8]) -> Result<usize> {
-
         loop {
             self.writable().await?;
 
@@ -37,14 +35,11 @@ impl Network for TcpStream {
                 Ok(n) => {
                     return Ok(n);
                 }
-                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    continue
-                }
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => continue,
                 Err(e) => {
                     return Err(e.into());
                 }
             }
         }
-
     }
 }

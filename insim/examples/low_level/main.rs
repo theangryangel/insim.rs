@@ -4,11 +4,14 @@
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
 use insim::{
-    result::Result,
-    relay,
-    v9::{Packet, insim::{Isi, IsiFlags, Tiny, TinyType}}, 
-    network::{Framed, websocket::TungsteniteWebSocket, FramedWrapped}, 
     codec::{Codec, Mode},
+    network::{Framed, FramedWrapped},
+    relay,
+    result::Result,
+    v9::{
+        insim::{Isi, IsiFlags},
+        Packet,
+    },
 };
 use std::{net::SocketAddr, time::Duration};
 use tokio::net::{TcpStream, UdpSocket};
@@ -76,9 +79,7 @@ pub async fn main() -> Result<()> {
 
     let mut isi = Isi {
         iname: "insim.rs".into(),
-        flags: IsiFlags::MCI
-            | IsiFlags::CON
-            | IsiFlags::OBH,
+        flags: IsiFlags::MCI | IsiFlags::CON | IsiFlags::OBH,
         interval: Duration::from_millis(1000),
         ..Default::default()
     };

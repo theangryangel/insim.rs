@@ -1,21 +1,19 @@
 mod event;
 mod identifier;
 mod network_options;
-mod options;
 
-use std::{net::{SocketAddr}, time::Duration, marker::PhantomData};
+use std::{net::SocketAddr, time::Duration};
 
 pub use event::Event;
 pub use identifier::ConnectionIdentifier;
-pub use options::ConnectionOptions;
-use tokio::{time::timeout, net::{TcpStream, UdpSocket}};
+use tokio::time::timeout;
 
 use crate::{
+    codec::{Codec, Mode, Packets},
     error::Error,
-    result::Result, 
-    codec::{Codec, Mode, Packets}, 
-    network::{Network, Framed, FramedWrapped}, 
+    network::{Framed, FramedWrapped},
     relay::HostSelect,
+    result::Result,
 };
 
 use self::network_options::NetworkOptions;
@@ -31,13 +29,7 @@ pub struct Connection<P: Packets + std::convert::From<HostSelect>> {
 }
 
 impl<P: Packets + std::convert::From<HostSelect>> Connection<P> {
-    pub fn tcp<
-        R: Into<SocketAddr>
-    >(
-        mode: Mode,
-        remote: R,
-        verify_version: bool,
-    ) -> Self {
+    pub fn tcp<R: Into<SocketAddr>>(mode: Mode, remote: R, verify_version: bool) -> Self {
         Connection {
             id: None,
             inner: None,
@@ -51,10 +43,7 @@ impl<P: Packets + std::convert::From<HostSelect>> Connection<P> {
         }
     }
 
-    pub fn udp<
-        L: Into<Option<SocketAddr>>,
-        R: Into<SocketAddr>
-    >(
+    pub fn udp<L: Into<Option<SocketAddr>>, R: Into<SocketAddr>>(
         local: L,
         remote: R,
         mode: Mode,
@@ -74,10 +63,7 @@ impl<P: Packets + std::convert::From<HostSelect>> Connection<P> {
         }
     }
 
-    pub fn relay<
-        H: Into<Option<String>>, 
-        S: Into<Option<String>>
-    > (
+    pub fn relay<H: Into<Option<String>>, S: Into<Option<String>>>(
         select_host: H,
         websocket: bool,
         spectator_password: S,
@@ -85,36 +71,29 @@ impl<P: Packets + std::convert::From<HostSelect>> Connection<P> {
         Connection {
             id: None,
             inner: None,
-            network_options: NetworkOptions::Relay { 
-                select_host: select_host.into(), 
-                spectator_password: spectator_password.into(), 
-                websocket
+            network_options: NetworkOptions::Relay {
+                select_host: select_host.into(),
+                spectator_password: spectator_password.into(),
+                websocket,
             },
             shutdown: false,
             shutdown_notify: tokio::sync::Notify::new(),
         }
     }
 
-
-    pub(crate) async fn connect(
-        &mut self,
-    ) -> Result<FramedWrapped<P>> {
+    pub(crate) async fn connect(&mut self) -> Result<FramedWrapped<P>> {
         let timeout_duration = Duration::from_secs(90);
 
         match &self.network_options {
-            NetworkOptions::Tcp {
-                remote, mode, ..
-            } => {
-                let stream = timeout(timeout_duration, tokio::net::TcpStream::connect(remote)).await??;
+            NetworkOptions::Tcp { remote, mode, .. } => {
+                let stream =
+                    timeout(timeout_duration, tokio::net::TcpStream::connect(remote)).await??;
                 stream.set_nodelay(true)?;
-                let codec = Codec::new(*mode);
-                return Ok(
-                    FramedWrapped::Tcp(Framed::new(stream, codec))
-                );
+                Ok(FramedWrapped::Tcp(Framed::new(stream, Codec::new(*mode))))
             }
             NetworkOptions::Udp {
                 local,
-                remote, 
+                remote,
                 mode,
                 ..
             } => {
@@ -122,22 +101,17 @@ impl<P: Packets + std::convert::From<HostSelect>> Connection<P> {
 
                 let stream = tokio::net::UdpSocket::bind(local).await?;
                 stream.connect(remote).await.unwrap();
-                return Ok(FramedWrapped::Udp(
-                    Framed::new(stream, Codec::new(*mode))
-                ));
+                Ok(FramedWrapped::Udp(Framed::new(stream, Codec::new(*mode))))
             }
             NetworkOptions::Relay {
                 select_host,
                 spectator_password,
                 websocket,
             } => {
-
                 let mut stream = if *websocket {
                     let stream = crate::network::websocket::connect_to_relay().await?;
 
-                    FramedWrapped::WebSocket(
-                        Framed::new(stream, Codec::new(Mode::Uncompressed))
-                    )
+                    FramedWrapped::WebSocket(Framed::new(stream, Codec::new(Mode::Uncompressed)))
                 } else {
                     let stream = timeout(
                         timeout_duration,
@@ -146,9 +120,7 @@ impl<P: Packets + std::convert::From<HostSelect>> Connection<P> {
                     .await??;
                     stream.set_nodelay(true)?;
 
-                    FramedWrapped::Tcp(
-                        Framed::new(stream, Codec::new(Mode::Uncompressed))
-                    )
+                    FramedWrapped::Tcp(Framed::new(stream, Codec::new(Mode::Uncompressed)))
                 };
 
                 if let Some(hostname) = select_host {
