@@ -64,23 +64,10 @@ impl From<tokio_tungstenite::tungstenite::Error> for Error {
         match value {
             tokio_tungstenite::tungstenite::Error::ConnectionClosed => Error::Disconnected,
             tokio_tungstenite::tungstenite::Error::AlreadyClosed => Error::Disconnected,
-            tokio_tungstenite::tungstenite::Error::Io(inner) => inner.into(),
-            tokio_tungstenite::tungstenite::Error::Tls(i) => Error::WebsocketIO(i.to_string()),
-            tokio_tungstenite::tungstenite::Error::Capacity(i) => Error::WebsocketIO(i.to_string()),
-            tokio_tungstenite::tungstenite::Error::Protocol(i) => Error::WebsocketIO(i.to_string()),
-            tokio_tungstenite::tungstenite::Error::WriteBufferFull(i) => {
-                Error::WebsocketIO(i.to_string())
-            }
             tokio_tungstenite::tungstenite::Error::Utf8 => {
                 Error::WebsocketIO("UTF-8 encoding error".into())
             }
-            tokio_tungstenite::tungstenite::Error::Url(i) => Error::WebsocketIO(i.to_string()),
-            tokio_tungstenite::tungstenite::Error::Http(i) => {
-                Error::WebsocketIO(format!("{:?}", i))
-            }
-            tokio_tungstenite::tungstenite::Error::HttpFormat(i) => {
-                Error::WebsocketIO(i.to_string())
-            }
+            _ => Error::WebsocketIO(value.to_string()),
         }
     }
 }
