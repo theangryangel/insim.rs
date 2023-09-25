@@ -2,8 +2,8 @@ use crate::result::Result;
 use insim_core::{identifiers::RequestId, Decodable, Encodable};
 use std::fmt::Debug;
 
-pub trait Packets: Encodable + Decodable + Debug + Clone + Sized + Send + Sync {
-    type Init: Encodable + Decodable + Debug + Clone + Sized + Send + Sync + Default + Into<Self>;
+pub trait VersionedFrame: Encodable + Decodable + Debug + Clone + Sized + Send + Sync {
+    type Init: Debug + Clone + Sized + Send + Sync + Default + Into<Self>;
 
     fn is_ping(&self) -> bool;
 

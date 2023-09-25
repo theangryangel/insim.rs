@@ -4,7 +4,7 @@ use tokio::{
     time,
 };
 
-use crate::{codec::Packets, error::Error, result::Result};
+use crate::{codec::VersionedFrame, error::Error, result::Result};
 use bytes::BytesMut;
 use if_chain::if_chain;
 
@@ -15,7 +15,7 @@ use super::websocket::TungsteniteWebSocket;
 pub struct Framed<N, P>
 where
     N: Network,
-    P: Packets,
+    P: VersionedFrame,
 {
     inner: N,
     codec: Codec<P>,
@@ -27,7 +27,7 @@ where
 impl<N, P> Framed<N, P>
 where
     N: Network,
-    P: Packets,
+    P: VersionedFrame,
 {
     pub fn new(inner: N, codec: Codec<P>) -> Self {
         let buffer = BytesMut::new();
@@ -114,13 +114,13 @@ where
 // I think this fine.
 // i.e. if we add a Websocket option down the line, then ConnectionOptions needs to understand it
 // therefore we cannot just box stuff magically anyway.
-pub enum FramedWrapped<P: Packets> {
+pub enum FramedWrapped<P: VersionedFrame> {
     Tcp(Framed<TcpStream, P>),
     Udp(Framed<UdpSocket, P>),
     WebSocket(Framed<TungsteniteWebSocket, P>),
 }
 
-impl<P: Packets> FramedWrapped<P> {
+impl<P: VersionedFrame> FramedWrapped<P> {
     pub async fn handshake(&mut self, isi: P::Init, timeout: Duration) -> Result<()> {
         match self {
             Self::Tcp(i) => i.handshake(isi, timeout).await,

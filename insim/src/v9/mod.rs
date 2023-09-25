@@ -10,7 +10,7 @@ pub mod insim;
 
 const VERSION: u8 = 9;
 
-use crate::{codec::Packets, relay};
+use crate::{codec::VersionedFrame, relay};
 
 #[derive(InsimEncode, InsimDecode, Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -174,7 +174,7 @@ crate::impl_packet_from! {
     relay::RelayError => RelayError,
 }
 
-impl Packets for Packet {
+impl VersionedFrame for Packet {
     type Init = insim::Isi;
 
     fn is_ping(&self) -> bool {

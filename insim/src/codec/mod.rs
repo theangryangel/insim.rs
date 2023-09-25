@@ -1,19 +1,22 @@
+mod frame;
 mod mode;
-mod packets;
 
+#[cfg(test)]
+mod tests;
+
+pub use frame::VersionedFrame;
 pub use mode::Mode;
-pub use packets::Packets;
 
 use crate::result::Result;
 use bytes::{Buf, BufMut, BytesMut};
 use std::marker::PhantomData;
 
-pub struct Codec<P: Packets> {
+pub struct Codec<P: VersionedFrame> {
     mode: Mode,
     marker: PhantomData<P>,
 }
 
-impl<P: Packets> Codec<P> {
+impl<P: VersionedFrame> Codec<P> {
     pub fn new(mode: Mode) -> Self {
         Self {
             mode,

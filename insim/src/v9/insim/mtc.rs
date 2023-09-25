@@ -6,7 +6,7 @@ use insim_core::{
     EncodableError,
 };
 
-use super::SoundType;
+pub use super::SoundType;
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -75,8 +75,8 @@ mod tests {
         Encodable,
     };
 
-    use super::Mtc;
-    use crate::{core::identifiers::RequestId, packets::insim::SoundType};
+    use super::{Mtc, SoundType};
+    use crate::core::identifiers::RequestId;
 
     #[test]
     fn ensure_last_byte_zero_always() {

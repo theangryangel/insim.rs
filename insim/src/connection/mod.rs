@@ -9,7 +9,7 @@ pub use identifier::ConnectionIdentifier;
 use tokio::time::timeout;
 
 use crate::{
-    codec::{Codec, Mode, Packets},
+    codec::{Codec, Mode, VersionedFrame},
     error::Error,
     network::{Framed, FramedWrapped},
     relay::HostSelect,
@@ -18,7 +18,7 @@ use crate::{
 
 use self::network_options::NetworkOptions;
 
-pub struct Connection<P: Packets + std::convert::From<HostSelect>> {
+pub struct Connection<P: VersionedFrame + std::convert::From<HostSelect>> {
     pub id: Option<ConnectionIdentifier>,
 
     pub isi: P::Init,
@@ -29,7 +29,7 @@ pub struct Connection<P: Packets + std::convert::From<HostSelect>> {
     shutdown_notify: tokio::sync::Notify,
 }
 
-impl<P: Packets + std::convert::From<HostSelect>> Connection<P> {
+impl<P: VersionedFrame + std::convert::From<HostSelect>> Connection<P> {
     pub fn tcp<R: Into<SocketAddr>>(
         mode: Mode,
         remote: R,
