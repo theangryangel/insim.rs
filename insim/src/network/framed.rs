@@ -1,10 +1,11 @@
 use std::{marker::PhantomData, time::Duration};
 use tokio::{
+    io::BufWriter,
     net::{TcpStream, UdpSocket},
     time,
 };
 
-use crate::{codec::VersionedFrame, error::Error, result::Result};
+use crate::{codec::Frame, error::Error, result::Result};
 use bytes::BytesMut;
 use if_chain::if_chain;
 
@@ -15,7 +16,7 @@ use super::websocket::TungsteniteWebSocket;
 pub struct Framed<N, P>
 where
     N: Network,
-    P: VersionedFrame,
+    P: Frame,
 {
     inner: N,
     codec: Codec<P>,
@@ -27,7 +28,7 @@ where
 impl<N, P> Framed<N, P>
 where
     N: Network,
-    P: VersionedFrame,
+    P: Frame,
 {
     pub fn new(inner: N, codec: Codec<P>) -> Self {
         let buffer = BytesMut::new();
@@ -63,9 +64,8 @@ where
                     }
 
                     // keepalive
-                    if packet.is_ping() {
-                        tracing::debug!("ping? pong!");
-                        self.write(P::pong(None)).await?;
+                    if let Some(pong) = packet.maybe_pong() {
+                        self.write(pong).await?;
                     }
 
                     return Ok(packet);
@@ -114,18 +114,20 @@ where
 // I think this fine.
 // i.e. if we add a Websocket option down the line, then ConnectionOptions needs to understand it
 // therefore we cannot just box stuff magically anyway.
-pub enum FramedWrapped<P: VersionedFrame> {
+pub enum FramedWrapped<P: Frame> {
     Tcp(Framed<TcpStream, P>),
+    BufferedTcp(Framed<BufWriter<TcpStream>, P>),
     Udp(Framed<UdpSocket, P>),
     WebSocket(Framed<TungsteniteWebSocket, P>),
 }
 
-impl<P: VersionedFrame> FramedWrapped<P> {
+impl<P: Frame> FramedWrapped<P> {
     pub async fn handshake(&mut self, isi: P::Init, timeout: Duration) -> Result<()> {
         match self {
             Self::Tcp(i) => i.handshake(isi, timeout).await,
             Self::Udp(i) => i.handshake(isi, timeout).await,
             Self::WebSocket(i) => i.handshake(isi, timeout).await,
+            Self::BufferedTcp(i) => i.handshake(isi, timeout).await,
         }
     }
 
@@ -134,6 +136,7 @@ impl<P: VersionedFrame> FramedWrapped<P> {
             Self::Tcp(i) => i.read().await,
             Self::Udp(i) => i.read().await,
             Self::WebSocket(i) => i.read().await,
+            Self::BufferedTcp(i) => i.read().await,
         }
     }
 
@@ -142,6 +145,7 @@ impl<P: VersionedFrame> FramedWrapped<P> {
             Self::Tcp(i) => i.write(packet.into()).await,
             Self::Udp(i) => i.write(packet.into()).await,
             Self::WebSocket(i) => i.write(packet.into()).await,
+            Self::BufferedTcp(i) => i.write(packet.into()).await,
         }
     }
 }

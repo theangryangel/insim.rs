@@ -3,7 +3,7 @@ use bytes::{Buf, BytesMut};
 use insim_core::{identifiers::RequestId, InsimDecode, InsimEncode};
 use tokio_test::assert_ok;
 
-use super::VersionedFrame;
+use super::Frame;
 
 #[derive(Debug, Default, Clone, InsimEncode, InsimDecode)]
 #[repr(u8)]
@@ -34,15 +34,11 @@ impl From<()> for TestPacket {
     }
 }
 
-impl VersionedFrame for TestPacket {
+impl Frame for TestPacket {
     type Init = ();
 
-    fn is_ping(&self) -> bool {
-        false
-    }
-
-    fn pong(_reqi: Option<RequestId>) -> Self {
-        Self::Tiny(TestTiny::default())
+    fn maybe_pong(&self) -> Option<Self> {
+        None
     }
 
     fn maybe_verify_version(&self) -> crate::result::Result<bool> {

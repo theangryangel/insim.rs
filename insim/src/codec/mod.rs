@@ -4,19 +4,19 @@ mod mode;
 #[cfg(test)]
 mod tests;
 
-pub use frame::VersionedFrame;
+pub use frame::Frame;
 pub use mode::Mode;
 
 use crate::result::Result;
 use bytes::{Buf, BufMut, BytesMut};
 use std::marker::PhantomData;
 
-pub struct Codec<P: VersionedFrame> {
+pub struct Codec<P: Frame> {
     mode: Mode,
     marker: PhantomData<P>,
 }
 
-impl<P: VersionedFrame> Codec<P> {
+impl<P: Frame> Codec<P> {
     pub fn new(mode: Mode) -> Self {
         Self {
             mode,

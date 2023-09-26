@@ -10,9 +10,9 @@ pub mod insim;
 
 const VERSION: u8 = 9;
 
-use crate::{codec::VersionedFrame, relay};
+use crate::{codec::Frame, relay};
 
-#[derive(InsimEncode, InsimDecode, Debug, Clone)]
+#[derive(InsimEncode, InsimDecode, Debug, Clone, from_variants::FromVariants)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 #[non_exhaustive]
@@ -99,94 +99,22 @@ impl Default for Packet {
     }
 }
 
-crate::impl_packet_from! {
-    insim::Isi => Init,
-    insim::Version => Version,
-    insim::Tiny => Tiny,
-    insim::Small => Small,
-    insim::Sta => State,
-    insim::Sch => SingleCharacter,
-    insim::Sfp => StateFlagsPack,
-    insim::Scc => SetCarCam,
-    insim::Cpp => CamPosPack,
-    insim::Ism => MultiPlayerNotification,
-    insim::Mso => MessageOut,
-    insim::Iii => InsimInfo,
-    insim::Mst => MessageType,
-    insim::Mtc => MessageToConnection,
-    insim::Mod => ScreenMode,
-    insim::Vtn => VoteNotification,
-    insim::Rst => RaceStart,
-    insim::Ncn => NewConnection,
-    insim::Cnl => ConnectionLeave,
-    insim::Cpr => ConnectionPlayerRenamed,
-    insim::Npl => NewPlayer,
-    insim::Plp => PlayerPits,
-    insim::Pll => PlayerLeave,
-    insim::Lap => Lap,
-    insim::Spx => SplitX,
-    insim::Pit => PitStopStart,
-    insim::Psf => PitStopFinish,
-    insim::Pla => PitLane,
-    insim::Cch => CameraChange,
-    insim::Pen => Penalty,
-    insim::Toc => TakeOverCar,
-    insim::Flg => Flag,
-    insim::Pfl => PlayerFlags,
-    insim::Fin => Finished,
-    insim::Res => Result,
-    insim::Reo => Reorder,
-    insim::Nlp => NodeLap,
-    insim::Mci => MultiCarInfo,
-    insim::Msx => MesssageExtended,
-    insim::Msl => MessageLocal,
-    insim::Crs => CarReset,
-    insim::Bfn => ButtonFunction,
-    insim::Axi => AutoXInfo,
-    insim::Axo => AutoXObject,
-    insim::Btn => Button,
-    insim::Btc => ButtonClick,
-    insim::Btt => ButtonType,
-    insim::Rip => ReplayInformation,
-    insim::Ssh => ScreenShot,
-    insim::Con => Contact,
-    insim::Obh => ObjectHit,
-    insim::Hlv => HotLapValidity,
-    insim::Plc => PlayerAllowedCars,
-    insim::Axm => AutoXMultipleObjects,
-    insim::Acr => AdminCommandReport,
-    insim::Hcp => Handicaps,
-    insim::Nci => Nci,
-    insim::Jrr => Jrr,
-    insim::Uco => UserControlObject,
-    insim::Oco => ObjectControl,
-    insim::Ttc => TargetToConnection,
-    insim::Slc => SelectedVehicle,
-    insim::Csc => VehicleStateChanged,
-    insim::Cim => ConnectionInterfaceMode,
-    insim::Mal => ModsAllowed,
-
-    relay::AdminRequest => RelayAdminRequest,
-    relay::AdminResponse => RelayAdminResponse,
-    relay::HostListRequest => RelayHostListRequest,
-    relay::HostList => RelayHostList,
-    relay::HostSelect => RelayHostSelect,
-    relay::RelayError => RelayError,
-}
-
-impl VersionedFrame for Packet {
+impl Frame for Packet {
     type Init = insim::Isi;
 
-    fn is_ping(&self) -> bool {
-        matches!(self, Packet::Tiny(_))
-    }
+    fn maybe_pong(&self) -> Option<Self> {
+        use self::insim::TinyType;
 
-    fn pong(reqi: Option<RequestId>) -> Self {
-        insim::Tiny {
-            reqi: reqi.unwrap_or(RequestId(0)),
-            subt: insim::TinyType::None,
+        match self {
+            Packet::Tiny(insim::Tiny {
+                subt: TinyType::None,
+                reqi: RequestId(0),
+            }) => Some(Self::Tiny(insim::Tiny {
+                reqi: RequestId(0),
+                subt: insim::TinyType::None,
+            })),
+            _ => None,
         }
-        .into()
     }
 
     fn maybe_verify_version(&self) -> crate::result::Result<bool> {

@@ -7,9 +7,6 @@ pub mod network;
 pub mod result;
 pub mod v9;
 
-#[doc(hidden)]
-pub mod macros;
-
 pub mod relay;
 
 // pub mod tools;

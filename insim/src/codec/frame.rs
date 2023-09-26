@@ -1,14 +1,11 @@
 use crate::result::Result;
-use insim_core::{identifiers::RequestId, Decodable, Encodable};
+use insim_core::{Decodable, Encodable};
 use std::fmt::Debug;
 
-pub trait VersionedFrame: Encodable + Decodable + Debug + Clone + Sized + Send + Sync {
+pub trait Frame: Encodable + Decodable + Debug + Clone + Sized + Send + Sync {
     type Init: Debug + Clone + Sized + Send + Sync + Default + Into<Self>;
 
-    fn is_ping(&self) -> bool;
-
-    /// Create a pong
-    fn pong(reqi: Option<RequestId>) -> Self;
+    fn maybe_pong(&self) -> Option<Self>;
 
     /// Maybe verify version
     fn maybe_verify_version(&self) -> Result<bool>;

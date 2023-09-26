@@ -1,10 +1,10 @@
-use crate::{codec::VersionedFrame, error::Error};
+use crate::{codec::Frame, error::Error};
 
 use super::ConnectionIdentifier;
 
 #[derive(Debug, Clone)]
 /// Events which can be yielded by [super::Connection] poll method
-pub enum Event<P: VersionedFrame> {
+pub enum Event<P: Frame> {
     Connected(Option<ConnectionIdentifier>),
     Disconnected(Option<ConnectionIdentifier>),
     Data(P, Option<ConnectionIdentifier>),

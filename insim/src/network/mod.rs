@@ -1,6 +1,7 @@
 use crate::result::Result;
 use bytes::BytesMut;
 
+pub mod bufwriter;
 pub mod framed;
 pub mod tcp;
 pub mod udp;

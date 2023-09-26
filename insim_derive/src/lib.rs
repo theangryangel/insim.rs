@@ -1,9 +1,12 @@
 #[macro_use]
 extern crate quote;
 
-use darling::{ast, FromDeriveInput, FromField, FromVariant};
+use darling::{
+    ast,
+    export::syn::{self, parse_macro_input, DeriveInput},
+    FromDeriveInput, FromField, FromVariant,
+};
 use proc_macro_error::proc_macro_error;
-use syn::{parse_macro_input, DeriveInput};
 
 mod decode;
 mod encode;
@@ -78,7 +81,7 @@ fn extract_type(ty: &syn::Type) -> proc_macro2::TokenStream {
 
 fn extract_repr_type(attrs: &[syn::Attribute]) -> Option<syn::Ident> {
     attrs.iter().find_map(|attr| {
-        if attr.path.is_ident("repr") {
+        if attr.path().is_ident("repr") {
             match attr.parse_args::<syn::Ident>() {
                 Ok(ident) => Some(ident),
                 _ => None,

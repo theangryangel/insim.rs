@@ -6,10 +6,10 @@ use std::{net::SocketAddr, time::Duration};
 
 pub use event::Event;
 pub use identifier::ConnectionIdentifier;
-use tokio::time::timeout;
+use tokio::{io::BufWriter, time::timeout};
 
 use crate::{
-    codec::{Codec, Mode, VersionedFrame},
+    codec::{Codec, Frame, Mode},
     error::Error,
     network::{Framed, FramedWrapped},
     relay::HostSelect,
@@ -18,7 +18,7 @@ use crate::{
 
 use self::network_options::NetworkOptions;
 
-pub struct Connection<P: VersionedFrame + std::convert::From<HostSelect>> {
+pub struct Connection<P: Frame + std::convert::From<HostSelect>> {
     pub id: Option<ConnectionIdentifier>,
 
     pub isi: P::Init,
@@ -29,7 +29,7 @@ pub struct Connection<P: VersionedFrame + std::convert::From<HostSelect>> {
     shutdown_notify: tokio::sync::Notify,
 }
 
-impl<P: VersionedFrame + std::convert::From<HostSelect>> Connection<P> {
+impl<P: Frame + std::convert::From<HostSelect>> Connection<P> {
     pub fn tcp<R: Into<SocketAddr>>(
         mode: Mode,
         remote: R,
@@ -109,12 +109,14 @@ impl<P: VersionedFrame + std::convert::From<HostSelect>> Connection<P> {
                     timeout(timeout_duration, tokio::net::TcpStream::connect(remote)).await??;
                 stream.set_nodelay(true)?;
 
+                let stream = BufWriter::new(stream);
+
                 let mut stream = Framed::new(stream, Codec::new(*mode));
                 stream
                     .handshake(self.isi.clone(), Duration::from_secs(30))
                     .await?;
 
-                Ok(FramedWrapped::Tcp(stream))
+                Ok(FramedWrapped::BufferedTcp(stream))
             }
             NetworkOptions::Udp {
                 local,
@@ -166,10 +168,6 @@ impl<P: VersionedFrame + std::convert::From<HostSelect>> Connection<P> {
                     };
 
                     stream.write(packet).await?;
-
-                    stream
-                        .handshake(self.isi.clone(), Duration::from_secs(30))
-                        .await?;
                 }
 
                 Ok(stream)
