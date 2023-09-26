@@ -21,7 +21,7 @@ use self::network_options::NetworkOptions;
 pub struct Connection<P: Frame + std::convert::From<HostSelect>> {
     pub id: Option<ConnectionIdentifier>,
 
-    pub isi: P::Init,
+    isi: P::Init,
     network_options: NetworkOptions,
     inner: Option<FramedWrapped<P>>,
     shutdown: bool,

@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use super::super::VERSION;
 use insim_core::{identifiers::RequestId, prelude::*, ser::Limit, DecodableError, EncodableError};
 
 #[cfg(feature = "serde")]
@@ -106,7 +107,7 @@ impl Encodable for Isi {
         self.flags.encode(buf, None)?;
 
         // version
-        (super::super::VERSION).encode(buf, None)?;
+        (VERSION).encode(buf, None)?;
 
         (self.prefix as u8).encode(buf, None)?;
         (self.interval.as_millis() as u16).encode(buf, None)?;
@@ -140,6 +141,15 @@ impl Decodable for Isi {
 
         data.udpport = u16::decode(buf, None)?;
         data.flags = IsiFlags::decode(buf, None)?;
+
+        // skip over version
+        let version = buf.get_u8();
+        if version != VERSION {
+            return Err(DecodableError::UnexpectedValue(format!(
+                "Expected version {:?}, received {:?}",
+                VERSION, version
+            )));
+        }
 
         data.prefix = u8::decode(buf, None)? as char;
         data.interval = Duration::from_millis(u16::decode(buf, None)?.into());
