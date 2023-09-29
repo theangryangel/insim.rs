@@ -9,6 +9,8 @@ pub mod websocket;
 
 pub use framed::{Framed, FramedWrapped};
 
+pub const DEFAULT_TIMEOUT_SECS: u64 = 90;
+
 #[async_trait::async_trait]
 pub trait Network: Send + Sync + Sized {
     async fn try_read_bytes(&mut self, buf: &mut BytesMut) -> Result<usize>;

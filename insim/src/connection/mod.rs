@@ -11,7 +11,7 @@ use tokio::{io::BufWriter, time::timeout};
 use crate::{
     codec::{Codec, Frame, Mode},
     error::Error,
-    network::{Framed, FramedWrapped},
+    network::{Framed, FramedWrapped, DEFAULT_TIMEOUT_SECS},
     relay::HostSelect,
     result::Result,
 };
@@ -21,7 +21,7 @@ use self::network_options::NetworkOptions;
 pub struct Connection<P: Frame + std::convert::From<HostSelect>> {
     pub id: Option<ConnectionIdentifier>,
 
-    isi: P::Init,
+    isi: P::Isi,
     network_options: NetworkOptions,
     inner: Option<FramedWrapped<P>>,
     shutdown: bool,
@@ -34,7 +34,7 @@ impl<P: Frame + std::convert::From<HostSelect>> Connection<P> {
         mode: Mode,
         remote: R,
         verify_version: bool,
-        options: P::Init,
+        options: P::Isi,
     ) -> Self {
         Connection {
             id: None,
@@ -55,7 +55,7 @@ impl<P: Frame + std::convert::From<HostSelect>> Connection<P> {
         remote: R,
         mode: Mode,
         verify_version: bool,
-        options: P::Init,
+        options: P::Isi,
     ) -> Self {
         Connection {
             id: None,
@@ -76,7 +76,7 @@ impl<P: Frame + std::convert::From<HostSelect>> Connection<P> {
         select_host: H,
         websocket: bool,
         spectator_password: S,
-        options: P::Init,
+        options: P::Isi,
     ) -> Self {
         Connection {
             id: None,
@@ -92,16 +92,16 @@ impl<P: Frame + std::convert::From<HostSelect>> Connection<P> {
         }
     }
 
-    pub fn isi(&self) -> &P::Init {
+    pub fn isi(&self) -> &P::Isi {
         &self.isi
     }
 
-    pub fn isi_mut(&mut self) -> &mut P::Init {
+    pub fn isi_mut(&mut self) -> &mut P::Isi {
         &mut self.isi
     }
 
     pub(crate) async fn connect(&mut self) -> Result<FramedWrapped<P>> {
-        let timeout_duration = Duration::from_secs(90);
+        let timeout_duration = Duration::from_secs(DEFAULT_TIMEOUT_SECS);
 
         match &self.network_options {
             NetworkOptions::Tcp { remote, mode, .. } => {

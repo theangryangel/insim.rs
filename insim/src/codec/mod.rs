@@ -4,7 +4,7 @@ mod mode;
 #[cfg(test)]
 mod tests;
 
-pub use frame::Frame;
+pub use frame::{Frame, FrameInitData};
 pub use mode::Mode;
 
 use crate::result::Result;

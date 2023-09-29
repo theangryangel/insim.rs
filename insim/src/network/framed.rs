@@ -2,7 +2,7 @@ use std::{marker::PhantomData, time::Duration};
 use tokio::{
     io::BufWriter,
     net::{TcpStream, UdpSocket},
-    time,
+    time::{self, timeout},
 };
 
 use crate::{codec::Frame, error::Error, result::Result};
@@ -12,6 +12,7 @@ use if_chain::if_chain;
 use crate::{codec::Codec, network::Network};
 
 use super::websocket::TungsteniteWebSocket;
+use super::DEFAULT_TIMEOUT_SECS;
 
 pub struct Framed<N, P>
 where
@@ -46,7 +47,7 @@ where
         self.verify_version = verify_version;
     }
 
-    pub async fn handshake(&mut self, isi: P::Init, timeout: Duration) -> Result<()> {
+    pub async fn handshake(&mut self, isi: P::Isi, timeout: Duration) -> Result<()> {
         time::timeout(timeout, self.write(isi.into())).await??;
 
         Ok(())
@@ -72,7 +73,12 @@ where
                 }
             }
 
-            match self.inner.try_read_bytes(&mut self.buffer).await {
+            match timeout(
+                Duration::from_secs(DEFAULT_TIMEOUT_SECS),
+                self.inner.try_read_bytes(&mut self.buffer),
+            )
+            .await?
+            {
                 Ok(0) => {
                     // The remote closed the connection. For this to be a clean
                     // shutdown, there should be no data in the read buffer. If
@@ -122,7 +128,7 @@ pub enum FramedWrapped<P: Frame> {
 }
 
 impl<P: Frame> FramedWrapped<P> {
-    pub async fn handshake(&mut self, isi: P::Init, timeout: Duration) -> Result<()> {
+    pub async fn handshake(&mut self, isi: P::Isi, timeout: Duration) -> Result<()> {
         match self {
             Self::Tcp(i) => i.handshake(isi, timeout).await,
             Self::Udp(i) => i.handshake(isi, timeout).await,

@@ -3,7 +3,7 @@ use bytes::{Buf, BytesMut};
 use insim_core::{identifiers::RequestId, InsimDecode, InsimEncode};
 use tokio_test::assert_ok;
 
-use super::Frame;
+use super::{Frame, FrameInitData};
 
 #[derive(Debug, Default, Clone, InsimEncode, InsimDecode)]
 #[repr(u8)]
@@ -35,7 +35,7 @@ impl From<()> for TestPacket {
 }
 
 impl Frame for TestPacket {
-    type Init = ();
+    type Isi = ();
 
     fn maybe_pong(&self) -> Option<Self> {
         None
@@ -45,6 +45,8 @@ impl Frame for TestPacket {
         Ok(true)
     }
 }
+
+impl FrameInitData for () {}
 
 #[tokio::test]
 /// Ensure that Codec can decode a basic small packet

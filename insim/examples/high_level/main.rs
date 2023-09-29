@@ -5,13 +5,13 @@
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
 use insim::{
-    codec::Mode,
+    codec::{Frame, Mode},
     connection::{Connection, Event},
     relay::HostListRequest,
     result::Result,
-    v9::{insim::Isi, Packet},
+    v9::{IsiFlags, Packet},
 };
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::Duration};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -81,16 +81,21 @@ pub async fn main() -> Result<()> {
     // Parse our command line arguments, using clap
     let cli = Cli::parse();
 
+    let mut isi = Packet::isi_default();
+    isi.flags = IsiFlags::MCI | IsiFlags::CON | IsiFlags::OBH;
+    isi.iname = "insim.rs".into();
+    isi.interval = Duration::from_millis(1000);
+
     let mut client: Connection<Packet> = match &cli.command {
         Commands::Udp { bind, addr } => {
             // if the local binding address is not provided, we let the OS decide a port to use
             let local = bind.unwrap_or("0.0.0.0:0".parse()?);
             tracing::info!("Connecting via UDP!");
-            Connection::udp(local, *addr, Mode::Compressed, true, Isi::default())
+            Connection::udp(local, *addr, Mode::Compressed, true, isi)
         }
         Commands::Tcp { addr } => {
             tracing::info!("Connecting via TCP!");
-            Connection::tcp(Mode::Compressed, *addr, true, Isi::default())
+            Connection::tcp(Mode::Compressed, *addr, true, isi)
         }
         Commands::Relay {
             select_host,
@@ -103,7 +108,7 @@ pub async fn main() -> Result<()> {
                 select_host.clone(),
                 *websocket,
                 spectator_password.clone(),
-                Isi::default(),
+                isi,
             )
         }
     };

@@ -1,16 +1,136 @@
-//! Insim and Insim Relay Packet definitions
+//! Insim v9 Packet definitions
+
 use insim_core::identifiers::RequestId;
 use insim_core::prelude::*;
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-/// Insim packet definitions
-pub mod insim;
-
 const VERSION: u8 = 9;
 
 use crate::{codec::Frame, relay};
+
+mod acr;
+mod axi;
+mod axm;
+mod axo;
+mod btn;
+mod cch;
+mod cim;
+mod cnl;
+mod con;
+mod cpp;
+mod cpr;
+mod crs;
+mod csc;
+mod fin;
+mod flg;
+mod hcp;
+mod hlv;
+mod iii;
+mod isi;
+mod ism;
+mod jrr;
+mod lap;
+mod mal;
+mod mci;
+mod mode;
+mod msl;
+mod mso;
+mod mst;
+mod msx;
+mod mtc;
+mod nci;
+mod ncn;
+mod nlp;
+mod npl;
+mod obh;
+mod oco;
+mod pen;
+mod pfl;
+mod pit;
+mod plc;
+mod pll;
+mod plp;
+mod reo;
+mod res;
+mod rip;
+mod rst;
+mod scc;
+mod sch;
+mod sfp;
+mod slc;
+mod small;
+mod spx;
+mod ssh;
+mod sta;
+mod tiny;
+mod toc;
+mod ttc;
+mod uco;
+mod ver;
+mod vtn;
+
+pub use acr::{Acr, AcrResult};
+pub use axi::Axi;
+pub use axm::{Axm, ObjectInfo, PmoAction};
+pub use axo::Axo;
+pub use btn::{Bfn, BfnType, Btc, Btn, Btt};
+pub use cch::{CameraView, Cch};
+pub use cim::{Cim, CimMode};
+pub use cnl::{Cnl, CnlReason};
+pub use con::{Con, ConInfo};
+pub use cpp::Cpp;
+pub use cpr::Cpr;
+pub use crs::Crs;
+pub use csc::{Csc, CscAction};
+pub use fin::{Fin, RaceResultFlags};
+pub use flg::{Flg, FlgType};
+pub use hcp::{Hcp, HcpCarHandicap};
+pub use hlv::{Hlv, Hlvc};
+pub use iii::Iii;
+pub use isi::{Isi, IsiFlags};
+pub use ism::Ism;
+pub use jrr::{Jrr, JrrAction};
+pub use lap::{Fuel, Fuel200, Lap};
+pub use mal::Mal;
+pub use mci::{CompCar, CompCarInfo, Mci};
+pub use mode::Mod;
+pub use msl::{Msl, SoundType};
+pub use mso::{Mso, MsoUserType};
+pub use mst::Mst;
+pub use msx::Msx;
+pub use mtc::Mtc;
+pub use nci::Nci;
+pub use ncn::Ncn;
+pub use nlp::{Nlp, NodeLapInfo};
+pub use npl::{Npl, PlayerFlags, TyreCompound};
+pub use obh::{CarContact, Obh, ObhFlags};
+pub use oco::{Oco, OcoAction, OcoIndex, OcoLights};
+pub use pen::{Pen, PenaltyInfo, PenaltyReason};
+pub use pfl::Pfl;
+pub use pit::{Pit, PitLaneFact, Pla, Psf};
+pub use plc::{Plc, PlcAllowedCars};
+pub use pll::Pll;
+pub use plp::Plp;
+pub use reo::Reo;
+pub use res::Res;
+pub use rip::{Rip, RipError};
+pub use rst::{HostFacts, Rst};
+pub use scc::Scc;
+pub use sch::{Sch, SchFlags};
+pub use sfp::Sfp;
+pub use slc::Slc;
+pub use small::{Small, SmallType};
+pub use spx::Spx;
+pub use ssh::{Ssh, SshError};
+pub use sta::{Sta, StaFlags, StaRacing};
+pub use tiny::{Tiny, TinyType};
+pub use toc::Toc;
+pub use ttc::{Ttc, TtcType};
+pub use uco::{Uco, UcoAction};
+pub use ver::Version;
+pub use vtn::{Vtn, VtnAction};
 
 #[derive(InsimEncode, InsimDecode, Debug, Clone, from_variants::FromVariants)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -19,71 +139,71 @@ use crate::{codec::Frame, relay};
 #[repr(u8)]
 /// Enum representing all possible packets receivable via an Insim connection
 pub enum Packet {
-    Init(insim::Isi) = 1,
-    Version(insim::Version) = 2,
-    Tiny(insim::Tiny) = 3,
-    Small(insim::Small) = 4,
-    State(insim::Sta) = 5,
-    SingleCharacter(insim::Sch) = 6,
-    StateFlagsPack(insim::Sfp) = 7,
-    SetCarCam(insim::Scc) = 8,
-    CamPosPack(insim::Cpp) = 9,
-    MultiPlayerNotification(insim::Ism) = 10,
-    MessageOut(insim::Mso) = 11,
-    InsimInfo(insim::Iii) = 12,
-    MessageType(insim::Mst) = 13,
-    MessageToConnection(insim::Mtc) = 14,
-    ScreenMode(insim::Mod) = 15,
-    VoteNotification(insim::Vtn) = 16,
-    RaceStart(insim::Rst) = 17,
-    NewConnection(insim::Ncn) = 18,
-    ConnectionLeave(insim::Cnl) = 19,
-    ConnectionPlayerRenamed(insim::Cpr) = 20,
-    NewPlayer(insim::Npl) = 21,
-    PlayerPits(insim::Plp) = 22,
-    PlayerLeave(insim::Pll) = 23,
-    Lap(insim::Lap) = 24,
-    SplitX(insim::Spx) = 25,
-    PitStopStart(insim::Pit) = 26,
-    PitStopFinish(insim::Psf) = 27,
-    PitLane(insim::Pla) = 28,
-    CameraChange(insim::Cch) = 29,
-    Penalty(insim::Pen) = 30,
-    TakeOverCar(insim::Toc) = 31,
-    Flag(insim::Flg) = 32,
-    PlayerFlags(insim::Pfl) = 33,
-    Finished(insim::Fin) = 34,
-    Result(insim::Res) = 35,
-    Reorder(insim::Reo) = 36,
-    NodeLap(insim::Nlp) = 37,
-    MultiCarInfo(insim::Mci) = 38,
-    MesssageExtended(insim::Msx) = 39,
-    MessageLocal(insim::Msl) = 40,
-    CarReset(insim::Crs) = 41,
-    ButtonFunction(insim::Bfn) = 42,
-    AutoXInfo(insim::Axi) = 43,
-    AutoXObject(insim::Axo) = 44,
-    Button(insim::Btn) = 45,
-    ButtonClick(insim::Btc) = 46,
-    ButtonType(insim::Btt) = 47,
-    ReplayInformation(insim::Rip) = 48,
-    ScreenShot(insim::Ssh) = 49,
-    Contact(insim::Con) = 50,
-    ObjectHit(insim::Obh) = 51,
-    HotLapValidity(insim::Hlv) = 52,
-    PlayerAllowedCars(insim::Plc) = 53,
-    AutoXMultipleObjects(insim::Axm) = 54,
-    AdminCommandReport(insim::Acr) = 55,
-    Handicaps(insim::Hcp) = 56,
-    Nci(insim::Nci) = 57,
-    Jrr(insim::Jrr) = 58,
-    UserControlObject(insim::Uco) = 59,
-    ObjectControl(insim::Oco) = 60,
-    TargetToConnection(insim::Ttc) = 61,
-    SelectedVehicle(insim::Slc) = 62,
-    VehicleStateChanged(insim::Csc) = 63,
-    ConnectionInterfaceMode(insim::Cim) = 64,
-    ModsAllowed(insim::Mal) = 65,
+    Init(Isi) = 1,
+    Version(Version) = 2,
+    Tiny(Tiny) = 3,
+    Small(Small) = 4,
+    State(Sta) = 5,
+    SingleCharacter(Sch) = 6,
+    StateFlagsPack(Sfp) = 7,
+    SetCarCam(Scc) = 8,
+    CamPosPack(Cpp) = 9,
+    MultiPlayerNotification(Ism) = 10,
+    MessageOut(Mso) = 11,
+    InsimInfo(Iii) = 12,
+    MessageType(Mst) = 13,
+    MessageToConnection(Mtc) = 14,
+    ScreenMode(Mod) = 15,
+    VoteNotification(Vtn) = 16,
+    RaceStart(Rst) = 17,
+    NewConnection(Ncn) = 18,
+    ConnectionLeave(Cnl) = 19,
+    ConnectionPlayerRenamed(Cpr) = 20,
+    NewPlayer(Npl) = 21,
+    PlayerPits(Plp) = 22,
+    PlayerLeave(Pll) = 23,
+    Lap(Lap) = 24,
+    SplitX(Spx) = 25,
+    PitStopStart(Pit) = 26,
+    PitStopFinish(Psf) = 27,
+    PitLane(Pla) = 28,
+    CameraChange(Cch) = 29,
+    Penalty(Pen) = 30,
+    TakeOverCar(Toc) = 31,
+    Flag(Flg) = 32,
+    PlayerFlags(Pfl) = 33,
+    Finished(Fin) = 34,
+    Result(Res) = 35,
+    Reorder(Reo) = 36,
+    NodeLap(Nlp) = 37,
+    MultiCarInfo(Mci) = 38,
+    MesssageExtended(Msx) = 39,
+    MessageLocal(Msl) = 40,
+    CarReset(Crs) = 41,
+    ButtonFunction(Bfn) = 42,
+    AutoXInfo(Axi) = 43,
+    AutoXObject(Axo) = 44,
+    Button(Btn) = 45,
+    ButtonClick(Btc) = 46,
+    ButtonType(Btt) = 47,
+    ReplayInformation(Rip) = 48,
+    ScreenShot(Ssh) = 49,
+    Contact(Con) = 50,
+    ObjectHit(Obh) = 51,
+    HotLapValidity(Hlv) = 52,
+    PlayerAllowedCars(Plc) = 53,
+    AutoXMultipleObjects(Axm) = 54,
+    AdminCommandReport(Acr) = 55,
+    Handicaps(Hcp) = 56,
+    Nci(Nci) = 57,
+    Jrr(Jrr) = 58,
+    UserControlObject(Uco) = 59,
+    ObjectControl(Oco) = 60,
+    TargetToConnection(Ttc) = 61,
+    SelectedVehicle(Slc) = 62,
+    VehicleStateChanged(Csc) = 63,
+    ConnectionInterfaceMode(Cim) = 64,
+    ModsAllowed(Mal) = 65,
 
     RelayAdminRequest(relay::AdminRequest) = 250,
     RelayAdminResponse(relay::AdminResponse) = 251,
@@ -95,23 +215,21 @@ pub enum Packet {
 
 impl Default for Packet {
     fn default() -> Self {
-        Self::Tiny(insim::Tiny::default())
+        Self::Tiny(Tiny::default())
     }
 }
 
 impl Frame for Packet {
-    type Init = insim::Isi;
+    type Isi = Isi;
 
     fn maybe_pong(&self) -> Option<Self> {
-        use self::insim::TinyType;
-
         match self {
-            Packet::Tiny(insim::Tiny {
+            Packet::Tiny(Tiny {
                 subt: TinyType::None,
                 reqi: RequestId(0),
-            }) => Some(Self::Tiny(insim::Tiny {
+            }) => Some(Self::Tiny(Tiny {
                 reqi: RequestId(0),
-                subt: insim::TinyType::None,
+                subt: TinyType::None,
             })),
             _ => None,
         }
@@ -119,7 +237,7 @@ impl Frame for Packet {
 
     fn maybe_verify_version(&self) -> crate::result::Result<bool> {
         match self {
-            Packet::Version(insim::Version { insimver, .. }) => {
+            Packet::Version(Version { insimver, .. }) => {
                 if *insimver != VERSION {
                     return Err(crate::error::Error::IncompatibleVersion(*insimver));
                 }
