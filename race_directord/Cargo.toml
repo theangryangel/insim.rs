@@ -13,3 +13,5 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-error = "0.2.0"
 color-eyre = "0.6.2"
+toml = "0.8.1"
+serde = "1.0.188"

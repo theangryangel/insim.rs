@@ -1,4 +1,5 @@
 mod cli;
+mod config;
 mod peer;
 
 pub type Result<T, E = Report> = color_eyre::Result<T, E>;
@@ -22,10 +23,12 @@ where
     }
 }
 
+use insim::{self, codec::Frame};
 use cli::Cli;
 
 use clap::Parser;
-use std::{io::IsTerminal, process::ExitCode};
+use tokio::time::sleep;
+use std::{io::IsTerminal, process::ExitCode, time::Duration};
 
 #[tokio::main]
 async fn main() -> Result<ExitCode> {
@@ -44,6 +47,40 @@ async fn main() -> Result<ExitCode> {
     tracing::info!("hello! infop");
     tracing::trace!("hello! treacing");
     tracing::debug!("hello! debug");
+
+    let config = config::Config::from_file(&cli.config)?;
+
+    for (name, peer) in config.peers.iter() {
+
+        use config::peer::PeerConfig;
+        use insim::v9::Packet;
+        use insim::connection::{Connection, Event};
+        use insim::error::Error;
+
+        use peer::Peer;
+
+        let client: Connection<Packet> = match peer {
+            PeerConfig::Relay { auto_select_host, websocket, spectator, .. } => {
+
+                Connection::relay(
+                    auto_select_host.clone(),
+                    *websocket,
+                    spectator.clone(),
+                    insim::v9::Packet::isi_default(),
+                )
+
+            },
+            _ => {
+                todo!()
+            }
+            
+        };
+
+        let peer = Peer::new(client);
+
+    }
+
+    tokio::signal::ctrl_c().await?;
 
     Ok(ExitCode::SUCCESS)
 }

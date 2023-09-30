@@ -1,0 +1,7 @@
+[web]
+listen = "0.0.0.0:3000"
+
+[peers.1]
+type = "relay"
+websocket = true
+auto-select-host = "Nubbins AU Demo"

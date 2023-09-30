@@ -16,7 +16,7 @@ pub(crate) enum Command {
 pub(crate) struct Cli {
     /// path to config file
     #[arg(short, long)]
-    config: String,
+    pub(crate) config: String,
 
     #[clap(flatten)]
     pub(crate) instrumentation: instrumentation::Instrumentation,
