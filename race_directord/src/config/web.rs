@@ -4,6 +4,5 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct WebConfig {
-    listen: Option<SocketAddr>,
+    pub listen: Option<SocketAddr>,
 }
-

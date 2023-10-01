@@ -6,11 +6,13 @@ use insim_core::{
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-
 #[cfg(feature = "serde")]
-fn serialize_playerids<const N: usize, S>(t: &[PlayerId; N], serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_playerids<const N: usize, S>(
+    t: &[PlayerId; N],
+    serializer: S,
+) -> Result<S::Ok, S::Error>
 where
-    S: serde::Serializer
+    S: serde::Serializer,
 {
     use serde::ser::SerializeTuple;
 
@@ -20,7 +22,6 @@ where
     }
     ser_tuple.end()
 }
-
 
 #[derive(Debug, InsimEncode, InsimDecode, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]

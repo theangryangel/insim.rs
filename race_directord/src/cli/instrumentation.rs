@@ -27,7 +27,6 @@ pub(crate) struct Instrumentation {
         default_value_t = Default::default(),
         global = true
     )]
-
     pub(crate) log_format: Format,
 
     /// Tracing directives
@@ -55,18 +54,10 @@ impl Instrumentation {
 
         // `try_init` called inside `match` since `with` changes the type
         match self.log_format {
-            Format::Compact => {
-                registry.with(self.fmt_layer_compact()).try_init()?
-            }
-            Format::Full => {
-                registry.with(self.fmt_layer_full()).try_init()?
-            }
-            Format::Pretty => {
-                registry.with(self.fmt_layer_pretty()).try_init()?
-            }
-            Format::Json => {
-                registry.with(self.fmt_layer_json()).try_init()?
-            }
+            Format::Compact => registry.with(self.fmt_layer_compact()).try_init()?,
+            Format::Full => registry.with(self.fmt_layer_full()).try_init()?,
+            Format::Pretty => registry.with(self.fmt_layer_pretty()).try_init()?,
+            Format::Json => registry.with(self.fmt_layer_json()).try_init()?,
         }
 
         Ok(())
@@ -148,5 +139,4 @@ impl Instrumentation {
             .with_file(false)
             .with_line_number(false)
     }
-
 }

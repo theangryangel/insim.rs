@@ -1,6 +1,12 @@
 mod cli;
 mod config;
-mod peer;
+mod peers;
+mod web;
+
+pub type InsimPacket = insim::v9::Packet;
+pub type InsimConnection = insim::connection::Connection<InsimPacket>;
+pub type InsimEvent = insim::connection::Event<InsimPacket>;
+pub type InsimError = insim::error::Error;
 
 pub type Result<T, E = Report> = color_eyre::Result<T, E>;
 // A generic error report
@@ -23,12 +29,9 @@ where
     }
 }
 
-use insim::{self, codec::Frame};
-use cli::Cli;
-
 use clap::Parser;
-use tokio::time::sleep;
-use std::{io::IsTerminal, process::ExitCode, time::Duration};
+use cli::Cli;
+use std::{io::IsTerminal, path::Path, process::ExitCode};
 
 #[tokio::main]
 async fn main() -> Result<ExitCode> {
@@ -44,43 +47,30 @@ async fn main() -> Result<ExitCode> {
     let cli = Cli::parse();
     cli.instrumentation.setup()?;
 
-    tracing::info!("hello! infop");
-    tracing::trace!("hello! treacing");
-    tracing::debug!("hello! debug");
-
-    let config = config::Config::from_file(&cli.config)?;
+    let config = config::Config::try_parse(Path::new(&cli.config))?;
+    let mut manager = peers::Manager::new();
 
     for (name, peer) in config.peers.iter() {
-
-        use config::peer::PeerConfig;
-        use insim::v9::Packet;
-        use insim::connection::{Connection, Event};
-        use insim::error::Error;
-
-        use peer::Peer;
-
-        let client: Connection<Packet> = match peer {
-            PeerConfig::Relay { auto_select_host, websocket, spectator, .. } => {
-
-                Connection::relay(
-                    auto_select_host.clone(),
-                    *websocket,
-                    spectator.clone(),
-                    insim::v9::Packet::isi_default(),
-                )
-
-            },
-            _ => {
-                todo!()
-            }
-            
-        };
-
-        let peer = Peer::new(client);
-
+        manager.add_peer(name, peer.clone()).await?;
     }
 
-    tokio::signal::ctrl_c().await?;
+    if let Some(listen) = config.web.listen {
+        web::run(&listen, manager.clone());
+    }
+
+    loop {
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {
+                tracing::info!("requesting shutdown");
+                manager.shutdown().await?;
+            },
+
+            _ = manager.run() => {
+                tracing::info!("All tasks shutdown");
+                break;
+            }
+        }
+    }
 
     Ok(ExitCode::SUCCESS)
 }

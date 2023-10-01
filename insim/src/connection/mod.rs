@@ -11,7 +11,7 @@ use tokio::{io::BufWriter, time::timeout};
 use crate::{
     codec::{Codec, Frame, Mode},
     error::Error,
-    network::{Framed, FramedWrapped, DEFAULT_TIMEOUT_SECS},
+    network::{Framed, FramedWrapped},
     relay::HostSelect,
     result::Result,
 };
@@ -76,6 +76,7 @@ impl<P: Frame + std::convert::From<HostSelect>> Connection<P> {
         select_host: H,
         websocket: bool,
         spectator_password: S,
+        admin_password: S,
         options: P::Isi,
     ) -> Self {
         Connection {
@@ -85,6 +86,7 @@ impl<P: Frame + std::convert::From<HostSelect>> Connection<P> {
             network_options: NetworkOptions::Relay {
                 select_host: select_host.into(),
                 spectator_password: spectator_password.into(),
+                admin_password: admin_password.into(),
                 websocket,
             },
             shutdown: false,
@@ -101,7 +103,9 @@ impl<P: Frame + std::convert::From<HostSelect>> Connection<P> {
     }
 
     pub(crate) async fn connect(&mut self) -> Result<FramedWrapped<P>> {
-        let timeout_duration = Duration::from_secs(DEFAULT_TIMEOUT_SECS);
+        let timeout_duration = Duration::from_secs(5);
+
+        tracing::debug!("Connecting...");
 
         match &self.network_options {
             NetworkOptions::Tcp { remote, mode, .. } => {
@@ -139,19 +143,27 @@ impl<P: Frame + std::convert::From<HostSelect>> Connection<P> {
             NetworkOptions::Relay {
                 select_host,
                 spectator_password,
+                admin_password,
                 websocket,
             } => {
                 let mut stream = if *websocket {
-                    let stream = crate::network::websocket::connect_to_relay().await?;
+                    let stream = timeout(
+                        timeout_duration,
+                        crate::network::websocket::connect_to_relay(),
+                    )
+                    .await??;
 
                     FramedWrapped::WebSocket(Framed::new(stream, Codec::new(Mode::Uncompressed)))
                 } else {
+                    tracing::debug!("Attempting connection...");
+
                     let stream = timeout(
-                        timeout_duration,
+                        Duration::from_secs(5),
                         tokio::net::TcpStream::connect("isrelay.lfs.net:47474"),
                     )
                     .await??;
-                    stream.set_nodelay(true)?;
+
+                    tracing::debug!("Finished Connecting");
 
                     FramedWrapped::Tcp(Framed::new(stream, Codec::new(Mode::Uncompressed)))
                 };
@@ -159,7 +171,10 @@ impl<P: Frame + std::convert::From<HostSelect>> Connection<P> {
                 if let Some(hostname) = select_host {
                     let packet = HostSelect {
                         hname: hostname.to_string(),
-                        admin: "".to_string(),
+                        admin: match admin_password {
+                            None => "".into(),
+                            Some(i) => i.clone(),
+                        },
                         spec: match spectator_password {
                             None => "".into(),
                             Some(i) => i.clone(),
@@ -223,8 +238,14 @@ impl<P: Frame + std::convert::From<HostSelect>> Connection<P> {
             },
 
             packet = stream.read() => {
-                Ok(Event::Data(packet?, self.id))
+                let packet = packet?;
+
+                Ok(Event::Data(packet, self.id))
             },
         }
+    }
+
+    pub fn is_connected(&self) -> bool {
+        self.inner.is_some()
     }
 }

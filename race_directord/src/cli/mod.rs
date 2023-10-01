@@ -1,5 +1,5 @@
-mod instrumentation;
 mod format;
+mod instrumentation;
 
 use clap::Parser;
 
@@ -21,4 +21,3 @@ pub(crate) struct Cli {
     #[clap(flatten)]
     pub(crate) instrumentation: instrumentation::Instrumentation,
 }
-

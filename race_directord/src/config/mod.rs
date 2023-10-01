@@ -3,7 +3,7 @@ pub(crate) mod web;
 
 use crate::Result;
 
-use std::{net::SocketAddr, collections::HashMap, path::Path, fs};
+use std::{collections::HashMap, fs, path::Path};
 
 use serde::Deserialize;
 
@@ -14,10 +14,9 @@ pub(crate) struct Config {
 }
 
 impl Config {
-    pub(crate) fn from_file(file: &str) -> Result<Self> {
+    pub(crate) fn try_parse(file: &Path) -> Result<Self> {
         let contents = fs::read_to_string(file)?;
         let config: Self = toml::from_str(&contents)?;
         Ok(config)
     }
 }
-

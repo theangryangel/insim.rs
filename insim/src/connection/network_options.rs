@@ -18,6 +18,7 @@ pub enum NetworkOptions {
     Relay {
         select_host: Option<String>,
         spectator_password: Option<String>,
+        admin_password: Option<String>,
         websocket: bool,
     },
 }

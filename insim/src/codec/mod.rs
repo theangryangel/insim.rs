@@ -68,11 +68,11 @@ impl<P: Frame> Codec<P> {
 
         match res {
             Ok(packet) => {
-                tracing::debug!("decoded: {:?}", packet);
+                tracing::trace!("Decoded packet={:?}", packet);
                 Ok(Some(packet))
             }
             Err(e) => {
-                tracing::error!("unhandled error: {:?}, data: {:?}", e, data);
+                tracing::error!("Unhandled error decoding packet: {:?}, data={:?}", e, data);
                 Err(e.into())
             }
         }

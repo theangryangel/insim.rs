@@ -108,6 +108,7 @@ pub async fn main() -> Result<()> {
                 select_host.clone(),
                 *websocket,
                 spectator_password.clone(),
+                None,
                 isi,
             )
         }

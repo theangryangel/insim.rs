@@ -1,10 +1,12 @@
-use crate::{result::Result, relay::HostSelect};
+use crate::{relay::HostSelect, result::Result};
 use insim_core::{Decodable, Encodable};
 use std::fmt::Debug;
 
 pub trait FrameInitData {}
 
-pub trait Frame: Encodable + Decodable + Debug + Clone + Sized + Send + Sync + From<HostSelect> {
+pub trait Frame:
+    Encodable + Decodable + Debug + Clone + Sized + Send + Sync + From<HostSelect>
+{
     type Isi: Debug + Clone + Sized + Send + Sync + Default + Into<Self> + FrameInitData;
 
     /// Maybe send a ping/pong response
