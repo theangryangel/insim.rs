@@ -5,7 +5,7 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize, Clone)]
 #[serde(tag = "type")]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum PeerConfig {
+pub(crate) enum ConnectionConfig {
     #[serde(rename_all = "kebab-case")]
     Tcp {
         addr: SocketAddr,

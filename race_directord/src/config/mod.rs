@@ -1,4 +1,4 @@
-pub(crate) mod peer;
+pub(crate) mod connection;
 pub(crate) mod web;
 
 use crate::Result;
@@ -9,8 +9,8 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Config {
-    pub web: web::WebConfig,
-    pub peers: HashMap<String, peer::PeerConfig>,
+    pub web: Option<web::WebConfig>,
+    pub connections: HashMap<String, connection::ConnectionConfig>,
 }
 
 impl Config {

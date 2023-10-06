@@ -7,14 +7,14 @@ use axum::{
 };
 use std::net::SocketAddr;
 
-use crate::{peers::Manager, InsimEvent};
+use crate::{connections::ConnectionManager, InsimEvent};
 
-async fn root(State(manager): State<Manager>) -> impl IntoResponse {
+async fn root(State(manager): State<ConnectionManager>) -> impl IntoResponse {
     Json(manager.list().await)
 }
 
 async fn subscribe(
-    State(manager): State<Manager>,
+    State(manager): State<ConnectionManager>,
     Path(peer): Path<String>,
 ) -> Sse<impl futures::Stream<Item = Result<Event, std::convert::Infallible>>> {
     // XXX: Proof of concept. Needs tidying.
@@ -39,7 +39,7 @@ async fn subscribe(
     .keep_alive(KeepAlive::default())
 }
 
-pub(crate) fn run(addr: &SocketAddr, manager: Manager) {
+pub(crate) fn run(addr: &SocketAddr, manager: ConnectionManager) {
     // build our application with a route
     let app = Router::new()
         // `GET /` goes to `root`

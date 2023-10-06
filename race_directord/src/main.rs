@@ -1,6 +1,6 @@
 mod cli;
 mod config;
-mod peers;
+mod connections;
 mod web;
 
 pub type InsimPacket = insim::v9::Packet;
@@ -48,20 +48,23 @@ async fn main() -> Result<ExitCode> {
     cli.instrumentation.setup()?;
 
     let config = config::Config::try_parse(Path::new(&cli.config))?;
-    let mut manager = peers::Manager::new();
-
-    for (name, peer) in config.peers.iter() {
+    let mut manager = connections::ConnectionManager::new();
+    for (name, peer) in config.connections.iter() {
         manager.add_peer(name, peer.clone()).await?;
     }
 
-    if let Some(listen) = config.web.listen {
-        web::run(&listen, manager.clone());
+    if_chain::if_chain! {
+        if let Some(web_config) = config.web;
+        if let Some(web_listen) = web_config.listen;
+        then {
+            web::run(&web_listen, manager.clone());
+        }
     }
 
     loop {
         tokio::select! {
             _ = tokio::signal::ctrl_c() => {
-                tracing::info!("requesting shutdown");
+                tracing::info!("Requesting shutdown");
                 manager.shutdown().await?;
             },
 

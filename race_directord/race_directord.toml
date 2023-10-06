@@ -1,14 +1,8 @@
 [web]
 listen = "0.0.0.0:4000"
 
-[peers.1]
+[connections.nubbins_au_demo]
 type = "relay"
 websocket = false
 auto-select-host = "Nubbins AU Demo"
 connection-attempts = 0
-
-
-[peers.2]
-type = "tcp"
-addr = "127.0.0.1:29999"
-connection-attempts = 3
