@@ -1,11 +1,11 @@
-use std::{marker::PhantomData, time::Duration};
+use std::time::Duration;
 use tokio::{
     io::BufWriter,
     net::{TcpStream, UdpSocket},
     time::{self, timeout},
 };
 
-use crate::{codec::Frame, error::Error, result::Result};
+use crate::{error::Error, insim::Isi, packet::Packet, result::Result};
 use bytes::BytesMut;
 use if_chain::if_chain;
 
@@ -14,24 +14,21 @@ use crate::{codec::Codec, network::Network};
 use super::websocket::TungsteniteWebSocket;
 use super::DEFAULT_TIMEOUT_SECS;
 
-pub struct Framed<N, P>
+pub struct Framed<N>
 where
     N: Network,
-    P: Frame,
 {
     inner: N,
-    codec: Codec<P>,
+    codec: Codec,
     buffer: BytesMut,
     verify_version: bool,
-    marker: PhantomData<P>,
 }
 
-impl<N, P> Framed<N, P>
+impl<N> Framed<N>
 where
     N: Network,
-    P: Frame,
 {
-    pub fn new(inner: N, codec: Codec<P>) -> Self {
+    pub fn new(inner: N, codec: Codec) -> Self {
         let buffer = BytesMut::new();
 
         Self {
@@ -39,7 +36,6 @@ where
             codec,
             buffer,
             verify_version: false,
-            marker: PhantomData,
         }
     }
 
@@ -47,13 +43,13 @@ where
         self.verify_version = verify_version;
     }
 
-    pub async fn handshake(&mut self, isi: P::Isi, timeout: Duration) -> Result<()> {
+    pub async fn handshake(&mut self, isi: Isi, timeout: Duration) -> Result<()> {
         time::timeout(timeout, self.write(isi.into())).await??;
 
         Ok(())
     }
 
-    pub async fn read(&mut self) -> Result<P> {
+    pub async fn read(&mut self) -> Result<Packet> {
         loop {
             if_chain! {
                 if !self.buffer.is_empty();
@@ -103,7 +99,7 @@ where
         }
     }
 
-    pub async fn write(&mut self, packet: P) -> Result<()> {
+    pub async fn write(&mut self, packet: Packet) -> Result<()> {
         let mut buf = BytesMut::new();
 
         self.codec.encode(&packet, &mut buf)?;
@@ -120,15 +116,15 @@ where
 // I think this fine.
 // i.e. if we add a Websocket option down the line, then ConnectionOptions needs to understand it
 // therefore we cannot just box stuff magically anyway.
-pub enum FramedWrapped<P: Frame> {
-    Tcp(Framed<TcpStream, P>),
-    BufferedTcp(Framed<BufWriter<TcpStream>, P>),
-    Udp(Framed<UdpSocket, P>),
-    WebSocket(Framed<TungsteniteWebSocket, P>),
+pub enum FramedWrapped {
+    Tcp(Framed<TcpStream>),
+    BufferedTcp(Framed<BufWriter<TcpStream>>),
+    Udp(Framed<UdpSocket>),
+    WebSocket(Framed<TungsteniteWebSocket>),
 }
 
-impl<P: Frame> FramedWrapped<P> {
-    pub async fn handshake(&mut self, isi: P::Isi, timeout: Duration) -> Result<()> {
+impl FramedWrapped {
+    pub async fn handshake(&mut self, isi: Isi, timeout: Duration) -> Result<()> {
         match self {
             Self::Tcp(i) => i.handshake(isi, timeout).await,
             Self::Udp(i) => i.handshake(isi, timeout).await,
@@ -137,7 +133,7 @@ impl<P: Frame> FramedWrapped<P> {
         }
     }
 
-    pub async fn read(&mut self) -> Result<P> {
+    pub async fn read(&mut self) -> Result<Packet> {
         match self {
             Self::Tcp(i) => i.read().await,
             Self::Udp(i) => i.read().await,
@@ -146,7 +142,7 @@ impl<P: Frame> FramedWrapped<P> {
         }
     }
 
-    pub async fn write<I: Into<P> + Send + Sync>(&mut self, packet: I) -> Result<()> {
+    pub async fn write<I: Into<Packet> + Send + Sync>(&mut self, packet: I) -> Result<()> {
         match self {
             Self::Tcp(i) => i.write(packet.into()).await,
             Self::Udp(i) => i.write(packet.into()).await,

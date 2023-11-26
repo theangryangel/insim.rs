@@ -7,7 +7,7 @@ use axum::{
 };
 use std::net::SocketAddr;
 
-use crate::{connections::ConnectionManager, InsimEvent};
+use crate::connections::ConnectionManager;
 
 async fn root(State(manager): State<ConnectionManager>) -> impl IntoResponse {
     Json(manager.list().await)
@@ -23,7 +23,7 @@ async fn subscribe(
     Sse::new(async_stream::stream! {
         loop {
             match receiver.recv().await {
-                Ok(InsimEvent::Data(i, _)) => {
+                Ok(insim::connection::Event::Data(i, _)) => {
                     let event = Event::default()
                         .json_data(i).unwrap();
 

@@ -9,32 +9,34 @@ pub use identifier::ConnectionIdentifier;
 use tokio::{io::BufWriter, time::timeout};
 
 use crate::{
-    codec::{Codec, Frame, Mode},
+    codec::{Codec, Mode},
     error::Error,
+    insim::Isi,
     network::{Framed, FramedWrapped},
+    packet::Packet,
     relay::HostSelect,
     result::Result,
 };
 
 use self::network_options::NetworkOptions;
 
-pub struct Connection<P: Frame + std::convert::From<HostSelect>> {
+pub struct Connection {
     pub id: Option<ConnectionIdentifier>,
 
-    isi: P::Isi,
+    isi: Isi,
     network_options: NetworkOptions,
-    inner: Option<FramedWrapped<P>>,
+    inner: Option<FramedWrapped>,
     shutdown: bool,
 
     shutdown_notify: tokio::sync::Notify,
 }
 
-impl<P: Frame + std::convert::From<HostSelect>> Connection<P> {
+impl Connection {
     pub fn tcp<R: Into<SocketAddr>>(
         mode: Mode,
         remote: R,
         verify_version: bool,
-        options: P::Isi,
+        options: Isi,
     ) -> Self {
         Connection {
             id: None,
@@ -55,7 +57,7 @@ impl<P: Frame + std::convert::From<HostSelect>> Connection<P> {
         remote: R,
         mode: Mode,
         verify_version: bool,
-        options: P::Isi,
+        options: Isi,
     ) -> Self {
         Connection {
             id: None,
@@ -77,7 +79,7 @@ impl<P: Frame + std::convert::From<HostSelect>> Connection<P> {
         websocket: bool,
         spectator_password: S,
         admin_password: S,
-        options: P::Isi,
+        options: Isi,
     ) -> Self {
         Connection {
             id: None,
@@ -94,15 +96,15 @@ impl<P: Frame + std::convert::From<HostSelect>> Connection<P> {
         }
     }
 
-    pub fn isi(&self) -> &P::Isi {
+    pub fn isi(&self) -> &Isi {
         &self.isi
     }
 
-    pub fn isi_mut(&mut self) -> &mut P::Isi {
+    pub fn isi_mut(&mut self) -> &mut Isi {
         &mut self.isi
     }
 
-    pub(crate) async fn connect(&mut self) -> Result<FramedWrapped<P>> {
+    pub(crate) async fn connect(&mut self) -> Result<FramedWrapped> {
         let timeout_duration = Duration::from_secs(5);
 
         tracing::debug!("Connecting...");
@@ -190,7 +192,7 @@ impl<P: Frame + std::convert::From<HostSelect>> Connection<P> {
         }
     }
 
-    pub async fn send<I: Into<P>>(&mut self, packet: I) -> Result<()> {
+    pub async fn send<I: Into<Packet>>(&mut self, packet: I) -> Result<()> {
         if self.shutdown {
             return Err(Error::Shutdown);
         }
@@ -210,7 +212,7 @@ impl<P: Frame + std::convert::From<HostSelect>> Connection<P> {
     /// [Event].
     /// On error, calling again will result in a reconnection attempt.
     /// Failure to call poll will result in a timeout.
-    pub async fn poll(&mut self) -> Result<Event<P>> {
+    pub async fn poll(&mut self) -> Result<Event> {
         if self.shutdown {
             return Err(Error::Shutdown);
         }
@@ -229,7 +231,7 @@ impl<P: Frame + std::convert::From<HostSelect>> Connection<P> {
         }
     }
 
-    async fn poll_inner(&mut self) -> Result<Event<P>> {
+    async fn poll_inner(&mut self) -> Result<Event> {
         let stream = self.inner.as_mut().unwrap();
 
         tokio::select! {

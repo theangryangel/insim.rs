@@ -4,11 +4,12 @@
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
 use insim::{
-    codec::{Codec, Frame, Mode},
+    codec::{Codec, Mode},
+    insim::{Isi, IsiFlags},
     network::{Framed, FramedWrapped},
+    packet::Packet,
     relay,
     result::Result,
-    v9::{IsiFlags, Packet},
 };
 use std::{net::SocketAddr, time::Duration};
 use tokio::net::{TcpStream, UdpSocket};
@@ -74,12 +75,12 @@ pub async fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
-    let mut isi = Packet::isi_default();
+    let mut isi = Isi::default();
     isi.flags = IsiFlags::MCI | IsiFlags::CON | IsiFlags::OBH;
     isi.iname = "insim.rs".into();
     isi.interval = Duration::from_millis(1000);
 
-    let mut client: FramedWrapped<Packet> = match &cli.command {
+    let mut client: FramedWrapped = match &cli.command {
         Commands::Udp { bind, addr } => {
             let local = bind.unwrap_or("0.0.0.0:0".parse()?);
             let stream = UdpSocket::bind(local).await.unwrap();

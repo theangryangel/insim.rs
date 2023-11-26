@@ -1,34 +1,28 @@
-mod frame;
 mod mode;
 
 #[cfg(test)]
 mod tests;
 
-pub use frame::{Frame, FrameInitData};
 pub use mode::Mode;
 
-use crate::result::Result;
+use crate::{packet::Packet, result::Result};
 use bytes::{Buf, BufMut, BytesMut};
-use std::marker::PhantomData;
+use insim_core::{Decodable, Encodable};
 
-pub struct Codec<P: Frame> {
+pub struct Codec {
     mode: Mode,
-    marker: PhantomData<P>,
 }
 
-impl<P: Frame> Codec<P> {
+impl Codec {
     pub fn new(mode: Mode) -> Self {
-        Self {
-            mode,
-            marker: PhantomData,
-        }
+        Self { mode }
     }
 
     pub fn mode(&self) -> crate::codec::Mode {
         self.mode
     }
 
-    pub fn encode(&self, msg: &P, dst: &mut BytesMut) -> Result<()> {
+    pub fn encode(&self, msg: &Packet, dst: &mut BytesMut) -> Result<()> {
         let mut buf = BytesMut::new();
         msg.encode(&mut buf, None)?;
 
@@ -46,7 +40,7 @@ impl<P: Frame> Codec<P> {
         Ok(())
     }
 
-    pub fn decode(&self, src: &mut BytesMut) -> Result<Option<P>> {
+    pub fn decode(&self, src: &mut BytesMut) -> Result<Option<Packet>> {
         if src.is_empty() {
             return Ok(None);
         }
@@ -64,7 +58,7 @@ impl<P: Frame> Codec<P> {
         // none of the packet definitions include the size
         data.advance(1);
 
-        let res = P::decode(&mut data, None);
+        let res = Packet::decode(&mut data, None);
 
         match res {
             Ok(packet) => {

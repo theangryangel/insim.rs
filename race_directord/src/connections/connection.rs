@@ -5,12 +5,10 @@ use tokio::{
     time::sleep,
 };
 
-use crate::{InsimConnection, InsimError, InsimEvent};
-
 #[derive(Debug)]
 pub enum Message {
     Subscribe {
-        respond_to: oneshot::Sender<broadcast::Receiver<InsimEvent>>,
+        respond_to: oneshot::Sender<broadcast::Receiver<insim::connection::Event>>,
     },
 
     Shutdown,
@@ -21,7 +19,7 @@ pub(crate) struct Connection {
 }
 
 impl Connection {
-    pub fn new(client: InsimConnection, connection_attempts: usize) -> Self {
+    pub fn new(client: insim::connection::Connection, connection_attempts: usize) -> Self {
         let (sender, receiver) = mpsc::channel(8);
 
         let actor = ConnectionActor::new(client, receiver, connection_attempts);
@@ -36,7 +34,7 @@ impl Connection {
         Ok(())
     }
 
-    pub async fn subscribe(&self) -> broadcast::Receiver<InsimEvent> {
+    pub async fn subscribe(&self) -> broadcast::Receiver<insim::connection::Event> {
         let (send, recv) = oneshot::channel();
         let _ = self
             .sender
@@ -52,22 +50,22 @@ impl Connection {
 }
 
 struct ConnectionActor {
-    client: InsimConnection,
+    client: insim::connection::Connection,
     rx: mpsc::Receiver<Message>,
     connection_attempts: usize,
     connected: bool,
     delay: u64,
     attempts: usize,
-    bcast: broadcast::Sender<InsimEvent>,
+    bcast: broadcast::Sender<insim::connection::Event>,
 }
 
 impl ConnectionActor {
     fn new(
-        client: InsimConnection,
+        client: insim::connection::Connection,
         rx: mpsc::Receiver<Message>,
         connection_attempts: usize,
     ) -> Self {
-        let (bcast, _) = broadcast::channel::<InsimEvent>(32);
+        let (bcast, _) = broadcast::channel::<insim::connection::Event>(32);
 
         Self {
             client,
@@ -97,26 +95,26 @@ impl ConnectionActor {
 
                 res = self.client.poll() => {
                     match res {
-                        Ok(InsimEvent::Connected(id)) => {
+                        Ok(insim::connection::Event::Connected(id)) => {
                             self.delay = 1;
                             self.attempts = 0;
                             self.connected = true;
                             tracing::info!("Connected");
-                            let _ = self.bcast.send(InsimEvent::Connected(id));
+                            let _ = self.bcast.send(insim::connection::Event::Connected(id));
                         },
                         Ok(e) => {
                             tracing::trace!("Event={:?}", e);
                             let _ = self.bcast.send(e);
                         },
-                        Err(InsimError::Shutdown) => {
+                        Err(insim::error::Error::Shutdown) => {
                             tracing::info!("Shutdown");
                             break;
                         },
-                        Err(InsimError::IncompatibleVersion(_)) => {
+                        Err(insim::error::Error::IncompatibleVersion(_)) => {
                             tracing::error!("{}", res.unwrap_err());
                             break;
                         },
-                        Err(InsimError::Timeout(_)) | Err(InsimError::IO { .. }) | Err(_) => {
+                        Err(insim::error::Error::Timeout(_)) | Err(insim::error::Error::IO { .. }) | Err(_) => {
                             tracing::error!("{:?}", res.unwrap_err());
                             if !self.connected {
                                 self.attempts = self.attempts.wrapping_add(1);

@@ -3,11 +3,13 @@
 pub mod codec;
 pub mod connection;
 pub mod error;
+pub mod insim;
 pub mod network;
-pub mod result;
-pub mod v9;
-
+pub mod packet;
 pub mod relay;
+pub mod result;
+
+const VERSION: u8 = 9;
 
 // pub mod tools;
 

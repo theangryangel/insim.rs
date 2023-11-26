@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use super::VERSION;
+use crate::VERSION;
 use insim_core::{identifiers::RequestId, prelude::*, ser::Limit, DecodableError, EncodableError};
 
 #[cfg(feature = "serde")]
@@ -160,5 +160,3 @@ impl Decodable for Isi {
         Ok(data)
     }
 }
-
-impl crate::codec::FrameInitData for Isi {}

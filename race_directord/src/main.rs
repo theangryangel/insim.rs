@@ -3,11 +3,6 @@ mod config;
 mod connections;
 mod web;
 
-pub type InsimPacket = insim::v9::Packet;
-pub type InsimConnection = insim::connection::Connection<InsimPacket>;
-pub type InsimEvent = insim::connection::Event<InsimPacket>;
-pub type InsimError = insim::error::Error;
-
 pub type Result<T, E = Report> = color_eyre::Result<T, E>;
 // A generic error report
 // Produced via `Err(some_err).wrap_err("Some context")`

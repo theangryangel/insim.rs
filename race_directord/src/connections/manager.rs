@@ -1,4 +1,4 @@
-use insim::codec::Frame;
+use insim::insim::Isi;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{
     sync::{broadcast, mpsc, oneshot, Notify},
@@ -6,7 +6,7 @@ use tokio::{
 };
 
 use super::Connection;
-use crate::{config::connection::ConnectionConfig, InsimConnection, InsimEvent, InsimPacket};
+use crate::config::connection::ConnectionConfig;
 
 #[derive(Debug)]
 enum ConnectionManagerControl {
@@ -23,7 +23,7 @@ enum ConnectionManagerControl {
 
     Subscribe {
         name: String,
-        respond_to: oneshot::Sender<crate::Result<broadcast::Receiver<InsimEvent>>>,
+        respond_to: oneshot::Sender<crate::Result<broadcast::Receiver<insim::connection::Event>>>,
     },
 
     Shutdown,
@@ -87,7 +87,10 @@ impl ConnectionManager {
         recv.await.expect("Actor killed")
     }
 
-    pub async fn subscribe(&self, name: &str) -> crate::Result<broadcast::Receiver<InsimEvent>> {
+    pub async fn subscribe(
+        &self,
+        name: &str,
+    ) -> crate::Result<broadcast::Receiver<insim::connection::Event>> {
         let (send, recv) = oneshot::channel();
 
         let _ = self
@@ -137,12 +140,12 @@ impl ConnectionManagerActor {
                     max_attempts = i;
                 }
 
-                InsimConnection::relay(
+                insim::connection::Connection::relay(
                     auto_select_host.clone(),
                     websocket,
                     spectator.clone(),
                     admin,
-                    InsimPacket::isi_default(),
+                    Isi::default(),
                 )
             }
             ConnectionConfig::Tcp {
@@ -153,11 +156,11 @@ impl ConnectionManagerActor {
                     max_attempts = i;
                 }
 
-                InsimConnection::tcp(
+                insim::connection::Connection::tcp(
                     insim::codec::Mode::Compressed,
                     addr,
                     true,
-                    InsimPacket::isi_default(),
+                    Isi::default(),
                 )
             }
 
@@ -170,12 +173,12 @@ impl ConnectionManagerActor {
                     max_attempts = i;
                 }
 
-                InsimConnection::udp(
+                insim::connection::Connection::udp(
                     bind,
                     addr,
                     insim::codec::Mode::Compressed,
                     true,
-                    InsimPacket::isi_default(),
+                    Isi::default(),
                 )
             }
         };
