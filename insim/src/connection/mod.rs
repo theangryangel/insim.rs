@@ -2,7 +2,7 @@ mod event;
 mod identifier;
 mod network_options;
 
-use std::{net::SocketAddr, time::Duration};
+use std::{fmt::Debug, net::SocketAddr, time::Duration};
 
 pub use event::Event;
 pub use identifier::ConnectionIdentifier;
@@ -20,6 +20,7 @@ use crate::{
 
 use self::network_options::NetworkOptions;
 
+#[derive(Debug)]
 pub struct Connection {
     pub id: Option<ConnectionIdentifier>,
 
@@ -32,12 +33,14 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub fn tcp<R: Into<SocketAddr>>(
+    #[tracing::instrument]
+    pub fn tcp<R: Into<SocketAddr> + Debug>(
         mode: Mode,
         remote: R,
         verify_version: bool,
         options: Isi,
     ) -> Self {
+        tracing::debug!("Building Tcp connection");
         Connection {
             id: None,
             inner: None,
@@ -52,13 +55,15 @@ impl Connection {
         }
     }
 
-    pub fn udp<L: Into<Option<SocketAddr>>, R: Into<SocketAddr>>(
+    #[tracing::instrument]
+    pub fn udp<L: Into<Option<SocketAddr>> + Debug, R: Into<SocketAddr> + Debug>(
         local: L,
         remote: R,
         mode: Mode,
         verify_version: bool,
         options: Isi,
     ) -> Self {
+        tracing::debug!("Building Udp connection");
         Connection {
             id: None,
             inner: None,
@@ -74,13 +79,15 @@ impl Connection {
         }
     }
 
-    pub fn relay<H: Into<Option<String>>, S: Into<Option<String>>>(
+    #[tracing::instrument]
+    pub fn relay<H: Into<Option<String>> + Debug, S: Into<Option<String>> + Debug>(
         select_host: H,
         websocket: bool,
         spectator_password: S,
         admin_password: S,
         options: Isi,
     ) -> Self {
+        tracing::debug!("Building Relay connection");
         Connection {
             id: None,
             inner: None,
@@ -104,6 +111,7 @@ impl Connection {
         &mut self.isi
     }
 
+    #[tracing::instrument(skip(self), fields(self = ?self.id))]
     pub(crate) async fn connect(&mut self) -> Result<Framed> {
         let timeout_duration = Duration::from_secs(5);
 
@@ -117,7 +125,7 @@ impl Connection {
 
                 let stream = BufWriter::new(stream);
 
-                let mut stream = FramedInner::new(stream, Codec::new(*mode));
+                let mut stream = FramedInner::new(stream, Codec::new(mode.clone()));
                 stream
                     .handshake(self.isi.clone(), Duration::from_secs(30))
                     .await?;
@@ -135,7 +143,7 @@ impl Connection {
                 let stream = tokio::net::UdpSocket::bind(local).await?;
                 stream.connect(remote).await.unwrap();
 
-                let mut stream = FramedInner::new(stream, Codec::new(*mode));
+                let mut stream = FramedInner::new(stream, Codec::new(mode.clone()));
                 stream
                     .handshake(self.isi.clone(), Duration::from_secs(30))
                     .await?;
@@ -192,7 +200,8 @@ impl Connection {
         }
     }
 
-    pub async fn send<I: Into<Packet>>(&mut self, packet: I) -> Result<()> {
+    #[tracing::instrument(skip(self), fields(self = ?self.id))]
+    pub async fn send<I: Into<Packet> + Debug>(&mut self, packet: I) -> Result<()> {
         if self.shutdown {
             return Err(Error::Shutdown);
         }
@@ -212,6 +221,7 @@ impl Connection {
     /// [Event].
     /// On error, calling again will result in a reconnection attempt.
     /// Failure to call poll will result in a timeout.
+    #[tracing::instrument(skip(self), fields(self = ?self.id))]
     pub async fn poll(&mut self) -> Result<Event> {
         if self.shutdown {
             return Err(Error::Shutdown);

@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{fmt::Debug, time::Duration};
 use tokio::{
     io::BufWriter,
     net::{TcpStream, UdpSocket},
@@ -122,30 +122,65 @@ pub enum Framed {
 }
 
 impl Framed {
+    #[tracing::instrument]
     pub async fn handshake(&mut self, isi: Isi, timeout: Duration) -> Result<()> {
-        match self {
+        let res = match self {
             Self::Tcp(i) => i.handshake(isi, timeout).await,
             Self::Udp(i) => i.handshake(isi, timeout).await,
             Self::WebSocket(i) => i.handshake(isi, timeout).await,
             Self::BufferedTcp(i) => i.handshake(isi, timeout).await,
-        }
+        };
+        tracing::debug!("handshake result {:?}", res);
+        res
     }
 
+    #[tracing::instrument]
     pub async fn read(&mut self) -> Result<Packet> {
-        match self {
+        let res = match self {
             Self::Tcp(i) => i.read().await,
             Self::Udp(i) => i.read().await,
             Self::WebSocket(i) => i.read().await,
             Self::BufferedTcp(i) => i.read().await,
-        }
+        };
+        tracing::debug!("read result {:?}", res);
+        res
     }
 
-    pub async fn write<I: Into<Packet> + Send + Sync>(&mut self, packet: I) -> Result<()> {
+    #[tracing::instrument]
+    pub async fn write<I: Into<Packet> + Send + Sync + Debug>(&mut self, packet: I) -> Result<()> {
+        tracing::debug!("writing packet {:?}", &packet);
         match self {
             Self::Tcp(i) => i.write(packet.into()).await,
             Self::Udp(i) => i.write(packet.into()).await,
             Self::WebSocket(i) => i.write(packet.into()).await,
             Self::BufferedTcp(i) => i.write(packet.into()).await,
+        }
+    }
+}
+
+impl Debug for Framed {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Framed::Tcp(i) => write!(
+                f,
+                "Framed::Tcp {{ codec: {:?}, verify_version: {:?} }}",
+                i.codec, i.verify_version
+            ),
+            Framed::BufferedTcp(i) => write!(
+                f,
+                "Framed::BufferedTcp {{ codec: {:?}, verify_version: {:?} }}",
+                i.codec, i.verify_version
+            ),
+            Framed::Udp(i) => write!(
+                f,
+                "Framed::Tcp {{ codec: {:?}, verify_version: {:?} }}",
+                i.codec, i.verify_version
+            ),
+            Framed::WebSocket(i) => write!(
+                f,
+                "Framed::Tcp {{ codec: {:?}, verify_version: {:?} }}",
+                i.codec, i.verify_version
+            ),
         }
     }
 }

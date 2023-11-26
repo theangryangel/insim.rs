@@ -98,6 +98,7 @@ impl Default for Packet {
 }
 
 impl Packet {
+    #[tracing::instrument]
     pub fn maybe_pong(&self) -> Option<Self> {
         match self {
             Packet::Tiny(Tiny {
@@ -111,6 +112,7 @@ impl Packet {
         }
     }
 
+    #[tracing::instrument]
     pub fn maybe_verify_version(&self) -> crate::result::Result<bool> {
         match self {
             Packet::Version(Version { insimver, .. }) => {

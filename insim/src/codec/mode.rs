@@ -4,7 +4,7 @@ use bytes::BytesMut;
 use std::io;
 
 /// Describes if Insim packets are in "compressed" or "uncompressed" mode.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Mode {
     /// Insim <= 8 and the LFSWorld relay uses verbatim packet sizes
     Uncompressed,
@@ -17,6 +17,7 @@ pub enum Mode {
 impl Mode {
     /// Given a single packet in dst, encode it's length, and ensure that it does not
     /// exceed maximum limits
+    #[tracing::instrument]
     pub fn encode_length(&self, len: usize) -> io::Result<u8> {
         if len < self.valid_raw_buffer_min_len() {
             // probably a programming error. lets bail.
@@ -54,6 +55,7 @@ impl Mode {
 
     /// Decode the length of the next packet in the buffer src, ensuring that it does
     /// not exceed limits.
+    #[tracing::instrument]
     pub fn decode_length(&self, src: &BytesMut) -> io::Result<Option<usize>> {
         if src.len() < self.valid_raw_buffer_min_len() {
             // Not enough data for even the header

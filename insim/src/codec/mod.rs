@@ -9,6 +9,7 @@ use crate::{packet::Packet, result::Result};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use insim_core::{Decodable, Encodable};
 
+#[derive(Debug)]
 pub struct Codec {
     mode: Mode,
 }
@@ -18,10 +19,11 @@ impl Codec {
         Self { mode }
     }
 
-    pub fn mode(&self) -> crate::codec::Mode {
-        self.mode
+    pub fn mode(&self) -> &Mode {
+        &self.mode
     }
 
+    #[tracing::instrument]
     pub fn encode(&self, msg: &Packet) -> Result<Bytes> {
         let mut dst = BytesMut::new();
 
@@ -40,6 +42,7 @@ impl Codec {
         Ok(dst.freeze())
     }
 
+    #[tracing::instrument]
     pub fn decode(&self, src: &mut BytesMut) -> Result<Option<Packet>> {
         if src.is_empty() {
             return Ok(None);

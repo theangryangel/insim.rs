@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use crate::codec::Mode;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum NetworkOptions {
     Tcp {
         remote: SocketAddr,
