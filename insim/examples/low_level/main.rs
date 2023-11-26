@@ -6,7 +6,7 @@ use if_chain::if_chain;
 use insim::{
     codec::{Codec, Mode},
     insim::{Isi, IsiFlags},
-    network::{Framed, FramedWrapped},
+    network::{Framed, FramedInner},
     packet::Packet,
     relay,
     result::Result,
@@ -80,28 +80,28 @@ pub async fn main() -> Result<()> {
     isi.iname = "insim.rs".into();
     isi.interval = Duration::from_millis(1000);
 
-    let mut client: FramedWrapped = match &cli.command {
+    let mut client: Framed = match &cli.command {
         Commands::Udp { bind, addr } => {
             let local = bind.unwrap_or("0.0.0.0:0".parse()?);
             let stream = UdpSocket::bind(local).await.unwrap();
             isi.udpport = stream.local_addr().unwrap().port().into();
             stream.connect(addr).await.unwrap();
 
-            FramedWrapped::Udp(Framed::new(stream, Codec::new(Mode::Compressed)))
+            Framed::Udp(FramedInner::new(stream, Codec::new(Mode::Compressed)))
         }
         Commands::Tcp { addr } => {
             let stream = TcpStream::connect(addr).await?;
 
             tracing::info!("Connected to server. Creating client");
 
-            FramedWrapped::Tcp(Framed::new(stream, Codec::new(Mode::Compressed)))
+            Framed::Tcp(FramedInner::new(stream, Codec::new(Mode::Compressed)))
         }
         Commands::Relay { .. } => {
             let stream = TcpStream::connect("isrelay.lfs.net:47474").await?;
 
             tracing::info!("Connected to LFSW Relay. Creating client");
 
-            FramedWrapped::Tcp(Framed::new(stream, Codec::new(Mode::Uncompressed)))
+            Framed::Tcp(FramedInner::new(stream, Codec::new(Mode::Uncompressed)))
         }
     };
 

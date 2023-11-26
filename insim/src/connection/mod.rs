@@ -12,7 +12,7 @@ use crate::{
     codec::{Codec, Mode},
     error::Error,
     insim::Isi,
-    network::{Framed, FramedWrapped},
+    network::{Framed, FramedInner},
     packet::Packet,
     relay::HostSelect,
     result::Result,
@@ -25,7 +25,7 @@ pub struct Connection {
 
     isi: Isi,
     network_options: NetworkOptions,
-    inner: Option<FramedWrapped>,
+    inner: Option<Framed>,
     shutdown: bool,
 
     shutdown_notify: tokio::sync::Notify,
@@ -104,7 +104,7 @@ impl Connection {
         &mut self.isi
     }
 
-    pub(crate) async fn connect(&mut self) -> Result<FramedWrapped> {
+    pub(crate) async fn connect(&mut self) -> Result<Framed> {
         let timeout_duration = Duration::from_secs(5);
 
         tracing::debug!("Connecting...");
@@ -117,12 +117,12 @@ impl Connection {
 
                 let stream = BufWriter::new(stream);
 
-                let mut stream = Framed::new(stream, Codec::new(*mode));
+                let mut stream = FramedInner::new(stream, Codec::new(*mode));
                 stream
                     .handshake(self.isi.clone(), Duration::from_secs(30))
                     .await?;
 
-                Ok(FramedWrapped::BufferedTcp(stream))
+                Ok(Framed::BufferedTcp(stream))
             }
             NetworkOptions::Udp {
                 local,
@@ -135,12 +135,12 @@ impl Connection {
                 let stream = tokio::net::UdpSocket::bind(local).await?;
                 stream.connect(remote).await.unwrap();
 
-                let mut stream = Framed::new(stream, Codec::new(*mode));
+                let mut stream = FramedInner::new(stream, Codec::new(*mode));
                 stream
                     .handshake(self.isi.clone(), Duration::from_secs(30))
                     .await?;
 
-                Ok(FramedWrapped::Udp(stream))
+                Ok(Framed::Udp(stream))
             }
             NetworkOptions::Relay {
                 select_host,
@@ -155,7 +155,7 @@ impl Connection {
                     )
                     .await??;
 
-                    FramedWrapped::WebSocket(Framed::new(stream, Codec::new(Mode::Uncompressed)))
+                    Framed::WebSocket(FramedInner::new(stream, Codec::new(Mode::Uncompressed)))
                 } else {
                     tracing::debug!("Attempting connection...");
 
@@ -167,7 +167,7 @@ impl Connection {
 
                     tracing::debug!("Finished Connecting");
 
-                    FramedWrapped::Tcp(Framed::new(stream, Codec::new(Mode::Uncompressed)))
+                    Framed::Tcp(FramedInner::new(stream, Codec::new(Mode::Uncompressed)))
                 };
 
                 if let Some(hostname) = select_host {

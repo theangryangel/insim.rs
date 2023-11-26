@@ -7,7 +7,7 @@ pub mod tcp;
 pub mod udp;
 pub mod websocket;
 
-pub use framed::{Framed, FramedWrapped};
+pub use framed::{Framed, FramedInner};
 
 pub const DEFAULT_TIMEOUT_SECS: u64 = 90;
 

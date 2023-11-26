@@ -14,7 +14,7 @@ use crate::{codec::Codec, network::Network};
 use super::websocket::TungsteniteWebSocket;
 use super::DEFAULT_TIMEOUT_SECS;
 
-pub struct Framed<N>
+pub struct FramedInner<N>
 where
     N: Network,
 {
@@ -24,7 +24,7 @@ where
     verify_version: bool,
 }
 
-impl<N> Framed<N>
+impl<N> FramedInner<N>
 where
     N: Network,
 {
@@ -116,14 +116,14 @@ where
 // I think this fine.
 // i.e. if we add a Websocket option down the line, then ConnectionOptions needs to understand it
 // therefore we cannot just box stuff magically anyway.
-pub enum FramedWrapped {
-    Tcp(Framed<TcpStream>),
-    BufferedTcp(Framed<BufWriter<TcpStream>>),
-    Udp(Framed<UdpSocket>),
-    WebSocket(Framed<TungsteniteWebSocket>),
+pub enum Framed {
+    Tcp(FramedInner<TcpStream>),
+    BufferedTcp(FramedInner<BufWriter<TcpStream>>),
+    Udp(FramedInner<UdpSocket>),
+    WebSocket(FramedInner<TungsteniteWebSocket>),
 }
 
-impl FramedWrapped {
+impl Framed {
     pub async fn handshake(&mut self, isi: Isi, timeout: Duration) -> Result<()> {
         match self {
             Self::Tcp(i) => i.handshake(isi, timeout).await,

@@ -1,4 +1,8 @@
-use crate::{codec::{Codec, Mode}, packet::Packet, insim::{Tiny, TinyType}};
+use crate::{
+    codec::{Codec, Mode},
+    insim::{Tiny, TinyType},
+    packet::Packet,
+};
 use bytes::{Buf, BytesMut};
 use insim_core::{identifiers::RequestId, InsimDecode, InsimEncode};
 use tokio_test::assert_ok;
