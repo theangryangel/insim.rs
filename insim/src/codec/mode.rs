@@ -6,7 +6,7 @@ use std::io;
 /// Describes if Insim packets are in "compressed" or "uncompressed" mode.
 #[derive(Debug, Clone, Copy)]
 pub enum Mode {
-    /// Insim <= 8 uses verbatim packet sizes
+    /// Insim <= 8 and the LFSWorld relay uses verbatim packet sizes
     Uncompressed,
 
     /// Insim >= 9 optionally supports "compressing" the packet size by dividing by 4
