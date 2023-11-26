@@ -6,7 +6,7 @@ mod tests;
 pub use mode::Mode;
 
 use crate::{packet::Packet, result::Result};
-use bytes::{Buf, BufMut, BytesMut};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use insim_core::{Decodable, Encodable};
 
 pub struct Codec {
@@ -22,22 +22,22 @@ impl Codec {
         self.mode
     }
 
-    pub fn encode(&self, msg: &Packet, dst: &mut BytesMut) -> Result<()> {
-        let mut buf = BytesMut::new();
-        msg.encode(&mut buf, None)?;
+    pub fn encode(&self, msg: &Packet) -> Result<Bytes> {
+        let mut dst = BytesMut::new();
 
-        let n = self.mode().encode_length(&mut buf)?;
+        // put a placeholder for our length, we'll come back to this later
+        dst.put_u8(0);
 
-        // Reserve capacity in the destination buffer to fit the frame and
-        // length field (plus adjustment).
-        dst.reserve(n + 1);
+        // encode the message
+        msg.encode(&mut dst, None)?;
 
-        dst.put_u8(n as u8);
+        // encode the length of the packet, including the placeholder for the length
+        let n = self.mode().encode_length(dst.len())?;
 
-        // Write the frame to the buffer
-        dst.extend_from_slice(&buf[..]);
+        // update the length the encoded length
+        dst[0] = n;
 
-        Ok(())
+        Ok(dst.freeze())
     }
 
     pub fn decode(&self, src: &mut BytesMut) -> Result<Option<Packet>> {

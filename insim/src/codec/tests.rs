@@ -39,17 +39,12 @@ async fn write_tiny_ping() {
         &[1, 3, 2, 3],
     );
 
-    let mut buf = BytesMut::new();
-
     let codec = Codec::new(Mode::Compressed);
-    let res = codec.encode(
-        &Packet::Tiny(Tiny {
-            subt: TinyType::Ping,
-            reqi: RequestId(2),
-        }),
-        &mut buf,
-    );
-    assert_ok!(res);
+    let buf = codec.encode(&Packet::Tiny(Tiny {
+        subt: TinyType::Ping,
+        reqi: RequestId(2),
+    }));
+    assert_ok!(&buf);
 
-    assert_eq!(&mock[..], &buf[..])
+    assert_eq!(&mock[..], &buf.unwrap()[..])
 }

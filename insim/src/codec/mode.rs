@@ -1,6 +1,6 @@
 //! Handles encoding and decoding of [Packets](crate::packets::Packet) from the wire.
 
-use bytes::{Buf, BytesMut};
+use bytes::BytesMut;
 use std::io;
 
 /// Describes if Insim packets are in "compressed" or "uncompressed" mode.
@@ -17,24 +17,18 @@ pub enum Mode {
 impl Mode {
     /// Given a single packet in dst, encode it's length, and ensure that it does not
     /// exceed maximum limits
-    pub fn encode_length(&self, dst: &mut BytesMut) -> io::Result<usize> {
-        // Adjust `n` with bounds checking to include the size of the packet
-        let n = match dst.len().checked_add(1) {
-            Some(n) => n,
-            None => {
-                // Probably a programming error, lets bail.
-                panic!(
-                    "Provided length would overflow after adjustment.
-                    This is probably a programming error."
-                );
-            }
-        };
+    pub fn encode_length(&self, len: usize) -> io::Result<u8> {
+        if len < self.valid_raw_buffer_min_len() {
+            // probably a programming error. lets bail.
+            panic!("Failed to encode any data. Possible programming error.");
+        }
 
+        // the length passed must include the placeholder byte for the packet size!
         let n = match self {
-            Mode::Uncompressed => n,
+            Mode::Uncompressed => len,
             Mode::Compressed => {
-                if n % 4 == 0 {
-                    n / 4
+                if let Some(0) = len.checked_rem(4) {
+                    len / 4
                 } else {
                     // probably a programming error, lets bail.
                     panic!(
@@ -55,45 +49,34 @@ impl Mode {
             );
         }
 
-        Ok(n)
+        Ok(n as u8)
     }
 
     /// Decode the length of the next packet in the buffer src, ensuring that it does
     /// not exceed limits.
-    pub fn decode_length(&self, src: &mut BytesMut) -> io::Result<Option<usize>> {
-        if src.len() < 4 {
+    pub fn decode_length(&self, src: &BytesMut) -> io::Result<Option<usize>> {
+        if src.len() < self.valid_raw_buffer_min_len() {
             // Not enough data for even the header
-            // All packets are defined as a minimum of:
-            // size: u8
-            // type: u8
-            // reqi: u8
-            // data: (at least u8)
             return Ok(None);
         }
 
-        let n = {
-            // we want a cursor so that we're not fiddling with the internal offset of src
-            let mut src = io::Cursor::new(&mut *src);
-
-            // get the size of this packet
-            let n = src.get_u8() as usize;
-
-            // if we're in compressed mode, multiply by 4
-            let n = match self {
-                Mode::Uncompressed => n,
-                Mode::Compressed => n * 4,
-            };
-
-            // does this exceed the max possible packet?
-            if n > self.max_length() {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "frame exceeds max_bytes",
-                ));
-            }
-
-            n
+        // get the size of this packet
+        let n = match src.first() {
+            Some(n) => match self {
+                Mode::Uncompressed => *n as usize,
+                // if we're in compressed mode, multiply by 4
+                Mode::Compressed => (*n as usize) * 4,
+            },
+            None => return Ok(None),
         };
+
+        // does this exceed the max possible packet?
+        if n > self.max_length() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "frame exceeds max_bytes",
+            ));
+        }
 
         if src.len() < n {
             // We dont have a full packet yet
@@ -101,6 +84,16 @@ impl Mode {
         }
 
         Ok(Some(n))
+    }
+
+    pub fn valid_raw_buffer_min_len(&self) -> usize {
+        // All packets are defined as a minimum of:
+        // size: u8
+        // type: u8
+        // reqi: u8
+        // data: (at least u8)
+        // Assumes we're using a raw buffer
+        4
     }
 
     /// What is the maximum size of a Packet, for a given Mode?

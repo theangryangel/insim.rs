@@ -100,9 +100,7 @@ where
     }
 
     pub async fn write(&mut self, packet: Packet) -> Result<()> {
-        let mut buf = BytesMut::new();
-
-        self.codec.encode(&packet, &mut buf)?;
+        let buf = self.codec.encode(&packet)?;
         if !buf.is_empty() {
             self.inner.try_write_bytes(&buf).await?;
         }
