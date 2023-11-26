@@ -3,8 +3,8 @@ use crate::{
     insim::{Tiny, TinyType},
     packet::Packet,
 };
-use bytes::{Buf, BytesMut};
-use insim_core::{identifiers::RequestId, InsimDecode, InsimEncode};
+use bytes::BytesMut;
+use insim_core::identifiers::RequestId;
 use tokio_test::assert_ok;
 
 #[tokio::test]
