@@ -1,0 +1,8 @@
+[web]
+listen = "0.0.0.0:4000"
+
+[connections.nubbins_au_demo]
+type = "relay"
+websocket = false
+auto-select-host = "Nubbins AU Demo"
+connection-attempts = 0

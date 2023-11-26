@@ -2,6 +2,7 @@ use crate::{Decodable, Encodable};
 use std::convert::From;
 
 #[derive(Debug, Default, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum RaceLaps {
     #[default]
     Practice,

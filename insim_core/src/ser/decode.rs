@@ -11,6 +11,7 @@ pub enum DecodableError {
     NeedsLimit(String),
     MissingMagic(String),
     UnexpectedLimit(String),
+    UnexpectedValue(String),
 }
 
 impl Error for DecodableError {}
@@ -23,6 +24,7 @@ impl fmt::Display for DecodableError {
             DecodableError::NeedsLimit(i) => write!(f, "Expected byte or count limit! {i}"),
             DecodableError::MissingMagic(i) => write!(f, "Missing magic: {i}"),
             DecodableError::UnexpectedLimit(limit) => write!(f, "Unexpected limit: {limit:?}"),
+            DecodableError::UnexpectedValue(i) => write!(f, "Unexpected value: {i:?}"),
         }
     }
 }

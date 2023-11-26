@@ -5,11 +5,14 @@
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
 use insim::{
-    connection::{Connection, ConnectionOptions, Event},
-    packets::{relay::HostListRequest, Packet},
+    codec::Mode,
+    connection::{Connection, Event},
+    insim::{Isi, IsiFlags},
+    packet::Packet,
+    relay::HostListRequest,
     result::Result,
 };
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::Duration};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -79,19 +82,21 @@ pub async fn main() -> Result<()> {
     // Parse our command line arguments, using clap
     let cli = Cli::parse();
 
-    // Use ConnectionBuilder to create a Connection
-    let mut options = ConnectionOptions::default();
+    let mut isi = Isi::default();
+    isi.flags = IsiFlags::MCI | IsiFlags::CON | IsiFlags::OBH;
+    isi.iname = "insim.rs".into();
+    isi.interval = Duration::from_millis(1000);
 
-    match &cli.command {
+    let mut client: Connection = match &cli.command {
         Commands::Udp { bind, addr } => {
             // if the local binding address is not provided, we let the OS decide a port to use
             let local = bind.unwrap_or("0.0.0.0:0".parse()?);
             tracing::info!("Connecting via UDP!");
-            options = options.udp(local, *addr, insim::codec::Mode::Compressed, true, true);
+            Connection::udp(local, *addr, Mode::Compressed, true, isi)
         }
         Commands::Tcp { addr } => {
             tracing::info!("Connecting via TCP!");
-            options = options.tcp(*addr, insim::codec::Mode::Compressed, true, true);
+            Connection::tcp(Mode::Compressed, *addr, true, isi)
         }
         Commands::Relay {
             select_host,
@@ -99,12 +104,16 @@ pub async fn main() -> Result<()> {
             spectator_password,
             ..
         } => {
-            options = options.relay(select_host.clone(), *websocket, spectator_password.clone());
             tracing::info!("Connecting via LFS World Relay!");
+            Connection::relay(
+                select_host.clone(),
+                *websocket,
+                spectator_password.clone(),
+                None,
+                isi,
+            )
         }
     };
-
-    let mut client = Connection::new(options, None);
 
     let mut i: usize = 0;
 

@@ -1,4 +1,4 @@
-use crate::{error::Error, packets::Packet};
+use crate::{error::Error, packet::Packet};
 
 use super::ConnectionIdentifier;
 

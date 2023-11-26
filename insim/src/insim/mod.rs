@@ -1,5 +1,3 @@
-//! Definitions for Insim Game Server packets.
-
 mod acr;
 mod axi;
 mod axm;

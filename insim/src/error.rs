@@ -1,7 +1,5 @@
 use insim_core::{DecodableError, EncodableError};
 
-use crate::packets::Packet;
-
 #[non_exhaustive]
 #[derive(thiserror::Error, Debug, Clone)]
 /// A specialized [`Error`] type for insim.
@@ -42,19 +40,6 @@ pub enum Error {
 
     #[error("Websocket Error: {0}")]
     WebsocketIO(String),
-
-    #[error("Packet received which is considered to be an error: {0:?}")]
-    PacketConsideredAsError(Packet),
-}
-
-impl From<Packet> for Error {
-    fn from(value: Packet) -> Self {
-        if value.is_error() {
-            Self::PacketConsideredAsError(value)
-        } else {
-            panic!("Not a packet which is considered to be an error. Programming error.")
-        }
-    }
 }
 
 impl From<tokio::time::error::Elapsed> for Error {
@@ -79,23 +64,10 @@ impl From<tokio_tungstenite::tungstenite::Error> for Error {
         match value {
             tokio_tungstenite::tungstenite::Error::ConnectionClosed => Error::Disconnected,
             tokio_tungstenite::tungstenite::Error::AlreadyClosed => Error::Disconnected,
-            tokio_tungstenite::tungstenite::Error::Io(inner) => inner.into(),
-            tokio_tungstenite::tungstenite::Error::Tls(i) => Error::WebsocketIO(i.to_string()),
-            tokio_tungstenite::tungstenite::Error::Capacity(i) => Error::WebsocketIO(i.to_string()),
-            tokio_tungstenite::tungstenite::Error::Protocol(i) => Error::WebsocketIO(i.to_string()),
-            tokio_tungstenite::tungstenite::Error::WriteBufferFull(i) => {
-                Error::WebsocketIO(i.to_string())
-            }
             tokio_tungstenite::tungstenite::Error::Utf8 => {
                 Error::WebsocketIO("UTF-8 encoding error".into())
             }
-            tokio_tungstenite::tungstenite::Error::Url(i) => Error::WebsocketIO(i.to_string()),
-            tokio_tungstenite::tungstenite::Error::Http(i) => {
-                Error::WebsocketIO(format!("{:?}", i))
-            }
-            tokio_tungstenite::tungstenite::Error::HttpFormat(i) => {
-                Error::WebsocketIO(i.to_string())
-            }
+            _ => Error::WebsocketIO(value.to_string()),
         }
     }
 }

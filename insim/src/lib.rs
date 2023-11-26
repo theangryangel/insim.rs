@@ -3,14 +3,15 @@
 pub mod codec;
 pub mod connection;
 pub mod error;
-pub mod packets;
+pub mod insim;
+pub mod network;
+pub mod packet;
+pub mod relay;
 pub mod result;
 
-pub mod tcp;
-pub mod tools;
-pub mod traits;
-pub mod udp;
-pub mod websocket;
+const VERSION: u8 = 9;
+
+// pub mod tools;
 
 #[doc(hidden)]
 /// Rexport insim_core
