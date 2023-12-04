@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use insim_core::{
     binrw::{self, binrw},
-    duration::{binrw_parse_u32_duration, binrw_write_u32_duration},
+    duration::{binrw_parse_duration, binrw_write_duration},
     identifiers::RequestId,
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
 };
@@ -81,12 +81,12 @@ pub struct Rip {
     #[brw(pad_after = 1)]
     pub options: RipOptions,
 
-    #[br(parse_with = binrw_parse_u32_duration::<_>)]
-    #[bw(write_with = binrw_write_u32_duration::<_>)]
+    #[br(parse_with = binrw_parse_duration::<u32, _>)]
+    #[bw(write_with = binrw_write_duration::<u32, _>)]
     pub ctime: Duration,
 
-    #[br(parse_with = binrw_parse_u32_duration::<_>)]
-    #[bw(write_with = binrw_write_u32_duration::<_>)]
+    #[br(parse_with = binrw_parse_duration::<u32, _>)]
+    #[bw(write_with = binrw_write_duration::<u32, _>)]
     pub ttime: Duration,
 
     #[br(parse_with = binrw_parse_codepage_string::<64, _>)]

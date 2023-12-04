@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use insim_core::{
     binrw::{self, binrw},
-    duration::{binrw_parse_u16_duration, binrw_write_u16_duration},
+    duration::{binrw_parse_duration, binrw_write_duration},
     identifiers::RequestId,
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
 };
@@ -69,8 +69,8 @@ pub struct Isi {
 
     /// Time in between each [Nlp](super::Nlp) or [Mci](super::Mci) packet when set to a non-zero value and
     /// the relevant flags are set.
-    #[br(parse_with = binrw_parse_u16_duration::<_>)]
-    #[bw(write_with = binrw_write_u16_duration::<_>)]
+    #[br(parse_with = binrw_parse_duration::<u16, _>)]
+    #[bw(write_with = binrw_write_duration::<u16, _>)]
     pub interval: Duration,
 
     /// Administrative password.

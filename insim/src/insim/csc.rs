@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use insim_core::{
     binrw::{self, binrw},
-    duration::{binrw_parse_u32_duration, binrw_write_u32_duration},
+    duration::{binrw_parse_duration, binrw_write_duration},
     identifiers::{PlayerId, RequestId},
 };
 
@@ -37,8 +37,8 @@ pub struct Csc {
     #[brw(pad_after = 2)]
     pub action: CscAction,
 
-    #[br(parse_with = binrw_parse_u32_duration::<_>)]
-    #[bw(write_with = binrw_write_u32_duration::<_>)]
+    #[br(parse_with = binrw_parse_duration::<u32, _>)]
+    #[bw(write_with = binrw_write_duration::<u32, _>)]
     pub time: Duration,
 
     pub c: CarContact,

@@ -5,7 +5,7 @@ use std::{
 
 use insim_core::{
     binrw::{self, binrw, BinRead, BinResult, BinWrite, Endian},
-    duration::{binrw_parse_u32_duration, binrw_write_u32_duration},
+    duration::{binrw_parse_duration, binrw_write_duration},
     identifiers::{PlayerId, RequestId},
 };
 
@@ -114,12 +114,12 @@ pub struct Lap {
     pub reqi: RequestId,
     pub plid: PlayerId,
 
-    #[br(parse_with = binrw_parse_u32_duration::<_>)]
-    #[bw(write_with = binrw_write_u32_duration::<_>)]
+    #[br(parse_with = binrw_parse_duration::<u32, _>)]
+    #[bw(write_with = binrw_write_duration::<u32, _>)]
     pub ltime: Duration, // lap time (ms)
 
-    #[br(parse_with = binrw_parse_u32_duration::<_>)]
-    #[bw(write_with = binrw_write_u32_duration::<_>)]
+    #[br(parse_with = binrw_parse_duration::<u32, _>)]
+    #[bw(write_with = binrw_write_duration::<u32, _>)]
     pub etime: Duration,
 
     pub lapsdone: u16,
