@@ -26,8 +26,9 @@ pub struct Ncn {
     pub pname: String,
 
     /// true if administrative user.
-    // FIXME should be bool
-    pub admin: u8,
+    #[br(map = |x: u8| x != 0)]
+    #[bw(map = |&x| x as u8)]
+    pub admin: bool,
 
     /// Total number of connections now this player has joined, plus host
     pub total: u8,

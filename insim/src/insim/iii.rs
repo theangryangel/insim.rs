@@ -1,4 +1,3 @@
-
 use insim_core::{
     binrw::{self, binrw},
     identifiers::{ConnectionId, PlayerId, RequestId},

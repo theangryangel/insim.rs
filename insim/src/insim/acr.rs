@@ -33,7 +33,9 @@ pub struct Acr {
     pub reqi: RequestId,
 
     pub ucid: ConnectionId,
-    pub admin: u8, // FIXME should be bool
+    #[br(map = |x: u8| x != 0)]
+    #[bw(map = |&x| x as u8)]
+    pub admin: bool,
 
     #[brw(pad_after = 1)]
     pub result: AcrResult,

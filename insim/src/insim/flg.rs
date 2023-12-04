@@ -29,8 +29,9 @@ pub struct Flg {
     pub reqi: RequestId,
     pub plid: PlayerId,
 
-    // FIXME this should be a bool
-    pub offon: u8,
+    #[br(map = |x: u8| x != 0)]
+    #[bw(map = |&x| x as u8)]
+    pub offon: bool,
 
     pub flag: FlgType,
     #[brw(pad_after = 1)]

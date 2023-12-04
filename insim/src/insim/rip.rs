@@ -70,10 +70,14 @@ pub struct Rip {
     pub reqi: RequestId,
     pub error: RipError,
 
-    // FIXME should be bool
-    pub mpr: u8,
-    // FIXME should be bool
-    pub paused: u8,
+    #[br(map = |x: u8| x != 0)]
+    #[bw(map = |&x| x as u8)]
+    pub mpr: bool,
+
+    #[br(map = |x: u8| x != 0)]
+    #[bw(map = |&x| x as u8)]
+    pub paused: bool,
+
     #[brw(pad_after = 1)]
     pub options: RipOptions,
 
