@@ -1,11 +1,13 @@
-use insim_core::{identifiers::RequestId, prelude::*};
+use insim_core::{identifiers::RequestId, binrw::{self, binrw}};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, Default, InsimEncode, InsimDecode, Clone)]
+#[binrw]
+#[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
+#[brw(repr(u8))]
 pub enum SmallType {
     #[default]
     None = 0,
@@ -38,7 +40,8 @@ pub enum SmallType {
     Lcs = 9,
 }
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// General purpose Small packet
 pub struct Small {

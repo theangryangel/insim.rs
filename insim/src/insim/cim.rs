@@ -1,16 +1,19 @@
 use insim_core::{
     identifiers::{ConnectionId, RequestId},
-    prelude::*,
+    binrw::{self, binrw}
 };
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone)]
+#[binrw]
+#[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
+#[brw(repr(u8))]
 /// Used within the [Cim] packet to indicate the mode.
 pub enum CimMode {
+    #[default]
     Normal = 0,
 
     Options = 1,
@@ -26,13 +29,8 @@ pub enum CimMode {
     ShiftU = 6,
 }
 
-impl Default for CimMode {
-    fn default() -> Self {
-        Self::Normal
-    }
-}
-
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Connection Interface Mode
 pub struct Cim {
@@ -41,6 +39,7 @@ pub struct Cim {
 
     pub mode: CimMode,
     pub submode: u8, // FIXME: How do we support this in the same way? LFS has multiple enum types.
-    #[insim(pad_bytes_after = "1")]
+
+    #[brw(pad_after = 1)]
     pub seltype: u8,
 }

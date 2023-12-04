@@ -1,13 +1,16 @@
 use bitflags::bitflags;
-use insim_core::{identifiers::RequestId, prelude::*, ser::Limit, DecodableError, EncodableError};
+use insim_core::{identifiers::RequestId, binrw::{self, binrw}};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 bitflags! {
     /// Bitwise flags used within the [Sch] packet
+    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
+    #[br(map = Self::from_bits_truncate)]
+    #[bw(map = |&x: &Self| x.bits())]
     pub struct SchFlags: u8 {
         /// Shift
         const SHIFT = (1 << 0);
@@ -17,63 +20,18 @@ bitflags! {
     }
 }
 
+#[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Send Single Character
 pub struct Sch {
+    #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
+    #[bw(map = |&x| x as u8)]
+    #[br(map = |x: u8| x as char)]
     pub charb: char,
+
+    #[brw(pad_after = 2)]
     pub flags: SchFlags,
-}
-
-impl Encodable for Sch {
-    fn encode(
-        &self,
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<(), EncodableError> {
-        if limit.is_some() {
-            return Err(EncodableError::UnexpectedLimit(format!(
-                "Sch does not support a limit: {limit:?}",
-            )));
-        }
-
-        self.reqi.encode(buf, None)?;
-        buf.put_bytes(0, 1);
-
-        (self.charb as u8).encode(buf, None)?;
-        self.flags.bits().encode(buf, None)?;
-        buf.put_bytes(0, 2);
-
-        Ok(())
-    }
-}
-
-impl Decodable for Sch {
-    fn decode(buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError>
-    where
-        Self: Default,
-    {
-        if limit.is_some() {
-            return Err(DecodableError::UnexpectedLimit(format!(
-                "Sch does not support a limit: {:?}",
-                limit
-            )));
-        }
-
-        let mut data = Self {
-            reqi: RequestId::decode(buf, None)?,
-            ..Default::default()
-        };
-
-        buf.advance(1);
-
-        data.charb = u8::decode(buf, None)? as char;
-
-        data.flags = SchFlags::from_bits_truncate(u8::decode(buf, None)?);
-        buf.advance(2);
-
-        Ok(data)
-    }
 }

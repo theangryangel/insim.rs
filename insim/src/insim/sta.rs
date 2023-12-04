@@ -1,8 +1,7 @@
 use insim_core::{
     identifiers::{PlayerId, RequestId},
-    prelude::*,
+    binrw::{self, binrw},
     racelaps::RaceLaps,
-    ser::Limit,
     track::Track,
     wind::Wind,
 };
@@ -14,9 +13,11 @@ use bitflags::bitflags;
 
 use super::CameraView;
 
-#[derive(Debug, Default, InsimEncode, InsimDecode, Clone)]
+#[binrw]
+#[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
+#[brw(repr(u8))]
 pub enum StaRacing {
     /// No race in progress
     #[default]
@@ -31,8 +32,11 @@ pub enum StaRacing {
 
 bitflags! {
     /// Bitwise flags used within the [Sta] packet
+    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
+    #[br(map = Self::from_bits_truncate)]
+    #[bw(map = |&x: &Self| x.bits())]
     pub struct StaFlags: u16 {
         /// In Game (or Multiplayer Replay)
         const GAME = (1 << 0);
@@ -84,37 +88,12 @@ bitflags! {
     }
 }
 
-impl Decodable for StaFlags {
-    fn decode(
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<Self, insim_core::DecodableError>
-    where
-        Self: Default,
-    {
-        Ok(Self::from_bits_truncate(u16::decode(buf, limit)?))
-    }
-}
-
-impl Encodable for StaFlags {
-    fn encode(
-        &self,
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<(), insim_core::EncodableError>
-    where
-        Self: Sized,
-    {
-        self.bits().encode(buf, limit)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// State
 pub struct Sta {
-    #[insim(pad_bytes_after = "1")]
+    #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
     /// 1.0 is normal speed
@@ -136,7 +115,7 @@ pub struct Sta {
     pub raceinprog: StaRacing,
 
     pub qualmins: u8,
-    #[insim(pad_bytes_after = "1")]
+    #[brw(pad_after = 1)]
     pub racelaps: RaceLaps,
     pub serverstatus: u8, // serverstatus isn't an enum, unfortunately
 

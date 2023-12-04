@@ -1,13 +1,14 @@
 use insim_core::{
     identifiers::{PlayerId, RequestId},
-    prelude::*,
+    binrw::{self, binrw}
 };
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 /// AutoX Object Contact
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Axo {
     pub reqi: RequestId,

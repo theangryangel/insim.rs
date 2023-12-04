@@ -1,6 +1,6 @@
 use insim_core::{
     identifiers::{PlayerId, RequestId},
-    prelude::*,
+    binrw::{self, binrw}
 };
 
 #[cfg(feature = "serde")]
@@ -8,13 +8,14 @@ use serde::Serialize;
 
 use super::PlayerFlags;
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Player Flags
 pub struct Pfl {
     pub reqi: RequestId,
     pub plid: PlayerId,
 
-    #[insim(pad_bytes_after = "2")]
+    #[brw(pad_after = 2)]
     pub flags: PlayerFlags,
 }

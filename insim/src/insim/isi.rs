@@ -1,7 +1,10 @@
 use std::time::Duration;
 
-use crate::VERSION;
-use insim_core::{identifiers::RequestId, prelude::*, ser::Limit, DecodableError, EncodableError};
+use insim_core::{
+    identifiers::RequestId, binrw::{self, binrw}, 
+    duration::{binrw_parse_u16_duration, binrw_write_u16_duration},
+    string::{binrw_write_codepage_string, binrw_parse_codepage_string}
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -10,8 +13,11 @@ use bitflags::bitflags;
 
 bitflags! {
     /// Flags for the [Init] packet flags field.
+    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
+    #[br(map = Self::from_bits_truncate)]
+    #[bw(map = |&x: &Self| x.bits())]
     pub struct IsiFlags: u16 {
         //RES0 => (1 << 0),	// bit  0: spare
         //RES_1 => (1 << 1),	// bit  1: spare
@@ -34,26 +40,8 @@ impl IsiFlags {
     }
 }
 
-impl Encodable for IsiFlags {
-    fn encode(
-        &self,
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<(), insim_core::EncodableError> {
-        self.bits().encode(buf, limit)?;
-        Ok(())
-    }
-}
 
-impl Decodable for IsiFlags {
-    fn decode(
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<Self, insim_core::DecodableError> {
-        Ok(Self::from_bits_truncate(u16::decode(buf, limit)?))
-    }
-}
-
+#[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Insim Init, or handshake packet.
@@ -61,6 +49,7 @@ impl Decodable for IsiFlags {
 pub struct Isi {
     /// When set to a non-zero value the server will send a [Version](super::Version) packet in response.
     ///packet in response.
+    #[brw(pad_after = 2)]
     pub reqi: RequestId,
 
     /// UDP Port
@@ -69,94 +58,28 @@ pub struct Isi {
     /// Options for the Insim Connection. See [IsiFlags] for more information.
     pub flags: IsiFlags,
 
+    pub version: u8,
+
     /// Messages typed with this prefix will be sent to your InSim program
     /// on the host (in IS_MSO) and not displayed on anyone's screen.
     /// This should be a single ascii character. i.e. '!'.
+    #[bw(map = |&x| x as u8)]
+    #[br(map = |x: u8| x as char)]
     pub prefix: char,
 
     /// Time in between each [Nlp](super::Nlp) or [Mci](super::Mci) packet when set to a non-zero value and
     /// the relevant flags are set.
+    #[br(parse_with = binrw_parse_u16_duration::<_>)]
+    #[bw(write_with = binrw_write_u16_duration::<_>)]
     pub interval: Duration,
 
     /// Administrative password.
+    #[bw(write_with = binrw_write_codepage_string::<16, _>)]
+    #[br(parse_with = binrw_parse_codepage_string::<16, _>)]
     pub admin: String,
 
     /// Name of the program.
+    #[bw(write_with = binrw_write_codepage_string::<16, _>)]
+    #[br(parse_with = binrw_parse_codepage_string::<16, _>)]
     pub iname: String,
-}
-
-impl Encodable for Isi {
-    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), EncodableError>
-    where
-        Self: Sized,
-    {
-        // impl Encodable by hand because the interval on ISI is u16 rather than u32
-
-        if limit.is_some() {
-            return Err(EncodableError::UnexpectedLimit(format!(
-                "ISI does not support a limit: {limit:?}",
-            )));
-        }
-
-        self.reqi.encode(buf, None)?;
-
-        // pad_after reqi
-        buf.put_bytes(0, 1);
-
-        self.udpport.encode(buf, None)?;
-        self.flags.encode(buf, None)?;
-
-        // version
-        (VERSION).encode(buf, None)?;
-
-        (self.prefix as u8).encode(buf, None)?;
-        (self.interval.as_millis() as u16).encode(buf, None)?;
-
-        self.admin.encode(buf, Some(Limit::Bytes(16)))?;
-        self.iname.encode(buf, Some(Limit::Bytes(16)))?;
-
-        Ok(())
-    }
-}
-
-impl Decodable for Isi {
-    fn decode(buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<Self, DecodableError>
-    where
-        Self: Default,
-    {
-        if limit.is_some() {
-            return Err(DecodableError::UnexpectedLimit(format!(
-                "ISI does not support a limit: {:?}",
-                limit
-            )));
-        }
-
-        let mut data = Self {
-            reqi: RequestId::decode(buf, None)?,
-            ..Default::default()
-        };
-
-        // pad bytes_after reqi
-        buf.advance(1);
-
-        data.udpport = u16::decode(buf, None)?;
-        data.flags = IsiFlags::decode(buf, None)?;
-
-        // skip over version
-        let version = buf.get_u8();
-        if version != VERSION {
-            return Err(DecodableError::UnexpectedValue(format!(
-                "Expected version {:?}, received {:?}",
-                VERSION, version
-            )));
-        }
-
-        data.prefix = u8::decode(buf, None)? as char;
-        data.interval = Duration::from_millis(u16::decode(buf, None)?.into());
-
-        data.admin = String::decode(buf, Some(Limit::Bytes(16)))?;
-        data.iname = String::decode(buf, Some(Limit::Bytes(16)))?;
-
-        Ok(data)
-    }
 }

@@ -1,7 +1,6 @@
 use insim_core::{
     identifiers::{ConnectionId, RequestId},
-    prelude::*,
-    ser::Limit,
+    binrw::{self, binrw}
 };
 
 #[cfg(feature = "serde")]
@@ -10,8 +9,11 @@ use serde::Serialize;
 use bitflags::bitflags;
 
 bitflags! {
+    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
+    #[br(map = Self::from_bits_truncate)]
+    #[bw(map = |&x: &Self| x.bits())]
     pub struct PlcAllowedCars: u32 {
          const XF_GTI = (1 << 1);
          const XR_GT = (1 << 2);
@@ -36,40 +38,15 @@ bitflags! {
     }
 }
 
-impl Decodable for PlcAllowedCars {
-    fn decode(
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<Self, insim_core::DecodableError>
-    where
-        Self: Default,
-    {
-        Ok(Self::from_bits_truncate(u32::decode(buf, limit)?))
-    }
-}
-
-impl Encodable for PlcAllowedCars {
-    fn encode(
-        &self,
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<(), insim_core::EncodableError>
-    where
-        Self: Sized,
-    {
-        self.bits().encode(buf, limit)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Player Cars
 pub struct Plc {
-    #[insim(pad_bytes_after = "1")]
+    #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
-    #[insim(pad_bytes_before = "3")]
+    #[brw(pad_before = 3)]
     pub ucid: ConnectionId,
 
     pub allowed_cars: PlcAllowedCars,

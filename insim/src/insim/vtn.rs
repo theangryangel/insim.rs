@@ -1,12 +1,14 @@
 use insim_core::{
     identifiers::{ConnectionId, RequestId},
-    prelude::*,
+    binrw::{self, binrw},
 };
 
 /// Enum for the action field of [Vtn].
-#[derive(Default, Debug, InsimEncode, InsimDecode, Clone)]
+#[binrw]
+#[derive(Default, Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
+#[brw(repr(u8))]
 pub enum VtnAction {
     #[default]
     None = 0,
@@ -21,15 +23,16 @@ pub enum VtnAction {
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Vote Notification
 pub struct Vtn {
-    #[insim(pad_bytes_after = "1")]
+    #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
     pub ucid: ConnectionId,
 
-    #[insim(pad_bytes_after = "2")]
+    #[brw(pad_after = 2)]
     pub action: VtnAction,
 }

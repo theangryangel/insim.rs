@@ -1,20 +1,20 @@
 //! Insim v9 Packet definitions
 
-use insim_core::identifiers::RequestId;
-use insim_core::prelude::*;
-
-use crate::insim::*;
+use insim_core::{identifiers::RequestId, binrw::{self, binrw}};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use crate::insim::*;
 use crate::relay;
 
-#[derive(InsimEncode, InsimDecode, Debug, Clone, from_variants::FromVariants)]
+#[repr(u8)]
+#[binrw]
+#[brw(little, repr(u8))]
+#[derive(Debug, Clone, from_variants::FromVariants)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 #[non_exhaustive]
-#[repr(u8)]
 /// Enum representing all possible packets receivable via an Insim connection
 pub enum Packet {
     Init(Isi) = 1,
@@ -125,12 +125,4 @@ impl Packet {
             _ => Ok(false),
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    // The majority of packet conversions are tested through insim_core.
-    // Any packets implementing their own InsimEncode InsimDecode should have their own test
-    // We could test every packet, but at a certain point we're just testing insim_core and
-    // insim_derive all over again.
 }

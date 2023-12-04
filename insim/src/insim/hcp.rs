@@ -1,9 +1,10 @@
-use insim_core::{identifiers::RequestId, prelude::*};
+use insim_core::{identifiers::RequestId, binrw::{self, binrw}};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Used within [Hcp] to apply handicaps to a vehicle.
 pub struct HcpCarHandicap {
@@ -11,7 +12,8 @@ pub struct HcpCarHandicap {
     pub intake_restriction: u8,
 }
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Vehicle Handicaps
 /// You can send a packet to add mass and restrict the intake on each car model
@@ -19,7 +21,7 @@ pub struct HcpCarHandicap {
 /// This can be useful for creating multi class hosts.
 /// The info field is indexed by the vehicle. i.e. XF GTI = 0, XR GT = 1, etc.
 pub struct Hcp {
-    #[insim(pad_bytes_after = "1")]
+    #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
     pub info: [HcpCarHandicap; 32],

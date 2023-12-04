@@ -5,9 +5,10 @@ mod tests;
 
 pub use mode::Mode;
 
+use std::io::Cursor;
 use crate::{packet::Packet, result::Result};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use insim_core::{Decodable, Encodable};
+use insim_core::binrw::{BinRead, BinWrite};
 
 #[derive(Debug)]
 pub struct Codec {
@@ -31,7 +32,9 @@ impl Codec {
         dst.put_u8(0);
 
         // encode the message
-        msg.encode(&mut dst, None)?;
+        let mut writer = Cursor::new(Vec::new());
+        msg.write(&mut writer).unwrap();
+        dst.extend_from_slice(&writer.into_inner());
 
         // encode the length of the packet, including the placeholder for the length
         let n = self.mode().encode_length(dst.len())?;
@@ -61,7 +64,9 @@ impl Codec {
         // none of the packet definitions include the size
         data.advance(1);
 
-        let res = Packet::decode(&mut data, None);
+        let mut cursor = std::io::Cursor::new(&data);
+
+        let res = Packet::read(&mut cursor);
 
         match res {
             Ok(packet) => {

@@ -1,7 +1,7 @@
 use insim_core::{
     identifiers::{PlayerId, RequestId},
     point::Point,
-    prelude::*,
+    binrw::{self, binrw}
 };
 
 #[cfg(feature = "serde")]
@@ -9,12 +9,13 @@ use serde::Serialize;
 
 use super::{CameraView, StaFlags};
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Camera Position Pack reports the current camera position and state. This packet may also be
 /// sent to control the camera.
 pub struct Cpp {
-    #[insim(pad_bytes_after = "1")]
+    #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
     pub pos: Point<i32>,

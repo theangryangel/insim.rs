@@ -1,11 +1,13 @@
-use insim_core::{identifiers::RequestId, prelude::*};
+use insim_core::{identifiers::RequestId, binrw::{self, binrw}};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, Default, InsimEncode, InsimDecode, Clone, Eq, PartialEq)]
+#[binrw]
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
+#[brw(repr(u8))]
 pub enum TinyType {
     #[default]
     None = 0,
@@ -92,7 +94,8 @@ pub enum TinyType {
     Mal = 27,
 }
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// General purpose Tiny packet
 pub struct Tiny {

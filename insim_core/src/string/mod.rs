@@ -127,3 +127,28 @@ pub fn escape(input: Cow<str>) -> Cow<str> {
 
     output.into()
 }
+
+use binrw::{BinWrite, BinRead};
+
+#[binrw::writer(writer, endian)]
+pub fn binrw_write_codepage_string<const SIZE: usize>(input: &String) -> binrw::BinResult<()> {
+    let mut res = codepages::to_lossy_bytes(input).into_owned();
+    res.truncate(SIZE);
+    res.write_options(writer, endian, ())?;
+
+    let remaining = SIZE - res.len();
+    if remaining > 0 {
+        for _ in 0..remaining {
+            (0 as u8).write_options(writer, endian, ())?;
+        }
+    }
+
+    Ok(())
+}
+
+#[binrw::parser(reader, endian)]
+pub fn binrw_parse_codepage_string<const SIZE: usize>() -> binrw::BinResult<String> {
+    <[u8; SIZE]>::read_options(reader, endian, ())
+        .map(|bytes| Ok(codepages::to_lossy_string(&bytes).to_string()))?
+}
+

@@ -3,23 +3,15 @@ pub mod license;
 pub mod point;
 pub mod prelude;
 pub mod racelaps;
-pub mod ser;
 pub mod string;
 pub mod track;
 pub mod vehicle;
 pub mod wind;
-
-pub use ser::{
-    decode::{Decodable, DecodableError},
-    encode::{Encodable, EncodableError},
-};
-
-pub use point::Pointable;
-
-#[doc(inline)]
-#[allow(unused)]
-pub use insim_derive::{InsimDecode, InsimEncode};
+pub mod duration;
 
 #[doc(hidden)]
 // reexport bytes for usage in macros
 pub use ::bytes;
+
+#[doc(hidden)]
+pub use ::binrw;

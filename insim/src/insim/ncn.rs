@@ -1,12 +1,14 @@
 use insim_core::{
     identifiers::{ConnectionId, RequestId},
-    prelude::*,
+    binrw::{self, binrw},
+    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
 };
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// New Connection
 pub struct Ncn {
@@ -14,18 +16,22 @@ pub struct Ncn {
     pub ucid: ConnectionId,
 
     /// Username.
-    #[insim(bytes = "24")]
+    #[bw(write_with = binrw_write_codepage_string::<24, _>)]
+    #[br(parse_with = binrw_parse_codepage_string::<24, _>)]
     pub uname: String,
-    #[insim(bytes = "24")]
+
+    #[bw(write_with = binrw_write_codepage_string::<24, _>)]
+    #[br(parse_with = binrw_parse_codepage_string::<24, _>)]
     /// Playername.
     pub pname: String,
 
     /// true if administrative user.
-    pub admin: bool,
+    // FIXME should be bool
+    pub admin: u8,
 
     /// Total number of connections now this player has joined, plus host
     pub total: u8,
 
-    #[insim(pad_bytes_after = "1")]
+    #[brw(pad_after = 1)]
     pub flags: u8,
 }

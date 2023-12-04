@@ -1,4 +1,4 @@
-use insim_core::{identifiers::RequestId, prelude::*, ser::Limit, track::Track};
+use insim_core::{identifiers::RequestId, track::Track, binrw::{self, binrw}, string::{binrw_parse_codepage_string, binrw_write_codepage_string}};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -8,6 +8,9 @@ use bitflags::bitflags;
 bitflags! {
     /// Bitwise flags used within the [HostInfo] packet, which is in turn used by the [HostList]
     /// packet.
+    #[binrw]
+    #[br(map = Self::from_bits_truncate)]
+    #[bw(map = |&x: &Self| x.bits())]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
     pub struct HostInfoFlags: u8 {
@@ -20,37 +23,13 @@ bitflags! {
     }
 }
 
-impl Decodable for HostInfoFlags {
-    fn decode(
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<Self, insim_core::DecodableError>
-    where
-        Self: Default,
-    {
-        Ok(Self::from_bits_truncate(u8::decode(buf, limit)?))
-    }
-}
-
-impl Encodable for HostInfoFlags {
-    fn encode(
-        &self,
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<(), insim_core::EncodableError>
-    where
-        Self: Sized,
-    {
-        self.bits().encode(buf, limit)?;
-        Ok(())
-    }
-}
-
 /// Information about a host. Used within the [HostList] packet.
-#[derive(Debug, Clone, Default, InsimEncode, InsimDecode)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct HostInfo {
-    #[insim(bytes = "32")]
+    #[br(parse_with = binrw_parse_codepage_string::<32, _>)]
+    #[bw(write_with = binrw_write_codepage_string::<32, _>)]
     pub hname: String,
 
     pub track: Track,
@@ -63,14 +42,16 @@ pub struct HostInfo {
 /// The relay will send a list of available hosts using this packet. There may be more than one
 /// HostList packet sent in response to a [super::host_list_request::HostListRequest]. You may use the [HostInfoFlags] to
 /// determine if the host is the last in the list.
-#[derive(Debug, Clone, Default, InsimEncode, InsimDecode)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct HostList {
     pub reqi: RequestId,
 
-    pub numhosts: u8,
+    #[bw(calc = hinfo.len() as u8)]
+    numhosts: u8,
 
-    #[insim(count = "numhosts")]
+    #[br(count = numhosts)]
     pub hinfo: Vec<HostInfo>,
 }
 

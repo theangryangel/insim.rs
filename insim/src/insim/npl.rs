@@ -1,8 +1,8 @@
 use insim_core::{
     identifiers::{ConnectionId, PlayerId, RequestId},
-    prelude::*,
-    ser::Limit,
     vehicle::Vehicle,
+    binrw::{self, binrw},
+    string::{binrw_write_codepage_string, binrw_parse_codepage_string}
 };
 
 #[cfg(feature = "serde")]
@@ -10,9 +10,11 @@ use serde::Serialize;
 
 use bitflags::bitflags;
 
-#[derive(Debug, Default, InsimEncode, InsimDecode, Clone)]
+#[binrw]
+#[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
+#[brw(repr(u8))]
 pub enum TyreCompound {
     R1 = 0,
 
@@ -35,8 +37,11 @@ pub enum TyreCompound {
 }
 
 bitflags! {
+    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
+    #[br(map = Self::from_bits_truncate)]
+    #[bw(map = |&x: &Self| x.bits())]
     pub struct PlayerFlags: u16 {
          const SWAPSIDE = (1 << 0);
          const RESERVED_2 = (1 << 1);
@@ -55,33 +60,9 @@ bitflags! {
     }
 }
 
-impl Encodable for PlayerFlags {
-    fn encode(
-        &self,
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<(), insim_core::EncodableError>
-    where
-        Self: Sized,
-    {
-        self.bits().encode(buf, limit)?;
-        Ok(())
-    }
-}
 
-impl Decodable for PlayerFlags {
-    fn decode(
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<Self, insim_core::DecodableError>
-    where
-        Self: Sized,
-    {
-        Ok(Self::from_bits_truncate(u16::decode(buf, limit)?))
-    }
-}
-
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Sent when a New Player joins.
 // TODO: Implement SetF, Fuel, RW/FWAdj, PType
@@ -93,13 +74,18 @@ pub struct Npl {
     pub ptype: u8,
     pub flags: PlayerFlags,
 
-    #[insim(bytes = "24")]
+    #[bw(write_with = binrw_write_codepage_string::<24, _>)]
+    #[br(parse_with = binrw_parse_codepage_string::<24, _>)]
     pub pname: String,
-    #[insim(bytes = "8")]
+
+    #[bw(write_with = binrw_write_codepage_string::<8, _>)]
+    #[br(parse_with = binrw_parse_codepage_string::<8, _>)]
     pub plate: String,
 
     pub cname: Vehicle,
-    #[insim(bytes = "16")]
+
+    #[bw(write_with = binrw_write_codepage_string::<16, _>)]
+    #[br(parse_with = binrw_parse_codepage_string::<16, _>)]
     pub sname: String,
     pub tyres: [TyreCompound; 4],
 
@@ -109,7 +95,7 @@ pub struct Npl {
     pub pass: u8,
 
     pub rwadj: u8,
-    #[insim(pad_bytes_after = "2")]
+    #[brw(pad_after = 2)]
     pub fwadj: u8,
 
     pub setf: u8,

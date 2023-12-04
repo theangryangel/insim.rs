@@ -1,11 +1,13 @@
-use insim_core::{identifiers::RequestId, prelude::*};
+use insim_core::{identifiers::RequestId, binrw::{self, binrw}, string::{binrw_write_codepage_string, binrw_parse_codepage_string}};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, Default, InsimEncode, InsimDecode, Clone)]
+#[binrw]
+#[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
+#[brw(repr(u8))]
 pub enum SshError {
     #[default]
     Ok = 0,
@@ -17,15 +19,17 @@ pub enum SshError {
     NoSave = 3,
 }
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Send Screenshot
 pub struct Ssh {
     pub reqi: RequestId,
 
-    #[insim(pad_bytes_after = "4")]
+    #[brw(pad_after = 4)]
     pub error: SshError,
 
-    #[insim(bytes = "32")]
+    #[br(parse_with = binrw_parse_codepage_string::<32, _>)]
+    #[bw(write_with = binrw_write_codepage_string::<32, _>)]
     pub lname: String,
 }

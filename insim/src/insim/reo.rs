@@ -1,6 +1,6 @@
 use insim_core::{
     identifiers::{PlayerId, RequestId},
-    prelude::*,
+    binrw::{self, binrw},
 };
 
 #[cfg(feature = "serde")]
@@ -23,7 +23,8 @@ where
     ser_tuple.end()
 }
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone)]
+#[binrw]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Reorder
 pub struct Reo {

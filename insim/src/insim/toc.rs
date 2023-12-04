@@ -1,12 +1,13 @@
 use insim_core::{
     identifiers::{ConnectionId, PlayerId, RequestId},
-    prelude::*,
+    binrw::{self, binrw}
 };
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Take Over Car
 pub struct Toc {
@@ -14,6 +15,6 @@ pub struct Toc {
     pub plid: PlayerId,
 
     pub olducid: ConnectionId,
-    #[insim(pad_bytes_after = "2")]
+    #[brw(pad_after = 2)]
     pub newucid: ConnectionId,
 }

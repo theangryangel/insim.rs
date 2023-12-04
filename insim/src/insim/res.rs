@@ -2,7 +2,9 @@ use std::time::Duration;
 
 use insim_core::{
     identifiers::{PlayerId, RequestId},
-    prelude::*,
+    binrw::{self, binrw},
+    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
+    duration::{binrw_parse_u32_duration, binrw_write_u32_duration},
     vehicle::Vehicle,
 };
 
@@ -11,27 +13,38 @@ use serde::Serialize;
 
 use super::{PlayerFlags, RaceResultFlags};
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Race Result
 pub struct Res {
     pub reqi: RequestId,
     pub plid: PlayerId,
 
-    #[insim(bytes = "24")]
+    #[bw(write_with = binrw_write_codepage_string::<24, _>)]
+    #[br(parse_with = binrw_parse_codepage_string::<24, _>)]
     pub uname: String,
-    #[insim(bytes = "24")]
+
+    #[bw(write_with = binrw_write_codepage_string::<24, _>)]
+    #[br(parse_with = binrw_parse_codepage_string::<24, _>)]
     pub pname: String,
-    #[insim(bytes = "8")]
+
+    #[bw(write_with = binrw_write_codepage_string::<8, _>)]
+    #[br(parse_with = binrw_parse_codepage_string::<8, _>)]
     pub plate: String,
     pub cname: Vehicle,
 
+    #[br(parse_with = binrw_parse_u32_duration::<_>)]
+    #[bw(write_with = binrw_write_u32_duration::<_>)]
     pub ttime: Duration,
-    #[insim(pad_bytes_after = "1")]
+    
+    #[brw(pad_after = 1)]
+    #[br(parse_with = binrw_parse_u32_duration::<_>)]
+    #[bw(write_with = binrw_write_u32_duration::<_>)]
     pub btime: Duration,
 
     pub numstops: u8,
-    #[insim(pad_bytes_after = "1")]
+    #[brw(pad_after = 1)]
     pub confirm: RaceResultFlags,
 
     pub lapsdone: u16,

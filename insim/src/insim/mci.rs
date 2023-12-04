@@ -1,8 +1,7 @@
 use insim_core::{
     identifiers::{PlayerId, RequestId},
     point::Point,
-    prelude::*,
-    ser::Limit,
+    binrw::{self, binrw}
 };
 
 #[cfg(feature = "serde")]
@@ -11,8 +10,11 @@ use serde::Serialize;
 use bitflags::bitflags;
 
 bitflags! {
+    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
+    #[br(map = Self::from_bits_truncate)]
+    #[bw(map = |&x: &Self| x.bits())]
     pub struct CompCarInfo: u8 {
         const BLUE_FLAG = (1 << 0);
         const YELLOW_FLAG = (1 << 1);
@@ -22,33 +24,8 @@ bitflags! {
     }
 }
 
-impl Encodable for CompCarInfo {
-    fn encode(
-        &self,
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<(), insim_core::EncodableError>
-    where
-        Self: Sized,
-    {
-        self.bits().encode(buf, limit)?;
-        Ok(())
-    }
-}
-
-impl Decodable for CompCarInfo {
-    fn decode(
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<Self, insim_core::DecodableError>
-    where
-        Self: Sized,
-    {
-        Ok(Self::from_bits_truncate(u8::decode(buf, limit)?))
-    }
-}
-
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Used within the [Mci] packet info field.
 pub struct CompCar {
@@ -64,7 +41,7 @@ pub struct CompCar {
     /// Race position
     pub position: u8,
 
-    #[insim(pad_bytes_after = "1")]
+    #[brw(pad_after = 1)]
     pub info: CompCarInfo,
 
     /// Positional information for the player, in game units.
@@ -88,7 +65,8 @@ pub struct CompCar {
     pub angvel: i16,
 }
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Multi Car Info - positional information for players/vehicles.
 /// The MCI packet does not contain the positional information for all players. Only some. The
@@ -96,8 +74,9 @@ pub struct CompCar {
 pub struct Mci {
     pub reqi: RequestId,
 
-    pub numc: u8,
+    #[bw(calc = info.len() as u8)]
+    numc: u8,
 
-    #[insim(count = "numc")]
+    #[br(count = numc)]
     pub info: Vec<CompCar>,
 }

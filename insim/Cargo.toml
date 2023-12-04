@@ -18,6 +18,8 @@ serde = [
 game_data = ["dep:insim_game_data"]
 pth = ["dep:insim_pth"]
 smx = ["dep:insim_smx"]
+# v9 = []
+# latest = ["v9"]
 
 [dependencies]
 bytes = "1"

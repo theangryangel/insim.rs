@@ -1,21 +1,26 @@
-use insim_core::{identifiers::RequestId, prelude::*};
+use insim_core::{identifiers::RequestId, binrw::{self, binrw}, 
+    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Version
 pub struct Version {
-    #[insim(pad_bytes_after = "1")]
+    #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
-    #[insim(bytes = "8")]
+    #[br(parse_with = binrw_parse_codepage_string::<8, _>)]
+    #[bw(write_with = binrw_write_codepage_string::<8, _>)]
     pub version: String,
 
-    #[insim(bytes = "6")]
+    #[br(parse_with = binrw_parse_codepage_string::<6, _>)]
+    #[bw(write_with = binrw_write_codepage_string::<6, _>)]
     pub product: String,
 
-    #[insim(pad_bytes_after = "1")]
+    #[brw(pad_after = 1)]
     pub insimver: u8,
 }
