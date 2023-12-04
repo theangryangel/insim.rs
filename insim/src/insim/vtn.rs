@@ -1,6 +1,6 @@
 use insim_core::{
-    identifiers::{ConnectionId, RequestId},
     binrw::{self, binrw},
+    identifiers::{ConnectionId, RequestId},
 };
 
 /// Enum for the action field of [Vtn].

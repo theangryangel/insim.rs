@@ -1,7 +1,7 @@
 use insim_core::{
+    binrw::{self, binrw},
     identifiers::{PlayerId, RequestId},
     point::Point,
-    binrw::{self, binrw}
 };
 
 #[cfg(feature = "serde")]

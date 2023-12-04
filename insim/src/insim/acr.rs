@@ -1,6 +1,6 @@
 use insim_core::{
-    identifiers::{ConnectionId, RequestId},
     binrw::{self, binrw},
+    identifiers::{ConnectionId, RequestId},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
 };
 

@@ -128,7 +128,7 @@ pub fn escape(input: Cow<str>) -> Cow<str> {
     output.into()
 }
 
-use binrw::{BinWrite, BinRead};
+use binrw::{BinRead, BinWrite};
 
 #[binrw::writer(writer, endian)]
 pub fn binrw_write_codepage_string<const SIZE: usize>(input: &String) -> binrw::BinResult<()> {
@@ -151,4 +151,3 @@ pub fn binrw_parse_codepage_string<const SIZE: usize>() -> binrw::BinResult<Stri
     <[u8; SIZE]>::read_options(reader, endian, ())
         .map(|bytes| Ok(codepages::to_lossy_string(&bytes).to_string()))?
 }
-

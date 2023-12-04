@@ -1,5 +1,6 @@
 use insim_core::{
-    identifiers::RequestId, binrw::{self, binrw}, 
+    binrw::{self, binrw},
+    identifiers::RequestId,
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
 };
 
@@ -15,7 +16,7 @@ pub struct Ism {
     pub reqi: RequestId,
 
     #[brw(pad_after = 3)]
-    /// false = guest, true = host 
+    /// false = guest, true = host
     // FIXME should be bool
     pub host: u8,
 

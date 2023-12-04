@@ -1,6 +1,6 @@
 use insim_core::{
+    binrw::{self, binrw},
     identifiers::{PlayerId, RequestId},
-    binrw::{binrw, self}
 };
 
 #[cfg(feature = "serde")]

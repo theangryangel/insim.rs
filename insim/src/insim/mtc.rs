@@ -1,7 +1,7 @@
 use insim_core::{
-    identifiers::{ConnectionId, PlayerId, RequestId},
     binrw::{self, binrw},
-    string::{binrw_write_codepage_string, binrw_parse_codepage_string},
+    identifiers::{ConnectionId, PlayerId, RequestId},
+    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
 };
 
 pub use super::SoundType;
@@ -31,9 +31,7 @@ pub struct Mtc {
 #[cfg(test)]
 mod tests {
     use bytes::BytesMut;
-    use insim_core::{
-        identifiers::{ConnectionId, PlayerId},
-    };
+    use insim_core::identifiers::{ConnectionId, PlayerId};
 
     use super::{Mtc, SoundType};
     use crate::core::identifiers::RequestId;

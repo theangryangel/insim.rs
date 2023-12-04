@@ -47,7 +47,6 @@ impl From<insim_core::binrw::Error> for Error {
     }
 }
 
-
 impl From<std::io::Error> for Error {
     fn from(value: std::io::Error) -> Self {
         Error::IO {

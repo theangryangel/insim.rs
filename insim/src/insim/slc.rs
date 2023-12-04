@@ -1,7 +1,7 @@
 use insim_core::{
+    binrw::{self, binrw},
     identifiers::{ConnectionId, RequestId},
     vehicle::Vehicle,
-    binrw::{self, binrw}
 };
 
 #[cfg(feature = "serde")]

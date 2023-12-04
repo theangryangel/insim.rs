@@ -1,8 +1,8 @@
 use std::net::Ipv4Addr;
 
 use insim_core::{
-    identifiers::{ConnectionId, RequestId},
     binrw::{self, binrw},
+    identifiers::{ConnectionId, RequestId},
 };
 
 #[cfg(feature = "serde")]

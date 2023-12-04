@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use binrw::{BinWrite, BinRead};
+use binrw::{BinRead, BinWrite};
 
 // FIXME binrw_parse_duration<T> should be possible
 
@@ -27,4 +27,3 @@ pub fn binrw_parse_u16_duration() -> binrw::BinResult<Duration> {
     let res = u16::read_options(reader, endian, ())?;
     Ok(Duration::from_millis(res as u64))
 }
-

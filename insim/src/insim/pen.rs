@@ -1,15 +1,13 @@
 use insim_core::{
+    binrw::{self, binrw},
     identifiers::{PlayerId, RequestId},
-    binrw::{self, binrw}
 };
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 #[binrw]
-#[derive(
-    PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default,
-)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]

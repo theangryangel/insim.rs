@@ -5,10 +5,10 @@ mod tests;
 
 pub use mode::Mode;
 
-use std::io::Cursor;
 use crate::{packet::Packet, result::Result};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use insim_core::binrw::{BinRead, BinWrite};
+use std::io::Cursor;
 
 #[derive(Debug)]
 pub struct Codec {

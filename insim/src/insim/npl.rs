@@ -1,8 +1,8 @@
 use insim_core::{
-    identifiers::{ConnectionId, PlayerId, RequestId},
-    vehicle::Vehicle,
     binrw::{self, binrw},
-    string::{binrw_write_codepage_string, binrw_parse_codepage_string}
+    identifiers::{ConnectionId, PlayerId, RequestId},
+    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
+    vehicle::Vehicle,
 };
 
 #[cfg(feature = "serde")]
@@ -59,7 +59,6 @@ bitflags! {
          const CUSTOM_VIEW = (1 << 13);
     }
 }
-
 
 #[binrw]
 #[derive(Debug, Clone, Default)]

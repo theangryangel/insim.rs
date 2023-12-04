@@ -1,5 +1,8 @@
 use bitflags::bitflags;
-use insim_core::{identifiers::RequestId, binrw::{self, binrw}};
+use insim_core::{
+    binrw::{self, binrw},
+    identifiers::RequestId,
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;

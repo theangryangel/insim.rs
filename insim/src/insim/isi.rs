@@ -1,9 +1,10 @@
 use std::time::Duration;
 
 use insim_core::{
-    identifiers::RequestId, binrw::{self, binrw}, 
+    binrw::{self, binrw},
     duration::{binrw_parse_u16_duration, binrw_write_u16_duration},
-    string::{binrw_write_codepage_string, binrw_parse_codepage_string}
+    identifiers::RequestId,
+    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
 };
 
 #[cfg(feature = "serde")]
@@ -39,7 +40,6 @@ impl IsiFlags {
         *self.0.bits_mut() = 0;
     }
 }
-
 
 #[binrw]
 #[derive(Debug, Clone, Default)]

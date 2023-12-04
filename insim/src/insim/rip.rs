@@ -1,9 +1,10 @@
 use std::time::Duration;
 
 use insim_core::{
-    identifiers::RequestId, binrw::{binrw, self},
+    binrw::{self, binrw},
     duration::{binrw_parse_u32_duration, binrw_write_u32_duration},
-    string::{binrw_parse_codepage_string, binrw_write_codepage_string}
+    identifiers::RequestId,
+    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
 };
 
 #[cfg(feature = "serde")]

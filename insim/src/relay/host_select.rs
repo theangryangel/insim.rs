@@ -1,4 +1,8 @@
-use insim_core::{identifiers::RequestId, binrw::{self, binrw}, string::{binrw_parse_codepage_string, binrw_write_codepage_string}};
+use insim_core::{
+    binrw::{self, binrw},
+    identifiers::RequestId,
+    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;

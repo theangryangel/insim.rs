@@ -1,10 +1,10 @@
 use std::time::Duration;
 
 use insim_core::{
-    identifiers::{PlayerId, RequestId},
     binrw::{self, binrw},
-    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
     duration::{binrw_parse_u32_duration, binrw_write_u32_duration},
+    identifiers::{PlayerId, RequestId},
+    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
     vehicle::Vehicle,
 };
 
@@ -37,7 +37,7 @@ pub struct Res {
     #[br(parse_with = binrw_parse_u32_duration::<_>)]
     #[bw(write_with = binrw_write_u32_duration::<_>)]
     pub ttime: Duration,
-    
+
     #[brw(pad_after = 1)]
     #[br(parse_with = binrw_parse_u32_duration::<_>)]
     #[bw(write_with = binrw_write_u32_duration::<_>)]

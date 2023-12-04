@@ -1,4 +1,9 @@
-use insim_core::{identifiers::RequestId, string::codepages, binrw::{self, binrw}, string::{binrw_parse_codepage_string, binrw_write_codepage_string}};
+use insim_core::{
+    binrw::{self, binrw},
+    identifiers::RequestId,
+    string::codepages,
+    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -11,12 +16,11 @@ pub struct Msx {
     #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
-    // FIXME - nul terminated 
+    // FIXME - nul terminated
     #[bw(write_with = binrw_write_codepage_string::<96, _>)]
     #[br(parse_with = binrw_parse_codepage_string::<96, _>)]
     pub msg: String,
 }
-
 
 #[cfg(test)]
 mod tests {

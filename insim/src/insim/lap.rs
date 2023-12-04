@@ -1,8 +1,12 @@
-use std::{time::Duration, io::{Write, Seek, Read}};
+use std::{
+    io::{Read, Seek, Write},
+    time::Duration,
+};
 
 use insim_core::{
+    binrw::{self, binrw, BinRead, BinResult, BinWrite, Endian},
+    duration::{binrw_parse_u32_duration, binrw_write_u32_duration},
     identifiers::{PlayerId, RequestId},
-    binrw::{binrw, self, BinWrite, BinRead, BinResult, Endian}, duration::{binrw_parse_u32_duration, binrw_write_u32_duration},
 };
 
 #[cfg(feature = "serde")]
@@ -28,7 +32,6 @@ impl BinWrite for Fuel200 {
         endian: Endian,
         args: Self::Args<'_>,
     ) -> BinResult<()> {
-
         let data = match self {
             Self::Percentage(data) => *data,
             Self::No => 255 as u8,
@@ -75,7 +78,6 @@ impl BinWrite for Fuel {
         endian: Endian,
         args: Self::Args<'_>,
     ) -> BinResult<()> {
-
         let data = match self {
             Self::Percentage(data) => *data,
             Self::No => 255 as u8,

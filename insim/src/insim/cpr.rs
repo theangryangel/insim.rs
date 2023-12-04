@@ -1,7 +1,7 @@
 use insim_core::{
+    binrw::{self, binrw},
     identifiers::{ConnectionId, RequestId},
-    binrw::{binrw, self},
-    string::{binrw_write_codepage_string, binrw_parse_codepage_string}
+    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
 };
 
 #[cfg(feature = "serde")]

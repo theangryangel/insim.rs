@@ -1,6 +1,6 @@
 use insim_core::{
+    binrw::{self, binrw},
     identifiers::{ConnectionId, RequestId},
-    binrw::{self, binrw}
 };
 
 #[cfg(feature = "serde")]
@@ -23,7 +23,7 @@ pub struct Mal {
     /// Number of mods in this packet
     #[bw(calc = allowed_mods.len() as u8)]
     numm: u8,
- 
+
     pub ucid: ConnectionId,
 
     #[brw(pad_after = 2)]

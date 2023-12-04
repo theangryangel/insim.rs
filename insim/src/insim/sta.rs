@@ -1,6 +1,6 @@
 use insim_core::{
-    identifiers::{PlayerId, RequestId},
     binrw::{self, binrw},
+    identifiers::{PlayerId, RequestId},
     racelaps::RaceLaps,
     track::Track,
     wind::Wind,

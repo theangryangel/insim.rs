@@ -1,6 +1,9 @@
 use insim_core::{
-    identifiers::RequestId, racelaps::RaceLaps, track::Track, wind::Wind,
-    binrw::{self, binrw}
+    binrw::{self, binrw},
+    identifiers::RequestId,
+    racelaps::RaceLaps,
+    track::Track,
+    wind::Wind,
 };
 
 #[cfg(feature = "serde")]
