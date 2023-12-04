@@ -1,7 +1,6 @@
 use insim_core::{
     binrw::{self, binrw},
     identifiers::RequestId,
-    string::codepages,
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
 };
 

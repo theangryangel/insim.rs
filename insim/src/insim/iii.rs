@@ -1,8 +1,8 @@
-use bytes::{Buf, BufMut};
+
 use insim_core::{
-    binrw::{self, binrw, parser, writer, BinResult},
+    binrw::{self, binrw},
     identifiers::{ConnectionId, PlayerId, RequestId},
-    string::{binrw_parse_codepage_string, binrw_write_codepage_string, codepages},
+    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
 };
 
 #[cfg(feature = "serde")]

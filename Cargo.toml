@@ -1,7 +1,6 @@
 [workspace]
 members = [
   "insim_core",
-  "insim_derive",
   "insim",
   "insim_pth",
   "insim_smx",
