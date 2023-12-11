@@ -2,8 +2,6 @@ use std::time::Duration;
 
 use binrw::{BinRead, BinWrite, Error as BinError};
 
-// FIXME binrw_parse_duration<T> should be possible
-
 #[binrw::writer(writer, endian)]
 pub fn binrw_write_duration<T: TryFrom<u128> + for<'a> BinWrite<Args<'a> = ()>>(
     input: &Duration,

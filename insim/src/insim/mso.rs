@@ -43,9 +43,6 @@ pub struct Mso {
     /// Index of the first character of user entered text, in msg field.
     pub textstart: u8,
 
-    // FIXME, this should be dynamic sized
-    // pad so that msg is divisible by 4
-    // after the size and type are added
     #[bw(write_with = binrw_write_codepage_string::<128, _>, args(false, 4))]
     #[br(parse_with = binrw_parse_codepage_string::<128, _>)]
     pub msg: String,
