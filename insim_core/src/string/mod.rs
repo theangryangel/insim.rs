@@ -2,6 +2,7 @@
 
 use std::borrow::Cow;
 
+use bytes::BufMut;
 use if_chain::if_chain;
 
 pub mod codepages;
@@ -131,23 +132,47 @@ pub fn escape(input: Cow<str>) -> Cow<str> {
 use binrw::{BinRead, BinWrite};
 
 #[binrw::writer(writer, endian)]
-pub fn binrw_write_codepage_string<const SIZE: usize>(input: &String) -> binrw::BinResult<()> {
-    let mut res = codepages::to_lossy_bytes(input).into_owned();
-    res.truncate(SIZE);
-    res.write_options(writer, endian, ())?;
+pub fn binrw_write_codepage_string<const SIZE: usize>(
+    input: &String,
+    raw: bool,
+    align_to: u8,
+) -> binrw::BinResult<()> {
+    let mut res: Vec<u8> = if raw {
+        input.as_bytes().to_vec()
+    } else {
+        codepages::to_lossy_bytes(input).to_vec()
+    };
 
-    let remaining = SIZE - res.len();
-    if remaining > 0 {
-        for _ in 0..remaining {
-            (0 as u8).write_options(writer, endian, ())?;
+    if align_to > 1 {
+        let align_to = (align_to as usize) - 1;
+        let round_to = (res.len() + align_to) & !align_to;
+
+        if round_to != res.len() {
+            res.put_bytes(0, round_to - res.len());
+        }
+
+        res.truncate(SIZE);
+    } else {
+        res.truncate(SIZE);
+
+        let remaining = SIZE - res.len();
+        if remaining > 0 {
+            res.put_bytes(0, remaining);
         }
     }
+
+    res.write_options(writer, endian, ())?;
 
     Ok(())
 }
 
 #[binrw::parser(reader, endian)]
-pub fn binrw_parse_codepage_string<const SIZE: usize>() -> binrw::BinResult<String> {
-    <[u8; SIZE]>::read_options(reader, endian, ())
-        .map(|bytes| Ok(codepages::to_lossy_string(&bytes).to_string()))?
+pub fn binrw_parse_codepage_string<const SIZE: usize>(raw: bool) -> binrw::BinResult<String> {
+    <[u8; SIZE]>::read_options(reader, endian, ()).map(|bytes| {
+        if raw {
+            Ok(String::from_utf8_lossy(strip_trailing_nul(&bytes)).to_string())
+        } else {
+            Ok(codepages::to_lossy_string(&bytes).to_string())
+        }
+    })?
 }

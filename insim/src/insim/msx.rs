@@ -15,7 +15,6 @@ pub struct Msx {
     #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
-    // FIXME - nul terminated
     #[bw(write_with = binrw_write_codepage_string::<96, _>)]
     #[br(parse_with = binrw_parse_codepage_string::<96, _>)]
     pub msg: String,
@@ -23,21 +22,23 @@ pub struct Msx {
 
 #[cfg(test)]
 mod tests {
-    use bytes::BytesMut;
+    use insim_core::binrw::BinWrite;
+    use std::io::Cursor;
 
     use super::Msx;
     use crate::core::identifiers::RequestId;
 
     #[test]
-    fn ensure_last_byte_zero_always() {
+    fn test_msx() {
         let data = Msx {
             reqi: RequestId(1),
             msg: "aaaaaa".into(),
         };
 
-        let mut buf = BytesMut::new();
-        let res = data.encode(&mut buf, None);
+        let mut buf = Cursor::new(Vec::new());
+        let res = data.write_le(&mut buf);
         assert!(res.is_ok());
+        let buf = buf.into_inner();
 
         assert_eq!(buf.last(), Some(&0));
         assert_eq!(buf.len(), 98);

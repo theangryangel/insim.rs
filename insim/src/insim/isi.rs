@@ -7,16 +7,13 @@ use insim_core::{
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
 };
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
-
 use bitflags::bitflags;
 
 bitflags! {
     /// Flags for the [Init] packet flags field.
     #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     #[br(map = Self::from_bits_truncate)]
     #[bw(map = |&x: &Self| x.bits())]
     pub struct IsiFlags: u16 {
@@ -43,13 +40,13 @@ impl IsiFlags {
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Insim Init, or handshake packet.
 /// Required to be sent to the server before any other packets.
 pub struct Isi {
     /// When set to a non-zero value the server will send a [Version](super::Version) packet in response.
     ///packet in response.
-    #[brw(pad_after = 2)]
+    #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
     /// UDP Port
@@ -74,12 +71,53 @@ pub struct Isi {
     pub interval: Duration,
 
     /// Administrative password.
-    #[bw(write_with = binrw_write_codepage_string::<16, _>)]
-    #[br(parse_with = binrw_parse_codepage_string::<16, _>)]
+    #[bw(write_with = binrw_write_codepage_string::<16, _>, args(true, 0))]
+    #[br(parse_with = binrw_parse_codepage_string::<16, _>, args(true))]
     pub admin: String,
 
     /// Name of the program.
     #[bw(write_with = binrw_write_codepage_string::<16, _>)]
     #[br(parse_with = binrw_parse_codepage_string::<16, _>)]
     pub iname: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::VERSION;
+    use insim_core::{binrw::BinWrite, identifiers::RequestId};
+    use std::{io::Cursor, time::Duration};
+
+    use super::Isi;
+
+    #[test]
+    fn test_isi() {
+        use bytes::BufMut;
+
+        let mut data = Isi::default();
+        data.reqi = RequestId(1);
+        data.iname = "insim.rs".to_string();
+        data.admin = "^JA".to_string();
+        data.version = VERSION;
+        data.prefix = '!';
+        data.interval = Duration::from_secs(1);
+
+        let mut buf = Cursor::new(Vec::new());
+        let res = data.write_le(&mut buf);
+        assert!(res.is_ok());
+        let buf = buf.into_inner();
+        assert_eq!(buf.len(), 42); // less magic, less size
+
+        assert_eq!(&buf[0], &0b1); // check that the reqi is 1
+        assert_eq!(&buf[6], &VERSION); // check that the version is VERSION
+        assert_eq!(&buf[7], &('!' as u8));
+        assert_eq!(
+            &buf[10..26],
+            &[b'^', b'J', b'A', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        );
+
+        let mut iname = "insim.rs".to_string().as_bytes().to_owned();
+        iname.put_bytes(0, 16 - iname.len());
+
+        assert_eq!(&buf[26..42], &iname,);
+    }
 }

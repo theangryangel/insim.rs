@@ -15,7 +15,6 @@ pub struct Mst {
     #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
-    // FIXME: ensure its nul terminated
     #[bw(write_with = binrw_write_codepage_string::<64, _>)]
     #[br(parse_with = binrw_parse_codepage_string::<64, _>)]
     pub msg: String,
@@ -23,21 +22,22 @@ pub struct Mst {
 
 #[cfg(test)]
 mod tests {
-    use bytes::BytesMut;
-
     use super::Mst;
     use crate::core::identifiers::RequestId;
+    use insim_core::binrw::BinWrite;
+    use std::io::Cursor;
 
     #[test]
-    fn ensure_last_byte_zero_always() {
+    fn test_mst() {
         let data = Mst {
             reqi: RequestId(1),
             msg: "aaaaaa".into(),
         };
 
-        let mut buf = BytesMut::new();
-        let res = data.encode(&mut buf, None);
+        let mut buf = Cursor::new(Vec::new());
+        let res = data.write_le(&mut buf);
         assert!(res.is_ok());
+        let buf = buf.into_inner();
 
         assert_eq!(buf.last(), Some(&0));
         assert_eq!(buf.len(), 66);

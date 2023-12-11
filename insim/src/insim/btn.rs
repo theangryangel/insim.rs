@@ -100,28 +100,28 @@ pub struct Btn {
     pub w: u8,
     pub h: u8,
 
-    // FIXME: This should be encodable UPTO 240 bytes and in multiples of 4
     #[br(parse_with = binrw_parse_codepage_string::<240, _>)]
-    #[bw(write_with = binrw_write_codepage_string::<240, _>)]
+    #[bw(write_with = binrw_write_codepage_string::<240, _>, args(false, 4))]
     pub text: String,
 }
 
 #[cfg(test)]
 mod tests {
-    use bytes::BytesMut;
-
     use super::Btn;
+    use insim_core::binrw::BinWrite;
+    use std::io::Cursor;
 
     #[test]
-    fn ensure_btn_divisible_by_four() {
+    fn test_btn() {
         let data = Btn {
             text: "aaaaa".into(),
             ..Default::default()
         };
 
-        let mut buf = BytesMut::new();
-        let res = data.encode(&mut buf, None);
+        let mut buf = Cursor::new(Vec::new());
+        let res = data.write_le(&mut buf);
         assert!(res.is_ok());
+        let buf = buf.into_inner();
 
         // we need to add the size and type to the buf len
         assert_eq!(buf.len() + 2, 20);

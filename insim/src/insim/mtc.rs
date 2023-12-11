@@ -21,23 +21,24 @@ pub struct Mtc {
     #[brw(pad_after = 2)]
     pub plid: PlayerId,
 
-    // FIXME: should be nul terminated, grow upto 128 bytes
-    // but pad so that msg is divisible by 4
-    #[bw(write_with = binrw_write_codepage_string::<128, _>)]
-    #[br(parse_with = binrw_parse_codepage_string::<128, _>)]
+    #[bw(write_with = binrw_write_codepage_string::<128, _>, args(false, 4))]
+    #[br(parse_with = binrw_parse_codepage_string::<128, _>, args(false))]
     pub msg: String,
 }
 
 #[cfg(test)]
 mod tests {
-    use bytes::BytesMut;
-    use insim_core::identifiers::{ConnectionId, PlayerId};
+    use insim_core::{
+        binrw::BinWrite,
+        identifiers::{ConnectionId, PlayerId},
+    };
+    use std::io::Cursor;
 
     use super::{Mtc, SoundType};
     use crate::core::identifiers::RequestId;
 
     #[test]
-    fn ensure_last_byte_zero_always() {
+    fn test_mtc_valid() {
         let data = Mtc {
             reqi: RequestId(1),
             plid: PlayerId(0),
@@ -46,9 +47,10 @@ mod tests {
             msg: "aaaaa".into(),
         };
 
-        let mut buf = BytesMut::new();
-        let res = data.encode(&mut buf, None);
+        let mut buf = Cursor::new(Vec::new());
+        let res = data.write_le(&mut buf);
         assert!(res.is_ok());
+        let buf = buf.into_inner();
 
         assert_eq!((buf.len() - 6) % 4, 0);
 

@@ -46,21 +46,21 @@ pub struct Mso {
     // FIXME, this should be dynamic sized
     // pad so that msg is divisible by 4
     // after the size and type are added
-    #[bw(write_with = binrw_write_codepage_string::<128, _>)]
+    #[bw(write_with = binrw_write_codepage_string::<128, _>, args(false, 4))]
     #[br(parse_with = binrw_parse_codepage_string::<128, _>)]
     pub msg: String,
 }
 
 #[cfg(test)]
 mod tests {
-
-    use bytes::{BufMut, BytesMut};
-
     use super::{Mso, MsoUserType};
     use crate::core::identifiers::{ConnectionId, PlayerId, RequestId};
+    use bytes::{BufMut, BytesMut};
+    use insim_core::binrw::BinWrite;
+    use std::io::Cursor;
 
     #[test]
-    fn dynamic_encodes_to_multiple_of_8() {
+    fn test_mso() {
         let data = Mso {
             reqi: RequestId(1),
             ucid: ConnectionId(10),
@@ -70,8 +70,8 @@ mod tests {
             msg: "two".into(),
         };
 
-        let mut buf = BytesMut::new();
-        let res = data.encode(&mut buf, None);
+        let mut buf = Cursor::new(Vec::new());
+        let res = data.write_le(&mut buf);
         assert!(res.is_ok());
 
         let mut comparison = BytesMut::new();
@@ -82,8 +82,8 @@ mod tests {
         comparison.put_u8(0);
         comparison.put_u8(0);
         comparison.extend_from_slice(&"two".to_string().as_bytes());
-        comparison.put_bytes(0, 3);
+        comparison.put_bytes(0, 1);
 
-        assert_eq!(buf.to_vec(), comparison.to_vec());
+        assert_eq!(buf.into_inner(), comparison.to_vec());
     }
 }

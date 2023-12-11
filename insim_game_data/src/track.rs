@@ -1,16 +1,10 @@
 //! Utility functions and structs for working with track names and fetching track data.
-
-#[cfg(feature = "serde")]
-use serde::Serialize;
-
 use insim_core::license::License;
-
+use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
-use once_cell::sync::Lazy;
-
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TrackInfo {
     pub code: String,
     pub name: String,
@@ -514,11 +508,6 @@ pub static TRACK_INFO: Lazy<HashMap<String, TrackInfo>> = Lazy::new(|| {
 
 /// Lookup a [TrackInfo] from a Track
 pub fn lookup(track: &insim_core::track::Track) -> Option<&TrackInfo> {
-    let input = track.inner;
-    if let Some(rpos) = input.iter().rposition(|x| ![b'X', b'R', 0].contains(x)) {
-        if let Ok(short_code) = std::str::from_utf8(&input[..=rpos]) {
-            return TRACK_INFO.get(short_code);
-        }
-    }
-    None
+    let matches = (track.inner).trim_end_matches(|c| c == 'X' || c == 'R');
+    TRACK_INFO.get(matches)
 }

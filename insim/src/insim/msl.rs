@@ -38,7 +38,6 @@ pub struct Msl {
 
     pub sound: SoundType,
 
-    // FIXME trailing nul
     #[bw(write_with = binrw_write_codepage_string::<128, _>)]
     #[br(parse_with = binrw_parse_codepage_string::<128, _>)]
     pub msg: String,
@@ -46,22 +45,25 @@ pub struct Msl {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
+
     use insim_core::binrw::BinWrite;
 
     use super::{Msl, SoundType};
     use crate::core::identifiers::RequestId;
 
     #[test]
-    fn ensure_last_byte_zero_always() {
+    fn test_msl() {
         let data = Msl {
             reqi: RequestId(1),
             sound: SoundType::Silent,
             msg: "aaaaaa".into(),
         };
 
-        let mut buf = vec![];
+        let mut buf = Cursor::new(Vec::new());
         let res = data.write_le(&mut buf);
         assert!(res.is_ok());
+        let buf = buf.into_inner();
 
         assert_eq!(buf.last(), Some(&0));
         assert_eq!(buf.len(), 130);
