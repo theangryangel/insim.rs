@@ -3,17 +3,12 @@ name = "insim_game_data"
 version = "0.1.0"
 edition = "2021"
 description = """
-LFS Game Data, such as track information
+Extended LFS Game Data, such as track and vehicle information
 """
 
 [lib]
 bench = false
 doctest = false
 
-[features]
-serde = ["dep:serde", "insim_core/serde"]
-
 [dependencies]
-once_cell = "1"
-serde = { version = "1", features = ["derive"], optional = true }
 insim_core = { path = "../insim_core" }

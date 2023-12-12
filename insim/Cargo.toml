@@ -12,7 +12,6 @@ doctest = false
 serde = [
   "dep:serde",
   "insim_core/serde",
-  "insim_game_data?/serde",
   "bitflags/serde",
 ]
 game_data = ["dep:insim_game_data"]
