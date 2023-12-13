@@ -1,6 +1,6 @@
 //! Utility functions for working with vehicles and fetching vehicle data.
 
-use crate::string::is_ascii_alphanumeric;
+use crate::{license::License, string::is_ascii_alphanumeric};
 use binrw::{BinRead, BinWrite};
 
 /// Handles parsing a vehicle name according to the Insim v9 rules.
@@ -43,6 +43,35 @@ impl Vehicle {
 
     pub fn is_mod(&self) -> bool {
         matches!(self, Vehicle::Mod(_))
+    }
+
+    pub fn license(&self) -> License {
+        match self {
+            Vehicle::Xfg => License::Demo,
+            Vehicle::Xrg => License::Demo,
+            Vehicle::Fbm => License::Demo,
+
+            Vehicle::Xrt => License::S1,
+            Vehicle::Rb4 => License::S1,
+            Vehicle::Fxo => License::S1,
+            Vehicle::Lx4 => License::S1,
+            Vehicle::Lx6 => License::S1,
+            Vehicle::Mrt => License::S1,
+
+            Vehicle::Uf1 => License::S2,
+            Vehicle::Rac => License::S2,
+            Vehicle::Fz5 => License::S2,
+            Vehicle::Fox => License::S2,
+            Vehicle::Xfr => License::S2,
+            Vehicle::Ufr => License::S2,
+            Vehicle::Fo8 => License::S2,
+            Vehicle::Fxr => License::S2,
+            Vehicle::Xrr => License::S2,
+            Vehicle::Fzr => License::S2,
+            Vehicle::Bf1 => License::S2,
+
+            Vehicle::Mod(_) => License::S3,
+        }
     }
 }
 

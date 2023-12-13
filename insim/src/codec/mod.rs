@@ -42,6 +42,8 @@ impl Codec {
         // update the length the encoded length
         dst[0] = n;
 
+        tracing::debug!("{:?}", dst);
+
         Ok(dst.freeze())
     }
 

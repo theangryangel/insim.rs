@@ -9,6 +9,8 @@ use insim_core::{
 
 use bitflags::bitflags;
 
+use crate::VERSION;
+
 bitflags! {
     /// Flags for the [Init] packet flags field.
     #[binrw]
@@ -39,7 +41,7 @@ impl IsiFlags {
 }
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Insim Init, or handshake packet.
 /// Required to be sent to the server before any other packets.
@@ -79,6 +81,21 @@ pub struct Isi {
     #[bw(write_with = binrw_write_codepage_string::<16, _>)]
     #[br(parse_with = binrw_parse_codepage_string::<16, _>)]
     pub iname: String,
+}
+
+impl Default for Isi {
+    fn default() -> Self {
+        Self {
+            reqi: RequestId(0),
+            udpport: 0,
+            flags: IsiFlags::default(),
+            version: VERSION,
+            prefix: 0 as char,
+            interval: Duration::default(),
+            admin: "".into(),
+            iname: "insim.rs".into(),
+        }
+    }
 }
 
 #[cfg(test)]

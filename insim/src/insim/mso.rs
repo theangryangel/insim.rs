@@ -1,7 +1,7 @@
 use insim_core::{
     binrw::{self, binrw},
     identifiers::{ConnectionId, PlayerId, RequestId},
-    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
+    string::{binrw_parse_codepage_string_until_eof, binrw_write_codepage_string},
 };
 
 #[cfg(feature = "serde")]
@@ -44,7 +44,7 @@ pub struct Mso {
     pub textstart: u8,
 
     #[bw(write_with = binrw_write_codepage_string::<128, _>, args(false, 4))]
-    #[br(parse_with = binrw_parse_codepage_string::<128, _>)]
+    #[br(parse_with = binrw_parse_codepage_string_until_eof)]
     pub msg: String,
 }
 
@@ -53,8 +53,9 @@ mod tests {
     use super::{Mso, MsoUserType};
     use crate::core::identifiers::{ConnectionId, PlayerId, RequestId};
     use bytes::{BufMut, BytesMut};
-    use insim_core::binrw::BinWrite;
+    use insim_core::binrw::{BinRead, BinWrite};
     use std::io::Cursor;
+    use tokio_test::assert_ok;
 
     #[test]
     fn test_mso() {
@@ -82,5 +83,13 @@ mod tests {
         comparison.put_bytes(0, 1);
 
         assert_eq!(buf.into_inner(), comparison.to_vec());
+    }
+
+    #[test]
+    fn test_mso_too_short() {
+        let mut buf = Cursor::new(b"\x0b\0\0\0\0\0\0Downloaded Skin : XFG_PRO38\0");
+
+        let res = Mso::read_le(&mut buf);
+        assert_ok!(res);
     }
 }

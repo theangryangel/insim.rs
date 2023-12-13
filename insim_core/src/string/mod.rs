@@ -129,7 +129,7 @@ pub fn escape(input: Cow<str>) -> Cow<str> {
     output.into()
 }
 
-use binrw::{BinRead, BinWrite};
+use binrw::{helpers::until_eof, BinRead, BinWrite};
 
 #[binrw::writer(writer, endian)]
 pub fn binrw_write_codepage_string<const SIZE: usize>(
@@ -169,6 +169,17 @@ pub fn binrw_write_codepage_string<const SIZE: usize>(
 #[binrw::parser(reader, endian)]
 pub fn binrw_parse_codepage_string<const SIZE: usize>(raw: bool) -> binrw::BinResult<String> {
     <[u8; SIZE]>::read_options(reader, endian, ()).map(|bytes| {
+        if raw {
+            Ok(String::from_utf8_lossy(strip_trailing_nul(&bytes)).to_string())
+        } else {
+            Ok(codepages::to_lossy_string(&bytes).to_string())
+        }
+    })?
+}
+
+#[binrw::parser(reader, endian)]
+pub fn binrw_parse_codepage_string_until_eof(raw: bool) -> binrw::BinResult<String> {
+    until_eof(reader, endian, ()).map(|bytes: Vec<u8>| {
         if raw {
             Ok(String::from_utf8_lossy(strip_trailing_nul(&bytes)).to_string())
         } else {
