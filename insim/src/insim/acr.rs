@@ -1,7 +1,7 @@
 use insim_core::{
     binrw::{self, binrw},
     identifiers::{ConnectionId, RequestId},
-    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
+    string::{binrw_parse_codepage_string_until_eof, binrw_write_codepage_string},
 };
 
 #[cfg(feature = "serde")]
@@ -40,7 +40,7 @@ pub struct Acr {
     #[brw(pad_after = 1)]
     pub result: AcrResult,
 
-    #[br(parse_with = binrw_parse_codepage_string::<64, _>)]
-    #[bw(write_with = binrw_write_codepage_string::<64, _>)]
+    #[bw(write_with = binrw_write_codepage_string::<64, _>, args(false, 4))]
+    #[br(parse_with = binrw_parse_codepage_string_until_eof)]
     pub text: String,
 }

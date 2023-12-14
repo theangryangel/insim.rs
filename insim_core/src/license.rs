@@ -1,11 +1,16 @@
+use binrw::binrw;
+
+#[binrw]
 #[non_exhaustive]
-#[derive(PartialEq, PartialOrd, Eq, Debug, Copy, Clone)]
+#[derive(Default, PartialEq, PartialOrd, Eq, Debug, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[brw(repr(u8))]
 pub enum License {
-    Demo,
-    S1,
-    S2,
-    S3,
+    #[default]
+    Demo = 0,
+    S1 = 1,
+    S2 = 2,
+    S3 = 3,
 }
 
 impl std::fmt::Display for License {

@@ -1,7 +1,10 @@
 use insim_core::{
     binrw::{self, binrw},
     identifiers::{ClickId, ConnectionId, RequestId},
-    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
+    string::{
+        binrw_parse_codepage_string, binrw_parse_codepage_string_until_eof,
+        binrw_write_codepage_string,
+    },
 };
 
 #[cfg(feature = "serde")]
@@ -100,7 +103,7 @@ pub struct Btn {
     pub w: u8,
     pub h: u8,
 
-    #[br(parse_with = binrw_parse_codepage_string::<240, _>)]
+    #[br(parse_with = binrw_parse_codepage_string_until_eof)]
     #[bw(write_with = binrw_write_codepage_string::<240, _>, args(false, 4))]
     pub text: String,
 }

@@ -171,6 +171,84 @@ impl Default for Packet {
 }
 
 impl Packet {
+    /// Hint at the possible *minimum* size of a packet, so that when we encode it, it can pre-allocate a
+    /// ballpark buffer.
+    /// It must not be trusted. An incorrect implementation of size_hint() should not lead to memory safety violations.
+    pub fn size_hint(&self) -> usize {
+        // TODO: For some of these packets we can be more intelligent.
+        // i.e. see RelayHostList
+        match self {
+            Packet::Init(_) => 44,
+            Packet::Version(_) => 20,
+            Packet::Small(_) => 8,
+            Packet::State(_) => 28,
+            Packet::SingleCharacter(_) => 8,
+            Packet::StateFlagsPack(_) => 8,
+            Packet::SetCarCam(_) => 8,
+            Packet::CamPosPack(_) => 32,
+            Packet::MultiPlayerNotification(_) => 40,
+            Packet::MessageOut(_) => 12,
+            Packet::InsimInfo(_) => 12,
+            Packet::MessageType(_) => 68,
+            Packet::MessageToConnection(_) => 12,
+            Packet::ScreenMode(_) => 20,
+            Packet::VoteNotification(_) => 8,
+            Packet::RaceStart(_) => 28,
+            Packet::NewConnection(_) => 56,
+            Packet::ConnectionLeave(_) => 8,
+            Packet::ConnectionPlayerRenamed(_) => 36,
+            Packet::NewPlayer(_) => 76,
+            Packet::Lap(_) => 20,
+            Packet::SplitX(_) => 16,
+            Packet::PitStopStart(_) => 24,
+            Packet::PitStopFinish(_) => 12,
+            Packet::PitLane(_) => 8,
+            Packet::CameraChange(_) => 8,
+            Packet::Penalty(_) => 8,
+            Packet::TakeOverCar(_) => 8,
+            Packet::Flag(_) => 8,
+            Packet::PlayerFlags(_) => 8,
+            Packet::Finished(_) => 20,
+            Packet::Result(_) => 86,
+            Packet::Reorder(_) => 44,
+            Packet::NodeLap(_) => 10,
+            Packet::MultiCarInfo(_) => 32,
+            Packet::MesssageExtended(_) => 100,
+            Packet::MessageLocal(_) => 132,
+            Packet::CarReset(_) => 4,
+            Packet::ButtonFunction(_) => 8,
+            Packet::AutoXInfo(_) => 40,
+            Packet::AutoXObject(_) => 4,
+            Packet::Button(_) => 16,
+            Packet::ButtonClick(_) => 8,
+            Packet::ButtonType(_) => 104,
+            Packet::ReplayInformation(_) => 80,
+            Packet::ScreenShot(_) => 40,
+            Packet::Contact(_) => 40,
+            Packet::ObjectHit(_) => 24,
+            Packet::HotLapValidity(_) => 16,
+            Packet::PlayerAllowedCars(_) => 8,
+            Packet::AutoXMultipleObjects(_) => 16,
+            Packet::AdminCommandReport(_) => 12,
+            Packet::Handicaps(_) => 68,
+            Packet::Nci(_) => 16,
+            Packet::Jrr(_) => 16,
+            Packet::UserControlObject(_) => 28,
+            Packet::ObjectControl(_) => 8,
+            Packet::TargetToConnection(_) => 8,
+            Packet::SelectedVehicle(_) => 8,
+            Packet::VehicleStateChanged(_) => 20,
+            Packet::ConnectionInterfaceMode(_) => 8,
+            Packet::ModsAllowed(_) => 12,
+            Packet::RelayHostList(i) => 4 + (i.hinfo.len() * 40),
+            Packet::RelayHostSelect(_) => 68,
+            _ => {
+                // a sensible default for everything else
+                4
+            }
+        }
+    }
+
     #[tracing::instrument]
     pub fn maybe_pong(&self) -> Option<Self> {
         match self {

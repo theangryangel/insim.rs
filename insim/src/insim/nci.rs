@@ -3,6 +3,7 @@ use std::net::Ipv4Addr;
 use insim_core::{
     binrw::{self, binrw},
     identifiers::{ConnectionId, RequestId},
+    license::License,
 };
 
 #[cfg(feature = "serde")]
@@ -63,8 +64,10 @@ pub struct Nci {
     pub reqi: RequestId,
     pub ucid: ConnectionId,
 
-    #[brw(pad_after = 3)]
     pub language: ILanguage,
+
+    #[brw(pad_after = 2)]
+    pub license: License,
 
     pub user_id: u32,
 
@@ -79,6 +82,7 @@ impl Default for Nci {
             reqi: RequestId::default(),
             ucid: ConnectionId::default(),
             language: ILanguage::default(),
+            license: License::default(),
             user_id: 0,
             ip_addr: Ipv4Addr::new(0, 0, 0, 0),
         }

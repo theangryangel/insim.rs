@@ -5,7 +5,7 @@ use binrw::{BinRead, BinWrite};
 
 /// Handles parsing a vehicle name according to the Insim v9 rules.
 /// See <https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info>
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
+#[derive(PartialEq, Eq, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub enum Vehicle {
@@ -34,6 +34,9 @@ pub enum Vehicle {
     Bf1,
 
     Mod(u32),
+
+    /// Unknown vehicle. *Probably* a private mod?
+    Unknown,
 }
 
 impl Vehicle {
@@ -69,8 +72,8 @@ impl Vehicle {
             Vehicle::Xrr => License::S2,
             Vehicle::Fzr => License::S2,
             Vehicle::Bf1 => License::S2,
-
             Vehicle::Mod(_) => License::S3,
+            Vehicle::Unknown => License::S3,
         }
     }
 }
@@ -92,6 +95,7 @@ impl BinRead for Vehicle {
                 && bytes.last() == Some(&0);
 
             match (bytes, is_builtin) {
+                ([0, 0, 0, 0], _) => Ok(Vehicle::Unknown),
                 ([b'X', b'F', b'G', 0], true) => Ok(Vehicle::Xfg),
                 ([b'X', b'R', b'G', 0], true) => Ok(Vehicle::Xrg),
                 ([b'F', b'B', b'M', 0], true) => Ok(Vehicle::Fbm),
@@ -150,6 +154,9 @@ impl BinWrite for Vehicle {
             Vehicle::Fzr => [b'F', b'Z', b'R', 0].write_options(writer, endian, args),
             Vehicle::Bf1 => [b'B', b'F', b'1', 0].write_options(writer, endian, args),
             Vehicle::Mod(vehmod) => vehmod.write_options(writer, endian, args),
+            Vehicle::Unknown => {
+                [0 as u8, 0 as u8, 0 as u8, 0 as u8].write_options(writer, endian, args)
+            }
         }
     }
 }
@@ -181,6 +188,39 @@ impl std::fmt::Display for Vehicle {
                 // Determine the mod id. This is only applicable for Insim v9.
                 write!(f, "{:06X}", vehmod)
             }
+            Vehicle::Unknown => write!(f, "Unknown"),
+        }
+    }
+}
+
+impl std::fmt::Debug for Vehicle {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Vehicle::Xfg => write!(f, "XFG"),
+            Vehicle::Xrg => write!(f, "XRG"),
+            Vehicle::Fbm => write!(f, "FBM"),
+            Vehicle::Xrt => write!(f, "XRT"),
+            Vehicle::Rb4 => write!(f, "RB4"),
+            Vehicle::Fxo => write!(f, "FXO"),
+            Vehicle::Lx4 => write!(f, "LX4"),
+            Vehicle::Lx6 => write!(f, "LX6"),
+            Vehicle::Mrt => write!(f, "MRT"),
+            Vehicle::Uf1 => write!(f, "UF1"),
+            Vehicle::Rac => write!(f, "RAC"),
+            Vehicle::Fz5 => write!(f, "FZ5"),
+            Vehicle::Fox => write!(f, "FOX"),
+            Vehicle::Xfr => write!(f, "XFR"),
+            Vehicle::Ufr => write!(f, "UFR"),
+            Vehicle::Fo8 => write!(f, "FO8"),
+            Vehicle::Fxr => write!(f, "FXR"),
+            Vehicle::Xrr => write!(f, "XRR"),
+            Vehicle::Fzr => write!(f, "FZR"),
+            Vehicle::Bf1 => write!(f, "BF1"),
+            Vehicle::Mod(vehmod) => {
+                // Determine the mod id. This is only applicable for Insim v9.
+                write!(f, "MOD({:06X})", vehmod)
+            }
+            Vehicle::Unknown => write!(f, "Unknown"),
         }
     }
 }

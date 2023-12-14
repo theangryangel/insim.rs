@@ -1,7 +1,7 @@
 use insim_core::{
     binrw::{self, binrw},
     identifiers::{ConnectionId, PlayerId, RequestId},
-    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
+    string::{binrw_parse_codepage_string_until_eof, binrw_write_codepage_string},
 };
 
 pub use super::SoundType;
@@ -22,7 +22,7 @@ pub struct Mtc {
     pub plid: PlayerId,
 
     #[bw(write_with = binrw_write_codepage_string::<128, _>, args(false, 4))]
-    #[br(parse_with = binrw_parse_codepage_string::<128, _>, args(false))]
+    #[br(parse_with = binrw_parse_codepage_string_until_eof)]
     pub msg: String,
 }
 
