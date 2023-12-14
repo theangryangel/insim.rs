@@ -1,16 +1,16 @@
 use insim_core::{
+    binrw::{self, binrw},
     identifiers::{PlayerId, RequestId},
-    prelude::*,
 };
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(
-    InsimEncode, InsimDecode, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default,
-)]
+#[binrw]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
+#[brw(repr(u8))]
 // *_VALID variation means this was cleared
 pub enum PenaltyInfo {
     #[default]
@@ -23,9 +23,11 @@ pub enum PenaltyInfo {
     Seconds45 = 6,
 }
 
-#[derive(Debug, Default, InsimEncode, InsimDecode, Clone)]
+#[binrw]
+#[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
+#[brw(repr(u8))]
 pub enum PenaltyReason {
     /// Unknown or cleared penalty
     #[default]
@@ -50,7 +52,8 @@ pub enum PenaltyReason {
     StopLate = 6,
 }
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Penalty
 pub struct Pen {
@@ -60,6 +63,6 @@ pub struct Pen {
     pub oldpen: PenaltyInfo,
     pub newpen: PenaltyInfo,
 
-    #[insim(pad_bytes_after = "1")]
+    #[brw(pad_after = 1)]
     pub reason: PenaltyReason,
 }

@@ -1,5 +1,6 @@
-use crate::{Decodable, Encodable};
 use std::convert::From;
+
+use binrw::{BinRead, BinWrite};
 
 #[derive(Debug, Default, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -8,6 +9,34 @@ pub enum RaceLaps {
     Practice,
     Laps(usize),
     Hours(usize),
+}
+
+impl BinRead for RaceLaps {
+    type Args<'a> = ();
+
+    fn read_options<R: std::io::Read + std::io::Seek>(
+        reader: &mut R,
+        endian: binrw::Endian,
+        args: Self::Args<'_>,
+    ) -> binrw::BinResult<Self> {
+        let res = u8::read_options(reader, endian, args)?;
+
+        Ok(RaceLaps::from(res))
+    }
+}
+
+impl BinWrite for RaceLaps {
+    type Args<'a> = ();
+
+    fn write_options<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+        endian: binrw::Endian,
+        args: Self::Args<'_>,
+    ) -> binrw::BinResult<()> {
+        let res = u8::from(*self);
+        res.write_options(writer, endian, args)
+    }
 }
 
 impl From<u8> for RaceLaps {
@@ -37,35 +66,6 @@ impl From<RaceLaps> for u8 {
         };
 
         data as u8
-    }
-}
-
-impl Decodable for RaceLaps {
-    fn decode(
-        buf: &mut bytes::BytesMut,
-        _limit: Option<crate::ser::Limit>,
-    ) -> Result<Self, crate::DecodableError>
-    where
-        Self: Sized,
-    {
-        let data: RaceLaps = u8::decode(buf, None)?.into();
-        Ok(data)
-    }
-}
-
-impl Encodable for RaceLaps {
-    fn encode(
-        &self,
-        buf: &mut bytes::BytesMut,
-        _limit: Option<crate::ser::Limit>,
-    ) -> Result<(), crate::EncodableError>
-    where
-        Self: Sized,
-    {
-        let data = Into::<u8>::into(*self);
-        data.encode(buf, None)?;
-
-        Ok(())
     }
 }
 

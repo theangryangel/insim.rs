@@ -1,5 +1,3 @@
-use insim_core::{DecodableError, EncodableError};
-
 #[non_exhaustive]
 #[derive(thiserror::Error, Debug, Clone)]
 /// A specialized [`Error`] type for insim.
@@ -19,14 +17,6 @@ pub enum Error {
         msg: String,
     },
 
-    /// Failed to decode a packet
-    #[error("Failed to decode packet: {0:?}")]
-    Decoding(#[from] DecodableError),
-
-    /// Failed to encode a packet
-    #[error("Failed to encode packet: {0:?}")]
-    Encoding(#[from] EncodableError),
-
     /// A timeout occured whilst waiting for an operation
     #[error("Timeout: {0:?}")]
     Timeout(String),
@@ -40,11 +30,20 @@ pub enum Error {
 
     #[error("Websocket Error: {0}")]
     WebsocketIO(String),
+
+    #[error("Insim Core error {0}")]
+    BinRw(String),
 }
 
 impl From<tokio::time::error::Elapsed> for Error {
     fn from(value: tokio::time::error::Elapsed) -> Self {
         Error::Timeout(value.to_string())
+    }
+}
+
+impl From<insim_core::binrw::Error> for Error {
+    fn from(value: insim_core::binrw::Error) -> Self {
+        Error::BinRw(value.to_string()) // FIXME
     }
 }
 

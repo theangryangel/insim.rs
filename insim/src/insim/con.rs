@@ -1,18 +1,19 @@
 use insim_core::{
+    binrw::{self, binrw},
     identifiers::{PlayerId, RequestId},
-    prelude::*,
 };
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Used within [Con] packet to give a break down of information about the Contact between the two
 /// players.
 pub struct ConInfo {
     pub plid: PlayerId,
-    #[insim(pad_bytes_after = "1")]
+    #[brw(pad_after = 1)]
     pub info: u8,
     pub steer: u8,
 
@@ -30,11 +31,12 @@ pub struct ConInfo {
     pub y: i16,
 }
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Contact
 pub struct Con {
-    #[insim(pad_bytes_after = "1")]
+    #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
     // TODO: abstract spclose and time

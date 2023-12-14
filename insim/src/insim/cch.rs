@@ -1,14 +1,16 @@
 use insim_core::{
+    binrw::{self, binrw},
     identifiers::{PlayerId, RequestId},
-    prelude::*,
 };
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, Default, InsimEncode, InsimDecode, Clone)]
+#[binrw]
+#[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
+#[brw(repr(u8))]
 pub enum CameraView {
     /// Arcade "follow" view
     #[default]
@@ -30,13 +32,14 @@ pub enum CameraView {
     OtherVehicle = 255,
 }
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 // Camera Change
 pub struct Cch {
     pub reqi: RequestId,
     pub plid: PlayerId,
 
-    #[insim(pad_bytes_after = "3")]
+    #[brw(pad_after = 3)]
     pub camera: CameraView,
 }

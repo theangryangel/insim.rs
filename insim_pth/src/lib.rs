@@ -17,13 +17,15 @@
 //! there is approximately 0.2 seconds of time between passing one node and the next,
 //! when you are "driving at a reasonable speed".
 
-use std::fs;
+use binrw::BinRead;
+use std::fs::{self, File};
 use std::io::ErrorKind;
-use std::io::Read;
 use std::path::PathBuf;
 use thiserror::Error;
 
-use insim_core::{point::Point, prelude::*, DecodableError};
+use insim_core::binrw::{self, binrw};
+
+use insim_core::point::Point;
 
 #[non_exhaustive]
 #[derive(Error, Debug)]
@@ -31,11 +33,8 @@ pub enum Error {
     #[error("IO Error: {kind}: {message}")]
     IO { kind: ErrorKind, message: String },
 
-    #[error("Failed to decode packet: {0:?}")]
-    Decoding(#[from] DecodableError),
-
-    #[error("Remaining bytes after decoding, possibly broken file?")]
-    UnexpectedRemainingBytes,
+    #[error("BinRw Err {0:?}")]
+    BinRwErr(#[from] binrw::Error),
 }
 
 impl From<std::io::Error> for Error {
@@ -48,14 +47,16 @@ impl From<std::io::Error> for Error {
 }
 
 /// Describes the Left and Right limit, of a given node.
-#[derive(Debug, InsimDecode, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default, PartialEq)]
+#[binrw]
 pub struct Limit {
     pub left: f32,
     pub right: f32,
 }
 
 /// Node / or point on a track
-#[derive(Debug, InsimDecode, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default, PartialEq)]
+#[binrw]
 pub struct Node {
     /// Center point of this node
     pub center: Point<i32>,
@@ -124,23 +125,31 @@ impl Node {
     }
 }
 
-#[derive(Debug, InsimDecode, Default)]
-#[insim(magic = b"LFSPTH")]
+#[binrw]
+#[brw(little, magic = b"LFSPTH")]
+#[derive(Debug, Default, PartialEq)]
 /// PTH file
 pub struct Pth {
     pub version: u8,
     pub revision: u8,
 
-    pub num_nodes: i32,
+    #[bw(calc = nodes.len() as i32)]
+    num_nodes: i32,
+
     pub finish_line_node: i32,
 
-    #[insim(count = "num_nodes")]
+    #[br(count = num_nodes)]
     pub nodes: Vec<Node>,
 }
 
 impl Pth {
     /// Read and parse a PTH file into a [Pth] struct.
-    pub fn from_file(i: &PathBuf) -> Result<Self, Error> {
+    pub fn from_file(i: &mut File) -> Result<Self, Error> {
+        Pth::read(i).map_err(Error::from).map_err(Error::from)
+    }
+
+    /// Read and parse a PTH file into a [Pth] struct.
+    pub fn from_pathbuf(i: &PathBuf) -> Result<Self, Error> {
         if !i.exists() {
             return Err(Error::IO {
                 kind: std::io::ErrorKind::NotFound,
@@ -150,18 +159,6 @@ impl Pth {
 
         let mut input = fs::File::open(i).map_err(Error::from)?;
 
-        let mut buffer = Vec::new();
-        input.read_to_end(&mut buffer).map_err(Error::from)?;
-
-        let mut data = insim_core::bytes::BytesMut::new();
-        data.extend_from_slice(&buffer);
-
-        let result = Self::decode(&mut data, None)?;
-
-        if data.remaining() > 0 {
-            return Err(Error::UnexpectedRemainingBytes);
-        }
-
-        Ok(result)
+        Self::from_file(&mut input)
     }
 }

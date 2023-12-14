@@ -1,9 +1,7 @@
 use insim_core::{
+    binrw::{self, binrw},
     identifiers::{ConnectionId, PlayerId, RequestId},
-    prelude::*,
-    ser::Limit,
-    string::codepages,
-    EncodableError,
+    string::{binrw_parse_codepage_string_until_eof, binrw_write_codepage_string},
 };
 
 pub use super::SoundType;
@@ -11,7 +9,8 @@ pub use super::SoundType;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Message to Connection - Send a message to a specific connection, restricted to hosts only
 pub struct Mtc {
@@ -19,67 +18,27 @@ pub struct Mtc {
     pub sound: SoundType,
 
     pub ucid: ConnectionId,
-    #[insim(pad_bytes_after = "2")]
+    #[brw(pad_after = 2)]
     pub plid: PlayerId,
 
-    #[insim(bytes = "128")]
+    #[bw(write_with = binrw_write_codepage_string::<128, _>, args(false, 4))]
+    #[br(parse_with = binrw_parse_codepage_string_until_eof)]
     pub msg: String,
-}
-
-impl Encodable for Mtc {
-    fn encode(
-        &self,
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<(), EncodableError> {
-        if limit.is_some() {
-            return Err(EncodableError::UnexpectedLimit(format!(
-                "Mtc does not support a limit: {limit:?}",
-            )));
-        }
-
-        self.reqi.encode(buf, None)?;
-        self.sound.encode(buf, None)?;
-
-        self.ucid.encode(buf, None)?;
-        self.plid.encode(buf, None)?;
-
-        buf.put_bytes(0, 2);
-
-        let msg = codepages::to_lossy_bytes(&self.msg);
-
-        if msg.len() > 127 {
-            return Err(EncodableError::WrongSize(
-                "Mtc packet only supports up to 127 character messages".into(),
-            ));
-        }
-
-        buf.put_slice(&msg);
-
-        // pad so that msg is divisible by 4
-        let round_to = (msg.len() + 3) & !3;
-
-        if round_to != msg.len() {
-            buf.put_bytes(0, round_to - msg.len());
-        }
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use bytes::BytesMut;
     use insim_core::{
+        binrw::BinWrite,
         identifiers::{ConnectionId, PlayerId},
-        Encodable,
     };
+    use std::io::Cursor;
 
     use super::{Mtc, SoundType};
     use crate::core::identifiers::RequestId;
 
     #[test]
-    fn ensure_last_byte_zero_always() {
+    fn test_mtc_valid() {
         let data = Mtc {
             reqi: RequestId(1),
             plid: PlayerId(0),
@@ -88,9 +47,10 @@ mod tests {
             msg: "aaaaa".into(),
         };
 
-        let mut buf = BytesMut::new();
-        let res = data.encode(&mut buf, None);
+        let mut buf = Cursor::new(Vec::new());
+        let res = data.write_le(&mut buf);
         assert!(res.is_ok());
+        let buf = buf.into_inner();
 
         assert_eq!((buf.len() - 6) % 4, 0);
 

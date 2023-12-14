@@ -6,8 +6,9 @@ mod tests;
 pub use mode::Mode;
 
 use crate::{packet::Packet, result::Result};
-use bytes::{Buf, BufMut, Bytes, BytesMut};
-use insim_core::{Decodable, Encodable};
+use bytes::{Buf, Bytes, BytesMut};
+use insim_core::binrw::{BinRead, BinWrite};
+use std::io::{Cursor, Write};
 
 #[derive(Debug)]
 pub struct Codec {
@@ -25,21 +26,24 @@ impl Codec {
 
     #[tracing::instrument]
     pub fn encode(&self, msg: &Packet) -> Result<Bytes> {
-        let mut dst = BytesMut::new();
-
-        // put a placeholder for our length, we'll come back to this later
-        dst.put_u8(0);
-
         // encode the message
-        msg.encode(&mut dst, None)?;
+        let mut writer = Cursor::new(Vec::with_capacity(msg.size_hint()));
+        let _ = writer.write(&[0]);
+        msg.write(&mut writer)?;
+
+        let pos = writer.position();
 
         // encode the length of the packet, including the placeholder for the length
-        let n = self.mode().encode_length(dst.len())?;
+        let n = self.mode().encode_length(pos as usize)?;
 
         // update the length the encoded length
-        dst[0] = n;
+        writer.set_position(0);
+        writer.write_all(&[n])?;
 
-        Ok(dst.freeze())
+        let data = writer.into_inner();
+        tracing::debug!("{:?}", &data);
+
+        Ok(data.into())
     }
 
     #[tracing::instrument]
@@ -61,17 +65,10 @@ impl Codec {
         // none of the packet definitions include the size
         data.advance(1);
 
-        let res = Packet::decode(&mut data, None);
+        let mut cursor = std::io::Cursor::new(&data);
 
-        match res {
-            Ok(packet) => {
-                tracing::trace!("Decoded packet={:?}", packet);
-                Ok(Some(packet))
-            }
-            Err(e) => {
-                tracing::error!("Unhandled error decoding packet: {:?}, data={:?}", e, data);
-                Err(e.into())
-            }
-        }
+        let packet = Packet::read(&mut cursor)?;
+        tracing::trace!("Decoded packet={:?}", packet);
+        Ok(Some(packet))
     }
 }

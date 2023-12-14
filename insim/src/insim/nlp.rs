@@ -1,12 +1,13 @@
 use insim_core::{
+    binrw::{self, binrw},
     identifiers::{PlayerId, RequestId},
-    prelude::*,
 };
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct NodeLapInfo {
     pub node: u16,
@@ -15,13 +16,16 @@ pub struct NodeLapInfo {
     pub position: u8,
 }
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Node and Lap packet - similar to Mci without positional information
 pub struct Nlp {
     pub reqi: RequestId,
-    pub nump: u8,
 
-    #[insim(count = "nump")]
+    #[bw(calc = nodelap.len() as u8)]
+    nump: u8,
+
+    #[br(count = nump)]
     pub nodelap: Vec<NodeLapInfo>,
 }

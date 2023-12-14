@@ -1,15 +1,17 @@
 use insim_core::{
+    binrw::{self, binrw},
     identifiers::{PlayerId, RequestId},
-    prelude::*,
 };
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 /// Enum for the flag field of [Flg].
-#[derive(Default, Debug, InsimEncode, InsimDecode, Clone)]
+#[binrw]
+#[derive(Default, Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
+#[brw(repr(u8))]
 pub enum FlgType {
     #[default]
     None = 0,
@@ -19,16 +21,19 @@ pub enum FlgType {
     Yellow = 2,
 }
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Race Flag is sent when a flag is waved at a player.
 pub struct Flg {
     pub reqi: RequestId,
     pub plid: PlayerId,
 
+    #[br(map = |x: u8| x != 0)]
+    #[bw(map = |&x| x as u8)]
     pub offon: bool,
 
     pub flag: FlgType,
-    #[insim(pad_bytes_after = "1")]
+    #[brw(pad_after = 1)]
     pub carbehind: u8,
 }

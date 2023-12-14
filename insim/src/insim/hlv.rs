@@ -1,6 +1,6 @@
 use insim_core::{
+    binrw::{self, binrw},
     identifiers::{PlayerId, RequestId},
-    prelude::*,
 };
 
 #[cfg(feature = "serde")]
@@ -8,9 +8,11 @@ use serde::Serialize;
 
 use super::CarContact;
 
-#[derive(Debug, Default, InsimEncode, InsimDecode, Clone)]
+#[binrw]
+#[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
+#[brw(repr(u8))]
 /// Used within [Hlv] to indicate the hotlap validity failure reason.
 pub enum Hlvc {
     #[default]
@@ -23,14 +25,15 @@ pub enum Hlvc {
     OutOfBounds = 5,
 }
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Reports incidents that would violate Hot Lap Validity checks.
 pub struct Hlv {
     pub reqi: RequestId,
     pub plid: PlayerId,
 
-    #[insim(pad_bytes_after = "1")]
+    #[brw(pad_after = 1)]
     pub hlvc: Hlvc,
     pub time: u16,
     pub c: CarContact,

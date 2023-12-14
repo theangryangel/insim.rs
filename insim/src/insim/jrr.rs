@@ -1,6 +1,6 @@
 use insim_core::{
+    binrw::{self, binrw},
     identifiers::{ConnectionId, PlayerId, RequestId},
-    prelude::*,
 };
 
 #[cfg(feature = "serde")]
@@ -8,9 +8,11 @@ use serde::Serialize;
 
 use super::ObjectInfo;
 
-#[derive(Debug, Default, InsimEncode, InsimDecode, Clone)]
+#[binrw]
+#[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
+#[brw(repr(u8))]
 /// Used within the [Jrr] packet.
 pub enum JrrAction {
     #[default]
@@ -31,7 +33,8 @@ pub enum JrrAction {
     Unused7 = 7,
 }
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Join Request Reply
 /// Set the ISF_REQ_JOIN flag in the IS_ISI to receive join requests
@@ -49,7 +52,7 @@ pub struct Jrr {
     pub plid: PlayerId,
 
     pub ucid: ConnectionId,
-    #[insim(pad_bytes_after = "2")]
+    #[brw(pad_after = 2)]
     pub action: JrrAction,
 
     pub startpos: ObjectInfo,

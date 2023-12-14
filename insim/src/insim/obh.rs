@@ -1,7 +1,6 @@
 use insim_core::{
+    binrw::{self, binrw},
     identifiers::{PlayerId, RequestId},
-    prelude::*,
-    ser::Limit,
 };
 
 #[cfg(feature = "serde")]
@@ -10,8 +9,11 @@ use serde::Serialize;
 use bitflags::bitflags;
 
 bitflags! {
+    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
+    #[br(map = Self::from_bits_truncate)]
+    #[bw(map = |&x: &Self| x.bits())]
     pub struct ObhFlags: u8 {
         const LAYOUT = (1 << 0);
         const CAN_MOVE = (1 << 1);
@@ -20,33 +22,8 @@ bitflags! {
     }
 }
 
-impl Encodable for ObhFlags {
-    fn encode(
-        &self,
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<(), insim_core::EncodableError>
-    where
-        Self: Sized,
-    {
-        self.bits().encode(buf, limit)?;
-        Ok(())
-    }
-}
-
-impl Decodable for ObhFlags {
-    fn decode(
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<Self, insim_core::DecodableError>
-    where
-        Self: Sized,
-    {
-        Ok(Self::from_bits_truncate(u8::decode(buf, limit)?))
-    }
-}
-
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct CarContact {
     pub direction: u8,
@@ -58,7 +35,8 @@ pub struct CarContact {
     pub y: i16,
 }
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Object Hit
 pub struct Obh {
@@ -73,7 +51,7 @@ pub struct Obh {
     pub x: i16,
     pub y: i16,
 
-    #[insim(pad_bytes_after = "1")]
+    #[brw(pad_after = 1)]
     pub z: u8,
     pub index: u8,
     pub flags: ObhFlags,

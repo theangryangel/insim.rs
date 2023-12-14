@@ -20,6 +20,9 @@ use std::{net::SocketAddr, time::Duration};
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+
+    #[arg(long)]
+    isi_interval: Option<u8>,
 }
 
 #[derive(Subcommand)]
@@ -84,8 +87,9 @@ pub async fn main() -> Result<()> {
 
     let mut isi = Isi::default();
     isi.flags = IsiFlags::MCI | IsiFlags::CON | IsiFlags::OBH;
-    isi.iname = "insim.rs".into();
-    isi.interval = Duration::from_millis(1000);
+    if let Some(interval) = &cli.isi_interval {
+        isi.interval = Duration::from_secs((*interval).into());
+    }
 
     let mut client: Connection = match &cli.command {
         Commands::Udp { bind, addr } => {

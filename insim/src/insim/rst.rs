@@ -1,5 +1,9 @@
 use insim_core::{
-    identifiers::RequestId, prelude::*, racelaps::RaceLaps, ser::Limit, track::Track, wind::Wind,
+    binrw::{self, binrw},
+    identifiers::RequestId,
+    racelaps::RaceLaps,
+    track::Track,
+    wind::Wind,
 };
 
 #[cfg(feature = "serde")]
@@ -8,8 +12,11 @@ use serde::Serialize;
 use bitflags::bitflags;
 
 bitflags! {
+    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
+    #[br(map = Self::from_bits_truncate)]
+    #[bw(map = |&x: &HostFacts| x.bits())]
     pub struct HostFacts: u16 {
          const CAN_VOTE = (1 << 0);
          const CAN_SELECT = (1 << 1);
@@ -21,37 +28,12 @@ bitflags! {
     }
 }
 
-impl Decodable for HostFacts {
-    fn decode(
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<Self, insim_core::DecodableError>
-    where
-        Self: Default,
-    {
-        Ok(Self::from_bits_truncate(u16::decode(buf, limit)?))
-    }
-}
-
-impl Encodable for HostFacts {
-    fn encode(
-        &self,
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<(), insim_core::EncodableError>
-    where
-        Self: Sized,
-    {
-        self.bits().encode(buf, limit)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Race Start
 pub struct Rst {
-    #[insim(pad_bytes_after = "1")]
+    #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
     pub racelaps: RaceLaps,

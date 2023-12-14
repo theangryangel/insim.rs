@@ -1,9 +1,9 @@
 use std::time::Duration;
 
 use insim_core::{
+    binrw::{self, binrw},
+    duration::{binrw_parse_duration, binrw_write_duration},
     identifiers::{PlayerId, RequestId},
-    prelude::*,
-    ser::Limit,
 };
 
 #[cfg(feature = "serde")]
@@ -14,8 +14,11 @@ use bitflags::bitflags;
 use super::{Fuel, PenaltyInfo, PlayerFlags, TyreCompound};
 
 bitflags! {
+    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
+    #[br(map = Self::from_bits_truncate)]
+    #[bw(map = |&x: &Self| x.bits())]
     pub struct PitStopWorkFlags: u32 {
          const NOTHING = 0;
          const STOP = (1 << 0);
@@ -38,33 +41,8 @@ bitflags! {
     }
 }
 
-impl Decodable for PitStopWorkFlags {
-    fn decode(
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<Self, insim_core::DecodableError>
-    where
-        Self: Default,
-    {
-        Ok(Self::from_bits_truncate(u32::decode(buf, limit)?))
-    }
-}
-
-impl Encodable for PitStopWorkFlags {
-    fn encode(
-        &self,
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<(), insim_core::EncodableError>
-    where
-        Self: Sized,
-    {
-        self.bits().encode(buf, limit)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Pit stop (stop at the garage, not "tele-pit")
 pub struct Pit {
@@ -76,28 +54,33 @@ pub struct Pit {
 
     pub fueladd: Fuel,
     pub penalty: PenaltyInfo,
-    #[insim(pad_bytes_after = "1")]
+    #[brw(pad_after = 1)]
     pub numstops: u8,
 
     pub tyres: [TyreCompound; 4],
-    #[insim(pad_bytes_after = "4")]
+    #[brw(pad_after = 4)]
     pub work: PitStopWorkFlags,
 }
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Pit Stop Finished
 pub struct Psf {
     pub reqi: RequestId,
     pub plid: PlayerId,
 
-    #[insim(pad_bytes_after = "4")]
+    #[brw(pad_after = 4)]
+    #[br(parse_with = binrw_parse_duration::<u32, _>)]
+    #[bw(write_with = binrw_write_duration::<u32, _>)]
     pub stime: Duration,
 }
 
-#[derive(Debug, Default, PartialEq, Eq, InsimEncode, InsimDecode, Clone)]
+#[binrw]
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
+#[brw(repr(u8))]
 pub enum PitLaneFact {
     #[default]
     /// Left pitlane
@@ -116,14 +99,15 @@ pub enum PitLaneFact {
     EnterStopGo = 4,
 }
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// PitLane
 pub struct Pla {
     pub reqi: RequestId,
     pub plid: PlayerId,
 
-    #[insim(pad_bytes_after = "3")]
+    #[brw(pad_after = 3)]
     pub fact: PitLaneFact,
 }
 

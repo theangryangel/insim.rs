@@ -7,14 +7,13 @@ currently not touching the version number.
 
 If you're not sure where to start, you probably want to look at the README and examples within the `insim` crate.
 
-| Crate             | Usage                                           |
-| ----------------- | ----------------------------------------------- |
-| `insim`           | Connection and protocol implementation.         |
-| `insim_core`      | Contains core types shared across other crates. |
-| `insim_derive`    | Contains proc_macros for insim_core.            |
-| `insim_game_data` | Contains track information.                     |
-| `insim_pth`       | Implements a PTH file read/writer.              |
-| `insim_smx`       | Implements a SMX file reader/writer.            |
+| Crate          | Usage                                           |
+| -------------- | ----------------------------------------------- |
+| `insim`        | Connection and protocol implementation.         |
+| `insim_core`   | Contains core types shared across other crates. |
+| `insim_derive` | Contains proc_macros for insim_core.            |
+| `insim_pth`    | Implements a PTH file read/writer.              |
+| `insim_smx`    | Implements a SMX file reader/writer.            |
 
 ## Documentation
 

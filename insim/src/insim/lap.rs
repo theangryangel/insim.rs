@@ -1,8 +1,12 @@
-use std::time::Duration;
+use std::{
+    io::{Read, Seek, Write},
+    time::Duration,
+};
 
 use insim_core::{
+    binrw::{self, binrw, BinRead, BinResult, BinWrite, Endian},
+    duration::{binrw_parse_duration, binrw_write_duration},
     identifiers::{PlayerId, RequestId},
-    prelude::*,
 };
 
 #[cfg(feature = "serde")]
@@ -19,36 +23,39 @@ pub enum Fuel200 {
     No,
 }
 
-impl Decodable for Fuel200 {
-    fn decode(
-        buf: &mut bytes::BytesMut,
-        limit: Option<insim_core::ser::Limit>,
-    ) -> Result<Self, insim_core::DecodableError>
-    where
-        Self: Sized,
-    {
-        let data = u8::decode(buf, limit)?;
+impl BinWrite for Fuel200 {
+    type Args<'a> = ();
 
-        if data == 255 {
-            Ok(Fuel200::No)
-        } else {
-            Ok(Fuel200::Percentage(data))
-        }
+    fn write_options<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        endian: Endian,
+        args: Self::Args<'_>,
+    ) -> BinResult<()> {
+        let data = match self {
+            Self::Percentage(data) => *data,
+            Self::No => 255 as u8,
+        };
+
+        data.write_options(writer, endian, args)?;
+        Ok(())
     }
 }
 
-impl Encodable for Fuel200 {
-    fn encode(
-        &self,
-        buf: &mut bytes::BytesMut,
-        limit: Option<insim_core::ser::Limit>,
-    ) -> Result<(), insim_core::EncodableError>
-    where
-        Self: Sized,
-    {
-        match self {
-            Fuel200::Percentage(data) => data.encode(buf, limit),
-            Fuel200::No => (255 as u8).encode(buf, limit),
+impl BinRead for Fuel200 {
+    type Args<'a> = ();
+
+    fn read_options<R: Read + Seek>(
+        reader: &mut R,
+        endian: Endian,
+        (): Self::Args<'_>,
+    ) -> BinResult<Self> {
+        let data = <u8>::read_options(reader, endian, ())?;
+
+        if data == 255 {
+            Ok(Self::No)
+        } else {
+            Ok(Self::Percentage(data))
         }
     }
 }
@@ -62,52 +69,61 @@ pub enum Fuel {
     No,
 }
 
-impl Decodable for Fuel {
-    fn decode(
-        buf: &mut bytes::BytesMut,
-        limit: Option<insim_core::ser::Limit>,
-    ) -> Result<Self, insim_core::DecodableError>
-    where
-        Self: Sized,
-    {
-        let data = u8::decode(buf, limit)?;
+impl BinWrite for Fuel {
+    type Args<'a> = ();
+
+    fn write_options<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        endian: Endian,
+        args: Self::Args<'_>,
+    ) -> BinResult<()> {
+        let data = match self {
+            Self::Percentage(data) => *data,
+            Self::No => 255 as u8,
+        };
+
+        data.write_options(writer, endian, args)?;
+        Ok(())
+    }
+}
+
+impl BinRead for Fuel {
+    type Args<'a> = ();
+
+    fn read_options<R: Read + Seek>(
+        reader: &mut R,
+        endian: Endian,
+        (): Self::Args<'_>,
+    ) -> BinResult<Self> {
+        let data = <u8>::read_options(reader, endian, ())?;
 
         if data == 255 {
-            Ok(Fuel::No)
+            Ok(Self::No)
         } else {
-            Ok(Fuel::Percentage(data))
+            Ok(Self::Percentage(data))
         }
     }
 }
 
-impl Encodable for Fuel {
-    fn encode(
-        &self,
-        buf: &mut bytes::BytesMut,
-        limit: Option<insim_core::ser::Limit>,
-    ) -> Result<(), insim_core::EncodableError>
-    where
-        Self: Sized,
-    {
-        match self {
-            Fuel::Percentage(data) => data.encode(buf, limit),
-            Fuel::No => (255 as u8).encode(buf, limit),
-        }
-    }
-}
-
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Lap Time for a given player.
 pub struct Lap {
     pub reqi: RequestId,
     pub plid: PlayerId,
 
+    #[br(parse_with = binrw_parse_duration::<u32, _>)]
+    #[bw(write_with = binrw_write_duration::<u32, _>)]
     pub ltime: Duration, // lap time (ms)
+
+    #[br(parse_with = binrw_parse_duration::<u32, _>)]
+    #[bw(write_with = binrw_write_duration::<u32, _>)]
     pub etime: Duration,
 
     pub lapsdone: u16,
-    #[insim(pad_bytes_after = "1")]
+    #[brw(pad_after = 1)]
     pub flags: PlayerFlags,
 
     pub penalty: PenaltyInfo,

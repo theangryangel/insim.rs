@@ -9,13 +9,14 @@
 //!
 //! I would suggest that SMX files should be considered historical at this point.
 
-use std::fs;
+use insim_core::binrw::{self, binrw, BinRead};
+use insim_core::string::{binrw_parse_codepage_string, binrw_write_codepage_string};
+use std::fs::{self, File};
 use std::io::ErrorKind;
-use std::io::Read;
 use std::path::PathBuf;
 use thiserror::Error;
 
-use insim_core::{point::Point, prelude::*, DecodableError};
+use insim_core::point::Point;
 
 #[non_exhaustive]
 #[derive(Error, Debug)]
@@ -23,11 +24,8 @@ pub enum Error {
     #[error("IO Error: {kind}: {message}")]
     IO { kind: ErrorKind, message: String },
 
-    #[error("Failed to decode packet: {0:?}")]
-    Decoding(#[from] DecodableError),
-
-    #[error("Remaining bytes after decoding, possibly broken file?")]
-    UnexpectedRemainingBytes,
+    #[error("BinRw Err {0:?}")]
+    BinRw(#[from] binrw::Error),
 }
 
 impl From<std::io::Error> for Error {
@@ -39,49 +37,59 @@ impl From<std::io::Error> for Error {
     }
 }
 
-#[derive(Debug, InsimDecode, Default, Clone)]
+#[binrw]
+#[derive(Debug, Default, Clone)]
 pub struct Rgb {
     pub r: u8,
     pub g: u8,
     pub b: u8,
 }
 
-#[derive(Debug, InsimDecode, Default, Clone)]
+#[binrw]
+#[derive(Debug, Default, Clone)]
 pub struct Argb {
     pub a: u8,
     pub rgb: Rgb,
 }
 
-#[derive(Debug, InsimDecode, Default, Clone)]
+#[binrw]
+#[derive(Debug, Default, Clone)]
 pub struct ObjectPoint {
     pub xyz: Point<i32>,
     pub colour: Argb,
 }
 
-#[derive(Debug, InsimDecode, Default, Clone)]
+#[binrw]
+#[derive(Debug, Default, Clone)]
 pub struct Triangle {
     pub a: u16, // index of the objectpoint
     pub b: u16,
-    #[insim(pad_bytes_after = "2")]
+    #[brw(pad_after = 2)]
     pub c: u16,
 }
 
-#[derive(Debug, InsimDecode, Default, Clone)]
+#[binrw]
+#[derive(Debug, Default, Clone)]
 pub struct Object {
     pub center: Point<i32>,
     pub radius: i32,
-    pub num_object_points: i32,
-    pub num_triangles: i32,
 
-    #[insim(count = "num_object_points")]
+    #[bw(calc = points.len() as i32)]
+    num_object_points: i32,
+
+    #[bw(calc = triangles.len() as i32)]
+    num_triangles: i32,
+
+    #[br(count = num_object_points)]
     pub points: Vec<ObjectPoint>,
 
-    #[insim(count = "num_triangles")]
+    #[br(count = num_triangles)]
     pub triangles: Vec<Triangle>,
 }
 
-#[derive(Debug, InsimDecode, Default, Clone)]
-#[insim(magic = b"LFSSMX")]
+#[binrw]
+#[derive(Debug, Default, Clone)]
+#[brw(magic = b"LFSSMX", little)]
 /// Smx file
 pub struct Smx {
     pub game_version: u8,
@@ -92,29 +100,37 @@ pub struct Smx {
     pub dimensions: u8,
     pub resolution: u8,
 
-    #[insim(pad_bytes_after = "4")]
+    #[brw(pad_after = 4)]
     pub vertex_colours: u8,
 
-    #[insim(bytes = "32")]
+    #[bw(write_with = binrw_write_codepage_string::<32, _>)]
+    #[br(parse_with = binrw_parse_codepage_string::<32, _>)]
     pub track: String,
 
-    #[insim(pad_bytes_after = "9")]
+    #[brw(pad_after = 9)]
     pub ground_colour: Rgb,
 
-    pub num_objects: i32,
+    #[bw(calc = objects.len() as i32)]
+    num_objects: i32,
 
-    #[insim(count = "num_objects")]
+    #[br(count = num_objects)]
     pub objects: Vec<Object>,
 
-    pub num_checkpoints: i32,
+    #[bw(calc = checkpoint_object_index.len() as i32)]
+    num_checkpoints: i32,
 
-    #[insim(count = "num_checkpoints")]
+    #[br(count = num_checkpoints)]
     pub checkpoint_object_index: Vec<i32>,
 }
 
 impl Smx {
+    /// Read and parse a PTH file into a [Pth] struct.
+    pub fn from_file(i: &mut File) -> Result<Self, Error> {
+        Self::read(i).map_err(Error::from).map_err(Error::from)
+    }
+
     /// Read and parse a SMX file into a [Smx] struct.
-    pub fn from_file(i: &PathBuf) -> Result<Self, Error> {
+    pub fn from_pathbuf(i: &PathBuf) -> Result<Self, Error> {
         if !i.exists() {
             return Err(Error::IO {
                 kind: std::io::ErrorKind::NotFound,
@@ -123,18 +139,7 @@ impl Smx {
         }
 
         let mut input = fs::File::open(i).map_err(Error::from)?;
-
-        let mut buffer = Vec::new();
-        input.read_to_end(&mut buffer).map_err(Error::from)?;
-
-        let mut data = insim_core::bytes::BytesMut::new();
-        data.extend_from_slice(&buffer);
-
-        let result = Self::decode(&mut data, None)?;
-
-        if data.remaining() > 0 {
-            return Err(Error::UnexpectedRemainingBytes);
-        }
+        let result = Self::read(&mut input)?;
 
         Ok(result)
     }

@@ -1,19 +1,27 @@
-use insim_core::{identifiers::RequestId, prelude::*};
+use insim_core::{
+    binrw::{self, binrw},
+    identifiers::RequestId,
+    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Insim Multiplayer - LFS sends this when a host is started or joined
 pub struct Ism {
-    #[insim(pad_bytes_after = "1")]
+    #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
-    #[insim(pad_bytes_after = "3")]
     /// false = guest, true = host
+    #[brw(pad_after = 3)]
+    #[br(map = |x: u8| x != 0)]
+    #[bw(map = |&x| x as u8)]
     pub host: bool,
 
-    #[insim(bytes = "32")]
+    #[br(parse_with = binrw_parse_codepage_string::<32, _>)]
+    #[bw(write_with = binrw_write_codepage_string::<32, _>)]
     pub hname: String,
 }

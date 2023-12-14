@@ -62,6 +62,7 @@ where
 
                     // keepalive
                     if let Some(pong) = packet.maybe_pong() {
+                        tracing::debug!("Ping? Pong!");
                         self.write(pong).await?;
                     }
 

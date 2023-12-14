@@ -1,12 +1,17 @@
-use insim_core::{identifiers::RequestId, prelude::*};
+use insim_core::{
+    binrw::{self, binrw},
+    identifiers::RequestId,
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 /// Enum of possible errors  that the Insim Relay can respond with.
-#[derive(Debug, Clone, Default, InsimEncode, InsimDecode)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
+#[brw(repr(u8))]
 pub enum RelayErrorKind {
     #[default]
     None = 0,
@@ -31,7 +36,8 @@ pub enum RelayErrorKind {
 }
 
 /// The relay will send this packet when it encounters an error.
-#[derive(Debug, Clone, Default, InsimEncode, InsimDecode)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct RelayError {
     pub reqi: RequestId,

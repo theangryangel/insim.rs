@@ -1,13 +1,20 @@
 use std::time::Duration;
 
-use insim_core::{identifiers::RequestId, prelude::*, ser::Limit};
+use insim_core::{
+    binrw::{self, binrw},
+    duration::{binrw_parse_duration, binrw_write_duration},
+    identifiers::RequestId,
+    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, Default, InsimEncode, InsimDecode, Clone)]
+#[binrw]
+#[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
+#[brw(repr(u8))]
 #[non_exhaustive]
 pub enum RipError {
     #[default]
@@ -38,8 +45,11 @@ pub enum RipError {
 
 bitflags::bitflags! {
     /// Bitwise flags used within the [Sta] packet
+    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(Serialize))]
+    #[br(map = Self::from_bits_truncate)]
+    #[bw(map = |&x: &Self| x.bits())]
     pub struct RipOptions: u8 {
         /// Replay will loop
         const LOOP = (1 << 0);
@@ -52,47 +62,34 @@ bitflags::bitflags! {
     }
 }
 
-impl Decodable for RipOptions {
-    fn decode(
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<Self, insim_core::DecodableError>
-    where
-        Self: Default,
-    {
-        Ok(Self::from_bits_truncate(u8::decode(buf, limit)?))
-    }
-}
-
-impl Encodable for RipOptions {
-    fn encode(
-        &self,
-        buf: &mut bytes::BytesMut,
-        limit: Option<Limit>,
-    ) -> Result<(), insim_core::EncodableError>
-    where
-        Self: Sized,
-    {
-        self.bits().encode(buf, limit)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Replay Information
 pub struct Rip {
     pub reqi: RequestId,
     pub error: RipError,
 
+    #[br(map = |x: u8| x != 0)]
+    #[bw(map = |&x| x as u8)]
     pub mpr: bool,
+
+    #[br(map = |x: u8| x != 0)]
+    #[bw(map = |&x| x as u8)]
     pub paused: bool,
-    #[insim(pad_bytes_after = "1")]
+
+    #[brw(pad_after = 1)]
     pub options: RipOptions,
 
+    #[br(parse_with = binrw_parse_duration::<u32, _>)]
+    #[bw(write_with = binrw_write_duration::<u32, _>)]
     pub ctime: Duration,
+
+    #[br(parse_with = binrw_parse_duration::<u32, _>)]
+    #[bw(write_with = binrw_write_duration::<u32, _>)]
     pub ttime: Duration,
 
-    #[insim(bytes = "64")]
+    #[br(parse_with = binrw_parse_codepage_string::<64, _>)]
+    #[bw(write_with = binrw_write_codepage_string::<64, _>)]
     pub rname: String,
 }

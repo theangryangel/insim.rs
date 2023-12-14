@@ -1,94 +1,167 @@
 //! Insim v9 Packet definitions
 
-use insim_core::identifiers::RequestId;
-use insim_core::prelude::*;
-
-use crate::insim::*;
+use insim_core::{
+    binrw::{self, binrw},
+    identifiers::RequestId,
+};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use crate::insim::*;
 use crate::relay;
 
-#[derive(InsimEncode, InsimDecode, Debug, Clone, from_variants::FromVariants)]
+#[binrw]
+#[brw(little)]
+#[derive(Debug, Clone, from_variants::FromVariants)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 #[non_exhaustive]
-#[repr(u8)]
 /// Enum representing all possible packets receivable via an Insim connection
 pub enum Packet {
-    Init(Isi) = 1,
-    Version(Version) = 2,
-    Tiny(Tiny) = 3,
-    Small(Small) = 4,
-    State(Sta) = 5,
-    SingleCharacter(Sch) = 6,
-    StateFlagsPack(Sfp) = 7,
-    SetCarCam(Scc) = 8,
-    CamPosPack(Cpp) = 9,
-    MultiPlayerNotification(Ism) = 10,
-    MessageOut(Mso) = 11,
-    InsimInfo(Iii) = 12,
-    MessageType(Mst) = 13,
-    MessageToConnection(Mtc) = 14,
-    ScreenMode(Mod) = 15,
-    VoteNotification(Vtn) = 16,
-    RaceStart(Rst) = 17,
-    NewConnection(Ncn) = 18,
-    ConnectionLeave(Cnl) = 19,
-    ConnectionPlayerRenamed(Cpr) = 20,
-    NewPlayer(Npl) = 21,
-    PlayerPits(Plp) = 22,
-    PlayerLeave(Pll) = 23,
-    Lap(Lap) = 24,
-    SplitX(Spx) = 25,
-    PitStopStart(Pit) = 26,
-    PitStopFinish(Psf) = 27,
-    PitLane(Pla) = 28,
-    CameraChange(Cch) = 29,
-    Penalty(Pen) = 30,
-    TakeOverCar(Toc) = 31,
-    Flag(Flg) = 32,
-    PlayerFlags(Pfl) = 33,
-    Finished(Fin) = 34,
-    Result(Res) = 35,
-    Reorder(Reo) = 36,
-    NodeLap(Nlp) = 37,
-    MultiCarInfo(Mci) = 38,
-    MesssageExtended(Msx) = 39,
-    MessageLocal(Msl) = 40,
-    CarReset(Crs) = 41,
-    ButtonFunction(Bfn) = 42,
-    AutoXInfo(Axi) = 43,
-    AutoXObject(Axo) = 44,
-    Button(Btn) = 45,
-    ButtonClick(Btc) = 46,
-    ButtonType(Btt) = 47,
-    ReplayInformation(Rip) = 48,
-    ScreenShot(Ssh) = 49,
-    Contact(Con) = 50,
-    ObjectHit(Obh) = 51,
-    HotLapValidity(Hlv) = 52,
-    PlayerAllowedCars(Plc) = 53,
-    AutoXMultipleObjects(Axm) = 54,
-    AdminCommandReport(Acr) = 55,
-    Handicaps(Hcp) = 56,
-    Nci(Nci) = 57,
-    Jrr(Jrr) = 58,
-    UserControlObject(Uco) = 59,
-    ObjectControl(Oco) = 60,
-    TargetToConnection(Ttc) = 61,
-    SelectedVehicle(Slc) = 62,
-    VehicleStateChanged(Csc) = 63,
-    ConnectionInterfaceMode(Cim) = 64,
-    ModsAllowed(Mal) = 65,
+    #[brw(magic = 1u8)]
+    Init(Isi),
+    #[brw(magic = 2u8)]
+    Version(Version),
+    #[brw(magic = 3u8)]
+    Tiny(Tiny),
+    #[brw(magic = 4u8)]
+    Small(Small),
+    #[brw(magic = 5u8)]
+    State(Sta),
+    #[brw(magic = 6u8)]
+    SingleCharacter(Sch),
+    #[brw(magic = 7u8)]
+    StateFlagsPack(Sfp),
+    #[brw(magic = 8u8)]
+    SetCarCam(Scc),
+    #[brw(magic = 9u8)]
+    CamPosPack(Cpp),
+    #[brw(magic = 10u8)]
+    MultiPlayerNotification(Ism),
+    #[brw(magic = 11u8)]
+    MessageOut(Mso),
+    #[brw(magic = 12u8)]
+    InsimInfo(Iii),
+    #[brw(magic = 13u8)]
+    MessageType(Mst),
+    #[brw(magic = 14u8)]
+    MessageToConnection(Mtc),
+    #[brw(magic = 15u8)]
+    ScreenMode(Mod),
+    #[brw(magic = 16u8)]
+    VoteNotification(Vtn),
+    #[brw(magic = 17u8)]
+    RaceStart(Rst),
+    #[brw(magic = 18u8)]
+    NewConnection(Ncn),
+    #[brw(magic = 19u8)]
+    ConnectionLeave(Cnl),
+    #[brw(magic = 20u8)]
+    ConnectionPlayerRenamed(Cpr),
+    #[brw(magic = 21u8)]
+    NewPlayer(Npl),
+    #[brw(magic = 22u8)]
+    PlayerPits(Plp),
+    #[brw(magic = 23u8)]
+    PlayerLeave(Pll),
+    #[brw(magic = 24u8)]
+    Lap(Lap),
+    #[brw(magic = 25u8)]
+    SplitX(Spx),
+    #[brw(magic = 26u8)]
+    PitStopStart(Pit),
+    #[brw(magic = 27u8)]
+    PitStopFinish(Psf),
+    #[brw(magic = 28u8)]
+    PitLane(Pla),
+    #[brw(magic = 29u8)]
+    CameraChange(Cch),
+    #[brw(magic = 30u8)]
+    Penalty(Pen),
+    #[brw(magic = 31u8)]
+    TakeOverCar(Toc),
+    #[brw(magic = 32u8)]
+    Flag(Flg),
+    #[brw(magic = 33u8)]
+    PlayerFlags(Pfl),
+    #[brw(magic = 34u8)]
+    Finished(Fin),
+    #[brw(magic = 35u8)]
+    Result(Res),
+    #[brw(magic = 36u8)]
+    Reorder(Reo),
+    #[brw(magic = 37u8)]
+    NodeLap(Nlp),
+    #[brw(magic = 38u8)]
+    MultiCarInfo(Mci),
+    #[brw(magic = 39u8)]
+    MesssageExtended(Msx),
+    #[brw(magic = 40u8)]
+    MessageLocal(Msl),
+    #[brw(magic = 41u8)]
+    CarReset(Crs),
+    #[brw(magic = 42u8)]
+    ButtonFunction(Bfn),
+    #[brw(magic = 43u8)]
+    AutoXInfo(Axi),
+    #[brw(magic = 44u8)]
+    AutoXObject(Axo),
+    #[brw(magic = 45u8)]
+    Button(Btn),
+    #[brw(magic = 46u8)]
+    ButtonClick(Btc),
+    #[brw(magic = 47u8)]
+    ButtonType(Btt),
+    #[brw(magic = 48u8)]
+    ReplayInformation(Rip),
+    #[brw(magic = 49u8)]
+    ScreenShot(Ssh),
+    #[brw(magic = 50u8)]
+    Contact(Con),
+    #[brw(magic = 51u8)]
+    ObjectHit(Obh),
+    #[brw(magic = 52u8)]
+    HotLapValidity(Hlv),
+    #[brw(magic = 53u8)]
+    PlayerAllowedCars(Plc),
+    #[brw(magic = 54u8)]
+    AutoXMultipleObjects(Axm),
+    #[brw(magic = 55u8)]
+    AdminCommandReport(Acr),
+    #[brw(magic = 56u8)]
+    Handicaps(Hcp),
+    #[brw(magic = 57u8)]
+    Nci(Nci),
+    #[brw(magic = 58u8)]
+    Jrr(Jrr),
+    #[brw(magic = 59u8)]
+    UserControlObject(Uco),
+    #[brw(magic = 60u8)]
+    ObjectControl(Oco),
+    #[brw(magic = 61u8)]
+    TargetToConnection(Ttc),
+    #[brw(magic = 62u8)]
+    SelectedVehicle(Slc),
+    #[brw(magic = 63u8)]
+    VehicleStateChanged(Csc),
+    #[brw(magic = 64u8)]
+    ConnectionInterfaceMode(Cim),
+    #[brw(magic = 65u8)]
+    ModsAllowed(Mal),
 
-    RelayAdminRequest(relay::AdminRequest) = 250,
-    RelayAdminResponse(relay::AdminResponse) = 251,
-    RelayHostListRequest(relay::HostListRequest) = 252,
-    RelayHostList(relay::HostList) = 253,
-    RelayHostSelect(relay::HostSelect) = 254,
-    RelayError(relay::RelayError) = 255,
+    #[brw(magic = 250u8)]
+    RelayAdminRequest(relay::AdminRequest),
+    #[brw(magic = 251u8)]
+    RelayAdminResponse(relay::AdminResponse),
+    #[brw(magic = 252u8)]
+    RelayHostListRequest(relay::HostListRequest),
+    #[brw(magic = 253u8)]
+    RelayHostList(relay::HostList),
+    #[brw(magic = 254u8)]
+    RelayHostSelect(relay::HostSelect),
+    #[brw(magic = 255u8)]
+    RelayError(relay::RelayError),
 }
 
 impl Default for Packet {
@@ -98,6 +171,84 @@ impl Default for Packet {
 }
 
 impl Packet {
+    /// Hint at the possible *minimum* size of a packet, so that when we encode it, it can pre-allocate a
+    /// ballpark buffer.
+    /// It must not be trusted. An incorrect implementation of size_hint() should not lead to memory safety violations.
+    pub fn size_hint(&self) -> usize {
+        // TODO: For some of these packets we can be more intelligent.
+        // i.e. see RelayHostList
+        match self {
+            Packet::Init(_) => 44,
+            Packet::Version(_) => 20,
+            Packet::Small(_) => 8,
+            Packet::State(_) => 28,
+            Packet::SingleCharacter(_) => 8,
+            Packet::StateFlagsPack(_) => 8,
+            Packet::SetCarCam(_) => 8,
+            Packet::CamPosPack(_) => 32,
+            Packet::MultiPlayerNotification(_) => 40,
+            Packet::MessageOut(_) => 12,
+            Packet::InsimInfo(_) => 12,
+            Packet::MessageType(_) => 68,
+            Packet::MessageToConnection(_) => 12,
+            Packet::ScreenMode(_) => 20,
+            Packet::VoteNotification(_) => 8,
+            Packet::RaceStart(_) => 28,
+            Packet::NewConnection(_) => 56,
+            Packet::ConnectionLeave(_) => 8,
+            Packet::ConnectionPlayerRenamed(_) => 36,
+            Packet::NewPlayer(_) => 76,
+            Packet::Lap(_) => 20,
+            Packet::SplitX(_) => 16,
+            Packet::PitStopStart(_) => 24,
+            Packet::PitStopFinish(_) => 12,
+            Packet::PitLane(_) => 8,
+            Packet::CameraChange(_) => 8,
+            Packet::Penalty(_) => 8,
+            Packet::TakeOverCar(_) => 8,
+            Packet::Flag(_) => 8,
+            Packet::PlayerFlags(_) => 8,
+            Packet::Finished(_) => 20,
+            Packet::Result(_) => 86,
+            Packet::Reorder(_) => 44,
+            Packet::NodeLap(_) => 10,
+            Packet::MultiCarInfo(_) => 32,
+            Packet::MesssageExtended(_) => 100,
+            Packet::MessageLocal(_) => 132,
+            Packet::CarReset(_) => 4,
+            Packet::ButtonFunction(_) => 8,
+            Packet::AutoXInfo(_) => 40,
+            Packet::AutoXObject(_) => 4,
+            Packet::Button(_) => 16,
+            Packet::ButtonClick(_) => 8,
+            Packet::ButtonType(_) => 104,
+            Packet::ReplayInformation(_) => 80,
+            Packet::ScreenShot(_) => 40,
+            Packet::Contact(_) => 40,
+            Packet::ObjectHit(_) => 24,
+            Packet::HotLapValidity(_) => 16,
+            Packet::PlayerAllowedCars(_) => 8,
+            Packet::AutoXMultipleObjects(_) => 16,
+            Packet::AdminCommandReport(_) => 12,
+            Packet::Handicaps(_) => 68,
+            Packet::Nci(_) => 16,
+            Packet::Jrr(_) => 16,
+            Packet::UserControlObject(_) => 28,
+            Packet::ObjectControl(_) => 8,
+            Packet::TargetToConnection(_) => 8,
+            Packet::SelectedVehicle(_) => 8,
+            Packet::VehicleStateChanged(_) => 20,
+            Packet::ConnectionInterfaceMode(_) => 8,
+            Packet::ModsAllowed(_) => 12,
+            Packet::RelayHostList(i) => 4 + (i.hinfo.len() * 40),
+            Packet::RelayHostSelect(_) => 68,
+            _ => {
+                // a sensible default for everything else
+                4
+            }
+        }
+    }
+
     #[tracing::instrument]
     pub fn maybe_pong(&self) -> Option<Self> {
         match self {
@@ -125,12 +276,4 @@ impl Packet {
             _ => Ok(false),
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    // The majority of packet conversions are tested through insim_core.
-    // Any packets implementing their own InsimEncode InsimDecode should have their own test
-    // We could test every packet, but at a certain point we're just testing insim_core and
-    // insim_derive all over again.
 }

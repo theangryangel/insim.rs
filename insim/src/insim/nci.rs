@@ -1,16 +1,19 @@
 use std::net::Ipv4Addr;
 
 use insim_core::{
+    binrw::{self, binrw},
     identifiers::{ConnectionId, RequestId},
-    prelude::*,
+    license::License,
 };
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, Default, InsimEncode, InsimDecode, Clone)]
+#[binrw]
+#[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
+#[brw(repr(u8))]
 pub enum ILanguage {
     #[default]
     English = 0,
@@ -52,7 +55,8 @@ pub enum ILanguage {
     Romanian = 36,
 }
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone)]
+#[binrw]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Extra information about the new connection. This is only sent when connected to a game server,
 /// and only if an administrative password has been set and used by Insim.
@@ -60,10 +64,15 @@ pub struct Nci {
     pub reqi: RequestId,
     pub ucid: ConnectionId,
 
-    #[insim(pad_bytes_after = "3")]
     pub language: ILanguage,
 
+    #[brw(pad_after = 2)]
+    pub license: License,
+
     pub user_id: u32,
+
+    #[br(map = |x: u32| Ipv4Addr::from(x) )]
+    #[bw(map = |&x: &Ipv4Addr| u32::from(x) )]
     pub ip_addr: Ipv4Addr,
 }
 
@@ -73,6 +82,7 @@ impl Default for Nci {
             reqi: RequestId::default(),
             ucid: ConnectionId::default(),
             language: ILanguage::default(),
+            license: License::default(),
             user_id: 0,
             ip_addr: Ipv4Addr::new(0, 0, 0, 0),
         }

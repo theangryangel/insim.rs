@@ -1,14 +1,16 @@
 use insim_core::{
+    binrw::{self, binrw},
     identifiers::{ConnectionId, RequestId},
-    prelude::*,
 };
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-#[derive(Debug, Default, InsimEncode, InsimDecode, Clone)]
+#[binrw]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
+#[brw(repr(u8))]
 /// Used within [Cnl] to indicate the leave reason.
 pub enum CnlReason {
     #[default]
@@ -43,7 +45,8 @@ pub enum CnlReason {
     Hack = 9,
 }
 
-#[derive(Debug, InsimEncode, InsimDecode, Clone, Default)]
+#[binrw]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 // Connection Leave
 pub struct Cnl {
@@ -51,6 +54,6 @@ pub struct Cnl {
     pub ucid: ConnectionId,
 
     pub reason: CnlReason,
-    #[insim(pad_bytes_after = "2")]
+    #[brw(pad_after = 2)]
     pub total: u8,
 }

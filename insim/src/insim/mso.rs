@@ -1,19 +1,18 @@
-use bytes::BufMut;
 use insim_core::{
+    binrw::{self, binrw},
     identifiers::{ConnectionId, PlayerId, RequestId},
-    prelude::*,
-    ser::Limit,
-    string::codepages,
-    EncodableError,
+    string::{binrw_parse_codepage_string_until_eof, binrw_write_codepage_string},
 };
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 /// Enum for the sound field of [Mso].
-#[derive(Debug, Default, InsimEncode, InsimDecode, Clone)]
+#[binrw]
+#[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
+#[brw(repr(u8))]
 pub enum MsoUserType {
     /// System message.
     #[default]
@@ -29,10 +28,12 @@ pub enum MsoUserType {
     O = 3,
 }
 
+#[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// System messsages and user messages, variable sized.
 pub struct Mso {
+    #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
     pub ucid: ConnectionId,
@@ -41,82 +42,23 @@ pub struct Mso {
     pub usertype: MsoUserType,
     /// Index of the first character of user entered text, in msg field.
     pub textstart: u8,
+
+    #[bw(write_with = binrw_write_codepage_string::<128, _>, args(false, 4))]
+    #[br(parse_with = binrw_parse_codepage_string_until_eof)]
     pub msg: String,
-}
-
-impl Encodable for Mso {
-    fn encode(&self, buf: &mut bytes::BytesMut, limit: Option<Limit>) -> Result<(), EncodableError>
-    where
-        Self: Sized,
-    {
-        if limit.is_some() {
-            return Err(EncodableError::UnexpectedLimit(format!(
-                "MSO does not support limit! {limit:?}",
-            )));
-        }
-
-        self.reqi.encode(buf, None)?;
-        buf.put_bytes(0, 1);
-        self.ucid.encode(buf, None)?;
-        self.plid.encode(buf, None)?;
-        self.usertype.encode(buf, None)?;
-        self.textstart.encode(buf, None)?;
-
-        let msg = codepages::to_lossy_bytes(&self.msg);
-        buf.put_slice(&msg);
-
-        if msg.len() > 128 {
-            return Err(EncodableError::WrongSize(
-                "Mso only supports upto 128 characters".into(),
-            ));
-        }
-
-        // pad so that msg is divisible by 4
-        // after the size and type are added
-        let total = msg.len() + 2;
-        let round_to = (total + 3) & !3;
-        if round_to != total {
-            buf.put_bytes(0, round_to - total);
-        }
-
-        Ok(())
-    }
-}
-
-impl Decodable for Mso {
-    fn decode(
-        buf: &mut bytes::BytesMut,
-        _limit: Option<Limit>,
-    ) -> Result<Self, insim_core::DecodableError>
-    where
-        Self: Default,
-    {
-        let mut data = Self {
-            reqi: RequestId::decode(buf, None)?,
-            ..Default::default()
-        };
-
-        buf.advance(1);
-        data.ucid = ConnectionId::decode(buf, None)?;
-        data.plid = PlayerId::decode(buf, None)?;
-        data.usertype = MsoUserType::decode(buf, None)?;
-        data.textstart = u8::decode(buf, None)?;
-        data.msg = String::decode(buf, Some(Limit::Bytes(buf.len())))?;
-        Ok(data)
-    }
 }
 
 #[cfg(test)]
 mod tests {
-
-    use bytes::{BufMut, BytesMut};
-    use insim_core::Encodable;
-
     use super::{Mso, MsoUserType};
     use crate::core::identifiers::{ConnectionId, PlayerId, RequestId};
+    use bytes::{BufMut, BytesMut};
+    use insim_core::binrw::{BinRead, BinWrite};
+    use std::io::Cursor;
+    use tokio_test::assert_ok;
 
     #[test]
-    fn dynamic_encodes_to_multiple_of_8() {
+    fn test_mso() {
         let data = Mso {
             reqi: RequestId(1),
             ucid: ConnectionId(10),
@@ -126,8 +68,8 @@ mod tests {
             msg: "two".into(),
         };
 
-        let mut buf = BytesMut::new();
-        let res = data.encode(&mut buf, None);
+        let mut buf = Cursor::new(Vec::new());
+        let res = data.write_le(&mut buf);
         assert!(res.is_ok());
 
         let mut comparison = BytesMut::new();
@@ -138,8 +80,16 @@ mod tests {
         comparison.put_u8(0);
         comparison.put_u8(0);
         comparison.extend_from_slice(&"two".to_string().as_bytes());
-        comparison.put_bytes(0, 3);
+        comparison.put_bytes(0, 1);
 
-        assert_eq!(buf.to_vec(), comparison.to_vec());
+        assert_eq!(buf.into_inner(), comparison.to_vec());
+    }
+
+    #[test]
+    fn test_mso_too_short() {
+        let mut buf = Cursor::new(b"\x0b\0\0\0\0\0\0Downloaded Skin : XFG_PRO38\0");
+
+        let res = Mso::read_le(&mut buf);
+        assert_ok!(res);
     }
 }

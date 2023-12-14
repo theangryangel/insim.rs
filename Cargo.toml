@@ -1,11 +1,9 @@
 [workspace]
 members = [
   "insim_core",
-  "insim_derive",
   "insim",
   "insim_pth",
   "insim_smx",
-  "insim_game_data",
   "race_directord"
 ]
 
