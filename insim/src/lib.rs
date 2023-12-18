@@ -11,15 +11,9 @@ pub mod result;
 
 const VERSION: u8 = 9;
 
-// pub mod tools;
-
 #[doc(hidden)]
 /// Rexport insim_core
 pub use insim_core as core;
-
-#[cfg(feature = "game_data")]
-/// Report insim_game_data when game_data feature is enabled
-pub use insim_game_data as game_data;
 
 #[cfg(feature = "pth")]
 /// Report insim_pth when pth feature is enabled
