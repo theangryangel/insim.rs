@@ -149,6 +149,8 @@ pub enum Packet {
     ConnectionInterfaceMode(Cim),
     #[brw(magic = 65u8)]
     ModsAllowed(Mal),
+    #[brw(magic = 66u8)]
+    Plh(Plh),
 
     #[brw(magic = 250u8)]
     RelayAdminRequest(relay::AdminRequest),

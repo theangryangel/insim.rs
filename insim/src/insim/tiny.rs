@@ -95,6 +95,9 @@ pub enum TinyType {
 
     /// Request a Mal packet
     Mal = 27,
+
+    /// Request a Plh packet
+    Plh = 28,
 }
 
 #[binrw]

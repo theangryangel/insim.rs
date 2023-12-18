@@ -41,6 +41,9 @@ pub enum SmallType {
 
     /// Set local car switches
     Lcs = 9,
+
+    /// Set local vehicle lights
+    Lcl = 10,
 }
 
 #[binrw]
