@@ -6,7 +6,7 @@ It's primary use case is to communicate with LFS via Insim, however it also prov
 additional utilities for working with LFS as a whole through feature flags and
 it's sibling crates.
 
-The intention is to provide a strongly typed, native rust implementation, rather 
+The intention is to provide a strongly typed, native rust implementation, rather
 than a thin layer over a series of bytes and primitive types.
 
 ## Supported Features
