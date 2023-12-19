@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use bitflags::bitflags;
+
 use insim_core::{
     binrw::{self, binrw, BinRead, BinWrite},
     identifiers::RequestId,
@@ -9,6 +11,73 @@ use insim_core::{
 use serde::Serialize;
 
 use super::VtnAction;
+
+bitflags! {
+    /// Bitwise flags used within the [SmallType] packet, Lcs
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
+    #[cfg_attr(feature = "serde", derive(Serialize))]
+    pub struct LcsFlags: u32 {
+        const SET_SIGNALS = (1 << 0);
+        const SET_FLASH = (1 << 1);
+        const SET_HEADLIGHTS = (1 << 2);
+        const SET_HORN = (1 << 3);
+        const SET_SIREN = (1 << 4);
+
+        const SIGNAL_OFF = Self::SET_SIGNALS.bits();
+        const SIGNAL_LEFT = Self::SET_SIGNALS.bits() | (1 << 8);
+        const SIGNAL_RIGHT = Self::SET_SIGNALS.bits() | (2 << 8);
+        const SIGNAL_HAZARD = Self::SET_SIGNALS.bits() | (3 << 8);
+
+        const FLASH_OFF = Self::SET_FLASH.bits();
+        const FLASH_ON = Self::SET_FLASH.bits() | (1 << 10);
+
+        const HEADLIGHTS_OFF = Self::SET_HEADLIGHTS.bits();
+        const HEADLIGHTS_ON = Self::SET_HEADLIGHTS.bits() | (1 << 11);
+
+        const HORN_OFF = Self::SET_HORN.bits();
+        const HORN_1 = Self::SET_HORN.bits() | (1 << 16);
+        const HORN_2 = Self::SET_HORN.bits() | (2 << 16);
+        const HORN_3 = Self::SET_HORN.bits() | (3 << 16);
+        const HORN_4 = Self::SET_HORN.bits() | (4 << 16);
+        const HORN_5 = Self::SET_HORN.bits() | (5 << 16);
+
+        const SIREN_OFF = Self::SET_SIREN.bits();
+        const SIREN_FAST = Self::SET_SIREN.bits() | (1 << 20);
+        const SIREN_SLOW = Self::SET_SIREN.bits() | (2 << 20);
+    }
+}
+
+bitflags! {
+    /// Bitwise flags used within the [SmallType] packet, Lcl
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
+    #[cfg_attr(feature = "serde", derive(Serialize))]
+    pub struct LclFlags: u32 {
+        const SET_SIGNALS = (1 << 0);
+        const SET_LIGHTS = (1 << 2);
+        const SET_FOG_REAR = (1 << 4);
+        const SET_FOG_FRONT = (1 << 5);
+        const SET_EXTRA = (1 << 6);
+
+        const SIGNAL_OFF = Self::SET_SIGNALS.bits();
+        const SIGNAL_LEFT = Self::SET_SIGNALS.bits() | (1 << 16);
+        const SIGNAL_RIGHT = Self::SET_SIGNALS.bits() | (2 << 16);
+        const SIGNAL_HAZARD = Self::SET_SIGNALS.bits() | (3 << 16);
+
+        const LIGHT_OFF = Self::SET_LIGHTS.bits();
+        const LIGHT_SIDE = Self::SET_LIGHTS.bits() | (1 << 18);
+        const LIGHT_LOW = Self::SET_LIGHTS.bits() | (2 << 18);
+        const LIGHT_HIGH = Self::SET_LIGHTS.bits() | (3 << 18);
+
+        const FOG_REAR_OFF = Self::SET_FOG_REAR.bits();
+        const FOG_REAR = Self::SET_FOG_REAR.bits() | (1 << 20);
+
+        const FOG_FRONT_OFF = Self::SET_FOG_FRONT.bits();
+        const FOG_FRONT = Self::SET_FOG_FRONT.bits() | (1 << 21);
+
+        const EXTRA_OFF = Self::SET_EXTRA.bits();
+        const EXTRA = Self::SET_EXTRA.bits() | (1 << 2);
+    }
+}
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -40,10 +109,10 @@ pub enum SmallType {
     Alc(u32),
 
     /// Set local car switches
-    Lcs(u32),
+    Lcs(LcsFlags),
 
     /// Set local vehicle lights
-    Lcl(u32),
+    Lcl(LclFlags),
 }
 
 impl Default for SmallType {
@@ -73,8 +142,8 @@ impl BinRead for SmallType {
             6 => Self::Rtp(Duration::from_millis(uval as u64 * 10)),
             7 => Self::Nli(Duration::from_millis(uval as u64)),
             8 => Self::Alc(uval),
-            9 => Self::Lcs(uval),
-            10 => Self::Lcl(uval),
+            9 => Self::Lcs(LcsFlags::from_bits_truncate(uval)),
+            10 => Self::Lcl(LclFlags::from_bits_truncate(uval)),
             _ => {
                 return Err(binrw::Error::BadMagic {
                     pos,
@@ -105,8 +174,8 @@ impl BinWrite for SmallType {
             SmallType::Rtp(uval) => (6u8, uval.as_millis() as u32 / 10),
             SmallType::Nli(uval) => (7u8, uval.as_millis() as u32),
             SmallType::Alc(_) => todo!(),
-            SmallType::Lcs(_) => todo!(),
-            SmallType::Lcl(_) => todo!(),
+            SmallType::Lcs(uval) => (9u8, uval.bits()),
+            SmallType::Lcl(uval) => (10u8, uval.bits()),
         };
 
         discrim.write_options(writer, endian, ())?;

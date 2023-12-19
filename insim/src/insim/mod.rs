@@ -111,7 +111,7 @@ pub use scc::Scc;
 pub use sch::{Sch, SchFlags};
 pub use sfp::Sfp;
 pub use slc::Slc;
-pub use small::{Small, SmallType};
+pub use small::{LclFlags, LcsFlags, Small, SmallType};
 pub use spx::Spx;
 pub use ssh::{Ssh, SshError};
 pub use sta::{Sta, StaFlags, StaRacing};
