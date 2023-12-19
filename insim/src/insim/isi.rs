@@ -19,8 +19,6 @@ bitflags! {
     #[br(map = Self::from_bits_truncate)]
     #[bw(map = |&x: &Self| x.bits())]
     pub struct IsiFlags: u16 {
-        //RES0 => (1 << 0),	// bit  0: spare
-        //RES_1 => (1 << 1),	// bit  1: spare
          const LOCAL = (1 << 2);	// bit  2: guest or single player
          const MSO_COLS = (1 << 3);	// bit  3: keep colours in MSO text
          const NLP = (1 << 4);	// bit  4: receive NLP packets
@@ -68,8 +66,8 @@ pub struct Isi {
 
     /// Time in between each [Nlp](super::Nlp) or [Mci](super::Mci) packet when set to a non-zero value and
     /// the relevant flags are set.
-    #[br(parse_with = binrw_parse_duration::<u16, _>)]
-    #[bw(write_with = binrw_write_duration::<u16, _>)]
+    #[br(parse_with = binrw_parse_duration::<u16, 1, _>)]
+    #[bw(write_with = binrw_write_duration::<u16, 1, _>)]
     pub interval: Duration,
 
     /// Administrative password.

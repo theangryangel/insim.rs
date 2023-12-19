@@ -52,12 +52,12 @@ pub struct Fin {
     pub reqi: RequestId,
     pub plid: PlayerId,
 
-    #[br(parse_with = binrw_parse_duration::<u32, _>)]
-    #[bw(write_with = binrw_write_duration::<u32, _>)]
+    #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
+    #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
     pub ttime: Duration,
 
-    #[br(parse_with = binrw_parse_duration::<u32, _>)]
-    #[bw(write_with = binrw_write_duration::<u32, _>)]
+    #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
+    #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
     #[brw(pad_after = 1)]
     pub btime: Duration,
 

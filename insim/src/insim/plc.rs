@@ -1,24 +1,19 @@
-use std::collections::{hash_set::Iter as HashSetIter, HashSet};
-
+use indexmap::{set::Iter as IndexSetIter, IndexSet};
 use insim_core::{
     binrw::{self, binrw},
     identifiers::{ConnectionId, RequestId},
     vehicle::Vehicle,
 };
 
+use crate::error::Error;
+
 #[cfg(feature = "serde")]
 use serde::Serialize;
-
-#[derive(Debug, thiserror::Error)]
-pub enum PlcAllowedCarsError {
-    #[error("Unknown or Mod vehicles cannot be used with the PLC packet, please use MAL")]
-    ModInvalid,
-}
 
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct PlcAllowedCars {
-    inner: HashSet<Vehicle>,
+    inner: IndexSet<Vehicle>,
 }
 
 impl PlcAllowedCars {
@@ -47,9 +42,9 @@ impl PlcAllowedCars {
         self.inner.contains(v)
     }
 
-    pub fn insert(&mut self, v: Vehicle) -> Result<bool, PlcAllowedCarsError> {
+    pub fn insert(&mut self, v: Vehicle) -> Result<bool, Error> {
         match v {
-            Vehicle::Mod(_) | Vehicle::Unknown => Err(PlcAllowedCarsError::ModInvalid),
+            Vehicle::Mod(_) | Vehicle::Unknown => Err(Error::VehicleNotStandard),
             _ => Ok(self.inner.insert(v)),
         }
     }
@@ -66,7 +61,7 @@ impl PlcAllowedCars {
         self.inner.clear()
     }
 
-    pub fn iter(&self) -> HashSetIter<'_, Vehicle> {
+    pub fn iter(&self) -> IndexSetIter<'_, Vehicle> {
         self.inner.iter()
     }
 
@@ -75,7 +70,7 @@ impl PlcAllowedCars {
     }
 
     pub fn from_bits_truncate(value: u32) -> Self {
-        let mut data = HashSet::default();
+        let mut data = IndexSet::default();
 
         if (value & Self::XF_GTI) == Self::XF_GTI {
             data.insert(Vehicle::Xfg);

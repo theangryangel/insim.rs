@@ -81,12 +81,12 @@ pub struct Rip {
     #[brw(pad_after = 1)]
     pub options: RipOptions,
 
-    #[br(parse_with = binrw_parse_duration::<u32, _>)]
-    #[bw(write_with = binrw_write_duration::<u32, _>)]
+    #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
+    #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
     pub ctime: Duration,
 
-    #[br(parse_with = binrw_parse_duration::<u32, _>)]
-    #[bw(write_with = binrw_write_duration::<u32, _>)]
+    #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
+    #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
     pub ttime: Duration,
 
     #[br(parse_with = binrw_parse_codepage_string::<64, _>)]

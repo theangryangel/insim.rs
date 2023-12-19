@@ -13,6 +13,7 @@ serde = [
   "dep:serde",
   "insim_core/serde",
   "bitflags/serde",
+  "indexmap/serde",
 ]
 pth = ["dep:insim_pth"]
 smx = ["dep:insim_smx"]
@@ -34,6 +35,7 @@ insim_smx = { path = "../insim_smx", optional = true }
 tokio-tungstenite = "0.21.0"
 futures-util = "0.3.28"
 from_variants = "1.0.2"
+indexmap = "2.1.0"
 
 [dev-dependencies]
 tokio-test = "0.4"
