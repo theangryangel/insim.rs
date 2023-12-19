@@ -5,7 +5,7 @@ use insim_core::{
 
 /// Enum for the action field of [Vtn].
 #[binrw]
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]

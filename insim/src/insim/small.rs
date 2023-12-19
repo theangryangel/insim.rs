@@ -79,7 +79,7 @@ bitflags! {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum SmallType {
     None,
@@ -173,7 +173,7 @@ impl BinWrite for SmallType {
             SmallType::Stp(uval) => (5u8, uval.as_millis() as u32 / 10),
             SmallType::Rtp(uval) => (6u8, uval.as_millis() as u32 / 10),
             SmallType::Nli(uval) => (7u8, uval.as_millis() as u32),
-            SmallType::Alc(_) => todo!(),
+            SmallType::Alc(uval) => (8u8, *uval),
             SmallType::Lcs(uval) => (9u8, uval.bits()),
             SmallType::Lcl(uval) => (10u8, uval.bits()),
         };
@@ -186,7 +186,7 @@ impl BinWrite for SmallType {
 }
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// General purpose Small packet
 pub struct Small {
@@ -214,6 +214,10 @@ mod tests {
 
         assert_eq!(buf.len(), 6);
         assert_eq!(buf, [1, 0, 0, 0, 0, 0]);
+
+        let mut reader = Cursor::new(buf.clone());
+        let data2 = Small::read_le(&mut reader).unwrap();
+        assert_eq!(data, data2);
     }
 
     #[test]
@@ -228,5 +232,61 @@ mod tests {
         let buf = writer.into_inner();
 
         assert_eq!(buf, [1, 1, 100, 0, 0, 0]);
+
+        let mut reader = Cursor::new(buf.clone());
+        let data2 = Small::read_le(&mut reader).unwrap();
+        assert_eq!(data, data2);
+    }
+
+    #[test]
+    fn test_lcs_flags_signals_hazard() {
+        let data = Small {
+            reqi: RequestId(1),
+            subt: SmallType::Lcs(LcsFlags::SIGNAL_HAZARD),
+        };
+
+        let mut writer = Cursor::new(Vec::new());
+        data.write_le(&mut writer).unwrap();
+        let buf = writer.into_inner();
+        assert_eq!(buf, [1, 9, 1, 3, 0, 0]);
+
+        let mut reader = Cursor::new(buf.clone());
+        let data2 = Small::read_le(&mut reader).unwrap();
+        assert_eq!(data, data2);
+    }
+
+    #[test]
+    fn test_lcl_flags_signals_off() {
+        let data = Small {
+            reqi: RequestId(1),
+            subt: SmallType::Lcl(LclFlags::SIGNAL_OFF),
+        };
+
+        let mut writer = Cursor::new(Vec::new());
+        data.write_le(&mut writer).unwrap();
+        let buf = writer.into_inner();
+        assert_eq!(buf, [1, 10, 1, 0, 0, 0]);
+
+        let mut reader = Cursor::new(buf.clone());
+        let data2 = Small::read_le(&mut reader).unwrap();
+        assert_eq!(data, data2);
+    }
+
+    #[test]
+    fn test_lcl_flags_signals_hazard() {
+        let data = Small {
+            reqi: RequestId(1),
+            subt: SmallType::Lcl(LclFlags::SIGNAL_HAZARD),
+        };
+
+        let mut writer = Cursor::new(Vec::new());
+        data.write_le(&mut writer).unwrap();
+        let buf = writer.into_inner();
+        assert_eq!(buf, [1, 10, 1, 0, 3, 0]);
+
+        let mut reader = Cursor::new(buf.clone());
+        let data2 = Small::read_le(&mut reader).unwrap();
+
+        assert_eq!(data, data2);
     }
 }
