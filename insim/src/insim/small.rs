@@ -10,7 +10,7 @@ use insim_core::{
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-use super::VtnAction;
+use super::{PlcAllowedCars, VtnAction};
 
 bitflags! {
     /// Bitwise flags used within the [SmallType] packet, Lcs
@@ -106,7 +106,7 @@ pub enum SmallType {
     Nli(Duration),
 
     /// Set or get allowed cars (Tiny, type = Alc)
-    Alc(u32),
+    Alc(PlcAllowedCars),
 
     /// Set local car switches
     Lcs(LcsFlags),
@@ -141,7 +141,7 @@ impl BinRead for SmallType {
             5 => Self::Stp(Duration::from_millis(uval as u64 * 10)),
             6 => Self::Rtp(Duration::from_millis(uval as u64 * 10)),
             7 => Self::Nli(Duration::from_millis(uval as u64)),
-            8 => Self::Alc(uval),
+            8 => Self::Alc(PlcAllowedCars::from_bits_truncate(uval)),
             9 => Self::Lcs(LcsFlags::from_bits_truncate(uval)),
             10 => Self::Lcl(LclFlags::from_bits_truncate(uval)),
             _ => {
@@ -173,7 +173,7 @@ impl BinWrite for SmallType {
             SmallType::Stp(uval) => (5u8, uval.as_millis() as u32 / 10),
             SmallType::Rtp(uval) => (6u8, uval.as_millis() as u32 / 10),
             SmallType::Nli(uval) => (7u8, uval.as_millis() as u32),
-            SmallType::Alc(uval) => (8u8, *uval),
+            SmallType::Alc(uval) => (8u8, uval.bits()),
             SmallType::Lcs(uval) => (9u8, uval.bits()),
             SmallType::Lcl(uval) => (10u8, uval.bits()),
         };
