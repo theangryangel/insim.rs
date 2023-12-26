@@ -37,8 +37,8 @@ pub struct Csc {
     #[brw(pad_after = 2)]
     pub action: CscAction,
 
-    #[br(parse_with = binrw_parse_duration::<u32, _>)]
-    #[bw(write_with = binrw_write_duration::<u32, _>)]
+    #[br(parse_with = binrw_parse_duration::<u32, 10, _>)]
+    #[bw(write_with = binrw_write_duration::<u32, 10, _>)]
     pub time: Duration,
 
     pub c: CarContact,

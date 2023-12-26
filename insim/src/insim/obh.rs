@@ -1,7 +1,9 @@
 use insim_core::{
     binrw::{self, binrw},
+    duration::{binrw_parse_duration, binrw_write_duration},
     identifiers::{PlayerId, RequestId},
 };
+use std::time::Duration;
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -44,7 +46,10 @@ pub struct Obh {
     pub plid: PlayerId,
 
     pub spclose: u16,
-    pub time: u16,
+
+    #[br(parse_with = binrw_parse_duration::<u16, 10, _>)]
+    #[bw(write_with = binrw_write_duration::<u16, 10, _>)]
+    pub time: Duration,
 
     pub info: CarContact,
 

@@ -33,6 +33,12 @@ pub enum Error {
 
     #[error("Insim Core error {0}")]
     BinRw(String),
+
+    #[error("Only Mods are permitted")]
+    VehicleNotAMod,
+
+    #[error("Only Standard vehicles are permitted")]
+    VehicleNotStandard,
 }
 
 impl From<tokio::time::error::Elapsed> for Error {

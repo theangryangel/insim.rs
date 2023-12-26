@@ -1,5 +1,8 @@
+use std::time::Duration;
+
 use insim_core::{
     binrw::{self, binrw},
+    duration::{binrw_parse_duration, binrw_write_duration},
     identifiers::{PlayerId, RequestId},
 };
 
@@ -39,9 +42,11 @@ pub struct Con {
     #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
-    // TODO: abstract spclose and time
     pub spclose: u16,
-    pub time: u16,
+
+    #[br(parse_with = binrw_parse_duration::<u16, 10, _>)]
+    #[bw(write_with = binrw_write_duration::<u16, 10, _>)]
+    pub time: Duration,
 
     pub a: ConInfo,
     pub b: ConInfo,
