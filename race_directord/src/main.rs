@@ -1,6 +1,6 @@
 mod cli;
 mod config;
-mod connections;
+mod ecs;
 mod web;
 
 pub type Result<T, E = Report> = color_eyre::Result<T, E>;
@@ -24,9 +24,91 @@ where
     }
 }
 
+use bevy_ecs::prelude::{Event, EventReader, EventWriter};
 use clap::Parser;
 use cli::Cli;
-use std::{io::IsTerminal, path::Path, process::ExitCode};
+use config::{connection::ConnectionConfig, Config, PluginConfig};
+use insim::connection::Connection;
+use std::{fmt::Debug, io::IsTerminal, path::Path, process::ExitCode, time::Duration};
+use tokio::time::{self, sleep};
+
+pub(crate) struct InsimSystem {
+    rx: flume::Receiver<insim::connection::Event>,
+}
+
+impl InsimSystem {
+    pub(crate) fn new(config: &ConnectionConfig) -> Self {
+        let (tx, rx) = flume::unbounded();
+
+        let mut conn = config.into_connection();
+
+        tokio::spawn(async move {
+            loop {
+                match conn.poll().await {
+                    Ok(e) => tx.send(e).unwrap(),
+                    _ => {
+                        tracing::info!("unhandled, sleeping");
+                        sleep(Duration::from_secs(1)).await;
+                    }
+                };
+            }
+        });
+
+        Self { rx }
+    }
+}
+
+fn startup() {
+    println!("starting up");
+}
+
+fn hello_world() {
+    println!("hello world!");
+}
+
+// This is our event that we will send and receive in systems
+#[derive(Event)]
+struct MyEvent {
+    pub message: String,
+    pub random_value: f32,
+}
+
+// In every frame we will send an event with a 50/50 chance
+fn sending_system(mut event_writer: EventWriter<MyEvent>) {
+    let random_value: f32 = rand::random();
+    if random_value > 0.5 {
+        event_writer.send(MyEvent {
+            message: "A random event with value > 0.5".to_string(),
+            random_value,
+        });
+    }
+}
+
+// This system listens for events of the type MyEvent
+// If an event is received it will be printed to the console
+fn receiving_system(mut event_reader: EventReader<MyEvent>) {
+    for my_event in event_reader.read() {
+        println!(
+            "    Received message {:?}, with random value of {}",
+            my_event.message, my_event.random_value
+        );
+    }
+}
+
+struct MyEventPlugin;
+
+impl ecs::Plugin for MyEventPlugin {
+    fn name(&self) -> &'static str {
+        "MyEvent"
+    }
+
+    fn register(&self, ecs: &mut ecs::Ecs) {
+        ecs.add_event::<MyEvent>();
+
+        ecs.add_system(ecs::PostTick, sending_system);
+        ecs.add_system(ecs::Tick, receiving_system);
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<ExitCode> {
@@ -42,33 +124,39 @@ async fn main() -> Result<ExitCode> {
     let cli = Cli::parse();
     cli.instrumentation.setup()?;
 
-    let config = config::Config::try_parse(Path::new(&cli.config))?;
-    let mut manager = connections::ConnectionManager::new();
-    for (name, peer) in config.connections.iter() {
-        manager.add_peer(name, peer.clone()).await?;
+    let config = Config::try_parse(Path::new(&cli.config))?;
+
+    if config.web.enabled {
+        web::start(&config.web);
     }
 
-    if_chain::if_chain! {
-        if let Some(web_config) = config.web;
-        if let Some(web_listen) = web_config.listen;
-        then {
-            web::run(&web_listen, manager.clone());
-        }
-    }
+    let mut world = ecs::Ecs::new();
+    world.add_system(ecs::Tick, hello_world);
+    world.add_system(ecs::Startup, startup);
+
+    println!("{:?}", &config.plugins);
+
+    world.register_plugin(MyEventPlugin);
+
+    world.startup();
+
+    let mut tick = time::interval(Duration::from_millis(500));
 
     loop {
         tokio::select! {
             _ = tokio::signal::ctrl_c() => {
                 tracing::info!("Requesting shutdown");
-                manager.shutdown().await?;
+                break;
             },
 
-            _ = manager.run() => {
-                tracing::info!("All tasks shutdown");
-                break;
-            }
+            _ = tick.tick() => {
+                world.tick();
+            },
+
         }
     }
+
+    world.shutdown();
 
     Ok(ExitCode::SUCCESS)
 }

@@ -1,8 +1,15 @@
 [web]
-listen = "0.0.0.0:4000"
+enabled = true
+address = "0.0.0.0:4000"
 
-[connections.nubbins_au_demo]
+[connection]
 type = "relay"
 websocket = false
 auto-select-host = "Nubbins AU Demo"
 connection-attempts = 0
+
+[plugins.MyEvent]
+chance = 1
+
+[plugins.MyEvent2]
+chance = 2

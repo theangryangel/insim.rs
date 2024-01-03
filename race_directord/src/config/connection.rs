@@ -1,5 +1,6 @@
 use std::net::SocketAddr;
 
+use insim::{connection::Connection, insim::Isi};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone)]
@@ -7,15 +8,11 @@ use serde::Deserialize;
 #[serde(rename_all = "lowercase")]
 pub(crate) enum ConnectionConfig {
     #[serde(rename_all = "kebab-case")]
-    Tcp {
-        addr: SocketAddr,
-        connection_attempts: Option<usize>,
-    },
+    Tcp { addr: SocketAddr },
     #[serde(rename_all = "kebab-case")]
     Udp {
         bind: Option<SocketAddr>,
         addr: SocketAddr,
-        connection_attempts: Option<usize>,
     },
     #[serde(rename_all = "kebab-case")]
     Relay {
@@ -23,6 +20,38 @@ pub(crate) enum ConnectionConfig {
         websocket: bool,
         admin: Option<String>,
         spectator: Option<String>,
-        connection_attempts: Option<usize>,
     },
+}
+
+impl ConnectionConfig {
+    pub(crate) fn into_connection(&self) -> Connection {
+        match self {
+            ConnectionConfig::Relay {
+                auto_select_host,
+                websocket,
+                spectator,
+                admin,
+            } => insim::connection::Connection::relay(
+                auto_select_host.clone(),
+                *websocket,
+                spectator.clone(),
+                admin.clone(),
+                Isi::default(),
+            ),
+            ConnectionConfig::Tcp { addr } => insim::connection::Connection::tcp(
+                insim::codec::Mode::Compressed,
+                *addr,
+                true,
+                Isi::default(),
+            ),
+
+            ConnectionConfig::Udp { bind, addr } => insim::connection::Connection::udp(
+                *bind,
+                *addr,
+                insim::codec::Mode::Compressed,
+                true,
+                Isi::default(),
+            ),
+        }
+    }
 }

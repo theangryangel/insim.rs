@@ -3,14 +3,29 @@ pub(crate) mod web;
 
 use crate::Result;
 
-use std::{collections::HashMap, fs, path::Path};
+use connection::ConnectionConfig;
+use toml::Table;
+use web::WebConfig;
+
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    path::Path,
+};
 
 use serde::Deserialize;
 
+#[derive(Debug, Deserialize, PartialEq, PartialOrd)]
+#[serde(tag = "plugin")]
+pub(crate) enum PluginConfig {
+    MyEvent { chance: f32 },
+}
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct Config {
-    pub web: Option<web::WebConfig>,
-    pub connections: HashMap<String, connection::ConnectionConfig>,
+    pub web: WebConfig,
+    pub connection: ConnectionConfig,
+    pub plugins: HashMap<String, Table>,
 }
 
 impl Config {
