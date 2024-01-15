@@ -1,5 +1,6 @@
 use bevy_ecs::prelude::{Event, Events, Schedule, System, World};
 use bevy_ecs::schedule::{IntoSystemConfigs, ScheduleLabel, Schedules};
+use bevy_ecs::system::Resource;
 
 #[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Startup;
@@ -56,7 +57,7 @@ impl Ecs {
         self
     }
 
-    pub fn add_event<T>(&mut self) -> &mut Self
+    pub(crate) fn add_event<T>(&mut self) -> &mut Self
     where
         T: Event,
     {
@@ -71,13 +72,18 @@ impl Ecs {
         self
     }
 
-    pub(crate) fn register_plugin(&mut self, p: impl Plugin) -> &mut Self {
+    pub(crate) fn add_plugin(&mut self, p: impl Plugin) -> &mut Self {
         p.register(self);
         println!("registering {:?}", p.name());
         self
     }
 
-    pub(crate) fn run(&mut self, label: impl ScheduleLabel) {
+    pub(crate) fn add_resource<R: Resource>(&mut self, resource: R) -> &mut Self {
+        self.world.insert_resource(resource);
+        self
+    }
+
+    fn run(&mut self, label: impl ScheduleLabel) {
         // FIXME
         self.world.try_run_schedule(label).unwrap();
     }

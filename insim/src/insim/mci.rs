@@ -68,6 +68,7 @@ pub struct CompCar {
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "bevy_ecs_event", derive(bevy_ecs::event::Event))]
 /// Multi Car Info - positional information for players/vehicles.
 /// The MCI packet does not contain the positional information for all players. Only some. The
 /// maximum number of players depends on the version of Insim.

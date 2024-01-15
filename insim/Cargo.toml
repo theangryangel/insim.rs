@@ -17,6 +17,7 @@ serde = [
 ]
 pth = ["dep:insim_pth"]
 smx = ["dep:insim_smx"]
+bevy_ecs_event = ["dep:bevy_ecs"]
 # v9 = []
 # latest = ["v9"]
 
@@ -36,6 +37,7 @@ tokio-tungstenite = "0.21.0"
 futures-util = "0.3.28"
 from_variants = "1.0.2"
 indexmap = "2.1.0"
+bevy_ecs = { version = "0.12", features = [], optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"
