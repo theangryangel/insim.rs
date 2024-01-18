@@ -1,3 +1,5 @@
+#![deny(unused_crate_dependencies)]
+
 //! # insim_pth
 //!
 //! Parse a Live for Speed pth (path) file.

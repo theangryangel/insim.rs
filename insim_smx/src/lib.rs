@@ -1,3 +1,5 @@
+#![deny(unused_crate_dependencies)]
+
 //! # insim_smx
 //!
 //! Parse a Live for Speed smx (Simple Mesh) file.
