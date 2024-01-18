@@ -62,6 +62,7 @@ impl From<std::io::Error> for Error {
     }
 }
 
+#[cfg(feature = "websocket")]
 impl From<tokio_tungstenite::tungstenite::Error> for Error {
     fn from(value: tokio_tungstenite::tungstenite::Error) -> Self {
         // TODO a lot of this is less than ideal mapping

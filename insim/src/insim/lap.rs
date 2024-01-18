@@ -34,7 +34,7 @@ impl BinWrite for Fuel200 {
     ) -> BinResult<()> {
         let data = match self {
             Self::Percentage(data) => *data,
-            Self::No => 255 as u8,
+            Self::No => 255_u8,
         };
 
         data.write_options(writer, endian, args)?;
@@ -80,7 +80,7 @@ impl BinWrite for Fuel {
     ) -> BinResult<()> {
         let data = match self {
             Self::Percentage(data) => *data,
-            Self::No => 255 as u8,
+            Self::No => 255_u8,
         };
 
         data.write_options(writer, endian, args)?;

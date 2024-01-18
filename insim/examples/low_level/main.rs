@@ -4,12 +4,10 @@
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
 use insim::{
-    codec::{Codec, Mode},
     insim::{Isi, IsiFlags},
-    network::{Framed, FramedInner},
-    packet::Packet,
-    relay,
-    result::Result,
+    net::{Codec, Framed, FramedInner, Mode},
+    relay::{HostListRequest, HostSelect},
+    Packet, Result,
 };
 use std::{net::SocketAddr, time::Duration};
 use tokio::net::{TcpStream, UdpSocket};
@@ -114,7 +112,7 @@ pub async fn main() -> Result<()> {
     } = &cli.command
     {
         tracing::info!("Sending HLR");
-        let hlr = relay::HostListRequest::default();
+        let hlr = HostListRequest::default();
         client.write(hlr).await?;
     }
 
@@ -124,7 +122,7 @@ pub async fn main() -> Result<()> {
     } = &cli.command
     {
         tracing::info!("Sending HS");
-        let hs = relay::HostSelect {
+        let hs = HostSelect {
             hname: hname.into(),
             ..Default::default()
         };

@@ -5,16 +5,13 @@ use insim_core::{
     identifiers::RequestId,
 };
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
-
 use crate::insim::*;
-use crate::relay;
+use crate::relay::*;
 
 #[binrw]
 #[brw(little)]
 #[derive(Debug, Clone, from_variants::FromVariants)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 #[non_exhaustive]
 /// Enum representing all possible packets receivable via an Insim connection
@@ -153,17 +150,22 @@ pub enum Packet {
     Plh(Plh),
 
     #[brw(magic = 250u8)]
-    RelayAdminRequest(relay::AdminRequest),
+    RelayAdminRequest(AdminRequest),
+
     #[brw(magic = 251u8)]
-    RelayAdminResponse(relay::AdminResponse),
+    RelayAdminResponse(AdminResponse),
+
     #[brw(magic = 252u8)]
-    RelayHostListRequest(relay::HostListRequest),
+    RelayHostListRequest(HostListRequest),
+
     #[brw(magic = 253u8)]
-    RelayHostList(relay::HostList),
+    RelayHostList(HostList),
+
     #[brw(magic = 254u8)]
-    RelayHostSelect(relay::HostSelect),
+    RelayHostSelect(HostSelect),
+
     #[brw(magic = 255u8)]
-    RelayError(relay::RelayError),
+    RelayError(RelayError),
 }
 
 impl Default for Packet {
