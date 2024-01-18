@@ -6,7 +6,7 @@ use crate::result::Result;
 
 use futures_util::{SinkExt, StreamExt};
 
-use super::Network;
+use super::TryReadWriteBytes;
 
 pub type TungsteniteWebSocket =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<TcpStream>>;
@@ -40,7 +40,7 @@ pub async fn connect_to_relay() -> Result<TungsteniteWebSocket> {
 }
 
 #[async_trait::async_trait]
-impl Network for TungsteniteWebSocket {
+impl TryReadWriteBytes for TungsteniteWebSocket {
     async fn try_read_bytes(&mut self, buf: &mut BytesMut) -> Result<usize> {
         use tokio_tungstenite::tungstenite::Message;
 

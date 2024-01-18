@@ -1,17 +1,8 @@
 //! High level example
-//! In this example you do not have to maintain the connection,
-//! manage sending keepalives, or reconnection.
-//! Just keep calling `poll` on your connection!
+//! This example showcases the shortcut methods
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
-use insim::{
-    codec::Mode,
-    connection::{Connection, Event},
-    insim::{Isi, IsiFlags},
-    packet::Packet,
-    relay::HostListRequest,
-    result::Result,
-};
+use insim::{insim::IsiFlags, relay::HostListRequest, Packet, Result};
 use std::{net::SocketAddr, time::Duration};
 
 #[derive(Parser)]
@@ -85,22 +76,17 @@ pub async fn main() -> Result<()> {
     // Parse our command line arguments, using clap
     let cli = Cli::parse();
 
-    let mut isi = Isi::default();
-    isi.flags = IsiFlags::MCI | IsiFlags::CON | IsiFlags::OBH;
-    if let Some(interval) = &cli.isi_interval {
-        isi.interval = Duration::from_secs((*interval).into());
-    }
-
-    let mut client: Connection = match &cli.command {
+    // Create an insim connection builder
+    let mut builder = match &cli.command {
         Commands::Udp { bind, addr } => {
-            // if the local binding address is not provided, we let the OS decide a port to use
-            let local = bind.unwrap_or("0.0.0.0:0".parse()?);
             tracing::info!("Connecting via UDP!");
-            Connection::udp(local, *addr, Mode::Compressed, true, isi)
+            // use udp
+            insim::udp(*addr, *bind)
         }
         Commands::Tcp { addr } => {
             tracing::info!("Connecting via TCP!");
-            Connection::tcp(Mode::Compressed, *addr, true, isi)
+            // use udp
+            insim::tcp(*addr)
         }
         Commands::Relay {
             select_host,
@@ -109,37 +95,44 @@ pub async fn main() -> Result<()> {
             ..
         } => {
             tracing::info!("Connecting via LFS World Relay!");
-            Connection::relay(
-                select_host.clone(),
-                *websocket,
-                spectator_password.clone(),
-                None,
-                isi,
-            )
+
+            // use insim relay
+            insim::relay()
+                .relay_websocket(*websocket)
+                .relay_spectator_password(spectator_password.clone())
+                .relay_select_host(select_host.clone())
         }
     };
+
+    // set our IsiFlags
+    builder = builder.isi_flags(IsiFlags::MCI | IsiFlags::CON | IsiFlags::OBH);
+    if let Some(interval) = &cli.isi_interval {
+        builder = builder.isi_interval(Duration::from_secs((*interval).into()));
+    }
+
+    // Establish a connection
+    let mut connection = builder.connect().await?;
+    tracing::info!("Connected!");
+
+    // If we're connected via the relay, and asked to list the hosts, request the host list
+    if let Commands::Relay {
+        list_hosts: true, ..
+    } = &cli.command
+    {
+        connection.write(HostListRequest::default()).await?;
+    }
 
     let mut i: usize = 0;
 
     loop {
-        let event = client.poll().await?;
+        let packet = connection.read().await?;
 
-        if matches!(event, Event::Connected(_)) {
-            if let Commands::Relay {
-                list_hosts: true, ..
-            } = &cli.command
-            {
-                client.send(HostListRequest::default()).await?;
-            }
+        tracing::info!("Packet={:?} Index={:?}", packet, i);
 
-            tracing::info!("Connected!");
-        }
-
-        tracing::info!("Evt={:?} Index={:?}", event, i);
-
+        // if we were connected via the relay and only asked for the list of hosts, and we have the
+        // last hostinfo, break the loop
         if_chain! {
             if let Commands::Relay{ list_hosts: true, .. } = &cli.command;
-            if let Event::Data(packet, _) = &event;
             if let Packet::RelayHostList(hostinfo) = &packet;
             if hostinfo.is_last();
             then {

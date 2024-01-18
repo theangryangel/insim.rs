@@ -11,13 +11,14 @@ currently not touching the version number.
 
 If you're not sure where to start, you probably want to look at the README and examples within the `insim` crate.
 
-| Crate            | Usage                                                      |
-| ---------------- | ---------------------------------------------------------- |
-| `insim`          | Connection and protocol implementation.                    |
-| `insim_core`     | Contains core types shared across other crates.            |
-| `insim_pth`      | Implements a PTH file read/writer.                         |
-| `insim_smx`      | Implements a SMX file reader/writer.                       |
-| `race_directord` | A ill-defined thing used to check the ergonomics of insim. |
+| Crate        | Usage                                           |
+| ------------ | ----------------------------------------------- |
+| `insim`      | Connection and protocol implementation.         |
+| `insim_core` | Contains core types shared across other crates. |
+| `insim_pth`  | Implements a PTH file read/writer.              |
+| `insim_smx`  | Implements a SMX file reader/writer.            |
+
+If you're looking for race_directord that has been moved to https://github.com/theangryangel/race_directord/.
 
 ## Documentation
 

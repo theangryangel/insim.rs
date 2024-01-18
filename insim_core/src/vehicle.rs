@@ -154,9 +154,7 @@ impl BinWrite for Vehicle {
             Vehicle::Fzr => [b'F', b'Z', b'R', 0].write_options(writer, endian, args),
             Vehicle::Bf1 => [b'B', b'F', b'1', 0].write_options(writer, endian, args),
             Vehicle::Mod(vehmod) => vehmod.write_options(writer, endian, args),
-            Vehicle::Unknown => {
-                [0 as u8, 0 as u8, 0 as u8, 0 as u8].write_options(writer, endian, args)
-            }
+            Vehicle::Unknown => [0_u8, 0_u8, 0_u8, 0_u8].write_options(writer, endian, args),
         }
     }
 }

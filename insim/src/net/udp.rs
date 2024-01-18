@@ -4,10 +4,10 @@ use tokio::net::UdpSocket;
 use crate::error::Error;
 use crate::result::Result;
 
-use super::Network;
+use super::TryReadWriteBytes;
 
 #[async_trait::async_trait]
-impl Network for UdpSocket {
+impl TryReadWriteBytes for UdpSocket {
     async fn try_read_bytes(&mut self, buf: &mut BytesMut) -> Result<usize> {
         loop {
             let ready = self.ready(tokio::io::Interest::READABLE).await?;

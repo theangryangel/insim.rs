@@ -4,7 +4,6 @@ members = [
   "insim",
   "insim_pth",
   "insim_smx",
-  "race_directord"
 ]
 
 resolver = "2"

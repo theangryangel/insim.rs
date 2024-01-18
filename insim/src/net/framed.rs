@@ -9,14 +9,14 @@ use crate::{error::Error, insim::Isi, packet::Packet, result::Result};
 use bytes::BytesMut;
 use if_chain::if_chain;
 
-use crate::{codec::Codec, network::Network};
+use super::{codec::Codec, TryReadWriteBytes, DEFAULT_TIMEOUT_SECS};
 
+#[cfg(feature = "websocket")]
 use super::websocket::TungsteniteWebSocket;
-use super::DEFAULT_TIMEOUT_SECS;
 
 pub struct FramedInner<N>
 where
-    N: Network,
+    N: TryReadWriteBytes,
 {
     inner: N,
     codec: Codec,
@@ -26,7 +26,7 @@ where
 
 impl<N> FramedInner<N>
 where
-    N: Network,
+    N: TryReadWriteBytes,
 {
     pub fn new(inner: N, codec: Codec) -> Self {
         let buffer = BytesMut::new();
@@ -39,7 +39,7 @@ where
         }
     }
 
-    pub fn set_verify_version(&mut self, verify_version: bool) {
+    pub fn verify_version(&mut self, verify_version: bool) {
         self.verify_version = verify_version;
     }
 
@@ -119,29 +119,19 @@ pub enum Framed {
     Tcp(FramedInner<TcpStream>),
     BufferedTcp(FramedInner<BufWriter<TcpStream>>),
     Udp(FramedInner<UdpSocket>),
+    #[cfg(feature = "websocket")]
     WebSocket(FramedInner<TungsteniteWebSocket>),
 }
 
 impl Framed {
     #[tracing::instrument]
-    pub async fn handshake(&mut self, isi: Isi, timeout: Duration) -> Result<()> {
-        let res = match self {
-            Self::Tcp(i) => i.handshake(isi, timeout).await,
-            Self::Udp(i) => i.handshake(isi, timeout).await,
-            Self::WebSocket(i) => i.handshake(isi, timeout).await,
-            Self::BufferedTcp(i) => i.handshake(isi, timeout).await,
-        };
-        tracing::debug!("handshake result {:?}", res);
-        res
-    }
-
-    #[tracing::instrument]
     pub async fn read(&mut self) -> Result<Packet> {
         let res = match self {
             Self::Tcp(i) => i.read().await,
             Self::Udp(i) => i.read().await,
-            Self::WebSocket(i) => i.read().await,
             Self::BufferedTcp(i) => i.read().await,
+            #[cfg(feature = "websocket")]
+            Self::WebSocket(i) => i.read().await,
         };
         tracing::debug!("read result {:?}", res);
         res
@@ -153,8 +143,9 @@ impl Framed {
         match self {
             Self::Tcp(i) => i.write(packet.into()).await,
             Self::Udp(i) => i.write(packet.into()).await,
-            Self::WebSocket(i) => i.write(packet.into()).await,
             Self::BufferedTcp(i) => i.write(packet.into()).await,
+            #[cfg(feature = "websocket")]
+            Self::WebSocket(i) => i.write(packet.into()).await,
         }
     }
 }
@@ -177,6 +168,8 @@ impl Debug for Framed {
                 "Framed::Tcp {{ codec: {:?}, verify_version: {:?} }}",
                 i.codec, i.verify_version
             ),
+
+            #[cfg(feature = "websocket")]
             Framed::WebSocket(i) => write!(
                 f,
                 "Framed::Tcp {{ codec: {:?}, verify_version: {:?} }}",
