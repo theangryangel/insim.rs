@@ -28,8 +28,8 @@ pub struct Builder {
     remote: SocketAddr,
     verify_version: bool,
     mode: Mode,
-    admin_password: Option<String>,
 
+    isi_admin_password: Option<String>,
     isi_flags: IsiFlags,
     isi_prefix: Option<char>,
     isi_interval: Option<Duration>,
@@ -74,7 +74,7 @@ impl Default for Builder {
             #[cfg(feature = "websocket")]
             relay_websocket: false,
 
-            admin_password: None,
+            isi_admin_password: None,
 
             isi_flags: IsiFlags::default(),
             isi_prefix: None,
@@ -161,8 +161,8 @@ impl Builder {
         self
     }
 
-    pub fn admin_password<P: Into<Option<String>>>(mut self, password: P) -> Self {
-        self.admin_password = password.into();
+    pub fn isi_admin_password<P: Into<Option<String>>>(mut self, password: P) -> Self {
+        self.isi_admin_password = password.into();
         self
     }
 
@@ -197,24 +197,12 @@ impl Builder {
             _ => 0,
         };
 
-        let admin = if let Some(admin) = &self.admin_password {
-            admin.clone()
-        } else {
-            "".into()
-        };
-
-        let iname = if let Some(iname) = &self.isi_iname {
-            iname.clone()
-        } else {
-            "".into()
-        };
-
         Isi {
             reqi: self.isi_reqi,
             udpport,
             flags: self.isi_flags,
-            admin,
-            iname,
+            admin: self.isi_admin_password.as_deref().unwrap_or("").to_owned(),
+            iname: self.isi_iname.as_deref().unwrap_or("").to_owned(),
             prefix: self.isi_prefix.unwrap_or(0 as char),
             interval: self.isi_interval.unwrap_or(Duration::ZERO),
             ..Default::default()
@@ -262,14 +250,16 @@ impl Builder {
                 if let Some(hostname) = &self.relay_select_host {
                     let packet = HostSelect {
                         hname: hostname.to_string(),
-                        admin: match &self.relay_admin_password {
-                            None => "".into(),
-                            Some(i) => i.clone(),
-                        },
-                        spec: match &self.relay_spectator_password {
-                            None => "".into(),
-                            Some(i) => i.clone(),
-                        },
+                        admin: self
+                            .relay_admin_password
+                            .as_deref()
+                            .unwrap_or("")
+                            .to_owned(),
+                        spec: self
+                            .relay_spectator_password
+                            .as_deref()
+                            .unwrap_or("")
+                            .to_owned(),
                         ..Default::default()
                     };
 

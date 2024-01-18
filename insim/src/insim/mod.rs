@@ -93,7 +93,7 @@ pub use mtc::Mtc;
 pub use nci::Nci;
 pub use ncn::Ncn;
 pub use nlp::{Nlp, NodeLapInfo};
-pub use npl::{Npl, PlayerFlags, TyreCompound};
+pub use npl::{Npl, Passengers, PlayerFlags, PlayerType, SetFlags, TyreCompound};
 pub use obh::{CarContact, Obh, ObhFlags};
 pub use oco::{Oco, OcoAction, OcoIndex, OcoLights};
 pub use pen::{Pen, PenaltyInfo, PenaltyReason};

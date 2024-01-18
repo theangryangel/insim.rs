@@ -10,6 +10,8 @@ use serde::Serialize;
 
 use bitflags::bitflags;
 
+use super::Fuel;
+
 #[binrw]
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -60,17 +62,60 @@ bitflags! {
     }
 }
 
+bitflags! {
+    #[binrw]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
+    #[cfg_attr(feature = "serde", derive(Serialize))]
+    #[br(map = Self::from_bits_truncate)]
+    #[bw(map = |&x: &Self| x.bits())]
+    pub struct SetFlags: u8 {
+         const SYMM_WHEELS = (1 << 0);
+         const TC_ENABLE = (1 << 1);
+         const ABS_ENABLE = (1 << 2);
+    }
+}
+
+bitflags! {
+    #[binrw]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
+    #[cfg_attr(feature = "serde", derive(Serialize))]
+    #[br(map = Self::from_bits_truncate)]
+    #[bw(map = |&x: &Self| x.bits())]
+    pub struct PlayerType: u8 {
+         const FEMALE = (1 << 0);
+         const AI = (1 << 1);
+         const REMOTE = (1 << 2);
+    }
+}
+
+bitflags! {
+    #[binrw]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
+    #[cfg_attr(feature = "serde", derive(Serialize))]
+    #[br(map = Self::from_bits_truncate)]
+    #[bw(map = |&x: &Self| x.bits())]
+    pub struct Passengers: u8 {
+         const FRONT_MALE = (1 << 0);
+         const FRONT_FEMALE = (1 << 1);
+         const REAR_LEFT_MALE = (1 << 2);
+         const REAR_LEFT_FEMALE = (1 << 3);
+         const REAR_MIDDLE_MALE = (1 << 4);
+         const REAR_MIDDLE_FEMALE = (1 << 5);
+         const REAR_RIGHT_MALE = (1 << 6);
+         const REAR_RIGHT_FEMALE = (1 << 7);
+    }
+}
+
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Sent when a New Player joins.
-// TODO: Implement SetF, Fuel, RW/FWAdj, PType
 pub struct Npl {
     pub reqi: RequestId,
     pub plid: PlayerId,
 
     pub ucid: ConnectionId,
-    pub ptype: u8,
+    pub ptype: PlayerType,
     pub flags: PlayerFlags,
 
     #[bw(write_with = binrw_write_codepage_string::<24, _>)]
@@ -91,14 +136,14 @@ pub struct Npl {
     pub h_mass: u8,
     pub h_tres: u8,
     pub model: u8,
-    pub pass: u8,
+    pub pass: Passengers,
 
     pub rwadj: u8,
     #[brw(pad_after = 2)]
     pub fwadj: u8,
 
-    pub setf: u8,
+    pub setf: SetFlags,
     pub nump: u8,
     pub config: u8,
-    pub fuel: u8,
+    pub fuel: Fuel,
 }
