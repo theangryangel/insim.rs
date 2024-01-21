@@ -3,6 +3,7 @@ name = "insim"
 version = "0.3.0"
 authors = ["Karl Southern <karl@theangryangel.co.uk>"]
 edition = "2021"
+rust-version = "1.66"
 
 [lib]
 bench = false
