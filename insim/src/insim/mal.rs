@@ -13,7 +13,7 @@ use serde::Serialize;
 const MAX_MAL_SIZE: usize = 120;
 
 #[binrw::parser(reader, endian)]
-pub fn binrw_parse_mal_allowed_mods(count: u8) -> BinResult<IndexSet<Vehicle>> {
+fn binrw_parse_mal_allowed_mods(count: u8) -> BinResult<IndexSet<Vehicle>> {
     let mut data = IndexSet::new();
     for _i in 0..count {
         data.insert(Vehicle::Mod(u32::read_options(reader, endian, ())?));
@@ -22,7 +22,7 @@ pub fn binrw_parse_mal_allowed_mods(count: u8) -> BinResult<IndexSet<Vehicle>> {
 }
 
 #[binrw::writer(writer, endian)]
-pub fn binrw_write_mal_allowed_mods(input: &IndexSet<Vehicle>) -> BinResult<()> {
+fn binrw_write_mal_allowed_mods(input: &IndexSet<Vehicle>) -> BinResult<()> {
     for i in input.iter() {
         match i {
             Vehicle::Mod(val) => val.write_options(writer, endian, ())?,
@@ -41,12 +41,14 @@ pub fn binrw_write_mal_allowed_mods(input: &IndexSet<Vehicle>) -> BinResult<()> 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 /// Mods Allowed - restrict the mods that can be used
 pub struct Mal {
+    /// RequestId
     pub reqi: RequestId,
 
     /// Number of mods in this packet
     #[bw(calc = allowed_mods.len() as u8)]
     numm: u8,
 
+    /// UCID to change
     #[brw(pad_after = 3)]
     pub ucid: ConnectionId,
 
@@ -56,6 +58,7 @@ pub struct Mal {
 }
 
 impl Mal {
+    /// Returns `true` if a Vehicle is contained in this packet
     pub fn contains(&self, v: &Vehicle) -> bool {
         self.allowed_mods.contains(v)
     }
@@ -69,10 +72,12 @@ impl Mal {
         }
     }
 
+    /// Remove a Vehicle from this packet
     pub fn remove(&mut self, vehicle: &Vehicle) -> bool {
         self.allowed_mods.remove(vehicle)
     }
 
+    /// Does this packet have no vehicles associated?
     pub fn is_empty(&self) -> bool {
         self.allowed_mods.is_empty()
     }
@@ -82,10 +87,12 @@ impl Mal {
         self.allowed_mods.clear()
     }
 
+    /// Iterator for all allowed mods
     pub fn iter(&self) -> IndexSetIter<'_, Vehicle> {
         self.allowed_mods.iter()
     }
 
+    /// Returns the number of allowed mods
     pub fn len(&self) -> usize {
         self.allowed_mods.len()
     }

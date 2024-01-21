@@ -1,5 +1,10 @@
 #![doc = include_str!("../README.md")]
 
+#![deny(missing_docs)]
+#![deny(missing_debug_implementations)]
+#![cfg_attr(test, deny(warnings))]
+#![cfg_attr(test, deny(unreachable_pub))]
+
 use std::net::SocketAddr;
 
 #[doc(hidden)]
