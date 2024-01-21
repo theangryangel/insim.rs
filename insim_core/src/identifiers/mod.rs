@@ -1,3 +1,5 @@
+//! Various identifiers used within insim, such as RequestId, ConnectionId, etc.
+
 mod click;
 mod connection;
 mod player;

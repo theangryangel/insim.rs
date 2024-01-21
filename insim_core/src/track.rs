@@ -1,3 +1,4 @@
+//! Strongly typed Tracks
 // Warning: This is an automatically generated file from combos.py
 
 use crate::license::License;

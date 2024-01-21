@@ -1,4 +1,4 @@
-//! Utility functions for working with vehicles and fetching vehicle data.
+//! Strongly typed Vehicles for both standard and mods
 
 use crate::{license::License, string::is_ascii_alphanumeric};
 use binrw::{BinRead, BinWrite};

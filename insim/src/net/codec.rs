@@ -5,6 +5,9 @@ use bytes::{Buf, Bytes, BytesMut};
 use insim_core::binrw::{BinRead, BinWrite};
 use std::io::{Cursor, Write};
 
+/// Handles the encoding and decoding of Insim packets to and from raw bytes.
+/// It automatically handles the encoding of the total size of the packet, and the packet
+/// type/identifier.
 #[derive(Debug)]
 pub struct Codec {
     mode: Mode,

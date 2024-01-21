@@ -126,7 +126,7 @@ pub struct Smx {
 }
 
 impl Smx {
-    /// Read and parse a PTH file into a [Pth] struct.
+    /// Read and parse a SMX file into a [Smx] struct.
     pub fn from_file(i: &mut File) -> Result<Self, Error> {
         Self::read(i).map_err(Error::from).map_err(Error::from)
     }

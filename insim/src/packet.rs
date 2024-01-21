@@ -1,4 +1,4 @@
-//! Insim v9 Packet definitions
+//! Contains [crate::Packet] enum
 
 use insim_core::{
     binrw::{self, binrw},
@@ -253,6 +253,7 @@ impl Packet {
         }
     }
 
+    /// Does this packet indicate that we should send a ping reply back?
     #[tracing::instrument]
     pub fn maybe_pong(&self) -> Option<Self> {
         match self {
@@ -267,6 +268,7 @@ impl Packet {
         }
     }
 
+    /// Does this packet contain the version of the Insim server, and can we verify it?
     #[tracing::instrument]
     pub fn maybe_verify_version(&self) -> crate::result::Result<bool> {
         match self {

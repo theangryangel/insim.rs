@@ -86,16 +86,19 @@ impl Default for Builder {
 }
 
 impl Builder {
+    /// Constructs a new `Builder`.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Use a TCP connection
     pub fn tcp<R: Into<SocketAddr>>(mut self, remote_addr: R) -> Self {
         self.proto = Proto::Tcp;
         self.remote = remote_addr.into();
         self
     }
 
+    /// Use a UDP connection
     pub fn udp<L: Into<Option<SocketAddr>>, R: Into<SocketAddr>>(
         mut self,
         remote_addr: R,
@@ -107,90 +110,121 @@ impl Builder {
         self
     }
 
+    /// Use the LFS World Relay over TCP
     pub fn relay(mut self) -> Self {
         self.proto = Proto::Relay;
         self
     }
 
+    /// Use the LFS World Relay over Websockets.
     #[cfg(feature = "websocket")]
     pub fn relay_websocket(mut self, ws: bool) -> Self {
         self.relay_websocket = ws;
         self
     }
 
+    /// Set the connection timeout.
     pub fn connect_timeout(mut self, duration: Duration) -> Self {
         self.connect_timeout = duration;
         self
     }
 
+    /// Insim 9+ allows for a "compressed" and "uncompressed" packet size mode.
+    /// When "compressed" the size on the wire is indicated as "true size / 4".
+    /// The LFS World relay does not currently appear to support compressed mode.
     pub fn mode(mut self, mode: Mode) -> Self {
         self.mode = mode;
         self
     }
 
+    /// Use "compressed" mode.
     pub fn compressed(self) -> Self {
         self.mode(Mode::Compressed)
     }
 
+    /// Use "uncompressed" mode. Force enabled for LFS World relay.
     pub fn uncompressed(self) -> Self {
         self.mode(Mode::Uncompressed)
     }
 
+    /// Enable the verification of the Insim version within the library. If a [crate::Packet::Version] is received with a differing version, [crate::Error::IncompatibleVersion] is returned and the connection is lost.
     pub fn verify_version(mut self, verify: bool) -> Self {
         self.verify_version = verify;
         self
     }
 
+    /// Set whether sockets have `TCP_NODELAY` enabled.
+    /// Default is `true`
     pub fn tcp_nodelay(mut self, no_delay: bool) -> Self {
         self.tcp_nodelay = no_delay;
         self
     }
 
+    /// Automatically select a host after connection to the LFS World relay.
+    /// This is not verified. If the host is not online, or registered with the LFS World relay, it
+    /// is currently your responsibility to handle this.
     pub fn relay_select_host<H: Into<Option<String>>>(mut self, host: H) -> Self {
         self.relay_select_host = host.into();
         self
     }
 
+    /// Set the spectator password to use when connecting to the host via the LFS World Relay.
     pub fn relay_spectator_password<P: Into<Option<String>>>(mut self, password: P) -> Self {
         self.relay_spectator_password = password.into();
         self
     }
 
+    /// Set the admin password to use when connecting to the host via the LFS World Relay.
     pub fn relay_admin_password<P: Into<Option<String>>>(mut self, password: P) -> Self {
         self.relay_admin_password = password.into();
         self
     }
 
+    /// Set the admin password to be used in the [crate::Packet::Init] packet during connection
+    /// handshake.
     pub fn isi_admin_password<P: Into<Option<String>>>(mut self, password: P) -> Self {
         self.isi_admin_password = password.into();
         self
     }
 
+    /// Set the [crate::core::identifiers::RequestId] to be used in the [crate::Packet::Init] packet during connection
+    /// handshake.
     pub fn isi_reqi(mut self, i: RequestId) -> Self {
         self.isi_reqi = i;
         self
     }
 
+    /// Set the [crate::insim::IsiFlags] to be used in the [crate::Packet::Init] packet during connection
+    /// handshake.
     pub fn isi_flags(mut self, flags: IsiFlags) -> Self {
         self.isi_flags = flags;
         self
     }
 
+    /// Set the prefix to be used in the [crate::Packet::Init] packet during connection
+    /// handshake.
     pub fn isi_prefix<C: Into<Option<char>>>(mut self, c: C) -> Self {
         self.isi_prefix = c.into();
         self
     }
 
+    /// Set the iname to be used in the [crate::Packet::Init] packet during connection
+    /// handshake.
     pub fn isi_iname<N: Into<Option<String>>>(mut self, iname: N) -> Self {
         self.isi_iname = iname.into();
         self
     }
 
+    /// Set the interval to be used in the [crate::Packet::Init] packet during connection
+    /// handshake.
+    /// This governs the time between [crate::Packet::MultiCarInfo] or [crate::Packet::NodeLap]
+    /// packets.
     pub fn isi_interval<D: Into<Option<Duration>>>(mut self, duration: D) -> Self {
         self.isi_interval = duration.into();
         self
     }
 
+    /// Create a [crate::insim::Isi] from this configuration.
     pub fn isi(&self) -> Isi {
         let udpport = match self.proto {
             Proto::Udp => self.udp_local_address.unwrap().port(),
@@ -209,6 +243,9 @@ impl Builder {
         }
     }
 
+    /// Attempt to establish (connect and handshake) a valid Insim connection using this
+    /// configuration.
+    /// The `Builder` is not consumed and may be reused.
     pub async fn connect(&self) -> Result<Framed> {
         match self.proto {
             Proto::Tcp => {
@@ -276,7 +313,7 @@ impl Builder {
         if self.relay_websocket {
             let stream = timeout(
                 self.connect_timeout,
-                crate::net::websocket::connect_to_relay(),
+                crate::net::websocket::connect_to_relay(self.tcp_nodelay),
             )
             .await??;
 
@@ -287,7 +324,7 @@ impl Builder {
 
         let stream = timeout(
             self.connect_timeout,
-            tokio::net::TcpStream::connect("isrelay.lfs.net:47474"),
+            tokio::net::TcpStream::connect(crate::LFSW_RELAY_ADDR),
         )
         .await??;
         stream.set_nodelay(self.tcp_nodelay)?;

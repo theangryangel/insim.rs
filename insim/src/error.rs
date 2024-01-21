@@ -1,6 +1,6 @@
 #[non_exhaustive]
 #[derive(thiserror::Error, Debug, Clone)]
-/// A specialized [`Error`] type for insim.
+/// The Errors that may occur during an Insim connection.
 pub enum Error {
     /// Connection is disconnected
     #[error("Disconnected")]
@@ -25,18 +25,21 @@ pub enum Error {
     #[error("Failed to parse address: {0}")]
     AddrParseError(#[from] std::net::AddrParseError),
 
-    #[error("Shutdown")]
-    Shutdown,
-
+    /// Websocket IO error. Only applicable during a LFS World Relay connection
     #[error("Websocket Error: {0}")]
     WebsocketIO(String),
 
+    /// Error during the encoding or decoding of an Insim packet from the network
     #[error("Insim Core error {0}")]
     BinRw(String),
 
+    /// Certain operations only allow for mods, this error indicates a standard vehicle was passed
+    /// instead.
     #[error("Only Mods are permitted")]
     VehicleNotAMod,
 
+    /// Certain operations only allow for standard vehicles, this error indicates a mod was passed
+    /// instead.
     #[error("Only Standard vehicles are permitted")]
     VehicleNotStandard,
 }

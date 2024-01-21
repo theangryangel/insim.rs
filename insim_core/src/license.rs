@@ -1,5 +1,9 @@
+//! Strongly type license data
 use binrw::binrw;
 
+/// Describes the various LFS "license" levels. Each "license" provides access to different
+/// levels of content.
+/// See <https://www.lfs.net/contents>
 #[binrw]
 #[non_exhaustive]
 #[derive(Default, PartialEq, PartialOrd, Eq, Debug, Copy, Clone)]

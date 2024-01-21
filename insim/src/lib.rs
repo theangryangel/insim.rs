@@ -1,18 +1,24 @@
 #![doc = include_str!("../README.md")]
 
-pub mod builder;
-pub mod error;
-pub mod insim;
-pub mod net;
-pub mod packet;
-pub mod relay;
-pub mod result;
-
-const VERSION: u8 = 9;
-
 use std::net::SocketAddr;
 
 #[doc(hidden)]
+pub mod builder;
+#[doc(hidden)]
+pub mod error;
+pub mod insim;
+pub mod net;
+#[doc(hidden)]
+pub mod packet;
+pub mod relay;
+#[doc(hidden)]
+pub mod result;
+
+/// The Insim Protocol Version Number supported by this library
+const VERSION: u8 = 9;
+/// The LFS World Relay address and port
+const LFSW_RELAY_ADDR: &str = "isrelay.lfs.net:47474";
+
 /// Rexport insim_core
 pub use insim_core as core;
 
@@ -32,8 +38,9 @@ pub use result::Result;
 ///
 /// # Examples
 /// ```rust
-/// let conn = insim::tcp("127.0.0.1:2999").connect().await?;
-/// while let Some(packet) = conn.read().await? {
+/// let conn = insim::tcp("127.0.0.1:29999").connect().await?;
+/// loop {
+///     let packet = conn.read().await?;
 ///     println!("{:?}", packet);
 /// }
 /// ```
@@ -46,8 +53,9 @@ pub fn tcp<R: Into<SocketAddr>>(remote_addr: R) -> builder::Builder {
 ///
 /// # Examples
 /// ```rust
-/// let conn = insim::udp("127.0.0.1:2999", None).connect().await?;
-/// while let Some(packet) = conn.read().await? {
+/// let conn = insim::udp("127.0.0.1:29999", None).connect().await?;
+/// loop {
+///     let packet = conn.read().await?;
 ///     println!("{:?}", packet);
 /// }
 /// ```
@@ -67,7 +75,8 @@ pub fn udp<L: Into<Option<SocketAddr>>, R: Into<SocketAddr>>(
 ///     .relay_websocket(true)
 ///     .connect()
 ///     .await?;
-/// while let Some(packet) = conn.read().await? {
+/// loop {
+///     let packet = conn.read().await?;
 ///     println!("{:?}", packet);
 /// }
 /// ```

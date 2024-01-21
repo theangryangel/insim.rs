@@ -1,4 +1,4 @@
-//! Handles encoding and decoding of [Packets](crate::packets::Packet) from the wire.
+//! Handles encoding and decoding of [Packets](crate::packet::Packet) from the wire.
 
 use bytes::BytesMut;
 use std::io;

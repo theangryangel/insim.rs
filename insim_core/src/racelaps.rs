@@ -2,6 +2,7 @@ use std::convert::From;
 
 use binrw::{BinRead, BinWrite};
 
+/// Handles the rules around how RaceLaps are described within Insim automatically for you.
 #[derive(Debug, Default, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum RaceLaps {

@@ -1,10 +1,11 @@
+//! Utility methods for encoding and decoding various durations and intervals used within Insim.
+//! These 2 methods allow the milliseconds to be scaled using the const SCALE generic.
+//! This is useful as a number of LFS packets use centiseconds (1/100th of a second, rather than
+//! 1/1000th).
+
 use std::time::Duration;
 
 use binrw::{BinRead, BinWrite, Error as BinError};
-
-// These 2 methods allow the milliseconds to be scaled using the const SCALE generic.
-// This is useful as a number of LFS packets use centiseconds (1/100th of a second, rather than
-// 1/1000th).
 
 #[binrw::writer(writer, endian)]
 pub fn binrw_write_duration<

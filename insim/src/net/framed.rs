@@ -14,6 +14,8 @@ use super::{codec::Codec, TryReadWriteBytes, DEFAULT_TIMEOUT_SECS};
 #[cfg(feature = "websocket")]
 use super::websocket::TungsteniteWebSocket;
 
+/// A unified wrapper around anything that implements [TryReadWriteBytes].
+/// You probably really want to look at [Framed].
 pub struct FramedInner<N>
 where
     N: TryReadWriteBytes,
@@ -110,6 +112,7 @@ where
     }
 }
 
+/// Concrete enum of connection types, to avoid Box'ing. Wraps [FramedInner].
 // The "Inner" connection for Connection, so that we can avoid Box'ing
 // Since the ConnectionOptions is all very hard coded, for "high level" API usage,
 // I think this fine.

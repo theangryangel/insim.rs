@@ -11,12 +11,12 @@ use super::TryReadWriteBytes;
 pub type TungsteniteWebSocket =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<TcpStream>>;
 
-pub async fn connect_to_relay() -> Result<TungsteniteWebSocket> {
+pub async fn connect_to_relay(tcp_nodelay: bool) -> Result<TungsteniteWebSocket> {
     use tokio_tungstenite::{
-        connect_async, tungstenite::handshake::client::generate_key, tungstenite::http,
+        connect_async_with_config, tungstenite::handshake::client::generate_key, tungstenite::http,
     };
 
-    let uri = "ws://isrelay.lfs.net:47474/connect"
+    let uri = format!("ws://{}/connect", crate::LFSW_RELAY_ADDR)
         .parse::<http::Uri>()
         .expect("Failed to parse relay URI");
 
@@ -34,7 +34,7 @@ pub async fn connect_to_relay() -> Result<TungsteniteWebSocket> {
         .body(())
         .unwrap();
 
-    let (stream, _response) = connect_async(req).await?;
+    let (stream, _response) = connect_async_with_config(req, None, tcp_nodelay).await?;
 
     Ok(stream)
 }

@@ -1,3 +1,4 @@
+//! Utilities for points in 3D space
 use binrw::{binrw, BinRead, BinWrite};
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -11,6 +12,7 @@ impl Pointable for i32 {}
 impl Pointable for f32 {}
 impl Pointable for u16 {}
 
+/// A point in 3D space.
 #[binrw]
 #[derive(Default, Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]

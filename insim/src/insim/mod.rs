@@ -1,3 +1,5 @@
+//! Definitions for the Insim packets and related bitflags, enums, etc.
+
 mod acr;
 mod axi;
 mod axm;

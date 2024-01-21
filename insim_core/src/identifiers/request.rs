@@ -5,6 +5,7 @@ use std::ops::{Deref, DerefMut};
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+/// Request Identifier, commonly referred to as reqi in Insim.txt
 #[binrw]
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
