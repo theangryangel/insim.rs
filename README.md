@@ -9,6 +9,8 @@ than a thin layer over a series of bytes and primitive types.
 :warning: The API is not yet stable at this time. Use at your own risk. I am
 currently not touching the version number.
 
+You can track the path to stable by monitoring these issues: <https://github.com/theangryangel/insim.rs/issues?q=is%3Aissue+is%3Aopen+label%3A%22target%3A+1.0.0%22>.
+
 If you're not sure where to start, you probably want to look at the README and examples within the `insim` crate.
 
 | Crate        | Usage                                           |
@@ -18,7 +20,7 @@ If you're not sure where to start, you probably want to look at the README and e
 | `insim_pth`  | Implements a PTH file read/writer.              |
 | `insim_smx`  | Implements a SMX file reader/writer.            |
 
-If you're looking for race_directord that has been moved to https://github.com/theangryangel/race_directord/.
+If you're looking for race_directord that has been moved to <https://github.com/theangryangel/race_directord/>.
 
 ## Documentation
 
