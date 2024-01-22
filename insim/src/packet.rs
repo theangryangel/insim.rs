@@ -1,9 +1,8 @@
 //! Contains [crate::Packet] enum
 
-use insim_core::{
-    binrw::{self, binrw},
-    identifiers::RequestId,
-};
+use insim_core::binrw::{self, binrw};
+
+use crate::identifiers::RequestId;
 
 use crate::insim::*;
 use crate::relay::*;

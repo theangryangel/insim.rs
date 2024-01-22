@@ -1,5 +1,7 @@
 //! Definitions for the Insim packets and related bitflags, enums, etc.
 
+mod racelaps;
+
 mod acr;
 mod axi;
 mod axm;
@@ -62,6 +64,8 @@ mod uco;
 mod ver;
 mod vtn;
 
+pub use racelaps::RaceLaps;
+
 pub use acr::{Acr, AcrResult};
 pub use axi::Axi;
 pub use axm::{Axm, ObjectInfo, PmoAction};
@@ -75,7 +79,7 @@ pub use cpp::Cpp;
 pub use cpr::Cpr;
 pub use crs::Crs;
 pub use csc::{Csc, CscAction};
-pub use fin::{Fin, RaceResultFlags};
+pub use fin::{Fin, RaceConfirmationFlags};
 pub use flg::{Flg, FlgType};
 pub use hcp::{Hcp, HcpCarHandicap};
 pub use hlv::{Hlv, Hlvc};
@@ -101,22 +105,22 @@ pub use oco::{Oco, OcoAction, OcoIndex, OcoLights};
 pub use pen::{Pen, PenaltyInfo, PenaltyReason};
 pub use pfl::Pfl;
 pub use pit::{Pit, PitLaneFact, Pla, Psf};
-pub use plc::{Plc, PlcAllowedCars};
+pub use plc::{Plc, PlcAllowedCarsSet};
 pub use plh::{PlayerHandicap, Plh};
 pub use pll::Pll;
 pub use plp::Plp;
 pub use reo::Reo;
 pub use res::Res;
-pub use rip::{Rip, RipError};
+pub use rip::{Rip, RipError, RipOptions};
 pub use rst::{HostFacts, Rst};
 pub use scc::Scc;
-pub use sch::{Sch, SchFlags};
+pub use sch::{Sch, SchModifiers};
 pub use sfp::Sfp;
 pub use slc::Slc;
 pub use small::{LclFlags, LcsFlags, Small, SmallType};
 pub use spx::Spx;
 pub use ssh::{Ssh, SshError};
-pub use sta::{Sta, StaFlags, StaRacing};
+pub use sta::{RaceInProgress, Sta, StaFlags};
 pub use tiny::{Tiny, TinyType};
 pub use toc::Toc;
 pub use ttc::{Ttc, TtcType};

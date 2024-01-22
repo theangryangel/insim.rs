@@ -1,14 +1,17 @@
 use std::convert::From;
 
-use binrw::{BinRead, BinWrite};
+use insim_core::binrw::{self, BinRead, BinWrite};
 
 /// Handles the rules around how RaceLaps are described within Insim automatically for you.
 #[derive(Debug, Default, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum RaceLaps {
+    /// This is a practise session
     #[default]
     Practice,
+    /// This is a fixed number of laps
     Laps(usize),
+    /// This is a time-based event
     Hours(usize),
 }
 

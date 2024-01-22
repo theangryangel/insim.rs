@@ -1,10 +1,6 @@
-use insim_core::{
-    binrw::{self, binrw},
-    identifiers::{PlayerId, RequestId},
-};
+use insim_core::binrw::{self, binrw};
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
+use crate::identifiers::{PlayerId, RequestId};
 
 #[cfg(feature = "serde")]
 fn serialize_playerids<const N: usize, S>(
@@ -25,12 +21,16 @@ where
 
 #[binrw]
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
-/// Reorder
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+/// Reorder the players
 pub struct Reo {
+    /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
+
+    /// Number of players
     pub nump: u8,
 
+    /// Order the players
     #[cfg_attr(feature = "serde", serde(serialize_with = "serialize_playerids"))]
     pub plid: [PlayerId; 40],
 }

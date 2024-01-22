@@ -6,19 +6,20 @@ use std::{
 use insim_core::{
     binrw::{self, binrw, BinRead, BinResult, BinWrite, Endian},
     duration::{binrw_parse_duration, binrw_write_duration},
-    identifiers::{PlayerId, RequestId},
 };
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
+use crate::identifiers::{PlayerId, RequestId};
 
 use super::{PenaltyInfo, PlayerFlags};
 
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[derive(Debug, Default, Clone)]
+/// When /showfuel yes: double fuel percent / no: 255
 pub enum Fuel200 {
+    /// Double fuel percent
     Percentage(u8),
 
+    /// Fuel cannot be reported, /showfuel=no
     #[default]
     No,
 }
@@ -60,11 +61,14 @@ impl BinRead for Fuel200 {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[derive(Debug, Default, Clone)]
+/// When /showfuel yes: fuel added percent / no: 255
 pub enum Fuel {
+    /// Double fuel percent
     Percentage(u8),
 
+    /// Fuel cannot be reported, /showfuel=no
     #[default]
     No,
 }
@@ -108,25 +112,38 @@ impl BinRead for Fuel {
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Lap Time for a given player.
 pub struct Lap {
+    /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
+
+    /// Unique player ID
     pub plid: PlayerId,
 
     #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
     #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
+    /// Lap time
     pub ltime: Duration, // lap time (ms)
 
     #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
     #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
+    /// Total elapsed time
     pub etime: Duration,
 
+    /// Number of laps completed.
     pub lapsdone: u16,
+
+    /// See [PlayerFlags].
     #[brw(pad_after = 1)]
     pub flags: PlayerFlags,
 
+    /// Current penalty
     pub penalty: PenaltyInfo,
+
+    /// Number of pit stops.
     pub numstops: u8,
+
+    /// See [Fuel200].
     pub fuel200: Fuel200,
 }

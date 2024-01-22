@@ -1,19 +1,16 @@
-use insim_core::{
-    binrw::{self, binrw},
-    identifiers::RequestId,
-};
+use insim_core::binrw::{self, binrw};
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
+use crate::identifiers::RequestId;
 
 /// Enum of possible errors  that the Insim Relay can respond with.
 #[binrw]
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
 pub enum RelayErrorKind {
     #[default]
+    /// None
     None = 0,
 
     /// Packet length or structure is invalid.
@@ -38,10 +35,12 @@ pub enum RelayErrorKind {
 /// The relay will send this packet when it encounters an error.
 #[binrw]
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct RelayError {
+    /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
+    /// The error
     pub err: RelayErrorKind,
 }
 

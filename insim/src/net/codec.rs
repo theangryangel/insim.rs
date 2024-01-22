@@ -14,14 +14,17 @@ pub struct Codec {
 }
 
 impl Codec {
+    /// Create a new Codec, with a given [Mode].
     pub fn new(mode: Mode) -> Self {
         Self { mode }
     }
 
+    /// Return the currect codec [Mode].
     pub fn mode(&self) -> &Mode {
         &self.mode
     }
 
+    /// Encode a [Packet] into [Bytes].
     #[tracing::instrument]
     pub fn encode(&self, msg: &Packet) -> Result<Bytes> {
         // encode the message
@@ -44,6 +47,7 @@ impl Codec {
         Ok(data.into())
     }
 
+    /// Decode a series of bytes into a [Packet]
     #[tracing::instrument]
     pub fn decode(&self, src: &mut BytesMut) -> Result<Option<Packet>> {
         if src.is_empty() {
@@ -76,11 +80,11 @@ mod tests {
     use super::*;
 
     use crate::{
+        identifiers::RequestId,
         insim::{Tiny, TinyType},
         packet::Packet,
     };
     use bytes::BytesMut;
-    use insim_core::identifiers::RequestId;
     use tokio_test::assert_ok;
 
     #[tokio::test]

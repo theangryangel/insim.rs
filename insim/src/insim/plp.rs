@@ -1,16 +1,15 @@
-use insim_core::{
-    binrw::{self, binrw},
-    identifiers::{PlayerId, RequestId},
-};
+use insim_core::binrw::{self, binrw};
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
+use crate::identifiers::{PlayerId, RequestId};
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
-/// Player Tele-pits
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+/// Player Tele-pits (shift+P in game)
 pub struct Plp {
+    /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
+
+    /// Unique player ID which tele-pitted
     pub plid: PlayerId,
 }

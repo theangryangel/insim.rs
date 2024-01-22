@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
-
+#![deny(missing_docs)]
+#![deny(missing_debug_implementations)]
 #![cfg_attr(test, deny(warnings))]
 #![cfg_attr(test, deny(unreachable_pub))]
 
@@ -9,6 +10,7 @@ use std::net::SocketAddr;
 pub mod builder;
 #[doc(hidden)]
 pub mod error;
+pub mod identifiers;
 pub mod insim;
 pub mod net;
 #[doc(hidden)]
@@ -18,9 +20,9 @@ pub mod relay;
 pub mod result;
 
 /// The Insim Protocol Version Number supported by this library
-const VERSION: u8 = 9;
+pub const VERSION: u8 = 9;
 /// The LFS World Relay address and port
-const LFSW_RELAY_ADDR: &str = "isrelay.lfs.net:47474";
+pub const LFSW_RELAY_ADDR: &str = "isrelay.lfs.net:47474";
 
 /// Rexport insim_core
 pub use insim_core as core;
@@ -33,6 +35,7 @@ pub use insim_pth as pth;
 /// Report insim_smx when smx feature is enabled
 pub use insim_smx as smx;
 
+pub use builder::Builder;
 pub use error::Error;
 pub use packet::Packet;
 pub use result::Result;

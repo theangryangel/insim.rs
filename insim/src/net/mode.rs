@@ -88,7 +88,7 @@ impl Mode {
         Ok(Some(n))
     }
 
-    pub fn valid_raw_buffer_min_len(&self) -> usize {
+    fn valid_raw_buffer_min_len(&self) -> usize {
         // All packets are defined as a minimum of:
         // size: u8
         // type: u8

@@ -1,21 +1,20 @@
-use insim_core::{
-    binrw::{self, binrw},
-    identifiers::{PlayerId, RequestId},
-};
+use insim_core::binrw::{self, binrw};
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
+use crate::identifiers::{PlayerId, RequestId};
 
 use super::PlayerFlags;
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
-/// Player Flags
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+/// Player flags changed
 pub struct Pfl {
+    /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
+    /// Player unique Id
     pub plid: PlayerId,
 
+    /// Flags which were altered. See [PlayerFlags].
     #[brw(pad_after = 2)]
     pub flags: PlayerFlags,
 }

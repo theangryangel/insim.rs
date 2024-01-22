@@ -1,17 +1,14 @@
-use insim_core::{
-    binrw::{self, binrw},
-    identifiers::{PlayerId, RequestId},
-};
+use insim_core::binrw::{self, binrw};
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
+use crate::identifiers::{PlayerId, RequestId};
 
 bitflags::bitflags! {
     #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     #[br(map = Self::from_bits_truncate)]
     #[bw(map = |&x: &Self| x.bits())]
+    /// Flags to indicate which handicap(s) to set.
     pub struct PlayerHandicapFlags: u8 {
          const SET_MASS = (1 << 0);
          const SET_TRES = (1 << 1);
@@ -21,26 +18,33 @@ bitflags::bitflags! {
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[bw(assert(*h_mass <= 200))]
 #[bw(assert(*h_tres <= 50))]
+/// Set the handicaps for a given player
 pub struct PlayerHandicap {
+    /// Player's unique ID
     pub plid: PlayerId,
+    /// Handicaps values to set
     pub flags: PlayerHandicapFlags,
+    /// Additional mass. Ensure that the flag `SET_MASS` is enabled.
     pub h_mass: u8,
+    /// Additional intake restriction. Ensure that the flag `SET_TRES` is enabled
     pub h_tres: u8,
 }
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Player handicaps
 pub struct Plh {
+    /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
     #[bw(calc = hcap.len() as u8)]
     nump: u8,
 
+    /// List of handicaps by player
     #[br(count = nump)]
     pub hcap: Vec<PlayerHandicap>,
 }

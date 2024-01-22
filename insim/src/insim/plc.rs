@@ -1,22 +1,22 @@
 use indexmap::{set::Iter as IndexSetIter, IndexSet};
 use insim_core::{
     binrw::{self, binrw},
-    identifiers::{ConnectionId, RequestId},
     vehicle::Vehicle,
 };
 
-use crate::error::Error;
-
-#[cfg(feature = "serde")]
-use serde::Serialize;
+use crate::{
+    error::Error,
+    identifiers::{ConnectionId, RequestId},
+};
 
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
-pub struct PlcAllowedCars {
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+/// Wrapper for IndexSet to allow the management of allowed vehicles, for the [Plc] packet.
+pub struct PlcAllowedCarsSet {
     inner: IndexSet<Vehicle>,
 }
 
-impl PlcAllowedCars {
+impl PlcAllowedCarsSet {
     const XF_GTI: u32 = (1 << 1);
     const XR_GT: u32 = (1 << 2);
     const XR_GT_TURBO: u32 = (1 << 3);
@@ -38,10 +38,12 @@ impl PlcAllowedCars {
     const BWM_SAUBER_F1_06: u32 = (1 << 19);
     const FORMULA_BMW_FB02: u32 = (1 << 20);
 
+    /// Does this set include a vehicle?
     pub fn contains(&self, v: &Vehicle) -> bool {
         self.inner.contains(v)
     }
 
+    /// Attempt to add a vehicle.
     pub fn insert(&mut self, v: Vehicle) -> Result<bool, Error> {
         match v {
             Vehicle::Mod(_) | Vehicle::Unknown => Err(Error::VehicleNotStandard),
@@ -49,26 +51,32 @@ impl PlcAllowedCars {
         }
     }
 
+    /// Remove a vehicle, if it's included in the set.
     pub fn remove(&mut self, v: &Vehicle) -> bool {
         self.inner.remove(v)
     }
 
+    /// Is this set empty?
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 
+    /// Clear the set.
     pub fn clear(&mut self) {
         self.inner.clear()
     }
 
+    /// Iterate through the set.
     pub fn iter(&self) -> IndexSetIter<'_, Vehicle> {
         self.inner.iter()
     }
 
+    /// Number of items in the set.
     pub fn len(&self) -> usize {
         self.inner.len()
     }
 
+    /// Transform the network representation of the set into [PlcAllowedCarsSet].
     pub fn from_bits_truncate(value: u32) -> Self {
         let mut data = IndexSet::default();
 
@@ -136,6 +144,7 @@ impl PlcAllowedCars {
         Self { inner: data }
     }
 
+    /// Output the network representation of this [PlcAllowedCarsSet].
     pub fn bits(&self) -> u32 {
         let mut data: u32 = 0;
 
@@ -171,18 +180,21 @@ impl PlcAllowedCars {
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
-/// Player Cars
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+/// Player ALlowed Cars. Allows you to restrict access to the standard (non-mod) vehicles.
 pub struct Plc {
+    /// Non-zero if the packet is a packet request or a reply to a request
     #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
+    /// Unique connection id to change
     #[brw(pad_before = 3)]
     pub ucid: ConnectionId,
 
-    #[br(map = PlcAllowedCars::from_bits_truncate)]
-    #[bw(map = |x: &PlcAllowedCars| x.bits())]
-    pub allowed_cars: PlcAllowedCars,
+    /// Player's allow cars
+    #[br(map = PlcAllowedCarsSet::from_bits_truncate)]
+    #[bw(map = |x: &PlcAllowedCarsSet| x.bits())]
+    pub allowed_cars: PlcAllowedCarsSet,
 }
 
 #[cfg(test)]
@@ -191,7 +203,7 @@ mod tests {
 
     #[test]
     fn test_hashset_xrg() {
-        let mut allowed = PlcAllowedCars::default();
+        let mut allowed = PlcAllowedCarsSet::default();
 
         assert!(allowed.insert(Vehicle::Unknown).is_err());
         assert!(allowed.insert(Vehicle::Mod(1)).is_err());
@@ -199,8 +211,9 @@ mod tests {
         allowed.insert(Vehicle::Xfg).unwrap();
         allowed.insert(Vehicle::Xrg).unwrap();
 
-        let reversed =
-            PlcAllowedCars::from_bits_truncate(PlcAllowedCars::XR_GT | PlcAllowedCars::XF_GTI);
+        let reversed = PlcAllowedCarsSet::from_bits_truncate(
+            PlcAllowedCarsSet::XR_GT | PlcAllowedCarsSet::XF_GTI,
+        );
 
         assert!(
             reversed.contains(&Vehicle::Xrg)

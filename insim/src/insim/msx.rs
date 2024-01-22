@@ -1,20 +1,20 @@
 use insim_core::{
     binrw::{self, binrw},
-    identifiers::RequestId,
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
 };
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
+use crate::identifiers::RequestId;
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Extended Message (like [Mst](super::Mst), but longer)
 pub struct Msx {
+    /// Non-zero if the packet is a packet request or a reply to a request
     #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
+    /// Message
     #[bw(write_with = binrw_write_codepage_string::<96, _>)]
     #[br(parse_with = binrw_parse_codepage_string::<96, _>)]
     pub msg: String,
@@ -25,8 +25,7 @@ mod tests {
     use insim_core::binrw::BinWrite;
     use std::io::Cursor;
 
-    use super::Msx;
-    use crate::core::identifiers::RequestId;
+    use super::*;
 
     #[test]
     fn test_msx() {

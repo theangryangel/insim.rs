@@ -1,23 +1,22 @@
-use insim_core::{
-    binrw::{self, binrw},
-    identifiers::RequestId,
-};
+use insim_core::binrw::{self, binrw};
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
+use crate::identifiers::RequestId;
 
 use super::StaFlags;
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// State Flags Pack
 pub struct Sfp {
+    /// Non-zero if the packet is a packet request or a reply to a request
     #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
+    /// The state to set/change. See [StaFlags].
     pub flag: StaFlags,
 
+    /// Turn the state on or off
     #[brw(pad_after = 1)]
     pub onoff: u8,
 }
