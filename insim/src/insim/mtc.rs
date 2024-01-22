@@ -1,26 +1,30 @@
 use insim_core::{
     binrw::{self, binrw},
-    identifiers::{ConnectionId, PlayerId, RequestId},
     string::{binrw_parse_codepage_string_until_eof, binrw_write_codepage_string},
 };
 
-pub use super::SoundType;
-
-#[cfg(feature = "serde")]
-use serde::Serialize;
+use super::SoundType;
+use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Message to Connection - Send a message to a specific connection, restricted to hosts only
 pub struct Mtc {
+    /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
+
+    /// See [SoundType].
     pub sound: SoundType,
 
+    /// Unique connection id
     pub ucid: ConnectionId,
+
+    /// Unique player id
     #[brw(pad_after = 2)]
     pub plid: PlayerId,
 
+    /// Message
     #[bw(write_with = binrw_write_codepage_string::<128, _>, args(false, 4))]
     #[br(parse_with = binrw_parse_codepage_string_until_eof)]
     pub msg: String,
@@ -28,14 +32,10 @@ pub struct Mtc {
 
 #[cfg(test)]
 mod tests {
-    use insim_core::{
-        binrw::BinWrite,
-        identifiers::{ConnectionId, PlayerId},
-    };
+    use insim_core::binrw::BinWrite;
     use std::io::Cursor;
 
-    use super::{Mtc, SoundType};
-    use crate::core::identifiers::RequestId;
+    use super::*;
 
     #[test]
     fn test_mtc_valid() {

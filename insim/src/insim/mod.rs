@@ -1,5 +1,7 @@
 //! Definitions for the Insim packets and related bitflags, enums, etc.
 
+mod racelaps;
+
 mod acr;
 mod axi;
 mod axm;
@@ -62,6 +64,8 @@ mod uco;
 mod ver;
 mod vtn;
 
+pub use racelaps::RaceLaps;
+
 pub use acr::{Acr, AcrResult};
 pub use axi::Axi;
 pub use axm::{Axm, ObjectInfo, PmoAction};
@@ -101,7 +105,7 @@ pub use oco::{Oco, OcoAction, OcoIndex, OcoLights};
 pub use pen::{Pen, PenaltyInfo, PenaltyReason};
 pub use pfl::Pfl;
 pub use pit::{Pit, PitLaneFact, Pla, Psf};
-pub use plc::{Plc, PlcAllowedCars};
+pub use plc::{Plc, PlcAllowedCarsSet};
 pub use plh::{PlayerHandicap, Plh};
 pub use pll::Pll;
 pub use plp::Plp;
@@ -110,7 +114,7 @@ pub use res::Res;
 pub use rip::{Rip, RipError};
 pub use rst::{HostFacts, Rst};
 pub use scc::Scc;
-pub use sch::{Sch, SchFlags};
+pub use sch::{Sch, SchModifiers};
 pub use sfp::Sfp;
 pub use slc::Slc;
 pub use small::{LclFlags, LcsFlags, Small, SmallType};

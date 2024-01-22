@@ -1,22 +1,25 @@
-use insim_core::{
-    binrw::{self, binrw},
-    identifiers::{ConnectionId, RequestId},
-};
+use insim_core::binrw::{self, binrw};
+
+use crate::identifiers::{ConnectionId, RequestId};
 
 /// Enum for the action field of [Vtn].
 #[binrw]
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
 pub enum VtnAction {
+    /// No vote, or cancel vote
     #[default]
     None = 0,
 
+    /// Vote to end race
     End = 1,
 
+    /// Vote to restart race
     Restart = 2,
 
+    /// Vote to qualify
     Qualify = 3,
 }
 
@@ -44,19 +47,19 @@ impl From<&VtnAction> for u32 {
     }
 }
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
-
 #[binrw]
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Vote Notification
 pub struct Vtn {
+    /// Non-zero if the packet is a packet request or a reply to a request
     #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
+    /// The unique connection id of the connection that voted
     pub ucid: ConnectionId,
 
+    /// The action or fact for this vote notification
     #[brw(pad_after = 2)]
     pub action: VtnAction,
 }

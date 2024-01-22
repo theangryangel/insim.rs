@@ -1,28 +1,42 @@
 use insim_core::{
     binrw::{self, binrw},
-    identifiers::{ConnectionId, RequestId},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
 };
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
+use crate::identifiers::{ConnectionId, RequestId};
+
+bitflags::bitflags! {
+    /// Additional facts about this connection. Used within [Ncn].
+    #[binrw]
+    #[br(map = Self::from_bits_truncate)]
+    #[bw(map = |&x: &Self| x.bits())]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    pub struct NcnFlags: u8 {
+        /// User is remote
+        const REMOTE = (1 << 2);
+    }
+}
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// New Connection
 pub struct Ncn {
+    /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
+
+    /// Unique connection id of new connection
     pub ucid: ConnectionId,
 
-    /// Username.
+    /// LFS.net username.
     #[bw(write_with = binrw_write_codepage_string::<24, _>)]
     #[br(parse_with = binrw_parse_codepage_string::<24, _>)]
     pub uname: String,
 
     #[bw(write_with = binrw_write_codepage_string::<24, _>)]
     #[br(parse_with = binrw_parse_codepage_string::<24, _>)]
-    /// Playername.
+    /// Player Name.
     pub pname: String,
 
     /// true if administrative user.
@@ -34,5 +48,6 @@ pub struct Ncn {
     pub total: u8,
 
     #[brw(pad_after = 1)]
-    pub flags: u8,
+    /// Flags describing additional facts about this connection
+    pub flags: NcnFlags,
 }

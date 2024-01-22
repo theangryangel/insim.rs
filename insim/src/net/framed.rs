@@ -16,6 +16,7 @@ use super::websocket::TungsteniteWebSocket;
 
 /// A unified wrapper around anything that implements [TryReadWriteBytes].
 /// You probably really want to look at [Framed].
+#[derive(Debug)]
 pub struct FramedInner<N>
 where
     N: TryReadWriteBytes,

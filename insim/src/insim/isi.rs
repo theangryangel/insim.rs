@@ -3,13 +3,12 @@ use std::time::Duration;
 use insim_core::{
     binrw::{self, binrw},
     duration::{binrw_parse_duration, binrw_write_duration},
-    identifiers::RequestId,
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
 };
 
 use bitflags::bitflags;
 
-use crate::VERSION;
+use crate::{identifiers::RequestId, VERSION};
 
 bitflags! {
     /// Flags for the [Init] packet flags field.
@@ -18,21 +17,42 @@ bitflags! {
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     #[br(map = Self::from_bits_truncate)]
     #[bw(map = |&x: &Self| x.bits())]
+    /// Flags for [Isi], used to indicate what behaviours we want to opt into
     pub struct IsiFlags: u16 {
-         const LOCAL = (1 << 2);	// bit  2: guest or single player
-         const MSO_COLS = (1 << 3);	// bit  3: keep colours in MSO text
-         const NLP = (1 << 4);	// bit  4: receive NLP packets
-         const MCI = (1 << 5);	// bit  5: receive MCI packets
-         const CON = (1 << 6);	// bit  6: receive CON packets
-         const OBH = (1 << 7);	// bit  7: receive OBH packets
-         const HLV = (1 << 8);	// bit  8: receive HLV packets
-         const AXM_LOAD = (1 << 9);	// bit  9: receive AXM when loading a layout
-         const AXM_EDIT = (1 << 10);	// bit 10: receive AXM when changing objects
-         const REQ_JOIN = (1 << 11);	// bit 11: process join requests
+        /// Guest or single player
+        const LOCAL = (1 << 2);
+
+        /// Keep colours in MSO text
+        const MSO_COLS = (1 << 3);
+
+        /// Receive NLP packets
+        const NLP = (1 << 4);
+
+        /// Receive MCI packets
+        const MCI = (1 << 5);
+
+        /// Receive CON packets
+        const CON = (1 << 6);
+
+        /// Receive OBH packets
+        const OBH = (1 << 7);
+
+        /// Receive HLV packets
+        const HLV = (1 << 8);
+
+        /// Rceive AXM when loading a layout
+        const AXM_LOAD = (1 << 9);
+
+        /// Receive AXM when changing objects
+        const AXM_EDIT = (1 << 10);
+
+        /// Process join requests
+        const REQ_JOIN = (1 << 11);
     }
 }
 
 impl IsiFlags {
+    /// Clear all flags
     pub fn clear(&mut self) {
         *self.0.bits_mut() = 0;
     }
@@ -98,8 +118,8 @@ impl Default for Isi {
 
 #[cfg(test)]
 mod tests {
-    use crate::VERSION;
-    use insim_core::{binrw::BinWrite, identifiers::RequestId};
+    use crate::{identifiers::RequestId, VERSION};
+    use insim_core::binrw::BinWrite;
     use std::{io::Cursor, time::Duration};
 
     use super::Isi;

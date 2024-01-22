@@ -2,18 +2,17 @@ use std::net::Ipv4Addr;
 
 use insim_core::{
     binrw::{self, binrw},
-    identifiers::{ConnectionId, RequestId},
     license::License,
 };
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
+use crate::identifiers::{ConnectionId, RequestId};
 
 #[binrw]
 #[derive(Debug, Default, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
+/// Language
 pub enum ILanguage {
     #[default]
     English = 0,
@@ -57,20 +56,27 @@ pub enum ILanguage {
 
 #[binrw]
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Extra information about the new connection. This is only sent when connected to a game server,
 /// and only if an administrative password has been set and used by Insim.
 pub struct Nci {
+    /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
+
+    /// Unique connection ID
     pub ucid: ConnectionId,
 
+    /// Language
     pub language: ILanguage,
 
+    /// License level.
     #[brw(pad_after = 2)]
     pub license: License,
 
+    /// LFS.net player ID
     pub user_id: u32,
 
+    /// Originating IP address
     #[br(map = |x: u32| Ipv4Addr::from(x) )]
     #[bw(map = |&x: &Ipv4Addr| u32::from(x) )]
     pub ip_addr: Ipv4Addr,

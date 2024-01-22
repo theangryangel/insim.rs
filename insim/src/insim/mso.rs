@@ -1,16 +1,14 @@
 use insim_core::{
     binrw::{self, binrw},
-    identifiers::{ConnectionId, PlayerId, RequestId},
     string::{binrw_parse_codepage_string_until_eof, binrw_write_codepage_string},
 };
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
+use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 /// Enum for the sound field of [Mso].
 #[binrw]
 #[derive(Debug, Default, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
 pub enum MsoUserType {
@@ -30,19 +28,26 @@ pub enum MsoUserType {
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// System messsages and user messages, variable sized.
 pub struct Mso {
+    /// Non-zero if the packet is a packet request or a reply to a request
     #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
+    /// Unique connection id
     pub ucid: ConnectionId,
+
+    /// Unique player id
     pub plid: PlayerId,
+
     /// Set if typed by a user
     pub usertype: MsoUserType,
+
     /// Index of the first character of user entered text, in msg field.
     pub textstart: u8,
 
+    /// Message
     #[bw(write_with = binrw_write_codepage_string::<128, _>, args(false, 4))]
     #[br(parse_with = binrw_parse_codepage_string_until_eof)]
     pub msg: String,
@@ -50,8 +55,8 @@ pub struct Mso {
 
 #[cfg(test)]
 mod tests {
-    use super::{Mso, MsoUserType};
-    use crate::core::identifiers::{ConnectionId, PlayerId, RequestId};
+    use super::*;
+
     use bytes::{BufMut, BytesMut};
     use insim_core::binrw::{BinRead, BinWrite};
     use std::io::Cursor;

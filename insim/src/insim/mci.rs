@@ -1,32 +1,40 @@
 use insim_core::{
     binrw::{self, binrw},
-    identifiers::{PlayerId, RequestId},
     point::Point,
 };
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
+use crate::identifiers::{PlayerId, RequestId};
 
 use bitflags::bitflags;
 
 bitflags! {
     #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     #[br(map = Self::from_bits_truncate)]
     #[bw(map = |&x: &Self| x.bits())]
+    /// Additional Car Info.
     pub struct CompCarInfo: u8 {
+        /// This car is in the way of a driver who is a lap ahead
         const BLUE_FLAG = (1 << 0);
+
+        /// This car is slow or stopped and in a dangerous place
         const YELLOW_FLAG = (1 << 1);
+
+        /// This car is lagging (missing or delayed position packets)
         const LAGGING = (1 << 5);
+
+        /// This is the first compcar in this set of MCI packets
         const FIRST = (1 << 6);
+
+        /// This is the last compcar in this set of MCI packets
         const LAST = (1 << 7);
     }
 }
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Used within the [Mci] packet info field.
 pub struct CompCar {
     /// Index of the last "node" that the player passed through.
@@ -67,16 +75,18 @@ pub struct CompCar {
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Multi Car Info - positional information for players/vehicles.
 /// The MCI packet does not contain the positional information for all players. Only some. The
 /// maximum number of players depends on the version of Insim.
 pub struct Mci {
+    /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
     #[bw(calc = info.len() as u8)]
     numc: u8,
 
+    /// Node and lap for a subset of players. Not all players may be included in a single packet.
     #[br(count = numc)]
     pub info: Vec<CompCar>,
 }

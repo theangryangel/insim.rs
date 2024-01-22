@@ -1,23 +1,23 @@
-use binrw::binrw;
+use insim_core::binrw::{self as binrw, binrw};
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-/// Request Identifier, commonly referred to as reqi in Insim.txt
+/// Unique Player Identifier, commonly referred to as PLID in Insim.txt
 #[binrw]
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
-pub struct RequestId(pub u8);
+pub struct PlayerId(pub u8);
 
-impl fmt::Display for RequestId {
+impl fmt::Display for PlayerId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl Deref for RequestId {
+impl Deref for PlayerId {
     type Target = u8;
 
     fn deref(&self) -> &Self::Target {
@@ -25,7 +25,7 @@ impl Deref for RequestId {
     }
 }
 
-impl DerefMut for RequestId {
+impl DerefMut for PlayerId {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }

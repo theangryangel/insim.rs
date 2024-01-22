@@ -1,16 +1,14 @@
 use insim_core::{
     binrw::{self, binrw},
-    identifiers::RequestId,
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
 };
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
+use crate::identifiers::RequestId;
 
 /// Send a HostSelect to the relay in order to start receiving information about the selected host.
 #[binrw]
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct HostSelect {
     #[brw(pad_after = 1)]
     pub reqi: RequestId,

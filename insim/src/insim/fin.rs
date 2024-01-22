@@ -3,11 +3,9 @@ use std::time::Duration;
 use insim_core::{
     binrw::{self, binrw},
     duration::{binrw_parse_duration, binrw_write_duration},
-    identifiers::{PlayerId, RequestId},
 };
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
+use crate::identifiers::{PlayerId, RequestId};
 
 use bitflags::bitflags;
 
@@ -16,7 +14,7 @@ use super::PlayerFlags;
 bitflags! {
     #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     #[br(map = Self::from_bits_truncate)]
     #[bw(map = |&x: &Self| x.bits())]
     pub struct RaceResultFlags: u8 {
@@ -46,7 +44,7 @@ impl RaceResultFlags {
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Provisional finish notification: This is not a final result, you should use the [Res](super::Res) packet for this instead.
 pub struct Fin {
     pub reqi: RequestId,

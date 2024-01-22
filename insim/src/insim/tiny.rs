@@ -1,17 +1,15 @@
-use insim_core::{
-    binrw::{self, binrw},
-    identifiers::RequestId,
-};
+use insim_core::binrw::{self, binrw};
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
+use crate::identifiers::RequestId;
 
 #[binrw]
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
+/// [Tiny] Subtype
 pub enum TinyType {
+    /// Keepalive request/response
     #[default]
     None = 0,
 
@@ -102,15 +100,18 @@ pub enum TinyType {
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// General purpose Tiny packet
 pub struct Tiny {
+    /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
+    /// Packet subtype
     pub subt: TinyType,
 }
 
 impl Tiny {
+    /// Is this a keepalive/ping request?
     pub fn is_keepalive(&self) -> bool {
         self.subt == TinyType::None && self.reqi == RequestId(0)
     }

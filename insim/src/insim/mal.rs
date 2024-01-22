@@ -1,14 +1,13 @@
-use crate::error::Error;
+use crate::{
+    error::Error,
+    identifiers::{ConnectionId, RequestId},
+};
 use indexmap::{set::Iter as IndexSetIter, IndexSet};
 use insim_core::{
     binrw::{self, binrw, BinRead, BinResult, BinWrite},
-    identifiers::{ConnectionId, RequestId},
     vehicle::Vehicle,
 };
 use std::default::Default;
-
-#[cfg(feature = "serde")]
-use serde::Serialize;
 
 const MAX_MAL_SIZE: usize = 120;
 
@@ -38,10 +37,10 @@ fn binrw_write_mal_allowed_mods(input: &IndexSet<Vehicle>) -> BinResult<()> {
 #[binrw]
 #[bw(assert(allowed_mods.len() <= MAX_MAL_SIZE))]
 #[derive(Debug, Clone, Default, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Mods Allowed - restrict the mods that can be used
 pub struct Mal {
-    /// RequestId
+    /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
     /// Number of mods in this packet

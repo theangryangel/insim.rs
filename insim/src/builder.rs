@@ -1,6 +1,5 @@
 use std::{fmt::Debug, net::SocketAddr, time::Duration};
 
-use insim_core::identifiers::RequestId;
 use tokio::{io::BufWriter, time::timeout};
 
 use crate::{
@@ -8,6 +7,7 @@ use crate::{
     net::{Codec, Framed, FramedInner, Mode},
     relay::HostSelect,
     result::Result,
+    identifiers::RequestId
 };
 
 #[derive(Clone, Debug, Default)]

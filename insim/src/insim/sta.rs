@@ -1,21 +1,18 @@
 use insim_core::{
     binrw::{self, binrw},
-    identifiers::{PlayerId, RequestId},
-    racelaps::RaceLaps,
     track::Track,
     wind::Wind,
 };
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
+use crate::identifiers::{PlayerId, RequestId};
 
 use bitflags::bitflags;
 
-use super::CameraView;
+use super::{CameraView, RaceLaps};
 
 #[binrw]
 #[derive(Debug, Default, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
 pub enum StaRacing {
@@ -34,7 +31,7 @@ bitflags! {
     /// Bitwise flags used within the [Sta] packet
     #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     #[br(map = Self::from_bits_truncate)]
     #[bw(map = |&x: &Self| x.bits())]
     pub struct StaFlags: u16 {
@@ -90,15 +87,17 @@ bitflags! {
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// State
 pub struct Sta {
     #[brw(pad_after = 1)]
+    /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
     /// 1.0 is normal speed
     pub replayspeed: f32,
 
+    /// State of the game
     pub flags: StaFlags,
     /// Which type of camera is selected
     pub ingamecam: CameraView,
@@ -114,13 +113,21 @@ pub struct Sta {
     /// Race status
     pub raceinprog: StaRacing,
 
+    /// Qualifying minutes
     pub qualmins: u8,
     #[brw(pad_after = 1)]
+    // Number of laps
     pub racelaps: RaceLaps,
+
+    /// Server status
     pub serverstatus: u8, // serverstatus isn't an enum, unfortunately
 
+    /// The track
     pub track: Track,
+    /// Weather conditions
     pub weather: u8, // TODO: Weather is track dependant?!
+
+    /// Wind conditions
     pub wind: Wind,
 }
 

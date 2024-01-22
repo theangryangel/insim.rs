@@ -2,20 +2,16 @@ use std::time::Duration;
 
 use bitflags::bitflags;
 
-use insim_core::{
-    binrw::{self, binrw, BinRead, BinWrite},
-    identifiers::RequestId,
-};
+use insim_core::binrw::{self, binrw, BinRead, BinWrite};
 
-#[cfg(feature = "serde")]
-use serde::Serialize;
+use crate::identifiers::RequestId;
 
-use super::{PlcAllowedCars, VtnAction};
+use super::{PlcAllowedCarsSet, VtnAction};
 
 bitflags! {
     /// Bitwise flags used within the [SmallType] packet, Lcs
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     pub struct LcsFlags: u32 {
         const SET_SIGNALS = (1 << 0);
         const SET_FLASH = (1 << 1);
@@ -50,7 +46,7 @@ bitflags! {
 bitflags! {
     /// Bitwise flags used within the [SmallType] packet, Lcl
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     pub struct LclFlags: u32 {
         const SET_SIGNALS = (1 << 0);
         const SET_LIGHTS = (1 << 2);
@@ -80,8 +76,9 @@ bitflags! {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum SmallType {
+    /// Nothing!
     None,
 
     /// Request LFS to start sending positions
@@ -106,7 +103,7 @@ pub enum SmallType {
     Nli(Duration),
 
     /// Set or get allowed cars (Tiny, type = Alc)
-    Alc(PlcAllowedCars),
+    Alc(PlcAllowedCarsSet),
 
     /// Set local car switches
     Lcs(LcsFlags),
@@ -141,7 +138,7 @@ impl BinRead for SmallType {
             5 => Self::Stp(Duration::from_millis(uval as u64 * 10)),
             6 => Self::Rtp(Duration::from_millis(uval as u64 * 10)),
             7 => Self::Nli(Duration::from_millis(uval as u64)),
-            8 => Self::Alc(PlcAllowedCars::from_bits_truncate(uval)),
+            8 => Self::Alc(PlcAllowedCarsSet::from_bits_truncate(uval)),
             9 => Self::Lcs(LcsFlags::from_bits_truncate(uval)),
             10 => Self::Lcl(LclFlags::from_bits_truncate(uval)),
             _ => {
@@ -187,11 +184,13 @@ impl BinWrite for SmallType {
 
 #[binrw]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// General purpose Small packet
 pub struct Small {
+    /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
+    /// Small subtype.
     pub subt: SmallType,
 }
 
