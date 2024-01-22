@@ -9,7 +9,21 @@ use insim_core::{
 use crate::identifiers::{ClickId, ConnectionId, RequestId};
 
 bitflags::bitflags! {
-    /// Bitwise flags used within the [Sta] packet
+    #[binrw]
+    #[br(map = Self::from_bits_truncate)]
+    #[bw(map = |&x: &Self| x.bits())]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    /// Bitwise flags used within the [Btn] packet
+    /// Mainly used internally by InSim but also provides some extra user flags
+    pub struct BtnInst: u8 {
+        /// If this bit is set the button is visible in all screens
+        const ALWAYSON = (1 << 7);
+    }
+}
+
+bitflags::bitflags! {
+    /// Bitwise flags used within the [Btn] packet
     #[binrw]
     #[br(map = Self::from_bits_truncate)]
     #[bw(map = |&x: &Self| x.bits())]
@@ -114,8 +128,8 @@ pub struct Bfn {
     /// If subt is BFN_DEL_BTN: ID of last button in range (if greater than ClickID)
     pub clickmax: u8,
 
-    /// Used internally by InSim
-    inst: u8,
+    /// Priarmily used internally by LFS
+    pub inst: BtnInst,
 }
 
 #[binrw]
@@ -130,8 +144,10 @@ pub struct Btn {
 
     /// Button ID (0 to 239)
     pub clickid: ClickId,
-    // TODO
-    pub inst: u8,
+
+    /// Primarily used internally by LFS
+    pub inst: BtnInst,
+
     /// Button style flags
     pub bstyle: BtnStyleFlags,
 
@@ -188,8 +204,8 @@ pub struct Btc {
     /// Button identifier originally sent in IS_BTN
     pub clickid: ClickId,
 
-    // XXX: Used internally by LFS
-    inst: u8,
+    /// Primarily used internally by LFS
+    pub inst: BtnInst,
 
     /// Button click flags
     #[brw(pad_after = 1)]
@@ -203,14 +219,14 @@ pub struct Btc {
 pub struct Btt {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
-    // Connection that typed into the button (zero if local)
+    /// Connection that typed into the button (zero if local)
     pub ucid: ConnectionId,
 
-    // Button identifier originally sent in IS_BTN
+    /// Button identifier originally sent in IS_BTN
     pub clickid: ClickId,
 
-    // XXX: Used internally by LFS
-    inst: u8,
+    /// Primarily used internally by LFS
+    pub inst: BtnInst,
 
     #[brw(pad_after = 1)]
     /// From original button specification (IS_BTN)

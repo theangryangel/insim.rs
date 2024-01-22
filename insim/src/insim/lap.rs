@@ -16,8 +16,10 @@ use super::{PenaltyInfo, PlayerFlags};
 #[derive(Debug, Default, Clone)]
 /// When /showfuel yes: double fuel percent / no: 255
 pub enum Fuel200 {
+    /// Double fuel percent
     Percentage(u8),
 
+    /// Fuel cannot be reported, /showfuel=no
     #[default]
     No,
 }
@@ -63,8 +65,10 @@ impl BinRead for Fuel200 {
 #[derive(Debug, Default, Clone)]
 /// When /showfuel yes: fuel added percent / no: 255
 pub enum Fuel {
+    /// Double fuel percent
     Percentage(u8),
 
+    /// Fuel cannot be reported, /showfuel=no
     #[default]
     No,
 }
@@ -114,7 +118,7 @@ pub struct Lap {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
-    // Unique player ID
+    /// Unique player ID
     pub plid: PlayerId,
 
     #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]

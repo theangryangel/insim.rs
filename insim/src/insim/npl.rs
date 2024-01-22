@@ -52,6 +52,8 @@ bitflags! {
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     #[br(map = Self::from_bits_truncate)]
     #[bw(map = |&x: &Self| x.bits())]
+    /// Describes the setup of a player and the various helpers that may be enabled, such as
+    /// auto-clutch, etc.
     pub struct PlayerFlags: u16 {
         /// Left side
         const LEFTSIDE = (1 << 0);
@@ -89,7 +91,7 @@ bitflags! {
     #[bw(map = |&x: &Self| x.bits())]
     /// Setup Flags
     pub struct SetFlags: u8 {
-        // Symmetric wheels
+        /// Symmetric wheels
         const SYMM_WHEELS = (1 << 0);
         /// Traction Control enabled
         const TC_ENABLE = (1 << 1);

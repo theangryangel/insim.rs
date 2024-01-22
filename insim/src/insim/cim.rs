@@ -28,7 +28,7 @@ pub enum CimMode {
     /// Track select screen
     TrackSelect = 5,
 
-    // Shift+U mode
+    /// Shift+U mode
     ShiftU = 6,
 }
 

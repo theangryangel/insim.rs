@@ -15,7 +15,8 @@ use super::{CameraView, RaceLaps};
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
-pub enum StaRacing {
+/// Game racing state
+pub enum RaceInProgress {
     /// No race in progress
     #[default]
     No = 0,
@@ -28,17 +29,17 @@ pub enum StaRacing {
 }
 
 bitflags! {
-    /// Bitwise flags used within the [Sta] packet
     #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     #[br(map = Self::from_bits_truncate)]
     #[bw(map = |&x: &Self| x.bits())]
+    /// Describes the game state
     pub struct StaFlags: u16 {
         /// In Game (or Multiplayer Replay)
         const GAME = (1 << 0);
 
-        // In Singleplayer Relay
+        /// In Singleplayer Replay
         const REPLAY = (1 << 1);
 
         /// Paused
@@ -111,12 +112,12 @@ pub struct Sta {
     /// Number of finished or qualifying players
     pub numfinished: u8,
     /// Race status
-    pub raceinprog: StaRacing,
+    pub raceinprog: RaceInProgress,
 
     /// Qualifying minutes
     pub qualmins: u8,
     #[brw(pad_after = 1)]
-    // Number of laps
+    /// Number of laps
     pub racelaps: RaceLaps,
 
     /// Server status
@@ -132,6 +133,7 @@ pub struct Sta {
 }
 
 impl Sta {
+    /// Is server status healthy?
     pub fn is_server_status_ok(&self) -> bool {
         self.serverstatus == 1
     }

@@ -25,9 +25,8 @@ pub enum SoundType {
     /// Invalid key "ping"
     InvalidKey = 3,
 
-    // This is referred to as "Error" in the Insim documentation, but this is a special word in
-    // rust so I'm trying to avoid it.
-    Failure = 4,
+    /// Error "ping"
+    Error = 4,
 }
 
 #[binrw]

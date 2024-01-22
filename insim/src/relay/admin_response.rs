@@ -12,5 +12,8 @@ pub struct AdminResponse {
     /// included in any relevant response packet.
     pub reqi: RequestId,
 
-    pub admin: u8,
+    #[br(map = |x: u8| x != 0)]
+    #[bw(map = |&x| x as u8)]
+    /// true if we are an admin
+    pub admin: bool,
 }

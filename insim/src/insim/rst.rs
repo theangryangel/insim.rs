@@ -64,12 +64,12 @@ pub struct Rst {
     pub flags: HostFacts,
     /// Total number of nodes in the path
     pub numnodes: u16,
-    // The index of the finish node
+    /// The index of the finish node
     pub finish: u16,
-    // The index of the split1 node
+    /// The index of the split1 node
     pub split1: u16,
-    // The index of the split2 node
+    /// The index of the split2 node
     pub split2: u16,
-    // The index of the split3 node
+    /// The index of the split3 node
     pub split3: u16,
 }

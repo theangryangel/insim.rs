@@ -44,7 +44,7 @@ pub enum CnlReason {
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-// Connection Leave
+/// Connection Leave
 pub struct Cnl {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,

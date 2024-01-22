@@ -27,7 +27,7 @@ pub struct Spx {
 
     #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
     #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
-    // Total elapsed time
+    /// Total elapsed time
     pub etime: Duration,
 
     /// Split number

@@ -32,7 +32,7 @@ pub enum CameraView {
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-// Camera Change - sent when an existing driver changes camera
+/// Camera Change - sent when an existing driver changes camera
 pub struct Cch {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,

@@ -75,6 +75,8 @@ pub struct Isi {
     /// Options for the Insim Connection. See [IsiFlags] for more information.
     pub flags: IsiFlags,
 
+    /// Insim protocol version. Unless you have a good reason you should probably leave this as the
+    /// default value of [crate::VERSION].
     pub version: u8,
 
     /// Messages typed with this prefix will be sent to your InSim program

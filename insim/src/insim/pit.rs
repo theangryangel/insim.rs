@@ -66,7 +66,7 @@ pub struct Pit {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
-    // Players unique ID
+    /// Players unique ID
     pub plid: PlayerId,
 
     /// Laps completed

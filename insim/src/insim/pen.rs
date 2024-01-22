@@ -28,7 +28,7 @@ pub enum PenaltyInfo {
     /// 30 Seconds added
     Seconds30 = 5,
 
-    // 45 seconds added
+    /// 45 seconds added
     Seconds45 = 6,
 }
 

@@ -9,20 +9,26 @@ use crate::identifiers::RequestId;
 use bitflags::bitflags;
 
 bitflags! {
-    /// Bitwise flags used within the [HostInfo] packet, which is in turn used by the [HostList]
-    /// packet.
+    /// Provides extended host information
     #[binrw]
     #[br(map = Self::from_bits_truncate)]
     #[bw(map = |&x: &Self| x.bits())]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     pub struct HostInfoFlags: u8 {
+        /// Spectator password is required
          const SPECTATE_PASSWORD_REQUIRED = (1 << 0);
-         const LICENSED = (1 << 1);
-         const S1 = (1 << 2);
-         const S2 = (1 << 3);
-         const FIRST = (1 << 6);
-         const LAST = (1 << 7);
+        /// Is the host licensed?
+        const LICENSED = (1 << 1);
+        /// This host requires a S1 license or greater
+        const S1 = (1 << 2);
+        /// This host requires a S2 license or greater
+        const S2 = (1 << 3);
+
+        /// This is the first of [HostInfo] records
+        const FIRST = (1 << 6);
+        /// This is the last of [HostInfo] records
+        const LAST = (1 << 7);
     }
 }
 
@@ -33,12 +39,16 @@ bitflags! {
 pub struct HostInfo {
     #[br(parse_with = binrw_parse_codepage_string::<32, _>)]
     #[bw(write_with = binrw_write_codepage_string::<32, _>)]
+    /// Hostname
     pub hname: String,
 
+    /// Current track
     pub track: Track,
 
+    /// Extended host information, such as license restrictions
     pub flags: HostInfoFlags,
 
+    /// Total number of connections
     pub numconns: u8,
 }
 

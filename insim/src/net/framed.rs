@@ -31,6 +31,7 @@ impl<N> FramedInner<N>
 where
     N: TryReadWriteBytes,
 {
+    /// Create a new FramedInner, which wraps some kind of network transport.
     pub fn new(inner: N, codec: Codec) -> Self {
         let buffer = BytesMut::new();
 
@@ -42,16 +43,21 @@ where
         }
     }
 
+    /// Modifies whether or not to verify the Insim version
     pub fn verify_version(&mut self, verify_version: bool) {
         self.verify_version = verify_version;
     }
 
+    /// Performs the Insim handshake by sending a [Isi] packet.
+    /// If the handshake does not complete within the given timeout, it will fail and the
+    /// connection should be considered invalid.
     pub async fn handshake(&mut self, isi: Isi, timeout: Duration) -> Result<()> {
         time::timeout(timeout, self.write(isi.into())).await??;
 
         Ok(())
     }
 
+    /// Asynchronously wait for a packet from the inner network.
     pub async fn read(&mut self) -> Result<Packet> {
         loop {
             if_chain! {
@@ -103,6 +109,7 @@ where
         }
     }
 
+    /// Asynchronously write a packet to the inner network.
     pub async fn write(&mut self, packet: Packet) -> Result<()> {
         let buf = self.codec.encode(&packet)?;
         if !buf.is_empty() {
@@ -120,15 +127,20 @@ where
 // i.e. if we add a Websocket option down the line, then ConnectionOptions needs to understand it
 // therefore we cannot just box stuff magically anyway.
 pub enum Framed {
+    /// Tcp
     Tcp(FramedInner<TcpStream>),
+    /// BufferedTcp
     BufferedTcp(FramedInner<BufWriter<TcpStream>>),
+    /// Udp
     Udp(FramedInner<UdpSocket>),
     #[cfg(feature = "websocket")]
+    /// Websocket, primarily intended for use with the LFS World relay.
     WebSocket(FramedInner<TungsteniteWebSocket>),
 }
 
 impl Framed {
     #[tracing::instrument]
+    /// Asynchronously wait for a packet from the inner network.
     pub async fn read(&mut self) -> Result<Packet> {
         let res = match self {
             Self::Tcp(i) => i.read().await,
@@ -142,6 +154,7 @@ impl Framed {
     }
 
     #[tracing::instrument]
+    /// Asynchronously write a packet to the inner network.
     pub async fn write<I: Into<Packet> + Send + Sync + Debug>(&mut self, packet: I) -> Result<()> {
         tracing::debug!("writing packet {:?}", &packet);
         match self {

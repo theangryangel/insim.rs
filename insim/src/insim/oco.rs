@@ -15,7 +15,7 @@ pub enum OcoAction {
     /// Give up control of all lights
     LightsReset = 4,
 
-    //// Use Data byte to set the bulbs
+    /// Use Data byte to set the bulbs
     LightsSet = 5,
 
     /// Give up control of the specified lights

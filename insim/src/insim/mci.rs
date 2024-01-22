@@ -50,6 +50,7 @@ pub struct CompCar {
     pub position: u8,
 
     #[brw(pad_after = 1)]
+    /// Additional information that describes this particular Compcar.
     pub info: CompCarInfo,
 
     /// Positional information for the player, in game units.

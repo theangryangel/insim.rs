@@ -85,6 +85,6 @@ pub struct Obh {
     /// The object index
     pub index: u8,
 
-    // Additional flags and information about the object
+    /// Additional flags and information about the object
     pub flags: ObhFlags,
 }

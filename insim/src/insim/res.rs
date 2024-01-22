@@ -9,7 +9,7 @@ use insim_core::{
 
 use crate::identifiers::{PlayerId, RequestId};
 
-use super::{PlayerFlags, RaceResultFlags};
+use super::{PlayerFlags, RaceConfirmationFlags};
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
@@ -56,7 +56,7 @@ pub struct Res {
 
     /// The result flags. Where they DNF?
     #[brw(pad_after = 1)]
-    pub confirm: RaceResultFlags,
+    pub confirm: RaceConfirmationFlags,
 
     /// The number of laps done
     pub lapsdone: u16,

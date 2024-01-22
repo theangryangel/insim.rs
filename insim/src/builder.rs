@@ -3,11 +3,11 @@ use std::{fmt::Debug, net::SocketAddr, time::Duration};
 use tokio::{io::BufWriter, time::timeout};
 
 use crate::{
+    identifiers::RequestId,
     insim::{Isi, IsiFlags},
     net::{Codec, Framed, FramedInner, Mode},
     relay::HostSelect,
     result::Result,
-    identifiers::RequestId
 };
 
 #[derive(Clone, Debug, Default)]
@@ -187,7 +187,7 @@ impl Builder {
         self
     }
 
-    /// Set the [crate::core::identifiers::RequestId] to be used in the [crate::Packet::Init] packet during connection
+    /// Set the [crate::identifiers::RequestId] to be used in the [crate::Packet::Init] packet during connection
     /// handshake.
     pub fn isi_reqi(mut self, i: RequestId) -> Self {
         self.isi_reqi = i;

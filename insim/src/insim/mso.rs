@@ -22,7 +22,7 @@ pub enum MsoUserType {
     /// Was this message received with the prefix character from the [Isi](super::Isi) message?
     Prefix = 2,
 
-    // Hidden message (due to be retired in Insim v9)
+    /// Hidden message (due to be retired in Insim v9?)
     O = 3,
 }
 

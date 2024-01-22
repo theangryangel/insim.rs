@@ -14,9 +14,10 @@ use crate::identifiers::RequestId;
 #[repr(u8)]
 #[brw(repr(u8))]
 #[non_exhaustive]
+/// Replay Information Error
 pub enum RipError {
     #[default]
-    /// Ok
+    /// Ok - No error!
     Ok = 0,
 
     /// Already at the destination
@@ -82,18 +83,18 @@ pub struct Rip {
     /// 0 or 1 = OK
     pub error: RipError,
 
+    /// Multiplayer replay?
     #[br(map = |x: u8| x != 0)]
     #[bw(map = |&x| x as u8)]
-    /// Multiplayer replay?
     pub mpr: bool,
 
+    /// Paused playback
     #[br(map = |x: u8| x != 0)]
     #[bw(map = |&x| x as u8)]
-    /// Paused playback
     pub paused: bool,
 
-    #[brw(pad_after = 1)]
     /// Misc options. See [RipOptions].
+    #[brw(pad_after = 1)]
     pub options: RipOptions,
 
     /// Request: destination / Reply: position
@@ -101,13 +102,13 @@ pub struct Rip {
     #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
     pub ctime: Duration,
 
-    // Request: zero / reply: replay length
+    /// Request: zero / reply: replay length
     #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
     #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
     pub ttime: Duration,
 
-    #[br(parse_with = binrw_parse_codepage_string::<64, _>)]
+    /// Zero or replay nam
     #[bw(write_with = binrw_write_codepage_string::<64, _>)]
-    /// Zero or replay name
+    #[br(parse_with = binrw_parse_codepage_string::<64, _>)]
     pub rname: String,
 }
