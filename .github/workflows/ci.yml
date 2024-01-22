@@ -14,48 +14,35 @@ jobs:
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v3
       - uses: dtolnay/rust-toolchain@stable
-
-      # get the python version for the cache key
-      - run: echo "PY=$(python -VV | sha256sum | cut -d' ' -f1)" >> $GITHUB_ENV
-
-      - uses: actions/cache@v3
-        with:
-          path: ~/.cache/pre-commit
-          key: pre-commit|${{ env.PY }}|${{ hashFiles('.pre-commit-config.yaml') }}
-
       - uses: pre-commit/action@v3.0.0
 
   test:
     runs-on: ubuntu-latest
+    needs: [pre-commit]
     steps:
-      - uses: actions/checkout@v3
-
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-
       - uses: Swatinem/rust-cache@v2
-
       - name: Run cargo test
         run: cargo test --all
-
       - name: Run cargo doc
         run: cargo doc --no-deps
 
   msrv:
     runs-on: ubuntu-latest
+    needs: [pre-commit]
     steps:
+      - uses: actions/checkout@v4
       - name: Get MSRV from package metadata
         id: msrv
-        run: grep rust-version Cargo.toml | cut -d'"' -f2 | sed 's/^/version=/' >> $GITHUB_OUTPUT
-
-      - name: Install rust (${{ steps.metadata.outputs.msrv }})
+        run: grep rust-version insim/Cargo.toml | cut -d'"' -f2 | sed 's/^/version=/' >> $GITHUB_OUTPUT
+      - name: Install rust (${{ steps.msrv.outputs.version }})
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ steps.metadata.outputs.msrv }}
-
+          toolchain: ${{ steps.msrv.outputs.version }}
       - uses: Swatinem/rust-cache@v2
-
       - name: Run cargo check
         run: cargo check
