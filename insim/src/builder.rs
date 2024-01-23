@@ -236,7 +236,11 @@ impl Builder {
             udpport,
             flags: self.isi_flags,
             admin: self.isi_admin_password.as_deref().unwrap_or("").to_owned(),
-            iname: self.isi_iname.as_deref().unwrap_or("").to_owned(),
+            iname: self
+                .isi_iname
+                .as_deref()
+                .unwrap_or(Isi::DEFAULT_INAME)
+                .to_owned(),
             prefix: self.isi_prefix.unwrap_or(0 as char),
             interval: self.isi_interval.unwrap_or(Duration::ZERO),
             ..Default::default()

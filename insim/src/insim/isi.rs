@@ -103,6 +103,11 @@ pub struct Isi {
     pub iname: String,
 }
 
+impl Isi {
+    /// Default application name
+    pub const DEFAULT_INAME: &'static str = "insim.rs";
+}
+
 impl Default for Isi {
     fn default() -> Self {
         Self {
@@ -113,7 +118,7 @@ impl Default for Isi {
             prefix: 0 as char,
             interval: Duration::default(),
             admin: "".into(),
-            iname: "insim.rs".into(),
+            iname: Self::DEFAULT_INAME.to_owned(),
         }
     }
 }
@@ -152,7 +157,7 @@ mod tests {
             &[b'^', b'J', b'A', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         );
 
-        let mut iname = "insim.rs".to_string().as_bytes().to_owned();
+        let mut iname = Isi::DEFAULT_INAME.as_bytes().to_owned();
         iname.put_bytes(0, 16 - iname.len());
 
         assert_eq!(&buf[26..42], &iname,);
