@@ -108,12 +108,12 @@ pub struct Axm {
     pub ucid: ConnectionId,
 
     /// Action that was taken
-    pub action: PmoAction,
+    pub pmoaction: PmoAction,
 
     /// Bitflags providing additional information about what has happened, or what you want to
     /// happen
     #[brw(pad_after = 1)]
-    pub flags: PmoFlags,
+    pub pmoflags: PmoFlags,
 
     /// List of information about the affected objects
     #[br(count = numo)]
