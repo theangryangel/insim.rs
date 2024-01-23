@@ -7,7 +7,7 @@ use crate::identifiers::RequestId;
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct HostListRequest {
+pub struct Hlr {
     #[brw(pad_after = 1)]
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,

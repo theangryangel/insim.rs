@@ -15,9 +15,9 @@ mod host_list;
 mod host_list_request;
 mod host_select;
 
-pub use admin_request::AdminRequest;
-pub use admin_response::AdminResponse;
-pub use error::{RelayError, RelayErrorKind};
-pub use host_list::{HostInfo, HostInfoFlags, HostList};
-pub use host_list_request::HostListRequest;
-pub use host_select::HostSelect;
+pub use admin_request::Arq;
+pub use admin_response::Arp;
+pub use error::{Error, RelayErrorKind};
+pub use host_list::{Hos, HostInfo, HostInfoFlags};
+pub use host_list_request::Hlr;
+pub use host_select::Sel;

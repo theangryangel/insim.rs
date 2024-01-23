@@ -36,7 +36,7 @@ pub enum RelayErrorKind {
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct RelayError {
+pub struct Error {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
@@ -44,10 +44,10 @@ pub struct RelayError {
     pub err: RelayErrorKind,
 }
 
-impl std::fmt::Display for RelayError {
+impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Encountered a Relay Error: {:?}", self.err)
     }
 }
 
-impl std::error::Error for RelayError {}
+impl std::error::Error for Error {}

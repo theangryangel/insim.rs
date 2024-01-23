@@ -6,7 +6,7 @@ use if_chain::if_chain;
 use insim::{
     insim::{Isi, IsiFlags},
     net::{Codec, Framed, FramedInner, Mode},
-    relay::{HostListRequest, HostSelect},
+    relay::{Hlr, Sel},
     Packet, Result,
 };
 use std::{net::SocketAddr, time::Duration};
@@ -112,7 +112,7 @@ pub async fn main() -> Result<()> {
     } = &cli.command
     {
         tracing::info!("Sending HLR");
-        let hlr = HostListRequest::default();
+        let hlr = Hlr::default();
         client.write(hlr).await?;
     }
 
@@ -122,7 +122,7 @@ pub async fn main() -> Result<()> {
     } = &cli.command
     {
         tracing::info!("Sending HS");
-        let hs = HostSelect {
+        let hs = Sel {
             hname: hname.into(),
             ..Default::default()
         };
@@ -141,7 +141,7 @@ pub async fn main() -> Result<()> {
         tracing::info!("Packet={:?} Index={:?}", m, i);
 
         if_chain! {
-            if let Packet::RelayHostList(i) = &m;
+            if let Packet::RelayHos(i) = &m;
             if i.is_last();
             then {
                 break;

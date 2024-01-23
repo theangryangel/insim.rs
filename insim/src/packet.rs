@@ -283,27 +283,27 @@ pub enum Packet {
 
     /// Instruction - Ask the LFS World relay if we are an admin
     #[brw(magic = 250u8)]
-    RelayAdminRequest(AdminRequest),
+    RelayArq(Arq),
 
     /// Information - LFS World relay response if we are an admin
     #[brw(magic = 251u8)]
-    RelayAdminResponse(AdminResponse),
+    RelayArp(Arp),
 
     /// Instruction - Ask the LFS World relay for a list of hosts
     #[brw(magic = 252u8)]
-    RelayHostListRequest(HostListRequest),
+    RelayHlr(Hlr),
 
     /// Information - LFS World relay response to a HostListRequest
     #[brw(magic = 253u8)]
-    RelayHostList(HostList),
+    RelayHos(Hos),
 
     /// Instruction - Ask the LFS World relay to select a host and start relaying Insim packets
     #[brw(magic = 254u8)]
-    RelayHostSelect(HostSelect),
+    RelaySel(Sel),
 
     /// Information - LFS World relay error (recoverable)
     #[brw(magic = 255u8)]
-    RelayError(RelayError),
+    RelayErr(Error),
 }
 
 impl Default for Packet {
@@ -382,8 +382,8 @@ impl Packet {
             Packet::Csc(_) => 20,
             Packet::Cim(_) => 8,
             Packet::Mal(_) => 12,
-            Packet::RelayHostList(i) => 4 + (i.hinfo.len() * 40),
-            Packet::RelayHostSelect(_) => 68,
+            Packet::RelayHos(i) => 4 + (i.hinfo.len() * 40),
+            Packet::RelaySel(_) => 68,
             _ => {
                 // a sensible default for everything else
                 4

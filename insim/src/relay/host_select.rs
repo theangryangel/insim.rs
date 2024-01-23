@@ -9,8 +9,8 @@ use crate::identifiers::RequestId;
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct HostSelect {
-    /// Non-zero if the packet is a packet request or a reply to a request
+pub struct Sel {
+    /// If Non-zero LFS World relay will reply with a [crate::Packet::Ver]
     #[brw(pad_after = 1)]
     pub reqi: RequestId,
 

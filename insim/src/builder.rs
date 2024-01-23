@@ -6,7 +6,7 @@ use crate::{
     identifiers::RequestId,
     insim::{Isi, IsiFlags},
     net::{Codec, Framed, FramedInner, Mode},
-    relay::HostSelect,
+    relay::Sel,
     result::Result,
 };
 
@@ -289,7 +289,8 @@ impl Builder {
                 let mut stream = self._connect_relay().await?;
 
                 if let Some(hostname) = &self.relay_select_host {
-                    let packet = HostSelect {
+                    let packet = Sel {
+                        reqi: RequestId(1),
                         hname: hostname.to_string(),
                         admin: self
                             .relay_admin_password
@@ -301,7 +302,6 @@ impl Builder {
                             .as_deref()
                             .unwrap_or("")
                             .to_owned(),
-                        ..Default::default()
                     };
 
                     stream.write(packet).await?;
@@ -322,7 +322,7 @@ impl Builder {
             .await??;
 
             let mut inner = FramedInner::new(stream, Codec::new(Mode::Uncompressed));
-            inner.verify_version(false);
+            inner.verify_version(self.verify_version);
             return Ok(Framed::WebSocket(inner));
         }
 
@@ -334,7 +334,7 @@ impl Builder {
         stream.set_nodelay(self.tcp_nodelay)?;
 
         let mut inner = FramedInner::new(stream, Codec::new(Mode::Uncompressed));
-        inner.verify_version(false);
+        inner.verify_version(self.verify_version);
         Ok(Framed::Tcp(inner))
     }
 }

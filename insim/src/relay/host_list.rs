@@ -58,7 +58,7 @@ pub struct HostInfo {
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct HostList {
+pub struct Hos {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
@@ -70,7 +70,7 @@ pub struct HostList {
     pub hinfo: Vec<HostInfo>,
 }
 
-impl HostList {
+impl Hos {
     /// Is this the last of all [HostList] packets, for a complete set of hosts?
     pub fn is_last(&self) -> bool {
         self.hinfo
