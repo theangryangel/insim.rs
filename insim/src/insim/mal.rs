@@ -15,7 +15,7 @@ const MAX_MAL_SIZE: usize = 120;
 fn binrw_parse_mal_allowed_mods(count: u8) -> BinResult<IndexSet<Vehicle>> {
     let mut data = IndexSet::new();
     for _i in 0..count {
-        data.insert(Vehicle::Mod(u32::read_options(reader, endian, ())?));
+        let _ = data.insert(Vehicle::Mod(u32::read_options(reader, endian, ())?));
     }
     Ok(data)
 }

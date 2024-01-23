@@ -2,7 +2,8 @@
 #![deny(
     missing_docs,
     rustdoc::broken_intra_doc_links,
-    missing_debug_implementations
+    missing_debug_implementations,
+    unused_results
 )]
 #![cfg_attr(test, deny(warnings, unreachable_pub))]
 

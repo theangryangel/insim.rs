@@ -72,7 +72,7 @@ impl BinRead for ConInfo {
         let plid = PlayerId::read_options(reader, endian, ())?;
         let info = CompCarInfo::read_options(reader, endian, ())?;
         // pad 1 bytes
-        reader.seek(std::io::SeekFrom::Current(1))?;
+        let _ = reader.seek(std::io::SeekFrom::Current(1))?;
         let steer = u8::read_options(reader, endian, ())?;
 
         let thrbrk = u8::read_options(reader, endian, ())?;

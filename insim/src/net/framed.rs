@@ -66,7 +66,7 @@ where
                 then {
                     if self.verify_version {
                         // maybe verify version
-                        packet.maybe_verify_version()?;
+                        let _ = packet.maybe_verify_version()?;
                     }
 
                     // keepalive
@@ -113,7 +113,7 @@ where
     pub async fn write(&mut self, packet: Packet) -> Result<()> {
         let buf = self.codec.encode(&packet)?;
         if !buf.is_empty() {
-            self.inner.try_write_bytes(&buf).await?;
+            let _ = self.inner.try_write_bytes(&buf).await?;
         }
 
         Ok(())
