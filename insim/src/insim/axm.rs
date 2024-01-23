@@ -66,6 +66,7 @@ bitflags::bitflags! {
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     #[br(map = Self::from_bits_truncate)]
     #[bw(map = |&x: &Self| x.bits())]
+    /// AutoX object flags
     pub struct PmoFlags: u16 {
         /// LFS has reached the end of a layout file which it is loading. The added objects will then be optimised.
         const FILE_END = (1 << 0);

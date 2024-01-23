@@ -12,6 +12,7 @@ use crate::identifiers::{ConnectionId, RequestId};
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
+#[allow(missing_docs)]
 /// Language
 pub enum ILanguage {
     #[default]
