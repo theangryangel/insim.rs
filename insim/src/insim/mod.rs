@@ -125,5 +125,5 @@ pub use tiny::{Tiny, TinyType};
 pub use toc::Toc;
 pub use ttc::{Ttc, TtcType};
 pub use uco::{Uco, UcoAction};
-pub use ver::Version;
+pub use ver::Ver;
 pub use vtn::{Vtn, VtnAction};
