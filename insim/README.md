@@ -39,7 +39,7 @@ loop {
     println!("{:?}", packet);
 
     match packet {
-        insim::Packet::MultiCarInfo(_) => {
+        insim::Packet::Mci(_) => {
           println!("Got a MCI packet!")
         },
         _ => {},
@@ -56,7 +56,7 @@ loop {
     println!("{:?}", packet);
 
     match packet {
-        insim::Packet::MultiCarInfo(_) => {
+        insim::Packet::Mci(_) => {
           println!("Got a MCI packet!")
         },
         _ => {},
@@ -78,7 +78,7 @@ loop {
     println!("{:?}", packet);
 
     match packet {
-        insim::Packet::MultiCarInfo(_) => {
+        insim::Packet::Mci(_) => {
           println!("Got a MCI packet!")
         },
         _ => {},
