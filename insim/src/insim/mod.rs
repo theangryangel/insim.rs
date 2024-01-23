@@ -72,7 +72,7 @@ pub use axm::{Axm, ObjectInfo, PmoAction};
 pub use axo::Axo;
 pub use btn::{Bfn, BfnType, Btc, Btn, Btt};
 pub use cch::{CameraView, Cch};
-pub use cim::{Cim, CimMode};
+pub use cim::{Cim, CimMode, CimSubModeGarage, CimSubModeNormal, CimSubModeShiftU};
 pub use cnl::{Cnl, CnlReason};
 pub use con::{Con, ConInfo};
 pub use cpp::Cpp;
