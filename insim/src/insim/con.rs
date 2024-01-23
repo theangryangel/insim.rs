@@ -7,7 +7,7 @@ use insim_core::{
 
 use crate::identifiers::{PlayerId, RequestId};
 
-use super::CompCarInfo;
+use super::{obh::binrw_parse_spclose_strip_reserved_bits, CompCarInfo};
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
@@ -65,8 +65,10 @@ pub struct Con {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
-    /// high 4 bits: reserved / low 12 bits: closing speed (10 = 1 m/s)
-    pub spclose: u16, // TODO strongly type
+    /// Low 12 bits: closing speed (10 = 1 m/s)
+    /// The high 4 bits are automatically stripped.
+    #[br(parse_with = binrw_parse_spclose_strip_reserved_bits)]
+    pub spclose: u16,
 
     #[br(parse_with = binrw_parse_duration::<u16, 10, _>)]
     #[bw(write_with = binrw_write_duration::<u16, 10, _>)]

@@ -69,11 +69,14 @@ pub enum CimSubModeNormal {
 impl From<u8> for CimSubModeNormal {
     fn from(value: u8) -> Self {
         match value {
+            0 => Self::Normal,
             1 => Self::WheelTemps,
             2 => Self::WheelDamage,
             3 => Self::LiveSettings,
-            4 => Self::LiveSettings,
-            _ => Self::Normal,
+            4 => Self::PitInstructions,
+            _ => {
+                panic!("Unhandled")
+            }
         }
     }
 }
@@ -101,24 +104,31 @@ pub enum CimSubModeGarage {
     /// Drive / gear tab of setup screen
     Drive = 5,
 
+    /// Tyres
+    Tyres = 6,
+
     /// Aero tab of setup screen
-    Aero = 6,
+    Aero = 7,
 
     /// Passengers tab of setup screen
-    Passengers = 7,
+    Passengers = 8,
 }
 
 impl From<u8> for CimSubModeGarage {
     fn from(value: u8) -> Self {
         match value {
+            0 => Self::Info,
             1 => Self::Colours,
             2 => Self::BrakeTC,
             3 => Self::Suspension,
             4 => Self::Steer,
             5 => Self::Drive,
-            6 => Self::Aero,
-            7 => Self::Passengers,
-            _ => Self::Info,
+            6 => Self::Tyres,
+            7 => Self::Aero,
+            8 => Self::Passengers,
+            _ => {
+                panic!("Unhandled")
+            }
         }
     }
 }

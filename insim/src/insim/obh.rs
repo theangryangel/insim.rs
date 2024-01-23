@@ -1,5 +1,5 @@
 use insim_core::{
-    binrw::{self, binrw},
+    binrw::{self, binrw, BinRead, BinResult},
     duration::{binrw_parse_duration, binrw_write_duration},
 };
 use std::time::Duration;
@@ -7,6 +7,13 @@ use std::time::Duration;
 use crate::identifiers::{PlayerId, RequestId};
 
 use bitflags::bitflags;
+
+#[binrw::parser(reader, endian)]
+pub(crate) fn binrw_parse_spclose_strip_reserved_bits() -> BinResult<u16> {
+    let res = u16::read_options(reader, endian, ())?;
+    // strip the top 4 bits off
+    Ok(res & !61440)
+}
 
 bitflags! {
     #[binrw]
@@ -62,8 +69,10 @@ pub struct Obh {
     /// Unique player id
     pub plid: PlayerId,
 
-    /// high 4 bits: reserved / low 12 bits: closing speed (10 = 1 m/s)
-    pub spclose: u16, // TODO
+    /// Low 12 bits: closing speed (10 = 1 m/s)
+    /// The high 4 bits are automatically stripped.
+    #[br(parse_with = binrw_parse_spclose_strip_reserved_bits)]
+    pub spclose: u16,
 
     #[br(parse_with = binrw_parse_duration::<u16, 10, _>)]
     #[bw(write_with = binrw_write_duration::<u16, 10, _>)]
@@ -87,4 +96,34 @@ pub struct Obh {
 
     /// Additional flags and information about the object
     pub flags: ObhFlags,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use super::*;
+
+    #[test]
+    fn ensure_high_bits_stripped() {
+        assert_eq!(
+            binrw_parse_spclose_strip_reserved_bits(
+                &mut Cursor::new(61441_u16.to_le_bytes()),
+                binrw::Endian::Little,
+                ()
+            )
+            .unwrap(),
+            1
+        );
+
+        assert_eq!(
+            binrw_parse_spclose_strip_reserved_bits(
+                &mut Cursor::new(63495_u16.to_le_bytes()),
+                binrw::Endian::Little,
+                ()
+            )
+            .unwrap(),
+            2055
+        );
+    }
 }
