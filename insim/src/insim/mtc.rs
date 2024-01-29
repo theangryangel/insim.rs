@@ -27,7 +27,7 @@ pub struct Mtc {
     /// Message
     #[bw(write_with = binrw_write_codepage_string::<128, _>, args(false, 4))]
     #[br(parse_with = binrw_parse_codepage_string_until_eof)]
-    pub msg: String,
+    pub text: String,
 }
 
 #[cfg(test)]
@@ -44,7 +44,7 @@ mod tests {
             plid: PlayerId(0),
             ucid: ConnectionId(0),
             sound: SoundType::default(),
-            msg: "aaaaa".into(),
+            text: "aaaaa".into(),
         };
 
         let mut buf = Cursor::new(Vec::new());

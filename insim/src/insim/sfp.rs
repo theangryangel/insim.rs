@@ -18,5 +18,7 @@ pub struct Sfp {
 
     /// Turn the state on or off
     #[brw(pad_after = 1)]
-    pub onoff: u8,
+    #[br(map = |x: u8| x != 0)]
+    #[bw(map = |&x| x as u8)]
+    pub onoff: bool,
 }

@@ -86,21 +86,21 @@ pub async fn main() -> Result<()> {
             stream.connect(addr).await.unwrap();
 
             Framed::Udp(FramedInner::new(stream, Codec::new(Mode::Compressed)))
-        }
+        },
         Commands::Tcp { addr } => {
             let stream = TcpStream::connect(addr).await?;
 
             tracing::info!("Connected to server. Creating client");
 
             Framed::Tcp(FramedInner::new(stream, Codec::new(Mode::Compressed)))
-        }
+        },
         Commands::Relay { .. } => {
             let stream = TcpStream::connect("isrelay.lfs.net:47474").await?;
 
             tracing::info!("Connected to LFSW Relay. Creating client");
 
             Framed::Tcp(FramedInner::new(stream, Codec::new(Mode::Uncompressed)))
-        }
+        },
     };
 
     tracing::info!("Sending ISI");

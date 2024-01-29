@@ -51,16 +51,16 @@ impl TryReadWriteBytes for TungsteniteWebSocket {
                 Some(Ok(Message::Binary(data))) => {
                     buf.extend_from_slice(&data);
                     return Ok(data.len());
-                }
+                },
                 Some(Ok(Message::Close(_))) => {
                     return Err(Error::Disconnected);
-                }
+                },
                 Some(Ok(msg)) => {
                     tracing::debug!(
                         "Ignoring non-binary packet received over websocket: {:?}",
                         msg
                     );
-                }
+                },
                 Some(Err(e)) => return Err(e.into()),
                 None => return Err(Error::Disconnected),
             }

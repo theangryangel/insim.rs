@@ -14,7 +14,7 @@ pub enum TinyType {
     None = 0,
 
     /// Get Version
-    Version = 1,
+    Ver = 1,
 
     /// Close
     Close = 2,
@@ -23,7 +23,7 @@ pub enum TinyType {
     Ping = 3,
 
     /// Reply to a ping
-    Pong = 4,
+    Reply = 4,
 
     /// Vote Cancel
     Vtc = 5,

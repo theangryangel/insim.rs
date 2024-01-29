@@ -51,7 +51,7 @@ pub struct Jrr {
 
     #[brw(pad_after = 2)]
     /// Action taken/to take
-    pub action: JrrAction,
+    pub jrraction: JrrAction,
 
     /// 0: use default start point / Flags = 0x80: set start point
     pub startpos: ObjectInfo,

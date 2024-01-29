@@ -10,8 +10,8 @@ bitflags::bitflags! {
     #[bw(map = |&x: &Self| x.bits())]
     /// Flags to indicate which handicap(s) to set.
     pub struct PlayerHandicapFlags: u8 {
-         const SET_MASS = (1 << 0);
-         const SET_TRES = (1 << 1);
+         const MASS = (1 << 0);
+         const TRES = (1 << 1);
          const SILENT = (1 << 7);
     }
 }
@@ -25,10 +25,13 @@ bitflags::bitflags! {
 pub struct PlayerHandicap {
     /// Player's unique ID
     pub plid: PlayerId,
+
     /// Handicaps values to set
     pub flags: PlayerHandicapFlags,
+
     /// Additional mass. Ensure that the flag `SET_MASS` is enabled.
     pub h_mass: u8,
+
     /// Additional intake restriction. Ensure that the flag `SET_TRES` is enabled
     pub h_tres: u8,
 }
@@ -41,12 +44,12 @@ pub struct Plh {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
-    #[bw(calc = hcap.len() as u8)]
+    #[bw(calc = hcaps.len() as u8)]
     nump: u8,
 
     /// List of handicaps by player
     #[br(count = nump)]
-    pub hcap: Vec<PlayerHandicap>,
+    pub hcaps: Vec<PlayerHandicap>,
 }
 
 #[cfg(test)]
@@ -79,29 +82,29 @@ mod tests {
         let plh = Plh::read_le(&mut c).unwrap();
 
         assert_eq!(plh.reqi, RequestId(1));
-        assert_eq!(plh.hcap.len(), 3);
+        assert_eq!(plh.hcaps.len(), 3);
 
-        assert_eq!(plh.hcap[0].plid, PlayerId(1));
-        assert_eq!(plh.hcap[0].h_mass, 200);
-        assert_eq!(plh.hcap[0].h_tres, 0);
-        assert!(plh.hcap[0].flags.contains(PlayerHandicapFlags::SET_MASS));
-        assert!(!plh.hcap[0].flags.contains(PlayerHandicapFlags::SET_TRES));
-        assert!(!plh.hcap[0].flags.contains(PlayerHandicapFlags::SILENT));
+        assert_eq!(plh.hcaps[0].plid, PlayerId(1));
+        assert_eq!(plh.hcaps[0].h_mass, 200);
+        assert_eq!(plh.hcaps[0].h_tres, 0);
+        assert!(plh.hcaps[0].flags.contains(PlayerHandicapFlags::MASS));
+        assert!(!plh.hcaps[0].flags.contains(PlayerHandicapFlags::TRES));
+        assert!(!plh.hcaps[0].flags.contains(PlayerHandicapFlags::SILENT));
 
-        assert_eq!(plh.hcap[1].plid, PlayerId(2));
-        assert_eq!(plh.hcap[1].h_mass, 0);
-        assert_eq!(plh.hcap[1].h_tres, 40);
-        assert!(!plh.hcap[1].flags.contains(PlayerHandicapFlags::SET_MASS));
-        assert!(plh.hcap[1].flags.contains(PlayerHandicapFlags::SET_TRES));
-        assert!(!plh.hcap[1].flags.contains(PlayerHandicapFlags::SILENT));
+        assert_eq!(plh.hcaps[1].plid, PlayerId(2));
+        assert_eq!(plh.hcaps[1].h_mass, 0);
+        assert_eq!(plh.hcaps[1].h_tres, 40);
+        assert!(!plh.hcaps[1].flags.contains(PlayerHandicapFlags::MASS));
+        assert!(plh.hcaps[1].flags.contains(PlayerHandicapFlags::TRES));
+        assert!(!plh.hcaps[1].flags.contains(PlayerHandicapFlags::SILENT));
 
-        assert_eq!(plh.hcap[2].plid, PlayerId(3));
-        assert_eq!(plh.hcap[2].h_mass, 200);
-        assert_eq!(plh.hcap[2].h_tres, 40);
+        assert_eq!(plh.hcaps[2].plid, PlayerId(3));
+        assert_eq!(plh.hcaps[2].h_mass, 200);
+        assert_eq!(plh.hcaps[2].h_tres, 40);
 
-        assert!(plh.hcap[2].flags.contains(PlayerHandicapFlags::SET_MASS));
-        assert!(plh.hcap[2].flags.contains(PlayerHandicapFlags::SET_TRES));
-        assert!(plh.hcap[2].flags.contains(PlayerHandicapFlags::SILENT));
+        assert!(plh.hcaps[2].flags.contains(PlayerHandicapFlags::MASS));
+        assert!(plh.hcaps[2].flags.contains(PlayerHandicapFlags::TRES));
+        assert!(plh.hcaps[2].flags.contains(PlayerHandicapFlags::SILENT));
 
         let mut output = Cursor::new(Vec::new());
         plh.write_le(&mut output).unwrap();

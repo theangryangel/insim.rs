@@ -26,8 +26,10 @@ fn binrw_write_mal_allowed_mods(input: &IndexSet<Vehicle>) -> BinResult<()> {
         match i {
             Vehicle::Mod(val) => val.write_options(writer, endian, ())?,
             _ => {
-                panic!("Non-Mod vehicle managed to get into the HashSet. Should not be possible.")
-            }
+                unreachable!(
+                    "Non-Mod vehicle managed to get into the HashSet. Should not be possible."
+                )
+            },
         }
     }
 

@@ -387,7 +387,7 @@ impl Packet {
             _ => {
                 // a sensible default for everything else
                 4
-            }
+            },
         }
     }
 
@@ -416,7 +416,7 @@ impl Packet {
                 }
 
                 Ok(true)
-            }
+            },
             _ => Ok(false),
         }
     }

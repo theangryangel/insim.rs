@@ -71,7 +71,7 @@ pub struct Oco {
     pub reqi: RequestId,
 
     /// Action to take
-    pub action: OcoAction,
+    pub ocoaction: OcoAction,
 
     /// Lights to manipulate
     pub index: OcoIndex,
@@ -80,5 +80,5 @@ pub struct Oco {
     pub identifer: u8,
 
     /// Bulbs/lights to manipulate
-    pub lights: OcoLights,
+    pub data: OcoLights,
 }

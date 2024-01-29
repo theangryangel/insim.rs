@@ -5,13 +5,15 @@ use crate::identifiers::RequestId;
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[bw(assert(*h_mass <= 200, "h_mass must be <= 200"))]
+#[bw(assert(*h_tres <= 50, "h_tres must be <= 50"))]
 /// Used within [Hcp] to apply handicaps to a vehicle.
 pub struct HcpCarHandicap {
     /// 0 to 200 - added mass (kg)
-    pub added_mass: u8,
+    pub h_mass: u8,
 
     /// 0 to  50 - intake restriction
-    pub intake_restriction: u8,
+    pub h_tres: u8,
 }
 
 #[binrw]

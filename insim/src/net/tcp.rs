@@ -13,16 +13,16 @@ impl TryReadWriteBytes for TcpStream {
             match self.try_read_buf(buf) {
                 Ok(0) => {
                     return Err(Error::Disconnected);
-                }
+                },
                 Ok(size) => {
                     return Ok(size);
-                }
+                },
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                     continue;
-                }
+                },
                 Err(e) => {
                     return Err(e.into());
-                }
+                },
             }
         }
     }
@@ -34,11 +34,11 @@ impl TryReadWriteBytes for TcpStream {
             match self.try_write(src) {
                 Ok(n) => {
                     return Ok(n);
-                }
+                },
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => continue,
                 Err(e) => {
                     return Err(e.into());
-                }
+                },
             }
         }
     }

@@ -13,10 +13,13 @@ pub struct Mod {
 
     /// Set to choose 16-bit
     pub bit16: i32,
+
     /// Refresh rate, zero for default
     pub rr: i32,
+
     /// Screen width. Zero to switch to windowed mode.
     pub width: i32,
+
     /// Screen height. Zero to switch to windowed mode.
     pub height: i32,
 }

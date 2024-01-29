@@ -195,7 +195,7 @@ pub struct Plc {
     /// Player's allow cars
     #[br(map = PlcAllowedCarsSet::from_bits_truncate)]
     #[bw(map = |x: &PlcAllowedCarsSet| x.bits())]
-    pub allowed_cars: PlcAllowedCarsSet,
+    pub cars: PlcAllowedCarsSet,
 }
 
 #[cfg(test)]

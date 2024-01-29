@@ -267,7 +267,7 @@ impl Builder {
                 stream.handshake(self.isi(), self.handshake_timeout).await?;
 
                 Ok(Framed::BufferedTcp(stream))
-            }
+            },
             Proto::Udp => {
                 let local = self.udp_local_address.unwrap_or("0.0.0.0:0".parse()?);
 
@@ -284,7 +284,7 @@ impl Builder {
                 stream.handshake(isi, self.handshake_timeout).await?;
 
                 Ok(Framed::Udp(stream))
-            }
+            },
             Proto::Relay => {
                 let mut stream = self._connect_relay().await?;
 
@@ -308,7 +308,7 @@ impl Builder {
                 }
 
                 Ok(stream)
-            }
+            },
         }
     }
 

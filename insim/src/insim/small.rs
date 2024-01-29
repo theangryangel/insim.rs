@@ -197,7 +197,7 @@ impl BinRead for SmallType {
                     pos,
                     found: Box::new(uval),
                 })
-            }
+            },
         };
         Ok(res)
     }

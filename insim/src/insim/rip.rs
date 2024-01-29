@@ -21,7 +21,7 @@ pub enum RipError {
     Ok = 0,
 
     /// Already at the destination
-    OkAlreadyAtDestination = 1,
+    Already = 1,
 
     /// Can't run a replay - dedicated host
     Dedicated = 2,
@@ -80,6 +80,7 @@ bitflags::bitflags! {
 pub struct Rip {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
+
     /// 0 or 1 = OK
     pub error: RipError,
 

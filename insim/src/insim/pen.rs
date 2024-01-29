@@ -14,16 +14,16 @@ pub enum PenaltyInfo {
     None = 0,
 
     /// Drive through
-    DriveThru = 1,
+    Dt = 1,
 
     /// Drive Through completed
-    DriveThruValid = 2,
+    DtValid = 2,
 
     /// Stop go
-    StopGo = 3,
+    Sg = 3,
 
     /// Stop go completed
-    StopGoValid = 4,
+    SgValid = 4,
 
     /// 30 Seconds added
     Seconds30 = 5,

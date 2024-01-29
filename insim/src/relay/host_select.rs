@@ -5,7 +5,7 @@ use insim_core::{
 
 use crate::identifiers::RequestId;
 
-/// Send a HostSelect to the relay in order to start receiving information about the selected host.
+/// Send a Sel to the relay in order to start receiving information about the selected host.
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

@@ -28,10 +28,10 @@ pub struct Nlp {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
-    #[bw(calc = nodelap.len() as u8)]
+    #[bw(calc = info.len() as u8)]
     nump: u8,
 
     /// Node, lap and position of each player.
     #[br(count = nump)]
-    pub nodelap: Vec<NodeLapInfo>,
+    pub info: Vec<NodeLapInfo>,
 }

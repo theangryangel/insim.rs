@@ -126,13 +126,13 @@ pub enum PitLaneFact {
     Enter = 1,
 
     /// Entered for no known reason
-    EnterNoPurpose = 2,
+    NoPurpose = 2,
 
     /// Entered for Drive-through penalty
-    EnterDriveThru = 3,
+    Dt = 3,
 
     /// Entered for a stop-go (time) penalty
-    EnterStopGo = 4,
+    Sg = 4,
 }
 
 #[binrw]

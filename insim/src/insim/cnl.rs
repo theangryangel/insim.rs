@@ -11,13 +11,13 @@ use crate::identifiers::{ConnectionId, RequestId};
 pub enum CnlReason {
     #[default]
     /// None
-    Disconnected = 0,
+    Disco = 0,
 
     /// Timeout
     Timeout = 1,
 
     /// Lost Connection
-    LostConnection = 2,
+    LostConn = 2,
 
     /// Kicked
     Kicked = 3,

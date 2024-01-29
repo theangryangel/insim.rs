@@ -44,7 +44,7 @@ pub struct Uco {
 
     /// What happened
     #[brw(pad_after = 2)]
-    pub action: UcoAction,
+    pub ucoaction: UcoAction,
 
     /// When this happened
     #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]

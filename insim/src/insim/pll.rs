@@ -9,6 +9,7 @@ use crate::identifiers::{PlayerId, RequestId};
 pub struct Pll {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
+
     /// Unique player id which left
     pub plid: PlayerId,
 }

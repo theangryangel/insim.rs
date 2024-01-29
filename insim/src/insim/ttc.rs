@@ -27,6 +27,7 @@ pub enum TtcType {
 pub struct Ttc {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
+
     /// Subtype
     pub subt: TtcType,
 
@@ -36,8 +37,10 @@ pub struct Ttc {
     // TODO: Fix this. It should be rolled into TtcType
     /// B1, B2, B3 may be used in various ways depending on SubT
     pub b1: u8,
+
     /// B1, B2, B3 may be used in various ways depending on SubT
     pub b2: u8,
+
     /// B1, B2, B3 may be used in various ways depending on SubT
     pub b3: u8,
 }

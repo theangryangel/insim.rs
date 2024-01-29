@@ -126,7 +126,7 @@ pub fn to_lossy_string(input: &[u8]) -> Cow<str> {
             if *last != input.len() {
                 indices.push(input.len());
             }
-        }
+        },
         None => indices.push(input.len()),
     };
 

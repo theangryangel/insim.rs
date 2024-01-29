@@ -92,18 +92,20 @@ For further examples see <https://github.com/theangryangel/insim.rs/tree/main/in
 
 ## Breaking changes
 
-- theangryangel/insim.rs#127 restructures the crate to more closely
+- [#140](https://github.com/theangryangel/insim.rs/issues/140) renamed a significant proportion of
+  the `insim::Packet` enum, and silbing structs and enums to more closely align with the upstream
+  spec (`Insim.txt`).
+- [#127](https://github.com/theangryangel/insim.rs/issues/127) restructures the crate to more closely
   align with the std library:
   - `insim::network` was renamed to `insim::net`
   - `insim::codec::Codec` was moved to `insim::net::Codec`
   - `insim::codec::Mode` was moved to `insim::net::Mode`
   - Several convenience aliases were added: `insim::{Result, Error, Packet}`
-  - :warning: `insim::connection` was removed in favour of the shortcut methods:
-    `insim::tcp`, `insim::udp`, `insim::relay` which now returns a reusable builder.
-    It does not auto-reconnect.
   - `Network` trait was renamed to `TryReadWriteBytes` to better indicate its
     usage. Network was too generic.
-- :warning: It is now your responsibility to escape and unescape strings
-  For convenience insim re-exports `insim::core::string::escape` and
-  `insim::core::string::unescape`.
-  See theangryangel/insim.rs#92 for further info.
+- [#127](https://github.com/theangryangel/insim.rs/issues/127) `insim::connection` was removed in favour
+  of the shortcut methods: `insim::tcp`, `insim::udp`, `insim::relay` which now return a reusable builder.
+  These do not auto-reconnect.
+- [#92](https://github.com/theangryangel/insim.rs/issues/92) disables the automatic escaping and
+  unescaping of strings. For convenience the insim crate now re-exports
+  `insim::core::string::escape` and `insim::core::string::unescape`.

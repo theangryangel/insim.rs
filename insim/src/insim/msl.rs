@@ -20,7 +20,7 @@ pub enum SoundType {
     Message = 1,
 
     /// System message "ping"
-    SystemMessage = 2,
+    SysMessage = 2,
 
     /// Invalid key "ping"
     InvalidKey = 3,

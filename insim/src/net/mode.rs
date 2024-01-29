@@ -37,7 +37,7 @@ impl Mode {
                         This is probably a programming error."
                     );
                 }
-            }
+            },
         };
 
         if n > self.max_length() {

@@ -98,13 +98,13 @@ where
                     }
 
                     return Err(Error::Disconnected);
-                }
+                },
                 Ok(_) => {
                     continue;
-                }
+                },
                 Err(e) => {
                     return Err(e);
-                }
+                },
             }
         }
     }
