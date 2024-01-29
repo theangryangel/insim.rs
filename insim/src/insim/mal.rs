@@ -75,7 +75,7 @@ impl Mal {
 
     /// Remove a Vehicle from this packet
     pub fn remove(&mut self, vehicle: &Vehicle) -> bool {
-        self.allowed_mods.remove(vehicle)
+        self.allowed_mods.shift_remove(vehicle)
     }
 
     /// Does this packet have no vehicles associated?

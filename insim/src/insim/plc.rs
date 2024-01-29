@@ -53,7 +53,7 @@ impl PlcAllowedCarsSet {
 
     /// Remove a vehicle, if it's included in the set.
     pub fn remove(&mut self, v: &Vehicle) -> bool {
-        self.inner.remove(v)
+        self.inner.shift_remove(v)
     }
 
     /// Is this set empty?
