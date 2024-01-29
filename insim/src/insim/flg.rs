@@ -24,6 +24,7 @@ pub enum FlgType {
 pub struct Flg {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
+
     /// Unique player ID
     pub plid: PlayerId,
 
@@ -32,7 +33,7 @@ pub struct Flg {
     /// Flag on/off
     pub offon: bool,
 
-    /// See [FlgType].
+    /// What type of flag is being waved
     pub flag: FlgType,
 
     /// Player behind

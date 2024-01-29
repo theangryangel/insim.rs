@@ -15,7 +15,7 @@ const MAX_MAL_SIZE: usize = 120;
 fn binrw_parse_mal_allowed_mods(count: u8) -> BinResult<IndexSet<Vehicle>> {
     let mut data = IndexSet::new();
     for _i in 0..count {
-        data.insert(Vehicle::Mod(u32::read_options(reader, endian, ())?));
+        let _ = data.insert(Vehicle::Mod(u32::read_options(reader, endian, ())?));
     }
     Ok(data)
 }
@@ -26,8 +26,10 @@ fn binrw_write_mal_allowed_mods(input: &IndexSet<Vehicle>) -> BinResult<()> {
         match i {
             Vehicle::Mod(val) => val.write_options(writer, endian, ())?,
             _ => {
-                panic!("Non-Mod vehicle managed to get into the HashSet. Should not be possible.")
-            }
+                unreachable!(
+                    "Non-Mod vehicle managed to get into the HashSet. Should not be possible."
+                )
+            },
         }
     }
 
@@ -73,7 +75,7 @@ impl Mal {
 
     /// Remove a Vehicle from this packet
     pub fn remove(&mut self, vehicle: &Vehicle) -> bool {
-        self.allowed_mods.remove(vehicle)
+        self.allowed_mods.shift_remove(vehicle)
     }
 
     /// Does this packet have no vehicles associated?

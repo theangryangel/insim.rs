@@ -1,8 +1,11 @@
 #![doc = include_str!("../README.md")]
-#![deny(missing_docs)]
-#![deny(missing_debug_implementations)]
-#![cfg_attr(test, deny(warnings))]
-#![cfg_attr(test, deny(unreachable_pub))]
+#![deny(
+    missing_docs,
+    rustdoc::broken_intra_doc_links,
+    missing_debug_implementations,
+    unused_results
+)]
+#![cfg_attr(test, deny(warnings, unreachable_pub))]
 
 use std::net::SocketAddr;
 

@@ -53,7 +53,7 @@ impl PlcAllowedCarsSet {
 
     /// Remove a vehicle, if it's included in the set.
     pub fn remove(&mut self, v: &Vehicle) -> bool {
-        self.inner.remove(v)
+        self.inner.shift_remove(v)
     }
 
     /// Is this set empty?
@@ -77,6 +77,7 @@ impl PlcAllowedCarsSet {
     }
 
     /// Transform the network representation of the set into [PlcAllowedCarsSet].
+    #[allow(unused_results)]
     pub fn from_bits_truncate(value: u32) -> Self {
         let mut data = IndexSet::default();
 
@@ -194,7 +195,7 @@ pub struct Plc {
     /// Player's allow cars
     #[br(map = PlcAllowedCarsSet::from_bits_truncate)]
     #[bw(map = |x: &PlcAllowedCarsSet| x.bits())]
-    pub allowed_cars: PlcAllowedCarsSet,
+    pub cars: PlcAllowedCarsSet,
 }
 
 #[cfg(test)]
@@ -208,8 +209,8 @@ mod tests {
         assert!(allowed.insert(Vehicle::Unknown).is_err());
         assert!(allowed.insert(Vehicle::Mod(1)).is_err());
 
-        allowed.insert(Vehicle::Xfg).unwrap();
-        allowed.insert(Vehicle::Xrg).unwrap();
+        let _ = allowed.insert(Vehicle::Xfg).unwrap();
+        let _ = allowed.insert(Vehicle::Xrg).unwrap();
 
         let reversed = PlcAllowedCarsSet::from_bits_truncate(
             PlcAllowedCarsSet::XR_GT | PlcAllowedCarsSet::XF_GTI,

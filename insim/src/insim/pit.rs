@@ -12,46 +12,46 @@ use bitflags::bitflags;
 use super::{Fuel, PenaltyInfo, PlayerFlags, TyreCompound};
 
 bitflags! {
+    /// Work which was carried out at a pitstop. Used in [Pit].
     #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     #[br(map = Self::from_bits_truncate)]
     #[bw(map = |&x: &Self| x.bits())]
-    /// Work which was carried out at a pitstop. Used in [Pit].
     pub struct PitStopWorkFlags: u32 {
-        /// Nothing.
+        /// Nothing asd
         const NOTHING = 0;
-        /// Stop
+        /// Stop only
         const STOP = (1 << 0);
         /// Front damage
         const FR_DAM = (1 << 1);
-        // FR wheel
+        /// FR wheel
         const FR_WHL = (1 << 2);
-        /// ???
+        /// LE_FR_DAM
         const PSE_LE_FR_DAM = (1 << 3);
-        /// ???
+        /// LE_FR_WHL
         const PSE_LE_FR_WHL = (1 << 4);
-        /// ???
+        /// RI_FR_DAM
         const PSE_RI_FR_DAM = (1 << 5);
-        /// ???
+        /// RI_FR_WHL
         const PSE_RI_FR_WHL = (1 << 6);
-        /// ???
+        /// RE_DAM
         const PSE_RE_DAM = (1 << 7);
-        /// ???
+        /// RE_WHL
         const PSE_RE_WHL = (1 << 8);
-        /// ???
+        /// LE_RE_DAM
         const PSE_LE_RE_DAM = (1 << 9);
-        /// ???
+        /// LE_RE_WHL
         const PSE_LE_RE_WHL = (1 << 10);
-        /// ???
+        /// RI_RE_DAM
         const PSE_RI_RE_DAM = (1 << 11);
-        /// ???
+        /// RI_RE_WHL
         const PSE_RI_RE_WHL = (1 << 12);
-        /// ???
+        /// Body Minor
         const PSE_BODY_MINOR = (1 << 13);
-        /// ???
+        /// Body Major
         const PSE_BODY_MAJOR = (1 << 14);
-        /// ???
+        /// Setup
         const PSE_SETUP = (1 << 15);
         /// Refuel
         const PSE_REFUEL = (1 << 16);
@@ -126,13 +126,13 @@ pub enum PitLaneFact {
     Enter = 1,
 
     /// Entered for no known reason
-    EnterNoPurpose = 2,
+    NoPurpose = 2,
 
     /// Entered for Drive-through penalty
-    EnterDriveThru = 3,
+    Dt = 3,
 
     /// Entered for a stop-go (time) penalty
-    EnterStopGo = 4,
+    Sg = 4,
 }
 
 #[binrw]

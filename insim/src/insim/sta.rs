@@ -67,13 +67,13 @@ bitflags! {
         const MULTI = (1 << 9);
 
         /// Multiplayer speedup
-        const MULTI_SPEEDUP = (1 << 10);
+        const MPSPEEDUP = (1 << 10);
 
         /// Windows mode
         const WINDOWED = (1 << 11);
 
         /// Muted
-        const MUTED = (1 << 12);
+        const SOUND_MUTE = (1 << 12);
 
         /// View override
         const VIEW_OVERRIDE = (1 << 13);
@@ -100,22 +100,28 @@ pub struct Sta {
 
     /// State of the game
     pub flags: StaFlags,
+
     /// Which type of camera is selected
     pub ingamecam: CameraView,
+
     /// Currently viewing player
     pub viewplid: PlayerId,
 
     /// Number of players in race
     pub nump: u8,
+
     /// Number of connections, including host
     pub numconns: u8,
+
     /// Number of finished or qualifying players
     pub numfinished: u8,
+
     /// Race status
     pub raceinprog: RaceInProgress,
 
     /// Qualifying minutes
     pub qualmins: u8,
+
     #[brw(pad_after = 1)]
     /// Number of laps
     pub racelaps: RaceLaps,
@@ -125,6 +131,7 @@ pub struct Sta {
 
     /// The track
     pub track: Track,
+
     /// Weather conditions
     pub weather: u8, // TODO: Weather is track dependant?!
 

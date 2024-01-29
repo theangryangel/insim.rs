@@ -12,8 +12,9 @@ use crate::identifiers::{ConnectionId, RequestId};
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
+#[allow(missing_docs)]
 /// Language
-pub enum ILanguage {
+pub enum Language {
     #[default]
     English = 0,
     Deutsch = 1,
@@ -67,19 +68,19 @@ pub struct Nci {
     pub ucid: ConnectionId,
 
     /// Language
-    pub language: ILanguage,
+    pub language: Language,
 
     /// License level.
     #[brw(pad_after = 2)]
     pub license: License,
 
     /// LFS.net player ID
-    pub user_id: u32,
+    pub userid: u32,
 
     /// Originating IP address
     #[br(map = |x: u32| Ipv4Addr::from(x) )]
     #[bw(map = |&x: &Ipv4Addr| u32::from(x) )]
-    pub ip_addr: Ipv4Addr,
+    pub ipaddress: Ipv4Addr,
 }
 
 impl Default for Nci {
@@ -87,10 +88,10 @@ impl Default for Nci {
         Self {
             reqi: RequestId::default(),
             ucid: ConnectionId::default(),
-            language: ILanguage::default(),
+            language: Language::default(),
             license: License::default(),
-            user_id: 0,
-            ip_addr: Ipv4Addr::new(0, 0, 0, 0),
+            userid: 0,
+            ipaddress: Ipv4Addr::new(0, 0, 0, 0),
         }
     }
 }

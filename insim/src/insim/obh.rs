@@ -80,16 +80,17 @@ pub struct Obh {
     pub time: Duration,
 
     /// Additional information about the contact.
-    pub info: CarContact,
+    pub c: CarContact,
 
     /// The X position of the object
     pub x: i16,
+
     /// The Y position of the object
     pub y: i16,
 
     #[brw(pad_after = 1)]
     /// The Z position of the object
-    pub z: u8,
+    pub zbyte: u8,
 
     /// The object index
     pub index: u8,

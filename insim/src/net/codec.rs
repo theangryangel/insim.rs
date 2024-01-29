@@ -58,7 +58,7 @@ impl Codec {
             Some(n) => n,
             None => {
                 return Ok(None);
-            }
+            },
         };
 
         let mut data = src.split_to(n);

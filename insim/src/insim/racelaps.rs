@@ -65,7 +65,7 @@ impl From<RaceLaps> for u8 {
                     100..=1000 => ((data - 100) / 10) + 100,
                     _ => 0, // if it's an invalid structure we're going to push it into practice
                 }
-            }
+            },
             RaceLaps::Hours(data) => data + 190,
         };
 

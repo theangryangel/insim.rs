@@ -38,7 +38,7 @@ pub struct Csc {
 
     /// Action that was taken
     #[brw(pad_after = 2)]
-    pub action: CscAction,
+    pub cscaction: CscAction,
 
     /// Time since start (warning: this is looping)
     #[br(parse_with = binrw_parse_duration::<u32, 10, _>)]

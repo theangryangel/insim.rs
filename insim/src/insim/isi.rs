@@ -64,7 +64,7 @@ impl IsiFlags {
 /// Insim Init, or handshake packet.
 /// Required to be sent to the server before any other packets.
 pub struct Isi {
-    /// When set to a non-zero value the server will send a [Version](super::Version) packet in response.
+    /// When set to a non-zero value the server will send a [crate::Packet::Ver] packet in response.
     ///packet in response.
     #[brw(pad_after = 1)]
     pub reqi: RequestId,

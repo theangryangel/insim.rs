@@ -75,7 +75,7 @@ impl From<tokio_tungstenite::tungstenite::Error> for Error {
             tokio_tungstenite::tungstenite::Error::AlreadyClosed => Error::Disconnected,
             tokio_tungstenite::tungstenite::Error::Utf8 => {
                 Error::WebsocketIO("UTF-8 encoding error".into())
-            }
+            },
             _ => Error::WebsocketIO(value.to_string()),
         }
     }

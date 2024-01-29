@@ -16,13 +16,13 @@ bitflags! {
     /// Additional Car Info.
     pub struct CompCarInfo: u8 {
         /// This car is in the way of a driver who is a lap ahead
-        const BLUE_FLAG = (1 << 0);
+        const BLUE = (1 << 0);
 
         /// This car is slow or stopped and in a dangerous place
-        const YELLOW_FLAG = (1 << 1);
+        const YELLOW = (1 << 1);
 
         /// This car is lagging (missing or delayed position packets)
-        const LAGGING = (1 << 5);
+        const LAG = (1 << 5);
 
         /// This is the first compcar in this set of MCI packets
         const FIRST = (1 << 6);

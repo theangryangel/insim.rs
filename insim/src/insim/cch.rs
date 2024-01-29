@@ -14,10 +14,10 @@ pub enum CameraView {
     Follow = 0,
 
     /// Helicopter view
-    Helicopter = 1,
+    Heli = 1,
 
     /// Static TV camera views
-    TvCamera = 2,
+    Cam = 2,
 
     /// Driver/cockpit view
     Driver = 3,
@@ -26,7 +26,7 @@ pub enum CameraView {
     Custom = 4,
 
     /// Viewing another player/vehicle
-    OtherVehicle = 255,
+    Another = 255,
 }
 
 #[binrw]

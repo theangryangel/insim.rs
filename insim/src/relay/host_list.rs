@@ -32,7 +32,7 @@ bitflags! {
     }
 }
 
-/// Information about a host. Used within the [HostList] packet.
+/// Information about a host. Used within the [Hos] packet.
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -53,12 +53,12 @@ pub struct HostInfo {
 }
 
 /// The relay will send a list of available hosts using this packet. There may be more than one
-/// HostList packet sent in response to a [super::host_list_request::HostListRequest]. You may use the [HostInfoFlags] to
+/// HostList packet sent in response to a [super::host_list_request::Hlr]. You may use the [HostInfoFlags] to
 /// determine if the host is the last in the list.
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct HostList {
+pub struct Hos {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
@@ -70,8 +70,8 @@ pub struct HostList {
     pub hinfo: Vec<HostInfo>,
 }
 
-impl HostList {
-    /// Is this the last of all [HostList] packets, for a complete set of hosts?
+impl Hos {
+    /// Is this the last of all [Hos] packets, for a complete set of hosts?
     pub fn is_last(&self) -> bool {
         self.hinfo
             .iter()

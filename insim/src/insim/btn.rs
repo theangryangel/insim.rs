@@ -96,7 +96,7 @@ bitflags::bitflags! {
 pub enum BfnType {
     #[default]
     /// Instruction - delete one button or range of buttons (must set ClickID)
-    DeleteButton = 0,
+    DelBtn = 0,
 
     /// Instruction - clear all buttons
     Clear = 1,
@@ -105,7 +105,7 @@ pub enum BfnType {
     UserClear = 2,
 
     /// Report - user requested buttons
-    ButtonsRequested = 3,
+    BtnRequest = 3,
 }
 
 #[binrw]

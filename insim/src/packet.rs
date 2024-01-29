@@ -13,158 +13,297 @@ use crate::relay::*;
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
 #[non_exhaustive]
-/// Enum representing all possible packets receivable via an Insim connection
+/// Enum representing all possible packets receivable via an Insim connection.
+/// Each variant may either be instructional (tell LFS to do something), informational (you are
+/// told something about LFS), or both.
 pub enum Packet {
+    /// Instruction - handshake or init
     #[brw(magic = 1u8)]
-    Init(Isi),
+    Isi(Isi),
+
+    /// Information - version info
     #[brw(magic = 2u8)]
-    Version(Version),
+    Ver(Ver),
+
+    /// Both - multi-purpose
     #[brw(magic = 3u8)]
     Tiny(Tiny),
+
+    /// Both - multi-purpose
     #[brw(magic = 4u8)]
     Small(Small),
+
+    /// Information - State info
     #[brw(magic = 5u8)]
-    State(Sta),
+    Sta(Sta),
+
+    /// Instruction - Single character
     #[brw(magic = 6u8)]
-    SingleCharacter(Sch),
+    Sch(Sch),
+
+    /// Instruction - State Flags Pack
     #[brw(magic = 7u8)]
-    StateFlagsPack(Sfp),
+    Sfp(Sfp),
+
+    /// Both - Set Car Cam
     #[brw(magic = 8u8)]
-    SetCarCam(Scc),
+    Scc(Scc),
+
+    /// Both - Camera position pack
     #[brw(magic = 9u8)]
-    CamPosPack(Cpp),
+    Cpp(Cpp),
+
+    /// Information - Start multiplayer
     #[brw(magic = 10u8)]
-    MultiPlayerNotification(Ism),
+    Ism(Ism),
+
+    /// Information - Message out
     #[brw(magic = 11u8)]
-    MessageOut(Mso),
+    Mso(Mso),
+
+    /// Information - Hidden /i message
     #[brw(magic = 12u8)]
-    InsimInfo(Iii),
+    Iii(Iii),
+
+    /// Instruction - Type a message or /command
     #[brw(magic = 13u8)]
-    MessageType(Mst),
+    Mst(Mst),
+
+    /// Instruction - Message to connection
     #[brw(magic = 14u8)]
-    MessageToConnection(Mtc),
+    Mtc(Mtc),
+
+    /// Instruction - set screen mode
     #[brw(magic = 15u8)]
-    ScreenMode(Mod),
+    Mod(Mod),
+
+    /// Information - Vote notification
     #[brw(magic = 16u8)]
-    VoteNotification(Vtn),
+    Vtn(Vtn),
+
+    /// Information - Race start
     #[brw(magic = 17u8)]
-    RaceStart(Rst),
+    Rst(Rst),
+
+    /// Information - New connection
     #[brw(magic = 18u8)]
-    NewConnection(Ncn),
+    Ncn(Ncn),
+
+    /// Information - Connection left
     #[brw(magic = 19u8)]
-    ConnectionLeave(Cnl),
+    Cnl(Cnl),
+
+    /// Information - Connection renamed
     #[brw(magic = 20u8)]
-    ConnectionPlayerRenamed(Cpr),
+    Cpr(Cpr),
+
+    /// Information - New player (player joined)
     #[brw(magic = 21u8)]
-    NewPlayer(Npl),
+    Npl(Npl),
+
+    /// Information - Player telepits
     #[brw(magic = 22u8)]
-    PlayerPits(Plp),
+    Plp(Plp),
+
+    /// Information - Player left
     #[brw(magic = 23u8)]
-    PlayerLeave(Pll),
+    Pll(Pll),
+
+    /// Information - Lap time
     #[brw(magic = 24u8)]
     Lap(Lap),
+
+    /// Information - Split time
     #[brw(magic = 25u8)]
-    SplitX(Spx),
+    Spx(Spx),
+
+    /// Information - Pit stop start
     #[brw(magic = 26u8)]
-    PitStopStart(Pit),
+    Pit(Pit),
+
+    /// Information - Pit stop finish
     #[brw(magic = 27u8)]
-    PitStopFinish(Psf),
+    Psf(Psf),
+
+    /// Information - Player entered pit lane
     #[brw(magic = 28u8)]
-    PitLane(Pla),
+    Pla(Pla),
+
+    /// Information - Camera changed
     #[brw(magic = 29u8)]
-    CameraChange(Cch),
+    Cch(Cch),
+
+    /// Information - Penalty
     #[brw(magic = 30u8)]
-    Penalty(Pen),
+    Pen(Pen),
+
+    /// Information - Take over
     #[brw(magic = 31u8)]
-    TakeOverCar(Toc),
+    Toc(Toc),
+
+    /// Information - Flag
     #[brw(magic = 32u8)]
-    Flag(Flg),
+    Flg(Flg),
+
+    /// Information - Player flags
     #[brw(magic = 33u8)]
-    PlayerFlags(Pfl),
+    Pfl(Pfl),
+
+    /// Information - Finished race - unverified result
     #[brw(magic = 34u8)]
-    Finished(Fin),
+    Fin(Fin),
+
+    /// Information - Verified finish result
     #[brw(magic = 35u8)]
-    Result(Res),
+    Res(Res),
+
+    /// Both - Player reorder
     #[brw(magic = 36u8)]
-    Reorder(Reo),
+    Reo(Reo),
+
+    /// Information - Node and lap
     #[brw(magic = 37u8)]
-    NodeLap(Nlp),
+    Nlp(Nlp),
+
+    /// Information - Multi-car info
     #[brw(magic = 38u8)]
-    MultiCarInfo(Mci),
+    Mci(Mci),
+
+    /// Instruction - Type a message
     #[brw(magic = 39u8)]
-    MesssageExtended(Msx),
+    Msx(Msx),
+
+    /// Instruction - Message to local computer
     #[brw(magic = 40u8)]
-    MessageLocal(Msl),
+    Msl(Msl),
+
+    /// Information - Car reset
     #[brw(magic = 41u8)]
-    CarReset(Crs),
+    Crs(Crs),
+
+    /// Both - Delete or receive buttons
     #[brw(magic = 42u8)]
-    ButtonFunction(Bfn),
+    Bfn(Bfn),
+
+    /// Information - AutoX layout info
     #[brw(magic = 43u8)]
-    AutoXInfo(Axi),
+    Axi(Axi),
+
+    /// Information - Player hit an AutoX object
     #[brw(magic = 44u8)]
-    AutoXObject(Axo),
+    Axo(Axo),
+
+    /// Instruction - Show a button
     #[brw(magic = 45u8)]
-    Button(Btn),
+    Btn(Btn),
+
+    /// Information - Button clicked
     #[brw(magic = 46u8)]
-    ButtonClick(Btc),
+    Btc(Btc),
+
+    /// Information - Button was typed into
     #[brw(magic = 47u8)]
-    ButtonType(Btt),
+    Btt(Btt),
+
+    /// Both - Replay information
     #[brw(magic = 48u8)]
-    ReplayInformation(Rip),
+    Rip(Rip),
+
+    /// Both - screenshot
     #[brw(magic = 49u8)]
-    ScreenShot(Ssh),
+    Ssh(Ssh),
+
+    /// Information - contact between vehicles
     #[brw(magic = 50u8)]
-    Contact(Con),
+    Con(Con),
+
+    /// Information - Object hit
     #[brw(magic = 51u8)]
-    ObjectHit(Obh),
+    Obh(Obh),
+
+    /// Information - Hot lap validity violation
     #[brw(magic = 52u8)]
-    HotLapValidity(Hlv),
+    Hlv(Hlv),
+
+    /// Instruction - Restrict player vehicles
     #[brw(magic = 53u8)]
-    PlayerAllowedCars(Plc),
+    Plc(Plc),
+
+    /// Both - AutoX - multiple object
     #[brw(magic = 54u8)]
-    AutoXMultipleObjects(Axm),
+    Axm(Axm),
+
+    /// Information - Admin command report
     #[brw(magic = 55u8)]
-    AdminCommandReport(Acr),
+    Acr(Acr),
+
+    /// Instruction - Handicap
     #[brw(magic = 56u8)]
-    Handicaps(Hcp),
+    Hcp(Hcp),
+
+    /// Information - New connection information
     #[brw(magic = 57u8)]
     Nci(Nci),
+
+    /// Instruction - Join reply response
     #[brw(magic = 58u8)]
     Jrr(Jrr),
+
+    /// Information - report insim checkpoint/circle
     #[brw(magic = 59u8)]
-    UserControlObject(Uco),
+    Uco(Uco),
+
+    /// Instruction - Object control
     #[brw(magic = 60u8)]
-    ObjectControl(Oco),
+    Oco(Oco),
+
+    /// Instruction - Multi-purpose, target to connection
     #[brw(magic = 61u8)]
-    TargetToConnection(Ttc),
+    Ttc(Ttc),
+
+    /// Information - Player selected vehicle
     #[brw(magic = 62u8)]
-    SelectedVehicle(Slc),
+    Slc(Slc),
+
+    /// Information - Vehicle changed state
     #[brw(magic = 63u8)]
-    VehicleStateChanged(Csc),
+    Csc(Csc),
+
+    /// Information - Connection interface mode
     #[brw(magic = 64u8)]
-    ConnectionInterfaceMode(Cim),
+    Cim(Cim),
+
+    /// Both - Set mods a player is allowed
     #[brw(magic = 65u8)]
-    ModsAllowed(Mal),
+    Mal(Mal),
+
+    /// Both - Set/receive player handicap
     #[brw(magic = 66u8)]
     Plh(Plh),
 
+    /// Instruction - Ask the LFS World relay if we are an admin
     #[brw(magic = 250u8)]
-    RelayAdminRequest(AdminRequest),
+    RelayArq(Arq),
 
+    /// Information - LFS World relay response if we are an admin
     #[brw(magic = 251u8)]
-    RelayAdminResponse(AdminResponse),
+    RelayArp(Arp),
 
+    /// Instruction - Ask the LFS World relay for a list of hosts
     #[brw(magic = 252u8)]
-    RelayHostListRequest(HostListRequest),
+    RelayHlr(Hlr),
 
+    /// Information - LFS World relay response to a HostListRequest
     #[brw(magic = 253u8)]
-    RelayHostList(HostList),
+    RelayHos(Hos),
 
+    /// Instruction - Ask the LFS World relay to select a host and start relaying Insim packets
     #[brw(magic = 254u8)]
-    RelayHostSelect(HostSelect),
+    RelaySel(Sel),
 
+    /// Information - LFS World relay error (recoverable)
     #[brw(magic = 255u8)]
-    RelayError(RelayError),
+    RelayErr(Error),
 }
 
 impl Default for Packet {
@@ -181,74 +320,74 @@ impl Packet {
         // TODO: For some of these packets we can be more intelligent.
         // i.e. see RelayHostList
         match self {
-            Packet::Init(_) => 44,
-            Packet::Version(_) => 20,
+            Packet::Isi(_) => 44,
+            Packet::Ver(_) => 20,
             Packet::Small(_) => 8,
-            Packet::State(_) => 28,
-            Packet::SingleCharacter(_) => 8,
-            Packet::StateFlagsPack(_) => 8,
-            Packet::SetCarCam(_) => 8,
-            Packet::CamPosPack(_) => 32,
-            Packet::MultiPlayerNotification(_) => 40,
-            Packet::MessageOut(_) => 12,
-            Packet::InsimInfo(_) => 12,
-            Packet::MessageType(_) => 68,
-            Packet::MessageToConnection(_) => 12,
-            Packet::ScreenMode(_) => 20,
-            Packet::VoteNotification(_) => 8,
-            Packet::RaceStart(_) => 28,
-            Packet::NewConnection(_) => 56,
-            Packet::ConnectionLeave(_) => 8,
-            Packet::ConnectionPlayerRenamed(_) => 36,
-            Packet::NewPlayer(_) => 76,
+            Packet::Sta(_) => 28,
+            Packet::Sch(_) => 8,
+            Packet::Sfp(_) => 8,
+            Packet::Scc(_) => 8,
+            Packet::Cpp(_) => 32,
+            Packet::Ism(_) => 40,
+            Packet::Mso(_) => 12,
+            Packet::Iii(_) => 12,
+            Packet::Mst(_) => 68,
+            Packet::Mtc(_) => 12,
+            Packet::Mod(_) => 20,
+            Packet::Vtn(_) => 8,
+            Packet::Rst(_) => 28,
+            Packet::Ncn(_) => 56,
+            Packet::Cnl(_) => 8,
+            Packet::Cpr(_) => 36,
+            Packet::Npl(_) => 76,
             Packet::Lap(_) => 20,
-            Packet::SplitX(_) => 16,
-            Packet::PitStopStart(_) => 24,
-            Packet::PitStopFinish(_) => 12,
-            Packet::PitLane(_) => 8,
-            Packet::CameraChange(_) => 8,
-            Packet::Penalty(_) => 8,
-            Packet::TakeOverCar(_) => 8,
-            Packet::Flag(_) => 8,
-            Packet::PlayerFlags(_) => 8,
-            Packet::Finished(_) => 20,
-            Packet::Result(_) => 86,
-            Packet::Reorder(_) => 44,
-            Packet::NodeLap(_) => 10,
-            Packet::MultiCarInfo(_) => 32,
-            Packet::MesssageExtended(_) => 100,
-            Packet::MessageLocal(_) => 132,
-            Packet::CarReset(_) => 4,
-            Packet::ButtonFunction(_) => 8,
-            Packet::AutoXInfo(_) => 40,
-            Packet::AutoXObject(_) => 4,
-            Packet::Button(_) => 16,
-            Packet::ButtonClick(_) => 8,
-            Packet::ButtonType(_) => 104,
-            Packet::ReplayInformation(_) => 80,
-            Packet::ScreenShot(_) => 40,
-            Packet::Contact(_) => 40,
-            Packet::ObjectHit(_) => 24,
-            Packet::HotLapValidity(_) => 16,
-            Packet::PlayerAllowedCars(_) => 8,
-            Packet::AutoXMultipleObjects(_) => 16,
-            Packet::AdminCommandReport(_) => 12,
-            Packet::Handicaps(_) => 68,
+            Packet::Spx(_) => 16,
+            Packet::Pit(_) => 24,
+            Packet::Psf(_) => 12,
+            Packet::Pla(_) => 8,
+            Packet::Cch(_) => 8,
+            Packet::Pen(_) => 8,
+            Packet::Toc(_) => 8,
+            Packet::Flg(_) => 8,
+            Packet::Pfl(_) => 8,
+            Packet::Fin(_) => 20,
+            Packet::Res(_) => 86,
+            Packet::Reo(_) => 44,
+            Packet::Nlp(_) => 10,
+            Packet::Mci(_) => 32,
+            Packet::Msx(_) => 100,
+            Packet::Msl(_) => 132,
+            Packet::Crs(_) => 4,
+            Packet::Bfn(_) => 8,
+            Packet::Axi(_) => 40,
+            Packet::Axo(_) => 4,
+            Packet::Btn(_) => 16,
+            Packet::Btc(_) => 8,
+            Packet::Btt(_) => 104,
+            Packet::Rip(_) => 80,
+            Packet::Ssh(_) => 40,
+            Packet::Con(_) => 40,
+            Packet::Obh(_) => 24,
+            Packet::Hlv(_) => 16,
+            Packet::Plc(_) => 8,
+            Packet::Axm(_) => 16,
+            Packet::Acr(_) => 12,
+            Packet::Hcp(_) => 68,
             Packet::Nci(_) => 16,
             Packet::Jrr(_) => 16,
-            Packet::UserControlObject(_) => 28,
-            Packet::ObjectControl(_) => 8,
-            Packet::TargetToConnection(_) => 8,
-            Packet::SelectedVehicle(_) => 8,
-            Packet::VehicleStateChanged(_) => 20,
-            Packet::ConnectionInterfaceMode(_) => 8,
-            Packet::ModsAllowed(_) => 12,
-            Packet::RelayHostList(i) => 4 + (i.hinfo.len() * 40),
-            Packet::RelayHostSelect(_) => 68,
+            Packet::Uco(_) => 28,
+            Packet::Oco(_) => 8,
+            Packet::Ttc(_) => 8,
+            Packet::Slc(_) => 8,
+            Packet::Csc(_) => 20,
+            Packet::Cim(_) => 8,
+            Packet::Mal(_) => 12,
+            Packet::RelayHos(i) => 4 + (i.hinfo.len() * 40),
+            Packet::RelaySel(_) => 68,
             _ => {
                 // a sensible default for everything else
                 4
-            }
+            },
         }
     }
 
@@ -271,13 +410,13 @@ impl Packet {
     #[tracing::instrument]
     pub fn maybe_verify_version(&self) -> crate::result::Result<bool> {
         match self {
-            Packet::Version(Version { insimver, .. }) => {
+            Packet::Ver(Ver { insimver, .. }) => {
                 if *insimver != crate::VERSION {
                     return Err(crate::error::Error::IncompatibleVersion(*insimver));
                 }
 
                 Ok(true)
-            }
+            },
             _ => Ok(false),
         }
     }

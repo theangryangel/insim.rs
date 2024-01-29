@@ -41,5 +41,5 @@ pub struct Ssh {
     /// Screenshot file path.
     #[br(parse_with = binrw_parse_codepage_string::<32, _>)]
     #[bw(write_with = binrw_write_codepage_string::<32, _>)]
-    pub lname: String,
+    pub name: String,
 }

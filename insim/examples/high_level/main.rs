@@ -2,7 +2,7 @@
 //! This example showcases the shortcut methods
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
-use insim::{insim::IsiFlags, relay::HostListRequest, Packet, Result};
+use insim::{insim::IsiFlags, relay::Hlr, Packet, Result};
 use std::{net::SocketAddr, time::Duration};
 
 #[derive(Parser)]
@@ -82,12 +82,12 @@ pub async fn main() -> Result<()> {
             tracing::info!("Connecting via UDP!");
             // use udp
             insim::udp(*addr, *bind)
-        }
+        },
         Commands::Tcp { addr } => {
             tracing::info!("Connecting via TCP!");
             // use udp
             insim::tcp(*addr)
-        }
+        },
         Commands::Relay {
             select_host,
             websocket,
@@ -101,7 +101,7 @@ pub async fn main() -> Result<()> {
                 .relay_websocket(*websocket)
                 .relay_spectator_password(spectator_password.clone())
                 .relay_select_host(select_host.clone())
-        }
+        },
     };
 
     // set our IsiFlags
@@ -119,7 +119,7 @@ pub async fn main() -> Result<()> {
         list_hosts: true, ..
     } = &cli.command
     {
-        connection.write(HostListRequest::default()).await?;
+        connection.write(Hlr::default()).await?;
     }
 
     let mut i: usize = 0;
@@ -133,7 +133,7 @@ pub async fn main() -> Result<()> {
         // last hostinfo, break the loop
         if_chain! {
             if let Commands::Relay{ list_hosts: true, .. } = &cli.command;
-            if let Packet::RelayHostList(hostinfo) = &packet;
+            if let Packet::RelayHos(hostinfo) = &packet;
             if hostinfo.is_last();
             then {
                 break;

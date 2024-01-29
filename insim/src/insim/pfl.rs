@@ -11,6 +11,7 @@ use super::PlayerFlags;
 pub struct Pfl {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
+
     /// Player unique Id
     pub plid: PlayerId,
 

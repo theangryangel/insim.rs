@@ -19,7 +19,7 @@ pub enum CimMode {
     Garage(CimSubModeGarage),
 
     /// Vehicle select screen
-    VehicleSelect,
+    CarSelect,
 
     /// Track select screen
     TrackSelect,
@@ -75,8 +75,10 @@ impl From<u8> for CimSubModeNormal {
             3 => Self::LiveSettings,
             4 => Self::PitInstructions,
             _ => {
-                panic!("Unhandled")
-            }
+                unreachable!(
+                    "Unhandled CimSubModeNormal. Perhaps a programming error or protocol update?"
+                )
+            },
         }
     }
 }
@@ -96,7 +98,7 @@ pub enum CimSubModeGarage {
     BrakeTC = 2,
 
     /// Suspension tab of setup screen
-    Suspension = 3,
+    Susp = 3,
 
     /// Steering tab of setup screen
     Steer = 4,
@@ -111,7 +113,7 @@ pub enum CimSubModeGarage {
     Aero = 7,
 
     /// Passengers tab of setup screen
-    Passengers = 8,
+    Pass = 8,
 }
 
 impl From<u8> for CimSubModeGarage {
@@ -120,15 +122,17 @@ impl From<u8> for CimSubModeGarage {
             0 => Self::Info,
             1 => Self::Colours,
             2 => Self::BrakeTC,
-            3 => Self::Suspension,
+            3 => Self::Susp,
             4 => Self::Steer,
             5 => Self::Drive,
             6 => Self::Tyres,
             7 => Self::Aero,
-            8 => Self::Passengers,
+            8 => Self::Pass,
             _ => {
-                panic!("Unhandled")
-            }
+                unreachable!(
+                    "Unhandled CimSubModeGarage. Perhaps a programming error or protocol update?"
+                )
+            },
         }
     }
 }
@@ -176,7 +180,7 @@ impl BinRead for CimMode {
             1 => Self::Options,
             2 => Self::HostOptions,
             3 => Self::Garage(submode.into()),
-            4 => Self::VehicleSelect,
+            4 => Self::CarSelect,
             5 => Self::TrackSelect,
             6 => Self::ShiftU {
                 submode: submode.into(),
@@ -187,7 +191,7 @@ impl BinRead for CimMode {
                     pos,
                     found: Box::new(submode),
                 })
-            }
+            },
         };
 
         Ok(res)
@@ -208,7 +212,7 @@ impl BinWrite for CimMode {
             CimMode::Options => (1u8, 0u8, 0u8),
             CimMode::HostOptions => (2u8, 0u8, 0u8),
             CimMode::Garage(submode) => (3u8, *submode as u8, 0u8),
-            CimMode::VehicleSelect => (4u8, 0u8, 0u8),
+            CimMode::CarSelect => (4u8, 0u8, 0u8),
             CimMode::TrackSelect => (5u8, 0u8, 0u8),
             CimMode::ShiftU {
                 submode: mode,

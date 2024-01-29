@@ -6,7 +6,7 @@ use crate::{
     identifiers::RequestId,
     insim::{Isi, IsiFlags},
     net::{Codec, Framed, FramedInner, Mode},
-    relay::HostSelect,
+    relay::Sel,
     result::Result,
 };
 
@@ -147,7 +147,7 @@ impl Builder {
         self.mode(Mode::Uncompressed)
     }
 
-    /// Enable the verification of the Insim version within the library. If a [crate::Packet::Version] is received with a differing version, [crate::Error::IncompatibleVersion] is returned and the connection is lost.
+    /// Enable the verification of the Insim version within the library. If a [crate::Packet::Ver] is received with a differing version, [crate::Error::IncompatibleVersion] is returned and the connection is lost.
     pub fn verify_version(mut self, verify: bool) -> Self {
         self.verify_version = verify;
         self
@@ -180,44 +180,44 @@ impl Builder {
         self
     }
 
-    /// Set the admin password to be used in the [crate::Packet::Init] packet during connection
+    /// Set the admin password to be used in the [crate::Packet::Isi] packet during connection
     /// handshake.
     pub fn isi_admin_password<P: Into<Option<String>>>(mut self, password: P) -> Self {
         self.isi_admin_password = password.into();
         self
     }
 
-    /// Set the [crate::identifiers::RequestId] to be used in the [crate::Packet::Init] packet during connection
+    /// Set the [crate::identifiers::RequestId] to be used in the [crate::Packet::Isi] packet during connection
     /// handshake.
     pub fn isi_reqi(mut self, i: RequestId) -> Self {
         self.isi_reqi = i;
         self
     }
 
-    /// Set the [crate::insim::IsiFlags] to be used in the [crate::Packet::Init] packet during connection
+    /// Set the [crate::insim::IsiFlags] to be used in the [crate::Packet::Isi] packet during connection
     /// handshake.
     pub fn isi_flags(mut self, flags: IsiFlags) -> Self {
         self.isi_flags = flags;
         self
     }
 
-    /// Set the prefix to be used in the [crate::Packet::Init] packet during connection
+    /// Set the prefix to be used in the [crate::Packet::Isi] packet during connection
     /// handshake.
     pub fn isi_prefix<C: Into<Option<char>>>(mut self, c: C) -> Self {
         self.isi_prefix = c.into();
         self
     }
 
-    /// Set the iname to be used in the [crate::Packet::Init] packet during connection
+    /// Set the iname to be used in the [crate::Packet::Isi] packet during connection
     /// handshake.
     pub fn isi_iname<N: Into<Option<String>>>(mut self, iname: N) -> Self {
         self.isi_iname = iname.into();
         self
     }
 
-    /// Set the interval to be used in the [crate::Packet::Init] packet during connection
+    /// Set the interval to be used in the [crate::Packet::Isi] packet during connection
     /// handshake.
-    /// This governs the time between [crate::Packet::MultiCarInfo] or [crate::Packet::NodeLap]
+    /// This governs the time between [crate::Packet::Mci] or [crate::Packet::Nlp]
     /// packets.
     pub fn isi_interval<D: Into<Option<Duration>>>(mut self, duration: D) -> Self {
         self.isi_interval = duration.into();
@@ -267,7 +267,7 @@ impl Builder {
                 stream.handshake(self.isi(), self.handshake_timeout).await?;
 
                 Ok(Framed::BufferedTcp(stream))
-            }
+            },
             Proto::Udp => {
                 let local = self.udp_local_address.unwrap_or("0.0.0.0:0".parse()?);
 
@@ -284,12 +284,13 @@ impl Builder {
                 stream.handshake(isi, self.handshake_timeout).await?;
 
                 Ok(Framed::Udp(stream))
-            }
+            },
             Proto::Relay => {
                 let mut stream = self._connect_relay().await?;
 
                 if let Some(hostname) = &self.relay_select_host {
-                    let packet = HostSelect {
+                    let packet = Sel {
+                        reqi: RequestId(1),
                         hname: hostname.to_string(),
                         admin: self
                             .relay_admin_password
@@ -301,14 +302,13 @@ impl Builder {
                             .as_deref()
                             .unwrap_or("")
                             .to_owned(),
-                        ..Default::default()
                     };
 
                     stream.write(packet).await?;
                 }
 
                 Ok(stream)
-            }
+            },
         }
     }
 
@@ -322,7 +322,7 @@ impl Builder {
             .await??;
 
             let mut inner = FramedInner::new(stream, Codec::new(Mode::Uncompressed));
-            inner.verify_version(false);
+            inner.verify_version(self.verify_version);
             return Ok(Framed::WebSocket(inner));
         }
 
@@ -334,7 +334,7 @@ impl Builder {
         stream.set_nodelay(self.tcp_nodelay)?;
 
         let mut inner = FramedInner::new(stream, Codec::new(Mode::Uncompressed));
-        inner.verify_version(false);
+        inner.verify_version(self.verify_version);
         Ok(Framed::Tcp(inner))
     }
 }

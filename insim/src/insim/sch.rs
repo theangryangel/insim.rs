@@ -10,7 +10,7 @@ bitflags! {
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     #[br(map = Self::from_bits_truncate)]
     #[bw(map = |&x: &Self| x.bits())]
-    pub struct SchModifiers: u8 {
+    pub struct SchFlags: u8 {
         /// Shift
         const SHIFT = (1 << 0);
 
@@ -35,5 +35,5 @@ pub struct Sch {
 
     /// Character modifiers/flags
     #[brw(pad_after = 2)]
-    pub flags: SchModifiers,
+    pub flags: SchFlags,
 }

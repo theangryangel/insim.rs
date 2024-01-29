@@ -12,7 +12,7 @@ use crate::identifiers::RequestId;
 /// It is advisable to request version information as soon as you have connected, to
 /// avoid problems when connecting to a host with a later or earlier version.  You will
 /// be sent a version packet on connection if you set ReqI in the IS_ISI packet.
-pub struct Version {
+pub struct Ver {
     /// Non-zero if the packet is a packet request or a reply to a request
     #[brw(pad_after = 1)]
     pub reqi: RequestId,

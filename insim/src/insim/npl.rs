@@ -208,6 +208,7 @@ pub struct Npl {
 
     /// Total number of players in server
     pub nump: u8,
+
     /// Configuration.
     /// UF1 / LX4 / LX6: 0 = DEFAULT / 1 = OPEN ROOF
     /// GTR racing cars: 0 = DEFAULT / 1 = ALTERNATE

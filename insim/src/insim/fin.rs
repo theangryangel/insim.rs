@@ -5,20 +5,17 @@ use insim_core::{
     duration::{binrw_parse_duration, binrw_write_duration},
 };
 
+use super::PlayerFlags;
 use crate::identifiers::{PlayerId, RequestId};
 
-use bitflags::bitflags;
-
-use super::PlayerFlags;
-
-bitflags! {
+bitflags::bitflags! {
     #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     #[br(map = Self::from_bits_truncate)]
     #[bw(map = |&x: &Self| x.bits())]
     /// Race result confirmation flags
-    pub struct RaceConfirmationFlags: u8 {
+    pub struct RaceConfirmFlags: u8 {
         /// Mentioned
         const MENTIONED = (1 << 0);
         /// Confirmed result
@@ -36,18 +33,17 @@ bitflags! {
     }
 }
 
-impl RaceConfirmationFlags {
+impl RaceConfirmFlags {
     /// Was the player disqualified for any reason?
     pub fn disqualified(&self) -> bool {
-        self.contains(RaceConfirmationFlags::PENALTY_DT)
-            || self.contains(RaceConfirmationFlags::PENALTY_SG)
-            || self.contains(RaceConfirmationFlags::DID_NOT_PIT)
+        self.contains(RaceConfirmFlags::PENALTY_DT)
+            || self.contains(RaceConfirmFlags::PENALTY_SG)
+            || self.contains(RaceConfirmFlags::DID_NOT_PIT)
     }
 
     /// Did the player receive a penalty for any reason?
     pub fn time_penalty(&self) -> bool {
-        self.contains(RaceConfirmationFlags::PENALTY_30)
-            || self.contains(RaceConfirmationFlags::PENALTY_45)
+        self.contains(RaceConfirmFlags::PENALTY_30) || self.contains(RaceConfirmFlags::PENALTY_45)
     }
 }
 
@@ -78,7 +74,7 @@ pub struct Fin {
 
     #[brw(pad_after = 1)]
     /// Confirmation flags give extra context to the result
-    pub confirm: RaceConfirmationFlags,
+    pub confirm: RaceConfirmFlags,
 
     /// Total laps completed
     pub lapsdone: u16,

@@ -185,7 +185,7 @@ impl std::fmt::Display for Vehicle {
             Vehicle::Mod(vehmod) => {
                 // Determine the mod id. This is only applicable for Insim v9.
                 write!(f, "{:06X}", vehmod)
-            }
+            },
             Vehicle::Unknown => write!(f, "Unknown"),
         }
     }
@@ -217,7 +217,7 @@ impl std::fmt::Debug for Vehicle {
             Vehicle::Mod(vehmod) => {
                 // Determine the mod id. This is only applicable for Insim v9.
                 write!(f, "MOD({:06X})", vehmod)
-            }
+            },
             Vehicle::Unknown => write!(f, "Unknown"),
         }
     }
