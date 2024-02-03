@@ -1,7 +1,8 @@
 //! TCP/UDP/Websocket bindings, and adapters to receive and send
 
-use crate::result::Result;
 use bytes::BytesMut;
+
+use crate::result::Result;
 
 pub(crate) mod bufwriter;
 pub(crate) mod codec;

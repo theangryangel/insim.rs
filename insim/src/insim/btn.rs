@@ -171,9 +171,11 @@ pub struct Btn {
 
 #[cfg(test)]
 mod tests {
-    use super::Btn;
-    use insim_core::binrw::BinWrite;
     use std::io::Cursor;
+
+    use insim_core::binrw::BinWrite;
+
+    use super::Btn;
 
     #[test]
     fn test_btn() {

@@ -17,6 +17,17 @@ repos:
     rev: v1.0
     hooks:
       - id: fmt
+        args: [
+            "--",
+            "--config",
+            # XXX: Unstable options are not read from rustfm.toml, however you
+            # can apply them via args to rustfmt.
+            # When stable, remove from here and add to rustfmt.toml
+            #
+            # See https://github.com/rust-lang/rustfmt/issues/5083
+            # See https://github.com/rust-lang/rustfmt/issues/4991
+            "group_imports=StdExternalCrate,imports_granularity=Crate",
+          ]
       - id: cargo-check
       - id: clippy
         # XXX: allowing clippy::unnecessary_fallible_conversions until binrw has

@@ -1,10 +1,11 @@
-use insim_core::binrw::BinWrite;
-use insim_pth::Pth;
 use std::{
     fs::File,
     io::{Cursor, Read, Seek, SeekFrom},
     path::PathBuf,
 };
+
+use insim_core::binrw::BinWrite;
+use insim_pth::Pth;
 
 fn assert_valid_as1_pth(p: &Pth) {
     assert_eq!(p.version, 0);

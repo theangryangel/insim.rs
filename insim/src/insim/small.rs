@@ -1,12 +1,10 @@
 use std::time::Duration;
 
 use bitflags::bitflags;
-
 use insim_core::binrw::{self, binrw, BinRead, BinWrite};
 
-use crate::identifiers::RequestId;
-
 use super::{PlcAllowedCarsSet, VtnAction};
+use crate::identifiers::RequestId;
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]

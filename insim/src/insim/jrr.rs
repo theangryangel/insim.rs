@@ -1,8 +1,7 @@
 use insim_core::binrw::{self, binrw};
 
-use crate::identifiers::{ConnectionId, PlayerId, RequestId};
-
 use super::ObjectInfo;
+use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 #[binrw]
 #[derive(Debug, Default, Clone)]

@@ -1,10 +1,8 @@
 use bytes::BytesMut;
 use tokio::net::UdpSocket;
 
-use crate::error::Error;
-use crate::result::Result;
-
 use super::TryReadWriteBytes;
+use crate::{error::Error, result::Result};
 
 #[async_trait::async_trait]
 impl TryReadWriteBytes for UdpSocket {

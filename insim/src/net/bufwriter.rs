@@ -1,8 +1,8 @@
-use crate::{error::Error, result::Result};
 use bytes::BytesMut;
 use tokio::net::TcpStream;
 
 use super::TryReadWriteBytes;
+use crate::{error::Error, result::Result};
 
 #[async_trait::async_trait]
 impl TryReadWriteBytes for tokio::io::BufWriter<TcpStream> {

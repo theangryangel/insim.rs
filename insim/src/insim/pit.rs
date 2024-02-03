@@ -1,15 +1,13 @@
 use std::time::Duration;
 
+use bitflags::bitflags;
 use insim_core::{
     binrw::{self, binrw},
     duration::{binrw_parse_duration, binrw_write_duration},
 };
 
-use crate::identifiers::{PlayerId, RequestId};
-
-use bitflags::bitflags;
-
 use super::{Fuel, PenaltyInfo, PlayerFlags, TyreCompound};
+use crate::identifiers::{PlayerId, RequestId};
 
 bitflags! {
     /// Work which was carried out at a pitstop. Used in [Pit].

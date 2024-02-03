@@ -5,9 +5,8 @@ use insim_core::{
     duration::{binrw_parse_duration, binrw_write_duration},
 };
 
-use crate::identifiers::{PlayerId, RequestId};
-
 use super::CarContact;
+use crate::identifiers::{PlayerId, RequestId};
 
 #[binrw]
 #[derive(Debug, Default, Clone)]

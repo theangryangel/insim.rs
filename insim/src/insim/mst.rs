@@ -22,9 +22,11 @@ pub struct Mst {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use insim_core::binrw::BinWrite;
     use std::io::Cursor;
+
+    use insim_core::binrw::BinWrite;
+
+    use super::*;
 
     #[test]
     fn test_mst() {

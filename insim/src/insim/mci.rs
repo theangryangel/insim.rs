@@ -1,11 +1,10 @@
+use bitflags::bitflags;
 use insim_core::{
     binrw::{self, binrw},
     point::Point,
 };
 
 use crate::identifiers::{PlayerId, RequestId};
-
-use bitflags::bitflags;
 
 bitflags! {
     #[binrw]

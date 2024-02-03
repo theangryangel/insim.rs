@@ -8,9 +8,8 @@ use insim_core::{
     duration::{binrw_parse_duration, binrw_write_duration},
 };
 
-use crate::identifiers::{PlayerId, RequestId};
-
 use super::{PenaltyInfo, PlayerFlags};
+use crate::identifiers::{PlayerId, RequestId};
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[derive(Debug, Default, Clone)]

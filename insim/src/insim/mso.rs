@@ -55,12 +55,13 @@ pub struct Mso {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::io::Cursor;
 
     use bytes::{BufMut, BytesMut};
     use insim_core::binrw::{BinRead, BinWrite};
-    use std::io::Cursor;
     use tokio_test::assert_ok;
+
+    use super::*;
 
     #[test]
     fn test_mso() {

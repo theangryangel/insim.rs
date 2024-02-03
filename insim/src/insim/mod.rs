@@ -64,8 +64,6 @@ mod uco;
 mod ver;
 mod vtn;
 
-pub use racelaps::RaceLaps;
-
 pub use acr::{Acr, AcrResult};
 pub use axi::Axi;
 pub use axm::{Axm, ObjectInfo, PmoAction, PmoFlags};
@@ -109,6 +107,7 @@ pub use plc::{Plc, PlcAllowedCarsSet};
 pub use plh::{PlayerHandicap, Plh};
 pub use pll::Pll;
 pub use plp::Plp;
+pub use racelaps::RaceLaps;
 pub use reo::Reo;
 pub use res::Res;
 pub use rip::{Rip, RipError, RipOptions};

@@ -1,5 +1,6 @@
-use crate::identifiers::{ConnectionId, RequestId};
 use insim_core::binrw::{self, binrw};
+
+use crate::identifiers::{ConnectionId, RequestId};
 
 #[binrw]
 #[derive(Debug, Default, Clone)]

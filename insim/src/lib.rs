@@ -27,19 +27,16 @@ pub const VERSION: u8 = 9;
 /// The LFS World Relay address and port
 pub const LFSW_RELAY_ADDR: &str = "isrelay.lfs.net:47474";
 
+pub use builder::Builder;
+pub use error::Error;
 /// Rexport insim_core
 pub use insim_core as core;
-
 #[cfg(feature = "pth")]
 /// Report insim_pth when pth feature is enabled
 pub use insim_pth as pth;
-
 #[cfg(feature = "smx")]
 /// Report insim_smx when smx feature is enabled
 pub use insim_smx as smx;
-
-pub use builder::Builder;
-pub use error::Error;
 pub use packet::Packet;
 pub use result::Result;
 

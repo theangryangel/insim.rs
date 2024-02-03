@@ -11,7 +11,7 @@ currently not touching the version number.
 
 You can track the path to stable by monitoring these issues: <https://github.com/theangryangel/insim.rs/issues?q=is%3Aissue+is%3Aopen+label%3A%22target%3A+1.0.0%22>.
 
-If you're not sure where to start, you probably want to look at the README and examples within the `insim` crate.
+If you're not sure where to start, you probably want to look at the [examples](https://github.com/theangryangel/insim.rs/tree/main/examples).
 
 | Crate        | Usage                                           |
 | ------------ | ----------------------------------------------- |
@@ -27,7 +27,7 @@ If you're looking for race_directord that has been moved to <https://github.com/
 Until we're released, either:
 
 - Please run `cargo doc --no-deps --open`
-- Take a look at the examples in each crate
+- Take a look at the examples
 
 ## TODO
 

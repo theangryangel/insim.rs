@@ -1,12 +1,11 @@
 use std::time::Duration;
 
+use bitflags::bitflags;
 use insim_core::{
     binrw::{self, binrw},
     duration::{binrw_parse_duration, binrw_write_duration},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
 };
-
-use bitflags::bitflags;
 
 use crate::{identifiers::RequestId, VERSION};
 
@@ -125,11 +124,12 @@ impl Default for Isi {
 
 #[cfg(test)]
 mod tests {
-    use crate::{identifiers::RequestId, VERSION};
-    use insim_core::binrw::BinWrite;
     use std::{io::Cursor, time::Duration};
 
+    use insim_core::binrw::BinWrite;
+
     use super::Isi;
+    use crate::{identifiers::RequestId, VERSION};
 
     #[test]
     fn test_isi() {

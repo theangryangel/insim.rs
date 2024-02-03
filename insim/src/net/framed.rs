@@ -1,18 +1,17 @@
 use std::{fmt::Debug, time::Duration};
+
+use bytes::BytesMut;
+use if_chain::if_chain;
 use tokio::{
     io::BufWriter,
     net::{TcpStream, UdpSocket},
     time::{self, timeout},
 };
 
-use crate::{error::Error, insim::Isi, packet::Packet, result::Result};
-use bytes::BytesMut;
-use if_chain::if_chain;
-
-use super::{codec::Codec, TryReadWriteBytes, DEFAULT_TIMEOUT_SECS};
-
 #[cfg(feature = "websocket")]
 use super::websocket::TungsteniteWebSocket;
+use super::{codec::Codec, TryReadWriteBytes, DEFAULT_TIMEOUT_SECS};
+use crate::{error::Error, insim::Isi, packet::Packet, result::Result};
 
 /// A unified wrapper around anything that implements [TryReadWriteBytes].
 /// You probably really want to look at [Framed].

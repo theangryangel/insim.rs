@@ -32,8 +32,9 @@ pub struct Mtc {
 
 #[cfg(test)]
 mod tests {
-    use insim_core::binrw::BinWrite;
     use std::io::Cursor;
+
+    use insim_core::binrw::BinWrite;
 
     use super::*;
 

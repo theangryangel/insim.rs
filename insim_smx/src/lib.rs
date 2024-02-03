@@ -11,14 +11,18 @@
 //!
 //! I would suggest that SMX files should be considered historical at this point.
 
-use insim_core::binrw::{self, binrw, BinRead};
-use insim_core::string::{binrw_parse_codepage_string, binrw_write_codepage_string};
-use std::fs::{self, File};
-use std::io::ErrorKind;
-use std::path::PathBuf;
-use thiserror::Error;
+use std::{
+    fs::{self, File},
+    io::ErrorKind,
+    path::PathBuf,
+};
 
-use insim_core::point::Point;
+use insim_core::{
+    binrw::{self, binrw, BinRead},
+    point::Point,
+    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
+};
+use thiserror::Error;
 
 #[non_exhaustive]
 #[derive(Error, Debug)]

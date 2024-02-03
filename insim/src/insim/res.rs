@@ -7,9 +7,8 @@ use insim_core::{
     vehicle::Vehicle,
 };
 
-use crate::identifiers::{PlayerId, RequestId};
-
 use super::{PlayerFlags, RaceConfirmFlags};
+use crate::identifiers::{PlayerId, RequestId};
 
 #[binrw]
 #[derive(Debug, Clone, Default)]

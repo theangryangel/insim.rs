@@ -1,7 +1,8 @@
 //! Handles encoding and decoding of [Packets](crate::packet::Packet) from the wire.
 
-use bytes::BytesMut;
 use std::io;
+
+use bytes::BytesMut;
 
 /// Describes if Insim packets are in "compressed" or "uncompressed" mode.
 #[derive(Debug, Clone)]

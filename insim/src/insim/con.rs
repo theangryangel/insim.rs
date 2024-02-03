@@ -5,9 +5,8 @@ use insim_core::{
     duration::{binrw_parse_duration, binrw_write_duration},
 };
 
-use crate::identifiers::{PlayerId, RequestId};
-
 use super::{obh::binrw_parse_spclose_strip_reserved_bits, CompCarInfo};
+use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

@@ -1,9 +1,10 @@
 //! High level example
 //! This example showcases the shortcut methods
+use std::{net::SocketAddr, time::Duration};
+
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
 use insim::{insim::IsiFlags, relay::Hlr, Packet, Result};
-use std::{net::SocketAddr, time::Duration};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]

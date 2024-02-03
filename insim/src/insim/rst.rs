@@ -1,3 +1,4 @@
+use bitflags::bitflags;
 use insim_core::{
     binrw::{self, binrw},
     track::Track,
@@ -6,8 +7,6 @@ use insim_core::{
 
 use super::RaceLaps;
 use crate::identifiers::RequestId;
-
-use bitflags::bitflags;
 
 bitflags! {
     #[binrw]

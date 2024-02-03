@@ -1,8 +1,7 @@
+use bitflags::bitflags;
 use insim_core::binrw::{self, binrw};
 
 use crate::identifiers::RequestId;
-
-use bitflags::bitflags;
 
 #[binrw]
 #[derive(Debug, Default, Clone)]

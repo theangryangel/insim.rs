@@ -1,3 +1,4 @@
+use bitflags::bitflags;
 use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
@@ -5,8 +6,6 @@ use insim_core::{
 };
 
 use crate::identifiers::RequestId;
-
-use bitflags::bitflags;
 
 bitflags! {
     /// Provides extended host information
