@@ -10,7 +10,9 @@ bench = false
 doctest = false
 
 [features]
-default = ["websocket"]
+default = ["async", "blocking", "websocket"]
+blocking = []
+async = ["dep:tokio", "dep:async-trait"]
 serde = [
   "dep:serde",
   "insim_core/serde",
@@ -19,13 +21,13 @@ serde = [
 ]
 pth = ["dep:insim_pth"]
 smx = ["dep:insim_smx"]
-websocket = ["dep:tokio-tungstenite"]
+websocket = ["async", "dep:tokio-tungstenite"]
 # TODO: feature flags for supported versions/packet defintions. How do we want to do this?
 # v9 = []
 # latest = ["v9"]
 
 [dependencies]
-async-trait = "0.1.68"
+async-trait = { version = "0.1.68", optional = true }
 bitflags = "2.4"
 bytes = "1"
 from_variants = "1.0.2"
@@ -37,7 +39,7 @@ insim_pth = { path = "../insim_pth", optional = true }
 insim_smx = { path = "../insim_smx", optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 thiserror = "1"
-tokio = { version = "1.11.0", features = ["rt", "time", "net", "macros", "sync", "tracing"] }
+tokio = { version = "1.11.0", features = ["rt", "time", "net", "macros", "sync", "tracing"], optional = true }
 tokio-tungstenite = { version = "0.21.0", optional = true }
 tracing = "0.1"
 

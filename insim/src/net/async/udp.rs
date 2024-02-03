@@ -1,11 +1,11 @@
 use bytes::BytesMut;
 use tokio::net::UdpSocket;
 
-use super::TryReadWriteBytes;
-use crate::{error::Error, result::Result};
+use super::AsyncTryReadWriteBytes;
+use crate::{error::Error, result::Result, MAX_SIZE_PACKET};
 
 #[async_trait::async_trait]
-impl TryReadWriteBytes for UdpSocket {
+impl AsyncTryReadWriteBytes for UdpSocket {
     async fn try_read_bytes(&mut self, buf: &mut BytesMut) -> Result<usize> {
         loop {
             let ready = self.ready(tokio::io::Interest::READABLE).await?;
@@ -15,8 +15,8 @@ impl TryReadWriteBytes for UdpSocket {
                 // I've picked 1492 because its the effectively a common MTU size across the internet
                 // still, and should give some future proofing if any packets insim increase
                 // in size
-                if buf.capacity() < 1492 {
-                    buf.reserve(1492 - buf.capacity());
+                if buf.capacity() < MAX_SIZE_PACKET {
+                    buf.reserve(MAX_SIZE_PACKET - buf.capacity());
                 }
 
                 match self.try_recv_buf(buf) {

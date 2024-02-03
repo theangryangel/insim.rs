@@ -44,6 +44,7 @@ pub enum Error {
     VehicleNotStandard,
 }
 
+#[cfg(feature = "async")]
 impl From<tokio::time::error::Elapsed> for Error {
     fn from(value: tokio::time::error::Elapsed) -> Self {
         Error::Timeout(value.to_string())

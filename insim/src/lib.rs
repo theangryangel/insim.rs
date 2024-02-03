@@ -27,7 +27,9 @@ pub const VERSION: u8 = 9;
 /// The LFS World Relay address and port
 pub const LFSW_RELAY_ADDR: &str = "isrelay.lfs.net:47474";
 
-pub use builder::Builder;
+// XXX: This is a temporary hack
+pub(crate) const MAX_SIZE_PACKET: usize = 1492;
+
 pub use error::Error;
 /// Rexport insim_core
 pub use insim_core as core;
@@ -39,6 +41,12 @@ pub use insim_pth as pth;
 pub use insim_smx as smx;
 pub use packet::Packet;
 pub use result::Result;
+
+/// Sync or blocking implementation
+#[cfg(feature = "blocking")]
+pub mod blocking {}
+
+pub use builder::Builder;
 
 /// Shortcut method to create a TCP connection
 ///

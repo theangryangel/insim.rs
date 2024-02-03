@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand};
 use if_chain::if_chain;
 use insim::{
     insim::{Isi, IsiFlags},
-    net::{Codec, Framed, FramedInner, Mode},
+    net::{Codec, r#async::{Framed, FramedInner}, Mode},
     relay::{Hlr, Sel},
     Packet, Result,
 };
