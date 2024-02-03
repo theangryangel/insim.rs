@@ -1,8 +1,9 @@
 //! Strongly typed Tracks
 // Warning: This is an automatically generated file from combos.py
 
-use crate::license::License;
 use binrw::{BinRead, BinWrite};
+
+use crate::license::License;
 
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

@@ -1,8 +1,9 @@
+use std::{
+    fmt,
+    ops::{Deref, DerefMut},
+};
+
 use insim_core::binrw::{self as binrw, binrw};
-
-use std::fmt;
-use std::ops::{Deref, DerefMut};
-
 #[cfg(feature = "serde")]
 use serde::Serialize;
 

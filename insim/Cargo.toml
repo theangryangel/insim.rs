@@ -25,24 +25,21 @@ websocket = ["dep:tokio-tungstenite"]
 # latest = ["v9"]
 
 [dependencies]
-bytes = "1"
-tokio = { version = "1.11.0", features = ["rt", "time", "net", "macros", "sync", "tracing"] }
-tracing = "0.1"
-serde = { version = "1", features = ["derive"], optional = true }
-bitflags = "2.4"
-thiserror = "1"
 async-trait = "0.1.68"
+bitflags = "2.4"
+bytes = "1"
+from_variants = "1.0.2"
+futures-util = "0.3.28"
 if_chain = "1"
+indexmap = "2.1.0"
 insim_core = { path = "../insim_core" }
 insim_pth = { path = "../insim_pth", optional = true }
 insim_smx = { path = "../insim_smx", optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+thiserror = "1"
+tokio = { version = "1.11.0", features = ["rt", "time", "net", "macros", "sync", "tracing"] }
 tokio-tungstenite = { version = "0.21.0", optional = true }
-futures-util = "0.3.28"
-from_variants = "1.0.2"
-indexmap = "2.1.0"
+tracing = "0.1"
 
 [dev-dependencies]
 tokio-test = "0.4"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-clap = { version = "4.2", features = ["derive"] }
-tokio = { version = "1.11.0", features = ["full"] }

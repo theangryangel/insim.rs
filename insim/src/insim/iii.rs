@@ -1,8 +1,9 @@
-use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string_until_eof, binrw_write_codepage_string},
 };
+
+use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 #[binrw]
 #[derive(Debug, Clone, Default)]

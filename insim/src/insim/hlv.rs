@@ -1,12 +1,12 @@
+use std::time::Duration;
+
 use insim_core::{
     binrw::{self, binrw},
     duration::{binrw_parse_duration, binrw_write_duration},
 };
 
-use crate::identifiers::{PlayerId, RequestId};
-use std::time::Duration;
-
 use super::CarContact;
+use crate::identifiers::{PlayerId, RequestId};
 
 #[binrw]
 #[derive(Debug, Default, Clone)]

@@ -1,19 +1,17 @@
 use bytes::BytesMut;
+use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpStream;
 
-use crate::error::Error;
-use crate::result::Result;
-
-use futures_util::{SinkExt, StreamExt};
-
 use super::TryReadWriteBytes;
+use crate::{error::Error, result::Result};
 
 pub(crate) type TungsteniteWebSocket =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<TcpStream>>;
 
 pub(crate) async fn connect_to_relay(tcp_nodelay: bool) -> Result<TungsteniteWebSocket> {
     use tokio_tungstenite::{
-        connect_async_with_config, tungstenite::handshake::client::generate_key, tungstenite::http,
+        connect_async_with_config,
+        tungstenite::{handshake::client::generate_key, http},
     };
 
     let uri = format!("ws://{}/connect", crate::LFSW_RELAY_ADDR)

@@ -1,6 +1,5 @@
 //! Strongly typed wind strength
 use binrw::binrw;
-
 #[cfg(feature = "serde")]
 use serde::Serialize;
 

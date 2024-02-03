@@ -19,15 +19,18 @@
 //! there is approximately 0.2 seconds of time between passing one node and the next,
 //! when you are "driving at a reasonable speed".
 
+use std::{
+    fs::{self, File},
+    io::ErrorKind,
+    path::PathBuf,
+};
+
 use binrw::BinRead;
-use std::fs::{self, File};
-use std::io::ErrorKind;
-use std::path::PathBuf;
+use insim_core::{
+    binrw::{self, binrw},
+    point::Point,
+};
 use thiserror::Error;
-
-use insim_core::binrw::{self, binrw};
-
-use insim_core::point::Point;
 
 #[non_exhaustive]
 #[derive(Error, Debug)]

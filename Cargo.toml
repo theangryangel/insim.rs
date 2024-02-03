@@ -4,6 +4,8 @@ members = [
   "insim",
   "insim_pth",
   "insim_smx",
+  "examples/*",
 ]
-
+# Only check / build main crates by default (check all with `--workspace`)
+default-members = ["insim", "insim_*"]
 resolver = "2"

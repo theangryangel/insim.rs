@@ -1,5 +1,7 @@
 //! Utilities for working with 'Codepage strings' from Insim.
 
+use std::{borrow::Cow, collections::HashMap, vec::Vec};
+
 /// LFS strings are a sequence of u8 bytes, with an optional trailing \0.
 /// The bytes are conventionally compromised of characters from multiple code pages, indicated by a `^` and
 /// a following code page identifier character. i.e. `^L` indicates Latin1.
@@ -9,7 +11,6 @@
 use encoding_rs;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
-use std::{borrow::Cow, collections::HashMap, vec::Vec};
 
 use super::{strip_trailing_nul, MARKER};
 

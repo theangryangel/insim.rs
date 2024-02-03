@@ -1,14 +1,12 @@
+use bitflags::bitflags;
 use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
     vehicle::Vehicle,
 };
 
-use crate::identifiers::{ConnectionId, PlayerId, RequestId};
-
-use bitflags::bitflags;
-
 use super::Fuel;
+use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 #[binrw]
 #[derive(Debug, Default, Clone)]

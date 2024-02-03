@@ -1,11 +1,11 @@
-use insim_core::binrw::BinWrite;
-use insim_smx::Smx;
 use std::{
     fs::File,
-    io::Seek,
-    io::{Cursor, Read, SeekFrom},
+    io::{Cursor, Read, Seek, SeekFrom},
     path::PathBuf,
 };
+
+use insim_core::binrw::BinWrite;
+use insim_smx::Smx;
 
 fn assert_valid_autocross_3dh(p: &Smx) {
     assert_eq!(p.objects.len(), 1666);

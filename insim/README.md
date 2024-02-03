@@ -88,7 +88,7 @@ loop {
 
 ## Additional examples
 
-For further examples see <https://github.com/theangryangel/insim.rs/tree/main/insim/examples>
+For further examples see <https://github.com/theangryangel/insim.rs/tree/main/examples>
 
 ## Breaking changes
 

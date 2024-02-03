@@ -54,8 +54,9 @@ pub struct Plh {
 
 #[cfg(test)]
 mod tests {
-    use binrw::{BinRead, BinWrite};
     use std::io::Cursor;
+
+    use binrw::{BinRead, BinWrite};
 
     use super::*;
 

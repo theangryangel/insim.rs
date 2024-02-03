@@ -1,7 +1,8 @@
 //! Strongly typed Vehicles for both standard and mods
 
-use crate::{license::License, string::is_ascii_alphanumeric};
 use binrw::{BinRead, BinWrite};
+
+use crate::{license::License, string::is_ascii_alphanumeric};
 
 /// Handles parsing a vehicle name according to the Insim v9 rules.
 /// See <https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info>

@@ -1,3 +1,5 @@
 match_block_trailing_comma = true
 max_width = 100
-# group_imports = "StdExternalCrate"  # XXX: Waiting on stablisation: https://github.com/rust-lang/rustfmt/issues/5083
+# XXX: These are unstable options. See .pre-commit-config.yaml
+# group_imports = "StdExternalCrate"
+# imports_granularity = "Crate"

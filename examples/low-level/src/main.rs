@@ -1,6 +1,8 @@
 //! Low level example of directly using connection::udp, tcp and relay directly.
 //! In this example you are 100% responsible for managing the state of the connection,
 //! providing the initial stream/udpsocket, sending keepalive packets, etc.
+use std::{net::SocketAddr, time::Duration};
+
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
 use insim::{
@@ -9,7 +11,6 @@ use insim::{
     relay::{Hlr, Sel},
     Packet, Result,
 };
-use std::{net::SocketAddr, time::Duration};
 use tokio::net::{TcpStream, UdpSocket};
 
 fn setup_tracing_subscriber() {

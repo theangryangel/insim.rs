@@ -1,8 +1,7 @@
 use insim_core::binrw::{self, binrw};
 
-use crate::identifiers::RequestId;
-
 use super::StaFlags;
+use crate::identifiers::RequestId;
 
 #[binrw]
 #[derive(Debug, Clone, Default)]

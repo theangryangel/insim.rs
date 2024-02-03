@@ -1,12 +1,12 @@
+use std::time::Duration;
+
+use bitflags::bitflags;
 use insim_core::{
     binrw::{self, binrw, BinRead, BinResult},
     duration::{binrw_parse_duration, binrw_write_duration},
 };
-use std::time::Duration;
 
 use crate::identifiers::{PlayerId, RequestId};
-
-use bitflags::bitflags;
 
 #[binrw::parser(reader, endian)]
 pub(crate) fn binrw_parse_spclose_strip_reserved_bits() -> BinResult<u16> {

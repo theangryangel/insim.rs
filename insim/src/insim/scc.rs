@@ -1,8 +1,7 @@
 use insim_core::binrw::{self, binrw};
 
-use crate::identifiers::{PlayerId, RequestId};
-
 use super::CameraView;
+use crate::identifiers::{PlayerId, RequestId};
 
 #[binrw]
 #[derive(Debug, Clone, Default)]

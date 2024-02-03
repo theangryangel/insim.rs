@@ -1,14 +1,12 @@
+use bitflags::bitflags;
 use insim_core::{
     binrw::{self, binrw},
     track::Track,
     wind::Wind,
 };
 
-use crate::identifiers::{PlayerId, RequestId};
-
-use bitflags::bitflags;
-
 use super::{CameraView, RaceLaps};
+use crate::identifiers::{PlayerId, RequestId};
 
 #[binrw]
 #[derive(Debug, Default, Clone)]

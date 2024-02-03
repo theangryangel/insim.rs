@@ -1,13 +1,15 @@
-use crate::{
-    error::Error,
-    identifiers::{ConnectionId, RequestId},
-};
+use std::default::Default;
+
 use indexmap::{set::Iter as IndexSetIter, IndexSet};
 use insim_core::{
     binrw::{self, binrw, BinRead, BinResult, BinWrite},
     vehicle::Vehicle,
 };
-use std::default::Default;
+
+use crate::{
+    error::Error,
+    identifiers::{ConnectionId, RequestId},
+};
 
 const MAX_MAL_SIZE: usize = 120;
 

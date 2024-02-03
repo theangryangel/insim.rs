@@ -1,9 +1,10 @@
-use super::mode::Mode;
+use std::io::{Cursor, Write};
 
-use crate::{packet::Packet, result::Result};
 use bytes::{Buf, Bytes, BytesMut};
 use insim_core::binrw::{BinRead, BinWrite};
-use std::io::{Cursor, Write};
+
+use super::mode::Mode;
+use crate::{packet::Packet, result::Result};
 
 /// Handles the encoding and decoding of Insim packets to and from raw bytes.
 /// It automatically handles the encoding of the total size of the packet, and the packet
@@ -77,15 +78,15 @@ impl Codec {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use bytes::BytesMut;
+    use tokio_test::assert_ok;
 
+    use super::*;
     use crate::{
         identifiers::RequestId,
         insim::{Tiny, TinyType},
         packet::Packet,
     };
-    use bytes::BytesMut;
-    use tokio_test::assert_ok;
 
     #[tokio::test]
     /// Ensure that Codec can decode a basic small packet

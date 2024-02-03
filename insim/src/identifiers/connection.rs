@@ -1,6 +1,9 @@
+use std::{
+    fmt,
+    ops::{Deref, DerefMut},
+};
+
 use insim_core::binrw::{self as binrw, binrw};
-use std::fmt;
-use std::ops::{Deref, DerefMut};
 
 /// Unique Connection Identifier, commonly referred to as UCID in Insim.txt
 #[binrw]
