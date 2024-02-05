@@ -4,6 +4,8 @@ version = "1.0.0"
 edition = "2021"
 description = "Insim PTH file implementation"
 rust-version = "1.66"
+license = "MIT"
+homepage = "https://github.com/theangryangel/insim.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
