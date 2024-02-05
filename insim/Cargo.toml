@@ -10,9 +10,9 @@ bench = false
 doctest = false
 
 [features]
-default = ["async", "blocking", "websocket"]
+default = ["tokio", "blocking", "websocket"]
 blocking = []
-async = ["dep:tokio", "dep:async-trait"]
+tokio = ["dep:tokio", "dep:async-trait"]
 serde = [
   "dep:serde",
   "insim_core/serde",
@@ -21,8 +21,8 @@ serde = [
 ]
 pth = ["dep:insim_pth"]
 smx = ["dep:insim_smx"]
-websocket = ["async", "dep:tokio-tungstenite"]
-# TODO: feature flags for supported versions/packet defintions. How do we want to do this?
+websocket = ["tokio", "dep:tokio-tungstenite", "futures-util"]
+# TODO: feature flags for supported versions/packet definitions. How do we want to do this?
 # v9 = []
 # latest = ["v9"]
 
@@ -31,7 +31,7 @@ async-trait = { version = "0.1.68", optional = true }
 bitflags = "2.4"
 bytes = "1"
 from_variants = "1.0.2"
-futures-util = "0.3.28"
+futures-util = { version = "0.3.28", optional = true }
 if_chain = "1"
 indexmap = "2.1.0"
 insim_core = { path = "../insim_core" }

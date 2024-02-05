@@ -28,8 +28,13 @@ pub const VERSION: u8 = 9;
 pub const LFSW_RELAY_ADDR: &str = "isrelay.lfs.net:47474";
 
 // XXX: This is a temporary hack
-pub(crate) const MAX_SIZE_PACKET: usize = 1492;
+// Why 255 * 4? Because the size of a packet is a u8, with a max byte size of 255.
+// In "compressed" mode the raw size is multiplied by 4.
+pub(crate) const MAX_SIZE_PACKET: usize = 255 * 4;
 
+pub(crate) const DEFAULT_BUFFER_CAPACITY: usize = MAX_SIZE_PACKET * 6;
+
+pub use builder::Builder;
 pub use error::Error;
 /// Rexport insim_core
 pub use insim_core as core;
@@ -42,17 +47,15 @@ pub use insim_smx as smx;
 pub use packet::Packet;
 pub use result::Result;
 
-/// Sync or blocking implementation
-#[cfg(feature = "blocking")]
-pub mod blocking {}
-
-pub use builder::Builder;
-
 /// Shortcut method to create a TCP connection
 ///
 /// # Examples
+///
+/// Supports both blocking and tokio. Swap about `connect_async` for `connect` and remove the
+/// `.await` annotations.
+///
 /// ```rust
-/// let conn = insim::tcp("127.0.0.1:29999").connect().await?;
+/// let conn = insim::tcp("127.0.0.1:29999").connect_async().await?;
 /// loop {
 ///     let packet = conn.read().await?;
 ///     println!("{:?}", packet);
@@ -66,8 +69,12 @@ pub fn tcp<R: Into<SocketAddr>>(remote_addr: R) -> builder::Builder {
 /// If local_addr is not provided then we will bind to "0.0.0.0:0" (all addresses, random port).
 ///
 /// # Examples
+///
+/// Supports both blocking and tokio. Swap about `connect_async` for `connect` and remove the
+/// `.await` annotations.
+///
 /// ```rust
-/// let conn = insim::udp("127.0.0.1:29999", None).connect().await?;
+/// let conn = insim::udp("127.0.0.1:29999", None).connect_async().await?;
 /// loop {
 ///     let packet = conn.read().await?;
 ///     println!("{:?}", packet);
@@ -83,11 +90,15 @@ pub fn udp<L: Into<Option<SocketAddr>>, R: Into<SocketAddr>>(
 /// Shortcut method to create a LFS World Relay connection.
 ///
 /// # Examples
+///
+/// Supports both blocking and tokio. Swap about `connect_async` for `connect` and remove the
+/// `.await` annotations.
+///
 /// ```rust
 /// let conn = insim::relay()
 ///     .relay_select_host("Nubbins AU Demo")
 ///     .relay_websocket(true)
-///     .connect()
+///     .connect_async()
 ///     .await?;
 /// loop {
 ///     let packet = conn.read().await?;

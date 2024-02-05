@@ -12,9 +12,8 @@ impl AsyncTryReadWriteBytes for UdpSocket {
 
             if ready.is_readable() {
                 // Tokio docs indicates that the buffer must be large enough for any packet.
-                // I've picked 1492 because its the effectively a common MTU size across the internet
-                // still, and should give some future proofing if any packets insim increase
-                // in size
+                // Since we know the max possible insim packet size, we ensure that we have at
+                // least that capacity.
                 if buf.capacity() < MAX_SIZE_PACKET {
                     buf.reserve(MAX_SIZE_PACKET - buf.capacity());
                 }

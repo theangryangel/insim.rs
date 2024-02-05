@@ -47,6 +47,7 @@ impl Default for CimMode {
 
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// CimMode::Normal, submode
 pub enum CimSubModeNormal {
     #[default]
@@ -59,7 +60,7 @@ pub enum CimSubModeNormal {
     /// Showing wheel damaage
     WheelDamage = 2,
 
-    /// Showing live setings
+    /// Showing live settings
     LiveSettings = 3,
 
     /// Show pit instructions
@@ -85,6 +86,7 @@ impl From<u8> for CimSubModeNormal {
 
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// CimMode::Garage, submode
 pub enum CimSubModeGarage {
     #[default]
@@ -139,6 +141,7 @@ impl From<u8> for CimSubModeGarage {
 
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// CimMode::ShiftU, submode
 pub enum CimSubModeShiftU {
     #[default]

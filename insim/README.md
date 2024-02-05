@@ -27,13 +27,15 @@ The following are a list of [Cargo features][cargo-features] that can be enabled
 - `serde`: Enable serde support
 - `pth`: Pull in insim_pth and re-export
 - `smx`: Pull in insim_smx and re-export
-- `websocket`: Enable LFSW Relay support over websocket (default) using
-  Tungstenite
+- `tokio`: Enable tokio support (default)
+- `blocking`: Enable blocking/sync support
+- `websocket`: Enable LFSW Relay support over websocket using
+  Tungstenite (requires tokio)
 
-## Making a TCP connection
+## Making a TCP connection (using tokio)
 
 ```rust
-let conn = insim::tcp("127.0.0.1:29999").connect().await?;
+let conn = insim::tcp("127.0.0.1:29999").connect_async().await?;
 loop {
     let packet = conn.read().await?;
     println!("{:?}", packet);
@@ -47,12 +49,12 @@ loop {
 }
 ```
 
-## Making a UDP connection
+## Making a TCP connection (using blocking)
 
 ```rust
-let conn = insim::udp("127.0.0.1:29999", None).connect().await?;
+let conn = insim::tcp("127.0.0.1:29999", None).connect()?;
 loop {
-    let packet = conn.read().await?;
+    let packet = conn.read()?;
     println!("{:?}", packet);
 
     match packet {
@@ -64,15 +66,31 @@ loop {
 }
 ```
 
-## Making a LFS World Relay connection
+## Making a LFS World Relay connection (using tokio)
 
 ```rust
 let conn = insim::relay()
     .relay_select_host("Nubbins AU Demo")
-    .relay_websocket(true)
-    .connect()
+    .connect_async()
     .await?;
 
+loop {
+    let packet = conn.read().await?;
+    println!("{:?}", packet);
+
+    match packet {
+        insim::Packet::Mci(_) => {
+          println!("Got a MCI packet!")
+        },
+        _ => {},
+    }
+}
+```
+
+## Making a UDP connection (using tokio)
+
+```rust
+let conn = insim::tcp("127.0.0.1:29999", None).connect_async().await?;
 loop {
     let packet = conn.read().await?;
     println!("{:?}", packet);
@@ -92,6 +110,9 @@ For further examples see <https://github.com/theangryangel/insim.rs/tree/main/ex
 
 ## Breaking changes
 
+- [#143](https://github.com/theangryangel/insim.rs/issues/143) blocking/std sync
+  support added. Tokio (async) support is now able to be disabled via `tokio`
+  feature. For backwards compatibility `tokio` is enabled by default.
 - [#140](https://github.com/theangryangel/insim.rs/issues/140) renamed a significant proportion of
   the `insim::Packet` enum, and silbing structs and enums to more closely align with the upstream
   spec (`Insim.txt`).

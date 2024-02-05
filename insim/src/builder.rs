@@ -1,9 +1,9 @@
 use std::{fmt::Debug, net::SocketAddr, time::Duration};
 
 #[cfg(feature = "blocking")]
-use crate::net::blocking::{Framed as BlockingFramed, FramedInner as BlockingFramedInner};
-#[cfg(feature = "async")]
-use crate::net::r#async::{Framed as AsyncFramed, FramedInner as AsyncFramedInner};
+use crate::net::blocking_impl::{Framed as BlockingFramed, FramedInner as BlockingFramedInner};
+#[cfg(feature = "tokio")]
+use crate::net::tokio_impl::{Framed as AsyncFramed, FramedInner as AsyncFramedInner};
 use crate::{
     identifiers::RequestId,
     insim::{Isi, IsiFlags},
@@ -324,7 +324,7 @@ impl Builder {
     /// Attempt to establish (connect and handshake) a valid Insim connection using this
     /// configuration.
     /// The `Builder` is not consumed and may be reused.
-    #[cfg(feature = "async")]
+    #[cfg(feature = "tokio")]
     pub async fn connect_async(&self) -> Result<AsyncFramed> {
         use tokio::{io::BufWriter, time::timeout};
 
@@ -389,7 +389,7 @@ impl Builder {
         }
     }
 
-    #[cfg(feature = "async")]
+    #[cfg(feature = "tokio")]
     async fn _connect_relay(&self) -> Result<AsyncFramed> {
         use tokio::time::timeout;
 
@@ -397,7 +397,7 @@ impl Builder {
         if self.relay_websocket {
             let stream = timeout(
                 self.connect_timeout,
-                crate::net::r#async::websocket::connect_to_relay(self.tcp_nodelay),
+                crate::net::tokio_impl::websocket::connect_to_relay(self.tcp_nodelay),
             )
             .await??;
 

@@ -13,7 +13,7 @@
 //!
 //! On a standard LFS track the [Node] is communicated via MCI and NLP Insim packets.
 //!
-//! On an open configuration [Node] are not used and are unavaiable via Insim MCI packets.
+//! On an open configuration [Node] are not used and are unavailable via Insim MCI packets.
 //!
 //! The distance between each [Node] is not constant. According to the LFS developers
 //! there is approximately 0.2 seconds of time between passing one node and the next,

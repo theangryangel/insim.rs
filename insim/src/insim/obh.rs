@@ -76,7 +76,7 @@ pub struct Obh {
 
     #[br(parse_with = binrw_parse_duration::<u16, 10, _>)]
     #[bw(write_with = binrw_write_duration::<u16, 10, _>)]
-    /// When this occured. Warning this is looping.
+    /// When this occurred. Warning this is looping.
     pub time: Duration,
 
     /// Additional information about the contact.

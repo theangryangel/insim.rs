@@ -20,7 +20,7 @@ impl Codec {
         Self { mode }
     }
 
-    /// Return the currect codec [Mode].
+    /// Return the current [Mode].
     pub fn mode(&self) -> &Mode {
         &self.mode
     }

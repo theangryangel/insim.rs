@@ -1,12 +1,12 @@
 //! Network implementation
 
 /// Async implementation
-#[cfg(feature = "async")]
-pub mod r#async;
+#[cfg(feature = "tokio")]
+pub mod tokio_impl;
 
 /// Sync or blocking implementation
 #[cfg(feature = "blocking")]
-pub mod blocking;
+pub mod blocking_impl;
 
 pub(crate) mod codec;
 pub(crate) mod mode;

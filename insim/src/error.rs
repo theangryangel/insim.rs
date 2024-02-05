@@ -17,7 +17,7 @@ pub enum Error {
         msg: String,
     },
 
-    /// A timeout occured whilst waiting for an operation
+    /// A timeout occurred whilst waiting for an operation
     #[error("Timeout: {0:?}")]
     Timeout(String),
 
@@ -44,7 +44,7 @@ pub enum Error {
     VehicleNotStandard,
 }
 
-#[cfg(feature = "async")]
+#[cfg(feature = "tokio")]
 impl From<tokio::time::error::Elapsed> for Error {
     fn from(value: tokio::time::error::Elapsed) -> Self {
         Error::Timeout(value.to_string())
