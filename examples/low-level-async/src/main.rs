@@ -7,7 +7,10 @@ use clap::{Parser, Subcommand};
 use if_chain::if_chain;
 use insim::{
     insim::{Isi, IsiFlags},
-    net::{Codec, Framed, FramedInner, Mode},
+    net::{
+        tokio_impl::{Framed, FramedInner},
+        Codec, Mode,
+    },
     relay::{Hlr, Sel},
     Packet, Result,
 };

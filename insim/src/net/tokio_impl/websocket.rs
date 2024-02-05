@@ -2,7 +2,7 @@ use bytes::BytesMut;
 use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpStream;
 
-use super::TryReadWriteBytes;
+use super::AsyncTryReadWriteBytes;
 use crate::{error::Error, result::Result};
 
 pub(crate) type TungsteniteWebSocket =
@@ -38,7 +38,7 @@ pub(crate) async fn connect_to_relay(tcp_nodelay: bool) -> Result<TungsteniteWeb
 }
 
 #[async_trait::async_trait]
-impl TryReadWriteBytes for TungsteniteWebSocket {
+impl AsyncTryReadWriteBytes for TungsteniteWebSocket {
     async fn try_read_bytes(&mut self, buf: &mut BytesMut) -> Result<usize> {
         use tokio_tungstenite::tungstenite::Message;
 

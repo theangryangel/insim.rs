@@ -1,11 +1,13 @@
 use std::{fmt::Debug, net::SocketAddr, time::Duration};
 
-use tokio::{io::BufWriter, time::timeout};
-
+#[cfg(feature = "blocking")]
+use crate::net::blocking_impl::{Framed as BlockingFramed, FramedInner as BlockingFramedInner};
+#[cfg(feature = "tokio")]
+use crate::net::tokio_impl::{Framed as AsyncFramed, FramedInner as AsyncFramedInner};
 use crate::{
     identifiers::RequestId,
     insim::{Isi, IsiFlags},
-    net::{Codec, Framed, FramedInner, Mode},
+    net::{Codec, Mode},
     relay::Sel,
     result::Result,
 };
@@ -250,7 +252,82 @@ impl Builder {
     /// Attempt to establish (connect and handshake) a valid Insim connection using this
     /// configuration.
     /// The `Builder` is not consumed and may be reused.
-    pub async fn connect(&self) -> Result<Framed> {
+    #[cfg(feature = "blocking")]
+    pub fn connect_blocking(&self) -> Result<BlockingFramed> {
+        use std::net::ToSocketAddrs;
+
+        use crate::LFSW_RELAY_ADDR;
+
+        match self.proto {
+            Proto::Tcp => {
+                let stream =
+                    std::net::TcpStream::connect_timeout(&self.remote, self.connect_timeout)?;
+                stream.set_nodelay(self.tcp_nodelay)?;
+
+                let mut stream = BlockingFramedInner::new(stream, Codec::new(self.mode.clone()));
+                stream.verify_version(self.verify_version);
+                stream.handshake(self.isi())?;
+
+                Ok(BlockingFramed::Tcp(stream))
+            },
+            Proto::Udp => {
+                let local = self.udp_local_address.unwrap_or("0.0.0.0:0".parse()?);
+
+                let stream = std::net::UdpSocket::bind(local)?;
+                stream.connect(self.remote)?;
+
+                let mut isi = self.isi();
+                if self.udp_local_address.is_none() {
+                    isi.udpport = local.port();
+                }
+
+                let mut stream = BlockingFramedInner::new(stream, Codec::new(self.mode.clone()));
+                stream.verify_version(self.verify_version);
+                stream.handshake(isi)?;
+
+                Ok(BlockingFramed::Udp(stream))
+            },
+            Proto::Relay => {
+                let addrs = LFSW_RELAY_ADDR.to_socket_addrs()?;
+                // FIXME we should try every result, not just the first
+                let stream = std::net::TcpStream::connect_timeout(
+                    &addrs.into_iter().nth(0).unwrap(),
+                    self.connect_timeout,
+                )?;
+                stream.set_nodelay(self.tcp_nodelay)?;
+                let mut stream = BlockingFramedInner::new(stream, Codec::new(Mode::Uncompressed));
+
+                if let Some(hostname) = &self.relay_select_host {
+                    let packet = Sel {
+                        reqi: RequestId(1),
+                        hname: hostname.to_string(),
+                        admin: self
+                            .relay_admin_password
+                            .as_deref()
+                            .unwrap_or("")
+                            .to_owned(),
+                        spec: self
+                            .relay_spectator_password
+                            .as_deref()
+                            .unwrap_or("")
+                            .to_owned(),
+                    };
+
+                    stream.write(packet.into())?;
+                }
+
+                Ok(BlockingFramed::Tcp(stream))
+            },
+        }
+    }
+
+    /// Attempt to establish (connect and handshake) a valid Insim connection using this
+    /// configuration.
+    /// The `Builder` is not consumed and may be reused.
+    #[cfg(feature = "tokio")]
+    pub async fn connect_async(&self) -> Result<AsyncFramed> {
+        use tokio::{io::BufWriter, time::timeout};
+
         match self.proto {
             Proto::Tcp => {
                 let stream = timeout(
@@ -262,11 +339,11 @@ impl Builder {
 
                 let stream = BufWriter::new(stream);
 
-                let mut stream = FramedInner::new(stream, Codec::new(self.mode.clone()));
+                let mut stream = AsyncFramedInner::new(stream, Codec::new(self.mode.clone()));
                 stream.verify_version(self.verify_version);
                 stream.handshake(self.isi(), self.handshake_timeout).await?;
 
-                Ok(Framed::BufferedTcp(stream))
+                Ok(AsyncFramed::BufferedTcp(stream))
             },
             Proto::Udp => {
                 let local = self.udp_local_address.unwrap_or("0.0.0.0:0".parse()?);
@@ -279,11 +356,11 @@ impl Builder {
                     isi.udpport = local.port();
                 }
 
-                let mut stream = FramedInner::new(stream, Codec::new(self.mode.clone()));
+                let mut stream = AsyncFramedInner::new(stream, Codec::new(self.mode.clone()));
                 stream.verify_version(self.verify_version);
                 stream.handshake(isi, self.handshake_timeout).await?;
 
-                Ok(Framed::Udp(stream))
+                Ok(AsyncFramed::Udp(stream))
             },
             Proto::Relay => {
                 let mut stream = self._connect_relay().await?;
@@ -312,18 +389,21 @@ impl Builder {
         }
     }
 
-    async fn _connect_relay(&self) -> Result<Framed> {
+    #[cfg(feature = "tokio")]
+    async fn _connect_relay(&self) -> Result<AsyncFramed> {
+        use tokio::time::timeout;
+
         #[cfg(feature = "websocket")]
         if self.relay_websocket {
             let stream = timeout(
                 self.connect_timeout,
-                crate::net::websocket::connect_to_relay(self.tcp_nodelay),
+                crate::net::tokio_impl::websocket::connect_to_relay(self.tcp_nodelay),
             )
             .await??;
 
-            let mut inner = FramedInner::new(stream, Codec::new(Mode::Uncompressed));
+            let mut inner = AsyncFramedInner::new(stream, Codec::new(Mode::Uncompressed));
             inner.verify_version(self.verify_version);
-            return Ok(Framed::WebSocket(inner));
+            return Ok(AsyncFramed::WebSocket(inner));
         }
 
         let stream = timeout(
@@ -333,8 +413,8 @@ impl Builder {
         .await??;
         stream.set_nodelay(self.tcp_nodelay)?;
 
-        let mut inner = FramedInner::new(stream, Codec::new(Mode::Uncompressed));
+        let mut inner = AsyncFramedInner::new(stream, Codec::new(Mode::Uncompressed));
         inner.verify_version(self.verify_version);
-        Ok(Framed::Tcp(inner))
+        Ok(AsyncFramed::Tcp(inner))
     }
 }

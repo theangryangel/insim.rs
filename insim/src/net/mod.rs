@@ -1,32 +1,18 @@
-//! TCP/UDP/Websocket bindings, and adapters to receive and send
+//! Network implementation
 
-use bytes::BytesMut;
+/// Async implementation
+#[cfg(feature = "tokio")]
+pub mod tokio_impl;
 
-use crate::result::Result;
+/// Sync or blocking implementation
+#[cfg(feature = "blocking")]
+pub mod blocking_impl;
 
-pub(crate) mod bufwriter;
 pub(crate) mod codec;
-pub(crate) mod framed;
 pub(crate) mod mode;
-pub(crate) mod tcp;
-pub(crate) mod udp;
-
-#[cfg(feature = "websocket")]
-pub(crate) mod websocket;
 
 pub use codec::Codec;
-pub use framed::{Framed, FramedInner};
 pub use mode::Mode;
 
 /// If no data is received within this period of seconds, consider the Insim connection to be lost.
 pub const DEFAULT_TIMEOUT_SECS: u64 = 90;
-
-/// Think of this as our own AsyncRead and AsyncWrite.
-#[async_trait::async_trait]
-pub trait TryReadWriteBytes: Send + Sync + Sized {
-    /// Try to read bytes.
-    async fn try_read_bytes(&mut self, buf: &mut BytesMut) -> Result<usize>;
-
-    /// Try to write bytes.
-    async fn try_write_bytes(&mut self, src: &[u8]) -> Result<usize>;
-}

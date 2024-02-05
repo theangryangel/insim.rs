@@ -29,7 +29,7 @@ pub enum MsoUserType {
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// System messsages and user messages, variable sized.
+/// System messages and user messages, variable sized.
 pub struct Mso {
     /// Non-zero if the packet is a packet request or a reply to a request
     #[brw(pad_after = 1)]

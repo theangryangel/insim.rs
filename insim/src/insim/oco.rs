@@ -76,7 +76,7 @@ pub struct Oco {
     pub index: OcoIndex,
 
     /// Optional identifier
-    pub identifer: u8,
+    pub identifier: u8,
 
     /// Bulbs/lights to manipulate
     pub data: OcoLights,

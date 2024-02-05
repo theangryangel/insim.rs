@@ -46,7 +46,7 @@ pub struct Hlv {
 
     #[br(parse_with = binrw_parse_duration::<u16, 10, _>)]
     #[bw(write_with = binrw_write_duration::<u16, 10, _>)]
-    /// When the violation occured. Warning: this is looping.
+    /// When the violation occurred. Warning: this is looping.
     pub time: Duration,
 
     /// Additional contact information. See [CarContact].

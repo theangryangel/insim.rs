@@ -108,7 +108,7 @@ pub struct Rip {
     #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
     pub ttime: Duration,
 
-    /// Zero or replay nam
+    /// Zero or replay name
     #[bw(write_with = binrw_write_codepage_string::<64, _>)]
     #[br(parse_with = binrw_parse_codepage_string::<64, _>)]
     pub rname: String,

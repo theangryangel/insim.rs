@@ -69,8 +69,7 @@ fn setup_tracing_subscriber() {
         .init();
 }
 
-#[tokio::main]
-pub async fn main() -> Result<()> {
+pub fn main() -> Result<()> {
     // Setup tracing_subcriber with some sane defaults
     setup_tracing_subscriber();
 
@@ -97,9 +96,12 @@ pub async fn main() -> Result<()> {
         } => {
             tracing::info!("Connecting via LFS World Relay!");
 
+            if *websocket {
+                panic!("Blocking does not yet support websockets!");
+            }
+
             // use insim relay
             insim::relay()
-                .relay_websocket(*websocket)
                 .relay_spectator_password(spectator_password.clone())
                 .relay_select_host(select_host.clone())
         },
@@ -112,7 +114,7 @@ pub async fn main() -> Result<()> {
     }
 
     // Establish a connection
-    let mut connection = builder.connect().await?;
+    let mut connection = builder.connect_blocking()?;
     tracing::info!("Connected!");
 
     // If we're connected via the relay, and asked to list the hosts, request the host list
@@ -120,13 +122,13 @@ pub async fn main() -> Result<()> {
         list_hosts: true, ..
     } = &cli.command
     {
-        connection.write(Hlr::default()).await?;
+        connection.write(Hlr::default())?;
     }
 
     let mut i: usize = 0;
 
     loop {
-        let packet = connection.read().await?;
+        let packet = connection.read()?;
 
         tracing::info!("Packet={:?} Index={:?}", packet, i);
 

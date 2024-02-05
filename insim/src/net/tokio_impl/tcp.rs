@@ -1,16 +1,16 @@
 use bytes::BytesMut;
 use tokio::net::TcpStream;
 
-use super::TryReadWriteBytes;
+use super::AsyncTryReadWriteBytes;
 use crate::{error::Error, result::Result};
 
 #[async_trait::async_trait]
-impl TryReadWriteBytes for tokio::io::BufWriter<TcpStream> {
+impl AsyncTryReadWriteBytes for TcpStream {
     async fn try_read_bytes(&mut self, buf: &mut BytesMut) -> Result<usize> {
         loop {
-            self.get_mut().readable().await?;
+            self.readable().await?;
 
-            match self.get_mut().try_read_buf(buf) {
+            match self.try_read_buf(buf) {
                 Ok(0) => {
                     return Err(Error::Disconnected);
                 },
@@ -29,9 +29,9 @@ impl TryReadWriteBytes for tokio::io::BufWriter<TcpStream> {
 
     async fn try_write_bytes(&mut self, src: &[u8]) -> Result<usize> {
         loop {
-            self.get_mut().writable().await?;
+            self.writable().await?;
 
-            match self.get_mut().try_write(src) {
+            match self.try_write(src) {
                 Ok(n) => {
                     return Ok(n);
                 },

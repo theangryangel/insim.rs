@@ -10,15 +10,22 @@ use tokio::{
 
 #[cfg(feature = "websocket")]
 use super::websocket::TungsteniteWebSocket;
-use super::{codec::Codec, TryReadWriteBytes, DEFAULT_TIMEOUT_SECS};
-use crate::{error::Error, insim::Isi, packet::Packet, result::Result};
+use super::AsyncTryReadWriteBytes;
+use crate::{
+    error::Error,
+    insim::Isi,
+    net::{Codec, DEFAULT_TIMEOUT_SECS},
+    packet::Packet,
+    result::Result,
+    DEFAULT_BUFFER_CAPACITY,
+};
 
-/// A unified wrapper around anything that implements [TryReadWriteBytes].
+/// A unified wrapper around anything that implements [AsyncTryReadWriteBytes].
 /// You probably really want to look at [Framed].
 #[derive(Debug)]
 pub struct FramedInner<N>
 where
-    N: TryReadWriteBytes,
+    N: AsyncTryReadWriteBytes,
 {
     inner: N,
     codec: Codec,
@@ -28,11 +35,11 @@ where
 
 impl<N> FramedInner<N>
 where
-    N: TryReadWriteBytes,
+    N: AsyncTryReadWriteBytes,
 {
     /// Create a new FramedInner, which wraps some kind of network transport.
     pub fn new(inner: N, codec: Codec) -> Self {
-        let buffer = BytesMut::new();
+        let buffer = BytesMut::with_capacity(DEFAULT_BUFFER_CAPACITY);
 
         Self {
             inner,

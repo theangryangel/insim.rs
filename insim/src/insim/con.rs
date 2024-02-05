@@ -59,7 +59,7 @@ pub struct ConInfo {
     pub y: i16,
 }
 
-// Manual implementation of BinRead, so that we can accomodate thrbrk, cluhan, etc.
+// Manual implementation of BinRead, so that we can accommodate thrbrk, cluhan, etc.
 impl BinRead for ConInfo {
     type Args<'a> = ();
 
@@ -114,7 +114,7 @@ impl BinRead for ConInfo {
     }
 }
 
-// Manual implementation of BinWrite, so that we can accomodate thrbrk, cluhan, etc.
+// Manual implementation of BinWrite, so that we can accommodate thrbrk, cluhan, etc.
 impl BinWrite for ConInfo {
     type Args<'a> = ();
 
