@@ -10,7 +10,7 @@ mod btn;
 mod cch;
 mod cim;
 mod cnl;
-mod con;
+mod contact; // con is a reserved file name on windows
 mod cpp;
 mod cpr;
 mod crs;
@@ -72,7 +72,7 @@ pub use btn::{Bfn, BfnType, Btc, Btn, BtnClickFlags, BtnInst, BtnStyleFlags, Btt
 pub use cch::{CameraView, Cch};
 pub use cim::{Cim, CimMode, CimSubModeGarage, CimSubModeNormal, CimSubModeShiftU};
 pub use cnl::{Cnl, CnlReason};
-pub use con::{Con, ConInfo};
+pub use contact::{Con, ConInfo};
 pub use cpp::Cpp;
 pub use cpr::Cpr;
 pub use crs::Crs;

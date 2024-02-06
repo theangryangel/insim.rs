@@ -1,3 +1,4 @@
+// con is a reserved word. Do not name this file `con.rs`.
 use std::time::Duration;
 
 use insim_core::{
