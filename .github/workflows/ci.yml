@@ -22,9 +22,14 @@ jobs:
   test:
     runs-on: ubuntu-latest
     needs: [pre-commit]
+    strategy:
+      matrix:
+        channel: [stable, nightly]
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.channel }}
       - uses: Swatinem/rust-cache@v2
       - name: Run cargo test
         run: cargo test --all --all-targets --all-features

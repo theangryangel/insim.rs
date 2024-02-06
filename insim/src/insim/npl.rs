@@ -196,8 +196,8 @@ pub struct Npl {
 
     /// low 4 bits: tyre width reduction (rear)
     pub rwadj: u8, // TODO: split into pair of u4
-    /// low 4 bits: tyre width reduction (front)
 
+    /// low 4 bits: tyre width reduction (front)
     #[brw(pad_after = 2)]
     pub fwadj: u8, // TODO: split into pair of u4
 
