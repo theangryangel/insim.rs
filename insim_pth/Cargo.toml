@@ -13,5 +13,5 @@ bench = false
 doctest = false
 
 [dependencies]
-insim_core = { path = "../insim_core" }
+insim_core = { path = "../insim_core", version = "1.0.0-alpha.1" }
 thiserror = "1"
