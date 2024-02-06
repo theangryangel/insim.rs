@@ -37,7 +37,7 @@ from_variants = "1.0.2"
 futures-util = { version = "0.3.28", optional = true }
 if_chain = "1"
 indexmap = "2.1.0"
-insim_core = { path = "../insim_core", version = "1.0.0-alpha.1" }
+insim_core = { path = "../insim_core", version = "1.0.0-alpha.2" }
 insim_pth = { path = "../insim_pth", optional = true, version = "1.0.0" }
 insim_smx = { path = "../insim_smx", optional = true, version = "1.0.0" }
 serde = { version = "1", features = ["derive"], optional = true }
