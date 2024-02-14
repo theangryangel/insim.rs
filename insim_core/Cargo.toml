@@ -1,6 +1,6 @@
 [package]
 name = "insim_core"
-version = "1.0.0-alpha.1"
+version = "1.0.0"
 edition = "2021"
 description = """
 Core types and traits for the insim crate.

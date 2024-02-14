@@ -1,6 +1,6 @@
 [package]
 name = "insim"
-version = "1.0.0-alpha.2"
+version = "1.0.0"
 authors = ["Karl Southern <karl@theangryangel.co.uk>"]
 edition = "2021"
 description = "LiveForSpeed Insim implementation that focuses on ergonomics and strong typing"
@@ -37,9 +37,9 @@ from_variants = "1.0.2"
 futures-util = { version = "0.3.28", optional = true }
 if_chain = "1"
 indexmap = "2.1.0"
-insim_core = { path = "../insim_core", version = "1.0.0-alpha.1" }
-insim_pth = { path = "../insim_pth", optional = true, version = "1.0.0" }
-insim_smx = { path = "../insim_smx", optional = true, version = "1.0.0" }
+insim_core = { path = "../insim_core", version = "1.0.0" }
+insim_pth = { path = "../insim_pth", optional = true, version = "1" }
+insim_smx = { path = "../insim_smx", optional = true, version = "1" }
 serde = { version = "1", features = ["derive"], optional = true }
 thiserror = "1"
 tokio = { version = "1.11.0", features = ["rt", "time", "net", "macros", "sync", "tracing"], optional = true }
