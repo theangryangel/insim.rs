@@ -13,7 +13,10 @@ Many of the core types, such as [Vehicle](crate::core::vehicle::Vehicle), [Track
 the crate `insim_core`, which is re-exported.
 
 You will probably want to use <https://en.lfsmanual.net/wiki/InSim.txt> as a
-detailed reference for what each packet describes and can do.
+detailed reference for what each packet describes and can do. Where possible
+this crate aligns the naming of fields in packets to match the original spec.
+In a handful of circumstances we have needed to rename, or separate some fields
+(most notably thrbrk and cluhan in the [Con](crate::Packet::Con) packet).
 
 ## Supported Features
 
@@ -24,13 +27,14 @@ detailed reference for what each packet describes and can do.
 
 The following are a list of [Cargo features][cargo-features] that can be enabled or disabled:
 
-- `serde`: Enable serde support
-- `pth`: Pull in insim_pth and re-export
-- `smx`: Pull in insim_smx and re-export
-- `tokio`: Enable tokio support (default)
-- `blocking`: Enable blocking/sync support
-- `websocket`: Enable LFSW Relay support over websocket using
-  Tungstenite (requires tokio)
+| Name      | Description                                                                 | Default? |
+| --------- | --------------------------------------------------------------------------- | -------- |
+| serde     | Enable serde support                                                        | No       |
+| pth       | Pull in insim_pth and re-export                                             | No       |
+| smx       | Pull in insim_smx and re-export                                             | No       |
+| tokio     | Enable tokio support                                                        | Yes      |
+| blocking  | Enable blocking/sync support                                                | Yes      |
+| websocket | Enable LFSW Relay support over websocket using Tungstenite (requires tokio) | Yes      |
 
 ## Making a TCP connection (using tokio)
 
@@ -52,7 +56,7 @@ loop {
 ## Making a TCP connection (using blocking)
 
 ```rust
-let conn = insim::tcp("127.0.0.1:29999", None).connect()?;
+let conn = insim::tcp("127.0.0.1:29999").connect()?;
 loop {
     let packet = conn.read()?;
     println!("{:?}", packet);
@@ -107,26 +111,3 @@ loop {
 ## Additional examples
 
 For further examples see <https://github.com/theangryangel/insim.rs/tree/main/examples>
-
-## Breaking changes
-
-- [#143](https://github.com/theangryangel/insim.rs/issues/143) blocking/std sync
-  support added. Tokio (async) support is now able to be disabled via `tokio`
-  feature. For backwards compatibility `tokio` is enabled by default.
-- [#140](https://github.com/theangryangel/insim.rs/issues/140) renamed a significant proportion of
-  the `insim::Packet` enum, and silbing structs and enums to more closely align with the upstream
-  spec (`Insim.txt`).
-- [#127](https://github.com/theangryangel/insim.rs/issues/127) restructures the crate to more closely
-  align with the std library:
-  - `insim::network` was renamed to `insim::net`
-  - `insim::codec::Codec` was moved to `insim::net::Codec`
-  - `insim::codec::Mode` was moved to `insim::net::Mode`
-  - Several convenience aliases were added: `insim::{Result, Error, Packet}`
-  - `Network` trait was renamed to `TryReadWriteBytes` to better indicate its
-    usage. Network was too generic.
-- [#127](https://github.com/theangryangel/insim.rs/issues/127) `insim::connection` was removed in favour
-  of the shortcut methods: `insim::tcp`, `insim::udp`, `insim::relay` which now return a reusable builder.
-  These do not auto-reconnect.
-- [#92](https://github.com/theangryangel/insim.rs/issues/92) disables the automatic escaping and
-  unescaping of strings. For convenience the insim crate now re-exports
-  `insim::core::string::escape` and `insim::core::string::unescape`.

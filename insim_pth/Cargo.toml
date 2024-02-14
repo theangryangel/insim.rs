@@ -1,6 +1,6 @@
 [package]
 name = "insim_pth"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 description = "Insim PTH file implementation"
 rust-version = "1.66"
@@ -13,5 +13,5 @@ bench = false
 doctest = false
 
 [dependencies]
-insim_core = { path = "../insim_core", version = "1.0.0-alpha.1" }
+insim_core = { path = "../insim_core", version = "1" }
 thiserror = "1"
