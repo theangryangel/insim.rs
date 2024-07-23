@@ -9,6 +9,7 @@ use crate::license::License;
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Handles parsing a Track name.
 #[non_exhaustive]
+#[allow(missing_docs)]
 pub enum Track {
     #[default]
     Bl1,
@@ -102,6 +103,7 @@ pub enum Track {
     We2x,
     We2y,
     We3,
+    #[allow(missing_docs)]
     We3x,
     We4,
     We4r,
@@ -168,6 +170,7 @@ pub enum Track {
 }
 
 impl Track {
+    /// What license is required to access this map
     pub fn license(&self) -> License {
         match self {
             Self::Bl1 => License::Demo,
@@ -327,10 +330,12 @@ impl Track {
         }
     }
 
+    /// Driving distance in kilometers
     pub fn distance_km(&self) -> Option<f32> {
         self.distance_mile().map(|distance| distance * 1.60934)
     }
 
+    /// Driving distance in miles
     pub fn distance_mile(&self) -> Option<f32> {
         match self {
             Self::Bl1 => Some(2.0),
@@ -490,7 +495,7 @@ impl Track {
         }
     }
 
-    // Complete name
+    /// Complete name of the track
     pub fn complete_name(&self) -> String {
         match self {
             Self::Bl1 => "Blackwood GP Track",
@@ -651,7 +656,7 @@ impl Track {
         .to_string()
     }
 
-    /// Code
+    /// Track short code
     pub fn code(&self) -> String {
         match self {
             Self::Bl1 => "BL1",

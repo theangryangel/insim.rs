@@ -65,7 +65,7 @@ We have no formal code of conduct at this time. But we do subscribe to
 
 Ideally this should be fully automated. At present it is not.
 
-- Create PR to change version in all crates to match (probably only just insim_core and insim realistically)
+- Create PR change version in workspace Cargo.toml
   - Locally run `cargo publish --dry-run` to ensure everything is OK
   - Wait for CI to go green
   - Merge
