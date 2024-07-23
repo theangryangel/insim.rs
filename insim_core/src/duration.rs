@@ -8,7 +8,6 @@ use std::time::Duration;
 use binrw::{BinRead, BinWrite, Error as BinError};
 
 #[allow(missing_docs)]
-#[doc(hidden)]
 #[binrw::writer(writer, endian)]
 pub fn binrw_write_duration<
     T: TryFrom<u128> + for<'a> BinWrite<Args<'a> = ()>,
@@ -28,7 +27,6 @@ pub fn binrw_write_duration<
 }
 
 #[allow(missing_docs)]
-#[doc(hidden)]
 #[binrw::parser(reader, endian)]
 pub fn binrw_parse_duration<T: TryInto<u64> + for<'a> BinRead<Args<'a> = ()>, const SCALE: u64>(
 ) -> binrw::BinResult<Duration> {

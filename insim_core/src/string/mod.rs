@@ -133,7 +133,6 @@ pub fn escape(input: Cow<str>) -> Cow<str> {
 
 use binrw::{helpers::until_eof, BinRead, BinWrite};
 
-#[doc(hidden)]
 #[allow(missing_docs)]
 #[binrw::writer(writer, endian)]
 pub fn binrw_write_codepage_string<const SIZE: usize>(
@@ -170,7 +169,6 @@ pub fn binrw_write_codepage_string<const SIZE: usize>(
     Ok(())
 }
 
-#[doc(hidden)]
 #[allow(missing_docs)]
 #[binrw::parser(reader, endian)]
 pub fn binrw_parse_codepage_string<const SIZE: usize>(raw: bool) -> binrw::BinResult<String> {
@@ -183,7 +181,6 @@ pub fn binrw_parse_codepage_string<const SIZE: usize>(raw: bool) -> binrw::BinRe
     })?
 }
 
-#[doc(hidden)]
 #[allow(missing_docs)]
 #[binrw::parser(reader, endian)]
 pub fn binrw_parse_codepage_string_until_eof(raw: bool) -> binrw::BinResult<String> {
