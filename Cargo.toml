@@ -46,6 +46,6 @@ serde = { version = "1.0.188" }
 thiserror = "1.0.40"
 tokio = { version = "1.11.0" }
 tokio-test = "0.4.0"
-tokio-tungstenite = { version = "0.21.0" }
+tokio-tungstenite = { version = "0.23.1" }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17" }
