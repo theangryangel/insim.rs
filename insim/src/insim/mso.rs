@@ -1,6 +1,9 @@
+use std::io::SeekFrom;
+
+use bytes::BufMut;
 use insim_core::{
     binrw::{self, binrw},
-    string::{binrw_parse_codepage_string_until_eof, binrw_write_codepage_string},
+    string::codepages,
 };
 
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
@@ -26,13 +29,14 @@ pub enum MsoUserType {
     O = 3,
 }
 
-#[binrw]
+const MSO_MSG_MAX_LEN: usize = 128;
+const MSO_MSG_ALIGN: usize = 4;
+
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// System messages and user messages, variable sized.
 pub struct Mso {
     /// Non-zero if the packet is a packet request or a reply to a request
-    #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
     /// Unique connection id
@@ -48,9 +52,95 @@ pub struct Mso {
     pub textstart: u8,
 
     /// Message
-    #[bw(write_with = binrw_write_codepage_string::<128, _>, args(false, 4))]
-    #[br(parse_with = binrw_parse_codepage_string_until_eof)]
     pub msg: String,
+}
+
+impl binrw::BinRead for Mso {
+    type Args<'a> = ();
+
+    fn read_options<R: std::io::prelude::Read + std::io::prelude::Seek>(
+        reader: &mut R,
+        endian: binrw::Endian,
+        _args: Self::Args<'_>,
+    ) -> binrw::prelude::BinResult<Self> {
+        let reqi = RequestId::read_options(reader, endian, ())?;
+
+        let _ = reader.seek(SeekFrom::Current(1))?;
+
+        let ucid = ConnectionId::read_options(reader, endian, ())?;
+        let plid = PlayerId::read_options(reader, endian, ())?;
+        let usertype = MsoUserType::read_options(reader, endian, ())?;
+        let textstart = u8::read_options(reader, endian, ())?;
+        let (textstart, msg) = if textstart > 0 {
+            let name = Vec::<u8>::read_options(
+                reader,
+                endian,
+                binrw::VecArgs {
+                    count: textstart as usize,
+                    inner: (),
+                },
+            )?;
+
+            let msg: Vec<u8> = binrw::helpers::until_eof(reader, endian, ())?;
+
+            let name = codepages::to_lossy_string(&name);
+            let msg = codepages::to_lossy_string(&msg);
+            (name.len() as u8, format!("{name}{msg}"))
+        } else {
+            let msg: Vec<u8> = binrw::helpers::until_eof(reader, endian, ())?;
+            (0_u8, codepages::to_lossy_string(&msg).to_string())
+        };
+
+        Ok(Self {
+            reqi,
+            ucid,
+            plid,
+            usertype,
+            textstart,
+            msg,
+        })
+    }
+}
+
+impl binrw::BinWrite for Mso {
+    type Args<'a> = ();
+
+    fn write_options<W: std::io::prelude::Write + std::io::prelude::Seek>(
+        &self,
+        writer: &mut W,
+        endian: binrw::Endian,
+        _args: Self::Args<'_>,
+    ) -> binrw::prelude::BinResult<()> {
+        self.reqi.write_options(writer, endian, ())?;
+        0_u8.write_options(writer, endian, ())?; // pad 1 byte
+        self.ucid.write_options(writer, endian, ())?;
+        self.plid.write_options(writer, endian, ())?;
+        self.usertype.write_options(writer, endian, ())?;
+
+        // if we need to encode the string, we need to move the textstart transparently for the
+        // user
+        let textstart = if self.textstart > 0 {
+            let name = &self.msg[..self.textstart as usize];
+            let textstart = codepages::to_lossy_bytes(name).len();
+
+            textstart as u8
+        } else {
+            self.textstart
+        };
+
+        textstart.write_options(writer, endian, ())?;
+        let mut res = codepages::to_lossy_bytes(&self.msg).to_vec();
+
+        let align_to = MSO_MSG_ALIGN - 1;
+        let round_to = (res.len() + align_to) & !align_to;
+        if round_to != res.len() {
+            res.put_bytes(0, round_to - res.len());
+        }
+        res.truncate(MSO_MSG_MAX_LEN);
+        res.write_options(writer, endian, ())?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -97,5 +187,20 @@ mod tests {
 
         let res = Mso::read_le(&mut buf);
         assert_ok!(res);
+    }
+
+    #[test]
+    fn test_codepages_moves_textstart() {
+        let mut buf = Cursor::new([
+            0, 0, 2, 4, 1, 17, 94, 55, 80, 108, 97, 121, 101, 114, 32, 94, 69, 236, 32, 94, 55, 58,
+            32, 94, 56, 99, 114, 154, 94, 69, 232, 0, 0, 0,
+        ]);
+
+        let mso = Mso::read_le(&mut buf).unwrap();
+        // Shamefully borrowed from https://github.com/simbroadcasts/node-insim/commit/533d107b695b58df64278a5935a7140fa340fb3d
+        assert_eq!(mso.msg, "^7Player ě ^7: ^8cršč");
+        assert_eq!(mso.textstart, 16); // moved from 17th position to 16th
+        assert_eq!(&mso.msg[..mso.textstart as usize], "^7Player ě ^7: ");
+        assert_eq!(&mso.msg[mso.textstart as usize..], "^8cršč");
     }
 }
