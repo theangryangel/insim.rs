@@ -65,7 +65,8 @@ We have no formal code of conduct at this time. But we do subscribe to
 
 Ideally this should be fully automated. At present it is not.
 
-- Create PR change version in workspace Cargo.toml
+- Create PR change version in workspace Cargo.toml, update all child crate Cargo.tomls to the
+  same version for any insim\_\* dependencies
   - Locally run `cargo publish --dry-run` to ensure everything is OK
   - Wait for CI to go green
   - Merge
