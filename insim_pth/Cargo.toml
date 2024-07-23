@@ -1,11 +1,14 @@
 [package]
 name = "insim_pth"
-version = "1.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 description = "Insim PTH file implementation"
-rust-version = "1.66"
-license = "MIT"
-homepage = "https://github.com/theangryangel/insim.rs"
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+
+[lints]
+workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
@@ -14,4 +17,4 @@ doctest = false
 
 [dependencies]
 insim_core = { path = "../insim_core", version = "1" }
-thiserror = "1"
+thiserror = { workspace = true }

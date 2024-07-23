@@ -14,6 +14,8 @@ use once_cell::sync::Lazy;
 
 use super::{strip_trailing_nul, MARKER};
 
+/// Supported character encoding within LFS
+#[allow(unused_results)]
 pub static MAPPING: Lazy<HashMap<u8, &encoding_rs::Encoding>> = Lazy::new(|| {
     let mut m = HashMap::new();
 

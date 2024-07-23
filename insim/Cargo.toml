@@ -1,16 +1,19 @@
 [package]
 name = "insim"
-version = "1.0.0"
-authors = ["Karl Southern <karl@theangryangel.co.uk>"]
-edition = "2021"
 description = "LiveForSpeed Insim implementation that focuses on ergonomics and strong typing"
-rust-version = "1.66"
-license = "MIT"
-homepage = "https://github.com/theangryangel/insim.rs"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
 
 [lib]
 bench = false
 doctest = false
+
+[lints]
+workspace = true
 
 [features]
 default = ["tokio", "blocking", "websocket"]
@@ -25,26 +28,23 @@ serde = [
 pth = ["dep:insim_pth"]
 smx = ["dep:insim_smx"]
 websocket = ["tokio", "dep:tokio-tungstenite", "futures-util"]
-# TODO: feature flags for supported versions/packet definitions. How do we want to do this?
-# v9 = []
-# latest = ["v9"]
 
 [dependencies]
-async-trait = { version = "0.1.68", optional = true }
-bitflags = "2.4"
-bytes = "1"
-from_variants = "1.0.2"
-futures-util = { version = "0.3.28", optional = true }
-if_chain = "1"
-indexmap = "2.1.0"
+async-trait = { workspace = true, optional = true }
+bitflags = { workspace = true }
+bytes = { workspace = true }
+from_variants = { workspace = true }
+futures-util = { workspace = true, optional = true }
+if_chain = { workspace = true }
+indexmap = { workspace = true }
 insim_core = { path = "../insim_core", version = "1.0.0" }
 insim_pth = { path = "../insim_pth", optional = true, version = "1" }
 insim_smx = { path = "../insim_smx", optional = true, version = "1" }
-serde = { version = "1", features = ["derive"], optional = true }
-thiserror = "1"
-tokio = { version = "1.11.0", features = ["rt", "time", "net", "macros", "sync", "tracing"], optional = true }
-tokio-tungstenite = { version = "0.21.0", optional = true }
-tracing = "0.1"
+serde = { workspace = true, features = ["derive"], optional = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["rt", "time", "net", "macros", "sync", "tracing"], optional = true }
+tokio-tungstenite = { workspace = true, optional = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
-tokio-test = "0.4"
+tokio-test = { workspace = true }

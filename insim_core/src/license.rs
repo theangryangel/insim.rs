@@ -11,9 +11,13 @@ use binrw::binrw;
 #[brw(repr(u8))]
 pub enum License {
     #[default]
+    /// Demo
     Demo = 0,
+    /// S1
     S1 = 1,
+    /// S2
     S2 = 2,
+    /// S2
     S3 = 3,
 }
 

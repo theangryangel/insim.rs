@@ -8,9 +8,13 @@ use serde::Serialize;
 #[repr(u8)]
 #[binrw]
 #[brw(repr(u8))]
+/// Wind strength levels within LFS
 pub enum Wind {
     #[default]
+    /// No wind
     None = 0,
+    /// Weak wind
     Weak = 1,
+    /// Strong wind
     Strong = 2,
 }

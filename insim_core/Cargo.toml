@@ -1,24 +1,27 @@
 [package]
 name = "insim_core"
-version = "1.0.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 description = """
 Core types and traits for the insim crate.
 """
-repository = "https://github.com/theangryangel/insim"
-rust-version = "1.66"
-license = "MIT"
-homepage = "https://github.com/theangryangel/insim.rs"
+repository.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+
+[lints]
+workspace = true
 
 [lib]
 bench = false
 doctest = false
 
 [dependencies]
-bytes = "1"
-encoding_rs = "0.8"
-itertools = "0.12"
-serde = { version = "1", features = ["derive"], optional = true }
-once_cell = "1"
-if_chain = "1.0.2"
-binrw = "0.13.3"
+bytes = { workspace = true }
+encoding_rs = { workspace = true }
+itertools = { workspace = true }
+serde = { workspace = true, features = ["derive"], optional = true }
+once_cell = { workspace = true }
+if_chain = { workspace = true }
+binrw = { workspace = true }

@@ -30,6 +30,7 @@ impl TryReadWriteBytes for TcpStream {
             .expect("set_write_timeout failed");
     }
 
+    #[allow(unsafe_code)]
     fn try_read_bytes(&mut self, buf: &mut BytesMut) -> Result<usize> {
         // TODO: Remove when read_buf becomes stable.
         // See https://users.rust-lang.org/t/how-to-read-from-tcpstream-and-append-to-vec-u8-efficiently/89059/4

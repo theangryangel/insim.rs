@@ -1,12 +1,15 @@
 [package]
 name = "insim_smx"
-version = "1.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 description = "Insim SMX file implementation"
-rust-version = "1.66"
-license = "MIT"
-repository = "https://github.com/theangryangel/insim.rs"
-homepage = "https://github.com/theangryangel/insim.rs"
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lints]
+workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
@@ -15,4 +18,4 @@ doctest = false
 
 [dependencies]
 insim_core = { path = "../insim_core", version = "1" }
-thiserror = "1"
+thiserror = { workspace = true }

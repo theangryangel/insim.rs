@@ -9,6 +9,7 @@ use crate::{license::License, string::is_ascii_alphanumeric};
 #[derive(PartialEq, Eq, Clone, Default, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
+#[allow(missing_docs)]
 pub enum Vehicle {
     #[default]
     Xfg,
@@ -40,6 +41,7 @@ pub enum Vehicle {
     Unknown,
 }
 
+#[allow(missing_docs)]
 impl Vehicle {
     pub fn is_builtin(&self) -> bool {
         !matches!(self, Vehicle::Mod(_))

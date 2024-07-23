@@ -3,6 +3,7 @@ use binrw::{binrw, BinRead, BinWrite};
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+#[allow(missing_docs)]
 pub trait Pointable:
     Copy + Clone + Default + for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>
 {
@@ -13,6 +14,7 @@ impl Pointable for f32 {}
 impl Pointable for u16 {}
 
 /// A point in 3D space.
+#[allow(missing_docs)]
 #[binrw]
 #[derive(Default, Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -26,6 +28,7 @@ where
 }
 
 impl Point<i32> {
+    /// Flip the Y axis
     pub fn flipped(&self) -> Self {
         Self {
             x: self.x,
@@ -36,6 +39,7 @@ impl Point<i32> {
 }
 
 impl Point<f32> {
+    /// Flip the Y axis
     pub fn flipped(&self) -> Self {
         Self {
             x: self.x,
