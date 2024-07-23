@@ -31,7 +31,7 @@ broken_intra_doc_links = "deny"
 
 [workspace.dependencies]
 async-trait = { version = "0.1.68" }
-binrw = "0.13.3"
+binrw = "0.14.0"
 bitflags = "2.4.0"
 bytes = "1.4.0"
 clap = { version = "4.2" }
