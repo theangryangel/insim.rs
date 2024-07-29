@@ -7,6 +7,7 @@ use crate::identifiers::{ConnectionId, RequestId};
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
+#[non_exhaustive]
 /// [Ttc] subtype.
 pub enum TtcType {
     /// Send Axm for the current layout editor selection

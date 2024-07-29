@@ -13,6 +13,7 @@ use crate::identifiers::{PlayerId, RequestId};
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
+#[non_exhaustive]
 /// Used within the [Csc] packet to indicate the type of state change.
 pub enum CscAction {
     #[default]

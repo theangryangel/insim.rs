@@ -13,6 +13,7 @@ use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
+#[non_exhaustive]
 /// Tyre compounds/types
 pub enum TyreCompound {
     /// R1

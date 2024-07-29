@@ -13,6 +13,7 @@ use crate::identifiers::{PlayerId, RequestId};
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
+#[non_exhaustive]
 /// Game racing state
 pub enum RaceInProgress {
     /// No race in progress

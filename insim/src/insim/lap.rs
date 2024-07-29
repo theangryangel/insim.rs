@@ -13,6 +13,7 @@ use crate::identifiers::{PlayerId, RequestId};
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[derive(Debug, Default, Clone)]
+#[non_exhaustive]
 /// When /showfuel yes: double fuel percent / no: 255
 pub enum Fuel200 {
     /// Double fuel percent
@@ -62,6 +63,7 @@ impl BinRead for Fuel200 {
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[derive(Debug, Default, Clone)]
+#[non_exhaustive]
 /// When /showfuel yes: fuel added percent / no: 255
 pub enum Fuel {
     /// Double fuel percent

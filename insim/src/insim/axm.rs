@@ -30,6 +30,7 @@ pub struct ObjectInfo {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
+#[non_exhaustive]
 pub enum PmoAction {
     #[default]
     /// Sent by the layout loading system only

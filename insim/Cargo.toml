@@ -37,9 +37,9 @@ from_variants = { workspace = true }
 futures-util = { workspace = true, optional = true }
 if_chain = { workspace = true }
 indexmap = { workspace = true }
-insim_core = { path = "../insim_core", version = "1.1.1" }
-insim_pth = { path = "../insim_pth", optional = true, version = "1.1.1" }
-insim_smx = { path = "../insim_smx", optional = true, version = "1.1.1" }
+insim_core = { path = "../insim_core", version = "2.0.0" }
+insim_pth = { path = "../insim_pth", optional = true, version = "2.0.0" }
+insim_smx = { path = "../insim_smx", optional = true, version = "2.0.0" }
 serde = { workspace = true, features = ["derive"], optional = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt", "time", "net", "macros", "sync", "tracing"], optional = true }

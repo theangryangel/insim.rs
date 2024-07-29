@@ -7,6 +7,7 @@ use crate::identifiers::RequestId;
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
+#[non_exhaustive]
 /// [Tiny] Subtype
 pub enum TinyType {
     /// Keepalive request/response
@@ -96,6 +97,9 @@ pub enum TinyType {
 
     /// Request a Plh packet
     Plh = 28,
+
+    /// Request a Ipb packet
+    Ipb = 29,
 }
 
 #[binrw]

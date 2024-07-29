@@ -10,6 +10,7 @@ use crate::identifiers::RequestId;
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
+#[non_exhaustive]
 /// Errors occurred during a [Ssh] request.
 pub enum SshError {
     #[default]

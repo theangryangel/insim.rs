@@ -4,6 +4,7 @@ use crate::identifiers::{ConnectionId, RequestId};
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[non_exhaustive]
 /// Used within the [Cim] packet to indicate the mode.
 pub enum CimMode {
     /// Not in a special mode
@@ -48,6 +49,7 @@ impl Default for CimMode {
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[non_exhaustive]
 /// CimMode::Normal, submode
 pub enum CimSubModeNormal {
     #[default]
@@ -87,6 +89,7 @@ impl From<u8> for CimSubModeNormal {
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[non_exhaustive]
 /// CimMode::Garage, submode
 pub enum CimSubModeGarage {
     #[default]
@@ -142,6 +145,7 @@ impl From<u8> for CimSubModeGarage {
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[non_exhaustive]
 /// CimMode::ShiftU, submode
 pub enum CimSubModeShiftU {
     #[default]

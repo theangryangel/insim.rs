@@ -11,6 +11,7 @@ use crate::identifiers::{ConnectionId, RequestId};
 #[repr(u8)]
 #[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[non_exhaustive]
 pub enum AcrResult {
     /// Command was processed
     #[default]

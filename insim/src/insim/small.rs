@@ -125,6 +125,7 @@ bitflags! {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[non_exhaustive]
 /// [Small] packet subtype.
 pub enum SmallType {
     /// Nothing!
