@@ -8,6 +8,7 @@ use crate::identifiers::RequestId;
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
+#[non_exhaustive]
 /// Object Control action to take. Used within [Oco].
 pub enum OcoAction {
     #[default]
@@ -26,6 +27,7 @@ pub enum OcoAction {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
+#[non_exhaustive]
 /// Which lights to manipulate. See [Oco].
 pub enum OcoIndex {
     /// Layout lights 1

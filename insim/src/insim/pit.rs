@@ -114,6 +114,7 @@ pub struct Psf {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
+#[non_exhaustive]
 /// Pit lane fact, or info. Used in [Pla].
 pub enum PitLaneFact {
     #[default]

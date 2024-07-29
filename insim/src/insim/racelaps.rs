@@ -5,6 +5,7 @@ use insim_core::binrw::{self, BinRead, BinWrite};
 /// Handles the rules around how RaceLaps are described within Insim automatically for you.
 #[derive(Debug, Default, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[non_exhaustive]
 pub enum RaceLaps {
     /// This is a practise session
     #[default]

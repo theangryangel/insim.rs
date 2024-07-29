@@ -7,6 +7,7 @@ use crate::identifiers::{PlayerId, RequestId};
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
+#[non_exhaustive]
 /// Camera/view identifiers
 pub enum CameraView {
     /// Arcade "follow" view

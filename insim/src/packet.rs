@@ -278,6 +278,10 @@ pub enum Packet {
     #[brw(magic = 66u8)]
     Plh(Plh),
 
+    /// Both - Set/receive player handicap
+    #[brw(magic = 67u8)]
+    Ipb(Ipb),
+
     /// Instruction - Ask the LFS World relay if we are an admin
     #[brw(magic = 250u8)]
     RelayArq(Arq),

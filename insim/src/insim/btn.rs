@@ -92,6 +92,7 @@ bitflags::bitflags! {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
+#[non_exhaustive]
 /// Used within [Bfn] to specify the action to take.
 pub enum BfnType {
     #[default]
