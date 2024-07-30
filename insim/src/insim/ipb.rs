@@ -30,7 +30,7 @@ fn binrw_write_ipb_bans(input: &IndexSet<Ipv4Addr>) -> BinResult<()> {
 #[bw(assert(banips.len() <= IPB_MAX_BANS))]
 #[derive(Debug, Clone, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Mods Allowed - restrict the mods that can be used
+/// Player Bans - Receive or set player bans, by IP address
 pub struct Ipb {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,

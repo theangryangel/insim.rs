@@ -278,7 +278,7 @@ pub enum Packet {
     #[brw(magic = 66u8)]
     Plh(Plh),
 
-    /// Both - Set/receive player handicap
+    /// Both - Set/receive player bans
     #[brw(magic = 67u8)]
     Ipb(Ipb),
 
