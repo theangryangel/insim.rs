@@ -1,13 +1,14 @@
 [workspace]
 members = [
-  "insim_core",
+  "examples/*",
   "insim",
+  "insim_core",
   "insim_pth",
   "insim_smx",
-  "examples/*",
+  "outgauge",
 ]
 # Only check / build main crates by default (check all with `--workspace`)
-default-members = ["insim", "insim_*"]
+default-members = ["insim", "insim_*", "outgauge"]
 resolver = "2"
 
 [workspace.package]

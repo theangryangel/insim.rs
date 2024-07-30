@@ -1,0 +1,25 @@
+[package]
+name = "outgauge"
+version = "0.1.0"
+authors = ["Karl Southern <karl@theangryangel.co.uk>"]
+edition = "2021"
+description = "LiveForSpeed Outgauge implementation that focuses on ergonomics and strong typing"
+rust-version = "1.66"
+license = "MIT"
+homepage = "https://github.com/theangryangel/insim.rs"
+
+[lib]
+bench = false
+doctest = false
+
+[features]
+serde = [
+  "dep:serde",
+  "insim_core/serde",
+  "bitflags/serde",
+]
+
+[dependencies]
+bitflags = "2.4"
+insim_core = { path = "../insim_core", version = "1.0.0" }
+serde = { version = "1", features = ["derive"], optional = true }
