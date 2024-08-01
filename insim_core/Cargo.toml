@@ -18,10 +18,11 @@ bench = false
 doctest = false
 
 [dependencies]
+binrw = { workspace = true }
 bytes = { workspace = true }
 encoding_rs = { workspace = true }
-itertools = { workspace = true }
-serde = { workspace = true, features = ["derive"], optional = true }
-once_cell = { workspace = true }
 if_chain = { workspace = true }
-binrw = { workspace = true }
+itertools = { workspace = true }
+once_cell = { workspace = true }
+serde = { workspace = true, features = ["derive"], optional = true }
+thiserror = { workspace = true }
