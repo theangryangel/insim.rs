@@ -1,6 +1,6 @@
 //! Utilities for working with 'Codepage strings' from Insim.
 
-use std::{borrow::Cow, collections::HashMap, vec::Vec};
+use std::{borrow::Cow, vec::Vec};
 
 /// LFS strings are a sequence of u8 bytes, with an optional trailing \0.
 /// The bytes are conventionally compromised of characters from multiple code pages, indicated by a `^` and
@@ -8,29 +8,41 @@ use std::{borrow::Cow, collections::HashMap, vec::Vec};
 ///
 /// The common practise is to use the function `to_lossy_string` to convert to a standard Rust
 /// String.
-use encoding_rs;
 use itertools::Itertools;
-use once_cell::sync::Lazy;
 
-use super::{strip_trailing_nul, MARKER};
+use super::MARKER;
 
 /// Supported character encoding within LFS
-#[allow(unused_results)]
-pub static MAPPING: Lazy<HashMap<u8, &encoding_rs::Encoding>> = Lazy::new(|| {
-    let mut m = HashMap::new();
+mod mappings {
+    static MAPPINGS: [(char, &encoding_rs::Encoding); 10] = [
+        ('L', encoding_rs::WINDOWS_1252),
+        ('C', encoding_rs::WINDOWS_1251),
+        ('G', encoding_rs::ISO_8859_7),
+        ('J', encoding_rs::SHIFT_JIS),
+        ('E', encoding_rs::ISO_8859_2),
+        ('T', encoding_rs::WINDOWS_1254),
+        ('B', encoding_rs::ISO_8859_13),
+        ('H', encoding_rs::GBK),
+        ('S', encoding_rs::EUC_KR),
+        ('K', encoding_rs::BIG5),
+    ];
 
-    m.insert(b'L', encoding_rs::WINDOWS_1252);
-    m.insert(b'G', encoding_rs::ISO_8859_7);
-    m.insert(b'J', encoding_rs::SHIFT_JIS);
-    m.insert(b'E', encoding_rs::ISO_8859_2);
-    m.insert(b'T', encoding_rs::WINDOWS_1254);
-    m.insert(b'B', encoding_rs::ISO_8859_13);
-    m.insert(b'H', encoding_rs::GBK);
-    m.insert(b'S', encoding_rs::EUC_KR);
-    m.insert(b'K', encoding_rs::BIG5);
+    pub(crate) fn get(c: char) -> Option<&'static encoding_rs::Encoding> {
+        if let Some(index) = MAPPINGS.iter().position(|&r| r.0 == c) {
+            Some(MAPPINGS.get(index).unwrap().1)
+        } else {
+            None
+        }
+    }
 
-    m
-});
+    pub(crate) fn iter() -> impl Iterator<Item = &'static (char, &'static encoding_rs::Encoding)> {
+        MAPPINGS.iter()
+    }
+
+    pub(crate) fn default() -> &'static encoding_rs::Encoding {
+        encoding_rs::WINDOWS_1252
+    }
+}
 
 /// Convert from a String, with potential lossy conversion to an Insim Codepage String
 pub fn to_lossy_bytes(input: &str) -> Cow<[u8]> {
@@ -43,8 +55,7 @@ pub fn to_lossy_bytes(input: &str) -> Cow<[u8]> {
     }
 
     let mut output = Vec::new();
-
-    let mut current_encoding = MAPPING.get(&b'L').unwrap();
+    let mut current_encoding = mappings::default();
 
     for c in input.chars() {
         // all codepages share ascii values
@@ -67,8 +78,8 @@ pub fn to_lossy_bytes(input: &str) -> Cow<[u8]> {
         let mut found = false;
 
         // find an encoding we can use
-        for (key, val) in MAPPING.iter() {
-            if val == current_encoding {
+        for (key, val) in mappings::iter() {
+            if *val == current_encoding {
                 continue;
             }
 
@@ -77,8 +88,8 @@ pub fn to_lossy_bytes(input: &str) -> Cow<[u8]> {
                 continue;
             }
 
-            output.push(MARKER);
-            output.push(*key);
+            output.push(MARKER as u8);
+            output.push(*key as u8);
 
             output.extend_from_slice(&cow);
             current_encoding = val;
@@ -97,24 +108,23 @@ pub fn to_lossy_bytes(input: &str) -> Cow<[u8]> {
 }
 
 /// Convert a InsimString into a native rust String, with potential lossy conversion from codepages
+/// Assumes any \0 characters have been stripped ahead of time
 pub fn to_lossy_string(input: &[u8]) -> Cow<str> {
     // empty string
     if input.is_empty() {
         return "".into();
     }
 
-    let input = strip_trailing_nul(input);
-
     // find the positions in the input for each ^L, ^B...
     let mut indices: Vec<usize> = input
         .iter()
         .tuple_windows()
-        .positions(|(elem, next)| *elem == MARKER && MAPPING.contains_key(next))
+        .positions(|(elem, next)| *elem == MARKER as u8 && mappings::get(*next as char).is_some())
         .collect();
 
     if indices.is_empty() {
         // no mappings at all, just encode it all as LATIN1
-        let (cow, _encoding, _had_errors) = encoding_rs::WINDOWS_1252.decode(input);
+        let (cow, _encoding, _had_errors) = mappings::default().decode(input);
         return cow;
     }
 
@@ -144,22 +154,52 @@ pub fn to_lossy_string(input: &[u8]) -> Cow<str> {
             continue;
         }
 
-        if range[0] != MARKER {
-            let (cow, _encoding, _had_errors) = encoding_rs::WINDOWS_1252.decode(range);
+        if range[0] != MARKER as u8 {
+            let (cow, _encoding, _had_errors) = mappings::default().decode(range);
             result.push_str(&cow);
             continue;
         }
 
-        if let Some(mapping) = MAPPING.get(&range[1]) {
+        if let Some(mapping) = mappings::get(range[1] as char) {
             let (cow, _encoding_used, _had_errors) = mapping.decode(&range[2..]);
             result.push_str(&cow);
         } else {
             // fallback to Latin
             // ensure we include the prefix
-            let (cow, _encoding, _had_errors) = encoding_rs::WINDOWS_1252.decode(range);
+            let (cow, _encoding, _had_errors) = mappings::default().decode(range);
             result.push_str(&cow);
         }
     }
 
     result.into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_codepage_hello_world() {
+        let output = to_lossy_bytes("Hello");
+
+        assert_eq!(output, "Hello".as_bytes(),);
+    }
+
+    // sample utf-8 strings from https://www.cl.cam.ac.uk/~mgk25/ucs/examples/quickbrown.txt
+
+    #[test]
+    fn test_codepage_to_hungarian() {
+        // flood-proof mirror-drilling machine
+        let as_bytes = to_lossy_bytes("Árvíztűrő tükörfúrógép");
+
+        assert_eq!(to_lossy_string(&as_bytes), "Árvízt?r? tükörfúrógép",);
+    }
+
+    #[test]
+    fn test_codepage_to_mixed() {
+        // flood-proof mirror-drilling machine
+        let as_bytes = to_lossy_bytes("TEST Árvíztűrő tükörfúrógép");
+
+        assert_eq!(to_lossy_string(&as_bytes), "TEST Árvízt?r? tükörfúrógép",);
+    }
 }

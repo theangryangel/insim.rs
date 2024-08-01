@@ -3,7 +3,7 @@ use std::io::SeekFrom;
 use bytes::BufMut;
 use insim_core::{
     binrw::{self, binrw},
-    string::codepages,
+    string::{codepages, strip_trailing_nul},
 };
 
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
@@ -84,12 +84,15 @@ impl binrw::BinRead for Mso {
 
             let msg: Vec<u8> = binrw::helpers::until_eof(reader, endian, ())?;
 
-            let name = codepages::to_lossy_string(&name);
-            let msg = codepages::to_lossy_string(&msg);
+            let name = codepages::to_lossy_string(strip_trailing_nul(&name));
+            let msg = codepages::to_lossy_string(strip_trailing_nul(&msg));
             (name.len() as u8, format!("{name}{msg}"))
         } else {
             let msg: Vec<u8> = binrw::helpers::until_eof(reader, endian, ())?;
-            (0_u8, codepages::to_lossy_string(&msg).to_string())
+            (
+                0_u8,
+                codepages::to_lossy_string(strip_trailing_nul(&msg)).to_string(),
+            )
         };
 
         Ok(Self {

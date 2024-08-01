@@ -2,7 +2,7 @@
 
 use binrw::{BinRead, BinWrite};
 
-use crate::{license::License, string::is_ascii_alphanumeric};
+use crate::license::License;
 
 /// Handles parsing a vehicle name according to the Insim v9 rules.
 /// See <https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info>
@@ -92,9 +92,9 @@ impl BinRead for Vehicle {
         let pos = reader.stream_position()?;
 
         <[u8; 4]>::read_options(reader, endian, args).map(|bytes| {
-            let is_builtin = is_ascii_alphanumeric(&bytes[0])
-                && is_ascii_alphanumeric(&bytes[1])
-                && is_ascii_alphanumeric(&bytes[2])
+            let is_builtin = bytes[0].is_ascii_alphanumeric()
+                && bytes[1].is_ascii_alphanumeric()
+                && bytes[2].is_ascii_alphanumeric()
                 && bytes.last() == Some(&0);
 
             match (bytes, is_builtin) {
