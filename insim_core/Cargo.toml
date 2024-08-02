@@ -23,6 +23,5 @@ bytes = { workspace = true }
 encoding_rs = { workspace = true }
 if_chain = { workspace = true }
 itertools = { workspace = true }
-once_cell = { workspace = true }
 serde = { workspace = true, features = ["derive"], optional = true }
 thiserror = { workspace = true }
