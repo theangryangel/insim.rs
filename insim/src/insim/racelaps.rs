@@ -46,11 +46,12 @@ impl BinWrite for RaceLaps {
 
 impl From<u8> for RaceLaps {
     fn from(value: u8) -> Self {
+        let value = value as usize;
         match value {
             0 => RaceLaps::Practice,
-            1..=99 => RaceLaps::Laps(value.into()),
-            100..=190 => RaceLaps::Laps(((value - 100) * 10 + 100).into()),
-            191..=238 => RaceLaps::Hours((value - 190).into()),
+            1..=99 => RaceLaps::Laps(value),
+            100..=190 => RaceLaps::Laps((value - 100) * 10 + 100),
+            191..=238 => RaceLaps::Hours(value - 190),
             _ => RaceLaps::Practice,
         }
     }
