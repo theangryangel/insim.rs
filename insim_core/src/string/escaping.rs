@@ -6,71 +6,84 @@ use if_chain::if_chain;
 
 use super::{colours, MARKER};
 
-/// Special character escape sequences
-pub(crate) static ESCAPE_SEQUENCES: [(char, char); 11] = [
-    ('v', '|'),
-    ('a', '*'),
-    ('c', ':'),
-    ('d', '\\'),
-    ('s', '/'),
-    ('q', '?'),
-    ('t', '"'),
-    ('l', '<'),
-    ('r', '>'),
-    ('h', '#'),
-    ('^', '^'),
-];
+mod mappings {
+
+    /// Special character escape sequences
+    /// ^v = |, etc.
+    const MAPPINGS: [(char, char); 11] = [
+        ('v', '|'),
+        ('a', '*'),
+        ('c', ':'),
+        ('d', '\\'),
+        ('s', '/'),
+        ('q', '?'),
+        ('t', '"'),
+        ('l', '<'),
+        ('r', '>'),
+        ('h', '#'),
+        ('^', '^'),
+    ];
+
+    pub(super) fn try_unescape(c: char) -> Option<char> {
+        MAPPINGS.iter().find(|x| x.0 == c).map(|k| k.1)
+    }
+
+    pub(super) fn try_escape(c: char) -> Option<char> {
+        MAPPINGS.iter().find(|x| x.1 == c).map(|k| k.0)
+    }
+
+    pub(super) fn needs_escaping(input: &str) -> bool {
+        for c in input.chars() {
+            if MAPPINGS.iter().any(|i| i.1 == c) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub(super) fn needs_unescaping(input: &str) -> bool {
+        input.chars().any(|c| c == super::MARKER)
+    }
+}
 
 /// Unescape a u8 slice according to LFS' rules.
-pub fn unescape(input: Cow<str>) -> Cow<str> {
-    let maybe_needs_unescaping = input.chars().any(|c| c == MARKER);
-
-    if !maybe_needs_unescaping {
-        return input;
+pub fn unescape(input: &str) -> Cow<str> {
+    if !mappings::needs_unescaping(input) {
+        return input.into();
     }
 
     let mut output = String::new();
     let mut chars = input.chars().peekable();
 
     while let Some(i) = chars.next() {
-        if i == MARKER {
-            if let Some(j) = chars.peek() {
-                if let Some(k) = ESCAPE_SEQUENCES.iter().find(|x| x.0 == *j) {
-                    output.push(k.1);
-                    let _ = chars.next(); // advance the iter
-                    continue;
-                }
+        if_chain! {
+            if i == MARKER;
+            if let Some(j) = chars.peek();
+            if let Some(k) = mappings::try_unescape(*j);
+            then {
+                output.push(k);
+                let _ = chars.next(); // advance the iter
+            } else {
+                output.push(i);
             }
         }
-
-        output.push(i);
     }
 
     output.into()
 }
 
 /// Unescape a string
-pub fn escape(input: Cow<str>) -> Cow<str> {
-    let mut maybe_needs_unescaping = false;
-
-    // TODO: We can probably do this better
-    for c in input.chars() {
-        if ESCAPE_SEQUENCES.iter().any(|i| i.1 == c) {
-            maybe_needs_unescaping = true;
-            break;
-        }
+pub fn escape(input: &str) -> Cow<str> {
+    if !mappings::needs_escaping(input) {
+        return input.into();
     }
 
-    if !maybe_needs_unescaping {
-        return input;
-    }
-
-    let mut output = String::new();
+    let mut output = String::with_capacity(input.len());
     let mut chars = input.chars().peekable();
 
     while let Some(c) = chars.next() {
         // is the current char a marker? and do we have a follow up character?
-        // TODO: replace with a let chain when its stable
         if_chain! {
             if c == MARKER;
             if let Some(d) = chars.peek();
@@ -85,9 +98,9 @@ pub fn escape(input: Cow<str>) -> Cow<str> {
         }
 
         // do we have a character that needs escaping?
-        if let Some(i) = ESCAPE_SEQUENCES.iter().find(|i| i.1 == c) {
+        if let Some(d) = mappings::try_escape(c) {
             output.push(MARKER);
-            output.push(i.0);
+            output.push(d);
             continue;
         }
 
@@ -103,12 +116,12 @@ mod tests {
 
     #[test]
     fn test_escaping_and_unescaping() {
-        let original: Cow<str> = "^|*:\\/?\"<>#123^945".into();
+        let original = "^|*:\\/?\"<>#123^945";
 
-        let escaped = escape(original.clone());
-        let unescaped = unescape(escaped.clone());
-
+        let escaped = escape(original);
         assert_eq!(escaped, "^^^v^a^c^d^s^q^t^l^r^h123^945");
+
+        let unescaped = unescape(&escaped);
         assert_eq!(unescaped, original);
     }
 }

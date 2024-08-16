@@ -5,24 +5,26 @@ use std::borrow::Cow;
 use super::MARKER;
 
 /// Supported colour codes within LFS
-pub(crate) static COLOUR_SEQUENCES: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+pub(super) const COLOUR_SEQUENCES: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 /// Strip LFS colours
 pub fn strip(input: &str) -> Cow<str> {
-    let mut iter = input.chars().peekable();
-
     if !input.chars().any(|c| c == MARKER) {
         return input.into();
     }
 
+    let mut iter = input.chars().peekable();
     let mut output = String::with_capacity(input.len());
 
     while let Some(i) = iter.next() {
         match (i, iter.peek()) {
-            // special case escaped ^ we dont want to strip
-            (MARKER, Some('^')) => {
+            // Special case, ignore escaped markers (AKA ^^)
+            // If we don't do this now, and just fall through the next check, something like ^^1
+            // wont be handled correctly!
+            (MARKER, Some(&MARKER)) => {
                 output.push(MARKER);
-                output.push(iter.next().unwrap());
+                output.push(MARKER);
+                let _ = iter.next();
             },
 
             (MARKER, Some(j)) if COLOUR_SEQUENCES.contains(j) => {

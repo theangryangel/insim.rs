@@ -14,33 +14,54 @@ use super::MARKER;
 
 /// Supported character encoding within LFS
 mod mappings {
-    static MAPPINGS: [(char, &encoding_rs::Encoding); 10] = [
-        ('L', encoding_rs::WINDOWS_1252),
-        ('C', encoding_rs::WINDOWS_1251),
-        ('G', encoding_rs::ISO_8859_7),
-        ('J', encoding_rs::SHIFT_JIS),
-        ('E', encoding_rs::ISO_8859_2),
-        ('T', encoding_rs::WINDOWS_1254),
-        ('B', encoding_rs::ISO_8859_13),
-        ('H', encoding_rs::GBK),
-        ('S', encoding_rs::EUC_KR),
-        ('K', encoding_rs::BIG5),
-    ];
+    pub(super) struct Encoding {
+        // escape code for this encoding table
+        pub(super) indicator: char,
+        // encoding table
+        pub(super) table: &'static encoding_rs::Encoding,
+        // should we propagate the marker and indicator? i.e. is this ^8 which has dual meaning?
+        pub(super) propagate: bool,
+    }
 
-    pub(crate) fn get(c: char) -> Option<&'static encoding_rs::Encoding> {
-        if let Some(index) = MAPPINGS.iter().position(|&r| r.0 == c) {
-            Some(MAPPINGS.get(index).unwrap().1)
-        } else {
-            None
+    impl Encoding {
+        pub const fn new(
+            indicator: char,
+            table: &'static encoding_rs::Encoding,
+            propagate: bool,
+        ) -> Self {
+            Self {
+                indicator,
+                table,
+                propagate,
+            }
         }
     }
 
-    pub(crate) fn iter() -> impl Iterator<Item = &'static (char, &'static encoding_rs::Encoding)> {
+    // Maintain the same order as node-insim to try and preserve compatibility with other projects as best as we can https://github.com/simbroadcasts/unicode-to-lfs/blob/main/src/codepages.ts
+    static MAPPINGS: [Encoding; 11] = [
+        Encoding::new('L', encoding_rs::WINDOWS_1252, false), // Latin-1
+        Encoding::new('G', encoding_rs::ISO_8859_7, false),   // Greek
+        Encoding::new('C', encoding_rs::WINDOWS_1251, false), // Cyrillic
+        Encoding::new('E', encoding_rs::ISO_8859_2, false),   // Central Europe
+        Encoding::new('T', encoding_rs::WINDOWS_1254, false), // Turkish
+        Encoding::new('B', encoding_rs::ISO_8859_13, false),  // Baltic
+        Encoding::new('J', encoding_rs::SHIFT_JIS, false),    // Japanese
+        Encoding::new('H', encoding_rs::GBK, false),          // Traditional Chinese
+        Encoding::new('S', encoding_rs::EUC_KR, false), // Simplified Chinese, EUC_KR seems to the the closest?
+        Encoding::new('K', encoding_rs::BIG5, false), // Should be CP950, BIG5 seems to the closest?
+        Encoding::new('8', encoding_rs::WINDOWS_1252, true), // Reset to default
+    ];
+
+    pub(super) fn get(c: char) -> Option<&'static Encoding> {
+        MAPPINGS.iter().find(|&r| r.indicator == c)
+    }
+
+    pub(super) fn iter() -> impl Iterator<Item = &'static Encoding> {
         MAPPINGS.iter()
     }
 
-    pub(crate) fn default() -> &'static encoding_rs::Encoding {
-        encoding_rs::WINDOWS_1252
+    pub(super) fn default_encoding() -> &'static Encoding {
+        &MAPPINGS[0]
     }
 }
 
@@ -54,8 +75,8 @@ pub fn to_lossy_bytes(input: &str) -> Cow<[u8]> {
         return input.as_bytes().into();
     }
 
-    let mut output = Vec::new();
-    let mut current_encoding = mappings::default();
+    let mut output = Vec::with_capacity(input.len());
+    let mut current_encoding = mappings::default_encoding().table;
 
     for c in input.chars() {
         // all codepages share ascii values
@@ -78,8 +99,8 @@ pub fn to_lossy_bytes(input: &str) -> Cow<[u8]> {
         let mut found = false;
 
         // find an encoding we can use
-        for (key, val) in mappings::iter() {
-            if *val == current_encoding {
+        for encoding_map in mappings::iter() {
+            if encoding_map.table == current_encoding {
                 continue;
             }
 
@@ -89,10 +110,10 @@ pub fn to_lossy_bytes(input: &str) -> Cow<[u8]> {
             }
 
             output.push(MARKER as u8);
-            output.push(*key as u8);
+            output.push(encoding_map.indicator as u8);
 
             output.extend_from_slice(&cow);
-            current_encoding = val;
+            current_encoding = encoding_map.table;
 
             found = true;
             break;
@@ -124,7 +145,7 @@ pub fn to_lossy_string(input: &[u8]) -> Cow<str> {
 
     if indices.is_empty() {
         // no mappings at all, just encode it all as LATIN1
-        let (cow, _encoding, _had_errors) = mappings::default().decode(input);
+        let (cow, _encoding, _had_errors) = mappings::default_encoding().table.decode(input);
         return cow;
     }
 
@@ -155,18 +176,24 @@ pub fn to_lossy_string(input: &[u8]) -> Cow<str> {
         }
 
         if range[0] != MARKER as u8 {
-            let (cow, _encoding, _had_errors) = mappings::default().decode(range);
+            let (cow, _encoding, _had_errors) = mappings::default_encoding().table.decode(range);
             result.push_str(&cow);
             continue;
         }
 
         if let Some(mapping) = mappings::get(range[1] as char) {
-            let (cow, _encoding_used, _had_errors) = mapping.decode(&range[2..]);
+            // do we need to propagate the marker?
+            if mapping.propagate {
+                result.push(MARKER);
+                result.push(range[1] as char);
+            }
+
+            let (cow, _encoding_used, _had_errors) = mapping.table.decode(&range[2..]);
             result.push_str(&cow);
         } else {
             // fallback to Latin
             // ensure we include the prefix
-            let (cow, _encoding, _had_errors) = mappings::default().decode(range);
+            let (cow, _encoding, _had_errors) = mappings::default_encoding().table.decode(range);
             result.push_str(&cow);
         }
     }
@@ -201,5 +228,13 @@ mod tests {
         let as_bytes = to_lossy_bytes("TEST Árvíztűrő tükörfúrógép");
 
         assert_eq!(to_lossy_string(&as_bytes), "TEST Árvízt?r? tükörfúrógép",);
+    }
+
+    #[test]
+    fn test_propagate_eight() {
+        // flood-proof mirror-drilling machine
+        let as_bytes = to_lossy_bytes("^8TEST Árvíztűrő tükörfúrógép");
+
+        assert_eq!(to_lossy_string(&as_bytes), "^8TEST Árvízt?r? tükörfúrógép",);
     }
 }
