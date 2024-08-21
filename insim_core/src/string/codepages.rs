@@ -10,119 +10,136 @@ use std::{borrow::Cow, vec::Vec};
 /// String.
 use itertools::Itertools;
 
-use super::MARKER;
+use super::control::ControlCharacter;
 
-/// Supported character encoding within LFS
-mod mappings {
-    pub(super) struct Encoding {
-        // escape code for this encoding table
-        pub(super) indicator: char,
-        // encoding table
-        pub(super) table: &'static encoding_rs::Encoding,
-        // should we propagate the marker and indicator? i.e. is this ^8 which has dual meaning?
-        pub(super) propagate: bool,
+const DEFAULT_LFS_CODEPAGE_MARKER: char = 'L';
+// 8 is left off this by design to prevent double checking LATIN1
+const ALL_LFS_CODEPAGE_MARKERS_FOR_ENCODING: [char; 10] =
+    ['L', 'G', 'C', 'E', 'T', 'B', 'J', 'H', 'S', 'K'];
+
+trait Codepage {
+    /// This is a valid codepage marker/identifier?
+    fn is_lfs_codepage(&self) -> bool;
+    /// Get the encoding_rs lookup table
+    fn as_lfs_codepage(&self) -> Option<&'static encoding_rs::Encoding>;
+    /// Should this codepage control character be propagated
+    fn propagate_lfs_codepage(self) -> bool;
+}
+
+impl Codepage for char {
+    fn is_lfs_codepage(&self) -> bool {
+        matches!(
+            self,
+            'L' | 'G' | 'C' | 'E' | 'T' | 'B' | 'J' | 'H' | 'S' | 'K' | '8'
+        )
     }
 
-    impl Encoding {
-        pub const fn new(
-            indicator: char,
-            table: &'static encoding_rs::Encoding,
-            propagate: bool,
-        ) -> Self {
-            Self {
-                indicator,
-                table,
-                propagate,
-            }
+    fn propagate_lfs_codepage(self) -> bool {
+        self == '8'
+    }
+
+    fn as_lfs_codepage(&self) -> Option<&'static encoding_rs::Encoding> {
+        match self {
+            'L' | '8' => Some(encoding_rs::WINDOWS_1252),
+            'G' => Some(encoding_rs::ISO_8859_7),
+            'C' => Some(encoding_rs::WINDOWS_1251),
+            'E' => Some(encoding_rs::ISO_8859_2),
+            'T' => Some(encoding_rs::WINDOWS_1254),
+            'B' => Some(encoding_rs::ISO_8859_13),
+            'J' => Some(encoding_rs::SHIFT_JIS),
+            'H' => Some(encoding_rs::GBK),
+            'S' => Some(encoding_rs::EUC_KR),
+            'K' => Some(encoding_rs::BIG5),
+            _ => None,
         }
     }
+}
 
-    // Maintain the same order as node-insim to try and preserve compatibility with other projects as best as we can https://github.com/simbroadcasts/unicode-to-lfs/blob/main/src/codepages.ts
-    static MAPPINGS: [Encoding; 11] = [
-        Encoding::new('L', encoding_rs::WINDOWS_1252, false), // Latin-1
-        Encoding::new('G', encoding_rs::ISO_8859_7, false),   // Greek
-        Encoding::new('C', encoding_rs::WINDOWS_1251, false), // Cyrillic
-        Encoding::new('E', encoding_rs::ISO_8859_2, false),   // Central Europe
-        Encoding::new('T', encoding_rs::WINDOWS_1254, false), // Turkish
-        Encoding::new('B', encoding_rs::ISO_8859_13, false),  // Baltic
-        Encoding::new('J', encoding_rs::SHIFT_JIS, false),    // Japanese
-        Encoding::new('H', encoding_rs::GBK, false),          // Traditional Chinese
-        Encoding::new('S', encoding_rs::EUC_KR, false), // Simplified Chinese, EUC_KR seems to the the closest?
-        Encoding::new('K', encoding_rs::BIG5, false), // Should be CP950, BIG5 seems to the closest?
-        Encoding::new('8', encoding_rs::WINDOWS_1252, true), // Reset to default
-    ];
-
-    pub(super) fn get(c: char) -> Option<&'static Encoding> {
-        MAPPINGS.iter().find(|&r| r.indicator == c)
+impl Codepage for u8 {
+    fn is_lfs_codepage(&self) -> bool {
+        (*self as char).is_lfs_codepage()
     }
 
-    pub(super) fn iter() -> impl Iterator<Item = &'static Encoding> {
-        MAPPINGS.iter()
+    fn propagate_lfs_codepage(self) -> bool {
+        (self as char).propagate_lfs_codepage()
     }
 
-    pub(super) fn default_encoding() -> &'static Encoding {
-        &MAPPINGS[0]
+    fn as_lfs_codepage(&self) -> Option<&'static encoding_rs::Encoding> {
+        (*self as char).as_lfs_codepage()
     }
 }
 
 /// Convert from a String, with potential lossy conversion to an Insim Codepage String
 pub fn to_lossy_bytes(input: &str) -> Cow<[u8]> {
-    let all_ascii = !input.chars().any(|c| c as u32 > 127);
-
-    if all_ascii {
+    if input.chars().all(|c| c.is_ascii()) {
         // all codepages share ascii values
         // therefore if it's all ascii, we can just dump it.
         return input.as_bytes().into();
     }
 
     let mut output = Vec::with_capacity(input.len());
-    let mut current_encoding = mappings::default_encoding().table;
+    let mut current_encoding = DEFAULT_LFS_CODEPAGE_MARKER;
 
-    for c in input.chars() {
+    // a succulent buffer for reuse, we'll zero it before each use.
+    // all utf-8 characters are 3 bytes.
+    let mut buf = [0; 3];
+
+    'outer: for c in input.chars() {
         // all codepages share ascii values
-        if (c as u32) <= 127 {
+        if c.is_ascii() {
             output.push(c as u8);
             continue;
         }
 
-        // all utf-8 characters are 3 bytes
-        let mut buf = [0; 3];
+        // zero the buffer
+        buf.fill(0);
         let char_as_bytes = c.encode_utf8(&mut buf);
 
-        let (cow, _, error) = current_encoding.encode(char_as_bytes);
+        // allowing unwrap because we should never get to a position where we cannot have one
+        let (cow, _, error) = current_encoding
+            .as_lfs_codepage()
+            .unwrap()
+            .encode(char_as_bytes);
 
         if !error {
             output.extend_from_slice(&cow);
             continue;
         }
 
-        let mut found = false;
-
-        // find an encoding we can use
-        for encoding_map in mappings::iter() {
-            if encoding_map.table == current_encoding {
+        // try to find an encoding we can use
+        for codepage_marker in ALL_LFS_CODEPAGE_MARKERS_FOR_ENCODING {
+            // we've already checked the current codepage and failed, don't check again, try the
+            // next codepage
+            if codepage_marker == current_encoding {
                 continue;
             }
 
-            let (cow, _, error) = current_encoding.encode(char_as_bytes);
+            // try to encode the current character
+            let (cow, _, error) = current_encoding
+                .as_lfs_codepage()
+                .unwrap()
+                .encode(char_as_bytes);
             if error {
+                // this codepage doesnt match, try the next one
                 continue;
             }
 
-            output.push(MARKER as u8);
-            output.push(encoding_map.indicator as u8);
+            // this one matched, push the control character and codepage control character
+            output.push(u8::lfs_control_char());
+            output.push(codepage_marker as u8);
 
+            // then push the new character
             output.extend_from_slice(&cow);
-            current_encoding = encoding_map.table;
+            // make sure for the next loop that we're going to try the same codepage again
+            current_encoding = codepage_marker;
 
-            found = true;
-            break;
+            // continue the outer loop
+            continue 'outer;
         }
 
-        if !found {
-            // fallback char
-            output.push(b'?');
-        }
+        // We found nothing, post the fallback character
+        // fallback char
+        output.push(b'?');
     }
 
     output.into()
@@ -140,12 +157,16 @@ pub fn to_lossy_string(input: &[u8]) -> Cow<str> {
     let mut indices: Vec<usize> = input
         .iter()
         .tuple_windows()
-        .positions(|(elem, next)| *elem == MARKER as u8 && mappings::get(*next as char).is_some())
+        .positions(|(elem, next)| elem.is_lfs_control_char() && next.is_lfs_codepage())
         .collect();
 
+    // allowing unwrap because if this panics we're screwed
+    let default_lfs_codepage = DEFAULT_LFS_CODEPAGE_MARKER.as_lfs_codepage().unwrap();
+
     if indices.is_empty() {
-        // no mappings at all, just encode it all as LATIN1
-        let (cow, _encoding, _had_errors) = mappings::default_encoding().table.decode(input);
+        // no mappings at all, just encode it all as the default
+        // allow unwrap because we should always have something here
+        let (cow, _encoding, _had_errors) = default_lfs_codepage.decode(input);
         return cow;
     }
 
@@ -170,32 +191,33 @@ pub fn to_lossy_string(input: &[u8]) -> Cow<str> {
     for pair in indices.windows(2) {
         let range = &input[pair[0]..pair[1]];
 
-        if range.len() < 2 {
-            result.push_str(&String::from_utf8_lossy(range));
-            continue;
-        }
+        match (
+            (range.len() < 2),
+            range[0].is_lfs_control_char(),
+            range[1].as_lfs_codepage(),
+        ) {
+            (true, _, _) | (false, false, _) | (false, true, None) => {
+                // No marker, encode everything
+                // OR
+                // Has a marker, but no mapping
+                // fallback to default codepage and ensure we include the prefix
+                let (cow, _encoding, _had_errors) = default_lfs_codepage.decode(range);
+                result.push_str(&cow);
+            },
+            (false, true, Some(mapping)) => {
+                // Has a marker and a mapping
 
-        if range[0] != MARKER as u8 {
-            let (cow, _encoding, _had_errors) = mappings::default_encoding().table.decode(range);
-            result.push_str(&cow);
-            continue;
-        }
+                // do we need to propagate the marker?
+                if range[1].propagate_lfs_codepage() {
+                    result.push(char::lfs_control_char());
+                    result.push(range[1] as char);
+                }
 
-        if let Some(mapping) = mappings::get(range[1] as char) {
-            // do we need to propagate the marker?
-            if mapping.propagate {
-                result.push(MARKER);
-                result.push(range[1] as char);
-            }
-
-            let (cow, _encoding_used, _had_errors) = mapping.table.decode(&range[2..]);
-            result.push_str(&cow);
-        } else {
-            // fallback to Latin
-            // ensure we include the prefix
-            let (cow, _encoding, _had_errors) = mappings::default_encoding().table.decode(range);
-            result.push_str(&cow);
-        }
+                // encode everything except the markers
+                let (cow, _encoding_used, _had_errors) = mapping.decode(&range[2..]);
+                result.push_str(&cow);
+            },
+        };
     }
 
     result.into()
