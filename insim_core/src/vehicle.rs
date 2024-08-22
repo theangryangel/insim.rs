@@ -92,10 +92,8 @@ impl BinRead for Vehicle {
         let pos = reader.stream_position()?;
 
         <[u8; 4]>::read_options(reader, endian, args).map(|bytes| {
-            let is_builtin = bytes[0].is_ascii_alphanumeric()
-                && bytes[1].is_ascii_alphanumeric()
-                && bytes[2].is_ascii_alphanumeric()
-                && bytes.last() == Some(&0);
+            let is_builtin =
+                bytes[0..=2].iter().all(|c| c.is_ascii_alphanumeric()) && bytes[3] == 0;
 
             match (bytes, is_builtin) {
                 ([0, 0, 0, 0], _) => Ok(Vehicle::Unknown),

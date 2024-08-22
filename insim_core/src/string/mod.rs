@@ -4,10 +4,8 @@ use bytes::BufMut;
 
 pub mod codepages;
 pub mod colours;
+mod control;
 pub mod escaping;
-
-/// Escape and special character prefix
-const MARKER: char = '^';
 
 /// Strip any trailing \0 bytes from a u8 slice.
 pub fn strip_trailing_nul(input: &[u8]) -> &[u8] {
