@@ -5,7 +5,7 @@ use std::{net::SocketAddr, time::Duration};
 use clap::Parser;
 use insim::{
     identifiers::{PlayerId, RequestId},
-    insim::{IsiFlags, LclFlags, PlayerType, Small, SmallType, Tiny, TinyType},
+    insim::{IsiFlags, LclFlags, Small, SmallType, Tiny, TinyType},
     Packet, Result,
 };
 use tokio::time::interval;
@@ -80,8 +80,6 @@ pub async fn main() -> Result<()> {
 
     let mut interval = interval(Duration::from_millis(250));
 
-    let mut i: usize = 0;
-
     let mut sequence = ReversibleSequence::new(vec![
         LclFlags::SIGNAL_LEFT
             | LclFlags::LIGHT_OFF
@@ -97,14 +95,13 @@ pub async fn main() -> Result<()> {
     loop {
         tokio::select! {
 
+            // TODO: We should probably find a way to pause the ticker, but whatever.
             _ = interval.tick() => {
                 if plid.is_none() {
                     continue;
                 }
 
                 connection.write(Small { subt: SmallType::Lcl(*sequence.next()), ..Default::default() }).await?;
-
-                i = i.wrapping_add(1);
             },
 
             packet = connection.read() => {
@@ -112,7 +109,7 @@ pub async fn main() -> Result<()> {
                 match packet? {
                     Packet::Npl(npl) => {
 
-                        if !npl.ptype.contains(PlayerType::REMOTE) && !npl.ptype.contains(PlayerType::AI) {
+                        if !npl.ptype.is_remote() && !npl.ptype.is_ai() {
                             plid = Some(npl.plid);
                             tracing::info!("Woot! local player joined! {:?}", plid);
                         }
