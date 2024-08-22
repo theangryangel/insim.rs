@@ -197,14 +197,14 @@ pub fn to_lossy_string(input: &[u8]) -> Cow<str> {
     for pair in indices.windows(2) {
         let range = &input[pair[0]..pair[1]];
 
-        match (
-            (range.len() < 2),
-            range[0].is_lfs_control_char(),
-            range[1].as_lfs_codepage(),
-        ) {
-            (true, _, _) | (false, false, _) | (false, true, None) => {
-                // Less than 2 characters
-                // OR
+        if range.len() < 2 {
+            let (cow, _encoding, _had_errors) = default_lfs_codepage.decode(range);
+            result.push_str(&cow);
+            continue;
+        }
+
+        match (range[0].is_lfs_control_char(), range[1].as_lfs_codepage()) {
+            (false, _) | (true, None) => {
                 // No control character
                 // OR
                 // Has a control character, but next character is not a codepage
@@ -213,7 +213,7 @@ pub fn to_lossy_string(input: &[u8]) -> Cow<str> {
                 let (cow, _encoding, _had_errors) = default_lfs_codepage.decode(range);
                 result.push_str(&cow);
             },
-            (false, true, Some(mapping)) => {
+            (true, Some(mapping)) => {
                 // Has a control character and next character is a codepage
 
                 // do we need to propagate the codepage because it has dual meaning?

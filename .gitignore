@@ -2,10 +2,4 @@
 **/target
 Cargo.lock
 **/node_modules
-pth2svg/assets
-pth2svg/*.svg
-smx2svg/assets
-smx2svg/*.svg
-**/*.pth
-**/*.smx
-patina/assets/*.txt
+examples/pth2svg/*.svg

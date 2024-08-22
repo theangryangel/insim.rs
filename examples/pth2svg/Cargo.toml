@@ -1,0 +1,15 @@
+[package]
+name = "pth2svg"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+homepage.workspace = true
+
+[dependencies]
+insim_pth = { path = "../../insim_pth" }
+clap = { workspace = true, features = ["derive"] }
+svg = "0.17.0"
+anyhow = "1.0.86"
