@@ -3,6 +3,9 @@
 
 use std::net::SocketAddr;
 
+#[macro_use]
+mod macros;
+
 #[doc(hidden)]
 pub mod builder;
 #[doc(hidden)]
