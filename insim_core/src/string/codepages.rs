@@ -88,7 +88,7 @@ pub fn to_lossy_bytes(input: &str) -> Cow<[u8]> {
         .as_lfs_codepage()
         .unwrap_or_else(|| unreachable!());
     // a succulent buffer for reuse, we'll zero it before each use.
-    // all utf-8 characters are 4 bytes.
+    // all utf-8 characters are no longer than 4 bytes.
     let mut buf = [0; 4];
 
     'outer: for c in input.chars() {
