@@ -1,6 +1,9 @@
 use insim_core::binrw::{self, binrw};
 
-use crate::identifiers::{ConnectionId, RequestId};
+use crate::{
+    identifiers::{ConnectionId, RequestId},
+    Packet,
+};
 
 #[binrw]
 #[derive(Debug, Default, Clone)]
@@ -45,4 +48,13 @@ pub struct Ttc {
 
     /// B1, B2, B3 may be used in various ways depending on SubT
     pub b3: u8,
+}
+
+impl From<TtcType> for Packet {
+    fn from(value: TtcType) -> Self {
+        Self::Ttc(Ttc {
+            subt: value,
+            ..Default::default()
+        })
+    }
 }

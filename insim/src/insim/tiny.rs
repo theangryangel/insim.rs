@@ -1,6 +1,6 @@
 use insim_core::binrw::{self, binrw};
 
-use crate::identifiers::RequestId;
+use crate::{identifiers::RequestId, Packet};
 
 #[binrw]
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
@@ -100,6 +100,15 @@ pub enum TinyType {
 
     /// Request a Ipb packet
     Ipb = 29,
+}
+
+impl From<TinyType> for Packet {
+    fn from(value: TinyType) -> Self {
+        Self::Tiny(Tiny {
+            subt: value,
+            ..Default::default()
+        })
+    }
 }
 
 #[binrw]

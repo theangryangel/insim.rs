@@ -101,7 +101,10 @@ pub async fn main() -> Result<()> {
                     continue;
                 }
 
-                connection.write(Small { subt: SmallType::Lcl(*sequence.next()), ..Default::default() }).await?;
+                // insim implements From<LclFlags> for Packet, so we can shortcut, we dont need to
+                // create a Small or a Packet::Small by hand if we're happy to use the default
+                // values
+                connection.write(*sequence.next()).await?;
             },
 
             packet = connection.read() => {
