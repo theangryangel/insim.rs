@@ -31,6 +31,15 @@ bitflags! {
     }
 }
 
+generate_bitflag_helpers!(HostInfoFlags,
+    pub requires_spectator_password => SPECTATE_PASSWORD_REQUIRED,
+    pub requires_s1 => S1,
+    pub requires_s2 => S2,
+    pub requires_license => LICENSED,
+    pub is_first => FIRST,
+    pub is_last => LAST
+);
+
 /// Information about a host. Used within the [Hos] packet.
 #[binrw]
 #[derive(Debug, Clone, Default)]
@@ -72,10 +81,6 @@ pub struct Hos {
 impl Hos {
     /// Is this the last of all [Hos] packets, for a complete set of hosts?
     pub fn is_last(&self) -> bool {
-        self.hinfo
-            .iter()
-            .filter(|i| i.flags.contains(HostInfoFlags::LAST))
-            .count()
-            > 0
+        self.hinfo.iter().any(|i| i.flags.is_last())
     }
 }

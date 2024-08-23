@@ -33,6 +33,16 @@ bitflags! {
     }
 }
 
+generate_bitflag_helpers!(
+    RaceFlags,
+    pub can_vote => CAN_VOTE,
+    pub can_select => CAN_SELECT,
+    pub can_mid_race_join => MID_RACE,
+    pub can_reset => CAN_RESET,
+    pub forces_cockpit_view => FCV,
+    pub is_cruise => CRUISE
+);
+
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

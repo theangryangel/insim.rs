@@ -85,6 +85,20 @@ bitflags! {
     }
 }
 
+generate_bitflag_helpers! {
+    StaFlags,
+
+    pub is_in_game => GAME,
+    pub is_viewing_replay => REPLAY,
+    pub is_shiftu => SHIFTU,
+    pub is_shiftu_following => SHIFTU_FOLLOW,
+    pub is_shiftu_buttons_hidden => SHIFTU_NO_OPT,
+    pub is_multiplayer => MULTI,
+    pub is_windowed => WINDOWED,
+    pub is_muted => SOUND_MUTE,
+    pub insim_buttons_visible => VISIBLE
+}
+
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

@@ -73,6 +73,14 @@ bitflags::bitflags! {
     }
 }
 
+generate_bitflag_helpers! {
+    RipOptions,
+
+    pub is_looping => LOOP,
+    pub missing_skin_download_enabled => SKINS,
+    pub is_full_physics_simulation => FULL_PHYS
+}
+
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

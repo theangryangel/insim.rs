@@ -18,6 +18,11 @@ bitflags::bitflags! {
     }
 }
 
+generate_bitflag_helpers! {
+    NcnFlags,
+    pub is_remote => REMOTE
+}
+
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

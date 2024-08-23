@@ -19,6 +19,12 @@ bitflags! {
     }
 }
 
+generate_bitflag_helpers! {
+    SchFlags,
+    pub shift => SHIFT,
+    pub ctrl => CTRL
+}
+
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

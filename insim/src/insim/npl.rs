@@ -113,8 +113,8 @@ bitflags! {
 
 generate_bitflag_helpers!(SetFlags,
     pub is_symmetric => SYMM_WHEELS,
-    pub has_traction_control => TC_ENABLE,
-    pub has_anti_lock_braking => ABS_ENABLE
+    pub is_traction_control_enabled => TC_ENABLE,
+    pub is_anti_lock_braking_enabled => ABS_ENABLE
 );
 
 bitflags! {
