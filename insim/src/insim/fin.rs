@@ -33,17 +33,41 @@ bitflags::bitflags! {
     }
 }
 
+generate_bitflag_helpers! {
+    RaceConfirmFlags,
+
+    pub is_mentioned => MENTIONED,
+    pub is_confirmed_result => CONFIRMED,
+    pub has_drive_thru_penalty => PENALTY_DT,
+    pub has_stop_go_penalty => PENALTY_SG,
+    pub has_30s_penalty => PENALTY_30,
+    pub has_45s_penalty => PENALTY_45,
+    pub skipped_mandatory_pit_stop => DID_NOT_PIT
+}
+
 impl RaceConfirmFlags {
     /// Was the player disqualified for any reason?
-    pub fn disqualified(&self) -> bool {
+    pub fn is_disqualified(&self) -> bool {
         self.contains(RaceConfirmFlags::PENALTY_DT)
             || self.contains(RaceConfirmFlags::PENALTY_SG)
             || self.contains(RaceConfirmFlags::DID_NOT_PIT)
     }
 
-    /// Did the player receive a penalty for any reason?
-    pub fn time_penalty(&self) -> bool {
+    /// Was the player disqualified for any reason?
+    #[deprecated = "Prefer is_disqualified"]
+    pub fn disqualified(&self) -> bool {
+        self.is_disqualified()
+    }
+
+    /// Did the player receive any time penalties?
+    pub fn has_time_penalty(&self) -> bool {
         self.contains(RaceConfirmFlags::PENALTY_30) || self.contains(RaceConfirmFlags::PENALTY_45)
+    }
+
+    /// Did the player receive any time penalties?
+    #[deprecated = "Prefer has_time_penalty"]
+    pub fn time_penalty(&self) -> bool {
+        self.has_time_penalty()
     }
 }
 

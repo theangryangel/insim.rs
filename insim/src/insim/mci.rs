@@ -31,6 +31,16 @@ bitflags! {
     }
 }
 
+generate_bitflag_helpers! {
+    CompCarInfo,
+
+    pub has_blue_flag => BLUE,
+    pub has_yellow_flag => YELLOW,
+    pub is_lagging => LAG,
+    pub is_first => FIRST,
+    pub is_last => LAST
+}
+
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -73,6 +83,18 @@ pub struct CompCar {
     pub angvel: i16,
 }
 
+impl CompCar {
+    /// This is the first compcar in this set of MCI packets
+    pub fn is_first(&self) -> bool {
+        self.info.is_first()
+    }
+
+    /// This is the last compcar in this set of MCI packets
+    pub fn is_last(&self) -> bool {
+        self.info.is_last()
+    }
+}
+
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -89,4 +111,16 @@ pub struct Mci {
     /// Node and lap for a subset of players. Not all players may be included in a single packet.
     #[br(count = numc)]
     pub info: Vec<CompCar>,
+}
+
+impl Mci {
+    /// Is this the first MCI packet in this set of MCI packets?
+    pub fn is_first(&self) -> bool {
+        self.info.iter().any(|i| i.is_first())
+    }
+
+    /// Is this the last MCI packet in this set of MCI packets?
+    pub fn is_last(&self) -> bool {
+        self.info.iter().any(|i| i.is_last())
+    }
 }

@@ -34,6 +34,15 @@ bitflags! {
     }
 }
 
+generate_bitflag_helpers! {
+    ObhFlags,
+
+    pub is_layout_object => LAYOUT,
+    pub is_movable_object => CAN_MOVE,
+    pub was_moving => WAS_MOVING,
+    pub was_in_original_position => ON_SPOT
+}
+
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

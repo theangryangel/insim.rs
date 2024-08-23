@@ -4,7 +4,7 @@ use bitflags::bitflags;
 use insim_core::binrw::{self, binrw, BinRead, BinWrite};
 
 use super::{PlcAllowedCarsSet, VtnAction};
-use crate::identifiers::RequestId;
+use crate::{identifiers::RequestId, Packet};
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
@@ -165,6 +165,42 @@ pub enum SmallType {
 impl Default for SmallType {
     fn default() -> Self {
         Self::None
+    }
+}
+
+impl From<SmallType> for Packet {
+    fn from(value: SmallType) -> Self {
+        Self::Small(Small {
+            subt: value,
+            ..Default::default()
+        })
+    }
+}
+
+impl From<LclFlags> for Packet {
+    fn from(value: LclFlags) -> Self {
+        Self::Small(Small {
+            subt: SmallType::Lcl(value),
+            ..Default::default()
+        })
+    }
+}
+
+impl From<LcsFlags> for Packet {
+    fn from(value: LcsFlags) -> Self {
+        Self::Small(Small {
+            subt: SmallType::Lcs(value),
+            ..Default::default()
+        })
+    }
+}
+
+impl From<PlcAllowedCarsSet> for Packet {
+    fn from(value: PlcAllowedCarsSet) -> Self {
+        Self::Small(Small {
+            subt: SmallType::Alc(value),
+            ..Default::default()
+        })
     }
 }
 

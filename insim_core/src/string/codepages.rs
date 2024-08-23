@@ -74,7 +74,7 @@ impl Codepage for u8 {
 
 /// Convert from a String, with potential lossy conversion to an Insim Codepage String
 /// Assumes you will escape any characters ahead of time, it will do not this for you.
-/// See https://github.com/theangryangel/insim.rs/issues/92 for further details.
+/// See <https://github.com/theangryangel/insim.rs/issues/92> for further details.
 pub fn to_lossy_bytes(input: &str) -> Cow<[u8]> {
     if input.chars().all(|c| c.is_ascii()) {
         // all codepages share ascii values
@@ -88,7 +88,7 @@ pub fn to_lossy_bytes(input: &str) -> Cow<[u8]> {
         .as_lfs_codepage()
         .unwrap_or_else(|| unreachable!());
     // a succulent buffer for reuse, we'll zero it before each use.
-    // all utf-8 characters are 4 bytes.
+    // all utf-8 characters are no longer than 4 bytes.
     let mut buf = [0; 4];
 
     'outer: for c in input.chars() {

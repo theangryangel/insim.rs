@@ -82,6 +82,18 @@ bitflags! {
     }
 }
 
+generate_bitflag_helpers!(PlayerFlags,
+    pub is_left_side => LEFTSIDE,
+    pub using_auto_gear_shift => AUTOGEARS,
+    pub has_shifter => SHIFTER,
+    pub in_pits => INPITS,
+    pub using_auto_clutch => AUTOCLUTCH,
+    pub using_mouse => MOUSE,
+    pub using_keyboard => KB_NO_HELP,
+    pub using_keyboard_with_stabilisation => KB_STABILISED,
+    pub using_custom_view => CUSTOM_VIEW
+);
+
 bitflags! {
     #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
@@ -99,6 +111,12 @@ bitflags! {
     }
 }
 
+generate_bitflag_helpers!(SetFlags,
+    pub is_symmetric => SYMM_WHEELS,
+    pub is_traction_control_enabled => TC_ENABLE,
+    pub is_anti_lock_braking_enabled => ABS_ENABLE
+);
+
 bitflags! {
     #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
@@ -115,6 +133,13 @@ bitflags! {
         const REMOTE = (1 << 2);
     }
 }
+
+generate_bitflag_helpers!(
+    PlayerType,
+    pub is_female => FEMALE,
+    pub is_ai => AI,
+    pub is_remote => REMOTE
+);
 
 bitflags! {
     #[binrw]
