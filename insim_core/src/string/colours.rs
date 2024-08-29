@@ -29,6 +29,66 @@ impl Colour for u8 {
     }
 }
 
+/// Trait to help build coloured strings. API is heavily inspired by colored-rs/colored.
+pub trait Colourify {
+    /// Make this black
+    fn black(self) -> String;
+    /// Make this red
+    fn red(self) -> String;
+    /// Make this light green
+    fn light_green(self) -> String;
+    /// Make this yellow
+    fn yellow(self) -> String;
+    /// Make this blue
+    fn blue(self) -> String;
+    /// Make this purple
+    fn purple(self) -> String;
+    /// Make this light blue
+    fn light_blue(self) -> String;
+    /// Make this white
+    fn white(self) -> String;
+    /// Make this dark green (default colour)
+    fn dark_green(self) -> String;
+}
+
+impl Colourify for &str {
+    fn black(self) -> String {
+        format!("^0{}", self)
+    }
+
+    fn red(self) -> String {
+        format!("^1{}", self)
+    }
+
+    fn light_green(self) -> String {
+        format!("^2{}", self)
+    }
+
+    fn yellow(self) -> String {
+        format!("^3{}", self)
+    }
+
+    fn blue(self) -> String {
+        format!("^4{}", self)
+    }
+
+    fn purple(self) -> String {
+        format!("^5{}", self)
+    }
+
+    fn light_blue(self) -> String {
+        format!("^6{}", self)
+    }
+
+    fn white(self) -> String {
+        format!("^7{}", self)
+    }
+
+    fn dark_green(self) -> String {
+        format!("^9{}", self)
+    }
+}
+
 /// Strip LFS colours
 pub fn strip(input: &str) -> Cow<str> {
     if !input.chars().any(|c| c.is_lfs_control_char()) {
@@ -90,5 +150,29 @@ mod tests {
     #[test]
     fn test_strip_colours_escaped() {
         assert_eq!(strip("^^1234^56789"), "^^12346789");
+    }
+
+    #[test]
+    fn test_colourify() {
+        assert_eq!(
+            "^9The ^0quick ^1brown ^2fox ^3jumps ^4over ^5the ^6lazy ^7dog",
+            format!(
+                "{} {} {} {} {} {} {} {} {}",
+                "The".dark_green(),
+                "quick".black(),
+                "brown".red(),
+                "fox".light_green(),
+                "jumps".yellow(),
+                "over".blue(),
+                "the".purple(),
+                "lazy".light_blue(),
+                "dog".white()
+            )
+        );
+    }
+
+    #[test]
+    fn test_colourify_deref() {
+        assert_eq!("^4Test", String::from("Test").blue());
     }
 }
