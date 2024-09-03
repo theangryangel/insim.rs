@@ -11,7 +11,7 @@ default-members = ["insim", "insim_*"]
 resolver = "2"
 
 [workspace.package]
-version = "2.0.0"
+version = "2.1.0"
 authors = ["Karl Southern <karl@theangryangel.co.uk>"]
 edition = "2021"
 rust-version = "1.75"
