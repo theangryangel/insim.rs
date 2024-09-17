@@ -133,6 +133,8 @@ pub struct Bfn {
     pub inst: BtnInst,
 }
 
+impl_typical_with_request_id!(Bfn);
+
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -169,6 +171,8 @@ pub struct Btn {
     #[bw(write_with = binrw_write_codepage_string::<240, _>, args(false, 4))]
     pub text: String,
 }
+
+impl_typical_with_request_id!(Btn);
 
 #[cfg(test)]
 mod tests {

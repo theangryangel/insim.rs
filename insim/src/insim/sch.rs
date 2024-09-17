@@ -43,3 +43,5 @@ pub struct Sch {
     #[brw(pad_after = 2)]
     pub flags: SchFlags,
 }
+
+impl_typical_with_request_id!(Sch);

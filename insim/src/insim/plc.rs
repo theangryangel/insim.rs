@@ -198,6 +198,8 @@ pub struct Plc {
     pub cars: PlcAllowedCarsSet,
 }
 
+impl_typical_with_request_id!(Plc);
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -77,9 +77,10 @@ impl From<u8> for CimSubModeNormal {
             2 => Self::WheelDamage,
             3 => Self::LiveSettings,
             4 => Self::PitInstructions,
-            _ => {
+            other => {
                 unreachable!(
-                    "Unhandled CimSubModeNormal. Perhaps a programming error or protocol update?"
+                    "Unhandled CimSubModeNormal. Perhaps a programming error or protocol update? Found {}, expected 0-4.",
+                    other
                 )
             },
         }
@@ -133,9 +134,9 @@ impl From<u8> for CimSubModeGarage {
             6 => Self::Tyres,
             7 => Self::Aero,
             8 => Self::Pass,
-            _ => {
+            other => {
                 unreachable!(
-                    "Unhandled CimSubModeGarage. Perhaps a programming error or protocol update?"
+                    "Unhandled CimSubModeGarage. Perhaps a programming error or protocol update? Found {}, expected 0-8", other
                 )
             },
         }

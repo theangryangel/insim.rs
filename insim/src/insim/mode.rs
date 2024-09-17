@@ -23,3 +23,5 @@ pub struct Mod {
     /// Screen height. Zero to switch to windowed mode.
     pub height: i32,
 }
+
+impl_typical_with_request_id!(Mod);

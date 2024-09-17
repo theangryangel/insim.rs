@@ -56,3 +56,5 @@ pub struct Jrr {
     /// 0: use default start point / Flags = 0x80: set start point
     pub startpos: ObjectInfo,
 }
+
+impl_typical_with_request_id!(Jrr);

@@ -19,3 +19,5 @@ pub struct Scc {
     #[brw(pad_after = 2)]
     pub ingamecam: CameraView,
 }
+
+impl_typical_with_request_id!(Scc);

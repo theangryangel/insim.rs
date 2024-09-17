@@ -32,3 +32,9 @@ impl DerefMut for ClickId {
         &mut self.0
     }
 }
+
+impl From<u8> for ClickId {
+    fn from(value: u8) -> Self {
+        Self(value)
+    }
+}

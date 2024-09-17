@@ -121,3 +121,5 @@ pub struct Rip {
     #[br(parse_with = binrw_parse_codepage_string::<64, _>)]
     pub rname: String,
 }
+
+impl_typical_with_request_id!(Rip);

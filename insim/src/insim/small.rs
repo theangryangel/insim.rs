@@ -4,7 +4,7 @@ use bitflags::bitflags;
 use insim_core::binrw::{self, binrw, BinRead, BinWrite};
 
 use super::{PlcAllowedCarsSet, VtnAction};
-use crate::{identifiers::RequestId, Packet};
+use crate::{identifiers::RequestId, Packet, WithRequestId};
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
@@ -186,6 +186,18 @@ impl From<LclFlags> for Packet {
     }
 }
 
+impl WithRequestId for LclFlags {
+    fn with_request_id<R: Into<crate::identifiers::RequestId>>(
+        self,
+        reqi: R,
+    ) -> impl Into<crate::Packet> + std::fmt::Debug {
+        Small {
+            reqi: reqi.into(),
+            subt: SmallType::Lcl(self),
+        }
+    }
+}
+
 impl From<LcsFlags> for Packet {
     fn from(value: LcsFlags) -> Self {
         Self::Small(Small {
@@ -195,12 +207,48 @@ impl From<LcsFlags> for Packet {
     }
 }
 
+impl WithRequestId for LcsFlags {
+    fn with_request_id<R: Into<crate::identifiers::RequestId>>(
+        self,
+        reqi: R,
+    ) -> impl Into<crate::Packet> + std::fmt::Debug {
+        Small {
+            reqi: reqi.into(),
+            subt: SmallType::Lcs(self),
+        }
+    }
+}
+
 impl From<PlcAllowedCarsSet> for Packet {
     fn from(value: PlcAllowedCarsSet) -> Self {
         Self::Small(Small {
             subt: SmallType::Alc(value),
             ..Default::default()
         })
+    }
+}
+
+impl WithRequestId for PlcAllowedCarsSet {
+    fn with_request_id<R: Into<crate::identifiers::RequestId>>(
+        self,
+        reqi: R,
+    ) -> impl Into<crate::Packet> + std::fmt::Debug {
+        Small {
+            reqi: reqi.into(),
+            subt: SmallType::Alc(self),
+        }
+    }
+}
+
+impl WithRequestId for SmallType {
+    fn with_request_id<R: Into<crate::identifiers::RequestId>>(
+        self,
+        reqi: R,
+    ) -> impl Into<crate::Packet> + std::fmt::Debug {
+        Small {
+            reqi: reqi.into(),
+            subt: self,
+        }
     }
 }
 
@@ -279,6 +327,8 @@ pub struct Small {
     /// Small subtype.
     pub subt: SmallType,
 }
+
+impl_typical_with_request_id!(Small);
 
 #[cfg(test)]
 mod tests {

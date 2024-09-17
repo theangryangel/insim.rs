@@ -32,3 +32,9 @@ impl DerefMut for RequestId {
         &mut self.0
     }
 }
+
+impl From<u8> for RequestId {
+    fn from(value: u8) -> Self {
+        Self(value)
+    }
+}

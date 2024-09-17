@@ -21,3 +21,5 @@ pub struct Sfp {
     #[bw(map = |&x| x as u8)]
     pub onoff: bool,
 }
+
+impl_typical_with_request_id!(Sfp);

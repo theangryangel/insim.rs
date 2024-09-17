@@ -30,6 +30,8 @@ pub struct Mtc {
     pub text: String,
 }
 
+impl_typical_with_request_id!(Mtc);
+
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;

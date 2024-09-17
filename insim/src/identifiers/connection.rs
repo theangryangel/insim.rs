@@ -40,3 +40,9 @@ impl DerefMut for ConnectionId {
         &mut self.0
     }
 }
+
+impl From<u8> for ConnectionId {
+    fn from(value: u8) -> Self {
+        Self(value)
+    }
+}

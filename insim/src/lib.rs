@@ -41,7 +41,7 @@ pub use insim_pth as pth;
 #[cfg(feature = "smx")]
 /// Report insim_smx when smx feature is enabled
 pub use insim_smx as smx;
-pub use packet::Packet;
+pub use packet::{Packet, WithRequestId};
 pub use result::Result;
 
 /// Shortcut method to create a TCP connection
