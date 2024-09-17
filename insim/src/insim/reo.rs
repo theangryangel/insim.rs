@@ -44,3 +44,5 @@ impl Default for Reo {
         }
     }
 }
+
+impl_typical_with_request_id!(Reo);

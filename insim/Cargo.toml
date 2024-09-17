@@ -42,7 +42,7 @@ insim_pth = { path = "../insim_pth", optional = true, version = "2.1.0" }
 insim_smx = { path = "../insim_smx", optional = true, version = "2.1.0" }
 serde = { workspace = true, features = ["derive"], optional = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["rt", "time", "net", "macros", "sync", "tracing"], optional = true }
+tokio = { workspace = true, features = ["time", "net", "macros", "sync", "tracing", "io-util"], optional = true }
 tokio-tungstenite = { workspace = true, optional = true }
 tracing = { workspace = true }
 

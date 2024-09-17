@@ -120,3 +120,5 @@ pub struct Axm {
     #[br(count = numo)]
     pub info: Vec<ObjectInfo>,
 }
+
+impl_typical_with_request_id!(Axm);

@@ -1,5 +1,7 @@
 //! Contains [crate::Packet] enum
 
+use std::fmt::Debug;
+
 use insim_core::binrw::{self, binrw};
 
 use crate::{identifiers::RequestId, insim::*, relay::*};
@@ -420,5 +422,99 @@ impl Packet {
             },
             _ => Ok(false),
         }
+    }
+}
+
+pub trait WithRequestId
+where
+    Self: std::fmt::Debug,
+{
+    fn with_request_id<R: Into<crate::identifiers::RequestId>>(
+        self,
+        reqi: R,
+    ) -> impl Into<crate::Packet> + std::fmt::Debug;
+}
+
+impl WithRequestId for Packet {
+    fn with_request_id<R: Into<crate::identifiers::RequestId>>(
+        mut self,
+        reqi: R,
+    ) -> impl Into<crate::Packet> + std::fmt::Debug {
+        match &mut self {
+            Packet::Isi(i) => i.reqi = reqi.into(),
+            Packet::Ver(i) => i.reqi = reqi.into(),
+            Packet::Tiny(i) => i.reqi = reqi.into(),
+            Packet::Small(i) => i.reqi = reqi.into(),
+            Packet::Sta(i) => i.reqi = reqi.into(),
+            Packet::Sch(i) => i.reqi = reqi.into(),
+            Packet::Sfp(i) => i.reqi = reqi.into(),
+            Packet::Scc(i) => i.reqi = reqi.into(),
+            Packet::Cpp(i) => i.reqi = reqi.into(),
+            Packet::Ism(i) => i.reqi = reqi.into(),
+            Packet::Mso(i) => i.reqi = reqi.into(),
+            Packet::Iii(i) => i.reqi = reqi.into(),
+            Packet::Mst(i) => i.reqi = reqi.into(),
+            Packet::Mtc(i) => i.reqi = reqi.into(),
+            Packet::Mod(i) => i.reqi = reqi.into(),
+            Packet::Vtn(i) => i.reqi = reqi.into(),
+            Packet::Rst(i) => i.reqi = reqi.into(),
+            Packet::Ncn(i) => i.reqi = reqi.into(),
+            Packet::Cnl(i) => i.reqi = reqi.into(),
+            Packet::Cpr(i) => i.reqi = reqi.into(),
+            Packet::Npl(i) => i.reqi = reqi.into(),
+            Packet::Plp(i) => i.reqi = reqi.into(),
+            Packet::Pll(i) => i.reqi = reqi.into(),
+            Packet::Lap(i) => i.reqi = reqi.into(),
+            Packet::Spx(i) => i.reqi = reqi.into(),
+            Packet::Pit(i) => i.reqi = reqi.into(),
+            Packet::Psf(i) => i.reqi = reqi.into(),
+            Packet::Pla(i) => i.reqi = reqi.into(),
+            Packet::Cch(i) => i.reqi = reqi.into(),
+            Packet::Pen(i) => i.reqi = reqi.into(),
+            Packet::Toc(i) => i.reqi = reqi.into(),
+            Packet::Flg(i) => i.reqi = reqi.into(),
+            Packet::Pfl(i) => i.reqi = reqi.into(),
+            Packet::Fin(i) => i.reqi = reqi.into(),
+            Packet::Res(i) => i.reqi = reqi.into(),
+            Packet::Reo(i) => i.reqi = reqi.into(),
+            Packet::Nlp(i) => i.reqi = reqi.into(),
+            Packet::Mci(i) => i.reqi = reqi.into(),
+            Packet::Msx(i) => i.reqi = reqi.into(),
+            Packet::Msl(i) => i.reqi = reqi.into(),
+            Packet::Crs(i) => i.reqi = reqi.into(),
+            Packet::Bfn(i) => i.reqi = reqi.into(),
+            Packet::Axi(i) => i.reqi = reqi.into(),
+            Packet::Axo(i) => i.reqi = reqi.into(),
+            Packet::Btn(i) => i.reqi = reqi.into(),
+            Packet::Btc(i) => i.reqi = reqi.into(),
+            Packet::Btt(i) => i.reqi = reqi.into(),
+            Packet::Rip(i) => i.reqi = reqi.into(),
+            Packet::Ssh(i) => i.reqi = reqi.into(),
+            Packet::Con(i) => i.reqi = reqi.into(),
+            Packet::Obh(i) => i.reqi = reqi.into(),
+            Packet::Hlv(i) => i.reqi = reqi.into(),
+            Packet::Plc(i) => i.reqi = reqi.into(),
+            Packet::Axm(i) => i.reqi = reqi.into(),
+            Packet::Acr(i) => i.reqi = reqi.into(),
+            Packet::Hcp(i) => i.reqi = reqi.into(),
+            Packet::Nci(i) => i.reqi = reqi.into(),
+            Packet::Jrr(i) => i.reqi = reqi.into(),
+            Packet::Uco(i) => i.reqi = reqi.into(),
+            Packet::Oco(i) => i.reqi = reqi.into(),
+            Packet::Ttc(i) => i.reqi = reqi.into(),
+            Packet::Slc(i) => i.reqi = reqi.into(),
+            Packet::Csc(i) => i.reqi = reqi.into(),
+            Packet::Cim(i) => i.reqi = reqi.into(),
+            Packet::Mal(i) => i.reqi = reqi.into(),
+            Packet::Plh(i) => i.reqi = reqi.into(),
+            Packet::Ipb(i) => i.reqi = reqi.into(),
+            Packet::RelayArq(i) => i.reqi = reqi.into(),
+            Packet::RelayArp(i) => i.reqi = reqi.into(),
+            Packet::RelayHlr(i) => i.reqi = reqi.into(),
+            Packet::RelayHos(i) => i.reqi = reqi.into(),
+            Packet::RelaySel(i) => i.reqi = reqi.into(),
+            Packet::RelayErr(i) => i.reqi = reqi.into(),
+        };
+        self
     }
 }

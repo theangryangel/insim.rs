@@ -2,7 +2,7 @@ use insim_core::binrw::{self, binrw};
 
 use crate::{
     identifiers::{ConnectionId, RequestId},
-    Packet,
+    Packet, WithRequestId,
 };
 
 #[binrw]
@@ -56,5 +56,20 @@ impl From<TtcType> for Packet {
             subt: value,
             ..Default::default()
         })
+    }
+}
+
+impl_typical_with_request_id!(Ttc);
+
+impl WithRequestId for TtcType {
+    fn with_request_id<R: Into<RequestId>>(
+        self,
+        reqi: R,
+    ) -> impl Into<crate::Packet> + std::fmt::Debug {
+        Ttc {
+            reqi: reqi.into(),
+            subt: self,
+            ..Default::default()
+        }
     }
 }

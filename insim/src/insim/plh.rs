@@ -52,6 +52,8 @@ pub struct Plh {
     pub hcaps: Vec<PlayerHandicap>,
 }
 
+impl_typical_with_request_id!(Plh);
+
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;

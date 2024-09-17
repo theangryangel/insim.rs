@@ -7,7 +7,7 @@ use insim_core::{
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
 };
 
-use crate::{identifiers::RequestId, VERSION};
+use crate::{identifiers::RequestId, WithRequestId, VERSION};
 
 bitflags! {
     /// Flags for the [Init] packet flags field.
@@ -54,6 +54,15 @@ impl IsiFlags {
     /// Clear all flags
     pub fn clear(&mut self) {
         *self.0.bits_mut() = 0;
+    }
+}
+
+impl From<IsiFlags> for Isi {
+    fn from(value: IsiFlags) -> Self {
+        Self {
+            flags: value,
+            ..Default::default()
+        }
     }
 }
 
@@ -118,6 +127,21 @@ impl Default for Isi {
             interval: Duration::default(),
             admin: "".into(),
             iname: Self::DEFAULT_INAME.to_owned(),
+        }
+    }
+}
+
+impl_typical_with_request_id!(Isi);
+
+impl WithRequestId for IsiFlags {
+    fn with_request_id<R: Into<crate::identifiers::RequestId>>(
+        self,
+        reqi: R,
+    ) -> impl Into<crate::Packet> + std::fmt::Debug {
+        Isi {
+            reqi: reqi.into(),
+            flags: self,
+            ..Default::default()
         }
     }
 }

@@ -32,3 +32,9 @@ impl DerefMut for PlayerId {
         &mut self.0
     }
 }
+
+impl From<u8> for PlayerId {
+    fn from(value: u8) -> Self {
+        Self(value)
+    }
+}

@@ -83,3 +83,5 @@ pub struct Oco {
     /// Bulbs/lights to manipulate
     pub data: OcoLights,
 }
+
+impl_typical_with_request_id!(Oco);

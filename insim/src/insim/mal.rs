@@ -101,6 +101,8 @@ impl Mal {
     }
 }
 
+impl_typical_with_request_id!(Mal);
+
 #[cfg(test)]
 mod tests {
     use std::io::{Cursor, Seek};

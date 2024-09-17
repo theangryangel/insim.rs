@@ -33,3 +33,5 @@ pub struct Hcp {
     // TODO make this work with [Vehicle]
     pub info: [HcpCarHandicap; 32],
 }
+
+impl_typical_with_request_id!(Hcp);

@@ -85,6 +85,8 @@ impl Ipb {
     }
 }
 
+impl_typical_with_request_id!(Ipb);
+
 #[cfg(test)]
 mod tests {
     use std::io::{Cursor, Seek};

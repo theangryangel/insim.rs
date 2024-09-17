@@ -48,3 +48,5 @@ pub struct Cpp {
     /// State flags to set
     pub flags: StaFlags,
 }
+
+impl_typical_with_request_id!(Cpp);

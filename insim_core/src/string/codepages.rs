@@ -76,7 +76,7 @@ impl Codepage for u8 {
 /// Assumes you will escape any characters ahead of time, it will do not this for you.
 /// See <https://github.com/theangryangel/insim.rs/issues/92> for further details.
 pub fn to_lossy_bytes(input: &str) -> Cow<[u8]> {
-    if input.chars().all(|c| c.is_ascii()) {
+    if input.is_ascii() {
         // all codepages share ascii values
         // therefore if it's all ascii, we can just dump it.
         return input.as_bytes().into();

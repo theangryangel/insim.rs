@@ -3,7 +3,7 @@ use insim_core::{
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
 };
 
-use crate::identifiers::RequestId;
+use crate::{identifiers::RequestId, WithRequestId};
 
 #[binrw]
 #[derive(Debug, Default, Clone)]
@@ -43,4 +43,28 @@ pub struct Ssh {
     #[br(parse_with = binrw_parse_codepage_string::<32, _>)]
     #[bw(write_with = binrw_write_codepage_string::<32, _>)]
     pub name: String,
+}
+
+impl_typical_with_request_id!(Ssh);
+
+impl From<SshError> for Ssh {
+    fn from(error: SshError) -> Self {
+        Self {
+            error,
+            ..Default::default()
+        }
+    }
+}
+
+impl WithRequestId for SshError {
+    fn with_request_id<R: Into<crate::identifiers::RequestId>>(
+        self,
+        reqi: R,
+    ) -> impl Into<crate::Packet> + std::fmt::Debug {
+        Ssh {
+            reqi: reqi.into(),
+            error: self,
+            ..Default::default()
+        }
+    }
 }

@@ -20,6 +20,8 @@ pub struct Mst {
     pub msg: String,
 }
 
+impl_typical_with_request_id!(Mst);
+
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;

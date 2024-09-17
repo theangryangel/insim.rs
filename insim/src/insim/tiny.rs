@@ -1,6 +1,6 @@
 use insim_core::binrw::{self, binrw};
 
-use crate::{identifiers::RequestId, Packet};
+use crate::{identifiers::RequestId, Packet, WithRequestId};
 
 #[binrw]
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
@@ -111,6 +111,15 @@ impl From<TinyType> for Packet {
     }
 }
 
+impl WithRequestId for TinyType {
+    fn with_request_id<R: Into<RequestId>>(self, reqi: R) -> impl Into<Packet> + std::fmt::Debug {
+        Tiny {
+            reqi: reqi.into(),
+            subt: self,
+        }
+    }
+}
+
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -129,3 +138,5 @@ impl Tiny {
         self.subt == TinyType::None && self.reqi == RequestId(0)
     }
 }
+
+impl_typical_with_request_id!(Tiny);
