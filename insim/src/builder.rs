@@ -203,6 +203,65 @@ impl Builder {
         self
     }
 
+    pub fn isi_flag_mci(mut self, enabled: bool) -> Self {
+        self.isi_flags.set(IsiFlags::MCI, enabled);
+        self
+    }
+
+    /// Set the [IsiFlags::LOCAL] flag
+    pub fn isi_flag_local(mut self, enabled: bool) -> Self {
+        self.isi_flags.set(IsiFlags::LOCAL, enabled);
+        self
+    }
+
+    /// Set the [IsiFlags::MSO_COLS] flag
+    pub fn isi_flag_mso_cols(mut self, enabled: bool) -> Self {
+        self.isi_flags.set(IsiFlags::MSO_COLS, enabled);
+        self
+    }
+
+    /// Set the [IsiFlags::NLP] flag
+    pub fn isi_flag_nlp(mut self, enabled: bool) -> Self {
+        self.isi_flags.set(IsiFlags::NLP, enabled);
+        self
+    }
+
+    /// Set the [IsiFlags::CON] flag
+    pub fn isi_flag_con(mut self, enabled: bool) -> Self {
+        self.isi_flags.set(IsiFlags::CON, enabled);
+        self
+    }
+
+    /// Set the [IsiFlags::OBH] flag
+    pub fn isi_flag_obh(mut self, enabled: bool) -> Self {
+        self.isi_flags.set(IsiFlags::OBH, enabled);
+        self
+    }
+
+    /// Set the [IsiFlags::HLV] flag
+    pub fn isi_flag_hlv(mut self, enabled: bool) -> Self {
+        self.isi_flags.set(IsiFlags::HLV, enabled);
+        self
+    }
+
+    /// Set the [IsiFlags::AXM_LOAD] flag
+    pub fn isi_flag_axm_load(mut self, enabled: bool) -> Self {
+        self.isi_flags.set(IsiFlags::AXM_LOAD, enabled);
+        self
+    }
+
+    /// Set the [IsiFlags::AXM_EDIT] flag
+    pub fn isi_flag_axm_edit(mut self, enabled: bool) -> Self {
+        self.isi_flags.set(IsiFlags::AXM_EDIT, enabled);
+        self
+    }
+
+    /// Set the [IsiFlags::REQ_JOIN] flag
+    pub fn isi_flag_req_join(mut self, enabled: bool) -> Self {
+        self.isi_flags.set(IsiFlags::REQ_JOIN, enabled);
+        self
+    }
+
     /// Set the prefix to be used in the [crate::Packet::Isi] packet during connection
     /// handshake.
     pub fn isi_prefix<C: Into<Option<char>>>(mut self, c: C) -> Self {
