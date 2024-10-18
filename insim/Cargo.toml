@@ -18,7 +18,9 @@ workspace = true
 [features]
 default = ["tokio", "blocking", "websocket"]
 blocking = []
-tokio = ["dep:tokio", "dep:async-trait"]
+tokio = [
+  "dep:tokio",
+]
 serde = [
   "dep:serde",
   "insim_core/serde",
@@ -27,19 +29,21 @@ serde = [
 ]
 pth = ["dep:insim_pth"]
 smx = ["dep:insim_smx"]
-websocket = ["tokio", "dep:tokio-tungstenite", "futures-util"]
+websocket = [
+  "tokio", "dep:tokio-tungstenite",
+  "futures-util"
+]
 
 [dependencies]
-async-trait = { workspace = true, optional = true }
 bitflags = { workspace = true }
 bytes = { workspace = true }
 from_variants = { workspace = true }
 futures-util = { workspace = true, optional = true }
 if_chain = { workspace = true }
 indexmap = { workspace = true }
-insim_core = { path = "../insim_core", version = "2.1.0" }
-insim_pth = { path = "../insim_pth", optional = true, version = "2.1.0" }
-insim_smx = { path = "../insim_smx", optional = true, version = "2.1.0" }
+insim_core = { path = "../insim_core", version = "3.0.0-unreleased" }
+insim_pth = { path = "../insim_pth", optional = true, version = "3.0.0-unreleased" }
+insim_smx = { path = "../insim_smx", optional = true, version = "3.0.0-unreleased" }
 serde = { workspace = true, features = ["derive"], optional = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["time", "net", "macros", "sync", "tracing", "io-util"], optional = true }

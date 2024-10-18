@@ -1,58 +1,76 @@
-use bytes::BytesMut;
-use tokio::net::UdpSocket;
+//! UDPStream
 
-use super::AsyncTryReadWriteBytes;
-use crate::{error::Error, result::Result, MAX_SIZE_PACKET};
+use std::{
+    io::{Read, Write},
+    pin::Pin,
+    task::{Context, Poll},
+};
 
-#[async_trait::async_trait]
-impl AsyncTryReadWriteBytes for UdpSocket {
-    async fn try_read_bytes(&mut self, buf: &mut BytesMut) -> Result<usize> {
-        loop {
-            let ready = self.ready(tokio::io::Interest::READABLE).await?;
+use tokio::{
+    io::{AsyncRead, AsyncWrite, ReadBuf},
+    net::UdpSocket,
+};
 
-            if ready.is_readable() {
-                // Tokio docs indicates that the buffer must be large enough for any packet.
-                // Since we know the max possible insim packet size, we ensure that we have at
-                // least that capacity.
-                if buf.capacity() < MAX_SIZE_PACKET {
-                    buf.reserve(MAX_SIZE_PACKET - buf.capacity());
-                }
+/// Tokio UDPSocket wrapper for AsyncRead, AsyncWrite, Read and Write
+#[derive(Debug)]
+pub struct UdpStream {
+    // FIXME: Add internal buf like we've done with WebSocketStream
+    inner: UdpSocket,
+}
 
-                match self.try_recv_buf(buf) {
-                    Ok(0) => {
-                        return Err(Error::Disconnected);
-                    },
-                    Ok(size) => {
-                        return Ok(size);
-                    },
-                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                        continue;
-                    },
-                    Err(e) => {
-                        return Err(e.into());
-                    },
-                }
-            }
-        }
+impl From<UdpSocket> for UdpStream {
+    fn from(value: UdpSocket) -> Self {
+        Self { inner: value }
+    }
+}
+
+impl Read for UdpStream {
+    fn read(&mut self, buff: &mut [u8]) -> Result<usize, std::io::Error> {
+        self.inner.try_recv(buff)
+    }
+}
+
+impl Write for UdpStream {
+    fn write(&mut self, buff: &[u8]) -> Result<usize, std::io::Error> {
+        self.inner.try_send(buff)
     }
 
-    async fn try_write_bytes(&mut self, src: &[u8]) -> Result<usize> {
-        if src.is_empty() {
-            return Ok(0);
-        }
+    fn flush(&mut self) -> Result<(), std::io::Error> {
+        Ok(())
+    }
+}
 
-        loop {
-            self.writable().await?;
-
-            match self.try_send(src) {
-                Ok(n) => {
-                    return Ok(n);
-                },
-                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => continue,
-                Err(e) => {
-                    return Err(e.into());
-                },
-            }
+impl AsyncRead for UdpStream {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<Result<(), std::io::Error>> {
+        match self.inner.poll_recv(cx, buf) {
+            Poll::Ready(Ok(_n)) => Poll::Ready(Ok(())),
+            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
+            Poll::Pending => Poll::Pending,
         }
+    }
+}
+
+impl AsyncWrite for UdpStream {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<Result<usize, std::io::Error>> {
+        self.inner.poll_send(cx, buf)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+    ) -> Poll<Result<(), std::io::Error>> {
+        Poll::Ready(Ok(()))
     }
 }
