@@ -1,14 +1,30 @@
-use bytes::BytesMut;
-use futures_util::{SinkExt, StreamExt};
-use tokio::net::TcpStream;
+//! Binary only Websockets used for LFS World Relay
 
-use super::AsyncTryReadWriteBytes;
-use crate::{error::Error, result::Result};
+use core::{
+    pin::Pin,
+    task::{Context, Poll},
+};
+use std::io;
+
+use bytes::{Buf, BytesMut};
+use futures_util::{
+    sink::{Sink, SinkExt},
+    stream::Stream,
+};
+use tokio::{
+    io::{AsyncRead, AsyncWrite, ReadBuf},
+    net::TcpStream,
+};
+use tokio_tungstenite::tungstenite::{error::Error as TungsteniteError, protocol::Message};
+
+use crate::MAX_SIZE_PACKET;
 
 pub(crate) type TungsteniteWebSocket =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<TcpStream>>;
 
-pub(crate) async fn connect_to_relay(tcp_nodelay: bool) -> Result<TungsteniteWebSocket> {
+pub(crate) async fn connect_to_relay(
+    tcp_nodelay: bool,
+) -> std::result::Result<TungsteniteWebSocket, std::io::Error> {
     use tokio_tungstenite::{
         connect_async_with_config,
         tungstenite::{handshake::client::generate_key, http},
@@ -32,42 +48,111 @@ pub(crate) async fn connect_to_relay(tcp_nodelay: bool) -> Result<TungsteniteWeb
         .body(())
         .unwrap();
 
-    let (stream, _response) = connect_async_with_config(req, None, tcp_nodelay).await?;
+    let (stream, _response) = connect_async_with_config(req, None, tcp_nodelay)
+        .await
+        .map_err(tungstenite_error_to_io)?;
 
     Ok(stream)
 }
 
-#[async_trait::async_trait]
-impl AsyncTryReadWriteBytes for TungsteniteWebSocket {
-    async fn try_read_bytes(&mut self, buf: &mut BytesMut) -> Result<usize> {
-        use tokio_tungstenite::tungstenite::Message;
+/// Convert from Tungstenite error to io::Error
+fn tungstenite_error_to_io(err: TungsteniteError) -> io::Error {
+    match err {
+        TungsteniteError::Io(io_err) => io_err,
+        err => io::Error::new(io::ErrorKind::Other, err),
+    }
+}
 
-        // loop because we might get non-binary packets
-        // which we need to ignore
-        loop {
-            match self.next().await {
-                Some(Ok(Message::Binary(data))) => {
-                    buf.extend_from_slice(&data);
-                    return Ok(data.len());
-                },
-                Some(Ok(Message::Close(_))) => {
-                    return Err(Error::Disconnected);
-                },
-                Some(Ok(msg)) => {
-                    tracing::debug!(
-                        "Ignoring non-binary packet received over websocket: {:?}",
-                        msg
-                    );
-                },
-                Some(Err(e)) => return Err(e.into()),
-                None => return Err(Error::Disconnected),
-            }
+impl From<TungsteniteWebSocket> for WebsocketStream {
+    fn from(value: TungsteniteWebSocket) -> Self {
+        Self {
+            inner: value,
+            buf: BytesMut::with_capacity(MAX_SIZE_PACKET),
+        }
+    }
+}
+
+/// Wrap a [WebSocketStream] so it implements [AsyncRead] and [AsyncWrite]
+#[derive(Debug)]
+pub struct WebsocketStream {
+    inner: TungsteniteWebSocket,
+    buf: BytesMut,
+}
+
+impl AsyncWrite for WebsocketStream {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<Result<usize, io::Error>> {
+        match self.inner.poll_ready_unpin(cx) {
+            Poll::Ready(Ok(())) => {
+                if let Err(e) = self.inner.start_send_unpin(Message::binary(buf)) {
+                    Poll::Ready(Err(tungstenite_error_to_io(e)))
+                } else {
+                    // FIXME - is this right?
+                    let _ = self.poll_flush(cx);
+                    Poll::Ready(Ok(buf.len()))
+                }
+            },
+            Poll::Ready(Err(e)) => Poll::Ready(Err(tungstenite_error_to_io(e))),
+            Poll::Pending => Poll::Pending,
         }
     }
 
-    async fn try_write_bytes(&mut self, src: &[u8]) -> Result<usize> {
-        let msg = tokio_tungstenite::tungstenite::protocol::Message::binary(src);
-        self.send(msg).await.unwrap();
-        Ok(src.len())
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
+        self.inner
+            .poll_flush_unpin(cx)
+            .map_err(tungstenite_error_to_io)
+    }
+
+    fn poll_shutdown(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), io::Error>> {
+        let ws = Pin::new(&mut self.inner);
+        ws.poll_close(cx).map_err(tungstenite_error_to_io)
+    }
+}
+
+impl AsyncRead for WebsocketStream {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        loop {
+            if !self.buf.is_empty() && buf.remaining() > 0 {
+                let to_copy = buf.remaining().min(self.buf.len());
+
+                let bytes = self.buf.copy_to_bytes(to_copy);
+                buf.put_slice(&bytes);
+                return Poll::Ready(Ok(()));
+            }
+
+            let ws = Pin::new(&mut self.inner);
+            match ws.poll_next(cx) {
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(None) => return Poll::Ready(Ok(())),
+                Poll::Ready(Some(Err(e))) => match e {
+                    TungsteniteError::Io(e) => {
+                        return Poll::Ready(Err(e));
+                    },
+                    _ => {
+                        return Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::Other, e)));
+                    },
+                },
+                Poll::Ready(Some(Ok(Message::Binary(msgbuf)))) => {
+                    self.buf.extend(msgbuf);
+                    continue;
+                },
+                Poll::Ready(Some(Ok(data))) => {
+                    tracing::debug!(
+                        "Got an unhandled message type from LFSWorld Relay? {:?}",
+                        data
+                    );
+                },
+            }
+        }
     }
 }

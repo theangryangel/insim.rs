@@ -1,104 +1,66 @@
 use std::{
     fmt::Debug,
     io::{Read, Write},
-    net::{TcpStream, UdpSocket},
-    time::Duration,
+    net::UdpSocket,
 };
 
-use bytes::{BufMut, BytesMut};
+use bytes::BytesMut;
 
-use super::{Codec, DEFAULT_TIMEOUT_SECS};
+use super::Codec;
 use crate::{insim::Isi, result::Result, Error, Packet, DEFAULT_BUFFER_CAPACITY};
 
-/// TryReadWriteBytes
-pub trait TryReadWriteBytes {
-    /// Set the timeout
-    fn try_read_write_timeout(&self, timeout: Duration);
+/// Read Write super trait
+pub trait ReadWrite: Read + Write + Debug {}
 
-    /// Try to read bytes.
-    fn try_read_bytes(&mut self, buf: &mut BytesMut) -> Result<usize>;
+impl<T: Read + Write + Debug> ReadWrite for T {}
 
-    /// Try to write bytes.
-    fn try_write_bytes(&mut self, src: &[u8]) -> Result<usize>;
-}
-
-impl TryReadWriteBytes for TcpStream {
-    fn try_read_write_timeout(&self, timeout: Duration) {
-        self.set_read_timeout(Some(timeout))
-            .expect("set_read_timeout failed");
-        self.set_write_timeout(Some(timeout))
-            .expect("set_write_timeout failed");
-    }
-
-    #[allow(unsafe_code)]
-    fn try_read_bytes(&mut self, buf: &mut BytesMut) -> Result<usize> {
-        // TODO: Remove when read_buf becomes stable.
-        // See https://users.rust-lang.org/t/how-to-read-from-tcpstream-and-append-to-vec-u8-efficiently/89059/4
-        // for why this is "safe"
-
-        let size = {
-            let chunk = buf.chunk_mut();
-            let len = chunk.len();
-
-            let ptr = chunk.as_mut_ptr();
-            // SAFETY: The file is not going to read from the uninitialized data.
-            let slice = unsafe { std::slice::from_raw_parts_mut(ptr, len) };
-            self.read(slice)?
-        };
-
-        // SAFETY: The tcpstream just initialized that many bytes.
-        unsafe {
-            buf.advance_mut(size);
-        }
-        Ok(size)
-    }
-
-    fn try_write_bytes(&mut self, src: &[u8]) -> Result<usize> {
-        Ok(self.write(src)?)
+impl From<UdpSocket> for UdpStream {
+    fn from(value: UdpSocket) -> Self {
+        Self { inner: value }
     }
 }
 
-impl TryReadWriteBytes for UdpSocket {
-    fn try_read_write_timeout(&self, timeout: Duration) {
-        self.set_read_timeout(Some(timeout))
-            .expect("set_read_timeout failed");
-        self.set_write_timeout(Some(timeout))
-            .expect("set_write_timeout failed");
+/// adsasd
+#[derive(Debug)]
+pub struct UdpStream {
+    inner: UdpSocket,
+}
+
+impl Read for UdpStream {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        // FIXME: Add an internal buffer
+
+        // XXX: This is "safe" because we ensure that the buffer has a minimum size anywhere we
+        // need where call this
+        // We ensure that the buffer can accept the max size packet and as such nothing can be
+        // discarded.
+        self.inner.recv(buf)
+    }
+}
+
+impl Write for UdpStream {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.inner.send(buf)
     }
 
-    fn try_read_bytes(&mut self, buf: &mut BytesMut) -> Result<usize> {
-        let mut rx_bytes = [0u8; crate::MAX_SIZE_PACKET];
-        let size = self.recv(&mut rx_bytes)?;
-        buf.extend_from_slice(&rx_bytes[..size]);
-        Ok(size)
-    }
-
-    fn try_write_bytes(&mut self, src: &[u8]) -> Result<usize> {
-        Ok(self.send(src)?)
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
     }
 }
 
 /// A unified wrapper around anything that implements Read + Write.
-/// You probably really want to look at [Framed].
 #[derive(Debug)]
-pub struct FramedInner<N>
-where
-    N: TryReadWriteBytes,
-{
-    inner: N,
+pub struct Framed {
+    inner: Box<dyn ReadWrite>,
     codec: Codec,
     buffer: BytesMut,
     verify_version: bool,
 }
 
-impl<N> FramedInner<N>
-where
-    N: TryReadWriteBytes,
-{
+impl Framed {
     /// Create a new FramedInner, which wraps some kind of network transport.
-    pub fn new(inner: N, codec: Codec) -> Self {
+    pub fn new(inner: Box<dyn ReadWrite>, codec: Codec) -> Self {
         let buffer = BytesMut::with_capacity(DEFAULT_BUFFER_CAPACITY);
-        inner.try_read_write_timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECS));
 
         Self {
             inner,
@@ -117,9 +79,20 @@ where
     /// If the handshake does not complete within the given timeout, it will fail and the
     /// connection should be considered invalid.
     pub fn handshake(&mut self, isi: Isi) -> Result<()> {
-        self.write(isi.into())?;
+        self.write(Into::<Packet>::into(isi))?;
 
         Ok(())
+    }
+
+    fn try_read_bytes(&mut self) -> Result<usize> {
+        // FIXME: Get rid of this when we fix the internal buffer for UDPStream
+
+        // we allocate a temporary buffer of MAX_SIZE_PACKET to ensure that we don't run into the
+        // issue where UDPSocket may truncate the data.
+        let mut rx_bytes = [0u8; crate::MAX_SIZE_PACKET];
+        let size = self.inner.read(&mut rx_bytes)?;
+        self.buffer.extend_from_slice(&rx_bytes[..size]);
+        Ok(size)
     }
 
     /// Wait for a packet from the inner network.
@@ -144,7 +117,7 @@ where
                 }
             }
 
-            match self.inner.try_read_bytes(&mut self.buffer) {
+            match self.try_read_bytes() {
                 Ok(0) => {
                     // The remote closed the connection. For this to be a clean
                     // shutdown, there should be no data in the read buffer. If
@@ -171,66 +144,12 @@ where
     }
 
     /// Write a packet to the inner network.
-    pub fn write(&mut self, packet: Packet) -> Result<()> {
-        let buf = self.codec.encode(&packet)?;
+    pub fn write<P: Into<Packet>>(&mut self, packet: P) -> Result<()> {
+        let buf = self.codec.encode(&packet.into())?;
         if !buf.is_empty() {
-            let _ = self.inner.try_write_bytes(&buf)?;
+            let _ = self.inner.write(&buf)?;
         }
 
         Ok(())
-    }
-}
-
-/// Concrete enum of connection types, to avoid Box'ing. Wraps [FramedInner].
-// The "Inner" connection for Connection, so that we can avoid Box'ing
-// Since the ConnectionOptions is all very hard coded, for "high level" API usage,
-// I think this fine.
-// i.e. if we add a Websocket option down the line, then ConnectionOptions needs to understand it
-// therefore we cannot just box stuff magically anyway.
-pub enum Framed {
-    /// Tcp
-    Tcp(FramedInner<TcpStream>),
-
-    /// Udp
-    Udp(FramedInner<UdpSocket>),
-}
-
-impl Framed {
-    #[tracing::instrument]
-    /// Wait for a packet from the inner network.
-    pub fn read(&mut self) -> Result<Packet> {
-        let res = match self {
-            Self::Tcp(i) => i.read(),
-            Self::Udp(i) => i.read(),
-        };
-        tracing::debug!("read result {:?}", res);
-        res
-    }
-
-    #[tracing::instrument]
-    /// Write a packet to the inner network.
-    pub fn write<I: Into<Packet> + Send + Sync + Debug>(&mut self, packet: I) -> Result<()> {
-        tracing::debug!("writing packet {:?}", &packet);
-        match self {
-            Self::Tcp(i) => i.write(packet.into()),
-            Self::Udp(i) => i.write(packet.into()),
-        }
-    }
-}
-
-impl Debug for Framed {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Framed::Tcp(i) => write!(
-                f,
-                "Framed::Tcp {{ codec: {:?}, verify_version: {:?} }}",
-                i.codec, i.verify_version
-            ),
-            Framed::Udp(i) => write!(
-                f,
-                "Framed::Tcp {{ codec: {:?}, verify_version: {:?} }}",
-                i.codec, i.verify_version
-            ),
-        }
     }
 }

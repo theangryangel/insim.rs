@@ -3,14 +3,17 @@ use std::{fmt::Debug, time::Duration};
 use bytes::BytesMut;
 use if_chain::if_chain;
 use tokio::{
-    io::BufWriter,
-    net::{TcpStream, UdpSocket},
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     time::{self, timeout},
 };
 
-#[cfg(feature = "websocket")]
-use super::websocket::TungsteniteWebSocket;
-use super::AsyncTryReadWriteBytes;
+/// Read Write super trait
+pub trait AsyncReadWriteExt: AsyncRead + AsyncWrite + Debug + Unpin + Send + Sync {}
+
+impl<T: AsyncRead + AsyncWrite + Debug + Unpin + Send + Sync> AsyncReadWriteExt for T {}
+
+// #[cfg(feature = "websocket")]
+// use super::websocket::TungsteniteWebSocket;
 use crate::{
     error::Error,
     insim::Isi,
@@ -20,25 +23,19 @@ use crate::{
     DEFAULT_BUFFER_CAPACITY,
 };
 
-/// A unified wrapper around anything that implements [AsyncTryReadWriteBytes].
+/// A unified wrapper around anything that implements [AsyncReadWrite].
 /// You probably really want to look at [Framed].
 #[derive(Debug)]
-pub struct FramedInner<N>
-where
-    N: AsyncTryReadWriteBytes,
-{
-    inner: N,
+pub struct Framed {
+    inner: Box<dyn AsyncReadWriteExt>,
     codec: Codec,
     buffer: BytesMut,
     verify_version: bool,
 }
 
-impl<N> FramedInner<N>
-where
-    N: AsyncTryReadWriteBytes,
-{
+impl Framed {
     /// Create a new FramedInner, which wraps some kind of network transport.
-    pub fn new(inner: N, codec: Codec) -> Self {
+    pub fn new(inner: Box<dyn AsyncReadWriteExt>, codec: Codec) -> Self {
         let buffer = BytesMut::with_capacity(DEFAULT_BUFFER_CAPACITY);
 
         Self {
@@ -58,9 +55,20 @@ where
     /// If the handshake does not complete within the given timeout, it will fail and the
     /// connection should be considered invalid.
     pub async fn handshake(&mut self, isi: Isi, timeout: Duration) -> Result<()> {
-        time::timeout(timeout, self.write(isi.into())).await??;
+        time::timeout(timeout, self.write(isi)).await??;
 
         Ok(())
+    }
+
+    async fn try_read_bytes(&mut self) -> Result<usize> {
+        // FIXME: Remove this temp internal buffer once I've fixed the UDPStream implementation
+
+        // we allocate a temporary buffer of MAX_SIZE_PACKET to ensure that we don't run into the
+        // issue where UDP implementations may truncate the data.
+        let mut rx_bytes = [0u8; crate::MAX_SIZE_PACKET];
+        let size = self.inner.read(&mut rx_bytes).await?;
+        self.buffer.extend_from_slice(&rx_bytes[..size]);
+        Ok(size)
     }
 
     /// Asynchronously wait for a packet from the inner network.
@@ -87,7 +95,7 @@ where
 
             match timeout(
                 Duration::from_secs(DEFAULT_TIMEOUT_SECS),
-                self.inner.try_read_bytes(&mut self.buffer),
+                self.try_read_bytes(),
             )
             .await?
             {
@@ -116,88 +124,12 @@ where
     }
 
     /// Asynchronously write a packet to the inner network.
-    pub async fn write(&mut self, packet: Packet) -> Result<()> {
-        let buf = self.codec.encode(&packet)?;
+    pub async fn write<P: Into<Packet>>(&mut self, packet: P) -> Result<()> {
+        let mut buf = self.codec.encode(&packet.into())?;
         if !buf.is_empty() {
-            let _ = self.inner.try_write_bytes(&buf).await?;
+            self.inner.write_all_buf(&mut buf).await?;
         }
 
         Ok(())
-    }
-}
-
-/// Concrete enum of connection types, to avoid Box'ing. Wraps [FramedInner].
-// The "Inner" connection for Connection, so that we can avoid Box'ing
-// Since the ConnectionOptions is all very hard coded, for "high level" API usage,
-// I think this fine.
-// i.e. if we add a Websocket option down the line, then ConnectionOptions needs to understand it
-// therefore we cannot just box stuff magically anyway.
-pub enum Framed {
-    /// Tcp
-    Tcp(FramedInner<TcpStream>),
-    /// BufferedTcp
-    BufferedTcp(FramedInner<BufWriter<TcpStream>>),
-    /// Udp
-    Udp(FramedInner<UdpSocket>),
-    #[cfg(feature = "websocket")]
-    /// Websocket, primarily intended for use with the LFS World relay.
-    WebSocket(FramedInner<TungsteniteWebSocket>),
-}
-
-impl Framed {
-    #[tracing::instrument]
-    /// Asynchronously wait for a packet from the inner network.
-    pub async fn read(&mut self) -> Result<Packet> {
-        let res = match self {
-            Self::Tcp(i) => i.read().await,
-            Self::Udp(i) => i.read().await,
-            Self::BufferedTcp(i) => i.read().await,
-            #[cfg(feature = "websocket")]
-            Self::WebSocket(i) => i.read().await,
-        };
-        tracing::debug!("read result {:?}", res);
-        res
-    }
-
-    #[tracing::instrument]
-    /// Asynchronously write a packet to the inner network.
-    pub async fn write<I: Into<Packet> + Send + Sync + Debug>(&mut self, packet: I) -> Result<()> {
-        tracing::debug!("writing packet {:?}", &packet);
-        match self {
-            Self::Tcp(i) => i.write(packet.into()).await,
-            Self::Udp(i) => i.write(packet.into()).await,
-            Self::BufferedTcp(i) => i.write(packet.into()).await,
-            #[cfg(feature = "websocket")]
-            Self::WebSocket(i) => i.write(packet.into()).await,
-        }
-    }
-}
-
-impl Debug for Framed {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Framed::Tcp(i) => write!(
-                f,
-                "Framed::Tcp {{ codec: {:?}, verify_version: {:?} }}",
-                i.codec, i.verify_version
-            ),
-            Framed::BufferedTcp(i) => write!(
-                f,
-                "Framed::BufferedTcp {{ codec: {:?}, verify_version: {:?} }}",
-                i.codec, i.verify_version
-            ),
-            Framed::Udp(i) => write!(
-                f,
-                "Framed::Tcp {{ codec: {:?}, verify_version: {:?} }}",
-                i.codec, i.verify_version
-            ),
-
-            #[cfg(feature = "websocket")]
-            Framed::WebSocket(i) => write!(
-                f,
-                "Framed::Tcp {{ codec: {:?}, verify_version: {:?} }}",
-                i.codec, i.verify_version
-            ),
-        }
     }
 }

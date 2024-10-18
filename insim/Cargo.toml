@@ -18,7 +18,9 @@ workspace = true
 [features]
 default = ["tokio", "blocking", "websocket"]
 blocking = []
-tokio = ["dep:tokio", "dep:async-trait"]
+tokio = [
+  "dep:tokio",
+]
 serde = [
   "dep:serde",
   "insim_core/serde",
@@ -27,10 +29,12 @@ serde = [
 ]
 pth = ["dep:insim_pth"]
 smx = ["dep:insim_smx"]
-websocket = ["tokio", "dep:tokio-tungstenite", "futures-util"]
+websocket = [
+  "tokio", "dep:tokio-tungstenite",
+  "futures-util"
+]
 
 [dependencies]
-async-trait = { workspace = true, optional = true }
 bitflags = { workspace = true }
 bytes = { workspace = true }
 from_variants = { workspace = true }
