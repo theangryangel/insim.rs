@@ -72,7 +72,7 @@ impl From<TungsteniteWebSocket> for WebsocketStream {
     }
 }
 
-/// Wrap a [WebSocketStream] so it implements [AsyncRead] and [AsyncWrite]
+/// Wrap a [TungsteniteWebSocket] so it implements [AsyncRead] and [AsyncWrite]
 #[derive(Debug)]
 pub struct WebsocketStream {
     inner: TungsteniteWebSocket,

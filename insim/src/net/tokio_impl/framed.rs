@@ -8,9 +8,9 @@ use tokio::{
 };
 
 /// Read Write super trait
-pub trait AsyncReadWriteExt: AsyncRead + AsyncWrite + Debug + Unpin + Send + Sync {}
+pub trait AsyncReadWrite: AsyncRead + AsyncWrite + Debug + Unpin + Send + Sync {}
 
-impl<T: AsyncRead + AsyncWrite + Debug + Unpin + Send + Sync> AsyncReadWriteExt for T {}
+impl<T: AsyncRead + AsyncWrite + Debug + Unpin + Send + Sync> AsyncReadWrite for T {}
 
 // #[cfg(feature = "websocket")]
 // use super::websocket::TungsteniteWebSocket;
@@ -27,7 +27,7 @@ use crate::{
 /// You probably really want to look at [Framed].
 #[derive(Debug)]
 pub struct Framed {
-    inner: Box<dyn AsyncReadWriteExt>,
+    inner: Box<dyn AsyncReadWrite>,
     codec: Codec,
     buffer: BytesMut,
     verify_version: bool,
@@ -35,7 +35,7 @@ pub struct Framed {
 
 impl Framed {
     /// Create a new FramedInner, which wraps some kind of network transport.
-    pub fn new(inner: Box<dyn AsyncReadWriteExt>, codec: Codec) -> Self {
+    pub fn new(inner: Box<dyn AsyncReadWrite>, codec: Codec) -> Self {
         let buffer = BytesMut::with_capacity(DEFAULT_BUFFER_CAPACITY);
 
         Self {
