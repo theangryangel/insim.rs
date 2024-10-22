@@ -6,33 +6,58 @@ use std::{
     task::{Context, Poll},
 };
 
+use bytes::{Buf, BytesMut};
 use tokio::{
     io::{AsyncRead, AsyncWrite, ReadBuf},
     net::UdpSocket,
 };
 
+use crate::DEFAULT_BUFFER_CAPACITY;
+
 /// Tokio UDPSocket wrapper for AsyncRead, AsyncWrite, Read and Write
 #[derive(Debug)]
 pub struct UdpStream {
-    // FIXME: Add internal buf like we've done with WebSocketStream
     inner: UdpSocket,
+    buffer: BytesMut,
+}
+
+impl UdpStream {
+    fn read_into_buffer(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let to_copy = buf.len().min(self.buffer.len());
+        self.buffer
+            .copy_to_bytes(to_copy)
+            .copy_to_slice(&mut buf[..to_copy]);
+        Ok(to_copy)
+    }
 }
 
 impl From<UdpSocket> for UdpStream {
     fn from(value: UdpSocket) -> Self {
-        Self { inner: value }
+        Self {
+            inner: value,
+            buffer: BytesMut::with_capacity(DEFAULT_BUFFER_CAPACITY),
+        }
     }
 }
 
 impl Read for UdpStream {
-    fn read(&mut self, buff: &mut [u8]) -> Result<usize, std::io::Error> {
-        self.inner.try_recv(buff)
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
+        // lets clear out our internal buffer first
+        if !self.buffer.is_empty() {
+            return self.read_into_buffer(buf);
+        }
+
+        let mut rx_bytes = [0u8; crate::MAX_SIZE_PACKET];
+        let size = self.inner.try_recv(&mut rx_bytes)?;
+
+        self.buffer.extend_from_slice(&rx_bytes[..size]);
+        self.read_into_buffer(buf)
     }
 }
 
 impl Write for UdpStream {
-    fn write(&mut self, buff: &[u8]) -> Result<usize, std::io::Error> {
-        self.inner.try_send(buff)
+    fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
+        self.inner.try_send(buf)
     }
 
     fn flush(&mut self) -> Result<(), std::io::Error> {

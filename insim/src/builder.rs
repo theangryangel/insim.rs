@@ -315,7 +315,7 @@ impl Builder {
     pub fn connect_blocking(&self) -> Result<BlockingFramed> {
         use std::net::ToSocketAddrs;
 
-        use crate::{net::blocking_impl::UdpStream, LFSW_RELAY_ADDR};
+        use crate::{net::blocking_impl::udp::UdpStream, LFSW_RELAY_ADDR};
 
         match self.proto {
             Proto::Tcp => {
