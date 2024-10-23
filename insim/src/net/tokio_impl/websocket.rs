@@ -1,5 +1,3 @@
-//! Binary only Websockets used for LFS World Relay
-
 use core::{
     pin::Pin,
     task::{Context, Poll},
@@ -22,7 +20,8 @@ use crate::MAX_SIZE_PACKET;
 pub(crate) type TungsteniteWebSocket =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<TcpStream>>;
 
-pub(crate) async fn connect_to_relay(
+/// Connect to the LFS World Relay over websocket
+pub async fn connect_to_lfsworld_relay_ws(
     tcp_nodelay: bool,
 ) -> std::result::Result<TungsteniteWebSocket, std::io::Error> {
     use tokio_tungstenite::{
@@ -72,7 +71,7 @@ impl From<TungsteniteWebSocket> for WebsocketStream {
     }
 }
 
-/// Wrap a [TungsteniteWebSocket] so it implements [AsyncRead] and [AsyncWrite]
+/// Binary only Websockets used for LFS World Relay that implements [AsyncRead] and [AsyncWrite]
 #[derive(Debug)]
 pub struct WebsocketStream {
     inner: TungsteniteWebSocket,
@@ -85,12 +84,12 @@ impl AsyncWrite for WebsocketStream {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
+        // TODO: Should we be wrapping stream and then polling that?
         match self.inner.poll_ready_unpin(cx) {
             Poll::Ready(Ok(())) => {
                 if let Err(e) = self.inner.start_send_unpin(Message::binary(buf)) {
                     Poll::Ready(Err(tungstenite_error_to_io(e)))
                 } else {
-                    // FIXME - is this right?
                     let _ = self.poll_flush(cx);
                     Poll::Ready(Ok(buf.len()))
                 }

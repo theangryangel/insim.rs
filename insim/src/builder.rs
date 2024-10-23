@@ -315,7 +315,7 @@ impl Builder {
     pub fn connect_blocking(&self) -> Result<BlockingFramed> {
         use std::net::ToSocketAddrs;
 
-        use crate::{net::blocking_impl::udp::UdpStream, LFSW_RELAY_ADDR};
+        use crate::{net::blocking_impl::UdpStream, LFSW_RELAY_ADDR};
 
         match self.proto {
             Proto::Tcp => {
@@ -467,13 +467,13 @@ impl Builder {
     async fn _connect_relay(&self) -> Result<AsyncFramed> {
         use tokio::time::timeout;
 
-        use crate::net::tokio_impl::websocket::WebsocketStream;
+        use crate::net::tokio_impl::{connect_to_lfsworld_relay_ws, WebsocketStream};
 
         #[cfg(feature = "websocket")]
         if self.relay_websocket {
             let stream = timeout(
                 self.connect_timeout,
-                crate::net::tokio_impl::websocket::connect_to_relay(self.tcp_nodelay),
+                connect_to_lfsworld_relay_ws(self.tcp_nodelay),
             )
             .await??;
 

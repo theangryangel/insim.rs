@@ -1,5 +1,3 @@
-//! UdpStream
-
 use std::{
     io::{Read, Write},
     net::UdpSocket,
@@ -18,8 +16,8 @@ impl From<UdpSocket> for UdpStream {
     }
 }
 
-/// Udp "stream" wrapper.
-/// By default UdpSocket doesnt behave like TcpStream and when calling recv any data that cannot
+/// UDP "stream" wrapper.
+/// By default [UdpSocket] doesnt behave like TcpStream and when calling recv any data that cannot
 /// fit inside of the passed buffer is lost. This UdpStream implementation papers over this fact,
 /// allowing us to safely implement Read.
 #[derive(Debug)]

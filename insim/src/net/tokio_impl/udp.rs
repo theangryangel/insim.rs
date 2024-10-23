@@ -14,7 +14,10 @@ use tokio::{
 
 use crate::DEFAULT_BUFFER_CAPACITY;
 
-/// Tokio UDPSocket wrapper for AsyncRead, AsyncWrite, Read and Write
+/// UDP "stream" wrapper.
+/// By default [UdpSocket] doesnt behave like TcpStream and when calling recv any data that cannot
+/// fit inside of the passed buffer is lost. This UdpStream implementation papers over this fact,
+/// allowing us to safely implement AsyncRead.
 #[derive(Debug)]
 pub struct UdpStream {
     inner: UdpSocket,
