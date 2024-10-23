@@ -1,58 +1,104 @@
-use bytes::BytesMut;
-use tokio::net::UdpSocket;
+//! UDPStream
 
-use super::AsyncTryReadWriteBytes;
-use crate::{error::Error, result::Result, MAX_SIZE_PACKET};
+use std::{
+    io::{Read, Write},
+    pin::Pin,
+    task::{Context, Poll},
+};
 
-#[async_trait::async_trait]
-impl AsyncTryReadWriteBytes for UdpSocket {
-    async fn try_read_bytes(&mut self, buf: &mut BytesMut) -> Result<usize> {
-        loop {
-            let ready = self.ready(tokio::io::Interest::READABLE).await?;
+use bytes::{Buf, BytesMut};
+use tokio::{
+    io::{AsyncRead, AsyncWrite, ReadBuf},
+    net::UdpSocket,
+};
 
-            if ready.is_readable() {
-                // Tokio docs indicates that the buffer must be large enough for any packet.
-                // Since we know the max possible insim packet size, we ensure that we have at
-                // least that capacity.
-                if buf.capacity() < MAX_SIZE_PACKET {
-                    buf.reserve(MAX_SIZE_PACKET - buf.capacity());
-                }
+use crate::DEFAULT_BUFFER_CAPACITY;
 
-                match self.try_recv_buf(buf) {
-                    Ok(0) => {
-                        return Err(Error::Disconnected);
-                    },
-                    Ok(size) => {
-                        return Ok(size);
-                    },
-                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                        continue;
-                    },
-                    Err(e) => {
-                        return Err(e.into());
-                    },
-                }
-            }
+/// UDP "stream" wrapper.
+/// By default [UdpSocket] doesnt behave like TcpStream and when calling recv any data that cannot
+/// fit inside of the passed buffer is lost. This UdpStream implementation papers over this fact,
+/// allowing us to safely implement AsyncRead.
+#[derive(Debug)]
+pub struct UdpStream {
+    inner: UdpSocket,
+    buffer: BytesMut,
+}
+
+impl UdpStream {
+    fn read_into_buffer(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let to_copy = buf.len().min(self.buffer.len());
+        self.buffer
+            .copy_to_bytes(to_copy)
+            .copy_to_slice(&mut buf[..to_copy]);
+        Ok(to_copy)
+    }
+}
+
+impl From<UdpSocket> for UdpStream {
+    fn from(value: UdpSocket) -> Self {
+        Self {
+            inner: value,
+            buffer: BytesMut::with_capacity(DEFAULT_BUFFER_CAPACITY),
         }
     }
+}
 
-    async fn try_write_bytes(&mut self, src: &[u8]) -> Result<usize> {
-        if src.is_empty() {
-            return Ok(0);
+impl Read for UdpStream {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
+        // lets clear out our internal buffer first
+        if !self.buffer.is_empty() {
+            return self.read_into_buffer(buf);
         }
 
-        loop {
-            self.writable().await?;
+        let mut rx_bytes = [0u8; crate::MAX_SIZE_PACKET];
+        let size = self.inner.try_recv(&mut rx_bytes)?;
 
-            match self.try_send(src) {
-                Ok(n) => {
-                    return Ok(n);
-                },
-                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => continue,
-                Err(e) => {
-                    return Err(e.into());
-                },
-            }
+        self.buffer.extend_from_slice(&rx_bytes[..size]);
+        self.read_into_buffer(buf)
+    }
+}
+
+impl Write for UdpStream {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
+        self.inner.try_send(buf)
+    }
+
+    fn flush(&mut self) -> Result<(), std::io::Error> {
+        Ok(())
+    }
+}
+
+impl AsyncRead for UdpStream {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<Result<(), std::io::Error>> {
+        match self.inner.poll_recv(cx, buf) {
+            Poll::Ready(Ok(_n)) => Poll::Ready(Ok(())),
+            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
+            Poll::Pending => Poll::Pending,
         }
+    }
+}
+
+impl AsyncWrite for UdpStream {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<Result<usize, std::io::Error>> {
+        self.inner.poll_send(cx, buf)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+    ) -> Poll<Result<(), std::io::Error>> {
+        Poll::Ready(Ok(()))
     }
 }

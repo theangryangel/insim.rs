@@ -11,7 +11,7 @@ default-members = ["insim", "insim_*"]
 resolver = "2"
 
 [workspace.package]
-version = "2.1.0"
+version = "3.0.0-unreleased"
 authors = ["Karl Southern <karl@theangryangel.co.uk>"]
 edition = "2021"
 rust-version = "1.75"
@@ -30,7 +30,6 @@ missing_debug_implementations = "deny"
 broken_intra_doc_links = "deny"
 
 [workspace.dependencies]
-async-trait = { version = "0.1.68" }
 binrw = "0.14.0"
 bitflags = "2.4.0"
 bytes = "1.4.0"

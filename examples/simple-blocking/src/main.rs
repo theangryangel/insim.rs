@@ -4,7 +4,7 @@ use std::{net::SocketAddr, time::Duration};
 
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
-use insim::{insim::IsiFlags, relay::Hlr, Packet, Result};
+use insim::{relay::Hlr, Packet, Result};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -108,7 +108,11 @@ pub fn main() -> Result<()> {
     };
 
     // set our IsiFlags
-    builder = builder.isi_flags(IsiFlags::MCI | IsiFlags::CON | IsiFlags::OBH);
+    builder = builder
+        .isi_flag_mci(true)
+        .isi_flag_con(true)
+        .isi_flag_obh(true);
+
     if let Some(interval) = &cli.isi_interval {
         builder = builder.isi_interval(Duration::from_secs((*interval).into()));
     }

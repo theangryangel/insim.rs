@@ -5,7 +5,7 @@ use std::{net::SocketAddr, time::Duration};
 use clap::Parser;
 use insim::{
     identifiers::{PlayerId, RequestId},
-    insim::{IsiFlags, LclFlags, Small, SmallType, Tiny, TinyType},
+    insim::{LclFlags, Tiny, TinyType},
     Packet, Result,
 };
 use tokio::time::interval;
@@ -63,7 +63,7 @@ pub async fn main() -> Result<()> {
     let mut builder = insim::tcp(cli.addr);
 
     // set our IsiFlags
-    builder = builder.isi_flags(IsiFlags::LOCAL);
+    builder = builder.isi_flag_local(true);
 
     // Establish a connection
     let mut connection = builder.connect_async().await?;
