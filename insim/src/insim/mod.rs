@@ -3,6 +3,8 @@
 mod racelaps;
 
 mod acr;
+mod aic;
+mod aii;
 mod axi;
 mod axm;
 mod axo;
@@ -66,6 +68,8 @@ mod ver;
 mod vtn;
 
 pub use acr::{Acr, AcrResult};
+pub use aic::{AiInputVal, Aic};
+pub use aii::{AiFlags, Aii};
 pub use axi::Axi;
 pub use axm::{Axm, ObjectInfo, PmoAction, PmoFlags};
 pub use axo::Axo;

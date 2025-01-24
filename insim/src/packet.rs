@@ -284,6 +284,14 @@ pub enum Packet {
     #[brw(magic = 67u8)]
     Ipb(Ipb),
 
+    /// Instruction - Set AI control value
+    #[brw(magic = 68u8)]
+    Aic(Aic),
+
+    /// Information - AI information
+    #[brw(magic = 69u8)]
+    Aii(Aii),
+
     /// Instruction - Ask the LFS World relay if we are an admin
     #[brw(magic = 250u8)]
     RelayArq(Arq),
@@ -385,6 +393,8 @@ impl Packet {
             Packet::Csc(_) => 20,
             Packet::Cim(_) => 8,
             Packet::Mal(_) => 12,
+            Packet::Aic(i) => 4 + (i.inputs.len() * 4),
+            Packet::Aii(_) => 96,
             Packet::RelayHos(i) => 4 + (i.hinfo.len() * 40),
             Packet::RelaySel(_) => 68,
             _ => {
@@ -508,6 +518,8 @@ impl WithRequestId for Packet {
             Packet::Mal(i) => i.reqi = reqi.into(),
             Packet::Plh(i) => i.reqi = reqi.into(),
             Packet::Ipb(i) => i.reqi = reqi.into(),
+            Packet::Aic(i) => i.reqi = reqi.into(),
+            Packet::Aii(i) => i.reqi = reqi.into(),
             Packet::RelayArq(i) => i.reqi = reqi.into(),
             Packet::RelayArp(i) => i.reqi = reqi.into(),
             Packet::RelayHlr(i) => i.reqi = reqi.into(),

@@ -1,10 +1,13 @@
-use std::time::Duration;
+use std::{ops::Deref, time::Duration};
 
 use bitflags::bitflags;
 use insim_core::binrw::{self, binrw, BinRead, BinWrite};
 
 use super::{PlcAllowedCarsSet, VtnAction};
-use crate::{identifiers::RequestId, Packet, WithRequestId};
+use crate::{
+    identifiers::{PlayerId, RequestId},
+    Packet, WithRequestId,
+};
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
@@ -160,6 +163,9 @@ pub enum SmallType {
 
     /// Set local vehicle lights
     Lcl(LclFlags),
+
+    /// Get local AI information
+    Aii(PlayerId),
 }
 
 impl Default for SmallType {
@@ -275,6 +281,7 @@ impl BinRead for SmallType {
             8 => Self::Alc(PlcAllowedCarsSet::from_bits_truncate(uval)),
             9 => Self::Lcs(LcsFlags::from_bits_truncate(uval)),
             10 => Self::Lcl(LclFlags::from_bits_truncate(uval)),
+            11 => Self::Aii(PlayerId(uval as u8)),
             _ => {
                 return Err(binrw::Error::BadMagic {
                     pos,
@@ -307,6 +314,7 @@ impl BinWrite for SmallType {
             SmallType::Alc(uval) => (8u8, uval.bits()),
             SmallType::Lcs(uval) => (9u8, uval.bits()),
             SmallType::Lcl(uval) => (10u8, uval.bits()),
+            SmallType::Aii(plid) => (11u8, (*plid.deref() as u32)),
         };
 
         discrim.write_options(writer, endian, ())?;
