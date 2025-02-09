@@ -8,7 +8,6 @@ use insim_core::binrw::{self as binrw, binrw};
 use serde::Serialize;
 
 /// Button Click Identifier
-#[binrw]
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ClickId(pub u8);

@@ -1,4 +1,4 @@
-use insim_core::binrw::{self, binrw};
+use insim_core::{binrw::{self, binrw}, FromToBytes};
 
 use crate::identifiers::RequestId;
 
@@ -12,8 +12,23 @@ pub struct Arp {
     /// included in any relevant response packet.
     pub reqi: RequestId,
 
-    #[br(map = |x: u8| x != 0)]
-    #[bw(map = |&x| x as u8)]
     /// true if we are an admin
     pub admin: bool,
+}
+
+impl FromToBytes for Arp {
+    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::from_bytes(buf)?;
+        let admin = u8::from_bytes(buf)? != 0;
+
+        Ok(Self {
+            reqi, admin
+        })
+    }
+
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.to_bytes(buf)?;
+        (self.admin as u8).to_bytes(buf)?;
+        Ok(())
+    }
 }

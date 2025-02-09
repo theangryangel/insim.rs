@@ -8,7 +8,6 @@ use insim_core::binrw::{self as binrw, binrw};
 use serde::Serialize;
 
 /// Unique Player Identifier, commonly referred to as PLID in Insim.txt
-#[binrw]
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct PlayerId(pub u8);

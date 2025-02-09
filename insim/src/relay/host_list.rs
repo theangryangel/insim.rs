@@ -2,16 +2,13 @@ use bitflags::bitflags;
 use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-    track::Track,
+    track::Track, FromToBytes,
 };
 
 use crate::identifiers::RequestId;
 
 bitflags! {
     /// Provides extended host information
-    #[binrw]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     pub struct HostInfoFlags: u8 {
@@ -40,8 +37,18 @@ generate_bitflag_helpers!(HostInfoFlags,
     pub is_last => LAST
 );
 
+impl FromToBytes for HostInfoFlags {
+    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let bits = u8::from_bytes(buf)?;
+        Ok(Self::from_bits_truncate(bits))
+    }
+
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.bits().to_bytes(buf)
+    }
+}
+
 /// Information about a host. Used within the [Hos] packet.
-#[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct HostInfo {
@@ -60,21 +67,26 @@ pub struct HostInfo {
     pub numconns: u8,
 }
 
+impl FromToBytes for HostInfo {
+    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        todo!()
+    }
+
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<usize, insim_core::Error> {
+        todo!()
+    }
+}
+
 /// The relay will send a list of available hosts using this packet. There may be more than one
 /// HostList packet sent in response to a [super::host_list_request::Hlr]. You may use the [HostInfoFlags] to
 /// determine if the host is the last in the list.
-#[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Hos {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
-    #[bw(calc = hinfo.len() as u8)]
-    numhosts: u8,
-
     /// A partial list of hosts
-    #[br(count = numhosts)]
     pub hinfo: Vec<HostInfo>,
 }
 
@@ -82,5 +94,30 @@ impl Hos {
     /// Is this the last of all [Hos] packets, for a complete set of hosts?
     pub fn is_last(&self) -> bool {
         self.hinfo.iter().any(|i| i.flags.is_last())
+    }
+}
+
+impl FromToBytes for Hos {
+    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::from_bytes(buf)?;
+        let num = u8::from_bytes(buf)?;
+        let mut hinfo = Vec::with_capacity(num as usize);
+        for i in 1..=num {
+            hinfo.push(HostInfo::from_bytes(buf)?);
+        }
+
+        Ok(Self {
+            reqi, hinfo
+        })
+    }
+
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.to_bytes(buf);
+        let num = self.hinfo.len() as u8;
+        num.to_bytes(buf)?;
+        for i in self.hinfo.iter() {
+            i.to_bytes(buf)?;
+        }
+        Ok(())
     }
 }

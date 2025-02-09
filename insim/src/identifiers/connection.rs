@@ -6,7 +6,6 @@ use std::{
 use insim_core::binrw::{self as binrw, binrw};
 
 /// Unique Connection Identifier, commonly referred to as UCID in Insim.txt
-#[binrw]
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConnectionId(pub u8);
