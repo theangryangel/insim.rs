@@ -100,7 +100,6 @@ pub struct Aic {
 
     /// Set to choose 16-bit
     pub plid: PlayerId,
-
     // FIXME: Needs manual BinRead and BinWrite implementation
     // pub inputs: Vec<AiInputVal>,
 }

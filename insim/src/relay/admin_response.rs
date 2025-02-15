@@ -1,4 +1,7 @@
-use insim_core::{binrw::{self, binrw}, FromToBytes};
+use insim_core::{
+    binrw::{self, binrw},
+    FromToBytes,
+};
 
 use crate::identifiers::RequestId;
 
@@ -23,9 +26,7 @@ impl FromToBytes for Arp {
         let reqi = RequestId::from_bytes(buf)?;
         let admin = u8::from_bytes(buf)? != 0;
 
-        Ok(Self {
-            reqi, admin
-        })
+        Ok(Self { reqi, admin })
     }
 
     fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {

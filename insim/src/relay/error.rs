@@ -1,4 +1,7 @@
-use insim_core::{binrw::{self, binrw}, FromToBytes};
+use insim_core::{
+    binrw::{self, binrw},
+    FromToBytes,
+};
 
 use crate::identifiers::RequestId;
 
@@ -43,7 +46,11 @@ impl FromToBytes for RelayErrorKind {
             4 => Self::BadAdminPassword,
             5 => Self::BadSpectatorPassword,
             6 => Self::MissingSpectatorPassword,
-            found => return Err(insim_core::Error::NoVariantMatch { found: found.into() })
+            found => {
+                return Err(insim_core::Error::NoVariantMatch {
+                    found: found.into(),
+                })
+            },
         };
 
         Ok(kind)
@@ -71,7 +78,7 @@ impl FromToBytes for Error {
     fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
         let reqi = RequestId::from_bytes(buf)?;
         let err = RelayErrorKind::from_bytes(buf)?;
-        Ok(Self{ reqi, err })
+        Ok(Self { reqi, err })
     }
 
     fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {

@@ -4,7 +4,10 @@ use std::{
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use insim_core::{binrw::{self as binrw, binrw}, FromToBytes};
+use insim_core::{
+    binrw::{self as binrw, binrw},
+    FromToBytes,
+};
 
 /// Unique Connection Identifier, commonly referred to as UCID in Insim.txt
 #[binrw]

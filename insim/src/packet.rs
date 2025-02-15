@@ -2,11 +2,12 @@
 
 use std::fmt::Debug;
 
-use insim_core::FromToBytes;
-use insim_core::binrw::{self, binrw};
+use insim_core::{
+    binrw::{self, binrw},
+    FromToBytes,
+};
 
 use crate::{identifiers::RequestId, insim::*, relay::*};
-
 
 #[binrw]
 #[brw(little)]
@@ -613,8 +614,7 @@ impl FromToBytes for Packet {
             // 253 => Self::RelayHos(Hos::from_bytes(buf)?),
             // 254 => Self::RelaySel(Sel::from_bytes(buf)?),
             // 255 => Self::RelayErr(Error::from_bytes(buf)?),
-
-            i => return Err(insim_core::Error::NoVariantMatch { found: i.into() })
+            i => return Err(insim_core::Error::NoVariantMatch { found: i.into() }),
         };
 
         Ok(packet)

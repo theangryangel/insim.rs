@@ -1,8 +1,7 @@
 //! Strongly typed wind strength
+use binrw::binrw;
 #[cfg(feature = "serde")]
 use serde::Serialize;
-
-use binrw::binrw;
 
 use crate::FromToBytes;
 
@@ -28,7 +27,9 @@ impl FromToBytes for Wind {
             0 => Ok(Wind::None),
             1 => Ok(Self::Weak),
             2 => Ok(Self::Strong),
-            other => Err(crate::Error::NoVariantMatch{found: other as u64})
+            other => Err(crate::Error::NoVariantMatch {
+                found: other as u64,
+            }),
         }
     }
 

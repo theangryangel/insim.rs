@@ -1,7 +1,7 @@
 //! Strongly type license data
-use crate::FromToBytes;
-
 use binrw::binrw;
+
+use crate::FromToBytes;
 
 /// Describes the various LFS "license" levels. Each "license" provides access to different
 /// levels of content.
@@ -42,7 +42,9 @@ impl FromToBytes for License {
             1 => Ok(Self::S1),
             2 => Ok(Self::S2),
             3 => Ok(Self::S3),
-            other => Err(crate::Error::NoVariantMatch{found: other as u64})
+            other => Err(crate::Error::NoVariantMatch {
+                found: other as u64,
+            }),
         }
     }
 

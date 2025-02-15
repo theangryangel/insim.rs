@@ -1,5 +1,8 @@
 use bytes::{Buf, BufMut};
-use insim_core::{binrw::{self, binrw}, FromToBytes};
+use insim_core::{
+    binrw::{self, binrw},
+    FromToBytes,
+};
 
 use crate::identifiers::RequestId;
 
@@ -17,7 +20,7 @@ impl FromToBytes for Hlr {
     fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
         let reqi = RequestId::from_bytes(buf)?;
         buf.advance(1);
-        Ok(Self{ reqi })
+        Ok(Self { reqi })
     }
 
     fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {

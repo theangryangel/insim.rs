@@ -2,7 +2,8 @@ use bitflags::bitflags;
 use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-    track::Track, FromToBytes,
+    track::Track,
+    FromToBytes,
 };
 
 use crate::identifiers::RequestId;
@@ -115,9 +116,7 @@ impl FromToBytes for Hos {
             hinfo.push(HostInfo::from_bytes(buf)?);
         }
 
-        Ok(Self {
-            reqi, hinfo
-        })
+        Ok(Self { reqi, hinfo })
     }
 
     fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {

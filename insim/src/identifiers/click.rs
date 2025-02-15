@@ -4,7 +4,10 @@ use std::{
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use insim_core::{binrw::{self as binrw, binrw}, FromToBytes};
+use insim_core::{
+    binrw::{self as binrw, binrw},
+    FromToBytes,
+};
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
@@ -39,7 +42,6 @@ impl From<u8> for ClickId {
         Self(value)
     }
 }
-
 
 impl FromToBytes for ClickId {
     fn from_bytes(buf: &mut Bytes) -> Result<Self, insim_core::Error> {

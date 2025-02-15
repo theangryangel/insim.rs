@@ -32,7 +32,7 @@ pub enum Error {
     /// Cannot convert
     NotAsciiChar {
         /// Found character
-        found: char
+        found: char,
     },
     /// TryFromInt
     TryFromInt(TryFromIntError),
@@ -58,7 +58,7 @@ impl FromToBytes for char {
             return Ok(());
         }
 
-        Err(Error::NotAsciiChar{found: *self})
+        Err(Error::NotAsciiChar { found: *self })
     }
 }
 

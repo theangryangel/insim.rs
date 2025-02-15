@@ -5,7 +5,8 @@ use bytes::BufMut;
 use insim_core::{
     binrw::{self, binrw},
     duration::{binrw_parse_duration, binrw_write_duration},
-    string::{binrw_parse_codepage_string, binrw_write_codepage_string}, FromToBytes,
+    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
+    FromToBytes,
 };
 
 use crate::{identifiers::RequestId, WithRequestId, VERSION};
@@ -129,7 +130,8 @@ impl FromToBytes for Isi {
         self.flags.bits().to_bytes(buf)?;
         self.version.to_bytes(buf)?;
         self.prefix.to_bytes(buf)?;
-        let interval = u16::try_from(self.interval.as_millis()).map_err(insim_core::Error::TryFromInt)?;
+        let interval =
+            u16::try_from(self.interval.as_millis()).map_err(insim_core::Error::TryFromInt)?;
         interval.to_bytes(buf)?;
 
         let admin = self.admin.as_bytes();
@@ -147,11 +149,10 @@ impl FromToBytes for Isi {
             buf.put(iname);
             buf.put_bytes(0, 16 - iname.len());
         }
-        
+
         Ok(())
     }
 }
-
 
 impl Default for Isi {
     fn default() -> Self {
