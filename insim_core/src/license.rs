@@ -1,9 +1,13 @@
 //! Strongly type license data
 use crate::FromToBytes;
 
+use binrw::binrw;
+
 /// Describes the various LFS "license" levels. Each "license" provides access to different
 /// levels of content.
 /// See <https://www.lfs.net/contents>
+#[binrw]
+#[brw(repr(u8))]
 #[non_exhaustive]
 #[derive(Default, PartialEq, PartialOrd, Eq, Debug, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -38,7 +42,7 @@ impl FromToBytes for License {
             1 => Ok(Self::S1),
             2 => Ok(Self::S2),
             3 => Ok(Self::S3),
-            other => Err(crate::Error::NoVariantMatch{pos: 0, found: other as u64})
+            other => Err(crate::Error::NoVariantMatch{found: other as u64})
         }
     }
 

@@ -9,6 +9,9 @@ use crate::identifiers::RequestId;
 
 bitflags! {
     /// Provides extended host information
+    #[binrw]
+    #[br(map = Self::from_bits_truncate)]
+    #[bw(map = |&x: &Self| x.bits())]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     pub struct HostInfoFlags: u8 {
@@ -49,6 +52,7 @@ impl FromToBytes for HostInfoFlags {
 }
 
 /// Information about a host. Used within the [Hos] packet.
+#[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct HostInfo {
@@ -68,11 +72,11 @@ pub struct HostInfo {
 }
 
 impl FromToBytes for HostInfo {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn from_bytes(_buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
         todo!()
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<usize, insim_core::Error> {
+    fn to_bytes(&self, _buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         todo!()
     }
 }
@@ -80,13 +84,18 @@ impl FromToBytes for HostInfo {
 /// The relay will send a list of available hosts using this packet. There may be more than one
 /// HostList packet sent in response to a [super::host_list_request::Hlr]. You may use the [HostInfoFlags] to
 /// determine if the host is the last in the list.
+#[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Hos {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
+    #[bw(calc = hinfo.len() as u8)]
+    numhosts: u8,
+
     /// A partial list of hosts
+    #[br(count = numhosts)]
     pub hinfo: Vec<HostInfo>,
 }
 
@@ -102,7 +111,7 @@ impl FromToBytes for Hos {
         let reqi = RequestId::from_bytes(buf)?;
         let num = u8::from_bytes(buf)?;
         let mut hinfo = Vec::with_capacity(num as usize);
-        for i in 1..=num {
+        for _i in 1..=num {
             hinfo.push(HostInfo::from_bytes(buf)?);
         }
 
@@ -112,7 +121,7 @@ impl FromToBytes for Hos {
     }
 
     fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.to_bytes(buf);
+        self.reqi.to_bytes(buf)?;
         let num = self.hinfo.len() as u8;
         num.to_bytes(buf)?;
         for i in self.hinfo.iter() {

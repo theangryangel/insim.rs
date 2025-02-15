@@ -3,9 +3,11 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use insim_core::binrw::{self as binrw, binrw};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use insim_core::{binrw::{self as binrw, binrw}, FromToBytes};
 
 /// Unique Connection Identifier, commonly referred to as UCID in Insim.txt
+#[binrw]
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConnectionId(pub u8);
@@ -43,5 +45,17 @@ impl DerefMut for ConnectionId {
 impl From<u8> for ConnectionId {
     fn from(value: u8) -> Self {
         Self(value)
+    }
+}
+
+impl FromToBytes for ConnectionId {
+    fn from_bytes(buf: &mut Bytes) -> Result<Self, insim_core::Error> {
+        Ok(ConnectionId(buf.get_u8()))
+    }
+
+    fn to_bytes(&self, buf: &mut BytesMut) -> Result<(), insim_core::Error> {
+        buf.put_u8(self.0);
+
+        Ok(())
     }
 }

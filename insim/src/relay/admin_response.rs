@@ -13,6 +13,8 @@ pub struct Arp {
     pub reqi: RequestId,
 
     /// true if we are an admin
+    #[br(map = |x: u8| x != 0)]
+    #[bw(map = |&x| x as u8)]
     pub admin: bool,
 }
 

@@ -3,7 +3,9 @@ use insim_core::{binrw::{self, binrw}, FromToBytes};
 use crate::identifiers::RequestId;
 
 /// Enum of possible errors  that the Insim Relay can respond with.
-#[derive(Debug, Clone, Default)]
+#[binrw]
+#[brw(repr(u8))]
+#[derive(Debug, Clone, Default, Copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 pub enum RelayErrorKind {
@@ -41,7 +43,7 @@ impl FromToBytes for RelayErrorKind {
             4 => Self::BadAdminPassword,
             5 => Self::BadSpectatorPassword,
             6 => Self::MissingSpectatorPassword,
-            found => return Err(insim_core::Error::NoVariantMatch { found })
+            found => return Err(insim_core::Error::NoVariantMatch { found: found.into() })
         };
 
         Ok(kind)
@@ -54,6 +56,7 @@ impl FromToBytes for RelayErrorKind {
 }
 
 /// The relay will send this packet when it encounters an error.
+#[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Error {

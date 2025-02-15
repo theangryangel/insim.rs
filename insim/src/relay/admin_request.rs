@@ -1,10 +1,11 @@
-use bytes::Buf;
+use bytes::{Buf, BufMut};
 use insim_core::{binrw::{self, binrw}, FromToBytes};
 
 use crate::identifiers::RequestId;
 
 /// Ask the relay if we are logged in as an administrative user on the selected host. A
 /// [super::admin_response::Arp] is sent back by the relay.
+#[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Arq {
@@ -21,9 +22,9 @@ impl FromToBytes for Arq {
         })
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<usize, insim_core::Error> {
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         self.reqi.to_bytes(buf)?;
         buf.put_bytes(0, 1);
-        Ok(2)
+        Ok(())
     }
 }

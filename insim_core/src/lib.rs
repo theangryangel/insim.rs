@@ -9,6 +9,8 @@ pub mod track;
 pub mod vehicle;
 pub mod wind;
 
+use std::num::TryFromIntError;
+
 #[doc(hidden)]
 pub use ::binrw;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
@@ -31,7 +33,9 @@ pub enum Error {
     NotAsciiChar {
         /// Found character
         found: char
-    }
+    },
+    /// TryFromInt
+    TryFromInt(TryFromIntError),
 }
 
 /// Read from bytes

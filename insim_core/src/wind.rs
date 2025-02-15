@@ -2,8 +2,12 @@
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use binrw::binrw;
+
 use crate::FromToBytes;
 
+#[binrw]
+#[brw(repr(u8))]
 #[derive(Debug, Default, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]

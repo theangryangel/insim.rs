@@ -53,17 +53,23 @@ pub struct Aii {
     /// Set to choose 16-bit
     pub plid: PlayerId,
 
+    /// Outsim main packet
     pub osmain: OsMain,
 
+    /// Flags
     pub flags: AiFlags,
 
     #[brw(pad_after = 2)]
+    /// Current gear
     pub gear: u8,
 
     #[brw(pad_after = 8)]
+    /// Current RPM
     pub rpm: f32,
 
     #[brw(pad_after = 12)]
+    /// Current lights
+    // FIXME
     pub showlights: u32,
 }
 

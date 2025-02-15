@@ -5,6 +5,7 @@ use crate::identifiers::RequestId;
 
 /// Request a list of available hosts from the Insim Relay. After sending this packet the relay
 /// will respond with a [super::host_list::Hos] packet.
+#[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Hlr {
@@ -19,7 +20,7 @@ impl FromToBytes for Hlr {
         Ok(Self{ reqi })
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<usize, insim_core::Error> {
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         self.reqi.to_bytes(buf)?;
         buf.put_bytes(0, 1);
         Ok(())

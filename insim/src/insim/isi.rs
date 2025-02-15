@@ -1,10 +1,11 @@
 use std::time::Duration;
 
 use bitflags::bitflags;
+use bytes::BufMut;
 use insim_core::{
     binrw::{self, binrw},
     duration::{binrw_parse_duration, binrw_write_duration},
-    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
+    string::{binrw_parse_codepage_string, binrw_write_codepage_string}, FromToBytes,
 };
 
 use crate::{identifiers::RequestId, WithRequestId, VERSION};
@@ -115,6 +116,42 @@ impl Isi {
     /// Default application name
     pub const DEFAULT_INAME: &'static str = "insim.rs";
 }
+
+impl FromToBytes for Isi {
+    fn from_bytes(_buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        todo!()
+    }
+
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.to_bytes(buf)?;
+        buf.put_bytes(0, 1);
+        self.udpport.to_bytes(buf)?;
+        self.flags.bits().to_bytes(buf)?;
+        self.version.to_bytes(buf)?;
+        self.prefix.to_bytes(buf)?;
+        let interval = u16::try_from(self.interval.as_millis()).map_err(insim_core::Error::TryFromInt)?;
+        interval.to_bytes(buf)?;
+
+        let admin = self.admin.as_bytes();
+        if admin.len() >= 16 {
+            buf.put(&admin[..16]);
+        } else {
+            buf.put(admin);
+            buf.put_bytes(0, 16 - admin.len());
+        }
+
+        let iname = self.iname.as_bytes();
+        if iname.len() >= 16 {
+            buf.put(&iname[..16]);
+        } else {
+            buf.put(iname);
+            buf.put_bytes(0, 16 - iname.len());
+        }
+        
+        Ok(())
+    }
+}
+
 
 impl Default for Isi {
     fn default() -> Self {
