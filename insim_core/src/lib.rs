@@ -133,3 +133,30 @@ impl FromToBytes for f32 {
         Ok(())
     }
 }
+
+#[macro_export]
+#[allow(missing_docs)]
+macro_rules! to_bytes_padded {
+    ($buf:expr, $data:expr, $size:expr) => {{
+        let len = $data.len().min($size);
+        $buf.extend_from_slice(&$data[..len]);
+        $buf.put_bytes(0, $size - len);
+    }};
+}
+
+#[cfg(test)]
+mod test {
+    use bytes::BytesMut;
+    use bytes::BufMut;
+
+    #[test]
+    fn test_macro_to_bytes_padded() {    
+        let data = b"hello";
+        let size = 10;
+        let mut buf = BytesMut::with_capacity(size);
+        
+        to_bytes_padded!(buf, data, size);
+        
+        assert_eq!(&buf[..], b"hello\0\0\0\0\0");
+    }
+}

@@ -3,8 +3,11 @@
 
 use std::{cmp::Ordering, fmt::Display, str::FromStr};
 
+use bytes::BufMut;
 use if_chain::if_chain;
 use itertools::Itertools;
+
+use crate::{to_bytes_padded, FromToBytes};
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 /// Possible errors when parsing a game version
@@ -152,8 +155,27 @@ impl FromStr for GameVersion {
     }
 }
 
+impl FromToBytes for GameVersion {
+    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
+        let new = buf.split_to(8);
+        // FIXME: remove the unwraps
+        let ver = std::str::from_utf8(&new).map(|s| {
+            GameVersion::from_str(s.trim_end_matches('\0'))
+        }).unwrap().unwrap();
+        Ok(ver)
+    }
+
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
+        let ver = self.to_string();
+        to_bytes_padded!(buf, ver.as_bytes(), 8);
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use bytes::BytesMut;
+
     use super::*;
 
     #[test]
@@ -261,5 +283,18 @@ mod tests {
     fn test_normalise_to_uppercase() {
         let res = "0.04k".parse::<GameVersion>().unwrap();
         assert!(res.minor == 'K');
+    }
+
+    #[test]
+    fn test_from_to_bytes() {
+        let ver = GameVersion::from_str("0.7F").unwrap();
+        let mut buf = BytesMut::new();
+        assert!(ver.to_bytes(&mut buf).is_ok());
+
+        assert_eq!(buf.len(), 8);
+
+        let from = GameVersion::from_bytes(&mut buf.freeze()).unwrap();
+
+        assert_eq!(ver, from);
     }
 }

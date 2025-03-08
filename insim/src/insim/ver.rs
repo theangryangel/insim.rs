@@ -1,10 +1,10 @@
 use std::str::FromStr;
 
-use bytes::BufMut;
+use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw, BinRead, BinWrite},
     game_version::GameVersion,
-    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
+    string::{binrw_parse_codepage_string, binrw_write_codepage_string, strip_trailing_nul}, FromToBytes,
 };
 
 use crate::identifiers::RequestId;
@@ -73,14 +73,52 @@ pub struct Ver {
     pub insimver: u8,
 }
 
+impl FromToBytes for Ver {
+    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::from_bytes(buf)?;
+        buf.advance(1);
+        let version = GameVersion::from_bytes(buf)?;
+        let product = String::from_utf8_lossy(
+            strip_trailing_nul(buf.copy_to_bytes(6).as_ref())
+        ).to_string();
+
+        let insimver = buf.get_u8();
+
+        buf.advance(1);
+
+        Ok(Self {
+            reqi,
+            version,
+            product,
+            insimver,
+        })
+    }
+
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.to_bytes(buf)?;
+        buf.put_u8(0);
+        self.version.to_bytes(buf)?;
+
+        let product = self.product.as_bytes();
+        insim_core::to_bytes_padded!(buf, product, 6);
+
+        self.insimver.to_bytes(buf)?;
+        buf.put_u8(0);
+
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
 
+    use bytes::BytesMut;
+
     use super::*;
 
     #[test]
-    fn test_version() {
+    fn test_version_binrw() {
         let data = vec![
             0, // reqi
             0, // padding
@@ -99,5 +137,30 @@ mod tests {
         parsed.write_le(&mut data2).unwrap();
 
         assert_eq!(data, data2.into_inner());
+    }
+
+    #[test]
+    fn test_version() {
+        let data = vec![
+            0, // reqi
+            0, // padding
+            48, 46, 55, 65, 0, 0, 0, 0, //  game version
+            68, 69, 77, 79, 0, 0, // product
+            9, // insim ver
+            0, // padding
+        ];
+
+        let mut buf = BytesMut::new();
+        buf.extend_from_slice(&data);
+
+        let parsed = Ver::from_bytes(&mut buf.freeze()).unwrap();
+        assert_eq!(parsed.version, GameVersion::from_str("0.7A").unwrap());
+        assert_eq!(parsed.product, "DEMO");
+        assert_eq!(parsed.insimver, 9);
+
+        let mut data2 = BytesMut::new();
+        parsed.to_bytes(&mut data2).unwrap();
+
+        assert_eq!(&data, data2.as_ref());
     }
 }
