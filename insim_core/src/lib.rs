@@ -134,6 +134,33 @@ impl FromToBytes for f32 {
     }
 }
 
+/// Read from bytes
+pub trait FromToCodepageBytes: Sized {
+    /// Read
+    fn from_codepage_bytes(buf: &mut Bytes, len: usize) -> Result<Self, Error>;
+
+    /// Write
+    fn to_codepage_bytes(&self, buf: &mut BytesMut, len: usize) -> Result<(), Error>;
+}
+
+impl FromToCodepageBytes for String {
+    fn from_codepage_bytes(buf: &mut Bytes, len: usize) -> Result<Self, Error> {
+        let new = buf.split_to(len);
+        let new = string::codepages::to_lossy_string(
+            string::strip_trailing_nul(&new)
+        );
+        Ok(new.to_string())
+    }
+
+    fn to_codepage_bytes(&self, buf: &mut BytesMut, len: usize) -> Result<(), Error> {
+        let new = string::codepages::to_lossy_bytes(&self);
+        let len_to_write = new.len().min(len);
+        buf.extend_from_slice(&new);
+        buf.put_bytes(0, len - len_to_write);
+        Ok(())
+    }
+}
+
 #[macro_export]
 #[allow(missing_docs)]
 macro_rules! to_bytes_padded {

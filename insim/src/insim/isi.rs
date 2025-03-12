@@ -3,7 +3,7 @@ use std::time::Duration;
 use bitflags::bitflags;
 use bytes::{Buf, BufMut};
 use insim_core::{
-    binrw::{self, binrw}, duration::{binrw_parse_duration, binrw_write_duration}, string::{binrw_parse_codepage_string, binrw_write_codepage_string}, to_bytes_padded, FromToBytes
+    binrw::{self, binrw}, duration::{binrw_parse_duration, binrw_write_duration}, string::{binrw_parse_codepage_string, binrw_write_codepage_string, strip_trailing_nul}, to_bytes_padded, FromToBytes
 };
 
 use crate::{identifiers::RequestId, WithRequestId, VERSION};
@@ -66,7 +66,7 @@ impl From<IsiFlags> for Isi {
 }
 
 #[binrw]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Insim Init, or handshake packet.
 /// Required to be sent to the server before any other packets.
@@ -123,7 +123,11 @@ impl FromToBytes for Isi {
         let flags = IsiFlags::from_bits_truncate(u16::from_bytes(buf)?);
         let version = u8::from_bytes(buf)?;
         let prefix = char::from_bytes(buf)?;
-
+        let interval = Duration::from_millis(u16::from_bytes(buf)? as u64);
+        let admin = String::from_utf8_lossy(strip_trailing_nul(&buf.split_to(16))).to_string();
+        let iname = insim_core::string::codepages::to_lossy_string(
+            strip_trailing_nul(&buf.split_to(16))
+        ).to_string();
 
         Ok(Self{
             reqi,
@@ -131,9 +135,9 @@ impl FromToBytes for Isi {
             flags,
             version,
             prefix,
-            interval: todo!(),
-            admin: todo!(),
-            iname: todo!(),
+            interval,
+            admin,
+            iname,
         })
     }
 
@@ -257,5 +261,8 @@ mod tests {
         iname.put_bytes(0, 16 - iname.len());
 
         assert_eq!(&buf[26..42], &iname,);
+
+        let data2 = Isi::from_bytes(&mut buf.freeze()).unwrap();
+        assert_eq!(data, data2);
     }
 }
