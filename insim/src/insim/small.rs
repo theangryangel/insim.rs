@@ -1,7 +1,10 @@
 use std::{ops::Deref, time::Duration};
 
 use bitflags::bitflags;
-use insim_core::binrw::{self, binrw, BinRead, BinWrite};
+use insim_core::{
+    binrw::{self, binrw, BinRead, BinWrite},
+    FromToBytes,
+};
 
 use super::{PlcAllowedCarsSet, VtnAction};
 use crate::{
@@ -324,6 +327,54 @@ impl BinWrite for SmallType {
     }
 }
 
+impl FromToBytes for SmallType {
+    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let discrim = u8::from_bytes(buf)?;
+        let uval = u32::from_bytes(buf)?;
+        let res = match discrim {
+            0 => Self::None,
+            1 => Self::Ssp(Duration::from_millis(uval as u64 * 10)),
+            2 => Self::Ssg(Duration::from_millis(uval as u64 * 10)),
+            3 => Self::Vta(uval.into()),
+            4 => Self::Tms(uval != 0),
+            5 => Self::Stp(Duration::from_millis(uval as u64 * 10)),
+            6 => Self::Rtp(Duration::from_millis(uval as u64 * 10)),
+            7 => Self::Nli(Duration::from_millis(uval as u64)),
+            8 => Self::Alc(PlcAllowedCarsSet::from_bits_truncate(uval)),
+            9 => Self::Lcs(LcsFlags::from_bits_truncate(uval)),
+            10 => Self::Lcl(LclFlags::from_bits_truncate(uval)),
+            11 => Self::Aii(PlayerId(uval as u8)),
+            found => {
+                return Err(insim_core::Error::NoVariantMatch {
+                    found: found as u64,
+                })
+            },
+        };
+        Ok(res)
+    }
+
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        let (discrim, uval) = match self {
+            SmallType::None => (0u8, 0u32),
+            SmallType::Ssp(uval) => (1u8, uval.as_millis() as u32 / 10),
+            SmallType::Ssg(uval) => (2u8, uval.as_millis() as u32 / 10),
+            SmallType::Vta(uval) => (3u8, uval.into()),
+            SmallType::Tms(uval) => (4u8, *uval as u32),
+            SmallType::Stp(uval) => (5u8, uval.as_millis() as u32 / 10),
+            SmallType::Rtp(uval) => (6u8, uval.as_millis() as u32 / 10),
+            SmallType::Nli(uval) => (7u8, uval.as_millis() as u32),
+            SmallType::Alc(uval) => (8u8, uval.bits()),
+            SmallType::Lcs(uval) => (9u8, uval.bits()),
+            SmallType::Lcl(uval) => (10u8, uval.bits()),
+            SmallType::Aii(plid) => (11u8, (*plid.deref() as u32)),
+        };
+
+        discrim.to_bytes(buf)?;
+        uval.to_bytes(buf)?;
+        Ok(())
+    }
+}
+
 #[binrw]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -336,100 +387,88 @@ pub struct Small {
     pub subt: SmallType,
 }
 
+impl FromToBytes for Small {
+    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::from_bytes(buf)?;
+        let subt = SmallType::from_bytes(buf)?;
+        Ok(Self { reqi, subt })
+    }
+
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.to_bytes(buf)?;
+        self.subt.to_bytes(buf)?;
+        Ok(())
+    }
+}
+
 impl_typical_with_request_id!(Small);
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
-
     use super::*;
 
     #[test]
     fn test_small_none() {
-        let data = Small {
-            reqi: RequestId(1),
-            subt: SmallType::None,
-        };
-
-        let mut writer = Cursor::new(Vec::new());
-        data.write_le(&mut writer).unwrap();
-        let buf = writer.into_inner();
-
-        assert_eq!(buf.len(), 6);
-        assert_eq!(buf, [1, 0, 0, 0, 0, 0]);
-
-        let mut reader = Cursor::new(buf.clone());
-        let data2 = Small::read_le(&mut reader).unwrap();
-        assert_eq!(data, data2);
+        let parsed = assert_from_to_bytes_bidirectional!(
+            Small,
+            vec![
+                1, // reqi
+                0, 0, 0, 0, 0 // subt
+            ]
+        );
+        assert_eq!(parsed.subt, SmallType::None);
     }
 
     #[test]
     fn test_small_ssp() {
-        let data = Small {
-            reqi: RequestId(1),
-            subt: SmallType::Ssp(Duration::from_secs(1)),
-        };
+        let parsed = assert_from_to_bytes_bidirectional!(
+            Small,
+            vec![
+                1, // reqi
+                1, 100, 0, 0, 0 // subt
+            ]
+        );
 
-        let mut writer = Cursor::new(Vec::new());
-        data.write_le(&mut writer).unwrap();
-        let buf = writer.into_inner();
-
-        assert_eq!(buf, [1, 1, 100, 0, 0, 0]);
-
-        let mut reader = Cursor::new(buf.clone());
-        let data2 = Small::read_le(&mut reader).unwrap();
-        assert_eq!(data, data2);
+        if let SmallType::Ssp(duration) = parsed.subt {
+            assert_eq!(duration, Duration::from_secs(1));
+        } else {
+            panic!("Expected SmallType::Ssp, found {:?}", parsed.subt);
+        }
     }
 
     #[test]
     fn test_lcs_flags_signals_hazard() {
-        let data = Small {
-            reqi: RequestId(1),
-            subt: SmallType::Lcs(LcsFlags::SIGNAL_HAZARD),
-        };
-
-        let mut writer = Cursor::new(Vec::new());
-        data.write_le(&mut writer).unwrap();
-        let buf = writer.into_inner();
-        assert_eq!(buf, [1, 9, 1, 3, 0, 0]);
-
-        let mut reader = Cursor::new(buf.clone());
-        let data2 = Small::read_le(&mut reader).unwrap();
-        assert_eq!(data, data2);
+        let parsed = assert_from_to_bytes_bidirectional!(Small, vec![1, 9, 1, 3, 0, 0]);
+        assert!(matches!(
+            parsed,
+            Small {
+                reqi: RequestId(1),
+                subt: SmallType::Lcs(LcsFlags::SIGNAL_HAZARD),
+            }
+        ));
     }
 
     #[test]
     fn test_lcl_flags_signals_off() {
-        let data = Small {
-            reqi: RequestId(1),
-            subt: SmallType::Lcl(LclFlags::SIGNAL_OFF),
-        };
-
-        let mut writer = Cursor::new(Vec::new());
-        data.write_le(&mut writer).unwrap();
-        let buf = writer.into_inner();
-        assert_eq!(buf, [1, 10, 1, 0, 0, 0]);
-
-        let mut reader = Cursor::new(buf.clone());
-        let data2 = Small::read_le(&mut reader).unwrap();
-        assert_eq!(data, data2);
+        let parsed = assert_from_to_bytes_bidirectional!(Small, vec![1, 10, 1, 0, 0, 0]);
+        assert!(matches!(
+            parsed,
+            Small {
+                reqi: RequestId(1),
+                subt: SmallType::Lcl(LclFlags::SIGNAL_OFF),
+            }
+        ));
     }
 
     #[test]
     fn test_lcl_flags_signals_hazard() {
-        let data = Small {
-            reqi: RequestId(1),
-            subt: SmallType::Lcl(LclFlags::SIGNAL_HAZARD),
-        };
-
-        let mut writer = Cursor::new(Vec::new());
-        data.write_le(&mut writer).unwrap();
-        let buf = writer.into_inner();
-        assert_eq!(buf, [1, 10, 1, 0, 3, 0]);
-
-        let mut reader = Cursor::new(buf.clone());
-        let data2 = Small::read_le(&mut reader).unwrap();
-
-        assert_eq!(data, data2);
+        let parsed = assert_from_to_bytes_bidirectional!(Small, vec![1, 10, 1, 0, 3, 0]);
+        assert!(matches!(
+            parsed,
+            Small {
+                reqi: RequestId(1),
+                subt: SmallType::Lcl(LclFlags::SIGNAL_HAZARD),
+            }
+        ));
     }
 }

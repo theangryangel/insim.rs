@@ -158,7 +158,7 @@ pub struct Pth {
 impl Pth {
     /// Read and parse a PTH file into a [Pth] struct.
     pub fn from_file(i: &mut File) -> Result<Self, Error> {
-        Pth::read(i).map_err(Error::from).map_err(Error::from)
+        Pth::read(i).map_err(Error::from)
     }
 
     /// Read and parse a PTH file into a [Pth] struct.

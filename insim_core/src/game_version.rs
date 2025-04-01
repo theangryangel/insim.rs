@@ -3,11 +3,10 @@
 
 use std::{cmp::Ordering, fmt::Display, str::FromStr};
 
-use bytes::BufMut;
 use if_chain::if_chain;
 use itertools::Itertools;
 
-use crate::{to_bytes_padded, FromToBytes};
+use crate::{FromToAsciiBytes, FromToBytes};
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 /// Possible errors when parsing a game version
@@ -159,15 +158,16 @@ impl FromToBytes for GameVersion {
     fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
         let new = buf.split_to(8);
         // FIXME: remove the unwraps
-        let ver = std::str::from_utf8(&new).map(|s| {
-            GameVersion::from_str(s.trim_end_matches('\0'))
-        }).unwrap().unwrap();
+        let ver = std::str::from_utf8(&new)
+            .map(|s| GameVersion::from_str(s.trim_end_matches('\0')))
+            .unwrap()
+            .unwrap();
         Ok(ver)
     }
 
     fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
         let ver = self.to_string();
-        to_bytes_padded!(buf, ver.as_bytes(), 8);
+        ver.to_ascii_bytes(buf, 8)?;
         Ok(())
     }
 }

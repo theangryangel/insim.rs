@@ -3,7 +3,10 @@ use std::time::Duration;
 use bitflags::bitflags;
 use bytes::{Buf, BufMut};
 use insim_core::{
-    binrw::{self, binrw}, duration::{binrw_parse_duration, binrw_write_duration}, string::{binrw_parse_codepage_string, binrw_write_codepage_string, strip_trailing_nul}, to_bytes_padded, FromToBytes
+    binrw::{self, binrw},
+    duration::{binrw_parse_duration, binrw_write_duration},
+    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
+    FromToAsciiBytes, FromToBytes, FromToCodepageBytes,
 };
 
 use crate::{identifiers::RequestId, WithRequestId, VERSION};
@@ -124,12 +127,10 @@ impl FromToBytes for Isi {
         let version = u8::from_bytes(buf)?;
         let prefix = char::from_bytes(buf)?;
         let interval = Duration::from_millis(u16::from_bytes(buf)? as u64);
-        let admin = String::from_utf8_lossy(strip_trailing_nul(&buf.split_to(16))).to_string();
-        let iname = insim_core::string::codepages::to_lossy_string(
-            strip_trailing_nul(&buf.split_to(16))
-        ).to_string();
+        let admin = String::from_ascii_bytes(buf, 16)?;
+        let iname = String::from_codepage_bytes(buf, 16)?;
 
-        Ok(Self{
+        Ok(Self {
             reqi,
             udpport,
             flags,
@@ -152,8 +153,8 @@ impl FromToBytes for Isi {
             u16::try_from(self.interval.as_millis()).map_err(insim_core::Error::TryFromInt)?;
         interval.to_bytes(buf)?;
 
-        to_bytes_padded!(buf, self.admin.as_bytes(), 16);
-        to_bytes_padded!(buf, self.iname.as_bytes(), 16);
+        self.admin.to_ascii_bytes(buf, 16)?;
+        self.iname.to_codepage_bytes(buf, 16)?;
 
         Ok(())
     }

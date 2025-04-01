@@ -25,6 +25,7 @@ missing_docs = "deny"
 unused_crate_dependencies = "deny"
 unused_results = "deny"
 missing_debug_implementations = "deny"
+unused_macros = "allow"
 
 [workspace.lints.rustdoc]
 broken_intra_doc_links = "deny"
