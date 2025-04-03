@@ -1,4 +1,7 @@
-use insim_core::binrw::{self, binrw};
+use insim_core::{
+    binrw::{self, binrw},
+    FromToBytes,
+};
 
 use crate::identifiers::{PlayerId, RequestId};
 
@@ -8,6 +11,7 @@ use crate::identifiers::{PlayerId, RequestId};
 #[repr(u8)]
 #[brw(repr(u8))]
 #[non_exhaustive]
+// FIXME: implement From<u8>
 /// Camera/view identifiers
 pub enum CameraView {
     /// Arcade "follow" view
@@ -28,6 +32,41 @@ pub enum CameraView {
 
     /// Viewing another player/vehicle
     Another = 255,
+}
+
+impl FromToBytes for CameraView {
+    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let discrim = u8::from_bytes(buf)?;
+        let res = match discrim {
+            0 => Self::Follow,
+            1 => Self::Heli,
+            2 => Self::Cam,
+            3 => Self::Driver,
+            4 => Self::Custom,
+            255 => Self::Another,
+            found => {
+                return Err(insim_core::Error::NoVariantMatch {
+                    found: found as u64,
+                })
+            },
+        };
+
+        Ok(res)
+    }
+
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        let discrim = match self {
+            CameraView::Follow => 0,
+            CameraView::Heli => 1,
+            CameraView::Cam => 2,
+            CameraView::Driver => 3,
+            CameraView::Custom => 4,
+            CameraView::Another => 255,
+        };
+
+        discrim.to_bytes(buf)?;
+        Ok(())
+    }
 }
 
 #[binrw]

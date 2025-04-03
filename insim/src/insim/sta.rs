@@ -1,8 +1,10 @@
 use bitflags::bitflags;
+use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw},
     track::Track,
     wind::Wind,
+    FromToBytes,
 };
 
 use super::{CameraView, RaceLaps};
@@ -25,6 +27,36 @@ pub enum RaceInProgress {
 
     /// Qualifying
     Qualifying = 2,
+}
+
+impl FromToBytes for RaceInProgress {
+    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let discrim = buf.get_u8();
+        let res = match discrim {
+            0 => Self::No,
+            1 => Self::Racing,
+            2 => Self::Qualifying,
+            found => {
+                return Err(insim_core::Error::NoVariantMatch {
+                    found: (found as u64),
+                })
+            },
+        };
+
+        Ok(res)
+    }
+
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        let discrim = match self {
+            Self::No => 0,
+            Self::Racing => 1,
+            Self::Qualifying => 2,
+        };
+
+        buf.put_u8(discrim);
+
+        Ok(())
+    }
 }
 
 bitflags! {
@@ -156,5 +188,106 @@ impl Sta {
     /// Is server status healthy?
     pub fn is_server_status_ok(&self) -> bool {
         self.serverstatus == 1
+    }
+}
+
+impl FromToBytes for Sta {
+    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::from_bytes(buf)?;
+        buf.advance(1);
+        let replayspeed = f32::from_bytes(buf)?;
+        let flags = u16::from_bytes(buf)?;
+        let flags = StaFlags::from_bits_truncate(flags);
+        let ingamecam = CameraView::from_bytes(buf)?;
+        let viewplid = PlayerId::from_bytes(buf)?;
+        let nump = u8::from_bytes(buf)?;
+        let numconns = u8::from_bytes(buf)?;
+        let numfinished = u8::from_bytes(buf)?;
+        let raceinprog = RaceInProgress::from_bytes(buf)?;
+        let qualmins = u8::from_bytes(buf)?;
+        let racelaps = RaceLaps::from_bytes(buf)?;
+        buf.advance(1);
+        let serverstatus = u8::from_bytes(buf)?;
+        let track = Track::from_bytes(buf)?;
+        let weather = u8::from_bytes(buf)?;
+        let wind = Wind::from_bytes(buf)?;
+
+        Ok(Self {
+            reqi,
+            replayspeed,
+            flags,
+            ingamecam,
+            viewplid,
+            nump,
+            numconns,
+            numfinished,
+            raceinprog,
+            qualmins,
+            racelaps,
+            serverstatus,
+            track,
+            weather,
+            wind,
+        })
+    }
+
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.to_bytes(buf)?;
+        buf.put_u8(0);
+        self.replayspeed.to_bytes(buf)?;
+        let flags = self.flags.bits();
+        flags.to_bytes(buf)?;
+        self.ingamecam.to_bytes(buf)?;
+        self.viewplid.to_bytes(buf)?;
+        self.nump.to_bytes(buf)?;
+        self.numconns.to_bytes(buf)?;
+        self.numfinished.to_bytes(buf)?;
+        self.raceinprog.to_bytes(buf)?;
+        self.qualmins.to_bytes(buf)?;
+        self.racelaps.to_bytes(buf)?;
+        buf.put_u8(0);
+        self.serverstatus.to_bytes(buf)?;
+        self.track.to_bytes(buf)?;
+        self.weather.to_bytes(buf)?;
+        self.wind.to_bytes(buf)?;
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use insim_core::binrw::{BinRead, BinWrite};
+
+    use super::*;
+
+    #[test]
+    fn test_sta() {
+        let _parsed = assert_from_to_bytes_bidirectional!(
+            Sta,
+            vec![
+                1,   // reqi
+                0,   // zero
+                0,   // replayspeed (1)
+                0,   // replayspeed (2)
+                128, // replayspeed (3)
+                62,  // replayspeed (4)
+                8,   // flags (1)
+                0,   // flags (2)
+                3,   // ingamecam
+                4,   // viewplid
+                32,  // nump
+                47,  // numconns
+                20,  // numfinished
+                2,   // raceinprog
+                60,  // qualmins
+                12,  // racelaps
+                0,   // sp2
+                1,   // serverstatus
+                b'B', b'L', b'2', b'R', 0, 0, //track
+                1, // weather
+                2, // wind
+            ]
+        );
     }
 }
