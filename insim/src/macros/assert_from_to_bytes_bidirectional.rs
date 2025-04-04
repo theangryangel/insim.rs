@@ -6,7 +6,11 @@ macro_rules! assert_from_to_bytes_bidirectional {
         let parsed_binrw = $thing::read_le(&mut ::std::io::Cursor::new(&raw)).unwrap();
         let mut written_binrw = ::std::io::Cursor::new(Vec::new());
         parsed_binrw.write_le(&mut written_binrw).unwrap();
-        assert_eq!(raw, written_binrw.into_inner(), "assert binrw reads and writes.");
+        assert_eq!(
+            raw, 
+            written_binrw.into_inner(), 
+            "assert binrw reads and writes. raw: {}, binrw: {}"
+        );
 
         // test FromToBytes
         let mut parsed_buf = ::bytes::BytesMut::new();
