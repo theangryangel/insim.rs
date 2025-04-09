@@ -257,15 +257,13 @@ impl FromToBytes for Sta {
 
 #[cfg(test)]
 mod test {
-    use insim_core::binrw::{BinRead, BinWrite};
-
     use super::*;
 
     #[test]
     fn test_sta() {
-        let _parsed = assert_from_to_bytes_bidirectional!(
+        assert_from_to_bytes!(
             Sta,
-            vec![
+            [
                 1,   // reqi
                 0,   // zero
                 0,   // replayspeed (1)
@@ -287,7 +285,13 @@ mod test {
                 b'B', b'L', b'2', b'R', 0, 0, //track
                 1, // weather
                 2, // wind
-            ]
+            ],
+            |parsed: Sta| {
+                assert_eq!(parsed.reqi, RequestId(1));
+                assert_eq!(parsed.nump, 32);
+                assert_eq!(parsed.numconns, 47);
+                assert!(matches!(parsed.racelaps, RaceLaps::Laps(12)));
+            }
         );
     }
 }

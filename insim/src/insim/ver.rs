@@ -112,7 +112,7 @@ mod tests {
 
     #[test]
     fn test_version() {
-        let parsed = assert_from_to_bytes_bidirectional!(
+        assert_from_to_bytes!(
             Ver,
             vec![
                 0, // reqi
@@ -121,10 +121,12 @@ mod tests {
                 68, 69, 77, 79, 0, 0, // product
                 9, // insim ver
                 0, // padding
-            ]
+            ],
+            |parsed: Ver| {
+                assert_eq!(parsed.version, GameVersion::from_str("0.7A").unwrap());
+                assert_eq!(parsed.product, "DEMO");
+                assert_eq!(parsed.insimver, 9);
+            }
         );
-        assert_eq!(parsed.version, GameVersion::from_str("0.7A").unwrap());
-        assert_eq!(parsed.product, "DEMO");
-        assert_eq!(parsed.insimver, 9);
     }
 }

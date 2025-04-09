@@ -409,66 +409,72 @@ mod tests {
 
     #[test]
     fn test_small_none() {
-        let parsed = assert_from_to_bytes_bidirectional!(
+        assert_from_to_bytes!(
             Small,
             vec![
                 1, // reqi
                 0, 0, 0, 0, 0 // subt
-            ]
+            ],
+            |parsed: Small| {
+                assert_eq!(parsed.subt, SmallType::None);
+            }
         );
-        assert_eq!(parsed.subt, SmallType::None);
     }
 
     #[test]
     fn test_small_ssp() {
-        let parsed = assert_from_to_bytes_bidirectional!(
+        assert_from_to_bytes!(
             Small,
             vec![
                 1, // reqi
                 1, 100, 0, 0, 0 // subt
-            ]
+            ],
+            |parsed: Small| {
+                if let SmallType::Ssp(duration) = parsed.subt {
+                    assert_eq!(duration, Duration::from_secs(1));
+                } else {
+                    panic!("Expected SmallType::Ssp, found {:?}", parsed.subt);
+                }
+            }
         );
-
-        if let SmallType::Ssp(duration) = parsed.subt {
-            assert_eq!(duration, Duration::from_secs(1));
-        } else {
-            panic!("Expected SmallType::Ssp, found {:?}", parsed.subt);
-        }
     }
 
     #[test]
     fn test_lcs_flags_signals_hazard() {
-        let parsed = assert_from_to_bytes_bidirectional!(Small, vec![1, 9, 1, 3, 0, 0]);
-        assert!(matches!(
-            parsed,
-            Small {
-                reqi: RequestId(1),
-                subt: SmallType::Lcs(LcsFlags::SIGNAL_HAZARD),
-            }
-        ));
+        assert_from_to_bytes!(Small, vec![1, 9, 1, 3, 0, 0], |parsed: Small| {
+            assert!(matches!(
+                parsed,
+                Small {
+                    reqi: RequestId(1),
+                    subt: SmallType::Lcs(LcsFlags::SIGNAL_HAZARD),
+                }
+            ));
+        });
     }
 
     #[test]
     fn test_lcl_flags_signals_off() {
-        let parsed = assert_from_to_bytes_bidirectional!(Small, vec![1, 10, 1, 0, 0, 0]);
-        assert!(matches!(
-            parsed,
-            Small {
-                reqi: RequestId(1),
-                subt: SmallType::Lcl(LclFlags::SIGNAL_OFF),
-            }
-        ));
+        assert_from_to_bytes!(Small, vec![1, 10, 1, 0, 0, 0], |parsed: Small| {
+            assert!(matches!(
+                parsed,
+                Small {
+                    reqi: RequestId(1),
+                    subt: SmallType::Lcl(LclFlags::SIGNAL_OFF),
+                }
+            ));
+        });
     }
 
     #[test]
     fn test_lcl_flags_signals_hazard() {
-        let parsed = assert_from_to_bytes_bidirectional!(Small, vec![1, 10, 1, 0, 3, 0]);
-        assert!(matches!(
-            parsed,
-            Small {
-                reqi: RequestId(1),
-                subt: SmallType::Lcl(LclFlags::SIGNAL_HAZARD),
-            }
-        ));
+        assert_from_to_bytes!(Small, vec![1, 10, 1, 0, 3, 0], |parsed: Small| {
+            assert!(matches!(
+                parsed,
+                Small {
+                    reqi: RequestId(1),
+                    subt: SmallType::Lcl(LclFlags::SIGNAL_HAZARD),
+                }
+            ));
+        });
     }
 }

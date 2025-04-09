@@ -242,19 +242,19 @@ impl FromToBytes for Tiny {
 
 #[cfg(test)]
 mod tests {
-    use binrw::{BinRead, BinWrite};
-
     use super::*;
 
     #[test]
     fn test_tiny() {
-        let parsed = assert_from_to_bytes_bidirectional!(
+        assert_from_to_bytes!(
             Tiny,
             vec![
                 0, // reqi
                 6  // subt
-            ]
+            ],
+            |parsed: Tiny| {
+                assert_eq!(parsed.subt, TinyType::Scp);
+            }
         );
-        assert_eq!(parsed.subt, TinyType::Scp);
     }
 }

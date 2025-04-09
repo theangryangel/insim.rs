@@ -55,7 +55,7 @@ impl FromToBytes for CameraView {
     }
 
     fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        let discrim = match self {
+        let discrim: u8 = match self {
             CameraView::Follow => 0,
             CameraView::Heli => 1,
             CameraView::Cam => 2,
@@ -82,4 +82,20 @@ pub struct Cch {
     #[brw(pad_after = 3)]
     /// View identifier
     pub camera: CameraView,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_camera_view() {
+        assert_from_to_bytes!(CameraView, [1], |parsed: CameraView| {
+            assert!(matches!(parsed, CameraView::Heli));
+        });
+
+        assert_from_to_bytes!(CameraView, [255], |parsed: CameraView| {
+            assert!(matches!(parsed, CameraView::Another));
+        });
+    }
 }
