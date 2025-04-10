@@ -131,6 +131,8 @@ generate_bitflag_helpers! {
     pub insim_buttons_visible => VISIBLE
 }
 
+impl_bitflags_from_to_bytes!(StaFlags, u16);
+
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

@@ -4,3 +4,5 @@ mod generate_bitflag_helpers;
 mod generate_with_request_id;
 #[macro_use]
 mod assert_from_to_bytes;
+#[macro_use]
+mod impl_bitflags_from_to_bytes;

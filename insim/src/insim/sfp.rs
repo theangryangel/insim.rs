@@ -1,4 +1,8 @@
-use insim_core::binrw::{self, binrw};
+use bytes::{Buf, BufMut};
+use insim_core::{
+    binrw::{self, binrw},
+    FromToBytes,
+};
 
 use super::StaFlags;
 use crate::identifiers::RequestId;
@@ -22,4 +26,48 @@ pub struct Sfp {
     pub onoff: bool,
 }
 
+impl FromToBytes for Sfp {
+    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::from_bytes(buf)?;
+        buf.advance(1);
+        let flag = StaFlags::from_bytes(buf)?;
+        let onoff = u8::from_bytes(buf)? > 0;
+        buf.advance(1);
+        Ok(Self { reqi, flag, onoff })
+    }
+
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.to_bytes(buf)?;
+        buf.put_u8(0);
+        self.flag.to_bytes(buf)?;
+        (self.onoff as u8).to_bytes(buf)?;
+        buf.put_u8(0);
+        Ok(())
+    }
+}
+
 impl_typical_with_request_id!(Sfp);
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_sfp() {
+        assert_from_to_bytes!(
+            Sfp,
+            vec![
+                0,   // ReqI
+                0,   // Zero
+                128, // Flag (1)
+                4,   // Flag (2)
+                1,   // OffOn
+                0,   // Sp3
+            ],
+            |parsed: Sfp| {
+                assert_eq!(parsed.reqi, RequestId(0));
+                assert_eq!(parsed.onoff, true);
+            }
+        );
+    }
+}
