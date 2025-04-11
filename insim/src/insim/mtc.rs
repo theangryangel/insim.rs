@@ -1,10 +1,14 @@
+use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string_until_eof, binrw_write_codepage_string},
+    FromToBytes, FromToCodepageBytes,
 };
 
 use super::SoundType;
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
+
+const MAX_MTC_TEXT_LEN: usize = 128;
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
@@ -30,6 +34,35 @@ pub struct Mtc {
     pub text: String,
 }
 
+impl FromToBytes for Mtc {
+    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::from_bytes(buf)?;
+        let sound = SoundType::from_bytes(buf)?;
+        let ucid = ConnectionId::from_bytes(buf)?;
+        let plid = PlayerId::from_bytes(buf)?;
+        buf.advance(2);
+        let text = String::from_codepage_bytes(buf, MAX_MTC_TEXT_LEN)?;
+        Ok(Self {
+            reqi,
+            sound,
+            ucid,
+            plid,
+            text,
+        })
+    }
+
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.to_bytes(buf)?;
+        self.sound.to_bytes(buf)?;
+        self.ucid.to_bytes(buf)?;
+        self.plid.to_bytes(buf)?;
+        buf.put_bytes(0, 2);
+        self.text
+            .to_codepage_bytes_aligned(buf, MAX_MTC_TEXT_LEN, 4)?;
+        Ok(())
+    }
+}
+
 impl_typical_with_request_id!(Mtc);
 
 #[cfg(test)]
@@ -41,7 +74,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_mtc_valid() {
+    fn test_mtc() {
+        let raw = [
+            1, // reqi
+            1, // soundtype
+            0, // ucid
+            2, // plid
+            0, 0, b'a', b'b', b'c', b'd', b'e', 0, 0, 0,
+        ];
+
+        assert_from_to_bytes!(Mtc, raw, |parsed: Mtc| {
+            assert_eq!(parsed.reqi, RequestId(1));
+            assert_eq!(parsed.plid, PlayerId(2));
+            assert_eq!(parsed.ucid, ConnectionId(0));
+            assert_eq!(parsed.sound, SoundType::Message);
+        });
+
         let data = Mtc {
             reqi: RequestId(1),
             plid: PlayerId(0),

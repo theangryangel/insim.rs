@@ -1,6 +1,8 @@
+use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
+    FromToBytes, FromToCodepageBytes,
 };
 
 use crate::identifiers::{ConnectionId, RequestId};
@@ -22,6 +24,8 @@ generate_bitflag_helpers! {
     NcnFlags,
     pub is_remote => REMOTE
 }
+
+impl_bitflags_from_to_bytes!(NcnFlags, u8);
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
@@ -55,4 +59,76 @@ pub struct Ncn {
     #[brw(pad_after = 1)]
     /// Flags describing additional facts about this connection
     pub flags: NcnFlags,
+}
+
+impl FromToBytes for Ncn {
+    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::from_bytes(buf)?;
+        let ucid = ConnectionId::from_bytes(buf)?;
+        let uname = String::from_codepage_bytes(buf, 24)?;
+        let pname = String::from_codepage_bytes(buf, 24)?;
+        let admin = u8::from_bytes(buf)? > 0;
+        let total = u8::from_bytes(buf)?;
+        let flags = NcnFlags::from_bytes(buf)?;
+        buf.advance(1);
+        Ok(Self {
+            reqi,
+            ucid,
+            uname,
+            pname,
+            admin,
+            total,
+            flags,
+        })
+    }
+
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.to_bytes(buf)?;
+        self.ucid.to_bytes(buf)?;
+        self.uname.to_codepage_bytes(buf, 24)?;
+        self.pname.to_codepage_bytes(buf, 24)?;
+        (self.admin as u8).to_bytes(buf)?;
+        self.total.to_bytes(buf)?;
+        self.flags.to_bytes(buf)?;
+        buf.put_u8(0);
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use bytes::BytesMut;
+
+    use super::*;
+
+    #[test]
+    fn test_ncn() {
+        let mut raw = BytesMut::new();
+        raw.extend_from_slice(&[
+            2, // reqi
+            3, // ucid
+        ]);
+
+        raw.extend_from_slice("user".as_bytes());
+        raw.put_bytes(0, 20);
+        raw.extend_from_slice("player".as_bytes());
+        raw.put_bytes(0, 18);
+
+        raw.extend_from_slice(&[
+            1,  // admin
+            14, // total
+            4,  // flags
+            0,  // sp3
+        ]);
+
+        assert_from_to_bytes!(Ncn, raw.as_ref(), |parsed: Ncn| {
+            assert!(parsed.admin);
+            assert_eq!(parsed.total, 14);
+            assert_eq!(parsed.reqi, RequestId(2));
+            assert_eq!(parsed.ucid, ConnectionId(3));
+            assert!(parsed.flags.is_remote());
+            assert_eq!(parsed.uname, "user");
+            assert_eq!(parsed.pname, "player");
+        });
+    }
 }

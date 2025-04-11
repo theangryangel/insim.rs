@@ -1,6 +1,8 @@
+use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
+    FromToBytes, FromToCodepageBytes,
 };
 
 use crate::identifiers::RequestId;
@@ -20,29 +22,38 @@ pub struct Mst {
     pub msg: String,
 }
 
+impl FromToBytes for Mst {
+    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::from_bytes(buf)?;
+        buf.advance(1);
+        let msg = String::from_codepage_bytes(buf, 64)?;
+        Ok(Self { reqi, msg })
+    }
+
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.to_bytes(buf)?;
+        buf.put_bytes(0, 1);
+        self.msg.to_codepage_bytes(buf, 64)?;
+        Ok(())
+    }
+}
+
 impl_typical_with_request_id!(Mst);
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
-
-    use insim_core::binrw::BinWrite;
+    use bytes::BytesMut;
 
     use super::*;
 
     #[test]
     fn test_mst() {
-        let data = Mst {
-            reqi: RequestId(1),
-            msg: "aaaaaa".into(),
-        };
+        let mut raw = BytesMut::new();
+        raw.extend_from_slice(&[1, 0, b'a', b'b', b'c', b'd', b'e', b'f']);
+        raw.put_bytes(0, 64 + 2 - raw.len());
 
-        let mut buf = Cursor::new(Vec::new());
-        let res = data.write_le(&mut buf);
-        assert!(res.is_ok());
-        let buf = buf.into_inner();
-
-        assert_eq!(buf.last(), Some(&0));
-        assert_eq!(buf.len(), 66);
+        assert_from_to_bytes!(Mst, raw.as_ref(), |parsed: Mst| {
+            assert_eq!(parsed.msg, "abcdef".to_string());
+        });
     }
 }

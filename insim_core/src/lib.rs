@@ -9,7 +9,7 @@ pub mod track;
 pub mod vehicle;
 pub mod wind;
 
-use std::num::TryFromIntError;
+use std::{array::from_fn, num::TryFromIntError};
 
 #[doc(hidden)]
 pub use ::binrw;
@@ -167,9 +167,9 @@ impl FromToAsciiBytes for String {
 }
 
 /// Read from bytes
-pub trait FromToCodepageBytes: Sized {
+pub trait FromToCodepageBytes {
     /// Read
-    fn from_codepage_bytes(buf: &mut Bytes, len: usize) -> Result<Self, Error>;
+    fn from_codepage_bytes(buf: &mut Bytes, len: usize) -> Result<String, Error>;
 
     /// Write fixed length
     fn to_codepage_bytes(&self, buf: &mut BytesMut, len: usize) -> Result<(), Error>;
@@ -183,15 +183,18 @@ pub trait FromToCodepageBytes: Sized {
     ) -> Result<(), Error>;
 }
 
-impl FromToCodepageBytes for String {
-    fn from_codepage_bytes(buf: &mut Bytes, len: usize) -> Result<Self, Error> {
-        let new = buf.split_to(len);
+impl<T> FromToCodepageBytes for T
+where
+    T: AsRef<str>,
+{
+    fn from_codepage_bytes(buf: &mut Bytes, len: usize) -> Result<String, Error> {
+        let new = buf.split_to(buf.len().min(len));
         let new = string::codepages::to_lossy_string(string::strip_trailing_nul(&new));
         Ok(new.to_string())
     }
 
     fn to_codepage_bytes(&self, buf: &mut BytesMut, len: usize) -> Result<(), Error> {
-        let new = string::codepages::to_lossy_bytes(self);
+        let new = string::codepages::to_lossy_bytes(self.as_ref());
         let len_to_write = new.len().min(len);
         buf.extend_from_slice(&new[..len_to_write]);
         buf.put_bytes(0, len - len_to_write);
@@ -204,7 +207,7 @@ impl FromToCodepageBytes for String {
         len: usize,
         alignment: usize,
     ) -> Result<(), Error> {
-        let new = string::codepages::to_lossy_bytes(self);
+        let new = string::codepages::to_lossy_bytes(self.as_ref());
         let len_to_write = new.len().min(len);
         buf.extend_from_slice(&new[..len_to_write]);
         if len_to_write < len {
@@ -213,6 +216,25 @@ impl FromToCodepageBytes for String {
             let round_to = round_to.min(len);
             buf.put_bytes(0, round_to - len_to_write);
         }
+        Ok(())
+    }
+}
+
+impl<T, const N: usize> FromToBytes for [T; N]
+where
+    T: FromToBytes,
+{
+    fn from_bytes(buf: &mut Bytes) -> Result<Self, Error> {
+        let val = from_fn(|_| T::from_bytes(buf).unwrap());
+
+        Ok(val)
+    }
+
+    fn to_bytes(&self, buf: &mut BytesMut) -> Result<(), Error> {
+        for i in self.iter() {
+            i.to_bytes(buf)?;
+        }
+
         Ok(())
     }
 }

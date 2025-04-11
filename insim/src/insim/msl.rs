@@ -1,13 +1,14 @@
 use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
+    FromToBytes,
 };
 
 use crate::identifiers::RequestId;
 
 /// Enum for the sound field of [Msl].
 #[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
@@ -28,6 +29,37 @@ pub enum SoundType {
 
     /// Error "ping"
     Error = 4,
+}
+
+impl FromToBytes for SoundType {
+    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let discrim = u8::from_bytes(buf)?;
+        let val = match discrim {
+            0 => Self::Silent,
+            1 => Self::Message,
+            2 => Self::SysMessage,
+            3 => Self::InvalidKey,
+            4 => Self::Error,
+            found => {
+                return Err(insim_core::Error::NoVariantMatch {
+                    found: found as u64,
+                })
+            },
+        };
+
+        Ok(val)
+    }
+
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        let val: u8 = match self {
+            Self::Silent => 0,
+            Self::Message => 1,
+            Self::SysMessage => 2,
+            Self::InvalidKey => 3,
+            Self::Error => 4,
+        };
+        val.to_bytes(buf)
+    }
 }
 
 #[binrw]

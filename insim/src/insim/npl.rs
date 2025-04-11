@@ -1,8 +1,10 @@
 use bitflags::bitflags;
+use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
     vehicle::Vehicle,
+    Error, FromToBytes, FromToCodepageBytes,
 };
 
 use super::Fuel;
@@ -43,6 +45,47 @@ pub enum TyreCompound {
     /// Special: "No change"
     #[default]
     NoChange = 255,
+}
+
+impl FromToBytes for TyreCompound {
+    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let discrim = u8::from_bytes(buf)?;
+        let val = match discrim {
+            0 => Self::R1,
+            1 => Self::R2,
+            2 => Self::R3,
+            3 => Self::R4,
+            4 => Self::RoadSuper,
+            5 => Self::RoadNormal,
+            6 => Self::Hybrid,
+            7 => Self::Knobbly,
+            255 => Self::NoChange,
+            found => {
+                return Err(Error::NoVariantMatch {
+                    found: found as u64,
+                })
+            },
+        };
+
+        Ok(val)
+    }
+
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        let discrim: u8 = match self {
+            Self::R1 => 0,
+            Self::R2 => 1,
+            Self::R3 => 2,
+            Self::R4 => 3,
+            Self::RoadSuper => 4,
+            Self::RoadNormal => 5,
+            Self::Hybrid => 6,
+            Self::Knobbly => 7,
+            Self::NoChange => 255,
+        };
+
+        discrim.to_bytes(buf)?;
+        Ok(())
+    }
 }
 
 bitflags! {
@@ -94,6 +137,8 @@ generate_bitflag_helpers!(PlayerFlags,
     pub using_custom_view => CUSTOM_VIEW
 );
 
+impl_bitflags_from_to_bytes!(PlayerFlags, u16);
+
 bitflags! {
     #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
@@ -110,6 +155,8 @@ bitflags! {
         const ABS_ENABLE = (1 << 2);
     }
 }
+
+impl_bitflags_from_to_bytes!(SetFlags, u8);
 
 generate_bitflag_helpers!(SetFlags,
     pub is_symmetric => SYMM_WHEELS,
@@ -133,6 +180,8 @@ bitflags! {
         const REMOTE = (1 << 2);
     }
 }
+
+impl_bitflags_from_to_bytes!(PlayerType, u8);
 
 generate_bitflag_helpers!(
     PlayerType,
@@ -167,6 +216,8 @@ bitflags! {
         const REAR_RIGHT_FEMALE = (1 << 7);
     }
 }
+
+impl_bitflags_from_to_bytes!(Passengers, u8);
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
@@ -240,4 +291,136 @@ pub struct Npl {
 
     /// When /showfuel yes: fuel percent / no: 255
     pub fuel: Fuel,
+}
+
+impl FromToBytes for Npl {
+    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, Error> {
+        let reqi = RequestId::from_bytes(buf)?;
+        let plid = PlayerId::from_bytes(buf)?;
+        let ucid = ConnectionId::from_bytes(buf)?;
+        let ptype = PlayerType::from_bytes(buf)?;
+        let flags = PlayerFlags::from_bytes(buf)?;
+        let pname = String::from_codepage_bytes(buf, 24)?;
+        let plate = String::from_codepage_bytes(buf, 8)?;
+        let cname = Vehicle::from_bytes(buf)?;
+        let sname = String::from_codepage_bytes(buf, 16)?;
+        let tyres = <[TyreCompound; 4]>::from_bytes(buf)?;
+        let h_mass = u8::from_bytes(buf)?;
+        let h_tres = u8::from_bytes(buf)?;
+        let model = u8::from_bytes(buf)?;
+        let pass = Passengers::from_bytes(buf)?;
+        let rwadj = u8::from_bytes(buf)?;
+        let fwadj = u8::from_bytes(buf)?;
+        buf.advance(2);
+        let setf = SetFlags::from_bytes(buf)?;
+        let nump = u8::from_bytes(buf)?;
+        let config = u8::from_bytes(buf)?;
+        let fuel = Fuel::from_bytes(buf)?;
+        Ok(Self {
+            reqi,
+            plid,
+            ucid,
+            ptype,
+            flags,
+            pname,
+            plate,
+            cname,
+            sname,
+            tyres,
+            h_mass,
+            h_tres,
+            model,
+            pass,
+            rwadj,
+            fwadj,
+            setf,
+            nump,
+            config,
+            fuel,
+        })
+    }
+
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), Error> {
+        self.reqi.to_bytes(buf)?;
+        self.plid.to_bytes(buf)?;
+        self.ucid.to_bytes(buf)?;
+        self.ptype.to_bytes(buf)?;
+        self.flags.to_bytes(buf)?;
+        self.pname.to_codepage_bytes(buf, 24)?;
+        self.plate.to_codepage_bytes(buf, 8)?;
+        self.cname.to_bytes(buf)?;
+        self.sname.to_codepage_bytes(buf, 16)?;
+        self.tyres.to_bytes(buf)?;
+        self.h_mass.to_bytes(buf)?;
+        self.h_tres.to_bytes(buf)?;
+        self.model.to_bytes(buf)?;
+        self.pass.to_bytes(buf)?;
+        self.rwadj.to_bytes(buf)?;
+        self.fwadj.to_bytes(buf)?;
+        buf.put_bytes(0, 2);
+        self.setf.to_bytes(buf)?;
+        self.nump.to_bytes(buf)?;
+        self.config.to_bytes(buf)?;
+        self.fuel.to_bytes(buf)?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use bytes::{BufMut, BytesMut};
+
+    use super::*;
+
+    #[test]
+    fn test_npl_xrt() {
+        let mut raw = BytesMut::new();
+        raw.extend_from_slice(&[
+            0, // reqi
+            3, // plid
+            5, // ucid
+            2, // ptype
+            8, // flags (0)
+            0, // flags (1)
+        ]);
+
+        raw.extend_from_slice("player".as_bytes());
+        raw.put_bytes(0, 18);
+        raw.extend_from_slice("12345678".as_bytes());
+        raw.extend_from_slice(b"XRT\0");
+        raw.extend_from_slice("MAX_CAR_TEX_NAME".as_bytes());
+        raw.extend_from_slice(&[
+            0,  // tyrerl
+            1,  // tyrerr
+            2,  // tyrefl
+            3,  // tyrefr
+            10, // h_mass
+            15, // h_tres
+            1,  // model
+            2,  // pass
+            4,  // rwadj
+            5,  // fwadj
+            0,  // sp2
+            0,  // sp3
+            4,  // setf
+            20, // nump
+            1,  // config
+            34, // fuel
+        ]);
+
+        assert_from_to_bytes!(Npl, raw.as_ref(), |parsed: Npl| {
+            assert_eq!(parsed.cname, Vehicle::Xrt);
+            assert_eq!(parsed.plid, PlayerId(3));
+            assert_eq!(parsed.ucid, ConnectionId(5));
+            assert!(matches!(
+                parsed.tyres,
+                [
+                    TyreCompound::R1,
+                    TyreCompound::R2,
+                    TyreCompound::R3,
+                    TyreCompound::R4
+                ]
+            ))
+        });
+    }
 }

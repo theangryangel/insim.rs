@@ -1,4 +1,8 @@
-use insim_core::binrw::{self, binrw};
+use bytes::{Buf, BufMut};
+use insim_core::{
+    binrw::{self, binrw},
+    Error, FromToBytes,
+};
 
 use crate::identifiers::{ConnectionId, RequestId};
 
@@ -42,6 +46,46 @@ pub enum CnlReason {
     Hack = 9,
 }
 
+impl FromToBytes for CnlReason {
+    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let val = match u8::from_bytes(buf)? {
+            0 => Self::Disco,
+            1 => Self::Timeout,
+            2 => Self::LostConn,
+            3 => Self::Kicked,
+            4 => Self::Banned,
+            5 => Self::Security,
+            6 => Self::Cpw,
+            7 => Self::Oos,
+            8 => Self::Joos,
+            9 => Self::Hack,
+            found => {
+                return Err(Error::NoVariantMatch {
+                    found: found as u64,
+                })
+            },
+        };
+        Ok(val)
+    }
+
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        let discrim: u8 = match self {
+            Self::Disco => 0,
+            Self::Timeout => 1,
+            Self::LostConn => 2,
+            Self::Kicked => 3,
+            Self::Banned => 4,
+            Self::Security => 5,
+            Self::Cpw => 6,
+            Self::Oos => 7,
+            Self::Joos => 8,
+            Self::Hack => 9,
+        };
+        discrim.to_bytes(buf)?;
+        Ok(())
+    }
+}
+
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -59,4 +103,54 @@ pub struct Cnl {
     /// Number of remaining connections including host
     #[brw(pad_after = 2)]
     pub total: u8,
+}
+
+impl FromToBytes for Cnl {
+    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, Error> {
+        let reqi = RequestId::from_bytes(buf)?;
+        let ucid = ConnectionId::from_bytes(buf)?;
+        let reason = CnlReason::from_bytes(buf)?;
+        let total = u8::from_bytes(buf)?;
+        buf.advance(2);
+        Ok(Self {
+            reqi,
+            ucid,
+            reason,
+            total,
+        })
+    }
+
+    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), Error> {
+        self.reqi.to_bytes(buf)?;
+        self.ucid.to_bytes(buf)?;
+        self.reason.to_bytes(buf)?;
+        self.total.to_bytes(buf)?;
+        buf.put_bytes(0, 2);
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_cnl() {
+        assert_from_to_bytes!(
+            Cnl,
+            [
+                0,  // reqi
+                4,  // ucid
+                3,  // reason
+                14, // total
+                0,  // sp2
+                0,  // sp3
+            ],
+            |parsed: Cnl| {
+                assert_eq!(parsed.ucid, ConnectionId(4));
+                assert_eq!(parsed.total, 14);
+                assert!(matches!(parsed.reason, CnlReason::Kicked));
+            }
+        );
+    }
 }
