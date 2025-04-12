@@ -42,6 +42,7 @@ futures-util = { workspace = true, optional = true }
 if_chain = { workspace = true }
 indexmap = { workspace = true }
 insim_core = { path = "../insim_core", version = "3.0.0-unreleased" }
+insim_macros = { path = "../insim_macros", version = "3.0.0-unreleased" }
 insim_pth = { path = "../insim_pth", optional = true, version = "3.0.0-unreleased" }
 insim_smx = { path = "../insim_smx", optional = true, version = "3.0.0-unreleased" }
 serde = { workspace = true, features = ["derive"], optional = true }
