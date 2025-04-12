@@ -1,10 +1,8 @@
 use bitflags::bitflags;
-use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw},
     track::Track,
     wind::Wind,
-    FromToBytes,
 };
 
 use super::RaceLaps;
@@ -48,12 +46,13 @@ generate_bitflag_helpers!(
 impl_bitflags_from_to_bytes!(RaceFlags, u16);
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::FromToBytes)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Race Start - informational - sent when a race starts
 pub struct Rst {
     /// Non-zero if the packet is a packet request or a reply to a request
     #[brw(pad_after = 1)]
+    #[fromtobytes(pad_after = 1)]
     pub reqi: RequestId,
 
     /// Total number of race laps
@@ -95,61 +94,6 @@ pub struct Rst {
 
     /// The index of the split3 node
     pub split3: u16,
-}
-
-impl FromToBytes for Rst {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::from_bytes(buf)?;
-        buf.advance(1);
-        let racelaps = RaceLaps::from_bytes(buf)?;
-        let qualmins = u8::from_bytes(buf)?;
-        let nump = u8::from_bytes(buf)?;
-        let timing = u8::from_bytes(buf)?;
-        let track = Track::from_bytes(buf)?;
-        let weather = u8::from_bytes(buf)?;
-        let wind = Wind::from_bytes(buf)?;
-        let flags = RaceFlags::from_bytes(buf)?;
-        let numnodes = u16::from_bytes(buf)?;
-        let finish = u16::from_bytes(buf)?;
-        let split1 = u16::from_bytes(buf)?;
-        let split2 = u16::from_bytes(buf)?;
-        let split3 = u16::from_bytes(buf)?;
-        Ok(Self {
-            reqi,
-            racelaps,
-            qualmins,
-            nump,
-            timing,
-            track,
-            weather,
-            wind,
-            flags,
-            numnodes,
-            finish,
-            split1,
-            split2,
-            split3,
-        })
-    }
-
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.to_bytes(buf)?;
-        buf.put_u8(0);
-        self.racelaps.to_bytes(buf)?;
-        self.qualmins.to_bytes(buf)?;
-        self.nump.to_bytes(buf)?;
-        self.timing.to_bytes(buf)?;
-        self.track.to_bytes(buf)?;
-        self.weather.to_bytes(buf)?;
-        self.wind.to_bytes(buf)?;
-        self.flags.to_bytes(buf)?;
-        self.numnodes.to_bytes(buf)?;
-        self.finish.to_bytes(buf)?;
-        self.split1.to_bytes(buf)?;
-        self.split2.to_bytes(buf)?;
-        self.split3.to_bytes(buf)?;
-        Ok(())
-    }
 }
 
 #[cfg(test)]

@@ -206,7 +206,7 @@ impl WithRequestId for TinyType {
 }
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::FromToBytes)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// General purpose Tiny packet
 pub struct Tiny {
@@ -225,20 +225,6 @@ impl Tiny {
 }
 
 impl_typical_with_request_id!(Tiny);
-
-impl FromToBytes for Tiny {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::from_bytes(buf)?;
-        let subt = TinyType::from_bytes(buf)?;
-        Ok(Tiny { reqi, subt })
-    }
-
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.to_bytes(buf)?;
-        self.subt.to_bytes(buf)?;
-        Ok(())
-    }
-}
 
 #[cfg(test)]
 mod tests {

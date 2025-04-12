@@ -376,7 +376,7 @@ impl FromToBytes for SmallType {
 }
 
 #[binrw]
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, insim_macros::FromToBytes)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// General purpose Small packet
 pub struct Small {
@@ -385,20 +385,6 @@ pub struct Small {
 
     /// Small subtype.
     pub subt: SmallType,
-}
-
-impl FromToBytes for Small {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::from_bytes(buf)?;
-        let subt = SmallType::from_bytes(buf)?;
-        Ok(Self { reqi, subt })
-    }
-
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.to_bytes(buf)?;
-        self.subt.to_bytes(buf)?;
-        Ok(())
-    }
 }
 
 impl_typical_with_request_id!(Small);
