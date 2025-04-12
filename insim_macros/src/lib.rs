@@ -43,7 +43,6 @@ pub fn derive_from_to_bytes(input: TokenStream) -> TokenStream {
         let field_name = f.ident.as_ref().unwrap();
         let pad_after = f.pad_after.unwrap_or(0);
         let pad_before = f.pad_before.unwrap_or(0);
-        let field_type = f.ty.clone();
         let skip = f.skip.unwrap_or(false);
         if skip {
             return None;
@@ -53,7 +52,7 @@ pub fn derive_from_to_bytes(input: TokenStream) -> TokenStream {
         if pad_before > 0 {
             tokens = quote! {
                 #tokens
-                <#field_type as ::bytes::buf::BufMut>::put_bytes(buf, #pad_before);
+                <::bytes::BytesMut as ::bytes::buf::BufMut>::put_bytes(buf, 0, #pad_before);
             }
         }
 
@@ -65,7 +64,7 @@ pub fn derive_from_to_bytes(input: TokenStream) -> TokenStream {
         if pad_after > 0 {
             tokens = quote! {
                 #tokens
-                <#field_type as ::bytes::buf::BufMut>::put_bytes(buf, #pad_after);
+                <::bytes::BytesMut as ::bytes::buf::BufMut>::put_bytes(buf, 0, #pad_after);
             }
         }
 
@@ -86,7 +85,7 @@ pub fn derive_from_to_bytes(input: TokenStream) -> TokenStream {
         if pad_before > 0 {
             tokens = quote! {
                 #tokens
-                <#field_type as ::bytes::buf::Buf>::advance(buf, #pad_before);
+                <::bytes::Bytes as ::bytes::buf::Buf>::advance(buf, #pad_before);
             }
         }
 
@@ -98,7 +97,7 @@ pub fn derive_from_to_bytes(input: TokenStream) -> TokenStream {
         if pad_after > 0 {
             tokens = quote! {
                 #tokens
-                <#field_type as ::bytes::buf::Buf>::advance(buf, #pad_after);
+                <::bytes::Bytes as ::bytes::buf::Buf>::advance(buf, #pad_after);
             }
         }
 

@@ -1,4 +1,3 @@
-use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw},
     FromToBytes,
@@ -87,12 +86,13 @@ impl FromToBytes for VtnAction {
 }
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::FromToBytes)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Vote Notification
 pub struct Vtn {
     /// Non-zero if the packet is a packet request or a reply to a request
     #[brw(pad_after = 1)]
+    #[fromtobytes(pad_after = 1)]
     pub reqi: RequestId,
 
     /// The unique connection id of the connection that voted
@@ -100,28 +100,8 @@ pub struct Vtn {
 
     /// The action or fact for this vote notification
     #[brw(pad_after = 2)]
+    #[fromtobytes(pad_after = 2)]
     pub action: VtnAction,
-}
-
-impl FromToBytes for Vtn {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::from_bytes(buf)?;
-        buf.advance(1);
-        let ucid = ConnectionId::from_bytes(buf)?;
-        let action = VtnAction::from_bytes(buf)?;
-        buf.advance(2);
-
-        Ok(Self { reqi, ucid, action })
-    }
-
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.to_bytes(buf)?;
-        buf.put_u8(0);
-        self.ucid.to_bytes(buf)?;
-        self.action.to_bytes(buf)?;
-        buf.put_bytes(0, 2);
-        Ok(())
-    }
 }
 
 #[cfg(test)]
