@@ -1,13 +1,10 @@
-use insim_core::{
-    binrw::{self, binrw},
-    FromToBytes,
-};
+use insim_core::binrw::{self, binrw};
 
 use crate::identifiers::{ConnectionId, RequestId};
 
 /// Enum for the action field of [Vtn].
 #[binrw]
-#[derive(Default, Debug, Clone, Eq, PartialEq)]
+#[derive(Default, Debug, Clone, Eq, PartialEq, insim_macros::FromToBytes)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
@@ -70,18 +67,6 @@ impl From<&VtnAction> for u32 {
             VtnAction::Qualify => 3,
             VtnAction::None => 0,
         }
-    }
-}
-
-impl FromToBytes for VtnAction {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        Ok(Self::from(u8::from_bytes(buf)?))
-    }
-
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        let discrim: u8 = self.into();
-        discrim.to_bytes(buf)?;
-        Ok(())
     }
 }
 

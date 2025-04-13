@@ -1,13 +1,9 @@
-use bytes::{Buf, BufMut};
-use insim_core::{
-    binrw::{self, binrw},
-    FromToBytes,
-};
+use insim_core::binrw::{self, binrw};
 
 use crate::{identifiers::RequestId, Packet, WithRequestId};
 
 #[binrw]
-#[derive(Debug, Default, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, insim_macros::FromToBytes)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
@@ -106,87 +102,6 @@ pub enum TinyType {
     Ipb = 29,
 }
 
-impl FromToBytes for TinyType {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let discrim = buf.get_u8();
-        let val = match discrim {
-            0 => Self::None,
-            1 => Self::Ver,
-            2 => Self::Close,
-            3 => Self::Ping,
-            4 => Self::Reply,
-            5 => Self::Vtc,
-            6 => Self::Scp,
-            7 => Self::Sst,
-            8 => Self::Gth,
-            9 => Self::Mpe,
-            10 => Self::Ism,
-            11 => Self::Ren,
-            12 => Self::Clr,
-            13 => Self::Ncn,
-            14 => Self::Npl,
-            15 => Self::Res,
-            16 => Self::Nlp,
-            17 => Self::Mci,
-            18 => Self::Reo,
-            19 => Self::Rst,
-            20 => Self::Axi,
-            21 => Self::Axc,
-            22 => Self::Rip,
-            23 => Self::Nci,
-            24 => Self::Alc,
-            25 => Self::Axm,
-            26 => Self::Slc,
-            27 => Self::Mal,
-            28 => Self::Plh,
-            29 => Self::Ipb,
-            found => {
-                return Err(insim_core::Error::NoVariantMatch {
-                    found: found as u64,
-                })
-            },
-        };
-        Ok(val)
-    }
-
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        let val: u8 = match self {
-            Self::None => 0,
-            Self::Ver => 1,
-            Self::Close => 2,
-            Self::Ping => 3,
-            Self::Reply => 4,
-            Self::Vtc => 5,
-            Self::Scp => 6,
-            Self::Sst => 7,
-            Self::Gth => 8,
-            Self::Mpe => 9,
-            Self::Ism => 10,
-            Self::Ren => 11,
-            Self::Clr => 12,
-            Self::Ncn => 13,
-            Self::Npl => 14,
-            Self::Res => 15,
-            Self::Nlp => 16,
-            Self::Mci => 17,
-            Self::Reo => 18,
-            Self::Rst => 19,
-            Self::Axi => 20,
-            Self::Axc => 21,
-            Self::Rip => 22,
-            Self::Nci => 23,
-            Self::Alc => 24,
-            Self::Axm => 25,
-            Self::Slc => 26,
-            Self::Mal => 27,
-            Self::Plh => 28,
-            Self::Ipb => 29,
-        };
-        buf.put_u8(val);
-        Ok(())
-    }
-}
-
 impl From<TinyType> for Packet {
     fn from(value: TinyType) -> Self {
         Self::Tiny(Tiny {
@@ -228,7 +143,19 @@ impl_typical_with_request_id!(Tiny);
 
 #[cfg(test)]
 mod tests {
+    use bytes::{BufMut, BytesMut};
+    use insim_core::FromToBytes;
+
     use super::*;
+
+    #[test]
+    fn test_tiny_type_mal() {
+        let mut buf = BytesMut::new();
+        buf.put_u8(27);
+
+        let ty = TinyType::from_bytes(&mut buf.freeze()).unwrap();
+        assert!(matches!(ty, TinyType::Mal));
+    }
 
     #[test]
     fn test_tiny() {
