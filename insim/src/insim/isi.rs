@@ -6,7 +6,7 @@ use insim_core::{
     binrw::{self, binrw},
     duration::{binrw_parse_duration, binrw_write_duration},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-    FromToAsciiBytes, ReadWriteBuf, FromToCodepageBytes,
+    FromToAsciiBytes, FromToCodepageBytes, ReadWriteBuf,
 };
 
 use crate::{identifiers::RequestId, WithRequestId, VERSION};

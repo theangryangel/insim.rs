@@ -4,7 +4,7 @@ use bytes::{Buf, BufMut, BytesMut};
 use insim_core::{
     binrw::{self, binrw},
     string::{codepages, strip_trailing_nul},
-    ReadWriteBuf, FromToCodepageBytes,
+    FromToCodepageBytes, ReadWriteBuf,
 };
 
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};

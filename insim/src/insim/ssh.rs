@@ -6,7 +6,7 @@ use insim_core::{
 use crate::{identifiers::RequestId, WithRequestId};
 
 #[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]

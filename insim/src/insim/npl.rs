@@ -4,7 +4,7 @@ use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
     vehicle::Vehicle,
-    Error, ReadWriteBuf, FromToCodepageBytes,
+    Error, FromToCodepageBytes, ReadWriteBuf,
 };
 
 use super::Fuel;

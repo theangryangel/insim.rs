@@ -5,7 +5,7 @@ use insim_core::{
     binrw::{self, binrw, BinRead, BinWrite},
     game_version::GameVersion,
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-    ReadWriteBuf, FromToCodepageBytes,
+    FromToCodepageBytes, ReadWriteBuf,
 };
 
 use crate::identifiers::RequestId;

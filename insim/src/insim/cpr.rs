@@ -1,7 +1,7 @@
 use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-    ReadWriteBuf, FromToCodepageBytes,
+    FromToCodepageBytes, ReadWriteBuf,
 };
 
 use crate::identifiers::{ConnectionId, RequestId};

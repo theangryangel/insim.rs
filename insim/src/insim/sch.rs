@@ -1,9 +1,5 @@
 use bitflags::bitflags;
-use bytes::{Buf, BufMut};
-use insim_core::{
-    binrw::{self, binrw},
-    ReadWriteBuf,
-};
+use insim_core::binrw::{self, binrw};
 
 use crate::identifiers::RequestId;
 
@@ -29,13 +25,16 @@ generate_bitflag_helpers! {
     pub ctrl => CTRL
 }
 
+impl_bitflags_from_to_bytes!(SchFlags, u8);
+
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Send Single Character
 pub struct Sch {
     /// Non-zero if the packet is a packet request or a reply to a request
     #[brw(pad_after = 1)]
+    #[read_write_buf(pad_after = 1)]
     pub reqi: RequestId,
 
     /// Character
@@ -45,30 +44,8 @@ pub struct Sch {
 
     /// Character modifiers/flags
     #[brw(pad_after = 2)]
+    #[read_write_buf(pad_after = 2)]
     pub flags: SchFlags,
-}
-
-impl ReadWriteBuf for Sch {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::read_buf(buf)?;
-        buf.advance(1);
-        let charb = char::read_buf(buf)?;
-        let flags = u8::read_buf(buf)?;
-        let flags = SchFlags::from_bits_truncate(flags);
-        buf.advance(2);
-
-        Ok(Self { reqi, charb, flags })
-    }
-
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.write_buf(buf)?;
-        buf.put_bytes(0, 1);
-        self.charb.write_buf(buf)?;
-        let flags = self.flags.bits();
-        flags.write_buf(buf)?;
-        buf.put_bytes(0, 2);
-        Ok(())
-    }
 }
 
 impl_typical_with_request_id!(Sch);

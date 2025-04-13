@@ -9,7 +9,7 @@ use insim_core::{
 use crate::identifiers::RequestId;
 
 #[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
@@ -80,6 +80,8 @@ generate_bitflag_helpers! {
     pub missing_skin_download_enabled => SKINS,
     pub is_full_physics_simulation => FULL_PHYS
 }
+
+impl_bitflags_from_to_bytes!(RipOptions, u8);
 
 #[binrw]
 #[derive(Debug, Clone, Default)]

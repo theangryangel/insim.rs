@@ -1,17 +1,15 @@
 use bitflags::bitflags;
-use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw},
     track::Track,
     wind::Wind,
-    ReadWriteBuf,
 };
 
 use super::{CameraView, RaceLaps};
 use crate::identifiers::{PlayerId, RequestId};
 
 #[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
@@ -27,36 +25,6 @@ pub enum RaceInProgress {
 
     /// Qualifying
     Qualifying = 2,
-}
-
-impl ReadWriteBuf for RaceInProgress {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let discrim = buf.get_u8();
-        let res = match discrim {
-            0 => Self::No,
-            1 => Self::Racing,
-            2 => Self::Qualifying,
-            found => {
-                return Err(insim_core::Error::NoVariantMatch {
-                    found: (found as u64),
-                })
-            },
-        };
-
-        Ok(res)
-    }
-
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        let discrim = match self {
-            Self::No => 0,
-            Self::Racing => 1,
-            Self::Qualifying => 2,
-        };
-
-        buf.put_u8(discrim);
-
-        Ok(())
-    }
 }
 
 bitflags! {
@@ -134,11 +102,12 @@ generate_bitflag_helpers! {
 impl_bitflags_from_to_bytes!(StaFlags, u16);
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// State
 pub struct Sta {
     #[brw(pad_after = 1)]
+    #[read_write_buf(pad_after = 1)]
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
@@ -170,6 +139,7 @@ pub struct Sta {
     pub qualmins: u8,
 
     #[brw(pad_after = 1)]
+    #[read_write_buf(pad_after = 1)]
     /// Number of laps
     pub racelaps: RaceLaps,
 
@@ -190,70 +160,6 @@ impl Sta {
     /// Is server status healthy?
     pub fn is_server_status_ok(&self) -> bool {
         self.serverstatus == 1
-    }
-}
-
-impl ReadWriteBuf for Sta {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::read_buf(buf)?;
-        buf.advance(1);
-        let replayspeed = f32::read_buf(buf)?;
-        let flags = u16::read_buf(buf)?;
-        let flags = StaFlags::from_bits_truncate(flags);
-        let ingamecam = CameraView::read_buf(buf)?;
-        let viewplid = PlayerId::read_buf(buf)?;
-        let nump = u8::read_buf(buf)?;
-        let numconns = u8::read_buf(buf)?;
-        let numfinished = u8::read_buf(buf)?;
-        let raceinprog = RaceInProgress::read_buf(buf)?;
-        let qualmins = u8::read_buf(buf)?;
-        let racelaps = RaceLaps::read_buf(buf)?;
-        buf.advance(1);
-        let serverstatus = u8::read_buf(buf)?;
-        let track = Track::read_buf(buf)?;
-        let weather = u8::read_buf(buf)?;
-        let wind = Wind::read_buf(buf)?;
-
-        Ok(Self {
-            reqi,
-            replayspeed,
-            flags,
-            ingamecam,
-            viewplid,
-            nump,
-            numconns,
-            numfinished,
-            raceinprog,
-            qualmins,
-            racelaps,
-            serverstatus,
-            track,
-            weather,
-            wind,
-        })
-    }
-
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.write_buf(buf)?;
-        buf.put_u8(0);
-        self.replayspeed.write_buf(buf)?;
-        let flags = self.flags.bits();
-        flags.write_buf(buf)?;
-        self.ingamecam.write_buf(buf)?;
-        self.viewplid.write_buf(buf)?;
-        self.nump.write_buf(buf)?;
-        self.numconns.write_buf(buf)?;
-        self.numfinished.write_buf(buf)?;
-        self.raceinprog.write_buf(buf)?;
-        self.qualmins.write_buf(buf)?;
-        self.racelaps.write_buf(buf)?;
-        buf.put_u8(0);
-        self.serverstatus.write_buf(buf)?;
-        self.track.write_buf(buf)?;
-        self.weather.write_buf(buf)?;
-        self.wind.write_buf(buf)?;
-
-        Ok(())
     }
 }
 

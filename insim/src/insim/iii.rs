@@ -2,7 +2,7 @@ use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string_until_eof, binrw_write_codepage_string},
-    ReadWriteBuf, FromToCodepageBytes,
+    FromToCodepageBytes, ReadWriteBuf,
 };
 
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};

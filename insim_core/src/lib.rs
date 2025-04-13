@@ -66,6 +66,17 @@ impl ReadWriteBuf for char {
     }
 }
 
+impl ReadWriteBuf for bool {
+    fn read_buf(buf: &mut Bytes) -> Result<Self, Error> {
+        Ok(buf.get_u8() > 0)
+    }
+
+    fn write_buf(&self, buf: &mut BytesMut) -> Result<(), Error> {
+        buf.put_u8(*self as u8);
+        Ok(())
+    }
+}
+
 impl ReadWriteBuf for u8 {
     fn read_buf(buf: &mut Bytes) -> Result<Self, Error> {
         Ok(buf.get_u8())
