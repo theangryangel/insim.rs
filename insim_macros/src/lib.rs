@@ -112,10 +112,17 @@ impl Receiver {
                 }
             }
 
-            tokens = quote! {
-                #tokens
-                self.#field_name.write_buf(buf)?;
-            };
+            if let Some(write_with) = f.write_with.clone() {
+                tokens = quote! {
+                    #tokens
+                    (#write_with)(&self.#field_name, buf)?;
+                };
+            } else {
+                tokens = quote! {
+                    #tokens
+                    self.#field_name.write_buf(buf)?;
+                };
+            }
 
             if pad_after > 0 {
                 tokens = quote! {
@@ -145,10 +152,17 @@ impl Receiver {
                 }
             }
 
-            tokens = quote! {
-                #tokens
-                let #field_name = #field_type::read_buf(buf)?;
-            };
+            if let Some(read_with) = f.read_with.clone() {
+                tokens = quote! {
+                    #tokens
+                    let #field_name = (#read_with)(buf)?;
+                };
+            } else {
+                tokens = quote! {
+                    #tokens
+                    let #field_name = #field_type::read_buf(buf)?;
+                };
+            }
 
             if pad_after > 0 {
                 tokens = quote! {
@@ -216,6 +230,8 @@ struct Field {
     pub pad_before: Option<usize>,
     pub pad_after: Option<usize>,
     pub skip: Option<bool>,
+    pub read_with: Option<syn::Expr>,
+    pub write_with: Option<syn::Expr>,
     pub ty: Type,
 }
 
@@ -225,6 +241,11 @@ struct Field {
 ///    Assumes all fields also implement ReadWriteBuf
 ///    Fields may have padding before or after using #[read_write_buf(pad_after=2)]
 ///    Fields may be skipped by supplying #[read_write_buf(skip)]
+///    Field may be mapped using the read_with and write_with attributes. i.e.
+///    #[read_write_buf(
+///    read_with = "|buf| { String::from_codepage_bytes(buf, 64) }",
+///    write_with = "|msg: &String, buf| { msg.to_codepage_bytes_aligned(buf, 64, 4) }"
+///    )]
 /// 2. Enums which are repr(typ) and have a supplied discriminant
 ///    Variants may be skipped using #[read_write_buf(skip)]
 pub fn derive_read_write_buf(input: TokenStream) -> TokenStream {
