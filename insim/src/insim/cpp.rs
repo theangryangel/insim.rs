@@ -5,7 +5,7 @@ use insim_core::{
     binrw::{self, binrw},
     duration::{binrw_parse_duration, binrw_write_duration},
     point::Point,
-    FromToBytes,
+    ReadWriteBuf,
 };
 
 use super::{CameraView, StaFlags};
@@ -51,20 +51,20 @@ pub struct Cpp {
     pub flags: StaFlags,
 }
 
-impl FromToBytes for Cpp {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::from_bytes(buf)?;
+impl ReadWriteBuf for Cpp {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
         buf.advance(1);
-        let pos = Point::from_bytes(buf)?;
-        let h = u16::from_bytes(buf)?;
-        let p = u16::from_bytes(buf)?;
-        let r = u16::from_bytes(buf)?;
-        let viewplid = PlayerId::from_bytes(buf)?;
-        let ingamecam = CameraView::from_bytes(buf)?;
-        let fov = f32::from_bytes(buf)?;
-        let time = u16::from_bytes(buf)?;
+        let pos = Point::read_buf(buf)?;
+        let h = u16::read_buf(buf)?;
+        let p = u16::read_buf(buf)?;
+        let r = u16::read_buf(buf)?;
+        let viewplid = PlayerId::read_buf(buf)?;
+        let ingamecam = CameraView::read_buf(buf)?;
+        let fov = f32::read_buf(buf)?;
+        let time = u16::read_buf(buf)?;
         let time = Duration::from_millis(time as u64);
-        let flags = StaFlags::from_bytes(buf)?;
+        let flags = StaFlags::read_buf(buf)?;
         Ok(Self {
             reqi,
             pos,
@@ -79,25 +79,25 @@ impl FromToBytes for Cpp {
         })
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.to_bytes(buf)?;
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
         buf.put_bytes(0, 1);
-        self.pos.to_bytes(buf)?;
-        self.h.to_bytes(buf)?;
-        self.p.to_bytes(buf)?;
-        self.r.to_bytes(buf)?;
-        self.viewplid.to_bytes(buf)?;
-        self.ingamecam.to_bytes(buf)?;
-        self.fov.to_bytes(buf)?;
+        self.pos.write_buf(buf)?;
+        self.h.write_buf(buf)?;
+        self.p.write_buf(buf)?;
+        self.r.write_buf(buf)?;
+        self.viewplid.write_buf(buf)?;
+        self.ingamecam.write_buf(buf)?;
+        self.fov.write_buf(buf)?;
         match TryInto::<u16>::try_into(self.time.as_millis()) {
             Ok(time) => {
-                time.to_bytes(buf)?;
+                time.write_buf(buf)?;
             },
             Err(_) => {
                 return Err(insim_core::Error::DurationTooLarge);
             },
         };
-        self.flags.to_bytes(buf)?;
+        self.flags.write_buf(buf)?;
         Ok(())
     }
 }

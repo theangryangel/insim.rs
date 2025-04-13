@@ -17,13 +17,13 @@ macro_rules! assert_from_to_bytes {
 
         $fn(parsed_binrw);
 
-        // test FromToBytes
+        // test ReadWriteBuf
         let mut parsed_buf = ::bytes::BytesMut::new();
         parsed_buf.extend_from_slice(&raw);
 
         let mut parsed_buf = parsed_buf.freeze();
 
-        let parsed = <$thing as ::insim_core::FromToBytes>::from_bytes(&mut parsed_buf).unwrap();
+        let parsed = <$thing as ::insim_core::ReadWriteBuf>::read_buf(&mut parsed_buf).unwrap();
         let remaining = <::bytes::Bytes as ::bytes::Buf>::remaining(&parsed_buf);
         assert_eq!(
             remaining, 0,
@@ -32,7 +32,7 @@ macro_rules! assert_from_to_bytes {
         );
 
         let mut written_buf = ::bytes::BytesMut::new();
-        <$thing as ::insim_core::FromToBytes>::to_bytes(&parsed, &mut written_buf).unwrap();
+        <$thing as ::insim_core::ReadWriteBuf>::write_buf(&parsed, &mut written_buf).unwrap();
 
         assert_eq!(
             written_buf.as_ref(),

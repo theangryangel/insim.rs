@@ -4,7 +4,7 @@ use crate::identifiers::{ConnectionId, RequestId};
 
 /// Enum for the action field of [Vtn].
 #[binrw]
-#[derive(Default, Debug, Clone, Eq, PartialEq, insim_macros::FromToBytes)]
+#[derive(Default, Debug, Clone, Eq, PartialEq, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
@@ -71,13 +71,13 @@ impl From<&VtnAction> for u32 {
 }
 
 #[binrw]
-#[derive(Debug, Clone, Default, insim_macros::FromToBytes)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Vote Notification
 pub struct Vtn {
     /// Non-zero if the packet is a packet request or a reply to a request
     #[brw(pad_after = 1)]
-    #[fromtobytes(pad_after = 1)]
+    #[read_write_buf(pad_after = 1)]
     pub reqi: RequestId,
 
     /// The unique connection id of the connection that voted
@@ -85,7 +85,7 @@ pub struct Vtn {
 
     /// The action or fact for this vote notification
     #[brw(pad_after = 2)]
-    #[fromtobytes(pad_after = 2)]
+    #[read_write_buf(pad_after = 2)]
     pub action: VtnAction,
 }
 

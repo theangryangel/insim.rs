@@ -4,7 +4,7 @@ use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
     vehicle::Vehicle,
-    Error, FromToBytes, FromToCodepageBytes,
+    Error, ReadWriteBuf, FromToCodepageBytes,
 };
 
 use super::Fuel;
@@ -47,9 +47,9 @@ pub enum TyreCompound {
     NoChange = 255,
 }
 
-impl FromToBytes for TyreCompound {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let discrim = u8::from_bytes(buf)?;
+impl ReadWriteBuf for TyreCompound {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let discrim = u8::read_buf(buf)?;
         let val = match discrim {
             0 => Self::R1,
             1 => Self::R2,
@@ -70,7 +70,7 @@ impl FromToBytes for TyreCompound {
         Ok(val)
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         let discrim: u8 = match self {
             Self::R1 => 0,
             Self::R2 => 1,
@@ -83,7 +83,7 @@ impl FromToBytes for TyreCompound {
             Self::NoChange => 255,
         };
 
-        discrim.to_bytes(buf)?;
+        discrim.write_buf(buf)?;
         Ok(())
     }
 }
@@ -293,29 +293,29 @@ pub struct Npl {
     pub fuel: Fuel,
 }
 
-impl FromToBytes for Npl {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, Error> {
-        let reqi = RequestId::from_bytes(buf)?;
-        let plid = PlayerId::from_bytes(buf)?;
-        let ucid = ConnectionId::from_bytes(buf)?;
-        let ptype = PlayerType::from_bytes(buf)?;
-        let flags = PlayerFlags::from_bytes(buf)?;
+impl ReadWriteBuf for Npl {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, Error> {
+        let reqi = RequestId::read_buf(buf)?;
+        let plid = PlayerId::read_buf(buf)?;
+        let ucid = ConnectionId::read_buf(buf)?;
+        let ptype = PlayerType::read_buf(buf)?;
+        let flags = PlayerFlags::read_buf(buf)?;
         let pname = String::from_codepage_bytes(buf, 24)?;
         let plate = String::from_codepage_bytes(buf, 8)?;
-        let cname = Vehicle::from_bytes(buf)?;
+        let cname = Vehicle::read_buf(buf)?;
         let sname = String::from_codepage_bytes(buf, 16)?;
-        let tyres = <[TyreCompound; 4]>::from_bytes(buf)?;
-        let h_mass = u8::from_bytes(buf)?;
-        let h_tres = u8::from_bytes(buf)?;
-        let model = u8::from_bytes(buf)?;
-        let pass = Passengers::from_bytes(buf)?;
-        let rwadj = u8::from_bytes(buf)?;
-        let fwadj = u8::from_bytes(buf)?;
+        let tyres = <[TyreCompound; 4]>::read_buf(buf)?;
+        let h_mass = u8::read_buf(buf)?;
+        let h_tres = u8::read_buf(buf)?;
+        let model = u8::read_buf(buf)?;
+        let pass = Passengers::read_buf(buf)?;
+        let rwadj = u8::read_buf(buf)?;
+        let fwadj = u8::read_buf(buf)?;
         buf.advance(2);
-        let setf = SetFlags::from_bytes(buf)?;
-        let nump = u8::from_bytes(buf)?;
-        let config = u8::from_bytes(buf)?;
-        let fuel = Fuel::from_bytes(buf)?;
+        let setf = SetFlags::read_buf(buf)?;
+        let nump = u8::read_buf(buf)?;
+        let config = u8::read_buf(buf)?;
+        let fuel = Fuel::read_buf(buf)?;
         Ok(Self {
             reqi,
             plid,
@@ -340,28 +340,28 @@ impl FromToBytes for Npl {
         })
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), Error> {
-        self.reqi.to_bytes(buf)?;
-        self.plid.to_bytes(buf)?;
-        self.ucid.to_bytes(buf)?;
-        self.ptype.to_bytes(buf)?;
-        self.flags.to_bytes(buf)?;
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), Error> {
+        self.reqi.write_buf(buf)?;
+        self.plid.write_buf(buf)?;
+        self.ucid.write_buf(buf)?;
+        self.ptype.write_buf(buf)?;
+        self.flags.write_buf(buf)?;
         self.pname.to_codepage_bytes(buf, 24)?;
         self.plate.to_codepage_bytes(buf, 8)?;
-        self.cname.to_bytes(buf)?;
+        self.cname.write_buf(buf)?;
         self.sname.to_codepage_bytes(buf, 16)?;
-        self.tyres.to_bytes(buf)?;
-        self.h_mass.to_bytes(buf)?;
-        self.h_tres.to_bytes(buf)?;
-        self.model.to_bytes(buf)?;
-        self.pass.to_bytes(buf)?;
-        self.rwadj.to_bytes(buf)?;
-        self.fwadj.to_bytes(buf)?;
+        self.tyres.write_buf(buf)?;
+        self.h_mass.write_buf(buf)?;
+        self.h_tres.write_buf(buf)?;
+        self.model.write_buf(buf)?;
+        self.pass.write_buf(buf)?;
+        self.rwadj.write_buf(buf)?;
+        self.fwadj.write_buf(buf)?;
         buf.put_bytes(0, 2);
-        self.setf.to_bytes(buf)?;
-        self.nump.to_bytes(buf)?;
-        self.config.to_bytes(buf)?;
-        self.fuel.to_bytes(buf)?;
+        self.setf.write_buf(buf)?;
+        self.nump.write_buf(buf)?;
+        self.config.write_buf(buf)?;
+        self.fuel.write_buf(buf)?;
         Ok(())
     }
 }

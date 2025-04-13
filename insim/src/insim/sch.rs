@@ -2,7 +2,7 @@ use bitflags::bitflags;
 use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw},
-    FromToBytes,
+    ReadWriteBuf,
 };
 
 use crate::identifiers::RequestId;
@@ -48,24 +48,24 @@ pub struct Sch {
     pub flags: SchFlags,
 }
 
-impl FromToBytes for Sch {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::from_bytes(buf)?;
+impl ReadWriteBuf for Sch {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
         buf.advance(1);
-        let charb = char::from_bytes(buf)?;
-        let flags = u8::from_bytes(buf)?;
+        let charb = char::read_buf(buf)?;
+        let flags = u8::read_buf(buf)?;
         let flags = SchFlags::from_bits_truncate(flags);
         buf.advance(2);
 
         Ok(Self { reqi, charb, flags })
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.to_bytes(buf)?;
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
         buf.put_bytes(0, 1);
-        self.charb.to_bytes(buf)?;
+        self.charb.write_buf(buf)?;
         let flags = self.flags.bits();
-        flags.to_bytes(buf)?;
+        flags.write_buf(buf)?;
         buf.put_bytes(0, 2);
         Ok(())
     }

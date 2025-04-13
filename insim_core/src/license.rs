@@ -1,7 +1,7 @@
 //! Strongly type license data
 use binrw::binrw;
 
-use crate::FromToBytes;
+use crate::ReadWriteBuf;
 
 /// Describes the various LFS "license" levels. Each "license" provides access to different
 /// levels of content.
@@ -35,9 +35,9 @@ impl std::fmt::Display for License {
     }
 }
 
-impl FromToBytes for License {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
-        match u8::from_bytes(buf)? {
+impl ReadWriteBuf for License {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
+        match u8::read_buf(buf)? {
             0 => Ok(Self::Demo),
             1 => Ok(Self::S1),
             2 => Ok(Self::S2),
@@ -48,8 +48,8 @@ impl FromToBytes for License {
         }
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
-        (*self as u8).to_bytes(buf)
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
+        (*self as u8).write_buf(buf)
     }
 }
 

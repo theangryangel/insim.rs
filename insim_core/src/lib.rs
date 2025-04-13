@@ -43,20 +43,20 @@ pub enum Error {
 }
 
 /// Read from bytes
-pub trait FromToBytes: Sized {
+pub trait ReadWriteBuf: Sized {
     /// Read
-    fn from_bytes(buf: &mut Bytes) -> Result<Self, Error>;
+    fn read_buf(buf: &mut Bytes) -> Result<Self, Error>;
 
     /// Write
-    fn to_bytes(&self, buf: &mut BytesMut) -> Result<(), Error>;
+    fn write_buf(&self, buf: &mut BytesMut) -> Result<(), Error>;
 }
 
-impl FromToBytes for char {
-    fn from_bytes(buf: &mut Bytes) -> Result<Self, Error> {
+impl ReadWriteBuf for char {
+    fn read_buf(buf: &mut Bytes) -> Result<Self, Error> {
         Ok(buf.get_u8() as char)
     }
 
-    fn to_bytes(&self, buf: &mut BytesMut) -> Result<(), Error> {
+    fn write_buf(&self, buf: &mut BytesMut) -> Result<(), Error> {
         if self.is_ascii() {
             buf.put_u8(*self as u8);
             return Ok(());
@@ -66,72 +66,72 @@ impl FromToBytes for char {
     }
 }
 
-impl FromToBytes for u8 {
-    fn from_bytes(buf: &mut Bytes) -> Result<Self, Error> {
+impl ReadWriteBuf for u8 {
+    fn read_buf(buf: &mut Bytes) -> Result<Self, Error> {
         Ok(buf.get_u8())
     }
 
-    fn to_bytes(&self, buf: &mut BytesMut) -> Result<(), Error> {
+    fn write_buf(&self, buf: &mut BytesMut) -> Result<(), Error> {
         buf.put_u8(*self);
 
         Ok(())
     }
 }
 
-impl FromToBytes for u16 {
-    fn from_bytes(buf: &mut Bytes) -> Result<Self, Error> {
+impl ReadWriteBuf for u16 {
+    fn read_buf(buf: &mut Bytes) -> Result<Self, Error> {
         Ok(buf.get_u16_le())
     }
 
-    fn to_bytes(&self, buf: &mut BytesMut) -> Result<(), Error> {
+    fn write_buf(&self, buf: &mut BytesMut) -> Result<(), Error> {
         buf.put_u16_le(*self);
 
         Ok(())
     }
 }
 
-impl FromToBytes for i16 {
-    fn from_bytes(buf: &mut Bytes) -> Result<Self, Error> {
+impl ReadWriteBuf for i16 {
+    fn read_buf(buf: &mut Bytes) -> Result<Self, Error> {
         Ok(buf.get_i16_le())
     }
 
-    fn to_bytes(&self, buf: &mut BytesMut) -> Result<(), Error> {
+    fn write_buf(&self, buf: &mut BytesMut) -> Result<(), Error> {
         buf.put_i16_le(*self);
 
         Ok(())
     }
 }
 
-impl FromToBytes for u32 {
-    fn from_bytes(buf: &mut Bytes) -> Result<Self, Error> {
+impl ReadWriteBuf for u32 {
+    fn read_buf(buf: &mut Bytes) -> Result<Self, Error> {
         Ok(buf.get_u32_le())
     }
 
-    fn to_bytes(&self, buf: &mut BytesMut) -> Result<(), Error> {
+    fn write_buf(&self, buf: &mut BytesMut) -> Result<(), Error> {
         buf.put_u32_le(*self);
 
         Ok(())
     }
 }
 
-impl FromToBytes for i32 {
-    fn from_bytes(buf: &mut Bytes) -> Result<Self, Error> {
+impl ReadWriteBuf for i32 {
+    fn read_buf(buf: &mut Bytes) -> Result<Self, Error> {
         Ok(buf.get_i32_le())
     }
 
-    fn to_bytes(&self, buf: &mut BytesMut) -> Result<(), Error> {
+    fn write_buf(&self, buf: &mut BytesMut) -> Result<(), Error> {
         buf.put_i32_le(*self);
 
         Ok(())
     }
 }
 
-impl FromToBytes for f32 {
-    fn from_bytes(buf: &mut Bytes) -> Result<Self, Error> {
+impl ReadWriteBuf for f32 {
+    fn read_buf(buf: &mut Bytes) -> Result<Self, Error> {
         Ok(buf.get_f32_le())
     }
 
-    fn to_bytes(&self, buf: &mut BytesMut) -> Result<(), Error> {
+    fn write_buf(&self, buf: &mut BytesMut) -> Result<(), Error> {
         buf.put_f32_le(*self);
 
         Ok(())
@@ -220,19 +220,19 @@ where
     }
 }
 
-impl<T, const N: usize> FromToBytes for [T; N]
+impl<T, const N: usize> ReadWriteBuf for [T; N]
 where
-    T: FromToBytes,
+    T: ReadWriteBuf,
 {
-    fn from_bytes(buf: &mut Bytes) -> Result<Self, Error> {
-        let val = from_fn(|_| T::from_bytes(buf).unwrap());
+    fn read_buf(buf: &mut Bytes) -> Result<Self, Error> {
+        let val = from_fn(|_| T::read_buf(buf).unwrap());
 
         Ok(val)
     }
 
-    fn to_bytes(&self, buf: &mut BytesMut) -> Result<(), Error> {
+    fn write_buf(&self, buf: &mut BytesMut) -> Result<(), Error> {
         for i in self.iter() {
-            i.to_bytes(buf)?;
+            i.write_buf(buf)?;
         }
 
         Ok(())

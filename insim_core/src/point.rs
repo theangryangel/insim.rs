@@ -3,14 +3,14 @@ use binrw::{binrw, BinRead, BinWrite};
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-use crate::FromToBytes;
+use crate::ReadWriteBuf;
 
 #[allow(missing_docs)]
 pub trait Pointable:
     Copy
     + Clone
     + Default
-    + FromToBytes
+    + ReadWriteBuf
     + for<'a> BinRead<Args<'a> = ()>
     + for<'a> BinWrite<Args<'a> = ()>
 {
@@ -34,21 +34,21 @@ where
     pub z: T,
 }
 
-impl<T> FromToBytes for Point<T>
+impl<T> ReadWriteBuf for Point<T>
 where
     T: Pointable,
 {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
-        let x = T::from_bytes(buf)?;
-        let y = T::from_bytes(buf)?;
-        let z = T::from_bytes(buf)?;
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
+        let x = T::read_buf(buf)?;
+        let y = T::read_buf(buf)?;
+        let z = T::read_buf(buf)?;
         Ok(Self { x, y, z })
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
-        self.x.to_bytes(buf)?;
-        self.y.to_bytes(buf)?;
-        self.z.to_bytes(buf)?;
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
+        self.x.write_buf(buf)?;
+        self.y.write_buf(buf)?;
+        self.z.write_buf(buf)?;
         Ok(())
     }
 }

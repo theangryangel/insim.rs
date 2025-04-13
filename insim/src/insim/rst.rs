@@ -46,13 +46,13 @@ generate_bitflag_helpers!(
 impl_bitflags_from_to_bytes!(RaceFlags, u16);
 
 #[binrw]
-#[derive(Debug, Clone, Default, insim_macros::FromToBytes)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Race Start - informational - sent when a race starts
 pub struct Rst {
     /// Non-zero if the packet is a packet request or a reply to a request
     #[brw(pad_after = 1)]
-    #[fromtobytes(pad_after = 1)]
+    #[read_write_buf(pad_after = 1)]
     pub reqi: RequestId,
 
     /// Total number of race laps

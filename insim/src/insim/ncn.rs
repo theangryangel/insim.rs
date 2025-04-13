@@ -2,7 +2,7 @@ use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-    FromToBytes, FromToCodepageBytes,
+    ReadWriteBuf, FromToCodepageBytes,
 };
 
 use crate::identifiers::{ConnectionId, RequestId};
@@ -61,15 +61,15 @@ pub struct Ncn {
     pub flags: NcnFlags,
 }
 
-impl FromToBytes for Ncn {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::from_bytes(buf)?;
-        let ucid = ConnectionId::from_bytes(buf)?;
+impl ReadWriteBuf for Ncn {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
+        let ucid = ConnectionId::read_buf(buf)?;
         let uname = String::from_codepage_bytes(buf, 24)?;
         let pname = String::from_codepage_bytes(buf, 24)?;
-        let admin = u8::from_bytes(buf)? > 0;
-        let total = u8::from_bytes(buf)?;
-        let flags = NcnFlags::from_bytes(buf)?;
+        let admin = u8::read_buf(buf)? > 0;
+        let total = u8::read_buf(buf)?;
+        let flags = NcnFlags::read_buf(buf)?;
         buf.advance(1);
         Ok(Self {
             reqi,
@@ -82,14 +82,14 @@ impl FromToBytes for Ncn {
         })
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.to_bytes(buf)?;
-        self.ucid.to_bytes(buf)?;
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
+        self.ucid.write_buf(buf)?;
         self.uname.to_codepage_bytes(buf, 24)?;
         self.pname.to_codepage_bytes(buf, 24)?;
-        (self.admin as u8).to_bytes(buf)?;
-        self.total.to_bytes(buf)?;
-        self.flags.to_bytes(buf)?;
+        (self.admin as u8).write_buf(buf)?;
+        self.total.write_buf(buf)?;
+        self.flags.write_buf(buf)?;
         buf.put_u8(0);
         Ok(())
     }

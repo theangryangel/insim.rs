@@ -1,7 +1,7 @@
 use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw},
-    FromToBytes,
+    ReadWriteBuf,
 };
 
 use crate::identifiers::RequestId;
@@ -16,15 +16,15 @@ pub struct Hlr {
     pub reqi: RequestId,
 }
 
-impl FromToBytes for Hlr {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::from_bytes(buf)?;
+impl ReadWriteBuf for Hlr {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
         buf.advance(1);
         Ok(Self { reqi })
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.to_bytes(buf)?;
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
         buf.put_bytes(0, 1);
         Ok(())
     }

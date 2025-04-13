@@ -1,6 +1,6 @@
 use insim_core::{
     binrw::{self, binrw},
-    FromToBytes,
+    ReadWriteBuf,
 };
 
 use crate::identifiers::RequestId;
@@ -35,9 +35,9 @@ pub enum RelayErrorKind {
     MissingSpectatorPassword = 6,
 }
 
-impl FromToBytes for RelayErrorKind {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let discrim = u8::from_bytes(buf)?;
+impl ReadWriteBuf for RelayErrorKind {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let discrim = u8::read_buf(buf)?;
         let kind = match discrim {
             0 => Self::None,
             1 => Self::InvalidPacketLength,
@@ -56,8 +56,8 @@ impl FromToBytes for RelayErrorKind {
         Ok(kind)
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        (*self as u8).to_bytes(buf)?;
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        (*self as u8).write_buf(buf)?;
         Ok(())
     }
 }
@@ -74,16 +74,16 @@ pub struct Error {
     pub err: RelayErrorKind,
 }
 
-impl FromToBytes for Error {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::from_bytes(buf)?;
-        let err = RelayErrorKind::from_bytes(buf)?;
+impl ReadWriteBuf for Error {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
+        let err = RelayErrorKind::read_buf(buf)?;
         Ok(Self { reqi, err })
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.to_bytes(buf)?;
-        self.err.to_bytes(buf)?;
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
+        self.err.write_buf(buf)?;
         Ok(())
     }
 }

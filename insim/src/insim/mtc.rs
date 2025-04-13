@@ -2,7 +2,7 @@ use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string_until_eof, binrw_write_codepage_string},
-    FromToBytes, FromToCodepageBytes,
+    ReadWriteBuf, FromToCodepageBytes,
 };
 
 use super::SoundType;
@@ -34,12 +34,12 @@ pub struct Mtc {
     pub text: String,
 }
 
-impl FromToBytes for Mtc {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::from_bytes(buf)?;
-        let sound = SoundType::from_bytes(buf)?;
-        let ucid = ConnectionId::from_bytes(buf)?;
-        let plid = PlayerId::from_bytes(buf)?;
+impl ReadWriteBuf for Mtc {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
+        let sound = SoundType::read_buf(buf)?;
+        let ucid = ConnectionId::read_buf(buf)?;
+        let plid = PlayerId::read_buf(buf)?;
         buf.advance(2);
         let text = String::from_codepage_bytes(buf, MAX_MTC_TEXT_LEN)?;
         Ok(Self {
@@ -51,11 +51,11 @@ impl FromToBytes for Mtc {
         })
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.to_bytes(buf)?;
-        self.sound.to_bytes(buf)?;
-        self.ucid.to_bytes(buf)?;
-        self.plid.to_bytes(buf)?;
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
+        self.sound.write_buf(buf)?;
+        self.ucid.write_buf(buf)?;
+        self.plid.write_buf(buf)?;
         buf.put_bytes(0, 2);
         self.text
             .to_codepage_bytes_aligned(buf, MAX_MTC_TEXT_LEN, 4)?;

@@ -3,7 +3,7 @@ use binrw::binrw;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-use crate::FromToBytes;
+use crate::ReadWriteBuf;
 
 #[binrw]
 #[brw(repr(u8))]
@@ -21,9 +21,9 @@ pub enum Wind {
     Strong = 2,
 }
 
-impl FromToBytes for Wind {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
-        match u8::from_bytes(buf)? {
+impl ReadWriteBuf for Wind {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
+        match u8::read_buf(buf)? {
             0 => Ok(Wind::None),
             1 => Ok(Self::Weak),
             2 => Ok(Self::Strong),
@@ -33,7 +33,7 @@ impl FromToBytes for Wind {
         }
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
-        (*self as u8).to_bytes(buf)
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
+        (*self as u8).write_buf(buf)
     }
 }

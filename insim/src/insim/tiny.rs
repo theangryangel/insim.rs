@@ -3,7 +3,7 @@ use insim_core::binrw::{self, binrw};
 use crate::{identifiers::RequestId, Packet, WithRequestId};
 
 #[binrw]
-#[derive(Debug, Default, Clone, Eq, PartialEq, insim_macros::FromToBytes)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
@@ -121,7 +121,7 @@ impl WithRequestId for TinyType {
 }
 
 #[binrw]
-#[derive(Debug, Clone, Default, insim_macros::FromToBytes)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// General purpose Tiny packet
 pub struct Tiny {
@@ -144,7 +144,7 @@ impl_typical_with_request_id!(Tiny);
 #[cfg(test)]
 mod tests {
     use bytes::{BufMut, BytesMut};
-    use insim_core::FromToBytes;
+    use insim_core::ReadWriteBuf;
 
     use super::*;
 
@@ -153,7 +153,7 @@ mod tests {
         let mut buf = BytesMut::new();
         buf.put_u8(27);
 
-        let ty = TinyType::from_bytes(&mut buf.freeze()).unwrap();
+        let ty = TinyType::read_buf(&mut buf.freeze()).unwrap();
         assert!(matches!(ty, TinyType::Mal));
     }
 

@@ -3,7 +3,7 @@ use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
     track::Track,
-    FromToBytes,
+    ReadWriteBuf,
 };
 
 use crate::identifiers::RequestId;
@@ -41,14 +41,14 @@ generate_bitflag_helpers!(HostInfoFlags,
     pub is_last => LAST
 );
 
-impl FromToBytes for HostInfoFlags {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let bits = u8::from_bytes(buf)?;
+impl ReadWriteBuf for HostInfoFlags {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let bits = u8::read_buf(buf)?;
         Ok(Self::from_bits_truncate(bits))
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.bits().to_bytes(buf)
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.bits().write_buf(buf)
     }
 }
 
@@ -72,12 +72,12 @@ pub struct HostInfo {
     pub numconns: u8,
 }
 
-impl FromToBytes for HostInfo {
-    fn from_bytes(_buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+impl ReadWriteBuf for HostInfo {
+    fn read_buf(_buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
         todo!()
     }
 
-    fn to_bytes(&self, _buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn write_buf(&self, _buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         todo!()
     }
 }
@@ -107,24 +107,24 @@ impl Hos {
     }
 }
 
-impl FromToBytes for Hos {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::from_bytes(buf)?;
-        let num = u8::from_bytes(buf)?;
+impl ReadWriteBuf for Hos {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
+        let num = u8::read_buf(buf)?;
         let mut hinfo = Vec::with_capacity(num as usize);
         for _i in 1..=num {
-            hinfo.push(HostInfo::from_bytes(buf)?);
+            hinfo.push(HostInfo::read_buf(buf)?);
         }
 
         Ok(Self { reqi, hinfo })
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.to_bytes(buf)?;
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
         let num = self.hinfo.len() as u8;
-        num.to_bytes(buf)?;
+        num.write_buf(buf)?;
         for i in self.hinfo.iter() {
-            i.to_bytes(buf)?;
+            i.write_buf(buf)?;
         }
         Ok(())
     }

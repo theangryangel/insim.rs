@@ -6,7 +6,7 @@ use std::{
 use insim_core::{
     binrw::{self, binrw, BinRead, BinResult, BinWrite, Endian},
     duration::{binrw_parse_duration, binrw_write_duration},
-    FromToBytes,
+    ReadWriteBuf,
 };
 
 use super::{PenaltyInfo, PlayerFlags};
@@ -112,9 +112,9 @@ impl BinRead for Fuel {
     }
 }
 
-impl FromToBytes for Fuel {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let data = u8::from_bytes(buf)?;
+impl ReadWriteBuf for Fuel {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let data = u8::read_buf(buf)?;
         if data == 255 {
             Ok(Self::No)
         } else {
@@ -122,12 +122,12 @@ impl FromToBytes for Fuel {
         }
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         let data = match self {
             Self::Percentage(data) => *data,
             Self::No => 255_u8,
         };
-        data.to_bytes(buf)?;
+        data.write_buf(buf)?;
         Ok(())
     }
 }

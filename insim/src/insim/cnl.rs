@@ -1,7 +1,7 @@
 use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw},
-    Error, FromToBytes,
+    Error, ReadWriteBuf,
 };
 
 use crate::identifiers::{ConnectionId, RequestId};
@@ -46,9 +46,9 @@ pub enum CnlReason {
     Hack = 9,
 }
 
-impl FromToBytes for CnlReason {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let val = match u8::from_bytes(buf)? {
+impl ReadWriteBuf for CnlReason {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let val = match u8::read_buf(buf)? {
             0 => Self::Disco,
             1 => Self::Timeout,
             2 => Self::LostConn,
@@ -68,7 +68,7 @@ impl FromToBytes for CnlReason {
         Ok(val)
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         let discrim: u8 = match self {
             Self::Disco => 0,
             Self::Timeout => 1,
@@ -81,7 +81,7 @@ impl FromToBytes for CnlReason {
             Self::Joos => 8,
             Self::Hack => 9,
         };
-        discrim.to_bytes(buf)?;
+        discrim.write_buf(buf)?;
         Ok(())
     }
 }
@@ -105,12 +105,12 @@ pub struct Cnl {
     pub total: u8,
 }
 
-impl FromToBytes for Cnl {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, Error> {
-        let reqi = RequestId::from_bytes(buf)?;
-        let ucid = ConnectionId::from_bytes(buf)?;
-        let reason = CnlReason::from_bytes(buf)?;
-        let total = u8::from_bytes(buf)?;
+impl ReadWriteBuf for Cnl {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, Error> {
+        let reqi = RequestId::read_buf(buf)?;
+        let ucid = ConnectionId::read_buf(buf)?;
+        let reason = CnlReason::read_buf(buf)?;
+        let total = u8::read_buf(buf)?;
         buf.advance(2);
         Ok(Self {
             reqi,
@@ -120,11 +120,11 @@ impl FromToBytes for Cnl {
         })
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), Error> {
-        self.reqi.to_bytes(buf)?;
-        self.ucid.to_bytes(buf)?;
-        self.reason.to_bytes(buf)?;
-        self.total.to_bytes(buf)?;
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), Error> {
+        self.reqi.write_buf(buf)?;
+        self.ucid.write_buf(buf)?;
+        self.reason.write_buf(buf)?;
+        self.total.write_buf(buf)?;
         buf.put_bytes(0, 2);
         Ok(())
     }

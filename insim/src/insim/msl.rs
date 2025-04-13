@@ -1,7 +1,7 @@
 use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-    FromToBytes,
+    ReadWriteBuf,
 };
 
 use crate::identifiers::RequestId;
@@ -31,9 +31,9 @@ pub enum SoundType {
     Error = 4,
 }
 
-impl FromToBytes for SoundType {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let discrim = u8::from_bytes(buf)?;
+impl ReadWriteBuf for SoundType {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let discrim = u8::read_buf(buf)?;
         let val = match discrim {
             0 => Self::Silent,
             1 => Self::Message,
@@ -50,7 +50,7 @@ impl FromToBytes for SoundType {
         Ok(val)
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         let val: u8 = match self {
             Self::Silent => 0,
             Self::Message => 1,
@@ -58,7 +58,7 @@ impl FromToBytes for SoundType {
             Self::InvalidKey => 3,
             Self::Error => 4,
         };
-        val.to_bytes(buf)
+        val.write_buf(buf)
     }
 }
 

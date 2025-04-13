@@ -6,7 +6,7 @@ use insim_core::{
     binrw::{self, binrw},
     duration::{binrw_parse_duration, binrw_write_duration},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-    FromToAsciiBytes, FromToBytes, FromToCodepageBytes,
+    FromToAsciiBytes, ReadWriteBuf, FromToCodepageBytes,
 };
 
 use crate::{identifiers::RequestId, WithRequestId, VERSION};
@@ -118,15 +118,15 @@ impl Isi {
     pub const DEFAULT_INAME: &'static str = "insim.rs";
 }
 
-impl FromToBytes for Isi {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::from_bytes(buf)?;
+impl ReadWriteBuf for Isi {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
         buf.advance(1);
-        let udpport = u16::from_bytes(buf)?;
-        let flags = IsiFlags::from_bits_truncate(u16::from_bytes(buf)?);
-        let version = u8::from_bytes(buf)?;
-        let prefix = char::from_bytes(buf)?;
-        let interval = Duration::from_millis(u16::from_bytes(buf)? as u64);
+        let udpport = u16::read_buf(buf)?;
+        let flags = IsiFlags::from_bits_truncate(u16::read_buf(buf)?);
+        let version = u8::read_buf(buf)?;
+        let prefix = char::read_buf(buf)?;
+        let interval = Duration::from_millis(u16::read_buf(buf)? as u64);
         let admin = String::from_ascii_bytes(buf, 16)?;
         let iname = String::from_codepage_bytes(buf, 16)?;
 
@@ -142,16 +142,16 @@ impl FromToBytes for Isi {
         })
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.to_bytes(buf)?;
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
         buf.put_bytes(0, 1);
-        self.udpport.to_bytes(buf)?;
-        self.flags.bits().to_bytes(buf)?;
-        self.version.to_bytes(buf)?;
-        self.prefix.to_bytes(buf)?;
+        self.udpport.write_buf(buf)?;
+        self.flags.bits().write_buf(buf)?;
+        self.version.write_buf(buf)?;
+        self.prefix.write_buf(buf)?;
         let interval =
             u16::try_from(self.interval.as_millis()).map_err(insim_core::Error::TryFromInt)?;
-        interval.to_bytes(buf)?;
+        interval.write_buf(buf)?;
 
         self.admin.to_ascii_bytes(buf, 16)?;
         self.iname.to_codepage_bytes(buf, 16)?;
@@ -195,7 +195,7 @@ mod tests {
     use std::{io::Cursor, time::Duration};
 
     use bytes::BytesMut;
-    use insim_core::{binrw::BinWrite, FromToBytes};
+    use insim_core::{binrw::BinWrite, ReadWriteBuf};
 
     use super::Isi;
     use crate::{identifiers::RequestId, VERSION};
@@ -245,7 +245,7 @@ mod tests {
         data.interval = Duration::from_secs(1);
 
         let mut buf = BytesMut::new();
-        let res = data.to_bytes(&mut buf);
+        let res = data.write_buf(&mut buf);
         assert!(res.is_ok());
 
         assert_eq!(buf.len(), 42); // less magic, less size
@@ -263,7 +263,7 @@ mod tests {
 
         assert_eq!(&buf[26..42], &iname,);
 
-        let data2 = Isi::from_bytes(&mut buf.freeze()).unwrap();
+        let data2 = Isi::read_buf(&mut buf.freeze()).unwrap();
         assert_eq!(data, data2);
     }
 }

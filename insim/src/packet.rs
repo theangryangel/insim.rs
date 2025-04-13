@@ -4,7 +4,7 @@ use std::fmt::Debug;
 
 use insim_core::{
     binrw::{self, binrw},
-    FromToBytes,
+    ReadWriteBuf,
 };
 
 use crate::{identifiers::RequestId, insim::*, relay::*};
@@ -534,11 +534,11 @@ impl WithRequestId for Packet {
     }
 }
 
-impl FromToBytes for Packet {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let discrimator = u8::from_bytes(buf)?;
+impl ReadWriteBuf for Packet {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let discrimator = u8::read_buf(buf)?;
         let packet = match discrimator {
-            1 => Self::Isi(Isi::from_bytes(buf)?),
+            1 => Self::Isi(Isi::read_buf(buf)?),
             // 2 => Self::Ver(Ver::from_bytes(buf)?),
             // 3 => Self::Tiny(Tiny::from_bytes(buf)?),
             // 4 => Self::Small(Small::from_bytes(buf)?),
@@ -620,7 +620,7 @@ impl FromToBytes for Packet {
         Ok(packet)
     }
 
-    fn to_bytes(&self, _buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn write_buf(&self, _buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         todo!()
     }
 }

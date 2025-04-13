@@ -11,7 +11,6 @@ use syn::{parse_macro_input, DeriveInput, Ident, Type};
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(
-    attributes(hello),
     supports(struct_named, enum_any),
     forward_attrs(repr)
 )]
@@ -38,13 +37,13 @@ impl Receiver {
 
     fn parse_enum(&self, variants: &[Variant]) -> TokenStream {
         let name = &self.ident;
-        let repr_ty = &self.repr_type().expect("FromToBytes requires a repr type");
+        let repr_ty = &self.repr_type().expect("ReadWriteBuf requires a repr type");
         let from_variants = variants.iter().filter_map(|f| {
             let variant_name = f.ident.clone();
             let discrim = f
                 .discriminant
                 .clone()
-                .expect("FromToBytes only works with discriminants");
+                .expect("ReadWriteBuf only works with discriminants");
             let skip = f.skip.unwrap_or(false);
             if skip {
                 return None;
@@ -60,7 +59,7 @@ impl Receiver {
             let discrim = f
                 .discriminant
                 .as_ref()
-                .expect("FromToBytes only works with discriminants");
+                .expect("ReadWriteBuf only works with discriminants");
             let skip = f.skip.unwrap_or(false);
             if skip {
                 return None;
@@ -72,10 +71,10 @@ impl Receiver {
         });
 
         TokenStream::from(quote! {
-            impl ::insim_core::FromToBytes for #name {
+            impl ::insim_core::ReadWriteBuf for #name {
                 /// Read
-                fn from_bytes(buf: &mut ::bytes::Bytes) -> Result<Self, ::insim_core::Error> {
-                    let val: Self = match #repr_ty::from_bytes(buf)? {
+                fn read_buf(buf: &mut ::bytes::Bytes) -> Result<Self, ::insim_core::Error> {
+                    let val: Self = match #repr_ty::read_buf(buf)? {
                         #(#from_variants)*
                         found => return Err(::insim_core::Error::NoVariantMatch { found: found as u64 })
                     };
@@ -83,11 +82,11 @@ impl Receiver {
                 }
 
                 /// Write
-                fn to_bytes(&self, buf: &mut ::bytes::BytesMut) -> Result<(), ::insim_core::Error> {
+                fn write_buf(&self, buf: &mut ::bytes::BytesMut) -> Result<(), ::insim_core::Error> {
                     let val: #repr_ty = match self {
                         #(#to_variants)*
                     };
-                    val.to_bytes(buf)?;
+                    val.write_buf(buf)?;
                     Ok(())
                 }
             }
@@ -116,7 +115,7 @@ impl Receiver {
 
             tokens = quote! {
                 #tokens
-                self.#field_name.to_bytes(buf)?;
+                self.#field_name.write_buf(buf)?;
             };
 
             if pad_after > 0 {
@@ -149,7 +148,7 @@ impl Receiver {
 
             tokens = quote! {
                 #tokens
-                let #field_name = #field_type::from_bytes(buf)?;
+                let #field_name = #field_type::read_buf(buf)?;
             };
 
             if pad_after > 0 {
@@ -175,9 +174,9 @@ impl Receiver {
         });
 
         let expanded = quote! {
-            impl ::insim_core::FromToBytes for #name {
+            impl ::insim_core::ReadWriteBuf for #name {
                 /// Read
-                fn from_bytes(buf: &mut ::bytes::Bytes) -> Result<Self, ::insim_core::Error> {
+                fn read_buf(buf: &mut ::bytes::Bytes) -> Result<Self, ::insim_core::Error> {
                     #(#from_bytes_fields)*
                     Ok(Self {
                         #(#from_bytes_fields_init),*
@@ -185,7 +184,7 @@ impl Receiver {
                 }
 
                 /// Write
-                fn to_bytes(&self, buf: &mut ::bytes::BytesMut) -> Result<(), ::insim_core::Error> {
+                fn write_buf(&self, buf: &mut ::bytes::BytesMut) -> Result<(), ::insim_core::Error> {
                     #(#to_bytes_fields)*
                     Ok(())
                 }
@@ -204,7 +203,7 @@ impl Receiver {
 }
 
 #[derive(Debug, FromVariant)]
-#[darling(attributes(fromtobytes))]
+#[darling(attributes(read_write_buf))]
 struct Variant {
     pub ident: Ident,
     pub discriminant: Option<syn::Expr>,
@@ -212,7 +211,7 @@ struct Variant {
 }
 
 #[derive(Debug, FromField)]
-#[darling(attributes(fromtobytes))]
+#[darling(attributes(read_write_buf))]
 struct Field {
     pub ident: Option<Ident>,
     pub pad_before: Option<usize>,
@@ -221,10 +220,10 @@ struct Field {
     pub ty: Type,
 }
 
-#[proc_macro_derive(FromToBytes, attributes(fromtobytes))]
-/// Derive a basic FromToBytes implementation for either:
+#[proc_macro_derive(ReadWriteBuf, attributes(read_write_buf))]
+/// Derive a basic ReadWriteBuf implementation for either:
 /// 1. Structs
-///    Assumes all fields also implement FromToBytes
+///    Assumes all fields also implement ReadWriteBuf
 ///    Fields may have padding before or after using #[fromtobytes(pad_after=2)]
 ///    Fields may be skipped by supplying #[fromtobytes(skip)]
 /// 2. Enums which are repr(typ) and have a supplied discriminant

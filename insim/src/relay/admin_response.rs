@@ -1,6 +1,6 @@
 use insim_core::{
     binrw::{self, binrw},
-    FromToBytes,
+    ReadWriteBuf,
 };
 
 use crate::identifiers::RequestId;
@@ -21,17 +21,17 @@ pub struct Arp {
     pub admin: bool,
 }
 
-impl FromToBytes for Arp {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::from_bytes(buf)?;
-        let admin = u8::from_bytes(buf)? != 0;
+impl ReadWriteBuf for Arp {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
+        let admin = u8::read_buf(buf)? != 0;
 
         Ok(Self { reqi, admin })
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.to_bytes(buf)?;
-        (self.admin as u8).to_bytes(buf)?;
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
+        (self.admin as u8).write_buf(buf)?;
         Ok(())
     }
 }

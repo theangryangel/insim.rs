@@ -3,7 +3,7 @@ use insim_core::binrw::{self, binrw};
 use crate::identifiers::{PlayerId, RequestId};
 
 #[binrw]
-#[derive(Debug, Clone, Default, insim_macros::FromToBytes)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Player Tele-pits (shift+P in game)
 pub struct Plp {

@@ -3,7 +3,7 @@
 
 use binrw::{BinRead, BinWrite};
 
-use crate::{license::License, FromToBytes};
+use crate::{license::License, ReadWriteBuf};
 
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -1305,8 +1305,8 @@ impl BinWrite for Track {
     }
 }
 
-impl FromToBytes for Track {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
+impl ReadWriteBuf for Track {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
         let raw = buf.split_to(6);
         match raw.as_ref() {
             [b'B', b'L', b'1', 0, 0, 0] => Ok(Self::Bl1),
@@ -1469,7 +1469,7 @@ impl FromToBytes for Track {
         }
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
         let slice = match self {
             Self::Bl1 => [b'B', b'L', b'1', 0, 0, 0],
             Self::Bl1r => [b'B', b'L', b'1', b'R', 0, 0],

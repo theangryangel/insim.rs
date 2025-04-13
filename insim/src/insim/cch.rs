@@ -1,6 +1,6 @@
 use insim_core::{
     binrw::{self, binrw},
-    FromToBytes,
+    ReadWriteBuf,
 };
 
 use crate::identifiers::{PlayerId, RequestId};
@@ -34,9 +34,9 @@ pub enum CameraView {
     Another = 255,
 }
 
-impl FromToBytes for CameraView {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let discrim = u8::from_bytes(buf)?;
+impl ReadWriteBuf for CameraView {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let discrim = u8::read_buf(buf)?;
         let res = match discrim {
             0 => Self::Follow,
             1 => Self::Heli,
@@ -54,7 +54,7 @@ impl FromToBytes for CameraView {
         Ok(res)
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         let discrim: u8 = match self {
             CameraView::Follow => 0,
             CameraView::Heli => 1,
@@ -64,7 +64,7 @@ impl FromToBytes for CameraView {
             CameraView::Another => 255,
         };
 
-        discrim.to_bytes(buf)?;
+        discrim.write_buf(buf)?;
         Ok(())
     }
 }

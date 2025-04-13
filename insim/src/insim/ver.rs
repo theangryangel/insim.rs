@@ -5,7 +5,7 @@ use insim_core::{
     binrw::{self, binrw, BinRead, BinWrite},
     game_version::GameVersion,
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-    FromToBytes, FromToCodepageBytes,
+    ReadWriteBuf, FromToCodepageBytes,
 };
 
 use crate::identifiers::RequestId;
@@ -74,11 +74,11 @@ pub struct Ver {
     pub insimver: u8,
 }
 
-impl FromToBytes for Ver {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::from_bytes(buf)?;
+impl ReadWriteBuf for Ver {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
         buf.advance(1);
-        let version = GameVersion::from_bytes(buf)?;
+        let version = GameVersion::read_buf(buf)?;
         let product = String::from_codepage_bytes(buf, 6)?;
 
         let insimver = buf.get_u8();
@@ -93,13 +93,13 @@ impl FromToBytes for Ver {
         })
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.to_bytes(buf)?;
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
         buf.put_u8(0);
-        self.version.to_bytes(buf)?;
+        self.version.write_buf(buf)?;
         self.product.to_codepage_bytes(buf, 6)?;
 
-        self.insimver.to_bytes(buf)?;
+        self.insimver.write_buf(buf)?;
         buf.put_u8(0);
 
         Ok(())

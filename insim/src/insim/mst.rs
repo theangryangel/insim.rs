@@ -2,7 +2,7 @@ use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-    FromToBytes, FromToCodepageBytes,
+    ReadWriteBuf, FromToCodepageBytes,
 };
 
 use crate::identifiers::RequestId;
@@ -22,16 +22,16 @@ pub struct Mst {
     pub msg: String,
 }
 
-impl FromToBytes for Mst {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::from_bytes(buf)?;
+impl ReadWriteBuf for Mst {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
         buf.advance(1);
         let msg = String::from_codepage_bytes(buf, 64)?;
         Ok(Self { reqi, msg })
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.to_bytes(buf)?;
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
         buf.put_bytes(0, 1);
         self.msg.to_codepage_bytes(buf, 64)?;
         Ok(())

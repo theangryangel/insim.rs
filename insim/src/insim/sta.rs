@@ -4,7 +4,7 @@ use insim_core::{
     binrw::{self, binrw},
     track::Track,
     wind::Wind,
-    FromToBytes,
+    ReadWriteBuf,
 };
 
 use super::{CameraView, RaceLaps};
@@ -29,8 +29,8 @@ pub enum RaceInProgress {
     Qualifying = 2,
 }
 
-impl FromToBytes for RaceInProgress {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+impl ReadWriteBuf for RaceInProgress {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
         let discrim = buf.get_u8();
         let res = match discrim {
             0 => Self::No,
@@ -46,7 +46,7 @@ impl FromToBytes for RaceInProgress {
         Ok(res)
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         let discrim = match self {
             Self::No => 0,
             Self::Racing => 1,
@@ -193,26 +193,26 @@ impl Sta {
     }
 }
 
-impl FromToBytes for Sta {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::from_bytes(buf)?;
+impl ReadWriteBuf for Sta {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
         buf.advance(1);
-        let replayspeed = f32::from_bytes(buf)?;
-        let flags = u16::from_bytes(buf)?;
+        let replayspeed = f32::read_buf(buf)?;
+        let flags = u16::read_buf(buf)?;
         let flags = StaFlags::from_bits_truncate(flags);
-        let ingamecam = CameraView::from_bytes(buf)?;
-        let viewplid = PlayerId::from_bytes(buf)?;
-        let nump = u8::from_bytes(buf)?;
-        let numconns = u8::from_bytes(buf)?;
-        let numfinished = u8::from_bytes(buf)?;
-        let raceinprog = RaceInProgress::from_bytes(buf)?;
-        let qualmins = u8::from_bytes(buf)?;
-        let racelaps = RaceLaps::from_bytes(buf)?;
+        let ingamecam = CameraView::read_buf(buf)?;
+        let viewplid = PlayerId::read_buf(buf)?;
+        let nump = u8::read_buf(buf)?;
+        let numconns = u8::read_buf(buf)?;
+        let numfinished = u8::read_buf(buf)?;
+        let raceinprog = RaceInProgress::read_buf(buf)?;
+        let qualmins = u8::read_buf(buf)?;
+        let racelaps = RaceLaps::read_buf(buf)?;
         buf.advance(1);
-        let serverstatus = u8::from_bytes(buf)?;
-        let track = Track::from_bytes(buf)?;
-        let weather = u8::from_bytes(buf)?;
-        let wind = Wind::from_bytes(buf)?;
+        let serverstatus = u8::read_buf(buf)?;
+        let track = Track::read_buf(buf)?;
+        let weather = u8::read_buf(buf)?;
+        let wind = Wind::read_buf(buf)?;
 
         Ok(Self {
             reqi,
@@ -233,25 +233,25 @@ impl FromToBytes for Sta {
         })
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.to_bytes(buf)?;
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
         buf.put_u8(0);
-        self.replayspeed.to_bytes(buf)?;
+        self.replayspeed.write_buf(buf)?;
         let flags = self.flags.bits();
-        flags.to_bytes(buf)?;
-        self.ingamecam.to_bytes(buf)?;
-        self.viewplid.to_bytes(buf)?;
-        self.nump.to_bytes(buf)?;
-        self.numconns.to_bytes(buf)?;
-        self.numfinished.to_bytes(buf)?;
-        self.raceinprog.to_bytes(buf)?;
-        self.qualmins.to_bytes(buf)?;
-        self.racelaps.to_bytes(buf)?;
+        flags.write_buf(buf)?;
+        self.ingamecam.write_buf(buf)?;
+        self.viewplid.write_buf(buf)?;
+        self.nump.write_buf(buf)?;
+        self.numconns.write_buf(buf)?;
+        self.numfinished.write_buf(buf)?;
+        self.raceinprog.write_buf(buf)?;
+        self.qualmins.write_buf(buf)?;
+        self.racelaps.write_buf(buf)?;
         buf.put_u8(0);
-        self.serverstatus.to_bytes(buf)?;
-        self.track.to_bytes(buf)?;
-        self.weather.to_bytes(buf)?;
-        self.wind.to_bytes(buf)?;
+        self.serverstatus.write_buf(buf)?;
+        self.track.write_buf(buf)?;
+        self.weather.write_buf(buf)?;
+        self.wind.write_buf(buf)?;
 
         Ok(())
     }

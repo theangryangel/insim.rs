@@ -2,7 +2,7 @@ use std::convert::From;
 
 use insim_core::{
     binrw::{self, BinRead, BinWrite},
-    FromToBytes,
+    ReadWriteBuf,
 };
 
 /// Handles the rules around how RaceLaps are described within Insim automatically for you.
@@ -78,15 +78,15 @@ impl From<RaceLaps> for u8 {
     }
 }
 
-impl FromToBytes for RaceLaps {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let val = u8::from_bytes(buf)?;
+impl ReadWriteBuf for RaceLaps {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let val = u8::read_buf(buf)?;
         Ok(val.into())
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         let val = u8::from(*self);
-        val.to_bytes(buf)?;
+        val.write_buf(buf)?;
         Ok(())
     }
 }

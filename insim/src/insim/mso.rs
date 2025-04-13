@@ -4,7 +4,7 @@ use bytes::{Buf, BufMut, BytesMut};
 use insim_core::{
     binrw::{self, binrw},
     string::{codepages, strip_trailing_nul},
-    FromToBytes, FromToCodepageBytes,
+    ReadWriteBuf, FromToCodepageBytes,
 };
 
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
@@ -31,9 +31,9 @@ pub enum MsoUserType {
     O = 3,
 }
 
-impl FromToBytes for MsoUserType {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let discrim = u8::from_bytes(buf)?;
+impl ReadWriteBuf for MsoUserType {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let discrim = u8::read_buf(buf)?;
         match discrim {
             0 => Ok(Self::System),
             1 => Ok(Self::User),
@@ -45,14 +45,14 @@ impl FromToBytes for MsoUserType {
         }
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         let discrim: u8 = match self {
             Self::System => 0,
             Self::User => 1,
             Self::Prefix => 2,
             Self::O => 3,
         };
-        discrim.to_bytes(buf)?;
+        discrim.write_buf(buf)?;
         Ok(())
     }
 }
@@ -200,14 +200,14 @@ impl binrw::BinWrite for Mso {
     }
 }
 
-impl FromToBytes for Mso {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::from_bytes(buf)?;
+impl ReadWriteBuf for Mso {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
         buf.advance(1);
-        let ucid = ConnectionId::from_bytes(buf)?;
-        let plid = PlayerId::from_bytes(buf)?;
-        let usertype = MsoUserType::from_bytes(buf)?;
-        let textstart = u8::from_bytes(buf)?;
+        let ucid = ConnectionId::read_buf(buf)?;
+        let plid = PlayerId::read_buf(buf)?;
+        let usertype = MsoUserType::read_buf(buf)?;
+        let textstart = u8::read_buf(buf)?;
 
         let (textstart, msg) = if textstart > 0 {
             let mut name = buf.split_to(textstart as usize);
@@ -229,12 +229,12 @@ impl FromToBytes for Mso {
         })
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.to_bytes(buf)?;
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
         buf.put_bytes(0, 1);
-        self.ucid.to_bytes(buf)?;
-        self.plid.to_bytes(buf)?;
-        self.usertype.to_bytes(buf)?;
+        self.ucid.write_buf(buf)?;
+        self.plid.write_buf(buf)?;
+        self.usertype.write_buf(buf)?;
 
         if self.textstart > 0 {
             let name = &self.msg[..self.textstart as usize];
@@ -326,7 +326,7 @@ mod tests {
         assert_eq!(res.textstart, 0);
         assert_eq!(res.msg, "Downloaded Skin : XFG_PRO38");
 
-        let res = Mso::from_bytes(&mut Bytes::from(raw.clone())).unwrap();
+        let res = Mso::read_buf(&mut Bytes::from(raw.clone())).unwrap();
         assert_eq!(res.textstart, 0);
         assert_eq!(res.msg, "Downloaded Skin : XFG_PRO38");
     }
@@ -354,12 +354,12 @@ mod tests {
         res.write_le(&mut buf).unwrap();
         assert_eq!(buf.into_inner().len(), MSO_MSG_MAX_LEN + 6);
 
-        let res = Mso::from_bytes(&mut Bytes::from(raw.clone())).unwrap();
+        let res = Mso::read_buf(&mut Bytes::from(raw.clone())).unwrap();
         assert_eq!(res.textstart, 0);
         assert_eq!(res.msg.len(), MSO_MSG_MAX_LEN + 10);
 
         let mut buf = BytesMut::new();
-        res.to_bytes(&mut buf).unwrap();
+        res.write_buf(&mut buf).unwrap();
         assert_eq!(buf.len(), MSO_MSG_MAX_LEN + 6);
     }
 

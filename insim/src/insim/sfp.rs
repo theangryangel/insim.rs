@@ -1,7 +1,7 @@
 use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw},
-    FromToBytes,
+    ReadWriteBuf,
 };
 
 use super::StaFlags;
@@ -26,21 +26,21 @@ pub struct Sfp {
     pub onoff: bool,
 }
 
-impl FromToBytes for Sfp {
-    fn from_bytes(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::from_bytes(buf)?;
+impl ReadWriteBuf for Sfp {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
         buf.advance(1);
-        let flag = StaFlags::from_bytes(buf)?;
-        let onoff = u8::from_bytes(buf)? > 0;
+        let flag = StaFlags::read_buf(buf)?;
+        let onoff = u8::read_buf(buf)? > 0;
         buf.advance(1);
         Ok(Self { reqi, flag, onoff })
     }
 
-    fn to_bytes(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.to_bytes(buf)?;
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
         buf.put_u8(0);
-        self.flag.to_bytes(buf)?;
-        (self.onoff as u8).to_bytes(buf)?;
+        self.flag.write_buf(buf)?;
+        (self.onoff as u8).write_buf(buf)?;
         buf.put_u8(0);
         Ok(())
     }

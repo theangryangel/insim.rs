@@ -6,7 +6,7 @@ use std::{
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use insim_core::{
     binrw::{self as binrw, binrw},
-    FromToBytes,
+    ReadWriteBuf,
 };
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -43,12 +43,12 @@ impl From<u8> for RequestId {
     }
 }
 
-impl FromToBytes for RequestId {
-    fn from_bytes(buf: &mut Bytes) -> Result<Self, insim_core::Error> {
+impl ReadWriteBuf for RequestId {
+    fn read_buf(buf: &mut Bytes) -> Result<Self, insim_core::Error> {
         Ok(RequestId(buf.get_u8()))
     }
 
-    fn to_bytes(&self, buf: &mut BytesMut) -> Result<(), insim_core::Error> {
+    fn write_buf(&self, buf: &mut BytesMut) -> Result<(), insim_core::Error> {
         buf.put_u8(self.0);
 
         Ok(())
