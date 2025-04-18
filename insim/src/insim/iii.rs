@@ -1,7 +1,6 @@
 use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string_until_eof, binrw_write_codepage_string},
-    FromToCodepageBytes,
 };
 
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
@@ -27,10 +26,7 @@ pub struct Iii {
     /// The message
     #[bw(write_with = binrw_write_codepage_string::<64, _>, args(false, 4))]
     #[br(parse_with = binrw_parse_codepage_string_until_eof)]
-    #[read_write_buf(
-        read_with = "|buf| { String::from_codepage_bytes(buf, 64) }",
-        write_with = "|msg: &str, buf| { msg.to_codepage_bytes_aligned(buf, 64, 4) }"
-    )]
+    #[read_write_buf(codepage(length = 64, align_to = 4))]
     pub msg: String,
 }
 

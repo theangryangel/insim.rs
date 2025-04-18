@@ -6,7 +6,7 @@ use darling::{
     FromDeriveInput, FromField, FromVariant,
 };
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::{parse_macro_input, DeriveInput, Ident, Type};
 
 #[derive(Debug, FromDeriveInput)]
@@ -100,6 +100,7 @@ impl Receiver {
             let pad_after = f.pad_after.unwrap_or(0);
             let pad_before = f.pad_before.unwrap_or(0);
             let skip = f.skip.unwrap_or(false);
+            let field_type = f.ty.clone();
             if skip {
                 return None;
             }
@@ -112,10 +113,40 @@ impl Receiver {
                 }
             }
 
-            if let Some(write_with) = f.write_with.clone() {
+            if field_type.to_token_stream().to_string() == "String" {
+                let string_tokens = if let Some(codepage_args) = f.codepage.as_ref() {
+                    match codepage_args {
+                        CodepageArgs { length, align_to: None } => {
+                            quote! {
+                                <#field_type as ::insim_core::FromToCodepageBytes>::to_codepage_bytes(
+                                    &self.#field_name, buf, #length
+                                )?;
+                            }
+                        },
+                        CodepageArgs { length, align_to } => {
+                            quote! {
+                                <#field_type as ::insim_core::FromToCodepageBytes>::to_codepage_bytes_aligned(
+                                    &self.#field_name, buf, #length, #align_to
+                                )?;
+                            }
+                        },
+                    }
+                }
+                else if let Some(AsciiArgs { length }) = f.ascii.as_ref() {
+                    quote! {
+                        <#field_type as ::insim_core::FromToAsciiBytes>::to_ascii_bytes(
+                            &self.#field_name, buf, #length
+                        )?;
+                    }
+                }
+                else {
+                    // FIXME: Better error handling
+                    panic!("String must have either codepage or ascii directives");
+                };
+
                 tokens = quote! {
                     #tokens
-                    (#write_with)(&self.#field_name, buf)?;
+                    #string_tokens;
                 };
             } else {
                 tokens = quote! {
@@ -152,10 +183,25 @@ impl Receiver {
                 }
             }
 
-            if let Some(read_with) = f.read_with.clone() {
+            if field_type.to_token_stream().to_string() == "String" {
+                let string_tokens = if let Some(CodepageArgs { length, .. }) = f.codepage.as_ref() {
+                    quote! { <#field_type as ::insim_core::FromToCodepageBytes>::from_codepage_bytes(
+                        buf, #length
+                    )?; }
+                }
+                else if let Some(AsciiArgs { length }) = f.ascii.as_ref() {
+                    quote! { <#field_type as ::insim_core::FromToAsciiBytes>::from_ascii_bytes(
+                        buf, #length
+                    )?; }
+                }
+                else {
+                    // FIXME: Better error handling
+                    panic!("String must have either codepage or ascii directives");
+                };
+
                 tokens = quote! {
                     #tokens
-                    let #field_name = (#read_with)(buf)?;
+                    let #field_name = #string_tokens;
                 };
             } else {
                 tokens = quote! {
@@ -223,16 +269,27 @@ struct Variant {
     pub skip: Option<bool>,
 }
 
+#[derive(Debug, darling::FromMeta, Clone)]
+struct AsciiArgs {
+    length: usize,
+}
+
+#[derive(Debug, darling::FromMeta, Clone)]
+struct CodepageArgs {
+    length: usize,
+    align_to: Option<usize>,
+}
+
 #[derive(Debug, FromField)]
 #[darling(attributes(read_write_buf))]
 struct Field {
     pub ident: Option<Ident>,
+    pub ty: Type,
     pub pad_before: Option<usize>,
     pub pad_after: Option<usize>,
     pub skip: Option<bool>,
-    pub read_with: Option<syn::Expr>,
-    pub write_with: Option<syn::Expr>,
-    pub ty: Type,
+    pub codepage: Option<CodepageArgs>,
+    pub ascii: Option<AsciiArgs>,
 }
 
 #[proc_macro_derive(ReadWriteBuf, attributes(read_write_buf))]
@@ -241,11 +298,7 @@ struct Field {
 ///    Assumes all fields also implement ReadWriteBuf
 ///    Fields may have padding before or after using #[read_write_buf(pad_after=2)]
 ///    Fields may be skipped by supplying #[read_write_buf(skip)]
-///    Field may be mapped using the read_with and write_with attributes. i.e.
-///    #[read_write_buf(
-///    read_with = "|buf| { String::from_codepage_bytes(buf, 64) }",
-///    write_with = "|msg: &String, buf| { msg.to_codepage_bytes_aligned(buf, 64, 4) }"
-///    )]
+///    Fields which are strings must have either acsii, or codepage directives provided.
 /// 2. Enums which are repr(typ) and have a supplied discriminant
 ///    Variants may be skipped using #[read_write_buf(skip)]
 pub fn derive_read_write_buf(input: TokenStream) -> TokenStream {

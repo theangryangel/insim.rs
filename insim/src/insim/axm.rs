@@ -4,7 +4,7 @@ use crate::identifiers::{ConnectionId, RequestId};
 
 /// Used within the [Axm] packet.
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ObjectInfo {
     /// X coordinate of object
@@ -26,7 +26,7 @@ pub struct ObjectInfo {
 
 /// Actions that can be taken as part of [Axm].
 #[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
@@ -92,6 +92,8 @@ bitflags::bitflags! {
         const AVOID_CHECK = (1 << 3);
     }
 }
+
+impl_bitflags_from_to_bytes!(PmoFlags, u16);
 
 /// AutoX Multiple Objects - Report on/add/remove multiple AutoX objects
 #[binrw]

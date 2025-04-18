@@ -1,7 +1,6 @@
 use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string_until_eof, binrw_write_codepage_string},
-    FromToCodepageBytes,
 };
 
 use crate::identifiers::{ConnectionId, RequestId};
@@ -51,10 +50,7 @@ pub struct Acr {
     /// Command
     #[bw(write_with = binrw_write_codepage_string::<64, _>, args(false, 4))]
     #[br(parse_with = binrw_parse_codepage_string_until_eof)]
-    #[read_write_buf(
-        read_with = "|buf| { String::from_codepage_bytes(buf, 64) }",
-        write_with = "|msg: &String, buf| { msg.to_codepage_bytes_aligned(buf, 64, 4) }"
-    )]
+    #[read_write_buf(codepage(length = 64, align_to = 4))]
     pub text: String,
 }
 
@@ -67,13 +63,11 @@ mod test {
         assert_from_to_bytes!(
             Acr,
             [
-                0,  // ReqI
-                0,  // Zero
-                2,  // UCID
-                1,  // Admin
-                1,  // Result
-                0,  // Sp3
-                47, // Text[64]
+                0, // reqi
+                0, 2, // ucid
+                1, // admin
+                1, // result
+                0, 47, // text[64]
                 108, 97, 112, 115, 32, 50, 0,
             ],
             |acr: Acr| {

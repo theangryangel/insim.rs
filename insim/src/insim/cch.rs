@@ -1,12 +1,9 @@
-use insim_core::{
-    binrw::{self, binrw},
-    ReadWriteBuf,
-};
+use insim_core::binrw::{self, binrw};
 
 use crate::identifiers::{PlayerId, RequestId};
 
 #[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
@@ -34,43 +31,8 @@ pub enum CameraView {
     Another = 255,
 }
 
-impl ReadWriteBuf for CameraView {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let discrim = u8::read_buf(buf)?;
-        let res = match discrim {
-            0 => Self::Follow,
-            1 => Self::Heli,
-            2 => Self::Cam,
-            3 => Self::Driver,
-            4 => Self::Custom,
-            255 => Self::Another,
-            found => {
-                return Err(insim_core::Error::NoVariantMatch {
-                    found: found as u64,
-                })
-            },
-        };
-
-        Ok(res)
-    }
-
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        let discrim: u8 = match self {
-            CameraView::Follow => 0,
-            CameraView::Heli => 1,
-            CameraView::Cam => 2,
-            CameraView::Driver => 3,
-            CameraView::Custom => 4,
-            CameraView::Another => 255,
-        };
-
-        discrim.write_buf(buf)?;
-        Ok(())
-    }
-}
-
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Camera Change - sent when an existing driver changes camera
 pub struct Cch {
@@ -80,6 +42,7 @@ pub struct Cch {
     pub plid: PlayerId,
 
     #[brw(pad_after = 3)]
+    #[read_write_buf(pad_after = 3)]
     /// View identifier
     pub camera: CameraView,
 }
@@ -87,6 +50,24 @@ pub struct Cch {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_cch() {
+        assert_from_to_bytes!(
+            Cch,
+            [
+                0, // reqi
+                3, // plid
+                4, // camera
+                0, 0, 0,
+            ],
+            |parsed: Cch| {
+                assert_eq!(parsed.reqi, RequestId(0));
+                assert_eq!(parsed.plid, PlayerId(3));
+                assert!(matches!(parsed.camera, CameraView::Custom));
+            }
+        );
+    }
 
     #[test]
     fn test_camera_view() {
