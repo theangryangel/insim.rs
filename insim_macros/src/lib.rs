@@ -6,8 +6,8 @@ use darling::{
     FromDeriveInput, FromField, FromVariant,
 };
 use proc_macro::TokenStream;
-use quote::{quote, ToTokens};
-use syn::{parse_macro_input, DeriveInput, Ident, Type};
+use quote::quote;
+use syn::{parse_macro_input, DeriveInput, Ident, Path, Type};
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(supports(struct_named, enum_any), forward_attrs(repr))]
@@ -113,42 +113,54 @@ impl Receiver {
                 }
             }
 
-            if field_type.to_token_stream().to_string() == "String" {
-                let string_tokens = if let Some(codepage_args) = f.codepage.as_ref() {
-                    match codepage_args {
-                        CodepageArgs { length, align_to: None } => {
-                            quote! {
-                                <#field_type as ::insim_core::FromToCodepageBytes>::to_codepage_bytes(
-                                    &self.#field_name, buf, #length
-                                )?;
-                            }
-                        },
-                        CodepageArgs { length, align_to } => {
-                            quote! {
-                                <#field_type as ::insim_core::FromToCodepageBytes>::to_codepage_bytes_aligned(
-                                    &self.#field_name, buf, #length, #align_to
-                                )?;
-                            }
-                        },
-                    }
-                }
-                else if let Some(AsciiArgs { length }) = f.ascii.as_ref() {
-                    quote! {
-                        <#field_type as ::insim_core::FromToAsciiBytes>::to_ascii_bytes(
-                            &self.#field_name, buf, #length
-                        )?;
-                    }
-                }
-                else {
-                    // FIXME: Better error handling
-                    panic!("String must have either codepage or ascii directives");
+            if let Some(codepage_args) = f.codepage.as_ref() {
+                let string_tokens = match codepage_args {
+                    CodepageArgs { length, align_to: None } => {
+                        quote! {
+                            <#field_type as ::insim_core::FromToCodepageBytes>::to_codepage_bytes(
+                                &self.#field_name, buf, #length
+                            )?;
+                        }
+                    },
+                    CodepageArgs { length, align_to } => {
+                        quote! {
+                            <#field_type as ::insim_core::FromToCodepageBytes>::to_codepage_bytes_aligned(
+                                &self.#field_name, buf, #length, #align_to
+                            )?;
+                        }
+                    },
                 };
 
                 tokens = quote! {
                     #tokens
-                    #string_tokens;
+                    #string_tokens
+                }
+            }
+            else if let Some(AsciiArgs { length }) = f.ascii.as_ref() {
+                let string_tokens = quote! {
+                    <#field_type as ::insim_core::FromToAsciiBytes>::to_ascii_bytes(
+                        &self.#field_name, buf, #length
+                    )?;
                 };
-            } else {
+
+                tokens = quote! {
+                    #tokens
+                    #string_tokens
+                }
+            }
+            else if let Some(duration_args) = f.duration.as_ref() {
+                let duration_repr = duration_args.ty().clone();
+                let scale = duration_args.scale();
+
+                tokens = quote! {
+                    #tokens
+                    match #duration_repr::try_from(self.#field_name.as_millis() / (#scale as u128)) {
+                        Ok(v) => v.write_buf(buf)?,
+                        Err(_) => return Err(::insim_core::Error::DurationTooLarge)
+                    };
+                };
+            }
+            else {
                 tokens = quote! {
                     #tokens
                     self.#field_name.write_buf(buf)?;
@@ -183,30 +195,57 @@ impl Receiver {
                 }
             }
 
-            if field_type.to_token_stream().to_string() == "String" {
-                let string_tokens = if let Some(CodepageArgs { length, .. }) = f.codepage.as_ref() {
-                    quote! { <#field_type as ::insim_core::FromToCodepageBytes>::from_codepage_bytes(
+            if let Some(CodepageArgs { length, .. }) = f.codepage.as_ref() {
+                tokens = quote! {
+                    #tokens
+                    let #field_name = <#field_type as ::insim_core::FromToCodepageBytes>::from_codepage_bytes(
                         buf, #length
-                    )?; }
+                    )?;
                 }
-                else if let Some(AsciiArgs { length }) = f.ascii.as_ref() {
-                    quote! { <#field_type as ::insim_core::FromToAsciiBytes>::from_ascii_bytes(
+            }
+            else if let Some(AsciiArgs { length }) = f.ascii.as_ref() {
+                tokens = quote! {
+                    #tokens
+                    let #field_name = <#field_type as ::insim_core::FromToAsciiBytes>::from_ascii_bytes(
                         buf, #length
-                    )?; }
+                    )?;
                 }
-                else {
-                    // FIXME: Better error handling
-                    panic!("String must have either codepage or ascii directives");
-                };
+            }
+            else if let Some(duration_args) = f.duration.as_ref() {
+                let duration_repr = duration_args.ty();
+                let scale = duration_args.scale();
 
                 tokens = quote! {
                     #tokens
-                    let #field_name = #string_tokens;
+                    let #field_name = match TryInto::<u64>::try_into(#duration_repr::read_buf(buf)?) {
+                        Ok(v) => std::time::Duration::from_millis(v * #scale),
+                        Err(_) => return Err(::insim_core::Error::DurationTooLarge),
+                    };
                 };
-            } else {
+            }
+            else {
+                // converts a Vec<u8> into Vec::<u8> for usage in the decoding calls
+                // if it doesnt match that format then just output the original type
+                // wrapped in angled brackets
+                let mut typ = quote! { #field_type };
+
+                if let syn::Type::Path(syn::TypePath {
+                    qself: None,
+                    ref path,
+                    ..
+                }) = field_type
+                {
+                    if path.leading_colon.is_none() && path.segments.len() == 1 {
+                        if let syn::PathArguments::AngleBracketed(ang) = &path.segments[0].arguments {
+                            let ident = &path.segments[0].ident;
+                            typ = quote! { #ident::#ang };
+                        }
+                    }
+                }
+
                 tokens = quote! {
                     #tokens
-                    let #field_name = #field_type::read_buf(buf)?;
+                    let #field_name = #typ::read_buf(buf)?;
                 };
             }
 
@@ -280,6 +319,34 @@ struct CodepageArgs {
     align_to: Option<usize>,
 }
 
+#[derive(Debug, darling::FromMeta, Clone)]
+enum RawDurationUnits {
+    Milliseconds(Path),
+    Centiseconds(Path),
+    Deciseconds(Path),
+    Seconds(Path),
+}
+
+impl RawDurationUnits {
+    fn scale(&self) -> u64 {
+        match self {
+            RawDurationUnits::Milliseconds(_) => 1,
+            RawDurationUnits::Centiseconds(_) => 10,
+            RawDurationUnits::Deciseconds(_) => 100,
+            RawDurationUnits::Seconds(_) => 1000,
+        }
+    }
+    fn ty(&self) -> Path {
+        match self {
+            RawDurationUnits::Milliseconds(v) => v,
+            RawDurationUnits::Centiseconds(v) => v,
+            RawDurationUnits::Deciseconds(v) => v,
+            RawDurationUnits::Seconds(v) => v,
+        }
+        .clone()
+    }
+}
+
 #[derive(Debug, FromField)]
 #[darling(attributes(read_write_buf))]
 struct Field {
@@ -290,6 +357,7 @@ struct Field {
     pub skip: Option<bool>,
     pub codepage: Option<CodepageArgs>,
     pub ascii: Option<AsciiArgs>,
+    pub duration: Option<RawDurationUnits>,
 }
 
 #[proc_macro_derive(ReadWriteBuf, attributes(read_write_buf))]
