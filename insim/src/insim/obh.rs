@@ -10,7 +10,7 @@ use insim_core::{
 
 use crate::identifiers::{PlayerId, RequestId};
 
-fn strip_high_bits(val: u16) -> u16 {
+pub(crate) fn spclose_strip_high_bits(val: u16) -> u16 {
     val & !61440
 }
 
@@ -18,7 +18,7 @@ fn strip_high_bits(val: u16) -> u16 {
 pub(crate) fn binrw_parse_spclose_strip_reserved_bits() -> BinResult<u16> {
     let res = u16::read_options(reader, endian, ())?;
     // strip the top 4 bits off
-    Ok(strip_high_bits(res))
+    Ok(spclose_strip_high_bits(res))
 }
 
 bitflags! {
@@ -121,7 +121,7 @@ impl ReadWriteBuf for Obh {
         let reqi = RequestId::read_buf(buf)?;
         let plid = PlayerId::read_buf(buf)?;
         // automatically strip off the first 4 bits as they're reserved
-        let spclose = strip_high_bits(u16::read_buf(buf)?);
+        let spclose = spclose_strip_high_bits(u16::read_buf(buf)?);
         let time = Duration::from_millis((u16::read_buf(buf)? as u64) * 10);
         let c = CarContact::read_buf(buf)?;
         let x = i16::read_buf(buf)?;
@@ -148,7 +148,7 @@ impl ReadWriteBuf for Obh {
         self.reqi.write_buf(buf)?;
         self.plid.write_buf(buf)?;
         // automatically strip off the first 4 bits as they're reserved
-        strip_high_bits(self.spclose).write_buf(buf)?;
+        spclose_strip_high_bits(self.spclose).write_buf(buf)?;
         // FIXME: handle if this is too small
         let time = (self.time.as_millis() / 10) as u16;
         time.write_buf(buf)?;
@@ -206,8 +206,8 @@ mod tests {
 
     #[test]
     fn ensure_high_bits_stripped() {
-        assert_eq!(strip_high_bits(61441), 1);
+        assert_eq!(spclose_strip_high_bits(61441), 1);
 
-        assert_eq!(strip_high_bits(63495,), 2055);
+        assert_eq!(spclose_strip_high_bits(63495,), 2055);
     }
 }

@@ -22,6 +22,8 @@ bitflags::bitflags! {
     }
 }
 
+impl_bitflags_from_to_bytes!(BtnInst, u8);
+
 bitflags::bitflags! {
     /// Bitwise flags used within the [Btn] packet
     #[binrw]
@@ -65,6 +67,8 @@ bitflags::bitflags! {
     }
 }
 
+impl_bitflags_from_to_bytes!(BtnStyleFlags, u8);
+
 bitflags::bitflags! {
     /// Bitwise flags used within the [Sta] packet
     #[binrw]
@@ -87,8 +91,10 @@ bitflags::bitflags! {
     }
 }
 
+impl_bitflags_from_to_bytes!(BtnClickFlags, u8);
+
 #[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
@@ -110,7 +116,7 @@ pub enum BfnType {
 }
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Button Function
 pub struct Bfn {
@@ -136,7 +142,7 @@ pub struct Bfn {
 impl_typical_with_request_id!(Bfn);
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Button - Instructional to create a button
 pub struct Btn {
@@ -169,6 +175,7 @@ pub struct Btn {
     /// Text
     #[br(parse_with = binrw_parse_codepage_string_until_eof)]
     #[bw(write_with = binrw_write_codepage_string::<240, _>, args(false, 4))]
+    #[read_write_buf(codepage(length = 240, align_to = 4))]
     pub text: String,
 }
 
@@ -200,7 +207,7 @@ mod tests {
 }
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Button Click - Sent back when a user clicks a button
 pub struct Btc {
@@ -216,11 +223,12 @@ pub struct Btc {
 
     /// Button click flags
     #[brw(pad_after = 1)]
+    #[read_write_buf(pad_after = 1)]
     pub cflags: BtnClickFlags,
 }
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Button Type - Sent back when a user types into a text entry "button"
 pub struct Btt {
@@ -236,11 +244,13 @@ pub struct Btt {
     pub inst: BtnInst,
 
     #[brw(pad_after = 1)]
+    #[read_write_buf(pad_after = 1)]
     /// From original button specification (IS_BTN)
     pub typein: u8,
 
     #[br(parse_with = binrw_parse_codepage_string::<96, _>)]
     #[bw(write_with = binrw_write_codepage_string::<96, _>)]
+    #[read_write_buf(codepage(length = 96))]
     /// Typed text, zero to TypeIn specified in IS_BTN
     pub text: String,
 }

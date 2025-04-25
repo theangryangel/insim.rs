@@ -41,24 +41,16 @@ generate_bitflag_helpers!(HostInfoFlags,
     pub is_last => LAST
 );
 
-impl ReadWriteBuf for HostInfoFlags {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let bits = u8::read_buf(buf)?;
-        Ok(Self::from_bits_truncate(bits))
-    }
-
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.bits().write_buf(buf)
-    }
-}
+impl_bitflags_from_to_bytes!(HostInfoFlags, u8);
 
 /// Information about a host. Used within the [Hos] packet.
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct HostInfo {
     #[br(parse_with = binrw_parse_codepage_string::<32, _>)]
     #[bw(write_with = binrw_write_codepage_string::<32, _>)]
+    #[read_write_buf(codepage(length = 32))]
     /// Hostname
     pub hname: String,
 
@@ -70,16 +62,6 @@ pub struct HostInfo {
 
     /// Total number of connections
     pub numconns: u8,
-}
-
-impl ReadWriteBuf for HostInfo {
-    fn read_buf(_buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        todo!()
-    }
-
-    fn write_buf(&self, _buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        todo!()
-    }
 }
 
 /// The relay will send a list of available hosts using this packet. There may be more than one
@@ -112,7 +94,7 @@ impl ReadWriteBuf for Hos {
         let reqi = RequestId::read_buf(buf)?;
         let num = u8::read_buf(buf)?;
         let mut hinfo = Vec::with_capacity(num as usize);
-        for _i in 1..=num {
+        for _i in 0..num {
             hinfo.push(HostInfo::read_buf(buf)?);
         }
 

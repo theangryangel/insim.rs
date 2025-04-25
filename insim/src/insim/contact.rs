@@ -1,12 +1,17 @@
 // con is a reserved word. Do not name this file `con.rs`.
 use std::time::Duration;
 
+use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw, BinRead, BinWrite},
     duration::{binrw_parse_duration, binrw_write_duration},
+    ReadWriteBuf,
 };
 
-use super::{obh::binrw_parse_spclose_strip_reserved_bits, CompCarInfo};
+use super::{
+    obh::{binrw_parse_spclose_strip_reserved_bits, spclose_strip_high_bits},
+    CompCarInfo,
+};
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default)]
@@ -76,12 +81,12 @@ impl BinRead for ConInfo {
         let steer = u8::read_options(reader, endian, ())?;
 
         let thrbrk = u8::read_options(reader, endian, ())?;
-        let thr = thrbrk >> 4; // top 4 bits are thr
-        let brk = thrbrk & !0b11110000; // last 4 bits are brk
+        let thr: u8 = (thrbrk >> 4) & 0x0F; // upper 4 bits
+        let brk: u8 = thrbrk & 0x0F; // lower 4 bits
 
         let cluhan = u8::read_options(reader, endian, ())?;
-        let clu = cluhan >> 4; // top 4 bits are clu
-        let han = cluhan & !0b11110000; // last 4 bits are han
+        let clu: u8 = (cluhan >> 4) & 0x0F; // upper 4 bits
+        let han: u8 = cluhan & 0x0F; // lower 4 bits
 
         let gearsp = u8::read_options(reader, endian, ())?;
         let gearsp = gearsp >> 4; // gearsp is only first 4 bits
@@ -176,7 +181,7 @@ impl BinWrite for ConInfo {
             });
         }
 
-        let gearsp = self.gearsp & !0b11110000;
+        let gearsp = self.gearsp << 4;
         gearsp.write_options(writer, endian, ())?;
 
         self.speed.write_options(writer, endian, ())?;
@@ -186,6 +191,100 @@ impl BinWrite for ConInfo {
         self.accelr.write_options(writer, endian, ())?;
         self.x.write_options(writer, endian, ())?;
         self.y.write_options(writer, endian, ())?;
+
+        Ok(())
+    }
+}
+
+impl ReadWriteBuf for ConInfo {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let plid = PlayerId::read_buf(buf)?;
+        let info = CompCarInfo::read_buf(buf)?;
+        // pad 1 bytes
+        buf.advance(1);
+        let steer = u8::read_buf(buf)?;
+
+        let thrbrk = u8::read_buf(buf)?;
+        let thr: u8 = (thrbrk >> 4) & 0x0F; // upper 4 bits
+        let brk: u8 = thrbrk & 0x0F; // lower 4 bits
+
+        let cluhan = u8::read_buf(buf)?;
+        let clu: u8 = (cluhan >> 4) & 0x0F; // upper 4 bits
+        let han: u8 = cluhan & 0x0F; // lower 4 bits
+
+        let gearsp = u8::read_buf(buf)?;
+        let gearsp = (gearsp >> 4) & 0x0F; // gearsp is only first 4 bits
+
+        let speed = u8::read_buf(buf)?;
+        let direction = u8::read_buf(buf)?;
+        let heading = u8::read_buf(buf)?;
+        let accelf = u8::read_buf(buf)?;
+        let accelr = u8::read_buf(buf)?;
+
+        let x = i16::read_buf(buf)?;
+        let y = i16::read_buf(buf)?;
+
+        Ok(Self {
+            plid,
+            info,
+            steer,
+            thr,
+            brk,
+            clu,
+            han,
+            gearsp,
+            speed,
+            direction,
+            heading,
+            accelf,
+            accelr,
+            x,
+            y,
+        })
+    }
+
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.plid.write_buf(buf)?;
+        self.info.write_buf(buf)?;
+        0_u8.write_buf(buf)?; // pad 1 bytes
+        self.steer.write_buf(buf)?;
+
+        if self.thr > 15 {
+            return Err(insim_core::Error::TooLarge);
+        }
+
+        if self.brk > 15 {
+            return Err(insim_core::Error::TooLarge);
+        }
+
+        let thrbrk = (self.thr << 4) | self.brk;
+        thrbrk.write_buf(buf)?;
+
+        if self.clu > 15 {
+            return Err(insim_core::Error::TooLarge);
+        }
+
+        if self.han > 15 {
+            return Err(insim_core::Error::TooLarge);
+        }
+
+        let cluhan = (self.clu << 4) | self.han;
+        cluhan.write_buf(buf)?;
+
+        if self.gearsp > 15 {
+            return Err(insim_core::Error::TooLarge);
+        }
+
+        let gearsp = self.gearsp << 4;
+        gearsp.write_buf(buf)?;
+
+        self.speed.write_buf(buf)?;
+        self.direction.write_buf(buf)?;
+        self.heading.write_buf(buf)?;
+        self.accelf.write_buf(buf)?;
+        self.accelr.write_buf(buf)?;
+        self.x.write_buf(buf)?;
+        self.y.write_buf(buf)?;
 
         Ok(())
     }
@@ -217,39 +316,74 @@ pub struct Con {
     pub b: ConInfo,
 }
 
+impl ReadWriteBuf for Con {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
+        buf.advance(1);
+        let spclose = spclose_strip_high_bits(u16::read_buf(buf)?);
+        let time = u16::read_buf(buf)? as u64;
+        let time = Duration::from_millis(time * 10);
+
+        let a = ConInfo::read_buf(buf)?;
+        let b = ConInfo::read_buf(buf)?;
+
+        Ok(Self {
+            reqi,
+            spclose,
+            time,
+            a,
+            b,
+        })
+    }
+
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
+        buf.put_bytes(0, 1);
+        spclose_strip_high_bits(self.spclose).write_buf(buf)?;
+        match TryInto::<u16>::try_into(self.time.as_millis() / 10) {
+            Ok(time) => time.write_buf(buf)?,
+            Err(_) => return Err(insim_core::Error::TooLarge),
+        }
+        self.a.write_buf(buf)?;
+        self.b.write_buf(buf)?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
-
     use super::*;
 
     #[test]
-    fn ensure_coninfo_decodes() {
+    fn test_coninfo() {
         // ConInfo has some fields which are effectively u4.
         // We need to ensure that we carefully decode them.
-        let coninfo = ConInfo::read_le(&mut Cursor::new(vec![
-            1, 0,          // CompCarInfoinfo
-            0,          // padding
-            12,         // steering
-            247,        // thrbrk
-            193,        // cluhan
-            0b11110000, // gearsp
-            0,          //speed
-            0,          // direction
-            1,          // heading
-            2,          // accelf
-            3,          // accelr
-            0, 0, // X
-            0, 0, // Y
-        ]))
-        .unwrap();
+        assert_from_to_bytes!(
+            ConInfo,
+            [
+                1, 0,          // CompCarInfoinfo
+                0,          // padding
+                12,         // steering
+                247,        // thrbrk
+                188,        // cluhan
+                0b11110000, // gearsp
+                0,          //speed
+                0,          // direction
+                1,          // heading
+                2,          // accelf
+                3,          // accelr
+                0, 0, // X
+                0, 0, // Y
+            ],
+            |coninfo: ConInfo| {
+                assert_eq!(coninfo.thr, 15);
+                assert_eq!(coninfo.brk, 7);
 
-        assert_eq!(coninfo.thr, 15);
-        assert_eq!(coninfo.brk, 7);
+                assert_eq!(coninfo.clu, 11);
+                assert_eq!(coninfo.han, 12);
 
-        assert_eq!(coninfo.clu, 12);
-        assert_eq!(coninfo.han, 1);
-
-        assert_eq!(coninfo.gearsp, 15);
+                assert_eq!(coninfo.gearsp, 15);
+            }
+        );
     }
 }

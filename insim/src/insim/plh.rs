@@ -1,6 +1,11 @@
-use insim_core::binrw::{self, binrw};
+use insim_core::{
+    binrw::{self, binrw},
+    ReadWriteBuf,
+};
 
 use crate::identifiers::{PlayerId, RequestId};
+
+const PLH_MAX_PLAYERS: usize = 40;
 
 bitflags::bitflags! {
     #[binrw]
@@ -15,6 +20,8 @@ bitflags::bitflags! {
          const SILENT = (1 << 7);
     }
 }
+
+impl_bitflags_from_to_bytes!(PlayerHandicapFlags, u8);
 
 #[binrw]
 #[derive(Debug, Clone, Default)]
@@ -36,6 +43,37 @@ pub struct PlayerHandicap {
     pub h_tres: u8,
 }
 
+impl ReadWriteBuf for PlayerHandicap {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let plid = PlayerId::read_buf(buf)?;
+        let flags = PlayerHandicapFlags::read_buf(buf)?;
+        let h_mass = u8::read_buf(buf)?;
+        let h_tres = u8::read_buf(buf)?;
+
+        Ok(Self {
+            plid,
+            flags,
+            h_mass,
+            h_tres,
+        })
+    }
+
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        if self.h_mass > 200 {
+            return Err(insim_core::Error::TooLarge);
+        }
+        if self.h_tres > 50 {
+            return Err(insim_core::Error::TooLarge);
+        }
+
+        self.plid.write_buf(buf)?;
+        self.flags.write_buf(buf)?;
+        self.h_mass.write_buf(buf)?;
+        self.h_tres.write_buf(buf)?;
+        Ok(())
+    }
+}
+
 #[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -53,6 +91,33 @@ pub struct Plh {
 }
 
 impl_typical_with_request_id!(Plh);
+
+impl ReadWriteBuf for Plh {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
+        let mut nump = u8::read_buf(buf)?;
+        let mut hcaps = Vec::with_capacity(nump as usize);
+        while nump > 0 {
+            hcaps.push(PlayerHandicap::read_buf(buf)?);
+            nump -= 1;
+        }
+
+        Ok(Self { reqi, hcaps })
+    }
+
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
+        let nump = self.hcaps.len();
+        if nump > PLH_MAX_PLAYERS {
+            return Err(insim_core::Error::TooLarge);
+        }
+        (nump as u8).write_buf(buf)?;
+        for i in self.hcaps.iter() {
+            i.write_buf(buf)?;
+        }
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {
