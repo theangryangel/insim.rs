@@ -62,6 +62,27 @@ impl BinRead for Fuel200 {
     }
 }
 
+impl ReadWriteBuf for Fuel200 {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let data = u8::read_buf(buf)?;
+
+        if data == 255 {
+            Ok(Self::No)
+        } else {
+            Ok(Self::Percentage(data))
+        }
+    }
+
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        let data = match self {
+            Self::Percentage(data) => *data,
+            Self::No => 255_u8,
+        };
+
+        data.write_buf(buf)
+    }
+}
+
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
@@ -133,7 +154,7 @@ impl ReadWriteBuf for Fuel {
 }
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Lap Time for a given player.
 pub struct Lap {
@@ -145,11 +166,13 @@ pub struct Lap {
 
     #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
     #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
+    #[read_write_buf(duration(milliseconds = u32))]
     /// Lap time
     pub ltime: Duration, // lap time (ms)
 
     #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
     #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
+    #[read_write_buf(duration(milliseconds = u32))]
     /// Total elapsed time
     pub etime: Duration,
 
@@ -158,6 +181,7 @@ pub struct Lap {
 
     /// See [PlayerFlags].
     #[brw(pad_after = 1)]
+    #[read_write_buf(pad_after = 1)]
     pub flags: PlayerFlags,
 
     /// Current penalty
@@ -168,4 +192,44 @@ pub struct Lap {
 
     /// See [Fuel200].
     pub fuel200: Fuel200,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_lap() {
+        assert_from_to_bytes!(
+            Lap,
+            [
+                0,  // reqi
+                2,  // plid
+                4,  // ltime (1)
+                0,  // ltime (2)
+                0,  // ltime (3)
+                1,  // ltime (4)
+                64, // etime (1)
+                0,  // etime (2)
+                1,  // etime (3)
+                0,  // etime (4)
+                1,  // lapsdone (1)
+                2,  // lapsdone (2)
+                64, // flags (1)
+                2,  // flags (2)
+                0,  // sp0
+                6,  // penalty
+                3,  // numstops
+                40, // fuel200
+            ],
+            |lap: Lap| {
+                assert_eq!(lap.plid, PlayerId(2));
+                assert_eq!(lap.ltime, Duration::from_millis(16777220));
+                assert_eq!(lap.etime, Duration::from_millis(65600));
+                assert_eq!(lap.lapsdone, 513);
+                assert_eq!(lap.numstops, 3);
+                assert!(matches!(lap.fuel200, Fuel200::Percentage(40)));
+            }
+        )
+    }
 }

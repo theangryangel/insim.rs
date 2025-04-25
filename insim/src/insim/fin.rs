@@ -33,6 +33,8 @@ bitflags::bitflags! {
     }
 }
 
+impl_bitflags_from_to_bytes!(RaceConfirmFlags, u8);
+
 generate_bitflag_helpers! {
     RaceConfirmFlags,
 
@@ -72,7 +74,7 @@ impl RaceConfirmFlags {
 }
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Provisional finish notification: This is not a final result, you should use the [Res](super::Res) packet for this instead.
 pub struct Fin {
@@ -84,11 +86,13 @@ pub struct Fin {
 
     #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
     #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
+    #[read_write_buf(duration(milliseconds = u32))]
     /// Total time elapsed
     pub ttime: Duration,
 
     #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
     #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
+    #[read_write_buf(duration(milliseconds = u32), pad_after = 1)]
     #[brw(pad_after = 1)]
     /// Best lap time
     pub btime: Duration,
@@ -97,6 +101,7 @@ pub struct Fin {
     pub numstops: u8,
 
     #[brw(pad_after = 1)]
+    #[read_write_buf(pad_after = 1)]
     /// Confirmation flags give extra context to the result
     pub confirm: RaceConfirmFlags,
 
@@ -105,4 +110,40 @@ pub struct Fin {
 
     /// Player flags (help settings)
     pub flags: PlayerFlags,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_fin() {
+        assert_from_to_bytes!(
+            Fin,
+            [
+                0,   // reqi
+                3,   // plid
+                145, // ttime (1)
+                4,   // ttime (2)
+                2,   // ttime (3)
+                0,   // ttime (4)
+                65,  // btime (1)
+                56,  // btime (2)
+                0,   // btime (3)
+                0,   // btime (4)
+                0,   // spa
+                1,   // numstops
+                22,  // confirm
+                0,   // spb
+                68,  // lapsdone (1)
+                0,   // lapsdone (2)
+                9,   // flags (1)
+                0,   // flags (2)
+            ],
+            |fin: Fin| {
+                assert_eq!(fin.ttime, Duration::from_millis(132241));
+                assert_eq!(fin.btime, Duration::from_millis(14401));
+            }
+        );
+    }
 }

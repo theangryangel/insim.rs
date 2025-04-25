@@ -1,12 +1,10 @@
 use std::time::Duration;
 
 use bitflags::bitflags;
-use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw},
     duration::{binrw_parse_duration, binrw_write_duration},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-    FromToAsciiBytes, FromToCodepageBytes, ReadWriteBuf,
 };
 
 use crate::{identifiers::RequestId, WithRequestId, VERSION};
@@ -21,7 +19,7 @@ bitflags! {
     /// Flags for [Isi], used to indicate what behaviours we want to opt into
     pub struct IsiFlags: u16 {
         /// Guest or single player
-        const LOCAL = (1 << 2);
+        const LOCAL = (1_u16 << 2);
 
         /// Keep colours in MSO text
         const MSO_COLS = (1 << 3);
@@ -68,8 +66,10 @@ impl From<IsiFlags> for Isi {
     }
 }
 
+impl_bitflags_from_to_bytes!(IsiFlags, u16);
+
 #[binrw]
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Insim Init, or handshake packet.
 /// Required to be sent to the server before any other packets.
@@ -77,6 +77,7 @@ pub struct Isi {
     /// When set to a non-zero value the server will send a [crate::Packet::Ver] packet in response.
     ///packet in response.
     #[brw(pad_after = 1)]
+    #[read_write_buf(pad_after = 1)]
     pub reqi: RequestId,
 
     /// UDP Port
@@ -100,64 +101,25 @@ pub struct Isi {
     /// the relevant flags are set.
     #[br(parse_with = binrw_parse_duration::<u16, 1, _>)]
     #[bw(write_with = binrw_write_duration::<u16, 1, _>)]
+    #[read_write_buf(duration(milliseconds = u16))]
     pub interval: Duration,
 
     /// Administrative password.
     #[bw(write_with = binrw_write_codepage_string::<16, _>, args(true, 0))]
     #[br(parse_with = binrw_parse_codepage_string::<16, _>, args(true))]
+    #[read_write_buf(codepage(length = 16))]
     pub admin: String,
 
     /// Name of the program.
     #[bw(write_with = binrw_write_codepage_string::<16, _>)]
     #[br(parse_with = binrw_parse_codepage_string::<16, _>)]
+    #[read_write_buf(codepage(length = 16))]
     pub iname: String,
 }
 
 impl Isi {
     /// Default application name
     pub const DEFAULT_INAME: &'static str = "insim.rs";
-}
-
-impl ReadWriteBuf for Isi {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::read_buf(buf)?;
-        buf.advance(1);
-        let udpport = u16::read_buf(buf)?;
-        let flags = IsiFlags::from_bits_truncate(u16::read_buf(buf)?);
-        let version = u8::read_buf(buf)?;
-        let prefix = char::read_buf(buf)?;
-        let interval = Duration::from_millis(u16::read_buf(buf)? as u64);
-        let admin = String::from_ascii_bytes(buf, 16)?;
-        let iname = String::from_codepage_bytes(buf, 16)?;
-
-        Ok(Self {
-            reqi,
-            udpport,
-            flags,
-            version,
-            prefix,
-            interval,
-            admin,
-            iname,
-        })
-    }
-
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.write_buf(buf)?;
-        buf.put_bytes(0, 1);
-        self.udpport.write_buf(buf)?;
-        self.flags.bits().write_buf(buf)?;
-        self.version.write_buf(buf)?;
-        self.prefix.write_buf(buf)?;
-        let interval =
-            u16::try_from(self.interval.as_millis()).map_err(insim_core::Error::TryFromInt)?;
-        interval.write_buf(buf)?;
-
-        self.admin.to_ascii_bytes(buf, 16)?;
-        self.iname.to_codepage_bytes(buf, 16)?;
-
-        Ok(())
-    }
 }
 
 impl Default for Isi {
@@ -192,78 +154,41 @@ impl WithRequestId for IsiFlags {
 
 #[cfg(test)]
 mod tests {
-    use std::{io::Cursor, time::Duration};
-
-    use bytes::BytesMut;
-    use insim_core::{binrw::BinWrite, ReadWriteBuf};
-
-    use super::Isi;
-    use crate::{identifiers::RequestId, VERSION};
+    use super::*;
 
     #[test]
-    fn test_isi_binrw() {
-        use bytes::BufMut;
-
-        let mut data = Isi::default();
-        data.reqi = RequestId(1);
-        data.iname = "insim.rs".to_string();
-        data.admin = "^JA".to_string();
-        data.version = VERSION;
-        data.prefix = '!';
-        data.interval = Duration::from_secs(1);
-
-        let mut buf = Cursor::new(Vec::new());
-        let res = data.write_le(&mut buf);
-        assert!(res.is_ok());
-        let buf = buf.into_inner();
-        assert_eq!(buf.len(), 42); // less magic, less size
-
-        assert_eq!(&buf[0], &0b1); // check that the reqi is 1
-        assert_eq!(&buf[6], &VERSION); // check that the version is VERSION
-        assert_eq!(&buf[7], &('!' as u8));
-        assert_eq!(
-            &buf[10..26],
-            &[b'^', b'J', b'A', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        );
-
-        let mut iname = Isi::DEFAULT_INAME.as_bytes().to_owned();
-        iname.put_bytes(0, 16 - iname.len());
-
-        assert_eq!(&buf[26..42], &iname,);
+    fn test_isi_flags() {
+        let local = IsiFlags::from_bits_truncate(4);
+        assert!(local.contains(IsiFlags::LOCAL));
     }
 
     #[test]
     fn test_isi() {
-        use bytes::BufMut;
-
-        let mut data = Isi::default();
-        data.reqi = RequestId(1);
-        data.iname = "insim.rs".to_string();
-        data.admin = "^JA".to_string();
-        data.version = VERSION;
-        data.prefix = '!';
-        data.interval = Duration::from_secs(1);
-
-        let mut buf = BytesMut::new();
-        let res = data.write_buf(&mut buf);
-        assert!(res.is_ok());
-
-        assert_eq!(buf.len(), 42); // less magic, less size
-
-        assert_eq!(&buf[0], &0b1); // check that the reqi is 1
-        assert_eq!(&buf[6], &VERSION); // check that the version is VERSION
-        assert_eq!(&buf[7], &('!' as u8));
-        assert_eq!(
-            &buf[10..26],
-            &[b'^', b'J', b'A', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        assert_from_to_bytes!(
+            Isi,
+            [
+                1, // reqi
+                0, 1,       // udpport (1)
+                1,       // udpport (2)
+                4,       // flags (1)
+                0,       // flags (2)
+                VERSION, // insimver
+                b'!',    // prefix
+                1,       // interval (1)
+                0,       // interval (2)
+                b'a', b'd', b'm', b'i', b'n', b'|', b'*', b':', b'\\', b'/', b'?', b'"', b'<',
+                b'>', b'#', 0, b'i', b'n', b's', b'i', b'm', b'.', b'r', b's', 0, 0, 0, 0, 0, 0, 0,
+                0
+            ],
+            |data: Isi| {
+                assert_eq!(data.reqi, RequestId(1));
+                assert_eq!(&data.iname, "insim.rs");
+                assert_eq!(&data.admin, "admin|*:\\/?\"<>#");
+                assert_eq!(data.version, VERSION);
+                assert_eq!(data.prefix, '!');
+                assert_eq!(data.interval, Duration::from_millis(1));
+                assert!(data.flags.contains(IsiFlags::LOCAL));
+            }
         );
-
-        let mut iname = Isi::DEFAULT_INAME.as_bytes().to_owned();
-        iname.put_bytes(0, 16 - iname.len());
-
-        assert_eq!(&buf[26..42], &iname,);
-
-        let data2 = Isi::read_buf(&mut buf.freeze()).unwrap();
-        assert_eq!(data, data2);
     }
 }

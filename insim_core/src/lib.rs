@@ -9,7 +9,7 @@ pub mod track;
 pub mod vehicle;
 pub mod wind;
 
-use std::{array::from_fn, num::TryFromIntError};
+use std::{array::from_fn, net::Ipv4Addr, num::TryFromIntError};
 
 #[doc(hidden)]
 pub use ::binrw;
@@ -38,8 +38,8 @@ pub enum Error {
     NotAsciiString,
     /// TryFromInt
     TryFromInt(TryFromIntError),
-    /// Duration too large for packet
-    DurationTooLarge,
+    /// Value too large for field
+    TooLarge,
 }
 
 /// Read from bytes
@@ -247,6 +247,17 @@ where
         }
 
         Ok(())
+    }
+}
+
+impl ReadWriteBuf for Ipv4Addr {
+    fn read_buf(buf: &mut Bytes) -> Result<Self, Error> {
+        Ok(Ipv4Addr::from(u32::read_buf(buf)?))
+    }
+
+    fn write_buf(&self, buf: &mut BytesMut) -> Result<(), Error> {
+        let repr = u32::from(*self);
+        repr.write_buf(buf)
     }
 }
 

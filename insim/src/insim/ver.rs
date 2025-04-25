@@ -5,7 +5,7 @@ use insim_core::{
     binrw::{self, binrw, BinRead, BinWrite},
     game_version::GameVersion,
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-    FromToCodepageBytes, ReadWriteBuf,
+    FromToAsciiBytes, FromToCodepageBytes, ReadWriteBuf,
 };
 
 use crate::identifiers::RequestId;
@@ -79,7 +79,7 @@ impl ReadWriteBuf for Ver {
         let reqi = RequestId::read_buf(buf)?;
         buf.advance(1);
         let version = GameVersion::read_buf(buf)?;
-        let product = String::from_codepage_bytes(buf, 6)?;
+        let product = String::from_ascii_bytes(buf, 6)?;
 
         let insimver = buf.get_u8();
 

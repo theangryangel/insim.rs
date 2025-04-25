@@ -56,8 +56,10 @@ bitflags! {
     }
 }
 
+impl_bitflags_from_to_bytes!(PitStopWorkFlags, u32);
+
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Pit stop (stop at the garage, not "tele-pit")
 pub struct Pit {
@@ -81,6 +83,7 @@ pub struct Pit {
 
     /// Total number of stops
     #[brw(pad_after = 1)]
+    #[read_write_buf(pad_after = 1)]
     pub numstops: u8,
 
     /// Tyres!
@@ -88,11 +91,12 @@ pub struct Pit {
 
     /// What work was carried out?
     #[brw(pad_after = 4)]
+    #[read_write_buf(pad_after = 4)]
     pub work: PitStopWorkFlags,
 }
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Pit Stop Finished
 pub struct Psf {
@@ -105,12 +109,13 @@ pub struct Psf {
     #[brw(pad_after = 4)]
     #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
     #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
+    #[read_write_buf(duration(milliseconds = u32), pad_after = 4)]
     /// How long were they pitting for?
     pub stime: Duration,
 }
 
 #[binrw]
-#[derive(Debug, Default, PartialEq, Eq, Clone)]
+#[derive(Debug, Default, PartialEq, Eq, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
@@ -135,7 +140,7 @@ pub enum PitLaneFact {
 }
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// PitLane
 pub struct Pla {
@@ -147,6 +152,7 @@ pub struct Pla {
 
     /// Fact
     #[brw(pad_after = 3)]
+    #[read_write_buf(pad_after = 3)]
     pub fact: PitLaneFact,
 }
 
@@ -159,5 +165,92 @@ impl Pla {
     /// Did the player exit the pitlane?
     pub fn exited_pitlane(&self) -> bool {
         !self.entered_pitlane()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_pit() {
+        assert_from_to_bytes!(
+            Pit,
+            [
+                0,   // reqi
+                1,   // plid
+                25,  // lapsdone (1)
+                0,   // lapsdone (2)
+                73,  // flags (1)
+                6,   // flags (2)
+                30,  // fueladd
+                0,   // penalty
+                1,   // numstops
+                0,   // sp3
+                255, // tyrerl
+                255, // tyrerr
+                255, // tyrefl
+                255, // tyrefl
+                2,   // work (1)
+                0,   // work (2)
+                0,   // work (3)
+                0,   // work (4)
+                0,   // spare (1)
+                0,   // spare (2)
+                0,   // spare (3)
+                0,   // spare (4)
+            ],
+            |parsed: Pit| {
+                assert_eq!(parsed.reqi, RequestId(0));
+                assert_eq!(parsed.plid, PlayerId(1));
+                assert_eq!(parsed.lapsdone, 25);
+                assert!(matches!(parsed.fueladd, Fuel::Percentage(30)));
+                assert_eq!(parsed.numstops, 1);
+            }
+        );
+    }
+
+    #[test]
+    fn test_psf() {
+        assert_from_to_bytes!(
+            Psf,
+            [
+                0,  // reqi
+                2,  // plid
+                89, // stime (1)
+                2,  // stime (2)
+                3,  // stime (3)
+                1,  // stime (4)
+                0,  // spare (1)
+                0,  // spare (2)
+                0,  // spare (3)
+                0,  // spare (4)
+            ],
+            |parsed: Psf| {
+                assert_eq!(parsed.reqi, RequestId(0));
+                assert_eq!(parsed.plid, PlayerId(2));
+                assert_eq!(parsed.stime, Duration::from_millis(16974425));
+            }
+        );
+    }
+
+    #[test]
+    fn test_pla() {
+        assert_from_to_bytes!(
+            Pla,
+            [
+                0, // reqi
+                3, // plid
+                4, // fact
+                0, // sp1
+                0, // sp2
+                0, // sp3
+            ],
+            |parsed: Pla| {
+                assert_eq!(parsed.reqi, RequestId(0));
+                assert_eq!(parsed.plid, PlayerId(3));
+                assert!(matches!(parsed.fact, PitLaneFact::Sg))
+            }
+        );
     }
 }

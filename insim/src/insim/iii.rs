@@ -40,12 +40,12 @@ mod test {
     fn test_iii() {
         let mut raw = BytesMut::new();
         raw.extend_from_slice(&[
-            0, // ReqI
-            0, // Zero
-            2, // UCID
-            4, // PLID
-            0, // Sp2
-            0, // Sp3
+            0, // reqi
+            0, // zero
+            2, // ucid
+            4, // plid
+            0, // sp2
+            0, // sp3
         ]);
         raw.extend_from_slice(b"abcd");
 

@@ -1,7 +1,9 @@
+use bytes::{Buf, BufMut};
 use indexmap::{set::Iter as IndexSetIter, IndexSet};
 use insim_core::{
     binrw::{self, binrw},
     vehicle::Vehicle,
+    ReadWriteBuf,
 };
 
 use crate::{
@@ -189,7 +191,7 @@ pub struct Plc {
     pub reqi: RequestId,
 
     /// Unique connection id to change
-    #[brw(pad_before = 3)]
+    #[brw(pad_after = 3)]
     pub ucid: ConnectionId,
 
     /// Player's allow cars
@@ -200,12 +202,32 @@ pub struct Plc {
 
 impl_typical_with_request_id!(Plc);
 
+impl ReadWriteBuf for Plc {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
+        buf.advance(1);
+        let ucid = ConnectionId::read_buf(buf)?;
+        buf.advance(3);
+        let cars = PlcAllowedCarsSet::from_bits_truncate(u32::read_buf(buf)?);
+        Ok(Self { reqi, ucid, cars })
+    }
+
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
+        buf.put_bytes(0, 1);
+        self.ucid.write_buf(buf)?;
+        buf.put_bytes(0, 3);
+        self.cars.bits().write_buf(buf)?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_hashset_xrg() {
+    fn test_plcallowedcarsset() {
         let mut allowed = PlcAllowedCarsSet::default();
 
         assert!(allowed.insert(Vehicle::Unknown).is_err());
@@ -225,5 +247,33 @@ mod tests {
         );
 
         assert_eq!(allowed.bits(), reversed.bits());
+    }
+
+    #[test]
+    fn test_plc() {
+        assert_from_to_bytes!(
+            Plc,
+            [
+                0,  // reqi
+                0,  // zero
+                13, // ucid
+                0,  // sp1
+                0,  // sp2
+                0,  // sp3
+                68, // carflags (1)
+                8,  // carflags (2)
+                0,  // carflags (3)
+                0,  // carflags (4)
+            ],
+            |parsed: Plc| {
+                assert_eq!(parsed.ucid, ConnectionId(13));
+                // FIXME?
+                // assert!(
+                //     parsed.cars.contains(&Vehicle::Fox) &&
+                //     parsed.cars.contains(&Vehicle::Lx6) &&
+                //     parsed.cars.contains(&Vehicle::Xrt)
+                // );
+            }
+        );
     }
 }

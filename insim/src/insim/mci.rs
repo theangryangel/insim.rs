@@ -2,6 +2,7 @@ use bitflags::bitflags;
 use insim_core::{
     binrw::{self, binrw},
     point::Point,
+    ReadWriteBuf,
 };
 
 use crate::identifiers::{PlayerId, RequestId};
@@ -41,8 +42,10 @@ generate_bitflag_helpers! {
     pub is_last => LAST
 }
 
+impl_bitflags_from_to_bytes!(CompCarInfo, u8);
+
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Used within the [Mci] packet info field.
 pub struct CompCar {
@@ -59,6 +62,7 @@ pub struct CompCar {
     pub position: u8,
 
     #[brw(pad_after = 1)]
+    #[read_write_buf(pad_after = 1)]
     /// Additional information that describes this particular Compcar.
     pub info: CompCarInfo,
 
@@ -122,5 +126,107 @@ impl Mci {
     /// Is this the last MCI packet in this set of MCI packets?
     pub fn is_last(&self) -> bool {
         self.info.iter().any(|i| i.is_last())
+    }
+}
+
+impl ReadWriteBuf for Mci {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
+        let mut numc = u8::read_buf(buf)?;
+        let mut info = Vec::with_capacity(numc as usize);
+        while numc > 0 {
+            info.push(CompCar::read_buf(buf)?);
+            numc -= 1;
+        }
+        Ok(Self { reqi, info })
+    }
+
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
+        let numc = self.info.len();
+        if numc > 255 {
+            return Err(insim_core::Error::TooLarge);
+        }
+        (numc as u8).write_buf(buf)?;
+        for i in self.info.iter() {
+            i.write_buf(buf)?;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_mci() {
+        assert_from_to_bytes!(
+            Mci,
+            [
+                0,   // reqi
+                2,   // numc
+                57,  // info[0] - node (1)
+                0,   // info[0] - node (2)
+                1,   // info[0] - lap (1)
+                0,   // info[0] - lap (1)
+                17,  // info[0] - plid
+                1,   // info[0] - position
+                64,  // info[0] - info
+                0,   // info[0] - sp3
+                107, // info[0] - x (1)
+                112, // info[0] - x (2)
+                252, // info[0] - x (3)
+                0,   // info[0] - x (4)
+                142, // info[0] - y (1)
+                220, // info[0] - y (2)
+                71,  // info[0] - y (3)
+                0,   // info[0] - y (4)
+                18,  // info[0] - z (1)
+                223, // info[0] - z (2)
+                3,   // info[0] - z (3)
+                0,   // info[0] - z (4)
+                147, // info[0] - speed (1)
+                14,  // info[0] - speed (2)
+                254, // info[0] - direction (1)
+                222, // info[0] - direction (2)
+                16,  // info[0] - heading (1)
+                223, // info[0] - heading (2)
+                192, // info[0] - angvel (1)
+                255, // info[0] - angvel (2)
+                60,  // info[1] - node (1)
+                0,   // info[1] - node (2)
+                1,   // info[1] - lap (1)
+                0,   // info[1] - lap (1)
+                18,  // info[1] - plid
+                2,   // info[1] - position
+                128, // info[1] - info
+                0,   // info[1] - sp3
+                193, // info[1] - x (1)
+                48,  // info[1] - x (2)
+                14,  // info[1] - x (3)
+                1,   // info[1] - x (4)
+                237, // info[1] - y (1)
+                94,  // info[1] - y (2)
+                81,  // info[1] - y (3)
+                0,   // info[1] - y (4)
+                211, // info[1] - z (1)
+                131, // info[1] - z (2)
+                3,   // info[1] - z (3)
+                0,   // info[1] - z (4)
+                224, // info[1] - speed (1)
+                17,  // info[1] - speed (2)
+                36,  // info[1] - direction (1)
+                220, // info[1] - direction (2)
+                250, // info[1] - heading (1)
+                219, // info[1] - heading (2)
+                71,  // info[1] - angvel (1)
+                0,   // info[1] - angvel (2)
+            ],
+            |mci: Mci| {
+                assert_eq!(mci.reqi, RequestId(0));
+                assert_eq!(mci.info.len(), 2);
+            }
+        );
     }
 }

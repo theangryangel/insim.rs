@@ -3,7 +3,9 @@ use insim_core::binrw::{self, binrw};
 use crate::identifiers::{PlayerId, RequestId};
 
 #[binrw]
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
+#[derive(
+    PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default, insim_macros::ReadWriteBuf,
+)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
@@ -34,7 +36,7 @@ pub enum PenaltyInfo {
 }
 
 #[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
@@ -64,7 +66,7 @@ pub enum PenaltyReason {
 }
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Penalty received or cleared by player
 pub struct Pen {
@@ -82,5 +84,32 @@ pub struct Pen {
 
     /// The reason for the change
     #[brw(pad_after = 1)]
+    #[read_write_buf(pad_after = 1)]
     pub reason: PenaltyReason,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_pen() {
+        assert_from_to_bytes!(
+            Pen,
+            [
+                0, // reqi
+                3, // plid
+                1, // oldpen
+                2, // newpen
+                4, // reason
+                0, // sp3
+            ],
+            |pen: Pen| {
+                assert_eq!(pen.plid, PlayerId(3));
+                assert_eq!(pen.oldpen, PenaltyInfo::Dt);
+                assert_eq!(pen.newpen, PenaltyInfo::DtValid);
+                assert!(matches!(pen.reason, PenaltyReason::Speeding));
+            }
+        );
+    }
 }

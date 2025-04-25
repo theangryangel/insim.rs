@@ -9,7 +9,7 @@ use super::{Fuel200, PenaltyInfo};
 use crate::identifiers::{PlayerId, RequestId};
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Split X timing
 pub struct Spx {
@@ -21,11 +21,13 @@ pub struct Spx {
 
     #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
     #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
+    #[read_write_buf(duration(milliseconds = u32))]
     /// Split duration
     pub stime: Duration,
 
     #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
     #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
+    #[read_write_buf(duration(milliseconds = u32))]
     /// Total elapsed time
     pub etime: Duration,
 

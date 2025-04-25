@@ -3,7 +3,7 @@ use insim_core::binrw::{self, binrw};
 use crate::identifiers::{PlayerId, RequestId};
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Car Reset packet indicates a vehicle has been reset or that a vehicle should be reset by the
 /// server.
@@ -12,4 +12,17 @@ pub struct Crs {
     pub reqi: RequestId,
     /// Unique player ID that was reset, or should be reset
     pub plid: PlayerId,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_crs() {
+        assert_from_to_bytes!(Crs, [1, 9], |crs: Crs| {
+            assert_eq!(crs.reqi, RequestId(1));
+            assert_eq!(crs.plid, PlayerId(9));
+        });
+    }
 }

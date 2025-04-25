@@ -1,6 +1,12 @@
-use insim_core::binrw::{self, binrw};
+use bytes::{Buf, BufMut};
+use insim_core::{
+    binrw::{self, binrw},
+    ReadWriteBuf,
+};
 
 use crate::identifiers::{ConnectionId, RequestId};
+
+const AXM_MAX_OBJECTS: usize = 60;
 
 /// Used within the [Axm] packet.
 #[binrw]
@@ -14,6 +20,7 @@ pub struct ObjectInfo {
     /// Z coordinate of object
     pub z: u8,
 
+    // TODO: check layout if this has something we can do with it
     /// Flags
     pub flags: u8,
 
@@ -68,7 +75,7 @@ bitflags::bitflags! {
     #[br(map = Self::from_bits_truncate)]
     #[bw(map = |&x: &Self| x.bits())]
     /// AutoX object flags
-    pub struct PmoFlags: u16 {
+    pub struct PmoFlags: u8 {
         /// LFS has reached the end of a layout file which it is loading. The added objects will then be optimised.
         const FILE_END = (1 << 0);
 
@@ -93,7 +100,7 @@ bitflags::bitflags! {
     }
 }
 
-impl_bitflags_from_to_bytes!(PmoFlags, u16);
+impl_bitflags_from_to_bytes!(PmoFlags, u8);
 
 /// AutoX Multiple Objects - Report on/add/remove multiple AutoX objects
 #[binrw]
@@ -124,3 +131,90 @@ pub struct Axm {
 }
 
 impl_typical_with_request_id!(Axm);
+
+impl ReadWriteBuf for Axm {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
+        let mut numo = u8::read_buf(buf)?;
+        let ucid = ConnectionId::read_buf(buf)?;
+        let pmoaction = PmoAction::read_buf(buf)?;
+        let pmoflags = PmoFlags::read_buf(buf)?;
+        buf.advance(1);
+        let mut info = Vec::with_capacity(numo as usize);
+        while numo > 0 {
+            info.push(ObjectInfo::read_buf(buf)?);
+            numo -= 1;
+        }
+
+        Ok(Self {
+            reqi,
+            ucid,
+            pmoaction,
+            pmoflags,
+            info,
+        })
+    }
+
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
+        let len = self.info.len();
+        if len > AXM_MAX_OBJECTS {
+            return Err(insim_core::Error::TooLarge);
+        }
+        (len as u8).write_buf(buf)?;
+        self.ucid.write_buf(buf)?;
+        self.pmoaction.write_buf(buf)?;
+        self.pmoflags.write_buf(buf)?;
+        buf.put_bytes(0, 1);
+        for i in self.info.iter() {
+            i.write_buf(buf)?;
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_axm() {
+        assert_from_to_bytes!(
+            Axm,
+            [
+                0,   // reqi
+                2,   // numo
+                3,   // ucid
+                1,   // pmoaction
+                4,   // pmoflags
+                0,   // objects
+                172, // info[1] - x (1)
+                218, // info[1] - x (2)
+                25,  // info[1] - y (1)
+                136, // info[1] - y (2)
+                8,   // info[1] - zbyte
+                0,   // info[1] - flags
+                1,   // info[1] - objectindex
+                128, // info[1] - heading
+                172, // info[2] - x (1)
+                218, // info[2] - x (2)
+                25,  // info[2] - y (1)
+                136, // info[2] - y (2)
+                8,   // info[2] - zbyte
+                0,   // info[2] - flags
+                2,   // info[2] - objectindex
+                128, // info[2] - heading
+            ],
+            |axm: Axm| {
+                assert_eq!(axm.info.len(), 2);
+                assert_eq!(axm.info[0].z, 8);
+                assert_eq!(axm.info[0].flags, 0);
+                assert_eq!(axm.info[0].index, 1);
+                assert_eq!(axm.info[0].heading, 128);
+
+                assert_eq!(axm.info[1].index, 2);
+            }
+        )
+    }
+}

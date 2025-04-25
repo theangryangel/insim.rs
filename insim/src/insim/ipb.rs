@@ -1,7 +1,11 @@
 use std::{default::Default, net::Ipv4Addr};
 
+use bytes::{Buf, BufMut};
 use indexmap::{set::Iter as IndexSetIter, IndexSet};
-use insim_core::binrw::{self, binrw, BinRead, BinResult, BinWrite};
+use insim_core::{
+    binrw::{self, binrw, BinRead, BinResult, BinWrite},
+    ReadWriteBuf,
+};
 
 use crate::identifiers::RequestId;
 
@@ -85,38 +89,58 @@ impl Ipb {
     }
 }
 
+impl ReadWriteBuf for Ipb {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
+        let mut numb = u8::read_buf(buf)?;
+        buf.advance(4);
+        let mut banips = IndexSet::with_capacity(numb as usize);
+        while numb > 0 {
+            let ip = Ipv4Addr::from(u32::read_buf(buf)?);
+            let _ = banips.insert(ip);
+            numb -= 1;
+        }
+
+        Ok(Self { reqi, banips })
+    }
+
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
+        let numb = self.banips.len();
+        if numb > IPB_MAX_BANS {
+            return Err(insim_core::Error::TooLarge);
+        }
+        (numb as u8).write_buf(buf)?;
+        buf.put_bytes(0, 4);
+        for i in self.banips.iter() {
+            u32::from(*i).write_buf(buf)?;
+        }
+
+        Ok(())
+    }
+}
+
 impl_typical_with_request_id!(Ipb);
 
 #[cfg(test)]
 mod tests {
-    use std::io::{Cursor, Seek};
-
     use super::*;
 
     #[test]
-    fn test_encoding() {
-        let mut bans = Ipb::default();
-        bans.reqi = RequestId(2);
-        let _ = bans.insert(Ipv4Addr::new(127, 0, 0, 1));
-
-        let mut buf = Cursor::new(Vec::new());
-        bans.write_le(&mut buf).unwrap();
-        buf.rewind().unwrap();
-
-        let buf2 = buf.clone().into_inner();
-        assert_eq!(
-            buf2,
+    fn test_ipb() {
+        assert_from_to_bytes!(
+            Ipb,
             [
                 2, // reqi
                 1, // numb
                 0, 0, 0, 0, // padding / unused
                 1, 0, 0, 127, // mod 1
-            ]
+            ],
+            |ibp: Ipb| {
+                assert_eq!(ibp.reqi, RequestId(2));
+                assert_eq!(ibp.len(), 1);
+                assert!(ibp.contains(&Ipv4Addr::new(127, 0, 0, 1)));
+            }
         );
-
-        let data2 = Ipb::read_le(&mut buf).unwrap();
-        assert_eq!(bans, data2);
-        assert_eq!(data2.len(), 1);
-        assert!(data2.contains(&Ipv4Addr::new(127, 0, 0, 1)));
     }
 }

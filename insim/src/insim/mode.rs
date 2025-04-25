@@ -1,16 +1,13 @@
-use bytes::{Buf, BufMut};
-use insim_core::{
-    binrw::{self, binrw},
-    ReadWriteBuf,
-};
+use insim_core::binrw::{self, binrw};
 
 use crate::identifiers::RequestId;
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Screen Mode (referred to as originally IS_MOD within Insim.txt)
 pub struct Mod {
+    #[read_write_buf(pad_after = 1)]
     #[brw(pad_after = 1)]
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
@@ -26,35 +23,6 @@ pub struct Mod {
 
     /// Screen height. Zero to switch to windowed mode.
     pub height: i32,
-}
-
-impl ReadWriteBuf for Mod {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::read_buf(buf)?;
-        buf.advance(1);
-        let bit16 = i32::read_buf(buf)?;
-        let rr = i32::read_buf(buf)?;
-        let width = i32::read_buf(buf)?;
-        let height = i32::read_buf(buf)?;
-        Ok(Self {
-            reqi,
-            bit16,
-            rr,
-            width,
-            height,
-        })
-    }
-
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.write_buf(buf)?;
-        buf.put_u8(0);
-        self.bit16.write_buf(buf)?;
-        self.rr.write_buf(buf)?;
-        self.width.write_buf(buf)?;
-        self.height.write_buf(buf)?;
-
-        Ok(())
-    }
 }
 
 impl_typical_with_request_id!(Mod);

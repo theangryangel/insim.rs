@@ -1,9 +1,11 @@
 use std::default::Default;
 
+use bytes::{Buf, BufMut};
 use indexmap::{set::Iter as IndexSetIter, IndexSet};
 use insim_core::{
     binrw::{self, binrw, BinRead, BinResult, BinWrite},
     vehicle::Vehicle,
+    ReadWriteBuf,
 };
 
 use crate::{
@@ -101,12 +103,51 @@ impl Mal {
     }
 }
 
+impl ReadWriteBuf for Mal {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
+        let mut numm = u8::read_buf(buf)?;
+        let ucid = ConnectionId::read_buf(buf)?;
+        buf.advance(3);
+        let mut set = IndexSet::with_capacity(numm as usize);
+
+        while numm > 0 {
+            let _ = set.insert(Vehicle::Mod(u32::read_buf(buf)?));
+            numm -= 1;
+        }
+
+        Ok(Self {
+            reqi,
+            ucid,
+            allowed_mods: set,
+        })
+    }
+
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
+        if self.allowed_mods.len() > MAX_MAL_SIZE {
+            return Err(insim_core::Error::TooLarge);
+        }
+        (self.allowed_mods.len() as u8).write_buf(buf)?;
+        self.ucid.write_buf(buf)?;
+        buf.put_bytes(0, 3);
+        for i in self.allowed_mods.iter() {
+            match i {
+                Vehicle::Mod(ident) => ident.write_buf(buf)?,
+                _ => unreachable!(
+                    "Non-Mod vehicle managed to get into the HashSet. Should not be possible."
+                ),
+            }
+        }
+
+        Ok(())
+    }
+}
+
 impl_typical_with_request_id!(Mal);
 
 #[cfg(test)]
 mod tests {
-    use std::io::{Cursor, Seek};
-
     use super::*;
 
     #[test]
@@ -119,20 +160,9 @@ mod tests {
     }
 
     #[test]
-    fn test_encoding() {
-        let mut data = Mal::default();
-        assert!(data.insert(Vehicle::Mod(1)).is_ok());
-        assert!(data.insert(Vehicle::Mod(2)).is_ok());
-        data.reqi = RequestId(2);
-        data.ucid = ConnectionId(3);
-
-        let mut buf = Cursor::new(Vec::new());
-        data.write_le(&mut buf).unwrap();
-        buf.rewind().unwrap();
-
-        let buf2 = buf.clone().into_inner();
-        assert_eq!(
-            buf2,
+    fn test_mal() {
+        assert_from_to_bytes!(
+            Mal,
             [
                 2, // reqi
                 2, // numm
@@ -140,11 +170,14 @@ mod tests {
                 0, 0, 0, // padding / unused
                 1, 0, 0, 0, // mod 1
                 2, 0, 0, 0, // mod 2
-            ]
+            ],
+            |mal: Mal| {
+                assert_eq!(mal.reqi, RequestId(2));
+                assert_eq!(mal.ucid, ConnectionId(3));
+                assert_eq!(mal.len(), 2);
+                assert!(mal.contains(&Vehicle::Mod(1)));
+                assert!(mal.contains(&Vehicle::Mod(2)));
+            }
         );
-
-        let data2 = Mal::read_le(&mut buf).unwrap();
-        assert_eq!(data, data2);
-        assert_eq!(data2.len(), 2);
     }
 }

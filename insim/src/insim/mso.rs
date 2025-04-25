@@ -11,7 +11,7 @@ use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 /// Enum for the sound field of [Mso].
 #[binrw]
-#[derive(Debug, Default, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, PartialOrd, Ord, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
@@ -29,32 +29,6 @@ pub enum MsoUserType {
 
     /// Hidden message (due to be retired in Insim v9?)
     O = 3,
-}
-
-impl ReadWriteBuf for MsoUserType {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let discrim = u8::read_buf(buf)?;
-        match discrim {
-            0 => Ok(Self::System),
-            1 => Ok(Self::User),
-            2 => Ok(Self::Prefix),
-            3 => Ok(Self::O),
-            found => Err(insim_core::Error::NoVariantMatch {
-                found: found as u64,
-            }),
-        }
-    }
-
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        let discrim: u8 = match self {
-            Self::System => 0,
-            Self::User => 1,
-            Self::Prefix => 2,
-            Self::O => 3,
-        };
-        discrim.write_buf(buf)?;
-        Ok(())
-    }
 }
 
 const MSO_MSG_MAX_LEN: usize = 128;

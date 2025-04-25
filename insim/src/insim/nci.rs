@@ -8,7 +8,7 @@ use insim_core::{
 use crate::identifiers::{ConnectionId, RequestId};
 
 #[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
@@ -56,7 +56,7 @@ pub enum Language {
 }
 
 #[binrw]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Extra information about the new connection. This is only sent when connected to a game server,
 /// and only if an administrative password has been set and used by Insim.
@@ -72,6 +72,7 @@ pub struct Nci {
 
     /// License level.
     #[brw(pad_after = 2)]
+    #[read_write_buf(pad_after = 2)]
     pub license: License,
 
     /// LFS.net player ID
@@ -93,5 +94,40 @@ impl Default for Nci {
             userid: 0,
             ipaddress: Ipv4Addr::new(0, 0, 0, 0),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_nci() {
+        assert_from_to_bytes!(
+            Nci,
+            [
+                1,   // reqi
+                3,   // ucid
+                12,  // language
+                3,   // license,
+                0,   // sp2,
+                0,   // sp3,
+                3,   // userid (1)
+                42,  // userid (2)
+                5,   // userid (3)
+                1,   // userid (4)
+                1,   // ipaddress (1)
+                0,   // ipaddress (2)
+                0,   // ipaddress (3)
+                127, // ipaddress (4)
+            ],
+            |nci: Nci| {
+                assert_eq!(nci.reqi, RequestId(1));
+                assert_eq!(nci.ucid, ConnectionId(3));
+                assert!(matches!(nci.language, Language::Czech));
+                assert_eq!(nci.ipaddress, Ipv4Addr::from([127, 0, 0, 1]));
+                assert_eq!(nci.userid, 17115651_u32);
+            }
+        );
     }
 }

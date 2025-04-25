@@ -4,7 +4,7 @@ use insim_core::binrw::{self, binrw};
 use crate::identifiers::RequestId;
 
 #[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
@@ -23,7 +23,7 @@ pub enum OcoAction {
 }
 
 #[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
@@ -61,14 +61,17 @@ bitflags! {
     }
 }
 
+impl_bitflags_from_to_bytes!(OcoLights, u8);
+
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Object Control
 /// Used to switch start lights
 pub struct Oco {
     /// Non-zero if the packet is a packet request or a reply to a request
     #[brw(pad_after = 1)]
+    #[read_write_buf(pad_after = 1)]
     pub reqi: RequestId,
 
     /// Action to take
@@ -85,3 +88,29 @@ pub struct Oco {
 }
 
 impl_typical_with_request_id!(Oco);
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_oco() {
+        assert_from_to_bytes!(
+            Oco,
+            [
+                0,   // reqi
+                0,   // zero
+                5,   // ocoaction
+                149, // index
+                35,  // identifier
+                3,   // data
+            ],
+            |oco: Oco| {
+                assert_eq!(oco.reqi, RequestId(0));
+                assert!(matches!(oco.ocoaction, OcoAction::LightsSet));
+                assert_eq!(oco.identifier, 35);
+                assert_eq!(oco.data.bits(), 3);
+            }
+        );
+    }
+}

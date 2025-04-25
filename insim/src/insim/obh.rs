@@ -1,18 +1,24 @@
 use std::time::Duration;
 
 use bitflags::bitflags;
+use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw, BinRead, BinResult},
     duration::{binrw_parse_duration, binrw_write_duration},
+    ReadWriteBuf,
 };
 
 use crate::identifiers::{PlayerId, RequestId};
+
+fn strip_high_bits(val: u16) -> u16 {
+    val & !61440
+}
 
 #[binrw::parser(reader, endian)]
 pub(crate) fn binrw_parse_spclose_strip_reserved_bits() -> BinResult<u16> {
     let res = u16::read_options(reader, endian, ())?;
     // strip the top 4 bits off
-    Ok(res & !61440)
+    Ok(strip_high_bits(res))
 }
 
 bitflags! {
@@ -43,8 +49,10 @@ generate_bitflag_helpers! {
     pub was_in_original_position => ON_SPOT
 }
 
+impl_bitflags_from_to_bytes!(ObhFlags, u8);
+
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Vehicle made contact with something else
 pub struct CarContact {
@@ -108,32 +116,98 @@ pub struct Obh {
     pub flags: ObhFlags,
 }
 
+impl ReadWriteBuf for Obh {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::read_buf(buf)?;
+        let plid = PlayerId::read_buf(buf)?;
+        // automatically strip off the first 4 bits as they're reserved
+        let spclose = strip_high_bits(u16::read_buf(buf)?);
+        let time = Duration::from_millis((u16::read_buf(buf)? as u64) * 10);
+        let c = CarContact::read_buf(buf)?;
+        let x = i16::read_buf(buf)?;
+        let y = i16::read_buf(buf)?;
+        let zbyte = u8::read_buf(buf)?;
+        buf.advance(1);
+        let index = u8::read_buf(buf)?;
+        let flags = ObhFlags::read_buf(buf)?;
+        Ok(Self {
+            reqi,
+            plid,
+            spclose,
+            time,
+            c,
+            x,
+            y,
+            zbyte,
+            index,
+            flags,
+        })
+    }
+
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.write_buf(buf)?;
+        self.plid.write_buf(buf)?;
+        // automatically strip off the first 4 bits as they're reserved
+        strip_high_bits(self.spclose).write_buf(buf)?;
+        // FIXME: handle if this is too small
+        let time = (self.time.as_millis() / 10) as u16;
+        time.write_buf(buf)?;
+        self.c.write_buf(buf)?;
+        self.x.write_buf(buf)?;
+        self.y.write_buf(buf)?;
+        self.zbyte.write_buf(buf)?;
+        buf.put_bytes(0, 1);
+        self.index.write_buf(buf)?;
+        self.flags.write_buf(buf)?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
-
     use super::*;
 
     #[test]
-    fn ensure_high_bits_stripped() {
-        assert_eq!(
-            binrw_parse_spclose_strip_reserved_bits(
-                &mut Cursor::new(61441_u16.to_le_bytes()),
-                binrw::Endian::Little,
-                ()
-            )
-            .unwrap(),
-            1
+    fn test_obh() {
+        assert_from_to_bytes!(
+            Obh,
+            [
+                0,   // reqi
+                3,   // plid
+                23,  // spclose (1)
+                0,   // spclose (2)
+                241, // time (1)
+                1,   // time (2)
+                2,   // c - direction
+                254, // c - heading
+                3,   // c - speed
+                9,   // c - zbyte
+                4,   // c - x (1)
+                213, // c - x (2)
+                132, // c - y (1)
+                134, // c - y (2)
+                18,  // x (1)
+                213, // x (2)
+                174, // y (1)
+                134, // y (2)
+                1,   // zbyte
+                0,   // sp1
+                113, // index
+                11,  // obhflags
+            ],
+            |obh: Obh| {
+                assert_eq!(obh.reqi, RequestId(0));
+                assert_eq!(obh.plid, PlayerId(3));
+                assert_eq!(obh.time, Duration::from_millis(4970));
+                assert_eq!(obh.spclose, 23);
+            }
         );
+    }
 
-        assert_eq!(
-            binrw_parse_spclose_strip_reserved_bits(
-                &mut Cursor::new(63495_u16.to_le_bytes()),
-                binrw::Endian::Little,
-                ()
-            )
-            .unwrap(),
-            2055
-        );
+    #[test]
+    fn ensure_high_bits_stripped() {
+        assert_eq!(strip_high_bits(61441), 1);
+
+        assert_eq!(strip_high_bits(63495,), 2055);
     }
 }

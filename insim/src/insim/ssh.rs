@@ -28,7 +28,7 @@ pub enum SshError {
 }
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Send Screenshot - instructional and informational.
 pub struct Ssh {
@@ -42,6 +42,8 @@ pub struct Ssh {
     /// Screenshot file path.
     #[br(parse_with = binrw_parse_codepage_string::<32, _>)]
     #[bw(write_with = binrw_write_codepage_string::<32, _>)]
+    // FIXME: Probably not really ascii. definitely not a codepage. Probably wchar_t?
+    #[read_write_buf(ascii(length = 32))]
     pub name: String,
 }
 

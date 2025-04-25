@@ -4,7 +4,7 @@ use crate::identifiers::{PlayerId, RequestId};
 
 /// Enum for the flag field of [Flg].
 #[binrw]
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
@@ -19,7 +19,7 @@ pub enum FlgType {
 }
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Race Flag is sent when a flag is waved at a player.
 pub struct Flg {
@@ -39,5 +39,30 @@ pub struct Flg {
 
     /// Player behind
     #[brw(pad_after = 1)]
+    #[read_write_buf(pad_after = 1)]
     pub carbehind: PlayerId,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_flg() {
+        assert_from_to_bytes!(
+            Flg,
+            [
+                0,  // reqi
+                3,  // plid
+                1,  // offon
+                2,  // flag
+                14, // carbehind
+                0,  // sp3
+            ],
+            |flg: Flg| {
+                assert_eq!(flg.offon, true);
+                assert!(matches!(flg.flag, FlgType::Yellow));
+            }
+        );
+    }
 }

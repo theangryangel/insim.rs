@@ -9,7 +9,7 @@ use super::{CarContact, ObjectInfo};
 use crate::identifiers::{PlayerId, RequestId};
 
 #[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
@@ -31,7 +31,7 @@ pub enum UcoAction {
 }
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// User Control Object - reports crossing an InSim checkpoint / entering an InSim circle (from layout)
 pub struct Uco {
@@ -49,6 +49,7 @@ pub struct Uco {
     /// When this happened
     #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
     #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
+    #[read_write_buf(duration(milliseconds = u32))]
     pub time: Duration,
 
     /// Was there any car contact?

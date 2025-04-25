@@ -1,8 +1,6 @@
-use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-    FromToCodepageBytes, ReadWriteBuf,
 };
 
 use crate::identifiers::{ConnectionId, RequestId};
@@ -28,7 +26,7 @@ generate_bitflag_helpers! {
 impl_bitflags_from_to_bytes!(NcnFlags, u8);
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// New Connection
 pub struct Ncn {
@@ -41,10 +39,12 @@ pub struct Ncn {
     /// LFS.net username.
     #[bw(write_with = binrw_write_codepage_string::<24, _>)]
     #[br(parse_with = binrw_parse_codepage_string::<24, _>)]
+    #[read_write_buf(codepage(length = 24))]
     pub uname: String,
 
     #[bw(write_with = binrw_write_codepage_string::<24, _>)]
     #[br(parse_with = binrw_parse_codepage_string::<24, _>)]
+    #[read_write_buf(codepage(length = 24))]
     /// Player Name.
     pub pname: String,
 
@@ -57,47 +57,14 @@ pub struct Ncn {
     pub total: u8,
 
     #[brw(pad_after = 1)]
+    #[read_write_buf(pad_after = 1)]
     /// Flags describing additional facts about this connection
     pub flags: NcnFlags,
 }
 
-impl ReadWriteBuf for Ncn {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::read_buf(buf)?;
-        let ucid = ConnectionId::read_buf(buf)?;
-        let uname = String::from_codepage_bytes(buf, 24)?;
-        let pname = String::from_codepage_bytes(buf, 24)?;
-        let admin = u8::read_buf(buf)? > 0;
-        let total = u8::read_buf(buf)?;
-        let flags = NcnFlags::read_buf(buf)?;
-        buf.advance(1);
-        Ok(Self {
-            reqi,
-            ucid,
-            uname,
-            pname,
-            admin,
-            total,
-            flags,
-        })
-    }
-
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.write_buf(buf)?;
-        self.ucid.write_buf(buf)?;
-        self.uname.to_codepage_bytes(buf, 24)?;
-        self.pname.to_codepage_bytes(buf, 24)?;
-        (self.admin as u8).write_buf(buf)?;
-        self.total.write_buf(buf)?;
-        self.flags.write_buf(buf)?;
-        buf.put_u8(0);
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod test {
-    use bytes::BytesMut;
+    use bytes::{BufMut, BytesMut};
 
     use super::*;
 

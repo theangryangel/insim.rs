@@ -1,17 +1,15 @@
 use bitflags::bitflags;
-use bytes::{Buf, BufMut};
 use insim_core::{
     binrw::{self, binrw},
     string::{binrw_parse_codepage_string, binrw_write_codepage_string},
     vehicle::Vehicle,
-    Error, FromToCodepageBytes, ReadWriteBuf,
 };
 
 use super::Fuel;
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 #[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[brw(repr(u8))]
@@ -45,47 +43,6 @@ pub enum TyreCompound {
     /// Special: "No change"
     #[default]
     NoChange = 255,
-}
-
-impl ReadWriteBuf for TyreCompound {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let discrim = u8::read_buf(buf)?;
-        let val = match discrim {
-            0 => Self::R1,
-            1 => Self::R2,
-            2 => Self::R3,
-            3 => Self::R4,
-            4 => Self::RoadSuper,
-            5 => Self::RoadNormal,
-            6 => Self::Hybrid,
-            7 => Self::Knobbly,
-            255 => Self::NoChange,
-            found => {
-                return Err(Error::NoVariantMatch {
-                    found: found as u64,
-                })
-            },
-        };
-
-        Ok(val)
-    }
-
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        let discrim: u8 = match self {
-            Self::R1 => 0,
-            Self::R2 => 1,
-            Self::R3 => 2,
-            Self::R4 => 3,
-            Self::RoadSuper => 4,
-            Self::RoadNormal => 5,
-            Self::Hybrid => 6,
-            Self::Knobbly => 7,
-            Self::NoChange => 255,
-        };
-
-        discrim.write_buf(buf)?;
-        Ok(())
-    }
 }
 
 bitflags! {
@@ -220,7 +177,7 @@ bitflags! {
 impl_bitflags_from_to_bytes!(Passengers, u8);
 
 #[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Sent when a New Player joins.
 pub struct Npl {
@@ -241,11 +198,13 @@ pub struct Npl {
 
     #[bw(write_with = binrw_write_codepage_string::<24, _>)]
     #[br(parse_with = binrw_parse_codepage_string::<24, _>)]
+    #[read_write_buf(codepage(length = 24))]
     /// Player name
     pub pname: String,
 
     #[bw(write_with = binrw_write_codepage_string::<8, _>)]
     #[br(parse_with = binrw_parse_codepage_string::<8, _>)]
+    #[read_write_buf(codepage(length = 8))]
     /// Number plate
     pub plate: String,
 
@@ -254,6 +213,7 @@ pub struct Npl {
 
     #[bw(write_with = binrw_write_codepage_string::<16, _>)]
     #[br(parse_with = binrw_parse_codepage_string::<16, _>)]
+    #[read_write_buf(codepage(length = 16))]
     /// Skin name.
     pub sname: String,
 
@@ -276,6 +236,7 @@ pub struct Npl {
 
     /// low 4 bits: tyre width reduction (front)
     #[brw(pad_after = 2)]
+    #[read_write_buf(pad_after = 2)]
     pub fwadj: u8, // TODO: split into pair of u4
 
     /// Setup flags, see [SetFlags].
@@ -291,79 +252,6 @@ pub struct Npl {
 
     /// When /showfuel yes: fuel percent / no: 255
     pub fuel: Fuel,
-}
-
-impl ReadWriteBuf for Npl {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, Error> {
-        let reqi = RequestId::read_buf(buf)?;
-        let plid = PlayerId::read_buf(buf)?;
-        let ucid = ConnectionId::read_buf(buf)?;
-        let ptype = PlayerType::read_buf(buf)?;
-        let flags = PlayerFlags::read_buf(buf)?;
-        let pname = String::from_codepage_bytes(buf, 24)?;
-        let plate = String::from_codepage_bytes(buf, 8)?;
-        let cname = Vehicle::read_buf(buf)?;
-        let sname = String::from_codepage_bytes(buf, 16)?;
-        let tyres = <[TyreCompound; 4]>::read_buf(buf)?;
-        let h_mass = u8::read_buf(buf)?;
-        let h_tres = u8::read_buf(buf)?;
-        let model = u8::read_buf(buf)?;
-        let pass = Passengers::read_buf(buf)?;
-        let rwadj = u8::read_buf(buf)?;
-        let fwadj = u8::read_buf(buf)?;
-        buf.advance(2);
-        let setf = SetFlags::read_buf(buf)?;
-        let nump = u8::read_buf(buf)?;
-        let config = u8::read_buf(buf)?;
-        let fuel = Fuel::read_buf(buf)?;
-        Ok(Self {
-            reqi,
-            plid,
-            ucid,
-            ptype,
-            flags,
-            pname,
-            plate,
-            cname,
-            sname,
-            tyres,
-            h_mass,
-            h_tres,
-            model,
-            pass,
-            rwadj,
-            fwadj,
-            setf,
-            nump,
-            config,
-            fuel,
-        })
-    }
-
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), Error> {
-        self.reqi.write_buf(buf)?;
-        self.plid.write_buf(buf)?;
-        self.ucid.write_buf(buf)?;
-        self.ptype.write_buf(buf)?;
-        self.flags.write_buf(buf)?;
-        self.pname.to_codepage_bytes(buf, 24)?;
-        self.plate.to_codepage_bytes(buf, 8)?;
-        self.cname.write_buf(buf)?;
-        self.sname.to_codepage_bytes(buf, 16)?;
-        self.tyres.write_buf(buf)?;
-        self.h_mass.write_buf(buf)?;
-        self.h_tres.write_buf(buf)?;
-        self.model.write_buf(buf)?;
-        self.pass.write_buf(buf)?;
-        self.rwadj.write_buf(buf)?;
-        self.fwadj.write_buf(buf)?;
-        buf.put_bytes(0, 2);
-        self.setf.write_buf(buf)?;
-        self.nump.write_buf(buf)?;
-        self.config.write_buf(buf)?;
-        self.fuel.write_buf(buf)?;
-        Ok(())
-    }
 }
 
 #[cfg(test)]
