@@ -605,8 +605,8 @@ impl ReadWriteBuf for Packet {
             65 => Self::Mal(Mal::read_buf(buf)?),
             66 => Self::Plh(Plh::read_buf(buf)?),
             67 => Self::Ipb(Ipb::read_buf(buf)?),
-            // 68 => Self::Aic(Aic::read_buf(buf)?),
-            // 69 => Self::Aii(Aii::read_buf(buf)?),
+            68 => Self::Aic(Aic::read_buf(buf)?),
+            69 => Self::Aii(Aii::read_buf(buf)?),
             250 => Self::RelayArq(Arq::read_buf(buf)?),
             251 => Self::RelayArp(Arp::read_buf(buf)?),
             252 => Self::RelayHlr(Hlr::read_buf(buf)?),
@@ -619,7 +619,310 @@ impl ReadWriteBuf for Packet {
         Ok(packet)
     }
 
-    fn write_buf(&self, _buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        todo!()
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        match self {
+            Self::Isi(i) => {
+                1_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Ver(i) => {
+                2_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Tiny(i) => {
+                3_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Small(i) => {
+                4_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Sta(i) => {
+                5_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Sch(i) => {
+                6_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Sfp(i) => {
+                7_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Scc(i) => {
+                8_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Cpp(i) => {
+                9_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Ism(i) => {
+                10_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Mso(i) => {
+                11_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Iii(i) => {
+                12_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Mst(i) => {
+                13_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Mtc(i) => {
+                14_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Mod(i) => {
+                15_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Vtn(i) => {
+                16_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Rst(i) => {
+                17_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Ncn(i) => {
+                18_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Cnl(i) => {
+                19_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Cpr(i) => {
+                20_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Npl(i) => {
+                21_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Plp(i) => {
+                22_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Pll(i) => {
+                23_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Lap(i) => {
+                24_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Spx(i) => {
+                25_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Pit(i) => {
+                26_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Psf(i) => {
+                27_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Pla(i) => {
+                28_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Cch(i) => {
+                29_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Pen(i) => {
+                30_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Toc(i) => {
+                31_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Flg(i) => {
+                32_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Pfl(i) => {
+                33_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Fin(i) => {
+                34_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Res(i) => {
+                35_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Reo(i) => {
+                36_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Nlp(i) => {
+                37_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Mci(i) => {
+                38_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Msx(i) => {
+                39_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Msl(i) => {
+                40_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Crs(i) => {
+                41_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Bfn(i) => {
+                42_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Axi(i) => {
+                43_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Axo(i) => {
+                44_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Btn(i) => {
+                45_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Btc(i) => {
+                46_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Btt(i) => {
+                47_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Rip(i) => {
+                48_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Ssh(i) => {
+                49_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Con(i) => {
+                50_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Obh(i) => {
+                51_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Hlv(i) => {
+                52_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Plc(i) => {
+                53_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Axm(i) => {
+                54_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Acr(i) => {
+                55_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Hcp(i) => {
+                56_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Nci(i) => {
+                57_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Jrr(i) => {
+                58_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Uco(i) => {
+                59_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Oco(i) => {
+                60_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Ttc(i) => {
+                61_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Slc(i) => {
+                62_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Csc(i) => {
+                63_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Cim(i) => {
+                64_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Mal(i) => {
+                65_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Plh(i) => {
+                66_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Ipb(i) => {
+                67_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Aic(i) => {
+                68_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::Aii(i) => {
+                69_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::RelayArq(i) => {
+                250_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::RelayArp(i) => {
+                251_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::RelayHlr(i) => {
+                252_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::RelayHos(i) => {
+                253_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::RelaySel(i) => {
+                254_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+            Self::RelayErr(i) => {
+                255_u8.write_buf(buf)?;
+                i.write_buf(buf)?;
+            },
+        };
+
+        Ok(())
     }
 }
