@@ -177,8 +177,8 @@ impl ReadWriteBuf for Smx {
         let smx_version = u8::read_buf(buf)?;
         let dimensions = u8::read_buf(buf)?;
         let resolution = u8::read_buf(buf)?;
-        buf.advance(4);
         let vertex_colours = u8::read_buf(buf)?;
+        buf.advance(4);
         let track = String::from_codepage_bytes(buf, 32)?;
         let ground_colour = Rgb::read_buf(buf)?;
         buf.advance(9);
@@ -297,6 +297,8 @@ mod test {
         let mut inner = BytesMut::new();
         p.write_buf(&mut inner)
             .expect("Should not fail to write SMX");
+
+        assert_eq!(inner.len(), raw.len());
         assert_eq!(inner.as_ref(), raw);
     }
 }
