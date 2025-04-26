@@ -9,11 +9,9 @@
 //!
 //! I would suggest that SMX files should be considered historical at this point.
 
-#[cfg(test)]
-use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::{
     fs::{self, File},
-    io::ErrorKind,
+    io::{ErrorKind, Read},
     path::PathBuf,
 };
 
@@ -258,43 +256,47 @@ impl Smx {
 }
 
 #[cfg(test)]
-fn assert_valid_autocross_3dh(p: &Smx) {
-    assert_eq!(p.objects.len(), 1666);
-    assert_eq!(p.checkpoint_object_index.len(), 6);
-    assert_eq!(p.track, "Autocross");
-    assert_eq!(p.track.as_bytes().len(), 9);
-}
+mod test {
+    use super::*;
 
-#[test]
-fn test_smx_decode_from_pathbuf() {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("./tests/Autocross_3DH.smx");
-    let p = Smx::from_pathbuf(&path).expect("Expected SMX file to be parsed");
+    fn assert_valid_autocross_3dh(p: &Smx) {
+        assert_eq!(p.objects.len(), 1666);
+        assert_eq!(p.checkpoint_object_index.len(), 6);
+        assert_eq!(p.track, "Autocross");
+        assert_eq!(p.track.as_bytes().len(), 9);
+    }
 
-    assert_valid_autocross_3dh(&p);
-}
+    #[test]
+    fn test_smx_decode_from_pathbuf() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("./tests/Autocross_3DH.smx");
+        let p = Smx::from_pathbuf(&path).expect("Expected SMX file to be parsed");
 
-#[test]
-fn test_smx_decode_from_file() {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("./tests/Autocross_3DH.smx");
-    let mut file = File::open(path).expect("Expected Autocross_3DH.smx to exist");
-    let p = Smx::from_file(&mut file).expect("Expected SMX file to be parsed");
+        assert_valid_autocross_3dh(&p);
+    }
 
-    assert_valid_autocross_3dh(&p);
-}
+    #[test]
+    fn test_smx_decode_from_file() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("./tests/Autocross_3DH.smx");
+        let mut file = File::open(path).expect("Expected Autocross_3DH.smx to exist");
+        let p = Smx::from_file(&mut file).expect("Expected SMX file to be parsed");
 
-#[test]
-fn test_smx_encode() {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("./tests/Autocross_3DH.smx");
-    let p = Smx::from_pathbuf(&path).expect("Expected SMX file to be parsed");
+        assert_valid_autocross_3dh(&p);
+    }
 
-    let mut file = File::open(path).expect("Expected Autocross_3DH.smx to exist");
-    let mut raw: Vec<u8> = Vec::new();
-    let _ = file
-        .read_to_end(&mut raw)
-        .expect("Expected to read whole file");
+    #[test]
+    fn test_smx_encode() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("./tests/Autocross_3DH.smx");
+        let p = Smx::from_pathbuf(&path).expect("Expected SMX file to be parsed");
 
-    let mut inner = BytesMut::new();
-    p.write_buf(&mut inner)
-        .expect("Should not fail to write SMX");
-    assert_eq!(inner.as_ref(), raw);
+        let mut file = File::open(path).expect("Expected Autocross_3DH.smx to exist");
+        let mut raw: Vec<u8> = Vec::new();
+        let _ = file
+            .read_to_end(&mut raw)
+            .expect("Expected to read whole file");
+
+        let mut inner = BytesMut::new();
+        p.write_buf(&mut inner)
+            .expect("Should not fail to write SMX");
+        assert_eq!(inner.as_ref(), raw);
+    }
 }

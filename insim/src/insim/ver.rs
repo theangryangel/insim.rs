@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use bytes::{Buf, BufMut};
 use insim_core::{game_version::GameVersion, FromToAsciiBytes, FromToCodepageBytes, ReadWriteBuf};
 
@@ -59,6 +57,8 @@ impl ReadWriteBuf for Ver {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
 
     #[test]

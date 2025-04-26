@@ -17,15 +17,13 @@
 //! there is approximately 0.2 seconds of time between passing one node and the next,
 //! when you are "driving at a reasonable speed".
 
-#[cfg(test)]
-use std::io::{Read, Seek, SeekFrom};
 use std::{
     fs::{self, File},
-    io::ErrorKind,
+    io::{ErrorKind, Read},
     path::PathBuf,
 };
 
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use insim_core::{point::Point, FromToAsciiBytes, ReadWriteBuf};
 use thiserror::Error;
 
@@ -206,47 +204,48 @@ impl Pth {
 }
 
 #[cfg(test)]
-fn assert_valid_as1_pth(p: &Pth) {
-    assert_eq!(p.version, 0);
-    assert_eq!(p.revision, 0);
-    assert_eq!(p.finish_line_node, 250);
-}
+mod test {
+    use bytes::BytesMut;
 
-#[test]
-fn test_pth_decode_from_pathbuf() {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("./tests/AS1.pth");
-    let p = Pth::from_pathbuf(&path).expect("Expected PTH file to be parsed");
+    use super::*;
 
-    assert_valid_as1_pth(&p)
-}
+    fn assert_valid_as1_pth(p: &Pth) {
+        assert_eq!(p.version, 0);
+        assert_eq!(p.revision, 0);
+        assert_eq!(p.finish_line_node, 250);
+    }
 
-#[test]
-fn test_pth_decode_from_file() {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("./tests/AS1.pth");
-    let mut file = File::open(path).expect("Expected Autocross_3DH.smx to exist");
-    let p = Pth::from_file(&mut file).expect("Expected PTH file to be parsed");
+    #[test]
+    fn test_pth_decode_from_pathbuf() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("./tests/AS1.pth");
+        let p = Pth::from_pathbuf(&path).expect("Expected PTH file to be parsed");
 
-    let pos = file.stream_position().unwrap();
-    let end = file.seek(SeekFrom::End(0)).unwrap();
+        assert_valid_as1_pth(&p)
+    }
 
-    assert_eq!(pos, end, "Expected the whole file to be completely read");
+    #[test]
+    fn test_pth_decode_from_file() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("./tests/AS1.pth");
+        let mut file = File::open(path).expect("Expected Autocross_3DH.smx to exist");
+        let p = Pth::from_file(&mut file).expect("Expected PTH file to be parsed");
 
-    assert_valid_as1_pth(&p)
-}
+        assert_valid_as1_pth(&p)
+    }
 
-#[test]
-fn test_pth_encode() {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("./tests/AS1.pth");
-    let p = Pth::from_pathbuf(&path).expect("Expected SMX file to be parsed");
+    #[test]
+    fn test_pth_encode() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("./tests/AS1.pth");
+        let p = Pth::from_pathbuf(&path).expect("Expected SMX file to be parsed");
 
-    let mut file = File::open(path).expect("Expected AS1.pth to exist");
-    let mut raw: Vec<u8> = Vec::new();
-    let _ = file
-        .read_to_end(&mut raw)
-        .expect("Expected to read whole file");
+        let mut file = File::open(path).expect("Expected AS1.pth to exist");
+        let mut raw: Vec<u8> = Vec::new();
+        let _ = file
+            .read_to_end(&mut raw)
+            .expect("Expected to read whole file");
 
-    let mut inner = BytesMut::new();
-    p.write_buf(&mut inner)
-        .expect("Should not fail to write pth file");
-    assert_eq!(inner.as_ref(), raw);
+        let mut inner = BytesMut::new();
+        p.write_buf(&mut inner)
+            .expect("Should not fail to write pth file");
+        assert_eq!(inner.as_ref(), raw);
+    }
 }
