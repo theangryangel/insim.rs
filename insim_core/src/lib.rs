@@ -12,6 +12,7 @@ use std::{array::from_fn, fmt::Display, net::Ipv4Addr, num::TryFromIntError};
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
+// FIXME: rename, add line/contextual information
 #[non_exhaustive]
 /// Read/Write Error
 #[derive(Debug)]
