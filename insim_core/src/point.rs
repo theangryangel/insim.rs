@@ -5,13 +5,7 @@ use serde::Serialize;
 use crate::ReadWriteBuf;
 
 #[allow(missing_docs)]
-pub trait Pointable:
-    Copy
-    + Clone
-    + Default
-    + ReadWriteBuf
-{
-}
+pub trait Pointable: Copy + Clone + Default + ReadWriteBuf {}
 
 impl Pointable for i32 {}
 impl Pointable for f32 {}

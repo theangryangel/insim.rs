@@ -18,15 +18,15 @@
 //! when you are "driving at a reasonable speed".
 
 #[cfg(test)]
-use std::io::{Cursor, Read, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom};
 use std::{
     fs::{self, File},
     io::ErrorKind,
     path::PathBuf,
 };
 
-use bytes::Bytes;
-use insim_core::{point::Point, ReadWriteBuf, FromToAsciiBytes};
+use bytes::{Bytes, BytesMut};
+use insim_core::{point::Point, FromToAsciiBytes, ReadWriteBuf};
 use thiserror::Error;
 
 #[non_exhaustive]
@@ -160,23 +160,34 @@ impl ReadWriteBuf for Pth {
             num_nodes -= 1;
         }
         Ok(Self {
-            version, revision, finish_line_node, nodes
+            version,
+            revision,
+            finish_line_node,
+            nodes,
         })
-
     }
 
     fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        todo!()
+        buf.extend_from_slice(b"LFSPTH");
+        self.version.write_buf(buf)?;
+        self.revision.write_buf(buf)?;
+        // FIXME
+        (self.nodes.len() as i32).write_buf(buf)?;
+        self.finish_line_node.write_buf(buf)?;
+        for i in self.nodes.iter() {
+            i.write_buf(buf)?;
+        }
+        Ok(())
     }
 }
 
 impl Pth {
     /// Read and parse a PTH file into a [Pth] struct.
     pub fn from_file(i: &mut File) -> Result<Self, Error> {
-        let mut data = vec![]; 
-        i.read_to_end(&mut data);
-        let buf = Bytes::from(data);
-        Pth::read_buf(i).map_err(Error::from)
+        let mut data = vec![];
+        let _ = i.read_to_end(&mut data)?;
+        let mut buf = Bytes::from(data);
+        Pth::read_buf(&mut buf).map_err(Error::from)
     }
 
     /// Read and parse a PTH file into a [Pth] struct.
@@ -223,18 +234,19 @@ fn test_pth_decode_from_file() {
     assert_valid_as1_pth(&p)
 }
 
-// FIXME
-// #[test]
-// fn test_pth_encode() {
-//     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("./tests/AS1.pth");
-//     let p = Pth::from_pathbuf(&path).expect("Expected SMX file to be parsed");
-//
-//     let mut file = File::open(path).expect("Expected AS1.pth to exist");
-//     let mut raw: Vec<u8> = Vec::new();
-//     let _ = file
-//         .read_to_end(&mut raw)
-//         .expect("Expected to read whole file");
-//
-//     let inner = writer.into_inner();
-//     assert_eq!(inner, raw);
-// }
+#[test]
+fn test_pth_encode() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("./tests/AS1.pth");
+    let p = Pth::from_pathbuf(&path).expect("Expected SMX file to be parsed");
+
+    let mut file = File::open(path).expect("Expected AS1.pth to exist");
+    let mut raw: Vec<u8> = Vec::new();
+    let _ = file
+        .read_to_end(&mut raw)
+        .expect("Expected to read whole file");
+
+    let mut inner = BytesMut::new();
+    p.write_buf(&mut inner)
+        .expect("Should not fail to write pth file");
+    assert_eq!(inner.as_ref(), raw);
+}

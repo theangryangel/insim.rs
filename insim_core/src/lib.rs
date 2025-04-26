@@ -10,8 +10,6 @@ pub mod wind;
 
 use std::{array::from_fn, fmt::Display, net::Ipv4Addr, num::TryFromIntError};
 
-#[doc(hidden)]
-pub use ::binrw;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 #[non_exhaustive]
@@ -40,6 +38,8 @@ pub enum Error {
     /// Value too large for field
     TooLarge,
 }
+
+impl std::error::Error for Error {}
 
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

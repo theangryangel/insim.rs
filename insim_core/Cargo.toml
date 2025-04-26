@@ -18,8 +18,6 @@ bench = false
 doctest = false
 
 [dependencies]
-binrw = { workspace = true }
-# bitflags = { workspace = true }
 bytes = { workspace = true }
 encoding_rs = { workspace = true }
 if_chain = { workspace = true }

@@ -29,10 +29,6 @@ pub enum Error {
     #[error("Websocket Error: {0}")]
     WebsocketIO(String),
 
-    /// Error during the encoding or decoding of an Insim packet from the network
-    #[error("Insim Core error {0}")]
-    BinRw(String),
-
     /// Certain operations only allow for mods, this error indicates a standard vehicle was passed
     /// instead.
     #[error("Only Mods are permitted")]
@@ -43,6 +39,7 @@ pub enum Error {
     #[error("Only Standard vehicles are permitted")]
     VehicleNotStandard,
 
+    // FIXME: Rename to ReadWriteBuf
     /// Placeholder
     #[error("Insim core error. Placeholder")]
     Core(insim_core::Error),
@@ -52,12 +49,6 @@ pub enum Error {
 impl From<tokio::time::error::Elapsed> for Error {
     fn from(value: tokio::time::error::Elapsed) -> Self {
         Error::Timeout(value.to_string())
-    }
-}
-
-impl From<insim_core::binrw::Error> for Error {
-    fn from(value: insim_core::binrw::Error) -> Self {
-        Error::BinRw(value.to_string()) // FIXME
     }
 }
 
