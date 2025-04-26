@@ -4,15 +4,11 @@ use std::{
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use insim_core::{
-    binrw::{self as binrw, binrw},
-    ReadWriteBuf,
-};
+use insim_core::ReadWriteBuf;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 /// Request Identifier, commonly referred to as reqi in Insim.txt
-#[binrw]
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct RequestId(pub u8);

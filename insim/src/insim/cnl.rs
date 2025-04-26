@@ -1,12 +1,8 @@
-use insim_core::binrw::{self, binrw};
-
 use crate::identifiers::{ConnectionId, RequestId};
 
-#[binrw]
 #[derive(Debug, Default, Clone, PartialEq, Eq, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// Used within [Cnl] to indicate the leave reason.
 pub enum CnlReason {
@@ -42,7 +38,6 @@ pub enum CnlReason {
     Hack = 9,
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Connection Leave
@@ -57,7 +52,6 @@ pub struct Cnl {
     pub reason: CnlReason,
 
     /// Number of remaining connections including host
-    #[brw(pad_after = 2)]
     #[read_write_buf(pad_after = 2)]
     pub total: u8,
 }

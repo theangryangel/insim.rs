@@ -1,21 +1,13 @@
 use std::time::Duration;
 
 use bitflags::bitflags;
-use insim_core::{
-    binrw::{self, binrw},
-    duration::{binrw_parse_duration, binrw_write_duration},
-    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-};
 
 use crate::{identifiers::RequestId, WithRequestId, VERSION};
 
 bitflags! {
     /// Flags for the [Init] packet flags field.
-    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     /// Flags for [Isi], used to indicate what behaviours we want to opt into
     pub struct IsiFlags: u16 {
         /// Guest or single player
@@ -68,7 +60,6 @@ impl From<IsiFlags> for Isi {
 
 impl_bitflags_from_to_bytes!(IsiFlags, u16);
 
-#[binrw]
 #[derive(Debug, Clone, Eq, PartialEq, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Insim Init, or handshake packet.
@@ -76,7 +67,6 @@ impl_bitflags_from_to_bytes!(IsiFlags, u16);
 pub struct Isi {
     /// When set to a non-zero value the server will send a [crate::Packet::Ver] packet in response.
     ///packet in response.
-    #[brw(pad_after = 1)]
     #[read_write_buf(pad_after = 1)]
     pub reqi: RequestId,
 
@@ -93,26 +83,18 @@ pub struct Isi {
     /// Messages typed with this prefix will be sent to your InSim program
     /// on the host (in IS_MSO) and not displayed on anyone's screen.
     /// This should be a single ascii character. i.e. '!'.
-    #[bw(map = |&x| x as u8)]
-    #[br(map = |x: u8| x as char)]
     pub prefix: char,
 
     /// Time in between each [Nlp](super::Nlp) or [Mci](super::Mci) packet when set to a non-zero value and
     /// the relevant flags are set.
-    #[br(parse_with = binrw_parse_duration::<u16, 1, _>)]
-    #[bw(write_with = binrw_write_duration::<u16, 1, _>)]
     #[read_write_buf(duration(milliseconds = u16))]
     pub interval: Duration,
 
     /// Administrative password.
-    #[bw(write_with = binrw_write_codepage_string::<16, _>, args(true, 0))]
-    #[br(parse_with = binrw_parse_codepage_string::<16, _>, args(true))]
     #[read_write_buf(codepage(length = 16))]
     pub admin: String,
 
     /// Name of the program.
-    #[bw(write_with = binrw_write_codepage_string::<16, _>)]
-    #[br(parse_with = binrw_parse_codepage_string::<16, _>)]
     #[read_write_buf(codepage(length = 16))]
     pub iname: String,
 }

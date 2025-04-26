@@ -1,18 +1,11 @@
 use std::time::Duration;
 
-use insim_core::{
-    binrw::{self, binrw},
-    duration::{binrw_parse_duration, binrw_write_duration},
-};
-
 use super::CarContact;
 use crate::identifiers::{PlayerId, RequestId};
 
-#[binrw]
 #[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// Used within [Hlv] to indicate the hotlap validity failure reason.
 pub enum Hlvc {
@@ -30,7 +23,6 @@ pub enum Hlvc {
     OutOfBounds = 5,
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Reports incidents that would violate Hot Lap Validity checks.
@@ -42,12 +34,9 @@ pub struct Hlv {
     pub plid: PlayerId,
 
     /// How did we invalidate this hotlap? See [Hlvc].
-    #[brw(pad_after = 1)]
     #[read_write_buf(pad_after = 1)]
     pub hlvc: Hlvc,
 
-    #[br(parse_with = binrw_parse_duration::<u16, 10, _>)]
-    #[bw(write_with = binrw_write_duration::<u16, 10, _>)]
     #[read_write_buf(duration(centiseconds = u16))]
     /// When the violation occurred. Warning: this is looping.
     pub time: Duration,

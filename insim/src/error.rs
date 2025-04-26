@@ -1,5 +1,5 @@
 #[non_exhaustive]
-#[derive(thiserror::Error, Debug, Clone)]
+#[derive(thiserror::Error, Debug)]
 /// The Errors that may occur during an Insim connection.
 pub enum Error {
     /// Connection is disconnected
@@ -42,6 +42,10 @@ pub enum Error {
     /// instead.
     #[error("Only Standard vehicles are permitted")]
     VehicleNotStandard,
+
+    /// Placeholder
+    #[error("Insim core error. Placeholder")]
+    Core(insim_core::Error),
 }
 
 #[cfg(feature = "tokio")]
@@ -54,6 +58,12 @@ impl From<tokio::time::error::Elapsed> for Error {
 impl From<insim_core::binrw::Error> for Error {
     fn from(value: insim_core::binrw::Error) -> Self {
         Error::BinRw(value.to_string()) // FIXME
+    }
+}
+
+impl From<insim_core::Error> for Error {
+    fn from(value: insim_core::Error) -> Self {
+        Error::Core(value) // FIXME
     }
 }
 

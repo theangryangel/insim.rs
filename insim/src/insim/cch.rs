@@ -1,12 +1,8 @@
-use insim_core::binrw::{self, binrw};
-
 use crate::identifiers::{PlayerId, RequestId};
 
-#[binrw]
 #[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 // FIXME: implement From<u8>
 /// Camera/view identifiers
@@ -31,7 +27,6 @@ pub enum CameraView {
     Another = 255,
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Camera Change - sent when an existing driver changes camera
@@ -41,7 +36,6 @@ pub struct Cch {
     /// Player unique ID
     pub plid: PlayerId,
 
-    #[brw(pad_after = 3)]
     #[read_write_buf(pad_after = 3)]
     /// View identifier
     pub camera: CameraView,

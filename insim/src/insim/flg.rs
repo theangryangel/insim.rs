@@ -1,13 +1,9 @@
-use insim_core::binrw::{self, binrw};
-
 use crate::identifiers::{PlayerId, RequestId};
 
 /// Enum for the flag field of [Flg].
-#[binrw]
 #[derive(Default, Debug, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 pub enum FlgType {
     #[default]
@@ -18,7 +14,6 @@ pub enum FlgType {
     Yellow = 2,
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Race Flag is sent when a flag is waved at a player.
@@ -29,8 +24,6 @@ pub struct Flg {
     /// Unique player ID
     pub plid: PlayerId,
 
-    #[br(map = |x: u8| x != 0)]
-    #[bw(map = |&x| x as u8)]
     /// Flag on/off
     pub offon: bool,
 
@@ -38,7 +31,6 @@ pub struct Flg {
     pub flag: FlgType,
 
     /// Player behind
-    #[brw(pad_after = 1)]
     #[read_write_buf(pad_after = 1)]
     pub carbehind: PlayerId,
 }

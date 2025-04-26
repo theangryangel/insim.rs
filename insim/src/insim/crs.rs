@@ -1,8 +1,5 @@
-use insim_core::binrw::{self, binrw};
-
 use crate::identifiers::{PlayerId, RequestId};
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Car Reset packet indicates a vehicle has been reset or that a vehicle should be reset by the

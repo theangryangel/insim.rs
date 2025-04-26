@@ -1,16 +1,10 @@
 use std::time::Duration;
 
-use insim_core::{
-    binrw::{self, binrw},
-    duration::{binrw_parse_duration, binrw_write_duration},
-    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-    vehicle::Vehicle,
-};
+use insim_core::vehicle::Vehicle;
 
 use super::{PlayerFlags, RaceConfirmFlags};
 use crate::identifiers::{PlayerId, RequestId};
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Race Result - qualifying or confirmed result
@@ -21,20 +15,14 @@ pub struct Res {
     /// The unique player ID that this race result is for
     pub plid: PlayerId,
 
-    #[bw(write_with = binrw_write_codepage_string::<24, _>)]
-    #[br(parse_with = binrw_parse_codepage_string::<24, _>)]
     #[read_write_buf(codepage(length = 24))]
     /// The LFS.net username of the player
     pub uname: String,
 
-    #[bw(write_with = binrw_write_codepage_string::<24, _>)]
-    #[br(parse_with = binrw_parse_codepage_string::<24, _>)]
     #[read_write_buf(codepage(length = 24))]
     /// The name of the player
     pub pname: String,
 
-    #[bw(write_with = binrw_write_codepage_string::<8, _>)]
-    #[br(parse_with = binrw_parse_codepage_string::<8, _>)]
     #[read_write_buf(codepage(length = 8))]
     /// The number plate of the player
     pub plate: String,
@@ -42,15 +30,10 @@ pub struct Res {
     /// The vehicle they finished in
     pub cname: Vehicle,
 
-    #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
-    #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
     #[read_write_buf(duration(milliseconds = u32))]
     /// The total time
     pub ttime: Duration,
 
-    #[brw(pad_after = 1)]
-    #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
-    #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
     #[read_write_buf(duration(milliseconds = u32), pad_after = 1)]
     /// The best lap time
     pub btime: Duration,
@@ -59,7 +42,6 @@ pub struct Res {
     pub numstops: u8,
 
     /// The result flags. Where they DNF?
-    #[brw(pad_after = 1)]
     #[read_write_buf(pad_after = 1)]
     pub confirm: RaceConfirmFlags,
 

@@ -1,16 +1,9 @@
-use insim_core::{
-    binrw::{self, binrw},
-    string::{binrw_parse_codepage_string_until_eof, binrw_write_codepage_string},
-};
-
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// InsIm Info -  a /i message from user to hosts Insim
 pub struct Iii {
-    #[brw(pad_after = 1)]
     #[read_write_buf(pad_after = 1)]
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
@@ -19,13 +12,10 @@ pub struct Iii {
     pub ucid: ConnectionId,
 
     /// Unique player iD that the message was received from
-    #[brw(pad_after = 2)]
     #[read_write_buf(pad_after = 2)]
     pub plid: PlayerId,
 
     /// The message
-    #[bw(write_with = binrw_write_codepage_string::<64, _>, args(false, 4))]
-    #[br(parse_with = binrw_parse_codepage_string_until_eof)]
     #[read_write_buf(codepage(length = 64, align_to = 4))]
     pub msg: String,
 }

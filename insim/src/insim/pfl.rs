@@ -1,9 +1,6 @@
-use insim_core::binrw::{self, binrw};
-
 use super::PlayerFlags;
 use crate::identifiers::{PlayerId, RequestId};
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Player flags changed
@@ -15,7 +12,6 @@ pub struct Pfl {
     pub plid: PlayerId,
 
     /// Flags which were altered. See [PlayerFlags].
-    #[brw(pad_after = 2)]
     #[read_write_buf(pad_after = 2)]
     pub flags: PlayerFlags,
 }

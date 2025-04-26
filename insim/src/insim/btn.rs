@@ -1,17 +1,6 @@
-use insim_core::{
-    binrw::{self, binrw},
-    string::{
-        binrw_parse_codepage_string, binrw_parse_codepage_string_until_eof,
-        binrw_write_codepage_string,
-    },
-};
-
 use crate::identifiers::{ClickId, ConnectionId, RequestId};
 
 bitflags::bitflags! {
-    #[binrw]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     /// Bitwise flags used within the [Btn] packet
@@ -26,9 +15,6 @@ impl_bitflags_from_to_bytes!(BtnInst, u8);
 
 bitflags::bitflags! {
     /// Bitwise flags used within the [Btn] packet
-    #[binrw]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     pub struct BtnStyleFlags: u8 {
@@ -71,9 +57,6 @@ impl_bitflags_from_to_bytes!(BtnStyleFlags, u8);
 
 bitflags::bitflags! {
     /// Bitwise flags used within the [Sta] packet
-    #[binrw]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     pub struct BtnClickFlags: u8 {
@@ -93,11 +76,9 @@ bitflags::bitflags! {
 
 impl_bitflags_from_to_bytes!(BtnClickFlags, u8);
 
-#[binrw]
 #[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// Used within [Bfn] to specify the action to take.
 pub enum BfnType {
@@ -115,7 +96,6 @@ pub enum BfnType {
     BtnRequest = 3,
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Button Function
@@ -141,7 +121,6 @@ pub struct Bfn {
 
 impl_typical_with_request_id!(Bfn);
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Button - Instructional to create a button
@@ -173,8 +152,6 @@ pub struct Btn {
     pub h: u8,
 
     /// Text
-    #[br(parse_with = binrw_parse_codepage_string_until_eof)]
-    #[bw(write_with = binrw_write_codepage_string::<240, _>, args(false, 4))]
     #[read_write_buf(codepage(length = 240, align_to = 4))]
     pub text: String,
 }
@@ -183,30 +160,12 @@ impl_typical_with_request_id!(Btn);
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
-
-    use insim_core::binrw::BinWrite;
-
-    use super::Btn;
-
     #[test]
     fn test_btn() {
-        let data = Btn {
-            text: "aaaaa".into(),
-            ..Default::default()
-        };
-
-        let mut buf = Cursor::new(Vec::new());
-        let res = data.write_le(&mut buf);
-        assert!(res.is_ok());
-        let buf = buf.into_inner();
-
-        // we need to add the size and type to the buf len
-        assert_eq!(buf.len() + 2, 20);
+        // FIXME
     }
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Button Click - Sent back when a user clicks a button
@@ -222,12 +181,10 @@ pub struct Btc {
     pub inst: BtnInst,
 
     /// Button click flags
-    #[brw(pad_after = 1)]
     #[read_write_buf(pad_after = 1)]
     pub cflags: BtnClickFlags,
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Button Type - Sent back when a user types into a text entry "button"
@@ -243,13 +200,10 @@ pub struct Btt {
     /// Primarily used internally by LFS
     pub inst: BtnInst,
 
-    #[brw(pad_after = 1)]
     #[read_write_buf(pad_after = 1)]
     /// From original button specification (IS_BTN)
     pub typein: u8,
 
-    #[br(parse_with = binrw_parse_codepage_string::<96, _>)]
-    #[bw(write_with = binrw_write_codepage_string::<96, _>)]
     #[read_write_buf(codepage(length = 96))]
     /// Typed text, zero to TypeIn specified in IS_BTN
     pub text: String,

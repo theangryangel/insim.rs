@@ -1,7 +1,4 @@
-use insim_core::{
-    binrw::{self, binrw, BinRead, BinWrite},
-    ReadWriteBuf,
-};
+use insim_core::ReadWriteBuf;
 
 use crate::identifiers::{ConnectionId, RequestId};
 
@@ -46,71 +43,6 @@ pub enum CimMode {
 impl Default for CimMode {
     fn default() -> Self {
         Self::Normal(CimSubModeNormal::Normal)
-    }
-}
-
-impl BinRead for CimMode {
-    type Args<'a> = ();
-
-    fn read_options<R: std::io::Read + std::io::Seek>(
-        reader: &mut R,
-        endian: binrw::Endian,
-        _args: Self::Args<'_>,
-    ) -> binrw::BinResult<Self> {
-        let pos = reader.stream_position()?;
-        let discrim = u8::read_options(reader, endian, ())?;
-        let submode = u8::read_options(reader, endian, ())?;
-        let seltype = u8::read_options(reader, endian, ())?;
-
-        let res = match discrim {
-            0 => Self::Normal(submode.into()),
-            1 => Self::Options,
-            2 => Self::HostOptions,
-            3 => Self::Garage(submode.into()),
-            4 => Self::CarSelect,
-            5 => Self::TrackSelect,
-            6 => Self::ShiftU {
-                submode: submode.into(),
-                seltype,
-            },
-            _ => {
-                return Err(binrw::Error::BadMagic {
-                    pos,
-                    found: Box::new(submode),
-                })
-            },
-        };
-
-        Ok(res)
-    }
-}
-
-impl BinWrite for CimMode {
-    type Args<'a> = ();
-
-    fn write_options<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        endian: binrw::Endian,
-        _args: Self::Args<'_>,
-    ) -> binrw::BinResult<()> {
-        let (discrim, submode, seltype) = match self {
-            CimMode::Normal(submode) => (0u8, *submode as u8, 0u8),
-            CimMode::Options => (1u8, 0u8, 0u8),
-            CimMode::HostOptions => (2u8, 0u8, 0u8),
-            CimMode::Garage(submode) => (3u8, *submode as u8, 0u8),
-            CimMode::CarSelect => (4u8, 0u8, 0u8),
-            CimMode::TrackSelect => (5u8, 0u8, 0u8),
-            CimMode::ShiftU {
-                submode: mode,
-                seltype,
-            } => (6u8, *mode as u8, *seltype),
-        };
-
-        discrim.write_options(writer, endian, ())?;
-        submode.write_options(writer, endian, ())?;
-        seltype.write_options(writer, endian, ())?;
-        Ok(())
     }
 }
 
@@ -286,7 +218,6 @@ impl From<u8> for CimSubModeShiftU {
     }
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Connection Interface Mode
@@ -298,7 +229,6 @@ pub struct Cim {
     pub ucid: ConnectionId,
 
     /// Mode & submode
-    #[brw(pad_after = 1)]
     #[read_write_buf(pad_after = 1)]
     pub mode: CimMode,
 }

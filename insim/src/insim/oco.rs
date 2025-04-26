@@ -1,13 +1,10 @@
 use bitflags::bitflags;
-use insim_core::binrw::{self, binrw};
 
 use crate::identifiers::RequestId;
 
-#[binrw]
 #[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// Object Control action to take. Used within [Oco].
 pub enum OcoAction {
@@ -22,11 +19,9 @@ pub enum OcoAction {
     LightsUnset = 6,
 }
 
-#[binrw]
 #[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// Which lights to manipulate. See [Oco].
 pub enum OcoIndex {
@@ -43,11 +38,8 @@ pub enum OcoIndex {
 }
 
 bitflags! {
-    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     /// Which blubs to manipulate. See [Oco].
     pub struct OcoLights: u8 {
         /// Red1
@@ -63,14 +55,12 @@ bitflags! {
 
 impl_bitflags_from_to_bytes!(OcoLights, u8);
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Object Control
 /// Used to switch start lights
 pub struct Oco {
     /// Non-zero if the packet is a packet request or a reply to a request
-    #[brw(pad_after = 1)]
     #[read_write_buf(pad_after = 1)]
     pub reqi: RequestId,
 

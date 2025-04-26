@@ -1,12 +1,8 @@
-use insim_core::binrw::{self, binrw};
-
 use crate::{identifiers::RequestId, Packet, WithRequestId};
 
-#[binrw]
 #[derive(Debug, Default, Clone, Eq, PartialEq, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// [Tiny] Subtype
 pub enum TinyType {
@@ -120,7 +116,6 @@ impl WithRequestId for TinyType {
     }
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// General purpose Tiny packet

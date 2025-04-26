@@ -1,20 +1,12 @@
-use std::io::SeekFrom;
-
-use bytes::{Buf, BufMut, BytesMut};
-use insim_core::{
-    binrw::{self, binrw},
-    string::{codepages, strip_trailing_nul},
-    FromToCodepageBytes, ReadWriteBuf,
-};
+use bytes::{Buf, BufMut};
+use insim_core::{string::codepages, FromToCodepageBytes, ReadWriteBuf};
 
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 /// Enum for the sound field of [Mso].
-#[binrw]
 #[derive(Debug, Default, Clone, Eq, PartialEq, PartialOrd, Ord, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 pub enum MsoUserType {
     /// System message.
@@ -50,128 +42,11 @@ pub struct Mso {
     /// Set if typed by a user
     pub usertype: MsoUserType,
 
-    // FIXME: drop textstart and transparently handle it for the user
     /// Index of the first character of user entered text, in msg field.
     pub textstart: u8,
 
     /// Message
     pub msg: String,
-}
-
-impl binrw::BinRead for Mso {
-    type Args<'a> = ();
-
-    fn read_options<R: std::io::prelude::Read + std::io::prelude::Seek>(
-        reader: &mut R,
-        endian: binrw::Endian,
-        _args: Self::Args<'_>,
-    ) -> binrw::prelude::BinResult<Self> {
-        let reqi = RequestId::read_options(reader, endian, ())?;
-
-        let _ = reader.seek(SeekFrom::Current(1))?;
-
-        let ucid = ConnectionId::read_options(reader, endian, ())?;
-        let plid = PlayerId::read_options(reader, endian, ())?;
-        let usertype = MsoUserType::read_options(reader, endian, ())?;
-        let textstart = u8::read_options(reader, endian, ())?;
-        let (textstart, msg) = if textstart > 0 {
-            let name = Vec::<u8>::read_options(
-                reader,
-                endian,
-                binrw::VecArgs {
-                    count: textstart as usize,
-                    inner: (),
-                },
-            )?;
-
-            let msg: Vec<u8> = binrw::helpers::until_eof(reader, endian, ())?;
-
-            let name = codepages::to_lossy_string(strip_trailing_nul(&name));
-            let msg = codepages::to_lossy_string(strip_trailing_nul(&msg));
-            (name.len() as u8, format!("{name}{msg}"))
-        } else {
-            let msg: Vec<u8> = binrw::helpers::until_eof(reader, endian, ())?;
-            (
-                0_u8,
-                codepages::to_lossy_string(strip_trailing_nul(&msg)).to_string(),
-            )
-        };
-
-        Ok(Self {
-            reqi,
-            ucid,
-            plid,
-            usertype,
-            textstart,
-            msg,
-        })
-    }
-}
-
-impl binrw::BinWrite for Mso {
-    type Args<'a> = ();
-
-    fn write_options<W: std::io::prelude::Write + std::io::prelude::Seek>(
-        &self,
-        writer: &mut W,
-        endian: binrw::Endian,
-        _args: Self::Args<'_>,
-    ) -> binrw::prelude::BinResult<()> {
-        self.reqi.write_options(writer, endian, ())?;
-        0_u8.write_options(writer, endian, ())?; // pad 1 byte
-        self.ucid.write_options(writer, endian, ())?;
-        self.plid.write_options(writer, endian, ())?;
-        self.usertype.write_options(writer, endian, ())?;
-
-        // if we need to encode the string, we need to move the textstart transparently for the
-        // user
-
-        if self.textstart > 0 {
-            let mut buf = BytesMut::new();
-            let name = &self.msg[..self.textstart as usize];
-            let msg = &self.msg[(self.textstart as usize)..];
-
-            let name = codepages::to_lossy_bytes(name);
-            let msg = codepages::to_lossy_bytes(msg);
-
-            // FIXME validate
-            let textstart = name.len() as u8;
-
-            buf.put_u8(textstart);
-
-            let mut remaining = MSO_MSG_MAX_LEN;
-
-            let name_len_to_write = name.len().min(remaining);
-            buf.extend_from_slice(&name[..name_len_to_write]);
-            remaining -= name_len_to_write;
-
-            let msg_len_to_write = msg.len().min(remaining);
-            buf.extend_from_slice(&msg[..msg_len_to_write]);
-
-            let written = name_len_to_write + msg_len_to_write;
-            if remaining > 0 {
-                let align_to = MSO_MSG_ALIGN - 1;
-                let round_to = (written + align_to) & !align_to;
-                let round_to = round_to.min(MSO_MSG_MAX_LEN);
-                buf.put_bytes(0, round_to - written);
-            }
-
-            buf.as_ref().write_options(writer, endian, ())?;
-        } else {
-            self.textstart.write_options(writer, endian, ())?;
-            let mut res = codepages::to_lossy_bytes(&self.msg).to_vec();
-
-            let align_to = MSO_MSG_ALIGN - 1;
-            let round_to = (res.len() + align_to) & !align_to;
-            if round_to != res.len() {
-                res.put_bytes(0, round_to - res.len());
-            }
-            res.truncate(MSO_MSG_MAX_LEN);
-            res.write_options(writer, endian, ())?;
-        }
-
-        Ok(())
-    }
 }
 
 impl ReadWriteBuf for Mso {
@@ -250,11 +125,7 @@ impl ReadWriteBuf for Mso {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
-
-    use binrw::BinWrite;
     use bytes::{BufMut, Bytes, BytesMut};
-    use insim_core::binrw::BinRead;
 
     use super::*;
 
@@ -296,10 +167,6 @@ mod tests {
                                                                                       //raw.put_bytes(0, 1);
         let raw = raw.freeze();
 
-        let res = Mso::read_le(&mut Cursor::new(raw.as_ref())).unwrap();
-        assert_eq!(res.textstart, 0);
-        assert_eq!(res.msg, "Downloaded Skin : XFG_PRO38");
-
         let res = Mso::read_buf(&mut Bytes::from(raw.clone())).unwrap();
         assert_eq!(res.textstart, 0);
         assert_eq!(res.msg, "Downloaded Skin : XFG_PRO38");
@@ -319,14 +186,6 @@ mod tests {
 
         // when reading we want to handle too long entries, but ensure that when we convert to
         // bytes it's appropriately truncated
-
-        let res = Mso::read_le(&mut Cursor::new(raw.as_ref())).unwrap();
-        assert_eq!(res.textstart, 0);
-        assert_eq!(res.msg.len(), MSO_MSG_MAX_LEN + 10);
-
-        let mut buf = ::std::io::Cursor::new(Vec::new());
-        res.write_le(&mut buf).unwrap();
-        assert_eq!(buf.into_inner().len(), MSO_MSG_MAX_LEN + 6);
 
         let res = Mso::read_buf(&mut Bytes::from(raw.clone())).unwrap();
         assert_eq!(res.textstart, 0);

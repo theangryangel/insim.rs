@@ -2,15 +2,10 @@
 
 use std::fmt::Debug;
 
-use insim_core::{
-    binrw::{self, binrw},
-    ReadWriteBuf,
-};
+use insim_core::ReadWriteBuf;
 
 use crate::{identifiers::RequestId, insim::*, relay::*};
 
-#[binrw]
-#[brw(little)]
 #[derive(Debug, Clone, from_variants::FromVariants)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type"))]
@@ -20,303 +15,228 @@ use crate::{identifiers::RequestId, insim::*, relay::*};
 /// told something about LFS), or both.
 pub enum Packet {
     /// Instruction - handshake or init
-    #[brw(magic = 1u8)]
     Isi(Isi),
 
     /// Information - version info
-    #[brw(magic = 2u8)]
     Ver(Ver),
 
     /// Both - multi-purpose
-    #[brw(magic = 3u8)]
     Tiny(Tiny),
 
     /// Both - multi-purpose
-    #[brw(magic = 4u8)]
     Small(Small),
 
     /// Information - State info
-    #[brw(magic = 5u8)]
     Sta(Sta),
 
     /// Instruction - Single character
-    #[brw(magic = 6u8)]
     Sch(Sch),
 
     /// Instruction - State Flags Pack
-    #[brw(magic = 7u8)]
     Sfp(Sfp),
 
     /// Both - Set Car Cam
-    #[brw(magic = 8u8)]
     Scc(Scc),
 
     /// Both - Camera position pack
-    #[brw(magic = 9u8)]
     Cpp(Cpp),
 
     /// Information - Start multiplayer
-    #[brw(magic = 10u8)]
     Ism(Ism),
 
     /// Information - Message out
-    #[brw(magic = 11u8)]
     Mso(Mso),
 
     /// Information - Hidden /i message
-    #[brw(magic = 12u8)]
     Iii(Iii),
 
     /// Instruction - Type a message or /command
-    #[brw(magic = 13u8)]
     Mst(Mst),
 
     /// Instruction - Message to connection
-    #[brw(magic = 14u8)]
     Mtc(Mtc),
 
     /// Instruction - set screen mode
-    #[brw(magic = 15u8)]
     Mod(Mod),
 
     /// Information - Vote notification
-    #[brw(magic = 16u8)]
     Vtn(Vtn),
 
     /// Information - Race start
-    #[brw(magic = 17u8)]
     Rst(Rst),
 
     /// Information - New connection
-    #[brw(magic = 18u8)]
     Ncn(Ncn),
 
     /// Information - Connection left
-    #[brw(magic = 19u8)]
     Cnl(Cnl),
 
     /// Information - Connection renamed
-    #[brw(magic = 20u8)]
     Cpr(Cpr),
 
     /// Information - New player (player joined)
-    #[brw(magic = 21u8)]
     Npl(Npl),
 
     /// Information - Player telepits
-    #[brw(magic = 22u8)]
     Plp(Plp),
 
     /// Information - Player left
-    #[brw(magic = 23u8)]
     Pll(Pll),
 
     /// Information - Lap time
-    #[brw(magic = 24u8)]
     Lap(Lap),
 
     /// Information - Split time
-    #[brw(magic = 25u8)]
     Spx(Spx),
 
     /// Information - Pit stop start
-    #[brw(magic = 26u8)]
     Pit(Pit),
 
     /// Information - Pit stop finish
-    #[brw(magic = 27u8)]
     Psf(Psf),
 
     /// Information - Player entered pit lane
-    #[brw(magic = 28u8)]
     Pla(Pla),
 
     /// Information - Camera changed
-    #[brw(magic = 29u8)]
     Cch(Cch),
 
     /// Information - Penalty
-    #[brw(magic = 30u8)]
     Pen(Pen),
 
     /// Information - Take over
-    #[brw(magic = 31u8)]
     Toc(Toc),
 
     /// Information - Flag
-    #[brw(magic = 32u8)]
     Flg(Flg),
 
     /// Information - Player flags
-    #[brw(magic = 33u8)]
     Pfl(Pfl),
 
     /// Information - Finished race - unverified result
-    #[brw(magic = 34u8)]
     Fin(Fin),
 
     /// Information - Verified finish result
-    #[brw(magic = 35u8)]
     Res(Res),
 
     /// Both - Player reorder
-    #[brw(magic = 36u8)]
     Reo(Reo),
 
     /// Information - Node and lap
-    #[brw(magic = 37u8)]
     Nlp(Nlp),
 
     /// Information - Multi-car info
-    #[brw(magic = 38u8)]
     Mci(Mci),
 
     /// Instruction - Type a message
-    #[brw(magic = 39u8)]
     Msx(Msx),
 
     /// Instruction - Message to local computer
-    #[brw(magic = 40u8)]
     Msl(Msl),
 
     /// Information - Car reset
-    #[brw(magic = 41u8)]
     Crs(Crs),
 
     /// Both - Delete or receive buttons
-    #[brw(magic = 42u8)]
     Bfn(Bfn),
 
     /// Information - AutoX layout info
-    #[brw(magic = 43u8)]
     Axi(Axi),
 
     /// Information - Player hit an AutoX object
-    #[brw(magic = 44u8)]
     Axo(Axo),
 
     /// Instruction - Show a button
-    #[brw(magic = 45u8)]
     Btn(Btn),
 
     /// Information - Button clicked
-    #[brw(magic = 46u8)]
     Btc(Btc),
 
     /// Information - Button was typed into
-    #[brw(magic = 47u8)]
     Btt(Btt),
 
     /// Both - Replay information
-    #[brw(magic = 48u8)]
     Rip(Rip),
 
     /// Both - screenshot
-    #[brw(magic = 49u8)]
     Ssh(Ssh),
 
     /// Information - contact between vehicles
-    #[brw(magic = 50u8)]
     Con(Con),
 
     /// Information - Object hit
-    #[brw(magic = 51u8)]
     Obh(Obh),
 
     /// Information - Hot lap validity violation
-    #[brw(magic = 52u8)]
     Hlv(Hlv),
 
     /// Instruction - Restrict player vehicles
-    #[brw(magic = 53u8)]
     Plc(Plc),
 
     /// Both - AutoX - multiple object
-    #[brw(magic = 54u8)]
     Axm(Axm),
 
     /// Information - Admin command report
-    #[brw(magic = 55u8)]
     Acr(Acr),
 
     /// Instruction - Handicap
-    #[brw(magic = 56u8)]
     Hcp(Hcp),
 
     /// Information - New connection information
-    #[brw(magic = 57u8)]
     Nci(Nci),
 
     /// Instruction - Join reply response
-    #[brw(magic = 58u8)]
     Jrr(Jrr),
 
     /// Information - report insim checkpoint/circle
-    #[brw(magic = 59u8)]
     Uco(Uco),
 
     /// Instruction - Object control
-    #[brw(magic = 60u8)]
     Oco(Oco),
 
     /// Instruction - Multi-purpose, target to connection
-    #[brw(magic = 61u8)]
     Ttc(Ttc),
 
     /// Information - Player selected vehicle
-    #[brw(magic = 62u8)]
     Slc(Slc),
 
     /// Information - Vehicle changed state
-    #[brw(magic = 63u8)]
     Csc(Csc),
 
     /// Information - Connection interface mode
-    #[brw(magic = 64u8)]
     Cim(Cim),
 
     /// Both - Set mods a player is allowed
-    #[brw(magic = 65u8)]
     Mal(Mal),
 
     /// Both - Set/receive player handicap
-    #[brw(magic = 66u8)]
     Plh(Plh),
 
     /// Both - Set/receive player bans
-    #[brw(magic = 67u8)]
     Ipb(Ipb),
 
     /// Instruction - Set AI control value
-    #[brw(magic = 68u8)]
     Aic(Aic),
 
     /// Information - AI information
-    #[brw(magic = 69u8)]
     Aii(Aii),
 
     /// Instruction - Ask the LFS World relay if we are an admin
-    #[brw(magic = 250u8)]
     RelayArq(Arq),
 
     /// Information - LFS World relay response if we are an admin
-    #[brw(magic = 251u8)]
     RelayArp(Arp),
 
     /// Instruction - Ask the LFS World relay for a list of hosts
-    #[brw(magic = 252u8)]
     RelayHlr(Hlr),
 
     /// Information - LFS World relay response to a HostListRequest
-    #[brw(magic = 253u8)]
     RelayHos(Hos),
 
     /// Instruction - Ask the LFS World relay to select a host and start relaying Insim packets
-    #[brw(magic = 254u8)]
     RelaySel(Sel),
 
     /// Information - LFS World relay error (recoverable)
-    #[brw(magic = 255u8)]
     RelayErr(Error),
 }
 

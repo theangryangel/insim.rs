@@ -1,15 +1,11 @@
-use insim_core::binrw::{self, binrw};
-
 use super::CameraView;
 use crate::identifiers::{PlayerId, RequestId};
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Set Car Camera
 pub struct Scc {
     /// Non-zero if the packet is a packet request or a reply to a request
-    #[brw(pad_after = 1)]
     #[read_write_buf(pad_after = 1)]
     pub reqi: RequestId,
 
@@ -17,7 +13,6 @@ pub struct Scc {
     pub viewplid: PlayerId,
 
     /// How to manipulate the camera. See [CameraView].
-    #[brw(pad_after = 2)]
     #[read_write_buf(pad_after = 2)]
     pub ingamecam: CameraView,
 }

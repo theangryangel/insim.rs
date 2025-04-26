@@ -9,7 +9,7 @@ pub mod track;
 pub mod vehicle;
 pub mod wind;
 
-use std::{array::from_fn, net::Ipv4Addr, num::TryFromIntError};
+use std::{array::from_fn, fmt::Display, net::Ipv4Addr, num::TryFromIntError};
 
 #[doc(hidden)]
 pub use ::binrw;
@@ -40,6 +40,12 @@ pub enum Error {
     TryFromInt(TryFromIntError),
     /// Value too large for field
     TooLarge,
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self) // FIXME
+    }
 }
 
 /// Read from bytes

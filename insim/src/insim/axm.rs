@@ -1,15 +1,11 @@
 use bytes::{Buf, BufMut};
-use insim_core::{
-    binrw::{self, binrw},
-    ReadWriteBuf,
-};
+use insim_core::ReadWriteBuf;
 
 use crate::identifiers::{ConnectionId, RequestId};
 
 const AXM_MAX_OBJECTS: usize = 60;
 
 /// Used within the [Axm] packet.
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ObjectInfo {
@@ -32,11 +28,9 @@ pub struct ObjectInfo {
 }
 
 /// Actions that can be taken as part of [Axm].
-#[binrw]
 #[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 pub enum PmoAction {
     #[default]
@@ -69,11 +63,8 @@ pub enum PmoAction {
 }
 
 bitflags::bitflags! {
-    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     /// AutoX object flags
     pub struct PmoFlags: u8 {
         /// LFS has reached the end of a layout file which it is loading. The added objects will then be optimised.
@@ -103,16 +94,11 @@ bitflags::bitflags! {
 impl_bitflags_from_to_bytes!(PmoFlags, u8);
 
 /// AutoX Multiple Objects - Report on/add/remove multiple AutoX objects
-#[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Axm {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
-
-    /// Number of objects in this packet
-    #[bw(calc = info.len() as u8)]
-    pub numo: u8,
 
     /// Unique id of the connection that sent the packet
     pub ucid: ConnectionId,
@@ -122,11 +108,9 @@ pub struct Axm {
 
     /// Bitflags providing additional information about what has happened, or what you want to
     /// happen
-    #[brw(pad_after = 1)]
     pub pmoflags: PmoFlags,
 
     /// List of information about the affected objects
-    #[br(count = numo)]
     pub info: Vec<ObjectInfo>,
 }
 

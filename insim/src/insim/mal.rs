@@ -2,11 +2,7 @@ use std::default::Default;
 
 use bytes::{Buf, BufMut};
 use indexmap::{set::Iter as IndexSetIter, IndexSet};
-use insim_core::{
-    binrw::{self, binrw, BinRead, BinResult, BinWrite},
-    vehicle::Vehicle,
-    ReadWriteBuf,
-};
+use insim_core::{vehicle::Vehicle, ReadWriteBuf};
 
 use crate::{
     error::Error,
@@ -15,33 +11,6 @@ use crate::{
 
 const MAX_MAL_SIZE: usize = 120;
 
-#[binrw::parser(reader, endian)]
-fn binrw_parse_mal_allowed_mods(count: u8) -> BinResult<IndexSet<Vehicle>> {
-    let mut data = IndexSet::new();
-    for _i in 0..count {
-        let _ = data.insert(Vehicle::Mod(u32::read_options(reader, endian, ())?));
-    }
-    Ok(data)
-}
-
-#[binrw::writer(writer, endian)]
-fn binrw_write_mal_allowed_mods(input: &IndexSet<Vehicle>) -> BinResult<()> {
-    for i in input.iter() {
-        match i {
-            Vehicle::Mod(val) => val.write_options(writer, endian, ())?,
-            _ => {
-                unreachable!(
-                    "Non-Mod vehicle managed to get into the HashSet. Should not be possible."
-                )
-            },
-        }
-    }
-
-    Ok(())
-}
-
-#[binrw]
-#[bw(assert(allowed_mods.len() <= MAX_MAL_SIZE))]
 #[derive(Debug, Clone, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Mods Allowed - restrict the mods that can be used
@@ -49,16 +18,9 @@ pub struct Mal {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
-    /// Number of mods in this packet
-    #[bw(calc = allowed_mods.len() as u8)]
-    numm: u8,
-
     /// UCID to change
-    #[brw(pad_after = 3)]
     pub ucid: ConnectionId,
 
-    #[br(parse_with = binrw_parse_mal_allowed_mods, args(numm))]
-    #[bw(write_with = binrw_write_mal_allowed_mods)]
     allowed_mods: IndexSet<Vehicle>,
 }
 

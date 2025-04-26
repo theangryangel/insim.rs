@@ -1,21 +1,15 @@
 use std::time::Duration;
 
-use insim_core::{
-    binrw::{self, binrw},
-    duration::{binrw_parse_duration, binrw_write_duration},
-    point::Point,
-};
+use insim_core::point::Point;
 
 use super::{CameraView, StaFlags};
 use crate::identifiers::{PlayerId, RequestId};
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Camera Position Pack reports the current camera position and state. This packet may also be
 /// sent to control the camera.
 pub struct Cpp {
-    #[brw(pad_after = 1)]
     #[read_write_buf(pad_after = 1)]
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
@@ -42,8 +36,6 @@ pub struct Cpp {
     pub fov: f32,
 
     /// Time in ms to get there (0 means instant)
-    #[br(parse_with = binrw_parse_duration::<u16, 1, _>)]
-    #[bw(write_with = binrw_write_duration::<u16, 1, _>)]
     #[read_write_buf(duration(milliseconds = u16))]
     pub time: Duration,
 

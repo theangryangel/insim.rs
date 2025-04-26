@@ -1,7 +1,5 @@
-use std::io::{Cursor, Write};
-
-use bytes::{Buf, Bytes, BytesMut};
-use insim_core::binrw::{BinRead, BinWrite};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use insim_core::ReadWriteBuf;
 
 use super::mode::Mode;
 use crate::{packet::Packet, result::Result};
@@ -28,24 +26,22 @@ impl Codec {
     /// Encode a [Packet] into [Bytes].
     #[tracing::instrument]
     pub fn encode(&self, msg: &Packet) -> Result<Bytes> {
+        let mut buf = BytesMut::with_capacity(msg.size_hint());
+
+        // add a placeholder for the size of the packet
+        buf.put_u8(0);
+
         // encode the message
-        let mut writer = Cursor::new(Vec::with_capacity(msg.size_hint()));
-        let _ = writer.write(&[0]);
-        msg.write(&mut writer)?;
+        msg.write_buf(&mut buf)?;
 
-        let pos = writer.position();
+        let n = self.mode().encode_length(buf.len())?;
 
-        // encode the length of the packet, including the placeholder for the length
-        let n = self.mode().encode_length(pos as usize)?;
+        // populate the size
+        buf[0] = n;
 
-        // update the length the encoded length
-        writer.set_position(0);
-        writer.write_all(&[n])?;
+        tracing::debug!("{:?}", &buf);
 
-        let data = writer.into_inner();
-        tracing::debug!("{:?}", &data);
-
-        Ok(data.into())
+        Ok(buf.freeze())
     }
 
     /// Decode a series of bytes into a [Packet]
@@ -68,9 +64,7 @@ impl Codec {
         // none of the packet definitions include the size
         data.advance(1);
 
-        let mut cursor = std::io::Cursor::new(&data);
-
-        let packet = Packet::read(&mut cursor)?;
+        let packet = Packet::read_buf(&mut data.freeze())?;
         tracing::trace!("Decoded packet={:?}", packet);
         Ok(Some(packet))
     }

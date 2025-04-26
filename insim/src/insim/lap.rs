@@ -1,13 +1,6 @@
-use std::{
-    io::{Read, Seek, Write},
-    time::Duration,
-};
+use std::time::Duration;
 
-use insim_core::{
-    binrw::{self, binrw, BinRead, BinResult, BinWrite, Endian},
-    duration::{binrw_parse_duration, binrw_write_duration},
-    ReadWriteBuf,
-};
+use insim_core::ReadWriteBuf;
 
 use super::{PenaltyInfo, PlayerFlags};
 use crate::identifiers::{PlayerId, RequestId};
@@ -23,43 +16,6 @@ pub enum Fuel200 {
     /// Fuel cannot be reported, /showfuel=no
     #[default]
     No,
-}
-
-impl BinWrite for Fuel200 {
-    type Args<'a> = ();
-
-    fn write_options<W: Write + Seek>(
-        &self,
-        writer: &mut W,
-        endian: Endian,
-        args: Self::Args<'_>,
-    ) -> BinResult<()> {
-        let data = match self {
-            Self::Percentage(data) => *data,
-            Self::No => 255_u8,
-        };
-
-        data.write_options(writer, endian, args)?;
-        Ok(())
-    }
-}
-
-impl BinRead for Fuel200 {
-    type Args<'a> = ();
-
-    fn read_options<R: Read + Seek>(
-        reader: &mut R,
-        endian: Endian,
-        (): Self::Args<'_>,
-    ) -> BinResult<Self> {
-        let data = <u8>::read_options(reader, endian, ())?;
-
-        if data == 255 {
-            Ok(Self::No)
-        } else {
-            Ok(Self::Percentage(data))
-        }
-    }
 }
 
 impl ReadWriteBuf for Fuel200 {
@@ -96,43 +52,6 @@ pub enum Fuel {
     No,
 }
 
-impl BinWrite for Fuel {
-    type Args<'a> = ();
-
-    fn write_options<W: Write + Seek>(
-        &self,
-        writer: &mut W,
-        endian: Endian,
-        args: Self::Args<'_>,
-    ) -> BinResult<()> {
-        let data = match self {
-            Self::Percentage(data) => *data,
-            Self::No => 255_u8,
-        };
-
-        data.write_options(writer, endian, args)?;
-        Ok(())
-    }
-}
-
-impl BinRead for Fuel {
-    type Args<'a> = ();
-
-    fn read_options<R: Read + Seek>(
-        reader: &mut R,
-        endian: Endian,
-        (): Self::Args<'_>,
-    ) -> BinResult<Self> {
-        let data = <u8>::read_options(reader, endian, ())?;
-
-        if data == 255 {
-            Ok(Self::No)
-        } else {
-            Ok(Self::Percentage(data))
-        }
-    }
-}
-
 impl ReadWriteBuf for Fuel {
     fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
         let data = u8::read_buf(buf)?;
@@ -153,7 +72,6 @@ impl ReadWriteBuf for Fuel {
     }
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Lap Time for a given player.
@@ -164,14 +82,10 @@ pub struct Lap {
     /// Unique player ID
     pub plid: PlayerId,
 
-    #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
-    #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
     #[read_write_buf(duration(milliseconds = u32))]
     /// Lap time
     pub ltime: Duration, // lap time (ms)
 
-    #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
-    #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
     #[read_write_buf(duration(milliseconds = u32))]
     /// Total elapsed time
     pub etime: Duration,
@@ -180,7 +94,6 @@ pub struct Lap {
     pub lapsdone: u16,
 
     /// See [PlayerFlags].
-    #[brw(pad_after = 1)]
     #[read_write_buf(pad_after = 1)]
     pub flags: PlayerFlags,
 

@@ -1,19 +1,11 @@
 use std::time::Duration;
 
-use insim_core::{
-    binrw::{self, binrw},
-    duration::{binrw_parse_duration, binrw_write_duration},
-};
-
 use super::PlayerFlags;
 use crate::identifiers::{PlayerId, RequestId};
 
 bitflags::bitflags! {
-    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     /// Race result confirmation flags
     pub struct RaceConfirmFlags: u8 {
         /// Mentioned
@@ -73,7 +65,6 @@ impl RaceConfirmFlags {
     }
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Provisional finish notification: This is not a final result, you should use the [Res](super::Res) packet for this instead.
@@ -84,23 +75,17 @@ pub struct Fin {
     /// Unique player id for this finish notification
     pub plid: PlayerId,
 
-    #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
-    #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
     #[read_write_buf(duration(milliseconds = u32))]
     /// Total time elapsed
     pub ttime: Duration,
 
-    #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
-    #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
     #[read_write_buf(duration(milliseconds = u32), pad_after = 1)]
-    #[brw(pad_after = 1)]
     /// Best lap time
     pub btime: Duration,
 
     /// Total number of stops
     pub numstops: u8,
 
-    #[brw(pad_after = 1)]
     #[read_write_buf(pad_after = 1)]
     /// Confirmation flags give extra context to the result
     pub confirm: RaceConfirmFlags,

@@ -1,5 +1,3 @@
-use insim_core::binrw::{self, binrw};
-
 use crate::identifiers::{PlayerId, RequestId};
 
 #[cfg(feature = "serde")]
@@ -19,7 +17,6 @@ where
     ser_tuple.end()
 }
 
-#[binrw]
 #[derive(Debug, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Reorder the players

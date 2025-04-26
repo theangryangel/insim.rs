@@ -1,11 +1,7 @@
-use insim_core::{
-    binrw::{self, binrw},
-    vehicle::Vehicle,
-};
+use insim_core::vehicle::Vehicle;
 
 use crate::identifiers::{ConnectionId, RequestId};
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// User Selected Car - sent when a connection selects a car (empty if no car)

@@ -1,10 +1,7 @@
 use std::{ops::Deref, time::Duration};
 
 use bitflags::bitflags;
-use insim_core::{
-    binrw::{self, binrw, BinRead, BinWrite},
-    ReadWriteBuf,
-};
+use insim_core::ReadWriteBuf;
 
 use super::{PlcAllowedCarsSet, VtnAction};
 use crate::{
@@ -261,72 +258,6 @@ impl WithRequestId for SmallType {
     }
 }
 
-impl BinRead for SmallType {
-    type Args<'a> = ();
-
-    fn read_options<R: std::io::Read + std::io::Seek>(
-        reader: &mut R,
-        endian: binrw::Endian,
-        _args: Self::Args<'_>,
-    ) -> binrw::BinResult<Self> {
-        let pos = reader.stream_position()?;
-        let discrim = u8::read_options(reader, endian, ())?;
-        let uval = u32::read_options(reader, endian, ())?;
-        let res = match discrim {
-            0 => Self::None,
-            1 => Self::Ssp(Duration::from_millis(uval as u64 * 10)),
-            2 => Self::Ssg(Duration::from_millis(uval as u64 * 10)),
-            3 => Self::Vta(uval.into()),
-            4 => Self::Tms(uval != 0),
-            5 => Self::Stp(Duration::from_millis(uval as u64 * 10)),
-            6 => Self::Rtp(Duration::from_millis(uval as u64 * 10)),
-            7 => Self::Nli(Duration::from_millis(uval as u64)),
-            8 => Self::Alc(PlcAllowedCarsSet::from_bits_truncate(uval)),
-            9 => Self::Lcs(LcsFlags::from_bits_truncate(uval)),
-            10 => Self::Lcl(LclFlags::from_bits_truncate(uval)),
-            11 => Self::Aii(PlayerId(uval as u8)),
-            _ => {
-                return Err(binrw::Error::BadMagic {
-                    pos,
-                    found: Box::new(uval),
-                })
-            },
-        };
-        Ok(res)
-    }
-}
-
-impl BinWrite for SmallType {
-    type Args<'a> = ();
-
-    fn write_options<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        endian: binrw::Endian,
-        _args: Self::Args<'_>,
-    ) -> binrw::BinResult<()> {
-        let (discrim, uval) = match self {
-            SmallType::None => (0u8, 0u32),
-            SmallType::Ssp(uval) => (1u8, uval.as_millis() as u32 / 10),
-            SmallType::Ssg(uval) => (2u8, uval.as_millis() as u32 / 10),
-            SmallType::Vta(uval) => (3u8, uval.into()),
-            SmallType::Tms(uval) => (4u8, *uval as u32),
-            SmallType::Stp(uval) => (5u8, uval.as_millis() as u32 / 10),
-            SmallType::Rtp(uval) => (6u8, uval.as_millis() as u32 / 10),
-            SmallType::Nli(uval) => (7u8, uval.as_millis() as u32),
-            SmallType::Alc(uval) => (8u8, uval.bits()),
-            SmallType::Lcs(uval) => (9u8, uval.bits()),
-            SmallType::Lcl(uval) => (10u8, uval.bits()),
-            SmallType::Aii(plid) => (11u8, (*plid.deref() as u32)),
-        };
-
-        discrim.write_options(writer, endian, ())?;
-        uval.write_options(writer, endian, ())?;
-
-        Ok(())
-    }
-}
-
 impl ReadWriteBuf for SmallType {
     fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
         let discrim = u8::read_buf(buf)?;
@@ -375,7 +306,6 @@ impl ReadWriteBuf for SmallType {
     }
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default, PartialEq, Eq, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// General purpose Small packet

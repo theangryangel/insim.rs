@@ -1,21 +1,14 @@
 use std::time::Duration;
 
 use bitflags::bitflags;
-use insim_core::{
-    binrw::{self, binrw},
-    duration::{binrw_parse_duration, binrw_write_duration},
-};
 
 use super::{Fuel, PenaltyInfo, PlayerFlags, TyreCompound};
 use crate::identifiers::{PlayerId, RequestId};
 
 bitflags! {
     /// Work which was carried out at a pitstop. Used in [Pit].
-    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     pub struct PitStopWorkFlags: u32 {
         /// Nothing asd
         const NOTHING = 0;
@@ -58,7 +51,6 @@ bitflags! {
 
 impl_bitflags_from_to_bytes!(PitStopWorkFlags, u32);
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Pit stop (stop at the garage, not "tele-pit")
@@ -82,7 +74,6 @@ pub struct Pit {
     pub penalty: PenaltyInfo,
 
     /// Total number of stops
-    #[brw(pad_after = 1)]
     #[read_write_buf(pad_after = 1)]
     pub numstops: u8,
 
@@ -90,12 +81,10 @@ pub struct Pit {
     pub tyres: [TyreCompound; 4],
 
     /// What work was carried out?
-    #[brw(pad_after = 4)]
     #[read_write_buf(pad_after = 4)]
     pub work: PitStopWorkFlags,
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Pit Stop Finished
@@ -106,19 +95,14 @@ pub struct Psf {
     /// Player's unique ID
     pub plid: PlayerId,
 
-    #[brw(pad_after = 4)]
-    #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
-    #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
     #[read_write_buf(duration(milliseconds = u32), pad_after = 4)]
     /// How long were they pitting for?
     pub stime: Duration,
 }
 
-#[binrw]
 #[derive(Debug, Default, PartialEq, Eq, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// Pit lane fact, or info. Used in [Pla].
 pub enum PitLaneFact {
@@ -139,7 +123,6 @@ pub enum PitLaneFact {
     Sg = 4,
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// PitLane
@@ -151,7 +134,6 @@ pub struct Pla {
     pub plid: PlayerId,
 
     /// Fact
-    #[brw(pad_after = 3)]
     #[read_write_buf(pad_after = 3)]
     pub fact: PitLaneFact,
 }

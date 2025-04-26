@@ -2,11 +2,7 @@ use std::time::Duration;
 
 use bitflags::bitflags;
 use bytes::{Buf, BufMut};
-use insim_core::{
-    binrw::{self, binrw, BinRead, BinResult},
-    duration::{binrw_parse_duration, binrw_write_duration},
-    ReadWriteBuf,
-};
+use insim_core::ReadWriteBuf;
 
 use crate::identifiers::{PlayerId, RequestId};
 
@@ -14,19 +10,9 @@ pub(crate) fn spclose_strip_high_bits(val: u16) -> u16 {
     val & !61440
 }
 
-#[binrw::parser(reader, endian)]
-pub(crate) fn binrw_parse_spclose_strip_reserved_bits() -> BinResult<u16> {
-    let res = u16::read_options(reader, endian, ())?;
-    // strip the top 4 bits off
-    Ok(spclose_strip_high_bits(res))
-}
-
 bitflags! {
-    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     /// Additional information for the object hit, used within the [Obh] packet.
     pub struct ObhFlags: u8 {
         /// An added object was hit
@@ -51,7 +37,6 @@ generate_bitflag_helpers! {
 
 impl_bitflags_from_to_bytes!(ObhFlags, u8);
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Vehicle made contact with something else
@@ -75,7 +60,6 @@ pub struct CarContact {
     pub y: i16,
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Object Hit
@@ -88,11 +72,8 @@ pub struct Obh {
 
     /// Low 12 bits: closing speed (10 = 1 m/s)
     /// The high 4 bits are automatically stripped.
-    #[br(parse_with = binrw_parse_spclose_strip_reserved_bits)]
     pub spclose: u16,
 
-    #[br(parse_with = binrw_parse_duration::<u16, 10, _>)]
-    #[bw(write_with = binrw_write_duration::<u16, 10, _>)]
     /// When this occurred. Warning this is looping.
     pub time: Duration,
 
@@ -105,7 +86,6 @@ pub struct Obh {
     /// The Y position of the object
     pub y: i16,
 
-    #[brw(pad_after = 1)]
     /// The Z position of the object
     pub zbyte: u8,
 

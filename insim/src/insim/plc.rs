@@ -1,10 +1,6 @@
 use bytes::{Buf, BufMut};
 use indexmap::{set::Iter as IndexSetIter, IndexSet};
-use insim_core::{
-    binrw::{self, binrw},
-    vehicle::Vehicle,
-    ReadWriteBuf,
-};
+use insim_core::{vehicle::Vehicle, ReadWriteBuf};
 
 use crate::{
     error::Error,
@@ -181,22 +177,17 @@ impl PlcAllowedCarsSet {
     }
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Player ALlowed Cars. Allows you to restrict access to the standard (non-mod) vehicles.
 pub struct Plc {
     /// Non-zero if the packet is a packet request or a reply to a request
-    #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
     /// Unique connection id to change
-    #[brw(pad_after = 3)]
     pub ucid: ConnectionId,
 
     /// Player's allow cars
-    #[br(map = PlcAllowedCarsSet::from_bits_truncate)]
-    #[bw(map = |x: &PlcAllowedCarsSet| x.bits())]
     pub cars: PlcAllowedCarsSet,
 }
 

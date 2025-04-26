@@ -2,16 +2,9 @@
 use std::time::Duration;
 
 use bytes::{Buf, BufMut};
-use insim_core::{
-    binrw::{self, binrw, BinRead, BinWrite},
-    duration::{binrw_parse_duration, binrw_write_duration},
-    ReadWriteBuf,
-};
+use insim_core::ReadWriteBuf;
 
-use super::{
-    obh::{binrw_parse_spclose_strip_reserved_bits, spclose_strip_high_bits},
-    CompCarInfo,
-};
+use super::{obh::spclose_strip_high_bits, CompCarInfo};
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default)]
@@ -63,137 +56,6 @@ pub struct ConInfo {
 
     /// position (1 metre = 16)
     pub y: i16,
-}
-
-// Manual implementation of BinRead, so that we can accommodate thrbrk, cluhan, etc.
-impl BinRead for ConInfo {
-    type Args<'a> = ();
-
-    fn read_options<R: std::io::Read + std::io::Seek>(
-        reader: &mut R,
-        endian: binrw::Endian,
-        _args: Self::Args<'_>,
-    ) -> binrw::BinResult<Self> {
-        let plid = PlayerId::read_options(reader, endian, ())?;
-        let info = CompCarInfo::read_options(reader, endian, ())?;
-        // pad 1 bytes
-        let _ = reader.seek(std::io::SeekFrom::Current(1))?;
-        let steer = u8::read_options(reader, endian, ())?;
-
-        let thrbrk = u8::read_options(reader, endian, ())?;
-        let thr: u8 = (thrbrk >> 4) & 0x0F; // upper 4 bits
-        let brk: u8 = thrbrk & 0x0F; // lower 4 bits
-
-        let cluhan = u8::read_options(reader, endian, ())?;
-        let clu: u8 = (cluhan >> 4) & 0x0F; // upper 4 bits
-        let han: u8 = cluhan & 0x0F; // lower 4 bits
-
-        let gearsp = u8::read_options(reader, endian, ())?;
-        let gearsp = gearsp >> 4; // gearsp is only first 4 bits
-
-        let speed = u8::read_options(reader, endian, ())?;
-        let direction = u8::read_options(reader, endian, ())?;
-        let heading = u8::read_options(reader, endian, ())?;
-        let accelf = u8::read_options(reader, endian, ())?;
-        let accelr = u8::read_options(reader, endian, ())?;
-
-        let x = i16::read_options(reader, endian, ())?;
-        let y = i16::read_options(reader, endian, ())?;
-
-        Ok(Self {
-            plid,
-            info,
-            steer,
-            thr,
-            brk,
-            clu,
-            han,
-            gearsp,
-            speed,
-            direction,
-            heading,
-            accelf,
-            accelr,
-            x,
-            y,
-        })
-    }
-}
-
-// Manual implementation of BinWrite, so that we can accommodate thrbrk, cluhan, etc.
-impl BinWrite for ConInfo {
-    type Args<'a> = ();
-
-    fn write_options<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        endian: binrw::Endian,
-        _args: Self::Args<'_>,
-    ) -> binrw::BinResult<()> {
-        self.plid.write_options(writer, endian, ())?;
-        self.info.write_options(writer, endian, ())?;
-        0_u8.write_options(writer, endian, ())?; // pad 1 bytes
-        self.steer.write_options(writer, endian, ())?;
-
-        if self.thr > 15 {
-            let pos = writer.stream_position()?;
-            return Err(binrw::Error::AssertFail {
-                pos,
-                message: "thr must be <= 15".into(),
-            });
-        }
-
-        if self.brk > 15 {
-            let pos = writer.stream_position()?;
-            return Err(binrw::Error::AssertFail {
-                pos,
-                message: "brk must be <= 15".into(),
-            });
-        }
-
-        let thrbrk: u8 = (self.thr << 4) | (self.brk & !0b11110000);
-        thrbrk.write_options(writer, endian, ())?;
-
-        if self.clu > 15 {
-            let pos = writer.stream_position()?;
-            return Err(binrw::Error::AssertFail {
-                pos,
-                message: "clu must be <= 15".into(),
-            });
-        }
-
-        if self.han > 15 {
-            let pos = writer.stream_position()?;
-            return Err(binrw::Error::AssertFail {
-                pos,
-                message: "han must be <= 15".into(),
-            });
-        }
-
-        let cluhan: u8 = (self.clu << 4) | (self.han & !0b11110000);
-        cluhan.write_options(writer, endian, ())?;
-
-        if self.gearsp > 15 {
-            let pos = writer.stream_position()?;
-            return Err(binrw::Error::AssertFail {
-                pos,
-                message: "gearsp must be <= 15".into(),
-            });
-        }
-
-        let gearsp = self.gearsp << 4;
-        gearsp.write_options(writer, endian, ())?;
-
-        self.speed.write_options(writer, endian, ())?;
-        self.direction.write_options(writer, endian, ())?;
-        self.heading.write_options(writer, endian, ())?;
-        self.accelf.write_options(writer, endian, ())?;
-        self.accelr.write_options(writer, endian, ())?;
-        self.x.write_options(writer, endian, ())?;
-        self.y.write_options(writer, endian, ())?;
-
-        Ok(())
-    }
 }
 
 impl ReadWriteBuf for ConInfo {
@@ -290,22 +152,17 @@ impl ReadWriteBuf for ConInfo {
     }
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Contact between 2 vehicles
 pub struct Con {
-    #[brw(pad_after = 1)]
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
     /// Low 12 bits: closing speed (10 = 1 m/s)
     /// The high 4 bits are automatically stripped.
-    #[br(parse_with = binrw_parse_spclose_strip_reserved_bits)]
     pub spclose: u16,
 
-    #[br(parse_with = binrw_parse_duration::<u16, 10, _>)]
-    #[bw(write_with = binrw_write_duration::<u16, 10, _>)]
     /// Time since last reset. Warning this is looping.
     pub time: Duration,
 

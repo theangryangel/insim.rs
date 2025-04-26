@@ -1,18 +1,11 @@
 use bitflags::bitflags;
-use insim_core::{
-    binrw::{self, binrw},
-    point::Point,
-    ReadWriteBuf,
-};
+use insim_core::{point::Point, ReadWriteBuf};
 
 use crate::identifiers::{PlayerId, RequestId};
 
 bitflags! {
-    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     /// Additional Car Info.
     pub struct CompCarInfo: u8 {
         /// This car is in the way of a driver who is a lap ahead
@@ -44,7 +37,6 @@ generate_bitflag_helpers! {
 
 impl_bitflags_from_to_bytes!(CompCarInfo, u8);
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Used within the [Mci] packet info field.
@@ -61,7 +53,6 @@ pub struct CompCar {
     /// Race position
     pub position: u8,
 
-    #[brw(pad_after = 1)]
     #[read_write_buf(pad_after = 1)]
     /// Additional information that describes this particular Compcar.
     pub info: CompCarInfo,
@@ -99,7 +90,6 @@ impl CompCar {
     }
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Multi Car Info - positional information for players/vehicles.
@@ -109,11 +99,7 @@ pub struct Mci {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
-    #[bw(calc = info.len() as u8)]
-    numc: u8,
-
     /// Node and lap for a subset of players. Not all players may be included in a single packet.
-    #[br(count = numc)]
     pub info: Vec<CompCar>,
 }
 

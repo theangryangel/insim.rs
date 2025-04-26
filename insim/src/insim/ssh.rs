@@ -1,15 +1,8 @@
-use insim_core::{
-    binrw::{self, binrw},
-    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-};
-
 use crate::{identifiers::RequestId, WithRequestId};
 
-#[binrw]
 #[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// Errors occurred during a [Ssh] request.
 pub enum SshError {
@@ -27,7 +20,6 @@ pub enum SshError {
     NoSave = 3,
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Send Screenshot - instructional and informational.
@@ -36,12 +28,10 @@ pub struct Ssh {
     pub reqi: RequestId,
 
     /// Result code
-    #[brw(pad_after = 4)]
+    #[read_write_buf(pad_after = 4)]
     pub error: SshError,
 
     /// Screenshot file path.
-    #[br(parse_with = binrw_parse_codepage_string::<32, _>)]
-    #[bw(write_with = binrw_write_codepage_string::<32, _>)]
     // FIXME: Probably not really ascii. definitely not a codepage. Probably wchar_t?
     #[read_write_buf(ascii(length = 32))]
     pub name: String,

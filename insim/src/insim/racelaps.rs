@@ -1,9 +1,6 @@
 use std::convert::From;
 
-use insim_core::{
-    binrw::{self, BinRead, BinWrite},
-    ReadWriteBuf,
-};
+use insim_core::ReadWriteBuf;
 
 /// Handles the rules around how RaceLaps are described within Insim automatically for you.
 #[derive(Debug, Default, Clone, Copy)]
@@ -17,34 +14,6 @@ pub enum RaceLaps {
     Laps(usize),
     /// This is a time-based event
     Hours(usize),
-}
-
-impl BinRead for RaceLaps {
-    type Args<'a> = ();
-
-    fn read_options<R: std::io::Read + std::io::Seek>(
-        reader: &mut R,
-        endian: binrw::Endian,
-        args: Self::Args<'_>,
-    ) -> binrw::BinResult<Self> {
-        let res = u8::read_options(reader, endian, args)?;
-
-        Ok(RaceLaps::from(res))
-    }
-}
-
-impl BinWrite for RaceLaps {
-    type Args<'a> = ();
-
-    fn write_options<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        endian: binrw::Endian,
-        args: Self::Args<'_>,
-    ) -> binrw::BinResult<()> {
-        let res = u8::from(*self);
-        res.write_options(writer, endian, args)
-    }
 }
 
 impl From<u8> for RaceLaps {

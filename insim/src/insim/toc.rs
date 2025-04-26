@@ -1,8 +1,5 @@
-use insim_core::binrw::{self, binrw};
-
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Take Over Car - informational - when a 2 connections swap drivers
@@ -19,7 +16,6 @@ pub struct Toc {
     pub olducid: ConnectionId,
 
     /// The new connection ID for this `plid`
-    #[brw(pad_after = 2)]
     #[read_write_buf(pad_after = 2)]
     pub newucid: ConnectionId,
 }

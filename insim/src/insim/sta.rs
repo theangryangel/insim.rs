@@ -1,18 +1,12 @@
 use bitflags::bitflags;
-use insim_core::{
-    binrw::{self, binrw},
-    track::Track,
-    wind::Wind,
-};
+use insim_core::{track::Track, wind::Wind};
 
 use super::{CameraView, RaceLaps};
 use crate::identifiers::{PlayerId, RequestId};
 
-#[binrw]
 #[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// Game racing state
 pub enum RaceInProgress {
@@ -28,11 +22,8 @@ pub enum RaceInProgress {
 }
 
 bitflags! {
-    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     /// Describes the game state
     pub struct StaFlags: u16 {
         /// In Game (or Multiplayer Replay)
@@ -101,12 +92,10 @@ generate_bitflag_helpers! {
 
 impl_bitflags_from_to_bytes!(StaFlags, u16);
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// State
 pub struct Sta {
-    #[brw(pad_after = 1)]
     #[read_write_buf(pad_after = 1)]
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
@@ -138,7 +127,6 @@ pub struct Sta {
     /// Qualifying minutes
     pub qualmins: u8,
 
-    #[brw(pad_after = 1)]
     #[read_write_buf(pad_after = 1)]
     /// Number of laps
     pub racelaps: RaceLaps,

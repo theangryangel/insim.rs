@@ -1,18 +1,11 @@
 use std::time::Duration;
 
-use insim_core::{
-    binrw::{self, binrw},
-    duration::{binrw_parse_duration, binrw_write_duration},
-};
-
 use super::{CarContact, ObjectInfo};
 use crate::identifiers::{PlayerId, RequestId};
 
-#[binrw]
 #[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// Action for a [Uco] packet.
 pub enum UcoAction {
@@ -30,7 +23,6 @@ pub enum UcoAction {
     CpRev = 3,
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// User Control Object - reports crossing an InSim checkpoint / entering an InSim circle (from layout)
@@ -39,16 +31,14 @@ pub struct Uco {
     pub reqi: RequestId,
 
     /// Player's unique ID that this report corresponds to.
-    #[brw(pad_after = 1)]
+    #[read_write_buf(pad_after = 1)]
     pub plid: PlayerId,
 
     /// What happened
-    #[brw(pad_after = 2)]
+    #[read_write_buf(pad_after = 2)]
     pub ucoaction: UcoAction,
 
     /// When this happened
-    #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
-    #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
     #[read_write_buf(duration(milliseconds = u32))]
     pub time: Duration,
 

@@ -1,16 +1,9 @@
-use insim_core::{
-    binrw::{self, binrw},
-    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-};
-
 use crate::identifiers::RequestId;
 
 /// Enum for the sound field of [Msl].
-#[binrw]
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 pub enum SoundType {
     #[default]
@@ -30,7 +23,6 @@ pub enum SoundType {
     Error = 4,
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Send a message to the local computer only. If you are connected to a server this means the
@@ -43,8 +35,6 @@ pub struct Msl {
     pub sound: SoundType,
 
     /// Message
-    #[bw(write_with = binrw_write_codepage_string::<128, _>)]
-    #[br(parse_with = binrw_parse_codepage_string::<128, _>)]
     #[read_write_buf(codepage(length = 128))]
     pub msg: String,
 }

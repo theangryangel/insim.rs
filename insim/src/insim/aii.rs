@@ -1,13 +1,8 @@
 use bitflags::bitflags;
-use insim_core::{
-    binrw::{self, binrw},
-    point::Point,
-    ReadWriteBuf,
-};
+use insim_core::{point::Point, ReadWriteBuf};
 
 use crate::identifiers::{PlayerId, RequestId};
 
-#[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct OsMain {
@@ -66,9 +61,6 @@ impl ReadWriteBuf for OsMain {
 
 bitflags! {
     /// Flags for AI Detection
-    #[binrw]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     pub struct AiFlags: u8 {
@@ -83,7 +75,6 @@ bitflags! {
 
 impl_bitflags_from_to_bytes!(AiFlags, u8);
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// AI Info
@@ -100,17 +91,14 @@ pub struct Aii {
     /// Flags
     pub flags: AiFlags,
 
-    #[brw(pad_after = 2)]
     #[read_write_buf(pad_after = 2)]
     /// Current gear
     pub gear: u8,
 
-    #[brw(pad_after = 8)]
     #[read_write_buf(pad_after = 8)]
     /// Current RPM
     pub rpm: f32,
 
-    #[brw(pad_after = 12)]
     #[read_write_buf(pad_after = 12)]
 
     /// Current lights

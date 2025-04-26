@@ -1,13 +1,9 @@
-use insim_core::binrw::{self, binrw};
-
 use super::ObjectInfo;
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
-#[binrw]
 #[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// Used within the [Jrr] packet.
 pub enum JrrAction {
@@ -25,7 +21,6 @@ pub enum JrrAction {
     ResetNoRepair = 5,
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Join Request Reply
@@ -49,7 +44,6 @@ pub struct Jrr {
     /// Unique connection ID
     pub ucid: ConnectionId,
 
-    #[brw(pad_after = 2)]
     #[read_write_buf(pad_after = 2)]
     /// Action taken/to take
     pub jrraction: JrrAction,

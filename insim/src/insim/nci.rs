@@ -1,17 +1,12 @@
 use std::net::Ipv4Addr;
 
-use insim_core::{
-    binrw::{self, binrw},
-    license::License,
-};
+use insim_core::license::License;
 
 use crate::identifiers::{ConnectionId, RequestId};
 
-#[binrw]
 #[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[allow(missing_docs)]
 /// Language
 pub enum Language {
@@ -55,7 +50,6 @@ pub enum Language {
     Romanian = 36,
 }
 
-#[binrw]
 #[derive(Debug, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Extra information about the new connection. This is only sent when connected to a game server,
@@ -71,7 +65,6 @@ pub struct Nci {
     pub language: Language,
 
     /// License level.
-    #[brw(pad_after = 2)]
     #[read_write_buf(pad_after = 2)]
     pub license: License,
 
@@ -79,8 +72,6 @@ pub struct Nci {
     pub userid: u32,
 
     /// Originating IP address
-    #[br(map = |x: u32| Ipv4Addr::from(x) )]
-    #[bw(map = |&x: &Ipv4Addr| u32::from(x) )]
     pub ipaddress: Ipv4Addr,
 }
 

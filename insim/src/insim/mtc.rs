@@ -1,12 +1,6 @@
-use insim_core::{
-    binrw::{self, binrw},
-    string::{binrw_parse_codepage_string_until_eof, binrw_write_codepage_string},
-};
-
 use super::SoundType;
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Message to Connection - Send a message to a specific connection, restricted to hosts only
@@ -21,13 +15,10 @@ pub struct Mtc {
     pub ucid: ConnectionId,
 
     /// Unique player id
-    #[brw(pad_after = 2)]
     #[read_write_buf(pad_after = 2)]
     pub plid: PlayerId,
 
     /// Message
-    #[bw(write_with = binrw_write_codepage_string::<128, _>, args(false, 4))]
-    #[br(parse_with = binrw_parse_codepage_string_until_eof)]
     #[read_write_buf(codepage(length = 128, align_to = 4))]
     pub text: String,
 }

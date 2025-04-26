@@ -1,14 +1,10 @@
-use insim_core::binrw::{self, binrw};
-
 use crate::identifiers::{PlayerId, RequestId};
 
-#[binrw]
 #[derive(
     PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default, insim_macros::ReadWriteBuf,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// Penalty types
 pub enum PenaltyInfo {
@@ -35,11 +31,9 @@ pub enum PenaltyInfo {
     Seconds45 = 6,
 }
 
-#[binrw]
 #[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 /// Enum of reasons for a penalty being applied to a player
 pub enum PenaltyReason {
     /// Unknown or cleared penalty
@@ -65,7 +59,6 @@ pub enum PenaltyReason {
     StopLate = 6,
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Penalty received or cleared by player
@@ -83,7 +76,6 @@ pub struct Pen {
     pub newpen: PenaltyInfo,
 
     /// The reason for the change
-    #[brw(pad_after = 1)]
     #[read_write_buf(pad_after = 1)]
     pub reason: PenaltyReason,
 }

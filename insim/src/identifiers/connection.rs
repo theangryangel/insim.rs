@@ -4,13 +4,9 @@ use std::{
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use insim_core::{
-    binrw::{self as binrw, binrw},
-    ReadWriteBuf,
-};
+use insim_core::ReadWriteBuf;
 
 /// Unique Connection Identifier, commonly referred to as UCID in Insim.txt
-#[binrw]
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConnectionId(pub u8);

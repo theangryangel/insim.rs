@@ -1,53 +1,8 @@
-use std::str::FromStr;
-
 use bytes::{Buf, BufMut};
-use insim_core::{
-    binrw::{self, binrw, BinRead, BinWrite},
-    game_version::GameVersion,
-    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-    FromToAsciiBytes, FromToCodepageBytes, ReadWriteBuf,
-};
+use insim_core::{game_version::GameVersion, FromToAsciiBytes, FromToCodepageBytes, ReadWriteBuf};
 
 use crate::identifiers::RequestId;
 
-#[binrw::parser(reader, endian)]
-fn parse_game_version() -> binrw::BinResult<GameVersion> {
-    let pos = reader.stream_position()?;
-    <[u8; 8]>::read_options(reader, endian, ()).and_then(|bytes| {
-        std::str::from_utf8(&bytes)
-            .map_err(|err| binrw::Error::Custom {
-                pos,
-                err: Box::new(err),
-            })
-            .map(|s| {
-                GameVersion::from_str(s.trim_end_matches('\0')).map_err(|err| {
-                    binrw::Error::Custom {
-                        pos,
-                        err: Box::new(err),
-                    }
-                })
-            })
-    })?
-}
-
-#[binrw::writer(writer, endian)]
-fn write_game_version(input: &GameVersion) -> binrw::BinResult<()> {
-    let mut ver = input.to_string().as_bytes().to_vec();
-    if ver.len() > 8 {
-        ver.truncate(8);
-    } else {
-        let remaining = 8 - ver.len();
-        if remaining > 0 {
-            ver.put_bytes(0, remaining);
-        }
-    }
-
-    ver.write_options(writer, endian, ())?;
-
-    Ok(())
-}
-
-#[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Version packet - informational
@@ -56,21 +11,15 @@ fn write_game_version(input: &GameVersion) -> binrw::BinResult<()> {
 /// be sent a version packet on connection if you set ReqI in the IS_ISI packet.
 pub struct Ver {
     /// Non-zero if the packet is a packet request or a reply to a request
-    #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
     /// LFS version, e.g. 0.3G
-    #[br(parse_with = parse_game_version)]
-    #[bw(write_with = write_game_version)]
     pub version: GameVersion,
 
     /// Product: DEMO / S1 / S2 / S3
-    #[br(parse_with = binrw_parse_codepage_string::<6, _>)]
-    #[bw(write_with = binrw_write_codepage_string::<6, _>)]
     pub product: String,
 
     /// InSim version
-    #[brw(pad_after = 1)]
     pub insimver: u8,
 }
 

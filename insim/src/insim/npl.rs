@@ -1,18 +1,12 @@
 use bitflags::bitflags;
-use insim_core::{
-    binrw::{self, binrw},
-    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-    vehicle::Vehicle,
-};
+use insim_core::vehicle::Vehicle;
 
 use super::Fuel;
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
-#[binrw]
 #[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// Tyre compounds/types
 pub enum TyreCompound {
@@ -46,11 +40,8 @@ pub enum TyreCompound {
 }
 
 bitflags! {
-    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     /// Describes the setup of a player and the various helpers that may be enabled, such as
     /// auto-clutch, etc.
     pub struct PlayerFlags: u16 {
@@ -97,11 +88,8 @@ generate_bitflag_helpers!(PlayerFlags,
 impl_bitflags_from_to_bytes!(PlayerFlags, u16);
 
 bitflags! {
-    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     /// Setup Flags
     pub struct SetFlags: u8 {
         /// Symmetric wheels
@@ -122,11 +110,8 @@ generate_bitflag_helpers!(SetFlags,
 );
 
 bitflags! {
-    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     /// Player model and type information
     pub struct PlayerType: u8 {
         /// Female, if not set assume male
@@ -148,11 +133,8 @@ generate_bitflag_helpers!(
 );
 
 bitflags! {
-    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     /// Passenger flags
     pub struct Passengers: u8 {
         /// Front male, opposite side from driver
@@ -176,7 +158,6 @@ bitflags! {
 
 impl_bitflags_from_to_bytes!(Passengers, u8);
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Sent when a New Player joins.
@@ -196,14 +177,10 @@ pub struct Npl {
     /// See [PlayerFlags].
     pub flags: PlayerFlags,
 
-    #[bw(write_with = binrw_write_codepage_string::<24, _>)]
-    #[br(parse_with = binrw_parse_codepage_string::<24, _>)]
     #[read_write_buf(codepage(length = 24))]
     /// Player name
     pub pname: String,
 
-    #[bw(write_with = binrw_write_codepage_string::<8, _>)]
-    #[br(parse_with = binrw_parse_codepage_string::<8, _>)]
     #[read_write_buf(codepage(length = 8))]
     /// Number plate
     pub plate: String,
@@ -211,8 +188,6 @@ pub struct Npl {
     /// Vehicle they've joined with.
     pub cname: Vehicle,
 
-    #[bw(write_with = binrw_write_codepage_string::<16, _>)]
-    #[br(parse_with = binrw_parse_codepage_string::<16, _>)]
     #[read_write_buf(codepage(length = 16))]
     /// Skin name.
     pub sname: String,
@@ -235,7 +210,6 @@ pub struct Npl {
     pub rwadj: u8, // TODO: split into pair of u4
 
     /// low 4 bits: tyre width reduction (front)
-    #[brw(pad_after = 2)]
     #[read_write_buf(pad_after = 2)]
     pub fwadj: u8, // TODO: split into pair of u4
 

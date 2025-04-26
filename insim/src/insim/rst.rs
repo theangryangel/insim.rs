@@ -1,19 +1,12 @@
 use bitflags::bitflags;
-use insim_core::{
-    binrw::{self, binrw},
-    track::Track,
-    wind::Wind,
-};
+use insim_core::{track::Track, wind::Wind};
 
 use super::RaceLaps;
 use crate::identifiers::RequestId;
 
 bitflags! {
-    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &RaceFlags| x.bits())]
     /// Facts about a server, or race
     pub struct RaceFlags: u16 {
         /// Can vote
@@ -45,13 +38,11 @@ generate_bitflag_helpers!(
 
 impl_bitflags_from_to_bytes!(RaceFlags, u16);
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Race Start - informational - sent when a race starts
 pub struct Rst {
     /// Non-zero if the packet is a packet request or a reply to a request
-    #[brw(pad_after = 1)]
     #[read_write_buf(pad_after = 1)]
     pub reqi: RequestId,
 

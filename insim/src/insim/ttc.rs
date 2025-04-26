@@ -1,15 +1,11 @@
-use insim_core::binrw::{self, binrw};
-
 use crate::{
     identifiers::{ConnectionId, RequestId},
     Packet, WithRequestId,
 };
 
-#[binrw]
 #[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// [Ttc] subtype.
 pub enum TtcType {
@@ -24,7 +20,6 @@ pub enum TtcType {
     SelStop = 3,
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// General purpose Target To Connection packet
