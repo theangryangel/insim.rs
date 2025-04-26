@@ -1,5 +1,4 @@
 //! Utilities for points in 3D space
-use binrw::{binrw, BinRead, BinWrite};
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
@@ -11,8 +10,6 @@ pub trait Pointable:
     + Clone
     + Default
     + ReadWriteBuf
-    + for<'a> BinRead<Args<'a> = ()>
-    + for<'a> BinWrite<Args<'a> = ()>
 {
 }
 
@@ -22,7 +19,6 @@ impl Pointable for u16 {}
 
 /// A point in 3D space.
 #[allow(missing_docs)]
-#[binrw]
 #[derive(Default, Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct Point<T>

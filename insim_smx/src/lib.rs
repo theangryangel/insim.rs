@@ -16,12 +16,8 @@ use std::{
     io::ErrorKind,
     path::PathBuf,
 };
-
-use insim_core::{
-    binrw::{self, binrw, BinRead},
-    point::Point,
-    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-};
+use bytes::Bytes;
+use insim_core::point::Point;
 use thiserror::Error;
 
 #[non_exhaustive]
@@ -32,7 +28,7 @@ pub enum Error {
     IO { kind: ErrorKind, message: String },
 
     #[error("BinRw Err {0:?}")]
-    BinRw(#[from] binrw::Error),
+    ReadWriteBuf(#[from] insim_core::Error),
 }
 
 impl From<std::io::Error> for Error {
@@ -44,8 +40,7 @@ impl From<std::io::Error> for Error {
     }
 }
 
-#[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 /// Red Green Blue
 pub struct Rgb {
     /// Red
@@ -56,8 +51,7 @@ pub struct Rgb {
     pub b: u8,
 }
 
-#[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 /// RGB with alpha channel
 pub struct Argb {
     /// Alpha
@@ -66,8 +60,7 @@ pub struct Argb {
     pub rgb: Rgb,
 }
 
-#[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 /// An Object at a given point with a colour
 pub struct ObjectPoint {
     /// Position/point
@@ -76,15 +69,14 @@ pub struct ObjectPoint {
     pub colour: Argb,
 }
 
-#[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
 /// Triangle block
 pub struct Triangle {
     /// Vertex A
     pub a: u16,
     /// Vertex B
     pub b: u16,
-    #[brw(pad_after = 2)]
+    #[read_write_buf(pad_after = 2)]
     /// Vertex C
     pub c: u16,
 }
@@ -162,7 +154,10 @@ pub struct Smx {
 impl Smx {
     /// Read and parse a SMX file into a [Smx] struct.
     pub fn from_file(i: &mut File) -> Result<Self, Error> {
-        Self::read(i).map_err(Error::from)
+        let mut data = Vec::new();
+        i.read_to_end(&mut data);
+        let mut data = Bytes::from(data);
+        Self::read_buf(data).map_err(Error:from)
     }
 
     /// Read and parse a SMX file into a [Smx] struct.
@@ -175,9 +170,7 @@ impl Smx {
         }
 
         let mut input = fs::File::open(i).map_err(Error::from)?;
-        let result = Self::read(&mut input)?;
-
-        Ok(result)
+        Self::from_file(&mut input)
     }
 }
 

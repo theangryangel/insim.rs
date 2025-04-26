@@ -1,12 +1,9 @@
 //! Strongly typed wind strength
-use binrw::binrw;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 use crate::ReadWriteBuf;
 
-#[binrw]
-#[brw(repr(u8))]
 #[derive(Debug, Default, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]

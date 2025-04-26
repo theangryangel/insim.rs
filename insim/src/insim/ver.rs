@@ -1,4 +1,5 @@
 use bytes::{Buf, BufMut};
+use std::str::FromStr;
 use insim_core::{game_version::GameVersion, FromToAsciiBytes, FromToCodepageBytes, ReadWriteBuf};
 
 use crate::identifiers::RequestId;

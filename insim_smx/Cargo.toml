@@ -18,4 +18,6 @@ doctest = false
 
 [dependencies]
 insim_core = { path = "../insim_core", version = "3.0.0-unreleased" }
+insim_macros = { path = "../insim_macros", version = "3.0.0-unreleased" }
 thiserror = { workspace = true }
+bytes = { workspace = true }

@@ -1,13 +1,9 @@
 //! Strongly type license data
-use binrw::binrw;
-
 use crate::ReadWriteBuf;
 
 /// Describes the various LFS "license" levels. Each "license" provides access to different
 /// levels of content.
 /// See <https://www.lfs.net/contents>
-#[binrw]
-#[brw(repr(u8))]
 #[non_exhaustive]
 #[derive(Default, PartialEq, PartialOrd, Eq, Debug, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
