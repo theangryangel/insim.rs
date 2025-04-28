@@ -1,3 +1,6 @@
+use std::time::Duration;
+
+use bitflags::bitflags;
 use bytes::Buf;
 use insim_core::ReadWriteBuf;
 
@@ -5,10 +8,28 @@ use crate::identifiers::{PlayerId, RequestId};
 
 const AIC_MAX_INPUTS: usize = 20;
 
+bitflags! {
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    /// Describes the setup of a player and the various helpers that may be enabled, such as
+    /// auto-clutch, etc.
+    pub struct AiHelpFlags: u16 {
+        /// Autogears
+        const AUTOGEARS = (1 << 3);
+        /// Brake help
+        const HELP_B = (1 << 6);
+        /// Autoclutch
+        const AUTOCLUTCH = (1 << 9);
+    }
+}
+
+impl_bitflags_from_to_bytes!(AiHelpFlags, u16);
+
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 /// AI input type
+// FIXME: Strongly type!
 pub enum AiInputType {
     /// Steering
     Msx(u16),
@@ -70,6 +91,15 @@ pub enum AiInputType {
     /// Fogs front
     FogFront(u16),
 
+    /// Send AI Info
+    SendAiInfo,
+
+    // Repeat AI Information at a given interval. 0 to stop.
+    RepeatAiInfo(Duration),
+
+    // Set help flags
+    SetHelpFlags(AiHelpFlags),
+
     /// Reset all controlled values
     ResetAll,
 
@@ -91,7 +121,7 @@ pub struct AiInputVal {
     pub input: AiInputType,
 
     /// Duration
-    pub time: u8,
+    pub time: Duration,
 }
 
 impl ReadWriteBuf for AiInputVal {
@@ -121,6 +151,12 @@ impl ReadWriteBuf for AiInputVal {
             17 => AiInputType::TcDisable(val),
             18 => AiInputType::FogRear(val),
             19 => AiInputType::FogFront(val),
+            240 => AiInputType::SendAiInfo,
+            241 => AiInputType::RepeatAiInfo(Duration::from_millis(val as u64 * 10)),
+            253 => {
+                let flags = AiHelpFlags::from_bits_truncate(val);
+                AiInputType::SetHelpFlags(flags)
+            },
             254 => AiInputType::ResetAll,
             255 => AiInputType::StopControl,
             found => {
@@ -130,103 +166,53 @@ impl ReadWriteBuf for AiInputVal {
             },
         };
 
+        let time = Duration::from_millis(time as u64 * 10);
+
         Ok(Self { input, time })
     }
 
     fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        match self.input {
-            AiInputType::Msx(val) => {
-                0_u8.write_buf(buf)?;
-                val.write_buf(buf)?;
+        let (discrim, val): (u8, u16) = match self.input {
+            AiInputType::Msx(val) => (0, val),
+            AiInputType::Throttle(val) => (1, val),
+            AiInputType::Brake(val) => (2, val),
+            AiInputType::Chup(val) => (3, val),
+            AiInputType::Chdn(val) => (4, val),
+            AiInputType::Ignition(val) => (5, val),
+            AiInputType::ExtraLight(val) => (6, val),
+            AiInputType::HeadLights(val) => (7, val),
+            AiInputType::Siren(val) => (8, val),
+            AiInputType::Horn(val) => (9, val),
+            AiInputType::Flash(val) => (10, val),
+            AiInputType::Clutch(val) => (11, val),
+            AiInputType::Handbrake(val) => (12, val),
+            AiInputType::Indicators(val) => (13, val),
+            AiInputType::Gear(val) => (14, val),
+            AiInputType::Look(val) => (15, val),
+            AiInputType::Pitspeed(val) => (16, val),
+            AiInputType::TcDisable(val) => (17, val),
+            AiInputType::FogRear(val) => (18, val),
+            AiInputType::FogFront(val) => (19, val),
+            AiInputType::SendAiInfo => (240, 0),
+            AiInputType::RepeatAiInfo(val) => {
+                (
+                    241,
+                    // FIXME: check boundary
+                    (((val.as_millis()) / 10) as u16),
+                )
             },
-            AiInputType::Throttle(val) => {
-                1_u8.write_buf(buf)?;
-                val.write_buf(buf)?;
-            },
-            AiInputType::Brake(val) => {
-                2_u8.write_buf(buf)?;
-                val.write_buf(buf)?;
-            },
-            AiInputType::Chup(val) => {
-                3_u8.write_buf(buf)?;
-                val.write_buf(buf)?;
-            },
-            AiInputType::Chdn(val) => {
-                4_u8.write_buf(buf)?;
-                val.write_buf(buf)?;
-            },
-            AiInputType::Ignition(val) => {
-                5_u8.write_buf(buf)?;
-                val.write_buf(buf)?;
-            },
-            AiInputType::ExtraLight(val) => {
-                6_u8.write_buf(buf)?;
-                val.write_buf(buf)?;
-            },
-            AiInputType::HeadLights(val) => {
-                7_u8.write_buf(buf)?;
-                val.write_buf(buf)?;
-            },
-            AiInputType::Siren(val) => {
-                8_u8.write_buf(buf)?;
-                val.write_buf(buf)?;
-            },
-            AiInputType::Horn(val) => {
-                9_u8.write_buf(buf)?;
-                val.write_buf(buf)?;
-            },
-            AiInputType::Flash(val) => {
-                10_u8.write_buf(buf)?;
-                val.write_buf(buf)?;
-            },
-            AiInputType::Clutch(val) => {
-                11_u8.write_buf(buf)?;
-                val.write_buf(buf)?;
-            },
-            AiInputType::Handbrake(val) => {
-                12_u8.write_buf(buf)?;
-                val.write_buf(buf)?;
-            },
-            AiInputType::Indicators(val) => {
-                13_u8.write_buf(buf)?;
-                val.write_buf(buf)?;
-            },
-            AiInputType::Gear(val) => {
-                14_u8.write_buf(buf)?;
-                val.write_buf(buf)?;
-            },
-            AiInputType::Look(val) => {
-                15_u8.write_buf(buf)?;
-                val.write_buf(buf)?;
-            },
-            AiInputType::Pitspeed(val) => {
-                16_u8.write_buf(buf)?;
-                val.write_buf(buf)?;
-            },
-            AiInputType::TcDisable(val) => {
-                17_u8.write_buf(buf)?;
-                val.write_buf(buf)?;
-            },
-            AiInputType::FogRear(val) => {
-                18_u8.write_buf(buf)?;
-                val.write_buf(buf)?;
-            },
-            AiInputType::FogFront(val) => {
-                19_u8.write_buf(buf)?;
-                val.write_buf(buf)?;
-            },
-            AiInputType::ResetAll => {
-                254_u8.write_buf(buf)?;
-                0_u16.write_buf(buf)?;
-            },
-            AiInputType::StopControl => {
-                255_u8.write_buf(buf)?;
-                0_u16.write_buf(buf)?;
-            },
+            AiInputType::SetHelpFlags(val) => (253, val.bits()),
+            AiInputType::ResetAll => (254, 0),
+            AiInputType::StopControl => (255, 0),
         };
 
-        self.time.write_buf(buf)?;
+        discrim.write_buf(buf)?;
 
+        // FIXME: check boundary
+        let time = (self.time.as_millis() / 10) as u8;
+        time.write_buf(buf)?;
+
+        val.write_buf(buf)?;
         Ok(())
     }
 }
@@ -269,5 +255,38 @@ impl ReadWriteBuf for Aic {
             i.write_buf(buf)?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_aic() {
+        assert_from_to_bytes!(
+            Aic,
+            [
+                0, // reqi
+                4, // plid
+                // input 1
+                15, // inputs[0].input - LOOK
+                10, // inputs[0].time
+                4,  // inputs[0].val[0] - LEFT
+                0,  // inputs[0].val[1]
+                // input 2
+                13,  // inputs[0].input - INDICATORS
+                100, // inputs[0].time
+                4,   // inputs[0].val[0] - Hazards
+                0,   // inputs[0].val[1]
+            ],
+            |parsed: Aic| {
+                assert_eq!(parsed.reqi, RequestId(0));
+                assert_eq!(parsed.plid, PlayerId(4));
+                assert_eq!(parsed.inputs.len(), 2);
+                assert!(matches!(parsed.inputs[0].input, AiInputType::Look(4)));
+                assert!(matches!(parsed.inputs[1].input, AiInputType::Indicators(4)));
+            }
+        );
     }
 }

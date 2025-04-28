@@ -3,12 +3,16 @@ use quote::quote;
 #[derive(Debug, darling::FromMeta, Clone)]
 pub(super) struct AsciiArgs {
     length: usize,
+    #[darling(default)]
+    trailing_nul: bool,
 }
 
 #[derive(Debug, darling::FromMeta, Clone)]
 pub(super) struct CodepageArgs {
     length: usize,
     align_to: Option<usize>,
+    #[darling(default)]
+    trailing_nul: bool,
 }
 
 #[derive(Debug, darling::FromMeta, Clone)]
@@ -80,7 +84,7 @@ impl Field {
                     buf, #length
                 )?;
             }
-        } else if let Some(AsciiArgs { length }) = f.ascii.as_ref() {
+        } else if let Some(AsciiArgs { length, .. }) = f.ascii.as_ref() {
             tokens = quote! {
                 #tokens
                 let #field_name = <#field_type as ::insim_core::FromToAsciiBytes>::from_ascii_bytes(
@@ -153,28 +157,37 @@ impl Field {
                 CodepageArgs {
                     length,
                     align_to: None,
+                    trailing_nul,
                 } => {
                     tokens = quote! {
                         #tokens
                         <#field_type as ::insim_core::FromToCodepageBytes>::to_codepage_bytes(
-                            &self.#field_name, buf, #length
+                            &self.#field_name, buf, #length, #trailing_nul
                         )?;
                     }
                 },
-                CodepageArgs { length, align_to } => {
+                CodepageArgs {
+                    length,
+                    align_to,
+                    trailing_nul,
+                } => {
                     tokens = quote! {
                         #tokens
                         <#field_type as ::insim_core::FromToCodepageBytes>::to_codepage_bytes_aligned(
-                            &self.#field_name, buf, #length, #align_to
+                            &self.#field_name, buf, #length, #align_to, #trailing_nul
                         )?;
                     }
                 },
             }
-        } else if let Some(AsciiArgs { length }) = f.ascii.as_ref() {
+        } else if let Some(AsciiArgs {
+            length,
+            trailing_nul,
+        }) = f.ascii.as_ref()
+        {
             tokens = quote! {
                 #tokens
                 <#field_type as ::insim_core::FromToAsciiBytes>::to_ascii_bytes(
-                    &self.#field_name, buf, #length
+                    &self.#field_name, buf, #length, #trailing_nul
                 )?;
             };
         } else if let Some(duration_args) = f.duration.as_ref() {

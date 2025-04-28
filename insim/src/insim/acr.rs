@@ -36,7 +36,7 @@ pub struct Acr {
     pub result: AcrResult,
 
     /// Command
-    #[read_write_buf(codepage(length = 64, align_to = 4))]
+    #[read_write_buf(codepage(length = 64, align_to = 4, trailing_nul = true))]
     pub text: String,
 }
 

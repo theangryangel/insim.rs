@@ -101,9 +101,46 @@ pub struct Rip {
     pub ttime: Duration,
 
     /// Zero or replay name
-    // FIXME: Not a codepage. probably not an ascii string either.. It's probably a wchar_t?
-    #[read_write_buf(ascii(length = 64))]
+    #[read_write_buf(codepage(length = 64, trailing_nul = true))]
     pub rname: String,
 }
 
 impl_typical_with_request_id!(Rip);
+
+#[cfg(test)]
+mod test {
+    use bytes::{BufMut, BytesMut};
+
+    use super::*;
+
+    #[test]
+    fn test_rip() {
+        let mut data = BytesMut::new();
+        data.extend_from_slice(&[
+            2,   // reqi
+            0,   // error
+            1,   // mpr
+            1,   // paused
+            6,   // options
+            0,   // sp3
+            116, // ctime (1)
+            41,  // ctime (2)
+            2,   // ctime (3)
+            0,   // ctime (4)
+            0,   // ttime (1)
+            0,   // ttime (2)
+            0,   // ttime (3)
+            0,   // ttime (4)
+        ]);
+        data.extend_from_slice(b"name_of_thing");
+        data.put_bytes(0, 64 - 13);
+
+        assert_from_to_bytes!(Rip, data.as_ref(), |parsed: Rip| {
+            assert_eq!(parsed.reqi, RequestId(2));
+            assert_eq!(parsed.mpr, true);
+            assert_eq!(parsed.paused, true);
+            assert_eq!(parsed.ctime, Duration::from_millis(141684));
+            assert_eq!(parsed.rname, "name_of_thing");
+        });
+    }
+}

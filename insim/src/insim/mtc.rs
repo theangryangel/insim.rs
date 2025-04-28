@@ -19,7 +19,7 @@ pub struct Mtc {
     pub plid: PlayerId,
 
     /// Message
-    #[read_write_buf(codepage(length = 128, align_to = 4))]
+    #[read_write_buf(codepage(length = 128, align_to = 4, trailing_nul = true))]
     pub text: String,
 }
 

@@ -127,6 +127,7 @@ impl_typical_with_request_id!(Bfn);
 pub struct Btn {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
+
     /// Connection to display the button (0 = local / 255 = all)
     pub ucid: ConnectionId,
 
@@ -144,10 +145,13 @@ pub struct Btn {
 
     /// Position - left (0-200)
     pub l: u8,
+
     /// Position - top (0-200)
     pub t: u8,
+
     /// Position - width (0-200)
     pub w: u8,
+
     /// Position - height (0-200)
     pub h: u8,
 
@@ -157,14 +161,6 @@ pub struct Btn {
 }
 
 impl_typical_with_request_id!(Btn);
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_btn() {
-        // FIXME
-    }
-}
 
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -207,4 +203,105 @@ pub struct Btt {
     #[read_write_buf(codepage(length = 96))]
     /// Typed text, zero to TypeIn specified in IS_BTN
     pub text: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use bytes::{BufMut, BytesMut};
+
+    use super::*;
+
+    #[test]
+    fn test_bfn() {
+        assert_from_to_bytes!(
+            Bfn,
+            [
+                0,   // reqi
+                3,   // subt
+                4,   // ucid
+                45,  // clickid
+                48,  // clickmax
+                128, // inst
+            ],
+            |parsed: Bfn| {
+                assert_eq!(parsed.ucid, ConnectionId(4));
+                assert!(matches!(parsed.subt, BfnType::BtnRequest));
+                assert_eq!(parsed.clickid, ClickId(45));
+                assert_eq!(parsed.clickmax, 48);
+                assert!(parsed.inst.contains(BtnInst::ALWAYSON));
+            }
+        );
+    }
+
+    #[test]
+    fn test_btn() {
+        let mut data = BytesMut::new();
+        data.extend_from_slice(&[
+            0,   // reqi
+            4,   // ucid
+            45,  // clickid
+            128, // inst
+            9,   // bstyle
+            3,   // typein
+            20,  // l
+            30,  // t
+            40,  // w
+            50,  // h
+        ]);
+        data.extend_from_slice(b"123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789$");
+
+        assert_from_to_bytes!(Btn, data.as_ref(), |parsed: Btn| {
+            assert_eq!(parsed.ucid, ConnectionId(4));
+            assert_eq!(parsed.clickid, ClickId(45));
+            assert_eq!(parsed.typein, 3);
+            assert_eq!(parsed.l, 20);
+            assert_eq!(parsed.t, 30);
+            assert_eq!(parsed.w, 40);
+            assert_eq!(parsed.h, 50);
+        });
+    }
+
+    #[test]
+    fn test_btc() {
+        assert_from_to_bytes!(
+            Btc,
+            [
+                1,   // reqi
+                2,   // ucid
+                3,   // clickid
+                128, // inst
+                2,   // cflags
+                0,
+            ],
+            |parsed: Btc| {
+                assert_eq!(parsed.ucid, ConnectionId(2));
+                assert_eq!(parsed.clickid, ClickId(3));
+                assert!(parsed.inst.contains(BtnInst::ALWAYSON));
+                assert!(parsed.cflags.contains(BtnClickFlags::RMB));
+            }
+        );
+    }
+
+    #[test]
+    fn test_btt() {
+        let mut data = BytesMut::new();
+        data.extend_from_slice(&[
+            1,   // reqi
+            2,   // ucid
+            3,   // clickid
+            128, // inst
+            7,   // typein
+            0,   // sp3
+        ]);
+        data.extend_from_slice(b"123456|^$");
+        data.put_bytes(0, 87);
+
+        assert_from_to_bytes!(Btt, data.as_ref(), |parsed: Btt| {
+            assert_eq!(parsed.ucid, ConnectionId(2));
+            assert_eq!(parsed.clickid, ClickId(3));
+            assert!(parsed.inst.contains(BtnInst::ALWAYSON));
+            assert_eq!(parsed.typein, 7);
+            assert_eq!(parsed.text, "123456|^$");
+        });
+    }
 }

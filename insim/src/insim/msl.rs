@@ -35,7 +35,7 @@ pub struct Msl {
     pub sound: SoundType,
 
     /// Message
-    #[read_write_buf(codepage(length = 128))]
+    #[read_write_buf(codepage(length = 128, trailing_nul = true))]
     pub msg: String,
 }
 

@@ -116,7 +116,7 @@ impl ReadWriteBuf for Mso {
         } else {
             buf.put_u8(0);
             self.msg
-                .to_codepage_bytes_aligned(buf, MSO_MSG_MAX_LEN, MSO_MSG_ALIGN)?;
+                .to_codepage_bytes_aligned(buf, MSO_MSG_MAX_LEN, MSO_MSG_ALIGN, true)?;
         }
 
         Ok(())
@@ -210,6 +210,6 @@ mod tests {
             assert_eq!(mso.textstart, 16); // moved from 17th position to 16th
             assert_eq!(&mso.msg[..mso.textstart as usize], "^7Player ě ^7: ");
             assert_eq!(&mso.msg[mso.textstart as usize..], "^8cršč");
-        })
+        });
     }
 }

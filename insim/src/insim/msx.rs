@@ -9,7 +9,7 @@ pub struct Msx {
     pub reqi: RequestId,
 
     /// Message
-    #[read_write_buf(codepage(length = 96))]
+    #[read_write_buf(codepage(length = 96, trailing_nul = true))]
     pub msg: String,
 }
 

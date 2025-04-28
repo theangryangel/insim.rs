@@ -68,3 +68,28 @@ impl WithRequestId for TtcType {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_ttc() {
+        assert_from_to_bytes!(
+            Ttc,
+            [
+                7, // reqi
+                2, // subt
+                5, // ucid
+                1, // b1
+                2, // b2
+                3, // b3
+            ],
+            |ttc: Ttc| {
+                assert_eq!(ttc.reqi, RequestId(7));
+                assert_eq!(ttc.ucid, ConnectionId(5));
+                assert!(matches!(ttc.subt, TtcType::SelStart));
+            }
+        );
+    }
+}

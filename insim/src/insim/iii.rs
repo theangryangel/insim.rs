@@ -16,7 +16,7 @@ pub struct Iii {
     pub plid: PlayerId,
 
     /// The message
-    #[read_write_buf(codepage(length = 64, align_to = 4))]
+    #[read_write_buf(codepage(length = 64, align_to = 4, trailing_nul = true))]
     pub msg: String,
 }
 

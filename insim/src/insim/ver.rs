@@ -46,7 +46,7 @@ impl ReadWriteBuf for Ver {
         self.reqi.write_buf(buf)?;
         buf.put_u8(0);
         self.version.write_buf(buf)?;
-        self.product.to_codepage_bytes(buf, 6)?;
+        self.product.to_codepage_bytes(buf, 6, false)?;
 
         self.insimver.write_buf(buf)?;
         buf.put_u8(0);

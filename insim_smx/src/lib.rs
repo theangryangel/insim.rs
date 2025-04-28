@@ -217,7 +217,7 @@ impl ReadWriteBuf for Smx {
         self.resolution.write_buf(buf)?;
         self.vertex_colours.write_buf(buf)?;
         buf.put_bytes(0, 4);
-        self.track.to_codepage_bytes(buf, 32)?;
+        self.track.to_codepage_bytes(buf, 32, false)?;
         self.ground_colour.write_buf(buf)?;
         buf.put_bytes(0, 9);
         (self.objects.len() as i32).write_buf(buf)?;

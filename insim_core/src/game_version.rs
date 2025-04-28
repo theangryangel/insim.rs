@@ -167,7 +167,7 @@ impl ReadWriteBuf for GameVersion {
 
     fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
         let ver = self.to_string();
-        ver.to_ascii_bytes(buf, 8)?;
+        ver.to_ascii_bytes(buf, 8, false)?;
         Ok(())
     }
 }

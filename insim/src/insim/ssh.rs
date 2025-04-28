@@ -31,9 +31,10 @@ pub struct Ssh {
     #[read_write_buf(pad_after = 4)]
     pub error: SshError,
 
-    /// Screenshot file path.
-    // FIXME: Probably not really ascii. definitely not a codepage. Probably wchar_t?
-    #[read_write_buf(ascii(length = 32))]
+    /// Screenshot name.
+    /// Not really ascii, but given we dont have control over the naming convention we can
+    /// probably just abuse the fact that LFS only generates ASCII compatible file names.
+    #[read_write_buf(ascii(length = 32, trailing_nul = true))]
     pub name: String,
 }
 
@@ -58,5 +59,28 @@ impl WithRequestId for SshError {
             error: self,
             ..Default::default()
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use bytes::{BufMut, BytesMut};
+
+    use super::*;
+
+    #[test]
+    fn test_ssh() {
+        let mut data = BytesMut::new();
+        data.extend_from_slice(&[
+            2, // reqi
+            0, // error
+            0, 0, 0, 0,
+        ]);
+        data.extend_from_slice(b"lfs_00000001");
+        data.put_bytes(0, 20);
+        assert_from_to_bytes!(Ssh, data.as_ref(), |ssh: Ssh| {
+            assert!(matches!(ssh.error, SshError::Ok));
+            assert_eq!(ssh.name, "lfs_00000001");
+        });
     }
 }
