@@ -4,7 +4,7 @@ use std::{net::SocketAddr, time::Duration};
 
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
-use insim::{relay::Hlr, Packet, Result};
+use insim::{insim::TinyType, relay::Hlr, Packet, Result};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -127,6 +127,10 @@ pub fn main() -> Result<()> {
     } = &cli.command
     {
         connection.write(Hlr::default())?;
+    } else {
+        connection.write(TinyType::Rst)?;
+        connection.write(TinyType::Ncn)?;
+        connection.write(TinyType::Npl)?;
     }
 
     let mut i: usize = 0;
