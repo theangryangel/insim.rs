@@ -316,7 +316,7 @@ impl Packet {
             Packet::Csc(_) => 20,
             Packet::Cim(_) => 8,
             Packet::Mal(_) => 12,
-            // Packet::Aic(i) => 4 + (i.inputs.len() * 4),
+            Packet::Aic(i) => 4 + (i.inputs.len() * 4),
             Packet::Aii(_) => 96,
             Packet::RelayHos(i) => 4 + (i.hinfo.len() * 40),
             Packet::RelaySel(_) => 68,

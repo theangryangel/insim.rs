@@ -39,6 +39,7 @@ generate_bitflag_helpers!(
 impl_bitflags_from_to_bytes!(RaceFlags, u16);
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Lap timing information
 pub enum LapTimingInfo {
     /// Standard lap timing, with a given number of checkpoints

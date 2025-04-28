@@ -138,7 +138,7 @@ pub struct Sta {
     pub track: Track,
 
     /// Weather conditions
-    pub weather: u8, // TODO: Weather is track dependant?!
+    pub weather: u8,
 
     /// Wind conditions
     pub wind: Wind,
