@@ -92,7 +92,10 @@ impl ReadWriteBuf for Mso {
             let name = codepages::to_lossy_bytes(name);
             let msg = codepages::to_lossy_bytes(msg);
 
-            // FIXME validate
+            if (name.len() + msg.len()) > (MSO_MSG_MAX_LEN - 1) {
+                return Err(insim_core::Error::TooLarge);
+            }
+
             let textstart = name.len() as u8;
 
             buf.put_u8(textstart);
