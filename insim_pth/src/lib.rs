@@ -169,7 +169,9 @@ impl ReadWriteBuf for Pth {
         buf.extend_from_slice(b"LFSPTH");
         self.version.write_buf(buf)?;
         self.revision.write_buf(buf)?;
-        // FIXME
+        if self.nodes.len() > (i32::MAX as usize) {
+            return Err(insim_core::Error::TooLarge);
+        } 
         (self.nodes.len() as i32).write_buf(buf)?;
         self.finish_line_node.write_buf(buf)?;
         for i in self.nodes.iter() {
