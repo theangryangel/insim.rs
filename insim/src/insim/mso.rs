@@ -192,8 +192,8 @@ mod tests {
         assert_eq!(res.msg.len(), MSO_MSG_MAX_LEN + 10);
 
         let mut buf = BytesMut::new();
-        res.write_buf(&mut buf).unwrap();
-        assert_eq!(buf.len(), MSO_MSG_MAX_LEN + 6);
+        let res = res.write_buf(&mut buf);
+        assert!(res.is_err());
     }
 
     #[test]

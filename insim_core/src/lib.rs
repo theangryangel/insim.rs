@@ -187,7 +187,9 @@ impl FromToAsciiBytes for String {
         }
         let new = self.as_bytes();
         let max_len = if trailing_nul { len - 1 } else { len };
-
+        if new.len() > max_len {
+            return Err(Error::TooLarge);
+        }
         let len_to_write = new.len().min(max_len);
         buf.extend_from_slice(&new[..len_to_write]);
         buf.put_bytes(0, len - len_to_write);
@@ -236,6 +238,9 @@ where
     ) -> Result<(), Error> {
         let new = string::codepages::to_lossy_bytes(self.as_ref());
         let max_len = if trailing_nul { len - 1 } else { len };
+        if new.len() > max_len {
+            return Err(Error::TooLarge);
+        }
         let len_to_write = new.len().min(max_len);
 
         buf.extend_from_slice(&new[..len_to_write]);
@@ -252,6 +257,9 @@ where
     ) -> Result<(), Error> {
         let new = string::codepages::to_lossy_bytes(self.as_ref());
         let max_len = if trailing_nul { len - 1 } else { len };
+        if new.len() > max_len {
+            return Err(Error::TooLarge);
+        }
         let len_to_write = new.len().min(max_len);
         buf.extend_from_slice(&new[..len_to_write]);
         if len_to_write < len {
@@ -321,19 +329,8 @@ mod test {
     }
 
     #[test]
-    fn test_string_codepage_bytes_aligned_truncates() {
-        let input = String::from("abcd");
-        let mut buf = BytesMut::new();
-        input
-            .to_codepage_bytes_aligned(&mut buf, 2, 2, false)
-            .unwrap();
-        let inner = buf.freeze();
-        assert_eq!(inner.as_ref(), [b'a', b'b']);
-    }
-
-    #[test]
     fn test_string_codepage_bytes_trialing_nul() {
-        let input = String::from("abcd");
+        let input = String::from("a");
         let mut buf = BytesMut::new();
         input
             .to_codepage_bytes_aligned(&mut buf, 2, 2, true)
@@ -344,10 +341,26 @@ mod test {
 
     #[test]
     fn test_string_ascii_bytes_trialing_nul() {
-        let input = String::from("abcd");
+        let input = String::from("ab");
         let mut buf = BytesMut::new();
-        input.to_ascii_bytes(&mut buf, 2, true).unwrap();
+        input.to_ascii_bytes(&mut buf, 4, true).unwrap();
         let inner = buf.freeze();
-        assert_eq!(inner.as_ref(), [b'a', 0]);
+        assert_eq!(inner.as_ref(), [b'a', b'b', 0, 0]);
+    }
+
+    #[test]
+    fn test_string_ascii_too_long() {
+        let input = String::from("abcde");
+        let mut buf = BytesMut::new();
+        let res = input.to_ascii_bytes(&mut buf, 4, true);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_string_codepage_too_long() {
+        let input = String::from("abcde");
+        let mut buf = BytesMut::new();
+        let res = input.to_codepage_bytes(&mut buf, 4, true);
+        assert!(res.is_err());
     }
 }
