@@ -16,7 +16,6 @@ pub struct ObjectInfo {
     /// Z coordinate of object
     pub z: u8,
 
-    // TODO: check layout if this has something we can do with it
     /// Flags
     pub flags: u8,
 

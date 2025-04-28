@@ -117,7 +117,7 @@ pub use racelaps::RaceLaps;
 pub use reo::Reo;
 pub use res::Res;
 pub use rip::{Rip, RipError, RipOptions};
-pub use rst::{RaceFlags, Rst};
+pub use rst::{LapTimingInfo, RaceFlags, Rst};
 pub use scc::Scc;
 pub use sch::{Sch, SchFlags};
 pub use sfp::Sfp;

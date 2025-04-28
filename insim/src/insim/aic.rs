@@ -195,11 +195,12 @@ impl ReadWriteBuf for AiInputVal {
             AiInputType::FogFront(val) => (19, val),
             AiInputType::SendAiInfo => (240, 0),
             AiInputType::RepeatAiInfo(val) => {
-                (
-                    241,
-                    // FIXME: check boundary
-                    (((val.as_millis()) / 10) as u16),
-                )
+                let val = match u16::try_from(val.as_millis() / 10) {
+                    Ok(val) => val,
+                    Err(_) => return Err(insim_core::Error::TooLarge),
+                };
+
+                (241, val)
             },
             AiInputType::SetHelpFlags(val) => (253, val.bits()),
             AiInputType::ResetAll => (254, 0),
@@ -208,9 +209,10 @@ impl ReadWriteBuf for AiInputVal {
 
         discrim.write_buf(buf)?;
 
-        // FIXME: check boundary
-        let time = (self.time.as_millis() / 10) as u8;
-        time.write_buf(buf)?;
+        match u8::try_from(self.time.as_millis() / 10) {
+            Ok(time) => time.write_buf(buf)?,
+            Err(_) => return Err(insim_core::Error::TooLarge),
+        }
 
         val.write_buf(buf)?;
         Ok(())

@@ -157,12 +157,11 @@ impl FromStr for GameVersion {
 impl ReadWriteBuf for GameVersion {
     fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
         let new = buf.split_to(8);
-        // FIXME: remove the unwraps
-        let ver = std::str::from_utf8(&new)
-            .map(|s| GameVersion::from_str(s.trim_end_matches('\0')))
-            .unwrap()
-            .unwrap();
-        Ok(ver)
+
+        match std::str::from_utf8(&new) {
+            Ok(s) => GameVersion::from_str(s.trim_end_matches('\0')).map_err(crate::Error::from),
+            Err(_) => Err(crate::Error::NotAsciiString),
+        }
     }
 
     fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {

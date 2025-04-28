@@ -95,7 +95,7 @@ pub async fn main() -> Result<()> {
     loop {
         tokio::select! {
 
-            // TODO: We should probably find a way to pause the ticker, but whatever.
+            // We should probably find a way to pause the ticker, but whatever.
             _ = interval.tick() => {
                 if plid.is_none() {
                     continue;

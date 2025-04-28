@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use insim_core::{track::Track, wind::Wind};
+use insim_core::{track::Track, wind::Wind, ReadWriteBuf};
 
 use super::RaceLaps;
 use crate::identifiers::RequestId;
@@ -38,6 +38,49 @@ generate_bitflag_helpers!(
 
 impl_bitflags_from_to_bytes!(RaceFlags, u16);
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+/// Lap timing information
+pub enum LapTimingInfo {
+    /// Standard lap timing, with a given number of checkpoints
+    Standard(u8), // 0x40 + checkpoint count (0–3)
+    /// Custom timing, with user placed checkpoints
+    Custom(u8), // 0x80 + checkpoint count (0–3)
+    #[default]
+    /// No lap timing, open configuration without checkpoints
+    None, // 0xC0
+}
+
+impl LapTimingInfo {
+    /// Read from u8
+    pub fn from_u8(val: u8) -> Self {
+        match val & 0xC0 {
+            0x40 => LapTimingInfo::Standard(val & 0x03),
+            0x80 => LapTimingInfo::Custom(val & 0x03),
+            0xC0 => LapTimingInfo::None,
+            _ => LapTimingInfo::None,
+        }
+    }
+
+    /// Convert to u8
+    pub fn to_u8(self) -> u8 {
+        match self {
+            LapTimingInfo::Standard(checkpoints) => 0x40 | (checkpoints & 0x03),
+            LapTimingInfo::Custom(checkpoints) => 0x80 | (checkpoints & 0x03),
+            LapTimingInfo::None => 0xC0,
+        }
+    }
+}
+
+impl ReadWriteBuf for LapTimingInfo {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        Ok(LapTimingInfo::from_u8(u8::read_buf(buf)?))
+    }
+
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.to_u8().write_buf(buf)
+    }
+}
+
 #[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Race Start - informational - sent when a race starts
@@ -56,8 +99,7 @@ pub struct Rst {
     pub nump: u8,
 
     /// Lap timing
-    // TODO: needs decoding and strongly typing
-    pub timing: u8,
+    pub timing: LapTimingInfo,
 
     /// The track
     pub track: Track,

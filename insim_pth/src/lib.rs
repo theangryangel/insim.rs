@@ -171,7 +171,7 @@ impl ReadWriteBuf for Pth {
         self.revision.write_buf(buf)?;
         if self.nodes.len() > (i32::MAX as usize) {
             return Err(insim_core::Error::TooLarge);
-        } 
+        }
         (self.nodes.len() as i32).write_buf(buf)?;
         self.finish_line_node.write_buf(buf)?;
         for i in self.nodes.iter() {

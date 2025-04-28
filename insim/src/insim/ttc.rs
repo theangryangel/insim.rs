@@ -34,7 +34,6 @@ pub struct Ttc {
     /// Connection unique ID to target
     pub ucid: ConnectionId,
 
-    // TODO: Fix this. It should be rolled into TtcType
     /// B1, B2, B3 may be used in various ways depending on SubT
     pub b1: u8,
 

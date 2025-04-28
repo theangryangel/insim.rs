@@ -11,6 +11,7 @@ pub mod wind;
 use std::{array::from_fn, fmt::Display, net::Ipv4Addr, num::TryFromIntError};
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+use game_version::GameVersionParseError;
 
 // FIXME: rename, add line/contextual information
 #[non_exhaustive]
@@ -38,9 +39,17 @@ pub enum Error {
     TryFromInt(TryFromIntError),
     /// Value too large for field
     TooLarge,
+    /// Game Version Parse Error
+    GameVersionParseError(GameVersionParseError),
 }
 
 impl std::error::Error for Error {}
+
+impl From<GameVersionParseError> for Error {
+    fn from(value: GameVersionParseError) -> Self {
+        Self::GameVersionParseError(value)
+    }
+}
 
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -129,9 +129,10 @@ impl ReadWriteBuf for Obh {
         self.plid.write_buf(buf)?;
         // automatically strip off the first 4 bits as they're reserved
         spclose_strip_high_bits(self.spclose).write_buf(buf)?;
-        // FIXME: handle if this is too small
-        let time = (self.time.as_millis() / 10) as u16;
-        time.write_buf(buf)?;
+        match u16::try_from(self.time.as_millis() / 10) {
+            Ok(time) => time.write_buf(buf)?,
+            Err(_) => return Err(insim_core::Error::TooLarge),
+        }
         self.c.write_buf(buf)?;
         self.x.write_buf(buf)?;
         self.y.write_buf(buf)?;
