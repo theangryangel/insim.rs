@@ -1,10 +1,18 @@
 //! High level example
 //! This example showcases the shortcut methods
-use std::{net::SocketAddr, time::Duration};
+use std::{io::Write, net::SocketAddr, time::Duration};
 
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
 use insim::{insim::TinyType, relay::Hlr, Packet, Result};
+use tabled::{Table, Tabled};
+
+#[derive(Tabled)]
+struct RelayHost {
+    name: String,
+    track: String,
+    numconns: u8,
+}
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -135,19 +143,42 @@ pub fn main() -> Result<()> {
 
     let mut i: usize = 0;
 
+    let mut hosts = vec![];
+
     loop {
         let packet = connection.read()?;
-
-        tracing::info!("Packet={:?} Index={:?}", packet, i);
 
         // if we were connected via the relay and only asked for the list of hosts, and we have the
         // last hostinfo, break the loop
         if_chain! {
             if let Commands::Relay{ list_hosts: true, .. } = &cli.command;
             if let Packet::RelayHos(hostinfo) = &packet;
-            if hostinfo.is_last();
             then {
-                break;
+
+                for host in hostinfo.hinfo.iter() {
+                    hosts.push(RelayHost {
+                        name: host.hname.clone(),
+                        track: host.track.to_string(),
+                        numconns: host.numconns,
+                    });
+                }
+
+                if hostinfo.is_last() {
+
+                    hosts.sort_by_key(|a| {
+                        a.numconns
+                    });
+                    hosts.reverse();
+
+                    let table = Table::new(hosts);
+                    let stdout = std::io::stdout();
+                    let mut handle = stdout.lock();
+                    handle.write_all(table.to_string().as_bytes())?;
+                    drop(handle);
+                    break;
+                }
+            } else {
+                tracing::info!("Packet={:?} Index={:?}", packet, i);
             }
         }
 

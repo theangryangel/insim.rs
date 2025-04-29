@@ -25,11 +25,44 @@ bitflags! {
 
 impl_bitflags_from_to_bytes!(AiHelpFlags, u16);
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[non_exhaustive]
+/// Special toggle-able helper for [AiInputType]
+pub enum AiInputToggle {
+    /// Toggle on/off
+    #[default]
+    Toggle = 1,
+    /// Turn off
+    Off = 2,
+    /// Turn on
+    On = 3,
+}
+
+impl From<u16> for AiInputToggle {
+    fn from(value: u16) -> Self {
+        match value {
+            3 => Self::On,
+            2 => Self::Off,
+            _ => Self::Toggle,
+        }
+    }
+}
+
+impl From<AiInputToggle> for u16 {
+    fn from(value: AiInputToggle) -> Self {
+        match value {
+            AiInputToggle::On => 3,
+            AiInputToggle::Off => 2,
+            AiInputToggle::Toggle => 1,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 /// AI input type
-// FIXME: Strongly type!
 pub enum AiInputType {
     /// Steering
     Msx(u16),
@@ -47,10 +80,10 @@ pub enum AiInputType {
     Chdn(u16),
 
     /// Ignition
-    Ignition(u16),
+    Ignition(AiInputToggle),
 
     /// Extra lights
-    ExtraLight(u16),
+    ExtraLight(AiInputToggle),
 
     /// Head lights
     HeadLights(u16),
@@ -80,22 +113,22 @@ pub enum AiInputType {
     Look(u16),
 
     /// Pitspeed
-    Pitspeed(u16),
+    Pitspeed(AiInputToggle),
 
     /// Disable Traction Control
-    TcDisable(u16),
+    TcDisable(AiInputToggle),
 
     /// Fogs rear
-    FogRear(u16),
+    FogRear(AiInputToggle),
 
     /// Fogs front
-    FogFront(u16),
+    FogFront(AiInputToggle),
 
     /// Send AI Info
     SendAiInfo,
 
     // Repeat AI Information at a given interval. 0 to stop.
-    RepeatAiInfo(Duration),
+    RepeatAiInfo,
 
     // Set help flags
     SetHelpFlags(AiHelpFlags),
@@ -109,22 +142,272 @@ pub enum AiInputType {
 
 impl Default for AiInputType {
     fn default() -> Self {
-        Self::Msx(32768)
+        Self::ResetAll
     }
 }
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// AI Input Control, value
-pub struct AiInputVal {
+pub struct AiInput {
     /// Input
     pub input: AiInputType,
 
     /// Duration
-    pub time: Duration,
+    pub time: Option<Duration>,
 }
 
-impl ReadWriteBuf for AiInputVal {
+impl AiInput {
+    /// Headlights off
+    pub fn headlights_off(time: Option<Duration>) -> Self {
+        Self {
+            input: AiInputType::HeadLights(1),
+            time,
+        }
+    }
+
+    /// Headlights side
+    pub fn headlights_side(time: Option<Duration>) -> Self {
+        Self {
+            input: AiInputType::HeadLights(2),
+            time,
+        }
+    }
+
+    /// Headlights low
+    pub fn headlights_low(time: Option<Duration>) -> Self {
+        Self {
+            input: AiInputType::HeadLights(3),
+            time,
+        }
+    }
+
+    /// HeadLights high
+    pub fn headlights_high(time: Option<Duration>) -> Self {
+        Self {
+            input: AiInputType::HeadLights(4),
+            time,
+        }
+    }
+
+    /// Siren fast
+    pub fn siren_fast(time: Option<Duration>) -> Self {
+        Self {
+            input: AiInputType::Siren(1),
+            time,
+        }
+    }
+
+    /// Siren low
+    pub fn siren_slow(time: Option<Duration>) -> Self {
+        Self {
+            input: AiInputType::Siren(2),
+            time,
+        }
+    }
+
+    /// Horn: 1 to 5
+    pub fn horn(level: u8, time: Option<Duration>) -> Self {
+        Self {
+            input: AiInputType::Horn(level as u16),
+            time,
+        }
+    }
+
+    /// Flash lights
+    pub fn flash(time: Option<Duration>) -> Self {
+        Self {
+            input: AiInputType::Flash(1),
+            time,
+        }
+    }
+
+    /// Clutch: 0 to 65535
+    pub fn clutch(value: u16, time: Option<Duration>) -> Self {
+        Self {
+            input: AiInputType::Clutch(value),
+            time,
+        }
+    }
+
+    /// Handbrake: 0 to 65535
+    pub fn handbrake(value: u16, time: Option<Duration>) -> Self {
+        Self {
+            input: AiInputType::Handbrake(value),
+            time,
+        }
+    }
+
+    /// Indicators cancel
+    pub fn indicators_cancel(time: Option<Duration>) -> Self {
+        Self {
+            input: AiInputType::Indicators(1),
+            time,
+        }
+    }
+
+    /// Indicate left
+    pub fn indicators_left(time: Option<Duration>) -> Self {
+        Self {
+            input: AiInputType::Indicators(2),
+            time,
+        }
+    }
+
+    /// Indicate right
+    pub fn indicators_right(time: Option<Duration>) -> Self {
+        Self {
+            input: AiInputType::Indicators(3),
+            time,
+        }
+    }
+
+    /// Hazards
+    pub fn hazards(time: Option<Duration>) -> Self {
+        Self {
+            input: AiInputType::Indicators(4),
+            time,
+        }
+    }
+
+    /// Gear: 0 to 254, or 255 for sequential
+    pub fn gear(value: u8, time: Option<Duration>) -> Self {
+        Self {
+            input: AiInputType::Gear(value as u16),
+            time,
+        }
+    }
+
+    /// Look ahead
+    pub fn look_ahead(time: Option<Duration>) -> Self {
+        Self {
+            input: AiInputType::Look(0),
+            time,
+        }
+    }
+
+    /// Look left
+    pub fn look_left(time: Option<Duration>) -> Self {
+        Self {
+            input: AiInputType::Look(4),
+            time,
+        }
+    }
+
+    /// Look left+
+    pub fn look_left_plus(time: Option<Duration>) -> Self {
+        Self {
+            input: AiInputType::Look(5),
+            time,
+        }
+    }
+
+    /// Look right
+    pub fn look_right(time: Option<Duration>) -> Self {
+        Self {
+            input: AiInputType::Look(6),
+            time,
+        }
+    }
+
+    /// Look right+
+    pub fn look_right_plus(time: Option<Duration>) -> Self {
+        Self {
+            input: AiInputType::Look(7),
+            time,
+        }
+    }
+
+    /// Toggle pitspeed limiter
+    pub fn pitspeed_toggle() -> Self {
+        Self {
+            input: AiInputType::Pitspeed(AiInputToggle::Toggle),
+            time: None,
+        }
+    }
+
+    /// Enable pitspeed limiter
+    pub fn pitspeed_on() -> Self {
+        Self {
+            input: AiInputType::Pitspeed(AiInputToggle::On),
+            time: None,
+        }
+    }
+
+    /// Disable pitspeed limiter
+    pub fn pitspeed_off() -> Self {
+        Self {
+            input: AiInputType::Pitspeed(AiInputToggle::Off),
+            time: None,
+        }
+    }
+
+    /// Toggle traction_control limiter
+    pub fn traction_control_toggle() -> Self {
+        Self {
+            input: AiInputType::TcDisable(AiInputToggle::Toggle),
+            time: None,
+        }
+    }
+
+    /// Enable traction_control limiter
+    pub fn traction_control_on() -> Self {
+        Self {
+            input: AiInputType::TcDisable(AiInputToggle::Off),
+            time: None,
+        }
+    }
+
+    /// Disable traction_control limiter
+    pub fn traction_control_off() -> Self {
+        Self {
+            input: AiInputType::TcDisable(AiInputToggle::On),
+            time: None,
+        }
+    }
+
+    /// Stop all control
+    pub fn stop_control() -> Self {
+        Self {
+            input: AiInputType::StopControl,
+            time: None,
+        }
+    }
+
+    /// Reset all inputs
+    pub fn reset_all_inputs() -> Self {
+        Self {
+            input: AiInputType::ResetAll,
+            time: None,
+        }
+    }
+
+    /// Request LFS sends AI Info once
+    pub fn ai_info_once() -> Self {
+        Self {
+            input: AiInputType::SendAiInfo,
+            time: None,
+        }
+    }
+
+    /// Request LFS sends AI Info at a given interval, or 0 to stop
+    pub fn ai_info_repeat(time: Duration) -> Self {
+        Self {
+            input: AiInputType::RepeatAiInfo,
+            time: Some(time),
+        }
+    }
+
+    /// Set the help flags
+    pub fn set_help_flags(flags: AiHelpFlags) -> Self {
+        Self {
+            input: AiInputType::SetHelpFlags(flags),
+            time: None,
+        }
+    }
+}
+
+impl ReadWriteBuf for AiInput {
     fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
         let input = u8::read_buf(buf)?;
         let time = u8::read_buf(buf)?;
@@ -136,8 +419,8 @@ impl ReadWriteBuf for AiInputVal {
             2 => AiInputType::Brake(val),
             3 => AiInputType::Chup(val),
             4 => AiInputType::Chdn(val),
-            5 => AiInputType::Ignition(val),
-            6 => AiInputType::ExtraLight(val),
+            5 => AiInputType::Ignition(val.into()),
+            6 => AiInputType::ExtraLight(val.into()),
             7 => AiInputType::HeadLights(val),
             8 => AiInputType::Siren(val),
             9 => AiInputType::Horn(val),
@@ -147,12 +430,12 @@ impl ReadWriteBuf for AiInputVal {
             13 => AiInputType::Indicators(val),
             14 => AiInputType::Gear(val),
             15 => AiInputType::Look(val),
-            16 => AiInputType::Pitspeed(val),
-            17 => AiInputType::TcDisable(val),
-            18 => AiInputType::FogRear(val),
-            19 => AiInputType::FogFront(val),
+            16 => AiInputType::Pitspeed(val.into()),
+            17 => AiInputType::TcDisable(val.into()),
+            18 => AiInputType::FogRear(val.into()),
+            19 => AiInputType::FogFront(val.into()),
             240 => AiInputType::SendAiInfo,
-            241 => AiInputType::RepeatAiInfo(Duration::from_millis(val as u64 * 10)),
+            241 => AiInputType::RepeatAiInfo,
             253 => {
                 let flags = AiHelpFlags::from_bits_truncate(val);
                 AiInputType::SetHelpFlags(flags)
@@ -166,7 +449,11 @@ impl ReadWriteBuf for AiInputVal {
             },
         };
 
-        let time = Duration::from_millis(time as u64 * 10);
+        let time = if time == 0 {
+            None
+        } else {
+            Some(Duration::from_millis(time as u64 * 10))
+        };
 
         Ok(Self { input, time })
     }
@@ -178,8 +465,8 @@ impl ReadWriteBuf for AiInputVal {
             AiInputType::Brake(val) => (2, val),
             AiInputType::Chup(val) => (3, val),
             AiInputType::Chdn(val) => (4, val),
-            AiInputType::Ignition(val) => (5, val),
-            AiInputType::ExtraLight(val) => (6, val),
+            AiInputType::Ignition(val) => (5, val.into()),
+            AiInputType::ExtraLight(val) => (6, val.into()),
             AiInputType::HeadLights(val) => (7, val),
             AiInputType::Siren(val) => (8, val),
             AiInputType::Horn(val) => (9, val),
@@ -189,19 +476,12 @@ impl ReadWriteBuf for AiInputVal {
             AiInputType::Indicators(val) => (13, val),
             AiInputType::Gear(val) => (14, val),
             AiInputType::Look(val) => (15, val),
-            AiInputType::Pitspeed(val) => (16, val),
-            AiInputType::TcDisable(val) => (17, val),
-            AiInputType::FogRear(val) => (18, val),
-            AiInputType::FogFront(val) => (19, val),
+            AiInputType::Pitspeed(val) => (16, val.into()),
+            AiInputType::TcDisable(val) => (17, val.into()),
+            AiInputType::FogRear(val) => (18, val.into()),
+            AiInputType::FogFront(val) => (19, val.into()),
             AiInputType::SendAiInfo => (240, 0),
-            AiInputType::RepeatAiInfo(val) => {
-                let val = match u16::try_from(val.as_millis() / 10) {
-                    Ok(val) => val,
-                    Err(_) => return Err(insim_core::Error::TooLarge),
-                };
-
-                (241, val)
-            },
+            AiInputType::RepeatAiInfo => (241, 0),
             AiInputType::SetHelpFlags(val) => (253, val.bits()),
             AiInputType::ResetAll => (254, 0),
             AiInputType::StopControl => (255, 0),
@@ -209,9 +489,13 @@ impl ReadWriteBuf for AiInputVal {
 
         discrim.write_buf(buf)?;
 
-        match u8::try_from(self.time.as_millis() / 10) {
-            Ok(time) => time.write_buf(buf)?,
-            Err(_) => return Err(insim_core::Error::TooLarge),
+        if let Some(time) = self.time {
+            match u8::try_from(time.as_millis() / 10) {
+                Ok(time) => time.write_buf(buf)?,
+                Err(_) => return Err(insim_core::Error::TooLarge),
+            }
+        } else {
+            0_u8.write_buf(buf)?;
         }
 
         val.write_buf(buf)?;
@@ -226,11 +510,11 @@ pub struct Aic {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
-    /// Set to choose 16-bit
+    /// Set to choose
     pub plid: PlayerId,
 
-    /// Inputs to send
-    pub inputs: Vec<AiInputVal>,
+    /// Inputs to send, there are helper methods on [AiInput] to assist building these
+    pub inputs: Vec<AiInput>,
 }
 
 impl_typical_with_request_id!(Aic);
@@ -241,7 +525,7 @@ impl ReadWriteBuf for Aic {
         let plid = PlayerId::read_buf(buf)?;
         let mut inputs = Vec::new();
         while buf.has_remaining() {
-            inputs.push(AiInputVal::read_buf(buf)?);
+            inputs.push(AiInput::read_buf(buf)?);
         }
 
         Ok(Self { reqi, plid, inputs })

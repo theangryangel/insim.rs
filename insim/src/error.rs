@@ -39,22 +39,15 @@ pub enum Error {
     #[error("Only Standard vehicles are permitted")]
     VehicleNotStandard,
 
-    // FIXME: Rename to ReadWriteBuf
     /// Placeholder
     #[error("Insim core error. Placeholder")]
-    Core(insim_core::Error),
+    ReadWriteBuf(#[from] insim_core::Error),
 }
 
 #[cfg(feature = "tokio")]
 impl From<tokio::time::error::Elapsed> for Error {
     fn from(value: tokio::time::error::Elapsed) -> Self {
         Error::Timeout(value.to_string())
-    }
-}
-
-impl From<insim_core::Error> for Error {
-    fn from(value: insim_core::Error) -> Self {
-        Error::Core(value) // FIXME
     }
 }
 

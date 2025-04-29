@@ -13,7 +13,7 @@ use std::{array::from_fn, fmt::Display, net::Ipv4Addr, num::TryFromIntError};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use game_version::GameVersionParseError;
 
-// FIXME: rename, add line/contextual information
+// FIXME: rename, add line/contextual information, split into ReadBufError and WriteBufError
 #[non_exhaustive]
 /// Read/Write Error
 #[derive(Debug)]

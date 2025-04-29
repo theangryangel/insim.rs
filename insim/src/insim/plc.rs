@@ -15,26 +15,26 @@ pub struct PlcAllowedCarsSet {
 }
 
 impl PlcAllowedCarsSet {
-    const XF_GTI: u32 = (1 << 1);
-    const XR_GT: u32 = (1 << 2);
-    const XR_GT_TURBO: u32 = (1 << 3);
-    const RB4: u32 = (1 << 4);
-    const FXO_TURBO: u32 = (1 << 5);
-    const LX4: u32 = (1 << 6);
-    const LX6: u32 = (1 << 7);
-    const MRT5: u32 = (1 << 8);
-    const UF_1000: u32 = (1 << 9);
-    const RACEABOUT: u32 = (1 << 10);
-    const FZ50: u32 = (1 << 11);
-    const FORMULA_XR: u32 = (1 << 12);
-    const XF_GTR: u32 = (1 << 13);
-    const UF_GTR: u32 = (1 << 14);
-    const FORMULA_V8: u32 = (1 << 15);
-    const FXO_GTR: u32 = (1 << 16);
-    const XR_GTR: u32 = (1 << 17);
-    const FZ50_GTR: u32 = (1 << 18);
-    const BWM_SAUBER_F1_06: u32 = (1 << 19);
-    const FORMULA_BMW_FB02: u32 = (1 << 20);
+    const XF_GTI: u32 = 1;
+    const XR_GT: u32 = (1 << 1);
+    const XR_GT_TURBO: u32 = (1 << 2);
+    const RB4: u32 = (1 << 3);
+    const FXO_TURBO: u32 = (1 << 4);
+    const LX4: u32 = (1 << 5);
+    const LX6: u32 = (1 << 6);
+    const MRT5: u32 = (1 << 7);
+    const UF_1000: u32 = (1 << 8);
+    const RACEABOUT: u32 = (1 << 9);
+    const FZ50: u32 = (1 << 10);
+    const FORMULA_XR: u32 = (1 << 11);
+    const XF_GTR: u32 = (1 << 12);
+    const UF_GTR: u32 = (1 << 13);
+    const FORMULA_V8: u32 = (1 << 14);
+    const FXO_GTR: u32 = (1 << 15);
+    const XR_GTR: u32 = (1 << 16);
+    const FZ50_GTR: u32 = (1 << 17);
+    const BWM_SAUBER_F1_06: u32 = (1 << 18);
+    const FORMULA_BMW_FB02: u32 = (1 << 19);
 
     /// Does this set include a vehicle?
     pub fn contains(&self, v: &Vehicle) -> bool {
@@ -258,12 +258,11 @@ mod tests {
             ],
             |parsed: Plc| {
                 assert_eq!(parsed.ucid, ConnectionId(13));
-                // FIXME?
-                // assert!(
-                //     parsed.cars.contains(&Vehicle::Fox) &&
-                //     parsed.cars.contains(&Vehicle::Lx6) &&
-                //     parsed.cars.contains(&Vehicle::Xrt)
-                // );
+                assert!(
+                    parsed.cars.contains(&Vehicle::Fox)
+                        && parsed.cars.contains(&Vehicle::Lx6)
+                        && parsed.cars.contains(&Vehicle::Xrt)
+                );
             }
         );
     }
