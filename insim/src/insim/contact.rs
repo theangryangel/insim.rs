@@ -2,7 +2,7 @@
 use std::time::Duration;
 
 use bytes::{Buf, BufMut};
-use insim_core::ReadWriteBuf;
+use insim_core::{speed::Speed, ReadWriteBuf};
 
 use super::{obh::spclose_strip_high_bits, CompCarInfo};
 use crate::identifiers::{PlayerId, RequestId};
@@ -161,7 +161,7 @@ pub struct Con {
 
     /// Low 12 bits: closing speed (10 = 1 m/s)
     /// The high 4 bits are automatically stripped.
-    pub spclose: u16,
+    pub spclose: Speed,
 
     /// Time since last reset. Warning this is looping.
     pub time: Duration,
@@ -178,6 +178,7 @@ impl ReadWriteBuf for Con {
         let reqi = RequestId::read_buf(buf)?;
         buf.advance(1);
         let spclose = spclose_strip_high_bits(u16::read_buf(buf)?);
+        let spclose = Speed::from_game_closing_speed(spclose);
         let time = u16::read_buf(buf)? as u64;
         let time = Duration::from_millis(time * 10);
 
@@ -196,7 +197,7 @@ impl ReadWriteBuf for Con {
     fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         self.reqi.write_buf(buf)?;
         buf.put_bytes(0, 1);
-        spclose_strip_high_bits(self.spclose).write_buf(buf)?;
+        spclose_strip_high_bits(self.spclose.as_game_closing_speed()).write_buf(buf)?;
         match TryInto::<u16>::try_into(self.time.as_millis() / 10) {
             Ok(time) => time.write_buf(buf)?,
             Err(_) => return Err(insim_core::Error::TooLarge),

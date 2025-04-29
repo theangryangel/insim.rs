@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bitflags::bitflags;
 use bytes::{Buf, BufMut};
-use insim_core::ReadWriteBuf;
+use insim_core::{speed::Speed, ReadWriteBuf};
 
 use crate::identifiers::{PlayerId, RequestId};
 
@@ -72,7 +72,7 @@ pub struct Obh {
 
     /// Low 12 bits: closing speed (10 = 1 m/s)
     /// The high 4 bits are automatically stripped.
-    pub spclose: u16,
+    pub spclose: Speed,
 
     /// When this occurred. Warning this is looping.
     pub time: Duration,
@@ -102,6 +102,7 @@ impl ReadWriteBuf for Obh {
         let plid = PlayerId::read_buf(buf)?;
         // automatically strip off the first 4 bits as they're reserved
         let spclose = spclose_strip_high_bits(u16::read_buf(buf)?);
+        let spclose = Speed::from_game_closing_speed(spclose);
         let time = Duration::from_millis((u16::read_buf(buf)? as u64) * 10);
         let c = CarContact::read_buf(buf)?;
         let x = i16::read_buf(buf)?;
@@ -128,7 +129,7 @@ impl ReadWriteBuf for Obh {
         self.reqi.write_buf(buf)?;
         self.plid.write_buf(buf)?;
         // automatically strip off the first 4 bits as they're reserved
-        spclose_strip_high_bits(self.spclose).write_buf(buf)?;
+        spclose_strip_high_bits(self.spclose.as_game_closing_speed()).write_buf(buf)?;
         match u16::try_from(self.time.as_millis() / 10) {
             Ok(time) => time.write_buf(buf)?,
             Err(_) => return Err(insim_core::Error::TooLarge),
@@ -180,7 +181,7 @@ mod tests {
                 assert_eq!(obh.reqi, RequestId(0));
                 assert_eq!(obh.plid, PlayerId(3));
                 assert_eq!(obh.time, Duration::from_millis(4970));
-                assert_eq!(obh.spclose, 23);
+                assert_eq!(obh.spclose.as_game_closing_speed(), 23);
             }
         );
     }

@@ -1,5 +1,6 @@
 use bitflags::bitflags;
-use insim_core::{point::Point, ReadWriteBuf};
+use bytes::{Buf, BufMut};
+use insim_core::{point::Point, speed::Speed, ReadWriteBuf};
 
 use crate::identifiers::{PlayerId, RequestId};
 
@@ -37,7 +38,7 @@ generate_bitflag_helpers! {
 
 impl_bitflags_from_to_bytes!(CompCarInfo, u8);
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Used within the [Mci] packet info field.
 pub struct CompCar {
@@ -53,17 +54,14 @@ pub struct CompCar {
     /// Race position
     pub position: u8,
 
-    #[read_write_buf(pad_after = 1)]
     /// Additional information that describes this particular Compcar.
     pub info: CompCarInfo,
 
     /// Positional information for the player, in game units.
     pub xyz: Point<i32>,
 
-    /// Speed in game world units (32768 = 100 m/s)
-    /// You may use the speed_uom function to convert this to real world units if the uom feature
-    /// is enabled.
-    pub speed: u16,
+    /// Speed
+    pub speed: Speed,
 
     /// Direction of car's motion : 0 = world y direction, 32768 = 180 deg
     /// You may use the direction_uom function to convert this to real world units if the uom feature is enabled.
@@ -87,6 +85,49 @@ impl CompCar {
     /// This is the last compcar in this set of MCI packets
     pub fn is_last(&self) -> bool {
         self.info.is_last()
+    }
+}
+
+impl ReadWriteBuf for CompCar {
+    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let node = u16::read_buf(buf)?;
+        let lap = u16::read_buf(buf)?;
+        let plid = PlayerId::read_buf(buf)?;
+        let position = u8::read_buf(buf)?;
+        let info = CompCarInfo::read_buf(buf)?;
+        buf.advance(1);
+        let xyz = Point::<i32>::read_buf(buf)?;
+        let speed = Speed::from_game_units(u16::read_buf(buf)?);
+        let direction = u16::read_buf(buf)?;
+        let heading = u16::read_buf(buf)?;
+        let angvel = i16::read_buf(buf)?;
+        Ok(Self {
+            node,
+            lap,
+            plid,
+            position,
+            info,
+            xyz,
+            speed,
+            direction,
+            heading,
+            angvel,
+        })
+    }
+
+    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.node.write_buf(buf)?;
+        self.lap.write_buf(buf)?;
+        self.plid.write_buf(buf)?;
+        self.position.write_buf(buf)?;
+        self.info.write_buf(buf)?;
+        buf.put_bytes(0, 1);
+        self.xyz.write_buf(buf)?;
+        self.speed.as_game_units().write_buf(buf)?;
+        self.direction.write_buf(buf)?;
+        self.heading.write_buf(buf)?;
+        self.angvel.write_buf(buf)?;
+        Ok(())
     }
 }
 

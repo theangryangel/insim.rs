@@ -31,7 +31,11 @@ pub struct Hcp {
     pub reqi: RequestId,
 
     /// H_Mass and H_TRes for each car: : XF GTI = 0 / XR GT = 1 etc. You should probably use the
-    /// [`set()`] function which allows you to use [Vehicle].
+    /// You should probably use the [`set`] and [`get`] functions which allow you to
+    /// use [Vehicle].
+    ///
+    /// [`set`]: Hcp::set
+    /// [`get`]: Hcp::get
     pub info: [HcpCarHandicap; 32],
 }
 
