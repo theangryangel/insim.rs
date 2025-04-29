@@ -17,7 +17,7 @@ pub struct Speed {
 
 impl Speed {
     /// From game units: 32768 = 100 m/s
-    pub fn from_game_units(value: u16) -> Self {
+    pub fn from_game_mci_units(value: u16) -> Self {
         Self {
             inner: (value as f64) / 327.68,
         }
@@ -48,7 +48,7 @@ impl Speed {
     }
 
     /// As game units
-    pub fn as_game_units(&self) -> u16 {
+    pub fn as_game_mci_units(&self) -> u16 {
         (self.inner * 327.68) as u16
     }
 
@@ -131,7 +131,7 @@ mod test {
 
     #[test]
     fn test_game_units() {
-        assert_eq!(Speed::from_game_units(32768).as_meters_per_sec(), 100.0);
-        assert_eq!(Speed::from_meters_per_sec(100.0).as_game_units(), 32768);
+        assert_eq!(Speed::from_game_mci_units(32768).as_meters_per_sec(), 100.0);
+        assert_eq!(Speed::from_meters_per_sec(100.0).as_game_mci_units(), 32768);
     }
 }

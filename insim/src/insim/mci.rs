@@ -97,7 +97,7 @@ impl ReadWriteBuf for CompCar {
         let info = CompCarInfo::read_buf(buf)?;
         buf.advance(1);
         let xyz = Point::<i32>::read_buf(buf)?;
-        let speed = Speed::from_game_units(u16::read_buf(buf)?);
+        let speed = Speed::from_game_mci_units(u16::read_buf(buf)?);
         let direction = u16::read_buf(buf)?;
         let heading = u16::read_buf(buf)?;
         let angvel = i16::read_buf(buf)?;
@@ -123,7 +123,7 @@ impl ReadWriteBuf for CompCar {
         self.info.write_buf(buf)?;
         buf.put_bytes(0, 1);
         self.xyz.write_buf(buf)?;
-        self.speed.as_game_units().write_buf(buf)?;
+        self.speed.as_game_mci_units().write_buf(buf)?;
         self.direction.write_buf(buf)?;
         self.heading.write_buf(buf)?;
         self.angvel.write_buf(buf)?;
