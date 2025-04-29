@@ -168,6 +168,9 @@ pub enum CimSubModeGarage {
 
     /// Passengers tab of setup screen
     Pass = 8,
+
+    /// Undocumented mod review tab
+    ModReview = 255,
 }
 
 impl From<u8> for CimSubModeGarage {
@@ -182,6 +185,7 @@ impl From<u8> for CimSubModeGarage {
             6 => Self::Tyres,
             7 => Self::Aero,
             8 => Self::Pass,
+            255 => Self::ModReview,
             other => {
                 unreachable!(
                     "Unhandled CimSubModeGarage. Perhaps a programming error or protocol update? Found {}, expected 0-8", other
