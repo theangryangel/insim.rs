@@ -9,6 +9,7 @@ use std::{
 /// The intention is to keep things simple.
 /// There is no intention to create a complex uom-style system.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Speed {
     // meters per second
     inner: f64,
