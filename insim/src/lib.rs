@@ -24,9 +24,8 @@ pub const VERSION: u8 = 9;
 /// The LFS World Relay address and port
 pub const LFSW_RELAY_ADDR: &str = "isrelay.lfs.net:47474";
 
-// XXX: This is a temporary hack
-// Why 255 * 4? Because the size of a packet is a u8, with a max byte size of 255.
-// In "compressed" mode the raw size is multiplied by 4.
+/// Why 255 * 4? Because the size of a packet is a u8, with a max byte size of 255.
+/// In "compressed" mode the raw size is multiplied by 4.
 pub(crate) const MAX_SIZE_PACKET: usize = 255 * 4;
 
 pub(crate) const DEFAULT_BUFFER_CAPACITY: usize = MAX_SIZE_PACKET * 6;
