@@ -207,11 +207,11 @@ pub struct Npl {
     pub pass: Passengers,
 
     /// low 4 bits: tyre width reduction (rear)
-    pub rwadj: u8, // TODO: split into pair of u4
+    pub rwadj: u8,
 
     /// low 4 bits: tyre width reduction (front)
     #[read_write_buf(pad_after = 2)]
-    pub fwadj: u8, // TODO: split into pair of u4
+    pub fwadj: u8,
 
     /// Setup flags, see [SetFlags].
     pub setf: SetFlags,
