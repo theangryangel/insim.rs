@@ -20,7 +20,11 @@ pub struct HcpCarHandicap {
 /// The same restriction applies to all drivers using a particular car model
 /// This can be useful for creating multi class hosts.
 /// The info field is indexed by the vehicle. i.e. XF GTI = 0, XR GT = 1, etc.
-/// You should probably use the [`set()`] function which allows you to use [Vehicle].
+/// You should probably use the [`set`] and [`get`] functions which allow you to
+/// use [Vehicle].
+///
+/// [`set`]: Hcp::set
+/// [`get`]: Hcp::get
 pub struct Hcp {
     #[read_write_buf(pad_after = 1)]
     /// Non-zero if the packet is a packet request or a reply to a request

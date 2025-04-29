@@ -68,7 +68,7 @@ mod ver;
 mod vtn;
 
 pub use acr::{Acr, AcrResult};
-pub use aic::{AiInput, AiInputToggle, Aic};
+pub use aic::{AiInput, AiInputToggle, AiInputType, Aic};
 pub use aii::{AiFlags, Aii};
 pub use axi::Axi;
 pub use axm::{Axm, ObjectInfo, PmoAction, PmoFlags};

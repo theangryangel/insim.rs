@@ -127,10 +127,10 @@ pub enum AiInputType {
     /// Send AI Info
     SendAiInfo,
 
-    // Repeat AI Information at a given interval. 0 to stop.
+    /// Repeat AI Information at a given interval. 0 to stop.
     RepeatAiInfo,
 
-    // Set help flags
+    /// Set help flags
     SetHelpFlags(AiHelpFlags),
 
     /// Reset all controlled values
