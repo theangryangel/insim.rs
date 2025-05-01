@@ -1,6 +1,6 @@
 //! Strongly typed Tracks
 
-use crate::{license::License, ReadWriteBuf};
+use crate::{license::License, Decode, Encode};
 
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -964,8 +964,8 @@ impl Track {
     }
 }
 
-impl ReadWriteBuf for Track {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
+impl Decode for Track {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
         let raw = buf.split_to(6);
         match raw.as_ref() {
             [b'B', b'L', b'1', 0, 0, 0] => Ok(Self::Bl1),
@@ -1127,8 +1127,10 @@ impl ReadWriteBuf for Track {
             }),
         }
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
+impl Encode for Track {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
         let slice = match self {
             Self::Bl1 => [b'B', b'L', b'1', 0, 0, 0],
             Self::Bl1r => [b'B', b'L', b'1', b'R', 0, 0],

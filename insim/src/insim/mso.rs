@@ -1,5 +1,5 @@
 use bytes::{Buf, BufMut};
-use insim_core::{string::codepages, FromToCodepageBytes, ReadWriteBuf};
+use insim_core::{string::codepages, Codepage, Decode, Encode};
 
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
@@ -49,14 +49,14 @@ pub struct Mso {
     pub msg: String,
 }
 
-impl ReadWriteBuf for Mso {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::read_buf(buf)?;
+impl Decode for Mso {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::decode(buf)?;
         buf.advance(1);
-        let ucid = ConnectionId::read_buf(buf)?;
-        let plid = PlayerId::read_buf(buf)?;
-        let usertype = MsoUserType::read_buf(buf)?;
-        let textstart = u8::read_buf(buf)?;
+        let ucid = ConnectionId::decode(buf)?;
+        let plid = PlayerId::decode(buf)?;
+        let usertype = MsoUserType::decode(buf)?;
+        let textstart = u8::decode(buf)?;
 
         let (textstart, msg) = if textstart > 0 {
             let mut name = buf.split_to(textstart as usize);
@@ -77,13 +77,15 @@ impl ReadWriteBuf for Mso {
             msg,
         })
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.write_buf(buf)?;
+impl Encode for Mso {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.encode(buf)?;
         buf.put_bytes(0, 1);
-        self.ucid.write_buf(buf)?;
-        self.plid.write_buf(buf)?;
-        self.usertype.write_buf(buf)?;
+        self.ucid.encode(buf)?;
+        self.plid.encode(buf)?;
+        self.usertype.encode(buf)?;
 
         if self.textstart > 0 {
             let name = &self.msg[..self.textstart as usize];
@@ -170,7 +172,7 @@ mod tests {
                                                                                       //raw.put_bytes(0, 1);
         let raw = raw.freeze();
 
-        let res = Mso::read_buf(&mut Bytes::from(raw.clone())).unwrap();
+        let res = Mso::decode(&mut Bytes::from(raw.clone())).unwrap();
         assert_eq!(res.textstart, 0);
         assert_eq!(res.msg, "Downloaded Skin : XFG_PRO38");
     }
@@ -190,12 +192,12 @@ mod tests {
         // when reading we want to handle too long entries, but ensure that when we convert to
         // bytes it's appropriately truncated
 
-        let res = Mso::read_buf(&mut Bytes::from(raw.clone())).unwrap();
+        let res = Mso::decode(&mut Bytes::from(raw.clone())).unwrap();
         assert_eq!(res.textstart, 0);
         assert_eq!(res.msg.len(), MSO_MSG_MAX_LEN + 10);
 
         let mut buf = BytesMut::new();
-        let res = res.write_buf(&mut buf);
+        let res = res.encode(&mut buf);
         assert!(res.is_err());
     }
 

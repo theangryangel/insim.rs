@@ -1,5 +1,5 @@
 //! Strongly type license data
-use crate::ReadWriteBuf;
+use crate::{Decode, Encode};
 
 /// Describes the various LFS "license" levels. Each "license" provides access to different
 /// levels of content.
@@ -31,9 +31,9 @@ impl std::fmt::Display for License {
     }
 }
 
-impl ReadWriteBuf for License {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
-        match u8::read_buf(buf)? {
+impl Decode for License {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
+        match u8::decode(buf)? {
             0 => Ok(Self::Demo),
             1 => Ok(Self::S1),
             2 => Ok(Self::S2),
@@ -43,9 +43,10 @@ impl ReadWriteBuf for License {
             }),
         }
     }
-
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
-        (*self as u8).write_buf(buf)
+}
+impl Encode for License {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
+        (*self as u8).encode(buf)
     }
 }
 

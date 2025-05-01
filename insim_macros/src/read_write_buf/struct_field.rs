@@ -80,14 +80,14 @@ impl Field {
         if let Some(CodepageArgs { length, .. }) = f.codepage.as_ref() {
             tokens = quote! {
                 #tokens
-                let #field_name = <#field_type as ::insim_core::FromToCodepageBytes>::from_codepage_bytes(
+                let #field_name = <#field_type as ::insim_core::Codepage>::from_codepage_bytes(
                     buf, #length
                 )?;
             }
         } else if let Some(AsciiArgs { length, .. }) = f.ascii.as_ref() {
             tokens = quote! {
                 #tokens
-                let #field_name = <#field_type as ::insim_core::FromToAsciiBytes>::from_ascii_bytes(
+                let #field_name = <#field_type as ::insim_core::Ascii>::from_ascii_bytes(
                     buf, #length
                 )?;
             }
@@ -97,7 +97,7 @@ impl Field {
 
             tokens = quote! {
                 #tokens
-                let #field_name = match TryInto::<u64>::try_into(#duration_repr::read_buf(buf)?) {
+                let #field_name = match TryInto::<u64>::try_into(#duration_repr::decode(buf)?) {
                     Ok(v) => std::time::Duration::from_millis(v * #scale),
                     Err(_) => return Err(::insim_core::Error::TooLarge),
                 };
@@ -124,7 +124,7 @@ impl Field {
 
             tokens = quote! {
                 #tokens
-                let #field_name = <#typ>::read_buf(buf)?;
+                let #field_name = <#typ>::decode(buf)?;
             };
         }
 
@@ -161,7 +161,7 @@ impl Field {
                 } => {
                     tokens = quote! {
                         #tokens
-                        <#field_type as ::insim_core::FromToCodepageBytes>::to_codepage_bytes(
+                        <#field_type as ::insim_core::Codepage>::to_codepage_bytes(
                             &self.#field_name, buf, #length, #trailing_nul
                         )?;
                     }
@@ -173,7 +173,7 @@ impl Field {
                 } => {
                     tokens = quote! {
                         #tokens
-                        <#field_type as ::insim_core::FromToCodepageBytes>::to_codepage_bytes_aligned(
+                        <#field_type as ::insim_core::Codepage>::to_codepage_bytes_aligned(
                             &self.#field_name, buf, #length, #align_to, #trailing_nul
                         )?;
                     }
@@ -186,7 +186,7 @@ impl Field {
         {
             tokens = quote! {
                 #tokens
-                <#field_type as ::insim_core::FromToAsciiBytes>::to_ascii_bytes(
+                <#field_type as ::insim_core::Ascii>::to_ascii_bytes(
                     &self.#field_name, buf, #length, #trailing_nul
                 )?;
             };
@@ -197,14 +197,14 @@ impl Field {
             tokens = quote! {
                 #tokens
                 match #duration_repr::try_from(self.#field_name.as_millis() / (#scale as u128)) {
-                    Ok(v) => v.write_buf(buf)?,
+                    Ok(v) => v.encode(buf)?,
                     Err(_) => return Err(::insim_core::Error::TooLarge)
                 };
             };
         } else {
             tokens = quote! {
                 #tokens
-                self.#field_name.write_buf(buf)?;
+                self.#field_name.encode(buf)?;
             };
         }
 

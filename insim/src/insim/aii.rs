@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use insim_core::{point::Point, ReadWriteBuf};
+use insim_core::{point::Point, Decode, Encode};
 
 use crate::identifiers::{PlayerId, RequestId};
 
@@ -21,19 +21,15 @@ pub struct OsMain {
     pub pos: Point<i32>,
 }
 
-impl ReadWriteBuf for OsMain {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let angvel = (
-            f32::read_buf(buf)?,
-            f32::read_buf(buf)?,
-            f32::read_buf(buf)?,
-        );
-        let heading = f32::read_buf(buf)?;
-        let pitch = f32::read_buf(buf)?;
-        let roll = f32::read_buf(buf)?;
-        let accel = Point::<f32>::read_buf(buf)?;
-        let vel = Point::<f32>::read_buf(buf)?;
-        let pos = Point::<i32>::read_buf(buf)?;
+impl Decode for OsMain {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let angvel = (f32::decode(buf)?, f32::decode(buf)?, f32::decode(buf)?);
+        let heading = f32::decode(buf)?;
+        let pitch = f32::decode(buf)?;
+        let roll = f32::decode(buf)?;
+        let accel = Point::<f32>::decode(buf)?;
+        let vel = Point::<f32>::decode(buf)?;
+        let pos = Point::<i32>::decode(buf)?;
         Ok(Self {
             angvel,
             heading,
@@ -44,17 +40,19 @@ impl ReadWriteBuf for OsMain {
             pos,
         })
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.angvel.0.write_buf(buf)?;
-        self.angvel.1.write_buf(buf)?;
-        self.angvel.2.write_buf(buf)?;
-        self.heading.write_buf(buf)?;
-        self.pitch.write_buf(buf)?;
-        self.roll.write_buf(buf)?;
-        self.accel.write_buf(buf)?;
-        self.vel.write_buf(buf)?;
-        self.pos.write_buf(buf)?;
+impl Encode for OsMain {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.angvel.0.encode(buf)?;
+        self.angvel.1.encode(buf)?;
+        self.angvel.2.encode(buf)?;
+        self.heading.encode(buf)?;
+        self.pitch.encode(buf)?;
+        self.roll.encode(buf)?;
+        self.accel.encode(buf)?;
+        self.vel.encode(buf)?;
+        self.pos.encode(buf)?;
         Ok(())
     }
 }

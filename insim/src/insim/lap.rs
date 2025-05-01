@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use insim_core::ReadWriteBuf;
+use insim_core::{Decode, Encode};
 
 use super::{PenaltyInfo, PlayerFlags};
 use crate::identifiers::{PlayerId, RequestId};
@@ -18,9 +18,9 @@ pub enum Fuel200 {
     No,
 }
 
-impl ReadWriteBuf for Fuel200 {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let data = u8::read_buf(buf)?;
+impl Decode for Fuel200 {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let data = u8::decode(buf)?;
 
         if data == 255 {
             Ok(Self::No)
@@ -28,14 +28,16 @@ impl ReadWriteBuf for Fuel200 {
             Ok(Self::Percentage(data))
         }
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+impl Encode for Fuel200 {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         let data = match self {
             Self::Percentage(data) => *data,
             Self::No => 255_u8,
         };
 
-        data.write_buf(buf)
+        data.encode(buf)
     }
 }
 
@@ -52,22 +54,24 @@ pub enum Fuel {
     No,
 }
 
-impl ReadWriteBuf for Fuel {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let data = u8::read_buf(buf)?;
+impl Decode for Fuel {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let data = u8::decode(buf)?;
         if data == 255 {
             Ok(Self::No)
         } else {
             Ok(Self::Percentage(data))
         }
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+impl Encode for Fuel {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         let data = match self {
             Self::Percentage(data) => *data,
             Self::No => 255_u8,
         };
-        data.write_buf(buf)?;
+        data.encode(buf)?;
         Ok(())
     }
 }

@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use insim_core::{track::Track, wind::Wind, ReadWriteBuf};
+use insim_core::{track::Track, wind::Wind, Decode, Encode};
 
 use super::RaceLaps;
 use crate::identifiers::RequestId;
@@ -72,13 +72,15 @@ impl LapTimingInfo {
     }
 }
 
-impl ReadWriteBuf for LapTimingInfo {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        Ok(LapTimingInfo::from_u8(u8::read_buf(buf)?))
+impl Decode for LapTimingInfo {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        Ok(LapTimingInfo::from_u8(u8::decode(buf)?))
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.to_u8().write_buf(buf)
+impl Encode for LapTimingInfo {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.to_u8().encode(buf)
     }
 }
 

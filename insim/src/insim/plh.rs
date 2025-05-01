@@ -1,4 +1,4 @@
-use insim_core::ReadWriteBuf;
+use insim_core::{Decode, Encode};
 
 use crate::identifiers::{PlayerId, RequestId};
 
@@ -34,12 +34,12 @@ pub struct PlayerHandicap {
     pub h_tres: u8,
 }
 
-impl ReadWriteBuf for PlayerHandicap {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let plid = PlayerId::read_buf(buf)?;
-        let flags = PlayerHandicapFlags::read_buf(buf)?;
-        let h_mass = u8::read_buf(buf)?;
-        let h_tres = u8::read_buf(buf)?;
+impl Decode for PlayerHandicap {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let plid = PlayerId::decode(buf)?;
+        let flags = PlayerHandicapFlags::decode(buf)?;
+        let h_mass = u8::decode(buf)?;
+        let h_tres = u8::decode(buf)?;
 
         Ok(Self {
             plid,
@@ -48,8 +48,10 @@ impl ReadWriteBuf for PlayerHandicap {
             h_tres,
         })
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+impl Encode for PlayerHandicap {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         if self.h_mass > 200 {
             return Err(insim_core::Error::TooLarge);
         }
@@ -57,10 +59,10 @@ impl ReadWriteBuf for PlayerHandicap {
             return Err(insim_core::Error::TooLarge);
         }
 
-        self.plid.write_buf(buf)?;
-        self.flags.write_buf(buf)?;
-        self.h_mass.write_buf(buf)?;
-        self.h_tres.write_buf(buf)?;
+        self.plid.encode(buf)?;
+        self.flags.encode(buf)?;
+        self.h_mass.encode(buf)?;
+        self.h_tres.encode(buf)?;
         Ok(())
     }
 }
@@ -78,28 +80,30 @@ pub struct Plh {
 
 impl_typical_with_request_id!(Plh);
 
-impl ReadWriteBuf for Plh {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::read_buf(buf)?;
-        let mut nump = u8::read_buf(buf)?;
+impl Decode for Plh {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::decode(buf)?;
+        let mut nump = u8::decode(buf)?;
         let mut hcaps = Vec::with_capacity(nump as usize);
         while nump > 0 {
-            hcaps.push(PlayerHandicap::read_buf(buf)?);
+            hcaps.push(PlayerHandicap::decode(buf)?);
             nump -= 1;
         }
 
         Ok(Self { reqi, hcaps })
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.write_buf(buf)?;
+impl Encode for Plh {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.encode(buf)?;
         let nump = self.hcaps.len();
         if nump > PLH_MAX_PLAYERS {
             return Err(insim_core::Error::TooLarge);
         }
-        (nump as u8).write_buf(buf)?;
+        (nump as u8).encode(buf)?;
         for i in self.hcaps.iter() {
-            i.write_buf(buf)?;
+            i.encode(buf)?;
         }
         Ok(())
     }

@@ -1,5 +1,5 @@
 use bytes::{Buf, BufMut};
-use insim_core::{game_version::GameVersion, FromToAsciiBytes, FromToCodepageBytes, ReadWriteBuf};
+use insim_core::{game_version::GameVersion, Ascii, Codepage, Decode, Encode};
 
 use crate::identifiers::RequestId;
 
@@ -23,11 +23,11 @@ pub struct Ver {
     pub insimver: u8,
 }
 
-impl ReadWriteBuf for Ver {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::read_buf(buf)?;
+impl Decode for Ver {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::decode(buf)?;
         buf.advance(1);
-        let version = GameVersion::read_buf(buf)?;
+        let version = GameVersion::decode(buf)?;
         let product = String::from_ascii_bytes(buf, 6)?;
 
         let insimver = buf.get_u8();
@@ -41,14 +41,16 @@ impl ReadWriteBuf for Ver {
             insimver,
         })
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.write_buf(buf)?;
+impl Encode for Ver {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.encode(buf)?;
         buf.put_u8(0);
-        self.version.write_buf(buf)?;
+        self.version.encode(buf)?;
         self.product.to_codepage_bytes(buf, 6, false)?;
 
-        self.insimver.write_buf(buf)?;
+        self.insimver.encode(buf)?;
         buf.put_u8(0);
 
         Ok(())

@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use insim_core::{track::Track, ReadWriteBuf};
+use insim_core::{track::Track, Decode, Encode};
 
 use crate::identifiers::RequestId;
 
@@ -73,24 +73,26 @@ impl Hos {
     }
 }
 
-impl ReadWriteBuf for Hos {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::read_buf(buf)?;
-        let num = u8::read_buf(buf)?;
+impl Decode for Hos {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::decode(buf)?;
+        let num = u8::decode(buf)?;
         let mut hinfo = Vec::with_capacity(num as usize);
         for _i in 0..num {
-            hinfo.push(HostInfo::read_buf(buf)?);
+            hinfo.push(HostInfo::decode(buf)?);
         }
 
         Ok(Self { reqi, hinfo })
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.write_buf(buf)?;
+impl Encode for Hos {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.encode(buf)?;
         let num = self.hinfo.len() as u8;
-        num.write_buf(buf)?;
+        num.encode(buf)?;
         for i in self.hinfo.iter() {
-            i.write_buf(buf)?;
+            i.encode(buf)?;
         }
         Ok(())
     }

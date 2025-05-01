@@ -2,7 +2,7 @@
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-use crate::ReadWriteBuf;
+use crate::{Decode, Encode};
 
 #[derive(Debug, Default, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -18,9 +18,9 @@ pub enum Wind {
     Strong = 2,
 }
 
-impl ReadWriteBuf for Wind {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
-        match u8::read_buf(buf)? {
+impl Decode for Wind {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
+        match u8::decode(buf)? {
             0 => Ok(Wind::None),
             1 => Ok(Self::Weak),
             2 => Ok(Self::Strong),
@@ -29,8 +29,10 @@ impl ReadWriteBuf for Wind {
             }),
         }
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
-        (*self as u8).write_buf(buf)
+impl Encode for Wind {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
+        (*self as u8).encode(buf)
     }
 }

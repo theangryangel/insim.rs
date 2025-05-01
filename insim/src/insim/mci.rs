@@ -1,6 +1,6 @@
 use bitflags::bitflags;
 use bytes::{Buf, BufMut};
-use insim_core::{point::Point, speed::Speed, ReadWriteBuf};
+use insim_core::{point::Point, speed::Speed, Decode, Encode};
 
 use crate::identifiers::{PlayerId, RequestId};
 
@@ -88,19 +88,19 @@ impl CompCar {
     }
 }
 
-impl ReadWriteBuf for CompCar {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let node = u16::read_buf(buf)?;
-        let lap = u16::read_buf(buf)?;
-        let plid = PlayerId::read_buf(buf)?;
-        let position = u8::read_buf(buf)?;
-        let info = CompCarInfo::read_buf(buf)?;
+impl Decode for CompCar {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let node = u16::decode(buf)?;
+        let lap = u16::decode(buf)?;
+        let plid = PlayerId::decode(buf)?;
+        let position = u8::decode(buf)?;
+        let info = CompCarInfo::decode(buf)?;
         buf.advance(1);
-        let xyz = Point::<i32>::read_buf(buf)?;
-        let speed = Speed::from_game_mci_units(u16::read_buf(buf)?);
-        let direction = u16::read_buf(buf)?;
-        let heading = u16::read_buf(buf)?;
-        let angvel = i16::read_buf(buf)?;
+        let xyz = Point::<i32>::decode(buf)?;
+        let speed = Speed::from_game_mci_units(u16::decode(buf)?);
+        let direction = u16::decode(buf)?;
+        let heading = u16::decode(buf)?;
+        let angvel = i16::decode(buf)?;
         Ok(Self {
             node,
             lap,
@@ -114,19 +114,21 @@ impl ReadWriteBuf for CompCar {
             angvel,
         })
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.node.write_buf(buf)?;
-        self.lap.write_buf(buf)?;
-        self.plid.write_buf(buf)?;
-        self.position.write_buf(buf)?;
-        self.info.write_buf(buf)?;
+impl Encode for CompCar {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.node.encode(buf)?;
+        self.lap.encode(buf)?;
+        self.plid.encode(buf)?;
+        self.position.encode(buf)?;
+        self.info.encode(buf)?;
         buf.put_bytes(0, 1);
-        self.xyz.write_buf(buf)?;
-        self.speed.as_game_mci_units().write_buf(buf)?;
-        self.direction.write_buf(buf)?;
-        self.heading.write_buf(buf)?;
-        self.angvel.write_buf(buf)?;
+        self.xyz.encode(buf)?;
+        self.speed.as_game_mci_units().encode(buf)?;
+        self.direction.encode(buf)?;
+        self.heading.encode(buf)?;
+        self.angvel.encode(buf)?;
         Ok(())
     }
 }
@@ -156,27 +158,29 @@ impl Mci {
     }
 }
 
-impl ReadWriteBuf for Mci {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::read_buf(buf)?;
-        let mut numc = u8::read_buf(buf)?;
+impl Decode for Mci {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::decode(buf)?;
+        let mut numc = u8::decode(buf)?;
         let mut info = Vec::with_capacity(numc as usize);
         while numc > 0 {
-            info.push(CompCar::read_buf(buf)?);
+            info.push(CompCar::decode(buf)?);
             numc -= 1;
         }
         Ok(Self { reqi, info })
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.write_buf(buf)?;
+impl Encode for Mci {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.encode(buf)?;
         let numc = self.info.len();
         if numc > 255 {
             return Err(insim_core::Error::TooLarge);
         }
-        (numc as u8).write_buf(buf)?;
+        (numc as u8).encode(buf)?;
         for i in self.info.iter() {
-            i.write_buf(buf)?;
+            i.encode(buf)?;
         }
         Ok(())
     }

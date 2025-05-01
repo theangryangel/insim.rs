@@ -1,4 +1,4 @@
-use insim_core::ReadWriteBuf;
+use insim_core::{Decode, Encode};
 
 use crate::identifiers::{ConnectionId, RequestId};
 
@@ -46,11 +46,11 @@ impl Default for CimMode {
     }
 }
 
-impl ReadWriteBuf for CimMode {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let discrim = u8::read_buf(buf)?;
-        let submode = u8::read_buf(buf)?;
-        let seltype = u8::read_buf(buf)?;
+impl Decode for CimMode {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let discrim = u8::decode(buf)?;
+        let submode = u8::decode(buf)?;
+        let seltype = u8::decode(buf)?;
 
         let res = match discrim {
             0 => Self::Normal(submode.into()),
@@ -72,8 +72,10 @@ impl ReadWriteBuf for CimMode {
 
         Ok(res)
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+impl Encode for CimMode {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         let (discrim, submode, seltype) = match self {
             CimMode::Normal(submode) => (0u8, *submode as u8, 0u8),
             CimMode::Options => (1u8, 0u8, 0u8),
@@ -87,9 +89,9 @@ impl ReadWriteBuf for CimMode {
             } => (6u8, *mode as u8, *seltype),
         };
 
-        discrim.write_buf(buf)?;
-        submode.write_buf(buf)?;
-        seltype.write_buf(buf)?;
+        discrim.encode(buf)?;
+        submode.encode(buf)?;
+        seltype.encode(buf)?;
         Ok(())
     }
 }

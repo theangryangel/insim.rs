@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bitflags::bitflags;
 use bytes::Buf;
-use insim_core::ReadWriteBuf;
+use insim_core::{Decode, Encode};
 
 use crate::identifiers::{PlayerId, RequestId};
 
@@ -407,11 +407,11 @@ impl AiInput {
     }
 }
 
-impl ReadWriteBuf for AiInput {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let input = u8::read_buf(buf)?;
-        let time = u8::read_buf(buf)?;
-        let val = u16::read_buf(buf)?;
+impl Decode for AiInput {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let input = u8::decode(buf)?;
+        let time = u8::decode(buf)?;
+        let val = u16::decode(buf)?;
 
         let input = match input {
             0 => AiInputType::Msx(val),
@@ -457,8 +457,10 @@ impl ReadWriteBuf for AiInput {
 
         Ok(Self { input, time })
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+impl Encode for AiInput {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         let (discrim, val): (u8, u16) = match self.input {
             AiInputType::Msx(val) => (0, val),
             AiInputType::Throttle(val) => (1, val),
@@ -487,18 +489,18 @@ impl ReadWriteBuf for AiInput {
             AiInputType::StopControl => (255, 0),
         };
 
-        discrim.write_buf(buf)?;
+        discrim.encode(buf)?;
 
         if let Some(time) = self.time {
             match u8::try_from(time.as_millis() / 10) {
-                Ok(time) => time.write_buf(buf)?,
+                Ok(time) => time.encode(buf)?,
                 Err(_) => return Err(insim_core::Error::TooLarge),
             }
         } else {
-            0_u8.write_buf(buf)?;
+            0_u8.encode(buf)?;
         }
 
-        val.write_buf(buf)?;
+        val.encode(buf)?;
         Ok(())
     }
 }
@@ -519,26 +521,28 @@ pub struct Aic {
 
 impl_typical_with_request_id!(Aic);
 
-impl ReadWriteBuf for Aic {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::read_buf(buf)?;
-        let plid = PlayerId::read_buf(buf)?;
+impl Decode for Aic {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::decode(buf)?;
+        let plid = PlayerId::decode(buf)?;
         let mut inputs = Vec::new();
         while buf.has_remaining() {
-            inputs.push(AiInput::read_buf(buf)?);
+            inputs.push(AiInput::decode(buf)?);
         }
 
         Ok(Self { reqi, plid, inputs })
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.write_buf(buf)?;
-        self.plid.write_buf(buf)?;
+impl Encode for Aic {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.encode(buf)?;
+        self.plid.encode(buf)?;
         if self.inputs.len() > AIC_MAX_INPUTS {
             return Err(insim_core::Error::TooLarge);
         }
         for i in self.inputs.iter() {
-            i.write_buf(buf)?;
+            i.encode(buf)?;
         }
         Ok(())
     }

@@ -1,6 +1,6 @@
 use bytes::{Buf, BufMut};
 use indexmap::{set::Iter as IndexSetIter, IndexSet};
-use insim_core::{vehicle::Vehicle, ReadWriteBuf};
+use insim_core::{vehicle::Vehicle, Decode, Encode};
 
 use crate::{
     error::Error,
@@ -193,22 +193,24 @@ pub struct Plc {
 
 impl_typical_with_request_id!(Plc);
 
-impl ReadWriteBuf for Plc {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::read_buf(buf)?;
+impl Decode for Plc {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::decode(buf)?;
         buf.advance(1);
-        let ucid = ConnectionId::read_buf(buf)?;
+        let ucid = ConnectionId::decode(buf)?;
         buf.advance(3);
-        let cars = PlcAllowedCarsSet::from_bits_truncate(u32::read_buf(buf)?);
+        let cars = PlcAllowedCarsSet::from_bits_truncate(u32::decode(buf)?);
         Ok(Self { reqi, ucid, cars })
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.write_buf(buf)?;
+impl Encode for Plc {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.encode(buf)?;
         buf.put_bytes(0, 1);
-        self.ucid.write_buf(buf)?;
+        self.ucid.encode(buf)?;
         buf.put_bytes(0, 3);
-        self.cars.bits().write_buf(buf)?;
+        self.cars.bits().encode(buf)?;
         Ok(())
     }
 }

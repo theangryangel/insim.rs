@@ -6,7 +6,7 @@ use std::{cmp::Ordering, fmt::Display, str::FromStr};
 use if_chain::if_chain;
 use itertools::Itertools;
 
-use crate::{FromToAsciiBytes, ReadWriteBuf};
+use crate::{Ascii, Decode, Encode};
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 /// Possible errors when parsing a game version
@@ -154,8 +154,8 @@ impl FromStr for GameVersion {
     }
 }
 
-impl ReadWriteBuf for GameVersion {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
+impl Decode for GameVersion {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
         let new = buf.split_to(8);
 
         match std::str::from_utf8(&new) {
@@ -163,8 +163,10 @@ impl ReadWriteBuf for GameVersion {
             Err(_) => Err(crate::Error::NotAsciiString),
         }
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
+impl Encode for GameVersion {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
         let ver = self.to_string();
         ver.to_ascii_bytes(buf, 8, false)?;
         Ok(())
@@ -288,11 +290,11 @@ mod tests {
     fn test_from_to_bytes() {
         let ver = GameVersion::from_str("0.7F").unwrap();
         let mut buf = BytesMut::new();
-        assert!(ver.write_buf(&mut buf).is_ok());
+        assert!(ver.encode(&mut buf).is_ok());
 
         assert_eq!(buf.len(), 8);
 
-        let from = GameVersion::read_buf(&mut buf.freeze()).unwrap();
+        let from = GameVersion::decode(&mut buf.freeze()).unwrap();
 
         assert_eq!(ver, from);
     }

@@ -2,7 +2,7 @@
 
 use std::fmt::Debug;
 
-use insim_core::ReadWriteBuf;
+use insim_core::{Decode, Encode};
 
 use crate::{identifiers::RequestId, insim::*, relay::*};
 
@@ -454,392 +454,394 @@ impl WithRequestId for Packet {
     }
 }
 
-impl ReadWriteBuf for Packet {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let discrimator = u8::read_buf(buf)?;
+impl Decode for Packet {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let discrimator = u8::decode(buf)?;
         let packet = match discrimator {
-            1 => Self::Isi(Isi::read_buf(buf)?),
-            2 => Self::Ver(Ver::read_buf(buf)?),
-            3 => Self::Tiny(Tiny::read_buf(buf)?),
-            4 => Self::Small(Small::read_buf(buf)?),
-            5 => Self::Sta(Sta::read_buf(buf)?),
-            6 => Self::Sch(Sch::read_buf(buf)?),
-            7 => Self::Sfp(Sfp::read_buf(buf)?),
-            8 => Self::Scc(Scc::read_buf(buf)?),
-            9 => Self::Cpp(Cpp::read_buf(buf)?),
-            10 => Self::Ism(Ism::read_buf(buf)?),
-            11 => Self::Mso(Mso::read_buf(buf)?),
-            12 => Self::Iii(Iii::read_buf(buf)?),
-            13 => Self::Mst(Mst::read_buf(buf)?),
-            14 => Self::Mtc(Mtc::read_buf(buf)?),
-            15 => Self::Mod(Mod::read_buf(buf)?),
-            16 => Self::Vtn(Vtn::read_buf(buf)?),
-            17 => Self::Rst(Rst::read_buf(buf)?),
-            18 => Self::Ncn(Ncn::read_buf(buf)?),
-            19 => Self::Cnl(Cnl::read_buf(buf)?),
-            20 => Self::Cpr(Cpr::read_buf(buf)?),
-            21 => Self::Npl(Npl::read_buf(buf)?),
-            22 => Self::Plp(Plp::read_buf(buf)?),
-            23 => Self::Pll(Pll::read_buf(buf)?),
-            24 => Self::Lap(Lap::read_buf(buf)?),
-            25 => Self::Spx(Spx::read_buf(buf)?),
-            26 => Self::Pit(Pit::read_buf(buf)?),
-            27 => Self::Psf(Psf::read_buf(buf)?),
-            28 => Self::Pla(Pla::read_buf(buf)?),
-            29 => Self::Cch(Cch::read_buf(buf)?),
-            30 => Self::Pen(Pen::read_buf(buf)?),
-            31 => Self::Toc(Toc::read_buf(buf)?),
-            32 => Self::Flg(Flg::read_buf(buf)?),
-            33 => Self::Pfl(Pfl::read_buf(buf)?),
-            34 => Self::Fin(Fin::read_buf(buf)?),
-            35 => Self::Res(Res::read_buf(buf)?),
-            36 => Self::Reo(Reo::read_buf(buf)?),
-            37 => Self::Nlp(Nlp::read_buf(buf)?),
-            38 => Self::Mci(Mci::read_buf(buf)?),
-            39 => Self::Msx(Msx::read_buf(buf)?),
-            40 => Self::Msl(Msl::read_buf(buf)?),
-            41 => Self::Crs(Crs::read_buf(buf)?),
-            42 => Self::Bfn(Bfn::read_buf(buf)?),
-            43 => Self::Axi(Axi::read_buf(buf)?),
-            44 => Self::Axo(Axo::read_buf(buf)?),
-            45 => Self::Btn(Btn::read_buf(buf)?),
-            46 => Self::Btc(Btc::read_buf(buf)?),
-            47 => Self::Btt(Btt::read_buf(buf)?),
-            48 => Self::Rip(Rip::read_buf(buf)?),
-            49 => Self::Ssh(Ssh::read_buf(buf)?),
-            50 => Self::Con(Con::read_buf(buf)?),
-            51 => Self::Obh(Obh::read_buf(buf)?),
-            52 => Self::Hlv(Hlv::read_buf(buf)?),
-            53 => Self::Plc(Plc::read_buf(buf)?),
-            54 => Self::Axm(Axm::read_buf(buf)?),
-            55 => Self::Acr(Acr::read_buf(buf)?),
-            56 => Self::Hcp(Hcp::read_buf(buf)?),
-            57 => Self::Nci(Nci::read_buf(buf)?),
-            58 => Self::Jrr(Jrr::read_buf(buf)?),
-            59 => Self::Uco(Uco::read_buf(buf)?),
-            60 => Self::Oco(Oco::read_buf(buf)?),
-            61 => Self::Ttc(Ttc::read_buf(buf)?),
-            62 => Self::Slc(Slc::read_buf(buf)?),
-            63 => Self::Csc(Csc::read_buf(buf)?),
-            64 => Self::Cim(Cim::read_buf(buf)?),
-            65 => Self::Mal(Mal::read_buf(buf)?),
-            66 => Self::Plh(Plh::read_buf(buf)?),
-            67 => Self::Ipb(Ipb::read_buf(buf)?),
-            68 => Self::Aic(Aic::read_buf(buf)?),
-            69 => Self::Aii(Aii::read_buf(buf)?),
-            250 => Self::RelayArq(Arq::read_buf(buf)?),
-            251 => Self::RelayArp(Arp::read_buf(buf)?),
-            252 => Self::RelayHlr(Hlr::read_buf(buf)?),
-            253 => Self::RelayHos(Hos::read_buf(buf)?),
-            254 => Self::RelaySel(Sel::read_buf(buf)?),
-            255 => Self::RelayErr(Error::read_buf(buf)?),
+            1 => Self::Isi(Isi::decode(buf)?),
+            2 => Self::Ver(Ver::decode(buf)?),
+            3 => Self::Tiny(Tiny::decode(buf)?),
+            4 => Self::Small(Small::decode(buf)?),
+            5 => Self::Sta(Sta::decode(buf)?),
+            6 => Self::Sch(Sch::decode(buf)?),
+            7 => Self::Sfp(Sfp::decode(buf)?),
+            8 => Self::Scc(Scc::decode(buf)?),
+            9 => Self::Cpp(Cpp::decode(buf)?),
+            10 => Self::Ism(Ism::decode(buf)?),
+            11 => Self::Mso(Mso::decode(buf)?),
+            12 => Self::Iii(Iii::decode(buf)?),
+            13 => Self::Mst(Mst::decode(buf)?),
+            14 => Self::Mtc(Mtc::decode(buf)?),
+            15 => Self::Mod(Mod::decode(buf)?),
+            16 => Self::Vtn(Vtn::decode(buf)?),
+            17 => Self::Rst(Rst::decode(buf)?),
+            18 => Self::Ncn(Ncn::decode(buf)?),
+            19 => Self::Cnl(Cnl::decode(buf)?),
+            20 => Self::Cpr(Cpr::decode(buf)?),
+            21 => Self::Npl(Npl::decode(buf)?),
+            22 => Self::Plp(Plp::decode(buf)?),
+            23 => Self::Pll(Pll::decode(buf)?),
+            24 => Self::Lap(Lap::decode(buf)?),
+            25 => Self::Spx(Spx::decode(buf)?),
+            26 => Self::Pit(Pit::decode(buf)?),
+            27 => Self::Psf(Psf::decode(buf)?),
+            28 => Self::Pla(Pla::decode(buf)?),
+            29 => Self::Cch(Cch::decode(buf)?),
+            30 => Self::Pen(Pen::decode(buf)?),
+            31 => Self::Toc(Toc::decode(buf)?),
+            32 => Self::Flg(Flg::decode(buf)?),
+            33 => Self::Pfl(Pfl::decode(buf)?),
+            34 => Self::Fin(Fin::decode(buf)?),
+            35 => Self::Res(Res::decode(buf)?),
+            36 => Self::Reo(Reo::decode(buf)?),
+            37 => Self::Nlp(Nlp::decode(buf)?),
+            38 => Self::Mci(Mci::decode(buf)?),
+            39 => Self::Msx(Msx::decode(buf)?),
+            40 => Self::Msl(Msl::decode(buf)?),
+            41 => Self::Crs(Crs::decode(buf)?),
+            42 => Self::Bfn(Bfn::decode(buf)?),
+            43 => Self::Axi(Axi::decode(buf)?),
+            44 => Self::Axo(Axo::decode(buf)?),
+            45 => Self::Btn(Btn::decode(buf)?),
+            46 => Self::Btc(Btc::decode(buf)?),
+            47 => Self::Btt(Btt::decode(buf)?),
+            48 => Self::Rip(Rip::decode(buf)?),
+            49 => Self::Ssh(Ssh::decode(buf)?),
+            50 => Self::Con(Con::decode(buf)?),
+            51 => Self::Obh(Obh::decode(buf)?),
+            52 => Self::Hlv(Hlv::decode(buf)?),
+            53 => Self::Plc(Plc::decode(buf)?),
+            54 => Self::Axm(Axm::decode(buf)?),
+            55 => Self::Acr(Acr::decode(buf)?),
+            56 => Self::Hcp(Hcp::decode(buf)?),
+            57 => Self::Nci(Nci::decode(buf)?),
+            58 => Self::Jrr(Jrr::decode(buf)?),
+            59 => Self::Uco(Uco::decode(buf)?),
+            60 => Self::Oco(Oco::decode(buf)?),
+            61 => Self::Ttc(Ttc::decode(buf)?),
+            62 => Self::Slc(Slc::decode(buf)?),
+            63 => Self::Csc(Csc::decode(buf)?),
+            64 => Self::Cim(Cim::decode(buf)?),
+            65 => Self::Mal(Mal::decode(buf)?),
+            66 => Self::Plh(Plh::decode(buf)?),
+            67 => Self::Ipb(Ipb::decode(buf)?),
+            68 => Self::Aic(Aic::decode(buf)?),
+            69 => Self::Aii(Aii::decode(buf)?),
+            250 => Self::RelayArq(Arq::decode(buf)?),
+            251 => Self::RelayArp(Arp::decode(buf)?),
+            252 => Self::RelayHlr(Hlr::decode(buf)?),
+            253 => Self::RelayHos(Hos::decode(buf)?),
+            254 => Self::RelaySel(Sel::decode(buf)?),
+            255 => Self::RelayErr(Error::decode(buf)?),
             i => return Err(insim_core::Error::NoVariantMatch { found: i.into() }),
         };
 
         Ok(packet)
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+impl Encode for Packet {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         match self {
             Self::Isi(i) => {
-                1_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                1_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Ver(i) => {
-                2_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                2_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Tiny(i) => {
-                3_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                3_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Small(i) => {
-                4_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                4_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Sta(i) => {
-                5_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                5_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Sch(i) => {
-                6_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                6_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Sfp(i) => {
-                7_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                7_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Scc(i) => {
-                8_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                8_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Cpp(i) => {
-                9_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                9_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Ism(i) => {
-                10_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                10_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Mso(i) => {
-                11_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                11_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Iii(i) => {
-                12_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                12_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Mst(i) => {
-                13_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                13_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Mtc(i) => {
-                14_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                14_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Mod(i) => {
-                15_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                15_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Vtn(i) => {
-                16_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                16_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Rst(i) => {
-                17_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                17_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Ncn(i) => {
-                18_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                18_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Cnl(i) => {
-                19_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                19_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Cpr(i) => {
-                20_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                20_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Npl(i) => {
-                21_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                21_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Plp(i) => {
-                22_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                22_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Pll(i) => {
-                23_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                23_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Lap(i) => {
-                24_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                24_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Spx(i) => {
-                25_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                25_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Pit(i) => {
-                26_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                26_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Psf(i) => {
-                27_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                27_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Pla(i) => {
-                28_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                28_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Cch(i) => {
-                29_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                29_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Pen(i) => {
-                30_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                30_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Toc(i) => {
-                31_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                31_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Flg(i) => {
-                32_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                32_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Pfl(i) => {
-                33_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                33_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Fin(i) => {
-                34_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                34_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Res(i) => {
-                35_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                35_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Reo(i) => {
-                36_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                36_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Nlp(i) => {
-                37_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                37_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Mci(i) => {
-                38_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                38_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Msx(i) => {
-                39_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                39_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Msl(i) => {
-                40_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                40_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Crs(i) => {
-                41_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                41_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Bfn(i) => {
-                42_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                42_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Axi(i) => {
-                43_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                43_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Axo(i) => {
-                44_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                44_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Btn(i) => {
-                45_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                45_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Btc(i) => {
-                46_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                46_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Btt(i) => {
-                47_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                47_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Rip(i) => {
-                48_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                48_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Ssh(i) => {
-                49_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                49_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Con(i) => {
-                50_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                50_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Obh(i) => {
-                51_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                51_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Hlv(i) => {
-                52_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                52_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Plc(i) => {
-                53_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                53_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Axm(i) => {
-                54_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                54_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Acr(i) => {
-                55_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                55_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Hcp(i) => {
-                56_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                56_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Nci(i) => {
-                57_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                57_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Jrr(i) => {
-                58_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                58_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Uco(i) => {
-                59_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                59_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Oco(i) => {
-                60_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                60_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Ttc(i) => {
-                61_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                61_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Slc(i) => {
-                62_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                62_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Csc(i) => {
-                63_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                63_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Cim(i) => {
-                64_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                64_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Mal(i) => {
-                65_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                65_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Plh(i) => {
-                66_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                66_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Ipb(i) => {
-                67_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                67_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Aic(i) => {
-                68_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                68_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::Aii(i) => {
-                69_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                69_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::RelayArq(i) => {
-                250_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                250_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::RelayArp(i) => {
-                251_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                251_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::RelayHlr(i) => {
-                252_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                252_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::RelayHos(i) => {
-                253_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                253_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::RelaySel(i) => {
-                254_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                254_u8.encode(buf)?;
+                i.encode(buf)?;
             },
             Self::RelayErr(i) => {
-                255_u8.write_buf(buf)?;
-                i.write_buf(buf)?;
+                255_u8.encode(buf)?;
+                i.encode(buf)?;
             },
         };
 

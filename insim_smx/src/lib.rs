@@ -16,7 +16,7 @@ use std::{
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use insim_core::{point::Point, FromToAsciiBytes, FromToCodepageBytes, ReadWriteBuf};
+use insim_core::{point::Point, Ascii, Codepage, Decode, Encode};
 use thiserror::Error;
 
 #[non_exhaustive]
@@ -95,20 +95,20 @@ pub struct Object {
     pub triangles: Vec<Triangle>,
 }
 
-impl ReadWriteBuf for Object {
-    fn read_buf(buf: &mut Bytes) -> Result<Self, insim_core::Error> {
-        let center = Point::<i32>::read_buf(buf)?;
-        let radius = i32::read_buf(buf)?;
-        let mut num_object_points = i32::read_buf(buf)?;
-        let mut num_triangles = i32::read_buf(buf)?;
+impl Decode for Object {
+    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::Error> {
+        let center = Point::<i32>::decode(buf)?;
+        let radius = i32::decode(buf)?;
+        let mut num_object_points = i32::decode(buf)?;
+        let mut num_triangles = i32::decode(buf)?;
         let mut points = Vec::new();
         let mut triangles = Vec::new();
         while num_object_points > 0 {
-            points.push(ObjectPoint::read_buf(buf)?);
+            points.push(ObjectPoint::decode(buf)?);
             num_object_points -= 1;
         }
         while num_triangles > 0 {
-            triangles.push(Triangle::read_buf(buf)?);
+            triangles.push(Triangle::decode(buf)?);
             num_triangles -= 1;
         }
         Ok(Self {
@@ -118,17 +118,19 @@ impl ReadWriteBuf for Object {
             triangles,
         })
     }
+}
 
-    fn write_buf(&self, buf: &mut BytesMut) -> Result<(), insim_core::Error> {
-        self.center.write_buf(buf)?;
-        self.radius.write_buf(buf)?;
-        (self.points.len() as i32).write_buf(buf)?;
-        (self.triangles.len() as i32).write_buf(buf)?;
+impl Encode for Object {
+    fn encode(&self, buf: &mut BytesMut) -> Result<(), insim_core::Error> {
+        self.center.encode(buf)?;
+        self.radius.encode(buf)?;
+        (self.points.len() as i32).encode(buf)?;
+        (self.triangles.len() as i32).encode(buf)?;
         for i in self.points.iter() {
-            i.write_buf(buf)?;
+            i.encode(buf)?;
         }
         for i in self.triangles.iter() {
-            i.write_buf(buf)?;
+            i.encode(buf)?;
         }
         Ok(())
     }
@@ -166,32 +168,32 @@ pub struct Smx {
     pub checkpoint_object_index: Vec<i32>,
 }
 
-impl ReadWriteBuf for Smx {
-    fn read_buf(buf: &mut Bytes) -> Result<Self, insim_core::Error> {
+impl Decode for Smx {
+    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::Error> {
         let magic = String::from_ascii_bytes(buf, 6)?;
         if magic != "LFSSMX" {
             unimplemented!("Not a LFS SMX file");
         }
-        let game_version = u8::read_buf(buf)?;
-        let game_revision = u8::read_buf(buf)?;
-        let smx_version = u8::read_buf(buf)?;
-        let dimensions = u8::read_buf(buf)?;
-        let resolution = u8::read_buf(buf)?;
-        let vertex_colours = u8::read_buf(buf)?;
+        let game_version = u8::decode(buf)?;
+        let game_revision = u8::decode(buf)?;
+        let smx_version = u8::decode(buf)?;
+        let dimensions = u8::decode(buf)?;
+        let resolution = u8::decode(buf)?;
+        let vertex_colours = u8::decode(buf)?;
         buf.advance(4);
         let track = String::from_codepage_bytes(buf, 32)?;
-        let ground_colour = Rgb::read_buf(buf)?;
+        let ground_colour = Rgb::decode(buf)?;
         buf.advance(9);
-        let mut num_objects = i32::read_buf(buf)?;
+        let mut num_objects = i32::decode(buf)?;
         let mut objects = Vec::new();
         while num_objects > 0 {
-            objects.push(Object::read_buf(buf)?);
+            objects.push(Object::decode(buf)?);
             num_objects -= 1;
         }
-        let mut num_checkpoints = i32::read_buf(buf)?;
+        let mut num_checkpoints = i32::decode(buf)?;
         let mut checkpoint_object_index = Vec::new();
         while num_checkpoints > 0 {
-            checkpoint_object_index.push(i32::read_buf(buf)?);
+            checkpoint_object_index.push(i32::decode(buf)?);
             num_checkpoints -= 1;
         }
         Ok(Self {
@@ -207,26 +209,28 @@ impl ReadWriteBuf for Smx {
             checkpoint_object_index,
         })
     }
+}
 
-    fn write_buf(&self, buf: &mut BytesMut) -> Result<(), insim_core::Error> {
+impl Encode for Smx {
+    fn encode(&self, buf: &mut BytesMut) -> Result<(), insim_core::Error> {
         buf.extend_from_slice(b"LFSSMX");
-        self.game_version.write_buf(buf)?;
-        self.game_revision.write_buf(buf)?;
-        self.smx_version.write_buf(buf)?;
-        self.dimensions.write_buf(buf)?;
-        self.resolution.write_buf(buf)?;
-        self.vertex_colours.write_buf(buf)?;
+        self.game_version.encode(buf)?;
+        self.game_revision.encode(buf)?;
+        self.smx_version.encode(buf)?;
+        self.dimensions.encode(buf)?;
+        self.resolution.encode(buf)?;
+        self.vertex_colours.encode(buf)?;
         buf.put_bytes(0, 4);
         self.track.to_codepage_bytes(buf, 32, false)?;
-        self.ground_colour.write_buf(buf)?;
+        self.ground_colour.encode(buf)?;
         buf.put_bytes(0, 9);
-        (self.objects.len() as i32).write_buf(buf)?;
+        (self.objects.len() as i32).encode(buf)?;
         for i in self.objects.iter() {
-            i.write_buf(buf)?;
+            i.encode(buf)?;
         }
-        (self.checkpoint_object_index.len() as i32).write_buf(buf)?;
+        (self.checkpoint_object_index.len() as i32).encode(buf)?;
         for i in self.checkpoint_object_index.iter() {
-            i.write_buf(buf)?;
+            i.encode(buf)?;
         }
         Ok(())
     }
@@ -238,7 +242,7 @@ impl Smx {
         let mut data = Vec::new();
         let _ = i.read_to_end(&mut data)?;
         let mut data = Bytes::from(data);
-        Self::read_buf(&mut data).map_err(Error::from)
+        Self::decode(&mut data).map_err(Error::from)
     }
 
     /// Read and parse a SMX file into a [Smx] struct.
@@ -295,8 +299,7 @@ mod test {
             .expect("Expected to read whole file");
 
         let mut inner = BytesMut::new();
-        p.write_buf(&mut inner)
-            .expect("Should not fail to write SMX");
+        p.encode(&mut inner).expect("Should not fail to write SMX");
 
         assert_eq!(inner.len(), raw.len());
         assert_eq!(inner.as_ref(), raw);

@@ -4,7 +4,7 @@ use std::{
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use insim_core::ReadWriteBuf;
+use insim_core::{Decode, Encode};
 
 /// Unique Connection Identifier, commonly referred to as UCID in Insim.txt
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
@@ -47,12 +47,14 @@ impl From<u8> for ConnectionId {
     }
 }
 
-impl ReadWriteBuf for ConnectionId {
-    fn read_buf(buf: &mut Bytes) -> Result<Self, insim_core::Error> {
+impl Decode for ConnectionId {
+    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::Error> {
         Ok(ConnectionId(buf.get_u8()))
     }
+}
 
-    fn write_buf(&self, buf: &mut BytesMut) -> Result<(), insim_core::Error> {
+impl Encode for ConnectionId {
+    fn encode(&self, buf: &mut BytesMut) -> Result<(), insim_core::Error> {
         buf.put_u8(self.0);
 
         Ok(())

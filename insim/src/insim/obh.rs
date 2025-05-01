@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bitflags::bitflags;
 use bytes::{Buf, BufMut};
-use insim_core::{speed::Speed, ReadWriteBuf};
+use insim_core::{speed::Speed, Decode, Encode};
 
 use crate::identifiers::{PlayerId, RequestId};
 
@@ -96,21 +96,21 @@ pub struct Obh {
     pub flags: ObhFlags,
 }
 
-impl ReadWriteBuf for Obh {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::read_buf(buf)?;
-        let plid = PlayerId::read_buf(buf)?;
+impl Decode for Obh {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::decode(buf)?;
+        let plid = PlayerId::decode(buf)?;
         // automatically strip off the first 4 bits as they're reserved
-        let spclose = spclose_strip_high_bits(u16::read_buf(buf)?);
+        let spclose = spclose_strip_high_bits(u16::decode(buf)?);
         let spclose = Speed::from_game_closing_speed(spclose);
-        let time = Duration::from_millis((u16::read_buf(buf)? as u64) * 10);
-        let c = CarContact::read_buf(buf)?;
-        let x = i16::read_buf(buf)?;
-        let y = i16::read_buf(buf)?;
-        let zbyte = u8::read_buf(buf)?;
+        let time = Duration::from_millis((u16::decode(buf)? as u64) * 10);
+        let c = CarContact::decode(buf)?;
+        let x = i16::decode(buf)?;
+        let y = i16::decode(buf)?;
+        let zbyte = u8::decode(buf)?;
         buf.advance(1);
-        let index = u8::read_buf(buf)?;
-        let flags = ObhFlags::read_buf(buf)?;
+        let index = u8::decode(buf)?;
+        let flags = ObhFlags::decode(buf)?;
         Ok(Self {
             reqi,
             plid,
@@ -124,23 +124,25 @@ impl ReadWriteBuf for Obh {
             flags,
         })
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.write_buf(buf)?;
-        self.plid.write_buf(buf)?;
+impl Encode for Obh {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.encode(buf)?;
+        self.plid.encode(buf)?;
         // automatically strip off the first 4 bits as they're reserved
-        spclose_strip_high_bits(self.spclose.as_game_closing_speed()).write_buf(buf)?;
+        spclose_strip_high_bits(self.spclose.as_game_closing_speed()).encode(buf)?;
         match u16::try_from(self.time.as_millis() / 10) {
-            Ok(time) => time.write_buf(buf)?,
+            Ok(time) => time.encode(buf)?,
             Err(_) => return Err(insim_core::Error::TooLarge),
         }
-        self.c.write_buf(buf)?;
-        self.x.write_buf(buf)?;
-        self.y.write_buf(buf)?;
-        self.zbyte.write_buf(buf)?;
+        self.c.encode(buf)?;
+        self.x.encode(buf)?;
+        self.y.encode(buf)?;
+        self.zbyte.encode(buf)?;
         buf.put_bytes(0, 1);
-        self.index.write_buf(buf)?;
-        self.flags.write_buf(buf)?;
+        self.index.encode(buf)?;
+        self.flags.encode(buf)?;
         Ok(())
     }
 }

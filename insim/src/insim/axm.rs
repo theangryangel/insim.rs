@@ -1,5 +1,5 @@
 use bytes::{Buf, BufMut};
-use insim_core::ReadWriteBuf;
+use insim_core::{Decode, Encode};
 
 use crate::identifiers::{ConnectionId, RequestId};
 
@@ -115,17 +115,17 @@ pub struct Axm {
 
 impl_typical_with_request_id!(Axm);
 
-impl ReadWriteBuf for Axm {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::read_buf(buf)?;
-        let mut numo = u8::read_buf(buf)?;
-        let ucid = ConnectionId::read_buf(buf)?;
-        let pmoaction = PmoAction::read_buf(buf)?;
-        let pmoflags = PmoFlags::read_buf(buf)?;
+impl Decode for Axm {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::decode(buf)?;
+        let mut numo = u8::decode(buf)?;
+        let ucid = ConnectionId::decode(buf)?;
+        let pmoaction = PmoAction::decode(buf)?;
+        let pmoflags = PmoFlags::decode(buf)?;
         buf.advance(1);
         let mut info = Vec::with_capacity(numo as usize);
         while numo > 0 {
-            info.push(ObjectInfo::read_buf(buf)?);
+            info.push(ObjectInfo::decode(buf)?);
             numo -= 1;
         }
 
@@ -137,20 +137,22 @@ impl ReadWriteBuf for Axm {
             info,
         })
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.write_buf(buf)?;
+impl Encode for Axm {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.encode(buf)?;
         let len = self.info.len();
         if len > AXM_MAX_OBJECTS {
             return Err(insim_core::Error::TooLarge);
         }
-        (len as u8).write_buf(buf)?;
-        self.ucid.write_buf(buf)?;
-        self.pmoaction.write_buf(buf)?;
-        self.pmoflags.write_buf(buf)?;
+        (len as u8).encode(buf)?;
+        self.ucid.encode(buf)?;
+        self.pmoaction.encode(buf)?;
+        self.pmoflags.encode(buf)?;
         buf.put_bytes(0, 1);
         for i in self.info.iter() {
-            i.write_buf(buf)?;
+            i.encode(buf)?;
         }
 
         Ok(())

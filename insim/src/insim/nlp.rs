@@ -1,4 +1,4 @@
-use insim_core::ReadWriteBuf;
+use insim_core::{Decode, Encode};
 
 use crate::identifiers::{PlayerId, RequestId};
 
@@ -30,27 +30,29 @@ pub struct Nlp {
     pub info: Vec<NodeLapInfo>,
 }
 
-impl ReadWriteBuf for Nlp {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::read_buf(buf)?;
-        let mut nump = u8::read_buf(buf)?;
+impl Decode for Nlp {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::decode(buf)?;
+        let mut nump = u8::decode(buf)?;
         let mut info = Vec::with_capacity(nump as usize);
         while nump > 0 {
-            info.push(NodeLapInfo::read_buf(buf)?);
+            info.push(NodeLapInfo::decode(buf)?);
             nump -= 1;
         }
         Ok(Self { reqi, info })
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.write_buf(buf)?;
+impl Encode for Nlp {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.encode(buf)?;
         let nump = self.info.len();
         if nump > 255 {
             return Err(insim_core::Error::TooLarge);
         }
-        (nump as u8).write_buf(buf)?;
+        (nump as u8).encode(buf)?;
         for i in self.info.iter() {
-            i.write_buf(buf)?;
+            i.encode(buf)?;
         }
 
         Ok(())

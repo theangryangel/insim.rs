@@ -67,22 +67,24 @@ impl Receiver {
         });
 
         Ok(quote! {
-            impl ::insim_core::ReadWriteBuf for #name {
+            impl ::insim_core::Decode for #name {
                 /// Read
-                fn read_buf(buf: &mut ::bytes::Bytes) -> Result<Self, ::insim_core::Error> {
-                    let val: Self = match #repr_ty::read_buf(buf)? {
+                fn decode(buf: &mut ::bytes::Bytes) -> Result<Self, ::insim_core::Error> {
+                    let val: Self = match #repr_ty::decode(buf)? {
                         #(#from_variants)*
                         found => return Err(::insim_core::Error::NoVariantMatch { found: found as u64 })
                     };
                     Ok(val)
                 }
+            }
 
+            impl ::insim_core::Encode for #name {
                 /// Write
-                fn write_buf(&self, buf: &mut ::bytes::BytesMut) -> Result<(), ::insim_core::Error> {
+                fn encode(&self, buf: &mut ::bytes::BytesMut) -> Result<(), ::insim_core::Error> {
                     let val: #repr_ty = match self {
                         #(#to_variants)*
                     };
-                    val.write_buf(buf)?;
+                    val.encode(buf)?;
                     Ok(())
                 }
             }
@@ -123,17 +125,19 @@ impl Receiver {
         });
 
         Ok(quote! {
-            impl ::insim_core::ReadWriteBuf for #name {
+            impl ::insim_core::Decode for #name {
                 /// Read
-                fn read_buf(buf: &mut ::bytes::Bytes) -> Result<Self, ::insim_core::Error> {
+                fn decode(buf: &mut ::bytes::Bytes) -> Result<Self, ::insim_core::Error> {
                     #(#from_bytes_fields)*
                     Ok(Self {
                         #(#from_bytes_fields_init),*
                     })
                 }
+            }
 
+            impl ::insim_core::Encode for #name {
                 /// Write
-                fn write_buf(&self, buf: &mut ::bytes::BytesMut) -> Result<(), ::insim_core::Error> {
+                fn encode(&self, buf: &mut ::bytes::BytesMut) -> Result<(), ::insim_core::Error> {
                     #(#to_bytes_fields)*
                     Ok(())
                 }

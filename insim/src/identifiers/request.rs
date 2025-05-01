@@ -4,7 +4,7 @@ use std::{
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use insim_core::ReadWriteBuf;
+use insim_core::{Decode, Encode};
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
@@ -39,12 +39,14 @@ impl From<u8> for RequestId {
     }
 }
 
-impl ReadWriteBuf for RequestId {
-    fn read_buf(buf: &mut Bytes) -> Result<Self, insim_core::Error> {
+impl Decode for RequestId {
+    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::Error> {
         Ok(RequestId(buf.get_u8()))
     }
+}
 
-    fn write_buf(&self, buf: &mut BytesMut) -> Result<(), insim_core::Error> {
+impl Encode for RequestId {
+    fn encode(&self, buf: &mut BytesMut) -> Result<(), insim_core::Error> {
         buf.put_u8(self.0);
 
         Ok(())

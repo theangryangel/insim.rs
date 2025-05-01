@@ -2,7 +2,7 @@ use std::{default::Default, net::Ipv4Addr};
 
 use bytes::{Buf, BufMut};
 use indexmap::{set::Iter as IndexSetIter, IndexSet};
-use insim_core::ReadWriteBuf;
+use insim_core::{Decode, Encode};
 
 use crate::identifiers::RequestId;
 
@@ -56,31 +56,33 @@ impl Ipb {
     }
 }
 
-impl ReadWriteBuf for Ipb {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::read_buf(buf)?;
-        let mut numb = u8::read_buf(buf)?;
+impl Decode for Ipb {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::decode(buf)?;
+        let mut numb = u8::decode(buf)?;
         buf.advance(4);
         let mut banips = IndexSet::with_capacity(numb as usize);
         while numb > 0 {
-            let ip = Ipv4Addr::from(u32::read_buf(buf)?);
+            let ip = Ipv4Addr::from(u32::decode(buf)?);
             let _ = banips.insert(ip);
             numb -= 1;
         }
 
         Ok(Self { reqi, banips })
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.write_buf(buf)?;
+impl Encode for Ipb {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.encode(buf)?;
         let numb = self.banips.len();
         if numb > IPB_MAX_BANS {
             return Err(insim_core::Error::TooLarge);
         }
-        (numb as u8).write_buf(buf)?;
+        (numb as u8).encode(buf)?;
         buf.put_bytes(0, 4);
         for i in self.banips.iter() {
-            u32::from(*i).write_buf(buf)?;
+            u32::from(*i).encode(buf)?;
         }
 
         Ok(())

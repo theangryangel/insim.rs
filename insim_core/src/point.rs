@@ -2,10 +2,10 @@
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-use crate::ReadWriteBuf;
+use crate::{Decode, Encode};
 
 #[allow(missing_docs)]
-pub trait Pointable: Copy + Clone + Default + ReadWriteBuf {}
+pub trait Pointable: Copy + Clone + Default + Decode + Encode {}
 
 impl Pointable for i32 {}
 impl Pointable for f32 {}
@@ -24,21 +24,26 @@ where
     pub z: T,
 }
 
-impl<T> ReadWriteBuf for Point<T>
+impl<T> Decode for Point<T>
 where
     T: Pointable,
 {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
-        let x = T::read_buf(buf)?;
-        let y = T::read_buf(buf)?;
-        let z = T::read_buf(buf)?;
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
+        let x = T::decode(buf)?;
+        let y = T::decode(buf)?;
+        let z = T::decode(buf)?;
         Ok(Self { x, y, z })
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
-        self.x.write_buf(buf)?;
-        self.y.write_buf(buf)?;
-        self.z.write_buf(buf)?;
+impl<T> Encode for Point<T>
+where
+    T: Pointable,
+{
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
+        self.x.encode(buf)?;
+        self.y.encode(buf)?;
+        self.z.encode(buf)?;
         Ok(())
     }
 }

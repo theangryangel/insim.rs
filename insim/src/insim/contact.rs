@@ -2,7 +2,7 @@
 use std::time::Duration;
 
 use bytes::{Buf, BufMut};
-use insim_core::{speed::Speed, ReadWriteBuf};
+use insim_core::{speed::Speed, Decode, Encode};
 
 use super::{obh::spclose_strip_high_bits, CompCarInfo};
 use crate::identifiers::{PlayerId, RequestId};
@@ -58,33 +58,33 @@ pub struct ConInfo {
     pub y: i16,
 }
 
-impl ReadWriteBuf for ConInfo {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let plid = PlayerId::read_buf(buf)?;
-        let info = CompCarInfo::read_buf(buf)?;
+impl Decode for ConInfo {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let plid = PlayerId::decode(buf)?;
+        let info = CompCarInfo::decode(buf)?;
         // pad 1 bytes
         buf.advance(1);
-        let steer = u8::read_buf(buf)?;
+        let steer = u8::decode(buf)?;
 
-        let thrbrk = u8::read_buf(buf)?;
+        let thrbrk = u8::decode(buf)?;
         let thr: u8 = (thrbrk >> 4) & 0x0F; // upper 4 bits
         let brk: u8 = thrbrk & 0x0F; // lower 4 bits
 
-        let cluhan = u8::read_buf(buf)?;
+        let cluhan = u8::decode(buf)?;
         let clu: u8 = (cluhan >> 4) & 0x0F; // upper 4 bits
         let han: u8 = cluhan & 0x0F; // lower 4 bits
 
-        let gearsp = u8::read_buf(buf)?;
+        let gearsp = u8::decode(buf)?;
         let gearsp = (gearsp >> 4) & 0x0F; // gearsp is only first 4 bits
 
-        let speed = u8::read_buf(buf)?;
-        let direction = u8::read_buf(buf)?;
-        let heading = u8::read_buf(buf)?;
-        let accelf = u8::read_buf(buf)?;
-        let accelr = u8::read_buf(buf)?;
+        let speed = u8::decode(buf)?;
+        let direction = u8::decode(buf)?;
+        let heading = u8::decode(buf)?;
+        let accelf = u8::decode(buf)?;
+        let accelr = u8::decode(buf)?;
 
-        let x = i16::read_buf(buf)?;
-        let y = i16::read_buf(buf)?;
+        let x = i16::decode(buf)?;
+        let y = i16::decode(buf)?;
 
         Ok(Self {
             plid,
@@ -104,12 +104,14 @@ impl ReadWriteBuf for ConInfo {
             y,
         })
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.plid.write_buf(buf)?;
-        self.info.write_buf(buf)?;
-        0_u8.write_buf(buf)?; // pad 1 bytes
-        self.steer.write_buf(buf)?;
+impl Encode for ConInfo {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.plid.encode(buf)?;
+        self.info.encode(buf)?;
+        0_u8.encode(buf)?; // pad 1 bytes
+        self.steer.encode(buf)?;
 
         if self.thr > 15 {
             return Err(insim_core::Error::TooLarge);
@@ -120,7 +122,7 @@ impl ReadWriteBuf for ConInfo {
         }
 
         let thrbrk = (self.thr << 4) | self.brk;
-        thrbrk.write_buf(buf)?;
+        thrbrk.encode(buf)?;
 
         if self.clu > 15 {
             return Err(insim_core::Error::TooLarge);
@@ -131,22 +133,22 @@ impl ReadWriteBuf for ConInfo {
         }
 
         let cluhan = (self.clu << 4) | self.han;
-        cluhan.write_buf(buf)?;
+        cluhan.encode(buf)?;
 
         if self.gearsp > 15 {
             return Err(insim_core::Error::TooLarge);
         }
 
         let gearsp = self.gearsp << 4;
-        gearsp.write_buf(buf)?;
+        gearsp.encode(buf)?;
 
-        self.speed.write_buf(buf)?;
-        self.direction.write_buf(buf)?;
-        self.heading.write_buf(buf)?;
-        self.accelf.write_buf(buf)?;
-        self.accelr.write_buf(buf)?;
-        self.x.write_buf(buf)?;
-        self.y.write_buf(buf)?;
+        self.speed.encode(buf)?;
+        self.direction.encode(buf)?;
+        self.heading.encode(buf)?;
+        self.accelf.encode(buf)?;
+        self.accelr.encode(buf)?;
+        self.x.encode(buf)?;
+        self.y.encode(buf)?;
 
         Ok(())
     }
@@ -173,17 +175,17 @@ pub struct Con {
     pub b: ConInfo,
 }
 
-impl ReadWriteBuf for Con {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::read_buf(buf)?;
+impl Decode for Con {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::decode(buf)?;
         buf.advance(1);
-        let spclose = spclose_strip_high_bits(u16::read_buf(buf)?);
+        let spclose = spclose_strip_high_bits(u16::decode(buf)?);
         let spclose = Speed::from_game_closing_speed(spclose);
-        let time = u16::read_buf(buf)? as u64;
+        let time = u16::decode(buf)? as u64;
         let time = Duration::from_millis(time * 10);
 
-        let a = ConInfo::read_buf(buf)?;
-        let b = ConInfo::read_buf(buf)?;
+        let a = ConInfo::decode(buf)?;
+        let b = ConInfo::decode(buf)?;
 
         Ok(Self {
             reqi,
@@ -193,17 +195,19 @@ impl ReadWriteBuf for Con {
             b,
         })
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.write_buf(buf)?;
+impl Encode for Con {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.encode(buf)?;
         buf.put_bytes(0, 1);
-        spclose_strip_high_bits(self.spclose.as_game_closing_speed()).write_buf(buf)?;
+        spclose_strip_high_bits(self.spclose.as_game_closing_speed()).encode(buf)?;
         match TryInto::<u16>::try_into(self.time.as_millis() / 10) {
-            Ok(time) => time.write_buf(buf)?,
+            Ok(time) => time.encode(buf)?,
             Err(_) => return Err(insim_core::Error::TooLarge),
         }
-        self.a.write_buf(buf)?;
-        self.b.write_buf(buf)?;
+        self.a.encode(buf)?;
+        self.b.encode(buf)?;
         Ok(())
     }
 }

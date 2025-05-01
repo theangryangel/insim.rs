@@ -2,7 +2,7 @@ use std::default::Default;
 
 use bytes::{Buf, BufMut};
 use indexmap::{set::Iter as IndexSetIter, IndexSet};
-use insim_core::{vehicle::Vehicle, ReadWriteBuf};
+use insim_core::{vehicle::Vehicle, Decode, Encode};
 
 use crate::{
     error::Error,
@@ -65,16 +65,16 @@ impl Mal {
     }
 }
 
-impl ReadWriteBuf for Mal {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let reqi = RequestId::read_buf(buf)?;
-        let mut numm = u8::read_buf(buf)?;
-        let ucid = ConnectionId::read_buf(buf)?;
+impl Decode for Mal {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let reqi = RequestId::decode(buf)?;
+        let mut numm = u8::decode(buf)?;
+        let ucid = ConnectionId::decode(buf)?;
         buf.advance(3);
         let mut set = IndexSet::with_capacity(numm as usize);
 
         while numm > 0 {
-            let _ = set.insert(Vehicle::Mod(u32::read_buf(buf)?));
+            let _ = set.insert(Vehicle::Mod(u32::decode(buf)?));
             numm -= 1;
         }
 
@@ -84,18 +84,20 @@ impl ReadWriteBuf for Mal {
             allowed_mods: set,
         })
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
-        self.reqi.write_buf(buf)?;
+impl Encode for Mal {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+        self.reqi.encode(buf)?;
         if self.allowed_mods.len() > MAX_MAL_SIZE {
             return Err(insim_core::Error::TooLarge);
         }
-        (self.allowed_mods.len() as u8).write_buf(buf)?;
-        self.ucid.write_buf(buf)?;
+        (self.allowed_mods.len() as u8).encode(buf)?;
+        self.ucid.encode(buf)?;
         buf.put_bytes(0, 3);
         for i in self.allowed_mods.iter() {
             match i {
-                Vehicle::Mod(ident) => ident.write_buf(buf)?,
+                Vehicle::Mod(ident) => ident.encode(buf)?,
                 _ => unreachable!(
                     "Non-Mod vehicle managed to get into the HashSet. Should not be possible."
                 ),

@@ -1,5 +1,5 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use insim_core::ReadWriteBuf;
+use insim_core::{Decode, Encode};
 
 use super::mode::Mode;
 use crate::{packet::Packet, result::Result};
@@ -32,7 +32,7 @@ impl Codec {
         buf.put_u8(0);
 
         // encode the message
-        msg.write_buf(&mut buf)?;
+        msg.encode(&mut buf)?;
 
         let n = self.mode().encode_length(buf.len())?;
 
@@ -64,7 +64,7 @@ impl Codec {
         // none of the packet definitions include the size
         data.advance(1);
 
-        let packet = Packet::read_buf(&mut data.freeze())?;
+        let packet = Packet::decode(&mut data.freeze())?;
         tracing::trace!("Decoded packet={:?}", packet);
         Ok(Some(packet))
     }

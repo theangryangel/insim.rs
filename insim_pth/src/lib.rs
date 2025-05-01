@@ -24,7 +24,7 @@ use std::{
 };
 
 use bytes::Bytes;
-use insim_core::{point::Point, FromToAsciiBytes, ReadWriteBuf};
+use insim_core::{point::Point, Ascii, Decode, Encode};
 use thiserror::Error;
 
 #[non_exhaustive]
@@ -142,19 +142,19 @@ pub struct Pth {
     pub nodes: Vec<Node>,
 }
 
-impl ReadWriteBuf for Pth {
-    fn read_buf(buf: &mut Bytes) -> Result<Self, insim_core::Error> {
+impl Decode for Pth {
+    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::Error> {
         let magic = String::from_ascii_bytes(buf, 6)?;
         if magic != "LFSPTH" {
             unimplemented!("Not a LFS PTH file");
         }
-        let version = u8::read_buf(buf)?;
-        let revision = u8::read_buf(buf)?;
-        let mut num_nodes = i32::read_buf(buf)?;
-        let finish_line_node = i32::read_buf(buf)?;
+        let version = u8::decode(buf)?;
+        let revision = u8::decode(buf)?;
+        let mut num_nodes = i32::decode(buf)?;
+        let finish_line_node = i32::decode(buf)?;
         let mut nodes = Vec::new();
         while num_nodes > 0 {
-            nodes.push(Node::read_buf(buf)?);
+            nodes.push(Node::decode(buf)?);
             num_nodes -= 1;
         }
         Ok(Self {
@@ -164,18 +164,20 @@ impl ReadWriteBuf for Pth {
             nodes,
         })
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+impl Encode for Pth {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         buf.extend_from_slice(b"LFSPTH");
-        self.version.write_buf(buf)?;
-        self.revision.write_buf(buf)?;
+        self.version.encode(buf)?;
+        self.revision.encode(buf)?;
         if self.nodes.len() > (i32::MAX as usize) {
             return Err(insim_core::Error::TooLarge);
         }
-        (self.nodes.len() as i32).write_buf(buf)?;
-        self.finish_line_node.write_buf(buf)?;
+        (self.nodes.len() as i32).encode(buf)?;
+        self.finish_line_node.encode(buf)?;
         for i in self.nodes.iter() {
-            i.write_buf(buf)?;
+            i.encode(buf)?;
         }
         Ok(())
     }
@@ -187,7 +189,7 @@ impl Pth {
         let mut data = vec![];
         let _ = i.read_to_end(&mut data)?;
         let mut buf = Bytes::from(data);
-        Pth::read_buf(&mut buf).map_err(Error::from)
+        Pth::decode(&mut buf).map_err(Error::from)
     }
 
     /// Read and parse a PTH file into a [Pth] struct.
@@ -246,7 +248,7 @@ mod test {
             .expect("Expected to read whole file");
 
         let mut inner = BytesMut::new();
-        p.write_buf(&mut inner)
+        p.encode(&mut inner)
             .expect("Should not fail to write pth file");
         assert_eq!(inner.as_ref(), raw);
     }

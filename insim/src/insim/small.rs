@@ -1,7 +1,7 @@
 use std::{ops::Deref, time::Duration};
 
 use bitflags::bitflags;
-use insim_core::ReadWriteBuf;
+use insim_core::{Decode, Encode};
 
 use super::{PlcAllowedCarsSet, VtnAction};
 use crate::{
@@ -258,10 +258,10 @@ impl WithRequestId for SmallType {
     }
 }
 
-impl ReadWriteBuf for SmallType {
-    fn read_buf(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
-        let discrim = u8::read_buf(buf)?;
-        let uval = u32::read_buf(buf)?;
+impl Decode for SmallType {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+        let discrim = u8::decode(buf)?;
+        let uval = u32::decode(buf)?;
         let res = match discrim {
             0 => Self::None,
             1 => Self::Ssp(Duration::from_millis(uval as u64 * 10)),
@@ -283,8 +283,10 @@ impl ReadWriteBuf for SmallType {
         };
         Ok(res)
     }
+}
 
-    fn write_buf(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+impl Encode for SmallType {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
         let (discrim, uval) = match self {
             SmallType::None => (0u8, 0u32),
             SmallType::Ssp(uval) => (1u8, uval.as_millis() as u32 / 10),
@@ -300,8 +302,8 @@ impl ReadWriteBuf for SmallType {
             SmallType::Aii(plid) => (11u8, (*plid.deref() as u32)),
         };
 
-        discrim.write_buf(buf)?;
-        uval.write_buf(buf)?;
+        discrim.encode(buf)?;
+        uval.encode(buf)?;
         Ok(())
     }
 }
