@@ -89,7 +89,7 @@ impl CompCar {
 }
 
 impl Decode for CompCar {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let node = u16::decode(buf)?;
         let lap = u16::decode(buf)?;
         let plid = PlayerId::decode(buf)?;
@@ -117,7 +117,7 @@ impl Decode for CompCar {
 }
 
 impl Encode for CompCar {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         self.node.encode(buf)?;
         self.lap.encode(buf)?;
         self.plid.encode(buf)?;
@@ -159,7 +159,7 @@ impl Mci {
 }
 
 impl Decode for Mci {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let reqi = RequestId::decode(buf)?;
         let mut numc = u8::decode(buf)?;
         let mut info = Vec::with_capacity(numc as usize);
@@ -172,11 +172,11 @@ impl Decode for Mci {
 }
 
 impl Encode for Mci {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         self.reqi.encode(buf)?;
         let numc = self.info.len();
         if numc > 255 {
-            return Err(insim_core::Error::TooLarge);
+            return Err(insim_core::EncodeError::TooLarge);
         }
         (numc as u8).encode(buf)?;
         for i in self.info.iter() {

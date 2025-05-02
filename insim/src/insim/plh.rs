@@ -35,7 +35,7 @@ pub struct PlayerHandicap {
 }
 
 impl Decode for PlayerHandicap {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let plid = PlayerId::decode(buf)?;
         let flags = PlayerHandicapFlags::decode(buf)?;
         let h_mass = u8::decode(buf)?;
@@ -51,12 +51,12 @@ impl Decode for PlayerHandicap {
 }
 
 impl Encode for PlayerHandicap {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         if self.h_mass > 200 {
-            return Err(insim_core::Error::TooLarge);
+            return Err(insim_core::EncodeError::TooLarge);
         }
         if self.h_tres > 50 {
-            return Err(insim_core::Error::TooLarge);
+            return Err(insim_core::EncodeError::TooLarge);
         }
 
         self.plid.encode(buf)?;
@@ -81,7 +81,7 @@ pub struct Plh {
 impl_typical_with_request_id!(Plh);
 
 impl Decode for Plh {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let reqi = RequestId::decode(buf)?;
         let mut nump = u8::decode(buf)?;
         let mut hcaps = Vec::with_capacity(nump as usize);
@@ -95,11 +95,11 @@ impl Decode for Plh {
 }
 
 impl Encode for Plh {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         self.reqi.encode(buf)?;
         let nump = self.hcaps.len();
         if nump > PLH_MAX_PLAYERS {
-            return Err(insim_core::Error::TooLarge);
+            return Err(insim_core::EncodeError::TooLarge);
         }
         (nump as u8).encode(buf)?;
         for i in self.hcaps.iter() {

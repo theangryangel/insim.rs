@@ -40,13 +40,13 @@ impl From<u8> for PlayerId {
 }
 
 impl Decode for PlayerId {
-    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
         Ok(PlayerId(buf.get_u8()))
     }
 }
 
 impl Encode for PlayerId {
-    fn encode(&self, buf: &mut BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut BytesMut) -> Result<(), insim_core::EncodeError> {
         buf.put_u8(self.0);
 
         Ok(())

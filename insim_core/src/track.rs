@@ -965,7 +965,7 @@ impl Track {
 }
 
 impl Decode for Track {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
         let raw = buf.split_to(6);
         match raw.as_ref() {
             [b'B', b'L', b'1', 0, 0, 0] => Ok(Self::Bl1),
@@ -1122,7 +1122,7 @@ impl Decode for Track {
             [b'L', b'A', b'1', b'X', 0, 0] => Ok(Self::La1x),
             [b'L', b'A', b'2', 0, 0, 0] => Ok(Self::La2),
             [b'L', b'A', b'2', b'X', 0, 0] => Ok(Self::La2x),
-            _ => Err(crate::Error::BadMagic {
+            _ => Err(crate::DecodeError::BadMagic {
                 found: Box::new(raw),
             }),
         }
@@ -1130,7 +1130,7 @@ impl Decode for Track {
 }
 
 impl Encode for Track {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodeError> {
         let slice = match self {
             Self::Bl1 => [b'B', b'L', b'1', 0, 0, 0],
             Self::Bl1r => [b'B', b'L', b'1', b'R', 0, 0],

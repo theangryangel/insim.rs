@@ -116,7 +116,7 @@ pub struct Axm {
 impl_typical_with_request_id!(Axm);
 
 impl Decode for Axm {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let reqi = RequestId::decode(buf)?;
         let mut numo = u8::decode(buf)?;
         let ucid = ConnectionId::decode(buf)?;
@@ -140,11 +140,11 @@ impl Decode for Axm {
 }
 
 impl Encode for Axm {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         self.reqi.encode(buf)?;
         let len = self.info.len();
         if len > AXM_MAX_OBJECTS {
-            return Err(insim_core::Error::TooLarge);
+            return Err(insim_core::EncodeError::TooLarge);
         }
         (len as u8).encode(buf)?;
         self.ucid.encode(buf)?;

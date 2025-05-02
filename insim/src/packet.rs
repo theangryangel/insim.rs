@@ -455,7 +455,7 @@ impl WithRequestId for Packet {
 }
 
 impl Decode for Packet {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let discrimator = u8::decode(buf)?;
         let packet = match discrimator {
             1 => Self::Isi(Isi::decode(buf)?),
@@ -533,7 +533,7 @@ impl Decode for Packet {
             253 => Self::RelayHos(Hos::decode(buf)?),
             254 => Self::RelaySel(Sel::decode(buf)?),
             255 => Self::RelayErr(Error::decode(buf)?),
-            i => return Err(insim_core::Error::NoVariantMatch { found: i.into() }),
+            i => return Err(insim_core::DecodeError::NoVariantMatch { found: i.into() }),
         };
 
         Ok(packet)
@@ -541,7 +541,7 @@ impl Decode for Packet {
 }
 
 impl Encode for Packet {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         match self {
             Self::Isi(i) => {
                 1_u8.encode(buf)?;

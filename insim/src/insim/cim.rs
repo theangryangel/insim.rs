@@ -47,7 +47,7 @@ impl Default for CimMode {
 }
 
 impl Decode for CimMode {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let discrim = u8::decode(buf)?;
         let submode = u8::decode(buf)?;
         let seltype = u8::decode(buf)?;
@@ -64,7 +64,7 @@ impl Decode for CimMode {
                 seltype,
             },
             found => {
-                return Err(insim_core::Error::NoVariantMatch {
+                return Err(insim_core::DecodeError::NoVariantMatch {
                     found: found as u64,
                 })
             },
@@ -75,7 +75,7 @@ impl Decode for CimMode {
 }
 
 impl Encode for CimMode {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         let (discrim, submode, seltype) = match self {
             CimMode::Normal(submode) => (0u8, *submode as u8, 0u8),
             CimMode::Options => (1u8, 0u8, 0u8),

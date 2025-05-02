@@ -74,7 +74,7 @@ impl Hos {
 }
 
 impl Decode for Hos {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let reqi = RequestId::decode(buf)?;
         let num = u8::decode(buf)?;
         let mut hinfo = Vec::with_capacity(num as usize);
@@ -87,7 +87,7 @@ impl Decode for Hos {
 }
 
 impl Encode for Hos {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         self.reqi.encode(buf)?;
         let num = self.hinfo.len() as u8;
         num.encode(buf)?;

@@ -48,14 +48,14 @@ impl From<RaceLaps> for u8 {
 }
 
 impl Decode for RaceLaps {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let val = u8::decode(buf)?;
         Ok(val.into())
     }
 }
 
 impl Encode for RaceLaps {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         let val = u8::from(*self);
         val.encode(buf)?;
         Ok(())

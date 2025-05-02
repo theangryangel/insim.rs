@@ -408,7 +408,7 @@ impl AiInput {
 }
 
 impl Decode for AiInput {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let input = u8::decode(buf)?;
         let time = u8::decode(buf)?;
         let val = u16::decode(buf)?;
@@ -443,7 +443,7 @@ impl Decode for AiInput {
             254 => AiInputType::ResetAll,
             255 => AiInputType::StopControl,
             found => {
-                return Err(insim_core::Error::NoVariantMatch {
+                return Err(insim_core::DecodeError::NoVariantMatch {
                     found: found as u64,
                 })
             },
@@ -460,7 +460,7 @@ impl Decode for AiInput {
 }
 
 impl Encode for AiInput {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         let (discrim, val): (u8, u16) = match self.input {
             AiInputType::Msx(val) => (0, val),
             AiInputType::Throttle(val) => (1, val),
@@ -494,7 +494,7 @@ impl Encode for AiInput {
         if let Some(time) = self.time {
             match u8::try_from(time.as_millis() / 10) {
                 Ok(time) => time.encode(buf)?,
-                Err(_) => return Err(insim_core::Error::TooLarge),
+                Err(_) => return Err(insim_core::EncodeError::TooLarge),
             }
         } else {
             0_u8.encode(buf)?;
@@ -522,7 +522,7 @@ pub struct Aic {
 impl_typical_with_request_id!(Aic);
 
 impl Decode for Aic {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let reqi = RequestId::decode(buf)?;
         let plid = PlayerId::decode(buf)?;
         let mut inputs = Vec::new();
@@ -535,11 +535,11 @@ impl Decode for Aic {
 }
 
 impl Encode for Aic {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         self.reqi.encode(buf)?;
         self.plid.encode(buf)?;
         if self.inputs.len() > AIC_MAX_INPUTS {
-            return Err(insim_core::Error::TooLarge);
+            return Err(insim_core::EncodeError::TooLarge);
         }
         for i in self.inputs.iter() {
             i.encode(buf)?;

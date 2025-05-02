@@ -31,7 +31,7 @@ pub struct Nlp {
 }
 
 impl Decode for Nlp {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let reqi = RequestId::decode(buf)?;
         let mut nump = u8::decode(buf)?;
         let mut info = Vec::with_capacity(nump as usize);
@@ -44,11 +44,11 @@ impl Decode for Nlp {
 }
 
 impl Encode for Nlp {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         self.reqi.encode(buf)?;
         let nump = self.info.len();
         if nump > 255 {
-            return Err(insim_core::Error::TooLarge);
+            return Err(insim_core::EncodeError::TooLarge);
         }
         (nump as u8).encode(buf)?;
         for i in self.info.iter() {

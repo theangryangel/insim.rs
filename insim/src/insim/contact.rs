@@ -59,7 +59,7 @@ pub struct ConInfo {
 }
 
 impl Decode for ConInfo {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let plid = PlayerId::decode(buf)?;
         let info = CompCarInfo::decode(buf)?;
         // pad 1 bytes
@@ -107,36 +107,36 @@ impl Decode for ConInfo {
 }
 
 impl Encode for ConInfo {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         self.plid.encode(buf)?;
         self.info.encode(buf)?;
         0_u8.encode(buf)?; // pad 1 bytes
         self.steer.encode(buf)?;
 
         if self.thr > 15 {
-            return Err(insim_core::Error::TooLarge);
+            return Err(insim_core::EncodeError::TooLarge);
         }
 
         if self.brk > 15 {
-            return Err(insim_core::Error::TooLarge);
+            return Err(insim_core::EncodeError::TooLarge);
         }
 
         let thrbrk = (self.thr << 4) | self.brk;
         thrbrk.encode(buf)?;
 
         if self.clu > 15 {
-            return Err(insim_core::Error::TooLarge);
+            return Err(insim_core::EncodeError::TooLarge);
         }
 
         if self.han > 15 {
-            return Err(insim_core::Error::TooLarge);
+            return Err(insim_core::EncodeError::TooLarge);
         }
 
         let cluhan = (self.clu << 4) | self.han;
         cluhan.encode(buf)?;
 
         if self.gearsp > 15 {
-            return Err(insim_core::Error::TooLarge);
+            return Err(insim_core::EncodeError::TooLarge);
         }
 
         let gearsp = self.gearsp << 4;
@@ -176,7 +176,7 @@ pub struct Con {
 }
 
 impl Decode for Con {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let reqi = RequestId::decode(buf)?;
         buf.advance(1);
         let spclose = spclose_strip_high_bits(u16::decode(buf)?);
@@ -198,13 +198,13 @@ impl Decode for Con {
 }
 
 impl Encode for Con {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         self.reqi.encode(buf)?;
         buf.put_bytes(0, 1);
         spclose_strip_high_bits(self.spclose.as_game_closing_speed()).encode(buf)?;
         match TryInto::<u16>::try_into(self.time.as_millis() / 10) {
             Ok(time) => time.encode(buf)?,
-            Err(_) => return Err(insim_core::Error::TooLarge),
+            Err(_) => return Err(insim_core::EncodeError::TooLarge),
         }
         self.a.encode(buf)?;
         self.b.encode(buf)?;

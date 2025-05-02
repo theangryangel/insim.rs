@@ -22,7 +22,7 @@ pub struct OsMain {
 }
 
 impl Decode for OsMain {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let angvel = (f32::decode(buf)?, f32::decode(buf)?, f32::decode(buf)?);
         let heading = f32::decode(buf)?;
         let pitch = f32::decode(buf)?;
@@ -43,7 +43,7 @@ impl Decode for OsMain {
 }
 
 impl Encode for OsMain {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         self.angvel.0.encode(buf)?;
         self.angvel.1.encode(buf)?;
         self.angvel.2.encode(buf)?;

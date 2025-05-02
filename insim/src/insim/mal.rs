@@ -66,7 +66,7 @@ impl Mal {
 }
 
 impl Decode for Mal {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let reqi = RequestId::decode(buf)?;
         let mut numm = u8::decode(buf)?;
         let ucid = ConnectionId::decode(buf)?;
@@ -87,10 +87,10 @@ impl Decode for Mal {
 }
 
 impl Encode for Mal {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         self.reqi.encode(buf)?;
         if self.allowed_mods.len() > MAX_MAL_SIZE {
-            return Err(insim_core::Error::TooLarge);
+            return Err(insim_core::EncodeError::TooLarge);
         }
         (self.allowed_mods.len() as u8).encode(buf)?;
         self.ucid.encode(buf)?;

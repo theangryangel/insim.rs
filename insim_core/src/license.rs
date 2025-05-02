@@ -32,20 +32,20 @@ impl std::fmt::Display for License {
 }
 
 impl Decode for License {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
         match u8::decode(buf)? {
             0 => Ok(Self::Demo),
             1 => Ok(Self::S1),
             2 => Ok(Self::S2),
             3 => Ok(Self::S3),
-            other => Err(crate::Error::NoVariantMatch {
+            other => Err(crate::DecodeError::NoVariantMatch {
                 found: other as u64,
             }),
         }
     }
 }
 impl Encode for License {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodeError> {
         (*self as u8).encode(buf)
     }
 }

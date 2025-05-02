@@ -19,7 +19,7 @@ pub enum Fuel200 {
 }
 
 impl Decode for Fuel200 {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let data = u8::decode(buf)?;
 
         if data == 255 {
@@ -31,7 +31,7 @@ impl Decode for Fuel200 {
 }
 
 impl Encode for Fuel200 {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         let data = match self {
             Self::Percentage(data) => *data,
             Self::No => 255_u8,
@@ -55,7 +55,7 @@ pub enum Fuel {
 }
 
 impl Decode for Fuel {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let data = u8::decode(buf)?;
         if data == 255 {
             Ok(Self::No)
@@ -66,7 +66,7 @@ impl Decode for Fuel {
 }
 
 impl Encode for Fuel {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         let data = match self {
             Self::Percentage(data) => *data,
             Self::No => 255_u8,

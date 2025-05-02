@@ -57,7 +57,7 @@ impl Ipb {
 }
 
 impl Decode for Ipb {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let reqi = RequestId::decode(buf)?;
         let mut numb = u8::decode(buf)?;
         buf.advance(4);
@@ -73,11 +73,11 @@ impl Decode for Ipb {
 }
 
 impl Encode for Ipb {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         self.reqi.encode(buf)?;
         let numb = self.banips.len();
         if numb > IPB_MAX_BANS {
-            return Err(insim_core::Error::TooLarge);
+            return Err(insim_core::EncodeError::TooLarge);
         }
         (numb as u8).encode(buf)?;
         buf.put_bytes(0, 4);

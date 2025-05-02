@@ -16,7 +16,7 @@ use std::{
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use insim_core::{point::Point, Ascii, Codepage, Decode, Encode};
+use insim_core::{point::Point, Decode, DecodeString, Encode, EncodeString};
 use thiserror::Error;
 
 #[non_exhaustive]
@@ -27,7 +27,10 @@ pub enum Error {
     IO { kind: ErrorKind, message: String },
 
     #[error("BinRw Err {0:?}")]
-    ReadWriteBuf(#[from] insim_core::Error),
+    ReadWriteBuf(#[from] insim_core::EncodeError),
+
+    #[error("Decode error: {0}")]
+    DecodeError(#[from] insim_core::DecodeError),
 }
 
 impl From<std::io::Error> for Error {
@@ -96,7 +99,7 @@ pub struct Object {
 }
 
 impl Decode for Object {
-    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
         let center = Point::<i32>::decode(buf)?;
         let radius = i32::decode(buf)?;
         let mut num_object_points = i32::decode(buf)?;
@@ -121,7 +124,7 @@ impl Decode for Object {
 }
 
 impl Encode for Object {
-    fn encode(&self, buf: &mut BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut BytesMut) -> Result<(), insim_core::EncodeError> {
         self.center.encode(buf)?;
         self.radius.encode(buf)?;
         (self.points.len() as i32).encode(buf)?;
@@ -169,8 +172,8 @@ pub struct Smx {
 }
 
 impl Decode for Smx {
-    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::Error> {
-        let magic = String::from_ascii_bytes(buf, 6)?;
+    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
+        let magic = String::decode_ascii(buf, 6)?;
         if magic != "LFSSMX" {
             unimplemented!("Not a LFS SMX file");
         }
@@ -181,7 +184,7 @@ impl Decode for Smx {
         let resolution = u8::decode(buf)?;
         let vertex_colours = u8::decode(buf)?;
         buf.advance(4);
-        let track = String::from_codepage_bytes(buf, 32)?;
+        let track = String::decode_codepage(buf, 32)?;
         let ground_colour = Rgb::decode(buf)?;
         buf.advance(9);
         let mut num_objects = i32::decode(buf)?;
@@ -212,7 +215,7 @@ impl Decode for Smx {
 }
 
 impl Encode for Smx {
-    fn encode(&self, buf: &mut BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut BytesMut) -> Result<(), insim_core::EncodeError> {
         buf.extend_from_slice(b"LFSSMX");
         self.game_version.encode(buf)?;
         self.game_revision.encode(buf)?;
@@ -221,7 +224,7 @@ impl Encode for Smx {
         self.resolution.encode(buf)?;
         self.vertex_colours.encode(buf)?;
         buf.put_bytes(0, 4);
-        self.track.to_codepage_bytes(buf, 32, false)?;
+        self.track.encode_codepage(buf, 32, false)?;
         self.ground_colour.encode(buf)?;
         buf.put_bytes(0, 9);
         (self.objects.len() as i32).encode(buf)?;

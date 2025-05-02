@@ -28,7 +28,7 @@ impl<T> Decode for Point<T>
 where
     T: Pointable,
 {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
         let x = T::decode(buf)?;
         let y = T::decode(buf)?;
         let z = T::decode(buf)?;
@@ -40,7 +40,7 @@ impl<T> Encode for Point<T>
 where
     T: Pointable,
 {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodeError> {
         self.x.encode(buf)?;
         self.y.encode(buf)?;
         self.z.encode(buf)?;

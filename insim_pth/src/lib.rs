@@ -24,7 +24,7 @@ use std::{
 };
 
 use bytes::Bytes;
-use insim_core::{point::Point, Ascii, Decode, Encode};
+use insim_core::{point::Point, Decode, Encode};
 use thiserror::Error;
 
 #[non_exhaustive]
@@ -35,7 +35,10 @@ pub enum Error {
     IO { kind: ErrorKind, message: String },
 
     #[error("ReadWriteBuf Err {0:?}")]
-    ReadWriteBuf(#[from] insim_core::Error),
+    ReadWriteBuf(#[from] insim_core::EncodeError),
+
+    #[error("ReadWriteBuf Err {0:?}")]
+    DecodeError(#[from] insim_core::DecodeError),
 }
 
 impl From<std::io::Error> for Error {
@@ -143,9 +146,9 @@ pub struct Pth {
 }
 
 impl Decode for Pth {
-    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::Error> {
-        let magic = String::from_ascii_bytes(buf, 6)?;
-        if magic != "LFSPTH" {
+    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
+        let magic = <[u8; 6]>::decode(buf)?;
+        if &magic != b"LFSPTH" {
             unimplemented!("Not a LFS PTH file");
         }
         let version = u8::decode(buf)?;
@@ -167,12 +170,12 @@ impl Decode for Pth {
 }
 
 impl Encode for Pth {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         buf.extend_from_slice(b"LFSPTH");
         self.version.encode(buf)?;
         self.revision.encode(buf)?;
         if self.nodes.len() > (i32::MAX as usize) {
-            return Err(insim_core::Error::TooLarge);
+            return Err(insim_core::EncodeError::TooLarge);
         }
         (self.nodes.len() as i32).encode(buf)?;
         self.finish_line_node.encode(buf)?;

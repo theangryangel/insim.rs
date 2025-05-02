@@ -1,5 +1,5 @@
 //! Strongly typed Vehicles for both standard and mods
-use crate::{license::License, Decode, Encode, Error};
+use crate::{license::License, Decode, Encode};
 
 /// Handles parsing a vehicle name according to the Insim v9 rules.
 /// See <https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info>
@@ -79,7 +79,7 @@ impl Vehicle {
 }
 
 impl Decode for Vehicle {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
         let mut bytes = buf.split_to(4);
         let is_builtin = bytes[0..=2].iter().all(|c| c.is_ascii_alphanumeric()) && bytes[3] == 0;
 
@@ -105,7 +105,7 @@ impl Decode for Vehicle {
             ([b'X', b'R', b'R', 0], true) => Ok(Vehicle::Xrr),
             ([b'F', b'Z', b'R', 0], true) => Ok(Vehicle::Fzr),
             ([b'B', b'F', b'1', 0], true) => Ok(Vehicle::Bf1),
-            (_, true) => Err(Error::BadMagic {
+            (_, true) => Err(crate::DecodeError::BadMagic {
                 found: Box::new(bytes),
             }),
             (_, false) => Ok(Vehicle::Mod(u32::decode(&mut bytes)?)),
@@ -114,7 +114,7 @@ impl Decode for Vehicle {
 }
 
 impl Encode for Vehicle {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodeError> {
         match self {
             Vehicle::Xfg => buf.extend_from_slice(&[b'X', b'F', b'G', 0]),
             Vehicle::Xrg => buf.extend_from_slice(&[b'X', b'R', b'G', 0]),

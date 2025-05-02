@@ -48,13 +48,13 @@ impl From<u8> for ConnectionId {
 }
 
 impl Decode for ConnectionId {
-    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
         Ok(ConnectionId(buf.get_u8()))
     }
 }
 
 impl Encode for ConnectionId {
-    fn encode(&self, buf: &mut BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut BytesMut) -> Result<(), insim_core::EncodeError> {
         buf.put_u8(self.0);
 
         Ok(())

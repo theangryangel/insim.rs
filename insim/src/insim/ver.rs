@@ -1,5 +1,5 @@
 use bytes::{Buf, BufMut};
-use insim_core::{game_version::GameVersion, Ascii, Codepage, Decode, Encode};
+use insim_core::{game_version::GameVersion, Decode, DecodeString, Encode, EncodeString};
 
 use crate::identifiers::RequestId;
 
@@ -24,11 +24,11 @@ pub struct Ver {
 }
 
 impl Decode for Ver {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let reqi = RequestId::decode(buf)?;
         buf.advance(1);
         let version = GameVersion::decode(buf)?;
-        let product = String::from_ascii_bytes(buf, 6)?;
+        let product = String::decode_ascii(buf, 6)?;
 
         let insimver = buf.get_u8();
 
@@ -44,11 +44,11 @@ impl Decode for Ver {
 }
 
 impl Encode for Ver {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         self.reqi.encode(buf)?;
         buf.put_u8(0);
         self.version.encode(buf)?;
-        self.product.to_codepage_bytes(buf, 6, false)?;
+        self.product.encode_codepage(buf, 6, false)?;
 
         self.insimver.encode(buf)?;
         buf.put_u8(0);

@@ -259,7 +259,7 @@ impl WithRequestId for SmallType {
 }
 
 impl Decode for SmallType {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let discrim = u8::decode(buf)?;
         let uval = u32::decode(buf)?;
         let res = match discrim {
@@ -276,7 +276,7 @@ impl Decode for SmallType {
             10 => Self::Lcl(LclFlags::from_bits_truncate(uval)),
             11 => Self::Aii(PlayerId(uval as u8)),
             found => {
-                return Err(insim_core::Error::NoVariantMatch {
+                return Err(insim_core::DecodeError::NoVariantMatch {
                     found: found as u64,
                 })
             },
@@ -286,7 +286,7 @@ impl Decode for SmallType {
 }
 
 impl Encode for SmallType {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         let (discrim, uval) = match self {
             SmallType::None => (0u8, 0u32),
             SmallType::Ssp(uval) => (1u8, uval.as_millis() as u32 / 10),

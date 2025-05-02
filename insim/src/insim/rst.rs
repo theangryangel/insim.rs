@@ -73,13 +73,13 @@ impl LapTimingInfo {
 }
 
 impl Decode for LapTimingInfo {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         Ok(LapTimingInfo::from_u8(u8::decode(buf)?))
     }
 }
 
 impl Encode for LapTimingInfo {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         self.to_u8().encode(buf)
     }
 }

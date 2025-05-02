@@ -194,7 +194,7 @@ pub struct Plc {
 impl_typical_with_request_id!(Plc);
 
 impl Decode for Plc {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let reqi = RequestId::decode(buf)?;
         buf.advance(1);
         let ucid = ConnectionId::decode(buf)?;
@@ -205,7 +205,7 @@ impl Decode for Plc {
 }
 
 impl Encode for Plc {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         self.reqi.encode(buf)?;
         buf.put_bytes(0, 1);
         self.ucid.encode(buf)?;

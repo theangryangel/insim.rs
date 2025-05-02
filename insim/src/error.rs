@@ -41,7 +41,11 @@ pub enum Error {
 
     /// Placeholder
     #[error("Insim core error. Placeholder")]
-    ReadWriteBuf(#[from] insim_core::Error),
+    ReadWriteBuf(#[from] insim_core::EncodeError),
+
+    /// Decode Error
+    #[error("Decode error: {0}")]
+    DecodeError(#[from] insim_core::DecodeError),
 }
 
 #[cfg(feature = "tokio")]

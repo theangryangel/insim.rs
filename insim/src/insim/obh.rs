@@ -97,7 +97,7 @@ pub struct Obh {
 }
 
 impl Decode for Obh {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let reqi = RequestId::decode(buf)?;
         let plid = PlayerId::decode(buf)?;
         // automatically strip off the first 4 bits as they're reserved
@@ -127,14 +127,14 @@ impl Decode for Obh {
 }
 
 impl Encode for Obh {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         self.reqi.encode(buf)?;
         self.plid.encode(buf)?;
         // automatically strip off the first 4 bits as they're reserved
         spclose_strip_high_bits(self.spclose.as_game_closing_speed()).encode(buf)?;
         match u16::try_from(self.time.as_millis() / 10) {
             Ok(time) => time.encode(buf)?,
-            Err(_) => return Err(insim_core::Error::TooLarge),
+            Err(_) => return Err(insim_core::EncodeError::TooLarge),
         }
         self.c.encode(buf)?;
         self.x.encode(buf)?;

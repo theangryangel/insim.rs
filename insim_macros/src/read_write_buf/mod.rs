@@ -69,10 +69,10 @@ impl Receiver {
         Ok(quote! {
             impl ::insim_core::Decode for #name {
                 /// Read
-                fn decode(buf: &mut ::bytes::Bytes) -> Result<Self, ::insim_core::Error> {
+                fn decode(buf: &mut ::bytes::Bytes) -> Result<Self, ::insim_core::DecodeError> {
                     let val: Self = match #repr_ty::decode(buf)? {
                         #(#from_variants)*
-                        found => return Err(::insim_core::Error::NoVariantMatch { found: found as u64 })
+                        found => return Err(::insim_core::DecodeError::NoVariantMatch { found: found as u64 })
                     };
                     Ok(val)
                 }
@@ -80,7 +80,7 @@ impl Receiver {
 
             impl ::insim_core::Encode for #name {
                 /// Write
-                fn encode(&self, buf: &mut ::bytes::BytesMut) -> Result<(), ::insim_core::Error> {
+                fn encode(&self, buf: &mut ::bytes::BytesMut) -> Result<(), ::insim_core::EncodeError> {
                     let val: #repr_ty = match self {
                         #(#to_variants)*
                     };
@@ -127,7 +127,7 @@ impl Receiver {
         Ok(quote! {
             impl ::insim_core::Decode for #name {
                 /// Read
-                fn decode(buf: &mut ::bytes::Bytes) -> Result<Self, ::insim_core::Error> {
+                fn decode(buf: &mut ::bytes::Bytes) -> Result<Self, ::insim_core::DecodeError> {
                     #(#from_bytes_fields)*
                     Ok(Self {
                         #(#from_bytes_fields_init),*
@@ -137,7 +137,7 @@ impl Receiver {
 
             impl ::insim_core::Encode for #name {
                 /// Write
-                fn encode(&self, buf: &mut ::bytes::BytesMut) -> Result<(), ::insim_core::Error> {
+                fn encode(&self, buf: &mut ::bytes::BytesMut) -> Result<(), ::insim_core::EncodeError> {
                     #(#to_bytes_fields)*
                     Ok(())
                 }

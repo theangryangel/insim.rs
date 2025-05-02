@@ -1,5 +1,5 @@
 use bytes::{Buf, BufMut};
-use insim_core::{string::codepages, Codepage, Decode, Encode};
+use insim_core::{string::codepages, Decode, DecodeString, Encode, EncodeString};
 
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
@@ -50,7 +50,7 @@ pub struct Mso {
 }
 
 impl Decode for Mso {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::Error> {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let reqi = RequestId::decode(buf)?;
         buf.advance(1);
         let ucid = ConnectionId::decode(buf)?;
@@ -61,11 +61,11 @@ impl Decode for Mso {
         let (textstart, msg) = if textstart > 0 {
             let mut name = buf.split_to(textstart as usize);
             let name_len = name.len();
-            let name = String::from_codepage_bytes(&mut name, name_len)?;
-            let msg = String::from_codepage_bytes(buf, buf.len())?;
+            let name = String::decode_codepage(&mut name, name_len)?;
+            let msg = String::decode_codepage(buf, buf.len())?;
             (name.len() as u8, format!("{name}{msg}"))
         } else {
-            (0_u8, String::from_codepage_bytes(buf, buf.len())?)
+            (0_u8, String::decode_codepage(buf, buf.len())?)
         };
 
         Ok(Self {
@@ -80,7 +80,7 @@ impl Decode for Mso {
 }
 
 impl Encode for Mso {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::Error> {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         self.reqi.encode(buf)?;
         buf.put_bytes(0, 1);
         self.ucid.encode(buf)?;
@@ -95,7 +95,7 @@ impl Encode for Mso {
             let msg = codepages::to_lossy_bytes(msg);
 
             if (name.len() + msg.len()) > (MSO_MSG_MAX_LEN - 1) {
-                return Err(insim_core::Error::TooLarge);
+                return Err(insim_core::EncodeError::TooLarge);
             }
 
             let textstart = name.len() as u8;
@@ -121,7 +121,7 @@ impl Encode for Mso {
         } else {
             buf.put_u8(0);
             self.msg
-                .to_codepage_bytes_aligned(buf, MSO_MSG_MAX_LEN, MSO_MSG_ALIGN, true)?;
+                .encode_codepage_with_alignment(buf, MSO_MSG_MAX_LEN, MSO_MSG_ALIGN, true)?;
         }
 
         Ok(())
