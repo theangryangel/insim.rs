@@ -2,7 +2,7 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 use insim_core::{Decode, Encode};
 
 use super::mode::Mode;
-use crate::{packet::Packet, result::Result};
+use crate::{packet::Packet, result::Result, Error};
 
 /// Handles the encoding and decoding of Insim packets to and from raw bytes.
 /// It automatically handles the encoding of the total size of the packet, and the packet
@@ -58,14 +58,24 @@ impl Codec {
             },
         };
 
-        let mut data = src.split_to(n);
+        let mut data = src.split_to(n).freeze();
+        // cloning Bytes is cheap:
+        // Bytes values facilitate zero-copy network programming by allowing multiple Bytes objects to point to the same underlying memory.
+        let original = data.clone();
 
         // skip over the size field now that we know we have a full packet
         // none of the packet definitions include the size
         data.advance(1);
 
-        let packet = Packet::decode(&mut data.freeze())?;
+        let packet = Packet::decode(&mut data)?;
         tracing::trace!("Decoded packet={:?}", packet);
+        if data.remaining() > 0 {
+            return Err(Error::CodecIncompleteDecode {
+                input: original,
+                decoded: packet,
+                remaining: data,
+            });
+        }
         Ok(Some(packet))
     }
 }

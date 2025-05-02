@@ -1,3 +1,7 @@
+use bytes::Bytes;
+
+use crate::Packet;
+
 #[non_exhaustive]
 #[derive(thiserror::Error, Debug)]
 /// The Errors that may occur during an Insim connection.
@@ -46,6 +50,19 @@ pub enum Error {
     /// Decode Error
     #[error("Decode error: {0}")]
     DecodeError(#[from] insim_core::DecodeError),
+
+    /// Partial decode
+    #[error("partial decode. likely invalid packet definition. decoded {:?}, remaining {:?}", input.as_ref(), remaining.as_ref())]
+    CodecIncompleteDecode {
+        /// original input
+        input: Bytes,
+
+        /// decoded
+        decoded: Packet,
+
+        /// remaining
+        remaining: Bytes,
+    },
 }
 
 #[cfg(feature = "tokio")]

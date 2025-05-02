@@ -4,7 +4,7 @@ use std::{io::Write, net::SocketAddr, time::Duration};
 
 use clap::{Parser, Subcommand};
 use if_chain::if_chain;
-use insim::{insim::TinyType, relay::Hlr, Packet, Result};
+use insim::{insim::TinyType, relay::Hlr, Packet, Result, WithRequestId};
 use tabled::{Table, Tabled};
 
 #[derive(Tabled)]
@@ -117,9 +117,11 @@ pub fn main() -> Result<()> {
 
     // set our IsiFlags
     builder = builder
+        .isi_flag_mso_cols(true)
         .isi_flag_mci(true)
         .isi_flag_con(true)
-        .isi_flag_obh(true);
+        .isi_flag_obh(true)
+        .isi_flag_hlv(true);
 
     if let Some(interval) = &cli.isi_interval {
         builder = builder.isi_interval(Duration::from_secs((*interval).into()));
@@ -136,9 +138,9 @@ pub fn main() -> Result<()> {
     {
         connection.write(Hlr::default())?;
     } else {
-        connection.write(TinyType::Rst)?;
-        connection.write(TinyType::Ncn)?;
-        connection.write(TinyType::Npl)?;
+        connection.write(TinyType::Rst.with_request_id(2))?;
+        connection.write(TinyType::Ncn.with_request_id(3))?;
+        connection.write(TinyType::Npl.with_request_id(4))?;
     }
 
     let mut i: usize = 0;

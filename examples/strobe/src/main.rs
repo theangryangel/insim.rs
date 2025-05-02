@@ -6,7 +6,7 @@ use clap::Parser;
 use insim::{
     identifiers::{PlayerId, RequestId},
     insim::{LclFlags, Tiny, TinyType},
-    Packet, Result,
+    Packet, Result, WithRequestId,
 };
 use tokio::time::interval;
 
@@ -16,6 +16,9 @@ use tokio::time::interval;
 struct Cli {
     /// host:port of LFS to connect to
     addr: SocketAddr,
+
+    /// interval
+    interval: Option<u64>,
 }
 
 struct ReversibleSequence<T> {
@@ -63,22 +66,19 @@ pub async fn main() -> Result<()> {
     let mut builder = insim::tcp(cli.addr);
 
     // set our IsiFlags
-    builder = builder.isi_flag_local(true);
+    builder = builder
+        .isi_flag_local(true)
+        .isi_iname(Some("strobe.insim.rs".to_string()));
 
     // Establish a connection
     let mut connection = builder.connect_async().await?;
     tracing::info!("Connected!");
 
-    connection
-        .write(Tiny {
-            subt: TinyType::Npl,
-            reqi: RequestId(1),
-        })
-        .await?;
+    connection.write(TinyType::Npl.with_request_id(1)).await?;
 
     let mut plid: Option<PlayerId> = None;
 
-    let mut interval = interval(Duration::from_millis(250));
+    let mut interval = interval(Duration::from_millis(cli.interval.unwrap_or(250)));
 
     let mut sequence = ReversibleSequence::new(vec![
         LclFlags::SIGNAL_LEFT
