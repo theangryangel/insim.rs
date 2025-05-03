@@ -1,7 +1,7 @@
 use super::ObjectInfo;
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
-#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]
@@ -21,7 +21,7 @@ pub enum JrrAction {
     ResetNoRepair = 5,
 }
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Join Request Reply
 /// Set the ISF_REQ_JOIN flag in the IS_ISI to receive join requests

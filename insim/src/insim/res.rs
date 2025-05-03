@@ -5,7 +5,7 @@ use insim_core::vehicle::Vehicle;
 use super::{PlayerFlags, RaceConfirmFlags};
 use crate::identifiers::{PlayerId, RequestId};
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Race Result - qualifying or confirmed result
 pub struct Res {

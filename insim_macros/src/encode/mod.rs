@@ -30,7 +30,76 @@ impl Receiver {
         }
     }
 
-    fn parse_enum(&self, variants: &[Variant]) -> Result<proc_macro2::TokenStream, darling::Error> {
+    fn encode_enum(&self, variants: &[Variant]) -> Result<proc_macro2::TokenStream, darling::Error> {
+        let name = &self.ident;
+        let repr_ty = &self
+            .repr_type()
+            .expect("ReadWriteBuf requires a repr type of u8..u64");
+
+        let to_variants = variants.iter().filter_map(|f| {
+            if f.skip() {
+                return None;
+            }
+
+            let variant_name = &f.ident;
+            let discrim = f
+                .discriminant
+                .as_ref()
+                .expect("ReadWriteBuf only works with discriminants");
+
+            Some(quote! {
+                Self::#variant_name => #discrim,
+            })
+        });
+
+        Ok(quote! {
+            impl ::insim_core::Encode for #name {
+                /// Write
+                fn encode(&self, buf: &mut ::bytes::BytesMut) -> Result<(), ::insim_core::EncodeError> {
+                    let val: #repr_ty = match self {
+                        #(#to_variants)*
+                    };
+                    val.encode(buf)?;
+                    Ok(())
+                }
+            }
+        })
+    }
+
+    fn encode_struct(
+        &self,
+        fields: &darling::ast::Fields<Field>,
+    ) -> Result<proc_macro2::TokenStream, darling::Error> {
+        let name = &self.ident;
+
+        let to_bytes_fields = fields.iter().filter_map(|f| {
+            if f.skip() {
+                None
+            } else {
+                Some(f.encode())
+            }
+        });
+
+
+        Ok(quote! {
+            impl ::insim_core::Encode for #name {
+                /// Write
+                fn encode(&self, buf: &mut ::bytes::BytesMut) -> Result<(), ::insim_core::EncodeError> {
+                    #(#to_bytes_fields)*
+                    Ok(())
+                }
+            }
+        })
+    }
+
+    pub fn encode(&self) -> Result<proc_macro2::TokenStream, darling::Error> {
+        match &self.data {
+            darling::ast::Data::Enum(items) => self.encode_enum(items),
+            darling::ast::Data::Struct(fields) => self.encode_struct(fields),
+        }
+    }
+
+    fn decode_enum(&self, variants: &[Variant]) -> Result<proc_macro2::TokenStream, darling::Error> {
         let name = &self.ident;
         let repr_ty = &self
             .repr_type()
@@ -50,22 +119,6 @@ impl Receiver {
             })
         });
 
-        let to_variants = variants.iter().filter_map(|f| {
-            if f.skip() {
-                return None;
-            }
-
-            let variant_name = &f.ident;
-            let discrim = f
-                .discriminant
-                .as_ref()
-                .expect("ReadWriteBuf only works with discriminants");
-
-            Some(quote! {
-                Self::#variant_name => #discrim,
-            })
-        });
-
         Ok(quote! {
             impl ::insim_core::Decode for #name {
                 /// Read
@@ -77,39 +130,20 @@ impl Receiver {
                     Ok(val)
                 }
             }
-
-            impl ::insim_core::Encode for #name {
-                /// Write
-                fn encode(&self, buf: &mut ::bytes::BytesMut) -> Result<(), ::insim_core::EncodeError> {
-                    let val: #repr_ty = match self {
-                        #(#to_variants)*
-                    };
-                    val.encode(buf)?;
-                    Ok(())
-                }
-            }
         })
     }
 
-    fn parse_struct(
+    fn decode_struct(
         &self,
         fields: &darling::ast::Fields<Field>,
     ) -> Result<proc_macro2::TokenStream, darling::Error> {
         let name = &self.ident;
 
-        let to_bytes_fields = fields.iter().filter_map(|f| {
-            if f.skip() {
-                None
-            } else {
-                Some(f.impl_write_buf())
-            }
-        });
-
         let from_bytes_fields = fields.iter().filter_map(|f| {
             if f.skip() {
                 None
             } else {
-                Some(f.impl_read_buf())
+                Some(f.decode())
             }
         });
 
@@ -134,21 +168,13 @@ impl Receiver {
                     })
                 }
             }
-
-            impl ::insim_core::Encode for #name {
-                /// Write
-                fn encode(&self, buf: &mut ::bytes::BytesMut) -> Result<(), ::insim_core::EncodeError> {
-                    #(#to_bytes_fields)*
-                    Ok(())
-                }
-            }
         })
     }
 
-    pub fn parse(&self) -> Result<proc_macro2::TokenStream, darling::Error> {
+    pub fn decode(&self) -> Result<proc_macro2::TokenStream, darling::Error> {
         match &self.data {
-            darling::ast::Data::Enum(items) => self.parse_enum(items),
-            darling::ast::Data::Struct(fields) => self.parse_struct(fields),
+            darling::ast::Data::Enum(items) => self.decode_enum(items),
+            darling::ast::Data::Struct(fields) => self.decode_struct(fields),
         }
     }
 }

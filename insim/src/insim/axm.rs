@@ -6,7 +6,7 @@ use crate::identifiers::{ConnectionId, RequestId};
 const AXM_MAX_OBJECTS: usize = 60;
 
 /// Used within the [Axm] packet.
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ObjectInfo {
     /// X coordinate of object
@@ -27,7 +27,7 @@ pub struct ObjectInfo {
 }
 
 /// Actions that can be taken as part of [Axm].
-#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]

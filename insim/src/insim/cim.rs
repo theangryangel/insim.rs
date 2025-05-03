@@ -97,7 +97,7 @@ impl Encode for CimMode {
 }
 
 #[repr(u8)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 /// CimMode::Normal, submode
@@ -138,7 +138,7 @@ impl From<u8> for CimSubModeNormal {
 }
 
 #[repr(u8)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 /// CimMode::Garage, submode
@@ -198,7 +198,7 @@ impl From<u8> for CimSubModeGarage {
 }
 
 #[repr(u8)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 /// CimMode::ShiftU, submode
@@ -224,7 +224,7 @@ impl From<u8> for CimSubModeShiftU {
     }
 }
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Connection Interface Mode
 pub struct Cim {

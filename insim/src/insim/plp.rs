@@ -1,6 +1,6 @@
 use crate::identifiers::{PlayerId, RequestId};
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Player Tele-pits (shift+P in game)
 pub struct Plp {

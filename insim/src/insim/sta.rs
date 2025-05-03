@@ -4,7 +4,7 @@ use insim_core::{track::Track, wind::Wind};
 use super::{CameraView, RaceLaps};
 use crate::identifiers::{PlayerId, RequestId};
 
-#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]
@@ -92,7 +92,7 @@ generate_bitflag_helpers! {
 
 impl_bitflags_from_to_bytes!(StaFlags, u16);
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// State
 pub struct Sta {

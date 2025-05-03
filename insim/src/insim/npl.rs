@@ -4,7 +4,7 @@ use insim_core::vehicle::Vehicle;
 use super::Fuel;
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
-#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]
@@ -158,7 +158,7 @@ bitflags! {
 
 impl_bitflags_from_to_bytes!(Passengers, u8);
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Sent when a New Player joins.
 pub struct Npl {

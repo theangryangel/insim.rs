@@ -1,7 +1,7 @@
 use crate::identifiers::RequestId;
 
 /// Enum for the sound field of [Msl].
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]
@@ -23,7 +23,7 @@ pub enum SoundType {
     Error = 4,
 }
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Send a message to the local computer only. If you are connected to a server this means the
 /// console. If you are connected to a client this means to the local client only.

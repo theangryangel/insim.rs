@@ -61,7 +61,7 @@ impl Field {
         self.skip.unwrap_or(false)
     }
 
-    pub(super) fn impl_read_buf(&self) -> proc_macro2::TokenStream {
+    pub(super) fn decode(&self) -> proc_macro2::TokenStream {
         let f = self;
         let field_name = f.ident.as_ref().unwrap();
         let pad_after = f.pad_after.unwrap_or(0);
@@ -137,7 +137,7 @@ impl Field {
         tokens
     }
 
-    pub(super) fn impl_write_buf(&self) -> proc_macro2::TokenStream {
+    pub(super) fn encode(&self) -> proc_macro2::TokenStream {
         let f = self;
         let field_name = f.ident.as_ref().unwrap();
         let pad_after = f.pad_after.unwrap_or(0);

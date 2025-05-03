@@ -1,7 +1,7 @@
 use crate::identifiers::RequestId;
 
 /// Send a Sel to the relay in order to start receiving information about the selected host.
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Sel {
     /// If Non-zero LFS World relay will reply with a [crate::Packet::Ver]

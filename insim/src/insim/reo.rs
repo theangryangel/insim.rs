@@ -17,7 +17,7 @@ where
     ser_tuple.end()
 }
 
-#[derive(Debug, Clone, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Reorder the players
 pub struct Reo {

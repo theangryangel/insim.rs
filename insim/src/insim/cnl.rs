@@ -1,6 +1,6 @@
 use crate::identifiers::{ConnectionId, RequestId};
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]
@@ -38,7 +38,7 @@ pub enum CnlReason {
     Hack = 9,
 }
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Connection Leave
 pub struct Cnl {

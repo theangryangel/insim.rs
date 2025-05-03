@@ -119,7 +119,7 @@ bitflags! {
 
 impl_bitflags_from_to_bytes!(AiShowLights, u32);
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// AI Info
 pub struct Aii {

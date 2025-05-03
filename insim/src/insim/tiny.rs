@@ -1,6 +1,6 @@
 use crate::{identifiers::RequestId, Packet, WithRequestId};
 
-#[derive(Debug, Default, Clone, Eq, PartialEq, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]
@@ -116,7 +116,7 @@ impl WithRequestId for TinyType {
     }
 }
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// General purpose Tiny packet
 pub struct Tiny {

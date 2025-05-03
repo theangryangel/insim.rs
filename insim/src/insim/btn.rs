@@ -76,7 +76,7 @@ bitflags::bitflags! {
 
 impl_bitflags_from_to_bytes!(BtnClickFlags, u8);
 
-#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]
@@ -96,7 +96,7 @@ pub enum BfnType {
     BtnRequest = 3,
 }
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Button Function
 pub struct Bfn {
@@ -121,7 +121,7 @@ pub struct Bfn {
 
 impl_typical_with_request_id!(Bfn);
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Button - Instructional to create a button
 pub struct Btn {
@@ -162,7 +162,7 @@ pub struct Btn {
 
 impl_typical_with_request_id!(Btn);
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Button Click - Sent back when a user clicks a button
 pub struct Btc {
@@ -181,7 +181,7 @@ pub struct Btc {
     pub cflags: BtnClickFlags,
 }
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Button Type - Sent back when a user types into a text entry "button"
 pub struct Btt {

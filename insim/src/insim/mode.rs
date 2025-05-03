@@ -1,6 +1,6 @@
 use crate::identifiers::RequestId;
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Screen Mode (referred to as originally IS_MOD within Insim.txt)
 pub struct Mod {

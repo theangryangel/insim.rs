@@ -4,7 +4,7 @@ use insim_core::license::License;
 
 use crate::identifiers::{ConnectionId, RequestId};
 
-#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[allow(missing_docs)]
@@ -50,7 +50,7 @@ pub enum Language {
     Romanian = 36,
 }
 
-#[derive(Debug, Clone, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Extra information about the new connection. This is only sent when connected to a game server,
 /// and only if an administrative password has been set and used by Insim.

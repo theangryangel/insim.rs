@@ -2,7 +2,7 @@ use crate::identifiers::{ConnectionId, RequestId};
 
 /// Enum for the result field of [Acr].
 #[repr(u8)]
-#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 pub enum AcrResult {
@@ -18,7 +18,7 @@ pub enum AcrResult {
 }
 
 /// Admin Command Report: A user typed an admin command - variable size
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Acr {
     /// Non-zero if the packet is a packet request or a reply to a request

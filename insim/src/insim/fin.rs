@@ -65,7 +65,7 @@ impl RaceConfirmFlags {
     }
 }
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Provisional finish notification: This is not a final result, you should use the [Res](super::Res) packet for this instead.
 pub struct Fin {

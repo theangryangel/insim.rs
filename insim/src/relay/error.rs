@@ -1,7 +1,7 @@
 use crate::identifiers::RequestId;
 
 /// Enum of possible errors  that the Insim Relay can respond with.
-#[derive(Debug, Clone, Default, Copy, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, Copy, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 pub enum RelayErrorKind {
@@ -29,7 +29,7 @@ pub enum RelayErrorKind {
 }
 
 /// The relay will send this packet when it encounters an error.
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Error {
     /// Non-zero if the packet is a packet request or a reply to a request

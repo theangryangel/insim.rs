@@ -1,6 +1,6 @@
 use crate::identifiers::{ConnectionId, RequestId};
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Connection Player Renamed indicates that a player has changed their name or number plate.
 pub struct Cpr {

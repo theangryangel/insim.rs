@@ -2,7 +2,7 @@ use insim_core::{Decode, Encode};
 
 use crate::identifiers::{PlayerId, RequestId};
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Information about a specific vehicle/player. Used within [Nlp].
 pub struct NodeLapInfo {

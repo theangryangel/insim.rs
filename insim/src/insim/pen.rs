@@ -1,7 +1,7 @@
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(
-    PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default, insim_macros::ReadWriteBuf,
+    PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default, insim_core::Decode, insim_core::Encode,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
@@ -31,7 +31,7 @@ pub enum PenaltyInfo {
     Seconds45 = 6,
 }
 
-#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 /// Enum of reasons for a penalty being applied to a player
@@ -59,7 +59,7 @@ pub enum PenaltyReason {
     StopLate = 6,
 }
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Penalty received or cleared by player
 pub struct Pen {

@@ -1,7 +1,7 @@
 use crate::identifiers::{ConnectionId, RequestId};
 
 /// Enum for the action field of [Vtn].
-#[derive(Default, Debug, Clone, Eq, PartialEq, insim_macros::ReadWriteBuf)]
+#[derive(Default, Debug, Clone, Eq, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]
@@ -66,7 +66,7 @@ impl From<&VtnAction> for u32 {
     }
 }
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Vote Notification
 pub struct Vtn {

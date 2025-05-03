@@ -42,7 +42,7 @@ impl From<std::io::Error> for Error {
     }
 }
 
-#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 /// Red Green Blue
 pub struct Rgb {
     /// Red
@@ -53,7 +53,7 @@ pub struct Rgb {
     pub b: u8,
 }
 
-#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 /// RGB with alpha channel
 pub struct Argb {
     /// Alpha
@@ -62,7 +62,7 @@ pub struct Argb {
     pub rgb: Rgb,
 }
 
-#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 /// An Object at a given point with a colour
 pub struct ObjectPoint {
     /// Position/point
@@ -71,7 +71,7 @@ pub struct ObjectPoint {
     pub colour: Argb,
 }
 
-#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 /// Triangle block
 pub struct Triangle {
     /// Vertex A

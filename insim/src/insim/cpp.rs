@@ -5,7 +5,7 @@ use insim_core::point::Point;
 use super::{CameraView, StaFlags};
 use crate::identifiers::{PlayerId, RequestId};
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Camera Position Pack reports the current camera position and state. This packet may also be
 /// sent to control the camera.

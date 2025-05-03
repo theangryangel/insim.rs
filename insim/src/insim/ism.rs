@@ -1,6 +1,6 @@
 use crate::identifiers::RequestId;
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Insim Multiplayer - LFS sends this when a host is started or joined
 pub struct Ism {

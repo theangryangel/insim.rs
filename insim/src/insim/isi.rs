@@ -60,7 +60,7 @@ impl From<IsiFlags> for Isi {
 
 impl_bitflags_from_to_bytes!(IsiFlags, u16);
 
-#[derive(Debug, Clone, Eq, PartialEq, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Eq, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Insim Init, or handshake packet.
 /// Required to be sent to the server before any other packets.

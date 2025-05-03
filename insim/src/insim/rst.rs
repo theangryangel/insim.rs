@@ -84,7 +84,7 @@ impl Encode for LapTimingInfo {
     }
 }
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Race Start - informational - sent when a race starts
 pub struct Rst {

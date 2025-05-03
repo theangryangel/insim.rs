@@ -2,7 +2,7 @@ use insim_core::vehicle::Vehicle;
 
 use crate::identifiers::{ConnectionId, RequestId};
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// User Selected Car - sent when a connection selects a car (empty if no car)
 pub struct Slc {

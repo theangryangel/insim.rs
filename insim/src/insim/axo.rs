@@ -1,7 +1,7 @@
 use crate::identifiers::{PlayerId, RequestId};
 
 /// AutoX Object Contact - if an autocross object is hit (2 second time penalty) this packet is sent
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Axo {
     /// Non-zero if the packet is a packet request or a reply to a RequestId

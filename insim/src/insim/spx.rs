@@ -3,7 +3,7 @@ use std::time::Duration;
 use super::{Fuel200, PenaltyInfo};
 use crate::identifiers::{PlayerId, RequestId};
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Split X timing
 pub struct Spx {

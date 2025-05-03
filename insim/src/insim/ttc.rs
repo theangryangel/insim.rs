@@ -3,7 +3,7 @@ use crate::{
     Packet, WithRequestId,
 };
 
-#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]
@@ -20,7 +20,7 @@ pub enum TtcType {
     SelStop = 3,
 }
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// General purpose Target To Connection packet
 /// b1..b3 may be used in various ways, depending on the subtype

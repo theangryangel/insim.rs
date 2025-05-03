@@ -1,7 +1,7 @@
 use super::SoundType;
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Message to Connection - Send a message to a specific connection, restricted to hosts only
 pub struct Mtc {

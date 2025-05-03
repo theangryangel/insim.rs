@@ -3,7 +3,7 @@ use std::time::Duration;
 use super::CarContact;
 use crate::identifiers::{PlayerId, RequestId};
 
-#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]
@@ -17,7 +17,7 @@ pub enum CscAction {
     Start = 1,
 }
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Car State Changed - reports a change in a car's state (currently start or stop)
 pub struct Csc {

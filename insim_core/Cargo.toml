@@ -21,6 +21,7 @@ doctest = false
 bytes = { workspace = true }
 encoding_rs = { workspace = true }
 if_chain = { workspace = true }
+insim_macros = { path = "../insim_macros", version = "3.0.0-unreleased" }
 itertools = { workspace = true }
 serde = { workspace = true, features = ["derive"], optional = true }
 thiserror = { workspace = true }

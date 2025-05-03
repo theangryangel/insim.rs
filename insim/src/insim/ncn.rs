@@ -17,7 +17,7 @@ generate_bitflag_helpers! {
 
 impl_bitflags_from_to_bytes!(NcnFlags, u8);
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// New Connection
 pub struct Ncn {

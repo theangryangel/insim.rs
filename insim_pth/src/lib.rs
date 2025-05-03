@@ -51,7 +51,7 @@ impl From<std::io::Error> for Error {
 }
 
 /// Describes the Left and Right limit, of a given node.
-#[derive(Debug, Copy, Clone, Default, PartialEq, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Copy, Clone, Default, PartialEq, insim_core::Decode, insim_core::Encode)]
 pub struct Limit {
     /// Left track limit
     pub left: f32,
@@ -61,7 +61,7 @@ pub struct Limit {
 }
 
 /// Node / or point on a track
-#[derive(Debug, Copy, Clone, Default, PartialEq, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Copy, Clone, Default, PartialEq, insim_core::Decode, insim_core::Encode)]
 pub struct Node {
     /// Center point of this node
     pub center: Point<i32>,

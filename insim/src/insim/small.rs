@@ -308,7 +308,7 @@ impl Encode for SmallType {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// General purpose Small packet
 pub struct Small {

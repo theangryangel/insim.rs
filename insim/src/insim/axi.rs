@@ -4,7 +4,7 @@ use crate::identifiers::RequestId;
 // You can request information about the current layout with this IS_TINY:
 // reqi: non-zero (returned in the reply)
 // subtype: TINY_AXI (AutoX Info)
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Axi {
     /// Non-zero if the packet is a packet request or a reply to a request

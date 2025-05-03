@@ -36,7 +36,7 @@ generate_bitflag_helpers!(HostInfoFlags,
 impl_bitflags_from_to_bytes!(HostInfoFlags, u8);
 
 /// Information about a host. Used within the [Hos] packet.
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct HostInfo {
     #[read_write_buf(codepage(length = 32))]

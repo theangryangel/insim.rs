@@ -3,7 +3,7 @@ use std::time::Duration;
 use super::{CarContact, ObjectInfo};
 use crate::identifiers::{PlayerId, RequestId};
 
-#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]
@@ -23,7 +23,7 @@ pub enum UcoAction {
     CpRev = 3,
 }
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// User Control Object - reports crossing an InSim checkpoint / entering an InSim circle (from layout)
 pub struct Uco {

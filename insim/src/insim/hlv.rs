@@ -3,7 +3,7 @@ use std::time::Duration;
 use super::CarContact;
 use crate::identifiers::{PlayerId, RequestId};
 
-#[derive(Debug, Default, Clone, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]
@@ -23,7 +23,7 @@ pub enum Hlvc {
     OutOfBounds = 5,
 }
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Reports incidents that would violate Hot Lap Validity checks.
 pub struct Hlv {

@@ -4,7 +4,7 @@ use insim_core::{string::codepages, Decode, DecodeString, Encode, EncodeString};
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 /// Enum for the sound field of [Mso].
-#[derive(Debug, Default, Clone, Eq, PartialEq, PartialOrd, Ord, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, PartialOrd, Ord, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]

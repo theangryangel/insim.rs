@@ -51,7 +51,7 @@ bitflags! {
 
 impl_bitflags_from_to_bytes!(PitStopWorkFlags, u32);
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Pit stop (stop at the garage, not "tele-pit")
 pub struct Pit {
@@ -85,7 +85,7 @@ pub struct Pit {
     pub work: PitStopWorkFlags,
 }
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Pit Stop Finished
 pub struct Psf {
@@ -100,7 +100,7 @@ pub struct Psf {
     pub stime: Duration,
 }
 
-#[derive(Debug, Default, PartialEq, Eq, Clone, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Default, PartialEq, Eq, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]
@@ -123,7 +123,7 @@ pub enum PitLaneFact {
     Sg = 4,
 }
 
-#[derive(Debug, Clone, Default, insim_macros::ReadWriteBuf)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// PitLane
 pub struct Pla {
