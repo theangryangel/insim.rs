@@ -86,11 +86,11 @@ pub struct Lap {
     /// Unique player ID
     pub plid: PlayerId,
 
-    #[read_write_buf(duration(milliseconds = u32))]
+    #[insim(duration(milliseconds = u32))]
     /// Lap time
     pub ltime: Duration, // lap time (ms)
 
-    #[read_write_buf(duration(milliseconds = u32))]
+    #[insim(duration(milliseconds = u32))]
     /// Total elapsed time
     pub etime: Duration,
 
@@ -98,7 +98,7 @@ pub struct Lap {
     pub lapsdone: u16,
 
     /// See [PlayerFlags].
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub flags: PlayerFlags,
 
     /// Current penalty

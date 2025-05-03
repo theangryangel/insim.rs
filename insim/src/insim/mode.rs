@@ -4,7 +4,7 @@ use crate::identifiers::RequestId;
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Screen Mode (referred to as originally IS_MOD within Insim.txt)
 pub struct Mod {
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 

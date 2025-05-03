@@ -13,11 +13,11 @@ pub struct Spx {
     /// Unique player id for this the split timing
     pub plid: PlayerId,
 
-    #[read_write_buf(duration(milliseconds = u32))]
+    #[insim(duration(milliseconds = u32))]
     /// Split duration
     pub stime: Duration,
 
-    #[read_write_buf(duration(milliseconds = u32))]
+    #[insim(duration(milliseconds = u32))]
     /// Total elapsed time
     pub etime: Duration,
 

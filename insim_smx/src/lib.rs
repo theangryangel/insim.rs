@@ -78,7 +78,7 @@ pub struct Triangle {
     pub a: u16,
     /// Vertex B
     pub b: u16,
-    #[read_write_buf(pad_after = 2)]
+    #[insim(pad_after = 2)]
     /// Vertex C
     pub c: u16,
 }

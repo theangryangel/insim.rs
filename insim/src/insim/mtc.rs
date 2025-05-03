@@ -15,11 +15,11 @@ pub struct Mtc {
     pub ucid: ConnectionId,
 
     /// Unique player id
-    #[read_write_buf(pad_after = 2)]
+    #[insim(pad_after = 2)]
     pub plid: PlayerId,
 
     /// Message
-    #[read_write_buf(codepage(length = 128, align_to = 4, trailing_nul = true))]
+    #[insim(codepage(length = 128, align_to = 4, trailing_nul = true))]
     pub text: String,
 }
 

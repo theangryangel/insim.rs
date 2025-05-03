@@ -5,11 +5,11 @@ use crate::identifiers::RequestId;
 /// Extended Message (like [Mst](super::Mst), but longer)
 pub struct Msx {
     /// Non-zero if the packet is a packet request or a reply to a request
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
     /// Message
-    #[read_write_buf(codepage(length = 96, trailing_nul = true))]
+    #[insim(codepage(length = 96, trailing_nul = true))]
     pub msg: String,
 }
 

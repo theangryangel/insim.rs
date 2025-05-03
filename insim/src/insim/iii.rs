@@ -4,7 +4,7 @@ use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// InsIm Info -  a /i message from user to hosts Insim
 pub struct Iii {
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
@@ -12,11 +12,11 @@ pub struct Iii {
     pub ucid: ConnectionId,
 
     /// Unique player iD that the message was received from
-    #[read_write_buf(pad_after = 2)]
+    #[insim(pad_after = 2)]
     pub plid: PlayerId,
 
     /// The message
-    #[read_write_buf(codepage(length = 64, align_to = 4, trailing_nul = true))]
+    #[insim(codepage(length = 64, align_to = 4, trailing_nul = true))]
     pub msg: String,
 }
 

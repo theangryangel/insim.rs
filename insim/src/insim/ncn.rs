@@ -28,10 +28,10 @@ pub struct Ncn {
     pub ucid: ConnectionId,
 
     /// LFS.net username.
-    #[read_write_buf(codepage(length = 24))]
+    #[insim(codepage(length = 24))]
     pub uname: String,
 
-    #[read_write_buf(codepage(length = 24))]
+    #[insim(codepage(length = 24))]
     /// Player Name.
     pub pname: String,
 
@@ -41,7 +41,7 @@ pub struct Ncn {
     /// Total number of connections now this player has joined, plus host
     pub total: u8,
 
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     /// Flags describing additional facts about this connection
     pub flags: NcnFlags,
 }

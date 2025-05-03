@@ -52,7 +52,7 @@ pub struct Cnl {
     pub reason: CnlReason,
 
     /// Number of remaining connections including host
-    #[read_write_buf(pad_after = 2)]
+    #[insim(pad_after = 2)]
     pub total: u8,
 }
 

@@ -8,7 +8,7 @@ use crate::identifiers::RequestId;
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Axi {
     /// Non-zero if the packet is a packet request or a reply to a request
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
     /// Autocross start position
@@ -21,7 +21,7 @@ pub struct Axi {
     pub numo: u16,
 
     /// The name of the layout last loaded (if loaded locally)
-    #[read_write_buf(codepage(length = 32))]
+    #[insim(codepage(length = 32))]
     pub lname: String,
 }
 

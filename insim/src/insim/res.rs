@@ -15,26 +15,26 @@ pub struct Res {
     /// The unique player ID that this race result is for
     pub plid: PlayerId,
 
-    #[read_write_buf(codepage(length = 24))]
+    #[insim(codepage(length = 24))]
     /// The LFS.net username of the player
     pub uname: String,
 
-    #[read_write_buf(codepage(length = 24))]
+    #[insim(codepage(length = 24))]
     /// The name of the player
     pub pname: String,
 
-    #[read_write_buf(codepage(length = 8))]
+    #[insim(codepage(length = 8))]
     /// The number plate of the player
     pub plate: String,
 
     /// The vehicle they finished in
     pub cname: Vehicle,
 
-    #[read_write_buf(duration(milliseconds = u32))]
+    #[insim(duration(milliseconds = u32))]
     /// The total time
     pub ttime: Duration,
 
-    #[read_write_buf(duration(milliseconds = u32), pad_after = 1)]
+    #[insim(duration(milliseconds = u32), pad_after = 1)]
     /// The best lap time
     pub btime: Duration,
 
@@ -42,7 +42,7 @@ pub struct Res {
     pub numstops: u8,
 
     /// The result flags. Where they DNF?
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub confirm: RaceConfirmFlags,
 
     /// The number of laps done

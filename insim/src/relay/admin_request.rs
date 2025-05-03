@@ -6,6 +6,6 @@ use crate::identifiers::RequestId;
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Arq {
     /// Non-zero if the packet is a packet request or a reply to a request
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub reqi: RequestId,
 }

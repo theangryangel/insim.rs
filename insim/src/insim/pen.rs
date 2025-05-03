@@ -1,7 +1,17 @@
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(
-    PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default, insim_core::Decode, insim_core::Encode,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    insim_core::Decode,
+    insim_core::Encode,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
@@ -76,7 +86,7 @@ pub struct Pen {
     pub newpen: PenaltyInfo,
 
     /// The reason for the change
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub reason: PenaltyReason,
 }
 

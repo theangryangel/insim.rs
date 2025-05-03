@@ -31,7 +31,7 @@ pub struct Flg {
     pub flag: FlgType,
 
     /// Player behind
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub carbehind: PlayerId,
 }
 

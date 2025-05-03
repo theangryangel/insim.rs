@@ -235,7 +235,7 @@ pub struct Cim {
     pub ucid: ConnectionId,
 
     /// Mode & submode
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub mode: CimMode,
 }
 

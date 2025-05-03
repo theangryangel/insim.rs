@@ -25,15 +25,15 @@ pub struct Csc {
     pub reqi: RequestId,
 
     /// Unique player ID
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub plid: PlayerId,
 
     /// Action that was taken
-    #[read_write_buf(pad_after = 2)]
+    #[insim(pad_after = 2)]
     pub cscaction: CscAction,
 
     /// Time since start (warning: this is looping)
-    #[read_write_buf(duration(centiseconds = u32))]
+    #[insim(duration(centiseconds = u32))]
     pub time: Duration,
 
     /// Any contact that may have happened

@@ -74,14 +74,14 @@ pub struct Pit {
     pub penalty: PenaltyInfo,
 
     /// Total number of stops
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub numstops: u8,
 
     /// Tyres!
     pub tyres: [TyreCompound; 4],
 
     /// What work was carried out?
-    #[read_write_buf(pad_after = 4)]
+    #[insim(pad_after = 4)]
     pub work: PitStopWorkFlags,
 }
 
@@ -95,7 +95,7 @@ pub struct Psf {
     /// Player's unique ID
     pub plid: PlayerId,
 
-    #[read_write_buf(duration(milliseconds = u32), pad_after = 4)]
+    #[insim(duration(milliseconds = u32), pad_after = 4)]
     /// How long were they pitting for?
     pub stime: Duration,
 }
@@ -134,7 +134,7 @@ pub struct Pla {
     pub plid: PlayerId,
 
     /// Fact
-    #[read_write_buf(pad_after = 3)]
+    #[insim(pad_after = 3)]
     pub fact: PitLaneFact,
 }
 

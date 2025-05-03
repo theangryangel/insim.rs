@@ -22,7 +22,7 @@ pub enum AcrResult {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Acr {
     /// Non-zero if the packet is a packet request or a reply to a request
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
     /// Unique connection identifier
@@ -32,11 +32,11 @@ pub struct Acr {
     pub admin: bool,
 
     /// Result
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub result: AcrResult,
 
     /// Command
-    #[read_write_buf(codepage(length = 64, align_to = 4, trailing_nul = true))]
+    #[insim(codepage(length = 64, align_to = 4, trailing_nul = true))]
     pub text: String,
 }
 

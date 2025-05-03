@@ -1,5 +1,5 @@
 #[derive(Debug, darling::FromVariant)]
-#[darling(attributes(read_write_buf))]
+#[darling(attributes(insim))]
 pub(super) struct Variant {
     pub ident: syn::Ident,
     pub discriminant: Option<syn::Expr>,

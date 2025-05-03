@@ -135,15 +135,15 @@ pub struct Aii {
     /// Flags
     pub flags: AiFlags,
 
-    #[read_write_buf(pad_after = 2)]
+    #[insim(pad_after = 2)]
     /// Current gear
     pub gear: u8,
 
-    #[read_write_buf(pad_after = 8)]
+    #[insim(pad_after = 8)]
     /// Current RPM
     pub rpm: f32,
 
-    #[read_write_buf(pad_after = 12)]
+    #[insim(pad_after = 12)]
     /// Current lights
     pub showlights: AiShowLights,
 }

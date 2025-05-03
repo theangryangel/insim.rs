@@ -15,11 +15,8 @@ pub enum Error {
     IncompatibleVersion(u8),
 
     /// IO Error, i.e. initial connection failed, etc.
-    #[error("IO error occurred: {kind:?} {msg:?}")]
-    IO {
-        kind: std::io::ErrorKind,
-        msg: String,
-    },
+    #[error("IO error occurred: {0}")]
+    IO(#[from] std::io::Error),
 
     /// A timeout occurred whilst waiting for an operation
     #[error("Timeout: {0:?}")]
@@ -43,16 +40,16 @@ pub enum Error {
     #[error("Only Standard vehicles are permitted")]
     VehicleNotStandard,
 
-    /// Placeholder
-    #[error("Insim core error. Placeholder")]
-    ReadWriteBuf(#[from] insim_core::EncodeError),
+    /// Encode Error
+    #[error("Encode error: {0}")]
+    Encode(#[from] insim_core::EncodeError),
 
     /// Decode Error
     #[error("Decode error: {0}")]
-    DecodeError(#[from] insim_core::DecodeError),
+    Decode(#[from] insim_core::DecodeError),
 
     /// Partial decode
-    #[error("partial decode. likely invalid packet definition. decoded {:?}, remaining {:?}", input.as_ref(), remaining.as_ref())]
+    #[error("Partial decode. Likely invalid packet definition. Decoded {:?}, remaining {:?}", input.as_ref(), remaining.as_ref())]
     CodecIncompleteDecode {
         /// original input
         input: Bytes,
@@ -69,15 +66,6 @@ pub enum Error {
 impl From<tokio::time::error::Elapsed> for Error {
     fn from(value: tokio::time::error::Elapsed) -> Self {
         Error::Timeout(value.to_string())
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(value: std::io::Error) -> Self {
-        Error::IO {
-            kind: value.kind(),
-            msg: value.to_string(),
-        }
     }
 }
 

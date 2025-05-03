@@ -61,7 +61,7 @@ impl_bitflags_from_to_bytes!(OcoLights, u8);
 /// Used to switch start lights
 pub struct Oco {
     /// Non-zero if the packet is a packet request or a reply to a request
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
     /// Action to take

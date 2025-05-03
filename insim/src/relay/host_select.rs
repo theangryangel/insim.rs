@@ -5,18 +5,18 @@ use crate::identifiers::RequestId;
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Sel {
     /// If Non-zero LFS World relay will reply with a [crate::Packet::Ver]
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
     /// Name of host to select
-    #[read_write_buf(codepage(length = 32))]
+    #[insim(codepage(length = 32))]
     pub hname: String,
 
     /// Administrative password.
-    #[read_write_buf(codepage(length = 16))]
+    #[insim(codepage(length = 16))]
     pub admin: String,
 
     /// Spectator password.
-    #[read_write_buf(codepage(length = 16))]
+    #[insim(codepage(length = 16))]
     pub spec: String,
 }

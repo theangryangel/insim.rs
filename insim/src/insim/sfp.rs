@@ -6,14 +6,14 @@ use crate::identifiers::RequestId;
 /// State Flags Pack
 pub struct Sfp {
     /// Non-zero if the packet is a packet request or a reply to a request
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
     /// The state to set/change. See [StaFlags].
     pub flag: StaFlags,
 
     /// Turn the state on or off
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub onoff: bool,
 }
 

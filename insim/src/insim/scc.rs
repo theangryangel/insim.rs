@@ -6,14 +6,14 @@ use crate::identifiers::{PlayerId, RequestId};
 /// Set Car Camera
 pub struct Scc {
     /// Non-zero if the packet is a packet request or a reply to a request
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
     /// Player ID
     pub viewplid: PlayerId,
 
     /// How to manipulate the camera. See [CameraView].
-    #[read_write_buf(pad_after = 2)]
+    #[insim(pad_after = 2)]
     pub ingamecam: CameraView,
 }
 

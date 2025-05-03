@@ -13,5 +13,4 @@ pub mod wind;
 
 pub use decode::{Decode, DecodeError, DecodeString};
 pub use encode::{Encode, EncodeError, EncodeString};
-
 pub use insim_macros::{Decode, Encode};

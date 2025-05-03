@@ -28,14 +28,14 @@ impl_bitflags_from_to_bytes!(SchFlags, u8);
 /// Send Single Character
 pub struct Sch {
     /// Non-zero if the packet is a packet request or a reply to a request
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
     /// Character
     pub charb: char,
 
     /// Character modifiers/flags
-    #[read_write_buf(pad_after = 2)]
+    #[insim(pad_after = 2)]
     pub flags: SchFlags,
 }
 

@@ -75,18 +75,18 @@ pub struct Fin {
     /// Unique player id for this finish notification
     pub plid: PlayerId,
 
-    #[read_write_buf(duration(milliseconds = u32))]
+    #[insim(duration(milliseconds = u32))]
     /// Total time elapsed
     pub ttime: Duration,
 
-    #[read_write_buf(duration(milliseconds = u32), pad_after = 1)]
+    #[insim(duration(milliseconds = u32), pad_after = 1)]
     /// Best lap time
     pub btime: Duration,
 
     /// Total number of stops
     pub numstops: u8,
 
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     /// Confirmation flags give extra context to the result
     pub confirm: RaceConfirmFlags,
 

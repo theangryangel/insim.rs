@@ -44,7 +44,7 @@ impl DurationUoM {
 }
 
 #[derive(Debug, darling::FromField)]
-#[darling(attributes(read_write_buf))]
+#[darling(attributes(insim))]
 pub(super) struct Field {
     pub ident: Option<syn::Ident>,
     pub ty: syn::Type,

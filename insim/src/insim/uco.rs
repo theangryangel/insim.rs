@@ -31,15 +31,15 @@ pub struct Uco {
     pub reqi: RequestId,
 
     /// Player's unique ID that this report corresponds to.
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub plid: PlayerId,
 
     /// What happened
-    #[read_write_buf(pad_after = 2)]
+    #[insim(pad_after = 2)]
     pub ucoaction: UcoAction,
 
     /// When this happened
-    #[read_write_buf(duration(milliseconds = u32))]
+    #[insim(duration(milliseconds = u32))]
     pub time: Duration,
 
     /// Was there any car contact?

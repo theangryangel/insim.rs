@@ -71,14 +71,14 @@ impl From<&VtnAction> for u32 {
 /// Vote Notification
 pub struct Vtn {
     /// Non-zero if the packet is a packet request or a reply to a request
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
     /// The unique connection id of the connection that voted
     pub ucid: ConnectionId,
 
     /// The action or fact for this vote notification
-    #[read_write_buf(pad_after = 2)]
+    #[insim(pad_after = 2)]
     pub action: VtnAction,
 }
 

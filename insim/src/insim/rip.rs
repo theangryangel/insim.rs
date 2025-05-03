@@ -89,19 +89,19 @@ pub struct Rip {
     pub paused: bool,
 
     /// Misc options. See [RipOptions].
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub options: RipOptions,
 
     /// Request: destination / Reply: position
-    #[read_write_buf(duration(milliseconds = u32))]
+    #[insim(duration(milliseconds = u32))]
     pub ctime: Duration,
 
     /// Request: zero / reply: replay length
-    #[read_write_buf(duration(milliseconds = u32))]
+    #[insim(duration(milliseconds = u32))]
     pub ttime: Duration,
 
     /// Zero or replay name
-    #[read_write_buf(codepage(length = 64, trailing_nul = true))]
+    #[insim(codepage(length = 64, trailing_nul = true))]
     pub rname: String,
 }
 

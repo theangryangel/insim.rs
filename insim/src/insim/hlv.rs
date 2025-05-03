@@ -34,10 +34,10 @@ pub struct Hlv {
     pub plid: PlayerId,
 
     /// How did we invalidate this hotlap? See [Hlvc].
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub hlvc: Hlvc,
 
-    #[read_write_buf(duration(centiseconds = u16))]
+    #[insim(duration(centiseconds = u16))]
     /// When the violation occurred. Warning: this is looping.
     pub time: Duration,
 

@@ -67,7 +67,7 @@ impl_bitflags_from_to_bytes!(IsiFlags, u16);
 pub struct Isi {
     /// When set to a non-zero value the server will send a [crate::Packet::Ver] packet in response.
     ///packet in response.
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
     /// UDP Port
@@ -87,15 +87,15 @@ pub struct Isi {
 
     /// Time in between each [Nlp](super::Nlp) or [Mci](super::Mci) packet when set to a non-zero value and
     /// the relevant flags are set.
-    #[read_write_buf(duration(milliseconds = u16))]
+    #[insim(duration(milliseconds = u16))]
     pub interval: Duration,
 
     /// Administrative password.
-    #[read_write_buf(codepage(length = 16))]
+    #[insim(codepage(length = 16))]
     pub admin: String,
 
     /// Name of the program.
-    #[read_write_buf(codepage(length = 16))]
+    #[insim(codepage(length = 16))]
     pub iname: String,
 }
 

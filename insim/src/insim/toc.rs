@@ -16,7 +16,7 @@ pub struct Toc {
     pub olducid: ConnectionId,
 
     /// The new connection ID for this `plid`
-    #[read_write_buf(pad_after = 2)]
+    #[insim(pad_after = 2)]
     pub newucid: ConnectionId,
 }
 

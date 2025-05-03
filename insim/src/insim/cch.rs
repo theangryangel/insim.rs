@@ -35,7 +35,7 @@ pub struct Cch {
     /// Player unique ID
     pub plid: PlayerId,
 
-    #[read_write_buf(pad_after = 3)]
+    #[insim(pad_after = 3)]
     /// View identifier
     pub camera: CameraView,
 }

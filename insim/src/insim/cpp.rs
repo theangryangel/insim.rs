@@ -10,7 +10,7 @@ use crate::identifiers::{PlayerId, RequestId};
 /// Camera Position Pack reports the current camera position and state. This packet may also be
 /// sent to control the camera.
 pub struct Cpp {
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
@@ -36,7 +36,7 @@ pub struct Cpp {
     pub fov: f32,
 
     /// Time in ms to get there (0 means instant)
-    #[read_write_buf(duration(milliseconds = u16))]
+    #[insim(duration(milliseconds = u16))]
     pub time: Duration,
 
     /// State flags to set

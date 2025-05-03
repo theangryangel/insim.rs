@@ -65,7 +65,7 @@ pub struct Nci {
     pub language: Language,
 
     /// License level.
-    #[read_write_buf(pad_after = 2)]
+    #[insim(pad_after = 2)]
     pub license: License,
 
     /// LFS.net player ID

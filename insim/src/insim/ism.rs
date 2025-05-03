@@ -5,15 +5,15 @@ use crate::identifiers::RequestId;
 /// Insim Multiplayer - LFS sends this when a host is started or joined
 pub struct Ism {
     /// Non-zero if the packet is a packet request or a reply to a request
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
     /// Are we a host? false = guest, true = host
-    #[read_write_buf(pad_after = 3)]
+    #[insim(pad_after = 3)]
     pub host: bool,
 
     /// Name of server joined/started
-    #[read_write_buf(codepage(length = 32))]
+    #[insim(codepage(length = 32))]
     pub hname: String,
 }
 

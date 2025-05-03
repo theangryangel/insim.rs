@@ -96,7 +96,7 @@ impl_bitflags_from_to_bytes!(StaFlags, u16);
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// State
 pub struct Sta {
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
@@ -127,7 +127,7 @@ pub struct Sta {
     /// Qualifying minutes
     pub qualmins: u8,
 
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     /// Number of laps
     pub racelaps: RaceLaps,
 

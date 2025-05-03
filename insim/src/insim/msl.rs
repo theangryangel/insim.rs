@@ -1,7 +1,9 @@
 use crate::identifiers::RequestId;
 
 /// Enum for the sound field of [Msl].
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, insim_core::Decode, insim_core::Encode)]
+#[derive(
+    Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, insim_core::Decode, insim_core::Encode,
+)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]
@@ -35,7 +37,7 @@ pub struct Msl {
     pub sound: SoundType,
 
     /// Message
-    #[read_write_buf(codepage(length = 128, trailing_nul = true))]
+    #[insim(codepage(length = 128, trailing_nul = true))]
     pub msg: String,
 }
 

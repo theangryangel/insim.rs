@@ -12,7 +12,7 @@ pub struct Pfl {
     pub plid: PlayerId,
 
     /// Flags which were altered. See [PlayerFlags].
-    #[read_write_buf(pad_after = 2)]
+    #[insim(pad_after = 2)]
     pub flags: PlayerFlags,
 }
 

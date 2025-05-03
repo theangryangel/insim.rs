@@ -89,7 +89,7 @@ impl Encode for LapTimingInfo {
 /// Race Start - informational - sent when a race starts
 pub struct Rst {
     /// Non-zero if the packet is a packet request or a reply to a request
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
     /// Total number of race laps

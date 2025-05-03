@@ -156,7 +156,7 @@ pub struct Btn {
     pub h: u8,
 
     /// Text
-    #[read_write_buf(codepage(length = 240, align_to = 4))]
+    #[insim(codepage(length = 240, align_to = 4))]
     pub text: String,
 }
 
@@ -177,7 +177,7 @@ pub struct Btc {
     pub inst: BtnInst,
 
     /// Button click flags
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub cflags: BtnClickFlags,
 }
 
@@ -196,11 +196,11 @@ pub struct Btt {
     /// Primarily used internally by LFS
     pub inst: BtnInst,
 
-    #[read_write_buf(pad_after = 1)]
+    #[insim(pad_after = 1)]
     /// From original button specification (IS_BTN)
     pub typein: u8,
 
-    #[read_write_buf(codepage(length = 96))]
+    #[insim(codepage(length = 96))]
     /// Typed text, zero to TypeIn specified in IS_BTN
     pub text: String,
 }

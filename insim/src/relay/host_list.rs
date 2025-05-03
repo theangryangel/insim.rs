@@ -39,7 +39,7 @@ impl_bitflags_from_to_bytes!(HostInfoFlags, u8);
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct HostInfo {
-    #[read_write_buf(codepage(length = 32))]
+    #[insim(codepage(length = 32))]
     /// Hostname
     pub hname: String,
 

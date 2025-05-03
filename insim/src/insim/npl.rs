@@ -177,18 +177,18 @@ pub struct Npl {
     /// See [PlayerFlags].
     pub flags: PlayerFlags,
 
-    #[read_write_buf(codepage(length = 24))]
+    #[insim(codepage(length = 24))]
     /// Player name
     pub pname: String,
 
-    #[read_write_buf(codepage(length = 8))]
+    #[insim(codepage(length = 8))]
     /// Number plate
     pub plate: String,
 
     /// Vehicle they've joined with.
     pub cname: Vehicle,
 
-    #[read_write_buf(codepage(length = 16))]
+    #[insim(codepage(length = 16))]
     /// Skin name.
     pub sname: String,
 
@@ -210,7 +210,7 @@ pub struct Npl {
     pub rwadj: u8,
 
     /// low 4 bits: tyre width reduction (front)
-    #[read_write_buf(pad_after = 2)]
+    #[insim(pad_after = 2)]
     pub fwadj: u8,
 
     /// Setup flags, see [SetFlags].

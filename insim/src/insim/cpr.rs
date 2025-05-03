@@ -10,11 +10,11 @@ pub struct Cpr {
     /// Unique connection ID of the connection that was renamed
     pub ucid: ConnectionId,
 
-    #[read_write_buf(codepage(length = 24))]
+    #[insim(codepage(length = 24))]
     /// New player name
     pub pname: String,
 
-    #[read_write_buf(codepage(length = 8))]
+    #[insim(codepage(length = 8))]
     /// New number plate
     pub plate: String,
 }

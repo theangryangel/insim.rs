@@ -44,7 +44,7 @@ pub struct Jrr {
     /// Unique connection ID
     pub ucid: ConnectionId,
 
-    #[read_write_buf(pad_after = 2)]
+    #[insim(pad_after = 2)]
     /// Action taken/to take
     pub jrraction: JrrAction,
 

@@ -28,13 +28,13 @@ pub struct Ssh {
     pub reqi: RequestId,
 
     /// Result code
-    #[read_write_buf(pad_after = 4)]
+    #[insim(pad_after = 4)]
     pub error: SshError,
 
     /// Screenshot name.
     /// Not really ascii, but given we dont have control over the naming convention we can
     /// probably just abuse the fact that LFS only generates ASCII compatible file names.
-    #[read_write_buf(ascii(length = 32, trailing_nul = true))]
+    #[insim(ascii(length = 32, trailing_nul = true))]
     pub name: String,
 }
 
