@@ -45,12 +45,16 @@ pub enum Error {
     Encode(#[from] insim_core::EncodeError),
 
     /// Decode Error
-    #[error("Decode error: {0}")]
-    Decode(#[from] insim_core::DecodeError),
+    #[error("Decode error {error} at offset {offset}: {:?}", input.as_ref())]
+    Decode {
+        offset: usize,
+        input: Bytes,
+        error: insim_core::DecodeError,
+    },
 
     /// Partial decode
     #[error("Partial decode. Likely invalid packet definition. Decoded {:?}, remaining {:?}", input.as_ref(), remaining.as_ref())]
-    CodecIncompleteDecode {
+    IncompleteDecode {
         /// original input
         input: Bytes,
 

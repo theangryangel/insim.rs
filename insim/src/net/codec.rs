@@ -67,16 +67,25 @@ impl Codec {
         // none of the packet definitions include the size
         data.advance(1);
 
-        let packet = Packet::decode(&mut data)?;
-        tracing::trace!("Decoded packet={:?}", packet);
-        if data.remaining() > 0 {
-            return Err(Error::CodecIncompleteDecode {
+        let packet = Packet::decode(&mut data);
+        match packet {
+            Ok(packet) => {
+                tracing::trace!("Decoded packet={:?}", packet);
+                if data.remaining() > 0 {
+                    return Err(Error::IncompleteDecode {
+                        input: original,
+                        decoded: packet,
+                        remaining: data,
+                    });
+                }
+                Ok(Some(packet))
+            },
+            Err(e) => Err(crate::Error::Decode {
+                offset: data.as_ptr() as usize - original.as_ptr() as usize,
+                error: e,
                 input: original,
-                decoded: packet,
-                remaining: data,
-            });
+            }),
         }
-        Ok(Some(packet))
     }
 }
 

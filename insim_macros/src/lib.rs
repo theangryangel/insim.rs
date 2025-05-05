@@ -8,9 +8,9 @@ use syn::{parse_macro_input, DeriveInput};
 mod encode;
 
 #[proc_macro_derive(Encode, attributes(insim))]
-/// Derive a basic ReadWriteBuf implementation for either:
+/// Derive a basic Encode implementation for either:
 /// 1. Structs
-///    Assumes all fields also implement ReadWriteBuf
+///    Assumes all fields also implement Encode
 ///    Fields may have padding before or after using #[insim(pad_after=2)]
 ///    Fields may be skipped by supplying #[insim(skip)]
 ///    Fields which are strings must have either acsii, or codepage directives provided.
@@ -29,9 +29,9 @@ pub fn derive_encode(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_derive(Decode, attributes(insim))]
-/// Derive a basic ReadWriteBuf implementation for either:
+/// Derive a basic Decode implementation for either:
 /// 1. Structs
-///    Assumes all fields also implement ReadWriteBuf
+///    Assumes all fields also implement Decode
 ///    Fields may have padding before or after using #[insim(pad_after=2)]
 ///    Fields may be skipped by supplying #[insim(skip)]
 ///    Fields which are strings must have either acsii, or codepage directives provided.
