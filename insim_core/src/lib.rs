@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 pub mod decode;
+pub mod direction;
 pub mod encode;
 pub mod game_version;
 pub mod license;

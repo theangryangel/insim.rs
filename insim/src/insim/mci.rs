@@ -1,6 +1,6 @@
 use bitflags::bitflags;
 use bytes::{Buf, BufMut};
-use insim_core::{point::Point, speed::Speed, Decode, Encode};
+use insim_core::{direction::Direction, point::Point, speed::Speed, Decode, Encode};
 
 use crate::identifiers::{PlayerId, RequestId};
 
@@ -65,11 +65,11 @@ pub struct CompCar {
 
     /// Direction of car's motion : 0 = world y direction, 32768 = 180 deg
     /// You may use the direction_uom function to convert this to real world units if the uom feature is enabled.
-    pub direction: u16,
+    pub direction: Direction,
 
     /// Direction of forward axis : 0 = world y direction, 32768 = 180 deg
     /// You may use the heading_uom function to convert this to real world units if the uom feature is enabled.
-    pub heading: u16,
+    pub heading: Direction,
 
     /// Signed, rate of change of heading : (16384 = 360 deg/s)
     /// You may use the angvel_uom function to convert this to real world units if the uom feature is enabled.
@@ -98,8 +98,8 @@ impl Decode for CompCar {
         buf.advance(1);
         let xyz = Point::<i32>::decode(buf)?;
         let speed = Speed::from_game_mci_units(u16::decode(buf)?);
-        let direction = u16::decode(buf)?;
-        let heading = u16::decode(buf)?;
+        let direction = Direction::from_game_units(u16::decode(buf)?);
+        let heading = Direction::from_game_units(u16::decode(buf)?);
         let angvel = i16::decode(buf)?;
         Ok(Self {
             node,
@@ -126,8 +126,8 @@ impl Encode for CompCar {
         buf.put_bytes(0, 1);
         self.xyz.encode(buf)?;
         self.speed.as_game_mci_units().encode(buf)?;
-        self.direction.encode(buf)?;
-        self.heading.encode(buf)?;
+        self.direction.as_game_units().encode(buf)?;
+        self.heading.as_game_units().encode(buf)?;
         self.angvel.encode(buf)?;
         Ok(())
     }
