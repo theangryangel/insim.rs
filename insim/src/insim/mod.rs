@@ -73,7 +73,9 @@ pub use aii::{AiFlags, Aii};
 pub use axi::Axi;
 pub use axm::{Axm, ObjectInfo, PmoAction, PmoFlags};
 pub use axo::Axo;
-pub use btn::{Bfn, BfnType, Btc, Btn, BtnClickFlags, BtnInst, BtnStyleFlags, Btt};
+pub use btn::{
+    Bfn, BfnType, Btc, Btn, BtnClickFlags, BtnInst, BtnStyle, BtnStyleColour, BtnStyleFlags, Btt,
+};
 pub use cch::{CameraView, Cch};
 pub use cim::{Cim, CimMode, CimSubModeGarage, CimSubModeNormal, CimSubModeShiftU};
 pub use cnl::{Cnl, CnlReason};

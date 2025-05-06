@@ -19,29 +19,34 @@ bitflags::bitflags! {
 
 impl_bitflags_from_to_bytes!(BtnInst, u8);
 
+/// Colour
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub enum BtnStyleColour {
+    /// Light grey
+    #[default]
+    LightGrey = 0,
+    /// Title
+    Title = 1,
+    /// Unselected text
+    UnselectedText = 2,
+    /// Selected text
+    SelectedText = 3,
+    /// Ok
+    Ok = 4,
+    /// Cancel
+    Cancel = 5,
+    /// Text string
+    TextString = 6,
+    /// Unavailable
+    Unavailable = 7,
+}
+
 bitflags::bitflags! {
     /// Bitwise flags used within the [Btn] packet
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     pub struct BtnStyleFlags: u8 {
-
-        // TODO: We need to abstract these lowest 3 bits with helpers to set the colours
-        // colour 0: light grey			(not user editable)
-        // colour 1: title colour		(default:yellow)
-        // colour 2: unselected text	(default:black)
-        // colour 3: selected text		(default:white)
-        // colour 4: ok					(default:green)
-        // colour 5: cancel				(default:red)
-        // colour 6: text string		(default:pale blue)
-        // colour 7: unavailable		(default:grey)
-
-        /// TODO
-        const C1 = (1 << 0);
-        /// TODO
-        const C2 = (1 << 1);
-        /// TODO
-        const C4 = (1 << 2);
-
         /// Click this button to send IS_BTC
         const CLICK = (1 << 3);
 
@@ -59,7 +64,53 @@ bitflags::bitflags! {
     }
 }
 
-impl_bitflags_from_to_bytes!(BtnStyleFlags, u8);
+#[derive(Debug, Clone, Default, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+/// Button style
+pub struct BtnStyle {
+    /// Colour
+    pub colour: BtnStyleColour,
+    /// Behavioural flags
+    pub flags: BtnStyleFlags,
+}
+
+impl Encode for BtnStyle {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+        let colour = match self.colour {
+            BtnStyleColour::LightGrey => 0,
+            BtnStyleColour::Title => 1,
+            BtnStyleColour::UnselectedText => 2,
+            BtnStyleColour::SelectedText => 3,
+            BtnStyleColour::Ok => 4,
+            BtnStyleColour::Cancel => 5,
+            BtnStyleColour::TextString => 6,
+            BtnStyleColour::Unavailable => 7,
+        };
+        let flags = self.flags.bits();
+
+        (colour | flags).encode(buf)
+    }
+}
+
+impl Decode for BtnStyle {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
+        let val = u8::decode(buf)?;
+
+        let colour = match val & !248 {
+            1 => BtnStyleColour::Title,
+            2 => BtnStyleColour::UnselectedText,
+            3 => BtnStyleColour::SelectedText,
+            4 => BtnStyleColour::Ok,
+            5 => BtnStyleColour::Cancel,
+            6 => BtnStyleColour::TextString,
+            7 => BtnStyleColour::Unavailable,
+            _ => BtnStyleColour::LightGrey,
+        };
+        let flags = BtnStyleFlags::from_bits_truncate(val);
+
+        Ok(Self { colour, flags })
+    }
+}
 
 bitflags::bitflags! {
     /// Bitwise flags used within the [Sta] packet
@@ -143,8 +194,8 @@ pub struct Btn {
     /// Primarily used internally by LFS
     pub inst: BtnInst,
 
-    /// Button style flags
-    pub bstyle: BtnStyleFlags,
+    /// Button style,
+    pub bstyle: BtnStyle,
 
     /// Max chars permitted for a buttonw within input
     pub typein: u8,
@@ -174,7 +225,7 @@ impl Decode for Btn {
         let ucid = ConnectionId::decode(buf)?;
         let clickid = ClickId::decode(buf)?;
         let inst = BtnInst::decode(buf)?;
-        let bstyle = BtnStyleFlags::decode(buf)?;
+        let bstyle = BtnStyle::decode(buf)?;
         let typein = u8::decode(buf)?;
         let l = u8::decode(buf)?;
         let t = u8::decode(buf)?;
@@ -334,6 +385,18 @@ mod tests {
     use bytes::{BufMut, BytesMut};
 
     use super::*;
+
+    #[test]
+    fn test_btnstyle() {
+        let mut bstyle = BtnStyle::default();
+        bstyle.flags.set(BtnStyleFlags::CLICK, true);
+        bstyle.colour = BtnStyleColour::Title;
+
+        let mut buf = BytesMut::new();
+        bstyle.encode(&mut buf).unwrap();
+
+        assert_eq!(buf.as_ref(), [9]);
+    }
 
     #[test]
     fn test_bfn() {
