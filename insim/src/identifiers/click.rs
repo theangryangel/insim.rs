@@ -13,6 +13,10 @@ use serde::Serialize;
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct ClickId(pub u8);
 
+impl ClickId {
+    const MAX: u8 = 239;
+}
+
 impl fmt::Display for ClickId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
@@ -41,14 +45,22 @@ impl From<u8> for ClickId {
 
 impl Decode for ClickId {
     fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
-        Ok(ClickId(buf.get_u8()))
+        let clickid = buf.get_u8();
+        if clickid > Self::MAX {
+            Err(insim_core::DecodeError::TooLarge)
+        } else {
+            Ok(ClickId(clickid))
+        }
     }
 }
 
 impl Encode for ClickId {
     fn encode(&self, buf: &mut BytesMut) -> Result<(), insim_core::EncodeError> {
-        buf.put_u8(self.0);
-
-        Ok(())
+        if self.0 > Self::MAX {
+            Err(insim_core::EncodeError::TooLarge)
+        } else {
+            buf.put_u8(self.0);
+            Ok(())
+        }
     }
 }

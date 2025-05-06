@@ -1,4 +1,10 @@
+use bytes::{Buf, BufMut};
+use insim_core::{Decode, DecodeString, Encode, EncodeString};
+
 use crate::identifiers::{ClickId, ConnectionId, RequestId};
+
+const BTN_TEXT_MAX_LEN: usize = 240;
+const BTN_TEXT_ALIGN: usize = 4;
 
 bitflags::bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
@@ -121,7 +127,7 @@ pub struct Bfn {
 
 impl_typical_with_request_id!(Bfn);
 
-#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Button - Instructional to create a button
 pub struct Btn {
@@ -155,9 +161,127 @@ pub struct Btn {
     /// Position - height (0-200)
     pub h: u8,
 
+    /// Optional caption
+    pub caption: Option<String>,
+
     /// Text
-    #[insim(codepage(length = 240, align_to = 4))]
     pub text: String,
+}
+
+impl Decode for Btn {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
+        let reqi = RequestId::decode(buf)?;
+        let ucid = ConnectionId::decode(buf)?;
+        let clickid = ClickId::decode(buf)?;
+        let inst = BtnInst::decode(buf)?;
+        let bstyle = BtnStyleFlags::decode(buf)?;
+        let typein = u8::decode(buf)?;
+        let l = u8::decode(buf)?;
+        let t = u8::decode(buf)?;
+        let w = u8::decode(buf)?;
+        let h = u8::decode(buf)?;
+
+        let (caption, text) = if let Some(&0_u8) = buf.first() {
+            // text with caption has a leading \0
+            buf.advance(1);
+
+            // find the caption ending
+            let split = buf.iter().position(|c| c == &0_u8).unwrap();
+
+            let caption = buf.split_to(split);
+            let caption = insim_core::string::codepages::to_lossy_string(&caption);
+
+            buf.advance(1);
+
+            let text = insim_core::string::codepages::to_lossy_string(
+                insim_core::string::strip_trailing_nul(buf.as_ref()),
+            )
+            .to_string();
+
+            // ensure that we don't leave anything unconsumed, so that the codec doesnt raise an
+            // incomplete parse error
+            let remaining = buf.remaining();
+            buf.advance(remaining);
+
+            (Some(caption.to_string()), text.to_string())
+        } else {
+            // just text
+            (None, String::decode_codepage(buf, buf.remaining())?)
+        };
+
+        Ok(Self {
+            reqi,
+            ucid,
+            clickid,
+            inst,
+            bstyle,
+            typein,
+            l,
+            t,
+            w,
+            h,
+            caption,
+            text,
+        })
+    }
+}
+
+impl Encode for Btn {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+        if self.l > 200 {
+            return Err(insim_core::EncodeError::TooLarge);
+        }
+
+        if self.t > 200 {
+            return Err(insim_core::EncodeError::TooLarge);
+        }
+
+        if self.w > 200 {
+            return Err(insim_core::EncodeError::TooLarge);
+        }
+
+        if self.h > 200 {
+            return Err(insim_core::EncodeError::TooLarge);
+        }
+
+        self.reqi.encode(buf)?;
+        self.ucid.encode(buf)?;
+        self.clickid.encode(buf)?;
+        self.inst.encode(buf)?;
+        self.bstyle.encode(buf)?;
+        self.typein.encode(buf)?;
+        self.l.encode(buf)?;
+        self.t.encode(buf)?;
+        self.w.encode(buf)?;
+        self.h.encode(buf)?;
+
+        if let Some(caption) = &self.caption {
+            let caption = insim_core::string::codepages::to_lossy_bytes(caption);
+            let text = insim_core::string::codepages::to_lossy_bytes(&self.text);
+
+            if (caption.len() + text.len()) > (BTN_TEXT_MAX_LEN - 2) {
+                return Err(insim_core::EncodeError::TooLarge);
+            }
+
+            buf.put_u8(0);
+            buf.extend_from_slice(&caption);
+            buf.put_u8(0);
+            buf.extend_from_slice(&text);
+
+            let written = caption.len() + text.len() + 2;
+            if written < BTN_TEXT_MAX_LEN {
+                let align_to = BTN_TEXT_ALIGN - 1;
+                let round_to = (written + align_to) & !align_to;
+                let round_to = round_to.min(BTN_TEXT_MAX_LEN);
+                buf.put_bytes(0, round_to - written);
+            }
+        } else {
+            self.text
+                .encode_codepage_with_alignment(buf, 240, 4, false)?;
+        }
+
+        Ok(())
+    }
 }
 
 impl_typical_with_request_id!(Btn);
@@ -234,7 +358,7 @@ mod tests {
     }
 
     #[test]
-    fn test_btn() {
+    fn test_btn_without_caption() {
         let mut data = BytesMut::new();
         data.extend_from_slice(&[
             0,   // reqi
@@ -258,6 +382,40 @@ mod tests {
             assert_eq!(parsed.t, 30);
             assert_eq!(parsed.w, 40);
             assert_eq!(parsed.h, 50);
+        });
+    }
+
+    #[test]
+    fn test_btn_with_caption() {
+        let mut data = BytesMut::new();
+        data.extend_from_slice(&[
+            0,   // reqi
+            4,   // ucid
+            45,  // clickid
+            128, // inst
+            9,   // bstyle
+            3,   // typein
+            20,  // l
+            30,  // t
+            40,  // w
+            50,  // h
+        ]);
+        data.put_u8(0);
+        data.extend_from_slice(b"1234");
+        data.put_u8(0);
+        data.extend_from_slice(b"abcdefg");
+        data.put_bytes(0, 3);
+
+        assert_from_to_bytes!(Btn, data.as_ref(), |parsed: Btn| {
+            assert_eq!(parsed.ucid, ConnectionId(4));
+            assert_eq!(parsed.clickid, ClickId(45));
+            assert_eq!(parsed.typein, 3);
+            assert_eq!(parsed.l, 20);
+            assert_eq!(parsed.t, 30);
+            assert_eq!(parsed.w, 40);
+            assert_eq!(parsed.h, 50);
+            assert_eq!(&parsed.caption.unwrap(), "1234");
+            assert_eq!(&parsed.text, "abcdefg");
         });
     }
 
