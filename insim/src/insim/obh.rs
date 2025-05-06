@@ -41,10 +41,12 @@ impl_bitflags_from_to_bytes!(ObhFlags, u8);
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Vehicle made contact with something else
 pub struct CarContact {
+    // FIXME, use Direction
     /// Car's motion if Speed > 0: 0 = world y direction, 128 = 180 deg
     pub direction: u8,
 
     /// Direction of forward axis: 0 = world y direction, 128 = 180 deg
+    // FIXME, use Direction
     pub heading: u8,
 
     /// Speed in m/s

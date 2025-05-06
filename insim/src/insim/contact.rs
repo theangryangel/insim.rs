@@ -40,9 +40,11 @@ pub struct ConInfo {
     pub speed: u8,
 
     /// Car's motion if Speed > 0: 0 = world y direction, 128 = 180 deg
+    // FIXME, use Direction
     pub direction: u8,
 
     /// direction of forward axis: 0 = world y direction, 128 = 180 deg
+    // FIXME, use Direction
     pub heading: u8,
 
     /// m/s^2 longitudinal acceleration (forward positive)

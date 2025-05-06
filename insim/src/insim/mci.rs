@@ -64,15 +64,13 @@ pub struct CompCar {
     pub speed: Speed,
 
     /// Direction of car's motion : 0 = world y direction, 32768 = 180 deg
-    /// You may use the direction_uom function to convert this to real world units if the uom feature is enabled.
     pub direction: Direction,
 
     /// Direction of forward axis : 0 = world y direction, 32768 = 180 deg
-    /// You may use the heading_uom function to convert this to real world units if the uom feature is enabled.
     pub heading: Direction,
 
     /// Signed, rate of change of heading : (16384 = 360 deg/s)
-    /// You may use the angvel_uom function to convert this to real world units if the uom feature is enabled.
+    // FIXME strongly type
     pub angvel: i16,
 }
 
