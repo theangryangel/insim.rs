@@ -5,6 +5,7 @@ use std::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Direction / Heading
 pub struct Direction {
     radians: f64,
