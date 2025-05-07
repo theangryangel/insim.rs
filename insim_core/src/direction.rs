@@ -8,54 +8,67 @@ use std::{
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Direction / Heading
 pub struct Direction {
-    radians: f64,
+    radians: f32,
 }
 
 impl Direction {
-    /// From game
-    pub fn from_game_units(value: u16) -> Self {
-        let full_circle = 65536.0;
-        let radians = (value as f64) / full_circle * 2.0 * std::f64::consts::PI;
-        Self { radians }.normalized()
+    /// From game MCI units
+    pub fn from_u16_game_units(value: u16) -> Self {
+        let radians = (value as f32) * std::f32::consts::PI / 32768.0;
+        Self { radians }
+    }
+
+    /// From game units (u8)
+    pub fn from_u8_game_units(value: u8) -> Self {
+        let radians = (value as f32) * std::f32::consts::PI / 128.0;
+        Self { radians }
     }
 
     /// From degrees
-    pub fn from_degrees(deg: f64) -> Self {
+    pub fn from_degrees(deg: f32) -> Self {
         Self {
             radians: deg.to_radians(),
         }
-        .normalized()
+        .normalise()
     }
 
     /// From radians
-    pub fn from_radians(rad: f64) -> Self {
-        Self { radians: rad }.normalized()
+    pub fn from_radians(rad: f32) -> Self {
+        Self { radians: rad }.normalise()
     }
 
     /// As game units
-    pub fn as_game_units(&self) -> u16 {
-        let full_circle = 65536.0;
-        let units = (self.normalized().radians / (2.0 * std::f64::consts::PI)) * full_circle;
-        units.round() as u16
+    pub fn as_u16_game_units(&self) -> u16 {
+        ((self.radians * 32768.0 / std::f32::consts::PI)
+            .round()
+            .clamp(0.0, 65535.0)) as u16
+    }
+
+    /// As game units
+    pub fn as_u8_game_units(&self) -> u8 {
+        ((self.radians * 128.0 / std::f32::consts::PI)
+            .round()
+            .clamp(0.0, 255.0)) as u8
     }
 
     /// As degrees
-    pub fn as_degrees(&self) -> f64 {
+    pub fn as_degrees(&self) -> f32 {
         self.radians.to_degrees()
     }
 
     /// As radians
-    pub fn as_radians(&self) -> f64 {
+    pub fn as_radians(&self) -> f32 {
         self.radians
     }
 
     /// Normalised Direction
-    pub fn normalized(self) -> Self {
-        let mut r = self.radians % (2.0 * std::f64::consts::PI);
-        if r < 0.0 {
-            r += 2.0 * std::f64::consts::PI;
+    pub fn normalise(self) -> Self {
+        let two_pi = std::f32::consts::TAU; // Same as 2π
+        let mut radians = self.radians % two_pi;
+        if radians < 0.0 {
+            radians += two_pi;
         }
-        Self { radians: r }
+        Self { radians }
     }
 }
 
@@ -78,7 +91,7 @@ impl Add for Direction {
         Direction {
             radians: self.radians + other.radians,
         }
-        .normalized()
+        .normalise()
     }
 }
 
@@ -89,29 +102,29 @@ impl Sub for Direction {
         Direction {
             radians: self.radians - other.radians,
         }
-        .normalized()
+        .normalise()
     }
 }
 
-impl Mul<f64> for Direction {
+impl Mul<f32> for Direction {
     type Output = Direction;
 
-    fn mul(self, scalar: f64) -> Direction {
+    fn mul(self, scalar: f32) -> Direction {
         Direction {
             radians: self.radians * scalar,
         }
-        .normalized()
+        .normalise()
     }
 }
 
-impl Div<f64> for Direction {
+impl Div<f32> for Direction {
     type Output = Direction;
 
-    fn div(self, scalar: f64) -> Direction {
+    fn div(self, scalar: f32) -> Direction {
         Direction {
             radians: self.radians / scalar,
         }
-        .normalized()
+        .normalise()
     }
 }
 
@@ -121,7 +134,13 @@ mod test {
 
     #[test]
     fn test_direction_game_units() {
-        assert_eq!(Direction::from_game_units(32768).as_degrees(), 180.0);
-        assert_eq!(Direction::from_degrees(180.0).as_game_units(), 32768);
+        assert_eq!(Direction::from_u16_game_units(32768).as_degrees(), 180.0);
+        assert_eq!(Direction::from_degrees(180.0).as_u16_game_units(), 32768);
+    }
+
+    #[test]
+    fn test_game_units_u8() {
+        assert_eq!(Direction::from_u8_game_units(128).as_degrees(), 180.0);
+        assert_eq!(Direction::from_degrees(180.0).as_u8_game_units(), 128);
     }
 }

@@ -12,43 +12,43 @@ use std::{
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Speed {
     // meters per second
-    inner: f64,
+    inner: f32,
 }
 
 impl Speed {
     /// From game units: 32768 = 100 m/s
-    pub fn from_game_mci_units(value: u16) -> Self {
+    pub fn from_game(value: u16) -> Self {
         Self {
-            inner: (value as f64) / 327.68,
+            inner: (value as f32) / 327.68,
         }
     }
 
     /// From game closing speed: 10 = 1m/s
     pub fn from_game_closing_speed(value: u16) -> Self {
         Self {
-            inner: (value as f64) / 10.0,
+            inner: (value as f32) / 10.0,
         }
     }
 
     /// From meters per second
-    pub fn from_meters_per_sec(value: f64) -> Self {
+    pub fn from_meters_per_sec(value: f32) -> Self {
         Self { inner: value }
     }
 
     /// From Km per hour
-    pub fn from_kilometers_per_hour(value: f64) -> Self {
+    pub fn from_kilometers_per_hour(value: f32) -> Self {
         Self { inner: value / 3.6 }
     }
 
     /// From miles per hour
-    pub fn from_miles_per_hour(value: f64) -> Self {
+    pub fn from_miles_per_hour(value: f32) -> Self {
         Self {
             inner: value * 0.44704,
         }
     }
 
     /// As game units
-    pub fn as_game_mci_units(&self) -> u16 {
+    pub fn as_game(&self) -> u16 {
         (self.inner * 327.68) as u16
     }
 
@@ -58,17 +58,17 @@ impl Speed {
     }
 
     /// As meters per second
-    pub fn as_meters_per_sec(&self) -> f64 {
+    pub fn as_meters_per_sec(&self) -> f32 {
         self.inner
     }
 
     /// As Km per hour
-    pub fn as_kilometers_per_hour(&self) -> f64 {
+    pub fn as_kilometers_per_hour(&self) -> f32 {
         self.inner * 3.6
     }
 
     /// As miles per hour
-    pub fn as_miles_per_hour(&self) -> f64 {
+    pub fn as_miles_per_hour(&self) -> f32 {
         self.inner / 0.44704
     }
 }
@@ -105,20 +105,20 @@ impl Sub for Speed {
     }
 }
 
-impl Mul<f64> for Speed {
+impl Mul<f32> for Speed {
     type Output = Speed;
 
-    fn mul(self, scalar: f64) -> Speed {
+    fn mul(self, scalar: f32) -> Speed {
         Speed {
             inner: self.inner * scalar,
         }
     }
 }
 
-impl Div<f64> for Speed {
+impl Div<f32> for Speed {
     type Output = Speed;
 
-    fn div(self, scalar: f64) -> Speed {
+    fn div(self, scalar: f32) -> Speed {
         Speed {
             inner: self.inner / scalar,
         }
@@ -130,8 +130,14 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_game_units() {
-        assert_eq!(Speed::from_game_mci_units(32768).as_meters_per_sec(), 100.0);
-        assert_eq!(Speed::from_meters_per_sec(100.0).as_game_mci_units(), 32768);
+    fn test_game() {
+        assert_eq!(Speed::from_game(32768).as_meters_per_sec(), 100.0);
+        assert_eq!(Speed::from_meters_per_sec(100.0).as_game(), 32768);
+    }
+
+    #[test]
+    fn test_game_closing_speed() {
+        assert_eq!(Speed::from_game_closing_speed(10).as_meters_per_sec(), 1.0);
+        assert_eq!(Speed::from_meters_per_sec(1.0).as_game_closing_speed(), 10);
     }
 }

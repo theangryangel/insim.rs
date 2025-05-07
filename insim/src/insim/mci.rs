@@ -95,9 +95,9 @@ impl Decode for CompCar {
         let info = CompCarInfo::decode(buf)?;
         buf.advance(1);
         let xyz = Point::<i32>::decode(buf)?;
-        let speed = Speed::from_game_mci_units(u16::decode(buf)?);
-        let direction = Direction::from_game_units(u16::decode(buf)?);
-        let heading = Direction::from_game_units(u16::decode(buf)?);
+        let speed = Speed::from_game(u16::decode(buf)?);
+        let direction = Direction::from_u16_game_units(u16::decode(buf)?);
+        let heading = Direction::from_u16_game_units(u16::decode(buf)?);
         let angvel = i16::decode(buf)?;
         Ok(Self {
             node,
@@ -123,9 +123,9 @@ impl Encode for CompCar {
         self.info.encode(buf)?;
         buf.put_bytes(0, 1);
         self.xyz.encode(buf)?;
-        self.speed.as_game_mci_units().encode(buf)?;
-        self.direction.as_game_units().encode(buf)?;
-        self.heading.as_game_units().encode(buf)?;
+        self.speed.as_game().encode(buf)?;
+        self.direction.as_u16_game_units().encode(buf)?;
+        self.heading.as_u16_game_units().encode(buf)?;
         self.angvel.encode(buf)?;
         Ok(())
     }
