@@ -95,7 +95,7 @@ pub struct Isi {
     pub admin: String,
 
     /// Name of the program.
-    #[insim(codepage(length = 16))]
+    #[insim(codepage(length = 16, trailing_nul = true))]
     pub iname: String,
 }
 

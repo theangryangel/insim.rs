@@ -19,6 +19,16 @@ impl ConnectionId {
     #[allow(dead_code)]
     /// Shortcut for commonly used "all" connection id
     const ALL: ConnectionId = ConnectionId(255);
+
+    /// Is this a "local" connection
+    pub fn local(&self) -> bool {
+        matches!(self, &Self::LOCAL)
+    }
+
+    /// Is this referencing "all" connections
+    pub fn all(&self) -> bool {
+        matches!(self, &Self::ALL)
+    }
 }
 
 impl fmt::Display for ConnectionId {

@@ -23,22 +23,22 @@ impl_bitflags_from_to_bytes!(BtnInst, u8);
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum BtnStyleColour {
-    /// Light grey
+    /// NotEditable, defaults to light grey
     #[default]
-    LightGrey = 0,
-    /// Title
+    NotEditable = 0,
+    /// Title, defaults to yellow
     Title = 1,
-    /// Unselected text
+    /// Unselected text, defaults to black
     UnselectedText = 2,
-    /// Selected text
+    /// Selected text, defaults to white
     SelectedText = 3,
-    /// Ok
+    /// Ok, defaults to green
     Ok = 4,
-    /// Cancel
+    /// Cancel, defaults to red
     Cancel = 5,
-    /// Text string
+    /// Text string, defaults to pale blue
     TextString = 6,
-    /// Unavailable
+    /// Unavailable, defaults to grey
     Unavailable = 7,
 }
 
@@ -74,10 +74,92 @@ pub struct BtnStyle {
     pub flags: BtnStyleFlags,
 }
 
+impl BtnStyle {
+    /// Light grey / NotEditable
+    pub fn light_grey(mut self) -> Self {
+        self.colour = BtnStyleColour::NotEditable;
+        self
+    }
+
+    /// Yellow/ Title
+    pub fn yellow(mut self) -> Self {
+        self.colour = BtnStyleColour::Title;
+        self
+    }
+
+    /// Black / UnselectedText
+    pub fn black(mut self) -> Self {
+        self.colour = BtnStyleColour::UnselectedText;
+        self
+    }
+
+    /// White / SelectedText
+    pub fn white(mut self) -> Self {
+        self.colour = BtnStyleColour::SelectedText;
+        self
+    }
+
+    /// Green / Ok
+    pub fn green(mut self) -> Self {
+        self.colour = BtnStyleColour::Ok;
+        self
+    }
+
+    /// Red / Cancel
+    pub fn red(mut self) -> Self {
+        self.colour = BtnStyleColour::Cancel;
+        self
+    }
+
+    /// Pale blue / TextString
+    pub fn pale_blue(mut self) -> Self {
+        self.colour = BtnStyleColour::TextString;
+        self
+    }
+
+    /// Grey / Unavailable
+    pub fn grey(mut self) -> Self {
+        self.colour = BtnStyleColour::Unavailable;
+        self
+    }
+
+    /// Set button as clickable
+    pub fn clickable(mut self) -> Self {
+        self.flags.set(BtnStyleFlags::CLICK, true);
+        self
+    }
+
+    /// Light button
+    pub fn light(mut self) -> Self {
+        self.flags.set(BtnStyleFlags::LIGHT, true);
+        self.flags.set(BtnStyleFlags::DARK, false);
+        self
+    }
+
+    /// Dark button
+    pub fn dark(mut self) -> Self {
+        self.flags.set(BtnStyleFlags::DARK, true);
+        self.flags.set(BtnStyleFlags::LIGHT, false);
+        self
+    }
+
+    /// Align text left
+    pub fn align_left(mut self) -> Self {
+        self.flags.set(BtnStyleFlags::LEFT, true);
+        self
+    }
+
+    /// Align text right
+    pub fn align_right(mut self) -> Self {
+        self.flags.set(BtnStyleFlags::RIGHT, true);
+        self
+    }
+}
+
 impl Encode for BtnStyle {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         let colour = match self.colour {
-            BtnStyleColour::LightGrey => 0,
+            BtnStyleColour::NotEditable => 0,
             BtnStyleColour::Title => 1,
             BtnStyleColour::UnselectedText => 2,
             BtnStyleColour::SelectedText => 3,
@@ -104,7 +186,7 @@ impl Decode for BtnStyle {
             5 => BtnStyleColour::Cancel,
             6 => BtnStyleColour::TextString,
             7 => BtnStyleColour::Unavailable,
-            _ => BtnStyleColour::LightGrey,
+            _ => BtnStyleColour::NotEditable,
         };
         let flags = BtnStyleFlags::from_bits_truncate(val);
 
@@ -197,8 +279,8 @@ pub struct Btn {
     /// Button style,
     pub bstyle: BtnStyle,
 
-    /// Max chars permitted for a buttonw within input
-    pub typein: u8,
+    /// Max chars permitted for a button with input
+    pub typein: Option<u8>,
 
     /// Position - left (0-200)
     pub l: u8,
@@ -227,6 +309,7 @@ impl Decode for Btn {
         let inst = BtnInst::decode(buf)?;
         let bstyle = BtnStyle::decode(buf)?;
         let typein = u8::decode(buf)?;
+        let typein = if typein > 0 { Some(typein) } else { None };
         let l = u8::decode(buf)?;
         let t = u8::decode(buf)?;
         let w = u8::decode(buf)?;
@@ -300,7 +383,11 @@ impl Encode for Btn {
         self.clickid.encode(buf)?;
         self.inst.encode(buf)?;
         self.bstyle.encode(buf)?;
-        self.typein.encode(buf)?;
+        if let Some(typein) = self.typein {
+            typein.encode(buf)?;
+        } else {
+            0_u8.encode(buf)?;
+        }
         self.l.encode(buf)?;
         self.t.encode(buf)?;
         self.w.encode(buf)?;
@@ -356,7 +443,7 @@ pub struct Btc {
     pub cflags: BtnClickFlags,
 }
 
-#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Button Type - Sent back when a user types into a text entry "button"
 pub struct Btt {
@@ -371,13 +458,52 @@ pub struct Btt {
     /// Primarily used internally by LFS
     pub inst: BtnInst,
 
-    #[insim(pad_after = 1)]
     /// From original button specification (IS_BTN)
-    pub typein: u8,
+    pub typein: Option<u8>,
 
-    #[insim(codepage(length = 96))]
     /// Typed text, zero to TypeIn specified in IS_BTN
     pub text: String,
+}
+
+impl Decode for Btt {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
+        let reqi = RequestId::decode(buf)?;
+        let ucid = ConnectionId::decode(buf)?;
+        let clickid = ClickId::decode(buf)?;
+        let inst = BtnInst::decode(buf)?;
+        let typein = u8::decode(buf)?;
+        if typein > 96 {
+            return Err(insim_core::DecodeError::TooLarge);
+        }
+        let typein = if typein > 0 { Some(typein) } else { None };
+        buf.advance(1);
+        let text = String::decode_codepage(buf, 96)?;
+        Ok(Self {
+            reqi,
+            ucid,
+            clickid,
+            inst,
+            typein,
+            text,
+        })
+    }
+}
+
+impl Encode for Btt {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+        self.reqi.encode(buf)?;
+        self.ucid.encode(buf)?;
+        self.clickid.encode(buf)?;
+        self.inst.encode(buf)?;
+        let typein = self.typein.unwrap_or(0_u8);
+        if typein > 96 {
+            return Err(insim_core::EncodeError::TooLarge);
+        }
+        typein.encode(buf)?;
+        buf.put_bytes(0, 1);
+        self.text.encode_codepage(buf, 96, false)?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -440,7 +566,7 @@ mod tests {
         assert_from_to_bytes!(Btn, data.as_ref(), |parsed: Btn| {
             assert_eq!(parsed.ucid, ConnectionId(4));
             assert_eq!(parsed.clickid, ClickId(45));
-            assert_eq!(parsed.typein, 3);
+            assert!(matches!(parsed.typein, Some(3)));
             assert_eq!(parsed.l, 20);
             assert_eq!(parsed.t, 30);
             assert_eq!(parsed.w, 40);
@@ -472,13 +598,39 @@ mod tests {
         assert_from_to_bytes!(Btn, data.as_ref(), |parsed: Btn| {
             assert_eq!(parsed.ucid, ConnectionId(4));
             assert_eq!(parsed.clickid, ClickId(45));
-            assert_eq!(parsed.typein, 3);
+            assert!(matches!(parsed.typein, Some(3)));
             assert_eq!(parsed.l, 20);
             assert_eq!(parsed.t, 30);
             assert_eq!(parsed.w, 40);
             assert_eq!(parsed.h, 50);
             assert_eq!(&parsed.caption.unwrap(), "1234");
             assert_eq!(&parsed.text, "abcdefg");
+        });
+    }
+
+    #[test]
+    fn test_btn_with_zero_typein_is_none() {
+        let mut data = BytesMut::new();
+        data.extend_from_slice(&[
+            0,   // reqi
+            4,   // ucid
+            45,  // clickid
+            128, // inst
+            9,   // bstyle
+            0,   // typein
+            20,  // l
+            30,  // t
+            40,  // w
+            50,  // h
+        ]);
+        data.put_u8(0);
+        data.extend_from_slice(b"1234");
+        data.put_u8(0);
+        data.extend_from_slice(b"abcdefg");
+        data.put_bytes(0, 3);
+
+        assert_from_to_bytes!(Btn, data.as_ref(), |parsed: Btn| {
+            assert!(parsed.typein.is_none());
         });
     }
 
@@ -521,7 +673,7 @@ mod tests {
             assert_eq!(parsed.ucid, ConnectionId(2));
             assert_eq!(parsed.clickid, ClickId(3));
             assert!(parsed.inst.contains(BtnInst::ALWAYSON));
-            assert_eq!(parsed.typein, 7);
+            assert!(matches!(parsed.typein, Some(7)));
             assert_eq!(parsed.text, "123456|^$");
         });
     }

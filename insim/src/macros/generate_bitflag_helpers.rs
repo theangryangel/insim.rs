@@ -34,7 +34,7 @@ mod test {
     );
 
     #[test]
-    fn name() {
+    fn test_generated_bitflag_helpers() {
         let flags = MyFlags::FLAG_B | MyFlags::FLAG_C;
 
         assert!(!flags.is_flag_a());
