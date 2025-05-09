@@ -211,12 +211,16 @@ pub fn main() -> Result<()> {
         match packet {
             Packet::Rst(rst) => {
                 // FIXME
-                if matches!(rst.timing, LapTimingInfo::Standard(_)) {
+                if matches!(
+                    rst.timing,
+                    LapTimingInfo::Standard(_) | LapTimingInfo::Custom(_)
+                ) {
                     if !recording {
                         deltas.clear();
                         recording = true;
                     }
                 } else {
+                    println!("{:?}", rst);
                     recording = false;
                     deltas.clear();
                 }
