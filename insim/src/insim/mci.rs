@@ -70,7 +70,6 @@ pub struct CompCar {
     pub heading: Direction,
 
     /// Signed, rate of change of heading : (16384 = 360 deg/s)
-    // FIXME strongly type
     pub angvel: i16,
 }
 
@@ -96,8 +95,8 @@ impl Decode for CompCar {
         buf.advance(1);
         let xyz = Point::<i32>::decode(buf)?;
         let speed = Speed::from_game(u16::decode(buf)?);
-        let direction = Direction::from_u16_game_units(u16::decode(buf)?);
-        let heading = Direction::from_u16_game_units(u16::decode(buf)?);
+        let direction = Direction::decode_u16(buf)?;
+        let heading = Direction::decode_u16(buf)?;
         let angvel = i16::decode(buf)?;
         Ok(Self {
             node,
@@ -124,8 +123,8 @@ impl Encode for CompCar {
         buf.put_bytes(0, 1);
         self.xyz.encode(buf)?;
         self.speed.as_game().encode(buf)?;
-        self.direction.as_u16_game_units().encode(buf)?;
-        self.heading.as_u16_game_units().encode(buf)?;
+        self.direction.encode_u16(buf)?;
+        self.heading.encode_u16(buf)?;
         self.angvel.encode(buf)?;
         Ok(())
     }

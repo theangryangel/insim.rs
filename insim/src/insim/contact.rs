@@ -2,7 +2,7 @@
 use std::time::Duration;
 
 use bytes::{Buf, BufMut};
-use insim_core::{speed::Speed, Decode, Encode};
+use insim_core::{direction::Direction, speed::Speed, Decode, Encode};
 
 use super::{obh::spclose_strip_high_bits, CompCarInfo};
 use crate::identifiers::{PlayerId, RequestId};
@@ -37,15 +37,13 @@ pub struct ConInfo {
     pub gearsp: u8,
 
     /// Speed in m/s
-    pub speed: u8,
+    pub speed: Speed,
 
     /// Car's motion if Speed > 0: 0 = world y direction, 128 = 180 deg
-    // FIXME, use Direction
-    pub direction: u8,
+    pub direction: Direction,
 
     /// direction of forward axis: 0 = world y direction, 128 = 180 deg
-    // FIXME, use Direction
-    pub heading: u8,
+    pub heading: Direction,
 
     /// m/s^2 longitudinal acceleration (forward positive)
     pub accelf: u8,
@@ -80,8 +78,9 @@ impl Decode for ConInfo {
         let gearsp = (gearsp >> 4) & 0x0F; // gearsp is only first 4 bits
 
         let speed = u8::decode(buf)?;
-        let direction = u8::decode(buf)?;
-        let heading = u8::decode(buf)?;
+        let speed = Speed::from_meters_per_sec(speed as f32);
+        let direction = Direction::decode_u8(buf)?;
+        let heading = Direction::decode_u8(buf)?;
         let accelf = u8::decode(buf)?;
         let accelr = u8::decode(buf)?;
 
@@ -144,9 +143,9 @@ impl Encode for ConInfo {
         let gearsp = self.gearsp << 4;
         gearsp.encode(buf)?;
 
-        self.speed.encode(buf)?;
-        self.direction.encode(buf)?;
-        self.heading.encode(buf)?;
+        (self.speed.as_meters_per_sec() as u8).encode(buf)?;
+        self.direction.encode_u8(buf)?;
+        self.heading.encode_u8(buf)?;
         self.accelf.encode(buf)?;
         self.accelr.encode(buf)?;
         self.x.encode(buf)?;

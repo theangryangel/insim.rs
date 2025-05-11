@@ -40,8 +40,8 @@ impl DeltaTracker {
     pub fn record(&mut self, pos: Point<i32>, time: Instant) {
         let last = self.current_lap.last().map(|p| &p.position);
         // did we move at least 1m? if not, do nothing
-        // FIXME: could probably remove this with the speed check tbh.
-        if last.map_or(true, |last_pos| distance(*last_pos, pos) >= 1.0) {
+        // could probably remove this with the speed check tbh.
+        if last.map_or(true, |last_pos| last_pos.distance(&pos) >= 1.0) {
             self.current_lap.push(RefPoint {
                 position: pos,
                 time,
@@ -79,8 +79,8 @@ impl DeltaTracker {
             let p1 = reference_lap[i].position;
             let p2 = reference_lap[i + 1].position;
 
-            let proj = project_point_on_segment(current_pos, p1, p2);
-            let dist = distance(current_pos, proj);
+            let proj = current_pos.project_onto_segment(&p1, &p2);
+            let dist = current_pos.distance(&proj);
 
             if dist < best_dist {
                 best_dist = dist;
@@ -91,7 +91,7 @@ impl DeltaTracker {
         let r1 = &reference_lap[best_index];
         let r2 = &reference_lap[best_index + 1];
 
-        let t = project_ratio(current_pos, r1.position, r2.position);
+        let t = current_pos.project_onto_segment_ratio(&r1.position, &r2.position);
 
         let segment_duration = r2.time.duration_since(r1.time);
         let ref_time = r1.time + segment_duration.mul_f32(t);
@@ -101,68 +101,6 @@ impl DeltaTracker {
 
         Some(current_duration - ref_duration)
     }
-}
-
-// FIXME: add to insim_core::point::Point as method i.e. point.distance(other)
-fn distance(a: Point<i32>, b: Point<i32>) -> f32 {
-    let dx = (a.x - b.x) as f32;
-    let dy = (a.y - b.y) as f32;
-    let dz = (a.z - b.z) as f32;
-    (dx * dx + dy * dy + dz * dz).sqrt()
-}
-
-// FIXME: add to insim_core::point::Point as method i.e. point.dot(other)
-fn dot(a: Point<i32>, b: Point<i32>) -> i32 {
-    a.x * b.x + a.y * b.y + a.z * b.z
-}
-
-// FIXME: add to insim_core::point::Point
-fn project_point_on_segment(p: Point<i32>, a: Point<i32>, b: Point<i32>) -> Point<i32> {
-    let ab = Point {
-        x: b.x - a.x,
-        y: b.y - a.y,
-        z: b.z - a.z,
-    };
-    let ap = Point {
-        x: p.x - a.x,
-        y: p.y - a.y,
-        z: p.z - a.z,
-    };
-
-    let ab_len2 = dot(ab, ab) as f32;
-    if ab_len2 == 0.0 {
-        return a;
-    }
-
-    let t = (dot(ap, ab) as f32) / ab_len2;
-    let t = t.clamp(0.0, 1.0);
-
-    Point {
-        x: (a.x as f32 + ab.x as f32 * t).round() as i32,
-        y: (a.y as f32 + ab.y as f32 * t).round() as i32,
-        z: (a.z as f32 + ab.z as f32 * t).round() as i32,
-    }
-}
-
-// FIXME: add to insim_core::point::Point
-fn project_ratio(p: Point<i32>, a: Point<i32>, b: Point<i32>) -> f32 {
-    let ab = Point {
-        x: b.x - a.x,
-        y: b.y - a.y,
-        z: b.z - a.z,
-    };
-    let ap = Point {
-        x: p.x - a.x,
-        y: p.y - a.y,
-        z: p.z - a.z,
-    };
-
-    let ab_len2 = dot(ab, ab) as f32;
-    if ab_len2 == 0.0 {
-        return 0.0;
-    }
-
-    ((dot(ap, ab) as f32) / ab_len2).clamp(0.0, 1.0)
 }
 
 #[derive(Parser)]

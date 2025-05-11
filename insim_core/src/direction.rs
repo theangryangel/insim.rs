@@ -4,6 +4,10 @@ use std::{
     ops::{Add, Div, Mul, Sub},
 };
 
+use bytes::{Bytes, BytesMut};
+
+use crate::{Decode, DecodeError, Encode, EncodeError};
+
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Direction / Heading
@@ -12,16 +16,28 @@ pub struct Direction {
 }
 
 impl Direction {
-    /// From game MCI units
-    pub fn from_u16_game_units(value: u16) -> Self {
+    /// From game u16
+    pub fn from_game_u16(value: u16) -> Self {
         let radians = (value as f32) * std::f32::consts::PI / 32768.0;
         Self { radians }
     }
 
-    /// From game units (u8)
-    pub fn from_u8_game_units(value: u8) -> Self {
+    /// From game MCI units
+    pub fn decode_u16(buf: &mut Bytes) -> Result<Self, DecodeError> {
+        let value = u16::decode(buf)?;
+        Ok(Self::from_game_u16(value))
+    }
+
+    /// From game u8
+    pub fn from_game_u8(value: u8) -> Self {
         let radians = (value as f32) * std::f32::consts::PI / 128.0;
         Self { radians }
+    }
+
+    /// From game units (u8)
+    pub fn decode_u8(buf: &mut Bytes) -> Result<Self, DecodeError> {
+        let value = u8::decode(buf)?;
+        Ok(Self::from_game_u8(value))
     }
 
     /// From degrees
@@ -37,18 +53,28 @@ impl Direction {
         Self { radians: rad }.normalise()
     }
 
-    /// As game units
-    pub fn as_u16_game_units(&self) -> u16 {
+    /// As game u16
+    pub fn as_game_u16(&self) -> u16 {
         ((self.radians * 32768.0 / std::f32::consts::PI)
             .round()
             .clamp(0.0, 65535.0)) as u16
     }
 
     /// As game units
-    pub fn as_u8_game_units(&self) -> u8 {
+    pub fn encode_u16(&self, buf: &mut BytesMut) -> Result<(), EncodeError> {
+        self.as_game_u16().encode(buf)
+    }
+
+    /// As game u8
+    pub fn as_game_u8(&self) -> u8 {
         ((self.radians * 128.0 / std::f32::consts::PI)
             .round()
             .clamp(0.0, 255.0)) as u8
+    }
+
+    /// As game units
+    pub fn encode_u8(&self, buf: &mut BytesMut) -> Result<(), EncodeError> {
+        self.as_game_u8().encode(buf)
     }
 
     /// As degrees
@@ -134,13 +160,13 @@ mod test {
 
     #[test]
     fn test_direction_game_units() {
-        assert_eq!(Direction::from_u16_game_units(32768).as_degrees(), 180.0);
-        assert_eq!(Direction::from_degrees(180.0).as_u16_game_units(), 32768);
+        assert_eq!(Direction::from_game_u16(32768).as_degrees(), 180.0);
+        assert_eq!(Direction::from_degrees(180.0).as_game_u16(), 32768);
     }
 
     #[test]
     fn test_game_units_u8() {
-        assert_eq!(Direction::from_u8_game_units(128).as_degrees(), 180.0);
-        assert_eq!(Direction::from_degrees(180.0).as_u8_game_units(), 128);
+        assert_eq!(Direction::from_game_u8(128).as_degrees(), 180.0);
+        assert_eq!(Direction::from_degrees(180.0).as_game_u8(), 128);
     }
 }

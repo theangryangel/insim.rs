@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bitflags::bitflags;
 use bytes::{Buf, BufMut};
-use insim_core::{speed::Speed, Decode, Encode};
+use insim_core::{direction::Direction, speed::Speed, Decode, Encode};
 
 use crate::identifiers::{PlayerId, RequestId};
 
@@ -37,20 +37,18 @@ generate_bitflag_helpers! {
 
 impl_bitflags_from_to_bytes!(ObhFlags, u8);
 
-#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Vehicle made contact with something else
 pub struct CarContact {
-    // FIXME, use Direction
     /// Car's motion if Speed > 0: 0 = world y direction, 128 = 180 deg
-    pub direction: u8,
+    pub direction: Direction,
 
     /// Direction of forward axis: 0 = world y direction, 128 = 180 deg
-    // FIXME, use Direction
-    pub heading: u8,
+    pub heading: Direction,
 
     /// Speed in m/s
-    pub speed: u8,
+    pub speed: Speed,
 
     /// Z position (1 metre = 16)
     pub z: u8,
@@ -60,6 +58,38 @@ pub struct CarContact {
 
     /// Y position (1 metre = 16)
     pub y: i16,
+}
+
+impl Decode for CarContact {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
+        let direction = Direction::decode_u8(buf)?;
+        let heading = Direction::decode_u8(buf)?;
+        let speed = u8::decode(buf)?;
+        let speed = Speed::from_meters_per_sec(speed as f32);
+        let z = u8::decode(buf)?;
+        let x = i16::decode(buf)?;
+        let y = i16::decode(buf)?;
+        Ok(Self {
+            direction,
+            heading,
+            speed,
+            z,
+            x,
+            y,
+        })
+    }
+}
+
+impl Encode for CarContact {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+        self.direction.encode_u8(buf)?;
+        self.heading.encode_u8(buf)?;
+        (self.speed.as_meters_per_sec() as u8).encode(buf)?;
+        self.z.encode(buf)?;
+        self.x.encode(buf)?;
+        self.y.encode(buf)?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Default)]
