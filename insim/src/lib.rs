@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(test, deny(warnings, unreachable_pub))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 use std::net::SocketAddr;
 
@@ -35,9 +36,11 @@ pub use error::Error;
 /// Rexport insim_core
 pub use insim_core as core;
 #[cfg(feature = "pth")]
+#[cfg_attr(docsrs, doc(cfg(feature = "pth")))]
 /// Report insim_pth when pth feature is enabled
 pub use insim_pth as pth;
 #[cfg(feature = "smx")]
+#[cfg_attr(docsrs, doc(cfg(feature = "smx")))]
 /// Report insim_smx when smx feature is enabled
 pub use insim_smx as smx;
 pub use packet::{Packet, WithRequestId};

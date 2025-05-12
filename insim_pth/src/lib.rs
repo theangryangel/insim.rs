@@ -16,6 +16,7 @@
 //! The distance between each [Node] is not constant. According to the LFS developers
 //! there is approximately 0.2 seconds of time between passing one node and the next,
 //! when you are "driving at a reasonable speed".
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 use std::{
     fs::{self, File},
@@ -35,10 +36,10 @@ pub enum Error {
     IO { kind: ErrorKind, message: String },
 
     #[error("ReadWriteBuf Err {0:?}")]
-    ReadWriteBuf(#[from] insim_core::EncodeError),
+    Encode(#[from] insim_core::EncodeError),
 
     #[error("ReadWriteBuf Err {0:?}")]
-    DecodeError(#[from] insim_core::DecodeError),
+    Decode(#[from] insim_core::DecodeError),
 }
 
 impl From<std::io::Error> for Error {

@@ -12,8 +12,6 @@ pub trait AsyncReadWrite: AsyncRead + AsyncWrite + Debug + Unpin + Send + Sync {
 
 impl<T: AsyncRead + AsyncWrite + Debug + Unpin + Send + Sync> AsyncReadWrite for T {}
 
-// #[cfg(feature = "websocket")]
-// use super::websocket::TungsteniteWebSocket;
 use crate::{
     error::Error,
     insim::Isi,

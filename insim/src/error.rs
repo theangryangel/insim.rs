@@ -67,6 +67,7 @@ pub enum Error {
 }
 
 #[cfg(feature = "tokio")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 impl From<tokio::time::error::Elapsed> for Error {
     fn from(value: tokio::time::error::Elapsed) -> Self {
         Error::Timeout(value.to_string())
@@ -74,6 +75,7 @@ impl From<tokio::time::error::Elapsed> for Error {
 }
 
 #[cfg(feature = "websocket")]
+#[cfg_attr(docsrs, doc(cfg(feature = "websocket")))]
 impl From<tokio_tungstenite::tungstenite::Error> for Error {
     fn from(value: tokio_tungstenite::tungstenite::Error) -> Self {
         // TODO a lot of this is less than ideal mapping

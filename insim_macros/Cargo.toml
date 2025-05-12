@@ -11,6 +11,10 @@ homepage.workspace = true
 [lib]
 proc-macro = true
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docrs"]
+
 [dependencies]
 syn = { workspace = true, features = ["full"] }
 quote = { workspace = true }

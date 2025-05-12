@@ -5,8 +5,10 @@ use std::{
 };
 
 #[cfg(feature = "blocking")]
+#[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
 use crate::net::blocking_impl::Framed as BlockingFramed;
 #[cfg(feature = "tokio")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 use crate::net::tokio_impl::Framed as AsyncFramed;
 use crate::{
     identifiers::RequestId,
@@ -75,6 +77,7 @@ pub struct Builder {
     relay_admin_password: Option<String>,
 
     #[cfg(feature = "websocket")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "websocket")))]
     relay_websocket: bool,
 }
 
@@ -143,6 +146,7 @@ impl Builder {
 
     /// Use the LFS World Relay over Websockets.
     #[cfg(feature = "websocket")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "websocket")))]
     pub fn relay_websocket(mut self, ws: bool) -> Self {
         self.relay_websocket = ws;
         self
@@ -335,6 +339,7 @@ impl Builder {
     /// configuration.
     /// The `Builder` is not consumed and may be reused.
     #[cfg(feature = "blocking")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
     pub fn connect_blocking(&self) -> Result<BlockingFramed> {
         use crate::{net::blocking_impl::UdpStream, LFSW_RELAY_ADDR};
 
@@ -412,6 +417,7 @@ impl Builder {
     /// configuration.
     /// The `Builder` is not consumed and may be reused.
     #[cfg(feature = "tokio")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     pub async fn connect_async(&self) -> Result<AsyncFramed> {
         use tokio::time::timeout;
 
@@ -480,6 +486,7 @@ impl Builder {
     }
 
     #[cfg(feature = "tokio")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     async fn _connect_relay(&self) -> Result<AsyncFramed> {
         use tokio::time::timeout;
 

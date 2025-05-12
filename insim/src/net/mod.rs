@@ -2,10 +2,12 @@
 
 /// Async implementation
 #[cfg(feature = "tokio")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 pub mod tokio_impl;
 
 /// Sync or blocking implementation
 #[cfg(feature = "blocking")]
+#[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
 pub mod blocking_impl;
 
 pub(crate) mod codec;

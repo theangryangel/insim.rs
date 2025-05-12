@@ -8,6 +8,7 @@
 //! available.
 //!
 //! I would suggest that SMX files should be considered historical at this point.
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 use std::{
     fs::{self, File},
@@ -27,10 +28,10 @@ pub enum Error {
     IO { kind: ErrorKind, message: String },
 
     #[error("BinRw Err {0:?}")]
-    ReadWriteBuf(#[from] insim_core::EncodeError),
+    Encode(#[from] insim_core::EncodeError),
 
     #[error("Decode error: {0}")]
-    DecodeError(#[from] insim_core::DecodeError),
+    Decode(#[from] insim_core::DecodeError),
 }
 
 impl From<std::io::Error> for Error {
