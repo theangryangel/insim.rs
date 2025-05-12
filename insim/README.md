@@ -27,14 +27,14 @@ In a handful of circumstances we have needed to rename, or separate some fields
 
 The following are a list of [Cargo features][cargo-features] that can be enabled or disabled:
 
-| Name      | Description                                                                 | Default? |
-| --------- | --------------------------------------------------------------------------- | -------- |
-| serde     | Enable serde support                                                        | No       |
-| pth       | Pull in insim_pth and re-export                                             | No       |
-| smx       | Pull in insim_smx and re-export                                             | No       |
-| tokio     | Enable tokio support                                                        | Yes      |
-| blocking  | Enable blocking/sync support                                                | Yes      |
-| websocket | Enable LFSW Relay support over websocket using Tungstenite (requires tokio) | Yes      |
+| Name        | Description                                                                 | Default? |
+| ----------- | --------------------------------------------------------------------------- | -------- |
+| `serde`     | Enable serde support                                                        | No       |
+| `pth`       | Pull in insim_pth and re-export                                             | No       |
+| `smx`       | Pull in insim_smx and re-export                                             | No       |
+| `tokio`     | Enable tokio support                                                        | Yes      |
+| `blocking`  | Enable blocking/sync support                                                | Yes      |
+| `websocket` | Enable LFSW Relay support over websocket using Tungstenite (requires tokio) | Yes      |
 
 ## Making a TCP connection (using tokio)
 

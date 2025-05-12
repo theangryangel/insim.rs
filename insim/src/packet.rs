@@ -358,10 +358,13 @@ impl Packet {
     }
 }
 
+/// Helper method to assist in converting the inner part of a [Packet] variant into [Packet] with a
+/// request identifier set. Mostly useful for things like [Packet::Tiny].
 pub trait WithRequestId
 where
     Self: std::fmt::Debug,
 {
+    /// Convert something into a Packet with a request identifier
     fn with_request_id<R: Into<crate::identifiers::RequestId>>(
         self,
         reqi: R,

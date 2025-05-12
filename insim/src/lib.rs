@@ -2,19 +2,21 @@
 #![cfg_attr(test, deny(warnings, unreachable_pub))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+#[cfg(any(feature = "blocking", feature = "tokio"))]
 use std::net::SocketAddr;
 
 #[macro_use]
 mod macros;
 
 #[doc(hidden)]
+#[cfg(any(feature = "blocking", feature = "tokio"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "blocking", feature = "tokio"))))]
 pub mod builder;
 #[doc(hidden)]
 pub mod error;
 pub mod identifiers;
 pub mod insim;
 pub mod net;
-#[doc(hidden)]
 pub mod packet;
 pub mod relay;
 #[doc(hidden)]
@@ -31,6 +33,8 @@ pub(crate) const MAX_SIZE_PACKET: usize = 255 * 4;
 
 pub(crate) const DEFAULT_BUFFER_CAPACITY: usize = MAX_SIZE_PACKET * 6;
 
+#[cfg(any(feature = "blocking", feature = "tokio"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "blocking", feature = "tokio"))))]
 pub use builder::Builder;
 pub use error::Error;
 /// Rexport insim_core
@@ -60,6 +64,8 @@ pub use result::Result;
 ///     println!("{:?}", packet);
 /// }
 /// ```
+#[cfg(any(feature = "blocking", feature = "tokio"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "blocking", feature = "tokio"))))]
 pub fn tcp<R: Into<SocketAddr>>(remote_addr: R) -> builder::Builder {
     builder::Builder::default().tcp(remote_addr)
 }
@@ -79,6 +85,8 @@ pub fn tcp<R: Into<SocketAddr>>(remote_addr: R) -> builder::Builder {
 ///     println!("{:?}", packet);
 /// }
 /// ```
+#[cfg(any(feature = "blocking", feature = "tokio"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "blocking", feature = "tokio"))))]
 pub fn udp<L: Into<Option<SocketAddr>>, R: Into<SocketAddr>>(
     remote_addr: R,
     local_addr: L,
@@ -104,6 +112,8 @@ pub fn udp<L: Into<Option<SocketAddr>>, R: Into<SocketAddr>>(
 ///     println!("{:?}", packet);
 /// }
 /// ```
+#[cfg(any(feature = "blocking", feature = "tokio"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "blocking", feature = "tokio"))))]
 pub fn relay() -> builder::Builder {
     builder::Builder::default().relay()
 }
