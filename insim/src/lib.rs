@@ -1,19 +1,22 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(test, deny(warnings, unreachable_pub))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
+#[cfg(any(feature = "blocking", feature = "tokio"))]
 use std::net::SocketAddr;
 
 #[macro_use]
 mod macros;
 
 #[doc(hidden)]
+#[cfg(any(feature = "blocking", feature = "tokio"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "blocking", feature = "tokio"))))]
 pub mod builder;
 #[doc(hidden)]
 pub mod error;
 pub mod identifiers;
 pub mod insim;
 pub mod net;
-#[doc(hidden)]
 pub mod packet;
 pub mod relay;
 #[doc(hidden)]
@@ -24,21 +27,24 @@ pub const VERSION: u8 = 9;
 /// The LFS World Relay address and port
 pub const LFSW_RELAY_ADDR: &str = "isrelay.lfs.net:47474";
 
-// XXX: This is a temporary hack
-// Why 255 * 4? Because the size of a packet is a u8, with a max byte size of 255.
-// In "compressed" mode the raw size is multiplied by 4.
+/// Why 255 * 4? Because the size of a packet is a u8, with a max byte size of 255.
+/// In "compressed" mode the raw size is multiplied by 4.
 pub(crate) const MAX_SIZE_PACKET: usize = 255 * 4;
 
 pub(crate) const DEFAULT_BUFFER_CAPACITY: usize = MAX_SIZE_PACKET * 6;
 
+#[cfg(any(feature = "blocking", feature = "tokio"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "blocking", feature = "tokio"))))]
 pub use builder::Builder;
 pub use error::Error;
 /// Rexport insim_core
 pub use insim_core as core;
 #[cfg(feature = "pth")]
+#[cfg_attr(docsrs, doc(cfg(feature = "pth")))]
 /// Report insim_pth when pth feature is enabled
 pub use insim_pth as pth;
 #[cfg(feature = "smx")]
+#[cfg_attr(docsrs, doc(cfg(feature = "smx")))]
 /// Report insim_smx when smx feature is enabled
 pub use insim_smx as smx;
 pub use packet::{Packet, WithRequestId};
@@ -58,6 +64,8 @@ pub use result::Result;
 ///     println!("{:?}", packet);
 /// }
 /// ```
+#[cfg(any(feature = "blocking", feature = "tokio"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "blocking", feature = "tokio"))))]
 pub fn tcp<R: Into<SocketAddr>>(remote_addr: R) -> builder::Builder {
     builder::Builder::default().tcp(remote_addr)
 }
@@ -77,6 +85,8 @@ pub fn tcp<R: Into<SocketAddr>>(remote_addr: R) -> builder::Builder {
 ///     println!("{:?}", packet);
 /// }
 /// ```
+#[cfg(any(feature = "blocking", feature = "tokio"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "blocking", feature = "tokio"))))]
 pub fn udp<L: Into<Option<SocketAddr>>, R: Into<SocketAddr>>(
     remote_addr: R,
     local_addr: L,
@@ -102,6 +112,8 @@ pub fn udp<L: Into<Option<SocketAddr>>, R: Into<SocketAddr>>(
 ///     println!("{:?}", packet);
 /// }
 /// ```
+#[cfg(any(feature = "blocking", feature = "tokio"))]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "blocking", feature = "tokio"))))]
 pub fn relay() -> builder::Builder {
     builder::Builder::default().relay()
 }

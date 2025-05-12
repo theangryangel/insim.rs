@@ -1,18 +1,10 @@
 use std::time::Duration;
 
-use insim_core::{
-    binrw::{self, binrw},
-    duration::{binrw_parse_duration, binrw_write_duration},
-    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-};
-
 use crate::identifiers::RequestId;
 
-#[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// Replay Information Error
 pub enum RipError {
@@ -56,11 +48,8 @@ pub enum RipError {
 
 bitflags::bitflags! {
     /// Bitwise flags used within the [Rip] packet
-    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     pub struct RipOptions: u8 {
         /// Replay will loop
         const LOOP = (1 << 0);
@@ -81,8 +70,9 @@ generate_bitflag_helpers! {
     pub is_full_physics_simulation => FULL_PHYS
 }
 
-#[binrw]
-#[derive(Debug, Clone, Default)]
+impl_bitflags_from_to_bytes!(RipOptions, u8);
+
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Replay Information
 pub struct Rip {
@@ -93,33 +83,64 @@ pub struct Rip {
     pub error: RipError,
 
     /// Multiplayer replay?
-    #[br(map = |x: u8| x != 0)]
-    #[bw(map = |&x| x as u8)]
     pub mpr: bool,
 
     /// Paused playback
-    #[br(map = |x: u8| x != 0)]
-    #[bw(map = |&x| x as u8)]
     pub paused: bool,
 
     /// Misc options. See [RipOptions].
-    #[brw(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub options: RipOptions,
 
     /// Request: destination / Reply: position
-    #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
-    #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
+    #[insim(duration(milliseconds = u32))]
     pub ctime: Duration,
 
     /// Request: zero / reply: replay length
-    #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
-    #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
+    #[insim(duration(milliseconds = u32))]
     pub ttime: Duration,
 
     /// Zero or replay name
-    #[bw(write_with = binrw_write_codepage_string::<64, _>)]
-    #[br(parse_with = binrw_parse_codepage_string::<64, _>)]
+    #[insim(codepage(length = 64, trailing_nul = true))]
     pub rname: String,
 }
 
 impl_typical_with_request_id!(Rip);
+
+#[cfg(test)]
+mod test {
+    use bytes::{BufMut, BytesMut};
+
+    use super::*;
+
+    #[test]
+    fn test_rip() {
+        let mut data = BytesMut::new();
+        data.extend_from_slice(&[
+            2,   // reqi
+            0,   // error
+            1,   // mpr
+            1,   // paused
+            6,   // options
+            0,   // sp3
+            116, // ctime (1)
+            41,  // ctime (2)
+            2,   // ctime (3)
+            0,   // ctime (4)
+            0,   // ttime (1)
+            0,   // ttime (2)
+            0,   // ttime (3)
+            0,   // ttime (4)
+        ]);
+        data.extend_from_slice(b"name_of_thing");
+        data.put_bytes(0, 64 - 13);
+
+        assert_from_to_bytes!(Rip, data.as_ref(), |parsed: Rip| {
+            assert_eq!(parsed.reqi, RequestId(2));
+            assert_eq!(parsed.mpr, true);
+            assert_eq!(parsed.paused, true);
+            assert_eq!(parsed.ctime, Duration::from_millis(141684));
+            assert_eq!(parsed.rname, "name_of_thing");
+        });
+    }
+}

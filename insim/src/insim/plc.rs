@@ -1,8 +1,6 @@
+use bytes::{Buf, BufMut};
 use indexmap::{set::Iter as IndexSetIter, IndexSet};
-use insim_core::{
-    binrw::{self, binrw},
-    vehicle::Vehicle,
-};
+use insim_core::{vehicle::Vehicle, Decode, Encode};
 
 use crate::{
     error::Error,
@@ -17,26 +15,26 @@ pub struct PlcAllowedCarsSet {
 }
 
 impl PlcAllowedCarsSet {
-    const XF_GTI: u32 = (1 << 1);
-    const XR_GT: u32 = (1 << 2);
-    const XR_GT_TURBO: u32 = (1 << 3);
-    const RB4: u32 = (1 << 4);
-    const FXO_TURBO: u32 = (1 << 5);
-    const LX4: u32 = (1 << 6);
-    const LX6: u32 = (1 << 7);
-    const MRT5: u32 = (1 << 8);
-    const UF_1000: u32 = (1 << 9);
-    const RACEABOUT: u32 = (1 << 10);
-    const FZ50: u32 = (1 << 11);
-    const FORMULA_XR: u32 = (1 << 12);
-    const XF_GTR: u32 = (1 << 13);
-    const UF_GTR: u32 = (1 << 14);
-    const FORMULA_V8: u32 = (1 << 15);
-    const FXO_GTR: u32 = (1 << 16);
-    const XR_GTR: u32 = (1 << 17);
-    const FZ50_GTR: u32 = (1 << 18);
-    const BWM_SAUBER_F1_06: u32 = (1 << 19);
-    const FORMULA_BMW_FB02: u32 = (1 << 20);
+    const XF_GTI: u32 = 1;
+    const XR_GT: u32 = (1 << 1);
+    const XR_GT_TURBO: u32 = (1 << 2);
+    const RB4: u32 = (1 << 3);
+    const FXO_TURBO: u32 = (1 << 4);
+    const LX4: u32 = (1 << 5);
+    const LX6: u32 = (1 << 6);
+    const MRT5: u32 = (1 << 7);
+    const UF_1000: u32 = (1 << 8);
+    const RACEABOUT: u32 = (1 << 9);
+    const FZ50: u32 = (1 << 10);
+    const FORMULA_XR: u32 = (1 << 11);
+    const XF_GTR: u32 = (1 << 12);
+    const UF_GTR: u32 = (1 << 13);
+    const FORMULA_V8: u32 = (1 << 14);
+    const FXO_GTR: u32 = (1 << 15);
+    const XR_GTR: u32 = (1 << 16);
+    const FZ50_GTR: u32 = (1 << 17);
+    const BWM_SAUBER_F1_06: u32 = (1 << 18);
+    const FORMULA_BMW_FB02: u32 = (1 << 19);
 
     /// Does this set include a vehicle?
     pub fn contains(&self, v: &Vehicle) -> bool {
@@ -179,33 +177,50 @@ impl PlcAllowedCarsSet {
     }
 }
 
-#[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Player ALlowed Cars. Allows you to restrict access to the standard (non-mod) vehicles.
 pub struct Plc {
     /// Non-zero if the packet is a packet request or a reply to a request
-    #[brw(pad_after = 1)]
     pub reqi: RequestId,
 
     /// Unique connection id to change
-    #[brw(pad_before = 3)]
     pub ucid: ConnectionId,
 
     /// Player's allow cars
-    #[br(map = PlcAllowedCarsSet::from_bits_truncate)]
-    #[bw(map = |x: &PlcAllowedCarsSet| x.bits())]
     pub cars: PlcAllowedCarsSet,
 }
 
 impl_typical_with_request_id!(Plc);
+
+impl Decode for Plc {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
+        let reqi = RequestId::decode(buf)?;
+        buf.advance(1);
+        let ucid = ConnectionId::decode(buf)?;
+        buf.advance(3);
+        let cars = PlcAllowedCarsSet::from_bits_truncate(u32::decode(buf)?);
+        Ok(Self { reqi, ucid, cars })
+    }
+}
+
+impl Encode for Plc {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+        self.reqi.encode(buf)?;
+        buf.put_bytes(0, 1);
+        self.ucid.encode(buf)?;
+        buf.put_bytes(0, 3);
+        self.cars.bits().encode(buf)?;
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_hashset_xrg() {
+    fn test_plcallowedcarsset() {
         let mut allowed = PlcAllowedCarsSet::default();
 
         assert!(allowed.insert(Vehicle::Unknown).is_err());
@@ -225,5 +240,32 @@ mod tests {
         );
 
         assert_eq!(allowed.bits(), reversed.bits());
+    }
+
+    #[test]
+    fn test_plc() {
+        assert_from_to_bytes!(
+            Plc,
+            [
+                0,  // reqi
+                0,  // zero
+                13, // ucid
+                0,  // sp1
+                0,  // sp2
+                0,  // sp3
+                68, // carflags (1)
+                8,  // carflags (2)
+                0,  // carflags (3)
+                0,  // carflags (4)
+            ],
+            |parsed: Plc| {
+                assert_eq!(parsed.ucid, ConnectionId(13));
+                assert!(
+                    parsed.cars.contains(&Vehicle::Fox)
+                        && parsed.cars.contains(&Vehicle::Lx6)
+                        && parsed.cars.contains(&Vehicle::Xrt)
+                );
+            }
+        );
     }
 }

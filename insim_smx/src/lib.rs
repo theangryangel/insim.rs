@@ -8,20 +8,16 @@
 //! available.
 //!
 //! I would suggest that SMX files should be considered historical at this point.
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
-#[cfg(test)]
-use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::{
     fs::{self, File},
-    io::ErrorKind,
+    io::{ErrorKind, Read},
     path::PathBuf,
 };
 
-use insim_core::{
-    binrw::{self, binrw, BinRead},
-    point::Point,
-    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use insim_core::{point::Point, Decode, DecodeString, Encode, EncodeString};
 use thiserror::Error;
 
 #[non_exhaustive]
@@ -32,7 +28,10 @@ pub enum Error {
     IO { kind: ErrorKind, message: String },
 
     #[error("BinRw Err {0:?}")]
-    BinRw(#[from] binrw::Error),
+    Encode(#[from] insim_core::EncodeError),
+
+    #[error("Decode error: {0}")]
+    Decode(#[from] insim_core::DecodeError),
 }
 
 impl From<std::io::Error> for Error {
@@ -44,8 +43,7 @@ impl From<std::io::Error> for Error {
     }
 }
 
-#[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 /// Red Green Blue
 pub struct Rgb {
     /// Red
@@ -56,8 +54,7 @@ pub struct Rgb {
     pub b: u8,
 }
 
-#[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 /// RGB with alpha channel
 pub struct Argb {
     /// Alpha
@@ -66,8 +63,7 @@ pub struct Argb {
     pub rgb: Rgb,
 }
 
-#[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 /// An Object at a given point with a colour
 pub struct ObjectPoint {
     /// Position/point
@@ -76,20 +72,18 @@ pub struct ObjectPoint {
     pub colour: Argb,
 }
 
-#[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 /// Triangle block
 pub struct Triangle {
     /// Vertex A
     pub a: u16,
     /// Vertex B
     pub b: u16,
-    #[brw(pad_after = 2)]
+    #[insim(pad_after = 2)]
     /// Vertex C
     pub c: u16,
 }
 
-#[binrw]
 #[derive(Debug, Default, Clone)]
 /// Object Block
 pub struct Object {
@@ -98,24 +92,55 @@ pub struct Object {
     /// Radius of object
     pub radius: i32,
 
-    #[bw(calc = points.len() as i32)]
-    num_object_points: i32,
-
-    #[bw(calc = triangles.len() as i32)]
-    num_triangles: i32,
-
-    #[br(count = num_object_points)]
     /// List of points
     pub points: Vec<ObjectPoint>,
 
-    #[br(count = num_triangles)]
     /// list of triangles
     pub triangles: Vec<Triangle>,
 }
 
-#[binrw]
+impl Decode for Object {
+    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
+        let center = Point::<i32>::decode(buf)?;
+        let radius = i32::decode(buf)?;
+        let mut num_object_points = i32::decode(buf)?;
+        let mut num_triangles = i32::decode(buf)?;
+        let mut points = Vec::new();
+        let mut triangles = Vec::new();
+        while num_object_points > 0 {
+            points.push(ObjectPoint::decode(buf)?);
+            num_object_points -= 1;
+        }
+        while num_triangles > 0 {
+            triangles.push(Triangle::decode(buf)?);
+            num_triangles -= 1;
+        }
+        Ok(Self {
+            center,
+            radius,
+            points,
+            triangles,
+        })
+    }
+}
+
+impl Encode for Object {
+    fn encode(&self, buf: &mut BytesMut) -> Result<(), insim_core::EncodeError> {
+        self.center.encode(buf)?;
+        self.radius.encode(buf)?;
+        (self.points.len() as i32).encode(buf)?;
+        (self.triangles.len() as i32).encode(buf)?;
+        for i in self.points.iter() {
+            i.encode(buf)?;
+        }
+        for i in self.triangles.iter() {
+            i.encode(buf)?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Default, Clone)]
-#[brw(magic = b"LFSSMX", little)]
 /// Smx file
 pub struct Smx {
     /// Game version
@@ -131,38 +156,97 @@ pub struct Smx {
     /// Resolution: 0 = High, 1 = Low
     pub resolution: u8,
 
-    #[brw(pad_after = 4)]
     /// Always 1
     pub vertex_colours: u8,
 
-    #[bw(write_with = binrw_write_codepage_string::<32, _>)]
-    #[br(parse_with = binrw_parse_codepage_string::<32, _>)]
     /// Track
     pub track: String,
 
-    #[brw(pad_after = 9)]
     /// Colour of ground
     pub ground_colour: Rgb,
 
-    #[bw(calc = objects.len() as i32)]
-    num_objects: i32,
-
-    #[br(count = num_objects)]
     /// List of objects
     pub objects: Vec<Object>,
 
-    #[bw(calc = checkpoint_object_index.len() as i32)]
-    num_checkpoints: i32,
-
-    #[br(count = num_checkpoints)]
     /// List of checkpoints
     pub checkpoint_object_index: Vec<i32>,
+}
+
+impl Decode for Smx {
+    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
+        let magic = String::decode_ascii(buf, 6)?;
+        if magic != "LFSSMX" {
+            unimplemented!("Not a LFS SMX file");
+        }
+        let game_version = u8::decode(buf)?;
+        let game_revision = u8::decode(buf)?;
+        let smx_version = u8::decode(buf)?;
+        let dimensions = u8::decode(buf)?;
+        let resolution = u8::decode(buf)?;
+        let vertex_colours = u8::decode(buf)?;
+        buf.advance(4);
+        let track = String::decode_codepage(buf, 32)?;
+        let ground_colour = Rgb::decode(buf)?;
+        buf.advance(9);
+        let mut num_objects = i32::decode(buf)?;
+        let mut objects = Vec::new();
+        while num_objects > 0 {
+            objects.push(Object::decode(buf)?);
+            num_objects -= 1;
+        }
+        let mut num_checkpoints = i32::decode(buf)?;
+        let mut checkpoint_object_index = Vec::new();
+        while num_checkpoints > 0 {
+            checkpoint_object_index.push(i32::decode(buf)?);
+            num_checkpoints -= 1;
+        }
+        Ok(Self {
+            game_version,
+            game_revision,
+            smx_version,
+            dimensions,
+            resolution,
+            vertex_colours,
+            track,
+            ground_colour,
+            objects,
+            checkpoint_object_index,
+        })
+    }
+}
+
+impl Encode for Smx {
+    fn encode(&self, buf: &mut BytesMut) -> Result<(), insim_core::EncodeError> {
+        buf.extend_from_slice(b"LFSSMX");
+        self.game_version.encode(buf)?;
+        self.game_revision.encode(buf)?;
+        self.smx_version.encode(buf)?;
+        self.dimensions.encode(buf)?;
+        self.resolution.encode(buf)?;
+        self.vertex_colours.encode(buf)?;
+        buf.put_bytes(0, 4);
+        self.track.encode_codepage(buf, 32, false)?;
+        self.ground_colour.encode(buf)?;
+        buf.put_bytes(0, 9);
+        (self.objects.len() as i32).encode(buf)?;
+        for i in self.objects.iter() {
+            i.encode(buf)?;
+        }
+        (self.checkpoint_object_index.len() as i32).encode(buf)?;
+        for i in self.checkpoint_object_index.iter() {
+            i.encode(buf)?;
+        }
+        Ok(())
+    }
 }
 
 impl Smx {
     /// Read and parse a SMX file into a [Smx] struct.
     pub fn from_file(i: &mut File) -> Result<Self, Error> {
-        Self::read(i).map_err(Error::from).map_err(Error::from)
+        let mut data = Vec::new();
+        let _ = i.read_to_end(&mut data)?;
+        let mut data = Bytes::from(data);
+        Self::decode(&mut data).map_err(Error::from)
     }
 
     /// Read and parse a SMX file into a [Smx] struct.
@@ -175,56 +259,53 @@ impl Smx {
         }
 
         let mut input = fs::File::open(i).map_err(Error::from)?;
-        let result = Self::read(&mut input)?;
-
-        Ok(result)
+        Self::from_file(&mut input)
     }
 }
 
 #[cfg(test)]
-fn assert_valid_autocross_3dh(p: &Smx) {
-    assert_eq!(p.objects.len(), 1666);
-    assert_eq!(p.checkpoint_object_index.len(), 6);
-    assert_eq!(p.track, "Autocross");
-    assert_eq!(p.track.as_bytes().len(), 9);
-}
+mod test {
+    use super::*;
 
-#[test]
-fn test_smx_decode_from_pathbuf() {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("./tests/Autocross_3DH.smx");
-    let p = Smx::from_pathbuf(&path).expect("Expected SMX file to be parsed");
+    fn assert_valid_autocross_3dh(p: &Smx) {
+        assert_eq!(p.objects.len(), 1666);
+        assert_eq!(p.checkpoint_object_index.len(), 6);
+        assert_eq!(p.track, "Autocross");
+        assert_eq!(p.track.as_bytes().len(), 9);
+    }
 
-    assert_valid_autocross_3dh(&p);
-}
+    #[test]
+    fn test_smx_decode_from_pathbuf() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("./tests/Autocross_3DH.smx");
+        let p = Smx::from_pathbuf(&path).expect("Expected SMX file to be parsed");
 
-#[test]
-fn test_smx_decode_from_file() {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("./tests/Autocross_3DH.smx");
-    let mut file = File::open(path).expect("Expected Autocross_3DH.smx to exist");
-    let p = Smx::from_file(&mut file).expect("Expected SMX file to be parsed");
+        assert_valid_autocross_3dh(&p);
+    }
 
-    let pos = file.stream_position().unwrap();
-    let end = file.seek(SeekFrom::End(0)).unwrap();
+    #[test]
+    fn test_smx_decode_from_file() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("./tests/Autocross_3DH.smx");
+        let mut file = File::open(path).expect("Expected Autocross_3DH.smx to exist");
+        let p = Smx::from_file(&mut file).expect("Expected SMX file to be parsed");
 
-    assert_eq!(pos, end, "Expected the whole file to be completely read");
+        assert_valid_autocross_3dh(&p);
+    }
 
-    assert_valid_autocross_3dh(&p);
-}
+    #[test]
+    fn test_smx_encode() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("./tests/Autocross_3DH.smx");
+        let p = Smx::from_pathbuf(&path).expect("Expected SMX file to be parsed");
 
-#[test]
-fn test_smx_encode() {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("./tests/Autocross_3DH.smx");
-    let p = Smx::from_pathbuf(&path).expect("Expected SMX file to be parsed");
+        let mut file = File::open(path).expect("Expected Autocross_3DH.smx to exist");
+        let mut raw: Vec<u8> = Vec::new();
+        let _ = file
+            .read_to_end(&mut raw)
+            .expect("Expected to read whole file");
 
-    let mut file = File::open(path).expect("Expected Autocross_3DH.smx to exist");
-    let mut raw: Vec<u8> = Vec::new();
-    let _ = file
-        .read_to_end(&mut raw)
-        .expect("Expected to read whole file");
+        let mut inner = BytesMut::new();
+        p.encode(&mut inner).expect("Should not fail to write SMX");
 
-    let mut writer = Cursor::new(Vec::new());
-    binrw::BinWrite::write(&p, &mut writer).expect("Expected to write the whole file");
-
-    let inner = writer.into_inner();
-    assert_eq!(inner, raw);
+        assert_eq!(inner.len(), raw.len());
+        assert_eq!(inner.as_ref(), raw);
+    }
 }

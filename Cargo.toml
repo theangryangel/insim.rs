@@ -2,6 +2,7 @@
 members = [
   "insim_core",
   "insim",
+  "insim_macros",
   "insim_pth",
   "insim_smx",
   "examples/*",
@@ -30,20 +31,24 @@ missing_debug_implementations = "deny"
 broken_intra_doc_links = "deny"
 
 [workspace.dependencies]
-binrw = "0.14.0"
 bitflags = "2.4.0"
 bytes = "1.4.0"
 clap = { version = "4.2" }
+darling = "0.20"
 encoding_rs = { version = "0.8.32" }
 from_variants = "1.0.2"
 futures-util = { version = "0.3.28" }
 if_chain = "1.0.2"
 indexmap = "2.1.0"
 itertools = { version = "0.13.0" }
+proc-macro2 = "1"
+quote = "1"
 serde = { version = "1.0.188" }
+syn = { version = "2" }
 thiserror = "1.0.40"
 tokio = { version = "1.11.0" }
 tokio-test = "0.4.0"
 tokio-tungstenite = { version = "0.24.0" }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17" }
+num-traits = "0.2.19"

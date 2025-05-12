@@ -1,15 +1,11 @@
-use insim_core::binrw::{self, binrw};
-
 use crate::{
     identifiers::{ConnectionId, RequestId},
     Packet, WithRequestId,
 };
 
-#[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// [Ttc] subtype.
 pub enum TtcType {
@@ -24,8 +20,7 @@ pub enum TtcType {
     SelStop = 3,
 }
 
-#[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// General purpose Target To Connection packet
 /// b1..b3 may be used in various ways, depending on the subtype
@@ -39,7 +34,6 @@ pub struct Ttc {
     /// Connection unique ID to target
     pub ucid: ConnectionId,
 
-    // TODO: Fix this. It should be rolled into TtcType
     /// B1, B2, B3 may be used in various ways depending on SubT
     pub b1: u8,
 
@@ -71,5 +65,30 @@ impl WithRequestId for TtcType {
             subt: self,
             ..Default::default()
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_ttc() {
+        assert_from_to_bytes!(
+            Ttc,
+            [
+                7, // reqi
+                2, // subt
+                5, // ucid
+                1, // b1
+                2, // b2
+                3, // b3
+            ],
+            |ttc: Ttc| {
+                assert_eq!(ttc.reqi, RequestId(7));
+                assert_eq!(ttc.ucid, ConnectionId(5));
+                assert!(matches!(ttc.subt, TtcType::SelStart));
+            }
+        );
     }
 }

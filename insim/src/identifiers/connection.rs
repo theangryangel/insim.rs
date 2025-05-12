@@ -3,10 +3,10 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use insim_core::binrw::{self as binrw, binrw};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use insim_core::{Decode, Encode};
 
 /// Unique Connection Identifier, commonly referred to as UCID in Insim.txt
-#[binrw]
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConnectionId(pub u8);
@@ -19,6 +19,16 @@ impl ConnectionId {
     #[allow(dead_code)]
     /// Shortcut for commonly used "all" connection id
     const ALL: ConnectionId = ConnectionId(255);
+
+    /// Is this a "local" connection
+    pub fn local(&self) -> bool {
+        matches!(self, &Self::LOCAL)
+    }
+
+    /// Is this referencing "all" connections
+    pub fn all(&self) -> bool {
+        matches!(self, &Self::ALL)
+    }
 }
 
 impl fmt::Display for ConnectionId {
@@ -44,5 +54,19 @@ impl DerefMut for ConnectionId {
 impl From<u8> for ConnectionId {
     fn from(value: u8) -> Self {
         Self(value)
+    }
+}
+
+impl Decode for ConnectionId {
+    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
+        Ok(ConnectionId(buf.get_u8()))
+    }
+}
+
+impl Encode for ConnectionId {
+    fn encode(&self, buf: &mut BytesMut) -> Result<(), insim_core::EncodeError> {
+        buf.put_u8(self.0);
+
+        Ok(())
     }
 }

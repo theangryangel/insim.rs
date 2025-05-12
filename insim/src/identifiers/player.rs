@@ -3,12 +3,12 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use insim_core::binrw::{self as binrw, binrw};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use insim_core::{Decode, Encode};
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
 /// Unique Player Identifier, commonly referred to as PLID in Insim.txt
-#[binrw]
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct PlayerId(pub u8);
@@ -36,5 +36,19 @@ impl DerefMut for PlayerId {
 impl From<u8> for PlayerId {
     fn from(value: u8) -> Self {
         Self(value)
+    }
+}
+
+impl Decode for PlayerId {
+    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
+        Ok(PlayerId(buf.get_u8()))
+    }
+}
+
+impl Encode for PlayerId {
+    fn encode(&self, buf: &mut BytesMut) -> Result<(), insim_core::EncodeError> {
+        buf.put_u8(self.0);
+
+        Ok(())
     }
 }

@@ -1,4 +1,4 @@
-use insim_core::binrw::{self, binrw, BinRead, BinWrite};
+use insim_core::{Decode, Encode};
 
 use crate::identifiers::{ConnectionId, RequestId};
 
@@ -46,8 +46,58 @@ impl Default for CimMode {
     }
 }
 
+impl Decode for CimMode {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
+        let discrim = u8::decode(buf)?;
+        let submode = u8::decode(buf)?;
+        let seltype = u8::decode(buf)?;
+
+        let res = match discrim {
+            0 => Self::Normal(submode.into()),
+            1 => Self::Options,
+            2 => Self::HostOptions,
+            3 => Self::Garage(submode.into()),
+            4 => Self::CarSelect,
+            5 => Self::TrackSelect,
+            6 => Self::ShiftU {
+                submode: submode.into(),
+                seltype,
+            },
+            found => {
+                return Err(insim_core::DecodeError::NoVariantMatch {
+                    found: found as u64,
+                })
+            },
+        };
+
+        Ok(res)
+    }
+}
+
+impl Encode for CimMode {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+        let (discrim, submode, seltype) = match self {
+            CimMode::Normal(submode) => (0u8, *submode as u8, 0u8),
+            CimMode::Options => (1u8, 0u8, 0u8),
+            CimMode::HostOptions => (2u8, 0u8, 0u8),
+            CimMode::Garage(submode) => (3u8, *submode as u8, 0u8),
+            CimMode::CarSelect => (4u8, 0u8, 0u8),
+            CimMode::TrackSelect => (5u8, 0u8, 0u8),
+            CimMode::ShiftU {
+                submode: mode,
+                seltype,
+            } => (6u8, *mode as u8, *seltype),
+        };
+
+        discrim.encode(buf)?;
+        submode.encode(buf)?;
+        seltype.encode(buf)?;
+        Ok(())
+    }
+}
+
 #[repr(u8)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 /// CimMode::Normal, submode
@@ -88,7 +138,7 @@ impl From<u8> for CimSubModeNormal {
 }
 
 #[repr(u8)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 /// CimMode::Garage, submode
@@ -120,6 +170,9 @@ pub enum CimSubModeGarage {
 
     /// Passengers tab of setup screen
     Pass = 8,
+
+    /// Undocumented mod review tab
+    ModReview = 255,
 }
 
 impl From<u8> for CimSubModeGarage {
@@ -134,6 +187,7 @@ impl From<u8> for CimSubModeGarage {
             6 => Self::Tyres,
             7 => Self::Aero,
             8 => Self::Pass,
+            255 => Self::ModReview,
             other => {
                 unreachable!(
                     "Unhandled CimSubModeGarage. Perhaps a programming error or protocol update? Found {}, expected 0-8", other
@@ -144,7 +198,7 @@ impl From<u8> for CimSubModeGarage {
 }
 
 #[repr(u8)]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 /// CimMode::ShiftU, submode
@@ -170,73 +224,7 @@ impl From<u8> for CimSubModeShiftU {
     }
 }
 
-impl BinRead for CimMode {
-    type Args<'a> = ();
-
-    fn read_options<R: std::io::Read + std::io::Seek>(
-        reader: &mut R,
-        endian: binrw::Endian,
-        _args: Self::Args<'_>,
-    ) -> binrw::BinResult<Self> {
-        let pos = reader.stream_position()?;
-        let discrim = u8::read_options(reader, endian, ())?;
-        let submode = u8::read_options(reader, endian, ())?;
-        let seltype = u8::read_options(reader, endian, ())?;
-
-        let res = match discrim {
-            0 => Self::Normal(submode.into()),
-            1 => Self::Options,
-            2 => Self::HostOptions,
-            3 => Self::Garage(submode.into()),
-            4 => Self::CarSelect,
-            5 => Self::TrackSelect,
-            6 => Self::ShiftU {
-                submode: submode.into(),
-                seltype,
-            },
-            _ => {
-                return Err(binrw::Error::BadMagic {
-                    pos,
-                    found: Box::new(submode),
-                })
-            },
-        };
-
-        Ok(res)
-    }
-}
-
-impl BinWrite for CimMode {
-    type Args<'a> = ();
-
-    fn write_options<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        endian: binrw::Endian,
-        _args: Self::Args<'_>,
-    ) -> binrw::BinResult<()> {
-        let (discrim, submode, seltype) = match self {
-            CimMode::Normal(submode) => (0u8, *submode as u8, 0u8),
-            CimMode::Options => (1u8, 0u8, 0u8),
-            CimMode::HostOptions => (2u8, 0u8, 0u8),
-            CimMode::Garage(submode) => (3u8, *submode as u8, 0u8),
-            CimMode::CarSelect => (4u8, 0u8, 0u8),
-            CimMode::TrackSelect => (5u8, 0u8, 0u8),
-            CimMode::ShiftU {
-                submode: mode,
-                seltype,
-            } => (6u8, *mode as u8, *seltype),
-        };
-
-        discrim.write_options(writer, endian, ())?;
-        submode.write_options(writer, endian, ())?;
-        seltype.write_options(writer, endian, ())?;
-        Ok(())
-    }
-}
-
-#[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Connection Interface Mode
 pub struct Cim {
@@ -247,6 +235,37 @@ pub struct Cim {
     pub ucid: ConnectionId,
 
     /// Mode & submode
-    #[brw(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub mode: CimMode,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_cim() {
+        assert_from_to_bytes!(
+            Cim,
+            [
+                0, // reqi
+                4, // ucid
+                6, // mode
+                2, // submode
+                5, // seltype
+                0, // sp3
+            ],
+            |cim: Cim| {
+                assert_eq!(cim.reqi, RequestId(0));
+                assert_eq!(cim.ucid, ConnectionId(4));
+                assert!(matches!(
+                    cim.mode,
+                    CimMode::ShiftU {
+                        submode: CimSubModeShiftU::Edit,
+                        seltype: 5
+                    },
+                ));
+            }
+        );
+    }
 }

@@ -1,18 +1,11 @@
 use std::time::Duration;
 
-use insim_core::{
-    binrw::{self, binrw},
-    duration::{binrw_parse_duration, binrw_write_duration},
-};
-
 use super::{CarContact, ObjectInfo};
 use crate::identifiers::{PlayerId, RequestId};
 
-#[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// Action for a [Uco] packet.
 pub enum UcoAction {
@@ -30,8 +23,7 @@ pub enum UcoAction {
     CpRev = 3,
 }
 
-#[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// User Control Object - reports crossing an InSim checkpoint / entering an InSim circle (from layout)
 pub struct Uco {
@@ -39,16 +31,15 @@ pub struct Uco {
     pub reqi: RequestId,
 
     /// Player's unique ID that this report corresponds to.
-    #[brw(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub plid: PlayerId,
 
     /// What happened
-    #[brw(pad_after = 2)]
+    #[insim(pad_after = 2)]
     pub ucoaction: UcoAction,
 
     /// When this happened
-    #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
-    #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
+    #[insim(duration(milliseconds = u32))]
     pub time: Duration,
 
     /// Was there any car contact?
@@ -56,4 +47,56 @@ pub struct Uco {
 
     /// Info about the checkpoint or circle (see below)
     pub info: ObjectInfo,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_uco() {
+        assert_from_to_bytes!(
+            Uco,
+            [
+                0,   // reqi
+                2,   // plid
+                0,   // sp0
+                1,   // ucoaction
+                0,   // sp2
+                0,   // sp3
+                8,   // time (1)
+                80,  // time (2)
+                2,   // time (3)
+                0,   // time (4)
+                0,   // c - direction
+                126, // c - heading
+                8,   // c - speed
+                10,  // c - zbyte
+                198, // c - x (1)
+                254, // c - x (2)
+                40,  // c - y (1)
+                250, // c - y (2)
+                232, // info - x (1)
+                254, // info - x (2)
+                207, // info - y (1)
+                249, // info - y (2)
+                8,   // info - zbyte
+                24,  // info - flags
+                253, // info - index
+                1,   // info - heading
+            ],
+            |parsed: Uco| {
+                assert_eq!(parsed.info.x, -280);
+                assert_eq!(parsed.info.y, -1585);
+                assert_eq!(parsed.info.z, 8);
+                assert_eq!(parsed.info.heading, 1);
+                assert!(matches!(parsed.ucoaction, UcoAction::CircleLeave));
+                assert_eq!(parsed.time, Duration::from_millis(151560));
+                assert_eq!(parsed.c.speed.to_meters_per_sec() as u8, 8);
+                assert_eq!(parsed.c.x, -314);
+                assert_eq!(parsed.c.y, -1496);
+                assert_eq!(parsed.c.z, 10);
+            }
+        );
+    }
 }

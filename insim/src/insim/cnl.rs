@@ -1,12 +1,8 @@
-use insim_core::binrw::{self, binrw};
-
 use crate::identifiers::{ConnectionId, RequestId};
 
-#[binrw]
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// Used within [Cnl] to indicate the leave reason.
 pub enum CnlReason {
@@ -42,8 +38,7 @@ pub enum CnlReason {
     Hack = 9,
 }
 
-#[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Connection Leave
 pub struct Cnl {
@@ -57,6 +52,30 @@ pub struct Cnl {
     pub reason: CnlReason,
 
     /// Number of remaining connections including host
-    #[brw(pad_after = 2)]
+    #[insim(pad_after = 2)]
     pub total: u8,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_cnl() {
+        assert_from_to_bytes!(
+            Cnl,
+            [
+                0,  // reqi
+                4,  // ucid
+                3,  // reason
+                14, // total
+                0, 0,
+            ],
+            |parsed: Cnl| {
+                assert_eq!(parsed.ucid, ConnectionId(4));
+                assert_eq!(parsed.total, 14);
+                assert!(matches!(parsed.reason, CnlReason::Kicked));
+            }
+        );
+    }
 }

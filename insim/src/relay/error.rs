@@ -1,13 +1,9 @@
-use insim_core::binrw::{self, binrw};
-
 use crate::identifiers::RequestId;
 
 /// Enum of possible errors  that the Insim Relay can respond with.
-#[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Copy, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 pub enum RelayErrorKind {
     #[default]
     /// None
@@ -33,8 +29,7 @@ pub enum RelayErrorKind {
 }
 
 /// The relay will send this packet when it encounters an error.
-#[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Error {
     /// Non-zero if the packet is a packet request or a reply to a request

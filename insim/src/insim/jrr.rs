@@ -1,13 +1,9 @@
-use insim_core::binrw::{self, binrw};
-
 use super::ObjectInfo;
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
-#[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// Used within the [Jrr] packet.
 pub enum JrrAction {
@@ -25,8 +21,7 @@ pub enum JrrAction {
     ResetNoRepair = 5,
 }
 
-#[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Join Request Reply
 /// Set the ISF_REQ_JOIN flag in the IS_ISI to receive join requests
@@ -49,7 +44,7 @@ pub struct Jrr {
     /// Unique connection ID
     pub ucid: ConnectionId,
 
-    #[brw(pad_after = 2)]
+    #[insim(pad_after = 2)]
     /// Action taken/to take
     pub jrraction: JrrAction,
 
@@ -58,3 +53,46 @@ pub struct Jrr {
 }
 
 impl_typical_with_request_id!(Jrr);
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_jrr() {
+        assert_from_to_bytes!(
+            Jrr,
+            [
+                0,   // reqi
+                3,   // plid
+                2,   // ucid
+                1,   // jrraction
+                0,   // sp2
+                0,   // sp3
+                172, // startpos - x (1)
+                218, // startpos - x (2)
+                25,  // startpos - y (1)
+                136, // startpos - y (2)
+                12,  // startpos - zbyte
+                128, // startpos - flags
+                0,   // startpos - index
+                67,  // startpos - heading
+            ],
+            |jrr: Jrr| {
+                assert_eq!(jrr.reqi, RequestId(0));
+                assert!(matches!(jrr.jrraction, JrrAction::Spawn));
+                assert!(matches!(
+                    jrr.startpos,
+                    ObjectInfo {
+                        x: -9556,
+                        y: -30695,
+                        z: 12,
+                        index: 0,
+                        heading: 67,
+                        flags: 128
+                    }
+                ));
+            }
+        );
+    }
+}

@@ -1,14 +1,13 @@
 //! Strongly type license data
-use binrw::binrw;
+use crate::{Decode, Encode};
 
 /// Describes the various LFS "license" levels. Each "license" provides access to different
 /// levels of content.
 /// See <https://www.lfs.net/contents>
-#[binrw]
 #[non_exhaustive]
 #[derive(Default, PartialEq, PartialOrd, Eq, Debug, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[brw(repr(u8))]
+#[repr(u8)]
 pub enum License {
     #[default]
     /// Demo
@@ -29,6 +28,25 @@ impl std::fmt::Display for License {
             License::S2 => write!(f, "S2"),
             License::S3 => write!(f, "S3"),
         }
+    }
+}
+
+impl Decode for License {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
+        match u8::decode(buf)? {
+            0 => Ok(Self::Demo),
+            1 => Ok(Self::S1),
+            2 => Ok(Self::S2),
+            3 => Ok(Self::S3),
+            other => Err(crate::DecodeError::NoVariantMatch {
+                found: other as u64,
+            }),
+        }
+    }
+}
+impl Encode for License {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodeError> {
+        (*self as u8).encode(buf)
     }
 }
 

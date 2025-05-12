@@ -1,12 +1,8 @@
-use insim_core::binrw::{self, binrw};
-
 use crate::identifiers::{PlayerId, RequestId};
 
-#[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// Camera/view identifiers
 pub enum CameraView {
@@ -30,8 +26,7 @@ pub enum CameraView {
     Another = 255,
 }
 
-#[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Camera Change - sent when an existing driver changes camera
 pub struct Cch {
@@ -40,7 +35,41 @@ pub struct Cch {
     /// Player unique ID
     pub plid: PlayerId,
 
-    #[brw(pad_after = 3)]
+    #[insim(pad_after = 3)]
     /// View identifier
     pub camera: CameraView,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_cch() {
+        assert_from_to_bytes!(
+            Cch,
+            [
+                0, // reqi
+                3, // plid
+                4, // camera
+                0, 0, 0,
+            ],
+            |parsed: Cch| {
+                assert_eq!(parsed.reqi, RequestId(0));
+                assert_eq!(parsed.plid, PlayerId(3));
+                assert!(matches!(parsed.camera, CameraView::Custom));
+            }
+        );
+    }
+
+    #[test]
+    fn test_camera_view() {
+        assert_from_to_bytes!(CameraView, [1], |parsed: CameraView| {
+            assert!(matches!(parsed, CameraView::Heli));
+        });
+
+        assert_from_to_bytes!(CameraView, [255], |parsed: CameraView| {
+            assert!(matches!(parsed, CameraView::Another));
+        });
+    }
 }

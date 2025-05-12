@@ -1,17 +1,12 @@
 use std::net::Ipv4Addr;
 
-use insim_core::{
-    binrw::{self, binrw},
-    license::License,
-};
+use insim_core::license::License;
 
 use crate::identifiers::{ConnectionId, RequestId};
 
-#[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[allow(missing_docs)]
 /// Language
 pub enum Language {
@@ -55,8 +50,7 @@ pub enum Language {
     Romanian = 36,
 }
 
-#[binrw]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Extra information about the new connection. This is only sent when connected to a game server,
 /// and only if an administrative password has been set and used by Insim.
@@ -71,15 +65,13 @@ pub struct Nci {
     pub language: Language,
 
     /// License level.
-    #[brw(pad_after = 2)]
+    #[insim(pad_after = 2)]
     pub license: License,
 
     /// LFS.net player ID
     pub userid: u32,
 
     /// Originating IP address
-    #[br(map = |x: u32| Ipv4Addr::from(x) )]
-    #[bw(map = |&x: &Ipv4Addr| u32::from(x) )]
     pub ipaddress: Ipv4Addr,
 }
 
@@ -93,5 +85,40 @@ impl Default for Nci {
             userid: 0,
             ipaddress: Ipv4Addr::new(0, 0, 0, 0),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_nci() {
+        assert_from_to_bytes!(
+            Nci,
+            [
+                1,   // reqi
+                3,   // ucid
+                12,  // language
+                3,   // license,
+                0,   // sp2,
+                0,   // sp3,
+                3,   // userid (1)
+                42,  // userid (2)
+                5,   // userid (3)
+                1,   // userid (4)
+                1,   // ipaddress (1)
+                0,   // ipaddress (2)
+                0,   // ipaddress (3)
+                127, // ipaddress (4)
+            ],
+            |nci: Nci| {
+                assert_eq!(nci.reqi, RequestId(1));
+                assert_eq!(nci.ucid, ConnectionId(3));
+                assert!(matches!(nci.language, Language::Czech));
+                assert_eq!(nci.ipaddress, Ipv4Addr::from([127, 0, 0, 1]));
+                assert_eq!(nci.userid, 17115651_u32);
+            }
+        );
     }
 }

@@ -3,6 +3,8 @@
 mod racelaps;
 
 mod acr;
+mod aic;
+mod aii;
 mod axi;
 mod axm;
 mod axo;
@@ -66,10 +68,14 @@ mod ver;
 mod vtn;
 
 pub use acr::{Acr, AcrResult};
+pub use aic::{AiInput, AiInputToggle, AiInputType, Aic};
+pub use aii::{AiFlags, Aii};
 pub use axi::Axi;
 pub use axm::{Axm, ObjectInfo, PmoAction, PmoFlags};
 pub use axo::Axo;
-pub use btn::{Bfn, BfnType, Btc, Btn, BtnClickFlags, BtnInst, BtnStyleFlags, Btt};
+pub use btn::{
+    Bfn, BfnType, Btc, Btn, BtnClickFlags, BtnInst, BtnStyle, BtnStyleColour, BtnStyleFlags, Btt,
+};
 pub use cch::{CameraView, Cch};
 pub use cim::{Cim, CimMode, CimSubModeGarage, CimSubModeNormal, CimSubModeShiftU};
 pub use cnl::{Cnl, CnlReason};
@@ -113,7 +119,7 @@ pub use racelaps::RaceLaps;
 pub use reo::Reo;
 pub use res::Res;
 pub use rip::{Rip, RipError, RipOptions};
-pub use rst::{RaceFlags, Rst};
+pub use rst::{LapTimingInfo, RaceFlags, Rst};
 pub use scc::Scc;
 pub use sch::{Sch, SchFlags};
 pub use sfp::Sfp;

@@ -1,10 +1,12 @@
-use insim_core::binrw::{self, binrw};
+use bytes::{Buf, BufMut};
+use insim_core::{Decode, Encode};
 
 use crate::identifiers::{ConnectionId, RequestId};
 
+const AXM_MAX_OBJECTS: usize = 60;
+
 /// Used within the [Axm] packet.
-#[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ObjectInfo {
     /// X coordinate of object
@@ -25,11 +27,9 @@ pub struct ObjectInfo {
 }
 
 /// Actions that can be taken as part of [Axm].
-#[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 pub enum PmoAction {
     #[default]
@@ -62,13 +62,10 @@ pub enum PmoAction {
 }
 
 bitflags::bitflags! {
-    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     /// AutoX object flags
-    pub struct PmoFlags: u16 {
+    pub struct PmoFlags: u8 {
         /// LFS has reached the end of a layout file which it is loading. The added objects will then be optimised.
         const FILE_END = (1 << 0);
 
@@ -93,17 +90,14 @@ bitflags::bitflags! {
     }
 }
 
+impl_bitflags_from_to_bytes!(PmoFlags, u8);
+
 /// AutoX Multiple Objects - Report on/add/remove multiple AutoX objects
-#[binrw]
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Axm {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
-
-    /// Number of objects in this packet
-    #[bw(calc = info.len() as u8)]
-    pub numo: u8,
 
     /// Unique id of the connection that sent the packet
     pub ucid: ConnectionId,
@@ -113,12 +107,99 @@ pub struct Axm {
 
     /// Bitflags providing additional information about what has happened, or what you want to
     /// happen
-    #[brw(pad_after = 1)]
     pub pmoflags: PmoFlags,
 
     /// List of information about the affected objects
-    #[br(count = numo)]
     pub info: Vec<ObjectInfo>,
 }
 
 impl_typical_with_request_id!(Axm);
+
+impl Decode for Axm {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
+        let reqi = RequestId::decode(buf)?;
+        let mut numo = u8::decode(buf)?;
+        let ucid = ConnectionId::decode(buf)?;
+        let pmoaction = PmoAction::decode(buf)?;
+        let pmoflags = PmoFlags::decode(buf)?;
+        buf.advance(1);
+        let mut info = Vec::with_capacity(numo as usize);
+        while numo > 0 {
+            info.push(ObjectInfo::decode(buf)?);
+            numo -= 1;
+        }
+
+        Ok(Self {
+            reqi,
+            ucid,
+            pmoaction,
+            pmoflags,
+            info,
+        })
+    }
+}
+
+impl Encode for Axm {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+        self.reqi.encode(buf)?;
+        let len = self.info.len();
+        if len > AXM_MAX_OBJECTS {
+            return Err(insim_core::EncodeError::TooLarge);
+        }
+        (len as u8).encode(buf)?;
+        self.ucid.encode(buf)?;
+        self.pmoaction.encode(buf)?;
+        self.pmoflags.encode(buf)?;
+        buf.put_bytes(0, 1);
+        for i in self.info.iter() {
+            i.encode(buf)?;
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_axm() {
+        assert_from_to_bytes!(
+            Axm,
+            [
+                0,   // reqi
+                2,   // numo
+                3,   // ucid
+                1,   // pmoaction
+                4,   // pmoflags
+                0,   // objects
+                172, // info[1] - x (1)
+                218, // info[1] - x (2)
+                25,  // info[1] - y (1)
+                136, // info[1] - y (2)
+                8,   // info[1] - zbyte
+                0,   // info[1] - flags
+                1,   // info[1] - objectindex
+                128, // info[1] - heading
+                172, // info[2] - x (1)
+                218, // info[2] - x (2)
+                25,  // info[2] - y (1)
+                136, // info[2] - y (2)
+                8,   // info[2] - zbyte
+                0,   // info[2] - flags
+                2,   // info[2] - objectindex
+                128, // info[2] - heading
+            ],
+            |axm: Axm| {
+                assert_eq!(axm.info.len(), 2);
+                assert_eq!(axm.info[0].z, 8);
+                assert_eq!(axm.info[0].flags, 0);
+                assert_eq!(axm.info[0].index, 1);
+                assert_eq!(axm.info[0].heading, 128);
+
+                assert_eq!(axm.info[1].index, 2);
+            }
+        )
+    }
+}

@@ -3,8 +3,11 @@
 
 use std::{cmp::Ordering, fmt::Display, str::FromStr};
 
+use bytes::Bytes;
 use if_chain::if_chain;
 use itertools::Itertools;
+
+use crate::{Decode, Encode, EncodeString};
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 /// Possible errors when parsing a game version
@@ -20,6 +23,10 @@ pub enum GameVersionParseError {
     /// Could not parse an int
     #[error("Could not parse patch: {0}")]
     Patch(String),
+
+    /// Could not parse string as UTF-8
+    #[error("Could not parse string: {0:?}")]
+    NotUtf8String(Bytes),
 }
 
 /// GameVersion
@@ -152,8 +159,33 @@ impl FromStr for GameVersion {
     }
 }
 
+impl Decode for GameVersion {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
+        let new = buf.split_to(8);
+
+        match std::str::from_utf8(&new) {
+            Ok(s) => {
+                GameVersion::from_str(s.trim_end_matches('\0')).map_err(crate::DecodeError::from)
+            },
+            Err(_) => Err(crate::DecodeError::GameVersionParseError(
+                GameVersionParseError::NotUtf8String(new.clone()),
+            )),
+        }
+    }
+}
+
+impl Encode for GameVersion {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodeError> {
+        let ver = self.to_string();
+        ver.encode_ascii(buf, 8, false)?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use bytes::BytesMut;
+
     use super::*;
 
     #[test]
@@ -261,5 +293,18 @@ mod tests {
     fn test_normalise_to_uppercase() {
         let res = "0.04k".parse::<GameVersion>().unwrap();
         assert!(res.minor == 'K');
+    }
+
+    #[test]
+    fn test_from_to_bytes() {
+        let ver = GameVersion::from_str("0.7F").unwrap();
+        let mut buf = BytesMut::new();
+        assert!(ver.encode(&mut buf).is_ok());
+
+        assert_eq!(buf.len(), 8);
+
+        let from = GameVersion::decode(&mut buf.freeze()).unwrap();
+
+        assert_eq!(ver, from);
     }
 }

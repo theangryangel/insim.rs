@@ -1,18 +1,12 @@
 use bitflags::bitflags;
-use insim_core::{
-    binrw::{self, binrw},
-    track::Track,
-    wind::Wind,
-};
+use insim_core::{track::Track, wind::Wind};
 
 use super::{CameraView, RaceLaps};
 use crate::identifiers::{PlayerId, RequestId};
 
-#[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// Game racing state
 pub enum RaceInProgress {
@@ -28,11 +22,8 @@ pub enum RaceInProgress {
 }
 
 bitflags! {
-    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     /// Describes the game state
     pub struct StaFlags: u16 {
         /// In Game (or Multiplayer Replay)
@@ -99,12 +90,13 @@ generate_bitflag_helpers! {
     pub insim_buttons_visible => VISIBLE
 }
 
-#[binrw]
-#[derive(Debug, Clone, Default)]
+impl_bitflags_from_to_bytes!(StaFlags, u16);
+
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// State
 pub struct Sta {
-    #[brw(pad_after = 1)]
+    #[insim(pad_after = 1)]
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
@@ -135,7 +127,7 @@ pub struct Sta {
     /// Qualifying minutes
     pub qualmins: u8,
 
-    #[brw(pad_after = 1)]
+    #[insim(pad_after = 1)]
     /// Number of laps
     pub racelaps: RaceLaps,
 
@@ -146,7 +138,7 @@ pub struct Sta {
     pub track: Track,
 
     /// Weather conditions
-    pub weather: u8, // TODO: Weather is track dependant?!
+    pub weather: u8,
 
     /// Wind conditions
     pub wind: Wind,
@@ -156,5 +148,46 @@ impl Sta {
     /// Is server status healthy?
     pub fn is_server_status_ok(&self) -> bool {
         self.serverstatus == 1
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_sta() {
+        assert_from_to_bytes!(
+            Sta,
+            [
+                1,   // reqi
+                0,   // zero
+                0,   // replayspeed (1)
+                0,   // replayspeed (2)
+                128, // replayspeed (3)
+                62,  // replayspeed (4)
+                8,   // flags (1)
+                0,   // flags (2)
+                3,   // ingamecam
+                4,   // viewplid
+                32,  // nump
+                47,  // numconns
+                20,  // numfinished
+                2,   // raceinprog
+                60,  // qualmins
+                12,  // racelaps
+                0,   // sp2
+                1,   // serverstatus
+                b'B', b'L', b'2', b'R', 0, 0, //track
+                1, // weather
+                2, // wind
+            ],
+            |parsed: Sta| {
+                assert_eq!(parsed.reqi, RequestId(1));
+                assert_eq!(parsed.nump, 32);
+                assert_eq!(parsed.numconns, 47);
+                assert!(matches!(parsed.racelaps, RaceLaps::Laps(12)));
+            }
+        );
     }
 }

@@ -1,13 +1,55 @@
 // con is a reserved word. Do not name this file `con.rs`.
 use std::time::Duration;
 
+use bytes::{Buf, BufMut};
 use insim_core::{
-    binrw::{self, binrw, BinRead, BinWrite},
-    duration::{binrw_parse_duration, binrw_write_duration},
+    direction::{Direction, DirectionKind},
+    speed::{Speed, SpeedKind},
+    Decode, Encode,
 };
 
-use super::{obh::binrw_parse_spclose_strip_reserved_bits, CompCarInfo};
+use super::{obh::spclose_strip_high_bits, CompCarInfo};
 use crate::identifiers::{PlayerId, RequestId};
+
+#[derive(Copy, Clone, Debug, Default)]
+pub struct SpeedConInfo;
+
+impl SpeedKind for SpeedConInfo {
+    type Inner = u8;
+
+    fn name() -> &'static str {
+        "m/s"
+    }
+
+    fn from_meters_per_sec(value: f32) -> Self::Inner {
+        value as Self::Inner
+    }
+
+    fn to_meters_per_sec(value: Self::Inner) -> f32 {
+        value as f32
+    }
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+pub struct DirectionConInfo;
+
+impl DirectionKind for DirectionConInfo {
+    type Inner = u8;
+
+    fn name() -> &'static str {
+        "128 = 180 deg"
+    }
+
+    fn from_radians(value: f32) -> Self::Inner {
+        ((value * 128.0 / std::f32::consts::PI)
+            .round()
+            .clamp(0.0, 255.0)) as u8
+    }
+
+    fn to_radians(value: Self::Inner) -> f32 {
+        (value as f32) * std::f32::consts::PI / 128.0
+    }
+}
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -39,13 +81,13 @@ pub struct ConInfo {
     pub gearsp: u8,
 
     /// Speed in m/s
-    pub speed: u8,
+    pub speed: Speed<SpeedConInfo>,
 
     /// Car's motion if Speed > 0: 0 = world y direction, 128 = 180 deg
-    pub direction: u8,
+    pub direction: Direction<DirectionConInfo>,
 
     /// direction of forward axis: 0 = world y direction, 128 = 180 deg
-    pub heading: u8,
+    pub heading: Direction<DirectionConInfo>,
 
     /// m/s^2 longitudinal acceleration (forward positive)
     pub accelf: u8,
@@ -60,40 +102,33 @@ pub struct ConInfo {
     pub y: i16,
 }
 
-// Manual implementation of BinRead, so that we can accommodate thrbrk, cluhan, etc.
-impl BinRead for ConInfo {
-    type Args<'a> = ();
-
-    fn read_options<R: std::io::Read + std::io::Seek>(
-        reader: &mut R,
-        endian: binrw::Endian,
-        _args: Self::Args<'_>,
-    ) -> binrw::BinResult<Self> {
-        let plid = PlayerId::read_options(reader, endian, ())?;
-        let info = CompCarInfo::read_options(reader, endian, ())?;
+impl Decode for ConInfo {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
+        let plid = PlayerId::decode(buf)?;
+        let info = CompCarInfo::decode(buf)?;
         // pad 1 bytes
-        let _ = reader.seek(std::io::SeekFrom::Current(1))?;
-        let steer = u8::read_options(reader, endian, ())?;
+        buf.advance(1);
+        let steer = u8::decode(buf)?;
 
-        let thrbrk = u8::read_options(reader, endian, ())?;
-        let thr = thrbrk >> 4; // top 4 bits are thr
-        let brk = thrbrk & !0b11110000; // last 4 bits are brk
+        let thrbrk = u8::decode(buf)?;
+        let thr: u8 = (thrbrk >> 4) & 0x0F; // upper 4 bits
+        let brk: u8 = thrbrk & 0x0F; // lower 4 bits
 
-        let cluhan = u8::read_options(reader, endian, ())?;
-        let clu = cluhan >> 4; // top 4 bits are clu
-        let han = cluhan & !0b11110000; // last 4 bits are han
+        let cluhan = u8::decode(buf)?;
+        let clu: u8 = (cluhan >> 4) & 0x0F; // upper 4 bits
+        let han: u8 = cluhan & 0x0F; // lower 4 bits
 
-        let gearsp = u8::read_options(reader, endian, ())?;
-        let gearsp = gearsp >> 4; // gearsp is only first 4 bits
+        let gearsp = u8::decode(buf)?;
+        let gearsp = (gearsp >> 4) & 0x0F; // gearsp is only first 4 bits
 
-        let speed = u8::read_options(reader, endian, ())?;
-        let direction = u8::read_options(reader, endian, ())?;
-        let heading = u8::read_options(reader, endian, ())?;
-        let accelf = u8::read_options(reader, endian, ())?;
-        let accelr = u8::read_options(reader, endian, ())?;
+        let speed = Speed::decode(buf)?;
+        let direction = Direction::decode(buf)?;
+        let heading = Direction::decode(buf)?;
+        let accelf = u8::decode(buf)?;
+        let accelr = u8::decode(buf)?;
 
-        let x = i16::read_options(reader, endian, ())?;
-        let y = i16::read_options(reader, endian, ())?;
+        let x = i16::decode(buf)?;
+        let y = i16::decode(buf)?;
 
         Ok(Self {
             plid,
@@ -115,98 +150,84 @@ impl BinRead for ConInfo {
     }
 }
 
-// Manual implementation of BinWrite, so that we can accommodate thrbrk, cluhan, etc.
-impl BinWrite for ConInfo {
-    type Args<'a> = ();
-
-    fn write_options<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        endian: binrw::Endian,
-        _args: Self::Args<'_>,
-    ) -> binrw::BinResult<()> {
-        self.plid.write_options(writer, endian, ())?;
-        self.info.write_options(writer, endian, ())?;
-        0_u8.write_options(writer, endian, ())?; // pad 1 bytes
-        self.steer.write_options(writer, endian, ())?;
+impl Encode for ConInfo {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+        self.plid.encode(buf)?;
+        self.info.encode(buf)?;
+        0_u8.encode(buf)?; // pad 1 bytes
+        self.steer.encode(buf)?;
 
         if self.thr > 15 {
-            let pos = writer.stream_position()?;
-            return Err(binrw::Error::AssertFail {
-                pos,
-                message: "thr must be <= 15".into(),
-            });
+            return Err(insim_core::EncodeError::TooLarge);
         }
 
         if self.brk > 15 {
-            let pos = writer.stream_position()?;
-            return Err(binrw::Error::AssertFail {
-                pos,
-                message: "brk must be <= 15".into(),
-            });
+            return Err(insim_core::EncodeError::TooLarge);
         }
 
-        let thrbrk: u8 = (self.thr << 4) | (self.brk & !0b11110000);
-        thrbrk.write_options(writer, endian, ())?;
+        let thrbrk = (self.thr << 4) | self.brk;
+        thrbrk.encode(buf)?;
 
         if self.clu > 15 {
-            let pos = writer.stream_position()?;
-            return Err(binrw::Error::AssertFail {
-                pos,
-                message: "clu must be <= 15".into(),
-            });
+            return Err(insim_core::EncodeError::TooLarge);
         }
 
         if self.han > 15 {
-            let pos = writer.stream_position()?;
-            return Err(binrw::Error::AssertFail {
-                pos,
-                message: "han must be <= 15".into(),
-            });
+            return Err(insim_core::EncodeError::TooLarge);
         }
 
-        let cluhan: u8 = (self.clu << 4) | (self.han & !0b11110000);
-        cluhan.write_options(writer, endian, ())?;
+        let cluhan = (self.clu << 4) | self.han;
+        cluhan.encode(buf)?;
 
         if self.gearsp > 15 {
-            let pos = writer.stream_position()?;
-            return Err(binrw::Error::AssertFail {
-                pos,
-                message: "gearsp must be <= 15".into(),
-            });
+            return Err(insim_core::EncodeError::TooLarge);
         }
 
-        let gearsp = self.gearsp & !0b11110000;
-        gearsp.write_options(writer, endian, ())?;
+        let gearsp = self.gearsp << 4;
+        gearsp.encode(buf)?;
 
-        self.speed.write_options(writer, endian, ())?;
-        self.direction.write_options(writer, endian, ())?;
-        self.heading.write_options(writer, endian, ())?;
-        self.accelf.write_options(writer, endian, ())?;
-        self.accelr.write_options(writer, endian, ())?;
-        self.x.write_options(writer, endian, ())?;
-        self.y.write_options(writer, endian, ())?;
+        self.speed.encode(buf)?;
+        self.direction.encode(buf)?;
+        self.heading.encode(buf)?;
+        self.accelf.encode(buf)?;
+        self.accelr.encode(buf)?;
+        self.x.encode(buf)?;
+        self.y.encode(buf)?;
 
         Ok(())
     }
 }
 
-#[binrw]
+#[derive(Copy, Clone, Debug, Default)]
+pub struct ClosingSpeed;
+
+impl SpeedKind for ClosingSpeed {
+    type Inner = u16;
+
+    fn name() -> &'static str {
+        "closing speed (10 = 1 m/s)"
+    }
+
+    fn from_meters_per_sec(value: f32) -> Self::Inner {
+        (value / 10.0) as Self::Inner
+    }
+
+    fn to_meters_per_sec(value: Self::Inner) -> f32 {
+        (value * 10) as f32
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Contact between 2 vehicles
 pub struct Con {
-    #[brw(pad_after = 1)]
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
     /// Low 12 bits: closing speed (10 = 1 m/s)
     /// The high 4 bits are automatically stripped.
-    #[br(parse_with = binrw_parse_spclose_strip_reserved_bits)]
-    pub spclose: u16,
+    pub spclose: Speed<ClosingSpeed>,
 
-    #[br(parse_with = binrw_parse_duration::<u16, 10, _>)]
-    #[bw(write_with = binrw_write_duration::<u16, 10, _>)]
     /// Time since last reset. Warning this is looping.
     pub time: Duration,
 
@@ -217,39 +238,77 @@ pub struct Con {
     pub b: ConInfo,
 }
 
+impl Decode for Con {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
+        let reqi = RequestId::decode(buf)?;
+        buf.advance(1);
+        let spclose = spclose_strip_high_bits(u16::decode(buf)?);
+        let spclose = Speed::new(spclose);
+        let time = u16::decode(buf)? as u64;
+        let time = Duration::from_millis(time * 10);
+
+        let a = ConInfo::decode(buf)?;
+        let b = ConInfo::decode(buf)?;
+
+        Ok(Self {
+            reqi,
+            spclose,
+            time,
+            a,
+            b,
+        })
+    }
+}
+
+impl Encode for Con {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+        self.reqi.encode(buf)?;
+        buf.put_bytes(0, 1);
+        spclose_strip_high_bits(self.spclose.into_inner()).encode(buf)?;
+        match TryInto::<u16>::try_into(self.time.as_millis() / 10) {
+            Ok(time) => time.encode(buf)?,
+            Err(_) => return Err(insim_core::EncodeError::TooLarge),
+        }
+        self.a.encode(buf)?;
+        self.b.encode(buf)?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
-
     use super::*;
 
     #[test]
-    fn ensure_coninfo_decodes() {
+    fn test_coninfo() {
         // ConInfo has some fields which are effectively u4.
         // We need to ensure that we carefully decode them.
-        let coninfo = ConInfo::read_le(&mut Cursor::new(vec![
-            1, 0,          // CompCarInfoinfo
-            0,          // padding
-            12,         // steering
-            247,        // thrbrk
-            193,        // cluhan
-            0b11110000, // gearsp
-            0,          //speed
-            0,          // direction
-            1,          // heading
-            2,          // accelf
-            3,          // accelr
-            0, 0, // X
-            0, 0, // Y
-        ]))
-        .unwrap();
+        assert_from_to_bytes!(
+            ConInfo,
+            [
+                1, 0,          // CompCarInfoinfo
+                0,          // padding
+                12,         // steering
+                247,        // thrbrk
+                188,        // cluhan
+                0b11110000, // gearsp
+                0,          //speed
+                0,          // direction
+                1,          // heading
+                2,          // accelf
+                3,          // accelr
+                0, 0, // X
+                0, 0, // Y
+            ],
+            |coninfo: ConInfo| {
+                assert_eq!(coninfo.thr, 15);
+                assert_eq!(coninfo.brk, 7);
 
-        assert_eq!(coninfo.thr, 15);
-        assert_eq!(coninfo.brk, 7);
+                assert_eq!(coninfo.clu, 11);
+                assert_eq!(coninfo.han, 12);
 
-        assert_eq!(coninfo.clu, 12);
-        assert_eq!(coninfo.han, 1);
-
-        assert_eq!(coninfo.gearsp, 15);
+                assert_eq!(coninfo.gearsp, 15);
+            }
+        );
     }
 }

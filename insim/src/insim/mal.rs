@@ -1,10 +1,8 @@
 use std::default::Default;
 
+use bytes::{Buf, BufMut};
 use indexmap::{set::Iter as IndexSetIter, IndexSet};
-use insim_core::{
-    binrw::{self, binrw, BinRead, BinResult, BinWrite},
-    vehicle::Vehicle,
-};
+use insim_core::{vehicle::Vehicle, Decode, Encode};
 
 use crate::{
     error::Error,
@@ -13,33 +11,6 @@ use crate::{
 
 const MAX_MAL_SIZE: usize = 120;
 
-#[binrw::parser(reader, endian)]
-fn binrw_parse_mal_allowed_mods(count: u8) -> BinResult<IndexSet<Vehicle>> {
-    let mut data = IndexSet::new();
-    for _i in 0..count {
-        let _ = data.insert(Vehicle::Mod(u32::read_options(reader, endian, ())?));
-    }
-    Ok(data)
-}
-
-#[binrw::writer(writer, endian)]
-fn binrw_write_mal_allowed_mods(input: &IndexSet<Vehicle>) -> BinResult<()> {
-    for i in input.iter() {
-        match i {
-            Vehicle::Mod(val) => val.write_options(writer, endian, ())?,
-            _ => {
-                unreachable!(
-                    "Non-Mod vehicle managed to get into the HashSet. Should not be possible."
-                )
-            },
-        }
-    }
-
-    Ok(())
-}
-
-#[binrw]
-#[bw(assert(allowed_mods.len() <= MAX_MAL_SIZE))]
 #[derive(Debug, Clone, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Mods Allowed - restrict the mods that can be used
@@ -47,16 +18,9 @@ pub struct Mal {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,
 
-    /// Number of mods in this packet
-    #[bw(calc = allowed_mods.len() as u8)]
-    numm: u8,
-
     /// UCID to change
-    #[brw(pad_after = 3)]
     pub ucid: ConnectionId,
 
-    #[br(parse_with = binrw_parse_mal_allowed_mods, args(numm))]
-    #[bw(write_with = binrw_write_mal_allowed_mods)]
     allowed_mods: IndexSet<Vehicle>,
 }
 
@@ -101,12 +65,53 @@ impl Mal {
     }
 }
 
+impl Decode for Mal {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
+        let reqi = RequestId::decode(buf)?;
+        let mut numm = u8::decode(buf)?;
+        let ucid = ConnectionId::decode(buf)?;
+        buf.advance(3);
+        let mut set = IndexSet::with_capacity(numm as usize);
+
+        while numm > 0 {
+            let _ = set.insert(Vehicle::Mod(u32::decode(buf)?));
+            numm -= 1;
+        }
+
+        Ok(Self {
+            reqi,
+            ucid,
+            allowed_mods: set,
+        })
+    }
+}
+
+impl Encode for Mal {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+        self.reqi.encode(buf)?;
+        if self.allowed_mods.len() > MAX_MAL_SIZE {
+            return Err(insim_core::EncodeError::TooLarge);
+        }
+        (self.allowed_mods.len() as u8).encode(buf)?;
+        self.ucid.encode(buf)?;
+        buf.put_bytes(0, 3);
+        for i in self.allowed_mods.iter() {
+            match i {
+                Vehicle::Mod(ident) => ident.encode(buf)?,
+                _ => unreachable!(
+                    "Non-Mod vehicle managed to get into the HashSet. Should not be possible."
+                ),
+            }
+        }
+
+        Ok(())
+    }
+}
+
 impl_typical_with_request_id!(Mal);
 
 #[cfg(test)]
 mod tests {
-    use std::io::{Cursor, Seek};
-
     use super::*;
 
     #[test]
@@ -119,20 +124,9 @@ mod tests {
     }
 
     #[test]
-    fn test_encoding() {
-        let mut data = Mal::default();
-        assert!(data.insert(Vehicle::Mod(1)).is_ok());
-        assert!(data.insert(Vehicle::Mod(2)).is_ok());
-        data.reqi = RequestId(2);
-        data.ucid = ConnectionId(3);
-
-        let mut buf = Cursor::new(Vec::new());
-        data.write_le(&mut buf).unwrap();
-        buf.rewind().unwrap();
-
-        let buf2 = buf.clone().into_inner();
-        assert_eq!(
-            buf2,
+    fn test_mal() {
+        assert_from_to_bytes!(
+            Mal,
             [
                 2, // reqi
                 2, // numm
@@ -140,11 +134,14 @@ mod tests {
                 0, 0, 0, // padding / unused
                 1, 0, 0, 0, // mod 1
                 2, 0, 0, 0, // mod 2
-            ]
+            ],
+            |mal: Mal| {
+                assert_eq!(mal.reqi, RequestId(2));
+                assert_eq!(mal.ucid, ConnectionId(3));
+                assert_eq!(mal.len(), 2);
+                assert!(mal.contains(&Vehicle::Mod(1)));
+                assert!(mal.contains(&Vehicle::Mod(2)));
+            }
         );
-
-        let data2 = Mal::read_le(&mut buf).unwrap();
-        assert_eq!(data, data2);
-        assert_eq!(data2.len(), 2);
     }
 }

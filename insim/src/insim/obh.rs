@@ -1,26 +1,19 @@
 use std::time::Duration;
 
 use bitflags::bitflags;
-use insim_core::{
-    binrw::{self, binrw, BinRead, BinResult},
-    duration::{binrw_parse_duration, binrw_write_duration},
-};
+use bytes::{Buf, BufMut};
+use insim_core::{direction::Direction, speed::Speed, Decode, Encode};
 
+use super::contact::{ClosingSpeed, DirectionConInfo, SpeedConInfo};
 use crate::identifiers::{PlayerId, RequestId};
 
-#[binrw::parser(reader, endian)]
-pub(crate) fn binrw_parse_spclose_strip_reserved_bits() -> BinResult<u16> {
-    let res = u16::read_options(reader, endian, ())?;
-    // strip the top 4 bits off
-    Ok(res & !61440)
+pub(crate) fn spclose_strip_high_bits(val: u16) -> u16 {
+    val & !61440
 }
 
 bitflags! {
-    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     /// Additional information for the object hit, used within the [Obh] packet.
     pub struct ObhFlags: u8 {
         /// An added object was hit
@@ -43,19 +36,20 @@ generate_bitflag_helpers! {
     pub was_in_original_position => ON_SPOT
 }
 
-#[binrw]
+impl_bitflags_from_to_bytes!(ObhFlags, u8);
+
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Vehicle made contact with something else
 pub struct CarContact {
     /// Car's motion if Speed > 0: 0 = world y direction, 128 = 180 deg
-    pub direction: u8,
+    pub direction: Direction<DirectionConInfo>,
 
     /// Direction of forward axis: 0 = world y direction, 128 = 180 deg
-    pub heading: u8,
+    pub heading: Direction<DirectionConInfo>,
 
     /// Speed in m/s
-    pub speed: u8,
+    pub speed: Speed<SpeedConInfo>,
 
     /// Z position (1 metre = 16)
     pub z: u8,
@@ -67,7 +61,37 @@ pub struct CarContact {
     pub y: i16,
 }
 
-#[binrw]
+impl Decode for CarContact {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
+        let direction = Direction::decode(buf)?;
+        let heading = Direction::decode(buf)?;
+        let speed = Speed::decode(buf)?;
+        let z = u8::decode(buf)?;
+        let x = i16::decode(buf)?;
+        let y = i16::decode(buf)?;
+        Ok(Self {
+            direction,
+            heading,
+            speed,
+            z,
+            x,
+            y,
+        })
+    }
+}
+
+impl Encode for CarContact {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+        self.direction.encode(buf)?;
+        self.heading.encode(buf)?;
+        self.speed.encode(buf)?;
+        self.z.encode(buf)?;
+        self.x.encode(buf)?;
+        self.y.encode(buf)?;
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Object Hit
@@ -80,11 +104,8 @@ pub struct Obh {
 
     /// Low 12 bits: closing speed (10 = 1 m/s)
     /// The high 4 bits are automatically stripped.
-    #[br(parse_with = binrw_parse_spclose_strip_reserved_bits)]
-    pub spclose: u16,
+    pub spclose: Speed<ClosingSpeed>,
 
-    #[br(parse_with = binrw_parse_duration::<u16, 10, _>)]
-    #[bw(write_with = binrw_write_duration::<u16, 10, _>)]
     /// When this occurred. Warning this is looping.
     pub time: Duration,
 
@@ -97,7 +118,6 @@ pub struct Obh {
     /// The Y position of the object
     pub y: i16,
 
-    #[brw(pad_after = 1)]
     /// The Z position of the object
     pub zbyte: u8,
 
@@ -108,32 +128,102 @@ pub struct Obh {
     pub flags: ObhFlags,
 }
 
+impl Decode for Obh {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
+        let reqi = RequestId::decode(buf)?;
+        let plid = PlayerId::decode(buf)?;
+        // automatically strip off the first 4 bits as they're reserved
+        let spclose = spclose_strip_high_bits(u16::decode(buf)?);
+        let spclose = Speed::new(spclose);
+        let time = Duration::from_millis((u16::decode(buf)? as u64) * 10);
+        let c = CarContact::decode(buf)?;
+        let x = i16::decode(buf)?;
+        let y = i16::decode(buf)?;
+        let zbyte = u8::decode(buf)?;
+        buf.advance(1);
+        let index = u8::decode(buf)?;
+        let flags = ObhFlags::decode(buf)?;
+        Ok(Self {
+            reqi,
+            plid,
+            spclose,
+            time,
+            c,
+            x,
+            y,
+            zbyte,
+            index,
+            flags,
+        })
+    }
+}
+
+impl Encode for Obh {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+        self.reqi.encode(buf)?;
+        self.plid.encode(buf)?;
+        // automatically strip off the first 4 bits as they're reserved
+        spclose_strip_high_bits(self.spclose.into_inner()).encode(buf)?;
+        match u16::try_from(self.time.as_millis() / 10) {
+            Ok(time) => time.encode(buf)?,
+            Err(_) => return Err(insim_core::EncodeError::TooLarge),
+        }
+        self.c.encode(buf)?;
+        self.x.encode(buf)?;
+        self.y.encode(buf)?;
+        self.zbyte.encode(buf)?;
+        buf.put_bytes(0, 1);
+        self.index.encode(buf)?;
+        self.flags.encode(buf)?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
-
     use super::*;
 
     #[test]
-    fn ensure_high_bits_stripped() {
-        assert_eq!(
-            binrw_parse_spclose_strip_reserved_bits(
-                &mut Cursor::new(61441_u16.to_le_bytes()),
-                binrw::Endian::Little,
-                ()
-            )
-            .unwrap(),
-            1
+    fn test_obh() {
+        assert_from_to_bytes!(
+            Obh,
+            [
+                0,   // reqi
+                3,   // plid
+                23,  // spclose (1)
+                0,   // spclose (2)
+                241, // time (1)
+                1,   // time (2)
+                2,   // c - direction
+                254, // c - heading
+                3,   // c - speed
+                9,   // c - zbyte
+                4,   // c - x (1)
+                213, // c - x (2)
+                132, // c - y (1)
+                134, // c - y (2)
+                18,  // x (1)
+                213, // x (2)
+                174, // y (1)
+                134, // y (2)
+                1,   // zbyte
+                0,   // sp1
+                113, // index
+                11,  // obhflags
+            ],
+            |obh: Obh| {
+                assert_eq!(obh.reqi, RequestId(0));
+                assert_eq!(obh.plid, PlayerId(3));
+                assert_eq!(obh.time, Duration::from_millis(4970));
+                assert_eq!(obh.spclose.into_inner(), 23);
+            }
         );
+    }
 
-        assert_eq!(
-            binrw_parse_spclose_strip_reserved_bits(
-                &mut Cursor::new(63495_u16.to_le_bytes()),
-                binrw::Endian::Little,
-                ()
-            )
-            .unwrap(),
-            2055
-        );
+    #[test]
+    fn ensure_high_bits_stripped() {
+        assert_eq!(spclose_strip_high_bits(61441), 1);
+
+        assert_eq!(spclose_strip_high_bits(63495,), 2055);
     }
 }

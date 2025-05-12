@@ -1,15 +1,8 @@
-use insim_core::{
-    binrw::{self, binrw},
-    string::{binrw_parse_codepage_string, binrw_write_codepage_string},
-};
-
 use crate::{identifiers::RequestId, WithRequestId};
 
-#[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// Errors occurred during a [Ssh] request.
 pub enum SshError {
@@ -27,8 +20,7 @@ pub enum SshError {
     NoSave = 3,
 }
 
-#[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Send Screenshot - instructional and informational.
 pub struct Ssh {
@@ -36,12 +28,13 @@ pub struct Ssh {
     pub reqi: RequestId,
 
     /// Result code
-    #[brw(pad_after = 4)]
+    #[insim(pad_after = 4)]
     pub error: SshError,
 
-    /// Screenshot file path.
-    #[br(parse_with = binrw_parse_codepage_string::<32, _>)]
-    #[bw(write_with = binrw_write_codepage_string::<32, _>)]
+    /// Screenshot name.
+    /// Not really ascii, but given we dont have control over the naming convention we can
+    /// probably just abuse the fact that LFS only generates ASCII compatible file names.
+    #[insim(ascii(length = 32, trailing_nul = true))]
     pub name: String,
 }
 
@@ -66,5 +59,28 @@ impl WithRequestId for SshError {
             error: self,
             ..Default::default()
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use bytes::{BufMut, BytesMut};
+
+    use super::*;
+
+    #[test]
+    fn test_ssh() {
+        let mut data = BytesMut::new();
+        data.extend_from_slice(&[
+            2, // reqi
+            0, // error
+            0, 0, 0, 0,
+        ]);
+        data.extend_from_slice(b"lfs_00000001");
+        data.put_bytes(0, 20);
+        assert_from_to_bytes!(Ssh, data.as_ref(), |ssh: Ssh| {
+            assert!(matches!(ssh.error, SshError::Ok));
+            assert_eq!(ssh.name, "lfs_00000001");
+        });
     }
 }

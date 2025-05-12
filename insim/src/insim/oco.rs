@@ -1,13 +1,10 @@
 use bitflags::bitflags;
-use insim_core::binrw::{self, binrw};
 
 use crate::identifiers::RequestId;
 
-#[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// Object Control action to take. Used within [Oco].
 pub enum OcoAction {
@@ -22,11 +19,9 @@ pub enum OcoAction {
     LightsUnset = 6,
 }
 
-#[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// Which lights to manipulate. See [Oco].
 pub enum OcoIndex {
@@ -43,11 +38,8 @@ pub enum OcoIndex {
 }
 
 bitflags! {
-    #[binrw]
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    #[br(map = Self::from_bits_truncate)]
-    #[bw(map = |&x: &Self| x.bits())]
     /// Which blubs to manipulate. See [Oco].
     pub struct OcoLights: u8 {
         /// Red1
@@ -61,14 +53,15 @@ bitflags! {
     }
 }
 
-#[binrw]
-#[derive(Debug, Clone, Default)]
+impl_bitflags_from_to_bytes!(OcoLights, u8);
+
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Object Control
 /// Used to switch start lights
 pub struct Oco {
     /// Non-zero if the packet is a packet request or a reply to a request
-    #[brw(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
     /// Action to take
@@ -85,3 +78,29 @@ pub struct Oco {
 }
 
 impl_typical_with_request_id!(Oco);
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_oco() {
+        assert_from_to_bytes!(
+            Oco,
+            [
+                0,   // reqi
+                0,   // zero
+                5,   // ocoaction
+                149, // index
+                35,  // identifier
+                3,   // data
+            ],
+            |oco: Oco| {
+                assert_eq!(oco.reqi, RequestId(0));
+                assert!(matches!(oco.ocoaction, OcoAction::LightsSet));
+                assert_eq!(oco.identifier, 35);
+                assert_eq!(oco.data.bits(), 3);
+            }
+        );
+    }
+}

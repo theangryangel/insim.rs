@@ -1,10 +1,8 @@
-use std::io::{Cursor, Write};
-
-use bytes::{Buf, Bytes, BytesMut};
-use insim_core::binrw::{BinRead, BinWrite};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use insim_core::{Decode, Encode};
 
 use super::mode::Mode;
-use crate::{packet::Packet, result::Result};
+use crate::{packet::Packet, result::Result, Error};
 
 /// Handles the encoding and decoding of Insim packets to and from raw bytes.
 /// It automatically handles the encoding of the total size of the packet, and the packet
@@ -28,24 +26,22 @@ impl Codec {
     /// Encode a [Packet] into [Bytes].
     #[tracing::instrument]
     pub fn encode(&self, msg: &Packet) -> Result<Bytes> {
+        let mut buf = BytesMut::with_capacity(msg.size_hint());
+
+        // add a placeholder for the size of the packet
+        buf.put_u8(0);
+
         // encode the message
-        let mut writer = Cursor::new(Vec::with_capacity(msg.size_hint()));
-        let _ = writer.write(&[0]);
-        msg.write(&mut writer)?;
+        msg.encode(&mut buf)?;
 
-        let pos = writer.position();
+        let n = self.mode().encode_length(buf.len())?;
 
-        // encode the length of the packet, including the placeholder for the length
-        let n = self.mode().encode_length(pos as usize)?;
+        // populate the size
+        buf[0] = n;
 
-        // update the length the encoded length
-        writer.set_position(0);
-        writer.write_all(&[n])?;
+        tracing::debug!("{:?}", &buf);
 
-        let data = writer.into_inner();
-        tracing::debug!("{:?}", &data);
-
-        Ok(data.into())
+        Ok(buf.freeze())
     }
 
     /// Decode a series of bytes into a [Packet]
@@ -62,17 +58,34 @@ impl Codec {
             },
         };
 
-        let mut data = src.split_to(n);
+        let mut data = src.split_to(n).freeze();
+        // cloning Bytes is cheap:
+        // Bytes values facilitate zero-copy network programming by allowing multiple Bytes objects to point to the same underlying memory.
+        let original = data.clone();
 
         // skip over the size field now that we know we have a full packet
         // none of the packet definitions include the size
         data.advance(1);
 
-        let mut cursor = std::io::Cursor::new(&data);
-
-        let packet = Packet::read(&mut cursor)?;
-        tracing::trace!("Decoded packet={:?}", packet);
-        Ok(Some(packet))
+        let packet = Packet::decode(&mut data);
+        match packet {
+            Ok(packet) => {
+                tracing::trace!("Decoded packet={:?}", packet);
+                if data.remaining() > 0 {
+                    return Err(Error::IncompleteDecode {
+                        input: original,
+                        decoded: packet,
+                        remaining: data,
+                    });
+                }
+                Ok(Some(packet))
+            },
+            Err(e) => Err(crate::Error::Decode {
+                offset: data.as_ptr() as usize - original.as_ptr() as usize,
+                error: e,
+                input: original,
+            }),
+        }
     }
 }
 

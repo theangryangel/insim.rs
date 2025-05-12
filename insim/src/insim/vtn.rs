@@ -1,13 +1,9 @@
-use insim_core::binrw::{self, binrw};
-
 use crate::identifiers::{ConnectionId, RequestId};
 
 /// Enum for the action field of [Vtn].
-#[binrw]
-#[derive(Default, Debug, Clone, Eq, PartialEq)]
+#[derive(Default, Debug, Clone, Eq, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 pub enum VtnAction {
     /// No vote, or cancel vote
@@ -22,6 +18,28 @@ pub enum VtnAction {
 
     /// Vote to qualify
     Qualify = 3,
+}
+
+impl From<u8> for VtnAction {
+    fn from(value: u8) -> Self {
+        match value {
+            1 => Self::End,
+            2 => Self::Restart,
+            3 => Self::Qualify,
+            _ => Self::None,
+        }
+    }
+}
+
+impl From<&VtnAction> for u8 {
+    fn from(value: &VtnAction) -> Self {
+        match value {
+            VtnAction::End => 1,
+            VtnAction::Restart => 2,
+            VtnAction::Qualify => 3,
+            VtnAction::None => 0,
+        }
+    }
 }
 
 // For usage in IS_SMALL
@@ -48,19 +66,41 @@ impl From<&VtnAction> for u32 {
     }
 }
 
-#[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Vote Notification
 pub struct Vtn {
     /// Non-zero if the packet is a packet request or a reply to a request
-    #[brw(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
     /// The unique connection id of the connection that voted
     pub ucid: ConnectionId,
 
     /// The action or fact for this vote notification
-    #[brw(pad_after = 2)]
+    #[insim(pad_after = 2)]
     pub action: VtnAction,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_vtn() {
+        assert_from_to_bytes!(
+            Vtn,
+            [
+                5, // reqi
+                0, 9, // ucid
+                3, // action
+                0, 0,
+            ],
+            |parsed: Vtn| {
+                assert_eq!(parsed.reqi, RequestId(5));
+                assert_eq!(parsed.ucid, ConnectionId(9));
+                assert_eq!(parsed.action, VtnAction::Qualify);
+            }
+        );
+    }
 }

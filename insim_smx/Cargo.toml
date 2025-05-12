@@ -16,6 +16,11 @@ workspace = true
 bench = false
 doctest = false
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docrs"]
+
 [dependencies]
+bytes = { workspace = true }
 insim_core = { path = "../insim_core", version = "3.0.0-unreleased" }
 thiserror = { workspace = true }

@@ -1,19 +1,14 @@
-use std::io::SeekFrom;
-
-use bytes::BufMut;
-use insim_core::{
-    binrw::{self, binrw},
-    string::{codepages, strip_trailing_nul},
-};
+use bytes::{Buf, BufMut};
+use insim_core::{string::codepages, Decode, DecodeString, Encode, EncodeString};
 
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 /// Enum for the sound field of [Mso].
-#[binrw]
-#[derive(Debug, Default, Clone)]
+#[derive(
+    Debug, Default, Clone, Eq, PartialEq, PartialOrd, Ord, insim_core::Decode, insim_core::Encode,
+)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 pub enum MsoUserType {
     /// System message.
@@ -56,43 +51,23 @@ pub struct Mso {
     pub msg: String,
 }
 
-impl binrw::BinRead for Mso {
-    type Args<'a> = ();
+impl Decode for Mso {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
+        let reqi = RequestId::decode(buf)?;
+        buf.advance(1);
+        let ucid = ConnectionId::decode(buf)?;
+        let plid = PlayerId::decode(buf)?;
+        let usertype = MsoUserType::decode(buf)?;
+        let textstart = u8::decode(buf)?;
 
-    fn read_options<R: std::io::prelude::Read + std::io::prelude::Seek>(
-        reader: &mut R,
-        endian: binrw::Endian,
-        _args: Self::Args<'_>,
-    ) -> binrw::prelude::BinResult<Self> {
-        let reqi = RequestId::read_options(reader, endian, ())?;
-
-        let _ = reader.seek(SeekFrom::Current(1))?;
-
-        let ucid = ConnectionId::read_options(reader, endian, ())?;
-        let plid = PlayerId::read_options(reader, endian, ())?;
-        let usertype = MsoUserType::read_options(reader, endian, ())?;
-        let textstart = u8::read_options(reader, endian, ())?;
         let (textstart, msg) = if textstart > 0 {
-            let name = Vec::<u8>::read_options(
-                reader,
-                endian,
-                binrw::VecArgs {
-                    count: textstart as usize,
-                    inner: (),
-                },
-            )?;
-
-            let msg: Vec<u8> = binrw::helpers::until_eof(reader, endian, ())?;
-
-            let name = codepages::to_lossy_string(strip_trailing_nul(&name));
-            let msg = codepages::to_lossy_string(strip_trailing_nul(&msg));
+            let mut name = buf.split_to(textstart as usize);
+            let name_len = name.len();
+            let name = String::decode_codepage(&mut name, name_len)?;
+            let msg = String::decode_codepage(buf, buf.len())?;
             (name.len() as u8, format!("{name}{msg}"))
         } else {
-            let msg: Vec<u8> = binrw::helpers::until_eof(reader, endian, ())?;
-            (
-                0_u8,
-                codepages::to_lossy_string(strip_trailing_nul(&msg)).to_string(),
-            )
+            (0_u8, String::decode_codepage(buf, buf.len())?)
         };
 
         Ok(Self {
@@ -106,42 +81,50 @@ impl binrw::BinRead for Mso {
     }
 }
 
-impl binrw::BinWrite for Mso {
-    type Args<'a> = ();
+impl Encode for Mso {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+        self.reqi.encode(buf)?;
+        buf.put_bytes(0, 1);
+        self.ucid.encode(buf)?;
+        self.plid.encode(buf)?;
+        self.usertype.encode(buf)?;
 
-    fn write_options<W: std::io::prelude::Write + std::io::prelude::Seek>(
-        &self,
-        writer: &mut W,
-        endian: binrw::Endian,
-        _args: Self::Args<'_>,
-    ) -> binrw::prelude::BinResult<()> {
-        self.reqi.write_options(writer, endian, ())?;
-        0_u8.write_options(writer, endian, ())?; // pad 1 byte
-        self.ucid.write_options(writer, endian, ())?;
-        self.plid.write_options(writer, endian, ())?;
-        self.usertype.write_options(writer, endian, ())?;
-
-        // if we need to encode the string, we need to move the textstart transparently for the
-        // user
-        let textstart = if self.textstart > 0 {
+        if self.textstart > 0 {
             let name = &self.msg[..self.textstart as usize];
-            let textstart = codepages::to_lossy_bytes(name).len();
+            let msg = &self.msg[(self.textstart as usize)..];
 
-            textstart as u8
+            let name = codepages::to_lossy_bytes(name);
+            let msg = codepages::to_lossy_bytes(msg);
+
+            if (name.len() + msg.len()) > (MSO_MSG_MAX_LEN - 1) {
+                return Err(insim_core::EncodeError::TooLarge);
+            }
+
+            let textstart = name.len() as u8;
+
+            buf.put_u8(textstart);
+
+            let mut remaining = MSO_MSG_MAX_LEN;
+
+            let name_len_to_write = name.len().min(remaining);
+            buf.extend_from_slice(&name[..name_len_to_write]);
+            remaining -= name_len_to_write;
+
+            let msg_len_to_write = msg.len().min(remaining);
+            buf.extend_from_slice(&msg[..msg_len_to_write]);
+
+            let written = name_len_to_write + msg_len_to_write;
+            if remaining > 0 {
+                let align_to = MSO_MSG_ALIGN - 1;
+                let round_to = (written + align_to) & !align_to;
+                let round_to = round_to.min(MSO_MSG_MAX_LEN);
+                buf.put_bytes(0, round_to - written);
+            }
         } else {
-            self.textstart
-        };
-
-        textstart.write_options(writer, endian, ())?;
-        let mut res = codepages::to_lossy_bytes(&self.msg).to_vec();
-
-        let align_to = MSO_MSG_ALIGN - 1;
-        let round_to = (res.len() + align_to) & !align_to;
-        if round_to != res.len() {
-            res.put_bytes(0, round_to - res.len());
+            buf.put_u8(0);
+            self.msg
+                .encode_codepage_with_alignment(buf, MSO_MSG_MAX_LEN, MSO_MSG_ALIGN, true)?;
         }
-        res.truncate(MSO_MSG_MAX_LEN);
-        res.write_options(writer, endian, ())?;
 
         Ok(())
     }
@@ -149,62 +132,91 @@ impl binrw::BinWrite for Mso {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
-
-    use bytes::{BufMut, BytesMut};
-    use insim_core::binrw::{BinRead, BinWrite};
-    use tokio_test::assert_ok;
+    use bytes::{BufMut, Bytes, BytesMut};
 
     use super::*;
 
     #[test]
     fn test_mso() {
-        let data = Mso {
-            reqi: RequestId(1),
-            ucid: ConnectionId(10),
-            plid: PlayerId(74),
-            usertype: MsoUserType::System,
-            textstart: 0,
-            msg: "two".into(),
-        };
-
-        let mut buf = Cursor::new(Vec::new());
-        let res = data.write_le(&mut buf);
-        assert!(res.is_ok());
-
         let mut comparison = BytesMut::new();
-        comparison.put_u8(1);
+        comparison.put_u8(1); // reqi
         comparison.put_u8(0);
-        comparison.put_u8(10);
-        comparison.put_u8(74);
-        comparison.put_u8(0);
-        comparison.put_u8(0);
-        comparison.extend_from_slice(&"two".to_string().as_bytes());
+        comparison.put_u8(10); // ucid
+        comparison.put_u8(74); // plid
+        comparison.put_u8(0); // usertype
+        comparison.put_u8(0); // textstart
+        comparison.extend_from_slice(&"two".to_string().as_bytes()); // msg
         comparison.put_bytes(0, 1);
 
-        assert_eq!(buf.into_inner(), comparison.to_vec());
+        assert_from_to_bytes!(Mso, comparison.as_ref(), |parsed: Mso| {
+            assert_eq!(parsed.reqi, RequestId(1));
+            assert_eq!(parsed.ucid, ConnectionId(10));
+            assert_eq!(parsed.plid, PlayerId(74));
+            assert_eq!(parsed.usertype, MsoUserType::System);
+            assert_eq!(parsed.textstart, 0);
+            assert_eq!(parsed.msg, "two");
+        });
     }
 
     #[test]
     fn test_mso_too_short() {
-        let mut buf = Cursor::new(b"\x0b\0\0\0\0\0\0Downloaded Skin : XFG_PRO38\0");
+        let mut raw = BytesMut::new();
+        raw.put_u8(0); // reqi
+        raw.put_u8(0);
+        raw.put_u8(10); // ucid
+        raw.put_u8(74); // plid
+        raw.put_u8(0); // usertype
+        raw.put_u8(0); // textstart
+        raw.extend_from_slice(&"Downloaded Skin : XFG_PRO38".to_string().as_bytes()); // ms
+                                                                                      // We are intentionally dropping the trailing nul byte here to ensure that we handle
+                                                                                      // packets that are too short somehow. For this reason we're not using
+                                                                                      // assert_from_to_bytes!
+                                                                                      //raw.put_bytes(0, 1);
+        let raw = raw.freeze();
 
-        let res = Mso::read_le(&mut buf);
-        assert_ok!(res);
+        let res = Mso::decode(&mut Bytes::from(raw.clone())).unwrap();
+        assert_eq!(res.textstart, 0);
+        assert_eq!(res.msg, "Downloaded Skin : XFG_PRO38");
+    }
+
+    #[test]
+    fn test_mso_too_long() {
+        let mut raw = BytesMut::new();
+        raw.put_u8(0); // reqi
+        raw.put_u8(0);
+        raw.put_u8(10); // ucid
+        raw.put_u8(74); // plid
+        raw.put_u8(0); // usertype
+        raw.put_u8(0); // textstart
+        raw.extend_from_slice(&[b'X'; MSO_MSG_MAX_LEN + 10]); // msg
+        let raw = raw.freeze();
+
+        // when reading we want to handle too long entries, but ensure that when we convert to
+        // bytes it's appropriately truncated
+
+        let res = Mso::decode(&mut Bytes::from(raw.clone())).unwrap();
+        assert_eq!(res.textstart, 0);
+        assert_eq!(res.msg.len(), MSO_MSG_MAX_LEN + 10);
+
+        let mut buf = BytesMut::new();
+        let res = res.encode(&mut buf);
+        assert!(res.is_err());
     }
 
     #[test]
     fn test_codepages_moves_textstart() {
-        let mut buf = Cursor::new([
-            0, 0, 2, 4, 1, 17, 94, 55, 80, 108, 97, 121, 101, 114, 32, 94, 69, 236, 32, 94, 55, 58,
-            32, 94, 56, 99, 114, 154, 94, 69, 232, 0, 0, 0,
-        ]);
+        let raw = [
+            0, 0, 2, 4, 1, 17, 94, // msg
+            55, 80, 108, 97, 121, 101, 114, 32, 94, 69, 236, 32, 94, 55, 58, 32, 94, 56, 99, 114,
+            154, 94, 69, 232, 0, 0, 0,
+        ];
 
-        let mso = Mso::read_le(&mut buf).unwrap();
-        // Shamefully borrowed from https://github.com/simbroadcasts/node-insim/commit/533d107b695b58df64278a5935a7140fa340fb3d
-        assert_eq!(mso.msg, "^7Player ě ^7: ^8cršč");
-        assert_eq!(mso.textstart, 16); // moved from 17th position to 16th
-        assert_eq!(&mso.msg[..mso.textstart as usize], "^7Player ě ^7: ");
-        assert_eq!(&mso.msg[mso.textstart as usize..], "^8cršč");
+        assert_from_to_bytes!(Mso, raw, |mso: Mso| {
+            // Shamefully borrowed from https://github.com/simbroadcasts/node-insim/commit/533d107b695b58df64278a5935a7140fa340fb3d
+            assert_eq!(mso.msg, "^7Player ě ^7: ^8cršč");
+            assert_eq!(mso.textstart, 16); // moved from 17th position to 16th
+            assert_eq!(&mso.msg[..mso.textstart as usize], "^7Player ě ^7: ");
+            assert_eq!(&mso.msg[mso.textstart as usize..], "^8cršč");
+        });
     }
 }

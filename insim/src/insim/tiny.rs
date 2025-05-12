@@ -1,12 +1,8 @@
-use insim_core::binrw::{self, binrw};
-
 use crate::{identifiers::RequestId, Packet, WithRequestId};
 
-#[binrw]
-#[derive(Debug, Default, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-#[brw(repr(u8))]
 #[non_exhaustive]
 /// [Tiny] Subtype
 pub enum TinyType {
@@ -120,8 +116,7 @@ impl WithRequestId for TinyType {
     }
 }
 
-#[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// General purpose Tiny packet
 pub struct Tiny {
@@ -140,3 +135,34 @@ impl Tiny {
 }
 
 impl_typical_with_request_id!(Tiny);
+
+#[cfg(test)]
+mod tests {
+    use bytes::{BufMut, BytesMut};
+    use insim_core::Decode;
+
+    use super::*;
+
+    #[test]
+    fn test_tiny_type_mal() {
+        let mut buf = BytesMut::new();
+        buf.put_u8(27);
+
+        let ty = TinyType::decode(&mut buf.freeze()).unwrap();
+        assert!(matches!(ty, TinyType::Mal));
+    }
+
+    #[test]
+    fn test_tiny() {
+        assert_from_to_bytes!(
+            Tiny,
+            vec![
+                0, // reqi
+                6  // subt
+            ],
+            |parsed: Tiny| {
+                assert_eq!(parsed.subt, TinyType::Scp);
+            }
+        );
+    }
+}

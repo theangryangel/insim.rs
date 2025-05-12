@@ -1,9 +1,6 @@
-use insim_core::binrw::{self, binrw};
-
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
-#[binrw]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Take Over Car - informational - when a 2 connections swap drivers
 /// Insim indicates this by sending this packet which describes a transfer of the relationship
@@ -19,6 +16,31 @@ pub struct Toc {
     pub olducid: ConnectionId,
 
     /// The new connection ID for this `plid`
-    #[brw(pad_after = 2)]
+    #[insim(pad_after = 2)]
     pub newucid: ConnectionId,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_toc() {
+        assert_from_to_bytes!(
+            Toc,
+            [
+                0, // reqi
+                3, // plid
+                1, // olducid
+                2, // newucid
+                0, 0,
+            ],
+            |toc: Toc| {
+                assert_eq!(toc.reqi, RequestId(0));
+                assert_eq!(toc.plid, PlayerId(3));
+                assert_eq!(toc.olducid, ConnectionId(1));
+                assert_eq!(toc.newucid, ConnectionId(2));
+            }
+        )
+    }
 }

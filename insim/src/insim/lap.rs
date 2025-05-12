@@ -1,12 +1,6 @@
-use std::{
-    io::{Read, Seek, Write},
-    time::Duration,
-};
+use std::time::Duration;
 
-use insim_core::{
-    binrw::{self, binrw, BinRead, BinResult, BinWrite, Endian},
-    duration::{binrw_parse_duration, binrw_write_duration},
-};
+use insim_core::{Decode, Encode};
 
 use super::{PenaltyInfo, PlayerFlags};
 use crate::identifiers::{PlayerId, RequestId};
@@ -24,40 +18,26 @@ pub enum Fuel200 {
     No,
 }
 
-impl BinWrite for Fuel200 {
-    type Args<'a> = ();
-
-    fn write_options<W: Write + Seek>(
-        &self,
-        writer: &mut W,
-        endian: Endian,
-        args: Self::Args<'_>,
-    ) -> BinResult<()> {
-        let data = match self {
-            Self::Percentage(data) => *data,
-            Self::No => 255_u8,
-        };
-
-        data.write_options(writer, endian, args)?;
-        Ok(())
-    }
-}
-
-impl BinRead for Fuel200 {
-    type Args<'a> = ();
-
-    fn read_options<R: Read + Seek>(
-        reader: &mut R,
-        endian: Endian,
-        (): Self::Args<'_>,
-    ) -> BinResult<Self> {
-        let data = <u8>::read_options(reader, endian, ())?;
+impl Decode for Fuel200 {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
+        let data = u8::decode(buf)?;
 
         if data == 255 {
             Ok(Self::No)
         } else {
             Ok(Self::Percentage(data))
         }
+    }
+}
+
+impl Encode for Fuel200 {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+        let data = match self {
+            Self::Percentage(data) => *data,
+            Self::No => 255_u8,
+        };
+
+        data.encode(buf)
     }
 }
 
@@ -74,35 +54,9 @@ pub enum Fuel {
     No,
 }
 
-impl BinWrite for Fuel {
-    type Args<'a> = ();
-
-    fn write_options<W: Write + Seek>(
-        &self,
-        writer: &mut W,
-        endian: Endian,
-        args: Self::Args<'_>,
-    ) -> BinResult<()> {
-        let data = match self {
-            Self::Percentage(data) => *data,
-            Self::No => 255_u8,
-        };
-
-        data.write_options(writer, endian, args)?;
-        Ok(())
-    }
-}
-
-impl BinRead for Fuel {
-    type Args<'a> = ();
-
-    fn read_options<R: Read + Seek>(
-        reader: &mut R,
-        endian: Endian,
-        (): Self::Args<'_>,
-    ) -> BinResult<Self> {
-        let data = <u8>::read_options(reader, endian, ())?;
-
+impl Decode for Fuel {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
+        let data = u8::decode(buf)?;
         if data == 255 {
             Ok(Self::No)
         } else {
@@ -111,8 +65,18 @@ impl BinRead for Fuel {
     }
 }
 
-#[binrw]
-#[derive(Debug, Clone, Default)]
+impl Encode for Fuel {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+        let data = match self {
+            Self::Percentage(data) => *data,
+            Self::No => 255_u8,
+        };
+        data.encode(buf)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Lap Time for a given player.
 pub struct Lap {
@@ -122,13 +86,11 @@ pub struct Lap {
     /// Unique player ID
     pub plid: PlayerId,
 
-    #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
-    #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
+    #[insim(duration(milliseconds = u32))]
     /// Lap time
     pub ltime: Duration, // lap time (ms)
 
-    #[br(parse_with = binrw_parse_duration::<u32, 1, _>)]
-    #[bw(write_with = binrw_write_duration::<u32, 1, _>)]
+    #[insim(duration(milliseconds = u32))]
     /// Total elapsed time
     pub etime: Duration,
 
@@ -136,7 +98,7 @@ pub struct Lap {
     pub lapsdone: u16,
 
     /// See [PlayerFlags].
-    #[brw(pad_after = 1)]
+    #[insim(pad_after = 1)]
     pub flags: PlayerFlags,
 
     /// Current penalty
@@ -147,4 +109,44 @@ pub struct Lap {
 
     /// See [Fuel200].
     pub fuel200: Fuel200,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_lap() {
+        assert_from_to_bytes!(
+            Lap,
+            [
+                0,  // reqi
+                2,  // plid
+                4,  // ltime (1)
+                0,  // ltime (2)
+                0,  // ltime (3)
+                1,  // ltime (4)
+                64, // etime (1)
+                0,  // etime (2)
+                1,  // etime (3)
+                0,  // etime (4)
+                1,  // lapsdone (1)
+                2,  // lapsdone (2)
+                64, // flags (1)
+                2,  // flags (2)
+                0,  // sp0
+                6,  // penalty
+                3,  // numstops
+                40, // fuel200
+            ],
+            |lap: Lap| {
+                assert_eq!(lap.plid, PlayerId(2));
+                assert_eq!(lap.ltime, Duration::from_millis(16777220));
+                assert_eq!(lap.etime, Duration::from_millis(65600));
+                assert_eq!(lap.lapsdone, 513);
+                assert_eq!(lap.numstops, 3);
+                assert!(matches!(lap.fuel200, Fuel200::Percentage(40)));
+            }
+        )
+    }
 }

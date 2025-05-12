@@ -1,8 +1,5 @@
 //! Strongly typed Vehicles for both standard and mods
-
-use binrw::{BinRead, BinWrite};
-
-use crate::license::License;
+use crate::{license::License, Decode, Encode};
 
 /// Handles parsing a vehicle name according to the Insim v9 rules.
 /// See <https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info>
@@ -81,82 +78,69 @@ impl Vehicle {
     }
 }
 
-impl BinRead for Vehicle {
-    type Args<'a> = ();
+impl Decode for Vehicle {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
+        let mut bytes = buf.split_to(4);
+        let is_builtin = bytes[0..=2].iter().all(|c| c.is_ascii_alphanumeric()) && bytes[3] == 0;
 
-    fn read_options<R: std::io::Read + std::io::Seek>(
-        reader: &mut R,
-        endian: binrw::Endian,
-        args: Self::Args<'_>,
-    ) -> binrw::BinResult<Self> {
-        let pos = reader.stream_position()?;
-
-        <[u8; 4]>::read_options(reader, endian, args).map(|bytes| {
-            let is_builtin =
-                bytes[0..=2].iter().all(|c| c.is_ascii_alphanumeric()) && bytes[3] == 0;
-
-            match (bytes, is_builtin) {
-                ([0, 0, 0, 0], _) => Ok(Vehicle::Unknown),
-                ([b'X', b'F', b'G', 0], true) => Ok(Vehicle::Xfg),
-                ([b'X', b'R', b'G', 0], true) => Ok(Vehicle::Xrg),
-                ([b'F', b'B', b'M', 0], true) => Ok(Vehicle::Fbm),
-                ([b'X', b'R', b'T', 0], true) => Ok(Vehicle::Xrt),
-                ([b'R', b'B', b'4', 0], true) => Ok(Vehicle::Rb4),
-                ([b'F', b'X', b'O', 0], true) => Ok(Vehicle::Fxo),
-                ([b'L', b'X', b'4', 0], true) => Ok(Vehicle::Lx4),
-                ([b'L', b'X', b'6', 0], true) => Ok(Vehicle::Lx6),
-                ([b'M', b'R', b'T', 0], true) => Ok(Vehicle::Mrt),
-                ([b'U', b'F', b'1', 0], true) => Ok(Vehicle::Uf1),
-                ([b'R', b'A', b'C', 0], true) => Ok(Vehicle::Rac),
-                ([b'F', b'Z', b'5', 0], true) => Ok(Vehicle::Fz5),
-                ([b'F', b'O', b'X', 0], true) => Ok(Vehicle::Fox),
-                ([b'X', b'F', b'R', 0], true) => Ok(Vehicle::Xfr),
-                ([b'U', b'F', b'R', 0], true) => Ok(Vehicle::Ufr),
-                ([b'F', b'O', b'8', 0], true) => Ok(Vehicle::Fo8),
-                ([b'F', b'X', b'R', 0], true) => Ok(Vehicle::Fxr),
-                ([b'X', b'R', b'R', 0], true) => Ok(Vehicle::Xrr),
-                ([b'F', b'Z', b'R', 0], true) => Ok(Vehicle::Fzr),
-                ([b'B', b'F', b'1', 0], true) => Ok(Vehicle::Bf1),
-                (_, true) => Err(binrw::Error::NoVariantMatch { pos }),
-                (_, false) => Ok(Vehicle::Mod(u32::from_le_bytes(bytes))),
-            }
-        })?
+        match (bytes.as_ref(), is_builtin) {
+            ([0, 0, 0, 0], _) => Ok(Vehicle::Unknown),
+            ([b'X', b'F', b'G', 0], true) => Ok(Vehicle::Xfg),
+            ([b'X', b'R', b'G', 0], true) => Ok(Vehicle::Xrg),
+            ([b'F', b'B', b'M', 0], true) => Ok(Vehicle::Fbm),
+            ([b'X', b'R', b'T', 0], true) => Ok(Vehicle::Xrt),
+            ([b'R', b'B', b'4', 0], true) => Ok(Vehicle::Rb4),
+            ([b'F', b'X', b'O', 0], true) => Ok(Vehicle::Fxo),
+            ([b'L', b'X', b'4', 0], true) => Ok(Vehicle::Lx4),
+            ([b'L', b'X', b'6', 0], true) => Ok(Vehicle::Lx6),
+            ([b'M', b'R', b'T', 0], true) => Ok(Vehicle::Mrt),
+            ([b'U', b'F', b'1', 0], true) => Ok(Vehicle::Uf1),
+            ([b'R', b'A', b'C', 0], true) => Ok(Vehicle::Rac),
+            ([b'F', b'Z', b'5', 0], true) => Ok(Vehicle::Fz5),
+            ([b'F', b'O', b'X', 0], true) => Ok(Vehicle::Fox),
+            ([b'X', b'F', b'R', 0], true) => Ok(Vehicle::Xfr),
+            ([b'U', b'F', b'R', 0], true) => Ok(Vehicle::Ufr),
+            ([b'F', b'O', b'8', 0], true) => Ok(Vehicle::Fo8),
+            ([b'F', b'X', b'R', 0], true) => Ok(Vehicle::Fxr),
+            ([b'X', b'R', b'R', 0], true) => Ok(Vehicle::Xrr),
+            ([b'F', b'Z', b'R', 0], true) => Ok(Vehicle::Fzr),
+            ([b'B', b'F', b'1', 0], true) => Ok(Vehicle::Bf1),
+            (_, true) => Err(crate::DecodeError::BadMagic {
+                found: Box::new(bytes),
+            }),
+            (_, false) => Ok(Vehicle::Mod(u32::decode(&mut bytes)?)),
+        }
     }
 }
 
-impl BinWrite for Vehicle {
-    type Args<'a> = ();
-
-    fn write_options<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        endian: binrw::Endian,
-        args: Self::Args<'_>,
-    ) -> binrw::BinResult<()> {
+impl Encode for Vehicle {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodeError> {
         match self {
-            Vehicle::Xfg => [b'X', b'F', b'G', 0].write_options(writer, endian, args),
-            Vehicle::Xrg => [b'X', b'R', b'G', 0].write_options(writer, endian, args),
-            Vehicle::Fbm => [b'F', b'B', b'M', 0].write_options(writer, endian, args),
-            Vehicle::Xrt => [b'X', b'R', b'T', 0].write_options(writer, endian, args),
-            Vehicle::Rb4 => [b'R', b'B', b'4', 0].write_options(writer, endian, args),
-            Vehicle::Fxo => [b'F', b'X', b'O', 0].write_options(writer, endian, args),
-            Vehicle::Lx4 => [b'L', b'X', b'4', 0].write_options(writer, endian, args),
-            Vehicle::Lx6 => [b'L', b'X', b'6', 0].write_options(writer, endian, args),
-            Vehicle::Mrt => [b'M', b'R', b'T', 0].write_options(writer, endian, args),
-            Vehicle::Uf1 => [b'U', b'F', b'1', 0].write_options(writer, endian, args),
-            Vehicle::Rac => [b'R', b'A', b'C', 0].write_options(writer, endian, args),
-            Vehicle::Fz5 => [b'F', b'Z', b'5', 0].write_options(writer, endian, args),
-            Vehicle::Fox => [b'F', b'O', b'X', 0].write_options(writer, endian, args),
-            Vehicle::Xfr => [b'X', b'F', b'R', 0].write_options(writer, endian, args),
-            Vehicle::Ufr => [b'U', b'F', b'R', 0].write_options(writer, endian, args),
-            Vehicle::Fo8 => [b'F', b'O', b'8', 0].write_options(writer, endian, args),
-            Vehicle::Fxr => [b'F', b'X', b'R', 0].write_options(writer, endian, args),
-            Vehicle::Xrr => [b'X', b'R', b'R', 0].write_options(writer, endian, args),
-            Vehicle::Fzr => [b'F', b'Z', b'R', 0].write_options(writer, endian, args),
-            Vehicle::Bf1 => [b'B', b'F', b'1', 0].write_options(writer, endian, args),
-            Vehicle::Mod(vehmod) => vehmod.write_options(writer, endian, args),
-            Vehicle::Unknown => [0_u8, 0_u8, 0_u8, 0_u8].write_options(writer, endian, args),
-        }
+            Vehicle::Xfg => buf.extend_from_slice(&[b'X', b'F', b'G', 0]),
+            Vehicle::Xrg => buf.extend_from_slice(&[b'X', b'R', b'G', 0]),
+            Vehicle::Fbm => buf.extend_from_slice(&[b'F', b'B', b'M', 0]),
+            Vehicle::Xrt => buf.extend_from_slice(&[b'X', b'R', b'T', 0]),
+            Vehicle::Rb4 => buf.extend_from_slice(&[b'R', b'B', b'4', 0]),
+            Vehicle::Fxo => buf.extend_from_slice(&[b'F', b'X', b'O', 0]),
+            Vehicle::Lx4 => buf.extend_from_slice(&[b'L', b'X', b'4', 0]),
+            Vehicle::Lx6 => buf.extend_from_slice(&[b'L', b'X', b'6', 0]),
+            Vehicle::Mrt => buf.extend_from_slice(&[b'M', b'R', b'T', 0]),
+            Vehicle::Uf1 => buf.extend_from_slice(&[b'U', b'F', b'1', 0]),
+            Vehicle::Rac => buf.extend_from_slice(&[b'R', b'A', b'C', 0]),
+            Vehicle::Fz5 => buf.extend_from_slice(&[b'F', b'Z', b'5', 0]),
+            Vehicle::Fox => buf.extend_from_slice(&[b'F', b'O', b'X', 0]),
+            Vehicle::Xfr => buf.extend_from_slice(&[b'X', b'F', b'R', 0]),
+            Vehicle::Ufr => buf.extend_from_slice(&[b'U', b'F', b'R', 0]),
+            Vehicle::Fo8 => buf.extend_from_slice(&[b'F', b'O', b'8', 0]),
+            Vehicle::Fxr => buf.extend_from_slice(&[b'F', b'X', b'R', 0]),
+            Vehicle::Xrr => buf.extend_from_slice(&[b'X', b'R', b'R', 0]),
+            Vehicle::Fzr => buf.extend_from_slice(&[b'F', b'Z', b'R', 0]),
+            Vehicle::Bf1 => buf.extend_from_slice(&[b'B', b'F', b'1', 0]),
+            Vehicle::Mod(vehmod) => vehmod.encode(buf)?,
+            Vehicle::Unknown => buf.extend_from_slice(&[0_u8, 0_u8, 0_u8, 0_u8]),
+        };
+
+        Ok(())
     }
 }
 

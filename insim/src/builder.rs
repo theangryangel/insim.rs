@@ -1,8 +1,14 @@
-use std::{fmt::Debug, net::SocketAddr, time::Duration};
+use std::{
+    fmt::Debug,
+    net::{SocketAddr, ToSocketAddrs},
+    time::Duration,
+};
 
 #[cfg(feature = "blocking")]
+#[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
 use crate::net::blocking_impl::Framed as BlockingFramed;
 #[cfg(feature = "tokio")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 use crate::net::tokio_impl::Framed as AsyncFramed;
 use crate::{
     identifiers::RequestId,
@@ -11,6 +17,25 @@ use crate::{
     relay::Sel,
     result::Result,
 };
+
+fn tcpstream_connect_to_any<A: ToSocketAddrs>(
+    addrs: A,
+    timeout: Duration,
+) -> std::io::Result<std::net::TcpStream> {
+    for addr in addrs.to_socket_addrs()? {
+        match std::net::TcpStream::connect_timeout(&addr, timeout) {
+            Ok(stream) => return Ok(stream),
+            Err(_) => {
+                continue;
+            },
+        }
+    }
+
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        "All connection attempts failed",
+    ))
+}
 
 #[derive(Clone, Debug, Default)]
 pub enum Proto {
@@ -52,6 +77,7 @@ pub struct Builder {
     relay_admin_password: Option<String>,
 
     #[cfg(feature = "websocket")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "websocket")))]
     relay_websocket: bool,
 }
 
@@ -120,6 +146,7 @@ impl Builder {
 
     /// Use the LFS World Relay over Websockets.
     #[cfg(feature = "websocket")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "websocket")))]
     pub fn relay_websocket(mut self, ws: bool) -> Self {
         self.relay_websocket = ws;
         self
@@ -312,9 +339,8 @@ impl Builder {
     /// configuration.
     /// The `Builder` is not consumed and may be reused.
     #[cfg(feature = "blocking")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
     pub fn connect_blocking(&self) -> Result<BlockingFramed> {
-        use std::net::ToSocketAddrs;
-
         use crate::{net::blocking_impl::UdpStream, LFSW_RELAY_ADDR};
 
         match self.proto {
@@ -355,12 +381,7 @@ impl Builder {
                 Ok(stream)
             },
             Proto::Relay => {
-                let addrs = LFSW_RELAY_ADDR.to_socket_addrs()?;
-                // FIXME we should try every result, not just the first
-                let stream = std::net::TcpStream::connect_timeout(
-                    &addrs.into_iter().nth(0).unwrap(),
-                    self.connect_timeout,
-                )?;
+                let stream = tcpstream_connect_to_any(LFSW_RELAY_ADDR, self.connect_timeout)?;
                 stream.set_nodelay(self.tcp_nodelay)?;
                 stream.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
                 stream.set_write_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
@@ -396,6 +417,7 @@ impl Builder {
     /// configuration.
     /// The `Builder` is not consumed and may be reused.
     #[cfg(feature = "tokio")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     pub async fn connect_async(&self) -> Result<AsyncFramed> {
         use tokio::time::timeout;
 
@@ -464,6 +486,7 @@ impl Builder {
     }
 
     #[cfg(feature = "tokio")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     async fn _connect_relay(&self) -> Result<AsyncFramed> {
         use tokio::time::timeout;
 
