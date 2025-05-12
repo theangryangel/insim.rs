@@ -1,156 +1,101 @@
 //! Direction
-use std::{
-    fmt,
-    ops::{Add, Div, Mul, Sub},
-};
+use std::{fmt, marker::PhantomData};
 
-use bytes::{Bytes, BytesMut};
+use num_traits::Num;
 
-use crate::{Decode, DecodeError, Encode, EncodeError};
+use crate::{Decode, Encode};
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+/// DirectionKind
+pub trait DirectionKind: Copy {
+    /// Raw/Inner type
+    type Inner: fmt::Display + Copy + Num + Decode + Encode + Default;
+
+    /// Display name, used in Display implementation
+    fn name() -> &'static str;
+
+    /// Convert from radians
+    fn from_radians(value: f32) -> Self::Inner;
+    /// Convert into radians
+    fn to_radians(value: Self::Inner) -> f32;
+}
+
+/// Representation of Direction. The intention is to keep things as close to raw as possible, whilst
+/// allowing to convert to and from human useful terms like mph, kmph, mps, etc. whilst maintaining
+/// type safety.
+/// There is no intention to create a complex uom-style system.
+/// Previous generations of Direction were more akin to Duration from the standard library, but this
+/// exposed a design conflict.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Direction / Heading
-pub struct Direction {
-    radians: f32,
+pub struct Direction<T: DirectionKind> {
+    inner: T::Inner,
+    _marker: PhantomData<T>,
 }
 
-impl Direction {
-    /// From game u16
-    pub fn from_game_u16(value: u16) -> Self {
-        let radians = (value as f32) * std::f32::consts::PI / 32768.0;
-        Self { radians }
-    }
-
-    /// From game MCI units
-    pub fn decode_u16(buf: &mut Bytes) -> Result<Self, DecodeError> {
-        let value = u16::decode(buf)?;
-        Ok(Self::from_game_u16(value))
-    }
-
-    /// From game u8
-    pub fn from_game_u8(value: u8) -> Self {
-        let radians = (value as f32) * std::f32::consts::PI / 128.0;
-        Self { radians }
-    }
-
-    /// From game units (u8)
-    pub fn decode_u8(buf: &mut Bytes) -> Result<Self, DecodeError> {
-        let value = u8::decode(buf)?;
-        Ok(Self::from_game_u8(value))
-    }
-
-    /// From degrees
-    pub fn from_degrees(deg: f32) -> Self {
+impl<T> Direction<T>
+where
+    T: DirectionKind,
+{
+    /// New
+    pub fn new(value: T::Inner) -> Self {
         Self {
-            radians: deg.to_radians(),
+            inner: value,
+            _marker: PhantomData,
         }
-        .normalise()
     }
 
-    /// From radians
-    pub fn from_radians(rad: f32) -> Self {
-        Self { radians: rad }.normalise()
+    /// Consumes Direction, returning the raw wrapped value.
+    pub fn into_inner(self) -> T::Inner {
+        self.inner
     }
 
-    /// As game u16
-    pub fn as_game_u16(&self) -> u16 {
-        ((self.radians * 32768.0 / std::f32::consts::PI)
-            .round()
-            .clamp(0.0, 65535.0)) as u16
+    /// Convert from degrees
+    pub fn from_degrees(value: f32) -> Self {
+        Self::new(T::from_radians(value.to_radians()))
+    }
+    /// Convert into degrees
+    pub fn to_degrees(&self) -> f32 {
+        T::to_radians(self.inner).to_degrees()
     }
 
-    /// As game units
-    pub fn encode_u16(&self, buf: &mut BytesMut) -> Result<(), EncodeError> {
-        self.as_game_u16().encode(buf)
+    /// Convert from radians
+    pub fn from_radians(value: f32) -> Self {
+        Self::new(T::from_radians(value))
     }
-
-    /// As game u8
-    pub fn as_game_u8(&self) -> u8 {
-        ((self.radians * 128.0 / std::f32::consts::PI)
-            .round()
-            .clamp(0.0, 255.0)) as u8
-    }
-
-    /// As game units
-    pub fn encode_u8(&self, buf: &mut BytesMut) -> Result<(), EncodeError> {
-        self.as_game_u8().encode(buf)
-    }
-
-    /// As degrees
-    pub fn as_degrees(&self) -> f32 {
-        self.radians.to_degrees()
-    }
-
-    /// As radians
-    pub fn as_radians(&self) -> f32 {
-        self.radians
-    }
-
-    /// Normalised Direction
-    pub fn normalise(self) -> Self {
-        let two_pi = std::f32::consts::TAU; // Same as 2π
-        let mut radians = self.radians % two_pi;
-        if radians < 0.0 {
-            radians += two_pi;
-        }
-        Self { radians }
+    /// Convert into radians
+    pub fn to_radians(&self) -> f32 {
+        T::to_radians(self.inner)
     }
 }
 
-impl Default for Direction {
-    fn default() -> Self {
-        Self { radians: 0.0 }
-    }
-}
-
-impl fmt::Display for Direction {
+impl<T: DirectionKind> fmt::Display for Direction<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:.2} rad", self.radians)
+        write!(f, "{:.2} {}", self.inner, T::name())
     }
 }
 
-impl Add for Direction {
-    type Output = Direction;
-
-    fn add(self, other: Direction) -> Direction {
-        Direction {
-            radians: self.radians + other.radians,
-        }
-        .normalise()
+impl<T: DirectionKind> Default for Direction<T> {
+    fn default() -> Self {
+        Self::new(T::Inner::default())
     }
 }
 
-impl Sub for Direction {
-    type Output = Direction;
-
-    fn sub(self, other: Direction) -> Direction {
-        Direction {
-            radians: self.radians - other.radians,
-        }
-        .normalise()
+impl<T> Encode for Direction<T>
+where
+    T: DirectionKind,
+{
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodeError> {
+        self.inner.encode(buf)
     }
 }
 
-impl Mul<f32> for Direction {
-    type Output = Direction;
-
-    fn mul(self, scalar: f32) -> Direction {
-        Direction {
-            radians: self.radians * scalar,
-        }
-        .normalise()
-    }
-}
-
-impl Div<f32> for Direction {
-    type Output = Direction;
-
-    fn div(self, scalar: f32) -> Direction {
-        Direction {
-            radians: self.radians / scalar,
-        }
-        .normalise()
+impl<T> Decode for Direction<T>
+where
+    T: DirectionKind,
+{
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
+        let inner = T::Inner::decode(buf)?;
+        Ok(Self::new(inner))
     }
 }
 
@@ -158,15 +103,33 @@ impl Div<f32> for Direction {
 mod test {
     use super::*;
 
-    #[test]
-    fn test_direction_game_units() {
-        assert_eq!(Direction::from_game_u16(32768).as_degrees(), 180.0);
-        assert_eq!(Direction::from_degrees(180.0).as_game_u16(), 32768);
+    #[derive(Copy, Clone, Debug, Default)]
+    pub struct Direction32768;
+
+    impl DirectionKind for Direction32768 {
+        type Inner = u16;
+
+        fn name() -> &'static str {
+            "32768 = 180 deg"
+        }
+
+        fn from_radians(value: f32) -> Self::Inner {
+            ((value * 32768.0 / std::f32::consts::PI)
+                .round()
+                .clamp(0.0, 65535.0)) as u16
+        }
+
+        fn to_radians(value: Self::Inner) -> f32 {
+            (value as f32) * std::f32::consts::PI / 32768.0
+        }
     }
 
     #[test]
-    fn test_game_units_u8() {
-        assert_eq!(Direction::from_game_u8(128).as_degrees(), 180.0);
-        assert_eq!(Direction::from_degrees(180.0).as_game_u8(), 128);
+    fn test_direction_game_units() {
+        assert_eq!(Direction::<Direction32768>::new(32768).to_degrees(), 180.0);
+        assert_eq!(
+            Direction::<Direction32768>::from_degrees(180.0).into_inner(),
+            32768
+        );
     }
 }

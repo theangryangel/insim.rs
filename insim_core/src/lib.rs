@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+pub mod angvel;
 pub mod decode;
 pub mod direction;
 pub mod encode;

@@ -1,15 +1,13 @@
 //! Utilities for points in 3D space
 
 use num_traits::{FromPrimitive, Num, ToPrimitive};
-#[cfg(feature = "serde")]
-use serde::Serialize;
 
 use crate::{Decode, Encode};
 
 /// A point in 3D space.
 #[allow(missing_docs)]
 #[derive(Default, Copy, Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Point<T>
 where
     T: Copy + Num + ToPrimitive + FromPrimitive + Decode + Encode,

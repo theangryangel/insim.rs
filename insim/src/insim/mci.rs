@@ -1,6 +1,12 @@
 use bitflags::bitflags;
 use bytes::{Buf, BufMut};
-use insim_core::{direction::Direction, point::Point, speed::Speed, Decode, Encode};
+use insim_core::{
+    angvel::AngVel,
+    direction::{Direction, DirectionKind},
+    point::Point,
+    speed::{Speed, SpeedKind},
+    Decode, Encode,
+};
 
 use crate::identifiers::{PlayerId, RequestId};
 
@@ -38,6 +44,46 @@ generate_bitflag_helpers! {
 
 impl_bitflags_from_to_bytes!(CompCarInfo, u8);
 
+#[derive(Copy, Clone, Debug, Default)]
+pub struct SpeedCompCar;
+
+impl SpeedKind for SpeedCompCar {
+    type Inner = u16;
+
+    fn name() -> &'static str {
+        "32768 = 100m/s"
+    }
+
+    fn from_meters_per_sec(value: f32) -> Self::Inner {
+        (value * 327.68) as Self::Inner
+    }
+
+    fn to_meters_per_sec(value: Self::Inner) -> f32 {
+        (value as f32) / 327.68
+    }
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+pub struct DirectionCompCar;
+
+impl DirectionKind for DirectionCompCar {
+    type Inner = u16;
+
+    fn name() -> &'static str {
+        "32768 = 180 deg"
+    }
+
+    fn from_radians(value: f32) -> Self::Inner {
+        ((value * 32768.0 / std::f32::consts::PI)
+            .round()
+            .clamp(0.0, 65535.0)) as u16
+    }
+
+    fn to_radians(value: Self::Inner) -> f32 {
+        (value as f32) * std::f32::consts::PI / 32768.0
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Used within the [Mci] packet info field.
@@ -61,16 +107,16 @@ pub struct CompCar {
     pub xyz: Point<i32>,
 
     /// Speed
-    pub speed: Speed,
+    pub speed: Speed<SpeedCompCar>,
 
     /// Direction of car's motion : 0 = world y direction, 32768 = 180 deg
-    pub direction: Direction,
+    pub direction: Direction<DirectionCompCar>,
 
     /// Direction of forward axis : 0 = world y direction, 32768 = 180 deg
-    pub heading: Direction,
+    pub heading: Direction<DirectionCompCar>,
 
     /// Signed, rate of change of heading : (16384 = 360 deg/s)
-    pub angvel: i16,
+    pub angvel: AngVel,
 }
 
 impl CompCar {
@@ -94,10 +140,10 @@ impl Decode for CompCar {
         let info = CompCarInfo::decode(buf)?;
         buf.advance(1);
         let xyz = Point::<i32>::decode(buf)?;
-        let speed = Speed::from_game(u16::decode(buf)?);
-        let direction = Direction::decode_u16(buf)?;
-        let heading = Direction::decode_u16(buf)?;
-        let angvel = i16::decode(buf)?;
+        let speed = Speed::decode(buf)?;
+        let direction = Direction::decode(buf)?;
+        let heading = Direction::decode(buf)?;
+        let angvel = AngVel::decode(buf)?;
         Ok(Self {
             node,
             lap,
@@ -122,9 +168,9 @@ impl Encode for CompCar {
         self.info.encode(buf)?;
         buf.put_bytes(0, 1);
         self.xyz.encode(buf)?;
-        self.speed.as_game().encode(buf)?;
-        self.direction.encode_u16(buf)?;
-        self.heading.encode_u16(buf)?;
+        self.speed.encode(buf)?;
+        self.direction.encode(buf)?;
+        self.heading.encode(buf)?;
         self.angvel.encode(buf)?;
         Ok(())
     }

@@ -1,127 +1,110 @@
 //! Utilities for speed
-use std::{
-    fmt,
-    ops::{Add, Div, Mul, Sub},
-};
+use std::{fmt, marker::PhantomData};
 
-/// Representation of Speed, stored meters per second internally, with conversions to common units.
-/// Implementation inspired by Duration from the standard library.
-/// The intention is to keep things simple.
-/// There is no intention to create a complex uom-style system.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct Speed {
-    // meters per second
-    inner: f32,
+use num_traits::Num;
+
+use crate::{Decode, Encode};
+
+/// SpeedKind
+pub trait SpeedKind: Copy {
+    /// Raw/Inner type
+    type Inner: fmt::Display + Copy + Num + Decode + Encode + Default;
+
+    /// Display name, used in Display implementation
+    fn name() -> &'static str;
+
+    /// Convert from meters per sec
+    fn from_meters_per_sec(value: f32) -> Self::Inner;
+    /// Convert into meters per sec
+    fn to_meters_per_sec(value: Self::Inner) -> f32;
 }
 
-impl Speed {
-    /// From game units: 32768 = 100 m/s
-    pub fn from_game(value: u16) -> Self {
+/// Representation of Speed. The intention is to keep things as close to raw as possible, whilst
+/// allowing to convert to and from human useful terms like mph, kmph, mps, etc. whilst maintaining
+/// type safety.
+/// There is no intention to create a complex uom-style system.
+/// Previous generations of Speed were more akin to Duration from the standard library, but this
+/// exposed a design conflict.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct Speed<T: SpeedKind> {
+    inner: T::Inner,
+    _marker: PhantomData<T>,
+}
+
+impl<T> Speed<T>
+where
+    T: SpeedKind,
+{
+    /// New
+    pub fn new(value: T::Inner) -> Self {
         Self {
-            inner: (value as f32) / 327.68,
+            inner: value,
+            _marker: PhantomData,
         }
     }
 
-    /// From game closing speed: 10 = 1m/s
-    pub fn from_game_closing_speed(value: u16) -> Self {
-        Self {
-            inner: (value as f32) / 10.0,
-        }
-    }
-
-    /// From meters per second
-    pub fn from_meters_per_sec(value: f32) -> Self {
-        Self { inner: value }
-    }
-
-    /// From Km per hour
-    pub fn from_kilometers_per_hour(value: f32) -> Self {
-        Self { inner: value / 3.6 }
-    }
-
-    /// From miles per hour
-    pub fn from_miles_per_hour(value: f32) -> Self {
-        Self {
-            inner: value * 0.44704,
-        }
-    }
-
-    /// As game units
-    pub fn as_game(&self) -> u16 {
-        (self.inner * 327.68) as u16
-    }
-
-    /// as game closing speed: 10 = 1m/s
-    pub fn as_game_closing_speed(&self) -> u16 {
-        (self.inner * 10.0) as u16
-    }
-
-    /// As meters per second
-    pub fn as_meters_per_sec(&self) -> f32 {
+    /// Consumes Speed, returning the raw wrapped value.
+    pub fn into_inner(self) -> T::Inner {
         self.inner
     }
 
-    /// As Km per hour
-    pub fn as_kilometers_per_hour(&self) -> f32 {
-        self.inner * 3.6
+    /// Convert from meters per sec
+    pub fn from_meters_per_sec(value: f32) -> Self {
+        Self::new(T::from_meters_per_sec(value))
+    }
+    /// Convert into meters per sec
+    pub fn to_meters_per_sec(&self) -> f32 {
+        T::to_meters_per_sec(self.inner)
     }
 
-    /// As miles per hour
-    pub fn as_miles_per_hour(&self) -> f32 {
-        self.inner / 0.44704
+    /// Convert from kph
+    pub fn from_kilometers_per_hour(value: f32) -> Self {
+        Self::new(T::from_meters_per_sec(value / 3.6))
+    }
+    /// Convert into kph
+    pub fn to_kilometers_per_hour(&self) -> f32 {
+        T::to_meters_per_sec(self.inner) * 3.6
+    }
+
+    /// Convert from mph
+    pub fn from_miles_per_hour(value: f32) -> Self {
+        Self::new(T::from_meters_per_sec(value / 2.23694))
+    }
+    /// Convert into mph
+    pub fn to_miles_per_hour(&self) -> f32 {
+        T::to_meters_per_sec(self.inner) * 2.23694
     }
 }
 
-impl fmt::Display for Speed {
+impl<T: SpeedKind> fmt::Display for Speed<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:.2} m/s", self.inner)
+        write!(f, "{:.2} {}", self.inner, T::name())
     }
 }
 
-impl Default for Speed {
+impl<T: SpeedKind> Default for Speed<T> {
     fn default() -> Self {
-        Self { inner: 0.0 }
+        Self::new(T::Inner::default())
     }
 }
 
-impl Add for Speed {
-    type Output = Speed;
-
-    fn add(self, other: Speed) -> Speed {
-        Speed {
-            inner: self.inner + other.inner,
-        }
+impl<T> Encode for Speed<T>
+where
+    T: SpeedKind,
+{
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodeError> {
+        self.inner.encode(buf)
     }
 }
 
-impl Sub for Speed {
-    type Output = Speed;
-
-    fn sub(self, other: Speed) -> Speed {
-        Speed {
-            inner: self.inner - other.inner,
-        }
-    }
-}
-
-impl Mul<f32> for Speed {
-    type Output = Speed;
-
-    fn mul(self, scalar: f32) -> Speed {
-        Speed {
-            inner: self.inner * scalar,
-        }
-    }
-}
-
-impl Div<f32> for Speed {
-    type Output = Speed;
-
-    fn div(self, scalar: f32) -> Speed {
-        Speed {
-            inner: self.inner / scalar,
-        }
+impl<T> Decode for Speed<T>
+where
+    T: SpeedKind,
+{
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
+        let inner = T::Inner::decode(buf)?;
+        Ok(Self::new(inner))
     }
 }
 
@@ -129,15 +112,76 @@ impl Div<f32> for Speed {
 mod test {
     use super::*;
 
-    #[test]
-    fn test_game() {
-        assert_eq!(Speed::from_game(32768).as_meters_per_sec(), 100.0);
-        assert_eq!(Speed::from_meters_per_sec(100.0).as_game(), 32768);
+    #[derive(Copy, Clone, Debug)]
+    struct SpeedKind32768;
+    impl SpeedKind for SpeedKind32768 {
+        type Inner = u16;
+
+        fn name() -> &'static str {
+            "SpeedKind32768"
+        }
+
+        fn from_meters_per_sec(value: f32) -> Self::Inner {
+            (value * 327.68) as Self::Inner
+        }
+
+        fn to_meters_per_sec(value: Self::Inner) -> f32 {
+            (value as f32) / 327.68
+        }
+    }
+
+    #[derive(Copy, Clone, Debug)]
+    struct SpeedKind1;
+    impl SpeedKind for SpeedKind1 {
+        type Inner = u8;
+
+        fn name() -> &'static str {
+            "SpeedKind1"
+        }
+
+        fn from_meters_per_sec(value: f32) -> Self::Inner {
+            value as Self::Inner
+        }
+
+        fn to_meters_per_sec(value: Self::Inner) -> f32 {
+            value as f32
+        }
     }
 
     #[test]
-    fn test_game_closing_speed() {
-        assert_eq!(Speed::from_game_closing_speed(10).as_meters_per_sec(), 1.0);
-        assert_eq!(Speed::from_meters_per_sec(1.0).as_game_closing_speed(), 10);
+    fn test_speedkind_32768_meters_per_sec() {
+        assert_eq!(
+            Speed::<SpeedKind32768>::new(32768).to_meters_per_sec(),
+            100.0
+        );
+        assert_eq!(
+            Speed::<SpeedKind32768>::from_meters_per_sec(100.0).into_inner(),
+            32768
+        );
+    }
+
+    #[test]
+    fn test_speedkind_32768_kmph() {
+        assert_eq!(
+            Speed::<SpeedKind32768>::from_kilometers_per_hour(100.0).into_inner(),
+            9102
+        );
+    }
+
+    #[test]
+    fn test_speedkind_32768_mph_kmph() {
+        assert_eq!(
+            Speed::<SpeedKind32768>::from_kilometers_per_hour(100.0).to_miles_per_hour(),
+            62.135704
+        );
+    }
+
+    #[test]
+    fn test_speedkind_1_meters_per_sec() {
+        assert_eq!(Speed::<SpeedKind1>::new(1).to_meters_per_sec(), 1.0);
+        assert_eq!(
+            Speed::<SpeedKind1>::from_meters_per_sec(1.0).into_inner(),
+            1
+        );
     }
 }
