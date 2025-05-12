@@ -40,7 +40,7 @@ from_variants = "1.0.2"
 futures-util = { version = "0.3.28" }
 if_chain = "1.0.2"
 indexmap = "2.1.0"
-itertools = { version = "0.13.0" }
+itertools = { version = "0.14.0" }
 proc-macro2 = "1"
 quote = "1"
 serde = { version = "1.0.188" }
