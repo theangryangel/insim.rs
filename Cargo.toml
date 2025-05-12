@@ -45,7 +45,7 @@ proc-macro2 = "1"
 quote = "1"
 serde = { version = "1.0.188" }
 syn = { version = "2" }
-thiserror = "1.0.40"
+thiserror = "2.0.12"
 tokio = { version = "1.11.0" }
 tokio-test = "0.4.0"
 tokio-tungstenite = { version = "0.24.0" }
