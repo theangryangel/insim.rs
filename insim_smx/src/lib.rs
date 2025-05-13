@@ -8,7 +8,7 @@
 //! available.
 //!
 //! I would suggest that SMX files should be considered historical at this point.
-#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 use std::{
     fs::{self, File},

@@ -1,8 +1,5 @@
-use std::{
-    fmt::Debug,
-    net::{SocketAddr, ToSocketAddrs},
-    time::Duration,
-};
+//! Tools to build a connection to LFS using Insim
+use std::{fmt::Debug, net::SocketAddr, time::Duration};
 
 #[cfg(feature = "blocking")]
 #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
@@ -14,11 +11,11 @@ use crate::{
     identifiers::RequestId,
     insim::{Isi, IsiFlags},
     net::{Codec, Mode, DEFAULT_TIMEOUT_SECS},
-    relay::Sel,
     result::Result,
 };
 
-fn tcpstream_connect_to_any<A: ToSocketAddrs>(
+#[cfg(all(feature = "relay", feature = "blocking"))]
+fn tcpstream_connect_to_any<A: std::net::ToSocketAddrs>(
     addrs: A,
     timeout: Duration,
 ) -> std::io::Result<std::net::TcpStream> {
@@ -38,18 +35,22 @@ fn tcpstream_connect_to_any<A: ToSocketAddrs>(
 }
 
 #[derive(Clone, Debug, Default)]
-pub enum Proto {
+enum Proto {
     #[default]
     Tcp,
     Udp,
+    #[cfg(feature = "relay")]
     Relay,
 }
 
 #[derive(Debug)]
+/// Builder to help you connect to Insim
 pub struct Builder {
     proto: Proto,
 
     connect_timeout: Duration,
+
+    #[cfg(feature = "tokio")]
     handshake_timeout: Duration,
 
     remote: SocketAddr,
@@ -72,12 +73,14 @@ pub struct Builder {
     tcp_nodelay: bool,
     udp_local_address: Option<SocketAddr>,
 
+    #[cfg(feature = "relay")]
     relay_select_host: Option<String>,
+    #[cfg(feature = "relay")]
     relay_spectator_password: Option<String>,
+    #[cfg(feature = "relay")]
     relay_admin_password: Option<String>,
 
-    #[cfg(feature = "websocket")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "websocket")))]
+    #[cfg(all(feature = "websocket", feature = "relay"))]
     relay_websocket: bool,
 }
 
@@ -85,6 +88,8 @@ impl Default for Builder {
     fn default() -> Self {
         Self {
             connect_timeout: Duration::from_secs(10),
+
+            #[cfg(feature = "tokio")]
             handshake_timeout: Duration::from_secs(30),
 
             proto: Proto::Tcp,
@@ -95,8 +100,11 @@ impl Default for Builder {
             tcp_nodelay: true,
             udp_local_address: None,
 
+            #[cfg(feature = "relay")]
             relay_select_host: None,
+            #[cfg(feature = "relay")]
             relay_spectator_password: None,
+            #[cfg(feature = "relay")]
             relay_admin_password: None,
 
             #[cfg(feature = "websocket")]
@@ -139,14 +147,14 @@ impl Builder {
     }
 
     /// Use the LFS World Relay over TCP
+    #[cfg(feature = "relay")]
     pub fn relay(mut self) -> Self {
         self.proto = Proto::Relay;
         self
     }
 
     /// Use the LFS World Relay over Websockets.
-    #[cfg(feature = "websocket")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "websocket")))]
+    #[cfg(all(feature = "websocket", feature = "relay"))]
     pub fn relay_websocket(mut self, ws: bool) -> Self {
         self.relay_websocket = ws;
         self
@@ -192,18 +200,21 @@ impl Builder {
     /// Automatically select a host after connection to the LFS World relay.
     /// This is not verified. If the host is not online, or registered with the LFS World relay, it
     /// is currently your responsibility to handle this.
+    #[cfg(feature = "relay")]
     pub fn relay_select_host<H: Into<Option<String>>>(mut self, host: H) -> Self {
         self.relay_select_host = host.into();
         self
     }
 
     /// Set the spectator password to use when connecting to the host via the LFS World Relay.
+    #[cfg(feature = "relay")]
     pub fn relay_spectator_password<P: Into<Option<String>>>(mut self, password: P) -> Self {
         self.relay_spectator_password = password.into();
         self
     }
 
     /// Set the admin password to use when connecting to the host via the LFS World Relay.
+    #[cfg(feature = "relay")]
     pub fn relay_admin_password<P: Into<Option<String>>>(mut self, password: P) -> Self {
         self.relay_admin_password = password.into();
         self
@@ -230,6 +241,7 @@ impl Builder {
         self
     }
 
+    /// Set the [IsiFlags::MCI] flag
     pub fn isi_flag_mci(mut self, enabled: bool) -> Self {
         self.isi_flags.set(IsiFlags::MCI, enabled);
         self
@@ -341,7 +353,7 @@ impl Builder {
     #[cfg(feature = "blocking")]
     #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
     pub fn connect_blocking(&self) -> Result<BlockingFramed> {
-        use crate::{net::blocking_impl::UdpStream, LFSW_RELAY_ADDR};
+        use crate::net::blocking_impl::UdpStream;
 
         match self.proto {
             Proto::Tcp => {
@@ -380,8 +392,10 @@ impl Builder {
 
                 Ok(stream)
             },
+            #[cfg(feature = "relay")]
             Proto::Relay => {
-                let stream = tcpstream_connect_to_any(LFSW_RELAY_ADDR, self.connect_timeout)?;
+                let stream =
+                    tcpstream_connect_to_any(crate::LFSW_RELAY_ADDR, self.connect_timeout)?;
                 stream.set_nodelay(self.tcp_nodelay)?;
                 stream.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
                 stream.set_write_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
@@ -390,7 +404,7 @@ impl Builder {
                     BlockingFramed::new(Box::new(stream), Codec::new(Mode::Uncompressed));
 
                 if let Some(hostname) = &self.relay_select_host {
-                    let packet = Sel {
+                    let packet = crate::relay::Sel {
                         reqi: RequestId(1),
                         hname: hostname.to_string(),
                         admin: self
@@ -458,11 +472,12 @@ impl Builder {
 
                 Ok(stream)
             },
+            #[cfg(feature = "relay")]
             Proto::Relay => {
                 let mut stream = self._connect_relay().await?;
 
                 if let Some(hostname) = &self.relay_select_host {
-                    let packet = Sel {
+                    let packet = crate::relay::Sel {
                         reqi: RequestId(1),
                         hname: hostname.to_string(),
                         admin: self
@@ -485,11 +500,12 @@ impl Builder {
         }
     }
 
-    #[cfg(feature = "tokio")]
+    #[cfg(all(feature = "tokio", feature = "relay"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     async fn _connect_relay(&self) -> Result<AsyncFramed> {
         use tokio::time::timeout;
 
+        #[cfg(feature = "websocket")]
         use crate::net::tokio_impl::{connect_to_lfsworld_relay_ws, WebsocketStream};
 
         #[cfg(feature = "websocket")]

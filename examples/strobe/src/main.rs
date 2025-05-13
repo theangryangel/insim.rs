@@ -63,15 +63,13 @@ pub async fn main() -> Result<()> {
     // Parse our command line arguments, using clap
     let cli = Cli::parse();
 
-    let mut builder = insim::tcp(cli.addr);
-
-    // set our IsiFlags
-    builder = builder
-        .isi_flag_local(true)
-        .isi_iname(Some("strobe.insim.rs".to_string()));
-
     // Establish a connection
-    let mut connection = builder.connect_async().await?;
+    let mut connection = insim::tcp(cli.addr)
+        .isi_flag_local(true)
+        .isi_iname(Some("insim.rs/strobe".to_string()))
+        .connect_async()
+        .await?;
+
     tracing::info!("Connected!");
 
     connection.write(TinyType::Npl.with_request_id(1)).await?;

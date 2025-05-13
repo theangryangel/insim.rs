@@ -120,17 +120,14 @@ pub fn main() -> Result<()> {
     // Parse our command line arguments, using clap
     let cli = Cli::parse();
 
-    let mut builder = insim::tcp(cli.addr);
-
-    // set our IsiFlags
-    builder = builder
+    // Establish a connection
+    let mut connection = insim::tcp(cli.addr)
         .isi_flag_local(true)
         .isi_flag_mci(true)
-        .isi_iname(Some("insim.rs/btns".to_string()))
-        .isi_interval(Duration::from_millis(100));
+        .isi_iname(Some("insim.rs/delta".to_string()))
+        .isi_interval(Duration::from_millis(100))
+        .connect_blocking()?;
 
-    // Establish a connection
-    let mut connection = builder.connect_blocking()?;
     tracing::info!("Connected!");
 
     connection.write(TinyType::Npl.with_request_id(1))?;

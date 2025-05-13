@@ -20,7 +20,8 @@ all-features = true
 rustdoc-args = ["--cfg", "docrs"]
 
 [features]
-default = ["tokio", "blocking", "websocket"]
+default = ["tokio", "blocking", "relay"]
+relay = []
 blocking = []
 tokio = [
   "dep:tokio",
@@ -31,10 +32,10 @@ serde = [
   "bitflags/serde",
   "indexmap/serde",
 ]
-pth = ["dep:insim_pth"]
-smx = ["dep:insim_smx"]
 websocket = [
-  "tokio", "dep:tokio-tungstenite",
+  "relay",
+  "tokio",
+  "dep:tokio-tungstenite",
   "futures-util"
 ]
 
@@ -46,8 +47,6 @@ futures-util = { workspace = true, optional = true }
 if_chain = { workspace = true }
 indexmap = { workspace = true }
 insim_core = { path = "../insim_core", version = "3.0.0-unreleased" }
-insim_pth = { path = "../insim_pth", optional = true, version = "3.0.0-unreleased" }
-insim_smx = { path = "../insim_smx", optional = true, version = "3.0.0-unreleased" }
 serde = { workspace = true, features = ["derive"], optional = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["time", "net", "macros", "sync", "tracing", "io-util"], optional = true }

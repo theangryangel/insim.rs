@@ -1,5 +1,5 @@
 //! Macros for insim
-#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 extern crate proc_macro;
 
 use darling::FromDeriveInput;

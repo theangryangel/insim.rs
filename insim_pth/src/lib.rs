@@ -16,7 +16,7 @@
 //! The distance between each [Node] is not constant. According to the LFS developers
 //! there is approximately 0.2 seconds of time between passing one node and the next,
 //! when you are "driving at a reasonable speed".
-#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 use std::{
     fs::{self, File},
