@@ -61,3 +61,4 @@ jobs:
         uses: obi1kenobi/cargo-semver-checks-action@v2
         with:
           feature-group: all-features
+          exclude: outgauge # XXX: Remove after publish

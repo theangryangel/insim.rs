@@ -2,10 +2,12 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 pub mod angvel;
+pub mod dash_lights;
 pub mod decode;
 pub mod direction;
 pub mod encode;
 pub mod game_version;
+pub mod identifiers;
 pub mod license;
 pub mod point;
 pub mod speed;

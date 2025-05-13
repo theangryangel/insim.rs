@@ -8,13 +8,14 @@ than a thin layer over a series of bytes and primitive types.
 
 If you're not sure where to start, you probably want to look at the [examples](https://github.com/theangryangel/insim.rs/tree/main/examples).
 
-| Crate          | Usage                                                | Documentation                |
-| -------------- | ---------------------------------------------------- | ---------------------------- |
-| `insim`        | Connection and protocol implementation.              | https://docs.rs/insim        |
-| `insim_core`   | Contains core types shared across other crates.      | https://docs.rs/insim_core   |
-| `insim_macros` | Contains proc_macros republished through insim_core. | https://docs.rs/insim_macros |
-| `insim_pth`    | Implements a PTH file read/writer.                   | https://docs.rs/insim_pth    |
-| `insim_smx`    | Implements a SMX file reader/writer.                 | https://docs.rs/insim_smx    |
+| Crate          | Usage                                                  |
+| -------------- | ------------------------------------------------------ |
+| `insim`        | Insim connection and protocol implementation.          |
+| `insim_core`   | Contains core types shared across other crates.        |
+| `insim_macros` | Contains proc_macros republished through insim_core.   |
+| `insim_pth`    | Implements a PTH file read/writer.                     |
+| `insim_smx`    | Implements a SMX file reader/writer.                   |
+| `outgauge`     | Implements "sans-io" Outgauge protocol implementation. |
 
 ## Thanks
 

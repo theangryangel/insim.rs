@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use insim_core::{point::Point, Decode, Encode};
+use insim_core::{dash_lights::DashLights, point::Point, Decode, Encode};
 
 use crate::identifiers::{PlayerId, RequestId};
 
@@ -73,52 +73,6 @@ bitflags! {
 
 impl_bitflags_from_to_bytes!(AiFlags, u8);
 
-bitflags! {
-    /// Flags for AI Detection
-    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    pub struct AiShowLights: u32 {
-        /// Shift light
-        const SHIFT = 1;
-        /// Fullbeam
-        const FULLBEAM = (1 << 1);
-        /// Handbrake
-        const HANDBRAKE = (1 << 2);
-        /// Pitspeed limiter
-        const PITSPEED = (1 << 3);
-        /// Traction control
-        const TC = (1 << 4);
-        /// Left turn
-        const SIGNAL_L = (1 << 5);
-        /// Right turn
-        const SIGNAL_R = (1 << 6);
-        /// Hazards
-        const SIGNAL_ANY = (1 << 7);
-        /// Oil pressure warning
-        const OILWARN = (1 << 8);
-        /// Battery warning
-        const BATTERY = (1 << 9);
-        /// ABS
-        const ABS = (1 << 10);
-        /// Engine damage
-        const ENGINE = (1 << 11);
-        /// Rear fog lights
-        const FOG_REAR = (1 << 12);
-        /// Front fog lights
-        const FOG_FRONT = (1 << 13);
-        /// Dipped headlights
-        const DIPPED = (1 << 14);
-        /// Low fuel warning
-        const FUELWARN = (1 << 15);
-        /// Sidelights
-        const SIDELIGHTS = (1 << 16);
-        /// Neutral
-        const NEUTRAL = (1 << 17);
-    }
-}
-
-impl_bitflags_from_to_bytes!(AiShowLights, u32);
-
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// AI Info
@@ -145,7 +99,7 @@ pub struct Aii {
 
     #[insim(pad_after = 12)]
     /// Current lights
-    pub showlights: AiShowLights,
+    pub showlights: DashLights,
 }
 
 impl_typical_with_request_id!(Aii);
@@ -235,7 +189,7 @@ mod test {
             ],
             |parsed: Aii| {
                 assert_eq!(parsed.gear, 2);
-                assert!(parsed.showlights.contains(AiShowLights::SHIFT));
+                assert!(parsed.showlights.contains(DashLights::SHIFT));
             }
         );
     }

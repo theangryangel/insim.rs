@@ -1,14 +1,15 @@
 [workspace]
 members = [
-  "insim_core",
   "insim",
+  "insim_core",
   "insim_macros",
   "insim_pth",
   "insim_smx",
+  "outgauge",
   "examples/*",
 ]
 # Only check / build main crates by default (check all with `--workspace`)
-default-members = ["insim", "insim_*"]
+default-members = ["insim", "insim_*", "outgauge"]
 resolver = "2"
 
 [workspace.package]
@@ -41,6 +42,7 @@ futures-util = { version = "0.3.28" }
 if_chain = "1.0.2"
 indexmap = "2.1.0"
 itertools = { version = "0.14.0" }
+num-traits = "0.2.19"
 proc-macro2 = "1"
 quote = "1"
 serde = { version = "1.0.188" }
@@ -51,4 +53,3 @@ tokio-test = "0.4.0"
 tokio-tungstenite = { version = "0.24.0" }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17" }
-num-traits = "0.2.19"
