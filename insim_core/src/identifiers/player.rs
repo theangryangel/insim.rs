@@ -4,7 +4,6 @@ use std::{
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use insim_core::{Decode, Encode};
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
@@ -39,14 +38,14 @@ impl From<u8> for PlayerId {
     }
 }
 
-impl Decode for PlayerId {
-    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
+impl crate::Decode for PlayerId {
+    fn decode(buf: &mut Bytes) -> Result<Self, crate::DecodeError> {
         Ok(PlayerId(buf.get_u8()))
     }
 }
 
-impl Encode for PlayerId {
-    fn encode(&self, buf: &mut BytesMut) -> Result<(), insim_core::EncodeError> {
+impl crate::Encode for PlayerId {
+    fn encode(&self, buf: &mut BytesMut) -> Result<(), crate::EncodeError> {
         buf.put_u8(self.0);
 
         Ok(())
