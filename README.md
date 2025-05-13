@@ -16,6 +16,7 @@ If you're not sure where to start, you probably want to look at the [examples](h
 | `insim_pth`    | Implements a PTH file read/writer.                     |
 | `insim_smx`    | Implements a SMX file reader/writer.                   |
 | `outgauge`     | Implements "sans-io" Outgauge protocol implementation. |
+| `outsim`       | Implements "sans-io" Outsim protocol implementation.   |
 
 ## Thanks
 

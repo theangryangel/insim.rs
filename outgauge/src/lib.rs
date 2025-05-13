@@ -250,8 +250,7 @@ impl Decode for Outgauge {
         let display2 = String::decode_ascii(buf, 16)?;
 
         let id = if buf.has_remaining() {
-            let id = i32::decode(buf)?;
-            Some(OutgaugeId(id))
+            Some(OutgaugeId::decode(buf)?)
         } else {
             None
         };

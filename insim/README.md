@@ -30,6 +30,7 @@ You might also find these related crates useful:
 - `insim_pth` – for reading and writing LFS PTH files
 - `insim_smx` – for reading and writing LFS SMX files
 - `outgauge` - "sans-io" implementation of the LFS outgauge protocol
+- `outsim` - "sans-io" implementation of the LFS outsim protocol
 
 They follow the same design focus and can be found in the same GitHub repository.
 
