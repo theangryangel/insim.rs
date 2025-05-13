@@ -1,6 +1,6 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(test, deny(warnings, unreachable_pub))]
-#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 #[cfg(any(feature = "blocking", feature = "tokio"))]
 use std::net::SocketAddr;
@@ -8,7 +8,6 @@ use std::net::SocketAddr;
 #[macro_use]
 mod macros;
 
-#[doc(hidden)]
 #[cfg(any(feature = "blocking", feature = "tokio"))]
 #[cfg_attr(docsrs, doc(cfg(any(feature = "blocking", feature = "tokio"))))]
 pub mod builder;
@@ -18,6 +17,7 @@ pub mod identifiers;
 pub mod insim;
 pub mod net;
 pub mod packet;
+#[cfg(feature = "relay")]
 pub mod relay;
 #[doc(hidden)]
 pub mod result;
@@ -33,20 +33,9 @@ pub(crate) const MAX_SIZE_PACKET: usize = 255 * 4;
 
 pub(crate) const DEFAULT_BUFFER_CAPACITY: usize = MAX_SIZE_PACKET * 6;
 
-#[cfg(any(feature = "blocking", feature = "tokio"))]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "blocking", feature = "tokio"))))]
-pub use builder::Builder;
 pub use error::Error;
 /// Rexport insim_core
 pub use insim_core as core;
-#[cfg(feature = "pth")]
-#[cfg_attr(docsrs, doc(cfg(feature = "pth")))]
-/// Report insim_pth when pth feature is enabled
-pub use insim_pth as pth;
-#[cfg(feature = "smx")]
-#[cfg_attr(docsrs, doc(cfg(feature = "smx")))]
-/// Report insim_smx when smx feature is enabled
-pub use insim_smx as smx;
 pub use packet::{Packet, WithRequestId};
 pub use result::Result;
 
@@ -112,8 +101,7 @@ pub fn udp<L: Into<Option<SocketAddr>>, R: Into<SocketAddr>>(
 ///     println!("{:?}", packet);
 /// }
 /// ```
-#[cfg(any(feature = "blocking", feature = "tokio"))]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "blocking", feature = "tokio"))))]
+#[cfg(all(feature = "relay", any(feature = "blocking", feature = "tokio")))]
 pub fn relay() -> builder::Builder {
     builder::Builder::default().relay()
 }
