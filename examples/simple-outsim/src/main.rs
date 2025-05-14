@@ -2,7 +2,7 @@
 use std::net::UdpSocket;
 
 use bytes::{Bytes, BytesMut};
-use outsim::{core::Decode, Outsim};
+use outsim::{core::Decode, OutsimPack};
 
 /// Setup tracing output
 fn setup_tracing_subscriber() {
@@ -32,7 +32,7 @@ pub fn main() {
 
         let mut buf: Bytes = BytesMut::from(&raw[..amt]).freeze();
 
-        let packet = Outsim::decode(&mut buf).unwrap();
+        let packet = OutsimPack::decode(&mut buf).unwrap();
         tracing::info!("from={:?}, len={:?}, data={:?}", src, amt, packet);
     }
 }

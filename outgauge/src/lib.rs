@@ -12,6 +12,7 @@ pub use ::insim_core as core;
 use bytes::{Buf, BufMut};
 use insim_core::{
     dash_lights::DashLights,
+    gear::Gear,
     identifiers::PlayerId,
     speed::{Speed, SpeedKind},
     Decode, DecodeString, Encode, EncodeString,
@@ -45,41 +46,6 @@ impl Encode for OutgaugeFlags {
 impl Decode for OutgaugeFlags {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         Ok(Self::from_bits_truncate(u16::decode(buf)?))
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Gear
-pub enum Gear {
-    /// Reverse
-    Reverse,
-    /// Neutral
-    Neutral,
-    /// Gear
-    Gear(u8),
-}
-
-impl Decode for Gear {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let discrim = u8::decode(buf)?;
-        match discrim {
-            0 => Ok(Self::Reverse),
-            1 => Ok(Self::Neutral),
-            _ => Ok(Self::Gear(discrim - 1)),
-        }
-    }
-}
-
-impl Encode for Gear {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        let val: u8 = match self {
-            Self::Reverse => 0,
-            Self::Neutral => 1,
-            Self::Gear(g) => g.saturating_add(1),
-        };
-
-        val.encode(buf)
     }
 }
 
