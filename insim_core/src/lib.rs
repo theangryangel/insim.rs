@@ -7,6 +7,7 @@ pub mod decode;
 pub mod direction;
 pub mod encode;
 pub mod game_version;
+pub mod gear;
 pub mod identifiers;
 pub mod license;
 pub mod point;
