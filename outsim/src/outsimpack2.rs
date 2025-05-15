@@ -204,7 +204,7 @@ impl OutsimPack2 {
         }
 
         if opts.contains(OutSimOpts::TIME) {
-            let time = Duration::from_millis(u16::decode(buf)? as u64);
+            let time = Duration::from_millis(u32::decode(buf)? as u64);
             val.time = Some(time);
         }
 
@@ -259,7 +259,7 @@ impl OutsimPack2 {
         }
 
         if opts.contains(OutSimOpts::TIME) {
-            (self.time.unwrap_or_default().as_millis() as u16).encode(buf)?;
+            (self.time.unwrap_or_default().as_millis() as u32).encode(buf)?;
         }
 
         if opts.contains(OutSimOpts::MAIN) {
@@ -628,7 +628,16 @@ mod test {
 
         let buf = input.freeze();
 
-        let parsed = OutsimPack2::decode_with_options(&mut buf.clone(), &opts).unwrap();
+        let mut buf_to_parse = buf.clone();
+
+        let parsed = OutsimPack2::decode_with_options(&mut buf_to_parse, &opts).unwrap();
+
+        assert!(
+            !buf_to_parse.has_remaining(),
+            "Should have no remaining bytes: found {}",
+            buf_to_parse.remaining()
+        );
+
         assert!(parsed.header.is_some());
         assert!(matches!(parsed.id, Some(OutsimId(117769280))));
 
