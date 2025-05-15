@@ -70,23 +70,25 @@ impl Framed {
     /// Wait for a packet from the inner network.
     pub fn read(&mut self) -> Result<Packet> {
         loop {
-            if_chain::if_chain! {
-                if !self.buffer.is_empty();
-                if let Some(packet) = self.codec.decode(&mut self.buffer)?;
-                then {
-                    if self.verify_version {
-                        // maybe verify version
-                        let _ = packet.maybe_verify_version()?;
-                    }
+            if self.codec.reached_timeout() {
+                return Err(Error::Timeout(
+                    "Timeout exceeded, no keepalive or packet received".into(),
+                ));
+            }
 
-                    // keepalive
-                    if let Some(pong) = packet.maybe_pong() {
-                        tracing::debug!("Ping? Pong!");
-                        self.write(pong)?;
-                    }
+            let packet = if !self.buffer.is_empty() {
+                self.codec.decode(&mut self.buffer)?
+            } else {
+                None
+            };
 
-                    return Ok(packet);
-                }
+            if let Some(keepalive) = self.codec.keepalive() {
+                tracing::debug!("Ping? Pong!");
+                self.write(keepalive)?;
+            }
+
+            if let Some(packet) = packet {
+                return Ok(packet);
             }
 
             match self.read_buf() {

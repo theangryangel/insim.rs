@@ -1,8 +1,16 @@
+use std::time::{Duration, Instant};
+
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use insim_core::{Decode, Encode};
 
-use super::mode::Mode;
-use crate::{packet::Packet, result::Result, Error};
+use super::{mode::Mode, DEFAULT_TIMEOUT_SECS};
+use crate::{
+    identifiers::RequestId,
+    insim::{Tiny, TinyType},
+    packet::Packet,
+    result::Result,
+    Error, WithRequestId,
+};
 
 /// Handles the encoding and decoding of Insim packets to and from raw bytes.
 /// It automatically handles the encoding of the total size of the packet, and the packet
@@ -10,12 +18,18 @@ use crate::{packet::Packet, result::Result, Error};
 #[derive(Debug)]
 pub struct Codec {
     mode: Mode,
+    timeout_at: Instant,
+    keepalive: bool,
 }
 
 impl Codec {
     /// Create a new Codec, with a given [Mode].
     pub fn new(mode: Mode) -> Self {
-        Self { mode }
+        Self {
+            mode,
+            timeout_at: Instant::now() + Duration::from_secs(DEFAULT_TIMEOUT_SECS),
+            keepalive: false,
+        }
     }
 
     /// Return the current [Mode].
@@ -46,7 +60,7 @@ impl Codec {
 
     /// Decode a series of bytes into a [Packet]
     #[tracing::instrument]
-    pub fn decode(&self, src: &mut BytesMut) -> Result<Option<Packet>> {
+    pub fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Packet>> {
         if src.is_empty() {
             return Ok(None);
         }
@@ -59,6 +73,9 @@ impl Codec {
         };
 
         let mut data = src.split_to(n).freeze();
+
+        self.timeout_at = Instant::now() + Duration::from_secs(DEFAULT_TIMEOUT_SECS);
+
         // cloning Bytes is cheap:
         // Bytes values facilitate zero-copy network programming by allowing multiple Bytes objects to point to the same underlying memory.
         let original = data.clone();
@@ -78,6 +95,17 @@ impl Codec {
                         remaining: data,
                     });
                 }
+
+                if matches!(
+                    packet,
+                    Packet::Tiny(Tiny {
+                        subt: TinyType::None,
+                        reqi: RequestId(0)
+                    })
+                ) {
+                    self.keepalive = true;
+                }
+
                 Ok(Some(packet))
             },
             Err(e) => Err(crate::Error::Decode {
@@ -85,6 +113,26 @@ impl Codec {
                 error: e,
                 input: original,
             }),
+        }
+    }
+
+    /// Return the next timeout
+    pub fn timeout(&self) -> Instant {
+        self.timeout_at
+    }
+
+    /// Has the connection timedout?
+    pub fn reached_timeout(&self) -> bool {
+        self.timeout_at <= Instant::now()
+    }
+
+    /// If Some value is returned, this needs to be sent to maintain the connection
+    pub fn keepalive(&mut self) -> Option<Packet> {
+        if self.keepalive {
+            self.keepalive = false;
+            Some(TinyType::None.with_request_id(RequestId(0)).into())
+        } else {
+            None
         }
     }
 }
@@ -110,7 +158,7 @@ mod tests {
             &[1, 3, 2, 3],
         );
 
-        let codec = Codec::new(Mode::Compressed);
+        let mut codec = Codec::new(Mode::Compressed);
         let data = codec.decode(&mut mock);
         assert_ok!(&data);
         let data = data.unwrap();
