@@ -12,7 +12,7 @@ Here is a non-exhaustive list of the things that `insim` supports:
 
 - insim over TCP or UDP
 - insim over TCP and Websocket via LFS World Relay
-- Optional Blocking or Tokio based async functionality
+- Optional Blocking or Tokio based async, or IO (aka 'sans-io') of your own choice
 - PTH file parsing
 - SMX file parsing
 

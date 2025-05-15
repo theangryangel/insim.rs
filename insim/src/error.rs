@@ -1,7 +1,5 @@
 use bytes::Bytes;
 
-use crate::Packet;
-
 #[non_exhaustive]
 #[derive(thiserror::Error, Debug)]
 /// The Errors that may occur during an Insim connection.
@@ -57,9 +55,6 @@ pub enum Error {
     IncompleteDecode {
         /// original input
         input: Bytes,
-
-        /// decoded
-        decoded: Packet,
 
         /// remaining
         remaining: Bytes,

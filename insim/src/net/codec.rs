@@ -6,20 +6,25 @@ use insim_core::{Decode, Encode};
 use super::{mode::Mode, DEFAULT_TIMEOUT_SECS};
 use crate::{
     identifiers::RequestId,
-    insim::{Tiny, TinyType},
+    insim::{Tiny, TinyType, Ver},
     packet::Packet,
     result::Result,
-    Error, WithRequestId,
+    Error, WithRequestId, DEFAULT_BUFFER_CAPACITY, VERSION,
 };
 
 /// Handles the encoding and decoding of Insim packets to and from raw bytes.
 /// It automatically handles the encoding of the total size of the packet, and the packet
 /// type/identifier.
+/// You may use this with your own IO, either sync or async. See Framed as an example of doing so.
+/// This is not responsible for managing the initial handshake, nor will it automatically send any
+/// keepalives. But it will indicate if a keepalive should be sent and when an IO timeout should
+/// occur.
 #[derive(Debug)]
 pub struct Codec {
     mode: Mode,
     timeout_at: Instant,
     keepalive: bool,
+    buffer: BytesMut,
 }
 
 impl Codec {
@@ -29,6 +34,7 @@ impl Codec {
             mode,
             timeout_at: Instant::now() + Duration::from_secs(DEFAULT_TIMEOUT_SECS),
             keepalive: false,
+            buffer: BytesMut::with_capacity(DEFAULT_BUFFER_CAPACITY),
         }
     }
 
@@ -58,21 +64,31 @@ impl Codec {
         Ok(buf.freeze())
     }
 
-    /// Decode a series of bytes into a [Packet]
+    /// Feed
     #[tracing::instrument]
-    pub fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Packet>> {
+    pub fn feed(&mut self, src: &[u8]) {
         if src.is_empty() {
+            return;
+        }
+
+        self.buffer.extend_from_slice(src);
+    }
+
+    /// Decode any complete packet in the buffer into a [Packet]
+    #[tracing::instrument]
+    pub fn decode(&mut self) -> Result<Option<Packet>> {
+        if self.buffer.is_empty() {
             return Ok(None);
         }
 
-        let n = match self.mode().decode_length(src)? {
+        let n = match self.mode().decode_length(&self.buffer)? {
             Some(n) => n,
             None => {
                 return Ok(None);
             },
         };
 
-        let mut data = src.split_to(n).freeze();
+        let mut data = self.buffer.split_to(n).freeze();
 
         self.timeout_at = Instant::now() + Duration::from_secs(DEFAULT_TIMEOUT_SECS);
 
@@ -91,19 +107,23 @@ impl Codec {
                 if data.remaining() > 0 {
                     return Err(Error::IncompleteDecode {
                         input: original,
-                        decoded: packet,
                         remaining: data,
                     });
                 }
 
-                if matches!(
-                    packet,
+                match packet {
                     Packet::Tiny(Tiny {
                         subt: TinyType::None,
-                        reqi: RequestId(0)
-                    })
-                ) {
-                    self.keepalive = true;
+                        reqi: RequestId(0),
+                    }) => {
+                        self.keepalive = true;
+                    },
+                    Packet::Ver(Ver { insimver, .. }) => {
+                        if insimver != VERSION {
+                            return Err(Error::IncompatibleVersion(insimver));
+                        }
+                    },
+                    _ => {},
                 }
 
                 Ok(Some(packet))
@@ -152,14 +172,12 @@ mod tests {
     #[tokio::test]
     /// Ensure that Codec can decode a basic small packet
     async fn read_tiny_ping() {
-        let mut mock = BytesMut::new();
-        mock.extend_from_slice(
+        let mut codec = Codec::new(Mode::Compressed);
+        codec.feed(
             // Packet::Tiny, subtype TinyType::Ping, compressed, reqi=2
             &[1, 3, 2, 3],
         );
-
-        let mut codec = Codec::new(Mode::Compressed);
-        let data = codec.decode(&mut mock);
+        let data = codec.decode();
         assert_ok!(&data);
         let data = data.unwrap();
 

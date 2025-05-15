@@ -100,7 +100,7 @@ impl Mode {
     }
 
     /// What is the maximum size of a Packet, for a given Mode?
-    pub fn max_length(&self) -> usize {
+    pub const fn max_length(&self) -> usize {
         match self {
             Mode::Uncompressed => 255,
             Mode::Compressed => 1020,

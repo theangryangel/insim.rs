@@ -28,10 +28,7 @@ fn tcpstream_connect_to_any<A: std::net::ToSocketAddrs>(
         }
     }
 
-    Err(std::io::Error::new(
-        std::io::ErrorKind::Other,
-        "All connection attempts failed",
-    ))
+    Err(std::io::Error::other("All connection attempts failed"))
 }
 
 #[derive(Clone, Debug, Default)]
@@ -50,11 +47,7 @@ pub struct Builder {
 
     connect_timeout: Duration,
 
-    #[cfg(feature = "tokio")]
-    handshake_timeout: Duration,
-
     remote: SocketAddr,
-    verify_version: bool,
     mode: Mode,
 
     isi_admin_password: Option<String>,
@@ -89,12 +82,8 @@ impl Default for Builder {
         Self {
             connect_timeout: Duration::from_secs(10),
 
-            #[cfg(feature = "tokio")]
-            handshake_timeout: Duration::from_secs(30),
-
             proto: Proto::Tcp,
             remote: "127.0.0.1:29999".parse().unwrap(),
-            verify_version: true,
             mode: Mode::Compressed,
 
             tcp_nodelay: true,
@@ -182,12 +171,6 @@ impl Builder {
     /// Use "uncompressed" mode. Force enabled for LFS World relay.
     pub fn uncompressed(self) -> Self {
         self.mode(Mode::Uncompressed)
-    }
-
-    /// Enable the verification of the Insim version within the library. If a [crate::Packet::Ver] is received with a differing version, [crate::Error::IncompatibleVersion] is returned and the connection is lost.
-    pub fn verify_version(mut self, verify: bool) -> Self {
-        self.verify_version = verify;
-        self
     }
 
     /// Set whether sockets have `TCP_NODELAY` enabled.
@@ -365,8 +348,7 @@ impl Builder {
 
                 let mut stream =
                     BlockingFramed::new(Box::new(stream), Codec::new(self.mode.clone()));
-                stream.verify_version(self.verify_version);
-                stream.handshake(self.isi())?;
+                stream.write(self.isi())?;
 
                 Ok(stream)
             },
@@ -387,8 +369,7 @@ impl Builder {
                     Box::new(UdpStream::from(stream)),
                     Codec::new(self.mode.clone()),
                 );
-                stream.verify_version(self.verify_version);
-                stream.handshake(isi)?;
+                stream.write(isi)?;
 
                 Ok(stream)
             },
@@ -447,8 +428,7 @@ impl Builder {
                 stream.set_nodelay(self.tcp_nodelay)?;
 
                 let mut stream = AsyncFramed::new(Box::new(stream), Codec::new(self.mode.clone()));
-                stream.verify_version(self.verify_version);
-                stream.handshake(self.isi(), self.handshake_timeout).await?;
+                stream.write(self.isi()).await?;
 
                 Ok(stream)
             },
@@ -467,8 +447,7 @@ impl Builder {
                     Box::new(UdpStream::from(stream)),
                     Codec::new(self.mode.clone()),
                 );
-                stream.verify_version(self.verify_version);
-                stream.handshake(isi, self.handshake_timeout).await?;
+                stream.write(isi).await?;
 
                 Ok(stream)
             },
@@ -516,11 +495,10 @@ impl Builder {
             )
             .await??;
 
-            let mut inner = AsyncFramed::new(
+            let inner = AsyncFramed::new(
                 Box::new(WebsocketStream::from(stream)),
                 Codec::new(Mode::Uncompressed),
             );
-            inner.verify_version(self.verify_version);
             return Ok(inner);
         }
 
@@ -531,8 +509,7 @@ impl Builder {
         .await??;
         stream.set_nodelay(self.tcp_nodelay)?;
 
-        let mut inner = AsyncFramed::new(Box::new(stream), Codec::new(Mode::Uncompressed));
-        inner.verify_version(self.verify_version);
+        let inner = AsyncFramed::new(Box::new(stream), Codec::new(Mode::Uncompressed));
         Ok(inner)
     }
 }

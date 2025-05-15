@@ -29,7 +29,7 @@ pub const LFSW_RELAY_ADDR: &str = "isrelay.lfs.net:47474";
 
 /// Why 255 * 4? Because the size of a packet is a u8, with a max byte size of 255.
 /// In "compressed" mode the raw size is multiplied by 4.
-pub(crate) const MAX_SIZE_PACKET: usize = 255 * 4;
+pub(crate) const MAX_SIZE_PACKET: usize = (u8::MAX as usize) * 4;
 
 pub(crate) const DEFAULT_BUFFER_CAPACITY: usize = MAX_SIZE_PACKET * 6;
 

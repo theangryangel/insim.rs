@@ -1,10 +1,8 @@
 use std::{fmt::Debug, time::Duration};
 
-use bytes::{BufMut, BytesMut};
-use if_chain::if_chain;
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
-    time::{self, timeout},
+    time::timeout,
 };
 
 /// Read Write super trait
@@ -14,11 +12,10 @@ impl<T: AsyncRead + AsyncWrite + Debug + Unpin + Send + Sync> AsyncReadWrite for
 
 use crate::{
     error::Error,
-    insim::Isi,
     net::{Codec, DEFAULT_TIMEOUT_SECS},
     packet::Packet,
     result::Result,
-    DEFAULT_BUFFER_CAPACITY,
+    MAX_SIZE_PACKET,
 };
 
 /// A unified wrapper around anything that implements [AsyncReadWrite].
@@ -27,102 +24,56 @@ use crate::{
 pub struct Framed {
     inner: Box<dyn AsyncReadWrite>,
     codec: Codec,
-    buffer: BytesMut,
-    verify_version: bool,
 }
 
 impl Framed {
     /// Create a new FramedInner, which wraps some kind of network transport.
     pub fn new(inner: Box<dyn AsyncReadWrite>, codec: Codec) -> Self {
-        let buffer = BytesMut::with_capacity(DEFAULT_BUFFER_CAPACITY);
-
-        Self {
-            inner,
-            codec,
-            buffer,
-            verify_version: false,
-        }
-    }
-
-    /// Modifies whether or not to verify the Insim version
-    pub fn verify_version(&mut self, verify_version: bool) {
-        self.verify_version = verify_version;
-    }
-
-    /// Performs the Insim handshake by sending a [Isi] packet.
-    /// If the handshake does not complete within the given timeout, it will fail and the
-    /// connection should be considered invalid.
-    pub async fn handshake(&mut self, isi: Isi, timeout: Duration) -> Result<()> {
-        time::timeout(timeout, self.write(isi)).await??;
-
-        Ok(())
-    }
-
-    #[allow(unsafe_code)]
-    async fn read_buf(&mut self) -> Result<usize> {
-        // We're making the assumption that the internal stream will not discard data if there is
-        // not enough space in the chunk.
-        // This is how TcpStream works, and how we've made UdpStream work.
-        let size = {
-            let chunk = self.buffer.chunk_mut();
-            let len = chunk.len();
-
-            let ptr = chunk.as_mut_ptr();
-            // SAFETY: The inner stream is not going to read from the uninitialized data.
-            let slice = unsafe { std::slice::from_raw_parts_mut(ptr, len) };
-            self.inner.read(slice).await?
-        };
-
-        // SAFETY: The inner stream just initialized that many bytes, we need to trust that
-        unsafe {
-            self.buffer.advance_mut(size);
-        }
-
-        Ok(size)
+        Self { inner, codec }
     }
 
     /// Asynchronously wait for a packet from the inner network.
     pub async fn read(&mut self) -> Result<Packet> {
         loop {
-            if_chain! {
-                if !self.buffer.is_empty();
-                if let Some(packet) = self.codec.decode(&mut self.buffer)?;
-                then {
-                    if self.verify_version {
-                        // maybe verify version
-                        let _ = packet.maybe_verify_version()?;
-                    }
-
-                    // keepalive
-                    if let Some(pong) = packet.maybe_pong() {
-                        tracing::debug!("Ping? Pong!");
-                        self.write(pong).await?;
-                    }
-
-                    return Ok(packet);
-                }
+            if self.codec.reached_timeout() {
+                return Err(Error::Timeout(
+                    "Timeout exceeded, no keepalive or packet received".into(),
+                ));
             }
 
-            match timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECS), self.read_buf()).await? {
+            // ensure that we exhaust the buffer first
+
+            let packet = self.codec.decode()?;
+
+            if let Some(keepalive) = self.codec.keepalive() {
+                tracing::debug!("Ping? Pong!");
+                self.write(keepalive).await?;
+            }
+
+            if let Some(packet) = packet {
+                return Ok(packet);
+            }
+
+            let mut buf = [0u8; MAX_SIZE_PACKET];
+
+            match timeout(
+                Duration::from_secs(DEFAULT_TIMEOUT_SECS),
+                self.inner.read(&mut buf),
+            )
+            .await?
+            {
                 Ok(0) => {
                     // The remote closed the connection. For this to be a clean
                     // shutdown, there should be no data in the read buffer. If
                     // there is, this means that the peer closed the socket while
                     // sending a frame.
-                    if !self.buffer.is_empty() {
-                        tracing::debug!(
-                            "Buffer was not empty when disconnected: {:?}",
-                            self.buffer
-                        );
-                    }
-
                     return Err(Error::Disconnected);
                 },
-                Ok(_) => {
-                    continue;
+                Ok(amt) => {
+                    self.codec.feed(&buf[..amt]);
                 },
                 Err(e) => {
-                    return Err(e);
+                    return Err(e.into());
                 },
             }
         }
