@@ -87,7 +87,7 @@ impl AsyncWrite for WebsocketStream {
         // TODO: Should we be wrapping stream and then polling that?
         match self.inner.poll_ready_unpin(cx) {
             Poll::Ready(Ok(())) => {
-                if let Err(e) = self.inner.start_send_unpin(Message::binary(buf)) {
+                if let Err(e) = self.inner.start_send_unpin(Message::binary(buf.clone())) {
                     Poll::Ready(Err(tungstenite_error_to_io(e)))
                 } else {
                     let _ = self.poll_flush(cx);
