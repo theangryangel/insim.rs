@@ -4,9 +4,9 @@ use std::fmt::Debug;
 
 use insim_core::{Decode, Encode};
 
+use crate::insim::*;
 #[cfg(feature = "relay")]
 use crate::relay::*;
-use crate::{identifiers::RequestId, insim::*};
 
 #[derive(Debug, Clone, from_variants::FromVariants)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -334,36 +334,6 @@ impl Packet {
                 // a sensible default for everything else
                 4
             },
-        }
-    }
-
-    /// Does this packet indicate that we should send a ping reply back?
-    #[tracing::instrument]
-    pub fn maybe_pong(&self) -> Option<Self> {
-        match self {
-            Packet::Tiny(Tiny {
-                subt: TinyType::None,
-                reqi: RequestId(0),
-            }) => Some(Self::Tiny(Tiny {
-                reqi: RequestId(0),
-                subt: TinyType::None,
-            })),
-            _ => None,
-        }
-    }
-
-    /// Does this packet contain the version of the Insim server, and can we verify it?
-    #[tracing::instrument]
-    pub fn maybe_verify_version(&self) -> crate::result::Result<bool> {
-        match self {
-            Packet::Ver(Ver { insimver, .. }) => {
-                if *insimver != crate::VERSION {
-                    return Err(crate::error::Error::IncompatibleVersion(*insimver));
-                }
-
-                Ok(true)
-            },
-            _ => Ok(false),
         }
     }
 }

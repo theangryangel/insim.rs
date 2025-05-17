@@ -17,4 +17,4 @@ pub use codec::Codec;
 pub use mode::Mode;
 
 /// If no data is received within this period of seconds, consider the Insim connection to be lost.
-pub const DEFAULT_TIMEOUT_SECS: u64 = 90;
+pub const DEFAULT_TIMEOUT_SECS: u64 = 70;

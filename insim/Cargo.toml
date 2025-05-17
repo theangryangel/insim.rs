@@ -44,7 +44,6 @@ bitflags = { workspace = true }
 bytes = { workspace = true }
 from_variants = { workspace = true }
 futures-util = { workspace = true, optional = true }
-if_chain = { workspace = true }
 indexmap = { workspace = true }
 insim_core = { path = "../insim_core", version = "3.0.0-unreleased" }
 serde = { workspace = true, features = ["derive"], optional = true }
