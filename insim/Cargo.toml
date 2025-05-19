@@ -32,11 +32,15 @@ serde = [
   "bitflags/serde",
   "indexmap/serde",
 ]
-websocket = [
+tokio-websocket = [
   "relay",
   "tokio",
   "dep:tokio-tungstenite",
   "futures-util"
+]
+blocking-websocket = [
+  "relay",
+  "dep:tungstenite",
 ]
 
 [dependencies]
@@ -50,6 +54,7 @@ serde = { workspace = true, features = ["derive"], optional = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["time", "net", "macros", "sync", "tracing", "io-util"], optional = true }
 tokio-tungstenite = { workspace = true, optional = true }
+tungstenite = { workspace = true, optional = true }
 tracing = { workspace = true }
 
 [dev-dependencies]

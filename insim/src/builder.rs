@@ -73,7 +73,7 @@ pub struct Builder {
     #[cfg(feature = "relay")]
     relay_admin_password: Option<String>,
 
-    #[cfg(all(feature = "websocket", feature = "relay"))]
+    #[cfg(all(any(feature = "tokio-websocket", feature = "blocking-websocket"), feature = "relay"))]
     relay_websocket: bool,
 }
 
@@ -96,7 +96,7 @@ impl Default for Builder {
             #[cfg(feature = "relay")]
             relay_admin_password: None,
 
-            #[cfg(feature = "websocket")]
+            #[cfg(all(any(feature = "tokio-websocket", feature = "blocking-websocket"), feature = "relay"))]
             relay_websocket: false,
 
             isi_admin_password: None,
@@ -143,7 +143,7 @@ impl Builder {
     }
 
     /// Use the LFS World Relay over Websockets.
-    #[cfg(all(feature = "websocket", feature = "relay"))]
+    #[cfg(all(any(feature = "tokio-websocket", feature = "blocking-websocket"), feature = "relay"))]
     pub fn relay_websocket(mut self, ws: bool) -> Self {
         self.relay_websocket = ws;
         self
@@ -479,15 +479,34 @@ impl Builder {
         }
     }
 
+    #[cfg(any(feature = "tokio-websocket", feature = "blocking-websocket"))]
+    fn relay_websocket_request(&self) -> tungstenite::http::request::Builder {
+        let uri = format!("ws://{}/connect", crate::LFSW_RELAY_ADDR)
+            .parse::<tungstenite::http::Uri>()
+            .expect("Failed to parse relay URI");
+
+        tungtensite::http::Request::builder()
+        .method("GET")
+        .header("Host", uri.host().expect("Failed to get host from uri"))
+        .header("Connection", "Upgrade")
+        .header("Upgrade", "websocket")
+        .header("Sec-WebSocket-Version", "13")
+        .header("Sec-WebSocket-Key", generate_key())
+        // It appears that isrelay.lfs.net requires an Origin header
+        // Without this it does not allow us to connect.
+        .header("Origin", "null")
+        .uri(uri)
+    }
+
     #[cfg(all(feature = "tokio", feature = "relay"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     async fn _connect_relay(&self) -> Result<AsyncFramed> {
         use tokio::time::timeout;
 
-        #[cfg(feature = "websocket")]
+        #[cfg(all(feature = "tokio-websocket", feature = "relay"))]
         use crate::net::tokio_impl::{connect_to_lfsworld_relay_ws, WebsocketStream};
 
-        #[cfg(feature = "websocket")]
+        #[cfg(all(feature = "tokio-websocket", feature = "relay"))]
         if self.relay_websocket {
             let stream = timeout(
                 self.connect_timeout,

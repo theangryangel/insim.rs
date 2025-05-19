@@ -69,8 +69,7 @@ impl From<tokio::time::error::Elapsed> for Error {
     }
 }
 
-#[cfg(feature = "websocket")]
-#[cfg_attr(docsrs, doc(cfg(feature = "websocket")))]
+#[cfg(any(feature = "tokio-websocket", feature = "blocking-websocket"))]
 impl From<tokio_tungstenite::tungstenite::Error> for Error {
     fn from(value: tokio_tungstenite::tungstenite::Error) -> Self {
         // TODO a lot of this is less than ideal mapping

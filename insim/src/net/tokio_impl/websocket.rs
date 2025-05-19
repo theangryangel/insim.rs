@@ -29,9 +29,6 @@ pub async fn connect_to_lfsworld_relay_ws(
         tungstenite::{handshake::client::generate_key, http},
     };
 
-    let uri = format!("ws://{}/connect", crate::LFSW_RELAY_ADDR)
-        .parse::<http::Uri>()
-        .expect("Failed to parse relay URI");
 
     let req = http::Request::builder()
         .method("GET")
