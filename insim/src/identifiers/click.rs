@@ -14,7 +14,8 @@ use serde::Serialize;
 pub struct ClickId(pub u8);
 
 impl ClickId {
-    const MAX: u8 = 239;
+    /// Maximum supported value for ClickId
+    pub const MAX: u8 = 239;
 }
 
 impl fmt::Display for ClickId {
