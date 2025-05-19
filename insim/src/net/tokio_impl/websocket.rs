@@ -4,7 +4,7 @@ use core::{
 };
 use std::io;
 
-use bytes::{Buf, BytesMut};
+use bytes::{Buf, Bytes, BytesMut};
 use futures_util::{
     sink::{Sink, SinkExt},
     stream::Stream,
@@ -84,10 +84,13 @@ impl AsyncWrite for WebsocketStream {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
+        let inner: Bytes = buf.to_vec().into();
+        let message = Message::Binary(inner);
+
         // TODO: Should we be wrapping stream and then polling that?
         match self.inner.poll_ready_unpin(cx) {
             Poll::Ready(Ok(())) => {
-                if let Err(e) = self.inner.start_send_unpin(Message::binary(buf)) {
+                if let Err(e) = self.inner.start_send_unpin(message) {
                     Poll::Ready(Err(tungstenite_error_to_io(e)))
                 } else {
                     let _ = self.poll_flush(cx);
