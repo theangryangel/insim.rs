@@ -12,13 +12,11 @@ use insim_core::{Decode, Encode};
 pub struct ConnectionId(pub u8);
 
 impl ConnectionId {
-    #[allow(dead_code)]
     /// Shortcut for local or server
-    const LOCAL: ConnectionId = ConnectionId(0);
+    pub const LOCAL: ConnectionId = ConnectionId(0);
 
-    #[allow(dead_code)]
     /// Shortcut for commonly used "all" connection id
-    const ALL: ConnectionId = ConnectionId(255);
+    pub const ALL: ConnectionId = ConnectionId(255);
 
     /// Is this a "local" connection
     pub fn local(&self) -> bool {
