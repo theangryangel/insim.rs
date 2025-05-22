@@ -55,11 +55,10 @@ impl Write for WebsocketStream {
         self.inner
             .write(tungstenite::Message::Binary(message))
             .map_err(io::Error::other)?;
-        self.inner.flush().map_err(io::Error::other)?;
         Ok(buf.len())
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        Ok(())
+        self.inner.flush().map_err(io::Error::other)
     }
 }

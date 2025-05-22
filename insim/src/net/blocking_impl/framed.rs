@@ -70,6 +70,7 @@ impl Framed {
         let buf = self.codec.encode(&packet.into())?;
         if !buf.is_empty() {
             let _ = self.inner.write(&buf)?;
+            self.inner.flush()?;
         }
 
         Ok(())
