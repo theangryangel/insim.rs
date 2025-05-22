@@ -104,12 +104,9 @@ pub fn main() -> Result<()> {
         } => {
             tracing::info!("Connecting via LFS World Relay!");
 
-            if *websocket {
-                panic!("Blocking does not yet support websockets!");
-            }
-
             // use insim relay
             insim::relay()
+                .relay_websocket(*websocket)
                 .relay_spectator_password(spectator_password.clone())
                 .relay_select_host(select_host.clone())
         },

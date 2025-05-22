@@ -17,7 +17,6 @@ pub mod identifiers;
 pub mod insim;
 pub mod net;
 pub mod packet;
-#[cfg(feature = "relay")]
 pub mod relay;
 #[doc(hidden)]
 pub mod result;
@@ -101,7 +100,6 @@ pub fn udp<L: Into<Option<SocketAddr>>, R: Into<SocketAddr>>(
 ///     println!("{:?}", packet);
 /// }
 /// ```
-#[cfg(all(feature = "relay", any(feature = "blocking", feature = "tokio")))]
 pub fn relay() -> builder::Builder {
     builder::Builder::default().relay()
 }

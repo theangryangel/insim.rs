@@ -4,9 +4,7 @@ use std::fmt::Debug;
 
 use insim_core::{Decode, Encode};
 
-use crate::insim::*;
-#[cfg(feature = "relay")]
-use crate::relay::*;
+use crate::{insim::*, relay::*};
 
 #[derive(Debug, Clone, from_variants::FromVariants)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -223,27 +221,21 @@ pub enum Packet {
     /// Information - AI information
     Aii(Aii),
 
-    #[cfg(feature = "relay")]
     /// Instruction - Ask the LFS World relay if we are an admin
     RelayArq(Arq),
 
-    #[cfg(feature = "relay")]
     /// Information - LFS World relay response if we are an admin
     RelayArp(Arp),
 
-    #[cfg(feature = "relay")]
     /// Instruction - Ask the LFS World relay for a list of hosts
     RelayHlr(Hlr),
 
-    #[cfg(feature = "relay")]
     /// Information - LFS World relay response to a HostListRequest
     RelayHos(Hos),
 
-    #[cfg(feature = "relay")]
     /// Instruction - Ask the LFS World relay to select a host and start relaying Insim packets
     RelaySel(Sel),
 
-    #[cfg(feature = "relay")]
     /// Information - LFS World relay error (recoverable)
     RelayErr(Error),
 }
@@ -326,9 +318,7 @@ impl Packet {
             Packet::Mal(_) => 12,
             Packet::Aic(i) => 4 + (i.inputs.len() * 4),
             Packet::Aii(_) => 96,
-            #[cfg(feature = "relay")]
             Packet::RelayHos(i) => 4 + (i.hinfo.len() * 40),
-            #[cfg(feature = "relay")]
             Packet::RelaySel(_) => 68,
             _ => {
                 // a sensible default for everything else
@@ -426,17 +416,11 @@ impl WithRequestId for Packet {
             Packet::Ipb(i) => i.reqi = reqi.into(),
             Packet::Aic(i) => i.reqi = reqi.into(),
             Packet::Aii(i) => i.reqi = reqi.into(),
-            #[cfg(feature = "relay")]
             Packet::RelayArq(i) => i.reqi = reqi.into(),
-            #[cfg(feature = "relay")]
             Packet::RelayArp(i) => i.reqi = reqi.into(),
-            #[cfg(feature = "relay")]
             Packet::RelayHlr(i) => i.reqi = reqi.into(),
-            #[cfg(feature = "relay")]
             Packet::RelayHos(i) => i.reqi = reqi.into(),
-            #[cfg(feature = "relay")]
             Packet::RelaySel(i) => i.reqi = reqi.into(),
-            #[cfg(feature = "relay")]
             Packet::RelayErr(i) => i.reqi = reqi.into(),
         };
         self
@@ -516,17 +500,11 @@ impl Decode for Packet {
             67 => Self::Ipb(Ipb::decode(buf)?),
             68 => Self::Aic(Aic::decode(buf)?),
             69 => Self::Aii(Aii::decode(buf)?),
-            #[cfg(feature = "relay")]
             250 => Self::RelayArq(Arq::decode(buf)?),
-            #[cfg(feature = "relay")]
             251 => Self::RelayArp(Arp::decode(buf)?),
-            #[cfg(feature = "relay")]
             252 => Self::RelayHlr(Hlr::decode(buf)?),
-            #[cfg(feature = "relay")]
             253 => Self::RelayHos(Hos::decode(buf)?),
-            #[cfg(feature = "relay")]
             254 => Self::RelaySel(Sel::decode(buf)?),
-            #[cfg(feature = "relay")]
             255 => Self::RelayErr(Error::decode(buf)?),
             i => return Err(insim_core::DecodeError::NoVariantMatch { found: i.into() }),
         };
@@ -814,32 +792,26 @@ impl Encode for Packet {
                 69_u8.encode(buf)?;
                 i.encode(buf)?;
             },
-            #[cfg(feature = "relay")]
             Self::RelayArq(i) => {
                 250_u8.encode(buf)?;
                 i.encode(buf)?;
             },
-            #[cfg(feature = "relay")]
             Self::RelayArp(i) => {
                 251_u8.encode(buf)?;
                 i.encode(buf)?;
             },
-            #[cfg(feature = "relay")]
             Self::RelayHlr(i) => {
                 252_u8.encode(buf)?;
                 i.encode(buf)?;
             },
-            #[cfg(feature = "relay")]
             Self::RelayHos(i) => {
                 253_u8.encode(buf)?;
                 i.encode(buf)?;
             },
-            #[cfg(feature = "relay")]
             Self::RelaySel(i) => {
                 254_u8.encode(buf)?;
                 i.encode(buf)?;
             },
-            #[cfg(feature = "relay")]
             Self::RelayErr(i) => {
                 255_u8.encode(buf)?;
                 i.encode(buf)?;

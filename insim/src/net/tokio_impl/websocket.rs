@@ -20,48 +20,6 @@ use crate::MAX_SIZE_PACKET;
 pub(crate) type TungsteniteWebSocket =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<TcpStream>>;
 
-/// Connect to the LFS World Relay over websocket
-pub async fn connect_to_lfsworld_relay_ws(
-    tcp_nodelay: bool,
-) -> std::result::Result<TungsteniteWebSocket, std::io::Error> {
-    use tokio_tungstenite::{
-        connect_async_with_config,
-        tungstenite::{handshake::client::generate_key, http},
-    };
-
-    let uri = format!("ws://{}/connect", crate::LFSW_RELAY_ADDR)
-        .parse::<http::Uri>()
-        .expect("Failed to parse relay URI");
-
-    let req = http::Request::builder()
-        .method("GET")
-        .header("Host", uri.host().expect("Failed to get host from uri"))
-        .header("Connection", "Upgrade")
-        .header("Upgrade", "websocket")
-        .header("Sec-WebSocket-Version", "13")
-        .header("Sec-WebSocket-Key", generate_key())
-        // It appears that isrelay.lfs.net requires an Origin header
-        // Without this it does not allow us to connect.
-        .header("Origin", "null")
-        .uri(uri)
-        .body(())
-        .unwrap();
-
-    let (stream, _response) = connect_async_with_config(req, None, tcp_nodelay)
-        .await
-        .map_err(tungstenite_error_to_io)?;
-
-    Ok(stream)
-}
-
-/// Convert from Tungstenite error to io::Error
-fn tungstenite_error_to_io(err: TungsteniteError) -> io::Error {
-    match err {
-        TungsteniteError::Io(io_err) => io_err,
-        err => io::Error::new(io::ErrorKind::Other, err),
-    }
-}
-
 impl From<TungsteniteWebSocket> for WebsocketStream {
     fn from(value: TungsteniteWebSocket) -> Self {
         Self {
@@ -91,21 +49,19 @@ impl AsyncWrite for WebsocketStream {
         match self.inner.poll_ready_unpin(cx) {
             Poll::Ready(Ok(())) => {
                 if let Err(e) = self.inner.start_send_unpin(message) {
-                    Poll::Ready(Err(tungstenite_error_to_io(e)))
+                    Poll::Ready(Err(io::Error::other(e)))
                 } else {
                     let _ = self.poll_flush(cx);
                     Poll::Ready(Ok(buf.len()))
                 }
             },
-            Poll::Ready(Err(e)) => Poll::Ready(Err(tungstenite_error_to_io(e))),
+            Poll::Ready(Err(e)) => Poll::Ready(Err(io::Error::other(e))),
             Poll::Pending => Poll::Pending,
         }
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
-        self.inner
-            .poll_flush_unpin(cx)
-            .map_err(tungstenite_error_to_io)
+        self.inner.poll_flush_unpin(cx).map_err(io::Error::other)
     }
 
     fn poll_shutdown(
@@ -113,7 +69,7 @@ impl AsyncWrite for WebsocketStream {
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), io::Error>> {
         let ws = Pin::new(&mut self.inner);
-        ws.poll_close(cx).map_err(tungstenite_error_to_io)
+        ws.poll_close(cx).map_err(io::Error::other)
     }
 }
 
@@ -141,7 +97,7 @@ impl AsyncRead for WebsocketStream {
                         return Poll::Ready(Err(e));
                     },
                     _ => {
-                        return Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::Other, e)));
+                        return Poll::Ready(Err(io::Error::other(e)));
                     },
                 },
                 Poll::Ready(Some(Ok(Message::Binary(msgbuf)))) => {

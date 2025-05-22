@@ -9,7 +9,7 @@ publish = false
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
 if_chain = { workspace = true }
-insim = { path = "../../insim", features = ["websocket"] }
+insim = { path = "../../insim", default-features = false, features = ["tokio"] }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }

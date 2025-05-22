@@ -114,10 +114,8 @@ loop {
 
 The following are a list of [Cargo features][cargo-features] that can be enabled or disabled:
 
-| Name        | Description                                                                           | Default? |
-| ----------- | ------------------------------------------------------------------------------------- | -------- |
-| `serde`     | Enable serde support                                                                  | No       |
-| `tokio`     | Enable tokio support                                                                  | Yes      |
-| `blocking`  | Enable blocking/sync support                                                          | Yes      |
-| `relay`     | Enable LFSW Relay support                                                             | Yes      |
-| `websocket` | Enable LFSW Relay support over websocket using Tungstenite (requires tokio and relay) | No       |
+| Name       | Description                  | Default? |
+| ---------- | ---------------------------- | -------- |
+| `serde`    | Enable serde support         | No       |
+| `tokio`    | Enable tokio support         | Yes      |
+| `blocking` | Enable blocking/sync support | Yes      |

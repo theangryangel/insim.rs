@@ -20,23 +20,21 @@ all-features = true
 rustdoc-args = ["--cfg", "docrs"]
 
 [features]
-default = ["tokio", "blocking", "relay"]
-relay = []
-blocking = []
+default = ["tokio", "blocking"]
+blocking = [
+  "dep:tungstenite",
+]
 tokio = [
   "dep:tokio",
+  "dep:tungstenite",
+  "dep:tokio-tungstenite",
+  "dep:futures-util"
 ]
 serde = [
   "dep:serde",
   "insim_core/serde",
   "bitflags/serde",
   "indexmap/serde",
-]
-websocket = [
-  "relay",
-  "tokio",
-  "dep:tokio-tungstenite",
-  "futures-util"
 ]
 
 [dependencies]
@@ -50,6 +48,7 @@ serde = { workspace = true, features = ["derive"], optional = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["time", "net", "macros", "sync", "tracing", "io-util"], optional = true }
 tokio-tungstenite = { workspace = true, optional = true }
+tungstenite = { workspace = true, optional = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
