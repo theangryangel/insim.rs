@@ -1,4 +1,8 @@
-use std::{net::TcpStream, io::{self, Read, Write}};
+use std::{
+    io::{self, Read, Write},
+    net::TcpStream,
+};
+
 use bytes::{Bytes, BytesMut};
 
 use crate::MAX_SIZE_PACKET;
@@ -6,6 +10,8 @@ use crate::MAX_SIZE_PACKET;
 pub(crate) type TungsteniteWebSocket =
     tungstenite::WebSocket<tungstenite::stream::MaybeTlsStream<TcpStream>>;
 
+#[derive(Debug)]
+/// Websocket "stream" wrapper.
 pub struct WebsocketStream {
     inner: TungsteniteWebSocket,
     buf: BytesMut,
@@ -25,16 +31,15 @@ impl Read for WebsocketStream {
         // If we have no buffered data, read the next message
         while self.buf.is_empty() {
             match self.inner.read() {
-                Ok(msg) => {
-                    match msg {
-                        tungstenite::Message::Binary(data) => {
-                            self.buf.extend_from_slice(&data);
-                        }
-                        tungstenite::Message::Close(_) => return Ok(0),
-                        _ => continue,
-                    }
-                }
-                Err(e) => return Err(io::Error::new(io::ErrorKind::Other, e)),
+                Ok(msg) => match msg {
+                    tungstenite::Message::Binary(data) => {
+                        self.buf.extend_from_slice(&data);
+                    },
+                    tungstenite::Message::Close(_) => return Ok(0),
+                    _ => continue,
+                },
+                Err(tungstenite::Error::Io(e)) => return Err(e),
+                Err(e) => return Err(io::Error::other(e)),
             }
         }
 
@@ -49,7 +54,8 @@ impl Write for WebsocketStream {
         let message: Bytes = buf.to_vec().into();
         self.inner
             .write(tungstenite::Message::Binary(message))
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+            .map_err(io::Error::other)?;
+        self.inner.flush().map_err(io::Error::other)?;
         Ok(buf.len())
     }
 

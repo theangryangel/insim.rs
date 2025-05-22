@@ -1,4 +1,4 @@
-use std::{fmt::Debug, time::Duration};
+use std::{fmt::Debug, io, time::Duration};
 
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
@@ -73,6 +73,10 @@ impl Framed {
                     self.codec.feed(&buf[..amt]);
                 },
                 Err(e) => {
+                    if e.kind() == io::ErrorKind::WouldBlock {
+                        continue;
+                    }
+
                     return Err(e.into());
                 },
             }

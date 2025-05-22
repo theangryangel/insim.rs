@@ -69,17 +69,14 @@ impl From<tokio::time::error::Elapsed> for Error {
     }
 }
 
-#[cfg(any(feature = "tokio-websocket", feature = "blocking-websocket"))]
-impl From<tokio_tungstenite::tungstenite::Error> for Error {
-    fn from(value: tokio_tungstenite::tungstenite::Error) -> Self {
+impl From<tungstenite::Error> for Error {
+    fn from(value: tungstenite::Error) -> Self {
         // TODO a lot of this is less than ideal mapping
         // Do some research on better ways to handle this
         match value {
-            tokio_tungstenite::tungstenite::Error::ConnectionClosed => Error::Disconnected,
-            tokio_tungstenite::tungstenite::Error::AlreadyClosed => Error::Disconnected,
-            tokio_tungstenite::tungstenite::Error::Utf8 => {
-                Error::WebsocketIO("UTF-8 encoding error".into())
-            },
+            tungstenite::Error::ConnectionClosed => Error::Disconnected,
+            tungstenite::Error::AlreadyClosed => Error::Disconnected,
+            tungstenite::Error::Utf8 => Error::WebsocketIO("UTF-8 encoding error".into()),
             _ => Error::WebsocketIO(value.to_string()),
         }
     }

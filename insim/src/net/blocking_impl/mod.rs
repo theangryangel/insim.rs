@@ -5,7 +5,6 @@ use std::{
 
 pub(crate) mod framed;
 pub(crate) mod udp;
-#[cfg(feature = "blocking-websocket")]
 pub(crate) mod websocket;
 
 /// Read Write super trait
@@ -14,3 +13,4 @@ impl<T: Read + Write + Debug> ReadWrite for T {}
 
 pub use framed::Framed;
 pub use udp::UdpStream;
+pub use websocket::WebsocketStream;
