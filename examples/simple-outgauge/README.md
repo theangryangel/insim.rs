@@ -1,3 +1,3 @@
 # simple-outgauge
 
-Demo using the outgauge library
+Demo using the outgauge library.
