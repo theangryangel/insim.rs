@@ -5,8 +5,8 @@ use std::{
 };
 
 use clap::Parser;
+use glam::IVec3;
 use insim::{
-    core::point::Point,
     identifiers::{ClickId, PlayerId, RequestId},
     insim::{Btn, BtnStyle, LapTimingInfo, TinyType},
     Packet, Result, WithRequestId,
@@ -14,7 +14,7 @@ use insim::{
 
 #[derive(Clone, Debug)]
 pub struct RefPoint {
-    pub position: Point<i32>,
+    pub position: IVec3,
     pub time: Instant,
 }
 
@@ -37,16 +37,11 @@ impl DeltaTracker {
         }
     }
 
-    pub fn record(&mut self, pos: Point<i32>, time: Instant) {
-        let last = self.current_lap.last().map(|p| &p.position);
-        // did we move at least 1m? if not, do nothing
-        // could probably remove this with the speed check tbh.
-        if last.map_or(true, |last_pos| last_pos.distance(&pos) >= 1.0) {
-            self.current_lap.push(RefPoint {
-                position: pos,
-                time,
-            });
-        }
+    pub fn record(&mut self, pos: IVec3, time: Instant) {
+        self.current_lap.push(RefPoint {
+            position: pos,
+            time,
+        });
     }
 
     /// We just did a lap
@@ -56,7 +51,7 @@ impl DeltaTracker {
     }
 
     /// Delta in seconds
-    pub fn delta(&self, current_pos: Point<i32>) -> Option<f32> {
+    pub fn delta(&self, current_pos: IVec3) -> Option<f32> {
         let reference_lap = self.reference_lap.as_ref()?;
         let lap_start = self.current_lap.first()?;
 
@@ -79,8 +74,8 @@ impl DeltaTracker {
             let p1 = reference_lap[i].position;
             let p2 = reference_lap[i + 1].position;
 
-            let proj = current_pos.project_onto_segment(&p1, &p2);
-            let dist = current_pos.distance(&proj);
+            let proj = project_onto_segment(&current_pos, &p1, &p2);
+            let dist = current_pos.as_vec3().distance(proj.as_vec3());
 
             if dist < best_dist {
                 best_dist = dist;
@@ -91,7 +86,7 @@ impl DeltaTracker {
         let r1 = &reference_lap[best_index];
         let r2 = &reference_lap[best_index + 1];
 
-        let t = current_pos.project_onto_segment_ratio(&r1.position, &r2.position);
+        let t = project_ratio(&current_pos, &r1.position, &r2.position);
 
         let segment_duration = r2.time.duration_since(r1.time);
         let ref_time = r1.time + segment_duration.mul_f32(t);
@@ -101,6 +96,33 @@ impl DeltaTracker {
 
         Some(current_duration - ref_duration)
     }
+}
+
+fn project_onto_segment(p: &IVec3, a: &IVec3, b: &IVec3) -> IVec3 {
+    let ab = b - a;
+    let ap = p - a;
+
+    let ab_len2 = ab.dot(ab) as f32;
+    if ab_len2 == 0.0 {
+        return a.clone();
+    }
+
+    let t = ap.dot(ab) as f32 / ab_len2;
+    let t = t.clamp(0.0, 1.0);
+
+    (a.as_vec3() + ab.as_vec3() * t).as_ivec3()
+}
+
+fn project_ratio(p: &IVec3, a: &IVec3, b: &IVec3) -> f32 {
+    let ab = b - a;
+    let ap = p - a;
+
+    let ab_len2 = ab.dot(ab) as f32;
+    if ab_len2 == 0.0 {
+        return 0.0;
+    }
+
+    (ap.dot(ab) as f32 / ab_len2).clamp(0.0, 1.0)
 }
 
 #[derive(Parser)]
@@ -137,7 +159,7 @@ pub fn main() -> Result<()> {
     // FIXME: tidy this all up.
     // We need a state machine
     let mut plid: Option<PlayerId> = None;
-    let mut pos: Point<i32> = Point::default();
+    let mut pos = IVec3::default();
 
     let mut deltas = DeltaTracker::new();
     let mut recording = false;

@@ -4,8 +4,8 @@ use std::{net::SocketAddr, time::Duration};
 
 use clap::Parser;
 use insim::{
-    identifiers::{PlayerId, RequestId},
-    insim::{LclFlags, Tiny, TinyType},
+    identifiers::PlayerId,
+    insim::{LclFlags, TinyType},
     Packet, Result, WithRequestId,
 };
 use tokio::time::interval;

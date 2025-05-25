@@ -25,6 +25,7 @@ doctest = false
 bitflags = { workspace = true }
 bytes = { workspace = true }
 encoding_rs = { workspace = true }
+glam = { workspace = true }
 if_chain = { workspace = true }
 insim_macros = { path = "../insim_macros", version = "3.0.0-unreleased" }
 itertools = { workspace = true }

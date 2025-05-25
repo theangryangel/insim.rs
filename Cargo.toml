@@ -40,6 +40,7 @@ darling = "0.20"
 encoding_rs = { version = "0.8.32" }
 from_variants = "1.0.2"
 futures-util = { version = "0.3.28" }
+glam = "0.30.3"
 if_chain = "1.0.2"
 indexmap = "2.1.0"
 itertools = { version = "0.14.0" }
@@ -52,6 +53,6 @@ thiserror = "2.0.12"
 tokio = { version = "1.11.0" }
 tokio-test = "0.4.0"
 tokio-tungstenite = { version = "0.26.2" }
-tungstenite = { version = "0.26.2" }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17" }
+tungstenite = { version = "0.26.2" }

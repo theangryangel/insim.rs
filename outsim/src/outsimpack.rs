@@ -2,7 +2,8 @@
 use std::time::Duration;
 
 use bytes::Buf;
-use insim_core::{point::Point, Decode, Encode};
+use glam::{IVec3, Vec3};
+use insim_core::{Decode, Encode};
 
 use crate::OutsimId;
 
@@ -14,7 +15,7 @@ pub struct OutsimPack {
     pub time: Duration,
 
     /// Angular velocity
-    pub angvel: (f32, f32, f32),
+    pub angvel: Vec3,
 
     /// Heading
     pub heading: f32,
@@ -26,13 +27,13 @@ pub struct OutsimPack {
     pub roll: f32,
 
     /// Acceleration
-    pub accel: (f32, f32, f32),
+    pub accel: Vec3,
 
     /// Velocity
-    pub vel: (f32, f32, f32),
+    pub vel: Vec3,
 
     /// Position
-    pub pos: Point<i32>,
+    pub pos: IVec3,
 
     /// Optional identifier
     pub id: Option<OutsimId>,
@@ -42,18 +43,12 @@ impl Encode for OutsimPack {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         let time = self.time.as_millis();
         (time as u32).encode(buf)?;
-        self.angvel.0.encode(buf)?;
-        self.angvel.1.encode(buf)?;
-        self.angvel.2.encode(buf)?;
+        self.angvel.encode(buf)?;
         self.heading.encode(buf)?;
         self.pitch.encode(buf)?;
         self.roll.encode(buf)?;
-        self.accel.0.encode(buf)?;
-        self.accel.1.encode(buf)?;
-        self.accel.2.encode(buf)?;
-        self.vel.0.encode(buf)?;
-        self.vel.1.encode(buf)?;
-        self.vel.2.encode(buf)?;
+        self.accel.encode(buf)?;
+        self.vel.encode(buf)?;
         self.pos.encode(buf)?;
         if let Some(id) = self.id {
             id.encode(buf)?;
@@ -65,13 +60,13 @@ impl Encode for OutsimPack {
 impl Decode for OutsimPack {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let time = Duration::from_millis(u32::decode(buf)? as u64);
-        let angvel = (f32::decode(buf)?, f32::decode(buf)?, f32::decode(buf)?);
+        let angvel = Vec3::decode(buf)?;
         let heading = f32::decode(buf)?;
         let pitch = f32::decode(buf)?;
         let roll = f32::decode(buf)?;
-        let accel = (f32::decode(buf)?, f32::decode(buf)?, f32::decode(buf)?);
-        let vel = (f32::decode(buf)?, f32::decode(buf)?, f32::decode(buf)?);
-        let pos = Point::decode(buf)?;
+        let accel = Vec3::decode(buf)?;
+        let vel = Vec3::decode(buf)?;
+        let pos = IVec3::decode(buf)?;
         let id = if buf.has_remaining() {
             Some(OutsimId::decode(buf)?)
         } else {

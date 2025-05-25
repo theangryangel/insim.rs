@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use insim_core::point::Point;
+use glam::IVec3;
 
 use super::{CameraView, StaFlags};
 use crate::identifiers::{PlayerId, RequestId};
@@ -15,7 +15,7 @@ pub struct Cpp {
     pub reqi: RequestId,
 
     /// Position vector
-    pub pos: Point<i32>,
+    pub pos: IVec3,
 
     /// heading - 0 points along Y axis
     pub h: u16,

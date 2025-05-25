@@ -1,12 +1,13 @@
 use bitflags::bitflags;
-use insim_core::{dash_lights::DashLights, point::Point, Decode, Encode};
+use glam::{IVec3, Vec3};
+use insim_core::{dash_lights::DashLights, Decode, Encode};
 
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct OsMain {
-    pub angvel: (f32, f32, f32),
+    pub angvel: Vec3,
 
     pub heading: f32,
 
@@ -14,22 +15,22 @@ pub struct OsMain {
 
     pub roll: f32,
 
-    pub accel: Point<f32>,
+    pub accel: Vec3,
 
-    pub vel: Point<f32>,
+    pub vel: Vec3,
 
-    pub pos: Point<i32>,
+    pub pos: IVec3,
 }
 
 impl Decode for OsMain {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let angvel = (f32::decode(buf)?, f32::decode(buf)?, f32::decode(buf)?);
+        let angvel = Vec3::decode(buf)?;
         let heading = f32::decode(buf)?;
         let pitch = f32::decode(buf)?;
         let roll = f32::decode(buf)?;
-        let accel = Point::<f32>::decode(buf)?;
-        let vel = Point::<f32>::decode(buf)?;
-        let pos = Point::<i32>::decode(buf)?;
+        let accel = Vec3::decode(buf)?;
+        let vel = Vec3::decode(buf)?;
+        let pos = IVec3::decode(buf)?;
         Ok(Self {
             angvel,
             heading,
@@ -44,9 +45,7 @@ impl Decode for OsMain {
 
 impl Encode for OsMain {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.angvel.0.encode(buf)?;
-        self.angvel.1.encode(buf)?;
-        self.angvel.2.encode(buf)?;
+        self.angvel.encode(buf)?;
         self.heading.encode(buf)?;
         self.pitch.encode(buf)?;
         self.roll.encode(buf)?;
