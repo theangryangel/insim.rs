@@ -1,3 +1,3 @@
 # simple-outsim
 
-Demo using the outsim library
+Demo using the outsim library.
