@@ -2,7 +2,6 @@ use std::path;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use insim_pth::Pth;
 
 mod complex;
 mod simple;

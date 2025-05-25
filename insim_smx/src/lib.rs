@@ -17,7 +17,8 @@ use std::{
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use insim_core::{point::Point, Decode, DecodeString, Encode, EncodeString};
+use glam::IVec3;
+use insim_core::{Decode, DecodeString, Encode, EncodeString};
 use thiserror::Error;
 
 #[non_exhaustive]
@@ -67,7 +68,7 @@ pub struct Argb {
 /// An Object at a given point with a colour
 pub struct ObjectPoint {
     /// Position/point
-    pub xyz: Point<i32>,
+    pub xyz: IVec3,
     /// Colour
     pub colour: Argb,
 }
@@ -88,7 +89,7 @@ pub struct Triangle {
 /// Object Block
 pub struct Object {
     /// Center point of object
-    pub center: Point<i32>,
+    pub center: IVec3,
     /// Radius of object
     pub radius: i32,
 
@@ -101,7 +102,7 @@ pub struct Object {
 
 impl Decode for Object {
     fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
-        let center = Point::<i32>::decode(buf)?;
+        let center = IVec3::decode(buf)?;
         let radius = i32::decode(buf)?;
         let mut num_object_points = i32::decode(buf)?;
         let mut num_triangles = i32::decode(buf)?;

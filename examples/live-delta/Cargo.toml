@@ -8,6 +8,7 @@ publish = false
 
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
+glam = { workspace = true }
 if_chain = { workspace = true }
 insim = { path = "../../insim", default-features = false, features = ["blocking"] }
 tracing = { workspace = true }

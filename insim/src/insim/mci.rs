@@ -1,9 +1,9 @@
 use bitflags::bitflags;
 use bytes::{Buf, BufMut};
+use glam::IVec3;
 use insim_core::{
     angvel::AngVel,
     direction::{Direction, DirectionKind},
-    point::Point,
     speed::{Speed, SpeedKind},
     Decode, Encode,
 };
@@ -104,7 +104,7 @@ pub struct CompCar {
     pub info: CompCarInfo,
 
     /// Positional information for the player, in game units.
-    pub xyz: Point<i32>,
+    pub xyz: IVec3,
 
     /// Speed
     pub speed: Speed<SpeedCompCar>,
@@ -139,7 +139,7 @@ impl Decode for CompCar {
         let position = u8::decode(buf)?;
         let info = CompCarInfo::decode(buf)?;
         buf.advance(1);
-        let xyz = Point::<i32>::decode(buf)?;
+        let xyz = IVec3::decode(buf)?;
         let speed = Speed::decode(buf)?;
         let direction = Direction::decode(buf)?;
         let heading = Direction::decode(buf)?;

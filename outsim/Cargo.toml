@@ -24,10 +24,12 @@ default = []
 serde = [
   "dep:serde",
   "insim_core/serde",
+  "glam/serde",
 ]
 
 [dependencies]
-bytes = { workspace = true }
 bitflags = { workspace = true }
+bytes = { workspace = true }
+glam = { workspace = true }
 insim_core = { path = "../insim_core", version = "3.0.0-unreleased" }
 serde = { workspace = true, features = ["derive"], optional = true }

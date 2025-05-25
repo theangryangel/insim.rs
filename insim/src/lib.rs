@@ -9,7 +9,6 @@ use std::net::SocketAddr;
 mod macros;
 
 #[cfg(any(feature = "blocking", feature = "tokio"))]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "blocking", feature = "tokio"))))]
 pub mod builder;
 #[doc(hidden)]
 pub mod error;
@@ -53,7 +52,6 @@ pub use result::Result;
 /// }
 /// ```
 #[cfg(any(feature = "blocking", feature = "tokio"))]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "blocking", feature = "tokio"))))]
 pub fn tcp<R: Into<SocketAddr>>(remote_addr: R) -> builder::Builder {
     builder::Builder::default().tcp(remote_addr)
 }
@@ -74,7 +72,6 @@ pub fn tcp<R: Into<SocketAddr>>(remote_addr: R) -> builder::Builder {
 /// }
 /// ```
 #[cfg(any(feature = "blocking", feature = "tokio"))]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "blocking", feature = "tokio"))))]
 pub fn udp<L: Into<Option<SocketAddr>>, R: Into<SocketAddr>>(
     remote_addr: R,
     local_addr: L,

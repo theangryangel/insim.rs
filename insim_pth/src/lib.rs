@@ -25,7 +25,8 @@ use std::{
 };
 
 use bytes::Bytes;
-use insim_core::{point::Point, Decode, Encode};
+use glam::{IVec3, Vec3};
+use insim_core::{Decode, Encode};
 use thiserror::Error;
 
 #[non_exhaustive]
@@ -65,10 +66,10 @@ pub struct Limit {
 #[derive(Debug, Copy, Clone, Default, PartialEq, insim_core::Decode, insim_core::Encode)]
 pub struct Node {
     /// Center point of this node
-    pub center: Point<i32>,
+    pub center: IVec3,
 
     /// Expected direction of travel
-    pub direction: Point<f32>,
+    pub direction: Vec3,
 
     /// Track outer limit, relative to the center point and direction of travel
     pub outer_limit: Limit,
@@ -79,10 +80,10 @@ pub struct Node {
 
 impl Node {
     /// Get the center point of this node, optionally scaled
-    pub fn get_center(&self, scale: Option<f32>) -> Point<f32> {
+    pub fn get_center(&self, scale: Option<f32>) -> Vec3 {
         let scale = scale.unwrap_or(1.0);
 
-        Point {
+        Vec3 {
             x: self.center.x as f32 / scale,
             y: self.center.y as f32 / scale,
             z: self.center.z as f32 / scale,
@@ -90,20 +91,16 @@ impl Node {
     }
 
     /// Calculate the absolute position of the left and right road limits
-    pub fn get_road_limit(&self, scale: Option<f32>) -> (Point<f32>, Point<f32>) {
+    pub fn get_road_limit(&self, scale: Option<f32>) -> (Vec3, Vec3) {
         self.calculate_limit_position(&self.road_limit, scale)
     }
 
     /// Calculate the absolute position of the left and right track limits
-    pub fn get_outer_limit(&self, scale: Option<f32>) -> (Point<f32>, Point<f32>) {
+    pub fn get_outer_limit(&self, scale: Option<f32>) -> (Vec3, Vec3) {
         self.calculate_limit_position(&self.outer_limit, scale)
     }
 
-    fn calculate_limit_position(
-        &self,
-        limit: &Limit,
-        scale: Option<f32>,
-    ) -> (Point<f32>, Point<f32>) {
+    fn calculate_limit_position(&self, limit: &Limit, scale: Option<f32>) -> (Vec3, Vec3) {
         let left_cos = f32::cos(90.0 * std::f32::consts::PI / 180.0);
         let left_sin = f32::sin(90.0 * std::f32::consts::PI / 180.0);
         let right_cos = f32::cos(-90.0 * std::f32::consts::PI / 180.0);
@@ -111,7 +108,7 @@ impl Node {
 
         let center = self.get_center(scale);
 
-        let left: Point<f32> = Point {
+        let left = Vec3 {
             x: ((self.direction.x * left_cos) - (self.direction.y * left_sin)) * limit.left
                 + (center.x),
             y: ((self.direction.y * left_cos) + (self.direction.x * left_sin)) * limit.left
@@ -119,7 +116,7 @@ impl Node {
             z: (center.z),
         };
 
-        let right: Point<f32> = Point {
+        let right = Vec3 {
             x: ((self.direction.x * right_cos) - (self.direction.y * right_sin)) * -limit.right
                 + (center.x),
             y: ((self.direction.y * right_cos) + (self.direction.x * right_sin)) * -limit.right
