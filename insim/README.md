@@ -10,11 +10,11 @@ In a handful of circumstances we have needed to rename, or separate some fields 
 
 Here is a non-exhaustive list of the things that `insim` supports:
 
-- insim over TCP or UDP
-- insim over TCP and Websocket via LFS World Relay
-- Optional Blocking or Tokio based async, or IO (aka 'sans-io') of your own choice
-- PTH file parsing
-- SMX file parsing
+- insim over TCP or UDP (for both blocking and tokio). Mixing and matching TCP and UDP
+  for positional updates is possible, but requires you to drop to the "sans-io"
+  approach.
+- insim via LFS World Relay over TCP and Websocket (for both blocking and tokio).
+- Or sans-io/bring-your-own-IO of your own choice through the [crate::net::Codec].
 
 # Usage
 
