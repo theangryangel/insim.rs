@@ -1,5 +1,9 @@
 //! Tools to build a connection to LFS using Insim
-use std::{fmt::Debug, net::SocketAddr, time::Duration};
+use std::{
+    fmt::Debug,
+    net::{SocketAddr, ToSocketAddrs},
+    time::Duration,
+};
 
 #[cfg(feature = "blocking")]
 #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
@@ -8,14 +12,14 @@ use crate::net::blocking_impl::Framed as BlockingFramed;
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 use crate::net::tokio_impl::Framed as AsyncFramed;
 use crate::{
+    address::Addr,
     identifiers::RequestId,
     insim::{Isi, IsiFlags},
-    net::{Codec, Mode, DEFAULT_TIMEOUT_SECS},
+    net::{Codec, Mode},
     result::Result,
 };
 
-#[cfg(feature = "blocking")]
-fn tcpstream_connect_to_any<A: std::net::ToSocketAddrs>(
+fn tcpstream_connect_to_any<A: ToSocketAddrs>(
     addrs: A,
     timeout: Duration,
 ) -> std::io::Result<std::net::TcpStream> {
@@ -46,7 +50,7 @@ pub struct Builder {
 
     connect_timeout: Duration,
 
-    remote: SocketAddr,
+    remote: Addr,
     mode: Mode,
 
     isi_admin_password: Option<String>,
@@ -78,7 +82,7 @@ impl Default for Builder {
             connect_timeout: Duration::from_secs(10),
 
             proto: Proto::Tcp,
-            remote: "127.0.0.1:29999".parse().unwrap(),
+            remote: ("127.0.0.1", 29999_u16).into(),
             mode: Mode::Compressed,
 
             tcp_nodelay: true,
@@ -108,14 +112,14 @@ impl Builder {
     }
 
     /// Use a TCP connection
-    pub fn tcp<R: Into<SocketAddr>>(mut self, remote_addr: R) -> Self {
+    pub fn tcp<R: Into<Addr>>(mut self, remote_addr: R) -> Self {
         self.proto = Proto::Tcp;
         self.remote = remote_addr.into();
         self
     }
 
     /// Use a UDP connection
-    pub fn udp<L: Into<Option<SocketAddr>>, R: Into<SocketAddr>>(
+    pub fn udp<L: Into<Option<SocketAddr>>, R: Into<Addr>>(
         mut self,
         remote_addr: R,
         local_addr: L,
@@ -324,12 +328,11 @@ impl Builder {
     pub fn connect_blocking(&self) -> Result<BlockingFramed> {
         use tungstenite::stream::NoDelay;
 
-        use crate::net::blocking_impl::UdpStream;
+        use crate::net::{blocking_impl::UdpStream, DEFAULT_TIMEOUT_SECS};
 
         match self.proto {
             Proto::Tcp => {
-                let stream =
-                    std::net::TcpStream::connect_timeout(&self.remote, self.connect_timeout)?;
+                let stream = tcpstream_connect_to_any(&self.remote, self.connect_timeout)?;
                 stream.set_nodelay(self.tcp_nodelay)?;
                 stream.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
                 stream.set_write_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
@@ -344,7 +347,7 @@ impl Builder {
                 let local = self.udp_local_address.unwrap_or("0.0.0.0:0".parse()?);
 
                 let stream = std::net::UdpSocket::bind(local)?;
-                stream.connect(self.remote)?;
+                stream.connect(&self.remote)?;
                 stream.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
                 stream.set_write_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
 
@@ -370,7 +373,7 @@ impl Builder {
                         tungstenite::client::connect_with_config(request, None, 2).unwrap();
                     match stream.get_mut() {
                         tungstenite::stream::MaybeTlsStream::Plain(t) => {
-                            t.set_nodelay(self.tcp_nodelay)?;
+                            t.set_nodelay(true)?;
                             t.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
                             t.set_write_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
                         },
@@ -385,7 +388,7 @@ impl Builder {
                 } else {
                     let stream =
                         tcpstream_connect_to_any(crate::LFSW_RELAY_ADDR, self.connect_timeout)?;
-                    stream.set_nodelay(self.tcp_nodelay)?;
+                    stream.set_nodelay(true)?;
                     stream.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
                     stream.set_write_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
                     BlockingFramed::new(Box::new(stream), Codec::new(Mode::Uncompressed))
@@ -421,18 +424,17 @@ impl Builder {
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     pub async fn connect_async(&self) -> Result<AsyncFramed> {
-        use tokio::time::timeout;
-
-        use crate::net::tokio_impl::{udp::UdpStream, websocket::WebsocketStream};
+        use crate::{
+            net::tokio_impl::{udp::UdpStream, websocket::WebsocketStream},
+            LFSW_RELAY_ADDR,
+        };
 
         match self.proto {
             Proto::Tcp => {
-                let stream = timeout(
-                    self.connect_timeout,
-                    tokio::net::TcpStream::connect(self.remote),
-                )
-                .await??;
+                let stream = tcpstream_connect_to_any(&self.remote, self.connect_timeout)?;
                 stream.set_nodelay(self.tcp_nodelay)?;
+                stream.set_nonblocking(true)?;
+                let stream = tokio::net::TcpStream::from_std(stream)?;
 
                 let mut stream = AsyncFramed::new(Box::new(stream), Codec::new(self.mode.clone()));
                 stream.write(self.isi()).await?;
@@ -442,8 +444,11 @@ impl Builder {
             Proto::Udp => {
                 let local = self.udp_local_address.unwrap_or("0.0.0.0:0".parse()?);
 
-                let stream = tokio::net::UdpSocket::bind(local).await?;
-                stream.connect(self.remote).await.unwrap();
+                let stream = std::net::UdpSocket::bind(local)?;
+                stream.connect(&self.remote)?;
+                stream.set_nonblocking(true)?;
+
+                let stream = tokio::net::UdpSocket::from_std(stream)?;
 
                 let mut isi = self.isi();
                 if self.udp_local_address.is_none() {
@@ -474,8 +479,10 @@ impl Builder {
                         Codec::new(Mode::Uncompressed),
                     )
                 } else {
-                    let stream = tokio::net::TcpStream::connect(crate::LFSW_RELAY_ADDR).await?;
+                    let stream = tcpstream_connect_to_any(LFSW_RELAY_ADDR, self.connect_timeout)?;
+                    stream.set_nonblocking(true)?;
                     stream.set_nodelay(self.tcp_nodelay)?;
+                    let stream = tokio::net::TcpStream::from_std(stream)?;
                     AsyncFramed::new(Box::new(stream), Codec::new(Mode::Uncompressed))
                 };
 

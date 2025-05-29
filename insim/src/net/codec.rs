@@ -19,6 +19,9 @@ use crate::{
 /// This is not responsible for managing the initial handshake, nor will it automatically send any
 /// keepalives. But it will indicate if a keepalive should be sent and when an IO timeout should
 /// occur.
+/// With your own IO it is your responsibility to ensure that your read and write timeouts under
+/// blocking implementations are appropriately set. We recommend
+/// [crate::net::DEFAULT_TIMEOUT_SECS].
 #[derive(Debug)]
 pub struct Codec {
     mode: Mode,
