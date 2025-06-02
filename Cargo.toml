@@ -9,12 +9,12 @@ members = [
   "outsim",
   "examples/*",
 ]
+exclude = ['examples/*']
 # Only check / build main crates by default (check all with `--workspace`)
 default-members = ["insim", "insim_*", "outgauge", "outsim"]
 resolver = "2"
 
 [workspace.package]
-version = "3.0.0-unreleased"
 authors = ["Karl Southern <karl@theangryangel.co.uk>"]
 edition = "2021"
 rust-version = "1.75"

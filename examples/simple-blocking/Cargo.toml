@@ -1,6 +1,6 @@
 [package]
 name = "simple-blocking"
-version.workspace = true
+version = "0.1.0-unreleased"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

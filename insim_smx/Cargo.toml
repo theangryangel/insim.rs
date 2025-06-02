@@ -1,6 +1,6 @@
 [package]
 name = "insim_smx"
-version.workspace = true
+version = "3.0.0-unreleased"
 edition.workspace = true
 description = "Insim SMX file implementation"
 rust-version.workspace = true
