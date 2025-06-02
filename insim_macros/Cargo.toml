@@ -1,5 +1,8 @@
 [package]
 name = "insim_macros"
+description = """
+Proc macros for insim_core
+"""
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
