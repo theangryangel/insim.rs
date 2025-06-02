@@ -3,7 +3,7 @@ name = "insim_macros"
 description = """
 Proc macros for insim_core
 """
-version = "0.1.0-unreleased"
+version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
