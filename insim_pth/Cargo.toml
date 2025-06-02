@@ -1,6 +1,6 @@
 [package]
 name = "insim_pth"
-version.workspace = true
+version = "3.0.0-unreleased"
 edition.workspace = true
 description = "Insim PTH file implementation"
 rust-version.workspace = true
