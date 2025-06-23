@@ -76,7 +76,9 @@ impl From<tungstenite::Error> for Error {
         match value {
             tungstenite::Error::ConnectionClosed => Error::Disconnected,
             tungstenite::Error::AlreadyClosed => Error::Disconnected,
-            tungstenite::Error::Utf8 => Error::WebsocketIO("UTF-8 encoding error".into()),
+            tungstenite::Error::Utf8(e) => {
+                Error::WebsocketIO(format!("UTF-8 encoding error: {}", e))
+            },
             _ => Error::WebsocketIO(value.to_string()),
         }
     }
