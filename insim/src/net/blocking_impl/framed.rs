@@ -34,7 +34,7 @@ impl Framed {
 
             if let Some(keepalive) = self.codec.keepalive() {
                 tracing::debug!("Ping? Pong!");
-                self.write(keepalive)?;
+                let _ = self.write(keepalive)?;
             }
 
             if let Some(packet) = packet {
@@ -66,13 +66,14 @@ impl Framed {
     }
 
     /// Write a packet to the inner network.
-    pub fn write<P: Into<Packet>>(&mut self, packet: P) -> Result<()> {
+    pub fn write<P: Into<Packet>>(&mut self, packet: P) -> Result<usize> {
         let buf = self.codec.encode(&packet.into())?;
         if !buf.is_empty() {
-            let _ = self.inner.write(&buf)?;
+            let size = self.inner.write(&buf)?;
             self.inner.flush()?;
+            return Ok(size);
         }
 
-        Ok(())
+        Ok(0)
     }
 }

@@ -5,6 +5,7 @@ use crate::identifiers::RequestId;
     Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, insim_core::Decode, insim_core::Encode,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum SoundType {
@@ -27,6 +28,7 @@ pub enum SoundType {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Send a message to the local computer only. If you are connected to a server this means the
 /// console. If you are connected to a client this means to the local client only.
 pub struct Msl {

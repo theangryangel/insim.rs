@@ -2,6 +2,7 @@ use crate::{identifiers::RequestId, Packet, WithRequestId};
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 #[repr(u8)]
 #[non_exhaustive]
 /// [Tiny] Subtype
@@ -118,6 +119,7 @@ impl WithRequestId for TinyType {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// General purpose Tiny packet
 pub struct Tiny {
     /// Non-zero if the packet is a packet request or a reply to a request

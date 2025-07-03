@@ -764,3 +764,112 @@ impl Encode for Packet {
         Ok(())
     }
 }
+
+#[cfg(feature = "python")]
+impl<'py> pyo3::IntoPyObject<'py> for Packet {
+    type Target = pyo3::types::PyAny;
+
+    type Output = pyo3::Bound<'py, Self::Target>;
+    type Error = pyo3::PyErr;
+
+    fn into_pyobject(self, py: pyo3::Python<'py>) -> Result<Self::Output, Self::Error> {
+        use pyo3::IntoPyObjectExt;
+        let inner = match self {
+            Self::Isi(i) => i.into_py_any(py)?,
+            Self::Ver(i) => i.into_py_any(py)?,
+            Self::Tiny(i) => i.into_py_any(py)?,
+            // Self::Small(i) => {
+            //     i.into_py_any(py)?
+            // },
+            Self::Sta(i) => i.into_py_any(py)?,
+            Self::Sch(i) => i.into_py_any(py)?,
+            Self::Sfp(i) => i.into_py_any(py)?,
+            Self::Scc(i) => i.into_py_any(py)?,
+            Self::Cpp(i) => i.into_py_any(py)?,
+            Self::Ism(i) => i.into_py_any(py)?,
+            Self::Mso(i) => i.into_py_any(py)?,
+            Self::Iii(i) => i.into_py_any(py)?,
+            Self::Mst(i) => i.into_py_any(py)?,
+            Self::Mtc(i) => i.into_py_any(py)?,
+            Self::Mod(i) => i.into_py_any(py)?,
+            Self::Vtn(i) => i.into_py_any(py)?,
+            Self::Rst(i) => i.into_py_any(py)?,
+            Self::Ncn(i) => i.into_py_any(py)?,
+            Self::Cnl(i) => i.into_py_any(py)?,
+            Self::Cpr(i) => i.into_py_any(py)?,
+            Self::Npl(i) => i.into_py_any(py)?,
+            Self::Plp(i) => i.into_py_any(py)?,
+            Self::Pll(i) => i.into_py_any(py)?,
+            Self::Lap(i) => i.into_py_any(py)?,
+            Self::Spx(i) => i.into_py_any(py)?,
+            Self::Pit(i) => i.into_py_any(py)?,
+            Self::Psf(i) => i.into_py_any(py)?,
+            Self::Pla(i) => i.into_py_any(py)?,
+            Self::Cch(i) => i.into_py_any(py)?,
+            Self::Pen(i) => i.into_py_any(py)?,
+            Self::Toc(i) => i.into_py_any(py)?,
+            Self::Flg(i) => i.into_py_any(py)?,
+            Self::Pfl(i) => i.into_py_any(py)?,
+            Self::Fin(i) => i.into_py_any(py)?,
+            Self::Res(i) => i.into_py_any(py)?,
+            Self::Reo(i) => i.into_py_any(py)?,
+            Self::Nlp(i) => i.into_py_any(py)?,
+            Self::Mci(i) => i.into_py_any(py)?,
+            Self::Msx(i) => i.into_py_any(py)?,
+            Self::Msl(i) => i.into_py_any(py)?,
+            Self::Crs(i) => i.into_py_any(py)?,
+            Self::Bfn(i) => i.into_py_any(py)?,
+            Self::Axi(i) => i.into_py_any(py)?,
+            Self::Axo(i) => i.into_py_any(py)?,
+            Self::Btn(i) => i.into_py_any(py)?,
+            // Self::Btc(i) => {
+            //     i.into_py_any(py)?
+            // },
+            // Self::Btt(i) => {
+            //     i.into_py_any(py)?
+            // },
+            Self::Rip(i) => i.into_py_any(py)?,
+            Self::Ssh(i) => i.into_py_any(py)?,
+            // Self::Con(i) => {
+            //     i.into_py_any(py)?
+            // },
+            Self::Obh(i) => i.into_py_any(py)?,
+            Self::Hlv(i) => i.into_py_any(py)?,
+            Self::Plc(i) => i.into_py_any(py)?,
+            Self::Axm(i) => i.into_py_any(py)?,
+            Self::Acr(i) => i.into_py_any(py)?,
+            Self::Hcp(i) => i.into_py_any(py)?,
+            Self::Nci(i) => i.into_py_any(py)?,
+            // Self::Jrr(i) => {
+            //     i.into_py_any(py)?
+            // },
+            // Self::Uco(i) => {
+            //     i.into_py_any(py)?
+            // },
+            Self::Oco(i) => i.into_py_any(py)?,
+            // Self::Ttc(i) => {
+            //     i.into_py_any(py)?
+            // },
+            Self::Slc(i) => i.into_py_any(py)?,
+            Self::Csc(i) => i.into_py_any(py)?,
+            // Self::Cim(i) => {
+            //     i.into_py_any(py)?
+            // },
+            Self::Mal(i) => i.into_py_any(py)?,
+            Self::Plh(i) => i.into_py_any(py)?,
+            Self::Ipb(i) => i.into_py_any(py)?,
+            // Self::Aic(i) => {
+            //     i.into_py_any(py)?
+            // },
+            Self::Aii(i) => i.into_py_any(py)?,
+
+            i => {
+                return Err(pyo3::PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    format!("Unsupported packet: {i:?}"),
+                ));
+            },
+        };
+
+        Ok(inner.into_bound(py))
+    }
+}

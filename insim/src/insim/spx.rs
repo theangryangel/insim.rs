@@ -5,6 +5,7 @@ use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Split X timing
 pub struct Spx {
     /// Non-zero if the packet is a packet request or a reply to a request

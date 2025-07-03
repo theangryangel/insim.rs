@@ -4,6 +4,7 @@ bitflags::bitflags! {
     /// Additional facts about this connection. Used within [Ncn].
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
     pub struct NcnFlags: u8 {
         /// User is remote
         const REMOTE = (1 << 2);
@@ -19,6 +20,7 @@ impl_bitflags_from_to_bytes!(NcnFlags, u8);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// New Connection
 pub struct Ncn {
     /// Non-zero if the packet is a packet request or a reply to a request

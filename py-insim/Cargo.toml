@@ -1,0 +1,12 @@
+[package]
+name = "py-insim"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { workspace = true, features = ["extension-module"] }
+insim = { path = "../insim", features = ["python", "blocking"] }

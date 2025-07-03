@@ -9,6 +9,7 @@ bitflags! {
     /// Work which was carried out at a pitstop. Used in [Pit].
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
     pub struct PitStopWorkFlags: u32 {
         /// Nothing asd
         const NOTHING = 0;
@@ -53,6 +54,7 @@ impl_bitflags_from_to_bytes!(PitStopWorkFlags, u32);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Pit stop (stop at the garage, not "tele-pit")
 pub struct Pit {
     /// Non-zero if the packet is a packet request or a reply to a request
@@ -87,6 +89,7 @@ pub struct Pit {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Pit Stop Finished
 pub struct Psf {
     /// Non-zero if the packet is a packet request or a reply to a request
@@ -102,6 +105,7 @@ pub struct Psf {
 
 #[derive(Debug, Default, PartialEq, Eq, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 #[repr(u8)]
 #[non_exhaustive]
 /// Pit lane fact, or info. Used in [Pla].
@@ -125,6 +129,7 @@ pub enum PitLaneFact {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// PitLane
 pub struct Pla {
     /// Non-zero if the packet is a packet request or a reply to a request

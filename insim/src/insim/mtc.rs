@@ -3,6 +3,7 @@ use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Message to Connection - Send a message to a specific connection, restricted to hosts only
 pub struct Mtc {
     /// Non-zero if the packet is a packet request or a reply to a request

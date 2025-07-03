@@ -14,6 +14,7 @@ pub(crate) fn spclose_strip_high_bits(val: u16) -> u16 {
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
     /// Additional information for the object hit, used within the [Obh] packet.
     pub struct ObhFlags: u8 {
         /// An added object was hit
@@ -40,6 +41,7 @@ impl_bitflags_from_to_bytes!(ObhFlags, u8);
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Vehicle made contact with something else
 pub struct CarContact {
     /// Car's motion if Speed > 0: 0 = world y direction, 128 = 180 deg
@@ -94,6 +96,7 @@ impl Encode for CarContact {
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Object Hit
 pub struct Obh {
     /// Non-zero if the packet is a packet request or a reply to a request

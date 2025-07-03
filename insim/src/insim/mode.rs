@@ -2,6 +2,7 @@ use crate::identifiers::RequestId;
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Screen Mode (referred to as originally IS_MOD within Insim.txt)
 pub struct Mod {
     #[insim(pad_after = 1)]

@@ -7,6 +7,7 @@ use crate::identifiers::RequestId;
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
     /// Facts about a server, or race
     pub struct RaceFlags: u16 {
         /// Can vote
@@ -86,6 +87,7 @@ impl Encode for LapTimingInfo {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Race Start - informational - sent when a race starts
 pub struct Rst {
     /// Non-zero if the packet is a packet request or a reply to a request

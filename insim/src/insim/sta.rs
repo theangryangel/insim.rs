@@ -6,6 +6,7 @@ use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 #[repr(u8)]
 #[non_exhaustive]
 /// Game racing state
@@ -24,6 +25,7 @@ pub enum RaceInProgress {
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
     /// Describes the game state
     pub struct StaFlags: u16 {
         /// In Game (or Multiplayer Replay)
@@ -94,6 +96,7 @@ impl_bitflags_from_to_bytes!(StaFlags, u16);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// State
 pub struct Sta {
     #[insim(pad_after = 1)]

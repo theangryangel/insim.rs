@@ -2,6 +2,7 @@ use crate::identifiers::RequestId;
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Insim Multiplayer - LFS sends this when a host is started or joined
 pub struct Ism {
     /// Non-zero if the packet is a packet request or a reply to a request

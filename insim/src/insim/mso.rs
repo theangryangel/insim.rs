@@ -8,6 +8,7 @@ use crate::identifiers::{ConnectionId, PlayerId, RequestId};
     Debug, Default, Clone, Eq, PartialEq, PartialOrd, Ord, insim_core::Decode, insim_core::Encode,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum MsoUserType {
@@ -30,6 +31,7 @@ const MSO_MSG_ALIGN: usize = 4;
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// System messages and user messages, variable sized.
 pub struct Mso {
     /// Non-zero if the packet is a packet request or a reply to a request

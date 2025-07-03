@@ -4,6 +4,7 @@ use crate::identifiers::RequestId;
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 #[repr(u8)]
 #[non_exhaustive]
 /// Replay Information Error
@@ -50,6 +51,7 @@ bitflags::bitflags! {
     /// Bitwise flags used within the [Rip] packet
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
     pub struct RipOptions: u8 {
         /// Replay will loop
         const LOOP = (1 << 0);
@@ -74,6 +76,7 @@ impl_bitflags_from_to_bytes!(RipOptions, u8);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Replay Information
 pub struct Rip {
     /// Non-zero if the packet is a packet request or a reply to a request

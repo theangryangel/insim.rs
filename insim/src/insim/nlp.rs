@@ -4,6 +4,7 @@ use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Information about a specific vehicle/player. Used within [Nlp].
 pub struct NodeLapInfo {
     /// Current path node
@@ -21,6 +22,7 @@ pub struct NodeLapInfo {
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Node and Lap packet - similar to Mci without positional information
 pub struct Nlp {
     /// Non-zero if the packet is a packet request or a reply to a request
