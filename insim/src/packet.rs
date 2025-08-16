@@ -4,7 +4,7 @@ use std::fmt::Debug;
 
 use insim_core::{Decode, Encode};
 
-use crate::{insim::*, relay::*};
+use crate::insim::*;
 
 #[derive(Debug, Clone, from_variants::FromVariants)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -220,24 +220,6 @@ pub enum Packet {
 
     /// Information - AI information
     Aii(Aii),
-
-    /// Instruction - Ask the LFS World relay if we are an admin
-    RelayArq(Arq),
-
-    /// Information - LFS World relay response if we are an admin
-    RelayArp(Arp),
-
-    /// Instruction - Ask the LFS World relay for a list of hosts
-    RelayHlr(Hlr),
-
-    /// Information - LFS World relay response to a HostListRequest
-    RelayHos(Hos),
-
-    /// Instruction - Ask the LFS World relay to select a host and start relaying Insim packets
-    RelaySel(Sel),
-
-    /// Information - LFS World relay error (recoverable)
-    RelayErr(Error),
 }
 
 impl Default for Packet {
@@ -252,7 +234,6 @@ impl Packet {
     /// It must not be trusted. An incorrect implementation of size_hint() should not lead to memory safety violations.
     pub fn size_hint(&self) -> usize {
         // TODO: For some of these packets we can be more intelligent.
-        // i.e. see RelayHostList
         match self {
             Packet::Isi(_) => 44,
             Packet::Ver(_) => 20,
@@ -318,8 +299,6 @@ impl Packet {
             Packet::Mal(_) => 12,
             Packet::Aic(i) => 4 + (i.inputs.len() * 4),
             Packet::Aii(_) => 96,
-            Packet::RelayHos(i) => 4 + (i.hinfo.len() * 40),
-            Packet::RelaySel(_) => 68,
             _ => {
                 // a sensible default for everything else
                 4
@@ -416,12 +395,6 @@ impl WithRequestId for Packet {
             Packet::Ipb(i) => i.reqi = reqi.into(),
             Packet::Aic(i) => i.reqi = reqi.into(),
             Packet::Aii(i) => i.reqi = reqi.into(),
-            Packet::RelayArq(i) => i.reqi = reqi.into(),
-            Packet::RelayArp(i) => i.reqi = reqi.into(),
-            Packet::RelayHlr(i) => i.reqi = reqi.into(),
-            Packet::RelayHos(i) => i.reqi = reqi.into(),
-            Packet::RelaySel(i) => i.reqi = reqi.into(),
-            Packet::RelayErr(i) => i.reqi = reqi.into(),
         };
         self
     }
@@ -500,12 +473,6 @@ impl Decode for Packet {
             67 => Self::Ipb(Ipb::decode(buf)?),
             68 => Self::Aic(Aic::decode(buf)?),
             69 => Self::Aii(Aii::decode(buf)?),
-            250 => Self::RelayArq(Arq::decode(buf)?),
-            251 => Self::RelayArp(Arp::decode(buf)?),
-            252 => Self::RelayHlr(Hlr::decode(buf)?),
-            253 => Self::RelayHos(Hos::decode(buf)?),
-            254 => Self::RelaySel(Sel::decode(buf)?),
-            255 => Self::RelayErr(Error::decode(buf)?),
             i => return Err(insim_core::DecodeError::NoVariantMatch { found: i.into() }),
         };
 
@@ -790,30 +757,6 @@ impl Encode for Packet {
             },
             Self::Aii(i) => {
                 69_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::RelayArq(i) => {
-                250_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::RelayArp(i) => {
-                251_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::RelayHlr(i) => {
-                252_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::RelayHos(i) => {
-                253_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::RelaySel(i) => {
-                254_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::RelayErr(i) => {
-                255_u8.encode(buf)?;
                 i.encode(buf)?;
             },
         };

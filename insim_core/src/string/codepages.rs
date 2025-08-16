@@ -75,7 +75,7 @@ impl Codepage for u8 {
 /// Convert from a String, with potential lossy conversion to an Insim Codepage String
 /// Assumes you will escape any characters ahead of time, it will do not this for you.
 /// See <https://github.com/theangryangel/insim.rs/issues/92> for further details.
-pub fn to_lossy_bytes(input: &str) -> Cow<[u8]> {
+pub fn to_lossy_bytes(input: &'_ str) -> Cow<'_, [u8]> {
     if input.is_ascii() {
         // all codepages share ascii values
         // therefore if it's all ascii, we can just dump it.
@@ -152,7 +152,7 @@ pub fn to_lossy_bytes(input: &str) -> Cow<[u8]> {
 
 /// Convert a InsimString into a native rust String, with potential lossy conversion from codepages
 /// Assumes any \0 characters have been stripped ahead of time
-pub fn to_lossy_string(input: &[u8]) -> Cow<str> {
+pub fn to_lossy_string(input: &'_ [u8]) -> Cow<'_, str> {
     // empty string
     if input.is_empty() {
         return "".into();

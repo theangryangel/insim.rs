@@ -1,18 +1,8 @@
 //! High level example
 //! This example showcases the shortcut methods
-use std::{io::Write, net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, time::Duration};
 
 use clap::{Parser, Subcommand};
-use if_chain::if_chain;
-use insim::{relay::Hlr, Packet, Result};
-use tabled::{Table, Tabled};
-
-#[derive(Tabled)]
-struct RelayHost {
-    name: String,
-    track: String,
-    numconns: u8,
-}
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -44,23 +34,6 @@ enum Commands {
         /// host:port of LFS to connect to
         addr: SocketAddr,
     },
-
-    /// Connect via LFS World Relay
-    Relay {
-        #[arg(long)]
-        /// Optional host to automatically select after successful connection to relay
-        select_host: Option<String>,
-
-        #[arg(long)]
-        /// List hosts on the relay and then quit
-        list_hosts: bool,
-
-        #[arg(long)]
-        websocket: bool,
-
-        #[arg(long)]
-        spectator_password: Option<String>,
-    },
 }
 
 fn setup_tracing_subscriber() {
@@ -78,7 +51,7 @@ fn setup_tracing_subscriber() {
 }
 
 #[tokio::main]
-pub async fn main() -> Result<()> {
+pub async fn main() -> insim::Result<()> {
     // Setup tracing_subcriber with some sane defaults
     setup_tracing_subscriber();
 
@@ -97,20 +70,6 @@ pub async fn main() -> Result<()> {
             // use udp
             insim::tcp(*addr)
         },
-        Commands::Relay {
-            select_host,
-            websocket,
-            spectator_password,
-            ..
-        } => {
-            tracing::info!("Connecting via LFS World Relay!");
-
-            // use insim relay
-            insim::relay()
-                .relay_websocket(*websocket)
-                .relay_spectator_password(spectator_password.clone())
-                .relay_select_host(select_host.clone())
-        },
     };
 
     // set our IsiFlags
@@ -126,57 +85,13 @@ pub async fn main() -> Result<()> {
     let mut connection = builder.connect_async().await?;
     tracing::info!("Connected!");
 
-    // If we're connected via the relay, and asked to list the hosts, request the host list
-    if let Commands::Relay {
-        list_hosts: true, ..
-    } = &cli.command
-    {
-        connection.write(Hlr::default()).await?;
-    }
-
     let mut i: usize = 0;
-
-    let mut hosts = vec![];
 
     loop {
         let packet = connection.read().await?;
 
         tracing::info!("Packet={:?} Index={:?}", packet, i);
 
-        // if we were connected via the relay and only asked for the list of hosts, and we have the
-        // last hostinfo, break the loop
-        if_chain! {
-            if let Commands::Relay{ list_hosts: true, .. } = &cli.command;
-            if let Packet::RelayHos(hostinfo) = &packet;
-            then {
-                for host in hostinfo.hinfo.iter() {
-                    hosts.push(RelayHost {
-                        name: host.hname.clone(),
-                        track: host.track.to_string(),
-                        numconns: host.numconns,
-                    });
-                }
-
-                if hostinfo.is_last() {
-
-                    hosts.sort_by_key(|a| {
-                        a.numconns
-                    });
-                    hosts.reverse();
-
-                    let table = Table::new(hosts);
-                    let stdout = std::io::stdout();
-                    let mut handle = stdout.lock();
-                    handle.write_all(table.to_string().as_bytes())?;
-                    drop(handle);
-                    break;
-                }
-
-            }
-        }
-
         i = i.wrapping_add(1);
     }
-
-    Ok(())
 }

@@ -54,7 +54,7 @@ impl Escape for char {
 }
 
 /// Unescape a u8 slice according to LFS' rules.
-pub fn unescape(input: &str) -> Cow<str> {
+pub fn unescape(input: &'_ str) -> Cow<'_, str> {
     // do we need to unescape?
     if !input.chars().any(|c| c.is_lfs_control_char()) {
         return input.into();
@@ -81,7 +81,7 @@ pub fn unescape(input: &str) -> Cow<str> {
 }
 
 /// Unescape a string
-pub fn escape(input: &str) -> Cow<str> {
+pub fn escape(input: &'_ str) -> Cow<'_, str> {
     if !input.chars().any(|c| c.try_lfs_escape().is_some()) {
         return input.into();
     }

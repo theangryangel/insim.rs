@@ -1,7 +1,7 @@
 [package]
 name = "insim"
 description = "LiveForSpeed Insim implementation that focuses on ergonomics and strong typing"
-version = "3.0.0"
+version = "4.0.0"
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -21,14 +21,9 @@ rustdoc-args = ["--cfg", "docrs"]
 
 [features]
 default = ["tokio", "blocking"]
-blocking = [
-  "dep:tungstenite",
-]
+blocking = []
 tokio = [
   "dep:tokio",
-  "dep:tungstenite",
-  "dep:tokio-tungstenite",
-  "dep:futures-util"
 ]
 serde = [
   "dep:serde",
@@ -42,15 +37,12 @@ serde = [
 bitflags = { workspace = true }
 bytes = { workspace = true }
 from_variants = { workspace = true }
-futures-util = { workspace = true, optional = true }
 indexmap = { workspace = true }
 insim_core = { path = "../insim_core", version = "3.0.0" }
 serde = { workspace = true, features = ["derive"], optional = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["time", "net", "macros", "sync", "tracing", "io-util"], optional = true }
-tokio-tungstenite = { workspace = true, optional = true }
 tracing = { workspace = true }
-tungstenite = { workspace = true, optional = true }
 glam = { workspace = true }
 
 [dev-dependencies]

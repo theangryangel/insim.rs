@@ -24,10 +24,6 @@ pub enum Error {
     #[error("Failed to parse address: {0}")]
     AddrParseError(#[from] std::net::AddrParseError),
 
-    /// Websocket IO error. Only applicable during a LFS World Relay connection
-    #[error("Websocket Error: {0}")]
-    WebsocketIO(String),
-
     /// Certain operations only allow for mods, this error indicates a standard vehicle was passed
     /// instead.
     #[error("Only Mods are permitted")]
@@ -66,18 +62,5 @@ pub enum Error {
 impl From<tokio::time::error::Elapsed> for Error {
     fn from(value: tokio::time::error::Elapsed) -> Self {
         Error::Timeout(value.to_string())
-    }
-}
-
-impl From<tungstenite::Error> for Error {
-    fn from(value: tungstenite::Error) -> Self {
-        // TODO a lot of this is less than ideal mapping
-        // Do some research on better ways to handle this
-        match value {
-            tungstenite::Error::ConnectionClosed => Error::Disconnected,
-            tungstenite::Error::AlreadyClosed => Error::Disconnected,
-            tungstenite::Error::Utf8 => Error::WebsocketIO("UTF-8 encoding error".into()),
-            _ => Error::WebsocketIO(value.to_string()),
-        }
     }
 }
