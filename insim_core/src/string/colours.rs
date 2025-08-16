@@ -90,7 +90,7 @@ impl Colourify for &str {
 }
 
 /// Strip LFS colours
-pub fn strip(input: &str) -> Cow<str> {
+pub fn strip(input: &'_ str) -> Cow<'_, str> {
     if !input.chars().any(|c| c.is_lfs_control_char()) {
         return input.into();
     }

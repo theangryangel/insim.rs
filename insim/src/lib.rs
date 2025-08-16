@@ -18,14 +18,11 @@ pub mod identifiers;
 pub mod insim;
 pub mod net;
 pub mod packet;
-pub mod relay;
 #[doc(hidden)]
 pub mod result;
 
 /// The Insim Protocol Version Number supported by this library
 pub const VERSION: u8 = 9;
-/// The LFS World Relay address and port
-pub const LFSW_RELAY_ADDR: &str = "isrelay.lfs.net:47474";
 
 /// Why 255 * 4? Because the size of a packet is a u8, with a max byte size of 255.
 /// In "compressed" mode the raw size is multiplied by 4.
@@ -79,26 +76,4 @@ pub fn udp<L: Into<Option<SocketAddr>>, R: Into<address::Addr>>(
     local_addr: L,
 ) -> builder::Builder {
     builder::Builder::default().udp(remote_addr, local_addr)
-}
-
-/// Shortcut method to create a LFS World Relay connection.
-///
-/// # Examples
-///
-/// Supports both blocking and tokio. Swap about `connect_async` for `connect` and remove the
-/// `.await` annotations.
-///
-/// ```rust
-/// let conn = insim::relay()
-///     .relay_select_host("Nubbins AU Demo")
-///     .relay_websocket(true)
-///     .connect_async()
-///     .await?;
-/// loop {
-///     let packet = conn.read().await?;
-///     println!("{:?}", packet);
-/// }
-/// ```
-pub fn relay() -> builder::Builder {
-    builder::Builder::default().relay()
 }
