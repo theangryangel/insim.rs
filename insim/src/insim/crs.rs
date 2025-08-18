@@ -2,6 +2,7 @@ use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Car Reset packet indicates a vehicle has been reset or that a vehicle should be reset by the
 /// server.
 pub struct Crs {

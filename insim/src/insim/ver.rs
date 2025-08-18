@@ -5,6 +5,7 @@ use crate::identifiers::RequestId;
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Version packet - informational
 /// It is advisable to request version information as soon as you have connected, to
 /// avoid problems when connecting to a host with a later or earlier version.  You will

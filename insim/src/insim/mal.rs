@@ -13,6 +13,7 @@ const MAX_MAL_SIZE: usize = 120;
 
 #[derive(Debug, Clone, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Mods Allowed - restrict the mods that can be used
 pub struct Mal {
     /// Non-zero if the packet is a packet request or a reply to a request

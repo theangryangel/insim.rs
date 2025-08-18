@@ -179,6 +179,7 @@ impl PlcAllowedCarsSet {
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Player ALlowed Cars. Allows you to restrict access to the standard (non-mod) vehicles.
 pub struct Plc {
     /// Non-zero if the packet is a packet request or a reply to a request

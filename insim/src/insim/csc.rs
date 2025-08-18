@@ -5,6 +5,7 @@ use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 #[repr(u8)]
 #[non_exhaustive]
 /// Used within the [Csc] packet to indicate the type of state change.
@@ -19,6 +20,7 @@ pub enum CscAction {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Car State Changed - reports a change in a car's state (currently start or stop)
 pub struct Csc {
     /// Non-zero if the packet is a packet request or a reply to a request

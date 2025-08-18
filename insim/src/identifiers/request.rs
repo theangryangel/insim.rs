@@ -11,6 +11,7 @@ use serde::Serialize;
 /// Request Identifier, commonly referred to as reqi in Insim.txt
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 pub struct RequestId(pub u8);
 
 impl fmt::Display for RequestId {

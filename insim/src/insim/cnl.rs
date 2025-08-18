@@ -2,6 +2,7 @@ use crate::identifiers::{ConnectionId, RequestId};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 #[repr(u8)]
 #[non_exhaustive]
 /// Used within [Cnl] to indicate the leave reason.
@@ -40,6 +41,7 @@ pub enum CnlReason {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Connection Leave
 pub struct Cnl {
     /// Non-zero if the packet is a packet request or a reply to a request

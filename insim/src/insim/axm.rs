@@ -8,6 +8,7 @@ const AXM_MAX_OBJECTS: usize = 60;
 /// Used within the [Axm] packet.
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 pub struct ObjectInfo {
     /// X coordinate of object
     pub x: i16,
@@ -29,6 +30,7 @@ pub struct ObjectInfo {
 /// Actions that can be taken as part of [Axm].
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum PmoAction {
@@ -95,6 +97,7 @@ impl_bitflags_from_to_bytes!(PmoFlags, u8);
 /// AutoX Multiple Objects - Report on/add/remove multiple AutoX objects
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 pub struct Axm {
     /// Non-zero if the packet is a packet request or a reply to a request
     pub reqi: RequestId,

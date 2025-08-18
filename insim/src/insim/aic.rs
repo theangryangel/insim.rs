@@ -27,6 +27,7 @@ impl_bitflags_from_to_bytes!(AiHelpFlags, u16);
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 #[non_exhaustive]
 /// Special toggle-able helper for [AiInputType]
 pub enum AiInputToggle {

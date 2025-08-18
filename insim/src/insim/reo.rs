@@ -19,6 +19,7 @@ where
 
 #[derive(Debug, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Reorder the players
 pub struct Reo {
     /// Non-zero if the packet is a packet request or a reply to a request

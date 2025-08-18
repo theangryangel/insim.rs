@@ -22,6 +22,7 @@ impl_bitflags_from_to_bytes!(BtnInst, u8);
 /// Colour
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 pub enum BtnStyleColour {
     /// NotEditable, defaults to light grey
     #[default]
@@ -66,6 +67,7 @@ bitflags::bitflags! {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Button style
 pub struct BtnStyle {
     /// Colour
@@ -217,6 +219,7 @@ impl_bitflags_from_to_bytes!(BtnClickFlags, u8);
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 #[repr(u8)]
 #[non_exhaustive]
 /// Used within [Bfn] to specify the action to take.
@@ -237,6 +240,7 @@ pub enum BfnType {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Button Function
 pub struct Bfn {
     /// Non-zero if the packet is a packet request or a reply to a request
@@ -262,6 +266,7 @@ impl_typical_with_request_id!(Bfn);
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Button - Instructional to create a button
 pub struct Btn {
     /// Non-zero if the packet is a packet request or a reply to a request

@@ -7,8 +7,8 @@ pub(crate) mod framed;
 pub(crate) mod udp;
 
 /// Read Write super trait
-pub trait ReadWrite: Read + Write + Debug {}
-impl<T: Read + Write + Debug> ReadWrite for T {}
+pub trait ReadWrite: Read + Write + Debug + Send {}
+impl<T: Read + Write + Debug + Send> ReadWrite for T {}
 
 pub use framed::Framed;
 pub use udp::UdpStream;

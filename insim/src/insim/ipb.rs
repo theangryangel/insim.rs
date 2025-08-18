@@ -10,6 +10,7 @@ const IPB_MAX_BANS: usize = 120;
 
 #[derive(Debug, Clone, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Player Bans - Receive or set player bans, by IP address
 pub struct Ipb {
     /// Non-zero if the packet is a packet request or a reply to a request

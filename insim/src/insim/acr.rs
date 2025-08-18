@@ -4,6 +4,7 @@ use crate::identifiers::{ConnectionId, RequestId};
 #[repr(u8)]
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 #[non_exhaustive]
 pub enum AcrResult {
     /// Command was processed
@@ -20,6 +21,7 @@ pub enum AcrResult {
 /// Admin Command Report: A user typed an admin command - variable size
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 pub struct Acr {
     /// Non-zero if the packet is a packet request or a reply to a request
     #[insim(pad_after = 1)]

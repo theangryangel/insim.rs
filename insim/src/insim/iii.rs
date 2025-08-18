@@ -2,6 +2,7 @@ use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// InsIm Info -  a /i message from user to hosts Insim
 pub struct Iii {
     #[insim(pad_after = 1)]

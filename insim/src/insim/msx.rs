@@ -2,6 +2,7 @@ use crate::identifiers::RequestId;
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Extended Message (like [Mst](super::Mst), but longer)
 pub struct Msx {
     /// Non-zero if the packet is a packet request or a reply to a request

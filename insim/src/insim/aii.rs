@@ -6,6 +6,7 @@ use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 pub struct OsMain {
     pub angvel: Vec3,
 
@@ -74,6 +75,7 @@ impl_bitflags_from_to_bytes!(AiFlags, u8);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// AI Info
 pub struct Aii {
     /// Non-zero if the packet is a packet request or a reply to a request

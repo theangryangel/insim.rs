@@ -13,6 +13,7 @@ use crate::identifiers::{PlayerId, RequestId};
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
     /// Additional Car Info.
     pub struct CompCarInfo: u8 {
         /// This car is in the way of a driver who is a lap ahead
@@ -86,6 +87,7 @@ impl DirectionKind for DirectionCompCar {
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Used within the [Mci] packet info field.
 pub struct CompCar {
     /// Index of the last "node" that the player passed through.
@@ -178,6 +180,7 @@ impl Encode for CompCar {
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Multi Car Info - positional information for players/vehicles.
 /// The MCI packet does not contain the positional information for all players. Only some. The
 /// maximum number of players depends on the version of Insim.

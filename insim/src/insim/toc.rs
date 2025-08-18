@@ -2,6 +2,7 @@ use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Take Over Car - informational - when a 2 connections swap drivers
 /// Insim indicates this by sending this packet which describes a transfer of the relationship
 /// between this PlayerId and two ConnectionId's.

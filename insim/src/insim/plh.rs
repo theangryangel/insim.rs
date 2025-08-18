@@ -7,6 +7,7 @@ const PLH_MAX_PLAYERS: usize = 40;
 bitflags::bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
     /// Flags to indicate which handicap(s) to set.
     pub struct PlayerHandicapFlags: u8 {
          const MASS = (1 << 0);
@@ -19,6 +20,7 @@ impl_bitflags_from_to_bytes!(PlayerHandicapFlags, u8);
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Set the handicaps for a given player
 pub struct PlayerHandicap {
     /// Player's unique ID
@@ -69,6 +71,7 @@ impl Encode for PlayerHandicap {
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Player handicaps
 pub struct Plh {
     /// Non-zero if the packet is a packet request or a reply to a request

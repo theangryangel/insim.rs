@@ -292,7 +292,7 @@ impl Builder {
 
                 let mut stream =
                     BlockingFramed::new(Box::new(stream), Codec::new(self.mode.clone()));
-                stream.write(self.isi())?;
+                let _ = stream.write(self.isi())?;
 
                 Ok(stream)
             },
@@ -313,7 +313,7 @@ impl Builder {
                     Box::new(UdpStream::from(stream)),
                     Codec::new(self.mode.clone()),
                 );
-                stream.write(isi)?;
+                let _ = stream.write(isi)?;
 
                 Ok(stream)
             },
@@ -336,7 +336,7 @@ impl Builder {
                 let stream = tokio::net::TcpStream::from_std(stream)?;
 
                 let mut stream = AsyncFramed::new(Box::new(stream), Codec::new(self.mode.clone()));
-                stream.write(self.isi()).await?;
+                let _ = stream.write(self.isi()).await?;
 
                 Ok(stream)
             },
@@ -358,7 +358,7 @@ impl Builder {
                     Box::new(UdpStream::from(stream)),
                     Codec::new(self.mode.clone()),
                 );
-                stream.write(isi).await?;
+                let _ = stream.write(isi).await?;
 
                 Ok(stream)
             },

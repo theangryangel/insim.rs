@@ -11,6 +11,7 @@ use serde::Serialize;
 /// Button Click Identifier
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 pub struct ClickId(pub u8);
 
 impl ClickId {

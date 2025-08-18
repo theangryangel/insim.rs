@@ -12,6 +12,7 @@ use crate::{
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
     /// Local Car Switches Flags. You probably want to use [LclFlags] instead. This is deprecated,
     /// but kept for backwards compatibility.
     /// Configure and control lights on a vehicle using a [Small] packet.
@@ -77,6 +78,7 @@ bitflags! {
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
     /// Local Car Lights Flags.
     /// Configure and control lights on a vehicle using a [Small] packet.
     pub struct LclFlags: u32 {

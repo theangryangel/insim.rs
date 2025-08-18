@@ -47,7 +47,7 @@ impl Framed {
 
             if let Some(keepalive) = self.codec.keepalive() {
                 tracing::debug!("Ping? Pong!");
-                self.write(keepalive).await?;
+                let _ = self.write(keepalive).await?;
             }
 
             if let Some(packet) = packet {
@@ -84,12 +84,13 @@ impl Framed {
     }
 
     /// Asynchronously write a packet to the inner network.
-    pub async fn write<P: Into<Packet>>(&mut self, packet: P) -> Result<()> {
+    pub async fn write<P: Into<Packet>>(&mut self, packet: P) -> Result<usize> {
         let mut buf = self.codec.encode(&packet.into())?;
+        let size = buf.len();
         if !buf.is_empty() {
             self.inner.write_all_buf(&mut buf).await?;
         }
 
-        Ok(())
+        Ok(size)
     }
 }

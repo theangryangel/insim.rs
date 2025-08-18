@@ -53,6 +53,7 @@ impl DirectionKind for DirectionConInfo {
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Used within [Con] packet to give a break down of information about the Contact between the two
 /// players.
 pub struct ConInfo {

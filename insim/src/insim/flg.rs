@@ -3,6 +3,7 @@ use crate::identifiers::{PlayerId, RequestId};
 /// Enum for the flag field of [Flg].
 #[derive(Default, Debug, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum FlgType {
@@ -16,6 +17,7 @@ pub enum FlgType {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Race Flag is sent when a flag is waved at a player.
 pub struct Flg {
     /// Non-zero if the packet is a packet request or a reply to a request

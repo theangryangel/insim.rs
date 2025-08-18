@@ -2,6 +2,7 @@ use crate::{identifiers::RequestId, WithRequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 #[repr(u8)]
 #[non_exhaustive]
 /// Errors occurred during a [Ssh] request.
@@ -22,6 +23,7 @@ pub enum SshError {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Send Screenshot - instructional and informational.
 pub struct Ssh {
     /// Non-zero if the packet is a packet request or a reply to a request

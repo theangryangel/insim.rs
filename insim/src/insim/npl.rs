@@ -6,6 +6,7 @@ use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 #[repr(u8)]
 #[non_exhaustive]
 /// Tyre compounds/types
@@ -42,6 +43,7 @@ pub enum TyreCompound {
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
     /// Describes the setup of a player and the various helpers that may be enabled, such as
     /// auto-clutch, etc.
     pub struct PlayerFlags: u16 {
@@ -90,6 +92,7 @@ impl_bitflags_from_to_bytes!(PlayerFlags, u16);
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
     /// Setup Flags
     pub struct SetFlags: u8 {
         /// Symmetric wheels
@@ -112,6 +115,7 @@ generate_bitflag_helpers!(SetFlags,
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
     /// Player model and type information
     pub struct PlayerType: u8 {
         /// Female, if not set assume male
@@ -135,6 +139,7 @@ generate_bitflag_helpers!(
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
     /// Passenger flags
     pub struct Passengers: u8 {
         /// Front male, opposite side from driver
@@ -160,6 +165,7 @@ impl_bitflags_from_to_bytes!(Passengers, u8);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Sent when a New Player joins.
 pub struct Npl {
     /// Non-zero if the packet is a packet request or a reply to a request

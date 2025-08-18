@@ -4,6 +4,7 @@ use crate::identifiers::RequestId;
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Used within [Hcp] to apply handicaps to a vehicle.
 pub struct HcpCarHandicap {
     /// 0 to 200 - added mass (kg)
@@ -15,6 +16,7 @@ pub struct HcpCarHandicap {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Vehicle Handicaps
 /// You can send a packet to add mass and restrict the intake on each car model
 /// The same restriction applies to all drivers using a particular car model

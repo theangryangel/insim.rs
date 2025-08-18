@@ -14,6 +14,7 @@ use crate::identifiers::{PlayerId, RequestId};
     insim_core::Encode,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 #[repr(u8)]
 #[non_exhaustive]
 /// Penalty types
@@ -43,6 +44,7 @@ pub enum PenaltyInfo {
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 #[repr(u8)]
 /// Enum of reasons for a penalty being applied to a player
 pub enum PenaltyReason {
@@ -71,6 +73,7 @@ pub enum PenaltyReason {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Penalty received or cleared by player
 pub struct Pen {
     /// Non-zero if the packet is a packet request or a reply to a request

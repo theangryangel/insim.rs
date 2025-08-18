@@ -6,6 +6,7 @@ bitflags! {
     /// Bitwise flags used within the [Sch] packet
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
     pub struct SchFlags: u8 {
         /// Shift
         const SHIFT = (1 << 0);
@@ -25,6 +26,7 @@ impl_bitflags_from_to_bytes!(SchFlags, u8);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "python", pyo3::prelude::pyclass)]
 /// Send Single Character
 pub struct Sch {
     /// Non-zero if the packet is a packet request or a reply to a request
