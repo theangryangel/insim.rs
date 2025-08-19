@@ -1,6 +1,6 @@
 use std::{
     fmt::Debug,
-    io::{self, Read, Write},
+    io::{Read, Write},
 };
 
 use super::ReadWrite;
@@ -42,24 +42,17 @@ impl Framed {
             }
 
             let mut buf = [0u8; MAX_SIZE_PACKET];
-            match self.inner.read(&mut buf) {
-                Ok(0) => {
+            match self.inner.read(&mut buf)? {
+                0 => {
                     // The remote closed the connection. For this to be a clean
                     // shutdown, there should be no data in the read buffer. If
                     // there is, this means that the peer closed the socket while
                     // sending a frame.
                     return Err(Error::Disconnected);
                 },
-                Ok(amt) => {
+                amt => {
                     // data
                     self.codec.feed(&buf[..amt]);
-                },
-                Err(e) => {
-                    if e.kind() == io::ErrorKind::WouldBlock {
-                        continue;
-                    }
-
-                    return Err(e.into());
                 },
             }
         }

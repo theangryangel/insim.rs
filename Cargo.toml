@@ -8,6 +8,7 @@ members = [
   "outgauge",
   "outsim",
   "examples/*",
+  "kitcar",
 ]
 exclude = ['examples/*']
 # Only check / build main crates by default (check all with `--workspace`)

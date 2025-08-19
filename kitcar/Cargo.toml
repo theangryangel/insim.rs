@@ -1,0 +1,15 @@
+[package]
+name = "kitcar"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+homepage.workspace = true
+
+[dependencies]
+insim = { path = "../insim", version = "4.0.0", features = ["blocking"] }
+
+[lints]
+workspace = true

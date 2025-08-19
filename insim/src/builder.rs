@@ -67,6 +67,7 @@ pub struct Builder {
     // Why would they do this? Absolutely no idea. However, by separating out the fields, it
     // massively simplifies things for us.
     tcp_nodelay: bool,
+    non_blocking: bool,
     udp_local_address: Option<SocketAddr>,
 }
 
@@ -80,6 +81,7 @@ impl Default for Builder {
             mode: Mode::Compressed,
 
             tcp_nodelay: true,
+            non_blocking: false,
             udp_local_address: None,
 
             isi_admin_password: None,
@@ -139,6 +141,14 @@ impl Builder {
     /// Use "uncompressed" mode.
     pub fn uncompressed(self) -> Self {
         self.mode(Mode::Uncompressed)
+    }
+
+    /// Set whether sockets are non-blocking.
+    /// Default is `false` if blocking.
+    /// Always forced for tokio implementation.
+    pub fn set_non_blocking(mut self, non_blocking: bool) -> Self {
+        self.non_blocking = non_blocking;
+        self
     }
 
     /// Set whether sockets have `TCP_NODELAY` enabled.
@@ -289,6 +299,9 @@ impl Builder {
                 stream.set_nodelay(self.tcp_nodelay)?;
                 stream.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
                 stream.set_write_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
+                if self.non_blocking {
+                    stream.set_nonblocking(true)?;
+                }
 
                 let mut stream =
                     BlockingFramed::new(Box::new(stream), Codec::new(self.mode.clone()));
@@ -303,6 +316,9 @@ impl Builder {
                 stream.connect(&self.remote)?;
                 stream.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
                 stream.set_write_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
+                if self.non_blocking {
+                    stream.set_nonblocking(true)?;
+                }
 
                 let mut isi = self.isi();
                 if self.udp_local_address.is_none() {

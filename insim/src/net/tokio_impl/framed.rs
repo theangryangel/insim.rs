@@ -1,4 +1,4 @@
-use std::{fmt::Debug, io, time::Duration};
+use std::{fmt::Debug, time::Duration};
 
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
@@ -60,24 +60,17 @@ impl Framed {
                 Duration::from_secs(DEFAULT_TIMEOUT_SECS),
                 self.inner.read(&mut buf),
             )
-            .await?
+            .await??
             {
-                Ok(0) => {
+                0 => {
                     // The remote closed the connection. For this to be a clean
                     // shutdown, there should be no data in the read buffer. If
                     // there is, this means that the peer closed the socket while
                     // sending a frame.
                     return Err(Error::Disconnected);
                 },
-                Ok(amt) => {
+                amt => {
                     self.codec.feed(&buf[..amt]);
-                },
-                Err(e) => {
-                    if e.kind() == io::ErrorKind::WouldBlock {
-                        continue;
-                    }
-
-                    return Err(e.into());
                 },
             }
         }
