@@ -1,0 +1,17 @@
+[package]
+name = "twenty_second_league"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+homepage.workspace = true
+
+[dependencies]
+humanize-duration = "0.0.7"
+insim = { path = "../../insim" }
+kitcar = { path = "../../kitcar" }
+
+[lints]
+workspace = true

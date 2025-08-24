@@ -4,6 +4,8 @@
 
 use std::{any::Any, collections::VecDeque, time::Duration};
 
+use insim::Packet;
+
 use crate::{Engine, Message};
 
 /// A container for the user-supplied state.
@@ -28,8 +30,8 @@ impl<C: 'static + Send> Context<C> {
     }
 
     /// A convenience method to queue a packet for later sending.
-    pub fn queue_packet(&mut self, packet: insim::Packet) {
-        self.outgoing_packets.push_back(packet);
+    pub fn queue_packet<I: Into<insim::Packet>>(&mut self, packet: I) {
+        self.outgoing_packets.push_back(packet.into());
     }
 }
 

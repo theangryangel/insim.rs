@@ -67,4 +67,14 @@ impl Timer {
     pub fn remaining_repeats(&self) -> Option<u32> {
         self.remaining
     }
+
+    /// Remaining duration
+    pub fn remaining_duration(&self) -> Duration {
+        if self.is_finished() {
+            return Duration::ZERO;
+        }
+
+        // FIXME: this could probably error
+        Instant::now() - self.start_time + self.duration
+    }
 }
