@@ -1,0 +1,10 @@
+iname: "insim.rs/20s-league"
+addr: "127.0.0.1:29999"
+admin: "123!"
+
+[[combo]]
+name = "FE1X_20s_cup"
+track = "FE1X"
+layout = "20s_cup"
+laps = 1
+vehicles = ['XRT']

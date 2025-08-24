@@ -1,21 +1,52 @@
 //! Twenty Second League
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, fs, time::Duration};
 
-use humanize_duration::prelude::DurationExt;
 use insim::{
     identifiers::ConnectionId,
-    insim::{Mst, Mtc},
+    insim::{Mso, Mst, Mtc, TinyType, Vtn},
     Packet,
 };
 use kitcar::{Context, Engine, Timer, Workshop};
+
+#[derive(Debug, serde::Deserialize)]
+/// Combo
+pub struct Combo {
+    /// Name
+    pub name: String,
+    /// Track to load
+    pub track: String,
+    /// Track layout
+    pub layout: String,
+    /// Lap count
+    pub laps: u8,
+    /// Valid vehicles
+    // FIXME: should be a Vehicle, not a String
+    pub vehicles: Vec<String>,
+}
+
+/// Config
+#[derive(Debug, serde::Deserialize)]
+pub struct Config {
+    /// Insim IName
+    pub iname: String,
+    /// Server address
+    pub addr: String,
+    /// admin password
+    pub admin: String,
+    /// Combination
+    pub combo: Vec<Combo>,
+}
 
 /// Represents the state of the mini-game.
 #[derive(Debug)]
 pub enum GameState {
     /// Waiting for players to take over server state
-    Waiting,
+    Idle,
     /// 5-minute countdown before the game starts.
-    Countdown,
+    Lobby {
+        /// Countdown to game start
+        countdown: Timer,
+    },
     /// Main game loop is in progress.
     InProgress {
         /// Current round
@@ -23,80 +54,67 @@ pub enum GameState {
         /// Time until next round
         timer: Timer,
     },
-    /// Game has ended.
-    Ended,
 }
 
 /// Manages the initial setup of the game, including loading the track and layout
 #[derive(Debug)]
-pub struct Setup;
+pub struct Control;
 
-impl Engine<GameState> for Setup {
-    fn tick(&mut self, context: &mut Context<GameState>) {
-        // FIXME: check LFS game state OR we make this manual. we probably need a MC really.
-        if matches!(context.state, GameState::Waiting) {
-            context.queue_packet(Mst {
-                msg: "/load FE1Y".to_owned(),
-                ..Default::default()
-            });
-            context.queue_packet(Mst {
-                msg: "/layout FE1X_20s_cup.lyt".to_owned(),
-                ..Default::default()
-            });
-            context.queue_packet(Mst {
-                msg: "/laps 0".to_owned(),
-                ..Default::default()
-            });
-            context.state = GameState::Countdown;
+impl Engine<GameState> for Control {
+    fn packet(&mut self, context: &mut Context<GameState>, packet: &insim::Packet) {
+        if let Packet::Mso(Mso { msg, .. }) = packet {
+            match msg.as_ref() {
+                // FIXME: check if admin
+                "!start" if matches!(context.state, GameState::Idle) => {
+                    // FIXME we need to select a random combo from the config.toml
+                    // and then load it
+                    context.state = GameState::Lobby {
+                        countdown: Timer::repeating(Duration::from_secs(10), Some(30)),
+                    };
+                },
+                // FIXME: check if admin
+                "!abort" => {
+                    context.state = GameState::Idle;
+                },
+                _ => {},
+            }
         }
     }
 }
 
 /// Manages a 5-minute countdown before the game begins.
 #[derive(Debug)]
-pub struct CountdownEngine {
-    timer: Timer,
-}
-
-impl CountdownEngine {
-    /// New
-    pub fn new() -> Self {
-        Self {
-            timer: Timer::repeating(Duration::from_secs(10), Some(30)),
-        }
-    }
-}
+pub struct CountdownEngine;
 
 impl Engine<GameState> for CountdownEngine {
     fn tick(&mut self, context: &mut Context<GameState>) {
-        if matches!(context.state, GameState::Countdown) {
-            return;
-        }
+        if let GameState::Lobby {
+            countdown: ref timer,
+        } = context.state
+        {
+            if timer.tick() {
+                if timer.is_finished() {
+                    context.state = GameState::InProgress {
+                        round: 0,
+                        timer: Timer::repeating(Duration::from_secs(60), Some(15)),
+                    };
+                    context.queue_packet(Mtc {
+                        text: format!("The game is starting in 1 minute. Good luck!"),
+                        ucid: ConnectionId::ALL,
+                        ..Default::default()
+                    });
+                } else {
+                    let remaining = timer.remaining_duration();
+                    let seconds = remaining.as_secs() % 60;
+                    let minutes = (remaining.as_secs() / 60) % 60;
 
-        if self.timer.tick() {
-            if self.timer.is_finished() {
-                context.state = GameState::InProgress {
-                    round: 0,
-                    timer: Timer::repeating(Duration::from_secs(60), Some(15)),
-                };
-                // TODO: RCM more appropriate?
-                context.queue_packet(Mtc {
-                    text: format!("The game is starting. Good luck!"),
-                    ucid: ConnectionId::ALL,
-                    ..Default::default()
-                });
-            } else {
-                // TODO: convert this to use buttons
-                context.queue_packet(Mtc {
-                    text: format!(
-                        "Game starts in {}",
-                        self.timer
-                            .remaining_duration()
-                            .human(humanize_duration::Truncate::Millis)
-                    ),
-                    ucid: ConnectionId::ALL,
-                    ..Default::default()
-                });
+                    // TODO: convert this to use buttons
+                    context.queue_packet(Mtc {
+                        text: format!("Game starts in {:02}:{:02}", minutes, seconds),
+                        ucid: ConnectionId::ALL,
+                        ..Default::default()
+                    });
+                }
             }
         }
     }
@@ -116,16 +134,12 @@ impl Engine<GameState> for Rounds {
         }
 
         if let Packet::Res(res) = packet {
-            let uname = "PLACEHOLDER".to_owned();
-            let _ = self.results.insert(uname, res.ttime);
+            let _ = self.results.insert(res.uname.clone(), res.ttime);
 
             // 20s exactly!
             if res.ttime == Duration::from_secs(20) {
                 context.queue_packet(Mtc {
-                    text: format!(
-                        "{} got exactly a 20s lap!",
-                        "PLACEHOLDER", // FIXME
-                    ),
+                    text: format!("Congrats {}, you got an exact 20s lap!", res.pname,),
                     ucid: ConnectionId::ALL,
                     ..Default::default()
                 });
@@ -147,7 +161,7 @@ impl Engine<GameState> for Rounds {
                 round = round + 1;
 
                 if timer.is_finished() {
-                    context.state = GameState::Ended;
+                    context.state = GameState::Idle;
 
                     context.queue_packet(Mtc {
                         text: "The game has ended! Thanks for playing".to_owned(),
@@ -176,11 +190,36 @@ impl Engine<GameState> for Rounds {
     }
 }
 
+/// Prevent voting when a game is in progress
+#[derive(Debug)]
+pub struct Dictator;
+
+impl Engine<GameState> for Dictator {
+    fn packet(&mut self, context: &mut Context<GameState>, packet: &insim::Packet) {
+        if !matches!(context.state, GameState::InProgress { .. }) {
+            return;
+        }
+
+        if let Packet::Vtn(Vtn { .. }) = packet {
+            context.queue_packet(TinyType::Vtc);
+        }
+    }
+}
+
 fn main() {
-    Workshop::with_state(GameState::Waiting)
-        .add_engine(Setup)
-        .add_engine(CountdownEngine::new())
+    // FIXME - unwrap
+    let config: Config = toml::from_str(&fs::read_to_string("config.toml").unwrap()).unwrap();
+
+    Workshop::with_state(GameState::Idle)
+        .add_engine(Control)
+        .add_engine(CountdownEngine)
         .add_engine(Rounds::default())
-        .ignition(insim::tcp("127.0.0.1:29999").set_non_blocking(true))
+        .add_engine(Dictator)
+        .ignition(
+            insim::tcp(config.addr.clone())
+                .isi_iname(config.iname.clone())
+                .isi_prefix('!')
+                .set_non_blocking(true),
+        )
         .run(Duration::from_millis(1000 / 60));
 }

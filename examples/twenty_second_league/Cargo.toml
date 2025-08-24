@@ -9,9 +9,10 @@ license.workspace = true
 homepage.workspace = true
 
 [dependencies]
-humanize-duration = "0.0.7"
-insim = { path = "../../insim" }
+insim = { path = "../../insim", features = ["serde", "blocking"] }
 kitcar = { path = "../../kitcar" }
+serde = { workspace = true, features = ["derive"] }
+toml = "0.9.5"
 
 [lints]
 workspace = true
