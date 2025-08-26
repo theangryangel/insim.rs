@@ -4,8 +4,6 @@
 
 use std::{any::Any, collections::VecDeque, time::Duration};
 
-use insim::Packet;
-
 use crate::{Engine, Message};
 
 /// A container for the user-supplied state.
@@ -72,11 +70,13 @@ impl<C: 'static + Send> Workshop<C> {
 
     /// Builds the `World` instance, consuming the builder.
     /// It connects to the network and then starts up all systems.
-    pub fn ignition(self, network_builder: insim::builder::Builder) -> Chassis<C> {
-        // FIXME: unwrap
-        let network = network_builder.connect_blocking().unwrap();
+    pub fn ignition(
+        self,
+        network_builder: insim::builder::Builder,
+    ) -> Result<Chassis<C>, insim::Error> {
+        let network = network_builder.connect_blocking()?;
 
-        Chassis {
+        Ok(Chassis {
             systems: self.systems,
             context: Context {
                 state: self.state,
@@ -85,7 +85,7 @@ impl<C: 'static + Send> Workshop<C> {
                 mailbox: VecDeque::new(),
             },
             network,
-        }
+        })
     }
 }
 

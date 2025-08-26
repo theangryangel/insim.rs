@@ -1,10 +1,11 @@
 //! Strongly typed Vehicles for both standard and mods
+use std::{convert::Infallible, str::FromStr};
+
 use crate::{license::License, Decode, Encode};
 
 /// Handles parsing a vehicle name according to the Insim v9 rules.
 /// See <https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info>
 #[derive(PartialEq, Eq, Clone, Default, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 #[allow(missing_docs)]
 pub enum Vehicle {
@@ -205,5 +206,92 @@ impl std::fmt::Debug for Vehicle {
             },
             Vehicle::Unknown => write!(f, "Unknown"),
         }
+    }
+}
+
+impl FromStr for Vehicle {
+    // Unknown tracks are always Vehicle::Unknown
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "XFG" => Ok(Self::Xfg),
+            "XRG" => Ok(Self::Xrg),
+            "FBM" => Ok(Self::Fbm),
+            "XRT" => Ok(Self::Xrt),
+            "RB4" => Ok(Self::Rb4),
+            "FXO" => Ok(Self::Fxo),
+            "LX4" => Ok(Self::Lx4),
+            "LX6" => Ok(Self::Lx6),
+            "MRT" => Ok(Self::Mrt),
+            "UF1" => Ok(Self::Uf1),
+            "RAC" => Ok(Self::Rac),
+            "FZ5" => Ok(Self::Fz5),
+            "FOX" => Ok(Self::Fox),
+            "XFR" => Ok(Self::Xfr),
+            "UFR" => Ok(Self::Ufr),
+            "FO8" => Ok(Self::Fo8),
+            "FXR" => Ok(Self::Fxr),
+            "XRR" => Ok(Self::Xrr),
+            "FZR" => Ok(Self::Fzr),
+            "BF1" => Ok(Self::Bf1),
+            o => {
+                if_chain::if_chain! {
+                    if o.len() == 6;
+                    if let Ok(i) = u32::from_str_radix(o, 16);
+                    then {
+                        Ok(Vehicle::Mod(i))
+                    } else {
+                        Ok(Vehicle::Unknown)
+
+                    }
+                }
+            },
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for Vehicle {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        serializer.collect_str(self)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Vehicle {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        // FromStr for Vehicle is Infallible, so I guess unwrap is good enough
+        Ok(String::deserialize(deserializer)?.parse().unwrap())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_xrt_from_str() {
+        let v = Vehicle::from_str("XRT").expect("Expected to handle XRT");
+        assert_eq!(v, Vehicle::Xrt);
+        assert_eq!("XRT", v.to_string());
+    }
+
+    #[test]
+    fn test_mod_from_str() {
+        let v = Vehicle::from_str("728419").expect("Expected to handle Mod");
+        assert_eq!(v, Vehicle::Mod(7504921));
+    }
+
+    #[test]
+    fn test_unknown_from_str() {
+        let v = Vehicle::from_str("").expect("Expected to handle blank");
+        assert_eq!(v, Vehicle::Unknown);
     }
 }

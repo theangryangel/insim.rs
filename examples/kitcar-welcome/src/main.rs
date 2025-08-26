@@ -110,6 +110,6 @@ fn main() {
         .add_engine(GameServer)
         .add_engine(CountdownSystem::new())
         .add_engine(InfiniteTimerSystem::new())
-        .ignition(insim::tcp("127.0.0.1:29999").set_non_blocking(true))
+        .ignition(insim::tcp("172.24.64.1:29999").set_non_blocking(true))
         .run(Duration::from_millis(1000 / 60))
 }

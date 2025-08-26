@@ -1,41 +1,19 @@
 //! Twenty Second League
 use std::{collections::HashMap, fs, time::Duration};
 
+use eyre::Context as _;
 use insim::{
+    core::vehicle::Vehicle,
     identifiers::ConnectionId,
-    insim::{Mso, Mst, Mtc, TinyType, Vtn},
+    insim::{Mal, Mso, Mst, Mtc, PlcAllowedCarsSet, SmallType, TinyType, Vtn},
     Packet,
 };
 use kitcar::{Context, Engine, Timer, Workshop};
+use rand::seq::IndexedRandom;
 
-#[derive(Debug, serde::Deserialize)]
-/// Combo
-pub struct Combo {
-    /// Name
-    pub name: String,
-    /// Track to load
-    pub track: String,
-    /// Track layout
-    pub layout: String,
-    /// Lap count
-    pub laps: u8,
-    /// Valid vehicles
-    // FIXME: should be a Vehicle, not a String
-    pub vehicles: Vec<String>,
-}
+mod config;
 
-/// Config
-#[derive(Debug, serde::Deserialize)]
-pub struct Config {
-    /// Insim IName
-    pub iname: String,
-    /// Server address
-    pub addr: String,
-    /// admin password
-    pub admin: String,
-    /// Combination
-    pub combo: Vec<Combo>,
-}
+use config::Config;
 
 /// Represents the state of the mini-game.
 #[derive(Debug)]
@@ -46,6 +24,8 @@ pub enum GameState {
     Lobby {
         /// Countdown to game start
         countdown: Timer,
+        /// Chosen combo
+        combo: config::Combo,
     },
     /// Main game loop is in progress.
     InProgress {
@@ -53,24 +33,52 @@ pub enum GameState {
         round: u8,
         /// Time until next round
         timer: Timer,
+        /// Chosen combo
+        combo: config::Combo,
     },
 }
 
 /// Manages the initial setup of the game, including loading the track and layout
 #[derive(Debug)]
-pub struct Control;
+pub struct Control {
+    combos: Vec<config::Combo>,
+}
 
 impl Engine<GameState> for Control {
     fn packet(&mut self, context: &mut Context<GameState>, packet: &insim::Packet) {
-        if let Packet::Mso(Mso { msg, .. }) = packet {
+        if let Packet::Mso(Mso { msg, ucid, .. }) = packet {
             match msg.as_ref() {
                 // FIXME: check if admin
                 "!start" if matches!(context.state, GameState::Idle) => {
-                    // FIXME we need to select a random combo from the config.toml
-                    // and then load it
-                    context.state = GameState::Lobby {
-                        countdown: Timer::repeating(Duration::from_secs(10), Some(30)),
-                    };
+                    if let Some(combo) = self.combos.choose(&mut rand::rng()) {
+                        context.state = GameState::Lobby {
+                            countdown: Timer::repeating(Duration::from_secs(10), Some(30)),
+                            combo: combo.clone(),
+                        };
+
+                        let mut plc = PlcAllowedCarsSet::default();
+                        let mut mal = Mal::default();
+                        for vehicle in combo.vehicles.iter() {
+                            match vehicle {
+                                Vehicle::Mod(_) => {
+                                    let _ = mal.insert(vehicle.clone());
+                                },
+                                Vehicle::Unknown => {},
+                                o => {
+                                    let _ = plc.insert(o.clone());
+                                },
+                            };
+                        }
+
+                        context.queue_packet(SmallType::Alc(plc));
+                        context.queue_packet(mal);
+                    } else {
+                        context.queue_packet(Mtc {
+                            ucid: *ucid,
+                            text: "No valid combos found. Invalid config.yaml?".to_owned(),
+                            ..Default::default()
+                        });
+                    }
                 },
                 // FIXME: check if admin
                 "!abort" => {
@@ -90,13 +98,17 @@ impl Engine<GameState> for CountdownEngine {
     fn tick(&mut self, context: &mut Context<GameState>) {
         if let GameState::Lobby {
             countdown: ref timer,
+            ref combo,
         } = context.state
         {
+            let combo = combo.clone();
+
             if timer.tick() {
                 if timer.is_finished() {
                     context.state = GameState::InProgress {
                         round: 0,
                         timer: Timer::repeating(Duration::from_secs(60), Some(15)),
+                        combo: combo,
                     };
                     context.queue_packet(Mtc {
                         text: format!("The game is starting in 1 minute. Good luck!"),
@@ -151,6 +163,7 @@ impl Engine<GameState> for Rounds {
         if let GameState::InProgress {
             mut round,
             ref mut timer,
+            ..
         } = context.state
         {
             if timer.tick() {
@@ -206,20 +219,28 @@ impl Engine<GameState> for Dictator {
     }
 }
 
-fn main() {
-    // FIXME - unwrap
-    let config: Config = toml::from_str(&fs::read_to_string("config.toml").unwrap()).unwrap();
+fn main() -> eyre::Result<()> {
+    let config: Config = serde_norway::from_str(
+        &fs::read_to_string("config.yaml").wrap_err("could not read config.yaml")?,
+    )
+    .wrap_err("Could not parse config.yaml")?;
 
     Workshop::with_state(GameState::Idle)
-        .add_engine(Control)
+        .add_engine(Control {
+            combos: config.combo.clone(),
+        })
         .add_engine(CountdownEngine)
         .add_engine(Rounds::default())
         .add_engine(Dictator)
         .ignition(
-            insim::tcp(config.addr.clone())
-                .isi_iname(config.iname.clone())
+            insim::tcp(config.addr)
+                .isi_iname(config.iname)
+                .isi_admin_password(config.admin)
                 .isi_prefix('!')
                 .set_non_blocking(true),
         )
-        .run(Duration::from_millis(1000 / 60));
+        .wrap_err("Failed to execute kitcar ignition")?
+        .run(Duration::from_millis(1000 / config.tick_rate.unwrap_or(64)));
+
+    Ok(())
 }

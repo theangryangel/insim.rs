@@ -1,9 +1,10 @@
 //! Strongly typed Tracks
 
+use std::str::FromStr;
+
 use crate::{license::License, Decode, Encode};
 
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Handles parsing a Track name.
 #[non_exhaustive]
 #[allow(missing_docs)]
@@ -1296,5 +1297,220 @@ impl Encode for Track {
 impl std::fmt::Display for Track {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.code())
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+/// Unknown Track Error
+pub struct TrackUnknownError(String);
+
+impl std::fmt::Display for TrackUnknownError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl FromStr for Track {
+    type Err = TrackUnknownError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "BL1" => Ok(Self::Bl1),
+            "BL1R" => Ok(Self::Bl1r),
+            "BL1X" => Ok(Self::Bl1x),
+            "BL1Y" => Ok(Self::Bl1y),
+            "BL2" => Ok(Self::Bl2),
+            "BL2R" => Ok(Self::Bl2r),
+            "BL2X" => Ok(Self::Bl2x),
+            "BL2Y" => Ok(Self::Bl2y),
+            "BL3" => Ok(Self::Bl3),
+            "BL3R" => Ok(Self::Bl3r),
+            "BL3X" => Ok(Self::Bl3x),
+            "BL3Y" => Ok(Self::Bl3y),
+            "BL4" => Ok(Self::Bl4),
+            "BL4X" => Ok(Self::Bl4x),
+            "SO1" => Ok(Self::So1),
+            "SO1R" => Ok(Self::So1r),
+            "SO1X" => Ok(Self::So1x),
+            "SO1Y" => Ok(Self::So1y),
+            "SO2" => Ok(Self::So2),
+            "SO2R" => Ok(Self::So2r),
+            "SO2X" => Ok(Self::So2x),
+            "SO2Y" => Ok(Self::So2y),
+            "SO3" => Ok(Self::So3),
+            "SO3R" => Ok(Self::So3r),
+            "SO3X" => Ok(Self::So3x),
+            "SO3Y" => Ok(Self::So3y),
+            "SO4" => Ok(Self::So4),
+            "SO4R" => Ok(Self::So4r),
+            "SO4X" => Ok(Self::So4x),
+            "SO4Y" => Ok(Self::So4y),
+            "SO5" => Ok(Self::So5),
+            "SO5R" => Ok(Self::So5r),
+            "SO5X" => Ok(Self::So5x),
+            "SO5Y" => Ok(Self::So5y),
+            "SO6" => Ok(Self::So6),
+            "SO6R" => Ok(Self::So6r),
+            "SO6X" => Ok(Self::So6x),
+            "SO6Y" => Ok(Self::So6y),
+            "FE1" => Ok(Self::Fe1),
+            "FE1R" => Ok(Self::Fe1r),
+            "FE1X" => Ok(Self::Fe1x),
+            "FE1Y" => Ok(Self::Fe1y),
+            "FE2" => Ok(Self::Fe2),
+            "FE2R" => Ok(Self::Fe2r),
+            "FE2X" => Ok(Self::Fe2x),
+            "FE2Y" => Ok(Self::Fe2y),
+            "FE3" => Ok(Self::Fe3),
+            "FE3R" => Ok(Self::Fe3r),
+            "FE3X" => Ok(Self::Fe3x),
+            "FE3Y" => Ok(Self::Fe3y),
+            "FE4" => Ok(Self::Fe4),
+            "FE4R" => Ok(Self::Fe4r),
+            "FE4X" => Ok(Self::Fe4x),
+            "FE4Y" => Ok(Self::Fe4y),
+            "FE5" => Ok(Self::Fe5),
+            "FE5R" => Ok(Self::Fe5r),
+            "FE5X" => Ok(Self::Fe5x),
+            "FE5Y" => Ok(Self::Fe5y),
+            "FE6" => Ok(Self::Fe6),
+            "FE6R" => Ok(Self::Fe6r),
+            "FE6X" => Ok(Self::Fe6x),
+            "FE6Y" => Ok(Self::Fe6y),
+            "AU1" => Ok(Self::Au1),
+            "AU1X" => Ok(Self::Au1x),
+            "AU2" => Ok(Self::Au2),
+            "AU2X" => Ok(Self::Au2x),
+            "AU3" => Ok(Self::Au3),
+            "AU3X" => Ok(Self::Au3x),
+            "AU4" => Ok(Self::Au4),
+            "AU4X" => Ok(Self::Au4x),
+            "KY1" => Ok(Self::Ky1),
+            "KY1R" => Ok(Self::Ky1r),
+            "KY1X" => Ok(Self::Ky1x),
+            "KY1Y" => Ok(Self::Ky1y),
+            "KY2" => Ok(Self::Ky2),
+            "KY2R" => Ok(Self::Ky2r),
+            "KY2X" => Ok(Self::Ky2x),
+            "KY2Y" => Ok(Self::Ky2y),
+            "KY3" => Ok(Self::Ky3),
+            "KY3R" => Ok(Self::Ky3r),
+            "KY3X" => Ok(Self::Ky3x),
+            "KY3Y" => Ok(Self::Ky3y),
+            "WE1" => Ok(Self::We1),
+            "WE1R" => Ok(Self::We1r),
+            "WE1X" => Ok(Self::We1x),
+
+            "WE1Y" => Ok(Self::We1y),
+            "WE2" => Ok(Self::We2),
+            "WE2R" => Ok(Self::We2r),
+            "WE2X" => Ok(Self::We2x),
+            "WE2Y" => Ok(Self::We2y),
+            "WE3" => Ok(Self::We3),
+            "WE3X" => Ok(Self::We3x),
+            "WE4" => Ok(Self::We4),
+            "WE4R" => Ok(Self::We4r),
+            "WE4X" => Ok(Self::We4x),
+            "WE4Y" => Ok(Self::We4y),
+            "WE5" => Ok(Self::We5),
+            "WE5R" => Ok(Self::We5r),
+            "WE5X" => Ok(Self::We5x),
+            "WE5Y" => Ok(Self::We5y),
+            "AS1" => Ok(Self::As1),
+            "AS1R" => Ok(Self::As1r),
+            "AS1X" => Ok(Self::As1x),
+            "AS1Y" => Ok(Self::As1y),
+            "AS2" => Ok(Self::As2),
+            "AS2R" => Ok(Self::As2r),
+            "AS2X" => Ok(Self::As2x),
+            "AS2Y" => Ok(Self::As2y),
+            "AS3" => Ok(Self::As3),
+            "AS3R" => Ok(Self::As3r),
+            "AS3X" => Ok(Self::As3x),
+            "AS3Y" => Ok(Self::As3y),
+            "AS4" => Ok(Self::As4),
+            "AS4R" => Ok(Self::As4r),
+
+            "AS4X" => Ok(Self::As4x),
+            "AS4Y" => Ok(Self::As4y),
+            "AS5" => Ok(Self::As5),
+            "AS5R" => Ok(Self::As5r),
+            "AS5X" => Ok(Self::As5x),
+            "AS5Y" => Ok(Self::As5y),
+            "AS6" => Ok(Self::As6),
+            "AS6R" => Ok(Self::As6r),
+            "AS6X" => Ok(Self::As6x),
+            "AS6Y" => Ok(Self::As6y),
+            "AS7" => Ok(Self::As7),
+            "AS7R" => Ok(Self::As7r),
+            "AS7X" => Ok(Self::As7x),
+            "AS7Y" => Ok(Self::As7y),
+            "RO1" => Ok(Self::Ro1),
+            "RO1X" => Ok(Self::Ro1x),
+            "RO2" => Ok(Self::Ro2),
+            "RO2X" => Ok(Self::Ro2x),
+            "RO3" => Ok(Self::Ro3),
+            "RO3X" => Ok(Self::Ro3x),
+            "RO4" => Ok(Self::Ro4),
+            "RO4X" => Ok(Self::Ro4x),
+            "RO5" => Ok(Self::Ro5),
+            "RO5X" => Ok(Self::Ro5x),
+            "RO6" => Ok(Self::Ro6),
+            "RO6X" => Ok(Self::Ro6x),
+            "RO7" => Ok(Self::Ro7),
+            "RO7X" => Ok(Self::Ro7x),
+            "RO8" => Ok(Self::Ro8),
+            "RO8X" => Ok(Self::Ro8x),
+            "RO9" => Ok(Self::Ro9),
+            "RO9X" => Ok(Self::Ro9x),
+            "RO10" => Ok(Self::Ro10),
+            "RO10X" => Ok(Self::Ro10x),
+            "RO11" => Ok(Self::Ro11),
+            "RO11X" => Ok(Self::Ro11x),
+            "LA1" => Ok(Self::La1),
+            "LA1X" => Ok(Self::La1x),
+            "LA2" => Ok(Self::La2),
+            "LA2X" => Ok(Self::La2x),
+            o => Err(TrackUnknownError(o.to_owned())),
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for Track {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        serializer.collect_str(self)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Track {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        // FIXME
+        Ok(String::deserialize(deserializer)?.parse().unwrap())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_xrt_from_str() {
+        let v = Track::from_str("BL1X").expect("Expected to handle BL1X");
+        assert_eq!(v, Track::Bl1x);
+        assert_eq!("BL1X", v.to_string());
+    }
+
+    #[test]
+    fn test_unknown_from_str() {
+        let v = Track::from_str("");
+        assert!(matches!(v, Err(TrackUnknownError(_))));
     }
 }
