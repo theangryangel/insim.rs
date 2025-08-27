@@ -5,15 +5,17 @@ use eyre::Context as _;
 use insim::{
     core::vehicle::Vehicle,
     identifiers::ConnectionId,
-    insim::{Mal, Mso, Mst, Mtc, PlcAllowedCarsSet, SmallType, TinyType, Vtn},
-    Packet,
+    insim::{Mal, Mso, Mst, Mtc, PlcAllowedCarsSet, Res, SmallType},
 };
 use kitcar::{Context, Engine, Timer, Workshop};
 use rand::seq::IndexedRandom;
 
 mod config;
+pub mod dictator;
 
 use config::Config;
+
+use crate::config::Combo;
 
 /// Represents the state of the mini-game.
 #[derive(Debug)]
@@ -24,68 +26,73 @@ pub enum GameState {
     Lobby {
         /// Countdown to game start
         countdown: Timer,
-        /// Chosen combo
-        combo: config::Combo,
     },
     /// Main game loop is in progress.
-    InProgress {
+    InGame {
         /// Current round
         round: u8,
         /// Time until next round
         timer: Timer,
-        /// Chosen combo
-        combo: config::Combo,
     },
+}
+
+/// State
+#[derive(Debug)]
+pub struct State {
+    state: GameState,
+
+    available_combos: Vec<Combo>,
+
+    combo: Option<Combo>,
 }
 
 /// Manages the initial setup of the game, including loading the track and layout
 #[derive(Debug)]
-pub struct Control {
-    combos: Vec<config::Combo>,
-}
+pub struct Control;
 
-impl Engine<GameState> for Control {
-    fn packet(&mut self, context: &mut Context<GameState>, packet: &insim::Packet) {
-        if let Packet::Mso(Mso { msg, ucid, .. }) = packet {
-            match msg.as_ref() {
-                // FIXME: check if admin
-                "!start" if matches!(context.state, GameState::Idle) => {
-                    if let Some(combo) = self.combos.choose(&mut rand::rng()) {
-                        context.state = GameState::Lobby {
-                            countdown: Timer::repeating(Duration::from_secs(10), Some(30)),
-                            combo: combo.clone(),
+impl Engine<State> for Control {
+    fn mso(&mut self, context: &mut Context<State>, mso: &Mso) {
+        match mso.msg.as_str() {
+            // FIXME: check if admin
+            "!lobby" if matches!(context.state.state, GameState::Idle) => {
+                if let Some(combo) = context.state.available_combos.choose(&mut rand::rng()) {
+                    context.state.state = GameState::Lobby {
+                        countdown: Timer::repeating(Duration::from_secs(10), Some(30)),
+                    };
+
+                    context.state.combo = Some(combo.clone());
+
+                    // TODO: use partition
+                    let mut plc = PlcAllowedCarsSet::default();
+                    let mut mal = Mal::default();
+                    for vehicle in combo.vehicles.iter() {
+                        match vehicle {
+                            Vehicle::Mod(_) => {
+                                let _ = mal.insert(vehicle.clone());
+                            },
+                            Vehicle::Unknown => {},
+                            o => {
+                                let _ = plc.insert(o.clone());
+                            },
                         };
-
-                        let mut plc = PlcAllowedCarsSet::default();
-                        let mut mal = Mal::default();
-                        for vehicle in combo.vehicles.iter() {
-                            match vehicle {
-                                Vehicle::Mod(_) => {
-                                    let _ = mal.insert(vehicle.clone());
-                                },
-                                Vehicle::Unknown => {},
-                                o => {
-                                    let _ = plc.insert(o.clone());
-                                },
-                            };
-                        }
-
-                        context.queue_packet(SmallType::Alc(plc));
-                        context.queue_packet(mal);
-                    } else {
-                        context.queue_packet(Mtc {
-                            ucid: *ucid,
-                            text: "No valid combos found. Invalid config.yaml?".to_owned(),
-                            ..Default::default()
-                        });
                     }
-                },
-                // FIXME: check if admin
-                "!abort" => {
-                    context.state = GameState::Idle;
-                },
-                _ => {},
-            }
+
+                    context.queue_packet(SmallType::Alc(plc));
+                    context.queue_packet(mal);
+                } else {
+                    context.queue_packet(Mtc {
+                        ucid: mso.ucid,
+                        text: "No valid combos found. Invalid config.yaml?".to_owned(),
+                        ..Default::default()
+                    });
+                }
+            },
+            // FIXME: check if admin
+            "!end" => {
+                context.state.state = GameState::Idle;
+                // TODO: clear combo, etc.
+            },
+            _ => {},
         }
     }
 }
@@ -94,25 +101,30 @@ impl Engine<GameState> for Control {
 #[derive(Debug)]
 pub struct CountdownEngine;
 
-impl Engine<GameState> for CountdownEngine {
-    fn tick(&mut self, context: &mut Context<GameState>) {
+impl Engine<State> for CountdownEngine {
+    fn tick(&mut self, context: &mut Context<State>) {
         if let GameState::Lobby {
             countdown: ref timer,
-            ref combo,
-        } = context.state
+        } = context.state.state
         {
-            let combo = combo.clone();
-
             if timer.tick() {
                 if timer.is_finished() {
-                    context.state = GameState::InProgress {
+                    context.state.state = GameState::InGame {
                         round: 0,
                         timer: Timer::repeating(Duration::from_secs(60), Some(15)),
-                        combo: combo,
                     };
                     context.queue_packet(Mtc {
                         text: format!("The game is starting in 1 minute. Good luck!"),
                         ucid: ConnectionId::ALL,
+                        ..Default::default()
+                    });
+
+                    context.queue_packet(Mst {
+                        msg: "/laps 1".to_owned(),
+                        ..Default::default()
+                    });
+                    context.queue_packet(Mst {
+                        msg: "/restart".to_owned(),
                         ..Default::default()
                     });
                 } else {
@@ -139,32 +151,30 @@ pub struct Rounds {
     results: HashMap<String, Duration>,
 }
 
-impl Engine<GameState> for Rounds {
-    fn packet(&mut self, context: &mut Context<GameState>, packet: &insim::Packet) {
-        if !matches!(context.state, GameState::InProgress { .. }) {
-            return;
-        }
+impl Engine<State> for Rounds {
+    fn active(&self, context: &Context<State>) -> bool {
+        matches!(context.state.state, GameState::InGame { .. })
+    }
 
-        if let Packet::Res(res) = packet {
-            let _ = self.results.insert(res.uname.clone(), res.ttime);
+    fn res(&mut self, context: &mut Context<State>, res: &Res) {
+        let _ = self.results.insert(res.uname.clone(), res.ttime);
 
-            // 20s exactly!
-            if res.ttime == Duration::from_secs(20) {
-                context.queue_packet(Mtc {
-                    text: format!("Congrats {}, you got an exact 20s lap!", res.pname,),
-                    ucid: ConnectionId::ALL,
-                    ..Default::default()
-                });
-            }
+        // 20s exactly!
+        if res.ttime == Duration::from_secs(20) {
+            context.queue_packet(Mtc {
+                text: format!("Congrats {}, you got an exact 20s lap!", res.pname,),
+                ucid: ConnectionId::ALL,
+                ..Default::default()
+            });
         }
     }
 
-    fn tick(&mut self, context: &mut Context<GameState>) {
-        if let GameState::InProgress {
+    fn tick(&mut self, context: &mut Context<State>) {
+        if let GameState::InGame {
             mut round,
             ref mut timer,
             ..
-        } = context.state
+        } = context.state.state
         {
             if timer.tick() {
                 if round > 0 {
@@ -174,7 +184,7 @@ impl Engine<GameState> for Rounds {
                 round = round + 1;
 
                 if timer.is_finished() {
-                    context.state = GameState::Idle;
+                    context.state.state = GameState::Idle;
 
                     context.queue_packet(Mtc {
                         text: "The game has ended! Thanks for playing".to_owned(),
@@ -186,7 +196,7 @@ impl Engine<GameState> for Rounds {
                 }
 
                 context.queue_packet(Mst {
-                    msg: "/laps 1".to_owned(),
+                    msg: format!("/laps {}", context.state.combo.as_ref().unwrap().laps),
                     ..Default::default()
                 });
                 context.queue_packet(Mst {
@@ -203,35 +213,23 @@ impl Engine<GameState> for Rounds {
     }
 }
 
-/// Prevent voting when a game is in progress
-#[derive(Debug)]
-pub struct Dictator;
-
-impl Engine<GameState> for Dictator {
-    fn packet(&mut self, context: &mut Context<GameState>, packet: &insim::Packet) {
-        if !matches!(context.state, GameState::InProgress { .. }) {
-            return;
-        }
-
-        if let Packet::Vtn(Vtn { .. }) = packet {
-            context.queue_packet(TinyType::Vtc);
-        }
-    }
-}
-
 fn main() -> eyre::Result<()> {
     let config: Config = serde_norway::from_str(
         &fs::read_to_string("config.yaml").wrap_err("could not read config.yaml")?,
     )
     .wrap_err("Could not parse config.yaml")?;
 
-    Workshop::with_state(GameState::Idle)
-        .add_engine(Control {
-            combos: config.combo.clone(),
-        })
+    let state = State {
+        state: GameState::Idle,
+        available_combos: config.combo.clone(),
+        combo: None,
+    };
+
+    Workshop::with_state(state)
+        .add_engine(Control)
         .add_engine(CountdownEngine)
         .add_engine(Rounds::default())
-        .add_engine(Dictator)
+        .add_engine(dictator::NoVote)
         .ignition(
             insim::tcp(config.addr)
                 .isi_iname(config.iname)

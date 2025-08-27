@@ -117,7 +117,9 @@ impl<C: 'static + Send> Chassis<C> {
     pub fn tick(&mut self) {
         if let Ok(packet) = self.network.read() {
             for system in &mut self.systems {
-                system.packet(&mut self.context, &packet);
+                if system.active(&self.context) {
+                    system.packet(&mut self.context, &packet);
+                }
             }
         }
 
@@ -129,14 +131,18 @@ impl<C: 'static + Send> Chassis<C> {
         }
 
         for system in &mut self.systems {
-            system.tick(&mut self.context);
+            if system.active(&self.context) {
+                system.tick(&mut self.context);
+            }
         }
 
         let messages_to_process: VecDeque<Box<dyn Any + Send>> =
             self.context.mailbox.drain(..).collect();
         for msg in messages_to_process.iter() {
             for system in &mut self.systems {
-                system.handle_message(&mut self.context, msg.as_ref());
+                if system.active(&self.context) {
+                    system.handle_message(&mut self.context, msg.as_ref());
+                }
             }
         }
     }
