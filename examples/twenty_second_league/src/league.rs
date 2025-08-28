@@ -26,13 +26,14 @@ pub enum League {
     },
 }
 
-impl<S, P, C> Engine<S, P, C> for League
+impl<S, P, C, G> Engine<S, P, C, G> for League
 where
     S: Default + Debug,
     P: Default + Debug,
     C: Default + Debug,
+    G: Default + Debug,
 {
-    fn tick(&mut self, context: &mut Context<S, P, C>) {
+    fn tick(&mut self, context: &mut Context<S, P, C, G>) {
         match self {
             League::Lobby { countdown } => {
                 if countdown.tick() {
@@ -110,22 +111,26 @@ where
         }
     }
 
-    fn mso(&mut self, _context: &mut Context<S, P, C>, mso: &Mso) {
-        // FIXME: check if admin
+    fn mso(&mut self, context: &mut Context<S, P, C, G>, mso: &Mso) {
+        let is_admin = context
+            .connections
+            .get(&mso.ucid)
+            .map_or_else(|| false, |u| u.admin);
+
         match mso.msg.as_str() {
-            "!lobby" if matches!(&self, Self::Idle) => {
+            "!lobby" if matches!(&self, Self::Idle) && is_admin => {
                 *self = Self::Lobby {
                     countdown: Timer::repeating(Duration::from_secs(10), 30),
                 };
             },
-            "!end" => {
+            "!end" if is_admin => {
                 *self = Self::Idle;
             },
             _ => {},
         }
     }
 
-    fn res(&mut self, context: &mut Context<S, P, C>, res: &Res) {
+    fn res(&mut self, context: &mut Context<S, P, C, G>, res: &Res) {
         if !matches!(self, Self::InGame { .. }) {
             return;
         }

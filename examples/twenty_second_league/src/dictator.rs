@@ -8,13 +8,14 @@ use kitcar::{Context, Engine};
 #[derive(Debug)]
 pub struct NoVote;
 
-impl<S, P, C> Engine<S, P, C> for NoVote
+impl<S, P, C, G> Engine<S, P, C, G> for NoVote
 where
     S: Default + Debug,
     P: Default + Debug,
     C: Default + Debug,
+    G: Default + Debug,
 {
-    fn vtn(&mut self, context: &mut Context<S, P, C>, _vtn: &Vtn) {
+    fn vtn(&mut self, context: &mut Context<S, P, C, G>, _vtn: &Vtn) {
         context.queue_packet(TinyType::Vtc);
     }
 }

@@ -23,13 +23,14 @@ impl Countdown {
     }
 }
 
-impl<S, P, C> Engine<S, P, C> for Countdown
+impl<S, P, C, G> Engine<S, P, C, G> for Countdown
 where
     S: Default + Debug,
     P: Default + Debug,
     C: Default + Debug,
+    G: Default + Debug,
 {
-    fn tick(&mut self, context: &mut Context<S, P, C>) {
+    fn tick(&mut self, context: &mut Context<S, P, C, G>) {
         if self.countdown.tick() {
             if self.countdown.is_finished() {
                 context.queue_packet(Bfn {

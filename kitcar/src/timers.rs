@@ -42,7 +42,6 @@ impl Timer {
     }
 
     /// Tick
-    /// Now only requires an immutable reference (&self).
     pub fn tick(&self) -> bool {
         if self.finished.get() {
             return false;
@@ -85,7 +84,6 @@ impl Timer {
     }
 
     /// Remaining duration
-    /// Note: I've also corrected the logic here for you.
     pub fn remaining_duration(&self) -> Duration {
         if self.is_finished() {
             return Duration::ZERO;

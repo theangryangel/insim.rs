@@ -8,103 +8,28 @@ use std::{
     time::Duration,
 };
 
-use insim::identifiers::{ConnectionId, PlayerId};
-
-use crate::Engine;
-
-#[derive(Debug)]
-/// PlayerInfo
-pub struct Player<S> {
-    /// PlayerId
-    pub plid: PlayerId,
-
-    /// State
-    pub state: S,
-}
-
-#[derive(Debug)]
-/// ConnectionInfo
-pub struct Connection<S> {
-    /// ConnectionId
-    pub ucid: ConnectionId,
-
-    /// State
-    pub state: S,
-}
-
-/// A container for the user-supplied state.
-#[derive(Debug)]
-pub struct Context<S, P, C>
-where
-    S: Default + Debug,
-    P: Default + Debug,
-    C: Default + Debug,
-{
-    pub(crate) stop: bool,
-    pub(crate) outgoing_packets: VecDeque<insim::Packet>,
-
-    /// State
-    pub state: S,
-
-    /// Connections list
-    pub connections: HashMap<ConnectionId, Connection<C>>,
-
-    /// Players list
-    pub players: HashMap<PlayerId, Player<P>>,
-}
-
-impl<S, P, C> Context<S, P, C>
-where
-    S: Default + Debug,
-    P: Default + Debug,
-    C: Default + Debug,
-{
-    /// A convenience method to shutdown.
-    pub fn shutdown(&mut self) {
-        self.stop = true;
-    }
-
-    /// A convenience method to queue a packet for later sending.
-    pub fn queue_packet<I: Into<insim::Packet>>(&mut self, packet: I) {
-        self.outgoing_packets.push_back(packet.into());
-    }
-
-    fn packet(&mut self, packet: &insim::Packet) {
-        match packet {
-            insim::Packet::Ncn(ncn) => self.ncn(ncn),
-            _ => {},
-        }
-    }
-
-    fn ncn(&mut self, ncn: &insim::insim::Ncn) {
-        let _ = self.connections.insert(
-            ncn.ucid.clone(),
-            Connection {
-                ucid: ncn.ucid.clone(),
-                state: C::default(),
-            },
-        );
-    }
-}
+use crate::{context::Game, Context, Engine};
 
 /// The Workshop struct is responsible for building the Chassis
 // TODO: Probably don't need this now.
 #[derive(Debug)]
-pub struct Workshop<S, P, C>
+pub struct Workshop<S, P, C, G>
 where
     S: Default + Debug,
     P: Default + Debug,
     C: Default + Debug,
+    G: Default + Debug,
 {
-    systems: Vec<Box<dyn Engine<S, P, C>>>,
+    systems: Vec<Box<dyn Engine<S, P, C, G>>>,
     state: S,
 }
 
-impl<S, P, C> Workshop<S, P, C>
+impl<S, P, C, G> Workshop<S, P, C, G>
 where
     S: Default + Debug,
     P: Default + Debug,
     C: Default + Debug,
+    G: Default + Debug,
 {
     /// Creates a new `Workshop`
     pub fn new(state: S) -> Self {
@@ -116,7 +41,7 @@ where
 
     /// Adds a system to the `WorldBuilder`.
     /// This method takes `self` and returns `Self` to allow for method chaining.
-    pub fn add_engine(mut self, system: impl Engine<S, P, C> + 'static) -> Self {
+    pub fn add_engine(mut self, system: impl Engine<S, P, C, G> + 'static) -> Self {
         self.systems.push(Box::new(system));
         self
     }
@@ -126,7 +51,7 @@ where
     pub fn ignition(
         self,
         network_builder: insim::builder::Builder,
-    ) -> Result<Chassis<S, P, C>, insim::Error> {
+    ) -> Result<Chassis<S, P, C, G>, insim::Error> {
         let network = network_builder.connect_blocking()?;
 
         Ok(Chassis {
@@ -135,6 +60,7 @@ where
                 stop: false,
                 outgoing_packets: VecDeque::new(),
                 state: self.state,
+                game: Game::default(),
                 connections: HashMap::new(),
                 players: HashMap::new(),
             },
@@ -145,22 +71,24 @@ where
 
 /// The main scheduling engine with built-in networking.
 #[derive(Debug)]
-pub struct Chassis<S, P, C>
+pub struct Chassis<S, P, C, G>
 where
     S: Default + Debug,
     P: Default + Debug,
     C: Default + Debug,
+    G: Default + Debug,
 {
-    pub(crate) systems: Vec<Box<dyn Engine<S, P, C>>>,
-    pub(crate) context: Context<S, P, C>,
+    pub(crate) systems: Vec<Box<dyn Engine<S, P, C, G>>>,
+    pub(crate) context: Context<S, P, C, G>,
     pub(crate) network: insim::net::blocking_impl::Framed,
 }
 
-impl<S, P, C> Chassis<S, P, C>
+impl<S, P, C, G> Chassis<S, P, C, G>
 where
     S: Default + Debug,
     P: Default + Debug,
     C: Default + Debug,
+    G: Default + Debug,
 {
     /// Connects to the network and starts up systems.
     /// This is a private method, only called by the WorldBuilder's `build` method.

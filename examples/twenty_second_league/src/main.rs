@@ -33,7 +33,7 @@ fn main() -> eyre::Result<()> {
     )
     .wrap_err("Could not parse config.yaml")?;
 
-    Workshop::<ComboCollection, (), ()>::new(config.combo.clone())
+    Workshop::<ComboCollection, (), (), ()>::new(config.combo.clone())
         // .add_engine(League::Idle)
         .add_engine(countdown::Countdown::new())
         .add_engine(cpa::Cpa)
