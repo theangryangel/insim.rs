@@ -2,68 +2,121 @@
 //!
 //! Refactored to use a WorldBuilder for a more fluent API.
 
-use std::{any::Any, collections::VecDeque, time::Duration};
+use std::{
+    collections::{HashMap, VecDeque},
+    fmt::Debug,
+    time::Duration,
+};
 
-use crate::{Engine, Message};
+use insim::identifiers::{ConnectionId, PlayerId};
+
+use crate::Engine;
+
+#[derive(Debug)]
+/// PlayerInfo
+pub struct Player<S> {
+    /// PlayerId
+    pub plid: PlayerId,
+
+    /// State
+    pub state: S,
+}
+
+#[derive(Debug)]
+/// ConnectionInfo
+pub struct Connection<S> {
+    /// ConnectionId
+    pub ucid: ConnectionId,
+
+    /// State
+    pub state: S,
+}
 
 /// A container for the user-supplied state.
 #[derive(Debug)]
-pub struct Context<C> {
-    /// User-supplied state
-    pub state: C,
+pub struct Context<S, P, C>
+where
+    S: Default + Debug,
+    P: Default + Debug,
+    C: Default + Debug,
+{
     pub(crate) stop: bool,
     pub(crate) outgoing_packets: VecDeque<insim::Packet>,
-    pub(crate) mailbox: VecDeque<Box<dyn Any + Send>>,
+
+    /// State
+    pub state: S,
+
+    /// Connections list
+    pub connections: HashMap<ConnectionId, Connection<C>>,
+
+    /// Players list
+    pub players: HashMap<PlayerId, Player<P>>,
 }
 
-impl<C: 'static + Send> Context<C> {
+impl<S, P, C> Context<S, P, C>
+where
+    S: Default + Debug,
+    P: Default + Debug,
+    C: Default + Debug,
+{
     /// A convenience method to shutdown.
     pub fn shutdown(&mut self) {
         self.stop = true;
-    }
-
-    /// A convenience method for systems to send messages.
-    pub fn send_message<M: Message>(&mut self, msg: M) {
-        self.mailbox.push_back(Box::new(msg));
     }
 
     /// A convenience method to queue a packet for later sending.
     pub fn queue_packet<I: Into<insim::Packet>>(&mut self, packet: I) {
         self.outgoing_packets.push_back(packet.into());
     }
-}
 
-/// The Workshop struct is responsible for building the Chassis
-#[derive(Debug)]
-pub struct Workshop<C> {
-    systems: Vec<Box<dyn Engine<C>>>,
-    state: C,
-}
-
-impl Workshop<()> {
-    /// Creates a new `WorldBuilder` with a default `()` state.
-    pub fn new() -> Self {
-        Self {
-            systems: Vec::new(),
-            state: (),
+    fn packet(&mut self, packet: &insim::Packet) {
+        match packet {
+            insim::Packet::Ncn(ncn) => self.ncn(ncn),
+            _ => {},
         }
     }
 
-    /// Creates a new `WorldBuilder` specifying the user-supplied state.
-    pub fn with_state<S: 'static + Send>(state: S) -> Workshop<S> {
-        Workshop {
-            // This is the key change: we create a new, empty systems vector
-            // with the correct generic type `S`.
+    fn ncn(&mut self, ncn: &insim::insim::Ncn) {
+        let _ = self.connections.insert(
+            ncn.ucid.clone(),
+            Connection {
+                ucid: ncn.ucid.clone(),
+                state: C::default(),
+            },
+        );
+    }
+}
+
+/// The Workshop struct is responsible for building the Chassis
+// TODO: Probably don't need this now.
+#[derive(Debug)]
+pub struct Workshop<S, P, C>
+where
+    S: Default + Debug,
+    P: Default + Debug,
+    C: Default + Debug,
+{
+    systems: Vec<Box<dyn Engine<S, P, C>>>,
+    state: S,
+}
+
+impl<S, P, C> Workshop<S, P, C>
+where
+    S: Default + Debug,
+    P: Default + Debug,
+    C: Default + Debug,
+{
+    /// Creates a new `Workshop`
+    pub fn new(state: S) -> Self {
+        Self {
             systems: Vec::new(),
             state,
         }
     }
-}
 
-impl<C: 'static + Send> Workshop<C> {
     /// Adds a system to the `WorldBuilder`.
     /// This method takes `self` and returns `Self` to allow for method chaining.
-    pub fn add_engine(mut self, system: impl Engine<C> + 'static) -> Self {
+    pub fn add_engine(mut self, system: impl Engine<S, P, C> + 'static) -> Self {
         self.systems.push(Box::new(system));
         self
     }
@@ -73,16 +126,17 @@ impl<C: 'static + Send> Workshop<C> {
     pub fn ignition(
         self,
         network_builder: insim::builder::Builder,
-    ) -> Result<Chassis<C>, insim::Error> {
+    ) -> Result<Chassis<S, P, C>, insim::Error> {
         let network = network_builder.connect_blocking()?;
 
         Ok(Chassis {
             systems: self.systems,
             context: Context {
-                state: self.state,
                 stop: false,
                 outgoing_packets: VecDeque::new(),
-                mailbox: VecDeque::new(),
+                state: self.state,
+                connections: HashMap::new(),
+                players: HashMap::new(),
             },
             network,
         })
@@ -91,13 +145,23 @@ impl<C: 'static + Send> Workshop<C> {
 
 /// The main scheduling engine with built-in networking.
 #[derive(Debug)]
-pub struct Chassis<C> {
-    pub(crate) systems: Vec<Box<dyn Engine<C>>>,
-    pub(crate) context: Context<C>,
+pub struct Chassis<S, P, C>
+where
+    S: Default + Debug,
+    P: Default + Debug,
+    C: Default + Debug,
+{
+    pub(crate) systems: Vec<Box<dyn Engine<S, P, C>>>,
+    pub(crate) context: Context<S, P, C>,
     pub(crate) network: insim::net::blocking_impl::Framed,
 }
 
-impl<C: 'static + Send> Chassis<C> {
+impl<S, P, C> Chassis<S, P, C>
+where
+    S: Default + Debug,
+    P: Default + Debug,
+    C: Default + Debug,
+{
     /// Connects to the network and starts up systems.
     /// This is a private method, only called by the WorldBuilder's `build` method.
     fn startup(&mut self) {
@@ -116,33 +180,21 @@ impl<C: 'static + Send> Chassis<C> {
     /// Main tick - processes network and then systems.
     pub fn tick(&mut self) {
         if let Ok(packet) = self.network.read() {
-            for system in &mut self.systems {
-                if system.active(&self.context) {
-                    system.packet(&mut self.context, &packet);
-                }
+            self.context.packet(&packet);
+
+            for system in &mut self.systems.iter_mut() {
+                system.packet(&mut self.context, &packet);
             }
+        }
+
+        for system in self.systems.iter_mut() {
+            system.tick(&mut self.context);
         }
 
         while let Some(packet) = self.context.outgoing_packets.pop_front() {
             if let Err(e) = self.network.write(packet) {
                 eprintln!("Failed to send packet: {}", e);
                 break;
-            }
-        }
-
-        for system in &mut self.systems {
-            if system.active(&self.context) {
-                system.tick(&mut self.context);
-            }
-        }
-
-        let messages_to_process: VecDeque<Box<dyn Any + Send>> =
-            self.context.mailbox.drain(..).collect();
-        for msg in messages_to_process.iter() {
-            for system in &mut self.systems {
-                if system.active(&self.context) {
-                    system.handle_message(&mut self.context, msg.as_ref());
-                }
             }
         }
     }

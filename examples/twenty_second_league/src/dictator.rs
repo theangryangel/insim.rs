@@ -1,19 +1,20 @@
 //! No voting!
+use std::fmt::Debug;
+
 use insim::insim::{TinyType, Vtn};
 use kitcar::{Context, Engine};
 
-use crate::{GameState, State};
-
-/// Prevent voting when a game is in progress
+/// Prevent voting
 #[derive(Debug)]
 pub struct NoVote;
 
-impl Engine<State> for NoVote {
-    fn active(&self, context: &Context<State>) -> bool {
-        matches!(context.state.inner, GameState::InProgress { .. })
-    }
-
-    fn vtn(&mut self, context: &mut Context<State>, _vtn: &Vtn) {
+impl<S, P, C> Engine<S, P, C> for NoVote
+where
+    S: Default + Debug,
+    P: Default + Debug,
+    C: Default + Debug,
+{
+    fn vtn(&mut self, context: &mut Context<S, P, C>, _vtn: &Vtn) {
         context.queue_packet(TinyType::Vtc);
     }
 }

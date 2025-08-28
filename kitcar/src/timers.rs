@@ -29,8 +29,16 @@ impl Timer {
     }
 
     /// Create a new repeating timer
-    pub fn repeating(interval: Duration, remaining: Option<u32>) -> Self {
-        Self::new(interval, remaining)
+    pub fn repeating(interval: Duration, remaining: u32) -> Self {
+        println!("repeating={:?}", remaining);
+        let res = Self::new(interval, Some(remaining));
+        println!("repeating={:?}", res.remaining.get());
+        res
+    }
+
+    /// Create a new countdown
+    pub fn countdown(duration: Duration) -> Self {
+        Self::repeating(Duration::from_secs(1), duration.as_secs() as u32)
     }
 
     /// Tick
@@ -43,10 +51,12 @@ impl Timer {
         // We use .borrow() to get an immutable reference to the Instant.
         if Instant::now() >= *self.start_time.borrow() + self.duration {
             if let Some(r) = self.remaining.get() {
+                println!("r={:?}", r);
                 if r <= 1 {
                     self.finished.set(true);
                 } else {
                     self.remaining.set(Some(r - 1));
+                    println!("reminaing - 1, {:?}", self.remaining.get());
                 }
             } else {
                 // This is a repeating timer with no limit

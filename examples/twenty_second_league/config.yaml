@@ -1,5 +1,5 @@
-iname: "insim.rs/20s-league"
-addr: "127.0.0.1:29999"
+iname: "insim.rs/20sl"
+addr: "172.24.64.1:29999"
 admin: "123!"
 tick_rate: 64
 
