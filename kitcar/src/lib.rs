@@ -3,8 +3,8 @@
 
 pub mod context;
 pub mod engine;
-pub mod lease;
 pub mod timers;
+pub mod ui;
 pub mod world;
 
 pub use context::{ConnectionInfo, Context, PlayerInfo};

@@ -10,6 +10,7 @@ homepage.workspace = true
 
 [dependencies]
 insim = { path = "../insim", version = "4.0.0", features = ["blocking"] }
+fixedbitset = { workspace = true }
 
 [lints]
 workspace = true
