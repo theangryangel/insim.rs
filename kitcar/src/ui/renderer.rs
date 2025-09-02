@@ -1,11 +1,14 @@
 //! UI Renderer
 use std::{any::TypeId, collections::HashMap};
 
-use insim::{identifiers::ClickId, insim::Btn};
+use insim::{
+    identifiers::{ClickId, ConnectionId},
+    insim::Btn,
+};
 use taffy::{prelude::length, NodeId, Size, TaffyTree};
 
 use crate::ui::{
-    click_id_pool::ClickIdPool,
+    id_pool::ClickIdPool,
     node::{UINode, UINodeKey},
     tree::TreeState,
 };
@@ -35,6 +38,7 @@ impl Renderer {
         click_id_pool: &mut ClickIdPool,
         id_to_tree_map: &HashMap<ClickId, TypeId>,
         tree_id: TypeId,
+        ucid: ConnectionId,
     ) -> RendererResult {
         // Skip rendering if marked for deletion
         if tree_state.marked_for_deletion {
@@ -115,7 +119,8 @@ impl Renderer {
                     text: node.text().unwrap().to_string(),
                     bstyle: node.bstyle().unwrap(),
 
-                    // FIXME: UCID
+                    ucid,
+
                     ..Default::default()
                 });
             }

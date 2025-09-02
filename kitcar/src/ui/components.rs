@@ -7,7 +7,7 @@ use taffy::{prelude::length, AlignItems, FlexDirection, Size, Style};
 
 use crate::ui::node::{UINode, UINodeKey};
 
-/// Create a basic button
+/// A basic button
 pub fn primary_button(text: Cow<'static, str>, key: UINodeKey) -> UINode {
     UINode::Rendered {
         layout: Style {

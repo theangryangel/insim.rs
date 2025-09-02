@@ -1,7 +1,7 @@
 //! UI related things
 
-pub(crate) mod click_id_pool;
 pub mod components;
+pub(crate) mod id_pool;
 pub mod manager;
 pub mod node;
 pub(crate) mod renderer;

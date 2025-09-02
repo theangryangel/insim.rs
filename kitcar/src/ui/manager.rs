@@ -2,10 +2,13 @@
 
 use std::{any::TypeId, collections::HashMap};
 
-use insim::{identifiers::ClickId, insim::Btn};
+use insim::{
+    identifiers::{ClickId, ConnectionId},
+    insim::{Bfn, BfnType, Btn},
+};
 
 use crate::ui::{
-    click_id_pool::IdPool,
+    id_pool::IdPool,
     node::{UINode, UINodeKey},
     renderer::Renderer,
     tree::TreeManager,
@@ -52,13 +55,20 @@ impl UIManager {
     }
 
     /// Render a specific tree using its TypeId
-    pub fn render_tree<T: 'static>(&mut self) -> Result<(Vec<Btn>, Vec<ClickId>), String> {
+    pub fn render_tree<T: 'static>(
+        &mut self,
+        ucid: ConnectionId,
+    ) -> Result<(Vec<Btn>, Vec<ClickId>), String> {
         let tree_id = TypeId::of::<T>();
-        self.render_tree_by_id(tree_id)
+        self.render_tree_by_id(tree_id, ucid)
     }
 
     /// Internal method to render by tree ID
-    fn render_tree_by_id(&mut self, tree_id: TypeId) -> Result<(Vec<Btn>, Vec<ClickId>), String> {
+    fn render_tree_by_id(
+        &mut self,
+        tree_id: TypeId,
+        ucid: ConnectionId,
+    ) -> Result<(Vec<Btn>, Vec<ClickId>), String> {
         let tree_state = self
             .tree_manager
             .get_tree_state(tree_id)
@@ -69,6 +79,7 @@ impl UIManager {
             &mut self.click_id_pool,
             &self.id_to_tree,
             tree_id,
+            ucid,
         )?;
 
         // Update the tree state with new button mappings
@@ -91,7 +102,7 @@ impl UIManager {
     }
 
     /// Render all active trees and return combined packets
-    pub fn render_all(&mut self) -> (Vec<Btn>, Vec<ClickId>) {
+    pub fn render_all(&mut self, ucid: ConnectionId) -> (Vec<Btn>, Vec<Bfn>) {
         let mut all_packets = Vec::new();
         let mut all_removed = Vec::new();
 
@@ -108,7 +119,7 @@ impl UIManager {
         let tree_ids: Vec<TypeId> = self.tree_manager.get_tree_ids();
 
         for tree_id in tree_ids {
-            match self.render_tree_by_id(tree_id) {
+            match self.render_tree_by_id(tree_id, ucid) {
                 Ok((mut packets, mut removed)) => {
                     all_packets.append(&mut packets);
                     all_removed.append(&mut removed);
@@ -122,7 +133,18 @@ impl UIManager {
         // Batch deallocate all removed click IDs at the end
         self.click_id_pool.release(&all_removed);
 
-        (all_packets, all_removed)
+        (
+            all_packets,
+            all_removed
+                .into_iter()
+                .map(|clickid| Bfn {
+                    ucid,
+                    clickid,
+                    subt: BfnType::DelBtn,
+                    ..Default::default()
+                })
+                .collect(),
+        )
     }
 
     /// Handle a click and return both the tree ID and button key that was clicked
@@ -188,7 +210,7 @@ mod tests {
         assert!(ui_manager.get_tree_ids().contains(&tree_id));
 
         // Verify we can render it
-        let result = ui_manager.render_tree::<TestViewA>();
+        let result = ui_manager.render_tree::<TestViewA>(ConnectionId::LOCAL);
         assert!(result.is_ok());
 
         let (packets, removed) = result.unwrap();
@@ -220,7 +242,7 @@ mod tests {
         assert!(ui_manager.has_tree::<TestViewB>());
 
         // Render all and verify we get packets from both trees
-        let (all_packets, all_removed) = ui_manager.render_all();
+        let (all_packets, all_removed) = ui_manager.render_all(ConnectionId::LOCAL);
         assert_eq!(all_packets.len(), 3); // 1 from A, 2 from B
         assert_eq!(all_removed.len(), 0);
 
@@ -243,7 +265,9 @@ mod tests {
         let _ = ui_manager.set_tree::<TestViewA>(initial_view);
 
         // Render to allocate click IDs
-        let (initial_packets, _) = ui_manager.render_tree::<TestViewA>().unwrap();
+        let (initial_packets, _) = ui_manager
+            .render_tree::<TestViewA>(ConnectionId::LOCAL)
+            .unwrap();
         assert_eq!(initial_packets.len(), 1);
         assert_eq!(initial_packets[0].text, "Initial Button");
 
@@ -259,7 +283,9 @@ mod tests {
         assert!(ui_manager.has_tree::<TestViewA>());
 
         // Render and verify updated content
-        let (updated_packets, _) = ui_manager.render_tree::<TestViewA>().unwrap();
+        let (updated_packets, _) = ui_manager
+            .render_tree::<TestViewA>(ConnectionId::LOCAL)
+            .unwrap();
         assert_eq!(updated_packets.len(), 2); // Now has 2 buttons
 
         let button_texts: Vec<&String> = updated_packets.iter().map(|p| &p.text).collect();
@@ -289,7 +315,7 @@ mod tests {
         assert!(ui_manager.has_tree::<TestViewA>());
 
         // Should be able to render successfully
-        let result = ui_manager.render_tree::<TestViewA>();
+        let result = ui_manager.render_tree::<TestViewA>(ConnectionId::LOCAL);
         assert!(result.is_ok());
         let (packets, _) = result.unwrap();
         assert_eq!(packets.len(), 1);
@@ -308,7 +334,9 @@ mod tests {
         assert!(ui_manager.has_tree::<TestViewA>());
 
         // Render should succeed but return no packets
-        let (packets, removed) = ui_manager.render_tree::<TestViewA>().unwrap();
+        let (packets, removed) = ui_manager
+            .render_tree::<TestViewA>(ConnectionId::LOCAL)
+            .unwrap();
         assert_eq!(packets.len(), 0);
         assert_eq!(removed.len(), 0);
     }
@@ -327,7 +355,9 @@ mod tests {
         let _ = ui_manager.set_tree::<TestViewA>(view);
 
         // Render to allocate click IDs
-        let (packets, _) = ui_manager.render_tree::<TestViewA>().unwrap();
+        let (packets, _) = ui_manager
+            .render_tree::<TestViewA>(ConnectionId::LOCAL)
+            .unwrap();
         assert_eq!(packets.len(), 3);
 
         // Verify click IDs were allocated
@@ -364,8 +394,12 @@ mod tests {
         assert!(!ui_manager.has_tree::<TestViewC>()); // Not added
 
         // Should be able to render each independently
-        let (packets_a, _) = ui_manager.render_tree::<TestViewA>().unwrap();
-        let (packets_b, _) = ui_manager.render_tree::<TestViewB>().unwrap();
+        let (packets_a, _) = ui_manager
+            .render_tree::<TestViewA>(ConnectionId::LOCAL)
+            .unwrap();
+        let (packets_b, _) = ui_manager
+            .render_tree::<TestViewB>(ConnectionId::LOCAL)
+            .unwrap();
 
         assert_eq!(packets_a.len(), 1);
         assert_eq!(packets_b.len(), 1);
@@ -378,7 +412,7 @@ mod tests {
         let mut ui_manager = UIManager::new();
 
         // Try to render a view that was never added
-        let result = ui_manager.render_tree::<TestViewA>();
+        let result = ui_manager.render_tree::<TestViewA>(ConnectionId::LOCAL);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("not found"));
     }

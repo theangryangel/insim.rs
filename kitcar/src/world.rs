@@ -107,6 +107,10 @@ where
 
     /// Main tick - processes network and then systems.
     pub fn tick(&mut self) {
+        // render any btn uis, translate packets, etc.
+        self.context.render();
+
+        // handle packets
         if let Ok(packet) = self.network.read() {
             self.context.packet(&packet);
 
@@ -115,10 +119,12 @@ where
             }
         }
 
+        // tick tock
         for system in self.systems.iter_mut() {
             system.tick(&mut self.context);
         }
 
+        // send queued
         while let Some(packet) = self.context.outgoing_packets.pop_front() {
             if let Err(e) = self.network.write(packet) {
                 eprintln!("Failed to send packet: {}", e);

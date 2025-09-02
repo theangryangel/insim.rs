@@ -134,6 +134,27 @@ where
         self.outgoing_packets.push_back(packet.into());
     }
 
+    pub(crate) fn render(&mut self) {
+        // FIXME we can do better, but this'll do
+        let (to_add, to_remove) = self
+            .connections
+            .iter_mut()
+            .map(|(c, info)| info.ui.render_all(*c))
+            .fold((vec![], vec![]), |mut acc, i| {
+                acc.0.extend_from_slice(&i.0);
+                acc.1.extend_from_slice(&i.1);
+                acc
+            });
+
+        to_remove.into_iter().for_each(|p| {
+            self.queue_packet(p);
+        });
+
+        to_add.into_iter().for_each(|p| {
+            self.queue_packet(p);
+        });
+    }
+
     pub(crate) fn packet(&mut self, packet: &insim::Packet) {
         match packet {
             // Game
@@ -149,6 +170,9 @@ where
             insim::Packet::Toc(toc) => self.toc(toc),
             insim::Packet::Pfl(pfl) => self.pfl(pfl),
             insim::Packet::Pla(pla) => self.pla(pla),
+
+            // FIXME: process Btn's and pipe through ucid ui to translate and then forward onto the
+            // Engine's
             _ => {},
         }
     }
