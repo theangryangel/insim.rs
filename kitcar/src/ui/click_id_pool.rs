@@ -1,15 +1,19 @@
 //! Click ID Pool Manager - handles allocation and deallocation of unique IDs
 
 use fixedbitset::FixedBitSet;
+use insim::identifiers::ClickId;
+
+/// Helper alias for a Btn ClickId Pool
+pub type ClickIdPool = IdPool<1, 239>;
 
 #[derive(Debug)]
 /// ClickId Pool - handles allocation and deallocation of unique IDs for buttons
-pub struct ClickIdPool<const MIN: u8, const MAX: u8> {
+pub struct IdPool<const MIN: u8, const MAX: u8> {
     // Bit set where 1 = available, 0 = allocated
     available_ids: FixedBitSet,
 }
 
-impl<const MIN: u8, const MAX: u8> ClickIdPool<MIN, MAX> {
+impl<const MIN: u8, const MAX: u8> IdPool<MIN, MAX> {
     /// New!
     pub fn new() -> Self {
         let mut available_ids = FixedBitSet::with_capacity(MAX.saturating_add(1) as usize);
@@ -23,12 +27,12 @@ impl<const MIN: u8, const MAX: u8> ClickIdPool<MIN, MAX> {
     }
 
     /// Lease/allocate a click ID by finding the first available slot.
-    pub fn lease(&mut self) -> Option<u8> {
+    pub fn lease(&mut self) -> Option<ClickId> {
         // Find the first available ID by iterating from the beginning.
         if let Some(id) = self.available_ids.ones().next() {
             let click_id = id as u8;
             self.available_ids.set(id, false);
-            Some(click_id)
+            Some(click_id.into())
         } else {
             None // Pool exhausted
         }
@@ -37,11 +41,11 @@ impl<const MIN: u8, const MAX: u8> ClickIdPool<MIN, MAX> {
     /// Release/deallocate one or more ClickIds
     pub fn release<'a, I>(&mut self, click_ids: &'a I)
     where
-        &'a I: IntoIterator<Item = &'a u8>,
+        &'a I: IntoIterator<Item = &'a ClickId>,
     {
         for click_id in click_ids.into_iter() {
             if (MIN..=MAX).contains(&click_id) {
-                self.available_ids.set(*click_id as usize, true);
+                self.available_ids.set(click_id.0 as usize, true);
             }
         }
     }
@@ -66,7 +70,7 @@ mod tests {
 
     #[test]
     fn test_new_pool_creation() {
-        let pool: ClickIdPool<1, 10> = ClickIdPool::new();
+        let pool: IdPool<1, 10> = IdPool::new();
         let (total, available, allocated) = pool.stats();
 
         assert_eq!(total, 10); // 1-10 inclusive
@@ -76,7 +80,7 @@ mod tests {
 
     #[test]
     fn test_new_pool_with_single_id() {
-        let pool: ClickIdPool<5, 5> = ClickIdPool::new();
+        let pool: IdPool<5, 5> = IdPool::new();
         let (total, available, allocated) = pool.stats();
 
         assert_eq!(total, 1);
@@ -86,7 +90,7 @@ mod tests {
 
     #[test]
     fn test_new_pool_with_zero_min() {
-        let pool: ClickIdPool<0, 3> = ClickIdPool::new();
+        let pool: IdPool<0, 3> = IdPool::new();
         let (total, available, allocated) = pool.stats();
 
         assert_eq!(total, 4); // 0-3 inclusive
@@ -96,11 +100,11 @@ mod tests {
 
     #[test]
     fn test_lease_single_id() {
-        let mut pool: ClickIdPool<1, 10> = ClickIdPool::new();
+        let mut pool: IdPool<1, 10> = IdPool::new();
 
         let id = pool.lease();
         assert!(id.is_some());
-        assert_eq!(id.unwrap(), 1); // Should get the first available (min)
+        assert_eq!(id.unwrap().0, 1); // Should get the first available (min)
 
         let (total, available, allocated) = pool.stats();
         assert_eq!(total, 10);
@@ -110,15 +114,15 @@ mod tests {
 
     #[test]
     fn test_lease_multiple_ids_sequential() {
-        let mut pool: ClickIdPool<5, 8> = ClickIdPool::new();
+        let mut pool: IdPool<5, 8> = IdPool::new();
 
         let id1 = pool.lease().unwrap();
         let id2 = pool.lease().unwrap();
         let id3 = pool.lease().unwrap();
 
-        assert_eq!(id1, 5);
-        assert_eq!(id2, 6);
-        assert_eq!(id3, 7);
+        assert_eq!(id1.0, 5);
+        assert_eq!(id2.0, 6);
+        assert_eq!(id3.0, 7);
 
         let (_, available, allocated) = pool.stats();
         assert_eq!(available, 1);
@@ -127,16 +131,16 @@ mod tests {
 
     #[test]
     fn test_lease_until_exhausted() {
-        let mut pool: ClickIdPool<1, 3> = ClickIdPool::new();
+        let mut pool: IdPool<1, 3> = IdPool::new();
 
         // Lease all available IDs
         let id1 = pool.lease();
         let id2 = pool.lease();
         let id3 = pool.lease();
 
-        assert_eq!(id1, Some(1));
-        assert_eq!(id2, Some(2));
-        assert_eq!(id3, Some(3));
+        assert_eq!(id1, Some(ClickId(1)));
+        assert_eq!(id2, Some(ClickId(2)));
+        assert_eq!(id3, Some(ClickId(3)));
 
         // Pool should be exhausted
         let id4 = pool.lease();
@@ -149,10 +153,10 @@ mod tests {
 
     #[test]
     fn test_release_single_id() {
-        let mut pool: ClickIdPool<1, 5> = ClickIdPool::new();
+        let mut pool: IdPool<1, 5> = IdPool::new();
 
         let id = pool.lease().unwrap();
-        assert_eq!(id, 1);
+        assert_eq!(id.0, 1);
 
         pool.release(&vec![id]);
 
@@ -162,12 +166,12 @@ mod tests {
 
         // Should be able to lease the same ID again
         let new_id = pool.lease().unwrap();
-        assert_eq!(new_id, 1);
+        assert_eq!(new_id.0, 1);
     }
 
     #[test]
     fn test_release_multiple_ids() {
-        let mut pool: ClickIdPool<1, 5> = ClickIdPool::new();
+        let mut pool: IdPool<1, 5> = IdPool::new();
 
         let id1 = pool.lease().unwrap(); // 1
         let _id2 = pool.lease().unwrap(); // 2
@@ -181,18 +185,18 @@ mod tests {
 
         // Next lease should get ID 1 (first available)
         let next_id = pool.lease().unwrap();
-        assert_eq!(next_id, 1);
+        assert_eq!(next_id.0, 1);
     }
 
     #[test]
     fn test_release_out_of_range_ids() {
-        let mut pool: ClickIdPool<5, 10> = ClickIdPool::new();
+        let mut pool: IdPool<5, 10> = IdPool::new();
 
-        let _id = pool.lease().unwrap(); // Should be 5
-        assert_eq!(_id, 5);
+        let id = pool.lease().unwrap(); // Should be 5
+        assert_eq!(id.0, 5);
 
         // Try to release IDs outside the valid range
-        pool.release(&vec![0u8, 4u8, 11u8, 255u8]);
+        pool.release(&vec![ClickId(0), ClickId(4), ClickId(11), ClickId(255)]);
 
         // Stats shouldn't change since none were in range
         let (_, available, allocated) = pool.stats();
@@ -200,7 +204,7 @@ mod tests {
         assert_eq!(allocated, 1); // 5
 
         // Release the valid ID
-        pool.release(&vec![_id]);
+        pool.release(&[id]);
         let (_, available, allocated) = pool.stats();
         assert_eq!(available, 6);
         assert_eq!(allocated, 0);
@@ -208,12 +212,12 @@ mod tests {
 
     #[test]
     fn test_release_already_available_ids() {
-        let mut pool: ClickIdPool<1, 3> = ClickIdPool::new();
+        let mut pool: IdPool<1, 3> = IdPool::new();
 
         let _ = pool.lease().unwrap(); // 1
 
         // Release ID 2 which was never allocated
-        pool.release(&vec![2]);
+        pool.release(&[ClickId(2)]);
 
         // Stats shouldn't change since ID 2 was already available
         let (_, available, allocated) = pool.stats();
@@ -223,7 +227,7 @@ mod tests {
 
     #[test]
     fn test_release_with_different_iterables() {
-        let mut pool: ClickIdPool<1, 5> = ClickIdPool::new();
+        let mut pool: IdPool<1, 5> = IdPool::new();
 
         let id1 = pool.lease().unwrap();
         let id2 = pool.lease().unwrap();
@@ -246,7 +250,7 @@ mod tests {
 
     #[test]
     fn test_stats_consistency() {
-        let mut pool: ClickIdPool<10, 20> = ClickIdPool::new();
+        let mut pool: IdPool<10, 20> = IdPool::new();
 
         let (total, available, allocated) = pool.stats();
         assert_eq!(total, available + allocated);
@@ -266,7 +270,7 @@ mod tests {
 
     #[test]
     fn test_available_count() {
-        let mut pool: ClickIdPool<1, 5> = ClickIdPool::new();
+        let mut pool: IdPool<1, 5> = IdPool::new();
 
         assert_eq!(pool.available_count(), 5);
 
@@ -282,7 +286,7 @@ mod tests {
 
     #[test]
     fn test_lease_after_partial_release() {
-        let mut pool: ClickIdPool<1, 4> = ClickIdPool::new();
+        let mut pool: IdPool<1, 4> = IdPool::new();
 
         // Lease all IDs
         let _id1 = pool.lease().unwrap(); // 1
@@ -298,10 +302,10 @@ mod tests {
 
         // Should be able to lease again, getting the lowest available
         let new_id = pool.lease().unwrap();
-        assert_eq!(new_id, 2);
+        assert_eq!(new_id.0, 2);
 
         let another_id = pool.lease().unwrap();
-        assert_eq!(another_id, 3);
+        assert_eq!(another_id.0, 3);
 
         // Now exhausted again
         assert_eq!(pool.lease(), None);
@@ -309,11 +313,11 @@ mod tests {
 
     #[test]
     fn test_empty_release() {
-        let mut pool: ClickIdPool<1, 3> = ClickIdPool::new();
+        let mut pool: IdPool<1, 3> = IdPool::new();
         let _id = pool.lease().unwrap();
 
         // Release empty collection
-        let empty_vec: Vec<u8> = vec![];
+        let empty_vec: Vec<ClickId> = vec![];
         pool.release(&empty_vec);
 
         // Stats should be unchanged

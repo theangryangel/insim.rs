@@ -11,6 +11,7 @@ homepage.workspace = true
 [dependencies]
 insim = { path = "../insim", version = "4.0.0", features = ["blocking"] }
 fixedbitset = { workspace = true }
+taffy = "0.9.1"
 
 [lints]
 workspace = true

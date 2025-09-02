@@ -11,6 +11,8 @@ use insim::{
     insim::{PlayerFlags, PlayerType, RaceInProgress, RaceLaps, StaFlags},
 };
 
+use crate::ui::manager::UIManager;
+
 #[derive(Debug, Default)]
 /// GameInfo
 pub struct Game<S> {
@@ -82,6 +84,9 @@ pub struct ConnectionInfo<S> {
     /// List of players relating to this connection
     /// Some may be AI players.
     pub players: HashSet<PlayerId>,
+
+    /// Manage the Buttons for the user
+    pub ui: UIManager,
 
     /// Custom State
     pub state: S,
@@ -175,6 +180,7 @@ where
                 uname: ncn.uname.clone(),
                 pname: ncn.pname.clone(),
                 players: HashSet::new(),
+                ui: UIManager::new(),
                 state: C::default(),
             },
         );
