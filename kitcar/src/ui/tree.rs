@@ -33,12 +33,14 @@ impl TreeState {
 pub(crate) struct TreeManager {
     // Maps tree ID to its state
     pub(crate) trees: HashMap<TypeId, TreeState>,
+    pub(crate) stale: bool,
 }
 
 impl TreeManager {
     pub(crate) fn new() -> Self {
         Self {
             trees: HashMap::new(),
+            stale: false,
         }
     }
 
@@ -55,7 +57,7 @@ impl TreeManager {
             let tree_state = TreeState::new(ui_tree);
             let _ = self.trees.insert(tree_id, tree_state);
         }
-
+        self.stale = true;
         tree_id
     }
 
@@ -64,6 +66,7 @@ impl TreeManager {
         let tree_id = TypeId::of::<T>();
         if let Some(tree_state) = self.trees.get_mut(&tree_id) {
             tree_state.marked_for_deletion = true;
+            self.stale = true;
             true
         } else {
             false

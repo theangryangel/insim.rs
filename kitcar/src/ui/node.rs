@@ -53,6 +53,8 @@ pub enum UINode {
         text: Cow<'static, str>,
         /// *Your* ClickId - the ClickId sent to LFS will be assigned
         key: UINodeKey,
+        /// Child nodes
+        children: Vec<Self>,
     },
     /// Unrendered items are just used to help the layout generation
     Unrendered {
@@ -94,6 +96,13 @@ impl UINode {
             Some(hasher.finish())
         } else {
             None
+        }
+    }
+
+    pub(crate) fn children(&self) -> &[Self] {
+        match self {
+            Self::Unrendered { children, .. } => children,
+            Self::Rendered { children, .. } => children,
         }
     }
 }

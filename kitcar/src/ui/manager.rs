@@ -103,6 +103,10 @@ impl UIManager {
 
     /// Render all active trees and return combined packets
     pub fn render_all(&mut self, ucid: ConnectionId) -> (Vec<Btn>, Vec<Bfn>) {
+        if !self.tree_manager.stale {
+            return (vec![], vec![]);
+        }
+
         let mut all_packets = Vec::new();
         let mut all_removed = Vec::new();
 

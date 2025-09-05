@@ -7,7 +7,6 @@ use kitcar::Workshop;
 use crate::combo::ComboCollection;
 
 mod combo;
-mod countdown;
 mod cpa;
 mod dictator;
 mod league;
@@ -34,8 +33,7 @@ fn main() -> eyre::Result<()> {
     .wrap_err("Could not parse config.yaml")?;
 
     Workshop::<ComboCollection, (), (), ()>::new(config.combo.clone())
-        // .add_engine(League::Idle)
-        .add_engine(countdown::Countdown::new())
+        .add_engine(league::League::Idle)
         .add_engine(cpa::Cpa)
         .add_engine(dictator::NoVote)
         .ignition(

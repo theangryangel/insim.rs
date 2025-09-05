@@ -9,5 +9,6 @@ pub mod world;
 
 pub use context::{ConnectionInfo, Context, PlayerInfo};
 pub use engine::Engine;
+pub use taffy;
 pub use timers::Timer;
 pub use world::{Chassis, Workshop};

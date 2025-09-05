@@ -147,22 +147,25 @@ impl Renderer {
         node_id_map: &mut HashMap<UINodeKey, NodeId>,
     ) -> NodeId {
         let mut child_ids = Vec::new();
-        if let UINode::Unrendered { children, .. } = ui_node {
-            for child_node in children {
-                let child_id = Self::build_taffy_tree_and_collect_buttons(
-                    taffy,
-                    child_node,
-                    button_info,
-                    node_id_map,
-                );
-                child_ids.push(child_id);
-            }
+
+        for child_node in ui_node.children() {
+            let child_id = Self::build_taffy_tree_and_collect_buttons(
+                taffy,
+                child_node,
+                button_info,
+                node_id_map,
+            );
+            child_ids.push(child_id);
         }
 
         match ui_node {
             UINode::Rendered { layout, key, .. } => {
                 let _ = button_info.insert(*key, ui_node);
-                let node_id = taffy.new_leaf(layout.clone()).unwrap();
+                let node_id = if child_ids.is_empty() {
+                    taffy.new_leaf(layout.clone()).unwrap()
+                } else {
+                    taffy.new_with_children(layout.clone(), &child_ids).unwrap()
+                };
                 let _ = node_id_map.insert(*key, node_id);
                 node_id
             },

@@ -51,6 +51,13 @@ pub struct Mso {
     pub msg: String,
 }
 
+impl Mso {
+    /// Return msg with the textstart stripped
+    pub fn msg_from_textstart(&self) -> &str {
+        &self.msg[self.textstart as usize..]
+    }
+}
+
 impl Decode for Mso {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let reqi = RequestId::decode(buf)?;

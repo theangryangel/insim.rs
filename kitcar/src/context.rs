@@ -9,6 +9,7 @@ use insim::{
     core::{track::Track, vehicle::Vehicle, wind::Wind},
     identifiers::{ConnectionId, PlayerId},
     insim::{PlayerFlags, PlayerType, RaceInProgress, RaceLaps, StaFlags},
+    WithRequestId,
 };
 
 use crate::ui::manager::UIManager;
@@ -151,7 +152,8 @@ where
         });
 
         to_add.into_iter().for_each(|p| {
-            self.queue_packet(p);
+            let reqi = p.clickid.0;
+            self.queue_packet(p.with_request_id(reqi));
         });
     }
 
@@ -196,6 +198,7 @@ where
     }
 
     fn ncn(&mut self, ncn: &insim::insim::Ncn) {
+        println!("{:?}", ncn);
         let _ = self.connections.insert(
             ncn.ucid.clone(),
             ConnectionInfo {

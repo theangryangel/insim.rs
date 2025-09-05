@@ -20,6 +20,7 @@ where
             if let Some(player) = context.players.get(&packet.plid);
             if let Some(connection) = context.connections.get(&player.ucid);
             then {
+                println!("{:?}", connection);
                 context.queue_packet(Mst {
                     msg: format!("/p_clear {}", &connection.uname),
                     ..Default::default()

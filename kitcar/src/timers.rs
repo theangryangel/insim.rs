@@ -50,7 +50,6 @@ impl Timer {
         // We use .borrow() to get an immutable reference to the Instant.
         if Instant::now() >= *self.start_time.borrow() + self.duration {
             if let Some(r) = self.remaining.get() {
-                println!("r={:?}", r);
                 if r <= 1 {
                     self.finished.set(true);
                 } else {

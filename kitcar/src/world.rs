@@ -8,6 +8,8 @@ use std::{
     time::Duration,
 };
 
+use insim::{insim::TinyType, WithRequestId};
+
 use crate::{context::Game, Context, Engine};
 
 /// The Workshop struct is responsible for building the Chassis
@@ -93,6 +95,9 @@ where
     /// Connects to the network and starts up systems.
     /// This is a private method, only called by the WorldBuilder's `build` method.
     fn startup(&mut self) {
+        self.context.queue_packet(TinyType::Ncn.with_request_id(1));
+        self.context.queue_packet(TinyType::Npl.with_request_id(2));
+
         for system in &mut self.systems {
             system.startup(&mut self.context);
         }

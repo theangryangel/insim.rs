@@ -5,7 +5,10 @@ use insim::{
     identifiers::ConnectionId,
     insim::{Mal, Mso, Mst, Mtc, PlcAllowedCarsSet, Res, SmallType},
 };
-use kitcar::{Context, Engine, Timer};
+use kitcar::{
+    ui::components::{basic, vstack},
+    Context, Engine, Timer,
+};
 
 /// Represents the state of the mini-game.
 #[derive(Debug)]
@@ -17,6 +20,8 @@ pub enum League {
         /// Countdown to game start
         countdown: Timer,
     },
+    LoadTrack,
+    Warmup,
     /// Main game loop is in progress.
     InGame {
         /// Current round
@@ -25,6 +30,8 @@ pub enum League {
         timer: Timer,
     },
 }
+
+struct CountdownView;
 
 impl<S, P, C, G> Engine<S, P, C, G> for League
 where
@@ -38,35 +45,36 @@ where
             League::Lobby { countdown } => {
                 if countdown.tick() {
                     if countdown.is_finished() {
-                        *self = Self::InGame {
-                            round: 0,
-                            timer: Timer::repeating(Duration::from_secs(60), 15),
-                        };
-                        context.queue_packet(Mtc {
-                            text: format!("The game is starting in 1 minute. Good luck!"),
-                            ucid: ConnectionId::ALL,
-                            ..Default::default()
-                        });
+                        for (_ucid, info) in context.connections.iter_mut() {
+                            let _ = info.ui.remove_tree::<CountdownView>();
+                        }
 
-                        context.queue_packet(Mst {
-                            msg: "/laps 1".to_owned(),
-                            ..Default::default()
-                        });
-                        context.queue_packet(Mst {
-                            msg: "/restart".to_owned(),
-                            ..Default::default()
-                        });
+                        // TODO: end game, load track, load layout
+                        *self = Self::LoadTrack;
                     } else {
-                        let remaining = countdown.remaining_duration();
+                        let remaining =
+                            countdown.remaining_duration() * countdown.remaining_repeats().unwrap();
                         let seconds = remaining.as_secs() % 60;
                         let minutes = (remaining.as_secs() / 60) % 60;
 
-                        // TODO: convert this to use buttons
-                        context.queue_packet(Mtc {
-                            text: format!("Game starts in {:02}:{:02}", minutes, seconds),
-                            ucid: ConnectionId::ALL,
-                            ..Default::default()
-                        });
+                        let countdown = vstack(vec![
+                            basic(
+                                "Welcome to ^120sl^8, game starts in".into(),
+                                35,
+                                5,
+                                1.into(),
+                            ),
+                            basic(
+                                format!("{:02}:{:02}", minutes, seconds).into(),
+                                35,
+                                15,
+                                2.into(),
+                            ),
+                        ]);
+
+                        for (_ucid, info) in context.connections.iter_mut() {
+                            let _ = info.ui.set_tree::<CountdownView>(countdown.clone());
+                        }
                     }
                 }
             },
@@ -117,14 +125,24 @@ where
             .get(&mso.ucid)
             .map_or_else(|| false, |u| u.admin);
 
-        match mso.msg.as_str() {
+        println!("{:?} {:?}", mso, mso.msg_from_textstart());
+
+        match mso.msg_from_textstart() {
             "!lobby" if matches!(&self, Self::Idle) && is_admin => {
                 *self = Self::Lobby {
-                    countdown: Timer::repeating(Duration::from_secs(10), 30),
+                    countdown: Timer::countdown(Duration::from_secs(15)),
                 };
             },
             "!end" if is_admin => {
                 *self = Self::Idle;
+            },
+            "!state" => {
+                println!("{:?}", self);
+                context.queue_packet(Mtc {
+                    ucid: mso.ucid.clone(),
+                    text: format!("{:?}", self),
+                    ..Default::default()
+                });
             },
             _ => {},
         }
