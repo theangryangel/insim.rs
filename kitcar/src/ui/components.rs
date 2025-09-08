@@ -10,6 +10,20 @@ use taffy::{
 
 use crate::ui::node::{UINode, UINodeKey};
 
+/// Fullscreen
+pub fn fullscreen() -> UINode {
+    UINode::Unrendered {
+        layout: Style {
+            size: Size {
+                width: length(200.0),
+                height: length(200.0),
+            },
+            ..Default::default()
+        },
+        children: Vec::new(),
+    }
+}
+
 /// A primary button
 pub fn primary_button(text: Cow<'static, str>, key: UINodeKey) -> UINode {
     UINode::Rendered {
@@ -33,7 +47,7 @@ pub fn basic(text: Cow<'static, str>, width: u8, height: u8, key: UINodeKey) -> 
             },
             ..Default::default()
         },
-        style: BtnStyle::default().dark().white().align_left(),
+        style: BtnStyle::default().light().white().align_left(),
         text,
         key,
         children: vec![],

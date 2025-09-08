@@ -3,10 +3,10 @@ use std::{fmt::Debug, time::Duration};
 
 use insim::{
     identifiers::ConnectionId,
-    insim::{Mal, Mso, Mst, Mtc, PlcAllowedCarsSet, Res, SmallType},
+    insim::{BtnStyle, Mal, Mso, Mst, Mtc, PlcAllowedCarsSet, Res, SmallType},
 };
 use kitcar::{
-    ui::components::{basic, vstack},
+    ui::components::{basic, fullscreen, vstack},
     Context, Engine, Timer,
 };
 
@@ -57,20 +57,37 @@ where
                         let seconds = remaining.as_secs() % 60;
                         let minutes = (remaining.as_secs() / 60) % 60;
 
-                        let countdown = vstack(vec![
-                            basic(
-                                "Welcome to ^120sl^8, game starts in".into(),
-                                35,
-                                5,
-                                1.into(),
-                            ),
-                            basic(
-                                format!("{:02}:{:02}", minutes, seconds).into(),
-                                35,
-                                15,
-                                2.into(),
-                            ),
-                        ]);
+                        let countdown = fullscreen()
+                            .height(150.0)
+                            .display_flex()
+                            .flex_direction_column()
+                            .align_items_flex_start()
+                            .justify_content_flex_start()
+                            .padding(20.0)
+                            .with_child(
+                                kitcar::ui::node::UINode::rendered(
+                                    BtnStyle::default().dark(),
+                                    "", 
+                                    1.into()
+                                )
+                                .display_block()
+                                .position_relative()
+                                .padding(1.0)
+                                .with_children(
+                                    [basic(
+                                        "Welcome to ^120sl^8, game starts in".into(),
+                                        35,
+                                        5,
+                                        2.into(),
+                                    ),
+                                    basic(
+                                        format!("{:02}:{:02}", minutes, seconds).into(),
+                                        35,
+                                        15,
+                                        3.into(),
+                                    )]
+                                )
+                            );
 
                         for (_ucid, info) in context.connections.iter_mut() {
                             let _ = info.ui.set_tree::<CountdownView>(countdown.clone());

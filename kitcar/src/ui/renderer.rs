@@ -106,11 +106,14 @@ impl Renderer {
                 };
 
             if needs_update {
+
+                let (x, y) = Self::get_absolute_position(&taffy, node_id_map[&key]);
+
                 packets.push(Btn {
                     clickid: click_id,
                     // Round to avoid visual oddities since LFS works in ints, and taffy with floats
-                    l: layout.location.x.round() as u8,
-                    t: layout.location.y.round() as u8,
+                    l: x.round() as u8,
+                    t: y.round() as u8,
                     w: layout.size.width.round() as u8,
                     h: layout.size.height.round() as u8,
 
@@ -173,5 +176,34 @@ impl Renderer {
                 taffy.new_with_children(layout.clone(), &child_ids).unwrap()
             },
         }
+    }
+
+    // FIXME: we need to get this into the loop somewhere so that we dont need to redo it every
+    // time
+    fn get_absolute_position(
+        taffy: &TaffyTree,
+        node_id: NodeId,
+    ) -> (f32, f32) {
+        let mut current_node = node_id;
+        let mut absolute_location = (0.0, 0.0);
+
+        loop {
+            let layout = taffy.layout(current_node).unwrap();
+            absolute_location.0 += layout.location.x;
+            absolute_location.1 += layout.location.y;
+
+            // Get the parent of the current node
+            let parent = taffy.parent(current_node);
+
+            if let Some(parent_node) = parent {
+                // If there is a parent, move up the tree
+                current_node = parent_node;
+            } else {
+                // If there is no parent, we've reached the root
+                break;
+            }
+        }
+
+        absolute_location
     }
 }
