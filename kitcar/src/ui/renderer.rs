@@ -106,7 +106,6 @@ impl Renderer {
                 };
 
             if needs_update {
-
                 let (x, y) = Self::get_absolute_position(&taffy, node_id_map[&key]);
 
                 packets.push(Btn {
@@ -119,8 +118,8 @@ impl Renderer {
 
                     // unwraps are fine here because we *know* we've got something we can actually
                     // render
-                    text: node.text().unwrap().to_string(),
-                    bstyle: node.bstyle().unwrap(),
+                    text: node.text().unwrap_or_default().to_string(),
+                    bstyle: node.bstyle().unwrap_or_default(),
 
                     ucid,
 
@@ -151,7 +150,9 @@ impl Renderer {
     ) -> NodeId {
         let mut child_ids = Vec::new();
 
-        for child_node in ui_node.children() {
+        let children = ui_node.children();
+
+        for child_node in children.unwrap_or(&[]) {
             let child_id = Self::build_taffy_tree_and_collect_buttons(
                 taffy,
                 child_node,
@@ -164,11 +165,7 @@ impl Renderer {
         match ui_node {
             UINode::Rendered { layout, key, .. } => {
                 let _ = button_info.insert(*key, ui_node);
-                let node_id = if child_ids.is_empty() {
-                    taffy.new_leaf(layout.clone()).unwrap()
-                } else {
-                    taffy.new_with_children(layout.clone(), &child_ids).unwrap()
-                };
+                let node_id = taffy.new_leaf(layout.clone()).unwrap();
                 let _ = node_id_map.insert(*key, node_id);
                 node_id
             },
@@ -180,10 +177,7 @@ impl Renderer {
 
     // FIXME: we need to get this into the loop somewhere so that we dont need to redo it every
     // time
-    fn get_absolute_position(
-        taffy: &TaffyTree,
-        node_id: NodeId,
-    ) -> (f32, f32) {
+    fn get_absolute_position(taffy: &TaffyTree, node_id: NodeId) -> (f32, f32) {
         let mut current_node = node_id;
         let mut absolute_location = (0.0, 0.0);
 

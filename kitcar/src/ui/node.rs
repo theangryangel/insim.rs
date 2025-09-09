@@ -7,8 +7,11 @@ use std::{
 };
 
 use insim::insim::BtnStyle;
-use taffy::{prelude::length, AlignContent, AlignItems, AlignSelf, Dimension, Display, FlexDirection, FlexWrap, JustifyContent, Layout, LengthPercentage, LengthPercentageAuto, Position, Rect, Size, Style};
-
+use taffy::{
+    prelude::length, AlignContent, AlignItems, AlignSelf, Dimension, Display, FlexDirection,
+    FlexWrap, JustifyContent, Layout, LengthPercentage, LengthPercentageAuto, Position, Rect, Size,
+    Style,
+};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 /// Unique key for a UINode.
@@ -54,8 +57,6 @@ pub enum UINode {
         text: Cow<'static, str>,
         /// *Your* ClickId - the ClickId sent to LFS will be assigned
         key: UINodeKey,
-        /// Child nodes
-        children: Vec<Self>,
     },
     /// Unrendered items are just used to help the layout generation
     Unrendered {
@@ -100,27 +101,22 @@ impl UINode {
         }
     }
 
-    pub(crate) fn children(&self) -> &[Self] {
+    pub(crate) fn children(&self) -> Option<&[Self]> {
         match self {
-            Self::Unrendered { children, .. } => children,
-            Self::Rendered { children, .. } => children,
+            Self::Unrendered { children, .. } => Some(children),
+            Self::Rendered { .. } => None,
         }
     }
 
     // ... Builder methods start here ...
 
     /// Creates a new rendered node.
-    pub fn rendered(
-        style: BtnStyle, 
-        text: impl Into<Cow<'static, str>>, 
-        key: UINodeKey
-    ) -> Self {
+    pub fn rendered(style: BtnStyle, text: impl Into<Cow<'static, str>>, key: UINodeKey) -> Self {
         Self::Rendered {
             layout: Style::default(),
             style,
             text: text.into(),
             key,
-            children: Vec::new(),
         }
     }
 
@@ -153,13 +149,14 @@ impl UINode {
     // Child management
     /// Adds a single child.
     pub fn with_child(mut self, child: UINode) -> Self {
-        match &mut self {
-            UINode::Rendered { children, .. } => children.push(child),
-            UINode::Unrendered { children, .. } => children.push(child),
+        if let UINode::Unrendered {
+            ref mut children, ..
+        } = self
+        {
+            children.push(child);
         }
         self
     }
-
 
     // pub fn release<'a, I>(&mut self, click_ids: &'a I)
     // where
@@ -168,11 +165,14 @@ impl UINode {
 
     /// Adds a list of children.
     pub fn with_children<I>(mut self, new_children: I) -> Self
-    where 
-        I: IntoIterator<Item = Self> {
-        match &mut self {
-            UINode::Rendered { children, .. } => children.extend(new_children),
-            UINode::Unrendered { children, .. } => children.extend(new_children),
+    where
+        I: IntoIterator<Item = Self>,
+    {
+        if let UINode::Unrendered {
+            ref mut children, ..
+        } = self
+        {
+            children.extend(new_children);
         }
         self
     }
@@ -458,17 +458,20 @@ impl UINode {
 
     /// Sets flex and direction to column.
     pub fn flex_direction_column(self) -> Self {
-        self.display_flex().with_flex_direction(FlexDirection::Column)
+        self.display_flex()
+            .with_flex_direction(FlexDirection::Column)
     }
 
     /// Sets flex and direction to row_reverse.
     pub fn flex_direction_row_reverse(self) -> Self {
-        self.display_flex().with_flex_direction(FlexDirection::RowReverse)
+        self.display_flex()
+            .with_flex_direction(FlexDirection::RowReverse)
     }
 
     /// Sets flex and direction to column_reverse.
     pub fn flex_direction_column_reverse(self) -> Self {
-        self.display_flex().with_flex_direction(FlexDirection::ColumnReverse)
+        self.display_flex()
+            .with_flex_direction(FlexDirection::ColumnReverse)
     }
 
     /// Sets flex wrap to wrap.
@@ -628,7 +631,10 @@ impl UINode {
     /// Sets both row and column gap.
     pub fn gap(self, gap: f32) -> Self {
         let gap_val = LengthPercentage::length(gap);
-        self.with_gap(Size { width: gap_val, height: gap_val })
+        self.with_gap(Size {
+            width: gap_val,
+            height: gap_val,
+        })
     }
 
     /// Sets horizontal and vertical gaps.

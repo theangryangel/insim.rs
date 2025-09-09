@@ -11,6 +11,7 @@ pub struct Timer {
     duration: Duration,
     finished: Cell<bool>,
     remaining: Cell<Option<u32>>,
+    iteration: Cell<usize>,
 }
 
 impl Timer {
@@ -20,6 +21,7 @@ impl Timer {
             duration,
             finished: Cell::new(false),
             remaining: Cell::new(remaining),
+            iteration: Cell::new(0),
         }
     }
 
@@ -61,6 +63,7 @@ impl Timer {
             }
             // We use .borrow_mut() to get a mutable reference to reset the time.
             *self.start_time.borrow_mut() = Instant::now();
+            self.iteration.set(self.iteration.get().saturating_add(1));
             true
         } else {
             false
@@ -91,5 +94,10 @@ impl Timer {
         // Calculate the next finish time and see how far away it is from now.
         let finish_time = *self.start_time.borrow() + self.duration;
         finish_time.saturating_duration_since(Instant::now())
+    }
+
+    /// Get the current iteration number (starts at 0, increments each time tick() returns true)
+    pub fn iteration(&self) -> usize {
+        self.iteration.get()
     }
 }

@@ -19,8 +19,8 @@ where
         if_chain::if_chain! {
             if let Some(player) = context.players.get(&packet.plid);
             if let Some(connection) = context.connections.get(&player.ucid);
+            if connection.uname.len() > 0;
             then {
-                println!("{:?}", connection);
                 context.queue_packet(Mst {
                     msg: format!("/p_clear {}", &connection.uname),
                     ..Default::default()

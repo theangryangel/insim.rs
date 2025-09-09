@@ -200,10 +200,8 @@ mod tests {
         assert!(!ui_manager.has_tree::<TestViewA>());
 
         // Create a simple view
-        let test_view = components::page_layout(vec![components::primary_button(
-            "Test Button".into(),
-            1.into(),
-        )]);
+        let test_view = components::fullscreen()
+            .with_children(vec![components::button("Test Button".into(), 1.into())]);
 
         // Add the view
         let tree_id = ui_manager.set_tree::<TestViewA>(test_view);
@@ -228,13 +226,11 @@ mod tests {
         let mut ui_manager = UIManager::new();
 
         // Add multiple different view types
-        let view_a = components::page_layout(vec![components::primary_button(
-            "Button A".into(),
-            1.into(),
-        )]);
-        let view_b = components::page_layout(vec![
-            components::primary_button("Button B1".into(), 10.into()),
-            components::primary_button("Button B2".into(), 11.into()),
+        let view_a = components::fullscreen()
+            .with_children(vec![components::button("Button A".into(), 1.into())]);
+        let view_b = components::fullscreen().with_children(vec![
+            components::button("Button B1".into(), 10.into()),
+            components::button("Button B2".into(), 11.into()),
         ]);
 
         let _ = ui_manager.set_tree::<TestViewA>(view_a);
@@ -262,10 +258,8 @@ mod tests {
         let mut ui_manager = UIManager::new();
 
         // Add initial view
-        let initial_view = components::page_layout(vec![components::primary_button(
-            "Initial Button".into(),
-            1.into(),
-        )]);
+        let initial_view = components::fullscreen()
+            .with_children(vec![components::button("Initial Button".into(), 1.into())]);
         let _ = ui_manager.set_tree::<TestViewA>(initial_view);
 
         // Render to allocate click IDs
@@ -276,9 +270,9 @@ mod tests {
         assert_eq!(initial_packets[0].text, "Initial Button");
 
         // Update the same view type with new content
-        let updated_view = components::page_layout(vec![
-            components::primary_button("Updated Button".into(), 1.into()),
-            components::primary_button("New Button".into(), 2.into()),
+        let updated_view = components::fullscreen().with_children(vec![
+            components::button("Updated Button".into(), 1.into()),
+            components::button("New Button".into(), 2.into()),
         ]);
         let _ = ui_manager.set_tree::<TestViewA>(updated_view); // Same method, different content
 
@@ -302,8 +296,8 @@ mod tests {
         let mut ui_manager = UIManager::new();
 
         // Add and mark for deletion
-        let view =
-            components::page_layout(vec![components::primary_button("Test".into(), 1.into())]);
+        let view = components::fullscreen()
+            .with_children(vec![components::button("Test".into(), 1.into())]);
         let _ = ui_manager.set_tree::<TestViewA>(view);
         let _ = ui_manager.remove_tree::<TestViewA>();
 
@@ -311,8 +305,8 @@ mod tests {
         assert!(!ui_manager.has_tree::<TestViewA>()); // has_tree returns false for marked trees
 
         // Update the tree (should unmark it)
-        let updated_view =
-            components::page_layout(vec![components::primary_button("Updated".into(), 1.into())]);
+        let updated_view = components::fullscreen()
+            .with_children(vec![components::button("Updated".into(), 1.into())]);
         let _ = ui_manager.set_tree::<TestViewA>(updated_view);
 
         // Verify it's no longer marked for deletion
@@ -331,7 +325,7 @@ mod tests {
         let mut ui_manager = UIManager::new();
 
         // Add a view with no rendered buttons
-        let empty_view = components::page_layout(vec![]);
+        let empty_view = components::fullscreen().with_children(vec![]);
         let _ = ui_manager.set_tree::<TestViewA>(empty_view);
 
         // Verify the tree exists
@@ -351,10 +345,10 @@ mod tests {
         let initial_available = ui_manager.available_click_ids();
 
         // Add a view with 3 buttons
-        let view = components::page_layout(vec![
-            components::primary_button("Button 1".into(), 1.into()),
-            components::primary_button("Button 2".into(), 2.into()),
-            components::primary_button("Button 3".into(), 3.into()),
+        let view = components::fullscreen().with_children(vec![
+            components::button("Button 1".into(), 1.into()),
+            components::button("Button 2".into(), 2.into()),
+            components::button("Button 3".into(), 3.into()),
         ]);
         let _ = ui_manager.set_tree::<TestViewA>(view);
 
@@ -380,14 +374,10 @@ mod tests {
         let mut ui_manager = UIManager::new();
 
         // Add views of different types
-        let view_a = components::page_layout(vec![components::primary_button(
-            "A Button".into(),
-            1.into(),
-        )]);
-        let view_b = components::page_layout(vec![components::primary_button(
-            "B Button".into(),
-            10.into(),
-        )]);
+        let view_a = components::fullscreen()
+            .with_children([components::button("A Button".into(), 1.into())]);
+        let view_b = components::fullscreen()
+            .with_children(vec![components::button("B Button".into(), 10.into())]);
 
         let _ = ui_manager.set_tree::<TestViewA>(view_a);
         let _ = ui_manager.set_tree::<TestViewB>(view_b);

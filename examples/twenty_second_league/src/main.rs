@@ -10,6 +10,7 @@ mod combo;
 mod cpa;
 mod dictator;
 mod league;
+mod components;
 
 /// Config
 #[derive(Debug, serde::Deserialize)]

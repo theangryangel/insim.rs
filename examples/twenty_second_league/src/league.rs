@@ -3,12 +3,13 @@ use std::{fmt::Debug, time::Duration};
 
 use insim::{
     identifiers::ConnectionId,
-    insim::{BtnStyle, Mal, Mso, Mst, Mtc, PlcAllowedCarsSet, Res, SmallType},
+    insim::{Mso, Mst, Mtc, Res},
 };
 use kitcar::{
-    ui::components::{basic, fullscreen, vstack},
     Context, Engine, Timer,
 };
+
+use crate::combo::{Combo, ComboCollection};
 
 /// Represents the state of the mini-game.
 #[derive(Debug)]
@@ -20,10 +21,15 @@ pub enum League {
         /// Countdown to game start
         countdown: Timer,
     },
-    LoadTrack,
-    Warmup,
+    LoadTrack {
+        combo: Combo,
+        timer: Option<Timer>,
+    },
     /// Main game loop is in progress.
     InGame {
+        /// Chosen combo
+        combo: Combo,
+
         /// Current round
         round: u8,
         /// Time until next round
@@ -33,14 +39,9 @@ pub enum League {
 
 struct CountdownView;
 
-impl<S, P, C, G> Engine<S, P, C, G> for League
-where
-    S: Default + Debug,
-    P: Default + Debug,
-    C: Default + Debug,
-    G: Default + Debug,
+impl Engine<ComboCollection, (), (), ()> for League
 {
-    fn tick(&mut self, context: &mut Context<S, P, C, G>) {
+    fn tick(&mut self, context: &mut Context<ComboCollection, (), (),()>) {
         match self {
             League::Lobby { countdown } => {
                 if countdown.tick() {
@@ -49,45 +50,16 @@ where
                             let _ = info.ui.remove_tree::<CountdownView>();
                         }
 
-                        // TODO: end game, load track, load layout
-                        *self = Self::LoadTrack;
+                        let combo = context.state.random().cloned().unwrap();
+
+                        *self = Self::LoadTrack {
+                            timer: None, combo
+                        };
                     } else {
                         let remaining =
                             countdown.remaining_duration() * countdown.remaining_repeats().unwrap();
-                        let seconds = remaining.as_secs() % 60;
-                        let minutes = (remaining.as_secs() / 60) % 60;
 
-                        let countdown = fullscreen()
-                            .height(150.0)
-                            .display_flex()
-                            .flex_direction_column()
-                            .align_items_flex_start()
-                            .justify_content_flex_start()
-                            .padding(20.0)
-                            .with_child(
-                                kitcar::ui::node::UINode::rendered(
-                                    BtnStyle::default().dark(),
-                                    "", 
-                                    1.into()
-                                )
-                                .display_block()
-                                .position_relative()
-                                .padding(1.0)
-                                .with_children(
-                                    [basic(
-                                        "Welcome to ^120sl^8, game starts in".into(),
-                                        35,
-                                        5,
-                                        2.into(),
-                                    ),
-                                    basic(
-                                        format!("{:02}:{:02}", minutes, seconds).into(),
-                                        35,
-                                        15,
-                                        3.into(),
-                                    )]
-                                )
-                            );
+                        let countdown = crate::components::countdown(remaining);
 
                         for (_ucid, info) in context.connections.iter_mut() {
                             let _ = info.ui.set_tree::<CountdownView>(countdown.clone());
@@ -95,9 +67,72 @@ where
                     }
                 }
             },
+            League::LoadTrack { timer: None, combo } => {
+                context.queue_packet(Mst {
+                    msg: format!("/end"),
+                    ..Default::default()
+                });
+
+                *self = League::LoadTrack { 
+                    timer: Some(Timer::once(Duration::from_secs(6))), combo: combo.clone() 
+                };
+            },
+            League::LoadTrack { timer: Some(timer), combo } => {
+                if timer.tick() {
+
+                    if timer.is_finished() {
+                        // FIXME: check game state
+
+                    }
+
+                    let iteration = timer.iteration().saturating_sub(1);
+
+                    match iteration {
+                        0 => {
+                            context.queue_packet(Mst {
+                                msg: format!("/end"),
+                                ..Default::default()
+                            });
+                        },
+                        1 => {
+                            context.queue_packet(Mst {
+                                msg: "/clear".into(),
+                                ..Default::default()
+                            });
+
+                            context.queue_packet(Mst {
+                                msg: format!("/track={}", combo.track),
+                                ..Default::default()
+                            });
+                        },
+                        2 => {
+                            context.queue_packet(Mst {
+                                msg: format!("/qual=0"),
+                                ..Default::default()
+                            });
+
+                            context.queue_packet(Mst {
+                                msg: format!("/laps={}", combo.laps.unwrap_or(1)),
+                                ..Default::default()
+                            });
+                        },
+                        3 => {
+                            if let Some(layout) = combo.layout.as_ref() {
+                                context.queue_packet(Mst {
+                                    msg: format!("/layout={}", layout),
+                                    ..Default::default()
+                                });
+                            }
+                        },
+                        _ => {},
+                    }
+
+                }
+            },
             League::InGame {
                 timer,
                 ref mut round,
+                ..
             } => {
                 if timer.tick() {
                     if *round > 0 {
@@ -136,7 +171,7 @@ where
         }
     }
 
-    fn mso(&mut self, context: &mut Context<S, P, C, G>, mso: &Mso) {
+    fn mso(&mut self, context: &mut Context<ComboCollection, (), (),()>, mso: &Mso) {
         let is_admin = context
             .connections
             .get(&mso.ucid)
@@ -165,7 +200,7 @@ where
         }
     }
 
-    fn res(&mut self, context: &mut Context<S, P, C, G>, res: &Res) {
+    fn res(&mut self, context: &mut Context<ComboCollection, (), (),()>, res: &Res) {
         if !matches!(self, Self::InGame { .. }) {
             return;
         }
