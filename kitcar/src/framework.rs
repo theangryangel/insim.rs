@@ -1,10 +1,12 @@
 //! Framework
 
-use std::fmt::Debug;
+use std::{any::TypeId, fmt::Debug};
 
-use insim::Packet;
+use insim::{identifiers::ConnectionId, Packet};
 use tokio::sync::{broadcast, mpsc};
 use tracing::{error, info, warn};
+
+use crate::ui::{manager::UIManager, node::UINode};
 
 /// Framework TaskContext
 #[derive(Debug)]
@@ -14,11 +16,30 @@ where
 {
     /// events
     pub events: broadcast::Receiver<Packet>,
-    /// insim sender
-    pub insim_sender: mpsc::Sender<Packet>,
+
+    /// command sender
+    pub commands: mpsc::Sender<Command>,
 
     /// user state
     pub state: S,
+}
+
+impl<S> TaskContext<S> 
+where 
+    S: Send + Sync {
+    pub async fn send<P: Into<Packet>>(&self, packet: P) {
+        self.commands.send(Command::SendPacket(packet.into())).await;
+    }
+
+    pub async fn set_ui<T: 'static>(&mut self, ucid: &ConnectionId, node: UINode) {
+        let tree_id = TypeId::of::<T>();
+        self.commands.send(Command::SetUi(tree_id, *ucid, node)).await;
+    }
+
+    pub async fn remove_ui<T: 'static>(&mut self, ucid: &ConnectionId) {
+        let tree_id = TypeId::of::<T>();
+        self.commands.send(Command::RemoveUi(tree_id, *ucid)).await;
+    }
 }
 
 /// Plugin trait
@@ -34,6 +55,17 @@ where
     async fn run(&mut self, ctx: TaskContext<S>) -> Result<(), ()>;
 }
 
+pub(crate) enum Command {
+    SendPacket(Packet),
+    SetUi(
+        TypeId, ConnectionId, UINode
+    ),
+    RemoveUi(
+        TypeId, ConnectionId
+    ),
+
+}
+
 #[derive(Debug)]
 /// Framework
 pub struct Framework<S> 
@@ -47,21 +79,24 @@ impl<S> Framework<S>
 where 
     S: Send + Sync + Clone + 'static
 {
+    /// New
     pub async fn new() -> Self {
         Self {
             plugins: vec![]
         }
     }
     
+    /// Add plugin
     pub async fn register_plugin(mut self, name: &str, plugin: Box<dyn Plugin<S>>) -> Self {
         info!("Registering plugin: {}", name);
         self.plugins.push(plugin);
         self
     }
     
+    /// Run
     pub async fn run(mut self, state: S, mut net: insim::net::tokio_impl::Framed) -> Result<(), insim::Error> {
         let (event_sender, _) = broadcast::channel::<Packet>(1000);
-        let (insim_sender, mut insim_receiver) = mpsc::channel::<Packet>(1000);
+        let (insim_sender, mut insim_receiver) = mpsc::channel::<Command>(1000);
 
         info!("Starting InSim mini-game framework");
         
@@ -70,7 +105,7 @@ where
         for mut plugin in self.plugins.drain(..) {
             let ctx = TaskContext {
                 events: event_sender.subscribe(),
-                insim_sender: insim_sender.clone(),
+                commands: insim_sender.clone(),
                 state: state.clone(),
             };
             
@@ -94,8 +129,10 @@ where
                     let _ = event_sender.send(packet?).unwrap();
                 },
 
-                Some(packet) = insim_receiver.recv() => {
-                    net.write(packet).await?;
+                Some(command) = insim_receiver.recv() => match command {
+                    Command::SendPacket(packet) => net.write(packet).await?,
+                    Command::SetUi(type_id, connection_id, uinode) => todo!(),
+                    Command::RemoveUi(type_id, connection_id) => todo!(),
                 }
             }
         }
