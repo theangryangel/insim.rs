@@ -1,6 +1,6 @@
 //! Framework
 
-use std::{collections::HashMap, fmt::Debug, time::Duration};
+use std::{any::TypeId, collections::HashMap, fmt::Debug, time::Duration};
 
 use insim::{
     identifiers::{ConnectionId, PlayerId},
@@ -14,10 +14,14 @@ use tracing::{error, info, warn};
 use crate::{
     plugin::{Plugin, PluginContext},
     state::{ConnectionInfo, GameInfo, PlayerInfo, State, Ui},
+    ui::node::UINode,
 };
 
 pub(crate) enum Command {
     SendPacket(Packet),
+
+    SetUi(TypeId, ConnectionId, UINode),
+    RemoveUi(TypeId, ConnectionId),
 
     // Game state shit
     GetPlayer(PlayerId, oneshot::Sender<Option<PlayerInfo>>),
@@ -29,6 +33,14 @@ pub(crate) enum Command {
     Shutdown,
 }
 
+#[derive(Debug, thiserror::Error)]
+/// Framework Error
+pub enum FrameworkError {
+    /// Insim error
+    #[error("An insim error occured")]
+    Insim(#[from] insim::Error),
+}
+
 /// Framework
 pub struct Framework<S>
 where
@@ -37,6 +49,7 @@ where
     plugins: Vec<(String, Box<dyn Plugin<S>>)>,
     packet_channel_capacity: usize,
     command_channel_capacity: usize,
+    ui_tick_rate: Duration,
 }
 
 impl<S> Debug for Framework<S>
@@ -60,16 +73,17 @@ where
     S: Send + Sync + Clone + Debug + 'static,
 {
     /// New
-    pub async fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             plugins: vec![],
             packet_channel_capacity: 1000,
             command_channel_capacity: 64,
+            ui_tick_rate: Duration::from_secs(1),
         }
     }
 
     /// Add plugin
-    pub async fn with_plugin<P: Plugin<S> + 'static>(mut self, plugin: P) -> Self {
+    pub fn with_plugin<P: Plugin<S> + 'static>(mut self, plugin: P) -> Self {
         let plugin_name = std::any::type_name::<P>().to_string();
         self.plugins.push((plugin_name, Box::new(plugin)));
         self
@@ -80,13 +94,13 @@ where
         self,
         user_state: S,
         mut net: insim::net::tokio_impl::Framed,
-    ) -> Result<(), insim::Error> {
+    ) -> Result<(), FrameworkError> {
         // Request state from LFS
         for (i, subt) in [TinyType::Sst, TinyType::Ism, TinyType::Ncn, TinyType::Npl]
             .into_iter()
             .enumerate()
         {
-            net.write(subt.with_request_id(i as u8)).await?;
+            net.write(subt.with_request_id((i + 1) as u8)).await?;
         }
 
         let (event_sender, _) = broadcast::channel::<Packet>(self.packet_channel_capacity);
@@ -95,9 +109,9 @@ where
 
         let cancellation_token = CancellationToken::new();
         let mut state = State::default();
-        let mut ui = Ui::new(Duration::from_secs(1));
+        let mut ui = Ui::new(self.ui_tick_rate);
 
-        info!("Starting Insim mini-game framework");
+        info!("Starting framework");
 
         // Start plugin tasks
         let mut plugin_handles = Vec::new();
@@ -121,14 +135,13 @@ where
         }
 
         // Main event loop
-
         loop {
             tokio::select! {
 
                 // UI update packets to send
                 to_update = ui.tick() => {
                     for p in to_update {
-                        let _ = net.write(p).await.unwrap();
+                        let _ = net.write(p).await?;
                     }
                 },
 
@@ -140,10 +153,12 @@ where
                     state.handle_packet(&packet);
                     ui.handle_packet(&packet);
 
-                    let _ = event_sender.send(packet).unwrap();
+                    if event_sender.receiver_count() > 0 {
+                        let _ = event_sender.send(packet);
+                    }
                 },
 
-                // Commands
+                // commands
                 Some(command) = command_receiver.recv() => match command {
                     Command::Shutdown => {
                         break;
@@ -164,6 +179,17 @@ where
                     Command::GetGame(sender) => {
                         let _ = sender.send(state.game.clone());
                     },
+                    Command::SetUi(type_id, connection_id, view) => {
+                        if let Some(mgr) = ui.inner.get_mut(&connection_id) {
+                            println!("{:?}", view);
+                            let _ = mgr.set_tree(type_id, view);
+                        }
+                    },
+                    Command::RemoveUi(type_id, connection_id) => {
+                        if let Some(mgr) = ui.inner.get_mut(&connection_id) {
+                            let _ = mgr.remove_tree(type_id);
+                        }
+                    }
                 }
             }
         }

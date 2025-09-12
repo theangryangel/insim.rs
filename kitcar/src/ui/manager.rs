@@ -43,13 +43,13 @@ impl UIManager {
     }
 
     /// Register or update a UI tree using the TypeId of an empty struct
-    pub fn set_tree<T: 'static>(&mut self, ui_tree: UINode) -> TypeId {
-        self.tree_manager.set_tree::<T>(ui_tree)
+    pub fn set_tree(&mut self, tree_id: TypeId, ui_tree: UINode) -> TypeId {
+        self.tree_manager.set_tree(tree_id, ui_tree)
     }
 
     /// Mark a tree for removal (will be removed in next render cycle)
-    pub fn remove_tree<T: 'static>(&mut self) -> bool {
-        self.tree_manager.remove_tree::<T>()
+    pub fn remove_tree(&mut self, tree_id: TypeId) -> bool {
+        self.tree_manager.remove_tree(tree_id)
     }
 
     /// Get all registered tree IDs
@@ -58,16 +58,16 @@ impl UIManager {
     }
 
     /// Check if a tree is registered and not marked for deletion
-    pub fn has_tree<T: 'static>(&self) -> bool {
-        self.tree_manager.has_tree::<T>()
+    pub fn has_tree(&self, tree_id: TypeId) -> bool {
+        self.tree_manager.has_tree(tree_id)
     }
 
     /// Render a specific tree using its TypeId
-    pub fn render_tree<T: 'static>(
+    pub fn render_tree(
         &mut self,
+        tree_id: TypeId,
         ucid: ConnectionId,
     ) -> Result<(Vec<Btn>, Vec<ClickId>), String> {
-        let tree_id = TypeId::of::<T>();
         self.render_tree_by_id(tree_id, ucid)
     }
 
@@ -205,22 +205,22 @@ mod tests {
 
         // Initially no trees should be present
         assert_eq!(ui_manager.get_tree_ids().len(), 0);
-        assert!(!ui_manager.has_tree::<TestViewA>());
+        assert!(!ui_manager.has_tree(TypeId::of::<TestViewA>()));
 
         // Create a simple view
         let test_view = components::fullscreen()
             .with_children(vec![components::button("Test Button".into(), 1.into())]);
 
         // Add the view
-        let tree_id = ui_manager.set_tree::<TestViewA>(test_view);
+        let tree_id = ui_manager.set_tree(TypeId::of::<TestViewA>(), test_view);
 
         // Verify the view was added
         assert_eq!(ui_manager.get_tree_ids().len(), 1);
-        assert!(ui_manager.has_tree::<TestViewA>());
+        assert!(ui_manager.has_tree(TypeId::of::<TestViewA>()));
         assert!(ui_manager.get_tree_ids().contains(&tree_id));
 
         // Verify we can render it
-        let result = ui_manager.render_tree::<TestViewA>(ConnectionId::LOCAL);
+        let result = ui_manager.render_tree(TypeId::of::<TestViewA>(), ConnectionId::LOCAL);
         assert!(result.is_ok());
 
         let (packets, removed) = result.unwrap();
@@ -241,13 +241,16 @@ mod tests {
             components::button("Button B2".into(), 11.into()),
         ]);
 
-        let _ = ui_manager.set_tree::<TestViewA>(view_a);
-        let _ = ui_manager.set_tree::<TestViewB>(view_b);
+        let type_a = TypeId::of::<TestViewA>();
+        let type_b = TypeId::of::<TestViewB>();
+
+        let _ = ui_manager.set_tree(type_a, view_a);
+        let _ = ui_manager.set_tree(type_b, view_b);
 
         // Verify both views exist
         assert_eq!(ui_manager.get_tree_ids().len(), 2);
-        assert!(ui_manager.has_tree::<TestViewA>());
-        assert!(ui_manager.has_tree::<TestViewB>());
+        assert!(ui_manager.has_tree(type_a));
+        assert!(ui_manager.has_tree(type_b));
 
         // Render all and verify we get packets from both trees
         let (all_packets, all_removed) = ui_manager.render_all(ConnectionId::LOCAL);
@@ -265,15 +268,15 @@ mod tests {
     fn test_updating_existing_view() {
         let mut ui_manager = UIManager::new();
 
+        let type_a = TypeId::of::<TestViewA>();
+
         // Add initial view
         let initial_view = components::fullscreen()
             .with_children(vec![components::button("Initial Button".into(), 1.into())]);
-        let _ = ui_manager.set_tree::<TestViewA>(initial_view);
+        let _ = ui_manager.set_tree(type_a, initial_view);
 
         // Render to allocate click IDs
-        let (initial_packets, _) = ui_manager
-            .render_tree::<TestViewA>(ConnectionId::LOCAL)
-            .unwrap();
+        let (initial_packets, _) = ui_manager.render_tree(type_a, ConnectionId::LOCAL).unwrap();
         assert_eq!(initial_packets.len(), 1);
         assert_eq!(initial_packets[0].text, "Initial Button");
 
@@ -282,16 +285,14 @@ mod tests {
             components::button("Updated Button".into(), 1.into()),
             components::button("New Button".into(), 2.into()),
         ]);
-        let _ = ui_manager.set_tree::<TestViewA>(updated_view); // Same method, different content
+        let _ = ui_manager.set_tree(type_a, updated_view); // Same method, different content
 
         // Verify it's still the same tree (no new tree added)
         assert_eq!(ui_manager.get_tree_ids().len(), 1);
-        assert!(ui_manager.has_tree::<TestViewA>());
+        assert!(ui_manager.has_tree(type_a));
 
         // Render and verify updated content
-        let (updated_packets, _) = ui_manager
-            .render_tree::<TestViewA>(ConnectionId::LOCAL)
-            .unwrap();
+        let (updated_packets, _) = ui_manager.render_tree(type_a, ConnectionId::LOCAL).unwrap();
         assert_eq!(updated_packets.len(), 2); // Now has 2 buttons
 
         let button_texts: Vec<&String> = updated_packets.iter().map(|p| &p.text).collect();

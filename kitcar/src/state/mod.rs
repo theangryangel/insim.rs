@@ -8,7 +8,7 @@ use std::{
 use insim::{
     core::{track::Track, vehicle::Vehicle, wind::Wind},
     identifiers::{ConnectionId, PlayerId},
-    insim::{Cnl, PlayerFlags, PlayerType, RaceInProgress, RaceLaps, StaFlags},
+    insim::{Cnl, Ncn, PlayerFlags, PlayerType, RaceInProgress, RaceLaps, StaFlags},
     Packet, WithRequestId,
 };
 use tokio::time::{interval, Interval, MissedTickBehavior};
@@ -225,7 +225,7 @@ impl State {
 
 #[derive(Debug)]
 pub(crate) struct Ui {
-    inner: HashMap<ConnectionId, UIManager>,
+    pub(crate) inner: HashMap<ConnectionId, UIManager>,
     render_interval: Interval,
 }
 
@@ -243,10 +243,15 @@ impl Ui {
     pub(crate) fn handle_packet(&mut self, packet: &insim::Packet) {
         match packet {
             // Connection left
+            insim::Packet::Ncn(ncn) => self.ncn(ncn),
             insim::Packet::Cnl(cnl) => self.cnl(cnl),
 
             _ => {},
         }
+    }
+
+    fn ncn(&mut self, ncn: &Ncn) {
+        let _ = self.inner.insert(ncn.ucid, UIManager::new());
     }
 
     fn cnl(&mut self, cnl: &Cnl) {

@@ -45,9 +45,7 @@ impl TreeManager {
     }
 
     /// Register or update a UI tree
-    pub(crate) fn set_tree<T: 'static>(&mut self, ui_tree: UINode) -> TypeId {
-        let tree_id = TypeId::of::<T>();
-
+    pub(crate) fn set_tree(&mut self, tree_id: TypeId, ui_tree: UINode) -> TypeId {
         if let Some(tree_state) = self.trees.get_mut(&tree_id) {
             // Update existing tree and unmark for deletion
             tree_state.ui_tree = ui_tree;
@@ -62,8 +60,7 @@ impl TreeManager {
     }
 
     /// Mark a tree for removal
-    pub(crate) fn remove_tree<T: 'static>(&mut self) -> bool {
-        let tree_id = TypeId::of::<T>();
+    pub(crate) fn remove_tree(&mut self, tree_id: TypeId) -> bool {
         if let Some(tree_state) = self.trees.get_mut(&tree_id) {
             tree_state.marked_for_deletion = true;
             self.stale = true;
@@ -74,8 +71,7 @@ impl TreeManager {
     }
 
     /// Check if a tree exists and is not marked for deletion
-    pub(crate) fn has_tree<T: 'static>(&self) -> bool {
-        let tree_id = TypeId::of::<T>();
+    pub(crate) fn has_tree(&self, tree_id: TypeId) -> bool {
         self.trees
             .get(&tree_id)
             .map(|state| !state.marked_for_deletion)

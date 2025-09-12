@@ -5,7 +5,7 @@ use insim::{
     identifiers::{ClickId, ConnectionId},
     insim::Btn,
 };
-use taffy::{prelude::length, NodeId, Size, TaffyTree};
+use taffy::{prelude::length, Layout, NodeId, Size, Style, TaffyTree};
 
 use crate::ui::{
     id_pool::ClickIdPool,
@@ -119,7 +119,7 @@ impl Renderer {
                     // unwraps are fine here because we *know* we've got something we can actually
                     // render
                     text: node.text().unwrap_or_default().to_string(),
-                    bstyle: node.bstyle().unwrap_or_default(),
+                    bstyle: node.get_layout().into(),
 
                     ucid,
 
@@ -163,14 +163,18 @@ impl Renderer {
         }
 
         match ui_node {
-            UINode::Rendered { layout, key, .. } => {
+            UINode::Rendered {
+                style: layout, key, ..
+            } => {
                 let _ = button_info.insert(*key, ui_node);
-                let node_id = taffy.new_leaf(layout.clone()).unwrap();
+                let layout = Into::<Style>::into(layout);
+                let node_id = taffy.new_leaf(layout).unwrap();
                 let _ = node_id_map.insert(*key, node_id);
                 node_id
             },
-            UINode::Unrendered { layout, .. } => {
-                taffy.new_with_children(layout.clone(), &child_ids).unwrap()
+            UINode::Unrendered { style: layout, .. } => {
+                let layout = Into::<Style>::into(layout);
+                taffy.new_with_children(layout, &child_ids).unwrap()
             },
         }
     }

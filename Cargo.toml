@@ -34,6 +34,7 @@ missing_debug_implementations = "deny"
 broken_intra_doc_links = "deny"
 
 [workspace.dependencies]
+async-trait = "0.1.89"
 bitflags = "2.4.0"
 bytes = "1.4.0"
 clap = { version = "4.2" }

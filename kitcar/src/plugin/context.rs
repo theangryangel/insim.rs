@@ -1,6 +1,6 @@
 //! Context mother fucker, do you speak it?
 
-use std::{collections::HashMap, fmt::Debug};
+use std::{any::TypeId, collections::HashMap, fmt::Debug};
 
 use insim::{
     identifiers::{ConnectionId, PlayerId},
@@ -139,13 +139,21 @@ where
     }
 
     /// Update the UI
-    pub async fn set_ui<T: Send + 'static>(&mut self, _ucid: ConnectionId, _node: UINode) {
-        todo!()
+    pub async fn set_ui<T: Send + 'static>(&mut self, ucid: ConnectionId, node: UINode) {
+        let _ = self
+            .commands
+            .send(Command::SetUi(TypeId::of::<T>(), ucid, node))
+            .await
+            .unwrap();
     }
 
     /// clear the ui
-    pub async fn remove_ui<T: 'static>(&mut self, _ucid: ConnectionId) {
-        todo!()
+    pub async fn remove_ui<T: 'static>(&mut self, ucid: ConnectionId) {
+        let _ = self
+            .commands
+            .send(Command::RemoveUi(TypeId::of::<T>(), ucid))
+            .await
+            .unwrap();
     }
 
     /// Wait for cancellation

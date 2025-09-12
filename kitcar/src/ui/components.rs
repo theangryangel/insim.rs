@@ -3,58 +3,36 @@
 use std::borrow::Cow;
 
 use insim::insim::BtnStyle;
-use taffy::{prelude::length, AlignContent, AlignItems, Display, FlexDirection, Size, Style};
 
-use crate::ui::node::{UINode, UINodeKey};
+use crate::ui::{
+    node::{UINode, UINodeKey},
+    style::SendableStyle,
+};
 
 /// Fullscreen
 pub fn fullscreen() -> UINode {
-    UINode::Unrendered {
-        layout: Style {
-            size: Size {
-                width: length(200.0),
-                height: length(200.0),
-            },
-            ..Default::default()
-        },
-        children: Vec::new(),
-    }
+    UINode::unrendered().width(200).height(200)
 }
 
 /// Create a "vstack" layout
 pub fn vstack(children: Vec<UINode>) -> UINode {
-    UINode::Unrendered {
-        layout: Style {
-            display: Display::Flex,
-            flex_direction: FlexDirection::Column,
-            justify_content: Some(AlignContent::FlexStart),
-            align_items: Some(AlignItems::FlexStart),
-            ..Default::default()
-        },
-        children,
-    }
+    UINode::unrendered()
+        .display_flex()
+        .flex_direction_column()
+        .with_children(children)
 }
 
 /// Create a "hstack" layout
 pub fn hstack(children: Vec<UINode>) -> UINode {
-    UINode::Unrendered {
-        layout: Style {
-            display: Display::Flex,
-            flex_direction: FlexDirection::Row,
-            justify_content: Some(AlignContent::FlexStart),
-            align_items: Some(AlignItems::FlexStart),
-            ..Default::default()
-        },
-        children,
-    }
+    UINode::unrendered()
+        .display_flex()
+        .flex_direction_row()
+        .justify_content_flex_start()
+        .align_items_flex_start()
+        .with_children(children)
 }
 
 /// A basic button
 pub fn button(text: Cow<'static, str>, key: UINodeKey) -> UINode {
-    UINode::Rendered {
-        layout: Style::default(),
-        style: BtnStyle::default(),
-        text,
-        key,
-    }
+    UINode::rendered(text, key)
 }
