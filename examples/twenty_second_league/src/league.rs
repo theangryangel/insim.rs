@@ -5,9 +5,7 @@ use insim::{
     identifiers::ConnectionId,
     insim::{Mso, Mst, Mtc, Res},
 };
-use kitcar::{
-    Context, Engine, Timer,
-};
+use kitcar::{Context, Engine, Timer};
 
 use crate::combo::{Combo, ComboCollection};
 
@@ -39,9 +37,8 @@ pub enum League {
 
 struct CountdownView;
 
-impl Engine<ComboCollection, (), (), ()> for League
-{
-    fn tick(&mut self, context: &mut Context<ComboCollection, (), (),()>) {
+impl Engine<ComboCollection, (), (), ()> for League {
+    fn tick(&mut self, context: &mut Context<ComboCollection, (), (), ()>) {
         match self {
             League::Lobby { countdown } => {
                 if countdown.tick() {
@@ -52,9 +49,7 @@ impl Engine<ComboCollection, (), (), ()> for League
 
                         let combo = context.state.random().cloned().unwrap();
 
-                        *self = Self::LoadTrack {
-                            timer: None, combo
-                        };
+                        *self = Self::LoadTrack { timer: None, combo };
                     } else {
                         let remaining =
                             countdown.remaining_duration() * countdown.remaining_repeats().unwrap();
@@ -73,16 +68,18 @@ impl Engine<ComboCollection, (), (), ()> for League
                     ..Default::default()
                 });
 
-                *self = League::LoadTrack { 
-                    timer: Some(Timer::once(Duration::from_secs(6))), combo: combo.clone() 
+                *self = League::LoadTrack {
+                    timer: Some(Timer::once(Duration::from_secs(6))),
+                    combo: combo.clone(),
                 };
             },
-            League::LoadTrack { timer: Some(timer), combo } => {
+            League::LoadTrack {
+                timer: Some(timer),
+                combo,
+            } => {
                 if timer.tick() {
-
                     if timer.is_finished() {
                         // FIXME: check game state
-
                     }
 
                     let iteration = timer.iteration().saturating_sub(1);
@@ -126,7 +123,6 @@ impl Engine<ComboCollection, (), (), ()> for League
                         },
                         _ => {},
                     }
-
                 }
             },
             League::InGame {
@@ -171,7 +167,7 @@ impl Engine<ComboCollection, (), (), ()> for League
         }
     }
 
-    fn mso(&mut self, context: &mut Context<ComboCollection, (), (),()>, mso: &Mso) {
+    fn mso(&mut self, context: &mut Context<ComboCollection, (), (), ()>, mso: &Mso) {
         let is_admin = context
             .connections
             .get(&mso.ucid)
@@ -200,7 +196,7 @@ impl Engine<ComboCollection, (), (), ()> for League
         }
     }
 
-    fn res(&mut self, context: &mut Context<ComboCollection, (), (),()>, res: &Res) {
+    fn res(&mut self, context: &mut Context<ComboCollection, (), (), ()>, res: &Res) {
         if !matches!(self, Self::InGame { .. }) {
             return;
         }

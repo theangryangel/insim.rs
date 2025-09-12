@@ -14,14 +14,22 @@ use crate::ui::{
     tree::TreeManager,
 };
 
+// FIXME: Rename to UiTreeManager
 #[derive(Debug)]
 /// UI / Button Manager - Give it UINode and it will render LFS packets
 /// It will do a basic view diff to ensure that the minimum number of updates are sent to LFS
+/// Intended for user against a single connection
 pub struct UIManager {
     tree_manager: TreeManager,
     click_id_pool: IdPool<1, 239>,
     // Maps click_id back to which tree it belongs to
     id_to_tree: HashMap<ClickId, TypeId>,
+}
+
+impl Default for UIManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl UIManager {

@@ -7,10 +7,10 @@ use kitcar::Workshop;
 use crate::combo::ComboCollection;
 
 mod combo;
+mod components;
 mod cpa;
 mod dictator;
 mod league;
-mod components;
 
 /// Config
 #[derive(Debug, serde::Deserialize)]

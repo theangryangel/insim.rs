@@ -13,7 +13,8 @@ async-trait = "0.1.89"
 fixedbitset = { workspace = true }
 insim = { path = "../insim", version = "4.0.0", features = ["tokio"] }
 taffy = "0.9.1"
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["rt"] }
+tokio-util = "0.7.16"
 tracing = { workspace = true }
 
 [lints]

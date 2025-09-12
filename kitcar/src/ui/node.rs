@@ -50,6 +50,8 @@ pub enum UINode {
     /// Rendered items generate buttons in LFS
     Rendered {
         /// Requested layout
+        // FIXME: taffy Style is not Send. So.. I guess we need to have our own :(
+        // https://github.com/DioxusLabs/taffy/issues/823
         layout: Style,
         /// Button style
         style: BtnStyle,
@@ -61,6 +63,7 @@ pub enum UINode {
     /// Unrendered items are just used to help the layout generation
     Unrendered {
         /// Requested layout
+        // FIXME: see above
         layout: Style,
         /// Child nodes
         children: Vec<Self>,
