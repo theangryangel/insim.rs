@@ -1,6 +1,7 @@
 //! Countdown
 
 use std::time::Duration;
+
 use tokio::time::Interval;
 
 /// A countdown timer that ticks a specific number of times at a given interval.
@@ -45,8 +46,9 @@ impl Countdown {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::time::Duration;
+
+    use super::*;
 
     #[tokio::test]
     async fn test_countdown_completes_correctly() {
@@ -61,7 +63,7 @@ mod tests {
 
         // After the final tick, it should return None
         assert_eq!(countdown.tick().await, None);
-        
+
         // It should continue to return None on subsequent calls
         assert_eq!(countdown.tick().await, None);
     }

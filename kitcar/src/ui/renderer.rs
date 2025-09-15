@@ -5,11 +5,12 @@ use insim::{
     identifiers::{ClickId, ConnectionId},
     insim::Btn,
 };
-use taffy::{prelude::length, Layout, NodeId, Size, Style, TaffyTree};
+use taffy::{prelude::length, NodeId, Size, TaffyTree};
 
 use crate::ui::{
     id_pool::ClickIdPool,
     node::{UINode, UINodeKey},
+    style::Style,
     tree::TreeState,
 };
 
@@ -22,8 +23,8 @@ pub(crate) type RendererResult = Result<
         Vec<Btn>,
         // Btn ClickIds to ask LFS to remove
         Vec<ClickId>,
-        // ClickId to UINodeKey and hash
-        HashMap<ClickId, (UINodeKey, u64)>,
+        // ClickId to UINodeKey, Style and Text
+        HashMap<ClickId, (UINodeKey, Style, String)>,
         // UINodeKey to ClickId
         HashMap<UINodeKey, ClickId>,
     ),
@@ -75,14 +76,20 @@ impl Renderer {
 
         for (key, node) in desired_style_map {
             let layout = taffy.layout(node_id_map[&key]).unwrap();
-            let hash = node.hash(layout).unwrap();
+            let style = node.style();
+            let text = node.text().unwrap();
 
             let (click_id, needs_update) =
                 if let Some(old_click_id) = tree_state.active_keys.get(&key) {
                     // Validate that we still own this click ID
                     if id_to_tree_map.get(old_click_id) == Some(&tree_id) {
-                        if let Some((_, old_hash)) = tree_state.active_buttons.get(old_click_id) {
-                            (*old_click_id, *old_hash != hash)
+                        if let Some((_, old_hash, old_text)) =
+                            tree_state.active_buttons.get(old_click_id)
+                        {
+                            (
+                                *old_click_id,
+                                old_hash != style || old_text.as_str() != text.as_ref(),
+                            )
                         } else {
                             // Inconsistent state - allocate new ID
                             let click_id = click_id_pool
@@ -119,7 +126,7 @@ impl Renderer {
                     // unwraps are fine here because we *know* we've got something we can actually
                     // render
                     text: node.text().unwrap_or_default().to_string(),
-                    bstyle: node.get_layout().into(),
+                    bstyle: node.style().into(),
 
                     ucid,
 
@@ -127,7 +134,7 @@ impl Renderer {
                 });
             }
 
-            let _ = next_active_buttons.insert(click_id, (key, hash));
+            let _ = next_active_buttons.insert(click_id, (key, style.clone(), text.into_owned()));
             let _ = next_active_keys.insert(key, click_id);
         }
 
@@ -167,13 +174,13 @@ impl Renderer {
                 style: layout, key, ..
             } => {
                 let _ = button_info.insert(*key, ui_node);
-                let layout = Into::<Style>::into(layout);
+                let layout = Into::<taffy::Style>::into(layout);
                 let node_id = taffy.new_leaf(layout).unwrap();
                 let _ = node_id_map.insert(*key, node_id);
                 node_id
             },
             UINode::Unrendered { style: layout, .. } => {
-                let layout = Into::<Style>::into(layout);
+                let layout = Into::<taffy::Style>::into(layout);
                 taffy.new_with_children(layout, &child_ids).unwrap()
             },
         }

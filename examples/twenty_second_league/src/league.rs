@@ -2,14 +2,15 @@
 use std::{collections::HashMap, fmt::Debug, time::Duration};
 
 use insim::{
-    identifiers::{ConnectionId, PlayerId},
-    insim::{Con, Mso, Mst, Mtc, Res}, Packet,
+    identifiers::ConnectionId,
+    insim::{Mso, Mtc},
+    Packet,
 };
-use kitcar::{Plugin, PluginContext, time::countdown::Countdown};
-use tokio::time::{interval, sleep};
+use kitcar::{time::countdown::Countdown, Plugin, PluginContext};
+use tokio::time::sleep;
 use tracing::{info, warn};
 
-use crate::{combo::{Combo, ComboCollection}, Config};
+use crate::Config;
 
 /// League Mini-Game State
 #[derive(Debug, Default)]
@@ -19,20 +20,19 @@ pub(crate) enum LeagueState {
     Warmup,
     Game {
         round: u32,
-    }
+    },
 }
 
 impl LeagueState {
     async fn tick(&mut self) {
-        // TODO: what do we want to output here? 
+        // TODO: what do we want to output here?
         // is this wise? do we just go for a global tick instead and suck it up?
-    } 
+    }
 }
 
 /// League Mini-Game
 #[derive(Debug, Default)]
-pub(crate) struct League
-{
+pub(crate) struct League {
     state: LeagueState,
     // TODO: Move into LeagueState
     scoreboard: HashMap<ConnectionId, u32>,
@@ -84,7 +84,7 @@ impl League {
         }
     }
 
-    async fn handle_chat(&mut self, mso: Mso, ctx: &PluginContext<Config>) { 
+    async fn handle_chat(&mut self, mso: Mso, ctx: &PluginContext<Config>) {
         // FIXME unwrap
         let is_admin = if let Some(info) = ctx.get_connection(mso.ucid).await {
             info.admin
@@ -98,23 +98,18 @@ impl League {
             "!start" => {
                 if matches!(self.state, LeagueState::Idle) && is_admin {
                     info!("Starting 20 Second League warmup");
-                    ctx.send_packet(Mst {
-                        msg: "^3Starting 20 Second League! Warmup phase beginning...".into(),
-                        ..Default::default()
-                    }).await;
+                    ctx.send_message("^3Starting 20 Second League! Warmup phase beginning...")
+                        .await;
 
                     self.select_and_set_track(&ctx).await;
-                    self.state = LeagueState::Warmup; 
+                    self.state = LeagueState::Warmup;
                     self.timer = Some(Countdown::new(Duration::from_secs(1), 300));
                 }
             },
 
             "!stop" => {
                 if !matches!(self.state, LeagueState::Idle) && is_admin {
-                    ctx.send_packet(Mst {
-                        msg: "^320 Second League aborted!".into(),
-                        ..Default::default()
-                    }).await;
+                    ctx.send_message("^320 Second League aborted!").await;
                     self.state = LeagueState::Idle;
                 }
             },
@@ -129,8 +124,8 @@ impl League {
                     ucid: mso.ucid,
                     text: status.into(),
                     ..Default::default()
-
-                }).await;
+                })
+                .await;
             },
 
             _ => {},
@@ -143,26 +138,28 @@ impl League {
             warn!("No tracks configured for 20 Second League");
             return;
         }
-        
+
         let combo = combos.random().unwrap(); // FIXME
-        
+
         ctx.send_command("/end").await;
         sleep(Duration::from_secs(6)).await;
         ctx.send_command("/clear").await;
         ctx.send_command(&format!("/track={}", combo.track)).await;
-        ctx.send_command(&format!("/laps={}", combo.laps.unwrap_or(1))).await;
-        
-        ctx.send_message(&format!("^3Loading ^6{}. Starting warmup.", combo.name)).await;
+        ctx.send_command(&format!("/laps={}", combo.laps.unwrap_or(1)))
+            .await;
+        ctx.send_message(&format!("^3Loading ^6{}. Starting warmup.", combo.name))
+            .await;
     }
 
     async fn start_game(&mut self, ctx: &PluginContext<Config>) {
         info!("Starting 20 Second League game phase");
-        ctx.send_message("^2Warmup complete! Starting 20 Second League game phase!").await;
-        ctx.send_message("^7Objective: Get as close to 20.000 seconds as possible!").await;
-        ctx.send_message("^7Double points for exactly 20.000 seconds!").await;
-        self.state = LeagueState::Game {
-            round: 0,
-        };
+        ctx.send_message("^2Warmup complete! Starting 20 Second League game phase!")
+            .await;
+        ctx.send_message("^7Objective: Get as close to 20.000 seconds as possible!")
+            .await;
+        ctx.send_message("^7Double points for exactly 20.000 seconds!")
+            .await;
+        self.state = LeagueState::Game { round: 0 };
         self.start_round(ctx).await;
     }
 
@@ -170,7 +167,11 @@ impl League {
         ctx.send_command("/restart").await;
         if let LeagueState::Game { mut round } = &self.state {
             round = round.saturating_add(1);
-            ctx.send_message(&format!("^3Round {}/20 starting! Get as close to 20.000 seconds as possible!", round)).await;
+            ctx.send_message(&format!(
+                "^3Round {}/20 starting! Get as close to 20.000 seconds as possible!",
+                round
+            ))
+            .await;
         }
     }
 
@@ -178,15 +179,24 @@ impl League {
         ctx.send_command("/restart").await;
         if let LeagueState::Game { mut round } = &self.state {
             round = round.saturating_add(1);
-            ctx.send_message(&format!("^3Round {}/20 starting! Get as close to 20.000 seconds as possible!", round)).await;
+            ctx.send_message(&format!(
+                "^3Round {}/20 starting! Get as close to 20.000 seconds as possible!",
+                round
+            ))
+            .await;
         }
     }
 
     async fn end_game(&mut self, ctx: &PluginContext<Config>) {
         info!("20 Second League game completed");
 
+        ctx.send_message(&format!(
+            "^3Thanks for playing! Final results being tallied!"
+        ))
+        .await;
+
         // TODO: calculate final standings
-        
+
         self.state = LeagueState::Idle;
         self.scoreboard.clear();
         self.timer = None;
@@ -194,8 +204,7 @@ impl League {
 }
 
 #[async_trait::async_trait]
-impl Plugin<Config> for League
-{
+impl Plugin<Config> for League {
     async fn run(mut self: Box<Self>, ctx: PluginContext<Config>) -> Result<(), ()> {
         let mut packets = ctx.subscribe_to_packets();
 

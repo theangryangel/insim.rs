@@ -1,10 +1,9 @@
 //! No voting!
 
-use std::fmt::Debug;
 use insim::{insim::TinyType, Packet};
-use kitcar::PluginContext;
+use kitcar::{plugin::UserState, PluginContext};
 
-pub(crate) async fn dictator<S: Send + Sync + Clone + Debug + 'static>(ctx: PluginContext<S>) -> Result<(), ()> {
+pub(crate) async fn dictator<S: UserState>(ctx: PluginContext<S>) -> Result<(), ()> {
     let mut packets = ctx.subscribe_to_packets();
 
     while let Ok(packet) = packets.recv().await {

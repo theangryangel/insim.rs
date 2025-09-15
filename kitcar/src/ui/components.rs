@@ -6,7 +6,7 @@ use insim::insim::BtnStyle;
 
 use crate::ui::{
     node::{UINode, UINodeKey},
-    style::SendableStyle,
+    style::Style,
 };
 
 /// Fullscreen

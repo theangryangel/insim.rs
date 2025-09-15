@@ -6,11 +6,15 @@ use std::{fmt::Debug, future::Future};
 
 pub use context::PluginContext;
 
+/// User State
+pub trait UserState: Send + Sync + Clone + Debug + 'static {}
+impl UserState for () {}
+
 /// Plugin trait
 #[async_trait::async_trait]
 pub trait Plugin<S>: Send + Sync
 where
-    S: Send + Sync + Clone + Debug + 'static,
+    S: UserState,
 {
     /// Run
     // FIXME: some kind of error?
@@ -26,7 +30,7 @@ where
 #[async_trait::async_trait]
 impl<S, F, Fut> Plugin<S> for F
 where
-    S: Send + Sync + Clone + Debug + 'static,
+    S: UserState,
     F: Fn(PluginContext<S>) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = Result<(), ()>> + Send + 'static,
 {

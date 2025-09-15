@@ -6,16 +6,12 @@ use std::{
 };
 
 use eyre::Context as _;
-use insim::{
-    identifiers::ConnectionId,
-    insim::{Mso, Mst},
-    Packet,
-};
-use kitcar::{Framework, Plugin, PluginContext};
+use insim::{insim::Con, Packet};
+use kitcar::{plugin::UserState, Framework, Plugin, PluginContext};
 use tokio::time::interval;
 use tracing::info;
 
-use crate::{combo::ComboCollection, components::countdown};
+use crate::components::countdown;
 
 mod combo;
 mod components;
@@ -44,12 +40,14 @@ pub struct Config {
     pub total_rounds: u32,
 }
 
+impl UserState for Config {}
+
 struct AnnouncerPlugin;
 
 #[async_trait::async_trait]
 impl<S> Plugin<S> for AnnouncerPlugin
 where
-    S: Send + Sync + Clone + Debug + 'static,
+    S: UserState,
 {
     async fn run(mut self: Box<Self>, _ctx: PluginContext<S>) -> Result<(), ()> {
         info!("Announcer Plugin started and finished its job!");
@@ -59,7 +57,7 @@ where
 
 pub(crate) struct CountdownView;
 
-async fn chatterbox<S: Send + Sync + Clone + Debug + 'static>(mut ctx: PluginContext<S>) -> Result<(), ()> {
+async fn chatterbox<S: UserState>(mut ctx: PluginContext<S>) -> Result<(), ()> {
     info!("Chatterbox plugin started!");
     let mut packets = ctx.subscribe_to_packets();
 
@@ -71,6 +69,7 @@ async fn chatterbox<S: Send + Sync + Clone + Debug + 'static>(mut ctx: PluginCon
         tokio::select! {
 
             _ = timer.tick() => {
+                println!("ticking!");
 
                 let connections = ctx.get_connections().await;
 
@@ -89,10 +88,9 @@ async fn chatterbox<S: Send + Sync + Clone + Debug + 'static>(mut ctx: PluginCon
 
                         println!("conn = {:?}", conn);
 
-                        ctx.send_packet(Mst {
-                            msg: format!("A big welcome to {:?} ({:?})", ncn.pname, ncn.uname),
-                            ..Default::default()
-                        }).await;
+                        ctx.send_message(
+                            &format!("A big welcome to {:?} ({:?})", ncn.pname, ncn.uname),
+                        ).await;
                     },
                     _ => {},
                 }

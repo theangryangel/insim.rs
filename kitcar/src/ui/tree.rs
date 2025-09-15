@@ -3,14 +3,17 @@ use std::{any::TypeId, collections::HashMap};
 
 use insim::identifiers::ClickId;
 
-use crate::ui::node::{UINode, UINodeKey};
+use crate::ui::{
+    node::{UINode, UINodeKey},
+    style::Style,
+};
 
 // Per-tree state tracking
 #[derive(Debug)]
 pub(crate) struct TreeState {
     pub(crate) ui_tree: UINode,
-    // Maps click_id to (UINode Key, hash) for this specific tree
-    pub(crate) active_buttons: HashMap<ClickId, (UINodeKey, u64)>,
+    // Maps click_id to (UINode Key, hash, String) for this specific tree
+    pub(crate) active_buttons: HashMap<ClickId, (UINodeKey, Style, String)>,
     // Maps UINode Key to click_id for this specific tree
     pub(crate) active_keys: HashMap<UINodeKey, ClickId>,
     // Mark for deletion in next render cycle

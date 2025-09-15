@@ -12,7 +12,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 
 use crate::{
-    plugin::{Plugin, PluginContext},
+    plugin::{Plugin, PluginContext, UserState},
     state::{ConnectionInfo, GameInfo, PlayerInfo, State, Ui},
     ui::node::UINode,
 };
@@ -70,7 +70,7 @@ where
 
 impl<S> Framework<S>
 where
-    S: Send + Sync + Clone + Debug + 'static,
+    S: UserState,
 {
     /// New
     pub fn new() -> Self {
@@ -78,7 +78,7 @@ where
             plugins: vec![],
             packet_channel_capacity: 1000,
             command_channel_capacity: 64,
-            ui_tick_rate: Duration::from_secs(1),
+            ui_tick_rate: Duration::from_millis(500),
         }
     }
 
@@ -140,6 +140,7 @@ where
 
                 // UI update packets to send
                 to_update = ui.tick() => {
+                    println!("UI TICKING");
                     for p in to_update {
                         let _ = net.write(p).await?;
                     }
@@ -181,7 +182,6 @@ where
                     },
                     Command::SetUi(type_id, connection_id, view) => {
                         if let Some(mgr) = ui.inner.get_mut(&connection_id) {
-                            println!("{:?}", view);
                             let _ = mgr.set_tree(type_id, view);
                         }
                     },

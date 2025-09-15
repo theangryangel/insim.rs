@@ -1,8 +1,9 @@
-use insim::{insim::Mst, Packet};
-use kitcar::PluginContext;
 use std::fmt::Debug;
 
-pub(crate) async fn cpa<S: Send + Sync + Clone + Debug + 'static>(ctx: PluginContext<S>) -> Result<(), ()> {
+use insim::{insim::Mst, Packet};
+use kitcar::{plugin::UserState, PluginContext};
+
+pub(crate) async fn cpa<S: UserState>(ctx: PluginContext<S>) -> Result<(), ()> {
     let mut packets = ctx.subscribe_to_packets();
 
     while let Ok(packet) = packets.recv().await {
@@ -12,10 +13,9 @@ pub(crate) async fn cpa<S: Send + Sync + Clone + Debug + 'static>(ctx: PluginCon
             if let Some(connection) = ctx.get_connection(player.ucid).await;
             if connection.uname.len() > 0;
             then {
-                ctx.send_packet(Mst {
-                    msg: format!("/p_clear {}", &connection.uname),
-                    ..Default::default()
-                }).await;
+                ctx.send_command(
+                    &format!("/p_clear {}", &connection.uname),
+                ).await;
             }
         }
     }

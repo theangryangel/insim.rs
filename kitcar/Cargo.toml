@@ -12,6 +12,7 @@ homepage.workspace = true
 async-trait = { workspace = true }
 fixedbitset = { workspace = true }
 insim = { path = "../insim", version = "4.0.0", features = ["tokio"] }
+paste = "1.0.15"
 taffy = "0.9.1"
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt"] }

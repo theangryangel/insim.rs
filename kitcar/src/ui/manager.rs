@@ -163,7 +163,7 @@ impl UIManager {
     pub fn handle_click(&self, click_id: ClickId) -> Option<(TypeId, UINodeKey)> {
         let tree_id = self.id_to_tree.get(&click_id)?;
         let tree_state = self.tree_manager.get_tree_state(*tree_id)?;
-        let (button_key, _) = tree_state.active_buttons.get(&click_id)?;
+        let (button_key, _, _) = tree_state.active_buttons.get(&click_id)?;
         Some((*tree_id, *button_key))
     }
 

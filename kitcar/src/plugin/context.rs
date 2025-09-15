@@ -3,13 +3,16 @@
 use std::{any::TypeId, collections::HashMap, fmt::Debug};
 
 use insim::{
-    identifiers::{ConnectionId, PlayerId}, insim::Mso, Packet
+    identifiers::{ConnectionId, PlayerId},
+    insim::{Mso, Mst},
+    Packet,
 };
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
 use crate::{
     framework::Command,
+    plugin::UserState,
     state::{ConnectionInfo, GameInfo, PlayerInfo},
     ui::node::UINode,
 };
@@ -18,7 +21,7 @@ use crate::{
 #[derive(Debug)]
 pub struct PluginContext<S>
 where
-    S: Send + Sync + Clone + Debug,
+    S: UserState,
 {
     /// events
     pub(crate) events: broadcast::Sender<Packet>,
@@ -35,7 +38,7 @@ where
 
 impl<S> PluginContext<S>
 where
-    S: Send + Sync + Clone + Debug,
+    S: UserState,
 {
     /// Wheres mah packets at?
     pub fn subscribe_to_packets(&self) -> broadcast::Receiver<Packet> {
@@ -53,19 +56,21 @@ where
 
     /// Shortcut to send a command
     pub async fn send_command(&self, command: &str) {
-        self.send_packet(Mso {
+        self.send_packet(Mst {
             msg: command.into(),
             ..Default::default()
-        }).await;
+        })
+        .await;
     }
 
     /// Shortcut to send a command
     // TODO: make it pick the right packet type automatically.
     pub async fn send_message(&self, msg: &str) {
-        self.send_packet(Mso {
+        self.send_packet(Mst {
             msg: msg.into(),
             ..Default::default()
-        }).await;
+        })
+        .await;
     }
 
     /// Get a single player info

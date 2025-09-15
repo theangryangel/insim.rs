@@ -2,6 +2,9 @@ iname: "insim.rs/20sl"
 addr: "172.24.64.1:29999"
 admin: "123!"
 tick_rate: 64
+warmup_duration_minutes: 5
+game_duration_minutes: 1
+total_rounds: 20
 
 combo:
   - name: "FE1X_20s_cup"

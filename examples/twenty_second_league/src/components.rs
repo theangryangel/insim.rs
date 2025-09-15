@@ -12,14 +12,10 @@ pub(crate) fn countdown(remaining: Duration) -> UINode {
     fullscreen()
         .height(150)
         .display_flex()
+        .padding(20)
         .flex_direction_column()
-        .justify_content_flex_start()
+        .justify_content_flex_end()
         .with_children([
-            button("".into(), 4.into())
-                .width(150)
-                .height(150)
-                .position_absolute()
-                .dark(),
             button("Welcome to ^120sl^8, game starts in".into(), 2.into())
                 .width(35)
                 .height(5)
