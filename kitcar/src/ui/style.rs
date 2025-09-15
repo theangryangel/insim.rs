@@ -158,6 +158,12 @@ pub(crate) enum SendableJustifyContent {
 ///
 /// This struct can be safely sent across threads. It implements `From<SendableStyle>`
 /// for `taffy::style::Style` to allow for easy conversion before passing it to Taffy.
+// FIXME: This is all fucked and doesnt match the Taffy defaults, resulting me wasting my time.
+// Considering solutions.
+// This is great because it doesnt expose taffy to the user.
+// It's shit because we need to keep in sync with upstream defaults.
+// This is great because its Send and taffy 0.8 aint.
+// Maybe we just downgrade to 0.7 for now?
 #[derive(Clone, Debug, Hash)]
 pub struct SendableStyle {
     pub(crate) display: SendableDisplay,

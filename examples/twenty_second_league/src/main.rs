@@ -19,12 +19,12 @@ use crate::{combo::ComboCollection, components::countdown};
 
 mod combo;
 mod components;
-// mod cpa;
-// mod dictator;
-// mod league;
+mod cpa;
+mod dictator;
+mod league;
 
 /// Config
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 pub struct Config {
     /// Insim IName
     pub iname: String,
@@ -36,6 +36,12 @@ pub struct Config {
     pub combo: combo::ComboCollection,
     /// tick rate (hz)
     pub tick_rate: Option<u64>,
+    /// Warmup Duration
+    pub warmup_duration_minutes: u64,
+    /// Game duration
+    pub game_duration_minutes: u64,
+    /// Rounds
+    pub total_rounds: u32,
 }
 
 struct AnnouncerPlugin;
@@ -53,7 +59,7 @@ where
 
 pub(crate) struct CountdownView;
 
-async fn chatterbox(mut ctx: PluginContext<()>) -> Result<(), ()> {
+async fn chatterbox<S: Send + Sync + Clone + Debug + 'static>(mut ctx: PluginContext<S>) -> Result<(), ()> {
     info!("Chatterbox plugin started!");
     let mut packets = ctx.subscribe_to_packets();
 
@@ -108,7 +114,10 @@ async fn main() -> eyre::Result<()> {
     .wrap_err("Could not parse config.yaml")?;
 
     let framework = Framework::new()
+        .with_plugin(cpa::cpa)
+        .with_plugin(dictator::dictator)
         .with_plugin(AnnouncerPlugin)
+        .with_plugin(league::League::default())
         .with_plugin(chatterbox);
     // .with_chat_command("!test", |_ctx: TaskContext<()>| {
     //      info!("Woot!");
@@ -116,15 +125,15 @@ async fn main() -> eyre::Result<()> {
 
     info!("Framework built. Running application...");
 
-    let net = insim::tcp(config.addr)
-        .isi_iname(config.iname)
-        .isi_admin_password(config.admin)
+    let net = insim::tcp(config.addr.clone())
+        .isi_iname(config.iname.clone())
+        .isi_admin_password(config.admin.clone())
         .isi_prefix('!')
         .set_non_blocking(true)
         .connect_async()
         .await?;
 
-    framework.run((), net).await?;
+    framework.run(config, net).await?;
 
     Ok(())
 }

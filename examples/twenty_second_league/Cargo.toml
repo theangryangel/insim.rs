@@ -10,7 +10,7 @@ homepage.workspace = true
 
 [dependencies]
 eyre = "0.6.12"
-# if_chain = { workspace = true }
+if_chain = { workspace = true }
 insim = { path = "../../insim", features = ["serde", "blocking"] }
 kitcar = { path = "../../kitcar" }
 rand = "0.9.2"

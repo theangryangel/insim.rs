@@ -3,8 +3,7 @@
 use std::{any::TypeId, collections::HashMap, fmt::Debug};
 
 use insim::{
-    identifiers::{ConnectionId, PlayerId},
-    Packet,
+    identifiers::{ConnectionId, PlayerId}, insim::Mso, Packet
 };
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
@@ -50,6 +49,23 @@ where
             .send(Command::SendPacket(packet.into()))
             .await
             .unwrap();
+    }
+
+    /// Shortcut to send a command
+    pub async fn send_command(&self, command: &str) {
+        self.send_packet(Mso {
+            msg: command.into(),
+            ..Default::default()
+        }).await;
+    }
+
+    /// Shortcut to send a command
+    // TODO: make it pick the right packet type automatically.
+    pub async fn send_message(&self, msg: &str) {
+        self.send_packet(Mso {
+            msg: msg.into(),
+            ..Default::default()
+        }).await;
     }
 
     /// Get a single player info
