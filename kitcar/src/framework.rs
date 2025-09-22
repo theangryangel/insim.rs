@@ -1,6 +1,6 @@
 //! Framework
 
-use std::{any::TypeId, collections::HashMap, fmt::Debug, time::Duration};
+use std::{collections::HashMap, fmt::Debug};
 
 use insim::{
     identifiers::{ConnectionId, PlayerId},
@@ -13,15 +13,11 @@ use tracing::{error, info, warn};
 
 use crate::{
     plugin::{Plugin, PluginContext, UserState},
-    state::{ConnectionInfo, GameInfo, PlayerInfo, State, Ui},
-    ui::node::UINode,
+    state::{ConnectionInfo, GameInfo, PlayerInfo, State},
 };
 
 pub(crate) enum Command {
     SendPacket(Packet),
-
-    SetUi(TypeId, ConnectionId, UINode),
-    RemoveUi(TypeId, ConnectionId),
 
     // Game state shit
     GetPlayer(PlayerId, oneshot::Sender<Option<PlayerInfo>>),
@@ -49,7 +45,6 @@ where
     plugins: Vec<(String, Box<dyn Plugin<S>>)>,
     packet_channel_capacity: usize,
     command_channel_capacity: usize,
-    ui_tick_rate: Duration,
 }
 
 impl<S> Debug for Framework<S>
@@ -78,7 +73,6 @@ where
             plugins: vec![],
             packet_channel_capacity: 1000,
             command_channel_capacity: 64,
-            ui_tick_rate: Duration::from_millis(500),
         }
     }
 
@@ -109,7 +103,6 @@ where
 
         let cancellation_token = CancellationToken::new();
         let mut state = State::default();
-        let mut ui = Ui::new(self.ui_tick_rate);
 
         info!("Starting framework");
 
@@ -138,21 +131,12 @@ where
         loop {
             tokio::select! {
 
-                // UI update packets to send
-                to_update = ui.tick() => {
-                    println!("UI TICKING");
-                    for p in to_update {
-                        let _ = net.write(p).await?;
-                    }
-                },
-
                 // packet from LFS
                 packet = net.read() => {
                     let packet = packet?;
 
                     // we must always update our state and ui first
                     state.handle_packet(&packet);
-                    ui.handle_packet(&packet);
 
                     if event_sender.receiver_count() > 0 {
                         let _ = event_sender.send(packet);
@@ -180,16 +164,6 @@ where
                     Command::GetGame(sender) => {
                         let _ = sender.send(state.game.clone());
                     },
-                    Command::SetUi(type_id, connection_id, view) => {
-                        if let Some(mgr) = ui.inner.get_mut(&connection_id) {
-                            let _ = mgr.set_tree(type_id, view);
-                        }
-                    },
-                    Command::RemoveUi(type_id, connection_id) => {
-                        if let Some(mgr) = ui.inner.get_mut(&connection_id) {
-                            let _ = mgr.remove_tree(type_id);
-                        }
-                    }
                 }
             }
         }

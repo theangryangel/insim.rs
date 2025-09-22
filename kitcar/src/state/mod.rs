@@ -8,12 +8,8 @@ use std::{
 use insim::{
     core::{track::Track, vehicle::Vehicle, wind::Wind},
     identifiers::{ConnectionId, PlayerId},
-    insim::{Bfn, BfnType, Cnl, Ncn, PlayerFlags, PlayerType, RaceInProgress, RaceLaps, StaFlags},
-    Packet, WithRequestId,
+    insim::{PlayerFlags, PlayerType, RaceInProgress, RaceLaps, StaFlags},
 };
-use tokio::time::{interval, Interval, MissedTickBehavior};
-
-use crate::ui::manager::UIManager;
 
 #[derive(Debug, Default, Clone)]
 /// GameInfo
@@ -112,8 +108,6 @@ impl State {
             insim::Packet::Pfl(pfl) => self.pfl(pfl),
             insim::Packet::Pla(pla) => self.pla(pla),
 
-            // FIXME: process Btn's and pipe through ucid ui to translate and then forward onto the
-            // Plugins
             _ => {},
         }
     }
@@ -220,84 +214,5 @@ impl State {
                 player.in_pitlane = false;
             }
         }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Ui {
-    pub(crate) inner: HashMap<ConnectionId, UIManager>,
-    render_interval: Interval,
-    blocked: HashSet<ConnectionId>,
-}
-
-impl Ui {
-    pub(crate) fn new(render_interval: Duration) -> Self {
-        let mut render_interval = interval(render_interval);
-        render_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-
-        Self {
-            inner: HashMap::new(),
-            render_interval,
-            blocked: HashSet::new(),
-        }
-    }
-
-    pub(crate) fn handle_packet(&mut self, packet: &insim::Packet) {
-        match packet {
-            insim::Packet::Ncn(ncn) => self.ncn(ncn),
-            insim::Packet::Cnl(cnl) => self.cnl(cnl),
-            insim::Packet::Bfn(bfn) => self.bfn(bfn),
-            _ => {},
-        }
-    }
-
-    fn ncn(&mut self, ncn: &Ncn) {
-        let _ = self.inner.insert(ncn.ucid, UIManager::new());
-    }
-
-    fn cnl(&mut self, cnl: &Cnl) {
-        let _ = self.inner.remove(&cnl.ucid);
-    }
-
-    fn bfn(&mut self, bfn: &Bfn) {
-        if matches!(bfn.subt, BfnType::UserClear) {
-            let _ = self.blocked.insert(bfn.ucid);
-        }
-
-        if matches!(bfn.subt, BfnType::BtnRequest) {
-            let _ = self.blocked.remove(&bfn.ucid);
-        }
-    }
-
-    pub(crate) fn render(&mut self) -> Vec<Packet> {
-        // FIXME we can do better, but this'll do
-        let (to_add, to_remove) = self
-            .inner
-            .iter_mut()
-            .filter(|(c, _mgr)| !self.blocked.contains(&c))
-            .map(|(c, mngr)| mngr.render_all(*c))
-            .fold((vec![], vec![]), |mut acc, i| {
-                acc.0.extend_from_slice(&i.0);
-                acc.1.extend_from_slice(&i.1);
-                acc
-            });
-
-        let to_remove = to_remove.into_iter().map(|p| {
-            let reqi = p.clickid.0;
-            p.with_request_id(reqi).into()
-        });
-
-        let to_add = to_add.into_iter().map(|p| {
-            let reqi = p.clickid.0;
-            p.with_request_id(reqi).into()
-        });
-
-        to_remove.chain(to_add).collect()
-    }
-
-    // Async method that waits for the next tick and then renders
-    pub(crate) async fn tick(&mut self) -> Vec<Packet> {
-        let _ = self.render_interval.tick().await;
-        self.render()
     }
 }
