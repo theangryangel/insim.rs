@@ -1,12 +1,15 @@
 pub mod component;
+pub mod components;
 pub mod id_pool;
+pub mod styled;
 pub mod ui;
 pub mod vdom;
 
 pub use component::Component;
 pub use id_pool::ClickIdPool;
+pub use styled::Styled;
 pub use ui::{Ui, UiDiff};
-pub use vdom::{Element, ElementDiff};
+pub use vdom::Element;
 
 // Each plugin will be responsible for it's own set of Ui's. Nothing shared except for the id_pool.
 // Each Ui is per-connection.
@@ -73,21 +76,21 @@ mod test {
 
             let mut children = Vec::new();
 
-            children.push(Element::Button {
-                text: "foo".to_string(),
-                key: "1".into(),
-                height: 5,
-                width: 5,
-                style: taffy::Style::DEFAULT,
-                btnstyle: BtnStyle::default(),
-            });
+            children.push(
+                Element::Button {
+                    text: "foo".to_string(),
+                    key: "1".into(),
+                    style: taffy::Style::DEFAULT,
+                    btnstyle: BtnStyle::default(),
+                }
+                .w(5.0)
+                .h(5.0),
+            );
 
             if props.bar {
                 children.push(Element::Button {
                     text: "bar".to_string(),
                     key: "2".into(),
-                    height: 5,
-                    width: 5,
                     style: taffy::Style::DEFAULT,
                     btnstyle: BtnStyle::default(),
                 });

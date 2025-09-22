@@ -2,15 +2,7 @@ use std::collections::HashMap;
 
 use insim::insim::BtnStyle;
 
-#[derive(Debug, Default)]
-pub struct ElementDiff<'a> {
-    /// new keys
-    pub new: HashMap<&'a str, &'a Element>,
-    /// updated keys
-    pub changed: HashMap<&'a str, &'a Element>,
-    /// removed
-    pub removed: Vec<&'a str>,
-}
+use crate::ui::styled::Styled;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Element {
@@ -19,8 +11,6 @@ pub enum Element {
         key: String, // TODO: auto generate this somehow if not supplied
         text: String,
         style: taffy::Style,
-        width: u8,
-        height: u8,
         btnstyle: BtnStyle,
     },
     Container {
@@ -30,6 +20,33 @@ pub enum Element {
 }
 
 impl Element {
+    pub fn container() -> Self {
+        Self::Container {
+            children: vec![],
+            style: taffy::Style::DEFAULT,
+        }
+    }
+
+    pub fn button(key: &str, text: &str) -> Self {
+        Self::Button {
+            key: key.to_string(),
+            text: text.to_string(),
+            style: taffy::Style::DEFAULT,
+            btnstyle: BtnStyle::default(),
+        }
+    }
+
+    pub fn with_child(mut self, val: Element) -> Self {
+        match self {
+            Element::Container {
+                ref mut children, ..
+            } => children.push(val),
+            _ => panic!("Empty cannot have children"),
+        }
+
+        self
+    }
+
     pub fn children(&self) -> &[Element] {
         match self {
             Element::Container { children, .. } => &children,
@@ -39,28 +56,14 @@ impl Element {
 
     pub fn text(&self) -> &str {
         match self {
-            Element::Button { ref text, .. } => &text,
+            Element::Button { text, .. } => text,
             _ => "",
         }
     }
 
     pub fn bstyle(&self) -> Option<&BtnStyle> {
         match self {
-            Element::Button { btnstyle, .. } => Some(&btnstyle),
-            _ => None,
-        }
-    }
-
-    pub fn width(&self) -> Option<u8> {
-        match self {
-            Element::Button { width, .. } => Some(*width),
-            _ => None,
-        }
-    }
-
-    pub fn height(&self) -> Option<u8> {
-        match self {
-            Element::Button { height, .. } => Some(*height),
+            Element::Button { btnstyle, .. } => Some(btnstyle),
             _ => None,
         }
     }
@@ -69,6 +72,24 @@ impl Element {
         let mut result = HashMap::new();
         collect_renderable_recursively(&self, &mut result);
         result
+    }
+}
+
+impl Styled for Element {
+    fn style(&self) -> &taffy::Style {
+        match self {
+            Element::Empty => panic!("There is no style on an Empty Element"),
+            Element::Button { style, .. } => style,
+            Element::Container { style, .. } => style,
+        }
+    }
+
+    fn style_mut(&mut self) -> &mut taffy::Style {
+        match self {
+            Element::Empty => panic!("cannot set a style on an empty Element"),
+            Element::Button { ref mut style, .. } => style,
+            Element::Container { ref mut style, .. } => style,
+        }
     }
 }
 

@@ -6,6 +6,7 @@ use insim::{
 };
 
 use super::{component::Component, id_pool::ClickIdPool, vdom::Element};
+use crate::ui::Styled;
 
 #[derive(Debug, Default)]
 pub struct UiDiff {
@@ -72,12 +73,13 @@ where
             .map(|(k, v)| {
                 let node_id = node_map.get(&k.to_string()).unwrap();
                 let (x, y) = get_taffy_abs_position(&taffy, node_id);
+                let layout = taffy.layout(*node_id).unwrap();
 
                 let renderable = Btn {
                     l: x as u8,
                     t: y as u8,
-                    w: v.width().unwrap(),
-                    h: v.height().unwrap(),
+                    w: layout.size.width as u8,
+                    h: layout.size.height as u8,
                     text: v.text().to_string(),
                     bstyle: v.bstyle().unwrap().clone(),
                     ..Default::default()

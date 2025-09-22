@@ -1,6 +1,4 @@
-use std::fmt::Debug;
-
-use insim::{insim::Mst, Packet};
+use insim::Packet;
 use kitcar::{plugin::UserState, PluginContext};
 
 pub(crate) async fn cpa<S: UserState>(ctx: PluginContext<S>) -> Result<(), ()> {
