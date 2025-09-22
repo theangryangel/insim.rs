@@ -33,11 +33,6 @@ pub trait Styled: Sized {
         self
     }
 
-    fn grid(mut self) -> Self {
-        self.style_mut().display = taffy::Display::Grid;
-        self
-    }
-
     fn flex_col(mut self) -> Self {
         self.style_mut().flex_direction = taffy::FlexDirection::Column;
         self
@@ -229,6 +224,16 @@ pub trait Styled: Sized {
     fn py(mut self, val: f32) -> Self {
         self.style_mut().padding.top = taffy::LengthPercentage::length(val);
         self.style_mut().padding.bottom = taffy::LengthPercentage::length(val);
+        self
+    }
+
+    fn fit_content(mut self) -> Self {
+        self = self.w_auto().h_auto();
+        self
+    }
+
+    fn sized(mut self, width: f32, height: f32) -> Self {
+        self = self.w(width).h(height);
         self
     }
 }

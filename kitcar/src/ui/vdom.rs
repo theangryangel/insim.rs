@@ -6,7 +6,6 @@ use crate::ui::styled::Styled;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Element {
-    Empty,
     Button {
         key: String, // TODO: auto generate this somehow if not supplied
         text: String,
@@ -37,13 +36,42 @@ impl Element {
     }
 
     pub fn with_child(mut self, val: Element) -> Self {
-        match self {
-            Element::Container {
-                ref mut children, ..
-            } => children.push(val),
-            _ => panic!("Empty cannot have children"),
+        if let Element::Container {
+            ref mut children, ..
+        } = self
+        {
+            children.push(val);
         }
+        self
+    }
 
+    pub fn with_child_if<F>(mut self, val: Element, condition: bool) -> Self
+    where
+        F: FnOnce() -> Element,
+    {
+        if condition {
+            self = self.with_child(val);
+        }
+        self
+    }
+
+    pub fn with_children<I>(mut self, children: I) -> Self
+    where
+        I: IntoIterator<Item = Option<Element>>,
+    {
+        for child in children.into_iter().flatten() {
+            self = self.with_child(child);
+        }
+        self
+    }
+
+    pub fn with_children_if<I>(mut self, children: I, condition: bool) -> Self
+    where
+        I: IntoIterator<Item = Option<Element>>,
+    {
+        if condition {
+            self = self.with_children(children);
+        }
         self
     }
 
@@ -78,7 +106,6 @@ impl Element {
 impl Styled for Element {
     fn style(&self) -> &taffy::Style {
         match self {
-            Element::Empty => panic!("There is no style on an Empty Element"),
             Element::Button { style, .. } => style,
             Element::Container { style, .. } => style,
         }
@@ -86,7 +113,6 @@ impl Styled for Element {
 
     fn style_mut(&mut self) -> &mut taffy::Style {
         match self {
-            Element::Empty => panic!("cannot set a style on an empty Element"),
             Element::Button { ref mut style, .. } => style,
             Element::Container { ref mut style, .. } => style,
         }

@@ -1,13 +1,18 @@
 //! Twenty Second League
 use std::{
+    collections::HashMap,
     fmt::Debug,
     fs,
     time::{Duration, Instant},
 };
 
 use eyre::Context as _;
-use insim::{insim::Con, Packet};
-use kitcar::{plugin::UserState, Framework, Plugin, PluginContext};
+use insim::{identifiers::ConnectionId, insim::Con, Packet};
+use kitcar::{
+    plugin::UserState,
+    ui::{ClickIdPool, Element, Ui},
+    Framework, Plugin, PluginContext,
+};
 use tokio::time::interval;
 use tracing::info;
 
@@ -65,16 +70,24 @@ async fn chatterbox<S: UserState>(mut ctx: PluginContext<S>) -> Result<(), ()> {
 
     let target = Instant::now() + Duration::from_secs(100);
 
+    let mut uimap: HashMap<ConnectionId, Ui<fn(&Duration) -> Option<Element>, Duration>> =
+        HashMap::new();
+
     loop {
         tokio::select! {
 
             _ = timer.tick() => {
                 println!("ticking!");
 
-                let connections = ctx.get_connections().await;
+                // let connections = ctx.get_connections().await;
 
-                for ucid in connections.keys() {
-                    ctx.set_ui::<CountdownView>(*ucid, countdown(target - Instant::now())).await;
+                for (_ucid, u) in uimap.iter_mut() {
+                    if let Some(diff) = u.render(&(target - Instant::now())) {
+
+                        for i in diff.into_merged() {
+                            ctx.send_packet(i).await;
+                        }
+                    }
                 }
             },
 
@@ -91,6 +104,18 @@ async fn chatterbox<S: UserState>(mut ctx: PluginContext<S>) -> Result<(), ()> {
                         ctx.send_message(
                             &format!("A big welcome to {:?} ({:?})", ncn.pname, ncn.uname),
                         ).await;
+
+                        let _ = uimap.insert(
+                            ncn.ucid,
+                            Ui::new(
+                                ClickIdPool::new(),
+                                ncn.ucid,
+                                components::countdown,
+                            )
+                        );
+                    },
+                    Packet::Cnl(cnl) => {
+                        let _ = uimap.remove(&cnl.ucid);
                     },
                     _ => {},
                 }

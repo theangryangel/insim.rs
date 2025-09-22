@@ -1,12 +1,13 @@
-use std::collections::HashMap;
+// ui.rs
+use std::{collections::HashMap, fmt::Debug};
 
 use insim::{
     identifiers::{ClickId, ConnectionId},
     insim::{Bfn, BfnType, Btn},
+    Packet,
 };
 
-use super::{component::Component, id_pool::ClickIdPool, vdom::Element};
-use crate::ui::Styled;
+use super::{id_pool::ClickIdPool, vdom::Element};
 
 #[derive(Debug, Default)]
 pub struct UiDiff {
@@ -14,39 +15,59 @@ pub struct UiDiff {
     pub to_remove: Vec<Bfn>,
 }
 
+impl UiDiff {
+    pub fn into_merged(self) -> Vec<Packet> {
+        self.to_remove
+            .into_iter()
+            .map(|x| Packet::from(x))
+            .chain(self.to_update.into_iter().map(|x| Packet::from(x)))
+            .collect()
+    }
+}
+
 /// Ui for a single connection
 #[derive(Debug)]
-pub struct Ui<C>
+pub struct Ui<F, P>
 where
-    C: Component,
+    F: Fn(&P) -> Option<Element>,
+    P: Clone + PartialEq,
 {
     id_pool: ClickIdPool,
     // The root component for this connection
-    root_component: C,
+    render_fn: F,
     // Stable mapping from component keys to button IDs
-    key_to_button_id: HashMap<String, ClickId>,
+    key_to_click_id: HashMap<String, ClickId>,
+    click_id_to_key: HashMap<ClickId, String>,
     // last layout and props
     last_layout: Option<HashMap<String, Btn>>,
-    last_props: Option<C::Props>,
+    last_props: Option<P>,
+    ucid: ConnectionId,
 }
 
-impl<C> Ui<C>
+impl<F, P> Ui<F, P>
 where
-    C: Component,
+    F: Fn(&P) -> Option<Element>,
+    P: Clone + PartialEq,
 {
-    pub fn new(id_pool: ClickIdPool, root_component: C) -> Self {
+    pub fn new(id_pool: ClickIdPool, ucid: ConnectionId, root_component: F) -> Self
+    where
+        F: Fn(&P) -> Option<Element> + 'static,
+        P: Clone + PartialEq + 'static,
+    {
         Self {
             id_pool,
-            root_component,
-            key_to_button_id: HashMap::new(),
+            render_fn: root_component,
+            key_to_click_id: HashMap::new(),
+            click_id_to_key: HashMap::new(),
             last_layout: None,
             last_props: None,
+            ucid,
         }
     }
 
-    pub fn render(&mut self, ucid: ConnectionId, props: &C::Props) -> Option<UiDiff> {
+    pub fn render(&mut self, props: &P) -> Option<UiDiff> {
         let should_render = if let Some(old_props) = self.last_props.as_ref() {
-            self.root_component.should_render(old_props, props)
+            old_props != props
         } else {
             true
         };
@@ -56,16 +77,40 @@ where
             return None;
         }
 
-        let new_vdom = self.root_component.render(props);
+        let ucid = self.ucid;
+
+        let new_vdom = (self.render_fn)(props);
+
+        // Handle the case where render function returns None
+        let new_vdom = match new_vdom {
+            Some(vdom) => vdom,
+            None => {
+                // No UI to render - remove everything
+                let last_layout = self.last_layout.take().unwrap_or_default();
+                let to_remove = last_layout
+                    .iter()
+                    .map(|(key, _btn)| Bfn {
+                        ucid,
+                        subt: BfnType::DelBtn,
+                        clickid: self.release_clickid(key).unwrap(), // FIXME: don't unwrap
+                        ..Default::default()
+                    })
+                    .collect();
+
+                self.last_props = Some(props.clone());
+
+                return Some(UiDiff {
+                    to_update: vec![],
+                    to_remove,
+                });
+            },
+        };
 
         let mut taffy = taffy::TaffyTree::new();
-        // key to taffy::NodeId
         let mut node_map = HashMap::new();
 
         let root = populate_taffy_and_map(&mut taffy, &mut node_map, &new_vdom);
         let _ = taffy.compute_layout(root, taffy::Size::length(200.0));
-
-        // build renderable layout hashmap
 
         let new_layout: HashMap<String, Btn> = new_vdom
             .collect_renderable()
@@ -90,7 +135,7 @@ where
 
         let last_layout = self.last_layout.take().unwrap_or_default();
 
-        // find buttons to remove
+        // Find buttons to remove
         let to_remove = last_layout
             .iter()
             .filter_map(|(key, _btn)| {
@@ -98,8 +143,7 @@ where
                     Some(Bfn {
                         ucid,
                         subt: BfnType::DelBtn,
-                        // FIXME: dont unwrap
-                        clickid: self.release_clickid(key).unwrap(),
+                        clickid: self.release_clickid(key).unwrap(), // FIXME: don't unwrap
                         ..Default::default()
                     })
                 } else {
@@ -113,16 +157,17 @@ where
             .filter_map(|(key, btn)| {
                 match last_layout.get(key) {
                     None => {
-                        // new button
+                        // New button
                         let mut btn = btn.clone();
                         btn.clickid = self.lease_clickid(key).unwrap();
                         Some(btn)
                     },
                     Some(existing_btn) => {
-                        if !matches!(existing_btn, _btn) {
+                        // Check if button actually changed
+                        if existing_btn != btn {
                             let mut btn = btn.clone();
                             btn.clickid = self.lease_clickid(key).unwrap();
-                            Some(btn.into())
+                            Some(btn)
                         } else {
                             None
                         }
@@ -142,12 +187,13 @@ where
 
     fn lease_clickid(&mut self, key: &str) -> Option<ClickId> {
         // If we already have an ID for this key, reuse it
-        if let Some(&existing_id) = self.key_to_button_id.get(key) {
+        if let Some(&existing_id) = self.key_to_click_id.get(key) {
             return Some(existing_id);
         }
 
         if let Some(new_id) = self.id_pool.lease() {
-            let _ = self.key_to_button_id.insert(key.to_string(), new_id);
+            let _ = self.key_to_click_id.insert(key.to_string(), new_id);
+            let _ = self.click_id_to_key.insert(new_id, key.to_string());
             return Some(new_id);
         }
 
@@ -156,13 +202,21 @@ where
     }
 
     fn release_clickid(&mut self, key: &str) -> Option<ClickId> {
-        // If we already have an ID for this key, reuse it
-        if let Some(&existing_id) = self.key_to_button_id.get(key) {
+        if let Some(existing_id) = self.key_to_click_id.remove(key) {
+            let _ = self.click_id_to_key.remove(&existing_id);
             self.id_pool.release(&[existing_id]);
             return Some(existing_id);
         }
 
         None
+    }
+
+    pub fn click_id_to_key(&self, click_id: &ClickId) -> Option<&String> {
+        self.click_id_to_key.get(click_id)
+    }
+
+    pub fn key_to_click_id(&self, key: &str) -> Option<&ClickId> {
+        self.key_to_click_id.get(key)
     }
 }
 
@@ -185,10 +239,6 @@ fn populate_taffy_and_map(
             let taffy_id = tree.new_leaf(style.clone()).unwrap();
             let _ = node_map.insert(key.clone(), taffy_id);
             taffy_id
-        },
-        Element::Empty => {
-            // TODO: how do we avoid this
-            tree.new_leaf(taffy::Style::DEFAULT).unwrap()
         },
     }
 }
@@ -217,4 +267,83 @@ fn get_taffy_abs_position(taffy: &taffy::TaffyTree, node_id: &taffy::NodeId) -> 
     }
 
     absolute_location
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::{super::Styled, *};
+
+    #[test]
+    fn test_centered_button_layout() {
+        let button = Element::button("test_button", "Test").w(10.0).h(10.0);
+
+        let container = Element::container()
+            .w(200.0)
+            .h(200.0)
+            .flex()
+            .justify_center()
+            .items_center()
+            .with_child(button);
+
+        let mut taffy = taffy::TaffyTree::new();
+        let mut node_map = HashMap::new();
+
+        let root = populate_taffy_and_map(&mut taffy, &mut node_map, &container);
+
+        taffy
+            .compute_layout(root, taffy::Size::length(200.0))
+            .unwrap();
+
+        let button_node = node_map
+            .get("test_button")
+            .expect("Button node should exist");
+        let (x, y) = get_taffy_abs_position(&taffy, button_node);
+
+        assert_eq!(x, 95.0, "Button X position should be 95");
+        assert_eq!(y, 95.0, "Button Y position should be 95");
+
+        let layout = taffy.layout(*button_node).unwrap();
+        assert_eq!(layout.size.width, 10.0, "Button width should be 10");
+        assert_eq!(layout.size.height, 10.0, "Button height should be 10");
+    }
+
+    #[test]
+    fn test_multiple_buttons_layout() {
+        // Test with multiple buttons to ensure positioning works correctly
+        let button1 = Element::button("button1", "Button 1").w(20.0).h(10.0);
+
+        let button2 = Element::button("button2", "Button 2").w(20.0).h(10.0);
+
+        let container = Element::container()
+            .w(200.0)
+            .h(200.0)
+            .flex()
+            .flex_col()
+            .justify_center()
+            .items_center()
+            .with_child(button1)
+            .with_child(button2);
+
+        let mut taffy = taffy::TaffyTree::new();
+        let mut node_map = HashMap::new();
+
+        let root = populate_taffy_and_map(&mut taffy, &mut node_map, &container);
+        taffy
+            .compute_layout(root, taffy::Size::length(200.0))
+            .unwrap();
+
+        let button1_node = node_map.get("button1").unwrap();
+        let (x1, y1) = get_taffy_abs_position(&taffy, button1_node);
+
+        let button2_node = node_map.get("button2").unwrap();
+        let (x2, y2) = get_taffy_abs_position(&taffy, button2_node);
+
+        assert_eq!(x1, 90.0, "Button1 X should be 90");
+        assert_eq!(x2, 90.0, "Button2 X should be 90");
+
+        assert_eq!(y1, 90.0);
+        assert_eq!(y2, 100.0);
+    }
 }
