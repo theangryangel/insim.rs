@@ -158,6 +158,11 @@ pub trait Styled: Sized {
         self
     }
 
+    fn mt_auto(mut self) -> Self {
+        self.style_mut().margin.top = taffy::LengthPercentageAuto::auto();
+        self
+    }
+
     fn mt(mut self, val: f32) -> Self {
         self.style_mut().margin.top = taffy::LengthPercentageAuto::length(val);
         self

@@ -6,7 +6,7 @@ use insim::{
     insim::{Mso, Mtc},
     Packet,
 };
-use kitcar::{time::countdown::Countdown, Plugin, PluginContext};
+use kitcar::{time::countdown::Countdown, ui::Ui, Plugin, PluginContext};
 use tokio::time::sleep;
 use tracing::{info, warn};
 
@@ -38,6 +38,8 @@ pub(crate) struct League {
     scoreboard: HashMap<ConnectionId, u32>,
     // TODO: Move into LeagueState and add a tick method?
     timer: Option<Countdown>,
+
+    views: HashMap<ConnectionId, Ui<super::components::countdown>>,
 }
 
 impl League {

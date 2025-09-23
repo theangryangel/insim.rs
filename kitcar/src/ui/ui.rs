@@ -2,7 +2,7 @@
 use std::{collections::HashMap, fmt::Debug};
 
 use insim::{
-    identifiers::{ClickId, ConnectionId},
+    identifiers::{ClickId, ConnectionId, RequestId},
     insim::{Bfn, BfnType, Btn},
     Packet,
 };
@@ -159,14 +159,18 @@ where
                     None => {
                         // New button
                         let mut btn = btn.clone();
-                        btn.clickid = self.lease_clickid(key).unwrap();
+                        let clickid = self.lease_clickid(key).unwrap();
+                        btn.clickid = clickid;
+                        btn.reqi = RequestId(clickid.0);
                         Some(btn)
                     },
                     Some(existing_btn) => {
                         // Check if button actually changed
                         if existing_btn != btn {
                             let mut btn = btn.clone();
-                            btn.clickid = self.lease_clickid(key).unwrap();
+                            let clickid = self.lease_clickid(key).unwrap();
+                            btn.clickid = clickid;
+                            btn.reqi = RequestId(clickid.0);
                             Some(btn)
                         } else {
                             None

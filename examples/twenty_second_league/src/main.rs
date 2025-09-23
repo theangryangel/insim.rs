@@ -7,7 +7,7 @@ use std::{
 };
 
 use eyre::Context as _;
-use insim::{identifiers::ConnectionId, insim::Con, Packet};
+use insim::{identifiers::ConnectionId, Packet};
 use kitcar::{
     plugin::UserState,
     ui::{ClickIdPool, Element, Ui},
@@ -16,13 +16,11 @@ use kitcar::{
 use tokio::time::interval;
 use tracing::info;
 
-use crate::components::countdown;
-
 mod combo;
 mod components;
 mod cpa;
 mod dictator;
-mod league;
+// mod league;
 
 /// Config
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -60,9 +58,7 @@ where
     }
 }
 
-pub(crate) struct CountdownView;
-
-async fn chatterbox<S: UserState>(mut ctx: PluginContext<S>) -> Result<(), ()> {
+async fn chatterbox<S: UserState>(ctx: PluginContext<S>) -> Result<(), ()> {
     info!("Chatterbox plugin started!");
     let mut packets = ctx.subscribe_to_packets();
 
@@ -140,7 +136,7 @@ async fn main() -> eyre::Result<()> {
         .with_plugin(cpa::cpa)
         .with_plugin(dictator::dictator)
         .with_plugin(AnnouncerPlugin)
-        .with_plugin(league::League::default())
+        // .with_plugin(league::League::default())
         .with_plugin(chatterbox);
     // .with_chat_command("!test", |_ctx: TaskContext<()>| {
     //      info!("Woot!");

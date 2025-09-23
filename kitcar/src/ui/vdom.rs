@@ -31,7 +31,7 @@ impl Element {
             key: key.to_string(),
             text: text.to_string(),
             style: taffy::Style::DEFAULT,
-            btnstyle: BtnStyle::default(),
+            btnstyle: BtnStyle::default().dark(),
         }
     }
 
