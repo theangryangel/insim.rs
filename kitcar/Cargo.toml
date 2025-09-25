@@ -17,6 +17,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt"] }
 tokio-util = "0.7.16"
 tracing = { workspace = true }
+if_chain = { workspace = true }
 
 [lints]
 workspace = true

@@ -1,7 +1,7 @@
 use insim::Packet;
-use kitcar::{plugin::UserState, PluginContext};
+use kitcar::{plugin::UserState, Context};
 
-pub(crate) async fn cpa<S: UserState>(ctx: PluginContext<S>) -> Result<(), ()> {
+pub(crate) async fn cpa<S: UserState>(ctx: Context<S>) -> Result<(), ()> {
     let mut packets = ctx.subscribe_to_packets();
 
     while let Ok(packet) = packets.recv().await {

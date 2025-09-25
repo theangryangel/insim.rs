@@ -11,7 +11,7 @@ use insim::{identifiers::ConnectionId, Packet};
 use kitcar::{
     plugin::UserState,
     ui::{ClickIdPool, Element, Ui},
-    Framework, Plugin, PluginContext,
+    Framework, Plugin, Context,
 };
 use tokio::time::interval;
 use tracing::info;
@@ -52,13 +52,13 @@ impl<S> Plugin<S> for AnnouncerPlugin
 where
     S: UserState,
 {
-    async fn run(mut self: Box<Self>, _ctx: PluginContext<S>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, _ctx: Context<S>) -> Result<(), ()> {
         info!("Announcer Plugin started and finished its job!");
         Ok(())
     }
 }
 
-async fn chatterbox<S: UserState>(ctx: PluginContext<S>) -> Result<(), ()> {
+async fn chatterbox<S: UserState>(ctx: Context<S>) -> Result<(), ()> {
     info!("Chatterbox plugin started!");
     let mut packets = ctx.subscribe_to_packets();
 

@@ -10,6 +10,7 @@ pub mod id_pool;
 pub mod styled;
 pub mod ui;
 pub mod vdom;
+pub mod runtime;
 
 pub use id_pool::ClickIdPool;
 pub use styled::Styled;

@@ -18,7 +18,7 @@ use crate::{
 
 /// Framework PluginContext
 #[derive(Debug)]
-pub struct PluginContext<S>
+pub struct Context<S>
 where
     S: UserState,
 {
@@ -35,7 +35,7 @@ where
     pub user_state: S,
 }
 
-impl<S> PluginContext<S>
+impl<S> Context<S>
 where
     S: UserState,
 {

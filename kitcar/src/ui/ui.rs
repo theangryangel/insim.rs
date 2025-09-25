@@ -6,7 +6,6 @@ use insim::{
     insim::{Bfn, BfnType, Btn},
     Packet,
 };
-
 use super::{id_pool::ClickIdPool, vdom::Element};
 
 #[derive(Debug, Default)]

@@ -1,10 +1,8 @@
 //! Plugins.
 
-pub mod context;
-
 use std::{fmt::Debug, future::Future};
 
-pub use context::PluginContext;
+pub use super::Context;
 
 /// User State
 pub trait UserState: Send + Sync + Clone + Debug + 'static {}
@@ -18,7 +16,7 @@ where
 {
     /// Run
     // FIXME: some kind of error?
-    async fn run(mut self: Box<Self>, ctx: PluginContext<S>) -> Result<(), ()>;
+    async fn run(mut self: Box<Self>, ctx: Context<S>) -> Result<(), ()>;
 }
 
 /// Allow the user to do something like this:
@@ -31,10 +29,10 @@ where
 impl<S, F, Fut> Plugin<S> for F
 where
     S: UserState,
-    F: Fn(PluginContext<S>) -> Fut + Send + Sync + 'static,
+    F: Fn(Context<S>) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = Result<(), ()>> + Send + 'static,
 {
-    async fn run(self: Box<Self>, ctx: PluginContext<S>) -> Result<(), ()> {
+    async fn run(self: Box<Self>, ctx: Context<S>) -> Result<(), ()> {
         (self)(ctx).await
     }
 }

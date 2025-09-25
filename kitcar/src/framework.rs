@@ -12,7 +12,8 @@ use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 
 use crate::{
-    plugin::{Plugin, PluginContext, UserState},
+    Context,
+    plugin::{Plugin, UserState},
     state::{ConnectionInfo, GameInfo, PlayerInfo, State},
 };
 
@@ -109,7 +110,7 @@ where
         // Start plugin tasks
         let mut plugin_handles = Vec::new();
         for (plugin_name, plugin) in self.plugins {
-            let ctx = PluginContext {
+            let ctx = Context {
                 events: event_sender.clone(),
                 commands: command_sender.clone(),
                 user_state: user_state.clone(),
