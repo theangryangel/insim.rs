@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use insim::{identifiers::ConnectionId, insim::Btn, Packet};
 use tokio::{sync::{broadcast, mpsc, watch}, task::JoinHandle};
 
-use crate::{plugin::UserState, ui::{ClickIdPool, Element, Ui}, Context};
+use crate::ui::{ClickIdPool, Element, Ui};
 
 #[derive(Debug, Clone)]
 pub enum UiOutput {

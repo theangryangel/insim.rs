@@ -10,12 +10,25 @@ pub mod id_pool;
 pub mod styled;
 pub mod ui;
 pub mod vdom;
-pub mod runtime;
+// pub mod runtime;
 
 pub use id_pool::ClickIdPool;
 pub use styled::Styled;
 pub use ui::{Ui, UiDiff};
 pub use vdom::Element;
+
+use crate::Service;
+
+impl<F, P> Service for Ui<F, P> 
+where
+    F: Fn(&P) -> Option<Element>,
+    P: Clone + PartialEq,
+
+{
+    fn spawn(packet_rx: tokio::sync::broadcast::Receiver<insim::Packet>, packet_tx: tokio::sync::mpsc::Sender<insim::Packet>) {
+        todo!()
+    }
+}
 
 #[cfg(test)]
 mod test {
