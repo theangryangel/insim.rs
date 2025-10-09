@@ -6,15 +6,16 @@ use insim::{
     insim::{Bfn, BfnType, Btn},
     Packet,
 };
+
 use super::{id_pool::ClickIdPool, vdom::Element};
 
 #[derive(Debug, Default)]
-pub struct UiDiff {
+pub struct UiRendererDiff {
     pub to_update: Vec<Btn>,
     pub to_remove: Vec<Bfn>,
 }
 
-impl UiDiff {
+impl UiRendererDiff {
     pub fn into_merged(self) -> Vec<Packet> {
         self.to_remove
             .into_iter()
@@ -26,62 +27,38 @@ impl UiDiff {
 
 /// Ui for a single connection
 #[derive(Debug)]
-pub struct Ui<F, P>
-where
-    F: Fn(&P) -> Option<Element>,
-    P: Clone + PartialEq,
-{
+pub struct UiRenderer {
     id_pool: ClickIdPool,
-    // The root component for this connection
-    render_fn: F,
     // Stable mapping from component keys to button IDs
     key_to_click_id: HashMap<String, ClickId>,
     click_id_to_key: HashMap<ClickId, String>,
     // last layout and props
     last_layout: Option<HashMap<String, Btn>>,
-    last_props: Option<P>,
-    ucid: ConnectionId,
 }
 
-impl<F, P> Ui<F, P>
-where
-    F: Fn(&P) -> Option<Element>,
-    P: Clone + PartialEq,
-{
-    pub fn new(id_pool: ClickIdPool, ucid: ConnectionId, root_component: F) -> Self
-    where
-        F: Fn(&P) -> Option<Element> + 'static,
-        P: Clone + PartialEq + 'static,
-    {
+impl UiRenderer {
+    pub fn new(id_pool: ClickIdPool) -> Self {
         Self {
             id_pool,
-            render_fn: root_component,
             key_to_click_id: HashMap::new(),
             click_id_to_key: HashMap::new(),
             last_layout: None,
-            last_props: None,
-            ucid,
         }
     }
 
-    pub fn render(&mut self, props: &P) -> Option<UiDiff> {
-        let should_render = if let Some(old_props) = self.last_props.as_ref() {
-            old_props != props
-        } else {
-            true
-        };
-
-        if !should_render {
-            self.last_props = Some(props.clone());
-            return None;
+    /// Forcefully clear the ui. Useful for bfn clear
+    pub fn clear(&mut self) {
+        self.last_layout = None;
+        for key in self.click_id_to_key.keys() {
+            self.id_pool.release(&[*key]);
         }
+        self.click_id_to_key.clear();
+        self.key_to_click_id.clear();
+    }
 
-        let ucid = self.ucid;
-
-        let new_vdom = (self.render_fn)(props);
-
+    pub fn render(&mut self, vdom: Option<Element>, ucid: &ConnectionId) -> Option<UiRendererDiff> {
         // Handle the case where render function returns None
-        let new_vdom = match new_vdom {
+        let new_vdom = match vdom {
             Some(vdom) => vdom,
             None => {
                 // No UI to render - remove everything
@@ -89,16 +66,15 @@ where
                 let to_remove = last_layout
                     .iter()
                     .map(|(key, _btn)| Bfn {
-                        ucid,
+                        ucid: *ucid,
                         subt: BfnType::DelBtn,
                         clickid: self.release_clickid(key).unwrap(), // FIXME: don't unwrap
                         ..Default::default()
                     })
                     .collect();
+                self.last_layout = None;
 
-                self.last_props = Some(props.clone());
-
-                return Some(UiDiff {
+                return Some(UiRendererDiff {
                     to_update: vec![],
                     to_remove,
                 });
@@ -135,12 +111,12 @@ where
         let last_layout = self.last_layout.take().unwrap_or_default();
 
         // Find buttons to remove
-        let to_remove = last_layout
+        let to_remove: Vec<Bfn> = last_layout
             .iter()
             .filter_map(|(key, _btn)| {
                 if !new_layout.contains_key(key) {
                     Some(Bfn {
-                        ucid,
+                        ucid: *ucid,
                         subt: BfnType::DelBtn,
                         clickid: self.release_clickid(key).unwrap(), // FIXME: don't unwrap
                         ..Default::default()
@@ -151,7 +127,7 @@ where
             })
             .collect();
 
-        let to_update = new_layout
+        let to_update: Vec<Btn> = new_layout
             .iter()
             .filter_map(|(key, btn)| {
                 match last_layout.get(key) {
@@ -180,12 +156,15 @@ where
             .collect();
 
         self.last_layout = Some(new_layout);
-        self.last_props = Some(props.clone());
 
-        Some(UiDiff {
-            to_update,
-            to_remove,
-        })
+        if to_update.is_empty() && to_remove.is_empty() {
+            None
+        } else {
+            Some(UiRendererDiff {
+                to_update,
+                to_remove,
+            })
+        }
     }
 
     fn lease_clickid(&mut self, key: &str) -> Option<ClickId> {
@@ -276,7 +255,48 @@ fn get_taffy_abs_position(taffy: &taffy::TaffyTree, node_id: &taffy::NodeId) -> 
 mod tests {
     use std::collections::HashMap;
 
+    use insim::{identifiers::ConnectionId, insim::BtnStyle};
+
     use super::{super::Styled, *};
+
+    #[derive(Clone, PartialEq, Default)]
+    pub struct AppProps {
+        pub empty: bool,
+        pub bar: bool,
+    }
+
+    fn app(props: &AppProps) -> Option<Element> {
+        if props.empty {
+            return None;
+        }
+
+        let mut children = Vec::new();
+
+        children.push(
+            Element::Button {
+                text: "foo".to_string(),
+                key: "1".into(),
+                style: taffy::Style::DEFAULT,
+                btnstyle: BtnStyle::default(),
+            }
+            .w(5.0)
+            .h(5.0),
+        );
+
+        if props.bar {
+            children.push(Element::Button {
+                text: "bar".to_string(),
+                key: "2".into(),
+                style: taffy::Style::DEFAULT,
+                btnstyle: BtnStyle::default(),
+            });
+        }
+
+        Some(Element::Container {
+            children,
+            style: taffy::Style::DEFAULT,
+        })
+    }
 
     #[test]
     fn test_centered_button_layout() {
@@ -348,5 +368,68 @@ mod tests {
 
         assert_eq!(y1, 90.0);
         assert_eq!(y2, 100.0);
+    }
+
+    #[test]
+    fn test_ui() {
+        let mut renderer = UiRenderer::new(ClickIdPool::new());
+
+        let vdom = app(&AppProps {
+            empty: false,
+            bar: false,
+        });
+
+        let diff = renderer
+            .render(vdom, &ConnectionId::ALL)
+            .expect("Initial render should render *something*");
+
+        assert_eq!(diff.to_update.len(), 1);
+        assert_eq!(diff.to_remove.len(), 0);
+
+        let expected_click_id = diff.to_update[0].clickid;
+
+        assert_eq!(renderer.key_to_click_id("1"), Some(&expected_click_id));
+
+        assert_eq!(diff.to_update[0].text, "foo");
+
+        let vdom = app(&AppProps {
+            empty: false,
+            bar: false,
+        });
+
+        let diff = renderer.render(vdom, &ConnectionId::ALL);
+
+        // nothing changed
+        assert!(diff.is_none(), "{:?}", diff);
+
+        assert_eq!(renderer.key_to_click_id("1"), Some(&expected_click_id));
+
+        let vdom = app(&AppProps {
+            empty: false,
+            bar: true,
+        });
+
+        let diff = renderer
+            .render(vdom, &ConnectionId::ALL)
+            .expect("when updating bar, we should get a diff");
+
+        assert_eq!(diff.to_update.len(), 1);
+        assert_eq!(diff.to_remove.len(), 0);
+
+        assert_eq!(diff.to_update[0].text, "bar");
+        assert_ne!(diff.to_update[0].clickid, expected_click_id); // we dont reuse an id
+
+        let vdom = app(&AppProps {
+            empty: true,
+            bar: true,
+        });
+
+        let diff = renderer
+            .render(vdom, &ConnectionId::ALL)
+            .expect("when updating bar, we should get a diff");
+
+        assert_eq!(diff.to_remove.len(), 2, "received diff: {:?}", diff);
+
+        assert_eq!(renderer.key_to_click_id("1"), None);
     }
 }

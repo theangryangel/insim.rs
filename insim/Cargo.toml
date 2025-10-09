@@ -24,6 +24,8 @@ default = ["tokio", "blocking"]
 blocking = []
 tokio = [
   "dep:tokio",
+  "dep:tokio-util",
+  "dep:futures",
 ]
 serde = [
   "dep:serde",
@@ -37,13 +39,15 @@ serde = [
 bitflags = { workspace = true }
 bytes = { workspace = true }
 from_variants = { workspace = true }
+glam = { workspace = true }
 indexmap = { workspace = true }
 insim_core = { path = "../insim_core", version = "3.0.0" }
 serde = { workspace = true, features = ["derive"], optional = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["time", "net", "macros", "sync", "tracing", "io-util"], optional = true }
+tokio-util = { workspace = true, optional = true }
 tracing = { workspace = true }
-glam = { workspace = true }
+futures = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio-test = { workspace = true }

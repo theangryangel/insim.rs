@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use kitcar::ui::{Element, Styled};
 
-pub(crate) fn countdown(remaining: &Duration) -> Option<Element> {
+pub(crate) fn countdown(remaining: &Duration, show: &bool, value: &str) -> Option<Element> {
     let seconds = remaining.as_secs() % 60;
     let minutes = (remaining.as_secs() / 60) % 60;
 
@@ -13,7 +13,7 @@ pub(crate) fn countdown(remaining: &Duration) -> Option<Element> {
             .w(200.)
             .flex()
             .flex_col()
-            .with_child(
+            .with_child_if(
                 Element::container()
                     .flex()
                     .flex_row()
@@ -34,8 +34,10 @@ pub(crate) fn countdown(remaining: &Duration) -> Option<Element> {
                     .with_child(
                         Element::button("round_info", "Round 1/20 · 1st · +22pts")
                             .h(5.)
-                            .w(33.),
+                            .w(33.)
+                            .clickable(),
                     ),
+                *show,
             )
             .with_child(
                 Element::container()
@@ -43,9 +45,10 @@ pub(crate) fn countdown(remaining: &Duration) -> Option<Element> {
                     .mt_auto()
                     .justify_start()
                     .with_child(
-                        Element::button("plugin_info", "powered by insim.rs")
+                        Element::button("plugin_info", value)
                             .h(5.)
-                            .w(30.),
+                            .w(30.)
+                            .clickable(),
                     ),
             ),
     )

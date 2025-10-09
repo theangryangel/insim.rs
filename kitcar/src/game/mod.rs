@@ -6,7 +6,7 @@ use insim::{
     core::{track::Track, wind::Wind},
     insim::{RaceInProgress, RaceLaps, StaFlags},
 };
-use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot};
 
 use crate::State;
 
@@ -94,7 +94,10 @@ impl GameHandle {
     /// get complete gameinfo
     pub async fn all(&self) -> Option<GameInfo> {
         let (tx, rx) = oneshot::channel();
-        self.query_tx.send(GameQuery::GetAll { response_tx: tx }).await.ok()?;
+        self.query_tx
+            .send(GameQuery::GetAll { response_tx: tx })
+            .await
+            .ok()?;
         rx.await.ok()
     }
 }
@@ -104,17 +107,17 @@ impl State for GameInfo {
     fn update(&mut self, packet: &insim::Packet) {
         match packet {
             insim::Packet::Sta(sta) => self.sta(sta),
-            _ => {}
+            _ => {},
         }
     }
 
-    fn spawn(packet_rx: broadcast::Receiver<insim::Packet>) -> Self::H {
+    fn spawn(insim: insim::builder::SpawnedHandle) -> Self::H {
         let (query_tx, mut query_rx) = mpsc::channel(Self::BROADCAST_CAPACITY);
 
         let _ = tokio::spawn(async move {
             let mut inner = Self::new();
-            let mut packet_rx = packet_rx;
-            
+            let mut packet_rx = insim.subscribe();
+
             loop {
                 tokio::select! {
                     Ok(packet) = packet_rx.recv() => {
@@ -131,9 +134,7 @@ impl State for GameInfo {
             }
         });
 
-        GameHandle {
-            query_tx
-        }
+        GameHandle { query_tx }
     }
 }
 
@@ -141,4 +142,3 @@ impl State for GameInfo {
 mod test {
     // FIXME
 }
-

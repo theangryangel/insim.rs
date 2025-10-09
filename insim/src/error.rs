@@ -55,6 +55,10 @@ pub enum Error {
         /// remaining
         remaining: Bytes,
     },
+
+    #[cfg(feature = "tokio")]
+    #[error("Unable to send to the spawned insim connection. Task died?")]
+    SpawnedDead,
 }
 
 #[cfg(feature = "tokio")]

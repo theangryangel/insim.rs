@@ -10,10 +10,10 @@ homepage.workspace = true
 
 [dependencies]
 fixedbitset = { workspace = true }
+if_chain = { workspace = true }
 insim = { path = "../insim", version = "4.0.0", features = ["tokio"] }
 taffy = "0.9.1"
 tokio = { workspace = true, features = ["rt"] }
-# if_chain = { workspace = true }
 
 [lints]
 workspace = true

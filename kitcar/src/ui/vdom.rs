@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use insim::insim::BtnStyle;
+use insim::insim::{BtnStyle, BtnStyleFlags};
 
 use crate::ui::styled::Styled;
 
@@ -35,6 +35,16 @@ impl Element {
         }
     }
 
+    pub fn clickable(mut self) -> Self {
+        if let Element::Button {
+            ref mut btnstyle, ..
+        } = self
+        {
+            btnstyle.flags.set(BtnStyleFlags::CLICK, true);
+        }
+        self
+    }
+
     pub fn with_child(mut self, val: Element) -> Self {
         if let Element::Container {
             ref mut children, ..
@@ -45,10 +55,7 @@ impl Element {
         self
     }
 
-    pub fn with_child_if<F>(mut self, val: Element, condition: bool) -> Self
-    where
-        F: FnOnce() -> Element,
-    {
+    pub fn with_child_if(mut self, val: Element, condition: bool) -> Self {
         if condition {
             self = self.with_child(val);
         }

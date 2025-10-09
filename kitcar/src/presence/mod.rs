@@ -1,15 +1,13 @@
 //! Connection and player presence/tracking
 
-use std::
-    collections::{HashMap, HashSet}
-;
+use std::collections::{HashMap, HashSet};
 
 use insim::{
     core::vehicle::Vehicle,
     identifiers::{ConnectionId, PlayerId},
     insim::{PlayerFlags, PlayerType},
 };
-use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot};
 
 use crate::State;
 
@@ -75,10 +73,10 @@ impl Presence {
     }
 
     /// Fetch all connections
-    pub fn connections(&self) -> impl Iterator<Item=&ConnectionInfo> {
+    pub fn connections(&self) -> impl Iterator<Item = &ConnectionInfo> {
         self.connections.values()
     }
-    
+
     /// Fetch one connection
     pub fn connection(&self, ucid: &ConnectionId) -> Option<&ConnectionInfo> {
         self.connections.get(ucid)
@@ -90,7 +88,7 @@ impl Presence {
     }
 
     /// Fetch all players
-    pub fn players(&self) -> impl Iterator<Item=&PlayerInfo> {
+    pub fn players(&self) -> impl Iterator<Item = &PlayerInfo> {
         self.players.values()
     }
 
@@ -212,7 +210,7 @@ enum PresenceQuery {
     },
     GetPlayerCount {
         response_tx: oneshot::Sender<usize>,
-    }
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -225,35 +223,56 @@ impl PresenceHandle {
     /// Player count
     pub async fn player_count(&self) -> usize {
         let (tx, rx) = oneshot::channel();
-        self.query_tx.send(PresenceQuery::GetPlayerCount { response_tx: tx }).await.unwrap_or_default();
+        self.query_tx
+            .send(PresenceQuery::GetPlayerCount { response_tx: tx })
+            .await
+            .unwrap_or_default();
         rx.await.unwrap_or_default()
     }
 
     /// get all connections
     pub async fn connections(&self) -> Option<Vec<ConnectionInfo>> {
         let (tx, rx) = oneshot::channel();
-        self.query_tx.send(PresenceQuery::GetConnections { response_tx: tx }).await.ok()?;
+        self.query_tx
+            .send(PresenceQuery::GetConnections { response_tx: tx })
+            .await
+            .ok()?;
         rx.await.ok()
     }
 
     /// get a connection
     pub async fn connection(&self, ucid: &ConnectionId) -> Option<ConnectionInfo> {
         let (tx, rx) = oneshot::channel();
-        self.query_tx.send(PresenceQuery::GetConnection { ucid: ucid.clone(), response_tx: tx }).await.ok()?;
+        self.query_tx
+            .send(PresenceQuery::GetConnection {
+                ucid: ucid.clone(),
+                response_tx: tx,
+            })
+            .await
+            .ok()?;
         rx.await.ok()?
     }
 
     /// get all players
     pub async fn players(&self) -> Option<Vec<PlayerInfo>> {
         let (tx, rx) = oneshot::channel();
-        self.query_tx.send(PresenceQuery::GetPlayers { response_tx: tx }).await.ok()?;
+        self.query_tx
+            .send(PresenceQuery::GetPlayers { response_tx: tx })
+            .await
+            .ok()?;
         rx.await.ok()
     }
 
     /// get a player
     pub async fn player(&self, plid: &PlayerId) -> Option<PlayerInfo> {
         let (tx, rx) = oneshot::channel();
-        self.query_tx.send(PresenceQuery::GetPlayer { plid: plid.clone(), response_tx: tx }).await.ok()?;
+        self.query_tx
+            .send(PresenceQuery::GetPlayer {
+                plid: plid.clone(),
+                response_tx: tx,
+            })
+            .await
+            .ok()?;
         rx.await.ok()?
     }
 }
@@ -280,13 +299,13 @@ impl State for Presence {
         }
     }
 
-    fn spawn(packet_rx: broadcast::Receiver<insim::Packet>) -> Self::H {
+    fn spawn(insim: insim::builder::SpawnedHandle) -> Self::H {
         let (query_tx, mut query_rx) = mpsc::channel(Self::BROADCAST_CAPACITY);
 
         let _ = tokio::spawn(async move {
             let mut inner = Self::new();
-            let mut packet_rx = packet_rx;
-            
+            let mut packet_rx = insim.subscribe();
+
             loop {
                 tokio::select! {
                     Ok(packet) = packet_rx.recv() => {
@@ -316,9 +335,7 @@ impl State for Presence {
             }
         });
 
-        PresenceHandle {
-            query_tx
-        }
+        PresenceHandle { query_tx }
     }
 }
 

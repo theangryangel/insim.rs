@@ -764,3 +764,14 @@ impl Encode for Packet {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::Packet;
+    fn assert_send<T: Send>() {}
+
+    #[test]
+    fn ensure_packet_is_send() {
+        assert_send::<Packet>();
+    }
+}
