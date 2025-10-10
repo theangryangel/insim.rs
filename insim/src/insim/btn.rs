@@ -20,7 +20,7 @@ bitflags::bitflags! {
 impl_bitflags_from_to_bytes!(BtnInst, u8);
 
 /// Colour
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum BtnStyleColour {
     /// NotEditable, defaults to light grey
@@ -64,7 +64,7 @@ bitflags::bitflags! {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Hash)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Button style
 pub struct BtnStyle {

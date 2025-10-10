@@ -477,7 +477,7 @@ impl SpawnedHandle {
     pub async fn send_all<I, P>(&self, packets: I) -> crate::Result<()>
     where
         I: IntoIterator<Item = P> + Send,
-        P: Into<crate::Packet> + Send,
+        P: Into<crate::Packet> + Send + Debug,
     {
         let futures = packets.into_iter().map(|p| self.send(p.into()));
         let _ = futures::future::try_join_all(futures).await?;

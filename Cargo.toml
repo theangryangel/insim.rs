@@ -42,9 +42,10 @@ darling = "0.21"
 encoding_rs = { version = "0.8.32" }
 fixedbitset = "0.5.7"
 from_variants = "1.0.2"
+futures = "0.3"
 glam = "0.30.3"
 if_chain = "1.0.2"
-indexmap = "2.1.0"
+indexmap = "2.11.4"
 itertools = { version = "0.14.0" }
 num-traits = "0.2.19"
 proc-macro2 = "1"
@@ -57,4 +58,3 @@ tokio-test = "0.4.0"
 tokio-util = "0.7.16"
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17" }
-futures = "0.3"

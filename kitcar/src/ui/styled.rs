@@ -1,6 +1,7 @@
+use insim::insim::BtnStyle;
+
 pub trait Styled: Sized {
     fn style_mut(&mut self) -> &mut taffy::Style;
-
     fn style(&self) -> &taffy::Style;
 
     fn w(mut self, val: f32) -> Self {
@@ -192,6 +193,18 @@ pub trait Styled: Sized {
     fn my(mut self, val: f32) -> Self {
         self.style_mut().margin.top = taffy::LengthPercentageAuto::length(val);
         self.style_mut().margin.bottom = taffy::LengthPercentageAuto::length(val);
+        self
+    }
+
+    fn mx_auto(mut self) -> Self {
+        self.style_mut().margin.left = taffy::LengthPercentageAuto::auto();
+        self.style_mut().margin.right = taffy::LengthPercentageAuto::auto();
+        self
+    }
+
+    fn my_auto(mut self) -> Self {
+        self.style_mut().margin.top = taffy::LengthPercentageAuto::auto();
+        self.style_mut().margin.bottom = taffy::LengthPercentageAuto::auto();
         self
     }
 

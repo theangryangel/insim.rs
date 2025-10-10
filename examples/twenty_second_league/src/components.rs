@@ -1,55 +1,74 @@
-use std::time::Duration;
+use insim::core::string::colours::Colourify;
+use kitcar::ui::{wrap_text, Element, Styled};
 
-use kitcar::ui::{Element, Styled};
+pub(crate) fn topbar(text: &str) -> Element {
+    // top bar
+    Element::container()
+        .flex()
+        .flex_row()
+        .justify_center()
+        .with_child(
+            Element::button(
+                "welcome",
+                &format!(
+                    "{} {} {}",
+                    "Welcome to the".white(),
+                    "20".red(),
+                    "second league".white()
+                ),
+            )
+            .w(38.)
+            .h(5.)
+            .dark(),
+        )
+        .with_child(
+            Element::button(
+                "countdown",
+                // ,
+                &text,
+            )
+            .w(33.)
+            .h(5.)
+            .dark(),
+        )
+}
 
-pub(crate) fn countdown(remaining: &Duration, show: &bool, value: &str) -> Option<Element> {
-    let seconds = remaining.as_secs() % 60;
-    let minutes = (remaining.as_secs() / 60) % 60;
+pub(crate) fn motd() -> Element {
+    let text: Vec<Element> = wrap_text(
+        "Welcome drivers!
+Forget being the fastest, the goal is to be the most precise. Finish in as close to 20secs as possible!
+Full contact is allowed.
+Just remember: Don't be a dick. We're all here to have fun!",
+        5,
+        78
+    ).enumerate().map(|(i, line)| {
+        Element::button(&format!("motd_text_{}", i), line).h(5.).text_align_start()
+    }).collect();
 
-    Some(
-        Element::container()
-            // .h_auto()
-            .h(200.)
-            .w(200.)
+    Element::container().flex().flex_grow(1.0).with_child(
+        Element::button("motd", "")
             .flex()
             .flex_col()
-            .with_child_if(
-                Element::container()
+            .w(80.)
+            .p(1.)
+            .light()
+            .my_auto()
+            .mx_auto()
+            .with_child(
+                Element::button("motd_inner", "")
                     .flex()
-                    .flex_row()
-                    .justify_center()
-                    .with_child(
-                        Element::button("welcome", "Welcome to ^120^8 second league")
-                            .w(33.)
-                            .h(5.),
-                    )
-                    .with_child(
-                        Element::button(
-                            "countdown",
-                            &format!("Warmup. Game starts in {:02}:{:02}", minutes, seconds),
-                        )
-                        .w(33.)
-                        .h(5.),
-                    )
-                    .with_child(
-                        Element::button("round_info", "Round 1/20 · 1st · +22pts")
-                            .h(5.)
-                            .w(33.)
-                            .clickable(),
-                    ),
-                *show,
+                    .flex_col()
+                    .dark()
+                    .p(1.)
+                    .with_children(text),
             )
             .with_child(
-                Element::container()
-                    .flex()
-                    .mt_auto()
-                    .justify_start()
-                    .with_child(
-                        Element::button("plugin_info", value)
-                            .h(5.)
-                            .w(30.)
-                            .clickable(),
-                    ),
+                Element::button("motd_close", &"Got it!".light_green())
+                    .mt(2.)
+                    .h(5.)
+                    .green()
+                    .dark()
+                    .clickable(),
             ),
     )
 }

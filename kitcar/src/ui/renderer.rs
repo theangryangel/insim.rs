@@ -1,6 +1,7 @@
 // ui.rs
 use std::{collections::HashMap, fmt::Debug};
 
+use indexmap::IndexMap;
 use insim::{
     identifiers::{ClickId, ConnectionId, RequestId},
     insim::{Bfn, BfnType, Btn},
@@ -33,7 +34,7 @@ pub struct UiRenderer {
     key_to_click_id: HashMap<String, ClickId>,
     click_id_to_key: HashMap<ClickId, String>,
     // last layout and props
-    last_layout: Option<HashMap<String, Btn>>,
+    last_layout: Option<IndexMap<String, Btn>>,
 }
 
 impl UiRenderer {
@@ -87,7 +88,7 @@ impl UiRenderer {
         let root = populate_taffy_and_map(&mut taffy, &mut node_map, &new_vdom);
         let _ = taffy.compute_layout(root, taffy::Size::length(200.0));
 
-        let new_layout: HashMap<String, Btn> = new_vdom
+        let new_layout: IndexMap<String, Btn> = new_vdom
             .collect_renderable()
             .iter()
             .map(|(k, v)| {
@@ -217,8 +218,22 @@ fn populate_taffy_and_map(
             let taffy_id = tree.new_with_children(style.clone(), &child_ids).unwrap();
             taffy_id
         },
-        Element::Button { key, style, .. } => {
-            let taffy_id = tree.new_leaf(style.clone()).unwrap();
+        Element::Button {
+            key,
+            style,
+            children,
+            ..
+        } => {
+            let taffy_id = if children.len() == 0 {
+                tree.new_leaf(style.clone()).unwrap()
+            } else {
+                let child_ids: Vec<taffy::NodeId> = children
+                    .into_iter()
+                    .map(|c| populate_taffy_and_map(tree, node_map, c))
+                    .collect();
+
+                tree.new_with_children(style.clone(), &child_ids).unwrap()
+            };
             let _ = node_map.insert(key.clone(), taffy_id);
             taffy_id
         },

@@ -5,6 +5,7 @@ use std::{collections::HashMap, time::Duration};
 
 use anyhow::Result;
 use insim::{
+    core::string::colours::Colourify,
     identifiers::{ConnectionId, PlayerId},
     insim::{Mso, TinyType},
     Packet, WithRequestId,
@@ -13,7 +14,7 @@ use kitcar::{
     leaderboard::{Leaderboard, LeaderboardHandle},
     presence::{Presence, PresenceHandle},
     time::countdown::Countdown,
-    ui::{Element, UiManager},
+    ui::{Element, Styled, UiManager},
     utils::NoVote,
     Service, State as _,
 };
@@ -35,8 +36,7 @@ async fn main() -> Result<()> {
     let leaderboard = Leaderboard::spawn(insim.clone());
     NoVote::spawn(insim.clone());
 
-    let (signals_tx, signals_rx) = watch::channel(Duration::from_secs(10));
-    let mut game = TwentySecondLeague::new(leaderboard, presence, insim.clone(), signals_tx);
+    let (mut game, signals_rx) = TwentySecondLeague::new(leaderboard, presence, insim.clone());
     let _ = UiManager::spawn::<TwentySecondLeague>(signals_rx, (), insim.clone());
 
     let _ = insim.send(TinyType::Ncn.with_request_id(1)).await;
@@ -54,6 +54,13 @@ async fn main() -> Result<()> {
     }
 }
 
+#[derive(Debug, Clone)]
+enum Phase {
+    Idle,
+    Game { round: usize, remaining: Duration },
+    Victory,
+}
+
 struct TwentySecondLeague {
     round_scores: HashMap<PlayerId, Duration>,
     insim: insim::builder::SpawnedHandle,
@@ -62,7 +69,7 @@ struct TwentySecondLeague {
     presence: PresenceHandle,
 
     // TODO: hack
-    signals_tx: watch::Sender<Duration>,
+    signals_tx: watch::Sender<Phase>,
 }
 
 impl TwentySecondLeague {
@@ -70,15 +77,19 @@ impl TwentySecondLeague {
         leaderboard: LeaderboardHandle,
         presence: PresenceHandle,
         insim: insim::builder::SpawnedHandle,
-        signals_tx: watch::Sender<Duration>,
-    ) -> Self {
-        Self {
-            round_scores: HashMap::new(),
-            insim,
-            leaderboard,
-            presence,
-            signals_tx,
-        }
+    ) -> (Self, watch::Receiver<Phase>) {
+        let (signals_tx, signals_rx) = watch::channel(Phase::Idle);
+
+        (
+            Self {
+                round_scores: HashMap::new(),
+                insim,
+                leaderboard,
+                presence,
+                signals_tx,
+            },
+            signals_rx,
+        )
     }
 
     async fn reset(&mut self) -> Result<()> {
@@ -108,6 +119,11 @@ impl TwentySecondLeague {
 
             self.command(&format!("/restart")).await;
 
+            let _ = self.signals_tx.send(Phase::Game {
+                round: round,
+                remaining: Duration::from_secs(ROUND_DURATION as u64),
+            });
+
             println!("Starting round {}/{}", round, ROUNDS_PER_GAME);
 
             self.round_scores.clear();
@@ -131,6 +147,9 @@ impl TwentySecondLeague {
 
             self.message_all(&format!("Round {} complete!", round))
                 .await;
+
+            let _ = self.signals_tx.send(Phase::Victory);
+
             self.show_leaderboard(false).await?;
         }
 
@@ -157,8 +176,10 @@ impl TwentySecondLeague {
                         let remaining_duration = countdown.remaining_duration().await;
                         self.message_all(&format!("{:?}s remaining!", &remaining_duration)).await;
 
-                        // FIXME: temporary
-                        let _ = self.signals_tx.send(remaining_duration);
+                        let _ = self.signals_tx.send(Phase::Game {
+                            round: *round,
+                            remaining: remaining_duration
+                        });
                     },
                     None => {
                         break;
@@ -268,29 +289,54 @@ impl TwentySecondLeague {
 #[derive(Clone, Debug)]
 struct TwentySecondLeagueUiLocalState {
     show: bool,
-}
-
-impl Default for TwentySecondLeagueUiLocalState {
-    fn default() -> Self {
-        Self { show: true }
-    }
+    welcome: bool,
 }
 
 impl kitcar::ui::Ui for TwentySecondLeague {
     type State = TwentySecondLeagueUiLocalState;
-    type Signals = Duration;
+    type Signals = Phase;
     type Controller = ();
+
+    fn mount() -> Self::State {
+        Self::State {
+            show: true,
+            welcome: true,
+        }
+    }
 
     fn render(
         state: &Self::State,
         signals: &tokio::sync::watch::Receiver<Self::Signals>,
     ) -> Option<Element> {
-        components::countdown(&signals.borrow(), &state.show, "WooT!")
+        let phase = signals.borrow().to_owned();
+        let text = match phase {
+            Phase::Idle => "No game in progress".white(),
+            Phase::Game { round, remaining } => {
+                let seconds = remaining.as_secs() % 60;
+                let minutes = (remaining.as_secs() / 60) % 60;
+                format!(
+                    "Round {}/{} · {:02}:{:02} remaining",
+                    round, ROUNDS_PER_GAME, minutes, seconds
+                )
+                .white()
+            },
+            Phase::Victory => "Victory!".white(),
+        };
+
+        let interface = Element::container()
+            .h(150.0)
+            .w(200.0)
+            .flex()
+            .flex_col()
+            .with_child(components::topbar(&text))
+            .with_child_if(components::motd(), state.welcome);
+
+        Some(interface)
     }
 
     fn on_click(state: &mut Self::State, click_id: &str, _controller: &Self::Controller) -> bool {
-        if click_id == "plugin_info" {
-            state.show = !state.show;
+        if click_id == "motd_close" {
+            state.welcome = !state.welcome;
             true
         } else {
             false
@@ -298,10 +344,18 @@ impl kitcar::ui::Ui for TwentySecondLeague {
     }
 
     fn on_mso(state: &mut Self::State, mso: &Mso, _controller: &Self::Controller) -> bool {
-        if mso.msg_from_textstart() == "!toggle" {
-            state.show = !state.show;
-            return true;
-        }
-        false
+        match mso.msg_from_textstart() {
+            "!toggle" => {
+                state.show = !state.show;
+            },
+            "!rules" => {
+                state.welcome = true;
+            },
+            _ => {
+                return false;
+            },
+        };
+
+        true
     }
 }
