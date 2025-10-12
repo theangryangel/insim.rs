@@ -9,6 +9,7 @@ use insim::{
 };
 
 use super::{id_pool::ClickIdPool, vdom::Element};
+use crate::ui::vdom::ElementKey;
 
 #[derive(Debug, Default)]
 pub struct UiRendererDiff {
@@ -30,11 +31,11 @@ impl UiRendererDiff {
 #[derive(Debug)]
 pub struct UiRenderer {
     id_pool: ClickIdPool,
-    // Stable mapping from component keys to button IDs
-    key_to_click_id: HashMap<String, ClickId>,
-    click_id_to_key: HashMap<ClickId, String>,
+    // Stable mapping from component instance and key to button ClickId
+    key_to_click_id: HashMap<ElementKey, ClickId>,
+    click_id_to_key: HashMap<ClickId, ElementKey>,
     // last layout and props
-    last_layout: Option<IndexMap<String, Btn>>,
+    last_layout: Option<IndexMap<ElementKey, Btn>>,
 }
 
 impl UiRenderer {
@@ -88,11 +89,11 @@ impl UiRenderer {
         let root = populate_taffy_and_map(&mut taffy, &mut node_map, &new_vdom);
         let _ = taffy.compute_layout(root, taffy::Size::length(200.0));
 
-        let new_layout: IndexMap<String, Btn> = new_vdom
+        let new_layout: IndexMap<ElementKey, Btn> = new_vdom
             .collect_renderable()
-            .iter()
+            .into_iter()
             .map(|(k, v)| {
-                let node_id = node_map.get(&k.to_string()).unwrap();
+                let node_id = node_map.get(k).unwrap();
                 let (x, y) = get_taffy_abs_position(&taffy, node_id);
                 let layout = taffy.layout(*node_id).unwrap();
 
@@ -105,7 +106,7 @@ impl UiRenderer {
                     bstyle: v.bstyle().unwrap().clone(),
                     ..Default::default()
                 };
-                (k.to_string(), renderable)
+                (k.clone(), renderable)
             })
             .collect();
 
@@ -168,15 +169,15 @@ impl UiRenderer {
         }
     }
 
-    fn lease_clickid(&mut self, key: &str) -> Option<ClickId> {
+    fn lease_clickid(&mut self, key: &ElementKey) -> Option<ClickId> {
         // If we already have an ID for this key, reuse it
         if let Some(&existing_id) = self.key_to_click_id.get(key) {
             return Some(existing_id);
         }
 
         if let Some(new_id) = self.id_pool.lease() {
-            let _ = self.key_to_click_id.insert(key.to_string(), new_id);
-            let _ = self.click_id_to_key.insert(new_id, key.to_string());
+            let _ = self.key_to_click_id.insert(key.clone(), new_id);
+            let _ = self.click_id_to_key.insert(new_id, key.clone());
             return Some(new_id);
         }
 
@@ -184,7 +185,7 @@ impl UiRenderer {
         None
     }
 
-    fn release_clickid(&mut self, key: &str) -> Option<ClickId> {
+    fn release_clickid(&mut self, key: &ElementKey) -> Option<ClickId> {
         if let Some(existing_id) = self.key_to_click_id.remove(key) {
             let _ = self.click_id_to_key.remove(&existing_id);
             self.id_pool.release(&[existing_id]);
@@ -194,18 +195,18 @@ impl UiRenderer {
         None
     }
 
-    pub fn click_id_to_key(&self, click_id: &ClickId) -> Option<&String> {
+    pub fn click_id_to_key(&self, click_id: &ClickId) -> Option<&ElementKey> {
         self.click_id_to_key.get(click_id)
     }
 
-    pub fn key_to_click_id(&self, key: &str) -> Option<&ClickId> {
+    pub fn key_to_click_id(&self, key: &ElementKey) -> Option<&ClickId> {
         self.key_to_click_id.get(key)
     }
 }
 
 fn populate_taffy_and_map(
     tree: &mut taffy::TaffyTree,
-    node_map: &mut HashMap<String, taffy::NodeId>,
+    node_map: &mut HashMap<ElementKey, taffy::NodeId>,
     vdom: &Element,
 ) -> taffy::NodeId {
     match vdom {
@@ -290,9 +291,10 @@ mod tests {
         children.push(
             Element::Button {
                 text: "foo".to_string(),
-                key: "1".into(),
+                key: ElementKey::new(1, "1"),
                 style: taffy::Style::DEFAULT,
                 btnstyle: BtnStyle::default(),
+                children: vec![],
             }
             .w(5.0)
             .h(5.0),
@@ -301,9 +303,10 @@ mod tests {
         if props.bar {
             children.push(Element::Button {
                 text: "bar".to_string(),
-                key: "2".into(),
+                key: ElementKey::new(1, "2"),
                 style: taffy::Style::DEFAULT,
                 btnstyle: BtnStyle::default(),
+                children: vec![],
             });
         }
 
@@ -315,7 +318,7 @@ mod tests {
 
     #[test]
     fn test_centered_button_layout() {
-        let button = Element::button("test_button", "Test").w(10.0).h(10.0);
+        let button = Element::button(1, "test_button", "Test").w(10.0).h(10.0);
 
         let container = Element::container()
             .w(200.0)
@@ -335,7 +338,7 @@ mod tests {
             .unwrap();
 
         let button_node = node_map
-            .get("test_button")
+            .get(&ElementKey::new(1, "test_button"))
             .expect("Button node should exist");
         let (x, y) = get_taffy_abs_position(&taffy, button_node);
 
@@ -350,9 +353,9 @@ mod tests {
     #[test]
     fn test_multiple_buttons_layout() {
         // Test with multiple buttons to ensure positioning works correctly
-        let button1 = Element::button("button1", "Button 1").w(20.0).h(10.0);
+        let button1 = Element::button(1, "button1", "Button 1").w(20.0).h(10.0);
 
-        let button2 = Element::button("button2", "Button 2").w(20.0).h(10.0);
+        let button2 = Element::button(1, "button2", "Button 2").w(20.0).h(10.0);
 
         let container = Element::container()
             .w(200.0)
@@ -372,10 +375,10 @@ mod tests {
             .compute_layout(root, taffy::Size::length(200.0))
             .unwrap();
 
-        let button1_node = node_map.get("button1").unwrap();
+        let button1_node = node_map.get(&ElementKey::new(1, "button1")).unwrap();
         let (x1, y1) = get_taffy_abs_position(&taffy, button1_node);
 
-        let button2_node = node_map.get("button2").unwrap();
+        let button2_node = node_map.get(&ElementKey::new(1, "button2")).unwrap();
         let (x2, y2) = get_taffy_abs_position(&taffy, button2_node);
 
         assert_eq!(x1, 90.0, "Button1 X should be 90");
@@ -403,7 +406,10 @@ mod tests {
 
         let expected_click_id = diff.to_update[0].clickid;
 
-        assert_eq!(renderer.key_to_click_id("1"), Some(&expected_click_id));
+        assert_eq!(
+            renderer.key_to_click_id(&ElementKey::new(1, "1")),
+            Some(&expected_click_id)
+        );
 
         assert_eq!(diff.to_update[0].text, "foo");
 
@@ -417,7 +423,10 @@ mod tests {
         // nothing changed
         assert!(diff.is_none(), "{:?}", diff);
 
-        assert_eq!(renderer.key_to_click_id("1"), Some(&expected_click_id));
+        assert_eq!(
+            renderer.key_to_click_id(&ElementKey::new(1, "1")),
+            Some(&expected_click_id)
+        );
 
         let vdom = app(&AppProps {
             empty: false,
@@ -445,6 +454,6 @@ mod tests {
 
         assert_eq!(diff.to_remove.len(), 2, "received diff: {:?}", diff);
 
-        assert_eq!(renderer.key_to_click_id("1"), None);
+        assert_eq!(renderer.key_to_click_id(&ElementKey::new(1, "1")), None);
     }
 }

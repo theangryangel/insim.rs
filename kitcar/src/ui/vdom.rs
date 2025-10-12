@@ -1,14 +1,30 @@
-use std::collections::HashMap;
-
 use indexmap::IndexMap;
 use insim::insim::{BtnStyle, BtnStyleColour, BtnStyleFlags};
 
 use crate::ui::styled::Styled;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ElementKey {
+    // When used in nested components, we need to ensure that we can differentiate between reused
+    // components. This is the "cheapest" way to do so.
+    pub instance_id: u32,
+    /// Our easy to use human key
+    pub key: String,
+}
+
+impl ElementKey {
+    pub fn new(instance_id: u32, key: &str) -> Self {
+        Self {
+            instance_id,
+            key: key.to_owned(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Element {
     Button {
-        key: String, // TODO: auto generate this somehow if not supplied
+        key: ElementKey,
         text: String,
         style: taffy::Style,
         btnstyle: BtnStyle,
@@ -28,9 +44,12 @@ impl Element {
         }
     }
 
-    pub fn button(key: &str, text: &str) -> Self {
+    pub fn button(instance_id: u32, key: &str, text: &str) -> Self {
         Self::Button {
-            key: key.to_string(),
+            key: ElementKey {
+                instance_id,
+                key: key.to_string(),
+            },
             text: text.to_string(),
             style: taffy::Style::DEFAULT,
             btnstyle: BtnStyle::default(),
@@ -38,11 +57,11 @@ impl Element {
         }
     }
 
-    pub fn multi_line_text(key: &str, text: &[&str], height: f32) -> Vec<Self> {
+    pub fn multi_line_text(instance_id: u32, key: &str, text: &[&str], height: f32) -> Vec<Self> {
         text.iter()
             .enumerate()
             .map(|(i, f)| {
-                Self::button(&format!("{}-{}", key, i), f)
+                Self::button(instance_id, &format!("{}-{}", key, i), f)
                     .h(height)
                     .text_align_start()
             })
@@ -144,6 +163,13 @@ impl Element {
         self
     }
 
+    pub fn try_with_child(mut self, val: Option<Element>) -> Self {
+        if let Some(inner) = val {
+            self = self.with_child(inner);
+        }
+        self
+    }
+
     pub fn with_child_if(mut self, val: Element, condition: bool) -> Self {
         if condition {
             self = self.with_child(val);
@@ -192,7 +218,7 @@ impl Element {
         }
     }
 
-    pub fn collect_renderable(&self) -> IndexMap<&str, &Element> {
+    pub fn collect_renderable(&self) -> IndexMap<&ElementKey, &Element> {
         let mut result = IndexMap::new();
         collect_renderable_recursively(&self, &mut result);
         result
@@ -217,14 +243,14 @@ impl Styled for Element {
 
 fn collect_renderable_recursively<'a>(
     vdom: &'a Element,
-    result: &mut IndexMap<&'a str, &'a Element>,
+    result: &mut IndexMap<&'a ElementKey, &'a Element>,
 ) {
     // XXX: IndexMap because buttons are Z-Index'ed by ClickId it seems. And this is the best
     // "workaround" we have for this, for now.
     // When the ClickIdPool nears exhaustion, this all goes to shit.
 
     if let Element::Button { ref key, .. } = vdom {
-        let _ = result.insert(key.as_str(), vdom);
+        let _ = result.insert(key, vdom);
     }
 
     for child in vdom.children().iter() {

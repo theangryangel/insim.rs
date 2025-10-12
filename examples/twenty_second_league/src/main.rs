@@ -5,16 +5,15 @@ use std::{collections::HashMap, time::Duration};
 
 use anyhow::Result;
 use insim::{
-    core::string::colours::Colourify,
     identifiers::{ConnectionId, PlayerId},
-    insim::{Mso, TinyType},
+    insim::TinyType,
     Packet, WithRequestId,
 };
 use kitcar::{
     leaderboard::{Leaderboard, LeaderboardHandle},
     presence::{Presence, PresenceHandle},
     time::countdown::Countdown,
-    ui::{Element, Styled, UiManager},
+    ui::UiManager,
     utils::NoVote,
     Service, State as _,
 };
@@ -37,7 +36,7 @@ async fn main() -> Result<()> {
     NoVote::spawn(insim.clone());
 
     let (mut game, signals_rx) = TwentySecondLeague::new(leaderboard, presence, insim.clone());
-    let _ = UiManager::spawn::<TwentySecondLeague>(signals_rx, (), insim.clone());
+    let _ = UiManager::spawn::<components::Root>(signals_rx, insim.clone());
 
     let _ = insim.send(TinyType::Ncn.with_request_id(1)).await;
     let _ = insim.send(TinyType::Npl.with_request_id(2)).await;
@@ -54,7 +53,7 @@ async fn main() -> Result<()> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Phase {
     Idle,
     Game { round: usize, remaining: Duration },
@@ -283,79 +282,5 @@ impl TwentySecondLeague {
         println!("{}", command);
 
         let _ = self.insim.send_command(command).await;
-    }
-}
-
-#[derive(Clone, Debug)]
-struct TwentySecondLeagueUiLocalState {
-    show: bool,
-    welcome: bool,
-}
-
-impl kitcar::ui::Ui for TwentySecondLeague {
-    type State = TwentySecondLeagueUiLocalState;
-    type Signals = Phase;
-    type Controller = ();
-
-    fn mount() -> Self::State {
-        Self::State {
-            show: true,
-            welcome: true,
-        }
-    }
-
-    fn render(
-        state: &Self::State,
-        signals: &tokio::sync::watch::Receiver<Self::Signals>,
-    ) -> Option<Element> {
-        let phase = signals.borrow().to_owned();
-        let text = match phase {
-            Phase::Idle => "No game in progress".white(),
-            Phase::Game { round, remaining } => {
-                let seconds = remaining.as_secs() % 60;
-                let minutes = (remaining.as_secs() / 60) % 60;
-                format!(
-                    "Round {}/{} · {:02}:{:02} remaining",
-                    round, ROUNDS_PER_GAME, minutes, seconds
-                )
-                .white()
-            },
-            Phase::Victory => "Victory!".white(),
-        };
-
-        let interface = Element::container()
-            .h(150.0)
-            .w(200.0)
-            .flex()
-            .flex_col()
-            .with_child(components::topbar(&text))
-            .with_child_if(components::motd(), state.welcome);
-
-        Some(interface)
-    }
-
-    fn on_click(state: &mut Self::State, click_id: &str, _controller: &Self::Controller) -> bool {
-        if click_id == "motd_close" {
-            state.welcome = !state.welcome;
-            true
-        } else {
-            false
-        }
-    }
-
-    fn on_mso(state: &mut Self::State, mso: &Mso, _controller: &Self::Controller) -> bool {
-        match mso.msg_from_textstart() {
-            "!toggle" => {
-                state.show = !state.show;
-            },
-            "!rules" => {
-                state.welcome = true;
-            },
-            _ => {
-                return false;
-            },
-        };
-
-        true
     }
 }

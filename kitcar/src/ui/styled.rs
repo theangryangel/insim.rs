@@ -1,5 +1,3 @@
-use insim::insim::BtnStyle;
-
 pub trait Styled: Sized {
     fn style_mut(&mut self) -> &mut taffy::Style;
     fn style(&self) -> &taffy::Style;

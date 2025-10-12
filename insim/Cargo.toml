@@ -44,7 +44,7 @@ indexmap = { workspace = true }
 insim_core = { path = "../insim_core", version = "3.0.0" }
 serde = { workspace = true, features = ["derive"], optional = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["time", "net", "macros", "sync", "tracing", "io-util"], optional = true }
+tokio = { workspace = true, features = ["rt", "time", "net", "macros", "sync", "tracing", "io-util"], optional = true }
 tokio-util = { workspace = true, optional = true }
 tracing = { workspace = true }
 futures = { workspace = true, optional = true }

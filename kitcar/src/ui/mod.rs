@@ -6,6 +6,7 @@
 //! Each plugin will be responsible for it's own set of Ui's. Nothing shared except for the id_pool.
 //! `Ui` represents the ui for a single connection.
 pub mod id_pool;
+pub mod instance_id;
 pub mod renderer;
 pub mod styled;
 pub mod vdom;
@@ -18,27 +19,64 @@ use insim::{
     insim::{BfnType, Mso, TinyType},
     Packet, WithRequestId,
 };
+pub use instance_id::InstanceIdPool;
 pub use renderer::{UiRenderer, UiRendererDiff};
 pub use styled::Styled;
 use tokio::{sync::watch, task::JoinHandle};
-pub use vdom::Element;
+pub use vdom::{Element, ElementKey};
+
+#[derive(Default, Debug)]
+pub struct ComponentResult {
+    pub(crate) should_render: bool,
+    // TODO: implement
+    // pub(crate) commands: Vec<Box<dyn Any + Send>>,
+}
+
+impl ComponentResult {
+    pub fn render(mut self) -> Self {
+        self.should_render = true;
+        self
+    }
+
+    // pub fn with_command(mut self, _cmd: impl Any + Send + 'static) -> Self {
+    //     todo!()
+    //     // self.commands.push(Box::new(cmd));
+    //     // self
+    // }
+}
+
+pub trait ComponentHandler {
+    /// Get this component's instance id
+    fn instance_id(&self) -> u32;
+
+    /// Click occured for this connection
+    fn on_click(&mut self, _click_id: &ElementKey) -> ComponentResult {
+        ComponentResult::default()
+    }
+
+    /// Chat occurred for this connection
+    fn on_mso(&mut self, _mso: &Mso) -> ComponentResult {
+        ComponentResult::default()
+    }
+
+    /// child components
+    fn children_mut(&mut self) -> HashMap<&str, &mut dyn ComponentHandler> {
+        HashMap::new()
+    }
+}
 
 /// Trait for users to implement a Ui for a single connection
-pub trait Ui: Send + 'static {
-    type State: Sync + Send + Clone;
-    type Signals: Clone + Sync + Send + 'static;
-    type Controller: Clone + Sync + Send + 'static;
+pub trait Component: ComponentHandler + Send + 'static {
+    type Props: Clone + Sync + Send + 'static;
 
-    /// Returns default local state
-    fn mount() -> Self::State;
+    /// Create a new instance of this Component
+    fn mount(instance_ids: &mut InstanceIdPool, props: Self::Props) -> Self;
+
+    /// Update props
+    fn update(&mut self, props: Self::Props) -> ComponentResult;
+
     /// Render
-    fn render(state: &Self::State, signals: &watch::Receiver<Self::Signals>) -> Option<Element>;
-    /// Click occured for this connection
-    fn on_click(state: &mut Self::State, click_id: &str, controller: &Self::Controller) -> bool;
-    /// Chat occurred for this connection
-    fn on_mso(_state: &mut Self::State, _mso: &Mso, _controller: &Self::Controller) -> bool {
-        false
-    }
+    fn render(&self) -> Option<Element>;
 }
 
 /// Manager to implement Ui
@@ -46,9 +84,8 @@ pub trait Ui: Send + 'static {
 pub struct UiManager;
 
 impl UiManager {
-    pub fn spawn<U: Ui>(
-        signals: watch::Receiver<U::Signals>,
-        controller: U::Controller,
+    pub fn spawn<U: Component>(
+        signals: watch::Receiver<U::Props>,
         insim: insim::builder::SpawnedHandle,
     ) -> JoinHandle<insim::Result<()>> {
         tokio::spawn(async move {
@@ -61,12 +98,7 @@ impl UiManager {
                 match packet {
                     Packet::Ncn(ncn) => {
                         let _ = active.entry(ncn.ucid).or_insert_with(|| {
-                            Self::spawn_player_ui::<U>(
-                                ncn.ucid,
-                                signals.clone(),
-                                controller.clone(),
-                                insim.clone(),
-                            )
+                            Self::spawn_player_ui::<U>(ncn.ucid, signals.clone(), insim.clone())
                         });
                     },
                     Packet::Cnl(cnl) => {
@@ -83,21 +115,22 @@ impl UiManager {
         })
     }
 
-    fn spawn_player_ui<U: Ui>(
+    fn spawn_player_ui<U: Component>(
         ucid: ConnectionId,
-        mut signals: watch::Receiver<U::Signals>,
-        controller: U::Controller,
+        mut signals: watch::Receiver<U::Props>,
         insim: insim::builder::SpawnedHandle,
     ) -> JoinHandle<insim::Result<()>> {
         tokio::spawn(async move {
-            let mut state = U::mount();
+            let mut instance_ids = InstanceIdPool::new();
+            let props = signals.borrow().clone();
+            let mut root = U::mount(&mut instance_ids, props);
             let mut renderer = UiRenderer::new(ClickIdPool::new());
             // Honor when a user blocks/requests buttons
             let mut blocked = false;
 
             // Initial render
             if !blocked {
-                let element = U::render(&state, &signals);
+                let element = root.render();
                 if let Some(diff) = renderer.render(element, &ucid) {
                     insim.send_all(diff.into_merged()).await?;
                 }
@@ -109,12 +142,13 @@ impl UiManager {
                 tokio::select! {
                     // Handle button clicks
                     Ok(packet) = packet_rx.recv() => {
-                        let should_render = match packet {
+                        let render_result = match packet {
                             Packet::Mso(mso) => {
                                 if mso.ucid != ucid {
-                                    false
+                                    None
                                 } else {
-                                    U::on_mso(&mut state, &mso, &controller)
+                                    // FIXME: this should also traverse the component tree
+                                    Some(root.on_mso(&mso))
                                 }
                             },
 
@@ -122,50 +156,69 @@ impl UiManager {
                                 if_chain::if_chain! {
                                     if btc.ucid == ucid;
                                     if !blocked;
-                                    if let Some(click_id) = renderer.click_id_to_key(&btc.clickid);
+                                    if let Some(key) = renderer.click_id_to_key(&btc.clickid);
                                     then {
-                                        U::on_click(&mut state, &click_id, &controller)
+                                        let mut res: Option<ComponentResult> = None;
+                                        let mut stack = vec![&mut root as &mut dyn ComponentHandler];
+
+                                        // Iterative search
+                                        while let Some(component) = stack.pop() {
+                                            if component.instance_id() == key.instance_id {
+                                                res = Some(component.on_click(&key));
+                                                break;
+                                            }
+                                            stack.extend(component.children_mut().into_values());
+                                        }
+
+                                        res
                                     } else {
-                                        false
+                                        None
                                     }
                                 }
                             },
                             Packet::Bfn(bfn) => {
                                 if bfn.ucid != ucid {
-                                    false
+                                    None
                                 }
                                 else if matches!(bfn.subt, BfnType::Clear | BfnType::UserClear) {
                                     blocked = true;
                                     renderer.clear();
-                                    false
+                                    None
                                 }
                                 else if matches!(bfn.subt, BfnType::BtnRequest) {
                                     blocked = false;
-                                    true
+                                    Some(ComponentResult::default().render())
                                 } else {
-                                    false
+                                    None
                                 }
                             },
 
                             _ => {
-                                false
+                                None
                             }
                         };
 
-                        if !blocked && should_render {
-                            let element = U::render(&state, &signals);
-                            if let Some(diff) = renderer.render(element, &ucid) {
-                                insim.send_all(diff.into_merged()).await?;
+                        if_chain::if_chain! {
+                            if !blocked;
+                            if let Some(result) = render_result;
+                            if result.should_render;
+                            then {
+                                let element = root.render();
+                                if let Some(diff) = renderer.render(element, &ucid) {
+                                    insim.send_all(diff.into_merged()).await?;
+                                }
                             }
                         }
                     },
 
                     // Handle signal changes
                     _ = signals.changed() => {
-                        if blocked {
+                        let props = signals.borrow_and_update().clone();
+                        let res = root.update(props);
+                        if blocked || !res.should_render {
                             continue;
                         }
-                        let element = U::render(&state, &signals);
+                        let element = root.render();
                         if let Some(diff) = renderer.render(element, &ucid) {
                             insim.send_all(diff.into_merged()).await?;
                         }
