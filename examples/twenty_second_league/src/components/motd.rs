@@ -1,6 +1,9 @@
+use std::collections::HashMap;
+
 use insim::core::string::colours::Colourify;
 use kitcar::ui::{
-    wrap_text, Component, ComponentHandler, ComponentResult, Element, InstanceIdPool, Styled,
+    wrap_text, Component, ComponentBehaviour, ComponentResult, Element, ElementKey, InstanceIdPool,
+    Styled,
 };
 
 pub struct Motd {
@@ -8,29 +11,37 @@ pub struct Motd {
     show: bool,
 }
 
-impl ComponentHandler for Motd {
+impl ComponentBehaviour for Motd {
     fn instance_id(&self) -> u32 {
         self.instance_id
+    }
+
+    fn children_mut(&mut self) -> Option<HashMap<u32, &mut dyn ComponentBehaviour>> {
+        None
+    }
+
+    fn on_click(&mut self, click_id: &ElementKey) -> ComponentResult {
+        if click_id.key == "motd_close" {
+            self.show = false;
+        }
+
+        ComponentResult::default().render()
     }
 }
 
 impl Component for Motd {
     type Props = bool;
 
-    fn mount(instance_ids: &mut InstanceIdPool, props: Self::Props) -> Self {
+    fn mount(instance_ids: &mut InstanceIdPool, _props: Self::Props) -> Self {
         Self {
             instance_id: instance_ids.next(),
-            show: props,
+            show: true,
         }
     }
 
     fn update(&mut self, props: Self::Props) -> ComponentResult {
-        if self.show != props {
-            self.show = props;
-            ComponentResult::default().render()
-        } else {
-            ComponentResult::default()
-        }
+        self.show = props;
+        ComponentResult::default().render()
     }
 
     fn render(&self) -> Option<kitcar::ui::Element> {
@@ -41,9 +52,9 @@ impl Component for Motd {
         // FIXME: we need a generic wrapped text component?
         let text: Vec<Element> = wrap_text(
             "Welcome drivers!
-    Forget being the fastest, the goal is to be the most precise. Finish in as close to 20secs as possible!
-    Full contact is allowed.
-    Just remember: Don't be a dick. We're all here to have fun!",
+Forget being the fastest, the goal is to be the most precise. Finish in as close to 20secs as possible!
+Full contact is allowed.
+Just remember: Don't be a dick. We're all here to have fun!",
             5,
             78
         ).enumerate().map(|(i, line)| {

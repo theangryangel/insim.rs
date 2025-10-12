@@ -45,7 +45,7 @@ impl ComponentResult {
     // }
 }
 
-pub trait ComponentHandler {
+pub trait ComponentBehaviour {
     /// Get this component's instance id
     fn instance_id(&self) -> u32;
 
@@ -59,14 +59,12 @@ pub trait ComponentHandler {
         ComponentResult::default()
     }
 
-    /// child components
-    fn children_mut(&mut self) -> HashMap<&str, &mut dyn ComponentHandler> {
-        HashMap::new()
-    }
+    /// Child components
+    fn children_mut(&mut self) -> Option<HashMap<u32, &mut dyn ComponentBehaviour>>;
 }
 
 /// Trait for users to implement a Ui for a single connection
-pub trait Component: ComponentHandler + Send + 'static {
+pub trait Component: ComponentBehaviour + Send + 'static {
     type Props: Clone + Sync + Send + 'static;
 
     /// Create a new instance of this Component
@@ -159,7 +157,7 @@ impl UiManager {
                                     if let Some(key) = renderer.click_id_to_key(&btc.clickid);
                                     then {
                                         let mut res: Option<ComponentResult> = None;
-                                        let mut stack = vec![&mut root as &mut dyn ComponentHandler];
+                                        let mut stack = vec![&mut root as &mut dyn ComponentBehaviour];
 
                                         // Iterative search
                                         while let Some(component) = stack.pop() {
@@ -167,7 +165,9 @@ impl UiManager {
                                                 res = Some(component.on_click(&key));
                                                 break;
                                             }
-                                            stack.extend(component.children_mut().into_values());
+                                            if let Some(next) = component.children_mut() {
+                                                stack.extend(next.into_values());
+                                            }
                                         }
 
                                         res

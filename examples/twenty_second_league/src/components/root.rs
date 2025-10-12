@@ -1,7 +1,7 @@
+use std::collections::HashMap;
+
 use insim::core::string::colours::Colourify;
-use kitcar::ui::{
-    Component, ComponentHandler, ComponentResult, Element, ElementKey, InstanceIdPool, Styled,
-};
+use kitcar::ui::{Component, ComponentBehaviour, ComponentResult, Element, InstanceIdPool, Styled};
 
 use crate::{components::motd::Motd, Phase, ROUNDS_PER_GAME};
 
@@ -10,15 +10,12 @@ pub(crate) struct Root {
     phase: Phase,
     show: bool,
     motd: super::motd::Motd,
+    motd2: super::motd::Motd,
 }
 
-impl ComponentHandler for Root {
+impl ComponentBehaviour for Root {
     fn instance_id(&self) -> u32 {
         self.instance_id
-    }
-
-    fn on_click(&mut self, _click_id: &ElementKey) -> ComponentResult {
-        ComponentResult::default()
     }
 
     fn on_mso(&mut self, mso: &insim::insim::Mso) -> ComponentResult {
@@ -27,9 +24,25 @@ impl ComponentHandler for Root {
                 self.show = !self.show;
                 ComponentResult::default().render()
             },
-            "!rules" => self.motd.update(true),
+            "!rules" => {
+                let _ = self.motd.update(true);
+                self.motd2.update(true)
+            },
             _ => ComponentResult::default(),
         }
+    }
+
+    fn children_mut(&mut self) -> Option<HashMap<u32, &mut dyn ComponentBehaviour>> {
+        Some(HashMap::from([
+            (
+                self.motd.instance_id(),
+                &mut self.motd as &mut dyn ComponentBehaviour,
+            ),
+            (
+                self.motd2.instance_id(),
+                &mut self.motd2 as &mut dyn ComponentBehaviour,
+            ),
+        ]))
     }
 }
 
@@ -42,6 +55,7 @@ impl Component for Root {
             phase: props,
             show: true,
             motd: Motd::mount(instance_ids, true),
+            motd2: Motd::mount(instance_ids, true),
         }
     }
 
@@ -74,13 +88,16 @@ impl Component for Root {
             .w(200.0)
             .flex()
             .flex_col()
-            .with_child(topbar(self.instance_id, &text))
-            .try_with_child(self.motd.render());
+            .with_child_if(topbar(self.instance_id, &text), self.show)
+            .try_with_child(self.motd.render())
+            .try_with_child(self.motd2.render());
 
         Some(interface)
     }
 }
 
+// A not-component-component. We're just using this to make the Root component a bit more readable.
+// We're going to assume that we can safely reuse the instance_id
 pub(crate) fn topbar(instance_id: u32, text: &str) -> Element {
     // top bar
     Element::container()
