@@ -231,7 +231,7 @@ impl UiManager {
 
 const MAGIC_TEXT_RATIO: f32 = 0.2;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WrapTextIter<'a> {
     remaining_text: &'a str,
     line_width: usize,
@@ -307,13 +307,19 @@ impl<'a> Iterator for WrapTextIter<'a> {
     }
 }
 
-pub fn wrap_text<'a>(input: &'a str, height: u8, width: u8) -> WrapTextIter<'a> {
+impl<'a> WrapTextIter<'a> {
+    pub fn has_remaining_text(&self) -> bool {
+        !self.remaining_text.is_empty()
+    }
+}
+
+pub fn wrap_text<'a>(input: &'a str, height: u8, width: u8, max_lines: usize) -> WrapTextIter<'a> {
     let max_per_button = (width as f32 / (height as f32 * MAGIC_TEXT_RATIO)).floor();
 
     WrapTextIter {
         remaining_text: input,
         line_width: max_per_button as usize,
         lines_yielded: 0,
-        max_lines: 100,
+        max_lines,
     }
 }

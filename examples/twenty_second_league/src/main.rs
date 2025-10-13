@@ -1,9 +1,10 @@
 //! 20s league
+mod combo;
 mod components;
 
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, fs, time::Duration};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use insim::{
     identifiers::{ConnectionId, PlayerId},
     insim::TinyType,
@@ -26,16 +27,43 @@ const ROUNDS_PER_GAME: usize = 5;
 const ROUND_DURATION: u32 = 30;
 const TARGET_TIME: f32 = 20.0;
 
+/// Config
+#[derive(Debug, serde::Deserialize)]
+pub struct Config {
+    /// Insim IName
+    pub iname: Option<String>,
+    /// Server address
+    pub addr: String,
+    /// admin password
+    pub admin: Option<String>,
+    /// Warmup duration (seconds)
+    pub warmup_duration: Option<u64>,
+    /// Combinations
+    pub combos: combo::ComboCollection,
+    /// Number of rounds
+    pub rounds: Option<usize>,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    let (insim, _join_handle) = insim::tcp("172.24.64.1:29999").spawn(100).await?;
+    let config: Config = serde_norway::from_str(
+        &fs::read_to_string("config.yaml").context("could not read config.yaml")?,
+    )
+    .context("Could not parse config.yaml")?;
+
+    let (insim, _join_handle) = insim::tcp(config.addr.as_str())
+        .isi_admin_password(config.admin.clone())
+        .isi_iname(config.iname.clone())
+        .spawn(100)
+        .await?;
 
     // Spawn library handles
     let presence = Presence::spawn(insim.clone());
     let leaderboard = Leaderboard::spawn(insim.clone());
     NoVote::spawn(insim.clone());
 
-    let (mut game, signals_rx) = TwentySecondLeague::new(leaderboard, presence, insim.clone());
+    let (mut game, signals_rx) =
+        TwentySecondLeague::new(config, leaderboard, presence, insim.clone());
     let _ = UiManager::spawn::<components::Root>(signals_rx, insim.clone());
 
     let _ = insim.send(TinyType::Ncn.with_request_id(1)).await;
@@ -61,6 +89,8 @@ enum Phase {
 }
 
 struct TwentySecondLeague {
+    config: Config,
+
     round_scores: HashMap<PlayerId, Duration>,
     insim: insim::builder::SpawnedHandle,
 
@@ -73,6 +103,7 @@ struct TwentySecondLeague {
 
 impl TwentySecondLeague {
     fn new(
+        config: Config,
         leaderboard: LeaderboardHandle,
         presence: PresenceHandle,
         insim: insim::builder::SpawnedHandle,
@@ -81,6 +112,7 @@ impl TwentySecondLeague {
 
         (
             Self {
+                config,
                 round_scores: HashMap::new(),
                 insim,
                 leaderboard,
@@ -113,14 +145,14 @@ impl TwentySecondLeague {
     }
 
     async fn run(&mut self) -> Result<()> {
-        for round in 1..=ROUNDS_PER_GAME {
+        for round in 1..=self.config.rounds.unwrap_or(5) {
             let mut game_rx = self.insim.subscribe();
 
             self.command(&format!("/restart")).await;
 
             let _ = self.signals_tx.send(Phase::Game {
                 round: round,
-                remaining: Duration::from_secs(ROUND_DURATION as u64),
+                remaining: Duration::from_secs(self.config.game_duration.unwrap_or(60)),
             });
 
             println!("Starting round {}/{}", round, ROUNDS_PER_GAME);
@@ -166,7 +198,10 @@ impl TwentySecondLeague {
         ))
         .await;
 
-        let mut countdown = Countdown::new(Duration::from_secs(1), ROUND_DURATION);
+        let mut countdown = Countdown::new(
+            Duration::from_secs(1),
+            self.config.game_duration.unwrap_or(60) as u32,
+        );
 
         loop {
             tokio::select! {

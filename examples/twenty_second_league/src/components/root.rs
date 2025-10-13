@@ -60,7 +60,7 @@ impl Component for Root {
     }
 
     fn update(&mut self, props: Self::Props) -> ComponentResult {
-        if self.phase == props {
+        if self.phase != props {
             self.phase = props;
             ComponentResult::default().render()
         } else {

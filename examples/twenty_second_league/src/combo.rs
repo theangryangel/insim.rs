@@ -12,6 +12,10 @@ pub struct Combo {
     pub layout: Option<String>,
     /// Lap count
     pub laps: Option<u8>,
+    /// Target time in seconds (for now)
+    pub target_time: u64,
+    /// Cooldown - restart after X seconds
+    pub restart_after: u64,
     /// Valid vehicles
     pub vehicles: Vec<Vehicle>,
 }
@@ -116,6 +120,8 @@ mod tests {
                 layout: None,
                 laps: Some(1),
                 vehicles: vec![Vehicle::Xrt, Vehicle::Xrg],
+                target_time: 20,
+                restart_after: 10,
             }
         }
     }

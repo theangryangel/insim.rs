@@ -152,6 +152,26 @@ pub trait Styled: Sized {
         self
     }
 
+    fn self_start(mut self) -> Self {
+        self.style_mut().align_self = Some(taffy::AlignSelf::FlexStart);
+        self
+    }
+
+    fn self_end(mut self) -> Self {
+        self.style_mut().align_self = Some(taffy::AlignSelf::FlexEnd);
+        self
+    }
+
+    fn self_center(mut self) -> Self {
+        self.style_mut().align_self = Some(taffy::AlignSelf::Center);
+        self
+    }
+
+    fn self_stretch(mut self) -> Self {
+        self.style_mut().align_self = Some(taffy::AlignSelf::Stretch);
+        self
+    }
+
     fn m(mut self, val: f32) -> Self {
         self.style_mut().margin = taffy::Rect::length(val);
         self

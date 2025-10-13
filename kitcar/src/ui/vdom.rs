@@ -68,12 +68,12 @@ impl Element {
             .collect()
     }
 
-    pub fn clickable(mut self) -> Self {
+    pub fn clickable(mut self, val: bool) -> Self {
         if let Element::Button {
             ref mut btnstyle, ..
         } = self
         {
-            btnstyle.flags.set(BtnStyleFlags::CLICK, true);
+            btnstyle.flags.set(BtnStyleFlags::CLICK, val);
         }
         self
     }
