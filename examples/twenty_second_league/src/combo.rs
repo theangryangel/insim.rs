@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use insim::core::vehicle::Vehicle;
 use rand::seq::{IndexedRandom, SliceRandom};
 
@@ -12,10 +14,12 @@ pub struct Combo {
     pub layout: Option<String>,
     /// Lap count
     pub laps: Option<u8>,
-    /// Target time in seconds (for now)
-    pub target_time: u64,
-    /// Cooldown - restart after X seconds
-    pub restart_after: u64,
+    /// What time do we need to hit?
+    #[serde(with = "humantime_serde")]
+    pub target_time: Duration,
+    /// Cooldown - restart after
+    #[serde(with = "humantime_serde")]
+    pub restart_after: Duration,
     /// Valid vehicles
     pub vehicles: Vec<Vehicle>,
 }
@@ -120,8 +124,8 @@ mod tests {
                 layout: None,
                 laps: Some(1),
                 vehicles: vec![Vehicle::Xrt, Vehicle::Xrg],
-                target_time: 20,
-                restart_after: 10,
+                target_time: Duration::from_secs(20),
+                restart_after: Duration::from_secs(10),
             }
         }
     }

@@ -36,8 +36,9 @@ pub struct Config {
     pub addr: String,
     /// admin password
     pub admin: Option<String>,
-    /// Warmup duration (seconds)
-    pub warmup_duration: Option<u64>,
+    /// Warmup duration
+    #[serde(with = "humantime_serde")]
+    pub warmup_duration: Duration,
     /// Combinations
     pub combos: combo::ComboCollection,
     /// Number of rounds
@@ -73,6 +74,7 @@ async fn main() -> Result<()> {
 
     loop {
         game.wait_for_players().await?;
+        // TODO: select a combo
         game.run().await?;
         game.show_leaderboard(true).await?;
 
@@ -152,7 +154,7 @@ impl TwentySecondLeague {
 
             let _ = self.signals_tx.send(Phase::Game {
                 round: round,
-                remaining: Duration::from_secs(self.config.game_duration.unwrap_or(60)),
+                remaining: Duration::from_secs(60), // FIXME: pull from config
             });
 
             println!("Starting round {}/{}", round, ROUNDS_PER_GAME);
@@ -200,7 +202,7 @@ impl TwentySecondLeague {
 
         let mut countdown = Countdown::new(
             Duration::from_secs(1),
-            self.config.game_duration.unwrap_or(60) as u32,
+            60, // FIXME: pull from config
         );
 
         loop {
