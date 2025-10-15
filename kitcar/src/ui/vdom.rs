@@ -1,39 +1,87 @@
+use std::fmt::Debug;
+
 use indexmap::IndexMap;
 use insim::insim::{BtnStyle, BtnStyleColour, BtnStyleFlags};
 
-use crate::ui::styled::Styled;
+use crate::ui::{styled::Styled, AnyComponent};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ElementKey {
-    // When used in nested components, we need to ensure that we can differentiate between reused
-    // components. This is the "cheapest" way to do so.
-    pub instance_id: u32,
-    /// Our easy to use human key
-    pub key: String,
-}
+pub struct ElementId(Vec<usize>);
 
-impl ElementKey {
-    pub fn new(instance_id: u32, key: &str) -> Self {
-        Self {
-            instance_id,
-            key: key.to_owned(),
-        }
+// FIXME: we should finalise/hash this when all the building is done
+impl ElementId {
+    pub fn root() -> Self {
+        ElementId(vec![])
+    }
+
+    pub fn child(&self, index: usize) -> Self {
+        let mut path = self.0.clone();
+        path.push(index);
+        ElementId(path)
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+pub type ElementOnClickFn = Option<Box<dyn Fn() + Send + Sync + 'static>>;
+
 pub enum Element {
     Button {
-        key: ElementKey,
         text: String,
         style: taffy::Style,
         btnstyle: BtnStyle,
         children: Vec<Element>,
+        on_click: ElementOnClickFn,
     },
     Container {
         children: Vec<Element>,
         style: taffy::Style,
     },
+    Component(Box<dyn AnyComponent>),
+}
+
+impl PartialEq for Element {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Element::Button {
+                    text,
+                    style,
+                    children,
+                    btnstyle,
+                    ..
+                },
+                Element::Button {
+                    text: other_text,
+                    style: other_style,
+                    children: other_children,
+                    btnstyle: other_btnstyle,
+                    ..
+                },
+            ) => {
+                text == other_text
+                    && style == other_style
+                    && children == other_children
+                    && btnstyle == other_btnstyle
+            },
+            (
+                Element::Container { children, style },
+                Element::Container {
+                    children: other_children,
+                    style: other_style,
+                },
+            ) => children == other_children && style == other_style,
+            _ => false,
+        }
+    }
+}
+
+impl Debug for Element {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Element::Button { .. } => write!(f, "Element::Button"),
+            Element::Container { .. } => write!(f, "Element::Container"),
+            Element::Component(_) => write!(f, "Element::Component"),
+        }
+    }
 }
 
 impl Element {
@@ -44,36 +92,25 @@ impl Element {
         }
     }
 
-    pub fn button(instance_id: u32, key: &str, text: &str) -> Self {
+    pub fn button(text: &str) -> Self {
         Self::Button {
-            key: ElementKey {
-                instance_id,
-                key: key.to_string(),
-            },
             text: text.to_string(),
             style: taffy::Style::DEFAULT,
             btnstyle: BtnStyle::default(),
             children: vec![],
+            on_click: None,
         }
     }
 
-    pub fn multi_line_text(instance_id: u32, key: &str, text: &[&str], height: f32) -> Vec<Self> {
-        text.iter()
-            .enumerate()
-            .map(|(i, f)| {
-                Self::button(instance_id, &format!("{}-{}", key, i), f)
-                    .h(height)
-                    .text_align_start()
-            })
-            .collect()
-    }
-
-    pub fn clickable(mut self, val: bool) -> Self {
+    pub fn on_click(mut self, f: ElementOnClickFn) -> Self {
         if let Element::Button {
-            ref mut btnstyle, ..
+            ref mut btnstyle,
+            ref mut on_click,
+            ..
         } = self
         {
-            btnstyle.flags.set(BtnStyleFlags::CLICK, val);
+            btnstyle.flags.set(BtnStyleFlags::CLICK, f.is_some());
+            *on_click = f;
         }
         self
     }
@@ -158,6 +195,7 @@ impl Element {
             } => {
                 children.push(val);
             },
+            Self::Component(_) => {},
         }
 
         self
@@ -197,13 +235,6 @@ impl Element {
         self
     }
 
-    pub fn children(&self) -> &[Element] {
-        match self {
-            Element::Container { children, .. } => &children,
-            Element::Button { children, .. } => &children,
-        }
-    }
-
     pub fn text(&self) -> &str {
         match self {
             Element::Button { text, .. } => text,
@@ -217,12 +248,6 @@ impl Element {
             _ => None,
         }
     }
-
-    pub fn collect_renderable(&self) -> IndexMap<&ElementKey, &Element> {
-        let mut result = IndexMap::new();
-        collect_renderable_recursively(&self, &mut result);
-        result
-    }
 }
 
 impl Styled for Element {
@@ -230,6 +255,9 @@ impl Styled for Element {
         match self {
             Element::Button { style, .. } => style,
             Element::Container { style, .. } => style,
+            _ => {
+                unimplemented!()
+            },
         }
     }
 
@@ -237,23 +265,9 @@ impl Styled for Element {
         match self {
             Element::Button { ref mut style, .. } => style,
             Element::Container { ref mut style, .. } => style,
+            _ => {
+                unimplemented!()
+            },
         }
-    }
-}
-
-fn collect_renderable_recursively<'a>(
-    vdom: &'a Element,
-    result: &mut IndexMap<&'a ElementKey, &'a Element>,
-) {
-    // XXX: IndexMap because buttons are Z-Index'ed by ClickId it seems. And this is the best
-    // "workaround" we have for this, for now.
-    // When the ClickIdPool nears exhaustion, this all goes to shit.
-
-    if let Element::Button { ref key, .. } = vdom {
-        let _ = result.insert(key, vdom);
-    }
-
-    for child in vdom.children().iter() {
-        collect_renderable_recursively(child, result);
     }
 }

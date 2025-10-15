@@ -1,5 +1,5 @@
 mod motd;
 mod root;
-mod textbox;
+// mod textbox;
 
-pub(crate) use root::Root;
+pub(crate) use root::{Root, RootProps};

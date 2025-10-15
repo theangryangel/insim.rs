@@ -1,7 +1,7 @@
 iname: "insim.rs/20sl"
 addr: "172.24.64.1:29999"
 admin: "123!"
-warmup_duration: 5
+warmup_duration: 5mins
 rounds: 5
 
 combos:
@@ -9,8 +9,8 @@ combos:
     track: "FE1X"
     layout: "20s_cup"
     laps: 1
-    target_time: 20
-    restart_after: 10
+    target_time: 20s
+    restart_after: 10s
     vehicles:
       - XRT
       - XRG

@@ -1,5 +1,5 @@
 // ui.rs
-use std::{collections::HashMap, fmt::Debug};
+use std::{any::Any, collections::HashMap, fmt::Debug};
 
 use indexmap::IndexMap;
 use insim::{
@@ -9,7 +9,7 @@ use insim::{
 };
 
 use super::{id_pool::ClickIdPool, vdom::Element};
-use crate::ui::vdom::ElementKey;
+use crate::ui::vdom::{ElementId, ElementOnClickFn};
 
 #[derive(Debug, Default)]
 pub struct UiRendererDiff {
@@ -28,34 +28,38 @@ impl UiRendererDiff {
 }
 
 /// Ui for a single connection
-#[derive(Debug)]
-pub struct UiRenderer {
+pub struct UiRuntime {
     id_pool: ClickIdPool,
     // Stable mapping from component instance and key to button ClickId
-    key_to_click_id: HashMap<ElementKey, ClickId>,
-    click_id_to_key: HashMap<ClickId, ElementKey>,
+    element_id_to_click_id: HashMap<ElementId, ClickId>,
     // last layout and props
-    last_layout: Option<IndexMap<ElementKey, Btn>>,
+    last_layout: Option<IndexMap<ElementId, Btn>>,
+    states: HashMap<ElementId, Box<dyn Any + Send + Sync>>,
+    click_handlers: HashMap<ClickId, (ElementId, Box<dyn Fn() + Send + Sync>)>,
 }
 
-impl UiRenderer {
+impl Debug for UiRuntime {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl UiRuntime {
     pub fn new(id_pool: ClickIdPool) -> Self {
         Self {
             id_pool,
-            key_to_click_id: HashMap::new(),
-            click_id_to_key: HashMap::new(),
+            element_id_to_click_id: HashMap::new(),
             last_layout: None,
+            states: HashMap::new(),
+
+            click_handlers: HashMap::new(),
         }
     }
 
     /// Forcefully clear the ui. Useful for bfn clear
     pub fn clear(&mut self) {
         self.last_layout = None;
-        for key in self.click_id_to_key.keys() {
-            self.id_pool.release(&[*key]);
-        }
-        self.click_id_to_key.clear();
-        self.key_to_click_id.clear();
+        self.element_id_to_click_id.clear();
     }
 
     pub fn render(&mut self, vdom: Option<Element>, ucid: &ConnectionId) -> Option<UiRendererDiff> {
@@ -84,39 +88,29 @@ impl UiRenderer {
         };
 
         let mut taffy = taffy::TaffyTree::new();
-        let mut node_map = HashMap::new();
+        let mut node_map = IndexMap::new();
 
-        let root = populate_taffy_and_map(&mut taffy, &mut node_map, &new_vdom);
-        let _ = taffy.compute_layout(root, taffy::Size::length(200.0));
+        let root_id = flatten(&mut taffy, ElementId::root(), &mut node_map, new_vdom);
+        let _ = taffy.compute_layout(root_id, taffy::Size::length(200.0));
 
-        let new_layout: IndexMap<ElementKey, Btn> = new_vdom
-            .collect_renderable()
-            .into_iter()
-            .map(|(k, v)| {
-                let node_id = node_map.get(k).unwrap();
-                let (x, y) = get_taffy_abs_position(&taffy, node_id);
-                let layout = taffy.layout(*node_id).unwrap();
+        for (_element_id, (node_id, _on_click, btn)) in node_map.iter_mut() {
+            let (x, y) = get_taffy_abs_position(&taffy, node_id);
+            let layout = taffy.layout(*node_id).unwrap();
+            btn.l = x as u8;
+            btn.t = y as u8;
+            btn.w = layout.size.width as u8;
+            btn.h = layout.size.height as u8;
 
-                let renderable = Btn {
-                    l: x as u8,
-                    t: y as u8,
-                    w: layout.size.width as u8,
-                    h: layout.size.height as u8,
-                    text: v.text().to_string(),
-                    bstyle: v.bstyle().unwrap().clone(),
-                    ..Default::default()
-                };
-                (k.clone(), renderable)
-            })
-            .collect();
+            // FIXME: we could probably flatten the 2 loops below into this
+        }
 
         let last_layout = self.last_layout.take().unwrap_or_default();
 
         // Find buttons to remove
         let to_remove: Vec<Bfn> = last_layout
             .iter()
-            .filter_map(|(key, _btn)| {
-                if !new_layout.contains_key(key) {
+            .filter_map(|(key, _vals)| {
+                if !node_map.contains_key(key) {
                     Some(Bfn {
                         ucid: *ucid,
                         subt: BfnType::DelBtn,
@@ -129,25 +123,38 @@ impl UiRenderer {
             })
             .collect();
 
-        let to_update: Vec<Btn> = new_layout
-            .iter()
-            .filter_map(|(key, btn)| {
-                match last_layout.get(key) {
+        let to_update: Vec<Btn> = node_map
+            .iter_mut()
+            .filter_map(|(element_id, (_node_id, on_click, btn))| {
+                match last_layout.get(element_id) {
                     None => {
                         // New button
                         let mut btn = btn.clone();
-                        let clickid = self.lease_clickid(key).unwrap();
+                        let clickid = self.lease_clickid(element_id).unwrap();
                         btn.clickid = clickid;
                         btn.reqi = RequestId(clickid.0);
+                        if let Some(on_click) = on_click.take() {
+                            let _ = self
+                                .click_handlers
+                                .insert(clickid, (element_id.clone(), on_click));
+                        }
                         Some(btn)
                     },
                     Some(existing_btn) => {
                         // Check if button actually changed
                         if existing_btn != btn {
                             let mut btn = btn.clone();
-                            let clickid = self.lease_clickid(key).unwrap();
+                            let clickid = self.lease_clickid(element_id).unwrap();
                             btn.clickid = clickid;
                             btn.reqi = RequestId(clickid.0);
+                            if let Some(on_click) = on_click.take() {
+                                let _ = self
+                                    .click_handlers
+                                    .insert(clickid, (element_id.clone(), on_click));
+                            } else {
+                                // FIXME
+                                let _ = self.click_handlers.remove(&clickid);
+                            }
                             Some(btn)
                         } else {
                             None
@@ -157,7 +164,12 @@ impl UiRenderer {
             })
             .collect();
 
-        self.last_layout = Some(new_layout);
+        self.last_layout = Some(
+            node_map
+                .into_iter()
+                .map(|(element_id, (_node_id, _on_click, btn))| (element_id, btn))
+                .collect(),
+        );
 
         if to_update.is_empty() && to_remove.is_empty() {
             None
@@ -169,15 +181,14 @@ impl UiRenderer {
         }
     }
 
-    fn lease_clickid(&mut self, key: &ElementKey) -> Option<ClickId> {
+    fn lease_clickid(&mut self, key: &ElementId) -> Option<ClickId> {
         // If we already have an ID for this key, reuse it
-        if let Some(&existing_id) = self.key_to_click_id.get(key) {
+        if let Some(&existing_id) = self.element_id_to_click_id.get(key) {
             return Some(existing_id);
         }
 
         if let Some(new_id) = self.id_pool.lease() {
-            let _ = self.key_to_click_id.insert(key.clone(), new_id);
-            let _ = self.click_id_to_key.insert(new_id, key.clone());
+            let _ = self.element_id_to_click_id.insert(key.clone(), new_id);
             return Some(new_id);
         }
 
@@ -185,9 +196,11 @@ impl UiRenderer {
         None
     }
 
-    fn release_clickid(&mut self, key: &ElementKey) -> Option<ClickId> {
-        if let Some(existing_id) = self.key_to_click_id.remove(key) {
-            let _ = self.click_id_to_key.remove(&existing_id);
+    fn release_clickid(&mut self, key: &ElementId) -> Option<ClickId> {
+        let _ = self.states.remove(key);
+
+        if let Some(existing_id) = self.element_id_to_click_id.remove(key) {
+            let _ = self.click_handlers.remove(&existing_id);
             self.id_pool.release(&[existing_id]);
             return Some(existing_id);
         }
@@ -195,34 +208,49 @@ impl UiRenderer {
         None
     }
 
-    pub fn click_id_to_key(&self, click_id: &ClickId) -> Option<&ElementKey> {
-        self.click_id_to_key.get(click_id)
+    pub fn key_to_click_id(&self, key: &ElementId) -> Option<&ClickId> {
+        self.element_id_to_click_id.get(key)
     }
 
-    pub fn key_to_click_id(&self, key: &ElementKey) -> Option<&ClickId> {
-        self.key_to_click_id.get(key)
+    pub fn on_click(&mut self, click_id: &ClickId) {
+        if let Some((element_id, f)) = self.click_handlers.get_mut(click_id) {
+            f();
+        }
     }
 }
 
-fn populate_taffy_and_map(
+fn flatten(
     tree: &mut taffy::TaffyTree,
-    node_map: &mut HashMap<ElementKey, taffy::NodeId>,
-    vdom: &Element,
+    element_id: ElementId,
+    node_map: &mut IndexMap<ElementId, (taffy::NodeId, ElementOnClickFn, Btn)>,
+    vdom: Element,
 ) -> taffy::NodeId {
     match vdom {
-        Element::Container { children, style } => {
+        Element::Container {
+            children, style, ..
+        } => {
             let child_ids: Vec<taffy::NodeId> = children
                 .into_iter()
-                .map(|c| populate_taffy_and_map(tree, node_map, c))
+                .enumerate()
+                .map(|(i, c)| flatten(tree, element_id.child(i + 1), node_map, c))
                 .collect();
 
             let taffy_id = tree.new_with_children(style.clone(), &child_ids).unwrap();
             taffy_id
         },
+        Element::Component(component) => {
+            if let Some(inner) = component.render_any() {
+                flatten(tree, element_id.child(1), node_map, inner)
+            } else {
+                todo!()
+            }
+        },
         Element::Button {
-            key,
             style,
             children,
+            on_click,
+            btnstyle,
+            text,
             ..
         } => {
             let taffy_id = if children.len() == 0 {
@@ -230,12 +258,24 @@ fn populate_taffy_and_map(
             } else {
                 let child_ids: Vec<taffy::NodeId> = children
                     .into_iter()
-                    .map(|c| populate_taffy_and_map(tree, node_map, c))
+                    .enumerate()
+                    .map(|(i, c)| flatten(tree, element_id.child(i + 1), node_map, c))
                     .collect();
 
                 tree.new_with_children(style.clone(), &child_ids).unwrap()
             };
-            let _ = node_map.insert(key.clone(), taffy_id);
+            let _ = node_map.insert(
+                element_id.clone(),
+                (
+                    taffy_id,
+                    on_click,
+                    Btn {
+                        text,
+                        bstyle: btnstyle,
+                        ..Default::default()
+                    },
+                ),
+            );
             taffy_id
         },
     }
@@ -331,7 +371,7 @@ mod tests {
         let mut taffy = taffy::TaffyTree::new();
         let mut node_map = HashMap::new();
 
-        let root = populate_taffy_and_map(&mut taffy, &mut node_map, &container);
+        let root = flatten(&mut taffy, &mut node_map, &container);
 
         taffy
             .compute_layout(root, taffy::Size::length(200.0))
@@ -370,7 +410,7 @@ mod tests {
         let mut taffy = taffy::TaffyTree::new();
         let mut node_map = HashMap::new();
 
-        let root = populate_taffy_and_map(&mut taffy, &mut node_map, &container);
+        let root = flatten(&mut taffy, &mut node_map, &container);
         taffy
             .compute_layout(root, taffy::Size::length(200.0))
             .unwrap();
@@ -390,7 +430,7 @@ mod tests {
 
     #[test]
     fn test_ui() {
-        let mut renderer = UiRenderer::new(ClickIdPool::new());
+        let mut renderer = UiRuntime::new(ClickIdPool::new());
 
         let vdom = app(&AppProps {
             empty: false,

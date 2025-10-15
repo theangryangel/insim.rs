@@ -23,6 +23,8 @@ use tokio::{
     time::sleep,
 };
 
+use crate::components::RootProps;
+
 const ROUNDS_PER_GAME: usize = 5;
 const ROUND_DURATION: u32 = 30;
 const TARGET_TIME: f32 = 20.0;
@@ -100,7 +102,7 @@ struct TwentySecondLeague {
     presence: PresenceHandle,
 
     // TODO: hack
-    signals_tx: watch::Sender<Phase>,
+    signals_tx: watch::Sender<RootProps>,
 }
 
 impl TwentySecondLeague {
@@ -109,8 +111,11 @@ impl TwentySecondLeague {
         leaderboard: LeaderboardHandle,
         presence: PresenceHandle,
         insim: insim::builder::SpawnedHandle,
-    ) -> (Self, watch::Receiver<Phase>) {
-        let (signals_tx, signals_rx) = watch::channel(Phase::Idle);
+    ) -> (Self, watch::Receiver<RootProps>) {
+        let (signals_tx, signals_rx) = watch::channel(RootProps {
+            phase: Phase::Idle,
+            show: true,
+        });
 
         (
             Self {
@@ -152,9 +157,12 @@ impl TwentySecondLeague {
 
             self.command(&format!("/restart")).await;
 
-            let _ = self.signals_tx.send(Phase::Game {
-                round: round,
-                remaining: Duration::from_secs(60), // FIXME: pull from config
+            let _ = self.signals_tx.send(RootProps {
+                show: true,
+                phase: Phase::Game {
+                    round: round,
+                    remaining: Duration::from_secs(60), // FIXME: pull from config
+                },
             });
 
             println!("Starting round {}/{}", round, ROUNDS_PER_GAME);
@@ -181,7 +189,10 @@ impl TwentySecondLeague {
             self.message_all(&format!("Round {} complete!", round))
                 .await;
 
-            let _ = self.signals_tx.send(Phase::Victory);
+            let _ = self.signals_tx.send(RootProps {
+                show: true,
+                phase: Phase::Victory,
+            });
 
             self.show_leaderboard(false).await?;
         }
@@ -212,9 +223,12 @@ impl TwentySecondLeague {
                         let remaining_duration = countdown.remaining_duration().await;
                         self.message_all(&format!("{:?}s remaining!", &remaining_duration)).await;
 
-                        let _ = self.signals_tx.send(Phase::Game {
-                            round: *round,
-                            remaining: remaining_duration
+                        let _ = self.signals_tx.send(RootProps {
+                            show: true,
+                            phase: Phase::Game {
+                                round: *round,
+                                remaining: remaining_duration
+                            }
                         });
                     },
                     None => {

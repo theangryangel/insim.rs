@@ -1,13 +1,9 @@
 use std::collections::HashMap;
 
 use insim::core::string::colours::Colourify;
-use kitcar::ui::{
-    wrap_text, Component, ComponentBehaviour, ComponentResult, Element, ElementKey, InstanceIdPool,
-    Styled,
-};
+use kitcar::ui::{wrap_text, Component, Element, InstanceIdPool, Styled};
 
-pub struct Textbox {
-    instance_id: u32,
+pub struct TextboxProps {
     text: String,
     rows: u8,
     width: u8,
@@ -15,47 +11,9 @@ pub struct Textbox {
     offset: usize,
 }
 
-impl ComponentBehaviour for Textbox {
-    fn instance_id(&self) -> u32 {
-        self.instance_id
-    }
-
-    fn children_mut(&mut self) -> Option<HashMap<u32, &mut dyn ComponentBehaviour>> {
-        None
-    }
-
-    fn on_click(&mut self, click_id: &ElementKey) -> ComponentResult {
-        if click_id.key == "up" {
-            self.offset = self.offset.saturating_sub(1);
-        }
-
-        if click_id.key == "down" {
-            self.offset = self.offset.saturating_add(1);
-        }
-
-        ComponentResult::default().render()
-    }
-}
+pub struct Textbox;
 
 impl Component for Textbox {
-    type Props = String;
-
-    fn mount(instance_ids: &mut InstanceIdPool, props: Self::Props) -> Self {
-        Self {
-            instance_id: instance_ids.next(),
-            text: props,
-            width: 80,
-            rows: 3,
-            row_height: 5,
-            offset: 0,
-        }
-    }
-
-    fn update(&mut self, props: Self::Props) -> ComponentResult {
-        self.text = props;
-        ComponentResult::default().render()
-    }
-
     fn render(&self) -> Option<kitcar::ui::Element> {
         if self.text.is_empty() {
             return None;
@@ -73,7 +31,7 @@ impl Component for Textbox {
             .iter()
             .enumerate()
             .map(|(i, f)| {
-                Element::button(self.instance_id(), &format!("textarea_{}", i), &f.white())
+                Element::button(&f.white())
                     .w(self.width as f32 - 6.)
                     .h(self.row_height as f32)
                     .text_align_start()
@@ -81,13 +39,13 @@ impl Component for Textbox {
             .collect();
 
         Some(
-            Element::button(self.instance_id(), "outer", "")
+            Element::button("")
                 .light()
                 .flex()
                 .flex_row()
                 .p(1.)
                 .with_child(
-                    Element::button(self.instance_id(), "bg", "")
+                    Element::button("")
                         .p(1.)
                         .dark()
                         .flex()
@@ -99,21 +57,17 @@ impl Component for Textbox {
                         .flex()
                         .flex_col()
                         .flex_grow(1.)
-                        .with_child(
-                            Element::button(self.instance_id(), "up", &"▲".white())
-                                .dark()
-                                .w(5.)
-                                .h(5.)
-                                .clickable(self.offset > 0),
-                        )
+                        .with_child(Element::button(&"▲".white()).dark().w(5.).h(5.).on_click(
+                            Some(Box::new(|| {
+                                println!("Up was clicked!");
+                            })),
+                        ))
                         .with_child(Element::container().flex().flex_grow(1.))
-                        .with_child(
-                            Element::button(self.instance_id(), "down", &"▼".white())
-                                .dark()
-                                .w(5.)
-                                .h(5.)
-                                .clickable(has_more),
-                        ),
+                        .with_child(Element::button(&"▼".white()).dark().w(5.).h(5.).on_click(
+                            Some(Box::new(|| {
+                                println!("Down was clicked!");
+                            })),
+                        )),
                 ),
         )
     }
