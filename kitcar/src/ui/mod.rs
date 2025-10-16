@@ -5,190 +5,19 @@
 //! requirements.
 //! Each plugin will be responsible for it's own set of Ui's. Nothing shared except for the id_pool.
 //! `Ui` represents the ui for a single connection.
+pub mod component;
 pub mod id_pool;
-pub mod instance_id;
+pub mod manager;
 pub mod renderer;
-pub mod styled;
+pub mod scope;
 pub mod vdom;
 
-use std::{any::Any, collections::HashMap};
-
+pub use component::{Component, ComponentPath};
 pub use id_pool::ClickIdPool;
-use insim::{
-    identifiers::ConnectionId,
-    insim::{BfnType, TinyType},
-    Packet, WithRequestId,
-};
-pub use instance_id::InstanceIdPool;
-pub use renderer::{UiRendererDiff, UiRuntime};
-pub use styled::Styled;
-use tokio::{sync::watch, task::JoinHandle};
+pub use manager::Manager;
+pub use renderer::{RenderDiff, Runtime};
+pub use scope::Scope;
 pub use vdom::Element;
-
-/// Object safe trait for use in Element::Component variant
-pub trait AnyComponent {
-    fn render_any(&self) -> Option<Element>;
-}
-
-/// Trait for users to implement a Ui for a single connection
-pub trait Component: Send + 'static {
-    type Props: Send + Sync + Clone;
-
-    /// New!
-    fn new(props: Self::Props) -> Self;
-
-    /// Render
-    fn render(&self) -> Option<Element>;
-}
-
-// Blank impl
-impl<T> AnyComponent for T
-where
-    T: Component,
-{
-    fn render_any(&self) -> Option<Element> {
-        self.render()
-    }
-}
-
-#[derive(Debug)]
-pub struct ComponentScope {}
-
-/// Manager to implement Ui
-#[derive(Debug)]
-pub struct UiManager;
-
-impl UiManager {
-    pub fn spawn<U: Component>(
-        signals: watch::Receiver<U::Props>,
-        insim: insim::builder::SpawnedHandle,
-    ) -> JoinHandle<insim::Result<()>> {
-        tokio::spawn(async move {
-            let mut packet_rx = insim.subscribe();
-            let mut active = HashMap::new();
-
-            let _ = insim.send(TinyType::Ncn.with_request_id(1)).await?;
-
-            while let Ok(packet) = packet_rx.recv().await {
-                match packet {
-                    Packet::Ncn(ncn) => {
-                        let _ = active.entry(ncn.ucid).or_insert_with(|| {
-                            Self::spawn_player_ui::<U>(ncn.ucid, signals.clone(), insim.clone())
-                        });
-                    },
-                    Packet::Cnl(cnl) => {
-                        if let Some(handle) = active.remove(&cnl.ucid) {
-                            handle.abort();
-                        }
-                    },
-                    _ => {},
-                }
-            }
-
-            // FIXME: masking the error if one occurs
-            Ok(())
-        })
-    }
-
-    fn spawn_player_ui<U: Component>(
-        ucid: ConnectionId,
-        mut signals: watch::Receiver<U::Props>,
-        insim: insim::builder::SpawnedHandle,
-    ) -> JoinHandle<insim::Result<()>> {
-        tokio::spawn(async move {
-            let props = signals.borrow().clone();
-            let mut runtime = UiRuntime::new(ClickIdPool::new());
-            // Honor when a user blocks/requests buttons
-            let mut blocked = false;
-
-            // Initial render
-            if !blocked {
-                let element = U::new(props);
-                if let Some(diff) = runtime.render(element.render(), &ucid) {
-                    insim.send_all(diff.into_merged()).await?;
-                }
-            }
-
-            let mut packet_rx = insim.subscribe();
-
-            loop {
-                tokio::select! {
-                    // Handle button clicks
-                    Ok(packet) = packet_rx.recv() => {
-                        let render_result = match packet {
-                            // Packet::Mso(mso) => {
-                            //     if mso.ucid != ucid {
-                            //         None
-                            //     } else {
-                            //         // FIXME: this should also traverse the component tree
-                            //         Some(root.on_mso(&mso))
-                            //     }
-                            // },
-
-                            Packet::Btc(btc) => {
-                                if_chain::if_chain! {
-                                    if btc.ucid == ucid;
-                                    if !blocked;
-                                    then {
-                                        runtime.on_click(&btc.clickid);
-                                        Some(true)
-                                    } else {
-                                        None
-                                    }
-                                }
-                            },
-                            Packet::Bfn(bfn) => {
-                                if bfn.ucid != ucid {
-                                    None
-                                }
-                                else if matches!(bfn.subt, BfnType::Clear | BfnType::UserClear) {
-                                    blocked = true;
-                                    runtime.clear();
-                                    None
-                                }
-                                else if matches!(bfn.subt, BfnType::BtnRequest) {
-                                    blocked = false;
-                                    Some(true)
-                                } else {
-                                    None
-                                }
-                            },
-
-                            _ => {
-                                None
-                            }
-                        };
-
-                        if_chain::if_chain! {
-                            if !blocked;
-                            if let Some(should_render) = render_result;
-                            if should_render;
-                            then {
-                                let props = signals.borrow().clone();
-                                let element = U::new(props);
-                                if let Some(diff) = runtime.render(element.render(), &ucid) {
-                                    insim.send_all(diff.into_merged()).await?;
-                                }
-                            }
-                        }
-                    },
-
-                    // Handle signal changes
-                    _ = signals.changed() => {
-                        let props = signals.borrow_and_update().clone();
-                        let element = U::new(props);
-                        if blocked {
-                            continue;
-                        }
-                        if let Some(diff) = runtime.render(element.render(), &ucid) {
-                            insim.send_all(diff.into_merged()).await?;
-                        }
-                    }
-                }
-            }
-        })
-    }
-}
 
 const MAGIC_TEXT_RATIO: f32 = 0.2;
 

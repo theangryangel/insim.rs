@@ -1,41 +1,23 @@
 use std::fmt::Debug;
 
-use indexmap::IndexMap;
 use insim::insim::{BtnStyle, BtnStyleColour, BtnStyleFlags};
 
-use crate::ui::{styled::Styled, AnyComponent};
+pub type ElementId = usize;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ElementId(Vec<usize>);
-
-// FIXME: we should finalise/hash this when all the building is done
-impl ElementId {
-    pub fn root() -> Self {
-        ElementId(vec![])
-    }
-
-    pub fn child(&self, index: usize) -> Self {
-        let mut path = self.0.clone();
-        path.push(index);
-        ElementId(path)
-    }
-}
-
-pub type ElementOnClickFn = Option<Box<dyn Fn() + Send + Sync + 'static>>;
-
+/// Concrete Element - i.e. not a Component
 pub enum Element {
     Button {
+        id: ElementId,
         text: String,
         style: taffy::Style,
         btnstyle: BtnStyle,
         children: Vec<Element>,
-        on_click: ElementOnClickFn,
+        on_click: Option<Box<dyn Fn() + Send + Sync>>,
     },
     Container {
         children: Vec<Element>,
         style: taffy::Style,
     },
-    Component(Box<dyn AnyComponent>),
 }
 
 impl PartialEq for Element {
@@ -79,30 +61,12 @@ impl Debug for Element {
         match self {
             Element::Button { .. } => write!(f, "Element::Button"),
             Element::Container { .. } => write!(f, "Element::Container"),
-            Element::Component(_) => write!(f, "Element::Component"),
         }
     }
 }
 
 impl Element {
-    pub fn container() -> Self {
-        Self::Container {
-            children: vec![],
-            style: taffy::Style::DEFAULT,
-        }
-    }
-
-    pub fn button(text: &str) -> Self {
-        Self::Button {
-            text: text.to_string(),
-            style: taffy::Style::DEFAULT,
-            btnstyle: BtnStyle::default(),
-            children: vec![],
-            on_click: None,
-        }
-    }
-
-    pub fn on_click(mut self, f: ElementOnClickFn) -> Self {
+    pub fn on_click(mut self, f: Option<Box<dyn Fn() + Send + Sync>>) -> Self {
         if let Element::Button {
             ref mut btnstyle,
             ref mut on_click,
@@ -183,19 +147,22 @@ impl Element {
         self
     }
 
-    pub fn with_child(mut self, val: Element) -> Self {
+    pub fn with_child<E: Into<Option<Element>>>(mut self, val: E) -> Self {
+        let val = val.into();
+        if val.is_none() {
+            return self;
+        }
         match self {
             Self::Container {
                 ref mut children, ..
             } => {
-                children.push(val);
+                children.push(val.unwrap());
             },
             Self::Button {
                 ref mut children, ..
             } => {
-                children.push(val);
+                children.push(val.unwrap());
             },
-            Self::Component(_) => {},
         }
 
         self
@@ -248,26 +215,291 @@ impl Element {
             _ => None,
         }
     }
-}
 
-impl Styled for Element {
-    fn style(&self) -> &taffy::Style {
+    // Styling
+
+    pub fn style(&self) -> &taffy::Style {
         match self {
             Element::Button { style, .. } => style,
             Element::Container { style, .. } => style,
-            _ => {
-                unimplemented!()
-            },
         }
     }
 
-    fn style_mut(&mut self) -> &mut taffy::Style {
+    pub fn style_mut(&mut self) -> &mut taffy::Style {
         match self {
             Element::Button { ref mut style, .. } => style,
             Element::Container { ref mut style, .. } => style,
-            _ => {
-                unimplemented!()
-            },
         }
+    }
+
+    pub fn w(mut self, val: f32) -> Self {
+        self.style_mut().size.width = taffy::Dimension::length(val);
+        self
+    }
+
+    pub fn w_auto(mut self) -> Self {
+        self.style_mut().size.width = taffy::Dimension::auto();
+        self
+    }
+
+    pub fn h(mut self, val: f32) -> Self {
+        self.style_mut().size.height = taffy::Dimension::length(val);
+        self
+    }
+
+    pub fn h_auto(mut self) -> Self {
+        self.style_mut().size.height = taffy::Dimension::auto();
+        self
+    }
+
+    pub fn block(mut self) -> Self {
+        self.style_mut().display = taffy::Display::Block;
+        self
+    }
+
+    pub fn flex(mut self) -> Self {
+        self.style_mut().display = taffy::Display::Flex;
+        self
+    }
+
+    pub fn flex_col(mut self) -> Self {
+        self.style_mut().flex_direction = taffy::FlexDirection::Column;
+        self
+    }
+
+    pub fn flex_row(mut self) -> Self {
+        self.style_mut().flex_direction = taffy::FlexDirection::Row;
+        self
+    }
+
+    pub fn flex_col_reverse(mut self) -> Self {
+        self.style_mut().flex_direction = taffy::FlexDirection::ColumnReverse;
+        self
+    }
+
+    pub fn flex_row_reverse(mut self) -> Self {
+        self.style_mut().flex_direction = taffy::FlexDirection::RowReverse;
+        self
+    }
+
+    pub fn flex_grow(mut self, val: f32) -> Self {
+        self.style_mut().flex_grow = val;
+        self
+    }
+
+    pub fn flex_shrink(mut self, val: f32) -> Self {
+        self.style_mut().flex_shrink = val;
+        self
+    }
+
+    pub fn flex_wrap(mut self) -> Self {
+        self.style_mut().flex_wrap = taffy::FlexWrap::Wrap;
+        self
+    }
+
+    pub fn flex_nowrap(mut self) -> Self {
+        self.style_mut().flex_wrap = taffy::FlexWrap::NoWrap;
+        self
+    }
+
+    pub fn flex_wrap_reverse(mut self) -> Self {
+        self.style_mut().flex_wrap = taffy::FlexWrap::WrapReverse;
+        self
+    }
+
+    pub fn items_start(mut self) -> Self {
+        self.style_mut().align_items = Some(taffy::AlignItems::Start);
+        self
+    }
+
+    pub fn items_end(mut self) -> Self {
+        self.style_mut().align_items = Some(taffy::AlignItems::End);
+        self
+    }
+
+    pub fn items_center(mut self) -> Self {
+        self.style_mut().align_items = Some(taffy::AlignItems::Center);
+        self
+    }
+
+    pub fn items_baseline(mut self) -> Self {
+        self.style_mut().align_items = Some(taffy::AlignItems::Baseline);
+        self
+    }
+
+    pub fn justify_start(mut self) -> Self {
+        self.style_mut().justify_content = Some(taffy::JustifyContent::Start);
+        self
+    }
+
+    pub fn justify_end(mut self) -> Self {
+        self.style_mut().justify_content = Some(taffy::JustifyContent::End);
+        self
+    }
+
+    pub fn justify_center(mut self) -> Self {
+        self.style_mut().justify_content = Some(taffy::JustifyContent::Center);
+        self
+    }
+
+    pub fn justify_between(mut self) -> Self {
+        self.style_mut().justify_content = Some(taffy::JustifyContent::SpaceBetween);
+        self
+    }
+
+    pub fn justify_around(mut self) -> Self {
+        self.style_mut().justify_content = Some(taffy::JustifyContent::SpaceAround);
+        self
+    }
+
+    pub fn content_start(mut self) -> Self {
+        self.style_mut().align_content = Some(taffy::AlignContent::Start);
+        self
+    }
+
+    pub fn content_end(mut self) -> Self {
+        self.style_mut().align_content = Some(taffy::AlignContent::End);
+        self
+    }
+
+    pub fn content_around(mut self) -> Self {
+        self.style_mut().align_content = Some(taffy::AlignContent::SpaceAround);
+        self
+    }
+
+    pub fn content_between(mut self) -> Self {
+        self.style_mut().align_content = Some(taffy::AlignContent::SpaceBetween);
+        self
+    }
+
+    pub fn content_evenly(mut self) -> Self {
+        self.style_mut().align_content = Some(taffy::AlignContent::SpaceEvenly);
+        self
+    }
+
+    pub fn content_stretch(mut self) -> Self {
+        self.style_mut().align_content = Some(taffy::AlignContent::Stretch);
+        self
+    }
+
+    pub fn self_start(mut self) -> Self {
+        self.style_mut().align_self = Some(taffy::AlignSelf::FlexStart);
+        self
+    }
+
+    pub fn self_end(mut self) -> Self {
+        self.style_mut().align_self = Some(taffy::AlignSelf::FlexEnd);
+        self
+    }
+
+    pub fn self_center(mut self) -> Self {
+        self.style_mut().align_self = Some(taffy::AlignSelf::Center);
+        self
+    }
+
+    pub fn self_stretch(mut self) -> Self {
+        self.style_mut().align_self = Some(taffy::AlignSelf::Stretch);
+        self
+    }
+
+    pub fn m(mut self, val: f32) -> Self {
+        self.style_mut().margin = taffy::Rect::length(val);
+        self
+    }
+
+    pub fn mt_auto(mut self) -> Self {
+        self.style_mut().margin.top = taffy::LengthPercentageAuto::auto();
+        self
+    }
+
+    pub fn mt(mut self, val: f32) -> Self {
+        self.style_mut().margin.top = taffy::LengthPercentageAuto::length(val);
+        self
+    }
+
+    pub fn mb(mut self, val: f32) -> Self {
+        self.style_mut().margin.bottom = taffy::LengthPercentageAuto::length(val);
+        self
+    }
+
+    pub fn ml(mut self, val: f32) -> Self {
+        self.style_mut().margin.left = taffy::LengthPercentageAuto::length(val);
+        self
+    }
+
+    pub fn mr(mut self, val: f32) -> Self {
+        self.style_mut().margin.right = taffy::LengthPercentageAuto::length(val);
+        self
+    }
+
+    pub fn mx(mut self, val: f32) -> Self {
+        self.style_mut().margin.left = taffy::LengthPercentageAuto::length(val);
+        self.style_mut().margin.right = taffy::LengthPercentageAuto::length(val);
+        self
+    }
+
+    pub fn my(mut self, val: f32) -> Self {
+        self.style_mut().margin.top = taffy::LengthPercentageAuto::length(val);
+        self.style_mut().margin.bottom = taffy::LengthPercentageAuto::length(val);
+        self
+    }
+
+    pub fn mx_auto(mut self) -> Self {
+        self.style_mut().margin.left = taffy::LengthPercentageAuto::auto();
+        self.style_mut().margin.right = taffy::LengthPercentageAuto::auto();
+        self
+    }
+
+    pub fn my_auto(mut self) -> Self {
+        self.style_mut().margin.top = taffy::LengthPercentageAuto::auto();
+        self.style_mut().margin.bottom = taffy::LengthPercentageAuto::auto();
+        self
+    }
+
+    pub fn p(mut self, val: f32) -> Self {
+        self.style_mut().padding = taffy::Rect::length(val);
+        self
+    }
+
+    pub fn pt(mut self, val: f32) -> Self {
+        self.style_mut().padding.top = taffy::LengthPercentage::length(val);
+        self
+    }
+
+    pub fn pb(mut self, val: f32) -> Self {
+        self.style_mut().padding.bottom = taffy::LengthPercentage::length(val);
+        self
+    }
+
+    pub fn pl(mut self, val: f32) -> Self {
+        self.style_mut().padding.left = taffy::LengthPercentage::length(val);
+        self
+    }
+
+    pub fn pr(mut self, val: f32) -> Self {
+        self.style_mut().padding.right = taffy::LengthPercentage::length(val);
+        self
+    }
+
+    pub fn px(mut self, val: f32) -> Self {
+        self.style_mut().padding.left = taffy::LengthPercentage::length(val);
+        self.style_mut().padding.right = taffy::LengthPercentage::length(val);
+        self
+    }
+
+    pub fn py(mut self, val: f32) -> Self {
+        self.style_mut().padding.top = taffy::LengthPercentage::length(val);
+        self.style_mut().padding.bottom = taffy::LengthPercentage::length(val);
+        self
+    }
+
+    pub fn fit_content(mut self) -> Self {
+        self = self.w_auto().h_auto();
+        self
+    }
+
+    pub fn sized(mut self, width: f32, height: f32) -> Self {
+        self = self.w(width).h(height);
+        self
     }
 }

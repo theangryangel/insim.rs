@@ -1,10 +1,11 @@
-use std::collections::HashMap;
-
 use insim::core::string::colours::Colourify;
-use kitcar::ui::{Component, Element, Styled};
+use kitcar::ui::{Component, Element, Scope};
 
 use crate::{
-    components::motd::{Motd, MotdProps},
+    components::{
+        motd::{Motd, MotdProps},
+        topbar::Topbar,
+    },
     Phase, ROUNDS_PER_GAME,
 };
 
@@ -14,23 +15,17 @@ pub(crate) struct RootProps {
     pub show: bool,
 }
 
-pub(crate) struct Root {
-    pub phase: Phase,
-    pub show: bool,
-}
+pub(crate) struct Root;
 
 impl Component for Root {
     type Props = RootProps;
 
-    fn new(props: Self::Props) -> Self {
-        Self {
-            phase: props.phase,
-            show: props.show,
+    fn render(props: Self::Props, cx: &mut Scope) -> Option<Element> {
+        if !props.show {
+            return None;
         }
-    }
 
-    fn render(&self) -> Option<Element> {
-        let text = match self.phase {
+        let text = match props.phase {
             Phase::Idle => "No game in progress".white(),
             Phase::Game { round, remaining } => {
                 let seconds = remaining.as_secs() % 60;
@@ -44,43 +39,22 @@ impl Component for Root {
             Phase::Victory => "Victory!".white(),
         };
 
-        let interface = Element::container()
+        let interface = cx
+            .container()
             .h(150.0)
             .w(200.0)
             .flex()
             .flex_col()
-            .with_child(topbar(&text))
-            .with_child(Element::Component(Box::new(Motd::new(MotdProps {
+            .with_child(cx.component::<Topbar>(text))
+            .with_child(cx.component::<Motd>(MotdProps {
                 show: true,
                 what: 1,
-            }))))
-            .with_child(Element::Component(Box::new(Motd::new(MotdProps {
+            }))
+            .with_child(cx.component::<Motd>(MotdProps {
                 show: true,
                 what: 2,
-            }))));
+            }));
 
         Some(interface)
     }
-}
-
-// A not-component-component. We're just using this to make the Root component a bit more readable.
-// We're going to assume that we can safely reuse the instance_id
-pub(crate) fn topbar(text: &str) -> Element {
-    // top bar
-    Element::container()
-        .flex()
-        .flex_row()
-        .justify_center()
-        .with_child(
-            Element::button(&format!(
-                "{} {} {}",
-                "Welcome to the".white(),
-                "20".red(),
-                "second league".white()
-            ))
-            .w(38.)
-            .h(5.)
-            .dark(),
-        )
-        .with_child(Element::button(&text).w(33.).h(5.).dark())
 }

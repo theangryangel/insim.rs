@@ -14,7 +14,7 @@ use kitcar::{
     leaderboard::{Leaderboard, LeaderboardHandle},
     presence::{Presence, PresenceHandle},
     time::countdown::Countdown,
-    ui::UiManager,
+    ui,
     utils::NoVote,
     Service, State as _,
 };
@@ -26,7 +26,6 @@ use tokio::{
 use crate::components::RootProps;
 
 const ROUNDS_PER_GAME: usize = 5;
-const ROUND_DURATION: u32 = 30;
 const TARGET_TIME: f32 = 20.0;
 
 /// Config
@@ -67,7 +66,7 @@ async fn main() -> Result<()> {
 
     let (mut game, signals_rx) =
         TwentySecondLeague::new(config, leaderboard, presence, insim.clone());
-    let _ = UiManager::spawn::<components::Root>(signals_rx, insim.clone());
+    let _ = ui::Manager::spawn::<components::Root>(signals_rx, insim.clone());
 
     let _ = insim.send(TinyType::Ncn.with_request_id(1)).await;
     let _ = insim.send(TinyType::Npl.with_request_id(2)).await;
