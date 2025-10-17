@@ -6,14 +6,14 @@ pub mod component;
 pub mod component_state;
 pub mod id_pool;
 pub mod manager;
-pub mod renderer;
+pub mod runtime;
 pub mod scope;
 pub mod vdom;
 
 pub use component::{Component, ComponentPath};
 pub use id_pool::ClickIdPool;
 pub use manager::Manager;
-pub use renderer::{RenderDiff, Runtime};
+pub use runtime::{RenderDiff, Runtime};
 pub use scope::Scope;
 pub use vdom::Element;
 

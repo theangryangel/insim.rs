@@ -54,10 +54,6 @@ impl Component for Root {
             .with_child(cx.component::<Motd>(MotdProps {
                 text: WELCOME.to_owned(),
                 what: 1,
-            }))
-            .with_child(cx.component::<Motd>(MotdProps {
-                text: WELCOME.to_owned(),
-                what: 2,
             }));
 
         Some(interface)

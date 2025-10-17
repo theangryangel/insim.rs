@@ -18,7 +18,6 @@ impl Component for Textbox {
         if props.text.is_empty() {
             return None;
         }
-
         let offset = cx.use_state(|| 0 as usize);
 
         let wrapped: Vec<&str> = wrap_text(&props.text, props.row_height, props.width, 100)
@@ -31,7 +30,8 @@ impl Component for Textbox {
         let collected: Vec<Element> = (&wrapped[offset_by..slice_end])
             .iter()
             .map(|f| {
-                cx.button(f.white())
+                cx.button(f.black())
+                    .light()
                     .w(props.width as f32 - 6.)
                     .h(props.row_height as f32)
                     .text_align_start()
@@ -39,15 +39,13 @@ impl Component for Textbox {
             .collect();
 
         Some(
-            cx.button("".into())
-                .light()
+            cx.container()
                 .flex()
                 .flex_row()
                 .p(1.)
                 .with_child(
-                    cx.button("".into())
+                    cx.container()
                         .p(1.)
-                        .dark()
                         .flex()
                         .flex_col()
                         .with_children(collected),
@@ -57,7 +55,7 @@ impl Component for Textbox {
                         .flex()
                         .flex_col()
                         .flex_grow(1.)
-                        .with_child(cx.button("▲".white()).dark().w(5.).h(5.).on_click({
+                        .with_child(cx.button("▲".black()).light().w(5.).h(5.).on_click({
                             let offset = offset.clone();
 
                             Some(Box::new(move || {
@@ -68,13 +66,13 @@ impl Component for Textbox {
                             }))
                         }))
                         .with_child(cx.container().flex().flex_grow(1.))
-                        .with_child(cx.button("▼".white()).dark().w(5.).h(5.).on_click({
+                        .with_child(cx.button("▼".black()).light().w(5.).h(5.).on_click({
                             let offset = offset.clone();
 
                             Some(Box::new(move || {
                                 let next = std::cmp::min(
                                     offset.get() + 1,
-                                    (slice_end + 1 - props.rows as usize),
+                                    slice_end + 1 - props.rows as usize,
                                 );
 
                                 offset.set(next);

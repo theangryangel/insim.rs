@@ -32,7 +32,12 @@ impl Component for Motd {
         // FIXME: we need a generic wrapped text component?
         let text: Vec<Element> = wrap_text(&props.text, 5, 78, 100)
             .enumerate()
-            .map(|(_i, line)| cx.button(line.into()).h(5.).text_align_start())
+            .map(|(_i, line)| {
+                cx.button(line.to_string().black())
+                    .light()
+                    .h(5.)
+                    .text_align_start()
+            })
             .collect();
 
         if text.is_empty() {
@@ -43,35 +48,20 @@ impl Component for Motd {
             cx.container()
                 .flex()
                 .flex_col()
-                .flex_grow(1.0)
+                .my_auto()
+                .mx_auto()
+                .w(80.)
+                .with_children(text)
                 .with_child(
-                    cx.button("".into())
-                        .flex()
-                        .flex_col()
-                        .w(80.)
-                        .p(1.)
+                    cx.button("Got it!".light_green())
+                        .mt(2.)
+                        .h(5.)
+                        .green()
                         .light()
-                        .my_auto()
-                        .mx_auto()
-                        .with_child(
-                            cx.button("".into())
-                                .flex()
-                                .flex_col()
-                                .dark()
-                                .p(1.)
-                                .with_children(text),
-                        )
-                        .with_child(
-                            cx.button("Got it!".light_green())
-                                .mt(2.)
-                                .h(5.)
-                                .green()
-                                .dark()
-                                .on_click(Some(Box::new(move || {
-                                    println!("I GOT CLICKED! {:?}", props.what);
-                                    show.set(false);
-                                }))),
-                        ),
+                        .on_click(Some(Box::new(move || {
+                            println!("I GOT CLICKED! {:?}", props.what);
+                            show.set(false);
+                        }))),
                 )
                 .with_child(cx.container().mx_auto().with_child(cx.component::<Textbox>(
                     TextboxProps {

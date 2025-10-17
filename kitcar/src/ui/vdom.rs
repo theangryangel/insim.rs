@@ -9,7 +9,6 @@ pub(crate) struct Button {
     pub(crate) text: String,
     pub(crate) style: taffy::Style,
     pub(crate) btnstyle: BtnStyle,
-    pub(crate) children: Option<Vec<Element>>,
     pub(crate) on_click: Option<Box<dyn Fn()>>,
 }
 
@@ -159,11 +158,7 @@ impl Element {
             }) => {
                 children.get_or_insert_default().push(val.unwrap());
             },
-            Self::Button(Button {
-                ref mut children, ..
-            }) => {
-                children.get_or_insert_default().push(val.unwrap());
-            },
+            _ => {},
         }
 
         self

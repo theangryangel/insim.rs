@@ -52,7 +52,6 @@ impl<'a> Scope<'a> {
             on_click: None,
             btnstyle: Default::default(),
             style: Default::default(),
-            children: None,
         })
     }
 

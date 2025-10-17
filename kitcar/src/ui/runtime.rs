@@ -294,12 +294,7 @@ fn flatten(
         Element::Container(Container {
             children, style, ..
         }) => (0, style.clone(), children.take()),
-        Element::Button(Button {
-            id,
-            children,
-            style,
-            ..
-        }) => (*id, style.clone(), children.take()),
+        Element::Button(Button { id, style, .. }) => (*id, style.clone(), None),
     };
 
     let children = taken_children.unwrap_or_default();
