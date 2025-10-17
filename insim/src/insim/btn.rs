@@ -260,7 +260,7 @@ pub struct Bfn {
 
 impl_typical_with_request_id!(Bfn);
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Button - Instructional to create a button
 pub struct Btn {

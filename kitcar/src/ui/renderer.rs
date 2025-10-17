@@ -1,15 +1,24 @@
 // ui.rs
-use std::{any::Any, collections::HashMap, fmt::Debug};
+use std::{
+    any::Any,
+    collections::{hash_map::DefaultHasher, HashMap},
+    fmt::Debug,
+    hash::{Hash, Hasher},
+};
 
 use indexmap::IndexMap;
 use insim::{
     identifiers::{ClickId, ConnectionId, RequestId},
-    insim::{Bfn, BfnType, Btn},
+    insim::{Bfn, BfnType, Btn, Mso},
     Packet,
 };
 
 use super::{id_pool::ClickIdPool, vdom::Element};
-use crate::ui::{scope::Scope, vdom::ElementId, Component, ComponentPath};
+use crate::ui::{
+    scope::Scope,
+    vdom::{Button, Container, ElementId},
+    Component, ComponentPath,
+};
 
 #[derive(Debug, Default)]
 pub struct RenderDiff {
@@ -29,15 +38,20 @@ impl RenderDiff {
 
 /// Ui for a single connection
 pub struct Runtime {
+    // Who are we running this UI for?
+    ucid: ConnectionId,
+    // ClickId pool
     id_pool: ClickIdPool,
     // Stable mapping from component instance and key to button ClickId
     element_id_to_click_id: HashMap<ElementId, ClickId>,
-    // last layout
-    last_layout: Option<IndexMap<ElementId, Btn>>,
+    // last layout - TODO: store a hash of the button, not the actual button
+    last_layout: Option<IndexMap<ElementId, u64>>,
     // Persisted component state
-    component_states: HashMap<ComponentPath, Box<dyn Any + Send + Sync>>,
+    component_states: HashMap<ComponentPath, Box<dyn Any>>,
     // Click handlers
-    clicks: HashMap<ClickId, Box<dyn Fn() + Send + Sync>>,
+    clicks: HashMap<ClickId, Box<dyn Fn()>>,
+    // Chat handlers,
+    chats: HashMap<String, Vec<Box<dyn Fn()>>>,
     // Has the UI been removed through user request?
     blocked: bool,
 }
@@ -49,13 +63,15 @@ impl Debug for Runtime {
 }
 
 impl Runtime {
-    pub fn new(id_pool: ClickIdPool) -> Self {
+    pub fn new(id_pool: ClickIdPool, ucid: ConnectionId) -> Self {
         Self {
+            ucid,
             id_pool,
             element_id_to_click_id: HashMap::new(),
             last_layout: None,
             component_states: HashMap::new(),
             clicks: HashMap::new(),
+            chats: HashMap::new(),
             blocked: false,
         }
     }
@@ -64,6 +80,18 @@ impl Runtime {
         if let Some(f) = self.clicks.get_mut(click_id) {
             f()
         }
+    }
+
+    pub fn on_chat(&mut self, mso: &Mso) -> bool {
+        if let Some(handlers) = self.chats.get_mut(mso.msg_from_textstart()) {
+            for handler in handlers {
+                handler();
+            }
+
+            return true;
+        }
+
+        false
     }
 
     /// Unblock
@@ -82,22 +110,20 @@ impl Runtime {
         self.last_layout = None;
         self.element_id_to_click_id.clear();
         self.clicks.clear();
+        self.chats.clear();
     }
 
-    pub fn render<C: Component>(
-        &mut self,
-        props: C::Props,
-        ucid: &ConnectionId,
-    ) -> Option<RenderDiff> {
+    pub fn render<C: Component>(&mut self, props: C::Props) -> Option<RenderDiff> {
+        // TODO: This is a bit brutal. but fuck it for now.
+        self.chats.clear();
+        self.clicks.clear();
+
         let vdom = if self.blocked {
             None
         } else {
-            let mut cx = Scope::new(&mut self.component_states);
+            let mut cx = Scope::new(&mut self.component_states, &mut self.chats);
             C::render(props, &mut cx)
         };
-
-        // TODO: This is a bit brutal. but fuck it for now.
-        self.clicks.clear();
 
         // Handle the case where render function returns None
         let new_vdom = match vdom {
@@ -108,7 +134,7 @@ impl Runtime {
                 let to_remove = last_layout
                     .iter()
                     .map(|(key, _btn)| Bfn {
-                        ucid: *ucid,
+                        ucid: self.ucid,
                         subt: BfnType::DelBtn,
                         clickid: self.release_clickid(key).unwrap(), // FIXME: don't unwrap
                         ..Default::default()
@@ -129,17 +155,6 @@ impl Runtime {
         let root_id = flatten(&mut taffy, &mut node_map, new_vdom);
         let _ = taffy.compute_layout(root_id, taffy::Size::length(200.0));
 
-        for (_element_id, (node_id, _on_click, btn)) in node_map.iter_mut() {
-            let (x, y) = get_taffy_abs_position(&taffy, node_id);
-            let layout = taffy.layout(*node_id).unwrap();
-            btn.l = x as u8;
-            btn.t = y as u8;
-            btn.w = layout.size.width as u8;
-            btn.h = layout.size.height as u8;
-
-            // FIXME: we could probably flatten the 2 loops below into this
-        }
-
         let last_layout = self.last_layout.take().unwrap_or_default();
 
         // Find buttons to remove
@@ -148,7 +163,7 @@ impl Runtime {
             .filter_map(|(key, _vals)| {
                 if !node_map.contains_key(key) {
                     Some(Bfn {
-                        ucid: *ucid,
+                        ucid: self.ucid,
                         subt: BfnType::DelBtn,
                         clickid: self.release_clickid(key).unwrap(), // FIXME: don't unwrap
                         ..Default::default()
@@ -159,32 +174,47 @@ impl Runtime {
             })
             .collect();
 
+        let mut next_layout = IndexMap::new();
+
         let to_update: Vec<Btn> = node_map
             .iter_mut()
-            .filter_map(|(element_id, (_node_id, on_click, btn))| {
+            .filter_map(|(element_id, (element, node_id))| {
+                let click_id = self.lease_clickid(element_id).unwrap();
+
+                let (x, y) = get_taffy_abs_position(&taffy, node_id);
+                let layout = taffy.layout(*node_id).unwrap();
+
+                let btn = Btn {
+                    text: element.text.to_owned(),
+                    ucid: self.ucid,
+                    reqi: RequestId(click_id.0),
+                    clickid: click_id,
+                    l: x as u8,
+                    t: y as u8,
+                    w: layout.size.width as u8,
+                    h: layout.size.height as u8,
+                    bstyle: element.btnstyle.clone(),
+                    ..Default::default()
+                };
+
+                let mut hasher = DefaultHasher::new();
+                btn.hash(&mut hasher);
+                let hash = hasher.finish();
+
+                if let Some(on_click) = element.on_click.take() {
+                    let _ = self.clicks.insert(click_id.clone(), on_click);
+                }
+
+                let _ = next_layout.insert(*element_id, hash);
+
                 match last_layout.get(element_id) {
                     None => {
-                        let click_id = self.lease_clickid(element_id).unwrap();
-                        if let Some(on_click) = on_click.take() {
-                            let _ = self.clicks.insert(click_id.clone(), on_click);
-                        }
-
                         // New button
-                        let mut btn = btn.clone();
-                        btn.clickid = click_id;
-                        btn.reqi = RequestId(click_id.0);
                         Some(btn)
                     },
-                    Some(existing_btn) => {
+                    Some(existing_btn_hash) => {
                         // Check if button actually changed
-                        if existing_btn != btn {
-                            let mut btn = btn.clone();
-                            let click_id = self.lease_clickid(element_id).unwrap();
-                            if let Some(on_click) = on_click.take() {
-                                let _ = self.clicks.insert(click_id.clone(), on_click);
-                            }
-                            btn.clickid = click_id;
-                            btn.reqi = RequestId(click_id.0);
+                        if *existing_btn_hash != hash {
                             Some(btn)
                         } else {
                             None
@@ -194,12 +224,10 @@ impl Runtime {
             })
             .collect();
 
-        self.last_layout = Some(
-            node_map
-                .into_iter()
-                .map(|(element_id, (_node_id, _on_click, btn))| (element_id, btn))
-                .collect(),
-        );
+        self.last_layout = Some(next_layout);
+
+        println!("clicks = {:?}", self.clicks.len());
+        println!("chats = {:?}", self.chats.len());
 
         if to_update.is_empty() && to_remove.is_empty() {
             None
@@ -238,59 +266,60 @@ impl Runtime {
     pub fn key_to_click_id(&self, key: &ElementId) -> Option<&ClickId> {
         self.element_id_to_click_id.get(key)
     }
+
+    pub async fn render_diff_send<C: Component>(
+        &mut self,
+        props: C::Props,
+        insim: &insim::builder::SpawnedHandle,
+    ) -> insim::Result<()> {
+        if let Some(diff) = self.render::<C>(props) {
+            insim.send_all(diff.into_merged()).await
+        } else {
+            Ok(())
+        }
+    }
 }
 
+/// Flatten the Element tree, return the root taffy_id for convenice, consuming the children for
+/// each Element
+/// TODO: rather a IndexMap<ElementId, (Element, ...)> we probably need to separate out the Element
+/// into Button and Container structs so we don't need to go through an annoying match statement in
+/// lots of places
 fn flatten(
     tree: &mut taffy::TaffyTree,
-    node_map: &mut IndexMap<ElementId, (taffy::NodeId, Option<Box<dyn Fn() + Send + Sync>>, Btn)>,
-    vdom: Element,
+    node_map: &mut IndexMap<ElementId, (Button, taffy::NodeId)>,
+    mut vdom: Element,
 ) -> taffy::NodeId {
-    match vdom {
-        Element::Container {
+    let (id, style, taken_children) = match &mut vdom {
+        Element::Container(Container {
             children, style, ..
-        } => {
-            let child_ids: Vec<taffy::NodeId> = children
-                .into_iter()
-                .map(|c| flatten(tree, node_map, c))
-                .collect();
-
-            let taffy_id = tree.new_with_children(style.clone(), &child_ids).unwrap();
-            taffy_id
-        },
-        Element::Button {
+        }) => (0, style.clone(), children.take()),
+        Element::Button(Button {
             id,
-            style,
             children,
-            on_click,
-            btnstyle,
-            text,
+            style,
             ..
-        } => {
-            let taffy_id = if children.len() == 0 {
-                tree.new_leaf(style.clone()).unwrap()
-            } else {
-                let child_ids: Vec<taffy::NodeId> = children
-                    .into_iter()
-                    .map(|c| flatten(tree, node_map, c))
-                    .collect();
+        }) => (*id, style.clone(), children.take()),
+    };
 
-                tree.new_with_children(style.clone(), &child_ids).unwrap()
-            };
-            let _ = node_map.insert(
-                id,
-                (
-                    taffy_id,
-                    on_click,
-                    Btn {
-                        text,
-                        bstyle: btnstyle,
-                        ..Default::default()
-                    },
-                ),
-            );
-            taffy_id
+    let children = taken_children.unwrap_or_default();
+
+    let child_ids: Vec<taffy::NodeId> = children
+        .into_iter()
+        .map(|c| flatten(tree, node_map, c))
+        .collect();
+
+    let taffy_id = tree.new_with_children(style, &child_ids).unwrap();
+
+    // If it was a button, push the modified vdom (with children: None) into the map
+    match vdom {
+        Element::Button(i) => {
+            let _ = node_map.insert(id, (i, taffy_id));
         },
+        _ => {},
     }
+
+    taffy_id
 }
 
 // FIXME: we need to get this into the loop somewhere so that we dont need to redo it every

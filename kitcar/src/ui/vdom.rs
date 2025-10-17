@@ -4,74 +4,75 @@ use insim::insim::{BtnStyle, BtnStyleColour, BtnStyleFlags};
 
 pub type ElementId = usize;
 
-/// Concrete Element - i.e. not a Component
-pub enum Element {
-    Button {
-        id: ElementId,
-        text: String,
-        style: taffy::Style,
-        btnstyle: BtnStyle,
-        children: Vec<Element>,
-        on_click: Option<Box<dyn Fn() + Send + Sync>>,
-    },
-    Container {
-        children: Vec<Element>,
-        style: taffy::Style,
-    },
+pub(crate) struct Button {
+    pub(crate) id: ElementId,
+    pub(crate) text: String,
+    pub(crate) style: taffy::Style,
+    pub(crate) btnstyle: BtnStyle,
+    pub(crate) children: Option<Vec<Element>>,
+    pub(crate) on_click: Option<Box<dyn Fn()>>,
 }
 
-impl PartialEq for Element {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (
-                Element::Button {
-                    text,
-                    style,
-                    children,
-                    btnstyle,
-                    ..
-                },
-                Element::Button {
-                    text: other_text,
-                    style: other_style,
-                    children: other_children,
-                    btnstyle: other_btnstyle,
-                    ..
-                },
-            ) => {
-                text == other_text
-                    && style == other_style
-                    && children == other_children
-                    && btnstyle == other_btnstyle
-            },
-            (
-                Element::Container { children, style },
-                Element::Container {
-                    children: other_children,
-                    style: other_style,
-                },
-            ) => children == other_children && style == other_style,
-            _ => false,
-        }
-    }
+pub(crate) struct Container {
+    pub(crate) children: Option<Vec<Element>>,
+    pub(crate) style: taffy::Style,
+}
+
+/// Concrete Element - i.e. not a Component
+pub enum Element {
+    Button(Button),
+    Container(Container),
 }
 
 impl Debug for Element {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Element::Button { .. } => write!(f, "Element::Button"),
-            Element::Container { .. } => write!(f, "Element::Container"),
-        }
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
     }
 }
 
+// impl PartialEq for Element {
+//     fn eq(&self, other: &Self) -> bool {
+//         match (self, other) {
+//             (
+//                 Element::Button {
+//                     text,
+//                     style,
+//                     children,
+//                     btnstyle,
+//                     ..
+//                 },
+//                 Element::Button {
+//                     text: other_text,
+//                     style: other_style,
+//                     children: other_children,
+//                     btnstyle: other_btnstyle,
+//                     ..
+//                 },
+//             ) => {
+//                 text == other_text
+//                     && style == other_style
+//                     && children == other_children
+//                     && btnstyle == other_btnstyle
+//             },
+//             (
+//                 Element::Container { children, style },
+//                 Element::Container {
+//                     children: other_children,
+//                     style: other_style,
+//                 },
+//             ) => children == other_children && style == other_style,
+//             _ => false,
+//         }
+//     }
+// }
+
 impl Element {
-    pub fn on_click(mut self, f: Option<Box<dyn Fn() + Send + Sync>>) -> Self {
-        if let Element::Button {
+    pub fn on_click(mut self, f: Option<Box<dyn Fn()>>) -> Self {
+        if let Element::Button(Button {
             ref mut btnstyle,
             ref mut on_click,
             ..
-        } = self
+        }) = self
         {
             btnstyle.flags.set(BtnStyleFlags::CLICK, f.is_some());
             *on_click = f;
@@ -80,9 +81,9 @@ impl Element {
     }
 
     pub fn dark(mut self) -> Self {
-        if let Element::Button {
+        if let Element::Button(Button {
             ref mut btnstyle, ..
-        } = self
+        }) = self
         {
             btnstyle.flags.set(BtnStyleFlags::DARK, true);
             btnstyle.flags.set(BtnStyleFlags::LIGHT, false);
@@ -91,9 +92,9 @@ impl Element {
     }
 
     pub fn light(mut self) -> Self {
-        if let Element::Button {
+        if let Element::Button(Button {
             ref mut btnstyle, ..
-        } = self
+        }) = self
         {
             btnstyle.flags.set(BtnStyleFlags::LIGHT, true);
             btnstyle.flags.set(BtnStyleFlags::DARK, false);
@@ -102,9 +103,9 @@ impl Element {
     }
 
     pub fn green(mut self) -> Self {
-        if let Element::Button {
+        if let Element::Button(Button {
             ref mut btnstyle, ..
-        } = self
+        }) = self
         {
             btnstyle.colour = BtnStyleColour::Ok;
         }
@@ -113,9 +114,9 @@ impl Element {
 
     /// Align text left/start
     pub fn text_align_start(mut self) -> Self {
-        if let Element::Button {
+        if let Element::Button(Button {
             ref mut btnstyle, ..
-        } = self
+        }) = self
         {
             btnstyle.flags.set(BtnStyleFlags::LEFT, true);
             btnstyle.flags.set(BtnStyleFlags::RIGHT, false);
@@ -125,9 +126,9 @@ impl Element {
 
     /// Align text right/end
     pub fn text_align_end(mut self) -> Self {
-        if let Element::Button {
+        if let Element::Button(Button {
             ref mut btnstyle, ..
-        } = self
+        }) = self
         {
             btnstyle.flags.set(BtnStyleFlags::RIGHT, true);
             btnstyle.flags.set(BtnStyleFlags::LEFT, false);
@@ -137,9 +138,9 @@ impl Element {
 
     /// Align text center
     pub fn text_align_center(mut self) -> Self {
-        if let Element::Button {
+        if let Element::Button(Button {
             ref mut btnstyle, ..
-        } = self
+        }) = self
         {
             btnstyle.flags.set(BtnStyleFlags::RIGHT, false);
             btnstyle.flags.set(BtnStyleFlags::LEFT, false);
@@ -153,15 +154,15 @@ impl Element {
             return self;
         }
         match self {
-            Self::Container {
+            Self::Container(Container {
                 ref mut children, ..
-            } => {
-                children.push(val.unwrap());
+            }) => {
+                children.get_or_insert_default().push(val.unwrap());
             },
-            Self::Button {
+            Self::Button(Button {
                 ref mut children, ..
-            } => {
-                children.push(val.unwrap());
+            }) => {
+                children.get_or_insert_default().push(val.unwrap());
             },
         }
 
@@ -202,33 +203,19 @@ impl Element {
         self
     }
 
-    pub fn text(&self) -> &str {
-        match self {
-            Element::Button { text, .. } => text,
-            _ => "",
-        }
-    }
-
-    pub fn bstyle(&self) -> Option<&BtnStyle> {
-        match self {
-            Element::Button { btnstyle, .. } => Some(btnstyle),
-            _ => None,
-        }
-    }
-
     // Styling
 
     pub fn style(&self) -> &taffy::Style {
         match self {
-            Element::Button { style, .. } => style,
-            Element::Container { style, .. } => style,
+            Element::Button(Button { style, .. }) => style,
+            Element::Container(Container { style, .. }) => style,
         }
     }
 
     pub fn style_mut(&mut self) -> &mut taffy::Style {
         match self {
-            Element::Button { ref mut style, .. } => style,
-            Element::Container { ref mut style, .. } => style,
+            Element::Button(Button { ref mut style, .. }) => style,
+            Element::Container(Container { ref mut style, .. }) => style,
         }
     }
 

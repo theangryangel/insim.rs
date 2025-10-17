@@ -1,11 +1,9 @@
-//! An implementation of a retained immediate mode UI.
-//! A hybrid approach that combines the programming model of immediate mode with the
-//! performance optimizations of retained mode.
-//! Functions are called every frame, but we diff the output to minimise the rendering
-//! requirements.
-//! Each plugin will be responsible for it's own set of Ui's. Nothing shared except for the id_pool.
-//! `Ui` represents the ui for a single connection.
+//! An implementation of a retained immediate mode UI that looks somewhat like React.
+//! We diff the output to minimise the the button updates via insim.
+//! The manager and player connection tasks run on it's own thread in the background, and each player
+//! connection task is on the same tokio localset, allowing for !Send states within components, etc.
 pub mod component;
+pub mod component_state;
 pub mod id_pool;
 pub mod manager;
 pub mod renderer;

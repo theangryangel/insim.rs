@@ -1,6 +1,11 @@
 use insim::core::string::colours::Colourify;
 use kitcar::ui::{Component, Element, Scope};
 
+const WELCOME: &str = "Welcome drivers!
+Forget being the fastest, the goal is to be the most precise. Finish in as close to 20secs as possible!
+Full contact is allowed.
+Just remember: Don't be a dick. We're all here to have fun!";
+
 use crate::{
     components::{
         motd::{Motd, MotdProps},
@@ -47,11 +52,11 @@ impl Component for Root {
             .flex_col()
             .with_child(cx.component::<Topbar>(text))
             .with_child(cx.component::<Motd>(MotdProps {
-                show: true,
+                text: WELCOME.to_owned(),
                 what: 1,
             }))
             .with_child(cx.component::<Motd>(MotdProps {
-                show: true,
+                text: WELCOME.to_owned(),
                 what: 2,
             }));
 

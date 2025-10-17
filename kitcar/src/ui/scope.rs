@@ -1,26 +1,38 @@
-use std::{any::Any, collections::HashMap};
+use std::{any::Any, collections::HashMap, fmt::Debug};
 
-use crate::ui::{Component, ComponentPath, Element};
+use crate::ui::{
+    component_state::ComponentState,
+    vdom::{Button, Container},
+    Component, ComponentPath, Element,
+};
 
-#[derive(Debug)]
 pub struct Scope<'a> {
     path: ComponentPath,
     use_state_index: usize,
     child_index: usize,
-    component_states: &'a mut HashMap<ComponentPath, Box<dyn Any + Send + Sync>>,
+    component_states: &'a mut HashMap<ComponentPath, Box<dyn Any>>,
+    chat_commands: &'a mut HashMap<String, Vec<Box<dyn Fn()>>>,
     current_element_id: usize,
+}
+
+impl<'a> Debug for Scope<'a> {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
 }
 
 impl<'a> Scope<'a> {
     /// New!
     pub fn new(
-        component_states: &'a mut HashMap<ComponentPath, Box<dyn Any + Send + Sync>>,
+        component_states: &'a mut HashMap<ComponentPath, Box<dyn Any>>,
+        chat_commands: &'a mut HashMap<String, Vec<Box<dyn Fn()>>>,
     ) -> Self {
         Self {
             path: vec![0], // FIXME: dont just alias the type
             use_state_index: 0,
             child_index: 0,
             component_states,
+            chat_commands,
             current_element_id: 0,
         }
     }
@@ -34,23 +46,23 @@ impl<'a> Scope<'a> {
     pub fn button(&mut self, text: String) -> Element {
         let id = self.next_element_id();
 
-        Element::Button {
+        Element::Button(Button {
             id,
             text,
             on_click: None,
             btnstyle: Default::default(),
             style: Default::default(),
-            children: Vec::new(),
-        }
+            children: None,
+        })
     }
 
     /// Helper to create a non-rendered container
     /// Useful for layout
     pub fn container(&mut self) -> Element {
-        Element::Container {
-            children: vec![],
+        Element::Container(Container {
+            children: None,
             style: Default::default(),
-        }
+        })
     }
 
     /// Helper method to render a component
@@ -72,10 +84,10 @@ impl<'a> Scope<'a> {
     }
 
     /// Provide some state to your component
-    pub fn use_state<T: Send + Sync + 'static>(
+    pub fn use_state<T: 'static>(
         &mut self,
         initial_state: impl FnOnce() -> T,
-    ) -> &mut T {
+    ) -> ComponentState<T> {
         let mut hook_path = self.path.clone();
         hook_path.push(self.use_state_index);
         self.use_state_index += 1;
@@ -83,8 +95,18 @@ impl<'a> Scope<'a> {
         let state = self
             .component_states
             .entry(hook_path.clone())
-            .or_insert_with(|| Box::new(initial_state()));
+            .or_insert_with(|| Box::new(ComponentState::new(initial_state())));
 
-        state.downcast_mut::<T>().unwrap()
+        state.downcast_ref::<ComponentState<T>>().unwrap().clone()
+    }
+
+    /// On a chat command
+    pub fn use_chat(&mut self, command: String, f: impl Fn() + 'static) {
+        self.chat_commands
+            .entry(command)
+            .or_default()
+            .push(Box::new(f));
+
+        println!("{:?}", self.chat_commands.len());
     }
 }

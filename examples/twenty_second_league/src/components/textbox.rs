@@ -1,51 +1,51 @@
-use std::collections::HashMap;
-
 use insim::core::string::colours::Colourify;
-use kitcar::ui::{wrap_text, Component, Element, InstanceIdPool, Styled};
+use kitcar::ui::{wrap_text, Component, Element, Scope};
 
+#[derive(Clone, Debug)]
 pub struct TextboxProps {
-    text: String,
-    rows: u8,
-    width: u8,
-    row_height: u8,
-    offset: usize,
+    pub text: String,
+    pub rows: u8,
+    pub width: u8,
+    pub row_height: u8,
 }
 
 pub struct Textbox;
 
 impl Component for Textbox {
-    fn render(&self) -> Option<kitcar::ui::Element> {
-        if self.text.is_empty() {
+    type Props = TextboxProps;
+
+    fn render(props: Self::Props, cx: &mut Scope) -> Option<kitcar::ui::Element> {
+        if props.text.is_empty() {
             return None;
         }
 
-        let wrapped: Vec<&str> = wrap_text(&self.text, self.row_height, self.width, 100)
+        let offset = cx.use_state(|| 0 as usize);
+
+        let wrapped: Vec<&str> = wrap_text(&props.text, props.row_height, props.width, 100)
             .into_iter()
             .collect();
-        let end = self.offset as usize + self.rows as usize;
-        let has_more = end < wrapped.len();
+        let end = offset.get() + props.rows as usize;
         let slice_end = std::cmp::min(end, wrapped.len());
-        let offset = std::cmp::min(self.offset as usize, slice_end);
+        let offset_by = std::cmp::min(offset.get(), slice_end);
 
-        let collected: Vec<Element> = (&wrapped[offset..slice_end])
+        let collected: Vec<Element> = (&wrapped[offset_by..slice_end])
             .iter()
-            .enumerate()
-            .map(|(i, f)| {
-                Element::button(&f.white())
-                    .w(self.width as f32 - 6.)
-                    .h(self.row_height as f32)
+            .map(|f| {
+                cx.button(f.white())
+                    .w(props.width as f32 - 6.)
+                    .h(props.row_height as f32)
                     .text_align_start()
             })
             .collect();
 
         Some(
-            Element::button("")
+            cx.button("".into())
                 .light()
                 .flex()
                 .flex_row()
                 .p(1.)
                 .with_child(
-                    Element::button("")
+                    cx.button("".into())
                         .p(1.)
                         .dark()
                         .flex()
@@ -53,21 +53,34 @@ impl Component for Textbox {
                         .with_children(collected),
                 )
                 .with_child(
-                    Element::container()
+                    cx.container()
                         .flex()
                         .flex_col()
                         .flex_grow(1.)
-                        .with_child(Element::button(&"▲".white()).dark().w(5.).h(5.).on_click(
-                            Some(Box::new(|| {
+                        .with_child(cx.button("▲".white()).dark().w(5.).h(5.).on_click({
+                            let offset = offset.clone();
+
+                            Some(Box::new(move || {
+                                let next = offset.get().saturating_sub(1);
+
+                                offset.set(next);
                                 println!("Up was clicked!");
-                            })),
-                        ))
-                        .with_child(Element::container().flex().flex_grow(1.))
-                        .with_child(Element::button(&"▼".white()).dark().w(5.).h(5.).on_click(
-                            Some(Box::new(|| {
+                            }))
+                        }))
+                        .with_child(cx.container().flex().flex_grow(1.))
+                        .with_child(cx.button("▼".white()).dark().w(5.).h(5.).on_click({
+                            let offset = offset.clone();
+
+                            Some(Box::new(move || {
+                                let next = std::cmp::min(
+                                    offset.get() + 1,
+                                    (slice_end + 1 - props.rows as usize),
+                                );
+
+                                offset.set(next);
                                 println!("Down was clicked!");
-                            })),
-                        )),
+                            }))
+                        })),
                 ),
         )
     }
