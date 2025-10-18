@@ -198,7 +198,17 @@ impl Runtime {
                 };
 
                 let mut hasher = DefaultHasher::new();
-                btn.hash(&mut hasher);
+                btn.text.hash(&mut hasher);
+                btn.ucid.hash(&mut hasher);
+                btn.reqi.hash(&mut hasher);
+                btn.clickid.hash(&mut hasher);
+                btn.l.hash(&mut hasher);
+                btn.t.hash(&mut hasher);
+                btn.w.hash(&mut hasher);
+                btn.h.hash(&mut hasher);
+                btn.bstyle.flags.bits().hash(&mut hasher);
+                btn.bstyle.colour.hash(&mut hasher);
+                element.on_click.is_some().hash(&mut hasher);
                 let hash = hasher.finish();
 
                 if let Some(on_click) = element.on_click.take() {
@@ -281,10 +291,7 @@ impl Runtime {
 }
 
 /// Flatten the Element tree, return the root taffy_id for convenice, consuming the children for
-/// each Element
-/// TODO: rather a IndexMap<ElementId, (Element, ...)> we probably need to separate out the Element
-/// into Button and Container structs so we don't need to go through an annoying match statement in
-/// lots of places
+/// each Element, returning only renderable Buttons
 fn flatten(
     tree: &mut taffy::TaffyTree,
     node_map: &mut IndexMap<ElementId, (Button, taffy::NodeId)>,
