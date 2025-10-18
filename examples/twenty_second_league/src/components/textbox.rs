@@ -68,12 +68,13 @@ impl Component for Textbox {
                         .with_child(cx.container().flex().flex_grow(1.))
                         .with_child(cx.button("▼".black()).light().w(5.).h(5.).on_click({
                             let offset = offset.clone();
+                            let rows = props.rows as usize;
+                            let len = wrapped.len();
 
                             Some(Box::new(move || {
-                                let next = std::cmp::min(
-                                    offset.get() + 1,
-                                    slice_end + 1 - props.rows as usize,
-                                );
+                                // prevent over scroll
+                                let next =
+                                    std::cmp::min(offset.get() + 1, len.saturating_sub(rows));
 
                                 offset.set(next);
                                 println!("Down was clicked!");
