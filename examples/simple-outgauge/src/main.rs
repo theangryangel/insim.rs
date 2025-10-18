@@ -6,16 +6,13 @@ use outgauge::{Outgauge, core::Decode};
 
 /// Setup tracing output
 fn setup_tracing_subscriber() {
-    // setup tracing with some defaults if nothing is set
-    if std::env::var("RUST_LIB_BACKTRACE").is_err() {
-        std::env::set_var("RUST_LIB_BACKTRACE", "1")
-    }
-
-    if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "info")
-    }
+    // Setup with a default log level of INFO RUST_LOG is unset
     tracing_subscriber::fmt::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::builder()
+                .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
         .init();
 }
 
