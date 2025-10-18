@@ -12,13 +12,13 @@ members = [
 ]
 exclude = ['examples/*']
 # Only check / build main crates by default (check all with `--workspace`)
-default-members = ["insim", "insim_*", "outgauge", "outsim"]
+default-members = ["insim", "insim_*", "outgauge", "outsim", "kitcar"]
 resolver = "2"
 
 [workspace.package]
 authors = ["Karl Southern <karl@theangryangel.co.uk>"]
-edition = "2021"
-rust-version = "1.75"
+edition = "2024"
+rust-version = "1.85"
 repository = "https://github.com/theangryangel/insim.rs"
 license = "MIT"
 homepage = "https://github.com/theangryangel/insim.rs"

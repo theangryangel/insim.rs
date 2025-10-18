@@ -12,6 +12,16 @@ pub struct Button {
     pub(crate) on_click: Option<Box<dyn Fn()>>,
 }
 
+impl Button {
+    pub(crate) fn style(&self) -> &taffy::Style {
+        &self.style
+    }
+
+    pub(crate) fn style_mut(&mut self) -> &mut taffy::Style {
+        &mut self.style
+    }
+}
+
 impl Debug for Button {
     fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
@@ -22,6 +32,16 @@ impl Debug for Button {
 pub struct Container {
     pub(crate) children: Option<Vec<Element>>,
     pub(crate) style: taffy::Style,
+}
+
+impl Container {
+    pub(crate) fn style(&self) -> &taffy::Style {
+        &self.style
+    }
+
+    pub(crate) fn style_mut(&mut self) -> &mut taffy::Style {
+        &mut self.style
+    }
 }
 
 /// Concrete Element - i.e. not a Component
@@ -209,15 +229,15 @@ impl Element {
 
     pub fn style(&self) -> &taffy::Style {
         match self {
-            Element::Button(Button { style, .. }) => style,
-            Element::Container(Container { style, .. }) => style,
+            Element::Button(button) => button.style(),
+            Element::Container(container) => container.style(),
         }
     }
 
     pub fn style_mut(&mut self) -> &mut taffy::Style {
         match self {
-            Element::Button(Button { ref mut style, .. }) => style,
-            Element::Container(Container { ref mut style, .. }) => style,
+            Element::Button(button) => button.style_mut(),
+            Element::Container(container) => container.style_mut(),
         }
     }
 
