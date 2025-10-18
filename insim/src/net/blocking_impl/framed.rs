@@ -4,7 +4,7 @@ use std::{
 };
 
 use super::ReadWrite;
-use crate::{net::Codec, result::Result, Error, Packet, MAX_SIZE_PACKET};
+use crate::{Error, MAX_SIZE_PACKET, Packet, net::Codec, result::Result};
 
 /// A unified wrapper around anything that implements Read + Write.
 #[derive(Debug)]

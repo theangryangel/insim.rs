@@ -11,11 +11,11 @@ pub trait AsyncReadWrite: AsyncRead + AsyncWrite + Debug + Unpin + Send + Sync {
 impl<T: AsyncRead + AsyncWrite + Debug + Unpin + Send + Sync> AsyncReadWrite for T {}
 
 use crate::{
+    MAX_SIZE_PACKET,
     error::Error,
     net::{Codec, DEFAULT_TIMEOUT_SECS},
     packet::Packet,
     result::Result,
-    MAX_SIZE_PACKET,
 };
 
 /// A unified wrapper around anything that implements [AsyncReadWrite].

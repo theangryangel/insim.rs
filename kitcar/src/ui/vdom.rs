@@ -23,8 +23,14 @@ impl Button {
 }
 
 impl Debug for Button {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Button")
+            .field("id", &self.id)
+            .field("text", &self.text)
+            .field("style", &self.style)
+            .field("btnstyle", &self.btnstyle)
+            .field("on_click", &self.on_click.as_ref().map(|_| "<function>"))
+            .finish()
     }
 }
 
@@ -45,52 +51,11 @@ impl Container {
 }
 
 /// Concrete Element - i.e. not a Component
+#[derive(Debug)]
 pub enum Element {
     Button(Button),
     Container(Container),
 }
-
-impl Debug for Element {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
-    }
-}
-
-// impl PartialEq for Element {
-//     fn eq(&self, other: &Self) -> bool {
-//         match (self, other) {
-//             (
-//                 Element::Button {
-//                     text,
-//                     style,
-//                     children,
-//                     btnstyle,
-//                     ..
-//                 },
-//                 Element::Button {
-//                     text: other_text,
-//                     style: other_style,
-//                     children: other_children,
-//                     btnstyle: other_btnstyle,
-//                     ..
-//                 },
-//             ) => {
-//                 text == other_text
-//                     && style == other_style
-//                     && children == other_children
-//                     && btnstyle == other_btnstyle
-//             },
-//             (
-//                 Element::Container { children, style },
-//                 Element::Container {
-//                     children: other_children,
-//                     style: other_style,
-//                 },
-//             ) => children == other_children && style == other_style,
-//             _ => false,
-//         }
-//     }
-// }
 
 impl Element {
     pub fn on_click(mut self, f: Option<Box<dyn Fn()>>) -> Self {
@@ -179,13 +144,11 @@ impl Element {
         if val.is_none() {
             return self;
         }
-        match self {
-            Self::Container(Container {
-                ref mut children, ..
-            }) => {
-                children.get_or_insert_default().push(val.unwrap());
-            },
-            _ => {},
+        if let Self::Container(Container {
+            ref mut children, ..
+        }) = self
+        {
+            children.get_or_insert_default().push(val.unwrap());
         }
 
         self

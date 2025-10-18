@@ -1,6 +1,6 @@
 use bytes::{Buf, BufMut};
-use indexmap::{set::Iter as IndexSetIter, IndexSet};
-use insim_core::{vehicle::Vehicle, Decode, Encode};
+use indexmap::{IndexSet, set::Iter as IndexSetIter};
+use insim_core::{Decode, Encode, vehicle::Vehicle};
 
 use crate::{
     error::Error,

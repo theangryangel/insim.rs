@@ -66,13 +66,13 @@ impl GameInfo {
     fn sta(&mut self, sta: &insim::insim::Sta) {
         self.racing = sta.raceinprog.clone();
         self.qualifying_duration = Duration::from_secs(sta.qualmins as u64 * 60);
-        self.race_duration = sta.racelaps.clone();
+        self.race_duration = sta.racelaps;
 
         self.track = Some(sta.track.clone());
         self.weather = Some(sta.weather);
         self.wind = Some(sta.wind);
 
-        self.flags = sta.flags.clone();
+        self.flags = sta.flags;
     }
 }
 
@@ -105,6 +105,8 @@ impl GameHandle {
 impl State for GameInfo {
     type H = GameHandle;
     fn update(&mut self, packet: &insim::Packet) {
+        #[allow(clippy::single_match)] // we'll come back through to add more support for other
+        // stuff later
         match packet {
             insim::Packet::Sta(sta) => self.sta(sta),
             _ => {},
@@ -114,7 +116,7 @@ impl State for GameInfo {
     fn spawn(insim: insim::builder::SpawnedHandle) -> Self::H {
         let (query_tx, mut query_rx) = mpsc::channel(Self::BROADCAST_CAPACITY);
 
-        let _ = tokio::spawn(async move {
+        let _handle = tokio::spawn(async move {
             let mut inner = Self::new();
             let mut packet_rx = insim.subscribe();
 

@@ -1,23 +1,23 @@
 // ui.rs
 use std::{
     any::Any,
-    collections::{hash_map::DefaultHasher, HashMap},
+    collections::{HashMap, hash_map::DefaultHasher},
     fmt::Debug,
     hash::{Hash, Hasher},
 };
 
 use indexmap::IndexMap;
 use insim::{
+    Packet,
     identifiers::{ClickId, ConnectionId, RequestId},
     insim::{Bfn, BfnType, Btn, Mso},
-    Packet,
 };
 
 use super::{id_pool::ClickIdPool, vdom::Element};
 use crate::ui::{
+    Component, ComponentPath,
     scope::Scope,
     vdom::{Button, Container, ElementId},
-    Component, ComponentPath,
 };
 
 #[derive(Debug, Default)]
@@ -30,8 +30,8 @@ impl RenderDiff {
     pub fn into_merged(self) -> Vec<Packet> {
         self.to_remove
             .into_iter()
-            .map(|x| Packet::from(x))
-            .chain(self.to_update.into_iter().map(|x| Packet::from(x)))
+            .map(Packet::from)
+            .chain(self.to_update.into_iter().map(Packet::from))
             .collect()
     }
 }
@@ -44,7 +44,7 @@ pub struct Runtime {
     id_pool: ClickIdPool,
     // Stable mapping from component instance and key to button ClickId
     element_id_to_click_id: HashMap<ElementId, ClickId>,
-    // last layout - TODO: store a hash of the button, not the actual button
+    // last layout - stores a hash of the button, not the actual button
     last_layout: Option<IndexMap<ElementId, u64>>,
     // Persisted component state
     component_states: HashMap<ComponentPath, Box<dyn Any>>,
@@ -114,7 +114,7 @@ impl Runtime {
     }
 
     pub fn render<C: Component>(&mut self, props: C::Props) -> Option<RenderDiff> {
-        // TODO: This is a bit brutal. but fuck it for now.
+        // TODO: This is a bit brutal. When we add effects, we'll use a visitor pattern
         self.chats.clear();
         self.clicks.clear();
 
@@ -193,7 +193,7 @@ impl Runtime {
                     t: y as u8,
                     w: layout.size.width as u8,
                     h: layout.size.height as u8,
-                    bstyle: element.btnstyle.clone(),
+                    bstyle: element.btnstyle,
                     ..Default::default()
                 };
 
@@ -212,7 +212,7 @@ impl Runtime {
                 let hash = hasher.finish();
 
                 if let Some(on_click) = element.on_click.take() {
-                    let _ = self.clicks.insert(click_id.clone(), on_click);
+                    let _ = self.clicks.insert(click_id, on_click);
                 }
 
                 let _ = next_layout.insert(*element_id, hash);
@@ -256,11 +256,11 @@ impl Runtime {
         }
 
         if let Some(new_id) = self.id_pool.lease() {
-            let _ = self.element_id_to_click_id.insert(key.clone(), new_id);
+            let _ = self.element_id_to_click_id.insert(*key, new_id);
             return Some(new_id);
         }
 
-        // TODO: is probably really an error
+        // No available ids
         None
     }
 
@@ -314,11 +314,8 @@ fn flatten(
     let taffy_id = tree.new_with_children(style, &child_ids).unwrap();
 
     // If it was a button, push the modified vdom (with children: None) into the map
-    match vdom {
-        Element::Button(i) => {
-            let _ = node_map.insert(id, (i, taffy_id));
-        },
-        _ => {},
+    if let Element::Button(i) = vdom {
+        let _ = node_map.insert(id, (i, taffy_id));
     }
 
     taffy_id
@@ -327,7 +324,7 @@ fn flatten(
 // FIXME: we need to get this into the loop somewhere so that we dont need to redo it every
 // time
 fn get_taffy_abs_position(taffy: &taffy::TaffyTree, node_id: &taffy::NodeId) -> (f32, f32) {
-    let mut current_node = node_id.clone();
+    let mut current_node = *node_id;
     let mut absolute_location = (0.0, 0.0);
 
     loop {

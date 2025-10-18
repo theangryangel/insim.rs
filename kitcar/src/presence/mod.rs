@@ -105,9 +105,9 @@ impl Presence {
 
     fn ncn(&mut self, ncn: &insim::insim::Ncn) {
         let _ = self.connections.insert(
-            ncn.ucid.clone(),
+            ncn.ucid,
             ConnectionInfo {
-                ucid: ncn.ucid.clone(),
+                ucid: ncn.ucid,
                 admin: ncn.admin,
                 uname: ncn.uname.clone(),
                 pname: ncn.pname.clone(),
@@ -133,20 +133,20 @@ impl Presence {
 
     fn npl(&mut self, npl: &insim::insim::Npl) {
         let _ = self.players.insert(
-            npl.plid.clone(),
+            npl.plid,
             PlayerInfo {
-                plid: npl.plid.clone(),
-                ucid: npl.ucid.clone(),
+                plid: npl.plid,
+                ucid: npl.ucid,
                 vehicle: npl.cname.clone(),
-                ptype: npl.ptype.clone(),
-                flags: npl.flags.clone(),
+                ptype: npl.ptype,
+                flags: npl.flags,
                 in_pitlane: false,
                 pname: npl.pname.clone(),
             },
         );
 
         if let Some(connection) = self.connections.get_mut(&npl.ucid) {
-            let _ = connection.players.insert(npl.plid.clone());
+            let _ = connection.players.insert(npl.plid);
         }
     }
 
@@ -160,7 +160,7 @@ impl Presence {
 
     fn toc(&mut self, toc: &insim::insim::Toc) {
         if let Some(player) = self.players.get_mut(&toc.plid) {
-            player.ucid = toc.newucid.clone();
+            player.ucid = toc.newucid;
         }
 
         if let Some(old) = self.connections.get_mut(&toc.olducid) {
@@ -168,13 +168,13 @@ impl Presence {
         }
 
         if let Some(new) = self.connections.get_mut(&toc.newucid) {
-            let _ = new.players.insert(toc.plid.clone());
+            let _ = new.players.insert(toc.plid);
         }
     }
 
     fn pfl(&mut self, pfl: &insim::insim::Pfl) {
         if let Some(player) = self.players.get_mut(&pfl.plid) {
-            player.flags = pfl.flags.clone();
+            player.flags = pfl.flags;
         }
     }
 
@@ -193,22 +193,22 @@ impl Presence {
 
 #[derive(Debug)]
 enum PresenceQuery {
-    GetConnections {
+    Connections {
         response_tx: oneshot::Sender<Vec<ConnectionInfo>>,
     },
 
-    GetConnection {
+    Connection {
         ucid: ConnectionId,
         response_tx: oneshot::Sender<Option<ConnectionInfo>>,
     },
-    GetPlayers {
+    Players {
         response_tx: oneshot::Sender<Vec<PlayerInfo>>,
     },
-    GetPlayer {
+    Player {
         plid: PlayerId,
         response_tx: oneshot::Sender<Option<PlayerInfo>>,
     },
-    GetPlayerCount {
+    PlayerCount {
         response_tx: oneshot::Sender<usize>,
     },
 }
@@ -224,7 +224,7 @@ impl PresenceHandle {
     pub async fn player_count(&self) -> usize {
         let (tx, rx) = oneshot::channel();
         self.query_tx
-            .send(PresenceQuery::GetPlayerCount { response_tx: tx })
+            .send(PresenceQuery::PlayerCount { response_tx: tx })
             .await
             .unwrap_or_default();
         rx.await.unwrap_or_default()
@@ -234,7 +234,7 @@ impl PresenceHandle {
     pub async fn connections(&self) -> Option<Vec<ConnectionInfo>> {
         let (tx, rx) = oneshot::channel();
         self.query_tx
-            .send(PresenceQuery::GetConnections { response_tx: tx })
+            .send(PresenceQuery::Connections { response_tx: tx })
             .await
             .ok()?;
         rx.await.ok()
@@ -244,8 +244,8 @@ impl PresenceHandle {
     pub async fn connection(&self, ucid: &ConnectionId) -> Option<ConnectionInfo> {
         let (tx, rx) = oneshot::channel();
         self.query_tx
-            .send(PresenceQuery::GetConnection {
-                ucid: ucid.clone(),
+            .send(PresenceQuery::Connection {
+                ucid: *ucid,
                 response_tx: tx,
             })
             .await
@@ -257,7 +257,7 @@ impl PresenceHandle {
     pub async fn players(&self) -> Option<Vec<PlayerInfo>> {
         let (tx, rx) = oneshot::channel();
         self.query_tx
-            .send(PresenceQuery::GetPlayers { response_tx: tx })
+            .send(PresenceQuery::Players { response_tx: tx })
             .await
             .ok()?;
         rx.await.ok()
@@ -267,8 +267,8 @@ impl PresenceHandle {
     pub async fn player(&self, plid: &PlayerId) -> Option<PlayerInfo> {
         let (tx, rx) = oneshot::channel();
         self.query_tx
-            .send(PresenceQuery::GetPlayer {
-                plid: plid.clone(),
+            .send(PresenceQuery::Player {
+                plid: *plid,
                 response_tx: tx,
             })
             .await
@@ -302,7 +302,7 @@ impl State for Presence {
     fn spawn(insim: insim::builder::SpawnedHandle) -> Self::H {
         let (query_tx, mut query_rx) = mpsc::channel(Self::BROADCAST_CAPACITY);
 
-        let _ = tokio::spawn(async move {
+        let _handle = tokio::spawn(async move {
             let mut inner = Self::new();
             let mut packet_rx = insim.subscribe();
 
@@ -313,19 +313,19 @@ impl State for Presence {
                     }
                     Some(query) = query_rx.recv() => {
                         match query {
-                            PresenceQuery::GetConnections { response_tx } => {
+                            PresenceQuery::Connections { response_tx } => {
                                 let _ = response_tx.send(inner.connections().cloned().collect());
                             },
-                            PresenceQuery::GetConnection { ucid, response_tx } => {
+                            PresenceQuery::Connection { ucid, response_tx } => {
                                 let _ = response_tx.send(inner.connection(&ucid).cloned());
                             },
-                            PresenceQuery::GetPlayers { response_tx } => {
+                            PresenceQuery::Players { response_tx } => {
                                 let _ = response_tx.send(inner.players().cloned().collect());
                             },
-                            PresenceQuery::GetPlayer { plid, response_tx } => {
+                            PresenceQuery::Player { plid, response_tx } => {
                                 let _ = response_tx.send(inner.player(&plid).cloned());
                             },
-                            PresenceQuery::GetPlayerCount { response_tx } => {
+                            PresenceQuery::PlayerCount { response_tx } => {
                                 let _ = response_tx.send(inner.player_count());
                             },
 

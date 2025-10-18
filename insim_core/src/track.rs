@@ -2,7 +2,7 @@
 
 use std::str::FromStr;
 
-use crate::{license::License, Decode, Encode};
+use crate::{Decode, Encode, license::License};
 
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 /// Handles parsing a Track name.

@@ -4,7 +4,7 @@ use std::time::Duration;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use glam::{IVec3, Vec3};
 use insim_core::{
-    gear::Gear, Decode, DecodeError, DecodeString, Encode, EncodeError, EncodeString,
+    Decode, DecodeError, DecodeString, Encode, EncodeError, EncodeString, gear::Gear,
 };
 
 use crate::OutsimId;

@@ -5,14 +5,14 @@ use std::{
     time::Duration,
 };
 
+#[cfg(feature = "tokio")]
+use crate::Packet;
 #[cfg(feature = "blocking")]
 #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
 use crate::net::blocking_impl::Framed as BlockingFramed;
 #[cfg(feature = "tokio")]
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 use crate::net::tokio_impl::Framed as AsyncFramed;
-#[cfg(feature = "tokio")]
-use crate::Packet;
 use crate::{
     address::Addr,
     identifiers::RequestId,
@@ -293,7 +293,7 @@ impl Builder {
     #[cfg(feature = "blocking")]
     #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
     pub fn connect_blocking(&self) -> Result<BlockingFramed> {
-        use crate::net::{blocking_impl::UdpStream, DEFAULT_TIMEOUT_SECS};
+        use crate::net::{DEFAULT_TIMEOUT_SECS, blocking_impl::UdpStream};
 
         match self.proto {
             Proto::Tcp => {

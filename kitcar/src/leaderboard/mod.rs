@@ -1,10 +1,8 @@
 //! Leaderboard
 
-// TODO: the rest of the owl
-
 use std::collections::HashMap;
 
-use insim::{identifiers::PlayerId, Packet};
+use insim::{Packet, identifiers::PlayerId};
 use tokio::sync::{mpsc, oneshot};
 
 use crate::State;
@@ -24,11 +22,11 @@ impl Leaderboard {
 
     /// add to the score board for a player
     pub fn add_player_score(&mut self, plid: &PlayerId, points: i32) -> i32 {
-        self.scores
+        *self
+            .scores
             .entry(*plid)
             .and_modify(|p| *p = p.saturating_add(points))
             .or_insert(points)
-            .clone()
     }
 
     /// get the player score
@@ -41,7 +39,7 @@ impl Leaderboard {
         let mut ordered = self
             .scores
             .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
+            .map(|(k, v)| (*k, *v))
             .collect::<Vec<(PlayerId, i32)>>();
 
         ordered.sort_by(|a, b| b.1.cmp(&a.1));
@@ -135,6 +133,9 @@ impl State for Leaderboard {
 
     fn update(&mut self, packet: &Packet) {
         match packet {
+            Packet::Npl(npl) => {
+                let _ = self.scores.entry(npl.plid).or_default();
+            },
             Packet::Pll(pll) => {
                 let _ = self.scores.remove(&pll.plid);
             },
@@ -144,7 +145,7 @@ impl State for Leaderboard {
 
     fn spawn(insim: insim::builder::SpawnedHandle) -> Self::H {
         let (query_tx, mut query_rx) = mpsc::channel(Self::BROADCAST_CAPACITY);
-        let _ = tokio::spawn(async move {
+        let _handle = tokio::spawn(async move {
             let mut inner = Self::new();
             let mut packet_rx = insim.subscribe();
 

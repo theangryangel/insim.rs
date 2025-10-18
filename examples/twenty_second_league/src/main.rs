@@ -6,17 +6,17 @@ use std::{collections::HashMap, fs, time::Duration};
 
 use anyhow::{Context, Result};
 use insim::{
+    Packet, WithRequestId,
     identifiers::{ConnectionId, PlayerId},
     insim::TinyType,
-    Packet, WithRequestId,
 };
 use kitcar::{
+    Service, State as _,
     leaderboard::{Leaderboard, LeaderboardHandle},
     presence::{Presence, PresenceHandle},
     time::countdown::Countdown,
     ui,
     utils::NoVote,
-    Service, State as _,
 };
 use tokio::{
     sync::{broadcast, watch},

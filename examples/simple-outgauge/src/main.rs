@@ -2,7 +2,7 @@
 use std::net::UdpSocket;
 
 use bytes::{Bytes, BytesMut};
-use outgauge::{core::Decode, Outgauge};
+use outgauge::{Outgauge, core::Decode};
 
 /// Setup tracing output
 fn setup_tracing_subscriber() {

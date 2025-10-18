@@ -15,11 +15,12 @@ pub struct IdPool<const MIN: u8, const MAX: u8> {
 
 impl<const MIN: u8, const MAX: u8> IdPool<MIN, MAX> {
     /// New!
+    #[allow(clippy::new_without_default)] // We have no interest in Default clippy
     pub fn new() -> Self {
         let mut available_ids = FixedBitSet::with_capacity(MAX.saturating_add(1) as usize);
         // Set bits MIN-MAX to indicate they are available (skip 0)
         // sadly cannot use set_range since we want it inclusive
-        (MIN..=MAX).into_iter().for_each(|i| {
+        (MIN..=MAX).for_each(|i| {
             available_ids.set(i as usize, true);
         });
 
@@ -44,7 +45,7 @@ impl<const MIN: u8, const MAX: u8> IdPool<MIN, MAX> {
         &'a I: IntoIterator<Item = &'a ClickId>,
     {
         for click_id in click_ids.into_iter() {
-            if (MIN..=MAX).contains(&click_id) {
+            if (MIN..=MAX).contains(click_id) {
                 self.available_ids.set(click_id.0 as usize, true);
             }
         }

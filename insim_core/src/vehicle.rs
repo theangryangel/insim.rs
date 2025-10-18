@@ -1,7 +1,7 @@
 //! Strongly typed Vehicles for both standard and mods
 use std::{convert::Infallible, str::FromStr};
 
-use crate::{license::License, Decode, Encode};
+use crate::{Decode, Encode, license::License};
 
 /// Handles parsing a vehicle name according to the Insim v9 rules.
 /// See <https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info>

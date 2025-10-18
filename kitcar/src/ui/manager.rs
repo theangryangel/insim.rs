@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use insim::{
+    Packet, WithRequestId,
     identifiers::ConnectionId,
     insim::{BfnType, TinyType},
-    Packet, WithRequestId,
 };
 use tokio::{sync::watch, task::JoinHandle};
 
@@ -34,12 +34,12 @@ impl Manager {
                 let mut packet_rx = insim.subscribe();
                 let mut active = HashMap::new();
 
-                let _ = insim.send(TinyType::Ncn.with_request_id(1)).await.unwrap();
+                insim.send(TinyType::Ncn.with_request_id(1)).await.unwrap();
 
                 while let Ok(packet) = packet_rx.recv().await {
                     match packet {
                         Packet::Ncn(ncn) => {
-                            let _ = active.entry(ncn.ucid).or_insert_with(|| {
+                            let _clippy = active.entry(ncn.ucid).or_insert_with(|| {
                                 Self::spawn_player_ui::<C>(ncn.ucid, signals.clone(), insim.clone())
                             });
                         },

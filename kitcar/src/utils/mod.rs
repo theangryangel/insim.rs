@@ -1,6 +1,6 @@
 //! Misc utilies
 
-use insim::{insim::TinyType, Packet};
+use insim::{Packet, insim::TinyType};
 
 use crate::Service;
 
@@ -10,7 +10,7 @@ pub struct NoVote;
 
 impl Service for NoVote {
     fn spawn(insim: insim::builder::SpawnedHandle) {
-        let _ = tokio::spawn(async move {
+        let _handle = tokio::spawn(async move {
             let mut packet_rx = insim.subscribe();
             while let Ok(packet) = packet_rx.recv().await {
                 if matches!(packet, Packet::Vtn(_)) {

@@ -1,9 +1,9 @@
 use std::{any::Any, collections::HashMap, fmt::Debug};
 
 use crate::ui::{
+    Component, ComponentPath, Element,
     component_state::ComponentState,
     vdom::{Button, Container},
-    Component, ComponentPath, Element,
 };
 
 pub struct Scope<'a> {

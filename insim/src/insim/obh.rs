@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bitflags::bitflags;
 use bytes::{Buf, BufMut};
-use insim_core::{direction::Direction, speed::Speed, Decode, Encode};
+use insim_core::{Decode, Encode, direction::Direction, speed::Speed};
 
 use super::contact::{ClosingSpeed, DirectionConInfo, SpeedConInfo};
 use crate::identifiers::{PlayerId, RequestId};

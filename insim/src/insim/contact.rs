@@ -3,12 +3,12 @@ use std::time::Duration;
 
 use bytes::{Buf, BufMut};
 use insim_core::{
+    Decode, Encode,
     direction::{Direction, DirectionKind},
     speed::{Speed, SpeedKind},
-    Decode, Encode,
 };
 
-use super::{obh::spclose_strip_high_bits, CompCarInfo};
+use super::{CompCarInfo, obh::spclose_strip_high_bits};
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Copy, Clone, Debug, Default)]

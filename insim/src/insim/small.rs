@@ -5,8 +5,8 @@ use insim_core::{Decode, Encode};
 
 use super::{PlcAllowedCarsSet, VtnAction};
 use crate::{
-    identifiers::{PlayerId, RequestId},
     Packet, WithRequestId,
+    identifiers::{PlayerId, RequestId},
 };
 
 bitflags! {
@@ -278,7 +278,7 @@ impl Decode for SmallType {
             found => {
                 return Err(insim_core::DecodeError::NoVariantMatch {
                     found: found as u64,
-                })
+                });
             },
         };
         Ok(res)

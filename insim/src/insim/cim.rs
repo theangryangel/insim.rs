@@ -66,7 +66,7 @@ impl Decode for CimMode {
             found => {
                 return Err(insim_core::DecodeError::NoVariantMatch {
                     found: found as u64,
-                })
+                });
             },
         };
 
@@ -190,7 +190,8 @@ impl From<u8> for CimSubModeGarage {
             255 => Self::ModReview,
             other => {
                 unreachable!(
-                    "Unhandled CimSubModeGarage. Perhaps a programming error or protocol update? Found {}, expected 0-8", other
+                    "Unhandled CimSubModeGarage. Perhaps a programming error or protocol update? Found {}, expected 0-8",
+                    other
                 )
             },
         }

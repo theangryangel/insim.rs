@@ -7,11 +7,11 @@ Full contact is allowed.
 Just remember: Don't be a dick. We're all here to have fun!";
 
 use crate::{
+    Phase, ROUNDS_PER_GAME,
     components::{
         motd::{Motd, MotdProps},
         topbar::Topbar,
     },
-    Phase, ROUNDS_PER_GAME,
 };
 
 #[derive(Debug, Clone)]

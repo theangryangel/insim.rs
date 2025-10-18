@@ -445,7 +445,7 @@ impl Decode for AiInput {
             found => {
                 return Err(insim_core::DecodeError::NoVariantMatch {
                     found: found as u64,
-                })
+                });
             },
         };
 

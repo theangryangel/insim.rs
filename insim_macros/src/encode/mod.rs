@@ -75,10 +75,9 @@ impl Receiver {
     ) -> Result<proc_macro2::TokenStream, darling::Error> {
         let name = &self.ident;
 
-        let to_bytes_fields =
-            fields
-                .iter()
-                .filter_map(|f| if f.skip() { None } else { Some(f.encode()) });
+        let to_bytes_fields = fields
+            .iter()
+            .filter_map(|f| if f.skip() { None } else { Some(f.encode()) });
 
         Ok(quote! {
             impl ::insim_core::Encode for #name {
@@ -141,10 +140,9 @@ impl Receiver {
     ) -> Result<proc_macro2::TokenStream, darling::Error> {
         let name = &self.ident;
 
-        let from_bytes_fields =
-            fields
-                .iter()
-                .filter_map(|f| if f.skip() { None } else { Some(f.decode()) });
+        let from_bytes_fields = fields
+            .iter()
+            .filter_map(|f| if f.skip() { None } else { Some(f.decode()) });
 
         let from_bytes_fields_init = fields.iter().filter_map(|f| {
             if f.skip() {

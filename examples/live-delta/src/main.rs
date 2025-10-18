@@ -7,9 +7,9 @@ use std::{
 use clap::Parser;
 use glam::IVec3;
 use insim::{
+    Packet, Result, WithRequestId,
     identifiers::{ClickId, PlayerId, RequestId},
     insim::{Btn, BtnStyle, LapTimingInfo, TinyType},
-    Packet, Result, WithRequestId,
 };
 
 #[derive(Clone, Debug)]
