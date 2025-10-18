@@ -29,7 +29,7 @@ impl<const MIN: u8, const MAX: u8> IdPool<MIN, MAX> {
     /// Lease/allocate a click ID by finding the first available slot.
     pub fn lease(&mut self) -> Option<ClickId> {
         // Find the first available ID by iterating from the beginning.
-        if let Some(id) = self.available_ids.ones().rev().next() {
+        if let Some(id) = self.available_ids.ones().next() {
             let click_id = id as u8;
             self.available_ids.set(id, false);
             Some(click_id.into())

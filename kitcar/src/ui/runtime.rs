@@ -345,11 +345,9 @@ fn get_taffy_abs_position(taffy: &taffy::TaffyTree, node_id: &taffy::NodeId) -> 
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use insim::{identifiers::ConnectionId, insim::BtnStyle};
 
-    use super::{super::Styled, *};
+    use super::*;
 
     #[derive(Clone, PartialEq, Default)]
     pub struct AppProps {
@@ -357,71 +355,63 @@ mod tests {
         pub bar: bool,
     }
 
-    fn app(props: &AppProps) -> Option<Element> {
-        if props.empty {
-            return None;
-        }
+    pub struct App;
 
-        let mut children = Vec::new();
+    impl Component for App {
+        type Props = AppProps;
 
-        children.push(
-            Element::Button {
-                text: "foo".to_string(),
-                key: ElementKey::new(1, "1"),
-                style: taffy::Style::DEFAULT,
-                btnstyle: BtnStyle::default(),
-                children: vec![],
+        fn render(props: Self::Props, cx: &mut Scope) -> Option<Element> {
+            if props.empty {
+                return None;
             }
-            .w(5.0)
-            .h(5.0),
-        );
 
-        if props.bar {
-            children.push(Element::Button {
-                text: "bar".to_string(),
-                key: ElementKey::new(1, "2"),
-                style: taffy::Style::DEFAULT,
-                btnstyle: BtnStyle::default(),
-                children: vec![],
-            });
+            Some(
+                cx.container()
+                    .with_child(cx.button("foo".into()).w(5.).h(5.))
+                    .with_child_if(cx.button("bar".into()), props.bar),
+            )
         }
-
-        Some(Element::Container {
-            children,
-            style: taffy::Style::DEFAULT,
-        })
     }
 
     #[test]
     fn test_centered_button_layout() {
-        let button = Element::button(1, "test_button", "Test").w(10.0).h(10.0);
+        let button = Element::Button(Button {
+            id: 1,
+            text: "Test".to_string(),
+            style: taffy::Style::default(),
+            btnstyle: BtnStyle::default(),
+            on_click: None,
+        })
+        .w(10.0)
+        .h(10.0);
 
-        let container = Element::container()
-            .w(200.0)
-            .h(200.0)
-            .flex()
-            .justify_center()
-            .items_center()
-            .with_child(button);
+        let container = Element::Container(Container {
+            style: taffy::Style::default(),
+            children: None,
+        })
+        .w(200.0)
+        .h(200.0)
+        .flex()
+        .justify_center()
+        .items_center()
+        .with_child(button);
 
         let mut taffy = taffy::TaffyTree::new();
-        let mut node_map = HashMap::new();
+        let mut node_map = IndexMap::new();
 
-        let root = flatten(&mut taffy, &mut node_map, &container);
+        let root = flatten(&mut taffy, &mut node_map, container);
 
         taffy
             .compute_layout(root, taffy::Size::length(200.0))
             .unwrap();
 
-        let button_node = node_map
-            .get(&ElementKey::new(1, "test_button"))
-            .expect("Button node should exist");
-        let (x, y) = get_taffy_abs_position(&taffy, button_node);
+        let button_node = node_map.get(&1).expect("Button node should exist");
+        let (x, y) = get_taffy_abs_position(&taffy, &button_node.1);
 
         assert_eq!(x, 95.0, "Button X position should be 95");
         assert_eq!(y, 95.0, "Button Y position should be 95");
 
-        let layout = taffy.layout(*button_node).unwrap();
+        let layout = taffy.layout(button_node.1).unwrap();
         assert_eq!(layout.size.width, 10.0, "Button width should be 10");
         assert_eq!(layout.size.height, 10.0, "Button height should be 10");
     }
@@ -429,33 +419,52 @@ mod tests {
     #[test]
     fn test_multiple_buttons_layout() {
         // Test with multiple buttons to ensure positioning works correctly
-        let button1 = Element::button(1, "button1", "Button 1").w(20.0).h(10.0);
+        let button1 = Element::Button(Button {
+            id: 1,
+            text: "Button 1".into(),
+            style: Default::default(),
+            btnstyle: Default::default(),
+            on_click: None,
+        })
+        .w(20.0)
+        .h(10.0);
 
-        let button2 = Element::button(1, "button2", "Button 2").w(20.0).h(10.0);
+        let button2 = Element::Button(Button {
+            id: 2,
+            text: "Button 2".into(),
+            style: Default::default(),
+            btnstyle: Default::default(),
+            on_click: None,
+        })
+        .w(20.0)
+        .h(10.0);
 
-        let container = Element::container()
-            .w(200.0)
-            .h(200.0)
-            .flex()
-            .flex_col()
-            .justify_center()
-            .items_center()
-            .with_child(button1)
-            .with_child(button2);
+        let container = Element::Container(Container {
+            children: None,
+            style: Default::default(),
+        })
+        .w(200.0)
+        .h(200.0)
+        .flex()
+        .flex_col()
+        .justify_center()
+        .items_center()
+        .with_child(button1)
+        .with_child(button2);
 
         let mut taffy = taffy::TaffyTree::new();
-        let mut node_map = HashMap::new();
+        let mut node_map = IndexMap::new();
 
-        let root = flatten(&mut taffy, &mut node_map, &container);
+        let root = flatten(&mut taffy, &mut node_map, container);
         taffy
             .compute_layout(root, taffy::Size::length(200.0))
             .unwrap();
 
-        let button1_node = node_map.get(&ElementKey::new(1, "button1")).unwrap();
-        let (x1, y1) = get_taffy_abs_position(&taffy, button1_node);
+        let button1_node = node_map.get(&1).unwrap();
+        let (x1, y1) = get_taffy_abs_position(&taffy, &button1_node.1);
 
-        let button2_node = node_map.get(&ElementKey::new(1, "button2")).unwrap();
-        let (x2, y2) = get_taffy_abs_position(&taffy, button2_node);
+        let button2_node = node_map.get(&2).unwrap();
+        let (x2, y2) = get_taffy_abs_position(&taffy, &button2_node.1);
 
         assert_eq!(x1, 90.0, "Button1 X should be 90");
         assert_eq!(x2, 90.0, "Button2 X should be 90");
@@ -466,15 +475,13 @@ mod tests {
 
     #[test]
     fn test_ui() {
-        let mut renderer = Runtime::new(ClickIdPool::new());
-
-        let vdom = app(&AppProps {
-            empty: false,
-            bar: false,
-        });
+        let mut renderer = Runtime::new(ClickIdPool::new(), ConnectionId::ALL);
 
         let diff = renderer
-            .render(vdom, &ConnectionId::ALL)
+            .render::<App>(AppProps {
+                empty: false,
+                bar: false,
+            })
             .expect("Initial render should render *something*");
 
         assert_eq!(diff.to_update.len(), 1);
@@ -482,35 +489,25 @@ mod tests {
 
         let expected_click_id = diff.to_update[0].clickid;
 
-        assert_eq!(
-            renderer.key_to_click_id(&ElementKey::new(1, "1")),
-            Some(&expected_click_id)
-        );
+        assert_eq!(renderer.key_to_click_id(&1), Some(&expected_click_id));
 
         assert_eq!(diff.to_update[0].text, "foo");
 
-        let vdom = app(&AppProps {
+        let diff = renderer.render::<App>(AppProps {
             empty: false,
             bar: false,
         });
 
-        let diff = renderer.render(vdom, &ConnectionId::ALL);
-
         // nothing changed
         assert!(diff.is_none(), "{:?}", diff);
 
-        assert_eq!(
-            renderer.key_to_click_id(&ElementKey::new(1, "1")),
-            Some(&expected_click_id)
-        );
-
-        let vdom = app(&AppProps {
-            empty: false,
-            bar: true,
-        });
+        assert_eq!(renderer.key_to_click_id(&1), Some(&expected_click_id));
 
         let diff = renderer
-            .render(vdom, &ConnectionId::ALL)
+            .render::<App>(AppProps {
+                empty: false,
+                bar: true,
+            })
             .expect("when updating bar, we should get a diff");
 
         assert_eq!(diff.to_update.len(), 1);
@@ -519,17 +516,15 @@ mod tests {
         assert_eq!(diff.to_update[0].text, "bar");
         assert_ne!(diff.to_update[0].clickid, expected_click_id); // we dont reuse an id
 
-        let vdom = app(&AppProps {
-            empty: true,
-            bar: true,
-        });
-
         let diff = renderer
-            .render(vdom, &ConnectionId::ALL)
+            .render::<App>(AppProps {
+                empty: true,
+                bar: true,
+            })
             .expect("when updating bar, we should get a diff");
 
         assert_eq!(diff.to_remove.len(), 2, "received diff: {:?}", diff);
 
-        assert_eq!(renderer.key_to_click_id(&ElementKey::new(1, "1")), None);
+        assert_eq!(renderer.key_to_click_id(&1), None);
     }
 }

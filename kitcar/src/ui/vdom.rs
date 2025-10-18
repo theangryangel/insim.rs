@@ -4,7 +4,7 @@ use insim::insim::{BtnStyle, BtnStyleColour, BtnStyleFlags};
 
 pub type ElementId = usize;
 
-pub(crate) struct Button {
+pub struct Button {
     pub(crate) id: ElementId,
     pub(crate) text: String,
     pub(crate) style: taffy::Style,
@@ -12,7 +12,14 @@ pub(crate) struct Button {
     pub(crate) on_click: Option<Box<dyn Fn()>>,
 }
 
-pub(crate) struct Container {
+impl Debug for Button {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+#[derive(Debug)]
+pub struct Container {
     pub(crate) children: Option<Vec<Element>>,
     pub(crate) style: taffy::Style,
 }
