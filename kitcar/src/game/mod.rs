@@ -6,9 +6,6 @@ use insim::{
     core::{track::Track, wind::Wind},
     insim::{RaceInProgress, RaceLaps, StaFlags},
 };
-use tokio::sync::{mpsc, oneshot};
-
-use crate::State;
 
 #[derive(Debug, Default, Clone)]
 /// GameInfo
@@ -74,37 +71,9 @@ impl GameInfo {
 
         self.flags = sta.flags;
     }
-}
 
-#[derive(Debug)]
-enum GameQuery {
-    GetAll {
-        response_tx: oneshot::Sender<GameInfo>,
-    },
-    // TODO: all the other fields we should really handle as well
-}
-
-#[derive(Debug, Clone)]
-/// Handler for Presence
-pub struct GameHandle {
-    query_tx: mpsc::Sender<GameQuery>,
-}
-
-impl GameHandle {
-    /// get complete gameinfo
-    pub async fn all(&self) -> Option<GameInfo> {
-        let (tx, rx) = oneshot::channel();
-        self.query_tx
-            .send(GameQuery::GetAll { response_tx: tx })
-            .await
-            .ok()?;
-        rx.await.ok()
-    }
-}
-
-impl State for GameInfo {
-    type H = GameHandle;
-    fn update(&mut self, packet: &insim::Packet) {
+    /// Handle packet updates
+    pub fn handle_packet(&mut self, packet: &insim::Packet) {
         #[allow(clippy::single_match)] // we'll come back through to add more support for other
         // stuff later
         match packet {
@@ -112,35 +81,4 @@ impl State for GameInfo {
             _ => {},
         }
     }
-
-    fn spawn(insim: insim::builder::SpawnedHandle) -> Self::H {
-        let (query_tx, mut query_rx) = mpsc::channel(Self::BROADCAST_CAPACITY);
-
-        let _handle = tokio::spawn(async move {
-            let mut inner = Self::new();
-            let mut packet_rx = insim.subscribe();
-
-            loop {
-                tokio::select! {
-                    Ok(packet) = packet_rx.recv() => {
-                        inner.update(&packet);
-                    }
-                    Some(query) = query_rx.recv() => {
-                        match query {
-                            GameQuery::GetAll { response_tx } => {
-                                let _ = response_tx.send(inner.clone());
-                            },
-                        }
-                    }
-                }
-            }
-        });
-
-        GameHandle { query_tx }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    // FIXME
 }

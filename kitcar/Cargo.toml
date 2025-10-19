@@ -12,9 +12,9 @@ homepage.workspace = true
 fixedbitset = { workspace = true }
 indexmap = { workspace = true }
 insim = { path = "../insim", version = "4.0.0", features = ["tokio"] }
+kitcar_macros = { path = "../kitcar_macros", version = "*" }
 taffy = "0.9.1"
 tokio = { workspace = true, features = ["rt"] }
-kitcar_macros = { path = "../kitcar_macros", version = "*" }
 
 [lints]
 workspace = true

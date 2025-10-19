@@ -39,7 +39,7 @@ impl Countdown {
     }
 
     /// The remaining Duration for the countdown.
-    pub async fn remaining_duration(&self) -> Duration {
+    pub fn remaining_duration(&self) -> Duration {
         self.interval.period() * self.remaining_ticks
     }
 }

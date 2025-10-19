@@ -1,5 +1,7 @@
+use std::time::Duration;
+
 use insim::core::string::colours::Colourify;
-use kitcar::ui::{Component, Element, Scope, component};
+use kitcar::ui::{Element, Scope, component};
 
 const WELCOME: &str = "Welcome drivers!
 Forget being the fastest, the goal is to be the most precise. Finish in as close to 20secs as possible!
@@ -7,22 +9,29 @@ Full contact is allowed.
 Just remember: Don't be a dick. We're all here to have fun!";
 
 use crate::{
-    Phase, ROUNDS_PER_GAME,
+    ROUNDS_PER_GAME,
     components::{
         motd::{Motd, MotdProps},
         topbar::{Topbar, TopbarProps},
     },
 };
 
+#[derive(Debug, Clone)]
+pub enum RootPhase {
+    Idle,
+    Game { round: usize, remaining: Duration },
+    Victory,
+}
+
 #[component]
-pub(crate) fn Root(phase: Phase, show: bool) -> Option<Element> {
+pub(crate) fn Root(phase: RootPhase, show: bool) -> Option<Element> {
     if !show {
         return None;
     }
 
     let text = match phase {
-        Phase::Idle => "No game in progress".white(),
-        Phase::Game { round, remaining } => {
+        RootPhase::Idle => "No game in progress".white(),
+        RootPhase::Game { round, remaining } => {
             let seconds = remaining.as_secs() % 60;
             let minutes = (remaining.as_secs() / 60) % 60;
             format!(
@@ -31,7 +40,7 @@ pub(crate) fn Root(phase: Phase, show: bool) -> Option<Element> {
             )
             .white()
         },
-        Phase::Victory => "Victory!".white(),
+        RootPhase::Victory => "Victory!".white(),
     };
 
     let interface = cx

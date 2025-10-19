@@ -3,4 +3,4 @@ mod root;
 mod textbox;
 mod topbar;
 
-pub(crate) use root::{Root, RootProps};
+pub(crate) use root::{Root, RootPhase, RootProps};

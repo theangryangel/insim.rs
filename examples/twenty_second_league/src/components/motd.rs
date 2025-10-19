@@ -1,5 +1,5 @@
 use insim::core::string::colours::Colourify;
-use kitcar::ui::{Component, Element, Scope, component, wrap_text};
+use kitcar::ui::{Element, Scope, component, wrap_text};
 
 use crate::components::textbox::{Textbox, TextboxProps};
 

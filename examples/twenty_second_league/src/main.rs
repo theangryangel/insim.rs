@@ -1,29 +1,18 @@
 //! 20s league
 mod combo;
 mod components;
+mod no_vote;
 
 use std::{collections::HashMap, fs, time::Duration};
 
 use anyhow::{Context, Result};
-use insim::{
-    Packet, WithRequestId,
-    identifiers::{ConnectionId, PlayerId},
-    insim::TinyType,
-};
+use insim::{Packet, WithRequestId, identifiers::ConnectionId, insim::TinyType};
 use kitcar::{
-    Service, State as _,
-    leaderboard::{Leaderboard, LeaderboardHandle},
-    presence::{Presence, PresenceHandle},
-    time::countdown::Countdown,
-    ui,
-    utils::NoVote,
+    Service, leaderboard::Leaderboard, presence::Presence, time::countdown::Countdown, ui,
 };
-use tokio::{
-    sync::{broadcast, watch},
-    time::sleep,
-};
+use tokio::{sync::watch, time::sleep};
 
-use crate::components::RootProps;
+use crate::components::{RootPhase, RootProps};
 
 const ROUNDS_PER_GAME: usize = 5;
 const TARGET_TIME: f32 = 20.0;
@@ -60,84 +49,97 @@ async fn main() -> Result<()> {
         .await?;
 
     // Spawn library handles
-    let presence = Presence::spawn(insim.clone());
-    let leaderboard = Leaderboard::spawn(insim.clone());
-    NoVote::spawn(insim.clone());
+    no_vote::NoVote::spawn(insim.clone());
 
-    let (mut game, signals_rx) =
-        TwentySecondLeague::new(config, leaderboard, presence, insim.clone());
+    let (mut game, signals_rx) = TwentySecondLeague::new(config, insim.clone());
     let _ = ui::Manager::spawn::<components::Root>(signals_rx, insim.clone());
 
     let _ = insim.send(TinyType::Ncn.with_request_id(1)).await;
     let _ = insim.send(TinyType::Npl.with_request_id(2)).await;
 
+    let mut packet_rx = insim.subscribe();
+
     println!("20 Second League started!");
 
     loop {
-        game.wait_for_players().await?;
-        // TODO: select a combo
-        game.run().await?;
-        game.show_leaderboard(true).await?;
-
-        sleep(Duration::from_secs(30)).await;
-        game.reset().await?;
+        tokio::select! {
+            packet = packet_rx.recv() => {
+                let _ = game.handle_packet(&packet?).await;
+            },
+            res = game.run_phase() => {
+                // FIXME? or is this ok? seems fine probably.
+                game.phase = res?;
+            },
+        }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 enum Phase {
     Idle,
-    Game { round: usize, remaining: Duration },
+    Game {
+        round_scores: HashMap<String, Duration>, // by uname
+        leaderboard: Leaderboard<String>,        // by uname
+    },
     Victory,
 }
 
 struct TwentySecondLeague {
+    phase: Phase,
     config: Config,
-
-    round_scores: HashMap<PlayerId, Duration>,
     insim: insim::builder::SpawnedHandle,
+    presence: Presence,
 
-    leaderboard: LeaderboardHandle,
-    presence: PresenceHandle,
-
-    // TODO: hack
     signals_tx: watch::Sender<RootProps>,
 }
 
 impl TwentySecondLeague {
     fn new(
         config: Config,
-        leaderboard: LeaderboardHandle,
-        presence: PresenceHandle,
         insim: insim::builder::SpawnedHandle,
     ) -> (Self, watch::Receiver<RootProps>) {
         let (signals_tx, signals_rx) = watch::channel(RootProps {
-            phase: Phase::Idle,
+            phase: RootPhase::Idle,
             show: true,
         });
 
         (
             Self {
+                phase: Phase::Idle,
                 config,
-                round_scores: HashMap::new(),
                 insim,
-                leaderboard,
-                presence,
+                presence: Presence::new(),
                 signals_tx,
             },
             signals_rx,
         )
     }
 
-    async fn reset(&mut self) -> Result<()> {
-        self.leaderboard.clear().await;
-        self.round_scores.clear();
-        Ok(())
+    async fn run_phase(&mut self) -> Result<Phase> {
+        match self.phase {
+            Phase::Idle => {
+                self.wait_for_players().await?;
+                Ok(Phase::Game {
+                    leaderboard: Leaderboard::new(),
+                    round_scores: HashMap::new(),
+                })
+            },
+            Phase::Game { .. } => {
+                self.run_game().await?;
+                self.show_leaderboard(true).await?;
+                // TODO: we need to pass over the victory player info
+                Ok(Phase::Victory)
+            },
+            Phase::Victory => {
+                sleep(Duration::from_secs(30)).await;
+                Ok(Phase::Idle)
+            },
+        }
     }
 
     async fn wait_for_players(&self) -> Result<()> {
         loop {
-            let count = self.presence.player_count().await;
+            let count = self.presence.player_count();
 
             if count >= 1 {
                 self.message_all("Starting in 10s").await;
@@ -150,7 +152,7 @@ impl TwentySecondLeague {
         }
     }
 
-    async fn run(&mut self) -> Result<()> {
+    async fn run_game(&mut self) -> Result<()> {
         for round in 1..=self.config.rounds.unwrap_or(5) {
             let mut game_rx = self.insim.subscribe();
 
@@ -158,7 +160,7 @@ impl TwentySecondLeague {
 
             let _ = self.signals_tx.send(RootProps {
                 show: true,
-                phase: Phase::Game {
+                phase: RootPhase::Game {
                     round: round,
                     remaining: Duration::from_secs(60), // FIXME: pull from config
                 },
@@ -166,13 +168,18 @@ impl TwentySecondLeague {
 
             println!("Starting round {}/{}", round, ROUNDS_PER_GAME);
 
-            self.round_scores.clear();
+            if let Phase::Game {
+                ref mut round_scores,
+                ..
+            } = self.phase
+            {
+                round_scores.clear();
+            }
 
+            // FIXME: turn this into wait_for_race_start
             loop {
                 match game_rx.recv().await {
                     Ok(Packet::Rst(_)) => {
-                        // TODO: how do we prevent this from causing issues
-                        // its convenient. do we care?
                         sleep(Duration::from_secs(11)).await;
                         break;
                     },
@@ -182,7 +189,7 @@ impl TwentySecondLeague {
                 }
             }
 
-            self.run_round(&round, &mut game_rx).await?;
+            self.run_round(&round).await?;
             self.score_round(10).await;
 
             self.message_all(&format!("Round {} complete!", round))
@@ -190,7 +197,7 @@ impl TwentySecondLeague {
 
             let _ = self.signals_tx.send(RootProps {
                 show: true,
-                phase: Phase::Victory,
+                phase: RootPhase::Victory,
             });
 
             self.show_leaderboard(false).await?;
@@ -199,11 +206,7 @@ impl TwentySecondLeague {
         Ok(())
     }
 
-    async fn run_round(
-        &mut self,
-        round: &usize,
-        game_rx: &mut broadcast::Receiver<Packet>,
-    ) -> Result<()> {
+    async fn run_round(&mut self, round: &usize) -> Result<()> {
         self.message_all(&format!(
             "Round {}/{} - Get close to 20s!",
             round, ROUNDS_PER_GAME
@@ -215,39 +218,37 @@ impl TwentySecondLeague {
             60, // FIXME: pull from config
         );
 
-        loop {
-            tokio::select! {
-                remaining = countdown.tick() => match remaining {
-                    Some(_) => {
-                        let remaining_duration = countdown.remaining_duration().await;
-                        self.message_all(&format!("{:?}s remaining!", &remaining_duration)).await;
+        while let Some(_remaining) = countdown.tick().await {
+            let remaining_duration = countdown.remaining_duration();
+            self.message_all(&format!("{:?}s remaining!", &remaining_duration))
+                .await;
 
-                        let _ = self.signals_tx.send(RootProps {
-                            show: true,
-                            phase: Phase::Game {
-                                round: *round,
-                                remaining: remaining_duration
-                            }
-                        });
-                    },
-                    None => {
-                        break;
-                    }
+            let _ = self.signals_tx.send(RootProps {
+                show: true,
+                phase: RootPhase::Game {
+                    round: *round,
+                    remaining: remaining_duration,
                 },
-                packet = game_rx.recv() => match packet {
-                    Ok(packet) => { println!("{:?}", packet); self.handle_packet(&packet).await?; },
-                    _ => {}
-                }
-            }
+            });
         }
 
         Ok(())
     }
 
     async fn handle_packet(&mut self, packet: &Packet) -> Result<()> {
+        self.presence.handle_packet(packet);
+
         match packet {
             Packet::Fin(fin) => {
-                let _ = self.round_scores.insert(fin.plid, fin.ttime);
+                if_chain::if_chain! {
+                    if let Phase::Game { ref mut round_scores, .. } = self.phase;
+                    if let Some(player_info) = self.presence.player(&fin.plid);
+                    if !player_info.ptype.is_ai();
+                    if let Some(connection_info) = self.presence.connection(&player_info.ucid);
+                    then {
+                        let _ = round_scores.insert(connection_info.uname.clone(),fin.ttime);
+                    }
+                }
             },
             Packet::Ncn(ncn) => {
                 self.message(
@@ -256,10 +257,6 @@ impl TwentySecondLeague {
                 )
                 .await;
             },
-            Packet::Pll(pll) => {
-                // FIXME: probably unfair, but fuck it for now
-                let _ = self.round_scores.remove(&pll.plid);
-            },
             _ => {},
         }
 
@@ -267,51 +264,51 @@ impl TwentySecondLeague {
     }
 
     async fn score_round(&mut self, max: usize) {
-        let mut ordered = self
-            .round_scores
-            .drain()
-            .map(|(k, v)| (k, Duration::from_secs(TARGET_TIME as u64).abs_diff(v)))
-            .collect::<Vec<(PlayerId, Duration)>>();
+        if let Phase::Game {
+            ref mut round_scores,
+            ref mut leaderboard,
+        } = self.phase
+        {
+            let mut ordered = round_scores
+                .drain()
+                .map(|(k, v)| (k, Duration::from_secs(TARGET_TIME as u64).abs_diff(v)))
+                .collect::<Vec<(String, Duration)>>();
 
-        ordered.sort_by(|a, b| a.1.cmp(&b.1));
+            ordered.sort_by(|a, b| a.1.cmp(&b.1));
 
-        for (i, (plid, delta)) in ordered.into_iter().take(max).enumerate() {
-            let points = max - i;
-            let _ = self
-                .leaderboard
-                .add_player_score(&plid, points as i32)
-                .await;
-            println!(
-                "Player {} scored {} points (delta: {:?})",
-                plid, points, delta
-            );
+            for (i, (plid, delta)) in ordered.into_iter().take(max).enumerate() {
+                let points = max - i;
+                let _ = leaderboard.add_score(plid.clone(), points as i32);
+                println!(
+                    "Player {} scored {} points (delta: {:?})",
+                    plid, points, delta
+                );
+            }
         }
     }
 
     async fn show_leaderboard(&self, finished: bool) -> Result<()> {
-        let rankings = self.leaderboard.ranking(Some(10)).await;
+        if let Phase::Game {
+            ref leaderboard, ..
+        } = self.phase
+        {
+            let rankings = leaderboard.top_n_ranking(Some(10));
 
-        self.message_all("=== Leaderboard ===").await;
-        for (i, (plid, score)) in rankings.iter().enumerate() {
-            // TODO: shoudl really collect the playerinfo up front, but whatever
-            if let Some(playerinfo) = self.presence.player(plid).await {
-                self.message_all(&format!(
-                    "{}. Player {} - {} pts\n",
-                    i + 1,
-                    playerinfo.pname,
-                    score
-                ))
-                .await;
+            self.message_all("=== Leaderboard ===").await;
+            for (i, (uname, score)) in rankings.iter().enumerate() {
+                // TODO: shoudl really collect the playerinfo up front, but whatever
+                self.message_all(&format!("{}. Player {} - {} pts\n", i + 1, uname, score))
+                    .await;
             }
-        }
 
-        if finished {
-            if let Some((winner_plid, winner_score)) = rankings.first() {
-                self.message_all(&format!(
-                    "Winner: Player {} with {} points!",
-                    winner_plid, winner_score
-                ))
-                .await;
+            if finished {
+                if let Some((winner_uname, winner_score)) = rankings.first() {
+                    self.message_all(&format!(
+                        "Winner: Player {} with {} points!",
+                        winner_uname, winner_score
+                    ))
+                    .await;
+                }
             }
         }
 

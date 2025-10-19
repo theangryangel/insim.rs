@@ -1,5 +1,5 @@
 use insim::core::string::colours::Colourify;
-use kitcar::ui::{Component, Element, Scope, component, wrap_text};
+use kitcar::ui::{Element, Scope, component, wrap_text};
 
 #[component]
 pub(crate) fn Textbox(text: String, rows: u8, width: u8, row_height: u8) -> Option<Element> {

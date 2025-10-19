@@ -1,5 +1,5 @@
 use insim::core::string::colours::Colourify;
-use kitcar::ui::{Component, Element, Scope, component};
+use kitcar::ui::{Element, Scope, component};
 
 #[component]
 pub fn Topbar(text: String) -> Option<Element> {
