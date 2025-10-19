@@ -4,6 +4,7 @@ use std::{
     collections::{HashMap, hash_map::DefaultHasher},
     fmt::Debug,
     hash::{Hash, Hasher},
+    marker::PhantomData,
 };
 
 use indexmap::IndexMap;
@@ -37,7 +38,7 @@ impl RenderDiff {
 }
 
 /// Ui for a single connection
-pub struct Runtime {
+pub struct Runtime<C: Component> {
     // Who are we running this UI for?
     ucid: ConnectionId,
     // ClickId pool
@@ -54,15 +55,16 @@ pub struct Runtime {
     chats: HashMap<String, Vec<Box<dyn Fn()>>>,
     // Has the UI been removed through user request?
     blocked: bool,
+    _marker: PhantomData<C>,
 }
 
-impl Debug for Runtime {
+impl<C: Component> Debug for Runtime<C> {
     fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
 
-impl Runtime {
+impl<C: Component> Runtime<C> {
     pub fn new(id_pool: ClickIdPool, ucid: ConnectionId) -> Self {
         Self {
             ucid,
@@ -73,6 +75,7 @@ impl Runtime {
             clicks: HashMap::new(),
             chats: HashMap::new(),
             blocked: false,
+            _marker: PhantomData,
         }
     }
 
@@ -113,7 +116,7 @@ impl Runtime {
         self.chats.clear();
     }
 
-    pub fn render<C: Component>(&mut self, props: C::Props) -> Option<RenderDiff> {
+    pub fn render(&mut self, props: C::Props) -> Option<RenderDiff> {
         // TODO: This is a bit brutal. When we add effects, we'll use a visitor pattern
         self.chats.clear();
         self.clicks.clear();
@@ -277,12 +280,12 @@ impl Runtime {
         self.element_id_to_click_id.get(key)
     }
 
-    pub async fn render_diff_send<C: Component>(
+    pub async fn render_diff_send(
         &mut self,
         props: C::Props,
         insim: &insim::builder::SpawnedHandle,
     ) -> insim::Result<()> {
-        if let Some(diff) = self.render::<C>(props) {
+        if let Some(diff) = self.render(props) {
             insim.send_all(diff.into_merged()).await
         } else {
             Ok(())
@@ -479,10 +482,10 @@ mod tests {
 
     #[test]
     fn test_ui() {
-        let mut renderer = Runtime::new(ClickIdPool::new(), ConnectionId::ALL);
+        let mut renderer = Runtime::<App>::new(ClickIdPool::new(), ConnectionId::ALL);
 
         let diff = renderer
-            .render::<App>(AppProps {
+            .render(AppProps {
                 empty: false,
                 bar: false,
             })
@@ -497,7 +500,7 @@ mod tests {
 
         assert_eq!(diff.to_update[0].text, "foo");
 
-        let diff = renderer.render::<App>(AppProps {
+        let diff = renderer.render(AppProps {
             empty: false,
             bar: false,
         });
@@ -508,7 +511,7 @@ mod tests {
         assert_eq!(renderer.key_to_click_id(&1), Some(&expected_click_id));
 
         let diff = renderer
-            .render::<App>(AppProps {
+            .render(AppProps {
                 empty: false,
                 bar: true,
             })
@@ -521,7 +524,7 @@ mod tests {
         assert_ne!(diff.to_update[0].clickid, expected_click_id); // we dont reuse an id
 
         let diff = renderer
-            .render::<App>(AppProps {
+            .render(AppProps {
                 empty: true,
                 bar: true,
             })

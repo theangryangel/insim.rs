@@ -64,11 +64,11 @@ impl Manager {
         insim: insim::builder::SpawnedHandle,
     ) -> JoinHandle<insim::Result<()>> {
         tokio::task::spawn_local(async move {
-            let mut runtime = Runtime::new(ClickIdPool::new(), ucid);
+            let mut runtime = Runtime::<C>::new(ClickIdPool::new(), ucid);
 
             // Initial render
             runtime
-                .render_diff_send::<C>(signals.borrow().clone(), &insim)
+                .render_diff_send(signals.borrow().clone(), &insim)
                 .await?;
 
             let mut packet_rx = insim.subscribe();
@@ -104,13 +104,13 @@ impl Manager {
                         };
 
                         if should_render {
-                            runtime.render_diff_send::<C>(signals.borrow().clone(), &insim).await?;
+                            runtime.render_diff_send(signals.borrow().clone(), &insim).await?;
                         }
                     },
 
                     // Handle signal changes
                     _ = signals.changed() => {
-                        runtime.render_diff_send::<C>(signals.borrow().clone(), &insim).await?;
+                        runtime.render_diff_send(signals.borrow().clone(), &insim).await?;
                     }
                 }
             }
