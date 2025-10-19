@@ -12,6 +12,7 @@ pub mod vdom;
 
 pub use component::{Component, ComponentPath};
 pub use id_pool::ClickIdPool;
+pub use kitcar_macros::component;
 pub use manager::Manager;
 pub use runtime::{RenderDiff, Runtime};
 pub use scope::Scope;
