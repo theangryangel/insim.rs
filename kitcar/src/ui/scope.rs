@@ -42,16 +42,37 @@ impl<'a> Scope<'a> {
         self.current_element_id
     }
 
-    /// helper to create a standard button
+    /// Helper to create a standard "foreground" button
+    /// This is a best effort. Once the ClickIdPool is completely fragmented this can fail.
+    /// Releastically this can only happen when the pool of 1-239 ids is almost fully exhausted.
     pub fn button(&mut self, text: String) -> Element {
         let id = self.next_element_id();
 
         Element::Button(Button {
             id,
-            text,
+            text: Some(text),
             on_click: None,
             btnstyle: Default::default(),
             style: Default::default(),
+            children: None,
+            lease_strategy: Some(super::id_pool::LeaseStrategy::High),
+        })
+    }
+
+    /// Helper to create a "background" button
+    /// This is a best effort. Once the ClickIdPool is completely fragmented this can fail.
+    /// Releastically this can only happen when the pool of 1-239 ids is almost fully exhausted.
+    pub fn background(&mut self) -> Element {
+        let id = self.next_element_id();
+
+        Element::Button(Button {
+            id,
+            text: None,
+            on_click: None,
+            btnstyle: Default::default(),
+            style: Default::default(),
+            children: None,
+            lease_strategy: Some(super::id_pool::LeaseStrategy::Low),
         })
     }
 

@@ -8,7 +8,7 @@ pub type ClickIdPool = IdPool<1, 239>;
 
 /// How should IdPool handle dishing out available values?
 #[derive(Debug, Copy, Clone)]
-pub enum AllocationStrategy {
+pub enum LeaseStrategy {
     /// Prefer lowest values first
     Low,
     /// Prefer highest values first
@@ -20,7 +20,7 @@ pub enum AllocationStrategy {
 pub struct IdPool<const MIN: u8, const MAX: u8> {
     // Bit set where 1 = available, 0 = allocated
     available_ids: FixedBitSet,
-    strategy: AllocationStrategy,
+    strategy: LeaseStrategy,
 }
 
 impl<const MIN: u8, const MAX: u8> IdPool<MIN, MAX> {
@@ -36,24 +36,26 @@ impl<const MIN: u8, const MAX: u8> IdPool<MIN, MAX> {
 
         Self {
             available_ids,
-            strategy: AllocationStrategy::Low,
+            strategy: LeaseStrategy::Low,
         }
     }
 
-    pub fn set_strategy(&mut self, strategy: AllocationStrategy) {
+    pub fn set_strategy(&mut self, strategy: LeaseStrategy) {
         self.strategy = strategy;
     }
 
     /// Lease/allocate a click ID with the configured strategy
     pub fn lease(&mut self) -> Option<ClickId> {
-        self.lease_with_strategy(self.strategy)
+        self.lease_with_strategy(None)
     }
 
     /// Lease/allocate a click ID with a requested strategy.
-    pub fn lease_with_strategy(&mut self, strategy: AllocationStrategy) -> Option<ClickId> {
+    pub fn lease_with_strategy(&mut self, strategy: Option<&LeaseStrategy>) -> Option<ClickId> {
+        let strategy = strategy.unwrap_or(&self.strategy);
+
         let id = match strategy {
-            AllocationStrategy::Low => self.available_ids.ones().next(),
-            AllocationStrategy::High => self.available_ids.ones().next_back(),
+            LeaseStrategy::Low => self.available_ids.ones().next(),
+            LeaseStrategy::High => self.available_ids.ones().next_back(),
         };
 
         // Find the first available ID by iterating from the beginning.
@@ -357,7 +359,7 @@ mod tests {
     #[test]
     fn test_prefer_high_strategy() {
         let mut pool: IdPool<1, 5> = IdPool::new();
-        pool.set_strategy(AllocationStrategy::High);
+        pool.set_strategy(LeaseStrategy::High);
 
         let id1 = pool.lease().unwrap();
         let id2 = pool.lease().unwrap();
@@ -378,7 +380,7 @@ mod tests {
         assert_eq!(id1.0, 1);
 
         // Switch to PreferHigh
-        pool.set_strategy(AllocationStrategy::High);
+        pool.set_strategy(LeaseStrategy::High);
         let id2 = pool.lease().unwrap();
         assert_eq!(id2.0, 5);
 
@@ -386,7 +388,7 @@ mod tests {
         assert_eq!(id3.0, 4);
 
         // Switch back to PreferLow
-        pool.set_strategy(AllocationStrategy::Low);
+        pool.set_strategy(LeaseStrategy::Low);
         let id4 = pool.lease().unwrap();
         assert_eq!(id4.0, 2);
     }

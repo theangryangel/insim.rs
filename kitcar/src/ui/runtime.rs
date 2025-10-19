@@ -17,6 +17,7 @@ use insim::{
 use super::{id_pool::ClickIdPool, vdom::Element};
 use crate::ui::{
     Component, ComponentPath,
+    id_pool::LeaseStrategy,
     scope::Scope,
     vdom::{Button, Container, ElementId},
 };
@@ -182,13 +183,15 @@ impl<C: Component> Runtime<C> {
         let to_update: Vec<Btn> = node_map
             .iter_mut()
             .filter_map(|(element_id, (element, node_id))| {
-                let click_id = self.lease_clickid(element_id).unwrap();
+                let click_id = self
+                    .lease_clickid(element_id, element.lease_strategy.as_ref())
+                    .unwrap();
 
                 let (x, y) = get_taffy_abs_position(&taffy, node_id);
                 let layout = taffy.layout(*node_id).unwrap();
 
                 let btn = Btn {
-                    text: element.text.to_owned(),
+                    text: element.text.take().unwrap_or_default(),
                     ucid: self.ucid,
                     reqi: RequestId(click_id.0),
                     clickid: click_id,
@@ -252,13 +255,17 @@ impl<C: Component> Runtime<C> {
         }
     }
 
-    fn lease_clickid(&mut self, key: &ElementId) -> Option<ClickId> {
+    fn lease_clickid(
+        &mut self,
+        key: &ElementId,
+        strategy: Option<&LeaseStrategy>,
+    ) -> Option<ClickId> {
         // If we already have an ID for this key, reuse it
         if let Some(&existing_id) = self.element_id_to_click_id.get(key) {
             return Some(existing_id);
         }
 
-        if let Some(new_id) = self.id_pool.lease() {
+        if let Some(new_id) = self.id_pool.lease_with_strategy(strategy) {
             let _ = self.element_id_to_click_id.insert(*key, new_id);
             return Some(new_id);
         }
@@ -304,7 +311,12 @@ fn flatten(
         Element::Container(Container {
             children, style, ..
         }) => (0, style.clone(), children.take()),
-        Element::Button(Button { id, style, .. }) => (*id, style.clone(), None),
+        Element::Button(Button {
+            id,
+            style,
+            children,
+            ..
+        }) => (*id, style.clone(), children.take()),
     };
 
     let children = taken_children.unwrap_or_default();
@@ -384,10 +396,12 @@ mod tests {
     fn test_centered_button_layout() {
         let button = Element::Button(Button {
             id: 1,
-            text: "Test".to_string(),
+            text: Some("Test".to_string()),
             style: taffy::Style::default(),
             btnstyle: BtnStyle::default(),
             on_click: None,
+            children: None,
+            lease_strategy: None,
         })
         .w(10.0)
         .h(10.0);
@@ -428,20 +442,24 @@ mod tests {
         // Test with multiple buttons to ensure positioning works correctly
         let button1 = Element::Button(Button {
             id: 1,
-            text: "Button 1".into(),
+            text: Some("Button 1".into()),
             style: Default::default(),
             btnstyle: Default::default(),
             on_click: None,
+            children: None,
+            lease_strategy: None,
         })
         .w(20.0)
         .h(10.0);
 
         let button2 = Element::Button(Button {
             id: 2,
-            text: "Button 2".into(),
+            text: Some("Button 2".into()),
             style: Default::default(),
             btnstyle: Default::default(),
             on_click: None,
+            children: None,
+            lease_strategy: None,
         })
         .w(20.0)
         .h(10.0);

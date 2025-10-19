@@ -2,14 +2,18 @@ use std::fmt::Debug;
 
 use insim::insim::{BtnStyle, BtnStyleColour, BtnStyleFlags};
 
+use crate::ui::id_pool::LeaseStrategy;
+
 pub type ElementId = usize;
 
 pub struct Button {
     pub(crate) id: ElementId,
-    pub(crate) text: String,
+    pub(crate) text: Option<String>,
     pub(crate) style: taffy::Style,
     pub(crate) btnstyle: BtnStyle,
     pub(crate) on_click: Option<Box<dyn Fn()>>,
+    pub(crate) lease_strategy: Option<LeaseStrategy>,
+    pub(crate) children: Option<Vec<Element>>,
 }
 
 impl Button {
@@ -144,11 +148,18 @@ impl Element {
         if val.is_none() {
             return self;
         }
-        if let Self::Container(Container {
-            ref mut children, ..
-        }) = self
-        {
-            children.get_or_insert_default().push(val.unwrap());
+
+        match self {
+            Self::Container(Container {
+                ref mut children, ..
+            }) => {
+                children.get_or_insert_default().push(val.unwrap());
+            },
+            Self::Button(Button {
+                ref mut children, ..
+            }) => {
+                children.get_or_insert_default().push(val.unwrap());
+            },
         }
 
         self
