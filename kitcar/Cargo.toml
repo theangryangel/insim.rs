@@ -11,10 +11,16 @@ homepage.workspace = true
 [dependencies]
 fixedbitset = { workspace = true }
 indexmap = { workspace = true }
-insim = { path = "../insim", version = "4.0.0", features = ["tokio"] }
+insim = { path = "../insim", version = "4.0.0", features = ["tokio", "serde"] }
 kitcar_macros = { path = "../kitcar_macros", version = "*" }
+rand = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 taffy = "0.9.1"
+thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt"] }
+
+[dev-dependencies]
+serde_norway = { workspace = true }
 
 [lints]
 workspace = true

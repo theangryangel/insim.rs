@@ -8,18 +8,19 @@ Forget being the fastest, the goal is to be the most precise. Finish in as close
 Full contact is allowed.
 Just remember: Don't be a dick. We're all here to have fun!";
 
-use crate::{
-    ROUNDS_PER_GAME,
-    components::{
-        motd::{Motd, MotdProps},
-        topbar::{Topbar, TopbarProps},
-    },
+use crate::components::{
+    motd::{Motd, MotdProps},
+    topbar::{Topbar, TopbarProps},
 };
 
 #[derive(Debug, Clone)]
 pub enum RootPhase {
     Idle,
-    Game { round: usize, remaining: Duration },
+    Game {
+        round: u32,
+        total_rounds: u32,
+        remaining: Duration,
+    },
     Victory,
 }
 
@@ -31,12 +32,16 @@ pub(crate) fn Root(phase: RootPhase, show: bool) -> Option<Element> {
 
     let text = match phase {
         RootPhase::Idle => "No game in progress".white(),
-        RootPhase::Game { round, remaining } => {
+        RootPhase::Game {
+            round,
+            remaining,
+            total_rounds,
+        } => {
             let seconds = remaining.as_secs() % 60;
             let minutes = (remaining.as_secs() / 60) % 60;
             format!(
                 "Round {}/{} · {:02}:{:02} remaining",
-                round, ROUNDS_PER_GAME, minutes, seconds
+                round, total_rounds, minutes, seconds
             )
             .white()
         },

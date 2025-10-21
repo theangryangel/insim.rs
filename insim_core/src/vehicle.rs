@@ -5,7 +5,7 @@ use crate::{Decode, Encode, license::License};
 
 /// Handles parsing a vehicle name according to the Insim v9 rules.
 /// See <https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info>
-#[derive(PartialEq, Eq, Clone, Default, Hash)]
+#[derive(PartialEq, Eq, Clone, Copy, Default, Hash)]
 #[non_exhaustive]
 #[allow(missing_docs)]
 pub enum Vehicle {

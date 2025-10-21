@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use crate::{Decode, Encode, license::License};
 
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, Default)]
 /// Handles parsing a Track name.
 #[non_exhaustive]
 #[allow(missing_docs)]
