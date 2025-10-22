@@ -6,6 +6,7 @@ use insim::{
     core::{track::Track, wind::Wind},
     insim::{RaceInProgress, RaceLaps, StaFlags},
 };
+use tokio::sync::{mpsc, oneshot};
 
 #[derive(Debug, Default, Clone)]
 /// GameInfo
@@ -80,5 +81,43 @@ impl GameInfo {
             insim::Packet::Sta(sta) => self.sta(sta),
             _ => {},
         }
+    }
+
+    /// Spawn a background instance of GameInfo and return a handle so that we can query it
+    pub fn spawn(insim: insim::builder::SpawnedHandle, capacity: usize) -> GameHandle {
+        let (query_tx, mut query_rx) = mpsc::channel::<oneshot::Sender<GameInfo>>(capacity);
+
+        let _handle = tokio::spawn(async move {
+            let mut inner = Self::new();
+            let mut packet_rx = insim.subscribe();
+
+            loop {
+                tokio::select! {
+                    Ok(packet) = packet_rx.recv() => {
+                        inner.handle_packet(&packet);
+                    }
+                    Some(response_tx) = query_rx.recv() => {
+                        let _ = response_tx.send(inner.clone());
+                    }
+                }
+            }
+        });
+
+        GameHandle { query_tx }
+    }
+}
+
+#[derive(Debug, Clone)]
+/// Handler for Presence
+pub struct GameHandle {
+    query_tx: mpsc::Sender<oneshot::Sender<GameInfo>>,
+}
+
+impl GameHandle {
+    /// Request the game state
+    pub async fn get(&self) -> GameInfo {
+        let (tx, rx) = oneshot::channel();
+        self.query_tx.send(tx).await.unwrap(); // FIXME
+        rx.await.unwrap() // FIXME
     }
 }

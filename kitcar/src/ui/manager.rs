@@ -9,16 +9,31 @@ use tokio::{sync::watch, task::JoinHandle};
 
 use crate::ui::{ClickIdPool, Component, Runtime};
 
+#[derive(Debug, Clone)]
+pub struct ManagerHandle<C: Component> {
+    props_tx: watch::Sender<C::Props>,
+}
+
+impl<C: Component> ManagerHandle<C> {
+    pub async fn update(&self, props: C::Props) {
+        let _ = self.props_tx.send(props); // FIXME
+    }
+}
+
 /// Manager to spawn Ui's for each connection
 #[derive(Debug)]
 pub struct Manager;
 
 impl Manager {
     pub fn spawn<C: Component>(
-        signals: watch::Receiver<C::Props>,
         insim: insim::builder::SpawnedHandle,
-    ) -> std::thread::JoinHandle<insim::Result<()>> {
-        std::thread::spawn(move || {
+        props: C::Props,
+    ) -> (ManagerHandle<C>, std::thread::JoinHandle<insim::Result<()>>) {
+        let (props_tx, props_rx) = watch::channel(props);
+
+        let handle = ManagerHandle { props_tx };
+
+        let join_handle = std::thread::spawn(move || {
             // We spawn the UI as it's own thread, so that we can use a tokio LocalSet.
             // So that we can use Rc rather than Mutex to handle our component state
             // and to avoid a whole load of Send issues if the user attempts to use !Send values
@@ -40,7 +55,11 @@ impl Manager {
                     match packet {
                         Packet::Ncn(ncn) => {
                             let _clippy = active.entry(ncn.ucid).or_insert_with(|| {
-                                Self::spawn_player_ui::<C>(ncn.ucid, signals.clone(), insim.clone())
+                                Self::spawn_player_ui::<C>(
+                                    ncn.ucid,
+                                    props_rx.clone(),
+                                    insim.clone(),
+                                )
                             });
                         },
                         Packet::Cnl(cnl) => {
@@ -55,7 +74,9 @@ impl Manager {
 
             // FIXME: masking the error if one occurs
             Ok(())
-        })
+        });
+
+        (handle, join_handle)
     }
 
     fn spawn_player_ui<C: Component>(

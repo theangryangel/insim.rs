@@ -7,13 +7,15 @@ use std::{collections::HashMap, fs, time::Duration};
 
 use anyhow::{Context, Result};
 use insim::{Packet, WithRequestId, identifiers::ConnectionId, insim::TinyType};
-use kitcar::{combos::ComboList, leaderboard::Leaderboard, presence::Presence, ui};
-use tokio::{
-    sync::watch,
-    time::{Instant, interval},
+use kitcar::{
+    combos::ComboList,
+    leaderboard::Leaderboard,
+    presence::{Presence, PresenceHandle},
+    ui,
 };
+use tokio::time::{Instant, interval};
 
-use crate::components::{RootPhase, RootProps};
+use crate::components::{Root, RootPhase, RootProps};
 
 const TARGET_TIME: f32 = 20.0;
 
@@ -57,8 +59,17 @@ async fn main() -> Result<()> {
         .spawn(100)
         .await?;
 
-    let (mut game, signals_rx) = TwentySecondLeague::new(config, insim.clone());
-    let _ = ui::Manager::spawn::<components::Root>(signals_rx, insim.clone());
+    let (ui_handle, _ui_thread) = ui::Manager::spawn::<components::Root>(
+        insim.clone(),
+        RootProps {
+            phase: RootPhase::Idle,
+            show: true,
+        },
+    );
+
+    let presence_handle = Presence::spawn(insim.clone(), 32);
+
+    let mut game = TwentySecondLeague::new(config, presence_handle, ui_handle, insim.clone());
 
     let _ = insim.send(TinyType::Ncn.with_request_id(1)).await;
     let _ = insim.send(TinyType::Npl.with_request_id(2)).await;
@@ -100,31 +111,24 @@ struct TwentySecondLeague {
     phase: Option<Phase>,
     config: Config,
     insim: insim::builder::SpawnedHandle,
-    presence: Presence,
-
-    signals_tx: watch::Sender<RootProps>,
+    presence: PresenceHandle,
+    ui: ui::ManagerHandle<Root>,
 }
 
 impl TwentySecondLeague {
     fn new(
         config: Config,
+        presence: PresenceHandle,
+        ui: ui::ManagerHandle<Root>,
         insim: insim::builder::SpawnedHandle,
-    ) -> (Self, watch::Receiver<RootProps>) {
-        let (signals_tx, signals_rx) = watch::channel(RootProps {
-            phase: RootPhase::Idle,
-            show: true,
-        });
-
-        (
-            Self {
-                phase: None,
-                config,
-                insim,
-                presence: Presence::new(),
-                signals_tx,
-            },
-            signals_rx,
-        )
+    ) -> Self {
+        Self {
+            phase: None,
+            config,
+            insim,
+            presence,
+            ui,
+        }
     }
 
     /// Tick and then return the next phase
@@ -153,14 +157,16 @@ impl TwentySecondLeague {
 
                 // Update countdown every second
                 let last_prop_update = if last_prop_update.elapsed() > Duration::from_secs(1) {
-                    self.signals_tx.send(RootProps {
-                        phase: RootPhase::Game {
-                            round: round as u32,
-                            total_rounds: total_rounds as u32,
-                            remaining: remaining,
-                        },
-                        show: true,
-                    })?;
+                    self.ui
+                        .update(RootProps {
+                            phase: RootPhase::Game {
+                                round: round as u32,
+                                total_rounds: total_rounds as u32,
+                                remaining: remaining,
+                            },
+                            show: true,
+                        })
+                        .await;
                     Instant::now()
                 } else {
                     last_prop_update
@@ -193,10 +199,12 @@ impl TwentySecondLeague {
                         // Game over
                         self.message_all("Game over!").await;
 
-                        self.signals_tx.send(RootProps {
-                            phase: RootPhase::Victory,
-                            show: true,
-                        })?;
+                        self.ui
+                            .update(RootProps {
+                                phase: RootPhase::Victory,
+                                show: true,
+                            })
+                            .await;
 
                         self.show_leaderboard(true).await?;
 
@@ -210,14 +218,16 @@ impl TwentySecondLeague {
                         self.command("/restart").await;
 
                         // FIXME: do we even need this? probably not.
-                        self.signals_tx.send(RootProps {
-                            phase: RootPhase::Game {
-                                round: (round + 1) as u32,
-                                total_rounds: total_rounds as u32,
-                                remaining: remaining, // FIXME
-                            },
-                            show: true,
-                        })?;
+                        self.ui
+                            .update(RootProps {
+                                phase: RootPhase::Game {
+                                    round: (round + 1) as u32,
+                                    total_rounds: total_rounds as u32,
+                                    remaining: remaining, // FIXME
+                                },
+                                show: true,
+                            })
+                            .await;
 
                         Phase::Game {
                             total_rounds,
@@ -258,15 +268,15 @@ impl TwentySecondLeague {
     }
 
     async fn handle_packet(&mut self, packet: &Packet) -> Result<()> {
-        self.presence.handle_packet(packet);
+        // self.presence.handle_packet(packet);
 
         match packet {
             Packet::Fin(fin) => {
                 if_chain::if_chain! {
                     if let Some(Phase::Game { ref mut round_scores, .. }) = self.phase;
-                    if let Some(player_info) = self.presence.player(&fin.plid);
+                    if let Some(player_info) = self.presence.player(&fin.plid).await;
                     if !player_info.ptype.is_ai();
-                    if let Some(connection_info) = self.presence.connection(&player_info.ucid);
+                    if let Some(connection_info) = self.presence.connection(&player_info.ucid).await;
                     then {
                         let _ = round_scores.insert(connection_info.uname.clone(),fin.ttime);
                     }
@@ -287,7 +297,7 @@ impl TwentySecondLeague {
                 if_chain::if_chain! {
                     if mso.msg_from_textstart() == "!start";
                     if self.phase.is_none();
-                    if let Some(conn_info) = self.presence.connection(&mso.ucid);
+                    if let Some(conn_info) = self.presence.connection(&mso.ucid).await;
                     if conn_info.admin;
                     then {
                         self.message_all("Starting game...").await;

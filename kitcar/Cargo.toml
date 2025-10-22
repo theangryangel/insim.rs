@@ -16,7 +16,6 @@ kitcar_macros = { path = "../kitcar_macros", version = "*" }
 rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 taffy = "0.9.1"
-thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt"] }
 
 [dev-dependencies]
