@@ -8,7 +8,7 @@ pub(crate) fn Textbox(text: String, rows: u8, width: u8, row_height: u8) -> Opti
     }
     let offset = cx.use_state(|| 0 as usize);
 
-    let wrapped: Vec<&str> = wrap_text(&text, row_height, width, 100)
+    let wrapped: Vec<&str> = wrap_text(&text, row_height, width - 7, 100)
         .into_iter()
         .collect();
     let end = offset.get() + rows as usize;
@@ -18,9 +18,8 @@ pub(crate) fn Textbox(text: String, rows: u8, width: u8, row_height: u8) -> Opti
     let collected: Vec<Element> = (&wrapped[offset_by..slice_end])
         .iter()
         .map(|f| {
-            cx.button(f.black())
-                .light()
-                .w(width as f32 - 6.)
+            cx.button(f.white())
+                .w(width as f32 - 7.)
                 .h(row_height as f32)
                 .text_align_start()
         })
@@ -30,10 +29,9 @@ pub(crate) fn Textbox(text: String, rows: u8, width: u8, row_height: u8) -> Opti
         cx.container()
             .flex()
             .flex_row()
-            .p(1.)
             .with_child(
-                cx.container()
-                    .p(1.)
+                cx.background()
+                    .light()
                     .flex()
                     .flex_col()
                     .with_children(collected),
@@ -43,7 +41,7 @@ pub(crate) fn Textbox(text: String, rows: u8, width: u8, row_height: u8) -> Opti
                     .flex()
                     .flex_col()
                     .flex_grow(1.)
-                    .with_child(cx.button("▲".black()).light().w(5.).h(5.).on_click({
+                    .with_child(cx.button("▲".white()).dark().w(4.).h(4.).on_click({
                         let offset = offset.clone();
 
                         Some(Box::new(move || {
@@ -54,7 +52,7 @@ pub(crate) fn Textbox(text: String, rows: u8, width: u8, row_height: u8) -> Opti
                         }))
                     }))
                     .with_child(cx.container().flex().flex_grow(1.))
-                    .with_child(cx.button("▼".black()).light().w(5.).h(5.).on_click({
+                    .with_child(cx.button("▼".white()).dark().w(4.).h(4.).on_click({
                         let offset = offset.clone();
                         let rows = rows as usize;
                         let len = wrapped.len();

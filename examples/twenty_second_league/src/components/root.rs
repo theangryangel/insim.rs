@@ -16,12 +16,16 @@ use crate::components::{
 #[derive(Debug, Clone)]
 pub enum RootPhase {
     Idle,
+    Restarting,
     Game {
-        round: u32,
-        total_rounds: u32,
+        round: usize,
+        total_rounds: usize,
         remaining: Duration,
     },
     Victory,
+    Lobby {
+        remaining: Duration,
+    },
 }
 
 #[component]
@@ -32,6 +36,7 @@ pub(crate) fn Root(phase: RootPhase, show: bool) -> Option<Element> {
 
     let text = match phase {
         RootPhase::Idle => "No game in progress".white(),
+        RootPhase::Restarting => "Loading...".white(),
         RootPhase::Game {
             round,
             remaining,
@@ -45,6 +50,12 @@ pub(crate) fn Root(phase: RootPhase, show: bool) -> Option<Element> {
             )
             .white()
         },
+        RootPhase::Lobby { remaining } => {
+            let seconds = remaining.as_secs() % 60;
+            let minutes = (remaining.as_secs() / 60) % 60;
+            format!("Lobby · {:02}:{:02} remaining", minutes, seconds).white()
+        },
+
         RootPhase::Victory => "Victory!".white(),
     };
 

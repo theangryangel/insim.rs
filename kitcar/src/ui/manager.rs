@@ -15,7 +15,7 @@ pub struct ManagerHandle<C: Component> {
 }
 
 impl<C: Component> ManagerHandle<C> {
-    pub async fn update(&self, props: C::Props) {
+    pub fn update(&self, props: C::Props) {
         let _ = self.props_tx.send(props); // FIXME
     }
 }
@@ -48,8 +48,6 @@ impl Manager {
             local_set.block_on(&rt, async move {
                 let mut packet_rx = insim.subscribe();
                 let mut active = HashMap::new();
-
-                insim.send(TinyType::Ncn.with_request_id(1)).await.unwrap();
 
                 while let Ok(packet) = packet_rx.recv().await {
                     match packet {

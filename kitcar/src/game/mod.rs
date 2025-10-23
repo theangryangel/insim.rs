@@ -1,12 +1,13 @@
 //! Game state
 
-use std::time::Duration;
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use insim::{
+    WithRequestId,
     core::{track::Track, wind::Wind},
-    insim::{RaceInProgress, RaceLaps, StaFlags},
+    insim::{RaceInProgress, RaceLaps, StaFlags, TinyType},
 };
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{self, Notify, broadcast, mpsc, oneshot, watch};
 
 #[derive(Debug, Default, Clone)]
 /// GameInfo
@@ -85,19 +86,30 @@ impl GameInfo {
 
     /// Spawn a background instance of GameInfo and return a handle so that we can query it
     pub fn spawn(insim: insim::builder::SpawnedHandle, capacity: usize) -> GameHandle {
-        let (query_tx, mut query_rx) = mpsc::channel::<oneshot::Sender<GameInfo>>(capacity);
+        let (query_tx, mut query_rx) = mpsc::channel(capacity);
 
         let _handle = tokio::spawn(async move {
-            let mut inner = Self::new();
             let mut packet_rx = insim.subscribe();
+            let (tx, rx) = watch::channel(Self::new());
+
+            // Make the relevant background requests that we *must* have. If the user doesnt use
+            // spawn it's upto them to handle this.
+            let _ = insim.send(TinyType::Sst.with_request_id(1)).await;
 
             loop {
                 tokio::select! {
                     Ok(packet) = packet_rx.recv() => {
-                        inner.handle_packet(&packet);
+                        tx.send_modify(|inner| inner.handle_packet(&packet) );
                     }
-                    Some(response_tx) = query_rx.recv() => {
-                        let _ = response_tx.send(inner.clone());
+                    Some(query) = query_rx.recv() => {
+                        match query {
+                            GameQuery::Get { response_tx } => {
+                                let _ = response_tx.send(tx.borrow().clone());
+                            },
+                            GameQuery::Watch { response_tx } => {
+                                let _ = response_tx.send(rx.clone());
+                            },
+                        }
                     }
                 }
             }
@@ -107,17 +119,98 @@ impl GameInfo {
     }
 }
 
+#[derive(Debug)]
+enum GameQuery {
+    Get {
+        response_tx: oneshot::Sender<GameInfo>,
+    },
+    Watch {
+        response_tx: oneshot::Sender<watch::Receiver<GameInfo>>,
+    },
+}
+
 #[derive(Debug, Clone)]
 /// Handler for Presence
 pub struct GameHandle {
-    query_tx: mpsc::Sender<oneshot::Sender<GameInfo>>,
+    query_tx: mpsc::Sender<GameQuery>,
 }
 
 impl GameHandle {
     /// Request the game state
     pub async fn get(&self) -> GameInfo {
-        let (tx, rx) = oneshot::channel();
-        self.query_tx.send(tx).await.unwrap(); // FIXME
+        let (response_tx, rx) = oneshot::channel();
+        self.query_tx
+            .send(GameQuery::Get { response_tx })
+            .await
+            .unwrap(); // FIXME
         rx.await.unwrap() // FIXME
+    }
+
+    /// Wait for a given state
+    pub async fn wait_for<F: Fn(&GameInfo) -> bool>(&self, predicate: F) {
+        let (response_tx, rx) = oneshot::channel();
+        self.query_tx
+            .send(GameQuery::Watch { response_tx })
+            .await
+            .unwrap(); // FIXME
+        let mut watcher = rx.await.unwrap();
+        let _ = watcher.wait_for(predicate).await.unwrap(); // FIXME
+    }
+
+    /// Wait for the end
+    pub async fn wait_for_end(&self) {
+        self.wait_for(|info| {
+            if_chain::if_chain! {
+                    if !info.flags.is_in_game();
+                    if matches!(info.racing, RaceInProgress::No);
+                    then {
+                        true
+                    }
+                    else {
+                        false
+                    }
+            }
+        })
+        .await
+    }
+
+    /// Wait for track to load
+    pub async fn wait_for_track(&self, track: Track) {
+        self.wait_for(|info| {
+            println!("waiting for track {:?}", info);
+            if_chain::if_chain! {
+                    if let Some(state_track) = info.track.as_ref();
+                    if state_track == &track;
+                    if !info.flags.is_in_game();
+                    if matches!(info.racing, RaceInProgress::No);
+                    then {
+                        true
+                    }
+                    else {
+                        false
+                    }
+
+            }
+        })
+        .await
+    }
+
+    /// Wait for track to load
+    pub async fn wait_for_racing(&self) {
+        self.wait_for(|info| {
+            println!("waiting for racing {:?}", info);
+            if_chain::if_chain! {
+                    if info.flags.is_in_game();
+                    if matches!(info.racing, RaceInProgress::Racing);
+                    then {
+                        true
+                    }
+                    else {
+                        false
+                    }
+
+            }
+        })
+        .await
     }
 }

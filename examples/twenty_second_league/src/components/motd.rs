@@ -35,23 +35,19 @@ pub fn Motd(text: String, what: u8) -> Option<Element> {
     }
 
     Some(
-        cx.container()
+        cx.background()
+            .light()
             .flex()
             .flex_col()
             .my_auto()
             .mx_auto()
+            .p(1.)
             .w(80.)
-            .with_children(wrapped_text)
             .with_child(
-                cx.button("Got it!".light_green())
-                    .mt(2.)
+                cx.button("Welcome to the Cadence Cup!".white())
                     .h(5.)
-                    .green()
-                    .light()
-                    .on_click(Some(Box::new(move || {
-                        println!("I GOT CLICKED! {:?}", what);
-                        show.set(false);
-                    }))),
+                    .mb(2.)
+                    .text_align_start(),
             )
             .with_child(cx.container().mx_auto().with_child(cx.component::<Textbox>(
                 TextboxProps {
@@ -60,6 +56,17 @@ pub fn Motd(text: String, what: u8) -> Option<Element> {
                     rows: 3,
                     row_height: 5,
                 },
-            ))),
+            )))
+            .with_child(
+                cx.button("Got it!".light_green())
+                    .mt(2.)
+                    .h(5.)
+                    .green()
+                    .dark()
+                    .on_click(Some(Box::new(move || {
+                        println!("I GOT CLICKED! {:?}", what);
+                        show.set(false);
+                    }))),
+            ),
     )
 }

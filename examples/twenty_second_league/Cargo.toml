@@ -19,7 +19,7 @@ insim = { path = "../../insim", features = ["serde", "blocking"] }
 kitcar = { path = "../../kitcar" }
 serde = { workspace = true, features = ["derive"] }
 serde_norway = { workspace = true }
-tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros"]}
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "signal"]}
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 [lints]

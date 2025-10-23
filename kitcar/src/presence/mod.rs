@@ -3,9 +3,10 @@
 use std::collections::{HashMap, HashSet};
 
 use insim::{
+    WithRequestId,
     core::vehicle::Vehicle,
     identifiers::{ConnectionId, PlayerId},
-    insim::{PlayerFlags, PlayerType},
+    insim::{PlayerFlags, PlayerType, TinyType},
 };
 use tokio::sync::{mpsc, oneshot};
 

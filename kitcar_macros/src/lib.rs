@@ -67,11 +67,12 @@ pub fn component(_args: TokenStream, input: TokenStream) -> TokenStream {
 
     // Generate the component struct and impl
     let expanded = quote! {
-        #[derive(Clone)]
+        #[derive(Debug, Clone)]
         pub struct #props_struct_name {
             #(#props_struct_fields),*
         }
 
+        #[derive(Debug, Clone)]
         #fn_vis struct #fn_name;
 
         impl kitcar::ui::Component for #fn_name {
