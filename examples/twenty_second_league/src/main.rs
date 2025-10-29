@@ -1,20 +1,20 @@
 //! 20s league
 mod combo;
 mod components;
-mod no_vote;
-mod phases;
+mod stages;
 
 use std::{fs, time::Duration};
 
 use anyhow::{Context, Result};
-use insim::{Packet, WithRequestId, core::track::Track, insim::TinyType};
-use kitcar::{combos::ComboList, game::GameInfo, presence::Presence, ui};
-use tokio::signal;
-
-use crate::{
-    components::{RootPhase, RootProps},
-    phases::Transition,
+use insim::{WithRequestId, insim::TinyType};
+use kitcar::{
+    combos::ComboList,
+    game::{GameHandle, GameInfo},
+    presence::{Presence, PresenceHandle},
+    ui,
 };
+
+use crate::components::{RootPhase, RootProps};
 
 /// Config
 #[derive(Debug, serde::Deserialize)]
@@ -32,6 +32,13 @@ pub struct Config {
     pub combos: ComboList<combo::ComboExt>,
     /// Number of rounds
     pub rounds: Option<usize>,
+}
+
+#[derive(Debug, Clone)]
+struct MyState {
+    pub ui: ui::ManagerHandle<components::Root>,
+    pub presence: PresenceHandle,
+    pub game: GameHandle,
 }
 
 #[tokio::main]
@@ -69,79 +76,19 @@ async fn main() -> Result<()> {
 
     println!("20 Second League started!");
 
-    let mut packets = insim.subscribe();
-
     let _ = insim.send(TinyType::Ncn.with_request_id(1)).await;
     let _ = insim.send(TinyType::Npl.with_request_id(2)).await;
     let _ = insim.send(TinyType::Sst.with_request_id(3)).await;
 
-    // Why not avoid async? Because the state machine for the game gets a bit difficult to follow.
-    // We want to allow the ability to do things like "wait_for_restart().await?", or
-    // "wait_for_players().await?" without impacting the legibility of the code.
-
-    // Why no pinning? Because it's an utter ballache. I've got some very specific requirements
-    // where I want to setup things like "wait_for_restart().await?" as a function. However, doing
-    // so then causes the issue where we don't want to stop handling packets. This in turn makes
-    // the implementation a lot more fiddly. By simply spawning a task per-phase we shortcut a
-    // whole bunch of problems. Laziness for the win!
-
-    let mut task = phases::PhaseIdle::spawn(insim.clone(), presence_handle.clone());
-    let mut current_phase = Transition::Idle;
-
-    loop {
-        tokio::select! {
-            _ = signal::ctrl_c() => {
-                // TODO: graceful handling
-                task.abort();
-                break;
-            },
-
-            // Task completed naturally
-            result = &mut task => {
-                let next_phase = result?;
-                current_phase = next_phase;
-
-                task = match next_phase {
-                    Transition::Idle => phases::PhaseIdle::spawn(insim.clone(), presence_handle.clone()),
-                    Transition::Lobby => phases::PhaseLobby::spawn(insim.clone(), presence_handle.clone(), ui_handle.clone()),
-                    Transition::Game => phases::PhaseGame::spawn(insim.clone(), presence_handle.clone(), ui_handle.clone()),
-                    Transition::Shutdown => break,
-                };
-            },
-
-            // External packet forcing transition
-            packet = packets.recv() => {
-                if let Packet::Mso(mso) = packet? {
-                    if_chain::if_chain! {
-                        if mso.msg_from_textstart() == "!start";
-                        if let Some(conn_info) = presence_handle.connection(&mso.ucid).await;
-                        if conn_info.admin;
-                        if current_phase != Transition::Game;
-                        then {
-                            // Abort current task and start new one
-                            task.abort();
-
-                            println!("Transitioning to game");
-
-                            let _ = insim.send_command("/end").await;
-                            println!("Waiting for end state");
-                            game_state_handle.wait_for_end().await;
-
-                            println!("REquesting track change");
-                            let _ = insim.send_command("/track FE1").await;
-                            println!("Waiting for track");
-                            game_state_handle.wait_for_track(Track::Fe1).await;
-
-                            println!("Waiting for game to start");
-                            game_state_handle.wait_for_racing().await;
-
-                            task = phases::PhaseLobby::spawn(insim.clone(), presence_handle.clone(), ui_handle.clone());
-                            current_phase = Transition::Lobby;
-                        }
-                    }
-                }
-            }
-        }
-    }
+    kitcar::runtime::Runtime::new(
+        insim.clone(),
+        MyState {
+            ui: ui_handle,
+            presence: presence_handle,
+            game: game_state_handle,
+        },
+    )
+    .ignite(stages::idle)
+    .await?;
     Ok(())
 }

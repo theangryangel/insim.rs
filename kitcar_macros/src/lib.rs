@@ -87,35 +87,3 @@ pub fn component(_args: TokenStream, input: TokenStream) -> TokenStream {
 
     TokenStream::from(expanded)
 }
-
-/// Converts a function into a Service implementation
-///
-/// # Example
-/// ```ignore
-/// #[service]
-/// async fn MyService() {
-///     // Service logic here - insim SpawnedHandle argument is auto-injected
-/// }
-/// ```
-#[proc_macro_attribute]
-pub fn service(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let input_fn = parse_macro_input!(item as ItemFn);
-    let struct_name = &input_fn.sig.ident;
-
-    let fn_body = &input_fn.block;
-    let fn_vis = &input_fn.vis;
-    let fn_asyncness = &input_fn.sig.asyncness;
-    let stmts = &fn_body.stmts;
-
-    let expanded = quote! {
-        #fn_vis struct #struct_name;
-
-        impl kitcar::Service for #struct_name {
-            #fn_asyncness fn spawn(insim: insim::builder::SpawnedHandle) {
-                #(#stmts)*
-            }
-        }
-    };
-
-    TokenStream::from(expanded)
-}

@@ -8,16 +8,5 @@ pub mod combos;
 pub mod game;
 pub mod leaderboard;
 pub mod presence;
+pub mod runtime;
 pub mod time;
-
-pub use kitcar_macros::service;
-
-/// Reactive background service. Basically something you want to blindly run something on a packet
-/// query
-pub trait Service {
-    /// Broadcast capacity to use
-    const BROADCAST_CAPACITY: usize = 32;
-
-    /// Spawn as a background task, returning a handle for easy querying
-    fn spawn(insim: insim::builder::SpawnedHandle);
-}
