@@ -1,19 +1,16 @@
 use std::time::Duration;
 
-use kitcar::{
-    runtime::{Result, Transition, context::State},
-    time::countdown::Countdown,
-};
+use kitcar::time::countdown::Countdown;
 
 use crate::{
-    MyState,
+    GameState, MyState,
     components::{RootPhase, RootProps},
 };
 
 pub async fn lobby(
     insim: insim::builder::SpawnedHandle,
-    State(state): State<MyState>,
-) -> Result<Transition<MyState>> {
+    state: MyState,
+) -> anyhow::Result<GameState> {
     let mut packets = insim.subscribe();
 
     let mut countdown = Countdown::new(
@@ -48,5 +45,5 @@ pub async fn lobby(
         }
     }
 
-    Ok(Transition::next(super::game))
+    Ok(GameState::Game)
 }

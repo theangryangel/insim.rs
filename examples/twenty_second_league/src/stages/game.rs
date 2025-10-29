@@ -4,22 +4,18 @@ use insim::{
     Packet,
     identifiers::{ConnectionId, PlayerId},
 };
-use kitcar::{
-    leaderboard::Leaderboard,
-    runtime::{Result, Transition, context::State},
-    time::countdown::Countdown,
-};
+use kitcar::{leaderboard::Leaderboard, time::countdown::Countdown};
 use tokio::time::sleep;
 
 use crate::{
-    MyState,
+    GameState, MyState,
     components::{RootPhase, RootProps},
 };
 
 pub async fn game(
     insim: insim::builder::SpawnedHandle,
-    State(state): State<MyState>,
-) -> Result<Transition<MyState>> {
+    state: MyState,
+) -> anyhow::Result<GameState> {
     let mut packets = insim.subscribe();
 
     let target = Duration::from_secs(20); // FIXME: from config
@@ -134,6 +130,5 @@ pub async fn game(
         phase: RootPhase::Victory,
     });
 
-    // FIXME: we can't loop. Fuck.
-    Ok(Transition::exit())
+    Ok(GameState::Idle)
 }

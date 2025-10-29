@@ -41,6 +41,55 @@ struct MyState {
     pub game: GameHandle,
 }
 
+#[derive(Debug)]
+struct MyGame {
+    pub insim: insim::builder::SpawnedHandle,
+    pub state: MyState,
+    pub desired_state: GameState,
+}
+
+#[derive(Debug)]
+#[allow(dead_code)] // for exit. For now.
+enum GameState {
+    Idle,
+    Lobby,
+    Game,
+    Exit,
+}
+
+impl MyGame {
+    async fn poll(&mut self) -> anyhow::Result<()> {
+        loop {
+            let mut handle = match self.desired_state {
+                GameState::Idle => {
+                    tokio::task::spawn(stages::idle(self.insim.clone(), self.state.clone()))
+                },
+                GameState::Lobby => {
+                    tokio::task::spawn(stages::lobby(self.insim.clone(), self.state.clone()))
+                },
+                GameState::Game => {
+                    tokio::task::spawn(stages::game(self.insim.clone(), self.state.clone()))
+                },
+                GameState::Exit => {
+                    break;
+                },
+            };
+
+            loop {
+                tokio::select! {
+                    result = &mut handle => {
+                        self.desired_state = result??;
+                        break;
+                    }
+                    // TODO: add something
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Setup with a default log level of INFO RUST_LOG is unset
@@ -80,15 +129,46 @@ async fn main() -> Result<()> {
     let _ = insim.send(TinyType::Npl.with_request_id(2)).await;
     let _ = insim.send(TinyType::Sst.with_request_id(3)).await;
 
-    kitcar::runtime::Runtime::new(
-        insim.clone(),
-        MyState {
+    let mut game = MyGame {
+        insim: insim.clone(),
+        desired_state: GameState::Idle,
+        state: MyState {
             ui: ui_handle,
-            presence: presence_handle,
+            presence: presence_handle.clone(),
             game: game_state_handle,
         },
-    )
-    .ignite(stages::idle)
-    .await?;
+    };
+
+    let game_fut = game.poll();
+    // pin for cancel safety so we can use a select! loop below.
+    tokio::pin!(game_fut);
+
+    let mut packets = insim.subscribe();
+
+    loop {
+        tokio::select! {
+            result = &mut game_fut => {
+                result?;
+                break;
+            },
+            packet = packets.recv() => {
+                match packet? {
+                    insim::Packet::Mso(mso) => {
+                        if_chain::if_chain! {
+                            if mso.msg_from_textstart() == "!quit";
+                            if let Some(conn_info) = presence_handle.connection(&mso.ucid).await;
+                            if conn_info.admin;
+                            then {
+                                break;
+                            }
+                        }
+                    },
+                    _ => {}
+                }
+            }
+
+        }
+    }
+
     Ok(())
 }

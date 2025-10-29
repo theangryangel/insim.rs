@@ -1,16 +1,15 @@
 use insim::{Packet, core::track::Track};
-use kitcar::runtime::{Result, Transition, context::State};
 
-use crate::MyState;
+use crate::{GameState, MyState};
 
 pub async fn idle(
     insim: insim::builder::SpawnedHandle,
-    State(state): State<MyState>,
-) -> Result<Transition<MyState>> {
+    state: MyState,
+) -> anyhow::Result<GameState> {
     let mut packets = insim.subscribe();
 
     loop {
-        let packet = packets.recv().await.unwrap();
+        let packet = packets.recv().await?;
 
         match packet {
             Packet::Ncn(ncn) => {
@@ -42,7 +41,7 @@ pub async fn idle(
                         println!("Waiting for game to start");
                         state.game.wait_for_racing().await;
 
-                        return Ok(Transition::next(super::lobby));
+                        return Ok(GameState::Lobby);
                     }
                 }
             },

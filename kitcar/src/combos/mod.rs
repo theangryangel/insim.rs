@@ -110,7 +110,7 @@ impl<S> ComboList<S> {
     }
 
     /// Next in the combo list
-    pub fn next(&mut self) -> Option<&Combo<S>> {
+    pub fn advance(&mut self) -> Option<&Combo<S>> {
         if self.inner.is_empty() {
             return None;
         }
@@ -203,22 +203,22 @@ mod tests {
         let mut list = ComboList::new(combos);
 
         // First call to next moves to index 1
-        let first_next = list.next();
+        let first_next = list.advance();
         assert!(first_next.is_some());
 
         // Second call moves to index 2
-        let second_next = list.next();
+        let second_next = list.advance();
         assert!(second_next.is_some());
 
         // Third call wraps around to index 0
-        let third_next = list.next();
+        let third_next = list.advance();
         assert!(third_next.is_some());
     }
 
     #[test]
     fn test_next_empty_list() {
         let mut list = ComboList::<()>::new(vec![]);
-        assert_eq!(list.next(), None);
+        assert_eq!(list.advance(), None);
     }
 
     #[test]
@@ -226,8 +226,8 @@ mod tests {
         let combos = vec![create_test_combo(Track::Bl1), create_test_combo(Track::Bl2)];
         let mut list = ComboList::new(combos);
 
-        assert!(list.next().is_some()); // index 1
-        let wrapped = list.next(); // should wrap to index 0
+        assert!(list.advance().is_some()); // index 1
+        let wrapped = list.advance(); // should wrap to index 0
 
         assert!(wrapped.is_some());
         assert_eq!(list.current().is_some(), true);
@@ -242,8 +242,8 @@ mod tests {
         ];
         let mut list = ComboList::new(combos);
 
-        assert!(list.next().is_some());
-        assert!(list.next().is_some());
+        assert!(list.advance().is_some());
+        assert!(list.advance().is_some());
         assert_eq!(list.current, 2);
 
         list.reset();
@@ -269,7 +269,7 @@ mod tests {
         let combos = vec![create_test_combo(Track::Bl1), create_test_combo(Track::Bl2)];
         let mut list = ComboList::new(combos);
 
-        assert!(list.next().is_some());
+        assert!(list.advance().is_some());
         assert_ne!(list.current, 0);
 
         list.shuffle();

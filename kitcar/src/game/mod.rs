@@ -1,13 +1,13 @@
 //! Game state
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::time::Duration;
 
 use insim::{
     WithRequestId,
     core::{track::Track, wind::Wind},
     insim::{RaceInProgress, RaceLaps, StaFlags, TinyType},
 };
-use tokio::sync::{self, Notify, broadcast, mpsc, oneshot, watch};
+use tokio::sync::{mpsc, oneshot, watch};
 
 #[derive(Debug, Default, Clone)]
 /// GameInfo
@@ -67,7 +67,7 @@ impl GameInfo {
         self.qualifying_duration = Duration::from_secs(sta.qualmins as u64 * 60);
         self.race_duration = sta.racelaps;
 
-        self.track = Some(sta.track.clone());
+        self.track = Some(sta.track);
         self.weather = Some(sta.weather);
         self.wind = Some(sta.wind);
 

@@ -9,9 +9,7 @@ license.workspace = true
 homepage.workspace = true
 
 [dependencies]
-async-trait = { workspace = true }
 fixedbitset = { workspace = true }
-futures = { workspace = true }
 if_chain = { workspace = true }
 indexmap = { workspace = true }
 insim = { path = "../insim", version = "4.0.0", features = ["tokio", "serde"] }
@@ -19,7 +17,6 @@ kitcar_macros = { path = "../kitcar_macros", version = "*" }
 rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 taffy = "0.9.1"
-thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt", "sync"] }
 
 [dev-dependencies]

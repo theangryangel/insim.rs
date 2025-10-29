@@ -1,10 +1,6 @@
 use std::collections::HashMap;
 
-use insim::{
-    Packet, WithRequestId,
-    identifiers::ConnectionId,
-    insim::{BfnType, TinyType},
-};
+use insim::{Packet, identifiers::ConnectionId, insim::BfnType};
 use tokio::{sync::watch, task::JoinHandle};
 
 use crate::ui::{ClickIdPool, Component, Runtime};

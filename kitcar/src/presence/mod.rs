@@ -3,10 +3,9 @@
 use std::collections::{HashMap, HashSet};
 
 use insim::{
-    WithRequestId,
     core::vehicle::Vehicle,
     identifiers::{ConnectionId, PlayerId},
-    insim::{PlayerFlags, PlayerType, TinyType},
+    insim::{PlayerFlags, PlayerType},
 };
 use tokio::sync::{mpsc, oneshot};
 
@@ -156,7 +155,7 @@ impl Presence {
             PlayerInfo {
                 plid: npl.plid,
                 ucid: npl.ucid,
-                vehicle: npl.cname.clone(),
+                vehicle: npl.cname,
                 ptype: npl.ptype,
                 flags: npl.flags,
                 in_pitlane: false,

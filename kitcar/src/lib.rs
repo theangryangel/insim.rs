@@ -8,5 +8,4 @@ pub mod combos;
 pub mod game;
 pub mod leaderboard;
 pub mod presence;
-pub mod runtime;
 pub mod time;
