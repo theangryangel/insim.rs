@@ -1,7 +1,7 @@
 //! Macros for the kitcar crate
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{Error, FnArg, ItemFn, parse_macro_input};
+use syn::{Data, DeriveInput, Error, Fields, FnArg, ItemFn, parse_macro_input};
 
 fn is_cx(arg: &FnArg) -> bool {
     if let FnArg::Typed(pat_type) = arg {
@@ -86,4 +86,188 @@ pub fn component(_args: TokenStream, input: TokenStream) -> TokenStream {
     };
 
     TokenStream::from(expanded)
+}
+
+/// Convert an enum to something that impl a parse and parse_with_prefix function to handle chat
+/// messages
+#[proc_macro_derive(ChatCommands)]
+pub fn derive_command_parser(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let enum_name = &input.ident;
+
+    let Data::Enum(data_enum) = &input.data else {
+        panic!("CommandParser can only be derived for enums");
+    };
+
+    let mut match_arms = vec![];
+    let mut help_entries = vec![];
+
+    for variant in &data_enum.variants {
+        let variant_name = &variant.ident;
+        let cmd_name = variant_name.to_string().to_lowercase();
+
+        match &variant.fields {
+            Fields::Named(fields) => {
+                let field_names: Vec<_> = fields
+                    .named
+                    .iter()
+                    .map(|f| f.ident.as_ref().unwrap())
+                    .collect();
+
+                let field_types: Vec<_> = fields.named.iter().map(|f| &f.ty).collect();
+
+                let required_fields: Vec<_> = field_names
+                    .iter()
+                    .zip(field_types.iter())
+                    .filter(|(_, ty)| !is_option_type(ty))
+                    .collect();
+
+                let optional_fields: Vec<_> = field_names
+                    .iter()
+                    .zip(field_types.iter())
+                    .enumerate()
+                    .filter(|(_, (_, ty))| is_option_type(ty))
+                    .collect();
+
+                let parse_required: Vec<_> = required_fields.iter().enumerate()
+                    .map(|(i, (name, ty))| {
+                        let name_str = name.to_string();
+                        quote! {
+                            let #name = args.get(#i)
+                                .ok_or_else(|| kitcar::chat::ParseError::MissingRequiredArg(#name_str.to_string()))?;
+                            let #name = <#ty as kitcar::chat::FromArg>::from_arg(#name)
+                                .map_err(|e| kitcar::chat::ParseError::InvalidArg(#name_str.to_string(), e))?;
+                        }
+                    })
+                    .collect();
+
+                let parse_optional: Vec<_> = optional_fields.iter()
+                    .map(|(i, (name, ty))| {
+                        // Extract T from Option<T>
+                        let inner_ty = extract_option_inner(ty);
+                        quote! {
+                            let #name = args.get(#i)
+                                .map(|s| <#inner_ty as kitcar::chat::FromArg>::from_arg(s))
+                                .transpose()
+                                .map_err(|e| kitcar::chat::ParseError::InvalidArg(stringify!(#name).to_string(), e))?;
+                        }
+                    })
+                    .collect();
+
+                // Generate help text
+                let required_args: Vec<_> = required_fields
+                    .iter()
+                    .map(|(name, _)| format!("<{}>", name))
+                    .collect();
+                let optional_args: Vec<_> = optional_fields
+                    .iter()
+                    .map(|(_, (name, _))| format!("[{}]", name))
+                    .collect();
+                let all_args = [required_args, optional_args].concat();
+                let args_str = all_args.join(" ");
+
+                help_entries.push(quote! {
+                    format!("{} {}", #cmd_name, #args_str)
+                });
+
+                match_arms.push(quote! {
+                    #cmd_name => {
+                        #(#parse_required)*
+                        #(#parse_optional)*
+                        Ok(#enum_name::#variant_name { #(#field_names),* })
+                    }
+                });
+            },
+            Fields::Unnamed(_) => {
+                panic!("CommandParser does not support tuple variants");
+            },
+            Fields::Unit => {
+                help_entries.push(quote! {
+                    format!("{}", #cmd_name)
+                });
+
+                match_arms.push(quote! {
+                    #cmd_name => Ok(#enum_name::#variant_name)
+                });
+            },
+        }
+    }
+
+    let expanded = quote! {
+        #[allow(missing_docs)]
+        impl #enum_name {
+            pub fn parse(input: &str) -> Result<Self, kitcar::chat::ParseError> {
+                Self::parse_with_prefix(input, Some('!'))
+            }
+
+            pub fn parse_with_prefix(input: &str, prefix: Option<char>) -> Result<Self, kitcar::chat::ParseError> {
+                let input = input.trim();
+
+                if input.is_empty() {
+                    return Err(kitcar::chat::ParseError::EmptyInput);
+                }
+
+                // Strip prefix if required
+                let input = if let Some(prefix_char) = prefix {
+                    if let Some(stripped) = input.strip_prefix(prefix_char) {
+                        stripped
+                    } else {
+                        return Err(kitcar::chat::ParseError::MissingPrefix(prefix_char));
+                    }
+                } else {
+                    input
+                };
+
+                let parts: Vec<&str> = input.split_whitespace().collect();
+
+                if parts.is_empty() {
+                    return Err(kitcar::chat::ParseError::EmptyInput);
+                }
+
+                let cmd_name = parts[0];
+                let args = &parts[1..];
+
+                match cmd_name {
+                    #(#match_arms,)*
+                    _ => Err(kitcar::chat::ParseError::UnknownCommand(cmd_name.to_string()))
+                }
+            }
+
+            pub fn parse_no_prefix(input: &str) -> Result<Self, kitcar::chat::ParseError> {
+                Self::parse_with_prefix(input, None)
+            }
+
+            pub fn help() -> Vec<String> {
+                vec![
+                    #(#help_entries),*
+                ]
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+fn is_option_type(ty: &syn::Type) -> bool {
+    if let syn::Type::Path(type_path) = ty {
+        if let Some(segment) = type_path.path.segments.last() {
+            return segment.ident == "Option";
+        }
+    }
+    false
+}
+
+fn extract_option_inner(ty: &syn::Type) -> &syn::Type {
+    if let syn::Type::Path(type_path) = ty {
+        if let Some(segment) = type_path.path.segments.last() {
+            if segment.ident == "Option" {
+                if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+                    if let Some(syn::GenericArgument::Type(inner)) = args.args.first() {
+                        return inner;
+                    }
+                }
+            }
+        }
+    }
+    ty
 }

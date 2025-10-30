@@ -6,7 +6,7 @@ mod stages;
 use std::{fs, time::Duration};
 
 use anyhow::{Context, Result};
-use insim::{WithRequestId, insim::TinyType};
+use insim::{WithRequestId, identifiers::ConnectionId, insim::TinyType};
 use kitcar::{
     combos::ComboList,
     game::{GameHandle, GameInfo},
@@ -17,10 +17,8 @@ use kitcar::{
 use crate::components::{RootPhase, RootProps};
 
 /// Config
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 pub struct Config {
-    /// Insim IName
-    pub iname: Option<String>,
     /// Server address
     pub addr: String,
     /// admin password
@@ -30,8 +28,18 @@ pub struct Config {
     pub warmup_duration: Duration,
     /// Combinations
     pub combos: ComboList<combo::ComboExt>,
-    /// Number of rounds
-    pub rounds: Option<usize>,
+}
+
+// Just derive and you're done!
+#[derive(Debug, PartialEq, kitcar::chat::ChatCommands)]
+#[allow(missing_docs)]
+pub enum MyChatCommands {
+    Echo { message: String },
+    Quit,
+    Start,
+    Rules,
+    Motd,
+    Help,
 }
 
 #[derive(Debug, Clone)]
@@ -39,6 +47,8 @@ struct MyContext {
     pub ui: ui::ManagerHandle<components::Root>,
     pub presence: PresenceHandle,
     pub game: GameHandle,
+    #[allow(dead_code)]
+    pub config: ComboList<combo::ComboExt>,
 }
 
 #[derive(Debug)]
@@ -80,7 +90,7 @@ impl MyGame {
                     result = &mut handle => {
                         self.desired_state = result??;
                         break;
-                    }
+                    },
                     // TODO: add something
                 }
             }
@@ -108,7 +118,7 @@ async fn main() -> Result<()> {
 
     let (insim, _join_handle) = insim::tcp(config.addr.as_str())
         .isi_admin_password(config.admin.clone())
-        .isi_iname(config.iname.clone())
+        .isi_iname("cadence-cup".to_owned())
         .spawn(100)
         .await?;
 
@@ -136,6 +146,7 @@ async fn main() -> Result<()> {
             ui: ui_handle,
             presence: presence_handle.clone(),
             game: game_state_handle,
+            config: config.combos,
         },
     };
 
@@ -154,13 +165,22 @@ async fn main() -> Result<()> {
             packet = packets.recv() => {
                 match packet? {
                     insim::Packet::Mso(mso) => {
-                        if_chain::if_chain! {
-                            if mso.msg_from_textstart() == "!quit";
-                            if let Some(conn_info) = presence_handle.connection(&mso.ucid).await;
-                            if conn_info.admin;
-                            then {
-                                break;
-                            }
+
+                        match MyChatCommands::parse_with_prefix(mso.msg_from_textstart(), Some('!')) {
+                            Ok(MyChatCommands::Quit) => {
+                                if_chain::if_chain! {
+                                    if let Some(conn_info) = presence_handle.connection(&mso.ucid).await;
+                                    if conn_info.admin;
+                                    then {
+                                        insim.send_message("Quitting.. bye!", ConnectionId::ALL).await?;
+                                        break;
+                                    }
+                                }
+                            },
+                            Ok(MyChatCommands::Help) => {
+                                println!("{:?}", MyChatCommands::help());
+                            },
+                            _ => {},
                         }
                     },
                     _ => {}

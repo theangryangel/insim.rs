@@ -9,3 +9,6 @@ pub mod game;
 pub mod leaderboard;
 pub mod presence;
 pub mod time;
+
+#[allow(missing_docs)]
+pub mod chat;

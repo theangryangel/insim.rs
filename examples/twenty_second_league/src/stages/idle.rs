@@ -1,6 +1,9 @@
-use insim::{Packet, core::track::Track};
+use std::time::Duration;
 
-use crate::{GameState, MyContext};
+use insim::{Packet, core::track::Track, identifiers::ConnectionId};
+use tokio::time::timeout;
+
+use crate::{GameState, MyChatCommands, MyContext};
 
 pub async fn idle(
     insim: insim::builder::SpawnedHandle,
@@ -12,36 +15,44 @@ pub async fn idle(
         let packet = packets.recv().await?;
 
         match packet {
-            Packet::Ncn(ncn) => {
+            Packet::Ncn(ncn) if !ncn.ucid.local() => {
                 insim
                     .send_message(
                         &format!("Welcome. No game is currently in progress."),
                         ncn.ucid,
                     )
-                    .await
-                    .unwrap();
+                    .await?;
             },
             Packet::Mso(mso) => {
                 if_chain::if_chain! {
-                    if mso.msg_from_textstart() == "!start";
+                    if let Ok(MyChatCommands::Start) = MyChatCommands::parse_with_prefix(mso.msg_from_textstart(), Some('!'));
                     if let Some(conn_info) = state.presence.connection(&mso.ucid).await;
                     if conn_info.admin;
                     then {
-                        println!("Transitioning to game");
+                        let result = timeout(Duration::from_secs(60), async {
+                            println!("Transitioning to game");
 
-                        let _ = insim.send_command("/end").await;
-                        println!("Waiting for end state");
-                        state.game.wait_for_end().await;
+                            let _ = insim.send_command("/end").await;
+                            let _ = insim.send_message("Waiting for track selection screen...", ConnectionId::ALL);
+                            state.game.wait_for_end().await;
 
-                        println!("REquesting track change");
-                        let _ = insim.send_command("/track FE1").await;
-                        println!("Waiting for track");
-                        state.game.wait_for_track(Track::Fe1).await;
+                            let _ = insim.send_message("Requesting track change", ConnectionId::ALL).await;
+                            let _ = insim.send_command("/track FE1").await;
 
-                        println!("Waiting for game to start");
-                        state.game.wait_for_racing().await;
+                            let _ = insim.send_message("Waiting for track", ConnectionId::ALL).await;
+                            state.game.wait_for_track(Track::Fe1).await;
 
-                        return Ok(GameState::Lobby);
+                            let _ = insim.send_message("Waiting for game to start", ConnectionId::ALL).await;
+                            state.game.wait_for_racing().await;
+                        }).await;
+
+                        if result.is_ok() {
+                            return Ok(GameState::Lobby)
+                        } else {
+                            insim.send_message("Failed to start game after 60 seconds.. going idle", ConnectionId::ALL).await?;
+                            return Ok(GameState::Idle)
+                        }
+
                     }
                 }
             },
