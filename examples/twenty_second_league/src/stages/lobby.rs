@@ -3,13 +3,13 @@ use std::time::Duration;
 use kitcar::time::countdown::Countdown;
 
 use crate::{
-    GameState, MyState,
+    GameState, MyContext,
     components::{RootPhase, RootProps},
 };
 
 pub async fn lobby(
     insim: insim::builder::SpawnedHandle,
-    state: MyState,
+    state: MyContext,
 ) -> anyhow::Result<GameState> {
     let mut packets = insim.subscribe();
 

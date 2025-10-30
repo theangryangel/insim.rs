@@ -8,13 +8,13 @@ use kitcar::{leaderboard::Leaderboard, time::countdown::Countdown};
 use tokio::time::sleep;
 
 use crate::{
-    GameState, MyState,
+    GameState, MyContext,
     components::{RootPhase, RootProps},
 };
 
 pub async fn game(
     insim: insim::builder::SpawnedHandle,
-    state: MyState,
+    state: MyContext,
 ) -> anyhow::Result<GameState> {
     let mut packets = insim.subscribe();
 

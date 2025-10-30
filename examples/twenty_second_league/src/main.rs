@@ -35,7 +35,7 @@ pub struct Config {
 }
 
 #[derive(Debug, Clone)]
-struct MyState {
+struct MyContext {
     pub ui: ui::ManagerHandle<components::Root>,
     pub presence: PresenceHandle,
     pub game: GameHandle,
@@ -44,7 +44,7 @@ struct MyState {
 #[derive(Debug)]
 struct MyGame {
     pub insim: insim::builder::SpawnedHandle,
-    pub state: MyState,
+    pub state: MyContext,
     pub desired_state: GameState,
 }
 
@@ -132,7 +132,7 @@ async fn main() -> Result<()> {
     let mut game = MyGame {
         insim: insim.clone(),
         desired_state: GameState::Idle,
-        state: MyState {
+        state: MyContext {
             ui: ui_handle,
             presence: presence_handle.clone(),
             game: game_state_handle,

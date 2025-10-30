@@ -1,10 +1,10 @@
 use insim::{Packet, core::track::Track};
 
-use crate::{GameState, MyState};
+use crate::{GameState, MyContext};
 
 pub async fn idle(
     insim: insim::builder::SpawnedHandle,
-    state: MyState,
+    state: MyContext,
 ) -> anyhow::Result<GameState> {
     let mut packets = insim.subscribe();
 
