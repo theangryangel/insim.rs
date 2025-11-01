@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-#[derive(Debug, serde::Deserialize, serde::Serialize, Clone)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, Clone, Copy)]
 /// Combo Extension, for use with kitcar::combos::ComboList
 pub struct ComboExt {
     /// Lap count

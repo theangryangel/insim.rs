@@ -1,103 +1,31 @@
 //! 20s league
 mod combo;
 mod components;
-mod stages;
+mod scenes;
+mod config;
+mod chat;
 
-use std::{fs, time::Duration};
-
-use anyhow::{Context, Result};
-use insim::{WithRequestId, identifiers::ConnectionId, insim::TinyType};
+use anyhow::Result;
+use humantime_serde::re::humantime::Duration;
+use insim::{identifiers::{ConnectionId, PlayerId}, insim::TinyType, WithRequestId};
 use kitcar::{
-    combos::ComboList,
-    game::{GameHandle, GameInfo},
-    presence::{Presence, PresenceHandle},
-    ui,
+    combos::Combo, game::GameInfo, leaderboard::Leaderboard, presence::Presence, ui
 };
+use tokio::task::JoinHandle;
 
-use crate::components::{RootPhase, RootProps};
+use crate::{chat::MyChatCommands, components::RootProps};
 
-/// Config
-#[derive(Debug, Clone, serde::Deserialize)]
-pub struct Config {
-    /// Server address
-    pub addr: String,
-    /// admin password
-    pub admin: Option<String>,
-    /// Warmup duration
-    #[serde(with = "humantime_serde")]
-    pub warmup_duration: Duration,
-    /// Combinations
-    pub combos: ComboList<combo::ComboExt>,
-}
-
-// Just derive and you're done!
-#[derive(Debug, PartialEq, kitcar::chat::ChatCommands)]
-#[allow(missing_docs)]
-pub enum MyChatCommands {
-    Echo { message: String },
-    Quit,
-    Start,
-    Rules,
-    Motd,
-    Help,
-}
+type MyUi = ui::ManagerHandle<components::Root>;
 
 #[derive(Debug, Clone)]
-struct MyContext {
-    pub ui: ui::ManagerHandle<components::Root>,
-    pub presence: PresenceHandle,
-    pub game: GameHandle,
-    #[allow(dead_code)]
-    pub config: ComboList<combo::ComboExt>,
-}
-
-#[derive(Debug)]
-struct MyGame {
-    pub insim: insim::builder::SpawnedHandle,
-    pub state: MyContext,
-    pub desired_state: GameState,
-}
-
-#[derive(Debug)]
 #[allow(dead_code)] // for exit. For now.
 enum GameState {
     Idle,
-    Lobby,
-    Game,
+    TrackRotation { combo: Combo<combo::ComboExt> },
+    Lobby { combo: Combo<combo::ComboExt> },
+    Round { round: u32, combo: Combo<combo::ComboExt>, remaining: Duration },
+    Victory,
     Exit,
-}
-
-impl MyGame {
-    async fn poll(&mut self) -> anyhow::Result<()> {
-        loop {
-            let mut handle = match self.desired_state {
-                GameState::Idle => {
-                    tokio::task::spawn(stages::idle(self.insim.clone(), self.state.clone()))
-                },
-                GameState::Lobby => {
-                    tokio::task::spawn(stages::lobby(self.insim.clone(), self.state.clone()))
-                },
-                GameState::Game => {
-                    tokio::task::spawn(stages::game(self.insim.clone(), self.state.clone()))
-                },
-                GameState::Exit => {
-                    break;
-                },
-            };
-
-            loop {
-                tokio::select! {
-                    result = &mut handle => {
-                        self.desired_state = result??;
-                        break;
-                    },
-                    // TODO: add something
-                }
-            }
-        }
-
-        Ok(())
-    }
 }
 
 #[tokio::main]
@@ -111,10 +39,7 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let config: Config = serde_norway::from_str(
-        &fs::read_to_string("config.yaml").context("could not read config.yaml")?,
-    )
-    .context("Could not parse config.yaml")?;
+    let config = config::Config::from_file("config.yaml")?;
 
     let (insim, _join_handle) = insim::tcp(config.addr.as_str())
         .isi_admin_password(config.admin.clone())
@@ -125,13 +50,14 @@ async fn main() -> Result<()> {
     let (ui_handle, _ui_thread) = ui::Manager::spawn::<components::Root>(
         insim.clone(),
         RootProps {
-            phase: RootPhase::Idle,
+            phase: GameState::Idle,
             show: true,
         },
     );
 
     let presence_handle = Presence::spawn(insim.clone(), 32);
     let game_state_handle = GameInfo::spawn(insim.clone(), 32);
+    let leaderboard_handle = Leaderboard::<PlayerId>::spawn(32);
 
     println!("20 Second League started!");
 
@@ -139,29 +65,62 @@ async fn main() -> Result<()> {
     let _ = insim.send(TinyType::Npl.with_request_id(2)).await;
     let _ = insim.send(TinyType::Sst.with_request_id(3)).await;
 
-    let mut game = MyGame {
-        insim: insim.clone(),
-        desired_state: GameState::Idle,
-        state: MyContext {
-            ui: ui_handle,
-            presence: presence_handle.clone(),
-            game: game_state_handle,
-            config: config.combos,
-        },
-    };
-
-    let game_fut = game.poll();
-    // pin for cancel safety so we can use a select! loop below.
-    tokio::pin!(game_fut);
-
     let mut packets = insim.subscribe();
+    let mut scene_handle: Option<JoinHandle<anyhow::Result<GameState>>> = None;
+    let mut scene = GameState::Idle;
 
     loop {
+        if scene_handle.is_none() {
+            scene_handle = Some(match scene {
+                GameState::Idle => {
+                    tokio::task::spawn(scenes::idle(
+                        insim.clone(), 
+                        presence_handle.clone(), 
+                        leaderboard_handle.clone(), 
+                        config.combos.clone()
+                    ))
+                },
+                GameState::TrackRotation { ref combo } => {
+                    tokio::task::spawn(scenes::track_rotation(
+                        insim.clone(), combo.clone(), game_state_handle.clone()
+                    ))
+                }
+                GameState::Lobby { ref combo } => {
+                    tokio::task::spawn(scenes::lobby(
+                        insim.clone(), combo.clone(), ui_handle.clone(), config.lobby_duration
+                    ))
+                },
+                GameState::Round { round, ref combo, .. } => {
+                    tokio::task::spawn(scenes::round(
+                        insim.clone(), 
+                        leaderboard_handle.clone(), 
+                        round, 
+                        combo.clone(), 
+                        game_state_handle.clone(), 
+                        ui_handle.clone(),
+                        config.scores_by_position.clone(),
+                    ))
+                },
+                GameState::Victory => {
+                    tokio::task::spawn(scenes::victory(insim.clone(), leaderboard_handle.clone()))
+                },
+                GameState::Exit => {
+                    break;
+                },
+            });
+        }
+
         tokio::select! {
-            result = &mut game_fut => {
-                result?;
-                break;
+            Some(result) = async {
+                match scene_handle.as_mut() {
+                    Some(h) => h.await.ok(),
+                    None => None,
+                }
+            } => {
+                scene_handle = None;
+                scene = result?;
             },
+
             packet = packets.recv() => {
                 match packet? {
                     insim::Packet::Mso(mso) => {
@@ -186,6 +145,7 @@ async fn main() -> Result<()> {
                     _ => {}
                 }
             }
+
 
         }
     }

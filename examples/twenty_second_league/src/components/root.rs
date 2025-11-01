@@ -8,13 +8,13 @@ Forget being the fastest, the goal is to be the most precise. Finish in as close
 Full contact is allowed.
 Just remember: Don't be a dick. We're all here to have fun!";
 
-use crate::components::{
+use crate::{components::{
     motd::{Motd, MotdProps},
     topbar::{Topbar, TopbarProps},
-};
+}, GameState};
 
 #[derive(Debug, Clone)]
-pub enum RootPhase {
+pub enum RootPhase { // FIXME: remove this and replace with GameState being passed into the UI
     Idle,
     Restarting,
     Game {
@@ -22,41 +22,46 @@ pub enum RootPhase {
         total_rounds: usize,
         remaining: Duration,
     },
-    Victory,
     Lobby {
         remaining: Duration,
     },
 }
 
 #[component]
-pub(crate) fn Root(phase: RootPhase, show: bool) -> Option<Element> {
+pub(crate) fn Root(phase: GameState, show: bool) -> Option<Element> {
     if !show {
         return None;
     }
 
     let text = match phase {
-        RootPhase::Idle => "No game in progress".white(),
-        RootPhase::Restarting => "Loading...".white(),
-        RootPhase::Game {
-            round,
-            remaining,
-            total_rounds,
-        } => {
-            let seconds = remaining.as_secs() % 60;
-            let minutes = (remaining.as_secs() / 60) % 60;
+        GameState::Idle => "No game in progress".white(),
+        GameState::TrackRotation { combo } => {
             format!(
-                "Round {}/{} · {:02}:{:02} remaining",
-                round, total_rounds, minutes, seconds
+                "Loading track {}",
+                combo.track(),
             )
             .white()
         },
-        RootPhase::Lobby { remaining } => {
+        GameState::Round { round, combo, remaining } => {
+            let seconds = remaining.as_secs() % 60;
+            let minutes = (remaining.as_secs() / 60) % 60;
+            format!(
+                "Round {}/?? · {:02}:{:02} remaining",
+                round, minutes, seconds
+            )
+            .white()
+        },
+        GameState::Lobby { combo } => {
             let seconds = remaining.as_secs() % 60;
             let minutes = (remaining.as_secs() / 60) % 60;
             format!("Lobby · {:02}:{:02} remaining", minutes, seconds).white()
         },
-
-        RootPhase::Victory => "Victory!".white(),
+        GameState::Victory => {
+            format!("Victory. Todo")
+        },
+        GameState::Exit => {
+            unreachable!()
+        }
     };
 
     let interface = cx

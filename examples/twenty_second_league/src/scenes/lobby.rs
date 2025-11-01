@@ -1,21 +1,22 @@
 use std::time::Duration;
 
-use kitcar::time::countdown::Countdown;
+use kitcar::{combos::Combo, time::countdown::Countdown};
 
 use crate::{
-    GameState, MyContext,
-    components::{RootPhase, RootProps},
+    combo::ComboExt, components::{RootPhase, RootProps}, GameState
 };
 
 pub async fn lobby(
     insim: insim::builder::SpawnedHandle,
-    state: MyContext,
+    combo: Combo<ComboExt>,
+    ui: crate::MyUi,
+    lobby_duration: Duration,
 ) -> anyhow::Result<GameState> {
     let mut packets = insim.subscribe();
 
     let mut countdown = Countdown::new(
         Duration::from_secs(1),
-        60, // FIXME: pull from config
+        lobby_duration.as_secs() as u32, // FIXME
     );
 
     loop {
@@ -25,7 +26,7 @@ pub async fn lobby(
                     println!("Waiting for lobby to complete!");
                     let remaining_duration = countdown.remaining_duration();
 
-                    let _ = state.ui.update(RootProps {
+                    let _ = ui.update(RootProps {
                         show: true,
                         phase: RootPhase::Lobby {
                             remaining: remaining_duration
@@ -45,5 +46,5 @@ pub async fn lobby(
         }
     }
 
-    Ok(GameState::Game)
+    Ok(GameState::Round { round: 1, combo })
 }

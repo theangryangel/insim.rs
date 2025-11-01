@@ -1,6 +1,17 @@
 addr: "188.122.74.156:53321"
 admin: "rFcGByyvRevV"
-warmup_duration: 5mins
+lobby_duration: 2mins
+scores_by_position: 
+  - 10
+  - 9
+  - 8
+  - 7
+  - 6 
+  - 5 
+  - 4
+  - 3
+  - 2
+  - 1
 
 combos:
   - track: FE1X
