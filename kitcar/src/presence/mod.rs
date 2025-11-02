@@ -80,6 +80,16 @@ impl Presence {
         self.connections.get(ucid)
     }
 
+    /// Fetch one connection by player
+    pub fn connection_by_player(&self, plid: &PlayerId) -> Option<&ConnectionInfo> {
+        let player = self.players.get(plid);
+        if let Some(player) = player {
+            self.connections.get(&player.ucid)
+        } else {
+            None
+        }
+    }
+
     /// Fetch player count
     pub fn player_count(&self) -> usize {
         self.players.len()
@@ -229,6 +239,9 @@ impl Presence {
                             PresenceQuery::Connection { ucid, response_tx } => {
                                 let _ = response_tx.send(inner.connection(&ucid).cloned());
                             },
+                            PresenceQuery::ConnectionByPlayer { plid, response_tx } => {
+                                let _ = response_tx.send(inner.connection_by_player(&plid).cloned());
+                            },
                             PresenceQuery::Players { response_tx } => {
                                 let _ = response_tx.send(inner.players().cloned().collect());
                             },
@@ -254,9 +267,12 @@ enum PresenceQuery {
     Connections {
         response_tx: oneshot::Sender<Vec<ConnectionInfo>>,
     },
-
     Connection {
         ucid: ConnectionId,
+        response_tx: oneshot::Sender<Option<ConnectionInfo>>,
+    },
+    ConnectionByPlayer {
+        plid: PlayerId,
         response_tx: oneshot::Sender<Option<ConnectionInfo>>,
     },
     Players {
@@ -304,6 +320,18 @@ impl PresenceHandle {
         self.query_tx
             .send(PresenceQuery::Connection {
                 ucid: *ucid,
+                response_tx: tx,
+            })
+            .await
+            .ok()?;
+        rx.await.ok()?
+    }
+    /// get a connection by player
+    pub async fn connection_by_player(&self, plid: &PlayerId) -> Option<ConnectionInfo> {
+        let (tx, rx) = oneshot::channel();
+        self.query_tx
+            .send(PresenceQuery::ConnectionByPlayer {
+                plid: *plid,
                 response_tx: tx,
             })
             .await

@@ -1,9 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
-use insim::{
-    Packet,
-    identifiers::{ConnectionId, PlayerId},
-};
+use insim::{Packet, identifiers::ConnectionId};
 use kitcar::{combos::Combo, time::countdown::Countdown};
 use tokio::time::sleep;
 
@@ -19,7 +16,7 @@ pub async fn round(cx: Context, round: u32, combo: Combo<ComboExt>) -> anyhow::R
     let target = combo.extensions().target_time;
     let rounds = combo.extensions().rounds;
     let available_time = combo.extensions().restart_after;
-    let mut round_scores: HashMap<PlayerId, Duration> = HashMap::new();
+    let mut round_scores: HashMap<String, Duration> = HashMap::new();
 
     cx.insim.send_command("/restart").await?;
 
@@ -70,7 +67,10 @@ pub async fn round(cx: Context, round: u32, combo: Combo<ComboExt>) -> anyhow::R
             },
             packet = packets.recv() => match packet.unwrap() {
                 Packet::Fin(fin) => {
-                    let _ = round_scores.insert(fin.plid, fin.ttime);
+                    let conn_info = cx.presence.connection_by_player(&fin.plid).await;
+                    if let Some(conn_info) = conn_info {
+                        let _ = round_scores.insert(conn_info.uname, fin.ttime);
+                    }
                 },
                 Packet::Ncn(ncn) => {
                     cx.insim
@@ -80,10 +80,6 @@ pub async fn round(cx: Context, round: u32, combo: Combo<ComboExt>) -> anyhow::R
                         )
                         .await
                         .unwrap();
-                },
-                Packet::Pll(pll) => {
-                    // FIXME: probably unfair, but fuck it for now
-                    let _ = round_scores.remove(&pll.plid);
                 },
                 _ => {},
             }
@@ -96,20 +92,20 @@ pub async fn round(cx: Context, round: u32, combo: Combo<ComboExt>) -> anyhow::R
     let mut ordered = round_scores
         .drain()
         .map(|(k, v)| (k, target.abs_diff(v)))
-        .collect::<Vec<(PlayerId, Duration)>>();
+        .collect::<Vec<(String, Duration)>>();
 
     ordered.sort_by(|a, b| a.1.cmp(&b.1));
 
-    for (i, (plid, delta)) in ordered
+    for (i, (uname, delta)) in ordered
         .into_iter()
         .take(scores_by_position.len())
         .enumerate()
     {
         let points = scores_by_position[i];
-        let _ = cx.leaderboard.add_score(plid, points as i32).await;
+        let _ = cx.leaderboard.add_score(uname.clone(), points as i32).await;
         tracing::info!(
             "Player {} scored {} points (delta: {:?})",
-            plid,
+            uname,
             points,
             delta
         );

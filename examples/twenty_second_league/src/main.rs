@@ -8,11 +8,7 @@ mod scenes;
 use std::sync::Arc;
 
 use anyhow::Result;
-use insim::{
-    WithRequestId,
-    identifiers::{ConnectionId, PlayerId},
-    insim::TinyType,
-};
+use insim::{WithRequestId, identifiers::ConnectionId, insim::TinyType};
 use kitcar::{
     chat::Parse,
     combos::Combo,
@@ -47,7 +43,7 @@ struct Context {
     ui: ui::ManagerHandle<components::Root>,
     presence: PresenceHandle,
     game: GameHandle,
-    leaderboard: LeaderboardHandle<PlayerId>,
+    leaderboard: LeaderboardHandle<String>,
     config: Arc<Config>,
 }
 
@@ -89,7 +85,7 @@ async fn main() -> Result<()> {
         ui: ui_handle.clone(),
         presence: Presence::spawn(insim.clone(), 32),
         game: GameInfo::spawn(insim.clone(), 32),
-        leaderboard: Leaderboard::<PlayerId>::spawn(32),
+        leaderboard: Leaderboard::<String>::spawn(32),
         config: Arc::new(config.clone()),
     };
 
