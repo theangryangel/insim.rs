@@ -38,8 +38,12 @@ impl RenderDiff {
     }
 }
 
+pub type ChatFn = Box<dyn Fn(&str) -> bool>;
+
 /// Ui for a single connection
 pub struct Runtime<C: Component> {
+    // FIXME: we need to make this generic around anything that
+    // impl kitcar::chat::Parse
     // Who are we running this UI for?
     ucid: ConnectionId,
     // ClickId pool
@@ -53,7 +57,7 @@ pub struct Runtime<C: Component> {
     // Click handlers
     clicks: HashMap<ClickId, Box<dyn Fn()>>,
     // Chat handlers,
-    chats: HashMap<String, Vec<Box<dyn Fn()>>>,
+    chats: Vec<ChatFn>,
     // Has the UI been removed through user request?
     blocked: bool,
     _marker: PhantomData<C>,
@@ -74,7 +78,7 @@ impl<C: Component> Runtime<C> {
             last_layout: None,
             component_states: HashMap::new(),
             clicks: HashMap::new(),
-            chats: HashMap::new(),
+            chats: Vec::new(),
             blocked: false,
             _marker: PhantomData,
         }
@@ -87,15 +91,14 @@ impl<C: Component> Runtime<C> {
     }
 
     pub fn on_chat(&mut self, mso: &Mso) -> bool {
-        if let Some(handlers) = self.chats.get_mut(mso.msg_from_textstart()) {
-            for handler in handlers {
-                handler();
+        let mut render = false;
+        for handler in &self.chats {
+            let res = handler(mso.msg_from_textstart());
+            if res {
+                render = true;
             }
-
-            return true;
         }
-
-        false
+        render
     }
 
     /// Unblock
@@ -241,9 +244,6 @@ impl<C: Component> Runtime<C> {
             .collect();
 
         self.last_layout = Some(next_layout);
-
-        println!("clicks = {:?}", self.clicks.len());
-        println!("chats = {:?}", self.chats.len());
 
         if to_update.is_empty() && to_remove.is_empty() {
             None

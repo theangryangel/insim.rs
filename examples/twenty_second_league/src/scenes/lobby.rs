@@ -3,43 +3,47 @@ use std::time::Duration;
 use kitcar::{combos::Combo, time::countdown::Countdown};
 
 use crate::{
-    combo::ComboExt, components::{RootPhase, RootProps}, GameState
+    Context, GameState,
+    combo::ComboExt,
+    components::{RootProps, RootScene},
 };
 
-pub async fn lobby(
-    insim: insim::builder::SpawnedHandle,
-    combo: Combo<ComboExt>,
-    ui: crate::MyUi,
-    lobby_duration: Duration,
-) -> anyhow::Result<GameState> {
-    let mut packets = insim.subscribe();
+pub async fn lobby(cx: Context, combo: Combo<ComboExt>) -> anyhow::Result<GameState> {
+    let mut packets = cx.insim.subscribe();
+
+    let _ = cx.ui.update(RootProps {
+        scene: RootScene::Lobby {
+            combo: combo.clone(),
+            remaining: combo.extensions().restart_after,
+        },
+    });
 
     let mut countdown = Countdown::new(
         Duration::from_secs(1),
-        lobby_duration.as_secs() as u32, // FIXME
+        cx.config.lobby_duration.as_secs() as u32, // FIXME
     );
 
     loop {
         tokio::select! {
             remaining = countdown.tick() => match remaining {
                 Some(_) => {
-                    println!("Waiting for lobby to complete!");
+                    tracing::info!("Waiting for lobby to complete!");
                     let remaining_duration = countdown.remaining_duration();
 
-                    let _ = ui.update(RootProps {
-                        show: true,
-                        phase: RootPhase::Lobby {
-                            remaining: remaining_duration
-                        }
+                    let _ = cx.ui.update(RootProps {
+                        scene: RootScene::Lobby { combo: combo.clone(), remaining: remaining_duration }
                     });
                 },
                 None => {
+                    let _ = cx.ui.update(RootProps {
+                        scene: RootScene::Lobby { combo: combo.clone(), remaining: Duration::from_secs(0) }
+                    });
                     break;
                 }
             },
             packet = packets.recv() => match packet {
                 Ok(packet) => {
-                    println!("PhaseLobby: {:?}", packet);
+                    tracing::debug!("PhaseLobby: {:?}", packet);
                 },
                 _ => {}
             }

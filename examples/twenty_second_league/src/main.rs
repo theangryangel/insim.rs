@@ -1,31 +1,54 @@
 //! 20s league
+mod chat;
 mod combo;
 mod components;
-mod scenes;
 mod config;
-mod chat;
+mod scenes;
+
+use std::sync::Arc;
 
 use anyhow::Result;
-use humantime_serde::re::humantime::Duration;
-use insim::{identifiers::{ConnectionId, PlayerId}, insim::TinyType, WithRequestId};
+use insim::{
+    WithRequestId,
+    identifiers::{ConnectionId, PlayerId},
+    insim::TinyType,
+};
 use kitcar::{
-    combos::Combo, game::GameInfo, leaderboard::Leaderboard, presence::Presence, ui
+    chat::Parse,
+    combos::Combo,
+    game::{GameHandle, GameInfo},
+    leaderboard::{Leaderboard, LeaderboardHandle},
+    presence::{Presence, PresenceHandle},
+    ui,
 };
 use tokio::task::JoinHandle;
 
-use crate::{chat::MyChatCommands, components::RootProps};
-
-type MyUi = ui::ManagerHandle<components::Root>;
+use crate::{chat::MyChatCommands, components::RootProps, config::Config};
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // for exit. For now.
 enum GameState {
     Idle,
-    TrackRotation { combo: Combo<combo::ComboExt> },
-    Lobby { combo: Combo<combo::ComboExt> },
-    Round { round: u32, combo: Combo<combo::ComboExt>, remaining: Duration },
+    TrackRotation {
+        combo: Combo<combo::ComboExt>,
+    },
+    Lobby {
+        combo: Combo<combo::ComboExt>,
+    },
+    Round {
+        round: u32,
+        combo: Combo<combo::ComboExt>,
+    },
     Victory,
-    Exit,
+}
+
+#[derive(Debug, Clone)]
+struct Context {
+    insim: insim::builder::SpawnedHandle,
+    ui: ui::ManagerHandle<components::Root>,
+    presence: PresenceHandle,
+    game: GameHandle,
+    leaderboard: LeaderboardHandle<PlayerId>,
+    config: Arc<Config>,
 }
 
 #[tokio::main]
@@ -44,69 +67,50 @@ async fn main() -> Result<()> {
     let (insim, _join_handle) = insim::tcp(config.addr.as_str())
         .isi_admin_password(config.admin.clone())
         .isi_iname("cadence-cup".to_owned())
+        .isi_prefix('!')
         .spawn(100)
         .await?;
 
     let (ui_handle, _ui_thread) = ui::Manager::spawn::<components::Root>(
         insim.clone(),
         RootProps {
-            phase: GameState::Idle,
-            show: true,
+            scene: components::RootScene::Idle,
         },
     );
 
-    let presence_handle = Presence::spawn(insim.clone(), 32);
-    let game_state_handle = GameInfo::spawn(insim.clone(), 32);
-    let leaderboard_handle = Leaderboard::<PlayerId>::spawn(32);
-
-    println!("20 Second League started!");
-
-    let _ = insim.send(TinyType::Ncn.with_request_id(1)).await;
-    let _ = insim.send(TinyType::Npl.with_request_id(2)).await;
-    let _ = insim.send(TinyType::Sst.with_request_id(3)).await;
+    tracing::info!("20 Second League started!");
 
     let mut packets = insim.subscribe();
     let mut scene_handle: Option<JoinHandle<anyhow::Result<GameState>>> = None;
     let mut scene = GameState::Idle;
 
+    let cx = Context {
+        insim: insim.clone(),
+        ui: ui_handle.clone(),
+        presence: Presence::spawn(insim.clone(), 32),
+        game: GameInfo::spawn(insim.clone(), 32),
+        leaderboard: Leaderboard::<PlayerId>::spawn(32),
+        config: Arc::new(config.clone()),
+    };
+
+    let _ = insim.send(TinyType::Ncn.with_request_id(1)).await;
+    let _ = insim.send(TinyType::Npl.with_request_id(2)).await;
+    let _ = insim.send(TinyType::Sst.with_request_id(3)).await;
+
     loop {
         if scene_handle.is_none() {
             scene_handle = Some(match scene {
-                GameState::Idle => {
-                    tokio::task::spawn(scenes::idle(
-                        insim.clone(), 
-                        presence_handle.clone(), 
-                        leaderboard_handle.clone(), 
-                        config.combos.clone()
-                    ))
-                },
+                GameState::Idle => tokio::task::spawn(scenes::idle(cx.clone())),
                 GameState::TrackRotation { ref combo } => {
-                    tokio::task::spawn(scenes::track_rotation(
-                        insim.clone(), combo.clone(), game_state_handle.clone()
-                    ))
-                }
+                    tokio::task::spawn(scenes::track_rotation(cx.clone(), combo.clone()))
+                },
                 GameState::Lobby { ref combo } => {
-                    tokio::task::spawn(scenes::lobby(
-                        insim.clone(), combo.clone(), ui_handle.clone(), config.lobby_duration
-                    ))
+                    tokio::task::spawn(scenes::lobby(cx.clone(), combo.clone()))
                 },
-                GameState::Round { round, ref combo, .. } => {
-                    tokio::task::spawn(scenes::round(
-                        insim.clone(), 
-                        leaderboard_handle.clone(), 
-                        round, 
-                        combo.clone(), 
-                        game_state_handle.clone(), 
-                        ui_handle.clone(),
-                        config.scores_by_position.clone(),
-                    ))
-                },
-                GameState::Victory => {
-                    tokio::task::spawn(scenes::victory(insim.clone(), leaderboard_handle.clone()))
-                },
-                GameState::Exit => {
-                    break;
-                },
+                GameState::Round {
+                    round, ref combo, ..
+                } => tokio::task::spawn(scenes::round(cx.clone(), round, combo.clone())),
+                GameState::Victory => tokio::task::spawn(scenes::victory(cx.clone())),
             });
         }
 
@@ -124,11 +128,10 @@ async fn main() -> Result<()> {
             packet = packets.recv() => {
                 match packet? {
                     insim::Packet::Mso(mso) => {
-
-                        match MyChatCommands::parse_with_prefix(mso.msg_from_textstart(), Some('!')) {
+                        match MyChatCommands::parse(mso.msg_from_textstart()) {
                             Ok(MyChatCommands::Quit) => {
                                 if_chain::if_chain! {
-                                    if let Some(conn_info) = presence_handle.connection(&mso.ucid).await;
+                                    if let Some(conn_info) = cx.presence.connection(&mso.ucid).await;
                                     if conn_info.admin;
                                     then {
                                         insim.send_message("Quitting.. bye!", ConnectionId::ALL).await?;
@@ -137,7 +140,10 @@ async fn main() -> Result<()> {
                                 }
                             },
                             Ok(MyChatCommands::Help) => {
-                                println!("{:?}", MyChatCommands::help());
+                                insim.send_message("Available commands:", mso.ucid).await?;
+                                for cmd in MyChatCommands::help() {
+                                    insim.send_message(cmd, mso.ucid).await?;
+                                }
                             },
                             _ => {},
                         }
@@ -145,8 +151,6 @@ async fn main() -> Result<()> {
                     _ => {}
                 }
             }
-
-
         }
     }
 

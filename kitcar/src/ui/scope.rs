@@ -3,6 +3,7 @@ use std::{any::Any, collections::HashMap, fmt::Debug};
 use crate::ui::{
     Component, ComponentPath, Element,
     component_state::ComponentState,
+    runtime::ChatFn,
     vdom::{Button, Container},
 };
 
@@ -11,7 +12,7 @@ pub struct Scope<'a> {
     use_state_index: usize,
     child_index: usize,
     component_states: &'a mut HashMap<ComponentPath, Box<dyn Any>>,
-    chat_commands: &'a mut HashMap<String, Vec<Box<dyn Fn()>>>,
+    chat_commands: &'a mut Vec<ChatFn>,
     current_element_id: usize,
 }
 
@@ -25,7 +26,7 @@ impl<'a> Scope<'a> {
     /// New!
     pub fn new(
         component_states: &'a mut HashMap<ComponentPath, Box<dyn Any>>,
-        chat_commands: &'a mut HashMap<String, Vec<Box<dyn Fn()>>>,
+        chat_commands: &'a mut Vec<ChatFn>,
     ) -> Self {
         Self {
             path: vec![0], // FIXME: dont just alias the type
@@ -121,12 +122,7 @@ impl<'a> Scope<'a> {
     }
 
     /// On a chat command
-    pub fn use_chat(&mut self, command: String, f: impl Fn() + 'static) {
-        self.chat_commands
-            .entry(command)
-            .or_default()
-            .push(Box::new(f));
-
-        println!("{:?}", self.chat_commands.len());
+    pub fn use_chat(&mut self, f: impl Fn(&str) -> bool + 'static) {
+        self.chat_commands.push(Box::new(f));
     }
 }

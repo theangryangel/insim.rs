@@ -1,4 +1,10 @@
-pub use kitcar_macros::ChatCommands;
+pub use kitcar_macros::ParseChat as Parse;
+
+pub trait Parse: Sized {
+    fn parse(input: &str) -> Result<Self, ParseError>;
+    fn help() -> Vec<&'static str>;
+    fn prefix() -> Option<char>;
+}
 
 pub trait FromArg: Sized {
     fn from_arg(s: &str) -> Result<Self, String>;

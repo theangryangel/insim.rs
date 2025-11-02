@@ -4,45 +4,42 @@ use insim::{
     Packet,
     identifiers::{ConnectionId, PlayerId},
 };
-use kitcar::{combos::Combo, game::GameHandle, leaderboard::LeaderboardHandle, time::countdown::Countdown};
+use kitcar::{combos::Combo, time::countdown::Countdown};
 use tokio::time::sleep;
 
 use crate::{
-    combo::ComboExt, components::{RootPhase, RootProps}, GameState, MyUi
+    Context, GameState,
+    combo::ComboExt,
+    components::{RootProps, RootScene},
 };
 
-pub async fn round(
-    insim: insim::builder::SpawnedHandle,
-    leaderboard: LeaderboardHandle<PlayerId>,
-    round: u32,
-    combo: Combo<ComboExt>,
-    game: GameHandle,
-    ui: MyUi,
-    scores_by_position: Vec<i32>,
-) -> anyhow::Result<GameState> {
-    let mut packets = insim.subscribe();
+pub async fn round(cx: Context, round: u32, combo: Combo<ComboExt>) -> anyhow::Result<GameState> {
+    let mut packets = cx.insim.subscribe();
 
     let target = combo.extensions().target_time;
     let rounds = combo.extensions().rounds;
+    let available_time = combo.extensions().restart_after;
     let mut round_scores: HashMap<PlayerId, Duration> = HashMap::new();
 
-    insim.send_command("/restart").await?;
+    cx.insim.send_command("/restart").await?;
 
-    let _ = ui.update(RootProps {
-        show: true,
-        phase: RootPhase::Restarting,
+    let _ = cx.ui.update(RootProps {
+        scene: RootScene::Round {
+            round,
+            combo: combo.clone(),
+            remaining: available_time.into(),
+        },
     });
 
-    println!("Starting round {}/{}", round, rounds);
-
-    println!("Waiting for game to start");
+    tracing::info!("Starting round {}/{}", round, rounds);
+    tracing::debug!("Waiting for game to start");
 
     // TODO: how do we prevent this from causing issues
     // its convenient. do we care?
-    game.wait_for_racing().await;
+    cx.game.wait_for_racing().await;
     sleep(Duration::from_secs(11)).await;
 
-    insim
+    cx.insim
         .send_message(
             &format!("Round {}/{} - Get close to 20s!", round, rounds),
             ConnectionId::ALL,
@@ -50,24 +47,20 @@ pub async fn round(
         .await
         .unwrap();
 
-    let mut countdown = Countdown::new(
-        Duration::from_secs(1),
-        60, // FIXME: pull from config
-    );
+    let mut countdown = Countdown::new(Duration::from_secs(1), available_time.as_secs() as u32);
 
     loop {
         tokio::select! {
             remaining = countdown.tick() => match remaining {
                 Some(_) => {
                     let remaining_duration = countdown.remaining_duration();
-                    println!("{:?}s remaining!", &remaining_duration);
+                    tracing::debug!("{:?}s remaining!", &remaining_duration);
 
-                    let _ = ui.update(RootProps {
-                        show: true,
-                        phase: RootPhase::Game {
-                            round: round  as usize,
-                            total_rounds: rounds as usize,
-                            remaining: remaining_duration
+                    let _ = cx.ui.update(RootProps {
+                        scene: RootScene::Round {
+                            round,
+                            combo: combo.clone(),
+                            remaining: remaining_duration,
                         }
                     });
                 },
@@ -80,7 +73,7 @@ pub async fn round(
                     let _ = round_scores.insert(fin.plid, fin.ttime);
                 },
                 Packet::Ncn(ncn) => {
-                    insim
+                    cx.insim
                         .send_message(
                             "Welcome to 20 Second League! Get as close to 20s as possible.",
                             ncn.ucid,
@@ -97,6 +90,8 @@ pub async fn round(
         }
     }
 
+    let scores_by_position = &cx.config.scores_by_position;
+
     // score round
     let mut ordered = round_scores
         .drain()
@@ -105,16 +100,22 @@ pub async fn round(
 
     ordered.sort_by(|a, b| a.1.cmp(&b.1));
 
-    for (i, (plid, delta)) in ordered.into_iter().take(scores_by_position.len()).enumerate() {
+    for (i, (plid, delta)) in ordered
+        .into_iter()
+        .take(scores_by_position.len())
+        .enumerate()
+    {
         let points = scores_by_position[i];
-        let _ = leaderboard.add_score(plid, points as i32).await;
-        println!(
+        let _ = cx.leaderboard.add_score(plid, points as i32).await;
+        tracing::info!(
             "Player {} scored {} points (delta: {:?})",
-            plid, points, delta
+            plid,
+            points,
+            delta
         );
     }
 
-    insim
+    cx.insim
         .send_message(&format!("Round {} complete!", round), ConnectionId::ALL)
         .await
         .unwrap();
@@ -123,14 +124,32 @@ pub async fn round(
         // TODO: send leaderboard
         Ok(GameState::Victory)
     } else {
-        Ok(GameState::Round { round: round + 1, combo })
+        Ok(GameState::Round {
+            round: round + 1,
+            combo,
+        })
     }
 }
 
+pub async fn victory(cx: Context) -> anyhow::Result<GameState> {
+    cx.ui.update(RootProps {
+        scene: RootScene::Victory {
+            remaining: cx.config.victory_duration,
+        },
+    });
 
-pub async fn victory(
-    _insim: insim::builder::SpawnedHandle, _leaderboard: LeaderboardHandle<PlayerId>,
-) -> anyhow::Result<GameState> {
+    let mut countdown = Countdown::new(
+        Duration::from_secs(1),
+        cx.config.victory_duration.as_secs() as u32,
+    );
+
+    while let Some(_) = countdown.tick().await {
+        let remaining = countdown.remaining_duration();
+
+        let _ = cx.ui.update(RootProps {
+            scene: RootScene::Victory { remaining },
+        });
+    }
+
     Ok(GameState::Idle)
 }
-

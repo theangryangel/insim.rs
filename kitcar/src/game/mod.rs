@@ -177,7 +177,7 @@ impl GameHandle {
     /// Wait for track to load
     pub async fn wait_for_track(&self, track: Track) {
         self.wait_for(|info| {
-            println!("waiting for track {:?}", info);
+            tracing::debug!("waiting for track {:?}", info);
             if_chain::if_chain! {
                     if let Some(state_track) = info.track.as_ref();
                     if state_track == &track;
@@ -198,7 +198,7 @@ impl GameHandle {
     /// Wait for track to load
     pub async fn wait_for_racing(&self) {
         self.wait_for(|info| {
-            println!("waiting for racing {:?}", info);
+            tracing::debug!("waiting for racing {:?}", info);
             if_chain::if_chain! {
                     if info.flags.is_in_game();
                     if matches!(info.racing, RaceInProgress::Racing);

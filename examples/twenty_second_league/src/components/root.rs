@@ -1,67 +1,81 @@
 use std::time::Duration;
 
 use insim::core::string::colours::Colourify;
-use kitcar::ui::{Element, Scope, component};
+use kitcar::{
+    combos::Combo,
+    ui::{Element, Scope, component},
+};
 
 const WELCOME: &str = "Welcome drivers!
 Forget being the fastest, the goal is to be the most precise. Finish in as close to 20secs as possible!
 Full contact is allowed.
 Just remember: Don't be a dick. We're all here to have fun!";
 
-use crate::{components::{
-    motd::{Motd, MotdProps},
-    topbar::{Topbar, TopbarProps},
-}, GameState};
+use crate::{
+    combo::ComboExt,
+    components::{
+        motd::{Motd, MotdProps},
+        topbar::{Topbar, TopbarProps},
+    },
+};
 
 #[derive(Debug, Clone)]
-pub enum RootPhase { // FIXME: remove this and replace with GameState being passed into the UI
+pub enum RootScene {
     Idle,
-    Restarting,
-    Game {
-        round: usize,
-        total_rounds: usize,
+    TrackRotation {
+        combo: Combo<ComboExt>,
+    },
+    Round {
+        combo: Combo<ComboExt>,
+        round: u32,
         remaining: Duration,
     },
     Lobby {
+        combo: Combo<ComboExt>,
+        remaining: Duration,
+    },
+    Victory {
         remaining: Duration,
     },
 }
 
 #[component]
-pub(crate) fn Root(phase: GameState, show: bool) -> Option<Element> {
-    if !show {
-        return None;
-    }
-
-    let text = match phase {
-        GameState::Idle => "No game in progress".white(),
-        GameState::TrackRotation { combo } => {
-            format!(
-                "Loading track {}",
-                combo.track(),
-            )
-            .white()
-        },
-        GameState::Round { round, combo, remaining } => {
+pub(crate) fn Root(scene: RootScene) -> Option<Element> {
+    let text = match scene {
+        RootScene::Idle => "No game in progress".white(),
+        RootScene::TrackRotation { combo } => format!("Loading track {}", combo.track(),).white(),
+        RootScene::Round {
+            round,
+            combo,
+            remaining,
+        } => {
             let seconds = remaining.as_secs() % 60;
             let minutes = (remaining.as_secs() / 60) % 60;
             format!(
-                "Round {}/?? · {:02}:{:02} remaining",
-                round, minutes, seconds
+                "Round {}/{} · {:02}:{:02} remaining",
+                round,
+                combo.extensions().rounds,
+                minutes,
+                seconds
             )
             .white()
         },
-        GameState::Lobby { combo } => {
+        RootScene::Lobby { remaining, combo } => {
             let seconds = remaining.as_secs() % 60;
             let minutes = (remaining.as_secs() / 60) % 60;
-            format!("Lobby · {:02}:{:02} remaining", minutes, seconds).white()
+            format!(
+                "Warmup · {:02}:{:02} before {} rounds",
+                minutes,
+                seconds,
+                combo.extensions().rounds
+            )
+            .white()
         },
-        GameState::Victory => {
-            format!("Victory. Todo")
+        RootScene::Victory { remaining } => {
+            let seconds = remaining.as_secs() % 60;
+            let minutes = (remaining.as_secs() / 60) % 60;
+            format!("Thanks for playing · {:02}:{:02}", minutes, seconds).white()
         },
-        GameState::Exit => {
-            unreachable!()
-        }
     };
 
     let interface = cx
@@ -73,7 +87,6 @@ pub(crate) fn Root(phase: GameState, show: bool) -> Option<Element> {
         .with_child(cx.component::<Topbar>(TopbarProps { text }))
         .with_child(cx.component::<Motd>(MotdProps {
             text: WELCOME.to_owned(),
-            what: 1,
         }));
 
     Some(interface)

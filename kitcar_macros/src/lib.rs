@@ -90,7 +90,7 @@ pub fn component(_args: TokenStream, input: TokenStream) -> TokenStream {
 
 /// Convert an enum to something that impl a parse and parse_with_prefix function to handle chat
 /// messages
-#[proc_macro_derive(ChatCommands)]
+#[proc_macro_derive(ParseChat, attributes(chat))]
 pub fn derive_command_parser(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let enum_name = &input.ident;
@@ -99,12 +99,16 @@ pub fn derive_command_parser(input: TokenStream) -> TokenStream {
         panic!("CommandParser can only be derived for enums");
     };
 
+    let prefix = extract_prefix(&input.attrs);
+
     let mut match_arms = vec![];
     let mut help_entries = vec![];
 
     for variant in &data_enum.variants {
         let variant_name = &variant.ident;
         let cmd_name = variant_name.to_string().to_lowercase();
+
+        let doc_string = extract_doc_comments(&variant.attrs);
 
         match &variant.fields {
             Fields::Named(fields) => {
@@ -166,8 +170,20 @@ pub fn derive_command_parser(input: TokenStream) -> TokenStream {
                 let all_args = [required_args, optional_args].concat();
                 let args_str = all_args.join(" ");
 
+                let help_str = if let Some(doc) = doc_string {
+                    format!(
+                        " - {}{} {} - {}",
+                        prefix.unwrap_or(' '),
+                        cmd_name,
+                        args_str,
+                        doc
+                    )
+                } else {
+                    format!(" - {}{} {}", prefix.unwrap_or(' '), cmd_name, args_str)
+                };
+
                 help_entries.push(quote! {
-                    format!("{} {}", #cmd_name, #args_str)
+                    #help_str
                 });
 
                 match_arms.push(quote! {
@@ -182,8 +198,14 @@ pub fn derive_command_parser(input: TokenStream) -> TokenStream {
                 panic!("CommandParser does not support tuple variants");
             },
             Fields::Unit => {
+                let help_str = if let Some(doc) = doc_string {
+                    format!(" - {}{} - {}", prefix.unwrap_or(' '), cmd_name, doc)
+                } else {
+                    format!(" - {}{}", prefix.unwrap_or(' '), cmd_name)
+                };
+
                 help_entries.push(quote! {
-                    format!("{}", #cmd_name)
+                    #help_str
                 });
 
                 match_arms.push(quote! {
@@ -193,14 +215,29 @@ pub fn derive_command_parser(input: TokenStream) -> TokenStream {
         }
     }
 
+    let strip = if let Some(prefix_char) = prefix.as_ref() {
+        quote! {
+            if let Some(stripped) = input.strip_prefix(#prefix_char) {
+                stripped
+            } else {
+                return Err(kitcar::chat::ParseError::MissingPrefix(#prefix_char));
+            }
+        }
+    } else {
+        quote! {
+            input
+        }
+    };
+
+    let prefix_return = match prefix {
+        Some(c) => quote! { Some(#c) },
+        None => quote! { None },
+    };
+
     let expanded = quote! {
         #[allow(missing_docs)]
-        impl #enum_name {
-            pub fn parse(input: &str) -> Result<Self, kitcar::chat::ParseError> {
-                Self::parse_with_prefix(input, Some('!'))
-            }
-
-            pub fn parse_with_prefix(input: &str, prefix: Option<char>) -> Result<Self, kitcar::chat::ParseError> {
+        impl kitcar::chat::Parse for #enum_name {
+            fn parse(input: &str) -> Result<Self, kitcar::chat::ParseError> {
                 let input = input.trim();
 
                 if input.is_empty() {
@@ -208,15 +245,7 @@ pub fn derive_command_parser(input: TokenStream) -> TokenStream {
                 }
 
                 // Strip prefix if required
-                let input = if let Some(prefix_char) = prefix {
-                    if let Some(stripped) = input.strip_prefix(prefix_char) {
-                        stripped
-                    } else {
-                        return Err(kitcar::chat::ParseError::MissingPrefix(prefix_char));
-                    }
-                } else {
-                    input
-                };
+                let input = #strip;
 
                 let parts: Vec<&str> = input.split_whitespace().collect();
 
@@ -233,14 +262,14 @@ pub fn derive_command_parser(input: TokenStream) -> TokenStream {
                 }
             }
 
-            pub fn parse_no_prefix(input: &str) -> Result<Self, kitcar::chat::ParseError> {
-                Self::parse_with_prefix(input, None)
-            }
-
-            pub fn help() -> Vec<String> {
+            fn help() -> Vec<&'static str> {
                 vec![
                     #(#help_entries),*
                 ]
+            }
+
+            fn prefix() -> Option<char> {
+                #prefix_return
             }
         }
     };
@@ -270,4 +299,59 @@ fn extract_option_inner(ty: &syn::Type) -> &syn::Type {
         }
     }
     ty
+}
+
+fn extract_doc_comments(attrs: &[syn::Attribute]) -> Option<String> {
+    let docs: Vec<String> = attrs
+        .iter()
+        .filter_map(|attr| {
+            if attr.path().is_ident("doc") {
+                if let syn::Meta::NameValue(meta) = &attr.meta {
+                    if let syn::Expr::Lit(expr_lit) = &meta.value {
+                        if let syn::Lit::Str(lit_str) = &expr_lit.lit {
+                            return Some(lit_str.value().trim().to_string());
+                        }
+                    }
+                }
+            }
+            None
+        })
+        .collect();
+
+    if docs.is_empty() {
+        None
+    } else {
+        Some(docs.join(" "))
+    }
+}
+
+fn extract_prefix(attrs: &[syn::Attribute]) -> Option<char> {
+    for attr in attrs {
+        if attr.path().is_ident("chat") {
+            if let Ok(meta_list) = attr.meta.require_list() {
+                if let Ok(nested_metas) = meta_list.parse_args_with(
+                    syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
+                ) {
+                    for nested in nested_metas {
+                        if let syn::Meta::NameValue(nv) = nested {
+                            if nv.path.is_ident("prefix") {
+                                if let syn::Expr::Lit(expr_lit) = &nv.value {
+                                    if let syn::Lit::Char(lit_char) = &expr_lit.lit {
+                                        return Some(lit_char.value());
+                                    }
+                                    if let syn::Lit::Str(lit_str) = &expr_lit.lit {
+                                        let s = lit_str.value();
+                                        if s.len() == 1 {
+                                            return s.chars().next();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
 }

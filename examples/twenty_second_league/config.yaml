@@ -1,13 +1,14 @@
 addr: "188.122.74.156:53321"
 admin: "rFcGByyvRevV"
 lobby_duration: 2mins
-scores_by_position: 
+victory_duration: 5mins
+scores_by_position:
   - 10
   - 9
   - 8
   - 7
-  - 6 
-  - 5 
+  - 6
+  - 5
   - 4
   - 3
   - 2

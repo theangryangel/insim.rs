@@ -1,18 +1,30 @@
 use insim::core::string::colours::Colourify;
-use kitcar::ui::{Element, Scope, component, wrap_text};
+use kitcar::{
+    chat::Parse,
+    ui::{Element, Scope, component, wrap_text},
+};
 
-use crate::components::textbox::{Textbox, TextboxProps};
+use crate::{
+    chat::MyChatCommands,
+    components::textbox::{Textbox, TextboxProps},
+};
 
 #[component]
-pub fn Motd(text: String, what: u8) -> Option<Element> {
+pub fn Motd(text: String) -> Option<Element> {
     let show = cx.use_state(|| true);
 
     if !show.get() {
-        cx.use_chat("!rules".to_string(), {
-            println!("Adding chat/");
+        cx.use_chat({
             let show = show.clone();
-            move || {
-                show.set(true);
+            move |input: &str| -> bool {
+                if let Ok(MyChatCommands::Rules | MyChatCommands::Motd) =
+                    MyChatCommands::parse(input)
+                {
+                    show.set(true);
+                    true
+                } else {
+                    false
+                }
             }
         });
 
@@ -64,7 +76,6 @@ pub fn Motd(text: String, what: u8) -> Option<Element> {
                     .green()
                     .dark()
                     .on_click(Some(Box::new(move || {
-                        println!("I GOT CLICKED! {:?}", what);
                         show.set(false);
                     }))),
             ),

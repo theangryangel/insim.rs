@@ -37,7 +37,7 @@ mod test {
             0, // sp2
             0, // sp3
         ]);
-        raw.extend_from_slice(b"abcd");
+        raw.extend_from_slice(b"abcd\0\0\0\0");
 
         assert_from_to_bytes!(Iii, raw.freeze(), |parsed: Iii| {
             assert_eq!(parsed.reqi, RequestId(0));

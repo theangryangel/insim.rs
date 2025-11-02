@@ -7,7 +7,6 @@ use kitcar::combos::ComboList;
 
 use crate::combo::ComboExt;
 
-
 /// Config
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct Config {
@@ -18,6 +17,9 @@ pub struct Config {
     /// Lobby duration
     #[serde(with = "humantime_serde")]
     pub lobby_duration: Duration,
+    /// Victory duration
+    #[serde(with = "humantime_serde")]
+    pub victory_duration: Duration,
     /// Scores by position
     pub scores_by_position: Vec<i32>,
     /// Combinations
@@ -26,12 +28,10 @@ pub struct Config {
 
 impl Config {
     pub(crate) fn from_file(src: &str) -> anyhow::Result<Self> {
-        let config: Config = serde_norway::from_str(
-            &fs::read_to_string(src).context("could not read config.yaml")?,
-        )
-        .context("Could not parse config.yaml")?;
+        let config: Config =
+            serde_norway::from_str(&fs::read_to_string(src).context("could not read config.yaml")?)
+                .context("Could not parse config.yaml")?;
 
         Ok(config)
     }
 }
-

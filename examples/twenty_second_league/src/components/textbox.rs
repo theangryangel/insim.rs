@@ -46,9 +46,7 @@ pub(crate) fn Textbox(text: String, rows: u8, width: u8, row_height: u8) -> Opti
 
                         Some(Box::new(move || {
                             let next = offset.get().saturating_sub(1);
-
                             offset.set(next);
-                            println!("Up was clicked!");
                         }))
                     }))
                     .with_child(cx.container().flex().flex_grow(1.))
@@ -60,9 +58,7 @@ pub(crate) fn Textbox(text: String, rows: u8, width: u8, row_height: u8) -> Opti
                         Some(Box::new(move || {
                             // prevent over scroll
                             let next = std::cmp::min(offset.get() + 1, len.saturating_sub(rows));
-
                             offset.set(next);
-                            println!("Down was clicked!");
                         }))
                     })),
             ),

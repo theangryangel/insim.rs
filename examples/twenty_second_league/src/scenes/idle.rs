@@ -1,22 +1,24 @@
-use insim::{identifiers::PlayerId, Packet};
-use kitcar::{combos::ComboList, leaderboard::LeaderboardHandle, presence::PresenceHandle};
+use insim::Packet;
+use kitcar::chat::Parse;
 
-use crate::{combo::ComboExt, GameState, MyChatCommands};
+use crate::{
+    Context, GameState, MyChatCommands,
+    components::{RootProps, RootScene},
+};
 
-pub async fn idle(
-    insim: insim::builder::SpawnedHandle,
-    presence: PresenceHandle,
-    leaderboard: LeaderboardHandle<PlayerId>,
-    combos: ComboList<ComboExt>,
-) -> anyhow::Result<GameState> {
-    leaderboard.clear().await;
+pub async fn idle(cx: Context) -> anyhow::Result<GameState> {
+    cx.leaderboard.clear().await;
 
-    let mut packets = insim.subscribe();
+    let _ = cx.ui.update(RootProps {
+        scene: RootScene::Idle,
+    });
+
+    let mut packets = cx.insim.subscribe();
 
     while let Ok(packet) = packets.recv().await {
         match packet {
             Packet::Ncn(ncn) if !ncn.ucid.local() => {
-                insim
+                cx.insim
                     .send_message(
                         &format!("Welcome. No game is currently in progress."),
                         ncn.ucid,
@@ -25,14 +27,14 @@ pub async fn idle(
             },
             Packet::Mso(mso) => {
                 if_chain::if_chain! {
-                    if let Ok(MyChatCommands::Start) = MyChatCommands::parse_with_prefix(mso.msg_from_textstart(), Some('!'));
-                    if let Some(conn_info) = presence.connection(&mso.ucid).await;
+                    if let Ok(MyChatCommands::Start) = MyChatCommands::parse(mso.msg_from_textstart());
+                    if let Some(conn_info) = cx.presence.connection(&mso.ucid).await;
                     if conn_info.admin;
                     then {
-                        if let Some(combo) = combos.random() {
+                        if let Some(combo) = cx.config.combos.random() {
                             return Ok(GameState::TrackRotation { combo: combo.clone() });
                         } else {
-                            insim.send_message("No configured combos founded", conn_info.ucid).await?;
+                            cx.insim.send_message("No configured combos founded", conn_info.ucid).await?;
                         }
                     }
                 }
