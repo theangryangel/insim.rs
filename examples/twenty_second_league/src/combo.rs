@@ -1,16 +1,16 @@
-use std::time::Duration;
+use jiff::Span;
 
-#[derive(Debug, serde::Deserialize, serde::Serialize, Clone, Copy)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, Clone)]
 /// Combo Extension, for use with kitcar::combos::ComboList
 pub struct ComboExt {
+    /// Name for the combo
+    pub name: String,
     /// Lap count
     pub laps: Option<u8>,
     /// What time do we need to hit?
-    #[serde(with = "humantime_serde")]
-    pub target_time: Duration,
+    pub target_time: Span,
     /// Cooldown - restart after
-    #[serde(with = "humantime_serde")]
-    pub restart_after: Duration,
+    pub restart_after: Span,
     /// Number of rounds for this combo
     pub rounds: u32,
 }

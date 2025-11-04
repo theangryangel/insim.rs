@@ -8,19 +8,23 @@ use crate::{
     components::{RootProps, RootScene},
 };
 
-pub async fn lobby(cx: Context, combo: Combo<ComboExt>) -> anyhow::Result<Option<GameState>> {
-    let mut packets = cx.insim.subscribe();
+pub async fn lobby(
+    cx: Context,
+    combo: Combo<ComboExt>,
+    game_id: i64,
+) -> anyhow::Result<Option<GameState>> {
+    let restart_after = Duration::try_from(cx.config.lobby_duration)?;
 
     let _ = cx.ui.update(RootProps {
         scene: RootScene::Lobby {
             combo: combo.clone(),
-            remaining: combo.extensions().restart_after,
+            remaining: restart_after,
         },
     });
 
     let mut countdown = Countdown::new(
         Duration::from_secs(1),
-        cx.config.lobby_duration.as_secs() as u32, // FIXME
+        restart_after.as_secs() as u32, // FIXME
     );
 
     loop {
@@ -41,17 +45,15 @@ pub async fn lobby(cx: Context, combo: Combo<ComboExt>) -> anyhow::Result<Option
                     break;
                 }
             },
-            packet = packets.recv() => match packet {
-                Ok(packet) => {
-                    tracing::debug!("PhaseLobby: {:?}", packet);
-                },
-                _ => {}
-            },
             _ = cx.shutdown.cancelled() => {
                 return Ok(Some(GameState::Idle));
             }
         }
     }
 
-    Ok(Some(GameState::Round { round: 1, combo }))
+    Ok(Some(GameState::Round {
+        round: 1,
+        combo,
+        game_id,
+    }))
 }

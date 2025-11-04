@@ -36,7 +36,9 @@ pub async fn idle(cx: Context) -> anyhow::Result<Option<GameState>> {
                         if conn_info.admin;
                         then {
                             if let Some(combo) = cx.config.combos.random() {
-                                return Ok(Some(GameState::TrackRotation { combo: combo.clone() }));
+                                let game_id = cx.database.new_game(&combo.extensions().name)?;
+
+                                return Ok(Some(GameState::TrackRotation { combo: combo.clone(), game_id }));
                             } else {
                                 cx.insim.send_message("No configured combos founded", conn_info.ucid).await?;
                             }

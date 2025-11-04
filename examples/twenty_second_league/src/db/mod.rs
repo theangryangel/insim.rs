@@ -8,6 +8,7 @@ use anyhow::Result;
 use rusqlite::Connection;
 use rusqlite_migration::{M, Migrations};
 
+#[derive(Debug, Clone)]
 pub struct Repo {
     pub(crate) path: PathBuf,
 }
@@ -34,8 +35,8 @@ impl Repo {
                 "CREATE TABLE game (
                     id INTEGER PRIMARY KEY,
                     combo TEXT NOT NULL,
-                    started_at INTEGER NOT NULL,
-                    completed_at INTEGER,
+                    started_at TEXT NOT NULL,
+                    completed_at TEXT
                 )",
             ),
             M::up(
@@ -43,8 +44,8 @@ impl Repo {
                     id INTEGER PRIMARY KEY,
                     uname TEXT NOT NULL,
                     pname TEXT NOT NULL,
-                    first_seen INTEGER NOT NULL,
-                    last_seen INTEGER NOT NULL
+                    first_seen TEXT NOT NULL,
+                    last_seen TEXT NOT NULL
                 )",
             ),
             M::up(
@@ -53,6 +54,7 @@ impl Repo {
                     round INTEGER NOT NULL,
                     player_id INTEGER NOT NULL,
                     points INTEGER NOT NULL,
+                    delta INTEGER NOT NULL,
                     PRIMARY KEY (game_id, round, player_id),
                     FOREIGN KEY (game_id) REFERENCES game(id) ON DELETE CASCADE,
                     FOREIGN KEY (player_id) REFERENCES player(id)

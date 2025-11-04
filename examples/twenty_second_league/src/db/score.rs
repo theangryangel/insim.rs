@@ -8,16 +8,19 @@ impl Repo {
         &self,
         game_id: i64,
         round: u32,
-        player_id: i64,
+        uname: &str,
         points: i32,
         position: usize,
+        delta: u64,
     ) -> Result<()> {
         let conn = self.open()?;
 
+        let player_id = conn.execute("SELECT id FROM player WHERE uname = ?1", params![uname])?;
+
         let _ = conn.execute(
-            "INSERT INTO round_score (game_id, round, player_id, points, position)
+            "INSERT INTO round_score (game_id, round, player_id, points, position, delta)
              VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![game_id, round, player_id, points, position],
+            params![game_id, round, player_id, points, position, delta],
         )?;
 
         Ok(())

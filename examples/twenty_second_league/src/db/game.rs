@@ -6,12 +6,13 @@ use super::Repo;
 impl Repo {
     pub fn new_game(&self, combo: &str) -> Result<i64> {
         let conn = self.open()?;
-        let now = jiff::Timestamp::now().as_second();
+        let now = jiff::Timestamp::now();
 
-        // TODO: combo shouldn't be a str
+        // TODO: combo shouldn't be a str?
+        // Question, do we want to store combos in the database? eghasdj.
 
         let id: i64 = conn.query_row(
-            "INSERT INTO games (combo, started_at)
+            "INSERT INTO game (combo, started_at)
              VALUES (?1, ?2)
              RETURNING id",
             params![combo, now],

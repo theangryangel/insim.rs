@@ -1,8 +1,9 @@
 //! Config related stuff
 
-use std::{fs, time::Duration};
+use std::{fs, path::PathBuf};
 
 use anyhow::Context;
+use jiff::Span;
 use kitcar::combos::ComboList;
 
 use crate::combo::ComboExt;
@@ -14,12 +15,12 @@ pub struct Config {
     pub addr: String,
     /// admin password
     pub admin: Option<String>,
+    /// Path to database
+    pub database: PathBuf,
     /// Lobby duration
-    #[serde(with = "humantime_serde")]
-    pub lobby_duration: Duration,
+    pub lobby_duration: Span,
     /// Victory duration
-    #[serde(with = "humantime_serde")]
-    pub victory_duration: Duration,
+    pub victory_duration: Span,
     /// Scores by position
     pub scores_by_position: Vec<i32>,
     /// Combinations

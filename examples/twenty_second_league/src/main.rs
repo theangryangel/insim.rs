@@ -21,22 +21,27 @@ use kitcar::{
 use tokio::{task::JoinHandle, time::timeout};
 use tokio_util::sync::CancellationToken;
 
-use crate::{chat::MyChatCommands, components::RootProps, config::Config};
+use crate::{chat::MyChatCommands, components::RootProps, config::Config, db::Repo};
 
 #[derive(Debug, Clone)]
 enum GameState {
     Idle,
     TrackRotation {
         combo: Combo<combo::ComboExt>,
+        game_id: i64,
     },
     Lobby {
         combo: Combo<combo::ComboExt>,
+        game_id: i64,
     },
     Round {
+        game_id: i64,
         round: u32,
         combo: Combo<combo::ComboExt>,
     },
-    Victory,
+    Victory {
+        game_id: i64,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -48,6 +53,7 @@ struct Context {
     leaderboard: LeaderboardHandle<String>,
     config: Arc<Config>,
     shutdown: CancellationToken,
+    database: Repo,
 }
 
 #[tokio::main]
@@ -61,7 +67,12 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let config = config::Config::from_file("config.yaml")?;
+    let config = Arc::new(config::Config::from_file("config.yaml")?);
+
+    tracing::info!("{:?}", config);
+
+    let repo = db::Repo::new(&config.database);
+    repo.migrate()?;
 
     let (insim, _join_handle) = insim::tcp(config.addr.as_str())
         .isi_admin_password(config.admin.clone())
@@ -89,8 +100,9 @@ async fn main() -> Result<()> {
         presence: Presence::spawn(insim.clone(), 32),
         game: GameInfo::spawn(insim.clone(), 32),
         leaderboard: Leaderboard::<String>::spawn(32),
-        config: Arc::new(config.clone()),
+        config: config.clone(),
         shutdown: CancellationToken::new(),
+        database: repo.clone(),
     };
 
     let _ = insim.send(TinyType::Ncn.with_request_id(1)).await;
@@ -101,16 +113,20 @@ async fn main() -> Result<()> {
         // get a temporary handle for the select loop below
         let handle = scene_handle.get_or_insert_with(|| match scene {
             GameState::Idle => tokio::task::spawn(scenes::idle(cx.clone())),
-            GameState::TrackRotation { ref combo } => {
-                tokio::task::spawn(scenes::track_rotation(cx.clone(), combo.clone()))
+            GameState::TrackRotation { ref combo, game_id } => {
+                tokio::task::spawn(scenes::track_rotation(cx.clone(), combo.clone(), game_id))
             },
-            GameState::Lobby { ref combo } => {
-                tokio::task::spawn(scenes::lobby(cx.clone(), combo.clone()))
+            GameState::Lobby { ref combo, game_id } => {
+                tokio::task::spawn(scenes::lobby(cx.clone(), combo.clone(), game_id))
             },
             GameState::Round {
-                round, ref combo, ..
-            } => tokio::task::spawn(scenes::round(cx.clone(), round, combo.clone())),
-            GameState::Victory => tokio::task::spawn(scenes::victory(cx.clone())),
+                round,
+                ref combo,
+                game_id,
+            } => tokio::task::spawn(scenes::round(cx.clone(), game_id, round, combo.clone())),
+            GameState::Victory { game_id } => {
+                tokio::task::spawn(scenes::victory(cx.clone(), game_id))
+            },
         });
 
         tokio::select! {
@@ -133,6 +149,10 @@ async fn main() -> Result<()> {
             },
             packet = packets.recv() => {
                 match packet? {
+                    insim::Packet::Ncn(ncn) if ncn.ucid != ConnectionId::LOCAL => {
+                        repo.upsert_player(&ncn.uname, &ncn.pname)?;
+                    },
+
                     insim::Packet::Mso(mso) if mso.ucid != ConnectionId::LOCAL => {
                         match MyChatCommands::parse(mso.msg_from_textstart()) {
                             Ok(MyChatCommands::Quit) => {

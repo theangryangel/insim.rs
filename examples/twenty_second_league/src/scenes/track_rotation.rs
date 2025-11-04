@@ -13,6 +13,7 @@ use crate::{
 pub async fn track_rotation(
     cx: Context,
     combo: Combo<ComboExt>,
+    game_id: i64,
 ) -> anyhow::Result<Option<GameState>> {
     let _ = cx.ui.update(RootProps {
         scene: RootScene::TrackRotation {
@@ -64,7 +65,7 @@ pub async fn track_rotation(
             cx.game.wait_for_racing().await;
         }) => {
             if result.is_ok() {
-                Ok(Some(GameState::Lobby { combo }))
+                Ok(Some(GameState::Lobby { combo, game_id }))
             } else {
                 cx.insim
                     .send_message(

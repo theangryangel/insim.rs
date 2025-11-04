@@ -12,14 +12,26 @@ use crate::{
 
 pub async fn round(
     cx: Context,
+    game_id: i64,
     round: u32,
     combo: Combo<ComboExt>,
 ) -> anyhow::Result<Option<GameState>> {
+    if cx.presence.player_count().await < 1 {
+        cx.insim
+            .send_message(
+                "Returning to idle state because there's no players remaining",
+                ConnectionId::ALL,
+            )
+            .await?;
+        tracing::info!("Returning to idle state because there's no players remaining");
+        return Ok(Some(GameState::Idle));
+    }
+
     let mut packets = cx.insim.subscribe();
 
-    let target = combo.extensions().target_time;
+    let target = Duration::try_from(combo.extensions().target_time)?;
     let rounds = combo.extensions().rounds;
-    let available_time = combo.extensions().restart_after;
+    let available_time = Duration::try_from(combo.extensions().restart_after)?;
     let mut round_scores: HashMap<String, Duration> = HashMap::new();
 
     cx.insim.send_command("/restart").await?;
@@ -113,6 +125,15 @@ pub async fn round(
     {
         let points = scores_by_position[i];
         let _ = cx.leaderboard.add_score(uname.clone(), points as i32).await;
+        // XXX: This truncates the delta, but realistically nothing should be this high
+        cx.database.insert_player_score(
+            game_id,
+            round,
+            &uname,
+            points,
+            i,
+            delta.as_millis() as u64,
+        )?;
         tracing::info!(
             "Player {} scored {} points (delta: {:?})",
             uname,
@@ -130,26 +151,26 @@ pub async fn round(
         Ok(None)
     } else if round + 1 > combo.extensions().rounds {
         // TODO: send leaderboard
-        Ok(Some(GameState::Victory))
+        Ok(Some(GameState::Victory { game_id }))
     } else {
         Ok(Some(GameState::Round {
             round: round + 1,
             combo,
+            game_id,
         }))
     }
 }
 
-pub async fn victory(cx: Context) -> anyhow::Result<Option<GameState>> {
+pub async fn victory(cx: Context, _game_id: i64) -> anyhow::Result<Option<GameState>> {
+    let duration = Duration::try_from(cx.config.victory_duration)?;
+
     cx.ui.update(RootProps {
         scene: RootScene::Victory {
-            remaining: cx.config.victory_duration,
+            remaining: duration,
         },
     });
 
-    let mut countdown = Countdown::new(
-        Duration::from_secs(1),
-        cx.config.victory_duration.as_secs() as u32,
-    );
+    let mut countdown = Countdown::new(Duration::from_secs(1), duration.as_secs() as u32);
 
     while let Some(_) = countdown.tick().await {
         let remaining = countdown.remaining_duration();

@@ -1,5 +1,6 @@
 addr: "188.122.74.156:53321"
 admin: "rFcGByyvRevV"
+database: 20s.db
 lobby_duration: 2mins
 victory_duration: 5mins
 scores_by_position:
@@ -15,9 +16,10 @@ scores_by_position:
   - 1
 
 combos:
-  - track: FE1X
-    layout: "20s_cup"
+  - name: FE1X_20s
+    track: FE1X
+    layout: 20s_cup
     target_time: 20s
-    restart_after: 10s
+    restart_after: 1m10s
     rounds: 5
     allowed_vehicles: []
