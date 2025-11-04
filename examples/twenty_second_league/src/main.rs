@@ -99,6 +99,7 @@ async fn main() -> Result<()> {
         ui: ui_handle.clone(),
         presence: Presence::spawn(insim.clone(), 32),
         game: GameInfo::spawn(insim.clone(), 32),
+        // FIXME: with database this is unrequired probably
         leaderboard: Leaderboard::<String>::spawn(32),
         config: config.clone(),
         shutdown: CancellationToken::new(),
@@ -153,7 +154,7 @@ async fn main() -> Result<()> {
                         repo.upsert_player(&ncn.uname, &ncn.pname)?;
                     },
 
-                    insim::Packet::Mso(mso) if mso.ucid != ConnectionId::LOCAL => {
+                    insim::Packet::Mso(mso) => {
                         match MyChatCommands::parse(mso.msg_from_textstart()) {
                             Ok(MyChatCommands::Quit) => {
                                 if_chain::if_chain! {
@@ -165,6 +166,9 @@ async fn main() -> Result<()> {
                                     }
                                 }
                             },
+                            Ok(MyChatCommands::Echo { message }) => {
+                                insim.send_message(&format!("Echo: {}", message), mso.ucid).await?;
+                            }
                             Ok(MyChatCommands::Help) => {
                                 insim.send_message("Available commands:", mso.ucid).await?;
                                 for cmd in MyChatCommands::help() {

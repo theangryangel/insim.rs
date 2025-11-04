@@ -20,12 +20,13 @@ impl Repo {
 
     fn open(&self) -> Result<Connection> {
         let conn = Connection::open(&self.path)?;
-        let _ = conn.execute("PRAGMA foreign_keys = ON", [])?;
+        conn.pragma_update(None, "foreign_keys", &"ON")?;
         Ok(conn)
     }
 
     pub fn migrate(&self) -> Result<()> {
         let mut conn = self.open()?;
+        conn.pragma_update(None, "journal_mode", &"WAL")?;
 
         // TODO: record combos in database?
         // provide cli interface to add/remove combos?

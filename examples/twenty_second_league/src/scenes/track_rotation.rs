@@ -24,7 +24,7 @@ pub async fn track_rotation(
     tokio::select! {
         // It's ok for this timeout to be in tokio::select! because our only other arm right now is the
         // cx cancellationtoken, so if we're shutting down we're ok with this cancelling.
-        result = timeout(Duration::from_secs(600), async {
+        result = timeout(Duration::from_secs(300), async {
             tracing::info!("Changing track and layout combo");
 
             let _ = cx.insim.send_command("/end").await;
