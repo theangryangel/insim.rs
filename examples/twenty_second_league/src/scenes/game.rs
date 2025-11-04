@@ -54,7 +54,12 @@ pub async fn round(
 
     cx.insim
         .send_message(
-            &format!("Round {}/{} - Get close to 20s!", round, rounds),
+            &format!(
+                "Round {}/{} - Get close to {}!",
+                round,
+                rounds,
+                combo.extensions().target_time
+            ),
             ConnectionId::ALL,
         )
         .await?;
@@ -90,7 +95,7 @@ pub async fn round(
                 Packet::Ncn(ncn) => {
                     cx.insim
                         .send_message(
-                            "Welcome to 20 Second League! Get as close to 20s as possible.",
+                            "Welcome to the Cadence Cup! Game in currently in progress!",
                             ncn.ucid,
                         )
                         .await?;
@@ -158,7 +163,7 @@ pub async fn round(
     }
 }
 
-pub async fn victory(cx: Context, _game_id: i64) -> anyhow::Result<Option<GameState>> {
+pub async fn victory(cx: Context, game_id: i64) -> anyhow::Result<Option<GameState>> {
     let duration = Duration::try_from(cx.config.victory_duration)?;
 
     cx.ui.update(RootProps {
@@ -176,6 +181,8 @@ pub async fn victory(cx: Context, _game_id: i64) -> anyhow::Result<Option<GameSt
             scene: RootScene::Victory { remaining },
         });
     }
+
+    cx.database.complete_game(game_id)?;
 
     Ok(Some(GameState::Idle))
 }

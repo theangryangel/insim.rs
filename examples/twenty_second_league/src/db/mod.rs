@@ -43,7 +43,7 @@ impl Repo {
             M::up(
                 "CREATE TABLE player (
                     id INTEGER PRIMARY KEY,
-                    uname TEXT NOT NULL,
+                    uname TEXT UNIQUE NOT NULL,
                     pname TEXT NOT NULL,
                     first_seen TEXT NOT NULL,
                     last_seen TEXT NOT NULL
@@ -56,6 +56,7 @@ impl Repo {
                     player_id INTEGER NOT NULL,
                     points INTEGER NOT NULL,
                     delta INTEGER NOT NULL,
+                    position INTEGER NOT NULL,
                     PRIMARY KEY (game_id, round, player_id),
                     FOREIGN KEY (game_id) REFERENCES game(id) ON DELETE CASCADE,
                     FOREIGN KEY (player_id) REFERENCES player(id)

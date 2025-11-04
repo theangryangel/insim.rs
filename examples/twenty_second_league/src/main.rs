@@ -103,7 +103,7 @@ async fn main() -> Result<()> {
         leaderboard: Leaderboard::<String>::spawn(32),
         config: config.clone(),
         shutdown: CancellationToken::new(),
-        database: repo.clone(),
+        database: repo,
     };
 
     let _ = insim.send(TinyType::Ncn.with_request_id(1)).await?;
@@ -151,7 +151,7 @@ async fn main() -> Result<()> {
             packet = packets.recv() => {
                 match packet? {
                     insim::Packet::Ncn(ncn) if ncn.ucid != ConnectionId::LOCAL => {
-                        repo.upsert_player(&ncn.uname, &ncn.pname)?;
+                        cx.database.upsert_player(&ncn.uname, &ncn.pname)?;
                     },
 
                     insim::Packet::Mso(mso) => {

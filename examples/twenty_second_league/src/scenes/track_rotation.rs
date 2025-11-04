@@ -30,7 +30,7 @@ pub async fn track_rotation(
             let _ = cx.insim.send_command("/end").await;
             let _ = cx
                 .insim
-                .send_message("Waiting for track selection screen...", ConnectionId::ALL);
+                .send_message("Waiting for track selection screen...", ConnectionId::ALL).await;
             cx.game.wait_for_end().await;
 
             let _ = cx
