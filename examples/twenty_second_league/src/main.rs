@@ -106,9 +106,9 @@ async fn main() -> Result<()> {
         database: repo.clone(),
     };
 
-    let _ = insim.send(TinyType::Ncn.with_request_id(1)).await;
-    let _ = insim.send(TinyType::Npl.with_request_id(2)).await;
-    let _ = insim.send(TinyType::Sst.with_request_id(3)).await;
+    let _ = insim.send(TinyType::Ncn.with_request_id(1)).await?;
+    let _ = insim.send(TinyType::Npl.with_request_id(2)).await?;
+    let _ = insim.send(TinyType::Sst.with_request_id(3)).await?;
 
     loop {
         // get a temporary handle for the select loop below
