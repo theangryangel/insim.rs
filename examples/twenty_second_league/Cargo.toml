@@ -17,6 +17,7 @@ kitcar = { path = "../../kitcar" }
 serde = { workspace = true, features = ["derive"] }
 serde_norway = { workspace = true }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "signal"]}
+tokio-util = { workspace = true }
 tracing = {workspace = true}
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 

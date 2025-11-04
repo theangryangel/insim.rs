@@ -8,7 +8,7 @@ use crate::{
     components::{RootProps, RootScene},
 };
 
-pub async fn lobby(cx: Context, combo: Combo<ComboExt>) -> anyhow::Result<GameState> {
+pub async fn lobby(cx: Context, combo: Combo<ComboExt>) -> anyhow::Result<Option<GameState>> {
     let mut packets = cx.insim.subscribe();
 
     let _ = cx.ui.update(RootProps {
@@ -46,9 +46,12 @@ pub async fn lobby(cx: Context, combo: Combo<ComboExt>) -> anyhow::Result<GameSt
                     tracing::debug!("PhaseLobby: {:?}", packet);
                 },
                 _ => {}
+            },
+            _ = cx.shutdown.cancelled() => {
+                return Ok(Some(GameState::Idle));
             }
         }
     }
 
-    Ok(GameState::Round { round: 1, combo })
+    Ok(Some(GameState::Round { round: 1, combo }))
 }

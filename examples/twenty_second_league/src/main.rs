@@ -5,7 +5,7 @@ mod components;
 mod config;
 mod scenes;
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
 use insim::{WithRequestId, identifiers::ConnectionId, insim::TinyType};
@@ -17,7 +17,8 @@ use kitcar::{
     presence::{Presence, PresenceHandle},
     ui,
 };
-use tokio::task::JoinHandle;
+use tokio::{task::JoinHandle, time::timeout};
+use tokio_util::sync::CancellationToken;
 
 use crate::{chat::MyChatCommands, components::RootProps, config::Config};
 
@@ -45,6 +46,7 @@ struct Context {
     game: GameHandle,
     leaderboard: LeaderboardHandle<String>,
     config: Arc<Config>,
+    shutdown: CancellationToken,
 }
 
 #[tokio::main]
@@ -77,7 +79,7 @@ async fn main() -> Result<()> {
     tracing::info!("20 Second League started!");
 
     let mut packets = insim.subscribe();
-    let mut scene_handle: Option<JoinHandle<anyhow::Result<GameState>>> = None;
+    let mut scene_handle: Option<JoinHandle<anyhow::Result<Option<GameState>>>> = None;
     let mut scene = GameState::Idle;
 
     let cx = Context {
@@ -87,6 +89,7 @@ async fn main() -> Result<()> {
         game: GameInfo::spawn(insim.clone(), 32),
         leaderboard: Leaderboard::<String>::spawn(32),
         config: Arc::new(config.clone()),
+        shutdown: CancellationToken::new(),
     };
 
     let _ = insim.send(TinyType::Ncn.with_request_id(1)).await;
@@ -94,36 +97,42 @@ async fn main() -> Result<()> {
     let _ = insim.send(TinyType::Sst.with_request_id(3)).await;
 
     loop {
-        if scene_handle.is_none() {
-            scene_handle = Some(match scene {
-                GameState::Idle => tokio::task::spawn(scenes::idle(cx.clone())),
-                GameState::TrackRotation { ref combo } => {
-                    tokio::task::spawn(scenes::track_rotation(cx.clone(), combo.clone()))
-                },
-                GameState::Lobby { ref combo } => {
-                    tokio::task::spawn(scenes::lobby(cx.clone(), combo.clone()))
-                },
-                GameState::Round {
-                    round, ref combo, ..
-                } => tokio::task::spawn(scenes::round(cx.clone(), round, combo.clone())),
-                GameState::Victory => tokio::task::spawn(scenes::victory(cx.clone())),
-            });
-        }
+        // get a temporary handle for the select loop below
+        let handle = scene_handle.get_or_insert_with(|| match scene {
+            GameState::Idle => tokio::task::spawn(scenes::idle(cx.clone())),
+            GameState::TrackRotation { ref combo } => {
+                tokio::task::spawn(scenes::track_rotation(cx.clone(), combo.clone()))
+            },
+            GameState::Lobby { ref combo } => {
+                tokio::task::spawn(scenes::lobby(cx.clone(), combo.clone()))
+            },
+            GameState::Round {
+                round, ref combo, ..
+            } => tokio::task::spawn(scenes::round(cx.clone(), round, combo.clone())),
+            GameState::Victory => tokio::task::spawn(scenes::victory(cx.clone())),
+        });
 
         tokio::select! {
-            Some(result) = async {
-                match scene_handle.as_mut() {
-                    Some(h) => h.await.ok(),
-                    None => None,
+            _ = tokio::signal::ctrl_c() => {
+                cx.shutdown.cancel();
+                // we can take this because we're shutting down
+                if let Some(scene_handle) = scene_handle.take() {
+                    tracing::info!("Waiting 5 seconds for graceful shutdown...");
+                    let _ = timeout(Duration::from_secs(5), scene_handle).await;
                 }
-            } => {
-                scene_handle = None;
-                scene = result?;
-            },
+                break;
 
+            },
+            result = handle => {
+                scene_handle = None;
+                match result?? {
+                    Some(next) => { scene = next; },
+                    None => { break; },
+                }
+            },
             packet = packets.recv() => {
                 match packet? {
-                    insim::Packet::Mso(mso) => {
+                    insim::Packet::Mso(mso) if mso.ucid != ConnectionId::LOCAL => {
                         match MyChatCommands::parse(mso.msg_from_textstart()) {
                             Ok(MyChatCommands::Quit) => {
                                 if_chain::if_chain! {

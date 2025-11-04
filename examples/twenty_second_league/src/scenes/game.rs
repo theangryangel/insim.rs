@@ -10,7 +10,11 @@ use crate::{
     components::{RootProps, RootScene},
 };
 
-pub async fn round(cx: Context, round: u32, combo: Combo<ComboExt>) -> anyhow::Result<GameState> {
+pub async fn round(
+    cx: Context,
+    round: u32,
+    combo: Combo<ComboExt>,
+) -> anyhow::Result<Option<GameState>> {
     let mut packets = cx.insim.subscribe();
 
     let target = combo.extensions().target_time;
@@ -82,9 +86,15 @@ pub async fn round(cx: Context, round: u32, combo: Combo<ComboExt>) -> anyhow::R
                         .unwrap();
                 },
                 _ => {},
+            },
+            _ = cx.shutdown.cancelled() => {
+                return Ok(None);
             }
         }
     }
+
+    // let the scoring complete atomically, if without checking the cancel / shutdown token - this
+    // is by design.
 
     let scores_by_position = &cx.config.scores_by_position;
 
@@ -116,18 +126,20 @@ pub async fn round(cx: Context, round: u32, combo: Combo<ComboExt>) -> anyhow::R
         .await
         .unwrap();
 
-    if round + 1 >= combo.extensions().rounds {
+    if cx.shutdown.is_cancelled() {
+        Ok(None)
+    } else if round + 1 > combo.extensions().rounds {
         // TODO: send leaderboard
-        Ok(GameState::Victory)
+        Ok(Some(GameState::Victory))
     } else {
-        Ok(GameState::Round {
+        Ok(Some(GameState::Round {
             round: round + 1,
             combo,
-        })
+        }))
     }
 }
 
-pub async fn victory(cx: Context) -> anyhow::Result<GameState> {
+pub async fn victory(cx: Context) -> anyhow::Result<Option<GameState>> {
     cx.ui.update(RootProps {
         scene: RootScene::Victory {
             remaining: cx.config.victory_duration,
@@ -147,5 +159,5 @@ pub async fn victory(cx: Context) -> anyhow::Result<GameState> {
         });
     }
 
-    Ok(GameState::Idle)
+    Ok(Some(GameState::Idle))
 }
