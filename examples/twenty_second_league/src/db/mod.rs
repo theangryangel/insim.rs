@@ -45,8 +45,8 @@ impl Repo {
                     id INTEGER PRIMARY KEY,
                     uname TEXT UNIQUE NOT NULL,
                     pname TEXT NOT NULL,
-                    first_seen TEXT NOT NULL,
-                    last_seen TEXT NOT NULL
+                    first_seen_at TEXT NOT NULL,
+                    last_seen_at TEXT NOT NULL
                 )",
             ),
             M::up(
@@ -59,9 +59,11 @@ impl Repo {
                     position INTEGER NOT NULL,
                     PRIMARY KEY (game_id, round, player_id),
                     FOREIGN KEY (game_id) REFERENCES game(id) ON DELETE CASCADE,
-                    FOREIGN KEY (player_id) REFERENCES player(id)
+                    FOREIGN KEY (player_id) REFERENCES player(id) ON DELETE CASCADE
                 )",
             ),
+            M::up("CREATE INDEX idx_round_score_game_round ON round_score (game_id, round);"),
+            M::up("CREATE INDEX idx_round_score_player ON round_score (player_id);"),
         ]);
 
         migrations.to_latest(&mut conn)?;

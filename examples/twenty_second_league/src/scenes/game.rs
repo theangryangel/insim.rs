@@ -5,7 +5,7 @@ use kitcar::{combos::Combo, time::countdown::Countdown};
 use tokio::time::sleep;
 
 use crate::{
-    Context, GameState,
+    Context, Scene,
     combo::ComboExt,
     components::{RootProps, RootScene},
 };
@@ -15,7 +15,7 @@ pub async fn round(
     game_id: i64,
     round: u32,
     combo: Combo<ComboExt>,
-) -> anyhow::Result<Option<GameState>> {
+) -> anyhow::Result<Option<Scene>> {
     if cx.presence.player_count().await < 1 {
         cx.insim
             .send_message(
@@ -24,7 +24,7 @@ pub async fn round(
             )
             .await?;
         tracing::info!("Returning to idle state because there's no players remaining");
-        return Ok(Some(GameState::Idle));
+        return Ok(Some(Scene::Idle));
     }
 
     let mut packets = cx.insim.subscribe();
@@ -153,9 +153,9 @@ pub async fn round(
         Ok(None)
     } else if round + 1 > combo.extensions().rounds {
         // TODO: send leaderboard
-        Ok(Some(GameState::Victory { game_id }))
+        Ok(Some(Scene::Victory { game_id }))
     } else {
-        Ok(Some(GameState::Round {
+        Ok(Some(Scene::Round {
             round: round + 1,
             combo,
             game_id,
@@ -163,7 +163,7 @@ pub async fn round(
     }
 }
 
-pub async fn victory(cx: Context, game_id: i64) -> anyhow::Result<Option<GameState>> {
+pub async fn victory(cx: Context, game_id: i64) -> anyhow::Result<Option<Scene>> {
     let duration = Duration::try_from(cx.config.victory_duration)?;
 
     cx.ui.update(RootProps {
@@ -184,5 +184,5 @@ pub async fn victory(cx: Context, game_id: i64) -> anyhow::Result<Option<GameSta
 
     cx.database.complete_game(game_id)?;
 
-    Ok(Some(GameState::Idle))
+    Ok(Some(Scene::Idle))
 }

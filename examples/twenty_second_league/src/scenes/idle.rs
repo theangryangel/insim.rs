@@ -2,11 +2,11 @@ use insim::Packet;
 use kitcar::chat::Parse;
 
 use crate::{
-    Context, GameState, MyChatCommands,
+    Context, MyChatCommands, Scene,
     components::{RootProps, RootScene},
 };
 
-pub async fn idle(cx: Context) -> anyhow::Result<Option<GameState>> {
+pub async fn idle(cx: Context) -> anyhow::Result<Option<Scene>> {
     cx.leaderboard.clear().await;
 
     let _ = cx.ui.update(RootProps {
@@ -38,7 +38,7 @@ pub async fn idle(cx: Context) -> anyhow::Result<Option<GameState>> {
                             if let Some(combo) = cx.config.combos.random() {
                                 let game_id = cx.database.new_game(&combo.extensions().name)?;
 
-                                return Ok(Some(GameState::TrackRotation { combo: combo.clone(), game_id }));
+                                return Ok(Some(Scene::TrackRotation { combo: combo.clone(), game_id }));
                             } else {
                                 cx.insim.send_message("No configured combos founded", conn_info.ucid).await?;
                             }
@@ -49,6 +49,4 @@ pub async fn idle(cx: Context) -> anyhow::Result<Option<GameState>> {
             }
         }
     }
-
-    Ok(Some(GameState::Idle))
 }

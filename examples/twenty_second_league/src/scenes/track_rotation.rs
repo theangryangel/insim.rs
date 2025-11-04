@@ -5,7 +5,7 @@ use kitcar::combos::Combo;
 use tokio::time::timeout;
 
 use crate::{
-    Context, GameState,
+    Context, Scene,
     combo::ComboExt,
     components::{RootProps, RootScene},
 };
@@ -14,7 +14,7 @@ pub async fn track_rotation(
     cx: Context,
     combo: Combo<ComboExt>,
     game_id: i64,
-) -> anyhow::Result<Option<GameState>> {
+) -> anyhow::Result<Option<Scene>> {
     let _ = cx.ui.update(RootProps {
         scene: RootScene::TrackRotation {
             combo: combo.clone(),
@@ -65,7 +65,7 @@ pub async fn track_rotation(
             cx.game.wait_for_racing().await;
         }) => {
             if result.is_ok() {
-                Ok(Some(GameState::Lobby { combo, game_id }))
+                Ok(Some(Scene::Lobby { combo, game_id }))
             } else {
                 cx.insim
                     .send_message(
@@ -73,7 +73,7 @@ pub async fn track_rotation(
                         ConnectionId::ALL,
                     )
                     .await?;
-                Ok(Some(GameState::Idle))
+                Ok(Some(Scene::Idle))
             }
         },
         _ = cx.shutdown.cancelled() => {

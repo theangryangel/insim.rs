@@ -24,7 +24,11 @@ use tokio_util::sync::CancellationToken;
 use crate::{chat::MyChatCommands, components::RootProps, config::Config, db::Repo};
 
 #[derive(Debug, Clone)]
-enum GameState {
+// FIXME: switch to NewType pattern, move scenes from dangling functions to functions on inner
+// types. i.e. GameState::TrackRotation(TrackRotation), and impl TrackRotation { pub fn run(self,
+// cx: context) { .. } }
+// Once we've done this we can add a quick spawn/run fn on GameState
+enum Scene {
     Idle,
     TrackRotation {
         combo: Combo<combo::ComboExt>,
@@ -91,8 +95,8 @@ async fn main() -> Result<()> {
     tracing::info!("20 Second League started!");
 
     let mut packets = insim.subscribe();
-    let mut scene_handle: Option<JoinHandle<anyhow::Result<Option<GameState>>>> = None;
-    let mut scene = GameState::Idle;
+    let mut scene_handle: Option<JoinHandle<anyhow::Result<Option<Scene>>>> = None;
+    let mut scene = Scene::Idle;
 
     let cx = Context {
         insim: insim.clone(),
@@ -113,21 +117,19 @@ async fn main() -> Result<()> {
     loop {
         // get a temporary handle for the select loop below
         let handle = scene_handle.get_or_insert_with(|| match scene {
-            GameState::Idle => tokio::task::spawn(scenes::idle(cx.clone())),
-            GameState::TrackRotation { ref combo, game_id } => {
+            Scene::Idle => tokio::task::spawn(scenes::idle(cx.clone())),
+            Scene::TrackRotation { ref combo, game_id } => {
                 tokio::task::spawn(scenes::track_rotation(cx.clone(), combo.clone(), game_id))
             },
-            GameState::Lobby { ref combo, game_id } => {
+            Scene::Lobby { ref combo, game_id } => {
                 tokio::task::spawn(scenes::lobby(cx.clone(), combo.clone(), game_id))
             },
-            GameState::Round {
+            Scene::Round {
                 round,
                 ref combo,
                 game_id,
             } => tokio::task::spawn(scenes::round(cx.clone(), game_id, round, combo.clone())),
-            GameState::Victory { game_id } => {
-                tokio::task::spawn(scenes::victory(cx.clone(), game_id))
-            },
+            Scene::Victory { game_id } => tokio::task::spawn(scenes::victory(cx.clone(), game_id)),
         });
 
         tokio::select! {

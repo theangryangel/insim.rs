@@ -3,7 +3,7 @@ use std::time::Duration;
 use kitcar::{combos::Combo, time::countdown::Countdown};
 
 use crate::{
-    Context, GameState,
+    Context, Scene,
     combo::ComboExt,
     components::{RootProps, RootScene},
 };
@@ -12,7 +12,7 @@ pub async fn lobby(
     cx: Context,
     combo: Combo<ComboExt>,
     game_id: i64,
-) -> anyhow::Result<Option<GameState>> {
+) -> anyhow::Result<Option<Scene>> {
     let restart_after = Duration::try_from(cx.config.lobby_duration)?;
 
     let _ = cx.ui.update(RootProps {
@@ -51,7 +51,7 @@ pub async fn lobby(
         }
     }
 
-    Ok(Some(GameState::Round {
+    Ok(Some(Scene::Round {
         round: 1,
         combo,
         game_id,
