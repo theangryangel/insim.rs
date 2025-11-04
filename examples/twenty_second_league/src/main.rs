@@ -3,6 +3,7 @@ mod chat;
 mod combo;
 mod components;
 mod config;
+mod db;
 mod scenes;
 
 use std::{sync::Arc, time::Duration};

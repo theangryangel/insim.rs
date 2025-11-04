@@ -9,11 +9,14 @@ license.workspace = true
 homepage.workspace = true
 
 [dependencies]
-anyhow = "*"
+anyhow = "1.0.100"
 humantime-serde = "1.1.1"
 if_chain = { workspace = true }
 insim = { path = "../../insim", features = ["serde", "blocking"] }
+jiff = "0.2.15"
 kitcar = { path = "../../kitcar" }
+rusqlite = { version = "0.37.0", features = ["bundled"] }
+rusqlite_migration = "2.3.0"
 serde = { workspace = true, features = ["derive"] }
 serde_norway = { workspace = true }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "signal"]}
