@@ -57,8 +57,7 @@ pub async fn round(
             &format!("Round {}/{} - Get close to 20s!", round, rounds),
             ConnectionId::ALL,
         )
-        .await
-        .unwrap();
+        .await?;
 
     let mut countdown = Countdown::new(Duration::from_secs(1), available_time.as_secs() as u32);
 
@@ -81,7 +80,7 @@ pub async fn round(
                     break;
                 }
             },
-            packet = packets.recv() => match packet.unwrap() {
+            packet = packets.recv() => match packet? {
                 Packet::Fin(fin) => {
                     let conn_info = cx.presence.connection_by_player(&fin.plid).await;
                     if let Some(conn_info) = conn_info {
@@ -94,8 +93,7 @@ pub async fn round(
                             "Welcome to 20 Second League! Get as close to 20s as possible.",
                             ncn.ucid,
                         )
-                        .await
-                        .unwrap();
+                        .await?;
                 },
                 _ => {},
             },
@@ -144,8 +142,7 @@ pub async fn round(
 
     cx.insim
         .send_message(&format!("Round {} complete!", round), ConnectionId::ALL)
-        .await
-        .unwrap();
+        .await?;
 
     if cx.shutdown.is_cancelled() {
         Ok(None)

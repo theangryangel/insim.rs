@@ -77,7 +77,6 @@ pub async fn track_rotation(
             }
         },
         _ = cx.shutdown.cancelled() => {
-            // FIXME: This is a weird return value.
             Ok(None)
         }
     }

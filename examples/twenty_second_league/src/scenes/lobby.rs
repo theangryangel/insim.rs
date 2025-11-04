@@ -46,7 +46,7 @@ pub async fn lobby(
                 }
             },
             _ = cx.shutdown.cancelled() => {
-                return Ok(Some(GameState::Idle));
+                return Ok(None);
             }
         }
     }

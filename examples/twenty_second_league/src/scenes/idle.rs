@@ -18,7 +18,7 @@ pub async fn idle(cx: Context) -> anyhow::Result<Option<GameState>> {
     loop {
         tokio::select! {
             _ = cx.shutdown.cancelled() => {
-                break;
+                return Ok(None);
             },
             packet = packets.recv() => match packet? {
                 Packet::Ncn(ncn) if !ncn.ucid.local() => {
