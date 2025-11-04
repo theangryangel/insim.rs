@@ -121,6 +121,7 @@ pub async fn round(
 
     ordered.sort_by(|a, b| a.1.cmp(&b.1));
 
+    // FIXME: this should be batched so we can do it as a single transaction
     for (i, (uname, delta)) in ordered
         .into_iter()
         .take(scores_by_position.len())

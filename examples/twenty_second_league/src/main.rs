@@ -96,6 +96,8 @@ async fn main() -> Result<()> {
 
     let mut packets = insim.subscribe();
     let mut scene_handle: Option<JoinHandle<anyhow::Result<Option<Scene>>>> = None;
+
+    // FIXME - scene recovery from database?
     let mut scene = Scene::Idle;
 
     let cx = Context {
@@ -116,6 +118,7 @@ async fn main() -> Result<()> {
 
     loop {
         // get a temporary handle for the select loop below
+        // FIXME: see above note about consolidating this into a fn on Scene
         let handle = scene_handle.get_or_insert_with(|| match scene {
             Scene::Idle => tokio::task::spawn(scenes::idle(cx.clone())),
             Scene::TrackRotation { ref combo, game_id } => {
