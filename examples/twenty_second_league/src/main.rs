@@ -12,7 +12,6 @@ use anyhow::Result;
 use insim::{WithRequestId, identifiers::ConnectionId, insim::TinyType};
 use kitcar::{
     chat::Parse,
-    combos::Combo,
     game::{GameHandle, GameInfo},
     leaderboard::{Leaderboard, LeaderboardHandle},
     presence::{Presence, PresenceHandle},
@@ -23,29 +22,31 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{chat::MyChatCommands, components::RootProps, config::Config, db::Repo};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, from_variants::FromVariants)]
 // FIXME: switch to NewType pattern, move scenes from dangling functions to functions on inner
 // types. i.e. GameState::TrackRotation(TrackRotation), and impl TrackRotation { pub fn run(self,
 // cx: context) { .. } }
 // Once we've done this we can add a quick spawn/run fn on GameState
 enum Scene {
-    Idle,
-    TrackRotation {
-        combo: Combo<combo::ComboExt>,
-        game_id: i64,
-    },
-    Lobby {
-        combo: Combo<combo::ComboExt>,
-        game_id: i64,
-    },
-    Round {
-        game_id: i64,
-        round: u32,
-        combo: Combo<combo::ComboExt>,
-    },
-    Victory {
-        game_id: i64,
-    },
+    Idle(scenes::Idle),
+    TrackRotation(scenes::TrackRotation),
+    Lobby(scenes::Lobby),
+    Round(scenes::Round),
+    Victory(scenes::Victory),
+}
+
+impl Scene {
+    pub fn spawn(self, cx: Context) -> JoinHandle<anyhow::Result<Option<Scene>>> {
+        tokio::task::spawn(async move {
+            match self {
+                Scene::Idle(idle) => idle.run(cx).await,
+                Scene::TrackRotation(track_rotation) => track_rotation.run(cx).await,
+                Scene::Lobby(lobby) => lobby.run(cx).await,
+                Scene::Round(round) => round.run(cx).await,
+                Scene::Victory(victory) => victory.run(cx).await,
+            }
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -98,7 +99,7 @@ async fn main() -> Result<()> {
     let mut scene_handle: Option<JoinHandle<anyhow::Result<Option<Scene>>>> = None;
 
     // FIXME - scene recovery from database?
-    let mut scene = Scene::Idle;
+    let mut scene: Scene = scenes::Idle.into();
 
     let cx = Context {
         insim: insim.clone(),
@@ -112,36 +113,22 @@ async fn main() -> Result<()> {
         database: repo,
     };
 
-    let _ = insim.send(TinyType::Ncn.with_request_id(1)).await?;
-    let _ = insim.send(TinyType::Npl.with_request_id(2)).await?;
-    let _ = insim.send(TinyType::Sst.with_request_id(3)).await?;
+    insim.send(TinyType::Ncn.with_request_id(1)).await?;
+    insim.send(TinyType::Npl.with_request_id(2)).await?;
+    insim.send(TinyType::Sst.with_request_id(3)).await?;
 
     loop {
         // get a temporary handle for the select loop below
         // FIXME: see above note about consolidating this into a fn on Scene
-        let handle = scene_handle.get_or_insert_with(|| match scene {
-            Scene::Idle => tokio::task::spawn(scenes::idle(cx.clone())),
-            Scene::TrackRotation { ref combo, game_id } => {
-                tokio::task::spawn(scenes::track_rotation(cx.clone(), combo.clone(), game_id))
-            },
-            Scene::Lobby { ref combo, game_id } => {
-                tokio::task::spawn(scenes::lobby(cx.clone(), combo.clone(), game_id))
-            },
-            Scene::Round {
-                round,
-                ref combo,
-                game_id,
-            } => tokio::task::spawn(scenes::round(cx.clone(), game_id, round, combo.clone())),
-            Scene::Victory { game_id } => tokio::task::spawn(scenes::victory(cx.clone(), game_id)),
-        });
+        let handle = scene_handle.get_or_insert_with(|| scene.clone().spawn(cx.clone()));
 
         tokio::select! {
             _ = tokio::signal::ctrl_c() => {
                 cx.shutdown.cancel();
                 // we can take this because we're shutting down
-                if let Some(scene_handle) = scene_handle.take() {
+                if let Some(scene_handle) = scene_handle {
                     tracing::info!("Waiting 5 seconds for graceful shutdown...");
-                    let _ = timeout(Duration::from_secs(5), scene_handle).await;
+                    let _ = timeout(Duration::from_secs(5), scene_handle).await?;
                 }
                 break;
 
@@ -158,7 +145,6 @@ async fn main() -> Result<()> {
                     insim::Packet::Ncn(ncn) if ncn.ucid != ConnectionId::LOCAL => {
                         cx.database.upsert_player(&ncn.uname, &ncn.pname)?;
                     },
-
                     insim::Packet::Mso(mso) => {
                         match MyChatCommands::parse(mso.msg_from_textstart()) {
                             Ok(MyChatCommands::Quit) => {

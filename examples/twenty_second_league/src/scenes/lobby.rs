@@ -8,52 +8,59 @@ use crate::{
     components::{RootProps, RootScene},
 };
 
-pub async fn lobby(
-    cx: Context,
-    combo: Combo<ComboExt>,
-    game_id: i64,
-) -> anyhow::Result<Option<Scene>> {
-    let restart_after = Duration::try_from(cx.config.lobby_duration)?;
+#[derive(Debug, Clone)]
+pub struct Lobby {
+    pub combo: Combo<ComboExt>,
+    pub game_id: i64,
+}
 
-    let _ = cx.ui.update(RootProps {
-        scene: RootScene::Lobby {
-            combo: combo.clone(),
-            remaining: restart_after,
-        },
-    });
+impl Lobby {
+    pub async fn run(self, cx: Context) -> anyhow::Result<Option<Scene>> {
+        let restart_after = Duration::try_from(cx.config.lobby_duration)?;
 
-    let mut countdown = Countdown::new(
-        Duration::from_secs(1),
-        restart_after.as_secs() as u32, // FIXME
-    );
-
-    loop {
-        tokio::select! {
-            remaining = countdown.tick() => match remaining {
-                Some(_) => {
-                    tracing::info!("Waiting for lobby to complete!");
-                    let remaining_duration = countdown.remaining_duration();
-
-                    let _ = cx.ui.update(RootProps {
-                        scene: RootScene::Lobby { combo: combo.clone(), remaining: remaining_duration }
-                    });
-                },
-                None => {
-                    let _ = cx.ui.update(RootProps {
-                        scene: RootScene::Lobby { combo: combo.clone(), remaining: Duration::from_secs(0) }
-                    });
-                    break;
-                }
+        cx.ui.update(RootProps {
+            scene: RootScene::Lobby {
+                combo: self.combo.clone(),
+                remaining: restart_after,
             },
-            _ = cx.shutdown.cancelled() => {
-                return Ok(None);
+        });
+
+        let mut countdown = Countdown::new(
+            Duration::from_secs(1),
+            restart_after.as_secs() as u32, // FIXME
+        );
+
+        loop {
+            tokio::select! {
+                remaining = countdown.tick() => match remaining {
+                    Some(_) => {
+                        tracing::info!("Waiting for lobby to complete!");
+                        let remaining_duration = countdown.remaining_duration();
+
+                        cx.ui.update(RootProps {
+                            scene: RootScene::Lobby { combo: self.combo.clone(), remaining: remaining_duration }
+                        });
+                    },
+                    None => {
+                        cx.ui.update(RootProps {
+                            scene: RootScene::Lobby { combo: self.combo.clone(), remaining: Duration::from_secs(0) }
+                        });
+                        break;
+                    }
+                },
+                _ = cx.shutdown.cancelled() => {
+                    return Ok(None);
+                }
             }
         }
-    }
 
-    Ok(Some(Scene::Round {
-        round: 1,
-        combo,
-        game_id,
-    }))
+        Ok(Some(
+            super::Round {
+                round: 1,
+                combo: self.combo,
+                game_id: self.game_id,
+            }
+            .into(),
+        ))
+    }
 }

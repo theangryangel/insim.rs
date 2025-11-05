@@ -10,74 +10,80 @@ use crate::{
     components::{RootProps, RootScene},
 };
 
-pub async fn track_rotation(
-    cx: Context,
-    combo: Combo<ComboExt>,
-    game_id: i64,
-) -> anyhow::Result<Option<Scene>> {
-    let _ = cx.ui.update(RootProps {
-        scene: RootScene::TrackRotation {
-            combo: combo.clone(),
-        },
-    });
+#[derive(Debug, Clone)]
+pub struct TrackRotation {
+    pub combo: Combo<ComboExt>,
+    pub game_id: i64,
+}
 
-    tokio::select! {
-        // It's ok for this timeout to be in tokio::select! because our only other arm right now is the
-        // cx cancellationtoken, so if we're shutting down we're ok with this cancelling.
-        result = timeout(Duration::from_secs(300), async {
-            tracing::info!("Changing track and layout combo");
+impl TrackRotation {
+    pub async fn run(self, cx: Context) -> anyhow::Result<Option<Scene>> {
+        cx.ui.update(RootProps {
+            scene: RootScene::TrackRotation {
+                combo: self.combo.clone(),
+            },
+        });
 
-            let _ = cx.insim.send_command("/end").await;
-            let _ = cx
-                .insim
-                .send_message("Waiting for track selection screen...", ConnectionId::ALL).await;
-            cx.game.wait_for_end().await;
+        tokio::select! {
+            // It's ok for this timeout to be in tokio::select! because our only other arm right now is the
+            // cx cancellationtoken, so if we're shutting down we're ok with this cancelling.
+            result = timeout(Duration::from_secs(300), async {
+                tracing::info!("Changing track and layout combo");
 
-            let _ = cx
-                .insim
-                .send_message("Requesting track change", ConnectionId::ALL)
-                .await;
+                cx.insim.send_command("/end").await?;
+                cx
+                    .insim
+                    .send_message("Waiting for track selection screen...", ConnectionId::ALL).await?;
+                cx.game.wait_for_end().await;
 
-            let _ = cx
-                .insim
-                .send_command(&format!("/track {}", combo.track().code()))
-                .await;
-
-            if let Some(laps) = combo.extensions().laps.as_ref() {
-                let _ = cx.insim.send_command(&format!("/laps {}", laps)).await;
-            }
-
-            let _ = cx
-                .insim
-                .send_message("Waiting for track", ConnectionId::ALL)
-                .await;
-            cx.game.wait_for_track(*combo.track()).await;
-
-            // FIXME: how do we check that the layout loaded safely
-            if let Some(lyt) = combo.layout().as_ref() {
-                let _ = cx.insim.send_command(&format!("/axload {}", lyt)).await;
-            }
-
-            let _ = cx
-                .insim
-                .send_message("Waiting for game to start", ConnectionId::ALL)
-                .await;
-            cx.game.wait_for_racing().await;
-        }) => {
-            if result.is_ok() {
-                Ok(Some(Scene::Lobby { combo, game_id }))
-            } else {
-                cx.insim
-                    .send_message(
-                        "Timed out waiting for track change and player ready. Back to idle!",
-                        ConnectionId::ALL,
-                    )
+                cx
+                    .insim
+                    .send_message("Requesting track change", ConnectionId::ALL)
                     .await?;
-                Ok(Some(Scene::Idle))
+
+                cx
+                    .insim
+                    .send_command(&format!("/track {}", self.combo.track().code()))
+                    .await?;
+
+                if let Some(laps) = self.combo.extensions().laps.as_ref() {
+                    cx.insim.send_command(&format!("/laps {}", laps)).await?;
+                }
+
+                let _ = cx
+                    .insim
+                    .send_message("Waiting for track", ConnectionId::ALL)
+                    .await;
+                cx.game.wait_for_track(*self.combo.track()).await;
+
+                // FIXME: how do we check that the layout loaded safely
+                if let Some(lyt) = self.combo.layout().as_ref() {
+                    cx.insim.send_command(&format!("/axload {}", lyt)).await?;
+                }
+
+                let _ = cx
+                    .insim
+                    .send_message("Waiting for game to start", ConnectionId::ALL)
+                    .await;
+                cx.game.wait_for_racing().await;
+
+                anyhow::Ok(())
+            }) => {
+                if result.is_ok() {
+                    Ok(Some(super::Lobby { combo: self.combo, game_id: self.game_id }.into()))
+                } else {
+                    cx.insim
+                        .send_message(
+                            "Timed out waiting for track change and player ready. Back to idle!",
+                            ConnectionId::ALL,
+                        )
+                        .await?;
+                    Ok(Some(super::Idle.into()))
+                }
+            },
+            _ = cx.shutdown.cancelled() => {
+                Ok(None)
             }
-        },
-        _ = cx.shutdown.cancelled() => {
-            Ok(None)
         }
     }
 }

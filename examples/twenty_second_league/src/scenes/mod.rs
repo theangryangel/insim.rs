@@ -4,7 +4,7 @@ mod idle;
 mod lobby;
 mod track_rotation;
 
-pub(crate) use game::{round, victory};
-pub(crate) use idle::idle;
-pub(crate) use lobby::lobby;
-pub(crate) use track_rotation::track_rotation;
+pub(crate) use game::{Round, Victory};
+pub(crate) use idle::Idle;
+pub(crate) use lobby::Lobby;
+pub(crate) use track_rotation::TrackRotation;
