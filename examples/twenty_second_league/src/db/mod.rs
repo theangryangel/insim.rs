@@ -32,38 +32,7 @@ impl Repo {
         // provide cli interface to add/remove combos?
 
         let migrations = Migrations::new(vec![
-            M::up(
-                "CREATE TABLE game (
-                    id INTEGER PRIMARY KEY,
-                    combo TEXT NOT NULL,
-                    started_at TEXT NOT NULL,
-                    completed_at TEXT
-                )",
-            ),
-            M::up(
-                "CREATE TABLE player (
-                    id INTEGER PRIMARY KEY,
-                    uname TEXT UNIQUE NOT NULL,
-                    pname TEXT NOT NULL,
-                    first_seen_at TEXT NOT NULL,
-                    last_seen_at TEXT NOT NULL
-                )",
-            ),
-            M::up(
-                "CREATE TABLE round_score (
-                    game_id INTEGER NOT NULL,
-                    round INTEGER NOT NULL,
-                    player_id INTEGER NOT NULL,
-                    points INTEGER NOT NULL,
-                    delta INTEGER NOT NULL,
-                    position INTEGER NOT NULL,
-                    PRIMARY KEY (game_id, round, player_id),
-                    FOREIGN KEY (game_id) REFERENCES game(id) ON DELETE CASCADE,
-                    FOREIGN KEY (player_id) REFERENCES player(id) ON DELETE CASCADE
-                )",
-            ),
-            M::up("CREATE INDEX idx_round_score_game_round ON round_score (game_id, round);"),
-            M::up("CREATE INDEX idx_round_score_player ON round_score (player_id);"),
+            M::up(include_str!("../migrations/20251106162526_up_bootstrap.sql"))
         ]);
 
         migrations.to_latest(&mut conn)?;

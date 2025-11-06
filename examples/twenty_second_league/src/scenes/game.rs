@@ -204,7 +204,7 @@ impl Victory {
             });
         }
 
-        cx.database.complete_game(self.game_id)?;
+        cx.database.complete_event(self.game_id)?;
 
         Ok(Some(super::Idle.into()))
     }

@@ -4,7 +4,7 @@
 #[derive(Debug, PartialEq, kitcar::chat::Parse)]
 #[chat(prefix = '!')]
 /// Chat Commands
-pub enum MyChatCommands {
+pub enum Chat {
     /// Echo a string back from the server
     Echo { message: String },
     /// Quit the insim application

@@ -5,7 +5,7 @@ use kitcar::{
 };
 
 use crate::{
-    chat::MyChatCommands,
+    chat::Chat,
     components::textbox::{Textbox, TextboxProps},
 };
 
@@ -17,8 +17,8 @@ pub fn Motd(text: String) -> Option<Element> {
         cx.use_chat({
             let show = show.clone();
             move |input: &str| -> bool {
-                if let Ok(MyChatCommands::Rules | MyChatCommands::Motd) =
-                    MyChatCommands::parse(input)
+                if let Ok(Chat::Rules | Chat::Motd) =
+                    Chat::parse(input)
                 {
                     show.set(true);
                     true

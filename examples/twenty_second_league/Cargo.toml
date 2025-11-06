@@ -10,6 +10,8 @@ homepage.workspace = true
 
 [dependencies]
 anyhow = "1.0.100"
+clap = { workspace = true, features = ["derive"] }
+from_variants = { workspace = true }
 if_chain = { workspace = true }
 insim = { path = "../../insim", features = ["serde", "blocking"] }
 jiff = { version = "0.2.15", features = ["serde"] }
@@ -22,7 +24,6 @@ tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "sign
 tokio-util = { workspace = true }
 tracing = {workspace = true}
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
-from_variants = { workspace = true }
 
 [lints]
 workspace = true

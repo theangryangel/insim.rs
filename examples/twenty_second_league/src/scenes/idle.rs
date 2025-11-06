@@ -2,7 +2,7 @@ use insim::Packet;
 use kitcar::chat::Parse;
 
 use crate::{
-    Context, MyChatCommands, Scene,
+    Context, Chat, Scene,
     components::{RootProps, RootScene},
 };
 
@@ -35,12 +35,12 @@ impl Idle {
                     },
                     Packet::Mso(mso) => {
                         if_chain::if_chain! {
-                            if let Ok(MyChatCommands::Start) = MyChatCommands::parse(mso.msg_from_textstart());
+                            if let Ok(Chat::Start) = Chat::parse(mso.msg_from_textstart());
                             if let Some(conn_info) = cx.presence.connection(&mso.ucid).await;
                             if conn_info.admin;
                             then {
                                 if let Some(combo) = cx.config.combos.random() {
-                                    let game_id = cx.database.new_game(&combo.extensions().name)?;
+                                    let game_id = cx.database.new_event(&combo.extensions().name)?;
 
                                     return Ok(Some(super::TrackRotation { combo: combo.clone(), game_id }.into()));
                                 } else {

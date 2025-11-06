@@ -5,82 +5,33 @@ mod components;
 mod config;
 mod db;
 mod scenes;
+mod context;
+mod cli;
 
 use std::{sync::Arc, time::Duration};
 
+use clap::{Parser};
 use anyhow::Result;
 use insim::{WithRequestId, identifiers::ConnectionId, insim::TinyType};
 use kitcar::{
     chat::Parse,
-    game::{GameHandle, GameInfo},
-    leaderboard::{Leaderboard, LeaderboardHandle},
-    presence::{Presence, PresenceHandle},
+    game::GameInfo,
+    leaderboard::Leaderboard,
+    presence::Presence,
     ui,
 };
 use tokio::{task::JoinHandle, time::timeout};
 use tokio_util::sync::CancellationToken;
 
-use crate::{chat::MyChatCommands, components::RootProps, config::Config, db::Repo};
+use crate::{context::Context, chat::Chat, components::RootProps, scenes::Scene};
 
-#[derive(Debug, Clone, from_variants::FromVariants)]
-// FIXME: switch to NewType pattern, move scenes from dangling functions to functions on inner
-// types. i.e. GameState::TrackRotation(TrackRotation), and impl TrackRotation { pub fn run(self,
-// cx: context) { .. } }
-// Once we've done this we can add a quick spawn/run fn on GameState
-enum Scene {
-    Idle(scenes::Idle),
-    TrackRotation(scenes::TrackRotation),
-    Lobby(scenes::Lobby),
-    Round(scenes::Round),
-    Victory(scenes::Victory),
-}
-
-impl Scene {
-    pub fn spawn(self, cx: Context) -> JoinHandle<anyhow::Result<Option<Scene>>> {
-        tokio::task::spawn(async move {
-            match self {
-                Scene::Idle(idle) => idle.run(cx).await,
-                Scene::TrackRotation(track_rotation) => track_rotation.run(cx).await,
-                Scene::Lobby(lobby) => lobby.run(cx).await,
-                Scene::Round(round) => round.run(cx).await,
-                Scene::Victory(victory) => victory.run(cx).await,
-            }
-        })
-    }
-}
-
-#[derive(Debug, Clone)]
-struct Context {
-    insim: insim::builder::SpawnedHandle,
-    ui: ui::ManagerHandle<components::Root>,
-    presence: PresenceHandle,
-    game: GameHandle,
-    leaderboard: LeaderboardHandle<String>,
-    config: Arc<Config>,
-    shutdown: CancellationToken,
-    database: Repo,
-}
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    // Setup with a default log level of INFO RUST_LOG is unset
-    tracing_subscriber::fmt::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::builder()
-                .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
-                .from_env_lossy(),
-        )
-        .init();
-
+async fn run(repo: db::Repo, addr: &str, admin: Option<String>) -> anyhow::Result<()> {
     let config = Arc::new(config::Config::from_file("config.yaml")?);
 
     tracing::info!("{:?}", config);
 
-    let repo = db::Repo::new(&config.database);
-    repo.migrate()?;
-
-    let (insim, _join_handle) = insim::tcp(config.addr.as_str())
-        .isi_admin_password(config.admin.clone())
+    let (insim, _join_handle) = insim::tcp(addr)
+        .isi_admin_password(admin)
         .isi_iname("cadence-cup".to_owned())
         .isi_prefix('!')
         .spawn(100)
@@ -146,8 +97,8 @@ async fn main() -> Result<()> {
                         cx.database.upsert_player(&ncn.uname, &ncn.pname)?;
                     },
                     insim::Packet::Mso(mso) => {
-                        match MyChatCommands::parse(mso.msg_from_textstart()) {
-                            Ok(MyChatCommands::Quit) => {
+                        match Chat::parse(mso.msg_from_textstart()) {
+                            Ok(Chat::Quit) => {
                                 if_chain::if_chain! {
                                     if let Some(conn_info) = cx.presence.connection(&mso.ucid).await;
                                     if conn_info.admin;
@@ -157,12 +108,12 @@ async fn main() -> Result<()> {
                                     }
                                 }
                             },
-                            Ok(MyChatCommands::Echo { message }) => {
+                            Ok(Chat::Echo { message }) => {
                                 insim.send_message(&format!("Echo: {}", message), mso.ucid).await?;
                             }
-                            Ok(MyChatCommands::Help) => {
+                            Ok(Chat::Help) => {
                                 insim.send_message("Available commands:", mso.ucid).await?;
-                                for cmd in MyChatCommands::help() {
+                                for cmd in Chat::help() {
                                     insim.send_message(cmd, mso.ucid).await?;
                                 }
                             },
@@ -176,4 +127,31 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Setup with a default log level of INFO RUST_LOG is unset
+    tracing_subscriber::fmt::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::builder()
+                .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
+        .init();
+
+    let cli = cli::Args::parse();
+
+    let repo = db::Repo::new(&cli.database);
+    repo.migrate()?;
+
+    println!("{:?}", cli);
+
+    match cli.cmd {
+        cli::Cmd::Combo(cli::ComboCmd::Add { .. }) => todo!(),
+        cli::Cmd::Combo(cli::ComboCmd::List) => todo!(),
+        cli::Cmd::Combo(cli::ComboCmd::Delete) => todo!(),
+        cli::Cmd::Run { addr, admin, lobby_duration, victory_duration, max_scoring_players } => run(repo, &addr, admin).await
+    }
 }
