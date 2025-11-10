@@ -1,6 +1,6 @@
-mod game;
-mod player;
-mod score;
+pub mod game;
+pub mod player;
+pub mod score;
 
 use std::path::PathBuf;
 
@@ -28,11 +28,13 @@ impl Repo {
         let mut conn = self.open()?;
         conn.pragma_update(None, "journal_mode", &"WAL")?;
 
-        // TODO: record combos in database?
-        // provide cli interface to add/remove combos?
-
         let migrations = Migrations::new(vec![
-            M::up(include_str!("../migrations/20251106162526_up_bootstrap.sql"))
+            M::up(include_str!(
+                "../migrations/20251106162526_up_bootstrap.sql"
+            )),
+            M::up(include_str!(
+                "../migrations/20251110200300_up_leaderboard.sql"
+            )),
         ]);
 
         migrations.to_latest(&mut conn)?;

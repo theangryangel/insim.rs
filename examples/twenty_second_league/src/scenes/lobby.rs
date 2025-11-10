@@ -6,12 +6,13 @@ use crate::{
     Context, Scene,
     combo::ComboExt,
     components::{RootProps, RootScene},
+    db::game::EventId,
 };
 
 #[derive(Debug, Clone)]
 pub struct Lobby {
     pub combo: Combo<ComboExt>,
-    pub game_id: i64,
+    pub game_id: EventId,
 }
 
 impl Lobby {

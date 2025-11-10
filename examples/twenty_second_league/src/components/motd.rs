@@ -17,9 +17,7 @@ pub fn Motd(text: String) -> Option<Element> {
         cx.use_chat({
             let show = show.clone();
             move |input: &str| -> bool {
-                if let Ok(Chat::Rules | Chat::Motd) =
-                    Chat::parse(input)
-                {
+                if let Ok(Chat::Rules | Chat::Motd) = Chat::parse(input) {
                     show.set(true);
                     true
                 } else {

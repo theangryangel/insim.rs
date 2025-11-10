@@ -2,7 +2,7 @@ use insim::Packet;
 use kitcar::chat::Parse;
 
 use crate::{
-    Context, Chat, Scene,
+    Chat, Context, Scene,
     components::{RootProps, RootScene},
 };
 
@@ -11,8 +11,6 @@ pub struct Idle;
 
 impl Idle {
     pub async fn run(self, cx: Context) -> anyhow::Result<Option<Scene>> {
-        cx.leaderboard.clear().await;
-
         cx.ui.update(RootProps {
             scene: RootScene::Idle,
         });
@@ -40,7 +38,7 @@ impl Idle {
                             if conn_info.admin;
                             then {
                                 if let Some(combo) = cx.config.combos.random() {
-                                    let game_id = cx.database.new_event(&combo.extensions().name)?;
+                                    let game_id = cx.database.new_event(&combo)?;
 
                                     return Ok(Some(super::TrackRotation { combo: combo.clone(), game_id }.into()));
                                 } else {

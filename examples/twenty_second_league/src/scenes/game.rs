@@ -8,11 +8,12 @@ use crate::{
     Context, Scene,
     combo::ComboExt,
     components::{RootProps, RootScene},
+    db::game::EventId,
 };
 
 #[derive(Debug, Clone)]
 pub struct Round {
-    pub game_id: i64,
+    pub game_id: EventId,
     pub round: u32,
     pub combo: Combo<ComboExt>,
 }
@@ -35,15 +36,18 @@ impl Round {
         let target = Duration::try_from(self.combo.extensions().target_time)?;
         let rounds = self.combo.extensions().rounds;
         let available_time = Duration::try_from(self.combo.extensions().restart_after)?;
-        let mut round_scores: HashMap<String, Duration> = HashMap::new();
+        let mut round_scores: HashMap<String, Duration> = HashMap::new(); // TODO: Only the last scoring round is stored. add to MOTD
 
         cx.insim.send_command("/restart").await?;
+
+        let scores = cx.database.leaderboard(self.game_id, 10)?;
 
         cx.ui.update(RootProps {
             scene: RootScene::Round {
                 round: self.round,
                 combo: self.combo.clone(),
                 remaining: available_time.into(),
+                scores: scores.clone(),
             },
         });
 
@@ -81,6 +85,7 @@ impl Round {
                                 round: self.round,
                                 combo: self.combo.clone(),
                                 remaining: remaining_duration,
+                                scores: scores.clone(),
                             }
                         });
                     },
@@ -114,40 +119,26 @@ impl Round {
         // let the scoring complete atomically, if without checking the cancel / shutdown token - this
         // is by design.
 
-        let scores_by_position = &cx.config.scores_by_position;
+        let max_scorers = cx.config.max_scoring_players;
 
         // score round
         let mut ordered = round_scores
             .drain()
             .map(|(k, v)| (k, target.abs_diff(v)))
             .collect::<Vec<(String, Duration)>>();
-
         ordered.sort_by(|a, b| a.1.cmp(&b.1));
-
-        // FIXME: this should be batched so we can do it as a single transaction
-        for (i, (uname, delta)) in ordered
+        let top: Vec<(String, i32, usize, Duration)> = ordered
             .into_iter()
-            .take(scores_by_position.len())
+            .take(max_scorers)
             .enumerate()
-        {
-            let points = scores_by_position[i];
-            let _ = cx.leaderboard.add_score(uname.clone(), points as i32).await;
-            // XXX: This truncates the delta, but realistically nothing should be this high
-            cx.database.insert_player_score(
-                self.game_id,
-                self.round,
-                &uname,
-                points,
-                i,
-                delta.as_millis() as u64,
-            )?;
-            tracing::info!(
-                "Player {} scored {} points (delta: {:?})",
-                uname,
-                points,
-                delta
-            );
-        }
+            .map(|(i, (uname, delta))| {
+                let points = (max_scorers - i) as i32;
+                (uname, points, i, delta)
+            })
+            .collect();
+
+        cx.database
+            .insert_player_scores(self.game_id, self.round, top)?;
 
         cx.insim
             .send_message(
@@ -155,6 +146,17 @@ impl Round {
                 ConnectionId::ALL,
             )
             .await?;
+
+        let scores = cx.database.leaderboard(self.game_id, 10)?;
+
+        cx.ui.update(RootProps {
+            scene: RootScene::Round {
+                round: self.round,
+                combo: self.combo.clone(),
+                remaining: Duration::ZERO,
+                scores: scores.clone(),
+            },
+        });
 
         if cx.shutdown.is_cancelled() {
             Ok(None)
@@ -181,7 +183,7 @@ impl Round {
 
 #[derive(Debug, Clone)]
 pub struct Victory {
-    game_id: i64,
+    game_id: EventId,
 }
 
 impl Victory {

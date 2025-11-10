@@ -29,6 +29,7 @@ pub enum RootScene {
         combo: Combo<ComboExt>,
         round: u32,
         remaining: Duration,
+        scores: Vec<(String, i32, i64)>,
     },
     Lobby {
         combo: Combo<ComboExt>,
@@ -48,7 +49,10 @@ pub(crate) fn Root(scene: RootScene) -> Option<Element> {
             round,
             combo,
             remaining,
+            scores,
         } => {
+            println!("scores = {:?}", scores);
+
             let seconds = remaining.as_secs() % 60;
             let minutes = (remaining.as_secs() / 60) % 60;
             format!(

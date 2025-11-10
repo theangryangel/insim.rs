@@ -1,37 +1,42 @@
 //! 20s league
 mod chat;
+mod cli;
 mod combo;
 mod components;
 mod config;
+mod context;
 mod db;
 mod scenes;
-mod context;
-mod cli;
 
 use std::{sync::Arc, time::Duration};
 
-use clap::{Parser};
 use anyhow::Result;
+use clap::Parser;
 use insim::{WithRequestId, identifiers::ConnectionId, insim::TinyType};
-use kitcar::{
-    chat::Parse,
-    game::GameInfo,
-    leaderboard::Leaderboard,
-    presence::Presence,
-    ui,
-};
+use kitcar::{chat::Parse, game::GameInfo, presence::Presence, ui};
 use tokio::{task::JoinHandle, time::timeout};
 use tokio_util::sync::CancellationToken;
 
-use crate::{context::Context, chat::Chat, components::RootProps, scenes::Scene};
+use crate::{chat::Chat, components::RootProps, context::Context, scenes::Scene};
 
-async fn run(repo: db::Repo, addr: &str, admin: Option<String>) -> anyhow::Result<()> {
-    let config = Arc::new(config::Config::from_file("config.yaml")?);
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Setup with a default log level of INFO RUST_LOG is unset
+    tracing_subscriber::fmt::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::builder()
+                .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
+        .init();
 
-    tracing::info!("{:?}", config);
+    let args = cli::Args::parse();
+    let config = Arc::new(config::Config::from_file(&args.config_file)?);
+    let repo = db::Repo::new(&config.database);
+    repo.migrate()?;
 
-    let (insim, _join_handle) = insim::tcp(addr)
-        .isi_admin_password(admin)
+    let (insim, _join_handle) = insim::tcp(config.addr.clone())
+        .isi_admin_password(config.admin.clone())
         .isi_iname("cadence-cup".to_owned())
         .isi_prefix('!')
         .spawn(100)
@@ -57,8 +62,6 @@ async fn run(repo: db::Repo, addr: &str, admin: Option<String>) -> anyhow::Resul
         ui: ui_handle.clone(),
         presence: Presence::spawn(insim.clone(), 32),
         game: GameInfo::spawn(insim.clone(), 32),
-        // FIXME: with database this is unrequired probably
-        leaderboard: Leaderboard::<String>::spawn(32),
         config: config.clone(),
         shutdown: CancellationToken::new(),
         database: repo,
@@ -127,31 +130,4 @@ async fn run(repo: db::Repo, addr: &str, admin: Option<String>) -> anyhow::Resul
     }
 
     Ok(())
-
-}
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    // Setup with a default log level of INFO RUST_LOG is unset
-    tracing_subscriber::fmt::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::builder()
-                .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
-                .from_env_lossy(),
-        )
-        .init();
-
-    let cli = cli::Args::parse();
-
-    let repo = db::Repo::new(&cli.database);
-    repo.migrate()?;
-
-    println!("{:?}", cli);
-
-    match cli.cmd {
-        cli::Cmd::Combo(cli::ComboCmd::Add { .. }) => todo!(),
-        cli::Cmd::Combo(cli::ComboCmd::List) => todo!(),
-        cli::Cmd::Combo(cli::ComboCmd::Delete) => todo!(),
-        cli::Cmd::Run { addr, admin, lobby_duration, victory_duration, max_scoring_players } => run(repo, &addr, admin).await
-    }
 }
