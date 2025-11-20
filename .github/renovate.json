@@ -8,7 +8,8 @@
       "matchManagers": ["cargo"],
       "matchDepTypes": ["workspace.dependencies"],
       "enabled": true,
-      "groupName": "workspace dependencies"
+      "separateMajorMinor": true,
+      "separateMultipleMajor": true
     }
   ]
 }
