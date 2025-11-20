@@ -1,5 +1,8 @@
 {
   "extends": ["config:recommended"],
+  "cargo": {
+    "rangeStrategy": "bump"
+  },
   "packageRules": [
     {
       "matchManagers": ["cargo"],
