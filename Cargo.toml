@@ -45,7 +45,7 @@ darling = "0.21.3"
 encoding_rs = { version = "0.8.32" }
 fixedbitset = "0.5.7"
 from_variants = "1.0.2"
-futures = "0.3"
+futures = "0.3.31"
 glam = "0.30.3"
 if_chain = "1.0.2"
 indexmap = "2.11.4"
