@@ -56,6 +56,8 @@ impl_typical_with_request_id!(Jrr);
 
 #[cfg(test)]
 mod test {
+    use insim_core::object::{ObjectPosition, control};
+
     use super::*;
 
     #[test]
@@ -83,14 +85,15 @@ mod test {
                 assert!(matches!(jrr.jrraction, JrrAction::Spawn));
                 assert!(matches!(
                     jrr.startpos,
-                    ObjectInfo {
-                        x: -9556,
-                        y: -30695,
-                        z: 12,
-                        index: 0,
+                    ObjectInfo::Start(control::Point {
+                        xyz: ObjectPosition {
+                            x: -9556,
+                            y: -30695,
+                            z: 12,
+                        },
                         heading: 67,
-                        flags: 128
-                    }
+                        floating: true
+                    })
                 ));
             }
         );

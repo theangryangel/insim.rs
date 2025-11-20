@@ -29,6 +29,10 @@ pub enum EncodeError {
     /// Value too large for field
     #[error("too large")]
     TooLarge,
+
+    /// Value too small for field
+    #[error("too small")]
+    TooSmall,
 }
 
 /// Enable to bytes
