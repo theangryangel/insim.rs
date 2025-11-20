@@ -1,6 +1,6 @@
 use crate::{
-    identifiers::{ConnectionId, RequestId},
     Packet, WithRequestId,
+    identifiers::{ConnectionId, RequestId},
 };
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]

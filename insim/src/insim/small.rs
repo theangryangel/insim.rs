@@ -5,8 +5,8 @@ use insim_core::{Decode, Encode};
 
 use super::{PlcAllowedCarsSet, VtnAction};
 use crate::{
-    identifiers::{PlayerId, RequestId},
     Packet, WithRequestId,
+    identifiers::{PlayerId, RequestId},
 };
 
 bitflags! {
@@ -126,12 +126,13 @@ bitflags! {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 /// [Small] packet subtype.
 pub enum SmallType {
     /// Nothing!
+    #[default]
     None,
 
     /// Request LFS to start sending positions
@@ -166,12 +167,6 @@ pub enum SmallType {
 
     /// Get local AI information
     Aii(PlayerId),
-}
-
-impl Default for SmallType {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl From<SmallType> for Packet {
@@ -278,7 +273,7 @@ impl Decode for SmallType {
             found => {
                 return Err(insim_core::DecodeError::NoVariantMatch {
                     found: found as u64,
-                })
+                });
             },
         };
         Ok(res)

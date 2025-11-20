@@ -23,5 +23,5 @@ rustdoc-args = ["--cfg", "docrs"]
 [dependencies]
 bytes = { workspace = true }
 glam = { workspace = true }
-insim_core = { path = "../insim_core", version = "3.0.0" }
+insim_core = { path = "../insim_core", version = "4.0.0" }
 thiserror = { workspace = true }

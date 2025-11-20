@@ -1,7 +1,7 @@
 use std::{default::Default, net::Ipv4Addr};
 
 use bytes::{Buf, BufMut};
-use indexmap::{set::Iter as IndexSetIter, IndexSet};
+use indexmap::{IndexSet, set::Iter as IndexSetIter};
 use insim_core::{Decode, Encode};
 
 use crate::identifiers::RequestId;

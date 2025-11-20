@@ -1,0 +1,15 @@
+addr: "188.122.74.156:53321"
+admin: "rFcGByyvRevV"
+database: 20s.db
+lobby_duration: 10s
+victory_duration: 5mins
+max_scoring_players: 10
+
+combos:
+  - name: FE1Y_20s
+    track: FE1Y
+    layout: 20s_cup
+    target_time: 30s
+    restart_after: 1m10s
+    rounds: 2
+    allowed_vehicles: []

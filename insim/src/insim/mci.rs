@@ -2,10 +2,10 @@ use bitflags::bitflags;
 use bytes::{Buf, BufMut};
 use glam::IVec3;
 use insim_core::{
+    Decode, Encode,
     angvel::AngVel,
     direction::{Direction, DirectionKind},
     speed::{Speed, SpeedKind},
-    Decode, Encode,
 };
 
 use crate::identifiers::{PlayerId, RequestId};

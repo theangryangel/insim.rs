@@ -63,7 +63,7 @@ impl Field {
 
     pub(super) fn decode(&self) -> proc_macro2::TokenStream {
         let f = self;
-        let field_name = f.ident.as_ref().unwrap();
+        let field_name = f.ident.as_ref().expect("Missing field name?");
         let pad_after = f.pad_after.unwrap_or(0);
         let pad_before = f.pad_before.unwrap_or(0);
         let field_type = f.ty.clone();
@@ -139,7 +139,7 @@ impl Field {
 
     pub(super) fn encode(&self) -> proc_macro2::TokenStream {
         let f = self;
-        let field_name = f.ident.as_ref().unwrap();
+        let field_name = f.ident.as_ref().expect("Missing field name");
         let pad_after = f.pad_after.unwrap_or(0);
         let pad_before = f.pad_before.unwrap_or(0);
         let field_type = f.ty.clone();

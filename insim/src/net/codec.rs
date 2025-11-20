@@ -3,13 +3,13 @@ use std::time::{Duration, Instant};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use insim_core::{Decode, Encode};
 
-use super::{mode::Mode, DEFAULT_TIMEOUT_SECS};
+use super::{DEFAULT_TIMEOUT_SECS, mode::Mode};
 use crate::{
+    DEFAULT_BUFFER_CAPACITY, Error, VERSION, WithRequestId,
     identifiers::RequestId,
     insim::{Tiny, TinyType, Ver},
     packet::Packet,
     result::Result,
-    Error, WithRequestId, DEFAULT_BUFFER_CAPACITY, VERSION,
 };
 
 /// Handles the encoding and decoding of Insim packets to and from raw bytes.
@@ -106,7 +106,7 @@ impl Codec {
         let packet = Packet::decode(&mut data);
         match packet {
             Ok(packet) => {
-                tracing::trace!("Decoded packet={:?}", packet);
+                tracing::debug!("{:?}", packet);
                 if data.remaining() > 0 {
                     return Err(Error::IncompleteDecode {
                         input: original,

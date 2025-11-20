@@ -1,6 +1,6 @@
 use bitflags::bitflags;
 use glam::{IVec3, Vec3};
-use insim_core::{dash_lights::DashLights, Decode, Encode};
+use insim_core::{Decode, Encode, dash_lights::DashLights};
 
 use crate::identifiers::{PlayerId, RequestId};
 

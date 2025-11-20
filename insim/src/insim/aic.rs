@@ -59,7 +59,7 @@ impl From<AiInputToggle> for u16 {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 /// AI input type
@@ -134,16 +134,11 @@ pub enum AiInputType {
     SetHelpFlags(AiHelpFlags),
 
     /// Reset all controlled values
+    #[default]
     ResetAll,
 
     /// Yield control
     StopControl,
-}
-
-impl Default for AiInputType {
-    fn default() -> Self {
-        Self::ResetAll
-    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -445,7 +440,7 @@ impl Decode for AiInput {
             found => {
                 return Err(insim_core::DecodeError::NoVariantMatch {
                     found: found as u64,
-                })
+                });
             },
         };
 

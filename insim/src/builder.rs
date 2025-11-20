@@ -5,6 +5,8 @@ use std::{
     time::Duration,
 };
 
+#[cfg(feature = "tokio")]
+use crate::Packet;
 #[cfg(feature = "blocking")]
 #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
 use crate::net::blocking_impl::Framed as BlockingFramed;
@@ -67,6 +69,7 @@ pub struct Builder {
     // Why would they do this? Absolutely no idea. However, by separating out the fields, it
     // massively simplifies things for us.
     tcp_nodelay: bool,
+    non_blocking: bool,
     udp_local_address: Option<SocketAddr>,
 }
 
@@ -80,6 +83,7 @@ impl Default for Builder {
             mode: Mode::Compressed,
 
             tcp_nodelay: true,
+            non_blocking: false,
             udp_local_address: None,
 
             isi_admin_password: None,
@@ -139,6 +143,14 @@ impl Builder {
     /// Use "uncompressed" mode.
     pub fn uncompressed(self) -> Self {
         self.mode(Mode::Uncompressed)
+    }
+
+    /// Set whether sockets are non-blocking.
+    /// Default is `false` if blocking.
+    /// Always forced for tokio implementation.
+    pub fn set_non_blocking(mut self, non_blocking: bool) -> Self {
+        self.non_blocking = non_blocking;
+        self
     }
 
     /// Set whether sockets have `TCP_NODELAY` enabled.
@@ -253,15 +265,10 @@ impl Builder {
     }
 
     /// Create a [crate::insim::Isi] from this configuration.
-    pub fn isi(&self) -> Isi {
-        let udpport = match self.proto {
-            Proto::Udp => self.udp_local_address.unwrap().port(),
-            _ => 0,
-        };
-
+    pub fn isi(&self, udpport: Option<u16>) -> Isi {
         Isi {
             reqi: self.isi_reqi,
-            udpport,
+            udpport: udpport.unwrap_or(0),
             flags: self.isi_flags,
             admin: self.isi_admin_password.as_deref().unwrap_or("").to_owned(),
             iname: self
@@ -281,7 +288,7 @@ impl Builder {
     #[cfg(feature = "blocking")]
     #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
     pub fn connect_blocking(&self) -> Result<BlockingFramed> {
-        use crate::net::{blocking_impl::UdpStream, DEFAULT_TIMEOUT_SECS};
+        use crate::net::{DEFAULT_TIMEOUT_SECS, blocking_impl::UdpStream};
 
         match self.proto {
             Proto::Tcp => {
@@ -289,10 +296,13 @@ impl Builder {
                 stream.set_nodelay(self.tcp_nodelay)?;
                 stream.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
                 stream.set_write_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
+                if self.non_blocking {
+                    stream.set_nonblocking(true)?;
+                }
 
                 let mut stream =
                     BlockingFramed::new(Box::new(stream), Codec::new(self.mode.clone()));
-                stream.write(self.isi())?;
+                stream.write(self.isi(None))?;
 
                 Ok(stream)
             },
@@ -303,11 +313,11 @@ impl Builder {
                 stream.connect(&self.remote)?;
                 stream.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
                 stream.set_write_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
-
-                let mut isi = self.isi();
-                if self.udp_local_address.is_none() {
-                    isi.udpport = local.port();
+                if self.non_blocking {
+                    stream.set_nonblocking(true)?;
                 }
+
+                let isi = self.isi(Some(local.port()));
 
                 let mut stream = BlockingFramed::new(
                     Box::new(UdpStream::from(stream)),
@@ -336,7 +346,7 @@ impl Builder {
                 let stream = tokio::net::TcpStream::from_std(stream)?;
 
                 let mut stream = AsyncFramed::new(Box::new(stream), Codec::new(self.mode.clone()));
-                stream.write(self.isi()).await?;
+                stream.write(self.isi(None)).await?;
 
                 Ok(stream)
             },
@@ -349,10 +359,7 @@ impl Builder {
 
                 let stream = tokio::net::UdpSocket::from_std(stream)?;
 
-                let mut isi = self.isi();
-                if self.udp_local_address.is_none() {
-                    isi.udpport = local.port();
-                }
+                let isi = self.isi(Some(local.port()));
 
                 let mut stream = AsyncFramed::new(
                     Box::new(UdpStream::from(stream)),
@@ -363,5 +370,154 @@ impl Builder {
                 Ok(stream)
             },
         }
+    }
+
+    /// Connect and spawn a background Tokio task to manage the insim connection.
+    /// A [SpawnedHandle] is returned to allow you to interact with the background task to send and
+    /// receive packets.
+    /// Automatic reconnection is not handled at this time.
+    #[cfg(feature = "tokio")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
+    pub async fn spawn<C: Into<Option<usize>>>(
+        self,
+        capacity: C,
+    ) -> Result<(SpawnedHandle, tokio::task::JoinHandle<crate::Result<()>>)> {
+        let mut net = self.connect_async().await?;
+
+        let cap = capacity.into().unwrap_or(100);
+
+        let (event_sender, _) = tokio::sync::broadcast::channel::<crate::Packet>(cap);
+        let (command_sender, mut command_receiver) =
+            tokio::sync::mpsc::channel::<crate::Packet>(cap);
+
+        let token = tokio_util::sync::CancellationToken::new();
+
+        let cloned_event_sender = event_sender.clone();
+        let cloned_command_sender = command_sender.clone();
+        let cloned_token = token.clone();
+
+        let join_handle: tokio::task::JoinHandle<crate::Result<()>> = tokio::spawn(async move {
+            // main event loop
+            loop {
+                tokio::select! {
+                    // shutdown / abort / cancellation
+                    _ = token.cancelled() => {
+                        break;
+                    },
+
+                    // packet from LFS
+                    packet = net.read() => {
+                        let packet = packet?;
+
+                        if event_sender.receiver_count() > 0 {
+                            let _ = event_sender.send(packet);
+                        }
+                    },
+
+                    // commands
+                    Some(packet) = command_receiver.recv() => {
+                        net.write(packet).await?;
+                    }
+                }
+            }
+
+            Ok(())
+        });
+
+        let handle = SpawnedHandle {
+            events: cloned_event_sender,
+            commands: cloned_command_sender,
+            cancellation_token: cloned_token,
+        };
+
+        Ok((handle, join_handle))
+    }
+}
+
+#[cfg(feature = "tokio")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
+#[derive(Debug, Clone)]
+/// Handle for a spawned insim connection
+pub struct SpawnedHandle {
+    /// Receiver for packets
+    events: tokio::sync::broadcast::Sender<Packet>,
+    // Sender for packets
+    commands: tokio::sync::mpsc::Sender<Packet>,
+    // Cancellation token for shutdown handling
+    cancellation_token: tokio_util::sync::CancellationToken,
+}
+
+#[cfg(feature = "tokio")]
+impl SpawnedHandle {
+    /// Subscribe to a stream of Packets
+    pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<crate::Packet> {
+        self.events.subscribe()
+    }
+
+    /// Send an insim packet
+    pub async fn send<P: Into<crate::Packet> + Send + Sync>(&self, packet: P) -> crate::Result<()> {
+        self.commands
+            .send(packet.into())
+            .await
+            .map_err(|_| crate::Error::SpawnedDead)
+    }
+
+    /// Sends an iterator of packets concurrently and stops on the first error
+    pub async fn send_all<I, P>(&self, packets: I) -> crate::Result<()>
+    where
+        I: IntoIterator<Item = P> + Send,
+        P: Into<crate::Packet> + Send + Debug,
+    {
+        let futures = packets.into_iter().map(|p| self.send(p.into()));
+        let _ = futures::future::try_join_all(futures).await?;
+        Ok(())
+    }
+
+    /// Shortcut to send a command
+    pub async fn send_command(&self, command: &str) -> crate::Result<()> {
+        self.send(crate::insim::Mst {
+            msg: command.into(),
+            ..Default::default()
+        })
+        .await
+        .map_err(|_| crate::Error::SpawnedDead)
+    }
+
+    /// Shortcut to send a message. This will automatically detect what type of packet to send for
+    /// you.
+    pub async fn send_message<U: Into<Option<crate::identifiers::ConnectionId>>>(
+        &self,
+        msg: &str,
+        ucid: U,
+    ) -> crate::Result<()> {
+        let packet: crate::Packet = if let Some(ucid) = ucid.into() {
+            crate::insim::Mtc {
+                ucid,
+                text: msg.into(),
+                ..Default::default()
+            }
+            .into()
+        } else if msg.len() > 63 {
+            crate::insim::Mst {
+                msg: msg.into(),
+                ..Default::default()
+            }
+            .into()
+        } else {
+            crate::insim::Msx {
+                msg: msg.into(),
+                ..Default::default()
+            }
+            .into()
+        };
+
+        self.send(packet)
+            .await
+            .map_err(|_| crate::Error::SpawnedDead)
+    }
+
+    /// Request cancellation / shutdown
+    pub async fn shutdown(&self) {
+        self.cancellation_token.cancelled().await
     }
 }

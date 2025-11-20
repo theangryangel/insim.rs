@@ -8,16 +8,17 @@ members = [
   "outgauge",
   "outsim",
   "examples/*",
+  "kitcar", "kitcar_macros",
 ]
 exclude = ['examples/*']
 # Only check / build main crates by default (check all with `--workspace`)
-default-members = ["insim", "insim_*", "outgauge", "outsim"]
+default-members = ["insim", "insim_*", "outgauge", "outsim", "kitcar"]
 resolver = "2"
 
 [workspace.package]
 authors = ["Karl Southern <karl@theangryangel.co.uk>"]
-edition = "2021"
-rust-version = "1.75"
+edition = "2024"
+rust-version = "1.85"
 repository = "https://github.com/theangryangel/insim.rs"
 license = "MIT"
 homepage = "https://github.com/theangryangel/insim.rs"
@@ -32,24 +33,33 @@ missing_debug_implementations = "deny"
 [workspace.lints.rustdoc]
 broken_intra_doc_links = "deny"
 
+# [workspace.lints.clippy]
+# unwrap_used = "deny"
+
 [workspace.dependencies]
+async-trait = "0.1.89"
 bitflags = "2.4.0"
 bytes = "1.4.0"
 clap = { version = "4.2" }
 darling = "0.21"
 encoding_rs = { version = "0.8.32" }
+fixedbitset = "0.5.7"
 from_variants = "1.0.2"
+futures = "0.3"
 glam = "0.30.3"
 if_chain = "1.0.2"
-indexmap = "2.1.0"
+indexmap = "2.11.4"
 itertools = { version = "0.14.0" }
 num-traits = "0.2.19"
 proc-macro2 = "1"
 quote = "1"
+rand = "0.9.2"
 serde = { version = "1.0.188" }
+serde_norway = "0.9.42"
 syn = { version = "2" }
 thiserror = "2.0.12"
 tokio = { version = "1.11.0" }
 tokio-test = "0.4.0"
+tokio-util = "0.7.16"
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17" }

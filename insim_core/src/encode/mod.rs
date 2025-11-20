@@ -29,6 +29,10 @@ pub enum EncodeError {
     /// Value too large for field
     #[error("too large")]
     TooLarge,
+
+    /// Value too small for field
+    #[error("too small")]
+    TooSmall,
 }
 
 /// Enable to bytes
@@ -209,10 +213,18 @@ where
         }
         let len_to_write = new.len().min(max_len);
         buf.extend_from_slice(&new[..len_to_write]);
-        if len_to_write < len {
-            let align_to = alignment - 1;
-            let round_to = (len_to_write + align_to) & !align_to;
-            let round_to = round_to.min(len);
+
+        // Always pad to alignment, ensuring trailing_nul if needed
+        let align_to = alignment - 1;
+        let min_total = if trailing_nul {
+            len_to_write + 1
+        } else {
+            len_to_write
+        };
+        let round_to = (min_total + align_to) & !align_to;
+        let round_to = round_to.min(len);
+
+        if round_to > len_to_write {
             buf.put_bytes(0, round_to - len_to_write);
         }
         Ok(())

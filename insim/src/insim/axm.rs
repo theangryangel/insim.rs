@@ -5,26 +5,7 @@ use crate::identifiers::{ConnectionId, RequestId};
 
 const AXM_MAX_OBJECTS: usize = 60;
 
-/// Used within the [Axm] packet.
-#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct ObjectInfo {
-    /// X coordinate of object
-    pub x: i16,
-    /// Y coordinate of object
-    pub y: i16,
-    /// Z coordinate of object
-    pub z: u8,
-
-    /// Flags
-    pub flags: u8,
-
-    /// Index of object
-    pub index: u8,
-
-    /// Heading/direction of object
-    pub heading: u8,
-}
+pub use insim_core::object::ObjectInfo;
 
 /// Actions that can be taken as part of [Axm].
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
@@ -161,6 +142,8 @@ impl Encode for Axm {
 
 #[cfg(test)]
 mod test {
+    use insim_core::object::{ObjectPosition, control};
+
     use super::*;
 
     #[test]
@@ -180,7 +163,7 @@ mod test {
                 136, // info[1] - y (2)
                 8,   // info[1] - zbyte
                 0,   // info[1] - flags
-                1,   // info[1] - objectindex
+                0,   // info[1] - objectindex
                 128, // info[1] - heading
                 172, // info[2] - x (1)
                 218, // info[2] - x (2)
@@ -188,17 +171,23 @@ mod test {
                 136, // info[2] - y (2)
                 8,   // info[2] - zbyte
                 0,   // info[2] - flags
-                2,   // info[2] - objectindex
+                0,   // info[2] - objectindex
                 128, // info[2] - heading
             ],
             |axm: Axm| {
                 assert_eq!(axm.info.len(), 2);
-                assert_eq!(axm.info[0].z, 8);
-                assert_eq!(axm.info[0].flags, 0);
-                assert_eq!(axm.info[0].index, 1);
-                assert_eq!(axm.info[0].heading, 128);
-
-                assert_eq!(axm.info[1].index, 2);
+                assert!(matches!(
+                    axm.info[0],
+                    ObjectInfo::Start(control::Point {
+                        xyz: ObjectPosition {
+                            x: -9556,
+                            y: -30695,
+                            z: 8
+                        },
+                        heading: 128,
+                        floating: false,
+                    })
+                ));
             }
         )
     }

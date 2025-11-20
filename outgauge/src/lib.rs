@@ -11,11 +11,11 @@ use std::{
 pub use ::insim_core as core;
 use bytes::{Buf, BufMut};
 use insim_core::{
+    Decode, DecodeString, Encode, EncodeString,
     dash_lights::DashLights,
     gear::Gear,
     identifiers::PlayerId,
     speed::{Speed, SpeedKind},
-    Decode, DecodeString, Encode, EncodeString,
 };
 
 bitflags::bitflags! {

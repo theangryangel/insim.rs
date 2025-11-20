@@ -51,6 +51,8 @@ pub struct Uco {
 
 #[cfg(test)]
 mod test {
+    use insim_core::object::{ObjectPosition, control};
+
     use super::*;
 
     #[test]
@@ -86,10 +88,16 @@ mod test {
                 1,   // info - heading
             ],
             |parsed: Uco| {
-                assert_eq!(parsed.info.x, -280);
-                assert_eq!(parsed.info.y, -1585);
-                assert_eq!(parsed.info.z, 8);
-                assert_eq!(parsed.info.heading, 1);
+                let expected = ObjectInfo::InsimCircle(control::InsimCircle {
+                    xyz: ObjectPosition {
+                        x: -280,
+                        y: -1585,
+                        z: 8,
+                    },
+                    flags: 24,
+                    index: 1,
+                });
+                assert_eq!(parsed.info, expected);
                 assert!(matches!(parsed.ucoaction, UcoAction::CircleLeave));
                 assert_eq!(parsed.time, Duration::from_millis(151560));
                 assert_eq!(parsed.c.speed.to_meters_per_sec() as u8, 8);

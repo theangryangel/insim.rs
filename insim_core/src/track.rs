@@ -1,1294 +1,276 @@
 //! Strongly typed Tracks
 
-use crate::{license::License, Decode, Encode};
+use std::str::FromStr;
 
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Handles parsing a Track name.
-#[non_exhaustive]
-#[allow(missing_docs)]
-pub enum Track {
-    #[default]
-    Bl1,
-    Bl1r,
-    Bl1x,
-    Bl1y,
-    Bl2,
-    Bl2r,
-    Bl2x,
-    Bl2y,
-    Bl3,
-    Bl3r,
-    Bl3x,
-    Bl3y,
-    Bl4,
-    Bl4x,
-    So1,
-    So1r,
-    So1x,
-    So1y,
-    So2,
-    So2r,
-    So2x,
-    So2y,
-    So3,
-    So3r,
-    So3x,
-    So3y,
-    So4,
-    So4r,
-    So4x,
-    So4y,
-    So5,
-    So5r,
-    So5x,
-    So5y,
-    So6,
-    So6r,
-    So6x,
-    So6y,
-    Fe1,
-    Fe1r,
-    Fe1x,
-    Fe1y,
-    Fe2,
-    Fe2r,
-    Fe2x,
-    Fe2y,
-    Fe3,
-    Fe3r,
-    Fe3x,
-    Fe3y,
-    Fe4,
-    Fe4r,
-    Fe4x,
-    Fe4y,
-    Fe5,
-    Fe5r,
-    Fe5x,
-    Fe5y,
-    Fe6,
-    Fe6r,
-    Fe6x,
-    Fe6y,
-    Au1,
-    Au1x,
-    Au2,
-    Au2x,
-    Au3,
-    Au3x,
-    Au4,
-    Au4x,
-    Ky1,
-    Ky1r,
-    Ky1x,
-    Ky1y,
-    Ky2,
-    Ky2r,
-    Ky2x,
-    Ky2y,
-    Ky3,
-    Ky3r,
-    Ky3x,
-    Ky3y,
-    We1,
-    We1r,
-    We1x,
-    We1y,
-    We2,
-    We2r,
-    We2x,
-    We2y,
-    We3,
-    #[allow(missing_docs)]
-    We3x,
-    We4,
-    We4r,
-    We4x,
-    We4y,
-    We5,
-    We5r,
-    We5x,
-    We5y,
-    As1,
-    As1r,
-    As1x,
-    As1y,
-    As2,
-    As2r,
-    As2x,
-    As2y,
-    As3,
-    As3r,
-    As3x,
-    As3y,
-    As4,
-    As4r,
-    As4x,
-    As4y,
-    As5,
-    As5r,
-    As5x,
-    As5y,
-    As6,
-    As6r,
-    As6x,
-    As6y,
-    As7,
-    As7r,
-    As7x,
-    As7y,
-    Ro1,
-    Ro1x,
-    Ro2,
-    Ro2x,
-    Ro3,
-    Ro3x,
-    Ro4,
-    Ro4x,
-    Ro5,
-    Ro5x,
-    Ro6,
-    Ro6x,
-    Ro7,
-    Ro7x,
-    Ro8,
-    Ro8x,
-    Ro9,
-    Ro9x,
-    Ro10,
-    Ro10x,
-    Ro11,
-    Ro11x,
-    La1,
-    La1x,
-    La2,
-    La2x,
+use crate::{Decode, Encode, license::License};
+
+macro_rules! define_tracks {
+    (
+        $(
+            $variant:ident, // Enum Variant (e.g., Bl1)
+            $code:literal,  // String Code (e.g., "BL1")
+            $name:literal,  // Full Name (e.g., "Blackwood GP")
+            $license:ident, // License Enum (e.g., Demo)
+            $dist:expr      // Distance Miles (e.g., Some(2.0))
+        ),* $(,)?
+    ) => {
+        #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, Default)]
+        /// Handles parsing a Track name.
+        #[non_exhaustive]
+        #[allow(missing_docs)]
+        #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+        #[cfg_attr(feature = "serde", serde(try_from = "String", into = "String"))]
+        pub enum Track {
+            #[default]
+            $($variant),*
+        }
+
+        impl Track {
+            /// What license is required to access this map
+            pub fn license(&self) -> License {
+                match self {
+                    $(Self::$variant => License::$license),*
+                }
+            }
+
+            /// Driving distance in miles
+            pub fn distance_mile(&self) -> Option<f32> {
+                match self {
+                    $(Self::$variant => $dist),*
+                }
+            }
+
+            /// Driving distance in kilometers
+            pub fn distance_km(&self) -> Option<f32> {
+                self.distance_mile().map(|distance| distance * 1.60934)
+            }
+
+            /// Complete name of the track
+            pub fn complete_name(&self) -> &'static str {
+                match self {
+                    $(Self::$variant => $name),*
+                }
+            }
+
+            /// Track short code
+            pub fn code(&self) -> &'static str {
+                match self {
+                    $(Self::$variant => $code),*
+                }
+            }
+
+            /// Is this a reversed track?
+            pub fn is_reverse(&self) -> bool {
+                let s = self.code();
+                s.ends_with('R') || s.ends_with('Y')
+            }
+
+            /// Is this an open world track?
+            pub fn is_open(&self) -> bool {
+                let s = self.code();
+                s.ends_with('X') || s.ends_with('Y')
+            }
+        }
+
+        impl FromStr for Track {
+            type Err = TrackUnknownError;
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                match s {
+                    $($code => Ok(Self::$variant)),*,
+                    _ => Err(TrackUnknownError(s.to_string())),
+                }
+            }
+        }
+    };
 }
 
-impl Track {
-    /// What license is required to access this map
-    pub fn license(&self) -> License {
-        match self {
-            Self::Bl1 => License::Demo,
-            Self::Bl1r => License::Demo,
-            Self::Bl1x => License::Demo,
-            Self::Bl1y => License::Demo,
-            Self::Bl2 => License::Demo,
-            Self::Bl2r => License::Demo,
-            Self::Bl2x => License::Demo,
-            Self::Bl2y => License::Demo,
-            Self::Bl3 => License::Demo,
-            Self::Bl3r => License::Demo,
-            Self::Bl3x => License::Demo,
-            Self::Bl3y => License::Demo,
-            Self::Bl4 => License::Demo,
-            Self::Bl4x => License::Demo,
-            Self::So1 => License::S1,
-            Self::So1r => License::S1,
-            Self::So1x => License::S1,
-            Self::So1y => License::S1,
-            Self::So2 => License::S1,
-            Self::So2r => License::S1,
-            Self::So2x => License::S1,
-            Self::So2y => License::S1,
-            Self::So3 => License::S1,
-            Self::So3r => License::S1,
-            Self::So3x => License::S1,
-            Self::So3y => License::S1,
-            Self::So4 => License::S1,
-            Self::So4r => License::S1,
-            Self::So4x => License::S1,
-            Self::So4y => License::S1,
-            Self::So5 => License::S1,
-            Self::So5r => License::S1,
-            Self::So5x => License::S1,
-            Self::So5y => License::S1,
-            Self::So6 => License::S1,
-            Self::So6r => License::S1,
-            Self::So6x => License::S1,
-            Self::So6y => License::S1,
-            Self::Fe1 => License::S1,
-            Self::Fe1r => License::S1,
-            Self::Fe1x => License::S1,
-            Self::Fe1y => License::S1,
-            Self::Fe2 => License::S1,
-            Self::Fe2r => License::S1,
-            Self::Fe2x => License::S1,
-            Self::Fe2y => License::S1,
-            Self::Fe3 => License::S1,
-            Self::Fe3r => License::S1,
-            Self::Fe3x => License::S1,
-            Self::Fe3y => License::S1,
-            Self::Fe4 => License::S1,
-            Self::Fe4r => License::S1,
-            Self::Fe4x => License::S1,
-            Self::Fe4y => License::S1,
-            Self::Fe5 => License::S1,
-            Self::Fe5r => License::S1,
-            Self::Fe5x => License::S1,
-            Self::Fe5y => License::S1,
-            Self::Fe6 => License::S1,
-            Self::Fe6r => License::S1,
-            Self::Fe6x => License::S1,
-            Self::Fe6y => License::S1,
-            Self::Au1 => License::S1,
-            Self::Au1x => License::S1,
-            Self::Au2 => License::S1,
-            Self::Au2x => License::S1,
-            Self::Au3 => License::S1,
-            Self::Au3x => License::S1,
-            Self::Au4 => License::S1,
-            Self::Au4x => License::S1,
-            Self::Ky1 => License::S2,
-            Self::Ky1r => License::S2,
-            Self::Ky1x => License::S2,
-            Self::Ky1y => License::S2,
-            Self::Ky2 => License::S2,
-            Self::Ky2r => License::S2,
-            Self::Ky2x => License::S2,
-            Self::Ky2y => License::S2,
-            Self::Ky3 => License::S2,
-            Self::Ky3r => License::S2,
-            Self::Ky3x => License::S2,
-            Self::Ky3y => License::S2,
-            Self::We1 => License::S2,
-            Self::We1r => License::S2,
-            Self::We1x => License::S2,
-            Self::We1y => License::S2,
-            Self::We2 => License::S2,
-            Self::We2r => License::S2,
-            Self::We2x => License::S2,
-            Self::We2y => License::S2,
-            Self::We3 => License::S2,
-            Self::We3x => License::S2,
-            Self::We4 => License::S2,
-            Self::We4r => License::S2,
-            Self::We4x => License::S2,
-            Self::We4y => License::S2,
-            Self::We5 => License::S2,
-            Self::We5r => License::S2,
-            Self::We5x => License::S2,
-            Self::We5y => License::S2,
-            Self::As1 => License::S2,
-            Self::As1r => License::S2,
-            Self::As1x => License::S2,
-            Self::As1y => License::S2,
-            Self::As2 => License::S2,
-            Self::As2r => License::S2,
-            Self::As2x => License::S2,
-            Self::As2y => License::S2,
-            Self::As3 => License::S2,
-            Self::As3r => License::S2,
-            Self::As3x => License::S2,
-            Self::As3y => License::S2,
-            Self::As4 => License::S2,
-            Self::As4r => License::S2,
-            Self::As4x => License::S2,
-            Self::As4y => License::S2,
-            Self::As5 => License::S2,
-            Self::As5r => License::S2,
-            Self::As5x => License::S2,
-            Self::As5y => License::S2,
-            Self::As6 => License::S2,
-            Self::As6r => License::S2,
-            Self::As6x => License::S2,
-            Self::As6y => License::S2,
-            Self::As7 => License::S2,
-            Self::As7r => License::S2,
-            Self::As7x => License::S2,
-            Self::As7y => License::S2,
-            Self::Ro1 => License::S3,
-            Self::Ro1x => License::S3,
-            Self::Ro2 => License::S3,
-            Self::Ro2x => License::S3,
-            Self::Ro3 => License::S3,
-            Self::Ro3x => License::S3,
-            Self::Ro4 => License::S3,
-            Self::Ro4x => License::S3,
-            Self::Ro5 => License::S3,
-            Self::Ro5x => License::S3,
-            Self::Ro6 => License::S3,
-            Self::Ro6x => License::S3,
-            Self::Ro7 => License::S3,
-            Self::Ro7x => License::S3,
-            Self::Ro8 => License::S3,
-            Self::Ro8x => License::S3,
-            Self::Ro9 => License::S3,
-            Self::Ro9x => License::S3,
-            Self::Ro10 => License::S3,
-            Self::Ro10x => License::S3,
-            Self::Ro11 => License::S3,
-            Self::Ro11x => License::S3,
-            Self::La1 => License::S3,
-            Self::La1x => License::S3,
-            Self::La2 => License::S3,
-            Self::La2x => License::S3,
-        }
-    }
+#[rustfmt::skip]
+define_tracks!(
+    // Variant, Code, Name,                            License, Distance (Miles)
+    Bl1,   "BL1",   "Blackwood GP Track",              Demo, Some(2.0),
+    Bl1r,  "BL1R",  "Blackwood GP Track R",            Demo, Some(2.0),
+    Bl1x,  "BL1X",  "Blackwood GP Track X",            Demo, None,
+    Bl1y,  "BL1Y",  "Blackwood GP Track Y",            Demo, None,
+    Bl2,   "BL2",   "Blackwood Historic",              Demo, Some(2.0),
+    Bl2r,  "BL2R",  "Blackwood Historic R",            Demo, Some(2.0),
+    Bl2x,  "BL2X",  "Blackwood Historic X",            Demo, None,
+    Bl2y,  "BL2Y",  "Blackwood Historic Y",            Demo, None,
+    Bl3,   "BL3",   "Blackwood Rallycross",            Demo, Some(2.0),
+    Bl3r,  "BL3R",  "Blackwood Rallycross R",          Demo, Some(2.0),
+    Bl3x,  "BL3X",  "Blackwood Rallycross X",          Demo, None,
+    Bl3y,  "BL3Y",  "Blackwood Rallycross Y",          Demo, None,
+    Bl4,   "BL4",   "Blackwood Carpark",               Demo, None,
+    Bl4x,  "BL4X",  "Blackwood Carpark X",             Demo, None,
 
-    /// Driving distance in kilometers
-    pub fn distance_km(&self) -> Option<f32> {
-        self.distance_mile().map(|distance| distance * 1.60934)
-    }
+    So1,   "SO1",   "South City Classic",              S1,   Some(1.3),
+    So1r,  "SO1R",  "South City Classic R",            S1,   Some(1.3),
+    So1x,  "SO1X",  "South City Classic X",            S1,   None,
+    So1y,  "SO1Y",  "South City Classic Y",            S1,   None,
+    So2,   "SO2",   "South City Sprint 1",             S1,   Some(1.3),
+    So2r,  "SO2R",  "South City Sprint 1 R",           S1,   Some(1.3),
+    So2x,  "SO2X",  "South City Sprint 1 X",           S1,   None,
+    So2y,  "SO2Y",  "South City Sprint 1 Y",           S1,   None,
+    So3,   "SO3",   "South City Sprint 2",             S1,   Some(0.8),
+    So3r,  "SO3R",  "South City Sprint 2 R",           S1,   Some(0.8),
+    So3x,  "SO3X",  "South City Sprint 2 X",           S1,   None,
+    So3y,  "SO3Y",  "South City Sprint 2 Y",           S1,   None,
+    So4,   "SO4",   "South City City Long",            S1,   Some(2.5),
+    So4r,  "SO4R",  "South City City Long R",          S1,   Some(2.5),
+    So4x,  "SO4X",  "South City City Long X",          S1,   None,
+    So4y,  "SO4Y",  "South City City Long Y",          S1,   None,
+    So5,   "SO5",   "South City Town Course",          S1,   Some(2.0),
+    So5r,  "SO5R",  "South City Town Course R",        S1,   Some(2.0),
+    So5x,  "SO5X",  "South City Town Course X",        S1,   None,
+    So5y,  "SO5Y",  "South City Town Course Y",        S1,   None,
+    So6,   "SO6",   "South City Chicane Course",       S1,   Some(1.8),
+    So6r,  "SO6R",  "South City Chicane Course R",     S1,   Some(1.8),
+    So6x,  "SO6X",  "South City Chicane Course X",     S1,   None,
+    So6y,  "SO6Y",  "South City Chicane Course Y",     S1,   None,
 
-    /// Driving distance in miles
-    pub fn distance_mile(&self) -> Option<f32> {
-        match self {
-            Self::Bl1 => Some(2.0),
-            Self::Bl1r => Some(2.0),
-            Self::Bl1x => None,
-            Self::Bl1y => None,
-            Self::Bl2 => Some(2.0),
-            Self::Bl2r => Some(2.0),
-            Self::Bl2x => None,
-            Self::Bl2y => None,
-            Self::Bl3 => Some(2.0),
-            Self::Bl3r => Some(2.0),
-            Self::Bl3x => None,
-            Self::Bl3y => None,
-            Self::Bl4 => None,
-            Self::Bl4x => None,
-            Self::So1 => Some(1.3),
-            Self::So1r => Some(1.3),
-            Self::So1x => None,
-            Self::So1y => None,
-            Self::So2 => Some(1.3),
-            Self::So2r => Some(1.3),
-            Self::So2x => None,
-            Self::So2y => None,
-            Self::So3 => Some(0.8),
-            Self::So3r => Some(0.8),
-            Self::So3x => None,
-            Self::So3y => None,
-            Self::So4 => Some(2.5),
-            Self::So4r => Some(2.5),
-            Self::So4x => None,
-            Self::So4y => None,
-            Self::So5 => Some(2.0),
-            Self::So5r => Some(2.0),
-            Self::So5x => None,
-            Self::So5y => None,
-            Self::So6 => Some(1.8),
-            Self::So6r => Some(1.8),
-            Self::So6x => None,
-            Self::So6y => None,
-            Self::Fe1 => Some(1.0),
-            Self::Fe1r => Some(1.0),
-            Self::Fe1x => None,
-            Self::Fe1y => None,
-            Self::Fe2 => Some(1.9),
-            Self::Fe2r => Some(1.9),
-            Self::Fe2x => None,
-            Self::Fe2y => None,
-            Self::Fe3 => Some(2.2),
-            Self::Fe3r => Some(2.2),
-            Self::Fe3x => None,
-            Self::Fe3y => None,
-            Self::Fe4 => Some(4.1),
-            Self::Fe4r => Some(4.1),
-            Self::Fe4x => None,
-            Self::Fe4y => None,
-            Self::Fe5 => Some(1.3),
-            Self::Fe5r => Some(1.3),
-            Self::Fe5x => None,
-            Self::Fe5y => None,
-            Self::Fe6 => Some(0.5),
-            Self::Fe6r => Some(0.5),
-            Self::Fe6x => None,
-            Self::Fe6y => None,
-            Self::Au1 => None,
-            Self::Au1x => None,
-            Self::Au2 => None,
-            Self::Au2x => None,
-            Self::Au3 => None,
-            Self::Au3x => None,
-            Self::Au4 => None,
-            Self::Au4x => None,
-            Self::Ky1 => Some(1.9),
-            Self::Ky1r => Some(1.9),
-            Self::Ky1x => None,
-            Self::Ky1y => None,
-            Self::Ky2 => Some(3.2),
-            Self::Ky2r => Some(3.2),
-            Self::Ky2x => None,
-            Self::Ky2y => None,
-            Self::Ky3 => Some(4.6),
-            Self::Ky3r => Some(4.6),
-            Self::Ky3x => None,
-            Self::Ky3y => None,
-            Self::We1 => Some(2.7),
-            Self::We1r => Some(2.7),
-            Self::We1x => None,
-            Self::We1y => None,
-            Self::We2 => Some(3.6),
-            Self::We2r => Some(3.6),
-            Self::We2x => None,
-            Self::We2y => None,
-            Self::We3 => None,
-            Self::We3x => None,
-            Self::We4 => Some(0.3),
-            Self::We4r => Some(0.3),
-            Self::We4x => None,
-            Self::We4y => None,
-            Self::We5 => Some(0.8),
-            Self::We5r => Some(0.8),
-            Self::We5x => None,
-            Self::We5y => None,
-            Self::As1 => Some(1.2),
-            Self::As1r => Some(1.2),
-            Self::As1x => None,
-            Self::As1y => None,
-            Self::As2 => Some(1.9),
-            Self::As2r => Some(1.9),
-            Self::As2x => None,
-            Self::As2y => None,
-            Self::As3 => Some(3.5),
-            Self::As3r => Some(3.5),
-            Self::As3x => None,
-            Self::As3y => None,
-            Self::As4 => Some(5.0),
-            Self::As4r => Some(5.0),
-            Self::As4x => None,
-            Self::As4y => None,
-            Self::As5 => Some(5.5),
-            Self::As5r => Some(5.5),
-            Self::As5x => None,
-            Self::As5y => None,
-            Self::As6 => Some(5.0),
-            Self::As6r => Some(5.0),
-            Self::As6x => None,
-            Self::As6y => None,
-            Self::As7 => Some(3.2),
-            Self::As7r => Some(3.2),
-            Self::As7x => None,
-            Self::As7y => None,
-            Self::Ro1 => Some(1.9),
-            Self::Ro1x => None,
-            Self::Ro2 => Some(1.7),
-            Self::Ro2x => None,
-            Self::Ro3 => Some(1.5),
-            Self::Ro3x => None,
-            Self::Ro4 => Some(2.0),
-            Self::Ro4x => None,
-            Self::Ro5 => Some(0.7),
-            Self::Ro5x => None,
-            Self::Ro6 => Some(1.0),
-            Self::Ro6x => None,
-            Self::Ro7 => Some(2.4),
-            Self::Ro7x => None,
-            Self::Ro8 => Some(2.2),
-            Self::Ro8x => None,
-            Self::Ro9 => Some(1.4),
-            Self::Ro9x => None,
-            Self::Ro10 => Some(2.5),
-            Self::Ro10x => None,
-            Self::Ro11 => Some(1.7),
-            Self::Ro11x => None,
-            Self::La1 => None,
-            Self::La1x => None,
-            Self::La2 => None,
-            Self::La2x => None,
-        }
-    }
+    Fe1,   "FE1",   "Fern Bay Club",                   S1,   Some(1.0),
+    Fe1r,  "FE1R",  "Fern Bay Club R",                 S1,   Some(1.0),
+    Fe1x,  "FE1X",  "Fern Bay Club X",                 S1,   None,
+    Fe1y,  "FE1Y",  "Fern Bay Club Y",                 S1,   None,
+    Fe2,   "FE2",   "Fern Bay Green",                  S1,   Some(1.9),
+    Fe2r,  "FE2R",  "Fern Bay Green R",                S1,   Some(1.9),
+    Fe2x,  "FE2X",  "Fern Bay Green X",                S1,   None,
+    Fe2y,  "FE2Y",  "Fern Bay Green Y",                S1,   None,
+    Fe3,   "FE3",   "Fern Bay Gold",                   S1,   Some(2.2),
+    Fe3r,  "FE3R",  "Fern Bay Gold R",                 S1,   Some(2.2),
+    Fe3x,  "FE3X",  "Fern Bay Gold X",                 S1,   None,
+    Fe3y,  "FE3Y",  "Fern Bay Gold Y",                 S1,   None,
+    Fe4,   "FE4",   "Fern Bay Black",                  S1,   Some(4.1),
+    Fe4r,  "FE4R",  "Fern Bay Black R",                S1,   Some(4.1),
+    Fe4x,  "FE4X",  "Fern Bay Black X",                S1,   None,
+    Fe4y,  "FE4Y",  "Fern Bay Black Y",                S1,   None,
+    Fe5,   "FE5",   "Fern Bay Rallycross",             S1,   Some(1.3),
+    Fe5r,  "FE5R",  "Fern Bay Rallycross R",           S1,   Some(1.3),
+    Fe5x,  "FE5X",  "Fern Bay Rallycross X",           S1,   None,
+    Fe5y,  "FE5Y",  "Fern Bay Rallycross Y",           S1,   None,
+    Fe6,   "FE6",   "Fern Bay Rallycross Green",       S1,   Some(0.5),
+    Fe6r,  "FE6R",  "Fern Bay Rallycross Green R",     S1,   Some(0.5),
+    Fe6x,  "FE6X",  "Fern Bay Rallycross Green X",     S1,   None,
+    Fe6y,  "FE6Y",  "Fern Bay Rallycross Green Y",     S1,   None,
 
-    /// Complete name of the track
-    pub fn complete_name(&self) -> String {
-        match self {
-            Self::Bl1 => "Blackwood GP Track",
-            Self::Bl1r => "Blackwood GP Track R",
-            Self::Bl1x => "Blackwood GP Track X",
-            Self::Bl1y => "Blackwood GP Track Y",
-            Self::Bl2 => "Blackwood Historic",
-            Self::Bl2r => "Blackwood Historic R",
-            Self::Bl2x => "Blackwood Historic X",
-            Self::Bl2y => "Blackwood Historic Y",
-            Self::Bl3 => "Blackwood Rallycross",
-            Self::Bl3r => "Blackwood Rallycross R",
-            Self::Bl3x => "Blackwood Rallycross X",
-            Self::Bl3y => "Blackwood Rallycross Y",
-            Self::Bl4 => "Blackwood Carpark",
-            Self::Bl4x => "Blackwood Carpark X",
-            Self::So1 => "South City Classic",
-            Self::So1r => "South City Classic R",
-            Self::So1x => "South City Classic X",
-            Self::So1y => "South City Classic Y",
-            Self::So2 => "South City Sprint 1",
-            Self::So2r => "South City Sprint 1 R",
-            Self::So2x => "South City Sprint 1 X",
-            Self::So2y => "South City Sprint 1 Y",
-            Self::So3 => "South City Sprint 2",
-            Self::So3r => "South City Sprint 2 R",
-            Self::So3x => "South City Sprint 2 X",
-            Self::So3y => "South City Sprint 2 Y",
-            Self::So4 => "South City City Long",
-            Self::So4r => "South City City Long R",
-            Self::So4x => "South City City Long X",
-            Self::So4y => "South City City Long Y",
-            Self::So5 => "South City Town Course",
-            Self::So5r => "South City Town Course R",
-            Self::So5x => "South City Town Course X",
-            Self::So5y => "South City Town Course Y",
-            Self::So6 => "South City Chicane Course",
-            Self::So6r => "South City Chicane Course R",
-            Self::So6x => "South City Chicane Course X",
-            Self::So6y => "South City Chicane Course Y",
-            Self::Fe1 => "Fern Bay Club",
-            Self::Fe1r => "Fern Bay Club R",
-            Self::Fe1x => "Fern Bay Club X",
-            Self::Fe1y => "Fern Bay Club Y",
-            Self::Fe2 => "Fern Bay Green",
-            Self::Fe2r => "Fern Bay Green R",
-            Self::Fe2x => "Fern Bay Green X",
-            Self::Fe2y => "Fern Bay Green Y",
-            Self::Fe3 => "Fern Bay Gold",
-            Self::Fe3r => "Fern Bay Gold R",
-            Self::Fe3x => "Fern Bay Gold X",
-            Self::Fe3y => "Fern Bay Gold Y",
-            Self::Fe4 => "Fern Bay Black",
-            Self::Fe4r => "Fern Bay Black R",
-            Self::Fe4x => "Fern Bay Black X",
-            Self::Fe4y => "Fern Bay Black Y",
-            Self::Fe5 => "Fern Bay Rallycross",
-            Self::Fe5r => "Fern Bay Rallycross R",
-            Self::Fe5x => "Fern Bay Rallycross X",
-            Self::Fe5y => "Fern Bay Rallycross Y",
-            Self::Fe6 => "Fern Bay Rallycross Green",
-            Self::Fe6r => "Fern Bay Rallycross Green R",
-            Self::Fe6x => "Fern Bay Rallycross Green X",
-            Self::Fe6y => "Fern Bay Rallycross Green Y",
-            Self::Au1 => "Autocross",
-            Self::Au1x => "Autocross X",
-            Self::Au2 => "Skid Pad",
-            Self::Au2x => "Skid Pad X",
-            Self::Au3 => "Drag Strip",
-            Self::Au3x => "Drag Strip X",
-            Self::Au4 => "8 Lane Drag Strip",
-            Self::Au4x => "8 Lane Drag Strip X",
-            Self::Ky1 => "Kyoto Oval",
-            Self::Ky1r => "Kyoto Oval R",
-            Self::Ky1x => "Kyoto Oval X",
-            Self::Ky1y => "Kyoto Oval Y",
-            Self::Ky2 => "Kyoto National",
-            Self::Ky2r => "Kyoto National R",
-            Self::Ky2x => "Kyoto National X",
-            Self::Ky2y => "Kyoto National Y",
-            Self::Ky3 => "Kyoto GP Long",
-            Self::Ky3r => "Kyoto GP Long R",
-            Self::Ky3x => "Kyoto GP Long X",
-            Self::Ky3y => "Kyoto GP Long Y",
-            Self::We1 => "Westhill National",
-            Self::We1r => "Westhill National R",
-            Self::We1x => "Westhill National X",
-            Self::We1y => "Westhill National Y",
-            Self::We2 => "Westhill International",
-            Self::We2r => "Westhill International R",
-            Self::We2x => "Westhill International X",
-            Self::We2y => "Westhill International Y",
-            Self::We3 => "Westhill Car Park",
-            Self::We3x => "Westhill Car Park X",
-            Self::We4 => "Westhill Karting",
-            Self::We4r => "Westhill Karting R",
-            Self::We4x => "Westhill Karting X",
-            Self::We4y => "Westhill Karting Y",
-            Self::We5 => "Westhill Karting Long",
-            Self::We5r => "Westhill Karting Long R",
-            Self::We5x => "Westhill Karting Long X",
-            Self::We5y => "Westhill Karting Long Y",
-            Self::As1 => "Aston Cadet",
-            Self::As1r => "Aston Cadet R",
-            Self::As1x => "Aston Cadet X",
-            Self::As1y => "Aston Cadet Y",
-            Self::As2 => "Aston Club",
-            Self::As2r => "Aston Club R",
-            Self::As2x => "Aston Club X",
-            Self::As2y => "Aston Club Y",
-            Self::As3 => "Aston National",
-            Self::As3r => "Aston National R",
-            Self::As3x => "Aston National X",
-            Self::As3y => "Aston National Y",
-            Self::As4 => "Aston Historic",
-            Self::As4r => "Aston Historic R",
-            Self::As4x => "Aston Historic X",
-            Self::As4y => "Aston Historic Y",
-            Self::As5 => "Aston Grand Prix",
-            Self::As5r => "Aston Grand Prix R",
-            Self::As5x => "Aston Grand Prix X",
-            Self::As5y => "Aston Grand Prix Y",
-            Self::As6 => "Aston Grand Touring",
-            Self::As6r => "Aston Grand Touring R",
-            Self::As6x => "Aston Grand Touring X",
-            Self::As6y => "Aston Grand Touring Y",
-            Self::As7 => "Aston North",
-            Self::As7r => "Aston North R",
-            Self::As7x => "Aston North X",
-            Self::As7y => "Aston North Y",
-            Self::Ro1 => "Rockingham ISSC",
-            Self::Ro1x => "Rockingham ISSC X",
-            Self::Ro2 => "Rockingham National",
-            Self::Ro2x => "Rockingham National X",
-            Self::Ro3 => "Rockingham Oval",
-            Self::Ro3x => "Rockingham Oval X",
-            Self::Ro4 => "Rockingham ISSC Long",
-            Self::Ro4x => "Rockingham ISSC Long X",
-            Self::Ro5 => "Rockingham Lake",
-            Self::Ro5x => "Rockingham Lake X",
-            Self::Ro6 => "Rockingham Handling",
-            Self::Ro6x => "Rockingham Handling X",
-            Self::Ro7 => "Rockingham International",
-            Self::Ro7x => "Rockingham International X",
-            Self::Ro8 => "Rockingham Historic",
-            Self::Ro8x => "Rockingham Historic X",
-            Self::Ro9 => "Rockingham Historic Short",
-            Self::Ro9x => "Rockingham Historic Short X",
-            Self::Ro10 => "Rockingham International Long",
-            Self::Ro10x => "Rockingham International Long X",
-            Self::Ro11 => "Rockingham Sportscar",
-            Self::Ro11x => "Rockingham Sportscar X",
-            Self::La1 => "Layout Square Long Grid",
-            Self::La1x => "Layout Square Long Grid X",
-            Self::La2 => "Layout Square Wide Grid",
-            Self::La2x => "Layout Square Wide Grid X",
-        }
-        .to_string()
-    }
+    Au1,   "AU1",   "Autocross",                       S1,   None,
+    Au1x,  "AU1X",  "Autocross X",                     S1,   None,
+    Au2,   "AU2",   "Skid Pad",                        S1,   None,
+    Au2x,  "AU2X",  "Skid Pad X",                      S1,   None,
+    Au3,   "AU3",   "Drag Strip",                      S1,   None,
+    Au3x,  "AU3X",  "Drag Strip X",                    S1,   None,
+    Au4,   "AU4",   "8 Lane Drag Strip",               S1,   None,
+    Au4x,  "AU4X",  "8 Lane Drag Strip X",             S1,   None,
 
-    /// Track short code
-    pub fn code(&self) -> String {
-        match self {
-            Self::Bl1 => "BL1",
-            Self::Bl1r => "BL1R",
-            Self::Bl1x => "BL1X",
-            Self::Bl1y => "BL1Y",
-            Self::Bl2 => "BL2",
-            Self::Bl2r => "BL2R",
-            Self::Bl2x => "BL2X",
-            Self::Bl2y => "BL2Y",
-            Self::Bl3 => "BL3",
-            Self::Bl3r => "BL3R",
-            Self::Bl3x => "BL3X",
-            Self::Bl3y => "BL3Y",
-            Self::Bl4 => "BL4",
-            Self::Bl4x => "BL4X",
-            Self::So1 => "SO1",
-            Self::So1r => "SO1R",
-            Self::So1x => "SO1X",
-            Self::So1y => "SO1Y",
-            Self::So2 => "SO2",
-            Self::So2r => "SO2R",
-            Self::So2x => "SO2X",
-            Self::So2y => "SO2Y",
-            Self::So3 => "SO3",
-            Self::So3r => "SO3R",
-            Self::So3x => "SO3X",
-            Self::So3y => "SO3Y",
-            Self::So4 => "SO4",
-            Self::So4r => "SO4R",
-            Self::So4x => "SO4X",
-            Self::So4y => "SO4Y",
-            Self::So5 => "SO5",
-            Self::So5r => "SO5R",
-            Self::So5x => "SO5X",
-            Self::So5y => "SO5Y",
-            Self::So6 => "SO6",
-            Self::So6r => "SO6R",
-            Self::So6x => "SO6X",
-            Self::So6y => "SO6Y",
-            Self::Fe1 => "FE1",
-            Self::Fe1r => "FE1R",
-            Self::Fe1x => "FE1X",
-            Self::Fe1y => "FE1Y",
-            Self::Fe2 => "FE2",
-            Self::Fe2r => "FE2R",
-            Self::Fe2x => "FE2X",
-            Self::Fe2y => "FE2Y",
-            Self::Fe3 => "FE3",
-            Self::Fe3r => "FE3R",
-            Self::Fe3x => "FE3X",
-            Self::Fe3y => "FE3Y",
-            Self::Fe4 => "FE4",
-            Self::Fe4r => "FE4R",
-            Self::Fe4x => "FE4X",
-            Self::Fe4y => "FE4Y",
-            Self::Fe5 => "FE5",
-            Self::Fe5r => "FE5R",
-            Self::Fe5x => "FE5X",
-            Self::Fe5y => "FE5Y",
-            Self::Fe6 => "FE6",
-            Self::Fe6r => "FE6R",
-            Self::Fe6x => "FE6X",
-            Self::Fe6y => "FE6Y",
-            Self::Au1 => "AU1",
-            Self::Au1x => "AU1X",
-            Self::Au2 => "AU2",
-            Self::Au2x => "AU2X",
-            Self::Au3 => "AU3",
-            Self::Au3x => "AU3X",
-            Self::Au4 => "AU4",
-            Self::Au4x => "AU4X",
-            Self::Ky1 => "KY1",
-            Self::Ky1r => "KY1R",
-            Self::Ky1x => "KY1X",
-            Self::Ky1y => "KY1Y",
-            Self::Ky2 => "KY2",
-            Self::Ky2r => "KY2R",
-            Self::Ky2x => "KY2X",
-            Self::Ky2y => "KY2Y",
-            Self::Ky3 => "KY3",
-            Self::Ky3r => "KY3R",
-            Self::Ky3x => "KY3X",
-            Self::Ky3y => "KY3Y",
-            Self::We1 => "WE1",
-            Self::We1r => "WE1R",
-            Self::We1x => "WE1X",
-            Self::We1y => "WE1Y",
-            Self::We2 => "WE2",
-            Self::We2r => "WE2R",
-            Self::We2x => "WE2X",
-            Self::We2y => "WE2Y",
-            Self::We3 => "WE3",
-            Self::We3x => "WE3X",
-            Self::We4 => "WE4",
-            Self::We4r => "WE4R",
-            Self::We4x => "WE4X",
-            Self::We4y => "WE4Y",
-            Self::We5 => "WE5",
-            Self::We5r => "WE5R",
-            Self::We5x => "WE5X",
-            Self::We5y => "WE5Y",
-            Self::As1 => "AS1",
-            Self::As1r => "AS1R",
-            Self::As1x => "AS1X",
-            Self::As1y => "AS1Y",
-            Self::As2 => "AS2",
-            Self::As2r => "AS2R",
-            Self::As2x => "AS2X",
-            Self::As2y => "AS2Y",
-            Self::As3 => "AS3",
-            Self::As3r => "AS3R",
-            Self::As3x => "AS3X",
-            Self::As3y => "AS3Y",
-            Self::As4 => "AS4",
-            Self::As4r => "AS4R",
-            Self::As4x => "AS4X",
-            Self::As4y => "AS4Y",
-            Self::As5 => "AS5",
-            Self::As5r => "AS5R",
-            Self::As5x => "AS5X",
-            Self::As5y => "AS5Y",
-            Self::As6 => "AS6",
-            Self::As6r => "AS6R",
-            Self::As6x => "AS6X",
-            Self::As6y => "AS6Y",
-            Self::As7 => "AS7",
-            Self::As7r => "AS7R",
-            Self::As7x => "AS7X",
-            Self::As7y => "AS7Y",
-            Self::Ro1 => "RO1",
-            Self::Ro1x => "RO1X",
-            Self::Ro2 => "RO2",
-            Self::Ro2x => "RO2X",
-            Self::Ro3 => "RO3",
-            Self::Ro3x => "RO3X",
-            Self::Ro4 => "RO4",
-            Self::Ro4x => "RO4X",
-            Self::Ro5 => "RO5",
-            Self::Ro5x => "RO5X",
-            Self::Ro6 => "RO6",
-            Self::Ro6x => "RO6X",
-            Self::Ro7 => "RO7",
-            Self::Ro7x => "RO7X",
-            Self::Ro8 => "RO8",
-            Self::Ro8x => "RO8X",
-            Self::Ro9 => "RO9",
-            Self::Ro9x => "RO9X",
-            Self::Ro10 => "RO10",
-            Self::Ro10x => "RO10X",
-            Self::Ro11 => "RO11",
-            Self::Ro11x => "RO11X",
-            Self::La1 => "LA1",
-            Self::La1x => "LA1X",
-            Self::La2 => "LA2",
-            Self::La2x => "LA2X",
-        }
-        .to_string()
-    }
+    Ky1,   "KY1",   "Kyoto Oval",                      S2,   Some(1.9),
+    Ky1r,  "KY1R",  "Kyoto Oval R",                    S2,   Some(1.9),
+    Ky1x,  "KY1X",  "Kyoto Oval X",                    S2,   None,
+    Ky1y,  "KY1Y",  "Kyoto Oval Y",                    S2,   None,
+    Ky2,   "KY2",   "Kyoto National",                  S2,   Some(3.2),
+    Ky2r,  "KY2R",  "Kyoto National R",                S2,   Some(3.2),
+    Ky2x,  "KY2X",  "Kyoto National X",                S2,   None,
+    Ky2y,  "KY2Y",  "Kyoto National Y",                S2,   None,
+    Ky3,   "KY3",   "Kyoto GP Long",                   S2,   Some(4.6),
+    Ky3r,  "KY3R",  "Kyoto GP Long R",                 S2,   Some(4.6),
+    Ky3x,  "KY3X",  "Kyoto GP Long X",                 S2,   None,
+    Ky3y,  "KY3Y",  "Kyoto GP Long Y",                 S2,   None,
 
-    /// Is this a reversed track?
-    pub fn is_reverse(&self) -> bool {
-        matches!(
-            self,
-            Self::Bl1r
-                | Self::Bl1y
-                | Self::Bl2r
-                | Self::Bl2y
-                | Self::Bl3r
-                | Self::Bl3y
-                | Self::So1r
-                | Self::So1y
-                | Self::So2r
-                | Self::So2y
-                | Self::So3r
-                | Self::So3y
-                | Self::So4r
-                | Self::So4y
-                | Self::So5r
-                | Self::So5y
-                | Self::So6r
-                | Self::So6y
-                | Self::Fe1r
-                | Self::Fe1y
-                | Self::Fe2r
-                | Self::Fe2y
-                | Self::Fe3r
-                | Self::Fe3y
-                | Self::Fe4r
-                | Self::Fe4y
-                | Self::Fe5r
-                | Self::Fe5y
-                | Self::Fe6r
-                | Self::Fe6y
-                | Self::Ky1r
-                | Self::Ky1y
-                | Self::Ky2r
-                | Self::Ky2y
-                | Self::Ky3r
-                | Self::Ky3y
-                | Self::We1r
-                | Self::We1y
-                | Self::We2r
-                | Self::We2y
-                | Self::We4r
-                | Self::We4y
-                | Self::We5r
-                | Self::We5y
-                | Self::As1r
-                | Self::As1y
-                | Self::As2r
-                | Self::As2y
-                | Self::As3r
-                | Self::As3y
-                | Self::As4r
-                | Self::As4y
-                | Self::As5r
-                | Self::As5y
-                | Self::As6r
-                | Self::As6y
-                | Self::As7r
-                | Self::As7y
-        )
-    }
+    We1,   "WE1",   "Westhill National",               S2,   Some(2.7),
+    We1r,  "WE1R",  "Westhill National R",             S2,   Some(2.7),
+    We1x,  "WE1X",  "Westhill National X",             S2,   None,
+    We1y,  "WE1Y",  "Westhill National Y",             S2,   None,
+    We2,   "WE2",   "Westhill International",          S2,   Some(3.6),
+    We2r,  "WE2R",  "Westhill International R",        S2,   Some(3.6),
+    We2x,  "WE2X",  "Westhill International X",        S2,   None,
+    We2y,  "WE2Y",  "Westhill International Y",        S2,   None,
+    We3,   "WE3",   "Westhill Car Park",               S2,   None,
+    We3x,  "WE3X",  "Westhill Car Park X",             S2,   None,
+    We4,   "WE4",   "Westhill Karting",                S2,   Some(0.3),
+    We4r,  "WE4R",  "Westhill Karting R",              S2,   Some(0.3),
+    We4x,  "WE4X",  "Westhill Karting X",              S2,   None,
+    We4y,  "WE4Y",  "Westhill Karting Y",              S2,   None,
+    We5,   "WE5",   "Westhill Karting Long",           S2,   Some(0.8),
+    We5r,  "WE5R",  "Westhill Karting Long R",         S2,   Some(0.8),
+    We5x,  "WE5X",  "Westhill Karting Long X",         S2,   None,
+    We5y,  "WE5Y",  "Westhill Karting Long Y",         S2,   None,
 
-    /// Is this an open world track?
-    pub fn is_open(&self) -> bool {
-        matches!(
-            self,
-            Self::Bl1x
-                | Self::Bl1y
-                | Self::Bl2x
-                | Self::Bl2y
-                | Self::Bl3x
-                | Self::Bl3y
-                | Self::Bl4x
-                | Self::So1x
-                | Self::So1y
-                | Self::So2x
-                | Self::So2y
-                | Self::So3x
-                | Self::So3y
-                | Self::So4x
-                | Self::So4y
-                | Self::So5x
-                | Self::So5y
-                | Self::So6x
-                | Self::So6y
-                | Self::Fe1x
-                | Self::Fe1y
-                | Self::Fe2x
-                | Self::Fe2y
-                | Self::Fe3x
-                | Self::Fe3y
-                | Self::Fe4x
-                | Self::Fe4y
-                | Self::Fe5x
-                | Self::Fe5y
-                | Self::Fe6x
-                | Self::Fe6y
-                | Self::Au1x
-                | Self::Au2x
-                | Self::Au3x
-                | Self::Au4x
-                | Self::Ky1x
-                | Self::Ky1y
-                | Self::Ky2x
-                | Self::Ky2y
-                | Self::Ky3x
-                | Self::Ky3y
-                | Self::We1x
-                | Self::We1y
-                | Self::We2x
-                | Self::We2y
-                | Self::We3x
-                | Self::We4x
-                | Self::We4y
-                | Self::We5x
-                | Self::We5y
-                | Self::As1x
-                | Self::As1y
-                | Self::As2x
-                | Self::As2y
-                | Self::As3x
-                | Self::As3y
-                | Self::As4x
-                | Self::As4y
-                | Self::As5x
-                | Self::As5y
-                | Self::As6x
-                | Self::As6y
-                | Self::As7x
-                | Self::As7y
-                | Self::Ro1x
-                | Self::Ro2x
-                | Self::Ro3x
-                | Self::Ro4x
-                | Self::Ro5x
-                | Self::Ro6x
-                | Self::Ro7x
-                | Self::Ro8x
-                | Self::Ro9x
-                | Self::Ro10x
-                | Self::Ro11x
-                | Self::La1x
-                | Self::La2x
-        )
-    }
-}
+    As1,   "AS1",   "Aston Cadet",                     S2,   Some(1.2),
+    As1r,  "AS1R",  "Aston Cadet R",                   S2,   Some(1.2),
+    As1x,  "AS1X",  "Aston Cadet X",                   S2,   None,
+    As1y,  "AS1Y",  "Aston Cadet Y",                   S2,   None,
+    As2,   "AS2",   "Aston Club",                      S2,   Some(1.9),
+    As2r,  "AS2R",  "Aston Club R",                    S2,   Some(1.9),
+    As2x,  "AS2X",  "Aston Club X",                    S2,   None,
+    As2y,  "AS2Y",  "Aston Club Y",                    S2,   None,
+    As3,   "AS3",   "Aston National",                  S2,   Some(3.5),
+    As3r,  "AS3R",  "Aston National R",                S2,   Some(3.5),
+    As3x,  "AS3X",  "Aston National X",                S2,   None,
+    As3y,  "AS3Y",  "Aston National Y",                S2,   None,
+    As4,   "AS4",   "Aston Historic",                  S2,   Some(5.0),
+    As4r,  "AS4R",  "Aston Historic R",                S2,   Some(5.0),
+    As4x,  "AS4X",  "Aston Historic X",                S2,   None,
+    As4y,  "AS4Y",  "Aston Historic Y",                S2,   None,
+    As5,   "AS5",   "Aston Grand Prix",                S2,   Some(5.5),
+    As5r,  "AS5R",  "Aston Grand Prix R",              S2,   Some(5.5),
+    As5x,  "AS5X",  "Aston Grand Prix X",              S2,   None,
+    As5y,  "AS5Y",  "Aston Grand Prix Y",              S2,   None,
+    As6,   "AS6",   "Aston Grand Touring",             S2,   Some(5.0),
+    As6r,  "AS6R",  "Aston Grand Touring R",           S2,   Some(5.0),
+    As6x,  "AS6X",  "Aston Grand Touring X",           S2,   None,
+    As6y,  "AS6Y",  "Aston Grand Touring Y",           S2,   None,
+    As7,   "AS7",   "Aston North",                     S2,   Some(3.2),
+    As7r,  "AS7R",  "Aston North R",                   S2,   Some(3.2),
+    As7x,  "AS7X",  "Aston North X",                   S2,   None,
+    As7y,  "AS7Y",  "Aston North Y",                   S2,   None,
+
+    Ro1,   "RO1",   "Rockingham ISSC",                 S3,   Some(1.9),
+    Ro1x,  "RO1X",  "Rockingham ISSC X",               S3,   None,
+    Ro2,   "RO2",   "Rockingham National",             S3,   Some(1.7),
+    Ro2x,  "RO2X",  "Rockingham National X",           S3,   None,
+    Ro3,   "RO3",   "Rockingham Oval",                 S3,   Some(1.5),
+    Ro3x,  "RO3X",  "Rockingham Oval X",               S3,   None,
+    Ro4,   "RO4",   "Rockingham ISSC Long",            S3,   Some(2.0),
+    Ro4x,  "RO4X",  "Rockingham ISSC Long X",          S3,   None,
+    Ro5,   "RO5",   "Rockingham Lake",                 S3,   Some(0.7),
+    Ro5x,  "RO5X",  "Rockingham Lake X",               S3,   None,
+    Ro6,   "RO6",   "Rockingham Handling",             S3,   Some(1.0),
+    Ro6x,  "RO6X",  "Rockingham Handling X",           S3,   None,
+    Ro7,   "RO7",   "Rockingham International",        S3,   Some(2.4),
+    Ro7x,  "RO7X",  "Rockingham International X",      S3,   None,
+    Ro8,   "RO8",   "Rockingham Historic",             S3,   Some(2.2),
+    Ro8x,  "RO8X",  "Rockingham Historic X",           S3,   None,
+    Ro9,   "RO9",   "Rockingham Historic Short",       S3,   Some(1.4),
+    Ro9x,  "RO9X",  "Rockingham Historic Short X",     S3,   None,
+    Ro10,  "RO10",  "Rockingham International Long",   S3,   Some(2.5),
+    Ro10x, "RO10X", "Rockingham International Long X", S3, None,
+    Ro11,  "RO11",  "Rockingham Sportscar",            S3,   Some(1.7),
+    Ro11x, "RO11X", "Rockingham Sportscar X",          S3,   None,
+
+    La1,   "LA1",   "Layout Square Long Grid",         S3,   None,
+    La1x,  "LA1X",  "Layout Square Long Grid X",       S3,   None,
+    La2,   "LA2",   "Layout Square Wide Grid",         S3,   None,
+    La2x,  "LA2X",  "Layout Square Wide Grid X",       S3,   None
+);
 
 impl Decode for Track {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
         let raw = buf.split_to(6);
-        match raw.as_ref() {
-            [b'B', b'L', b'1', 0, 0, 0] => Ok(Self::Bl1),
-            [b'B', b'L', b'1', b'R', 0, 0] => Ok(Self::Bl1r),
-            [b'B', b'L', b'1', b'X', 0, 0] => Ok(Self::Bl1x),
-            [b'B', b'L', b'1', b'Y', 0, 0] => Ok(Self::Bl1y),
-            [b'B', b'L', b'2', 0, 0, 0] => Ok(Self::Bl2),
-            [b'B', b'L', b'2', b'R', 0, 0] => Ok(Self::Bl2r),
-            [b'B', b'L', b'2', b'X', 0, 0] => Ok(Self::Bl2x),
-            [b'B', b'L', b'2', b'Y', 0, 0] => Ok(Self::Bl2y),
-            [b'B', b'L', b'3', 0, 0, 0] => Ok(Self::Bl3),
-            [b'B', b'L', b'3', b'R', 0, 0] => Ok(Self::Bl3r),
-            [b'B', b'L', b'3', b'X', 0, 0] => Ok(Self::Bl3x),
-            [b'B', b'L', b'3', b'Y', 0, 0] => Ok(Self::Bl3y),
-            [b'B', b'L', b'4', 0, 0, 0] => Ok(Self::Bl4),
-            [b'B', b'L', b'4', b'X', 0, 0] => Ok(Self::Bl4x),
-            [b'S', b'O', b'1', 0, 0, 0] => Ok(Self::So1),
-            [b'S', b'O', b'1', b'R', 0, 0] => Ok(Self::So1r),
-            [b'S', b'O', b'1', b'X', 0, 0] => Ok(Self::So1x),
-            [b'S', b'O', b'1', b'Y', 0, 0] => Ok(Self::So1y),
-            [b'S', b'O', b'2', 0, 0, 0] => Ok(Self::So2),
-            [b'S', b'O', b'2', b'R', 0, 0] => Ok(Self::So2r),
-            [b'S', b'O', b'2', b'X', 0, 0] => Ok(Self::So2x),
-            [b'S', b'O', b'2', b'Y', 0, 0] => Ok(Self::So2y),
-            [b'S', b'O', b'3', 0, 0, 0] => Ok(Self::So3),
-            [b'S', b'O', b'3', b'R', 0, 0] => Ok(Self::So3r),
-            [b'S', b'O', b'3', b'X', 0, 0] => Ok(Self::So3x),
-            [b'S', b'O', b'3', b'Y', 0, 0] => Ok(Self::So3y),
-            [b'S', b'O', b'4', 0, 0, 0] => Ok(Self::So4),
-            [b'S', b'O', b'4', b'R', 0, 0] => Ok(Self::So4r),
-            [b'S', b'O', b'4', b'X', 0, 0] => Ok(Self::So4x),
-            [b'S', b'O', b'4', b'Y', 0, 0] => Ok(Self::So4y),
-            [b'S', b'O', b'5', 0, 0, 0] => Ok(Self::So5),
-            [b'S', b'O', b'5', b'R', 0, 0] => Ok(Self::So5r),
-            [b'S', b'O', b'5', b'X', 0, 0] => Ok(Self::So5x),
-            [b'S', b'O', b'5', b'Y', 0, 0] => Ok(Self::So5y),
-            [b'S', b'O', b'6', 0, 0, 0] => Ok(Self::So6),
-            [b'S', b'O', b'6', b'R', 0, 0] => Ok(Self::So6r),
-            [b'S', b'O', b'6', b'X', 0, 0] => Ok(Self::So6x),
-            [b'S', b'O', b'6', b'Y', 0, 0] => Ok(Self::So6y),
-            [b'F', b'E', b'1', 0, 0, 0] => Ok(Self::Fe1),
-            [b'F', b'E', b'1', b'R', 0, 0] => Ok(Self::Fe1r),
-            [b'F', b'E', b'1', b'X', 0, 0] => Ok(Self::Fe1x),
-            [b'F', b'E', b'1', b'Y', 0, 0] => Ok(Self::Fe1y),
-            [b'F', b'E', b'2', 0, 0, 0] => Ok(Self::Fe2),
-            [b'F', b'E', b'2', b'R', 0, 0] => Ok(Self::Fe2r),
-            [b'F', b'E', b'2', b'X', 0, 0] => Ok(Self::Fe2x),
-            [b'F', b'E', b'2', b'Y', 0, 0] => Ok(Self::Fe2y),
-            [b'F', b'E', b'3', 0, 0, 0] => Ok(Self::Fe3),
-            [b'F', b'E', b'3', b'R', 0, 0] => Ok(Self::Fe3r),
-            [b'F', b'E', b'3', b'X', 0, 0] => Ok(Self::Fe3x),
-            [b'F', b'E', b'3', b'Y', 0, 0] => Ok(Self::Fe3y),
-            [b'F', b'E', b'4', 0, 0, 0] => Ok(Self::Fe4),
-            [b'F', b'E', b'4', b'R', 0, 0] => Ok(Self::Fe4r),
-            [b'F', b'E', b'4', b'X', 0, 0] => Ok(Self::Fe4x),
-            [b'F', b'E', b'4', b'Y', 0, 0] => Ok(Self::Fe4y),
-            [b'F', b'E', b'5', 0, 0, 0] => Ok(Self::Fe5),
-            [b'F', b'E', b'5', b'R', 0, 0] => Ok(Self::Fe5r),
-            [b'F', b'E', b'5', b'X', 0, 0] => Ok(Self::Fe5x),
-            [b'F', b'E', b'5', b'Y', 0, 0] => Ok(Self::Fe5y),
-            [b'F', b'E', b'6', 0, 0, 0] => Ok(Self::Fe6),
-            [b'F', b'E', b'6', b'R', 0, 0] => Ok(Self::Fe6r),
-            [b'F', b'E', b'6', b'X', 0, 0] => Ok(Self::Fe6x),
-            [b'F', b'E', b'6', b'Y', 0, 0] => Ok(Self::Fe6y),
-            [b'A', b'U', b'1', 0, 0, 0] => Ok(Self::Au1),
-            [b'A', b'U', b'1', b'X', 0, 0] => Ok(Self::Au1x),
-            [b'A', b'U', b'2', 0, 0, 0] => Ok(Self::Au2),
-            [b'A', b'U', b'2', b'X', 0, 0] => Ok(Self::Au2x),
-            [b'A', b'U', b'3', 0, 0, 0] => Ok(Self::Au3),
-            [b'A', b'U', b'3', b'X', 0, 0] => Ok(Self::Au3x),
-            [b'A', b'U', b'4', 0, 0, 0] => Ok(Self::Au4),
-            [b'A', b'U', b'4', b'X', 0, 0] => Ok(Self::Au4x),
-            [b'K', b'Y', b'1', 0, 0, 0] => Ok(Self::Ky1),
-            [b'K', b'Y', b'1', b'R', 0, 0] => Ok(Self::Ky1r),
-            [b'K', b'Y', b'1', b'X', 0, 0] => Ok(Self::Ky1x),
-            [b'K', b'Y', b'1', b'Y', 0, 0] => Ok(Self::Ky1y),
-            [b'K', b'Y', b'2', 0, 0, 0] => Ok(Self::Ky2),
-            [b'K', b'Y', b'2', b'R', 0, 0] => Ok(Self::Ky2r),
-            [b'K', b'Y', b'2', b'X', 0, 0] => Ok(Self::Ky2x),
-            [b'K', b'Y', b'2', b'Y', 0, 0] => Ok(Self::Ky2y),
-            [b'K', b'Y', b'3', 0, 0, 0] => Ok(Self::Ky3),
-            [b'K', b'Y', b'3', b'R', 0, 0] => Ok(Self::Ky3r),
-            [b'K', b'Y', b'3', b'X', 0, 0] => Ok(Self::Ky3x),
-            [b'K', b'Y', b'3', b'Y', 0, 0] => Ok(Self::Ky3y),
-            [b'W', b'E', b'1', 0, 0, 0] => Ok(Self::We1),
-            [b'W', b'E', b'1', b'R', 0, 0] => Ok(Self::We1r),
-            [b'W', b'E', b'1', b'X', 0, 0] => Ok(Self::We1x),
-            [b'W', b'E', b'1', b'Y', 0, 0] => Ok(Self::We1y),
-            [b'W', b'E', b'2', 0, 0, 0] => Ok(Self::We2),
-            [b'W', b'E', b'2', b'R', 0, 0] => Ok(Self::We2r),
-            [b'W', b'E', b'2', b'X', 0, 0] => Ok(Self::We2x),
-            [b'W', b'E', b'2', b'Y', 0, 0] => Ok(Self::We2y),
-            [b'W', b'E', b'3', 0, 0, 0] => Ok(Self::We3),
-            [b'W', b'E', b'3', b'X', 0, 0] => Ok(Self::We3x),
-            [b'W', b'E', b'4', 0, 0, 0] => Ok(Self::We4),
-            [b'W', b'E', b'4', b'R', 0, 0] => Ok(Self::We4r),
-            [b'W', b'E', b'4', b'X', 0, 0] => Ok(Self::We4x),
-            [b'W', b'E', b'4', b'Y', 0, 0] => Ok(Self::We4y),
-            [b'W', b'E', b'5', 0, 0, 0] => Ok(Self::We5),
-            [b'W', b'E', b'5', b'R', 0, 0] => Ok(Self::We5r),
-            [b'W', b'E', b'5', b'X', 0, 0] => Ok(Self::We5x),
-            [b'W', b'E', b'5', b'Y', 0, 0] => Ok(Self::We5y),
-            [b'A', b'S', b'1', 0, 0, 0] => Ok(Self::As1),
-            [b'A', b'S', b'1', b'R', 0, 0] => Ok(Self::As1r),
-            [b'A', b'S', b'1', b'X', 0, 0] => Ok(Self::As1x),
-            [b'A', b'S', b'1', b'Y', 0, 0] => Ok(Self::As1y),
-            [b'A', b'S', b'2', 0, 0, 0] => Ok(Self::As2),
-            [b'A', b'S', b'2', b'R', 0, 0] => Ok(Self::As2r),
-            [b'A', b'S', b'2', b'X', 0, 0] => Ok(Self::As2x),
-            [b'A', b'S', b'2', b'Y', 0, 0] => Ok(Self::As2y),
-            [b'A', b'S', b'3', 0, 0, 0] => Ok(Self::As3),
-            [b'A', b'S', b'3', b'R', 0, 0] => Ok(Self::As3r),
-            [b'A', b'S', b'3', b'X', 0, 0] => Ok(Self::As3x),
-            [b'A', b'S', b'3', b'Y', 0, 0] => Ok(Self::As3y),
-            [b'A', b'S', b'4', 0, 0, 0] => Ok(Self::As4),
-            [b'A', b'S', b'4', b'R', 0, 0] => Ok(Self::As4r),
-            [b'A', b'S', b'4', b'X', 0, 0] => Ok(Self::As4x),
-            [b'A', b'S', b'4', b'Y', 0, 0] => Ok(Self::As4y),
-            [b'A', b'S', b'5', 0, 0, 0] => Ok(Self::As5),
-            [b'A', b'S', b'5', b'R', 0, 0] => Ok(Self::As5r),
-            [b'A', b'S', b'5', b'X', 0, 0] => Ok(Self::As5x),
-            [b'A', b'S', b'5', b'Y', 0, 0] => Ok(Self::As5y),
-            [b'A', b'S', b'6', 0, 0, 0] => Ok(Self::As6),
-            [b'A', b'S', b'6', b'R', 0, 0] => Ok(Self::As6r),
-            [b'A', b'S', b'6', b'X', 0, 0] => Ok(Self::As6x),
-            [b'A', b'S', b'6', b'Y', 0, 0] => Ok(Self::As6y),
-            [b'A', b'S', b'7', 0, 0, 0] => Ok(Self::As7),
-            [b'A', b'S', b'7', b'R', 0, 0] => Ok(Self::As7r),
-            [b'A', b'S', b'7', b'X', 0, 0] => Ok(Self::As7x),
-            [b'A', b'S', b'7', b'Y', 0, 0] => Ok(Self::As7y),
-            [b'R', b'O', b'1', 0, 0, 0] => Ok(Self::Ro1),
-            [b'R', b'O', b'1', b'X', 0, 0] => Ok(Self::Ro1x),
-            [b'R', b'O', b'2', 0, 0, 0] => Ok(Self::Ro2),
-            [b'R', b'O', b'2', b'X', 0, 0] => Ok(Self::Ro2x),
-            [b'R', b'O', b'3', 0, 0, 0] => Ok(Self::Ro3),
-            [b'R', b'O', b'3', b'X', 0, 0] => Ok(Self::Ro3x),
-            [b'R', b'O', b'4', 0, 0, 0] => Ok(Self::Ro4),
-            [b'R', b'O', b'4', b'X', 0, 0] => Ok(Self::Ro4x),
-            [b'R', b'O', b'5', 0, 0, 0] => Ok(Self::Ro5),
-            [b'R', b'O', b'5', b'X', 0, 0] => Ok(Self::Ro5x),
-            [b'R', b'O', b'6', 0, 0, 0] => Ok(Self::Ro6),
-            [b'R', b'O', b'6', b'X', 0, 0] => Ok(Self::Ro6x),
-            [b'R', b'O', b'7', 0, 0, 0] => Ok(Self::Ro7),
-            [b'R', b'O', b'7', b'X', 0, 0] => Ok(Self::Ro7x),
-            [b'R', b'O', b'8', 0, 0, 0] => Ok(Self::Ro8),
-            [b'R', b'O', b'8', b'X', 0, 0] => Ok(Self::Ro8x),
-            [b'R', b'O', b'9', 0, 0, 0] => Ok(Self::Ro9),
-            [b'R', b'O', b'9', b'X', 0, 0] => Ok(Self::Ro9x),
-            [b'R', b'O', b'1', b'0', 0, 0] => Ok(Self::Ro10),
-            [b'R', b'O', b'1', b'0', b'X', 0] => Ok(Self::Ro10x),
-            [b'R', b'O', b'1', b'1', 0, 0] => Ok(Self::Ro11),
-            [b'R', b'O', b'1', b'1', b'X', 0] => Ok(Self::Ro11x),
-            [b'L', b'A', b'1', 0, 0, 0] => Ok(Self::La1),
-            [b'L', b'A', b'1', b'X', 0, 0] => Ok(Self::La1x),
-            [b'L', b'A', b'2', 0, 0, 0] => Ok(Self::La2),
-            [b'L', b'A', b'2', b'X', 0, 0] => Ok(Self::La2x),
-            _ => Err(crate::DecodeError::BadMagic {
-                found: Box::new(raw),
-            }),
-        }
+        let s = std::str::from_utf8(&raw).unwrap_or("").trim_matches('\0');
+        s.parse().map_err(|_| crate::DecodeError::BadMagic {
+            found: Box::new(raw),
+        })
     }
 }
 
 impl Encode for Track {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodeError> {
-        let slice = match self {
-            Self::Bl1 => [b'B', b'L', b'1', 0, 0, 0],
-            Self::Bl1r => [b'B', b'L', b'1', b'R', 0, 0],
-            Self::Bl1x => [b'B', b'L', b'1', b'X', 0, 0],
-            Self::Bl1y => [b'B', b'L', b'1', b'Y', 0, 0],
-            Self::Bl2 => [b'B', b'L', b'2', 0, 0, 0],
-            Self::Bl2r => [b'B', b'L', b'2', b'R', 0, 0],
-            Self::Bl2x => [b'B', b'L', b'2', b'X', 0, 0],
-            Self::Bl2y => [b'B', b'L', b'2', b'Y', 0, 0],
-            Self::Bl3 => [b'B', b'L', b'3', 0, 0, 0],
-            Self::Bl3r => [b'B', b'L', b'3', b'R', 0, 0],
-            Self::Bl3x => [b'B', b'L', b'3', b'X', 0, 0],
-            Self::Bl3y => [b'B', b'L', b'3', b'Y', 0, 0],
-            Self::Bl4 => [b'B', b'L', b'4', 0, 0, 0],
-            Self::Bl4x => [b'B', b'L', b'4', b'X', 0, 0],
-            Self::So1 => [b'S', b'O', b'1', 0, 0, 0],
-            Self::So1r => [b'S', b'O', b'1', b'R', 0, 0],
-            Self::So1x => [b'S', b'O', b'1', b'X', 0, 0],
-            Self::So1y => [b'S', b'O', b'1', b'Y', 0, 0],
-            Self::So2 => [b'S', b'O', b'2', 0, 0, 0],
-            Self::So2r => [b'S', b'O', b'2', b'R', 0, 0],
-            Self::So2x => [b'S', b'O', b'2', b'X', 0, 0],
-            Self::So2y => [b'S', b'O', b'2', b'Y', 0, 0],
-            Self::So3 => [b'S', b'O', b'3', 0, 0, 0],
-            Self::So3r => [b'S', b'O', b'3', b'R', 0, 0],
-            Self::So3x => [b'S', b'O', b'3', b'X', 0, 0],
-            Self::So3y => [b'S', b'O', b'3', b'Y', 0, 0],
-            Self::So4 => [b'S', b'O', b'4', 0, 0, 0],
-            Self::So4r => [b'S', b'O', b'4', b'R', 0, 0],
-            Self::So4x => [b'S', b'O', b'4', b'X', 0, 0],
-            Self::So4y => [b'S', b'O', b'4', b'Y', 0, 0],
-            Self::So5 => [b'S', b'O', b'5', 0, 0, 0],
-            Self::So5r => [b'S', b'O', b'5', b'R', 0, 0],
-            Self::So5x => [b'S', b'O', b'5', b'X', 0, 0],
-            Self::So5y => [b'S', b'O', b'5', b'Y', 0, 0],
-            Self::So6 => [b'S', b'O', b'6', 0, 0, 0],
-            Self::So6r => [b'S', b'O', b'6', b'R', 0, 0],
-            Self::So6x => [b'S', b'O', b'6', b'X', 0, 0],
-            Self::So6y => [b'S', b'O', b'6', b'Y', 0, 0],
-            Self::Fe1 => [b'F', b'E', b'1', 0, 0, 0],
-            Self::Fe1r => [b'F', b'E', b'1', b'R', 0, 0],
-            Self::Fe1x => [b'F', b'E', b'1', b'X', 0, 0],
-            Self::Fe1y => [b'F', b'E', b'1', b'Y', 0, 0],
-            Self::Fe2 => [b'F', b'E', b'2', 0, 0, 0],
-            Self::Fe2r => [b'F', b'E', b'2', b'R', 0, 0],
-            Self::Fe2x => [b'F', b'E', b'2', b'X', 0, 0],
-            Self::Fe2y => [b'F', b'E', b'2', b'Y', 0, 0],
-            Self::Fe3 => [b'F', b'E', b'3', 0, 0, 0],
-            Self::Fe3r => [b'F', b'E', b'3', b'R', 0, 0],
-            Self::Fe3x => [b'F', b'E', b'3', b'X', 0, 0],
-            Self::Fe3y => [b'F', b'E', b'3', b'Y', 0, 0],
-            Self::Fe4 => [b'F', b'E', b'4', 0, 0, 0],
-            Self::Fe4r => [b'F', b'E', b'4', b'R', 0, 0],
-            Self::Fe4x => [b'F', b'E', b'4', b'X', 0, 0],
-            Self::Fe4y => [b'F', b'E', b'4', b'Y', 0, 0],
-            Self::Fe5 => [b'F', b'E', b'5', 0, 0, 0],
-            Self::Fe5r => [b'F', b'E', b'5', b'R', 0, 0],
-            Self::Fe5x => [b'F', b'E', b'5', b'X', 0, 0],
-            Self::Fe5y => [b'F', b'E', b'5', b'Y', 0, 0],
-            Self::Fe6 => [b'F', b'E', b'6', 0, 0, 0],
-            Self::Fe6r => [b'F', b'E', b'6', b'R', 0, 0],
-            Self::Fe6x => [b'F', b'E', b'6', b'X', 0, 0],
-            Self::Fe6y => [b'F', b'E', b'6', b'Y', 0, 0],
-            Self::Au1 => [b'A', b'U', b'1', 0, 0, 0],
-            Self::Au1x => [b'A', b'U', b'1', b'X', 0, 0],
-            Self::Au2 => [b'A', b'U', b'2', 0, 0, 0],
-            Self::Au2x => [b'A', b'U', b'2', b'X', 0, 0],
-            Self::Au3 => [b'A', b'U', b'3', 0, 0, 0],
-            Self::Au3x => [b'A', b'U', b'3', b'X', 0, 0],
-            Self::Au4 => [b'A', b'U', b'4', 0, 0, 0],
-            Self::Au4x => [b'A', b'U', b'4', b'X', 0, 0],
-            Self::Ky1 => [b'K', b'Y', b'1', 0, 0, 0],
-            Self::Ky1r => [b'K', b'Y', b'1', b'R', 0, 0],
-            Self::Ky1x => [b'K', b'Y', b'1', b'X', 0, 0],
-            Self::Ky1y => [b'K', b'Y', b'1', b'Y', 0, 0],
-            Self::Ky2 => [b'K', b'Y', b'2', 0, 0, 0],
-            Self::Ky2r => [b'K', b'Y', b'2', b'R', 0, 0],
-            Self::Ky2x => [b'K', b'Y', b'2', b'X', 0, 0],
-            Self::Ky2y => [b'K', b'Y', b'2', b'Y', 0, 0],
-            Self::Ky3 => [b'K', b'Y', b'3', 0, 0, 0],
-            Self::Ky3r => [b'K', b'Y', b'3', b'R', 0, 0],
-            Self::Ky3x => [b'K', b'Y', b'3', b'X', 0, 0],
-            Self::Ky3y => [b'K', b'Y', b'3', b'Y', 0, 0],
-            Self::We1 => [b'W', b'E', b'1', 0, 0, 0],
-            Self::We1r => [b'W', b'E', b'1', b'R', 0, 0],
-            Self::We1x => [b'W', b'E', b'1', b'X', 0, 0],
-            Self::We1y => [b'W', b'E', b'1', b'Y', 0, 0],
-            Self::We2 => [b'W', b'E', b'2', 0, 0, 0],
-            Self::We2r => [b'W', b'E', b'2', b'R', 0, 0],
-            Self::We2x => [b'W', b'E', b'2', b'X', 0, 0],
-            Self::We2y => [b'W', b'E', b'2', b'Y', 0, 0],
-            Self::We3 => [b'W', b'E', b'3', 0, 0, 0],
-            Self::We3x => [b'W', b'E', b'3', b'X', 0, 0],
-            Self::We4 => [b'W', b'E', b'4', 0, 0, 0],
-            Self::We4r => [b'W', b'E', b'4', b'R', 0, 0],
-            Self::We4x => [b'W', b'E', b'4', b'X', 0, 0],
-            Self::We4y => [b'W', b'E', b'4', b'Y', 0, 0],
-            Self::We5 => [b'W', b'E', b'5', 0, 0, 0],
-            Self::We5r => [b'W', b'E', b'5', b'R', 0, 0],
-            Self::We5x => [b'W', b'E', b'5', b'X', 0, 0],
-            Self::We5y => [b'W', b'E', b'5', b'Y', 0, 0],
-            Self::As1 => [b'A', b'S', b'1', 0, 0, 0],
-            Self::As1r => [b'A', b'S', b'1', b'R', 0, 0],
-            Self::As1x => [b'A', b'S', b'1', b'X', 0, 0],
-            Self::As1y => [b'A', b'S', b'1', b'Y', 0, 0],
-            Self::As2 => [b'A', b'S', b'2', 0, 0, 0],
-            Self::As2r => [b'A', b'S', b'2', b'R', 0, 0],
-            Self::As2x => [b'A', b'S', b'2', b'X', 0, 0],
-            Self::As2y => [b'A', b'S', b'2', b'Y', 0, 0],
-            Self::As3 => [b'A', b'S', b'3', 0, 0, 0],
-            Self::As3r => [b'A', b'S', b'3', b'R', 0, 0],
-            Self::As3x => [b'A', b'S', b'3', b'X', 0, 0],
-            Self::As3y => [b'A', b'S', b'3', b'Y', 0, 0],
-            Self::As4 => [b'A', b'S', b'4', 0, 0, 0],
-            Self::As4r => [b'A', b'S', b'4', b'R', 0, 0],
-            Self::As4x => [b'A', b'S', b'4', b'X', 0, 0],
-            Self::As4y => [b'A', b'S', b'4', b'Y', 0, 0],
-            Self::As5 => [b'A', b'S', b'5', 0, 0, 0],
-            Self::As5r => [b'A', b'S', b'5', b'R', 0, 0],
-            Self::As5x => [b'A', b'S', b'5', b'X', 0, 0],
-            Self::As5y => [b'A', b'S', b'5', b'Y', 0, 0],
-            Self::As6 => [b'A', b'S', b'6', 0, 0, 0],
-            Self::As6r => [b'A', b'S', b'6', b'R', 0, 0],
-            Self::As6x => [b'A', b'S', b'6', b'X', 0, 0],
-            Self::As6y => [b'A', b'S', b'6', b'Y', 0, 0],
-            Self::As7 => [b'A', b'S', b'7', 0, 0, 0],
-            Self::As7r => [b'A', b'S', b'7', b'R', 0, 0],
-            Self::As7x => [b'A', b'S', b'7', b'X', 0, 0],
-            Self::As7y => [b'A', b'S', b'7', b'Y', 0, 0],
-            Self::Ro1 => [b'R', b'O', b'1', 0, 0, 0],
-            Self::Ro1x => [b'R', b'O', b'1', b'X', 0, 0],
-            Self::Ro2 => [b'R', b'O', b'2', 0, 0, 0],
-            Self::Ro2x => [b'R', b'O', b'2', b'X', 0, 0],
-            Self::Ro3 => [b'R', b'O', b'3', 0, 0, 0],
-            Self::Ro3x => [b'R', b'O', b'3', b'X', 0, 0],
-            Self::Ro4 => [b'R', b'O', b'4', 0, 0, 0],
-            Self::Ro4x => [b'R', b'O', b'4', b'X', 0, 0],
-            Self::Ro5 => [b'R', b'O', b'5', 0, 0, 0],
-            Self::Ro5x => [b'R', b'O', b'5', b'X', 0, 0],
-            Self::Ro6 => [b'R', b'O', b'6', 0, 0, 0],
-            Self::Ro6x => [b'R', b'O', b'6', b'X', 0, 0],
-            Self::Ro7 => [b'R', b'O', b'7', 0, 0, 0],
-            Self::Ro7x => [b'R', b'O', b'7', b'X', 0, 0],
-            Self::Ro8 => [b'R', b'O', b'8', 0, 0, 0],
-            Self::Ro8x => [b'R', b'O', b'8', b'X', 0, 0],
-            Self::Ro9 => [b'R', b'O', b'9', 0, 0, 0],
-            Self::Ro9x => [b'R', b'O', b'9', b'X', 0, 0],
-            Self::Ro10 => [b'R', b'O', b'1', b'0', 0, 0],
-            Self::Ro10x => [b'R', b'O', b'1', b'0', b'X', 0],
-            Self::Ro11 => [b'R', b'O', b'1', b'1', 0, 0],
-            Self::Ro11x => [b'R', b'O', b'1', b'1', b'X', 0],
-            Self::La1 => [b'L', b'A', b'1', 0, 0, 0],
-            Self::La1x => [b'L', b'A', b'1', b'X', 0, 0],
-            Self::La2 => [b'L', b'A', b'2', 0, 0, 0],
-            Self::La2x => [b'L', b'A', b'2', b'X', 0, 0],
-        };
+        let s = self.code();
+        let bytes = s.as_bytes();
 
-        buf.extend_from_slice(&slice);
+        if bytes.len() > 6 {
+            return Err(crate::EncodeError::TooLarge);
+        }
+        buf.extend_from_slice(bytes);
+        buf.resize(buf.len() + (6 - bytes.len()), 0);
         Ok(())
     }
 }
@@ -1296,5 +278,56 @@ impl Encode for Track {
 impl std::fmt::Display for Track {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.code())
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+/// Unknown Track Error
+pub struct TrackUnknownError(String);
+
+impl std::fmt::Display for TrackUnknownError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl TryFrom<String> for Track {
+    type Error = <Track as FromStr>::Err;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        s.parse()
+    }
+}
+
+impl From<Track> for String {
+    fn from(track: Track) -> Self {
+        track.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bl1x_from_str() {
+        let v = Track::from_str("BL1X").expect("Expected to handle BL1X");
+        assert_eq!(v, Track::Bl1x);
+        assert_eq!("BL1X", v.to_string());
+    }
+
+    #[test]
+    fn test_unknown_from_str() {
+        let v = Track::from_str("");
+        assert!(matches!(v, Err(TrackUnknownError(_))));
+    }
+
+    #[test]
+    fn test_reverse_logic() {
+        assert!(Track::Bl1r.is_reverse());
+        assert!(!Track::Bl1.is_reverse());
+        assert!(!Track::Bl1.is_open());
+        assert!(Track::Bl1y.is_reverse());
+        assert!(Track::Bl1y.is_open());
     }
 }

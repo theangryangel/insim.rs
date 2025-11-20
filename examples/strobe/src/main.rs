@@ -4,9 +4,9 @@ use std::{net::SocketAddr, time::Duration};
 
 use clap::Parser;
 use insim::{
+    Packet, Result, WithRequestId,
     identifiers::PlayerId,
     insim::{LclFlags, TinyType},
-    Packet, Result, WithRequestId,
 };
 use tokio::time::interval;
 

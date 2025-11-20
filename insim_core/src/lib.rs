@@ -10,6 +10,7 @@ pub mod game_version;
 pub mod gear;
 pub mod identifiers;
 pub mod license;
+pub mod object;
 pub mod point;
 pub mod speed;
 pub mod string;

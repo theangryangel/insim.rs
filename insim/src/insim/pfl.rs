@@ -34,9 +34,10 @@ mod test {
             |pfl: Pfl| {
                 assert_eq!(pfl.reqi, RequestId(0));
                 assert_eq!(pfl.plid, PlayerId(3));
-                assert!(pfl
-                    .flags
-                    .contains(PlayerFlags::AUTOGEARS & PlayerFlags::LEFTSIDE));
+                assert!(
+                    pfl.flags
+                        .contains(PlayerFlags::AUTOGEARS & PlayerFlags::LEFTSIDE)
+                );
             }
         );
     }

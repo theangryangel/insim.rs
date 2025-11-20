@@ -20,10 +20,10 @@ impl Receiver {
         let attr = self.attrs.iter().find(|a| a.path().is_ident("repr"))?;
         let mut repr_ty = None;
         attr.parse_nested_meta(|m| {
-            repr_ty = Some(m.path.get_ident().unwrap().clone());
+            repr_ty = Some(m.path.get_ident().expect("Missing ident").clone());
             Ok(())
         })
-        .unwrap();
+        .expect("Expected to parse nested meta");
         match repr_ty.as_ref()?.to_string().as_str() {
             "u8" | "u16" | "u32" | "u64" => Some(repr_ty?),
             _ => None,
@@ -75,10 +75,9 @@ impl Receiver {
     ) -> Result<proc_macro2::TokenStream, darling::Error> {
         let name = &self.ident;
 
-        let to_bytes_fields =
-            fields
-                .iter()
-                .filter_map(|f| if f.skip() { None } else { Some(f.encode()) });
+        let to_bytes_fields = fields
+            .iter()
+            .filter_map(|f| if f.skip() { None } else { Some(f.encode()) });
 
         Ok(quote! {
             impl ::insim_core::Encode for #name {
@@ -141,16 +140,15 @@ impl Receiver {
     ) -> Result<proc_macro2::TokenStream, darling::Error> {
         let name = &self.ident;
 
-        let from_bytes_fields =
-            fields
-                .iter()
-                .filter_map(|f| if f.skip() { None } else { Some(f.decode()) });
+        let from_bytes_fields = fields
+            .iter()
+            .filter_map(|f| if f.skip() { None } else { Some(f.decode()) });
 
         let from_bytes_fields_init = fields.iter().filter_map(|f| {
             if f.skip() {
                 return None;
             }
-            let field_name = f.ident.as_ref().unwrap();
+            let field_name = f.ident.as_ref().expect("Missing field name");
 
             Some(quote! {
                 #field_name

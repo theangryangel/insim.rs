@@ -1,5 +1,5 @@
 use bytes::{Buf, BufMut};
-use insim_core::{Decode, DecodeString, Encode, EncodeString};
+use insim_core::{Decode, DecodeError, DecodeString, Encode, EncodeString};
 
 use crate::identifiers::{ClickId, ConnectionId, RequestId};
 
@@ -20,7 +20,7 @@ bitflags::bitflags! {
 impl_bitflags_from_to_bytes!(BtnInst, u8);
 
 /// Colour
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum BtnStyleColour {
     /// NotEditable, defaults to light grey
@@ -64,7 +64,7 @@ bitflags::bitflags! {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Button style
 pub struct BtnStyle {
@@ -215,7 +215,7 @@ bitflags::bitflags! {
 
 impl_bitflags_from_to_bytes!(BtnClickFlags, u8);
 
-#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
+#[derive(Debug, Default, Clone, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]
@@ -235,7 +235,7 @@ pub enum BfnType {
     BtnRequest = 3,
 }
 
-#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
+#[derive(Debug, Clone, Default, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Button Function
 pub struct Bfn {
@@ -260,7 +260,7 @@ pub struct Bfn {
 
 impl_typical_with_request_id!(Bfn);
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Button - Instructional to create a button
 pub struct Btn {
@@ -320,7 +320,11 @@ impl Decode for Btn {
             buf.advance(1);
 
             // find the caption ending
-            let split = buf.iter().position(|c| c == &0_u8).unwrap();
+            let split = if let Some(split) = buf.iter().position(|c| c == &0_u8) {
+                split
+            } else {
+                return Err(DecodeError::ExpectedNull);
+            };
 
             let caption = buf.split_to(split);
             let caption = insim_core::string::codepages::to_lossy_string(&caption);
@@ -424,7 +428,7 @@ impl Encode for Btn {
 
 impl_typical_with_request_id!(Btn);
 
-#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
+#[derive(Debug, Clone, Default, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Button Click - Sent back when a user clicks a button
 pub struct Btc {
@@ -443,7 +447,7 @@ pub struct Btc {
     pub cflags: BtnClickFlags,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Button Type - Sent back when a user types into a text entry "button"
 pub struct Btt {
