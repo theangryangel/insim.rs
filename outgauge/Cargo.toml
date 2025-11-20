@@ -30,5 +30,5 @@ serde = [
 [dependencies]
 bitflags = { workspace = true }
 bytes = { workspace = true }
-insim_core = { path = "../insim_core", version = "3.0.0" }
+insim_core = { path = "../insim_core", version = "4.0.0" }
 serde = { workspace = true, features = ["derive"], optional = true }

@@ -41,7 +41,7 @@ bytes = { workspace = true }
 from_variants = { workspace = true }
 glam = { workspace = true }
 indexmap = { workspace = true }
-insim_core = { path = "../insim_core", version = "3.1.0" }
+insim_core = { path = "../insim_core", version = "4.0.0" }
 serde = { workspace = true, features = ["derive"], optional = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt", "time", "net", "macros", "sync", "tracing", "io-util"], optional = true }
