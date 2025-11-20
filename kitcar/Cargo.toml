@@ -12,7 +12,7 @@ homepage.workspace = true
 fixedbitset = { workspace = true }
 if_chain = { workspace = true }
 indexmap = { workspace = true }
-insim = { path = "../insim", version = "4.0.0", features = ["tokio", "serde"] }
+insim = { path = "../insim", version = "5.0.0", features = ["tokio", "serde"] }
 kitcar_macros = { path = "../kitcar_macros", version = "*" }
 rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
