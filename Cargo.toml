@@ -42,7 +42,7 @@ bitflags = "2.4.0"
 bytes = "1.4.0"
 clap = { version = "4.2" }
 darling = "0.21.3"
-encoding_rs = { version = "0.8.32" }
+encoding_rs = { version = "0.8.35" }
 fixedbitset = "0.5.7"
 from_variants = "1.0.2"
 futures = "0.3"
