@@ -1,3 +1,12 @@
 {
-  "extends": ["config:recommended"]
+  "extends": ["config:recommended"],
+  "packageRules": [
+    {
+      "matchManagers": ["cargo"],
+      "matchFileNames": ["Cargo.toml"],
+      "matchDepTypes": ["workspace.dependencies"],
+      "enabled": true,
+      "groupName": "workspace dependencies"
+    }
+  ]
 }
