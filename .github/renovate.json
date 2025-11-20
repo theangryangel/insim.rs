@@ -3,7 +3,6 @@
   "packageRules": [
     {
       "matchManagers": ["cargo"],
-      "matchFileNames": ["Cargo.toml"],
       "matchDepTypes": ["workspace.dependencies"],
       "enabled": true,
       "groupName": "workspace dependencies"
