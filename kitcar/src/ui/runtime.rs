@@ -140,11 +140,17 @@ impl<C: Component> Runtime<C> {
                 let last_layout = self.last_layout.take().unwrap_or_default();
                 let to_remove = last_layout
                     .iter()
-                    .map(|(key, _btn)| Bfn {
-                        ucid: self.ucid,
-                        subt: BfnType::DelBtn,
-                        clickid: self.release_clickid(key).unwrap(), // FIXME: don't unwrap
-                        ..Default::default()
+                    .filter_map(|(key, _btn)| {
+                        if let Some(clickid) = self.release_clickid(key) {
+                            Some(Bfn {
+                                ucid: self.ucid,
+                                subt: BfnType::DelBtn,
+                                clickid,
+                                ..Default::default()
+                            })
+                        } else {
+                            None
+                        }
                     })
                     .collect();
                 self.last_layout = None;
@@ -168,15 +174,19 @@ impl<C: Component> Runtime<C> {
         let to_remove: Vec<Bfn> = last_layout
             .iter()
             .filter_map(|(key, _vals)| {
-                if !node_map.contains_key(key) {
-                    Some(Bfn {
-                        ucid: self.ucid,
-                        subt: BfnType::DelBtn,
-                        clickid: self.release_clickid(key).unwrap(), // FIXME: don't unwrap
-                        ..Default::default()
-                    })
-                } else {
-                    None
+                if_chain::if_chain! {
+                    if !node_map.contains_key(key);
+                    if let Some(clickid) = self.release_clickid(key);
+                    then {
+                        Some(Bfn {
+                            ucid: self.ucid,
+                            subt: BfnType::DelBtn,
+                            clickid,
+                            ..Default::default()
+                        })
+                    } else {
+                        None
+                    }
                 }
             })
             .collect();
@@ -186,12 +196,20 @@ impl<C: Component> Runtime<C> {
         let to_update: Vec<Btn> = node_map
             .iter_mut()
             .filter_map(|(element_id, (element, node_id))| {
-                let click_id = self
-                    .lease_clickid(element_id, element.lease_strategy.as_ref())
-                    .unwrap();
+                let click_id = match self.lease_clickid(element_id, element.lease_strategy.as_ref())
+                {
+                    Some(id) => id,
+                    None => {
+                        tracing::error!(
+                            "Failed to lease click_id for element, likely too many buttons: {:?}",
+                            element_id
+                        );
+                        return None;
+                    },
+                };
 
-                let (x, y) = get_taffy_abs_position(&taffy, node_id);
-                let layout = taffy.layout(*node_id).unwrap();
+                let (x, y) = get_taffy_abs_position(&taffy, node_id)?;
+                let layout = taffy.layout(*node_id).ok()?;
 
                 let btn = Btn {
                     text: element.text.take().unwrap_or_default(),
@@ -326,7 +344,9 @@ fn flatten(
         .map(|c| flatten(tree, node_map, c))
         .collect();
 
-    let taffy_id = tree.new_with_children(style, &child_ids).unwrap();
+    let taffy_id = tree
+        .new_with_children(style, &child_ids)
+        .expect("Could not add a new child to taffy layout.. too many buttons?");
 
     // If it was a button, push the modified vdom (with children: None) into the map
     if let Element::Button(i) = vdom {
@@ -338,12 +358,12 @@ fn flatten(
 
 // FIXME: we need to get this into the loop somewhere so that we dont need to redo it every
 // time
-fn get_taffy_abs_position(taffy: &taffy::TaffyTree, node_id: &taffy::NodeId) -> (f32, f32) {
+fn get_taffy_abs_position(taffy: &taffy::TaffyTree, node_id: &taffy::NodeId) -> Option<(f32, f32)> {
     let mut current_node = *node_id;
     let mut absolute_location = (0.0, 0.0);
 
     loop {
-        let layout = taffy.layout(current_node).unwrap();
+        let layout = taffy.layout(current_node).ok()?;
         absolute_location.0 += layout.location.x;
         absolute_location.1 += layout.location.y;
 
@@ -359,7 +379,7 @@ fn get_taffy_abs_position(taffy: &taffy::TaffyTree, node_id: &taffy::NodeId) -> 
         }
     }
 
-    absolute_location
+    Some(absolute_location)
 }
 
 #[cfg(test)]
@@ -427,7 +447,7 @@ mod tests {
             .unwrap();
 
         let button_node = node_map.get(&1).expect("Button node should exist");
-        let (x, y) = get_taffy_abs_position(&taffy, &button_node.1);
+        let (x, y) = get_taffy_abs_position(&taffy, &button_node.1).unwrap();
 
         assert_eq!(x, 95.0, "Button X position should be 95");
         assert_eq!(y, 95.0, "Button Y position should be 95");
@@ -486,10 +506,10 @@ mod tests {
             .unwrap();
 
         let button1_node = node_map.get(&1).unwrap();
-        let (x1, y1) = get_taffy_abs_position(&taffy, &button1_node.1);
+        let (x1, y1) = get_taffy_abs_position(&taffy, &button1_node.1).unwrap();
 
         let button2_node = node_map.get(&2).unwrap();
-        let (x2, y2) = get_taffy_abs_position(&taffy, &button2_node.1);
+        let (x2, y2) = get_taffy_abs_position(&taffy, &button2_node.1).unwrap();
 
         assert_eq!(x1, 90.0, "Button1 X should be 90");
         assert_eq!(x2, 90.0, "Button2 X should be 90");

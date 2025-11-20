@@ -118,7 +118,12 @@ impl<'a> Scope<'a> {
             .entry(hook_path.clone())
             .or_insert_with(|| Box::new(ComponentState::new(initial_state())));
 
-        state.downcast_ref::<ComponentState<T>>().unwrap().clone()
+        state
+            .downcast_ref::<ComponentState<T>>()
+            .expect(
+                "State mismatch - did you change the order or type of components between renders?",
+            )
+            .clone()
     }
 
     /// On a chat command

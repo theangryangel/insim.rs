@@ -44,7 +44,7 @@ impl<'a> Iterator for WrapTextIter<'a> {
                 .remaining_text
                 .char_indices()
                 .nth(self.line_width)
-                .unwrap()
+                .expect("It's all gone wonky.")
                 .0;
         }
 

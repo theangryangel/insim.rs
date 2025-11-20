@@ -20,10 +20,10 @@ impl Receiver {
         let attr = self.attrs.iter().find(|a| a.path().is_ident("repr"))?;
         let mut repr_ty = None;
         attr.parse_nested_meta(|m| {
-            repr_ty = Some(m.path.get_ident().unwrap().clone());
+            repr_ty = Some(m.path.get_ident().expect("Missing ident").clone());
             Ok(())
         })
-        .unwrap();
+        .expect("Expected to parse nested meta");
         match repr_ty.as_ref()?.to_string().as_str() {
             "u8" | "u16" | "u32" | "u64" => Some(repr_ty?),
             _ => None,
@@ -148,7 +148,7 @@ impl Receiver {
             if f.skip() {
                 return None;
             }
-            let field_name = f.ident.as_ref().unwrap();
+            let field_name = f.ident.as_ref().expect("Missing field name");
 
             Some(quote! {
                 #field_name

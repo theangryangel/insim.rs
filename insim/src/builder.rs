@@ -265,15 +265,10 @@ impl Builder {
     }
 
     /// Create a [crate::insim::Isi] from this configuration.
-    pub fn isi(&self) -> Isi {
-        let udpport = match self.proto {
-            Proto::Udp => self.udp_local_address.unwrap().port(),
-            _ => 0,
-        };
-
+    pub fn isi(&self, udpport: Option<u16>) -> Isi {
         Isi {
             reqi: self.isi_reqi,
-            udpport,
+            udpport: udpport.unwrap_or(0),
             flags: self.isi_flags,
             admin: self.isi_admin_password.as_deref().unwrap_or("").to_owned(),
             iname: self
@@ -307,7 +302,7 @@ impl Builder {
 
                 let mut stream =
                     BlockingFramed::new(Box::new(stream), Codec::new(self.mode.clone()));
-                stream.write(self.isi())?;
+                stream.write(self.isi(None))?;
 
                 Ok(stream)
             },
@@ -322,10 +317,7 @@ impl Builder {
                     stream.set_nonblocking(true)?;
                 }
 
-                let mut isi = self.isi();
-                if self.udp_local_address.is_none() {
-                    isi.udpport = local.port();
-                }
+                let isi = self.isi(Some(local.port()));
 
                 let mut stream = BlockingFramed::new(
                     Box::new(UdpStream::from(stream)),
@@ -354,7 +346,7 @@ impl Builder {
                 let stream = tokio::net::TcpStream::from_std(stream)?;
 
                 let mut stream = AsyncFramed::new(Box::new(stream), Codec::new(self.mode.clone()));
-                stream.write(self.isi()).await?;
+                stream.write(self.isi(None)).await?;
 
                 Ok(stream)
             },
@@ -367,10 +359,7 @@ impl Builder {
 
                 let stream = tokio::net::UdpSocket::from_std(stream)?;
 
-                let mut isi = self.isi();
-                if self.udp_local_address.is_none() {
-                    isi.udpport = local.port();
-                }
+                let isi = self.isi(Some(local.port()));
 
                 let mut stream = AsyncFramed::new(
                     Box::new(UdpStream::from(stream)),

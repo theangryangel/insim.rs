@@ -1,5 +1,5 @@
 use bytes::{Buf, BufMut};
-use insim_core::{Decode, DecodeString, Encode, EncodeString};
+use insim_core::{Decode, DecodeError, DecodeString, Encode, EncodeString};
 
 use crate::identifiers::{ClickId, ConnectionId, RequestId};
 
@@ -320,7 +320,11 @@ impl Decode for Btn {
             buf.advance(1);
 
             // find the caption ending
-            let split = buf.iter().position(|c| c == &0_u8).unwrap();
+            let split = if let Some(split) = buf.iter().position(|c| c == &0_u8) {
+                split
+            } else {
+                return Err(DecodeError::ExpectedNull);
+            };
 
             let caption = buf.split_to(split);
             let caption = insim_core::string::codepages::to_lossy_string(&caption);

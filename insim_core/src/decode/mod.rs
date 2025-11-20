@@ -1,6 +1,6 @@
 //! Decode trait
 
-use std::{array::from_fn, net::Ipv4Addr};
+use std::net::Ipv4Addr;
 
 use bytes::{Buf, Bytes};
 
@@ -28,6 +28,10 @@ pub enum DecodeError {
     /// Value too large for field
     #[error("too large")]
     TooLarge,
+
+    /// Expected \0 character
+    #[error("Expected \0 character")]
+    ExpectedNull,
 }
 
 /// Decode from bytes
@@ -100,9 +104,17 @@ where
     T: Decode,
 {
     fn decode(buf: &mut Bytes) -> Result<Self, DecodeError> {
-        let val = from_fn(|_| T::decode(buf).unwrap());
+        // If T::decode returns Err(BadMagic), collect stops and returns Err(BadMagic) immediately.
+        let items: Vec<T> = (0..N)
+            .map(|_| T::decode(buf))
+            .collect::<Result<Vec<T>, DecodeError>>()?;
 
-        Ok(val)
+        // We use .ok().expect() because if this fails, it's a bug in the code,
+        // not a problem with the input data.
+        Ok(items
+            .try_into()
+            .ok()
+            .expect("size must match N because we looped N times"))
     }
 }
 

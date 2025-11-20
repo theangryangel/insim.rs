@@ -95,11 +95,13 @@ pub fn escape(input: &'_ str) -> Cow<'_, str> {
             if c.is_lfs_control_char();
             if let Some(d) = chars.peek();
             if d.is_lfs_colour();
+            if let Some(d) = chars.next();  // to appease no unwrap lint, this should be infallible
+                                            // due to peek above.
             then {
                 // is this a colour?
                 // just push the colour and move on
                 output.push(c);
-                output.push(chars.next().unwrap());
+                output.push(d);
                 continue;
             }
         }

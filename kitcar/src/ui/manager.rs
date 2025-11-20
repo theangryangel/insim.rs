@@ -38,7 +38,7 @@ impl Manager {
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
-                .unwrap();
+                .expect("Tokio couldn't create a new runtime... Giving up. There's something out of our control here.");
 
             let local_set = tokio::task::LocalSet::new();
             local_set.block_on(&rt, async move {

@@ -144,21 +144,22 @@ impl Element {
     }
 
     pub fn with_child<E: Into<Option<Element>>>(mut self, val: E) -> Self {
-        let val = val.into();
-        if val.is_none() {
+        let val = if let Some(val) = val.into() {
+            val
+        } else {
             return self;
-        }
+        };
 
         match self {
             Self::Container(Container {
                 ref mut children, ..
             }) => {
-                children.get_or_insert_default().push(val.unwrap());
+                children.get_or_insert_default().push(val);
             },
             Self::Button(Button {
                 ref mut children, ..
             }) => {
-                children.get_or_insert_default().push(val.unwrap());
+                children.get_or_insert_default().push(val);
             },
         }
 
