@@ -54,7 +54,7 @@ num-traits = "0.2.19"
 proc-macro2 = "1"
 quote = "1"
 rand = "0.9.2"
-serde = { version = "1.0.188" }
+serde = { version = "1.0.228" }
 serde_norway = "0.9.42"
 syn = { version = "2" }
 thiserror = "2.0.12"
