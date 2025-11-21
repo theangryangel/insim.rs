@@ -47,9 +47,9 @@ impl TrackRotation {
                     .send_command(&format!("/track {}", self.combo.track().code()))
                     .await?;
 
-                if let Some(laps) = self.combo.extensions().laps.as_ref() {
-                    cx.insim.send_command(&format!("/laps {}", laps)).await?;
-                }
+                // always practise mode and no wind
+                cx.insim.send_command("/laps 0").await?;
+                cx.insim.send_command("/wind 0").await?;
 
                 let _ = cx
                     .insim

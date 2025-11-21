@@ -1,12 +1,18 @@
 use jiff::Span;
 
+#[derive(Debug, serde::Deserialize, serde::Serialize, Clone, Copy)]
+pub enum CheckpointKind {
+    Finish,
+    Cp1,
+    Cp2,
+    Cp3,
+}
+
 #[derive(Debug, serde::Deserialize, serde::Serialize, Clone)]
 /// Combo Extension, for use with kitcar::combos::ComboList
 pub struct ComboExt {
     /// Name for the combo
     pub name: String,
-    /// Lap count
-    pub laps: Option<u8>,
     /// What time do we need to hit?
     pub target_time: Span,
     /// Cooldown - restart after

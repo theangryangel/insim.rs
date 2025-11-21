@@ -1,6 +1,10 @@
 use std::{collections::HashMap, time::Duration};
 
-use insim::{Packet, identifiers::ConnectionId};
+use insim::{
+    Packet,
+    identifiers::{ConnectionId, PlayerId},
+    insim::ObjectInfo,
+};
 use kitcar::{combos::Combo, time::countdown::Countdown};
 use tokio::time::sleep;
 
@@ -37,6 +41,7 @@ impl Round {
         let rounds = self.combo.extensions().rounds;
         let available_time = Duration::try_from(self.combo.extensions().restart_after)?;
         let mut round_scores: HashMap<String, Duration> = HashMap::new(); // TODO: Only the last scoring round is stored. add to MOTD
+        let mut runs_in_progress: HashMap<PlayerId, Duration> = HashMap::new();
 
         cx.insim.send_command("/restart").await?;
 
@@ -99,6 +104,22 @@ impl Round {
                         if let Some(conn_info) = conn_info {
                             let _ = round_scores.insert(conn_info.uname, fin.ttime);
                         }
+                    },
+                    Packet::Uco(uco) => {
+                        match uco.info {
+                            ObjectInfo::InsimCheckpointFinish(_) => {
+                                if let Some(start) = runs_in_progress.remove(&uco.plid) {
+                                    let delta = uco.time.saturating_sub(start);
+                                    let conn_info = cx.presence.connection_by_player(&uco.plid).await.unwrap(); // FIXME
+                                    let _ = round_scores.insert(conn_info.uname, delta);
+                                }
+                            },
+                            ObjectInfo::InsimCheckpoint1(_) => {
+                                let _ = runs_in_progress.insert(uco.plid, uco.time);
+                            },
+                            _ => {}
+                        }
+
                     },
                     Packet::Ncn(ncn) => {
                         cx.insim
