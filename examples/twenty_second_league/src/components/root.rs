@@ -14,9 +14,11 @@ Just remember: Don't be a dick. We're all here to have fun!";
 use crate::{
     combo::ComboExt,
     components::{
+        leaderboard::{Leaderboard, LeaderboardProps},
         motd::{Motd, MotdProps},
         topbar::{Topbar, TopbarProps},
     },
+    db::models::LeaderboardEntry,
 };
 
 #[derive(Debug, Clone)]
@@ -29,7 +31,7 @@ pub enum RootScene {
         combo: Combo<ComboExt>,
         round: u32,
         remaining: Duration,
-        scores: Vec<(String, i32, i64)>,
+        scores: Vec<LeaderboardEntry>,
     },
     Lobby {
         combo: Combo<ComboExt>,
@@ -42,17 +44,15 @@ pub enum RootScene {
 
 #[component]
 pub(crate) fn Root(scene: RootScene) -> Option<Element> {
-    let text = match scene {
+    let text = match &scene {
         RootScene::Idle => "No game in progress".white(),
         RootScene::TrackRotation { combo } => format!("Loading track {}", combo.track(),).white(),
         RootScene::Round {
             round,
             combo,
             remaining,
-            scores,
+            ..
         } => {
-            println!("scores = {:?}", scores);
-
             let seconds = remaining.as_secs() % 60;
             let minutes = (remaining.as_secs() / 60) % 60;
             format!(
@@ -82,6 +82,11 @@ pub(crate) fn Root(scene: RootScene) -> Option<Element> {
         },
     };
 
+    let leaderboard_entries = match &scene {
+        RootScene::Round { scores, .. } => scores.clone(),
+        _ => vec![],
+    };
+
     let interface = cx
         .container()
         .h(150.0)
@@ -89,9 +94,26 @@ pub(crate) fn Root(scene: RootScene) -> Option<Element> {
         .flex()
         .flex_col()
         .with_child(cx.component::<Topbar>(TopbarProps { text }))
-        .with_child(cx.component::<Motd>(MotdProps {
-            text: WELCOME.to_owned(),
-        }));
+        .with_child(
+            // FIXME: this is wrong.
+            cx.container()
+                .flex()
+                .flex_row()
+                .with_child(cx.component::<Motd>(MotdProps {
+                    text: WELCOME.to_owned(),
+                }))
+                .with_child(
+                    cx.container()
+                        .flex()
+                        .flex_col()
+                        // FIXME: float right?
+                        .mr(2.0)
+                        .mt(2.0)
+                        .with_child(cx.component::<Leaderboard>(LeaderboardProps {
+                            entries: leaderboard_entries,
+                        })),
+                ),
+        );
 
     Some(interface)
 }
