@@ -32,8 +32,8 @@ async fn main() -> Result<()> {
 
     let args = cli::Args::parse();
     let config = Arc::new(config::Config::from_file(&args.config_file)?);
-    let repo = db::Repo::new(&config.database);
-    repo.migrate()?;
+    let repo = db::Repo::new(&config.database).await?;
+    repo.migrate().await?;
 
     let (insim, _join_handle) = insim::tcp(config.addr.clone())
         .isi_admin_password(config.admin.clone())
@@ -97,7 +97,7 @@ async fn main() -> Result<()> {
             packet = packets.recv() => {
                 match packet? {
                     insim::Packet::Ncn(ncn) if ncn.ucid != ConnectionId::LOCAL => {
-                        cx.database.upsert_player(&ncn.uname, &ncn.pname)?;
+                        let _ = cx.database.upsert_player(&ncn.uname, &ncn.pname).await?;
                     },
                     insim::Packet::Mso(mso) => {
                         match Chat::parse(mso.msg_from_textstart()) {

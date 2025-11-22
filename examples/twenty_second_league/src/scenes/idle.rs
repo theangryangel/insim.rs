@@ -38,7 +38,8 @@ impl Idle {
                             if conn_info.admin;
                             then {
                                 if let Some(combo) = cx.config.combos.random() {
-                                    let game_id = cx.database.new_event(&combo)?;
+                                    let event = cx.database.new_event(&combo).await?;
+                                    let game_id = crate::db::game::EventId(event.id);
 
                                     return Ok(Some(super::TrackRotation { combo: combo.clone(), game_id }.into()));
                                 } else {

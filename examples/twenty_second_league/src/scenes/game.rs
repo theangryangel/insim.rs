@@ -44,8 +44,8 @@ impl Round {
         let mut runs_in_progress: HashMap<PlayerId, Duration> = HashMap::new();
 
         cx.insim.send_command("/restart").await?;
-
-        let scores = cx.database.leaderboard(self.game_id, 10)?;
+        
+        let scores = cx.database.leaderboard(self.game_id, 10).await?;
 
         cx.ui.update(RootProps {
             scene: RootScene::Round {
@@ -102,7 +102,17 @@ impl Round {
                     Packet::Fin(fin) => {
                         let conn_info = cx.presence.connection_by_player(&fin.plid).await;
                         if let Some(conn_info) = conn_info {
-                            let _ = round_scores.insert(conn_info.uname, fin.ttime);
+                            let new_diff = target.abs_diff(fin.ttime);
+
+                            let _ = round_scores
+                                .entry(conn_info.uname)
+                                .and_modify(|existing| {
+                                    let existing_diff = target.abs_diff(*existing);
+                                    if new_diff < existing_diff {
+                                        *existing = fin.ttime;
+                                    }
+                                })
+                                .or_insert(fin.ttime);
                         }
                     },
                     Packet::Uco(uco) => {
@@ -110,8 +120,19 @@ impl Round {
                             ObjectInfo::InsimCheckpointFinish(_) => {
                                 if let Some(start) = runs_in_progress.remove(&uco.plid) {
                                     let delta = uco.time.saturating_sub(start);
-                                    let conn_info = cx.presence.connection_by_player(&uco.plid).await.unwrap(); // FIXME
-                                    let _ = round_scores.insert(conn_info.uname, delta);
+                                    if let Some(conn_info) = cx.presence.connection_by_player(&uco.plid).await {
+                                        let new_diff = target.abs_diff(delta);
+
+                                        let _ = round_scores
+                                            .entry(conn_info.uname)
+                                            .and_modify(|existing| {
+                                                let existing_diff = target.abs_diff(*existing);
+                                                if new_diff < existing_diff {
+                                                    *existing = delta;
+                                                }
+                                            })
+                                            .or_insert(delta);
+                                    }
                                 }
                             },
                             ObjectInfo::InsimCheckpoint1(_) => {
@@ -159,7 +180,8 @@ impl Round {
             .collect();
 
         cx.database
-            .insert_player_scores(self.game_id, self.round, top)?;
+            .insert_player_scores(self.game_id, self.round, top)
+            .await?;
 
         cx.insim
             .send_message(
@@ -168,7 +190,7 @@ impl Round {
             )
             .await?;
 
-        let scores = cx.database.leaderboard(self.game_id, 10)?;
+        let scores = cx.database.leaderboard(self.game_id, 10).await?;
 
         cx.ui.update(RootProps {
             scene: RootScene::Round {
@@ -227,7 +249,7 @@ impl Victory {
             });
         }
 
-        cx.database.complete_event(self.game_id)?;
+        cx.database.complete_event(self.game_id).await?;
 
         Ok(Some(super::Idle.into()))
     }

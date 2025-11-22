@@ -1,43 +1,35 @@
 pub mod game;
+pub mod models;
 pub mod player;
 pub mod score;
 
-use std::path::PathBuf;
+use std::path::Path;
 
 use anyhow::Result;
-use rusqlite::Connection;
-use rusqlite_migration::{M, Migrations};
+use sqlx::{
+    sqlite::{SqliteConnectOptions, SqliteJournalMode},
+    SqlitePool,
+};
 
 #[derive(Debug, Clone)]
 pub struct Repo {
-    pub(crate) path: PathBuf,
+    pub(crate) pool: SqlitePool,
 }
 
 impl Repo {
-    pub fn new(path: impl Into<PathBuf>) -> Self {
-        Self { path: path.into() }
+    pub async fn new(path: impl AsRef<Path>) -> Result<Self> {
+        let options = SqliteConnectOptions::new()
+            .filename(path.as_ref())
+            .create_if_missing(true)
+            .journal_mode(SqliteJournalMode::Wal);
+
+        let pool = SqlitePool::connect_with(options).await?;
+
+        Ok(Self { pool })
     }
 
-    fn open(&self) -> Result<Connection> {
-        let conn = Connection::open(&self.path)?;
-        conn.pragma_update(None, "foreign_keys", &"ON")?;
-        Ok(conn)
-    }
-
-    pub fn migrate(&self) -> Result<()> {
-        let mut conn = self.open()?;
-        conn.pragma_update(None, "journal_mode", &"WAL")?;
-
-        let migrations = Migrations::new(vec![
-            M::up(include_str!(
-                "../migrations/20251106162526_up_bootstrap.sql"
-            )),
-            M::up(include_str!(
-                "../migrations/20251110200300_up_leaderboard.sql"
-            )),
-        ]);
-
-        migrations.to_latest(&mut conn)?;
+    pub async fn migrate(&self) -> Result<()> {
+        sqlx::migrate!().run(&self.pool).await?;
         Ok(())
     }
 }
