@@ -5,8 +5,6 @@ use jiff::Span;
 pub struct ComboExt {
     /// Name for the combo
     pub name: String,
-    /// Lap count
-    pub laps: Option<u8>,
     /// What time do we need to hit?
     pub target_time: Span,
     /// Cooldown - restart after
