@@ -16,7 +16,7 @@ insim = { path = "../insim", version = "5.0.0", features = ["tokio", "serde"] }
 kitcar_macros = { path = "../kitcar_macros", version = "*" }
 rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-taffy = "0.9.1"
+taffy = "0.9.2"
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt", "sync"] }
 tracing = { workspace = true }
