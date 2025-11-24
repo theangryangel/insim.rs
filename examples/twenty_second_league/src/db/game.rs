@@ -17,21 +17,20 @@ impl Repo {
         let layout = combo.layout();
         let name = combo.extensions().name.clone();
 
-        let event = sqlx::query_as!(
-            Event,
+        let event = sqlx::query_as::<_, Event>(
             r#"
             INSERT INTO event (started_at, name, track, layout, target_time, restart_after, rounds)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             RETURNING id, started_at, completed_at, name, track, layout, target_time, restart_after, rounds
-            "#,
-            now,
-            name,
-            track,
-            layout,
-            target,
-            restart,
-            rounds,
+            "#
         )
+        .bind(now)
+        .bind(name)
+        .bind(track)
+        .bind(layout)
+        .bind(target)
+        .bind(restart)
+        .bind(rounds)
         .fetch_one(&self.pool)
         .await?;
 
@@ -40,13 +39,11 @@ impl Repo {
 
     pub async fn complete_event(&self, event_id: EventId) -> Result<()> {
         let now = jiff::Timestamp::now().to_string();
-        let _ = sqlx::query!(
-            "UPDATE event SET completed_at = ? WHERE id = ?",
-            now,
-            event_id.0
-        )
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("UPDATE event SET completed_at = ? WHERE id = ?")
+            .bind(now)
+            .bind(event_id.0)
+            .execute(&self.pool)
+            .await?;
 
         Ok(())
     }

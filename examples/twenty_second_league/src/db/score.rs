@@ -15,27 +15,25 @@ impl Repo {
         let mut tx = self.pool.begin().await?;
 
         for (uname, points, position, delta) in batch.into_iter() {
-            let player_id = sqlx::query_scalar!(
-                "SELECT id FROM player WHERE uname = ?",
-                uname
-            )
-            .fetch_one(&mut *tx)
-            .await?;
+            let player_id: i64 = sqlx::query_scalar("SELECT id FROM player WHERE uname = ?")
+                .bind(&uname)
+                .fetch_one(&mut *tx)
+                .await?;
 
             let delta_ms = delta.as_millis() as i64;
             // Schema says position is INTEGER (i64/i32).
             let position_i64 = position as i64;
 
-            let _ = sqlx::query!(
+            sqlx::query(
                 "INSERT INTO result (event_id, round, player_id, position, points, delta)
                  VALUES (?, ?, ?, ?, ?, ?)",
-                game_id.0,
-                round,
-                player_id,
-                position_i64,
-                points,
-                delta_ms
             )
+            .bind(game_id.0)
+            .bind(round)
+            .bind(player_id)
+            .bind(position_i64)
+            .bind(points)
+            .bind(delta_ms)
             .execute(&mut *tx)
             .await?;
         }
@@ -47,20 +45,19 @@ impl Repo {
 
     pub async fn leaderboard(&self, game_id: EventId, max: usize) -> Result<Vec<LeaderboardEntry>> {
         let max_i64 = max as i64;
-        let results = sqlx::query_as!(
-            LeaderboardEntry,
+        let results = sqlx::query_as::<_, LeaderboardEntry>(
             r#"
             SELECT pname,
-                   total_points as "total_points!: i64",
-                   position as "position!: i64"
+                   total_points,
+                   position
             FROM leaderboard
             WHERE event_id = ?
             ORDER BY position ASC
             LIMIT ?
             "#,
-            game_id.0,
-            max_i64
         )
+        .bind(game_id.0)
+        .bind(max_i64)
         .fetch_all(&self.pool)
         .await?;
 
