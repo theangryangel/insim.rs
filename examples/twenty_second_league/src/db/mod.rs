@@ -1,6 +1,7 @@
 pub mod game;
 pub mod models;
 pub mod player;
+pub mod repository;
 pub mod score;
 
 use std::path::Path;
@@ -11,25 +12,15 @@ use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode},
 };
 
-#[derive(Debug, Clone)]
-pub struct Repo {
-    pub(crate) pool: SqlitePool,
-}
+pub async fn init(path: impl AsRef<Path>) -> Result<SqlitePool> {
+    let options = SqliteConnectOptions::new()
+        .filename(path.as_ref())
+        .create_if_missing(true)
+        .journal_mode(SqliteJournalMode::Wal);
 
-impl Repo {
-    pub async fn new(path: impl AsRef<Path>) -> Result<Self> {
-        let options = SqliteConnectOptions::new()
-            .filename(path.as_ref())
-            .create_if_missing(true)
-            .journal_mode(SqliteJournalMode::Wal);
+    let pool = SqlitePool::connect_with(options).await?;
 
-        let pool = SqlitePool::connect_with(options).await?;
+    sqlx::migrate!().run(&pool).await?;
 
-        Ok(Self { pool })
-    }
-
-    pub async fn migrate(&self) -> Result<()> {
-        sqlx::migrate!().run(&self.pool).await?;
-        Ok(())
-    }
+    Ok(pool)
 }

@@ -45,7 +45,8 @@ impl Round {
 
         cx.insim.send_command("/restart").await?;
 
-        let scores = cx.database.leaderboard(self.game_id, 10).await?;
+        let scores =
+            crate::db::models::LeaderboardEntry::list_for_event(&cx.pool, self.game_id, 10).await?;
 
         cx.ui.update(RootProps {
             scene: RootScene::Round {
@@ -179,8 +180,7 @@ impl Round {
             })
             .collect();
 
-        cx.database
-            .insert_player_scores(self.game_id, self.round, top)
+        crate::db::score::RoundResult::insert_batch(&cx.pool, self.game_id, self.round, top)
             .await?;
 
         cx.insim
@@ -190,7 +190,8 @@ impl Round {
             )
             .await?;
 
-        let scores = cx.database.leaderboard(self.game_id, 10).await?;
+        let scores =
+            crate::db::models::LeaderboardEntry::list_for_event(&cx.pool, self.game_id, 10).await?;
 
         cx.ui.update(RootProps {
             scene: RootScene::Round {
@@ -249,7 +250,7 @@ impl Victory {
             });
         }
 
-        cx.database.complete_event(self.game_id).await?;
+        crate::db::models::Event::complete(&cx.pool, self.game_id).await?;
 
         Ok(Some(super::Idle.into()))
     }

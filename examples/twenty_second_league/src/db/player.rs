@@ -1,13 +1,25 @@
 use anyhow::Result;
+use sqlx::Executor;
 
-use super::{Repo, models::Player};
+use super::{
+    models::Player,
+    repository::{Repository, RepositoryCreate},
+};
 
-impl Repo {
-    pub async fn upsert_player(&self, uname: &str, pname: &str) -> Result<Player> {
+impl Repository for Player {
+    type Model = Player;
+    type Id = i64;
+}
+
+impl RepositoryCreate for Player {}
+
+impl Player {
+    pub async fn upsert<'e, E>(executor: E, uname: &str, pname: &str) -> Result<Self>
+    where
+        E: Executor<'e, Database = sqlx::Sqlite>,
+    {
         let now = jiff::Timestamp::now().to_string();
 
-        // We use query_as to return the Player struct.
-        // RETURNING * is supported in SQLite 3.35+ (2021), which sqlx supports.
         let player = sqlx::query_as::<_, Player>(
             r#"
             INSERT INTO player (uname, pname, first_seen_at, last_seen_at)
@@ -21,8 +33,8 @@ impl Repo {
         .bind(&now)
         .bind(&now)
         .bind(pname)
-        .bind(now)
-        .fetch_one(&self.pool)
+        .bind(&now)
+        .fetch_one(executor)
         .await?;
 
         Ok(player)

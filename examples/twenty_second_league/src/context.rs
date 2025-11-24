@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use sqlx::SqlitePool;
 use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Clone)]
@@ -10,5 +11,5 @@ pub struct Context {
     pub game: kitcar::game::GameHandle,
     pub config: Arc<super::config::Config>,
     pub shutdown: CancellationToken,
-    pub database: super::db::Repo,
+    pub pool: SqlitePool,
 }
