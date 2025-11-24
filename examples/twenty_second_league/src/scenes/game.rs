@@ -44,7 +44,7 @@ impl Round {
         let mut runs_in_progress: HashMap<PlayerId, Duration> = HashMap::new();
 
         cx.insim.send_command("/restart").await?;
-        
+
         let scores = cx.database.leaderboard(self.game_id, 10).await?;
 
         cx.ui.update(RootProps {

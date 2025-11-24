@@ -7,8 +7,8 @@ use std::path::Path;
 
 use anyhow::Result;
 use sqlx::{
-    sqlite::{SqliteConnectOptions, SqliteJournalMode},
     SqlitePool,
+    sqlite::{SqliteConnectOptions, SqliteJournalMode},
 };
 
 #[derive(Debug, Clone)]
