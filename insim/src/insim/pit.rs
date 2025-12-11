@@ -95,7 +95,7 @@ pub struct Psf {
     /// Player's unique ID
     pub plid: PlayerId,
 
-    #[insim(duration(milliseconds = u32), pad_after = 4)]
+    #[insim(duration= u32, pad_after = 4)]
     /// How long were they pitting for?
     pub stime: Duration,
 }

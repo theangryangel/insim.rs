@@ -75,11 +75,11 @@ pub struct Fin {
     /// Unique player id for this finish notification
     pub plid: PlayerId,
 
-    #[insim(duration(milliseconds = u32))]
+    #[insim(duration = u32)]
     /// Total time elapsed
     pub ttime: Duration,
 
-    #[insim(duration(milliseconds = u32), pad_after = 1)]
+    #[insim(duration = u32, pad_after = 1)]
     /// Best lap time
     pub btime: Duration,
 

@@ -33,7 +33,7 @@ pub struct Csc {
     pub cscaction: CscAction,
 
     /// Time since start (warning: this is looping)
-    #[insim(duration(milliseconds = u32))]
+    #[insim(duration = u32)]
     pub time: Duration,
 
     /// Any contact that may have happened

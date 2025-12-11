@@ -39,7 +39,7 @@ pub struct Uco {
     pub ucoaction: UcoAction,
 
     /// When this happened
-    #[insim(duration(milliseconds = u32))]
+    #[insim(duration = u32)]
     pub time: Duration,
 
     /// Was there any car contact?

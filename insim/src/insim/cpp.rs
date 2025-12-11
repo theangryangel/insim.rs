@@ -36,7 +36,7 @@ pub struct Cpp {
     pub fov: f32,
 
     /// Time in ms to get there (0 means instant)
-    #[insim(duration(milliseconds = u16))]
+    #[insim(duration = u16)]
     pub time: Duration,
 
     /// State flags to set

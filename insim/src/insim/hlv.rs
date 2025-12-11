@@ -37,7 +37,7 @@ pub struct Hlv {
     #[insim(pad_after = 1)]
     pub hlvc: Hlvc,
 
-    #[insim(duration(milliseconds = u32))]
+    #[insim(duration = u32)]
     /// When the violation occurred. Warning: this is looping.
     pub time: Duration,
 
