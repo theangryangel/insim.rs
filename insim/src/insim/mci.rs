@@ -21,6 +21,9 @@ bitflags! {
         /// This car is slow or stopped and in a dangerous place
         const YELLOW = (1 << 1);
 
+        /// This car is outside the path
+        const OOB = (1 << 2);
+
         /// This car is lagging (missing or delayed position packets)
         const LAG = (1 << 5);
 
@@ -39,7 +42,8 @@ generate_bitflag_helpers! {
     pub has_yellow_flag => YELLOW,
     pub is_lagging => LAG,
     pub is_first => FIRST,
-    pub is_last => LAST
+    pub is_last => LAST,
+    pub out_of_bounds => OOB
 }
 
 impl_bitflags_from_to_bytes!(CompCarInfo, u8);

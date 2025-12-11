@@ -1,4 +1,5 @@
-// con is a reserved word. Do not name this file `con.rs`.
+// XXX: `con` is a reserved word on Windows.
+// Do not name this file `con.rs`.
 use std::time::Duration;
 
 use bytes::{Buf, BufMut};
@@ -244,8 +245,8 @@ impl Decode for Con {
         buf.advance(1);
         let spclose = spclose_strip_high_bits(u16::decode(buf)?);
         let spclose = Speed::new(spclose);
-        let time = u16::decode(buf)? as u64;
-        let time = Duration::from_millis(time * 10);
+        let time = u32::decode(buf)? as u64;
+        let time = Duration::from_millis(time);
 
         let a = ConInfo::decode(buf)?;
         let b = ConInfo::decode(buf)?;
@@ -265,7 +266,7 @@ impl Encode for Con {
         self.reqi.encode(buf)?;
         buf.put_bytes(0, 1);
         spclose_strip_high_bits(self.spclose.into_inner()).encode(buf)?;
-        match TryInto::<u16>::try_into(self.time.as_millis() / 10) {
+        match TryInto::<u32>::try_into(self.time.as_millis()) {
             Ok(time) => time.encode(buf)?,
             Err(_) => return Err(insim_core::EncodeError::TooLarge),
         }

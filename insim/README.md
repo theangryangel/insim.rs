@@ -2,6 +2,8 @@ A friendly, Rust idiomatic library for the InSim protocol used by [Live for Spee
 
 The focus of this library is providing a high level, strongly typed, primitives that are difficult to misuse and have reasonable performance, rather than be a thin layer over a series of bytes.
 
+We prioritise compatibility with the latest LFS protocol specifications. Given LFS is now effectively in an evergreen release cycle, support for superseded protocol versions is systematically removed in new releases, which is a key measure for reducing technical debt and maintenance burden.
+
 Where possible this crate aligns the naming of fields in packets to match the [original Insim specification](https://en.lfsmanual.net/wiki/InSim.txt).
 
 In a handful of circumstances we have needed to rename, or separate some fields to align with the crate's key focus.

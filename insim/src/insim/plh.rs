@@ -2,7 +2,7 @@ use insim_core::{Decode, Encode};
 
 use crate::identifiers::{PlayerId, RequestId};
 
-const PLH_MAX_PLAYERS: usize = 40;
+const PLH_MAX_PLAYERS: usize = 48;
 
 bitflags::bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]

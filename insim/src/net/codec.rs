@@ -1,9 +1,12 @@
-use std::time::{Duration, Instant};
+use std::{
+    io,
+    time::{Duration, Instant},
+};
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use insim_core::{Decode, Encode};
 
-use super::{DEFAULT_TIMEOUT_SECS, mode::Mode};
+use super::DEFAULT_TIMEOUT_SECS;
 use crate::{
     DEFAULT_BUFFER_CAPACITY, Error, VERSION, WithRequestId,
     identifiers::RequestId,
@@ -11,6 +14,9 @@ use crate::{
     packet::Packet,
     result::Result,
 };
+
+const MAX_PACKET_SIZE: usize = 1020;
+const MIN_PACKET_SIZE: usize = 4;
 
 /// Handles the encoding and decoding of Insim packets to and from raw bytes.
 /// It automatically handles the encoding of the total size of the packet, and the packet
@@ -24,26 +30,25 @@ use crate::{
 /// [crate::net::DEFAULT_TIMEOUT_SECS].
 #[derive(Debug)]
 pub struct Codec {
-    mode: Mode,
     timeout_at: Instant,
     keepalive: bool,
     buffer: BytesMut,
 }
 
+impl Default for Codec {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Codec {
-    /// Create a new Codec, with a given [Mode].
-    pub fn new(mode: Mode) -> Self {
+    /// Create a new Codec
+    pub fn new() -> Self {
         Self {
-            mode,
             timeout_at: Instant::now() + Duration::from_secs(DEFAULT_TIMEOUT_SECS),
             keepalive: false,
             buffer: BytesMut::with_capacity(DEFAULT_BUFFER_CAPACITY),
         }
-    }
-
-    /// Return the current [Mode].
-    pub fn mode(&self) -> &Mode {
-        &self.mode
     }
 
     /// Encode a [Packet] into [Bytes].
@@ -57,7 +62,7 @@ impl Codec {
         // encode the message
         msg.encode(&mut buf)?;
 
-        let n = self.mode().encode_length(buf.len())?;
+        let n = self.encode_length(buf.len())?;
 
         // populate the size
         buf[0] = n;
@@ -84,7 +89,7 @@ impl Codec {
             return Ok(None);
         }
 
-        let n = match self.mode().decode_length(&self.buffer)? {
+        let n = match self.decode_length(&self.buffer)? {
             Some(n) => n,
             None => {
                 return Ok(None);
@@ -158,6 +163,69 @@ impl Codec {
             None
         }
     }
+
+    /// Given a single packet in dst, encode it's length, and ensure that it does not
+    /// exceed maximum limits
+    #[tracing::instrument]
+    fn encode_length(&self, len: usize) -> io::Result<u8> {
+        if len < MIN_PACKET_SIZE {
+            // probably a programming error. lets bail.
+            panic!("Failed to encode any data. Possible programming error.");
+        }
+
+        let n = if let Some(0) = len.checked_rem(4) {
+            len / 4
+        } else {
+            // probably a programming error, lets bail.
+            panic!(
+                "Packet length is not divisible by 4!
+                This is probably a programming error."
+            );
+        };
+
+        if n > MAX_PACKET_SIZE {
+            // probably a programming error. lets bail.
+            panic!(
+                "Provided length would overflow the maximum byte size of {}.
+                This is probably a programming error, or a change in the
+                packet definition.",
+                MAX_PACKET_SIZE
+            );
+        }
+
+        Ok(n as u8)
+    }
+
+    /// Decode the length of the next packet in the buffer src, ensuring that it does
+    /// not exceed limits.
+    #[tracing::instrument]
+    fn decode_length(&self, src: &BytesMut) -> io::Result<Option<usize>> {
+        if src.len() < MIN_PACKET_SIZE {
+            // Not enough data for even the header
+            return Ok(None);
+        }
+
+        // get the size of this packet
+        let n = match src.first() {
+            Some(n) => (*n as usize) * 4,
+            None => return Ok(None),
+        };
+
+        // does this exceed the max possible packet?
+        if n > MAX_PACKET_SIZE {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "frame exceeds max_bytes",
+            ));
+        }
+
+        if src.len() < n {
+            // We dont have a full packet yet
+            return Ok(None);
+        }
+
+        Ok(Some(n))
+    }
 }
 
 #[cfg(test)]
@@ -175,7 +243,7 @@ mod tests {
     #[tokio::test]
     /// Ensure that Codec can decode a basic small packet
     async fn read_tiny_ping() {
-        let mut codec = Codec::new(Mode::Compressed);
+        let mut codec = Codec::new();
         codec.feed(
             // Packet::Tiny, subtype TinyType::Ping, compressed, reqi=2
             &[1, 3, 2, 3],
@@ -202,7 +270,7 @@ mod tests {
             &[1, 3, 2, 3],
         );
 
-        let codec = Codec::new(Mode::Compressed);
+        let codec = Codec::new();
         let buf = codec.encode(&Packet::Tiny(Tiny {
             subt: TinyType::Ping,
             reqi: RequestId(2),

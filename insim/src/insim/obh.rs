@@ -135,7 +135,7 @@ impl Decode for Obh {
         // automatically strip off the first 4 bits as they're reserved
         let spclose = spclose_strip_high_bits(u16::decode(buf)?);
         let spclose = Speed::new(spclose);
-        let time = Duration::from_millis((u16::decode(buf)? as u64) * 10);
+        let time = Duration::from_millis(u32::decode(buf)? as u64);
         let c = CarContact::decode(buf)?;
         let x = i16::decode(buf)?;
         let y = i16::decode(buf)?;
@@ -164,7 +164,7 @@ impl Encode for Obh {
         self.plid.encode(buf)?;
         // automatically strip off the first 4 bits as they're reserved
         spclose_strip_high_bits(self.spclose.into_inner()).encode(buf)?;
-        match u16::try_from(self.time.as_millis() / 10) {
+        match u32::try_from(self.time.as_millis()) {
             Ok(time) => time.encode(buf)?,
             Err(_) => return Err(insim_core::EncodeError::TooLarge),
         }
@@ -192,8 +192,10 @@ mod tests {
                 3,   // plid
                 23,  // spclose (1)
                 0,   // spclose (2)
-                241, // time (1)
-                1,   // time (2)
+                106, // time (1)
+                19,  // time (2)
+                0,   // time (3)
+                0,   // time (4)
                 2,   // c - direction
                 254, // c - heading
                 3,   // c - speed
