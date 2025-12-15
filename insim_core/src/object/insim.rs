@@ -1,14 +1,17 @@
-use crate::object::marshal::MarshalKind;
+//! Insim objects
 
-use super::ObjectVariant;
-
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+/// Insim Checkpoint Kind
 pub enum InsimCheckpointKind {
     #[default]
+    /// Finish line
     Finish = 0,
+    /// Checkpoint 1
     Checkpoint1 = 1,
+    /// Checkpoint 2
     Checkpoint2 = 2,
+    /// Checkpoint 3
     Checkpoint3 = 3,
 }
 
@@ -26,7 +29,6 @@ impl TryFrom<u8> for InsimCheckpointKind {
     }
 }
 
-
 /// InsimCheckpoint
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -39,8 +41,8 @@ pub struct InsimCheckpoint {
     pub floating: bool,
 }
 
-impl ObjectVariant for InsimCheckpoint {
-    fn encode(&self) -> Result<(u8, u8), crate::EncodeError> {
+impl InsimCheckpoint {
+    pub(crate) fn encode(&self) -> Result<(u8, u8), crate::EncodeError> {
         let mut flags = 0;
         flags |= self.kind as u8;
         if self.floating {
@@ -49,8 +51,8 @@ impl ObjectVariant for InsimCheckpoint {
         Ok((flags, self.heading))
     }
 
-    fn decode(flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
-        let kind = MarshalKind::try_from(flags)?;
+    pub(crate) fn decode(flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
+        let kind = InsimCheckpointKind::try_from(flags)?;
         let floating = flags & 0x80 != 0;
         Ok(Self {
             kind,
@@ -60,8 +62,7 @@ impl ObjectVariant for InsimCheckpoint {
     }
 }
 
-
-/// InsimCheckpoint
+/// Insim Circle
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct InsimCircle {
@@ -71,8 +72,8 @@ pub struct InsimCircle {
     pub floating: bool,
 }
 
-impl ObjectVariant for InsimCircle {
-    fn encode(&self) -> Result<(u8, u8), crate::EncodeError> {
+impl InsimCircle {
+    pub(crate) fn encode(&self) -> Result<(u8, u8), crate::EncodeError> {
         let mut flags = 0;
         if self.floating {
             flags |= 0x80;
@@ -80,7 +81,7 @@ impl ObjectVariant for InsimCircle {
         Ok((flags, self.index))
     }
 
-    fn decode(flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
+    pub(crate) fn decode(flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
         let floating = flags & 0x80 != 0;
         Ok(Self {
             index: heading,
@@ -88,4 +89,3 @@ impl ObjectVariant for InsimCircle {
         })
     }
 }
-

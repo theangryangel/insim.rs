@@ -1,14 +1,20 @@
-use super::ObjectVariant;
+//! Marshal objects
 
+#[derive(Debug, Clone, PartialEq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+/// Marshal
 pub struct Marshal {
+    /// Kind of Marshal
     pub kind: MarshalKind,
+    /// Heading
     pub heading: u8,
+    /// Floating?
     pub floating: bool,
 }
 
-impl ObjectVariant for Marshal {
-    fn encode(&self) -> Result<(u8, u8), crate::EncodeError> {
-        let mut flags: u8 = self.kind.into();
+impl Marshal {
+    pub(crate) fn encode(&self) -> Result<(u8, u8), crate::EncodeError> {
+        let mut flags: u8 = self.kind as u8;
         if self.floating {
             flags |= 0x80;
         }
@@ -16,12 +22,14 @@ impl ObjectVariant for Marshal {
         Ok((flags, self.heading))
     }
 
-    fn decode(flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
+    pub(crate) fn decode(flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
         let kind = MarshalKind::try_from(flags)?;
         let floating = flags & 0x80 != 0;
 
         Ok(Self {
-            kind, heading, floating
+            kind,
+            heading,
+            floating,
         })
     }
 }
@@ -46,7 +54,7 @@ impl TryFrom<u8> for MarshalKind {
             0 => Ok(MarshalKind::Standing),
             1 => Ok(MarshalKind::Left),
             2 => Ok(MarshalKind::Right),
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 }
@@ -61,10 +69,9 @@ pub struct RestrictedArea {
     pub floating: bool,
 }
 
-impl ObjectVariant for RestrictedArea {
-    fn encode(&self) -> Result<(u8, u8), crate::EncodeError> {
+impl RestrictedArea {
+    pub(crate) fn encode(&self) -> Result<(u8, u8), crate::EncodeError> {
         let mut flags = 0;
-        flags |= self.marshall as u8;
         flags |= self.radius << 2;
         if self.floating {
             flags |= 0x80;
@@ -72,13 +79,10 @@ impl ObjectVariant for RestrictedArea {
         Ok((flags, 0))
     }
 
-    fn decode(flags: u8, _heading: u8) -> Result<Self, crate::DecodeError> {
+    pub(crate) fn decode(flags: u8, _heading: u8) -> Result<Self, crate::DecodeError> {
         let radius = (flags >> 2) & 0b11111;
         let floating = flags & 0x80 != 0;
-        Ok(Self {
-            radius,
-            floating,
-        })
+        Ok(Self { radius, floating })
     }
 }
 
@@ -94,8 +98,8 @@ pub struct RouteChecker {
     pub floating: bool,
 }
 
-impl ObjectVariant for RouteChecker {
-    fn encode(&self) -> Result<(u8, u8), crate::EncodeError> {
+impl RouteChecker {
+    pub(crate) fn encode(&self) -> Result<(u8, u8), crate::EncodeError> {
         let mut flags = 0;
         flags |= (self.radius << 2) & 0b11111;
         if self.floating {
@@ -104,7 +108,7 @@ impl ObjectVariant for RouteChecker {
         Ok((flags, self.index))
     }
 
-    fn decode(flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
+    pub(crate) fn decode(flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
         let radius = (flags >> 2) & 0b11111;
         let floating = flags & 0x80 != 0;
         Ok(Self {

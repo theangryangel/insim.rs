@@ -1,5 +1,43 @@
 //! Control objects
-use super::{ObjectCodec, ObjectPosition};
+use super::ObjectVariant;
+use crate::DecodeError;
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[repr(u8)]
+#[allow(missing_docs)]
+#[non_exhaustive]
+/// Tyre Kind
+pub enum TyreStackKind {
+    #[default]
+    Single = 46,
+    Stack2,
+    Stack3,
+    Stack4,
+    SingleBig,
+    Stack2Big,
+    Stack3Big,
+    Stack4Big,
+}
+
+impl TryFrom<u8> for TyreStackKind {
+    type Error = DecodeError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            46 => Ok(Self::Single),
+            47 => Ok(Self::Stack2),
+            48 => Ok(Self::Stack3),
+            49 => Ok(Self::Stack4),
+            50 => Ok(Self::SingleBig),
+            51 => Ok(Self::Stack2Big),
+            52 => Ok(Self::Stack3Big),
+            found => Err(DecodeError::NoVariantMatch {
+                found: found as u64,
+            }),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -39,8 +77,8 @@ impl From<u8> for TyreStackColour {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TyreStack {
-    /// XYZ position
-    pub xyz: ObjectPosition,
+    /// Kind
+    pub kind: TyreStackKind,
     /// Colour
     pub colour: TyreStackColour,
     /// Heading / Direction
@@ -49,21 +87,22 @@ pub struct TyreStack {
     pub floating: bool,
 }
 
-impl ObjectCodec for TyreStack {
-    fn encode(&self) -> Result<(&ObjectPosition, u8, u8), crate::EncodeError> {
+impl ObjectVariant for TyreStack {
+    fn encode(&self) -> Result<(u8, u8, u8), crate::EncodeError> {
         let mut flags = 0;
         flags |= self.colour as u8 & 0x07;
         if self.floating {
             flags |= 0x80;
         }
-        Ok((&self.xyz, flags, self.heading))
+        Ok((self.kind as u8, flags, self.heading))
     }
 
-    fn decode(xyz: ObjectPosition, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
+    fn decode(index: u8, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
+        let kind = TyreStackKind::try_from(index)?;
         let colour = TyreStackColour::from(flags & 0x07);
         let floating = flags & 0x80 != 0;
         Ok(Self {
-            xyz,
+            kind,
             colour,
             heading,
             floating,
