@@ -3,7 +3,8 @@
 //! LSPs/editors to very clearly indicate to users of the library what is valid and what is not.
 //! Whilst this makes it feel slightly awkward, it is an intentional productivity boost.
 
-use super::{ObjectCodec, ObjectPosition};
+use super::ObjectVariant;
+use crate::DecodeError;
 
 /// Represents Width and Length (2m, 4m, 8m, 16m)
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -92,6 +93,55 @@ impl TryFrom<u8> for Colour {
             }),
         }
     }
+}
+
+/// Concrete kind variants
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[non_exhaustive]
+pub enum ConcreteKind {
+    /// Slab (width, length, pitch)
+    Slab(Slab),
+    /// Ramp (width, length, height)
+    Ramp(Ramp),
+    /// Wall (colour, length, height)
+    Wall(Wall),
+    /// Pillar (size x, size y, height)
+    Pillar(Pillar),
+    /// Slab wall (colour, length, pitch)
+    SlabWall(SlabWall),
+    /// Ramp wall (colour, length, height)
+    RampWall(RampWall),
+    /// Short slab wall (colour, size y, pitch)
+    ShortSlabWall(ShortSlabWall),
+    /// Wedge (colour, length, angle)
+    Wedge(Wedge),
+}
+
+impl ConcreteKind {
+    /// Get index for this concrete kind
+    pub fn index(&self) -> u8 {
+        match self {
+            ConcreteKind::Slab(_) => 172,
+            ConcreteKind::Ramp(_) => 173,
+            ConcreteKind::Wall(_) => 174,
+            ConcreteKind::Pillar(_) => 175,
+            ConcreteKind::SlabWall(_) => 176,
+            ConcreteKind::RampWall(_) => 177,
+            ConcreteKind::ShortSlabWall(_) => 178,
+            ConcreteKind::Wedge(_) => 179,
+        }
+    }
+}
+
+/// Unified Concrete object
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct Concrete {
+    /// Kind of concrete object
+    pub kind: ConcreteKind,
+    /// Heading / Direction
+    pub heading: u8,
 }
 
 /// Represents Height in 0.25m steps (0.25m to 4.0m)
@@ -262,243 +312,221 @@ impl TryFrom<u8> for Angle {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Slab {
-    /// XYZ position
-    pub xyz: ObjectPosition,
     /// Width
     pub width: WidthLength,
     /// Length
     pub length: WidthLength,
     /// Pitch
     pub pitch: Pitch,
-    /// Heading / Direction
-    pub heading: u8,
 }
 
-/// Ramps and Slabs are the same
-pub type Ramp = Slab;
-
-impl ObjectCodec for Slab {
-    fn encode(&self) -> Result<(&ObjectPosition, u8, u8), crate::EncodeError> {
-        let mut flags = 0;
-        flags |= self.width as u8 & 0x03;
-        flags |= (self.length as u8 & 0x03) << 2;
-        flags |= (self.pitch as u8 & 0x0f) << 4;
-        Ok((&self.xyz, flags, self.heading))
-    }
-
-    fn decode(xyz: ObjectPosition, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
-        let width = WidthLength::try_from(flags & 0x03)?;
-        let length = WidthLength::try_from((flags & 0x0c) >> 2)?;
-        let pitch = Pitch::try_from((flags & 0xf0) >> 4)?;
-        Ok(Self {
-            xyz,
-            width,
-            length,
-            pitch,
-            heading,
-        })
-    }
+/// Ramp
+#[derive(Debug, Clone, PartialEq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct Ramp {
+    /// Width
+    pub width: WidthLength,
+    /// Length
+    pub length: WidthLength,
+    /// Height
+    pub height: Height,
 }
 
 /// Wall
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Wall {
-    /// XYZ position
-    pub xyz: ObjectPosition,
     /// Colour
     pub colour: Colour,
     /// Length
     pub length: WidthLength,
     /// Height
     pub height: Height,
-    /// Heading / Direction
-    pub heading: u8,
 }
 
 /// Ramp Wall
 pub type RampWall = Wall;
 
-impl ObjectCodec for Wall {
-    fn encode(&self) -> Result<(&ObjectPosition, u8, u8), crate::EncodeError> {
-        let mut flags = 0;
-        flags |= self.colour as u8 & 0x03;
-        flags |= (self.length as u8 & 0x03) << 2;
-        flags |= (self.height as u8 & 0x0f) << 4;
-        Ok((&self.xyz, flags, self.heading))
-    }
-
-    fn decode(xyz: ObjectPosition, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
-        let colour = Colour::try_from(flags & 0x03)?;
-        let length = WidthLength::try_from((flags & 0x0c) >> 2)?;
-        let height = Height::try_from((flags & 0xf0) >> 4)?;
-
-        Ok(Self {
-            xyz,
-            colour,
-            length,
-            height,
-            heading,
-        })
-    }
-}
-
 /// Pillar
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Pillar {
-    /// XYZ position
-    pub xyz: ObjectPosition,
     /// SizeX
     pub x: Size,
     /// SizeY
     pub y: Size,
     /// Height
     pub height: Height,
-    /// Heading / Direction
-    pub heading: u8,
-}
-
-impl ObjectCodec for Pillar {
-    fn encode(&self) -> Result<(&ObjectPosition, u8, u8), crate::EncodeError> {
-        let mut flags = 0;
-        flags |= self.x as u8 & 0x03;
-        flags |= (self.y as u8 & 0x03) << 2;
-        flags |= (self.height as u8 & 0x0f) << 4;
-        Ok((&self.xyz, flags, self.heading))
-    }
-
-    fn decode(xyz: ObjectPosition, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
-        let x = Size::try_from(flags & 0x03)?;
-        let y = Size::try_from((flags & 0xfc) >> 2)?;
-        let height = Height::try_from((flags & 0xf0) >> 4)?;
-
-        Ok(Self {
-            xyz,
-            x,
-            y,
-            height,
-            heading,
-        })
-    }
 }
 
 /// SlabWall
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SlabWall {
-    /// XYZ position
-    pub xyz: ObjectPosition,
     /// Colour
     pub colour: Colour,
     /// Length
     pub length: WidthLength,
-    /// Pithc
+    /// Pitch
     pub pitch: Pitch,
-    /// Heading / Direction
-    pub heading: u8,
-}
-
-impl ObjectCodec for SlabWall {
-    fn encode(&self) -> Result<(&ObjectPosition, u8, u8), crate::EncodeError> {
-        let mut flags = 0;
-        flags |= self.colour as u8 & 0x03;
-        flags |= (self.length as u8 & 0x03) << 2;
-        flags |= (self.pitch as u8 & 0x0f) << 4;
-        Ok((&self.xyz, flags, self.heading))
-    }
-
-    fn decode(xyz: ObjectPosition, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
-        let colour = Colour::try_from(flags & 0x03)?;
-        let length = WidthLength::try_from((flags & 0x0c) >> 2)?;
-        let pitch = Pitch::try_from((flags & 0xf0) >> 4)?;
-
-        Ok(Self {
-            xyz,
-            colour,
-            length,
-            pitch,
-            heading,
-        })
-    }
 }
 
 /// ShortSlabWall
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ShortSlabWall {
-    /// XYZ position
-    pub xyz: ObjectPosition,
     /// Colour
     pub colour: Colour,
     /// Size Y
     pub y: Size,
     /// Pitch
     pub pitch: Pitch,
-    /// Heading / Direction
-    pub heading: u8,
-}
-
-impl ObjectCodec for ShortSlabWall {
-    fn encode(&self) -> Result<(&ObjectPosition, u8, u8), crate::EncodeError> {
-        let mut flags = 0;
-        flags |= self.colour as u8 & 0x03;
-        flags |= (self.y as u8 & 0x03) << 2;
-        flags |= (self.pitch as u8 & 0x0f) << 4;
-        Ok((&self.xyz, flags, self.heading))
-    }
-
-    fn decode(xyz: ObjectPosition, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
-        let colour = Colour::try_from(flags & 0x03)?;
-        let y = Size::try_from((flags & 0x0c) >> 2)?;
-        let pitch = Pitch::try_from((flags & 0xf0) >> 4)?;
-
-        Ok(Self {
-            xyz,
-            colour,
-            y,
-            pitch,
-            heading,
-        })
-    }
 }
 
 /// Wedge
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Wedge {
-    /// XYZ position
-    pub xyz: ObjectPosition,
     /// Colour
     pub colour: Colour,
     /// Length
     pub length: WidthLength,
     /// Angle
     pub angle: Angle,
-    /// Heading / Direction
-    pub heading: u8,
 }
 
-impl ObjectCodec for Wedge {
-    fn encode(&self) -> Result<(&ObjectPosition, u8, u8), crate::EncodeError> {
+impl ObjectVariant for Concrete {
+    fn encode(&self) -> Result<(u8, u8, u8), crate::EncodeError> {
+        let index = self.kind.index();
         let mut flags = 0;
-        flags |= self.colour as u8 & 0x03;
-        flags |= (self.length as u8 & 0x03) << 2;
-        flags |= (self.angle as u8 & 0x0f) << 4;
-        Ok((&self.xyz, flags, self.heading))
+
+        match &self.kind {
+            ConcreteKind::Slab(slab) => {
+                flags |= slab.width as u8 & 0x03;
+                flags |= (slab.length as u8 & 0x03) << 2;
+                flags |= (slab.pitch as u8 & 0x0f) << 4;
+            },
+            ConcreteKind::Ramp(ramp) => {
+                flags |= ramp.width as u8 & 0x03;
+                flags |= (ramp.length as u8 & 0x03) << 2;
+                flags |= (ramp.height as u8 & 0x0f) << 4;
+            },
+            ConcreteKind::Wall(wall) => {
+                flags |= wall.colour as u8 & 0x03;
+                flags |= (wall.length as u8 & 0x03) << 2;
+                flags |= (wall.height as u8 & 0x0f) << 4;
+            },
+            ConcreteKind::Pillar(pillar) => {
+                flags |= pillar.x as u8 & 0x03;
+                flags |= (pillar.y as u8 & 0x03) << 2;
+                flags |= (pillar.height as u8 & 0x0f) << 4;
+            },
+            ConcreteKind::SlabWall(slab_wall) => {
+                flags |= slab_wall.colour as u8 & 0x03;
+                flags |= (slab_wall.length as u8 & 0x03) << 2;
+                flags |= (slab_wall.pitch as u8 & 0x0f) << 4;
+            },
+            ConcreteKind::RampWall(ramp_wall) => {
+                flags |= ramp_wall.colour as u8 & 0x03;
+                flags |= (ramp_wall.length as u8 & 0x03) << 2;
+                flags |= (ramp_wall.height as u8 & 0x0f) << 4;
+            },
+            ConcreteKind::ShortSlabWall(short_slab_wall) => {
+                flags |= short_slab_wall.colour as u8 & 0x03;
+                flags |= (short_slab_wall.y as u8 & 0x03) << 2;
+                flags |= (short_slab_wall.pitch as u8 & 0x0f) << 4;
+            },
+            ConcreteKind::Wedge(wedge) => {
+                flags |= wedge.colour as u8 & 0x03;
+                flags |= (wedge.length as u8 & 0x03) << 2;
+                flags |= (wedge.angle as u8 & 0x0f) << 4;
+            },
+        }
+
+        Ok((index, flags, self.heading))
     }
 
-    fn decode(xyz: ObjectPosition, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
-        let colour = Colour::try_from(flags & 0x03)?;
-        let length = WidthLength::try_from((flags & 0x0c) >> 2)?;
-        let angle = Angle::try_from((flags & 0xf0) >> 4)?;
+    fn decode(index: u8, flags: u8, heading: u8) -> Result<Self, DecodeError> {
+        let kind = match index {
+            172 => {
+                let width = WidthLength::try_from(flags & 0x03)?;
+                let length = WidthLength::try_from((flags & 0x0c) >> 2)?;
+                let pitch = Pitch::try_from((flags & 0xf0) >> 4)?;
+                ConcreteKind::Slab(Slab {
+                    width,
+                    length,
+                    pitch,
+                })
+            },
+            173 => {
+                let width = WidthLength::try_from(flags & 0x03)?;
+                let length = WidthLength::try_from((flags & 0x0c) >> 2)?;
+                let height = Height::try_from((flags & 0xf0) >> 4)?;
+                ConcreteKind::Ramp(Ramp {
+                    width,
+                    length,
+                    height,
+                })
+            },
+            174 => {
+                let colour = Colour::try_from(flags & 0x03)?;
+                let length = WidthLength::try_from((flags & 0x0c) >> 2)?;
+                let height = Height::try_from((flags & 0xf0) >> 4)?;
+                ConcreteKind::Wall(Wall {
+                    colour,
+                    length,
+                    height,
+                })
+            },
+            175 => {
+                let x = Size::try_from(flags & 0x03)?;
+                let y = Size::try_from((flags & 0x0c) >> 2)?;
+                let height = Height::try_from((flags & 0xf0) >> 4)?;
+                ConcreteKind::Pillar(Pillar { x, y, height })
+            },
+            176 => {
+                let colour = Colour::try_from(flags & 0x03)?;
+                let length = WidthLength::try_from((flags & 0x0c) >> 2)?;
+                let pitch = Pitch::try_from((flags & 0xf0) >> 4)?;
+                ConcreteKind::SlabWall(SlabWall {
+                    colour,
+                    length,
+                    pitch,
+                })
+            },
+            177 => {
+                let colour = Colour::try_from(flags & 0x03)?;
+                let length = WidthLength::try_from((flags & 0x0c) >> 2)?;
+                let height = Height::try_from((flags & 0xf0) >> 4)?;
+                ConcreteKind::RampWall(RampWall {
+                    colour,
+                    length,
+                    height,
+                })
+            },
+            178 => {
+                let colour = Colour::try_from(flags & 0x03)?;
+                let y = Size::try_from((flags & 0x0c) >> 2)?;
+                let pitch = Pitch::try_from((flags & 0xf0) >> 4)?;
+                ConcreteKind::ShortSlabWall(ShortSlabWall { colour, y, pitch })
+            },
+            179 => {
+                let colour = Colour::try_from(flags & 0x03)?;
+                let length = WidthLength::try_from((flags & 0x0c) >> 2)?;
+                let angle = Angle::try_from((flags & 0xf0) >> 4)?;
+                ConcreteKind::Wedge(Wedge {
+                    colour,
+                    length,
+                    angle,
+                })
+            },
+            _ => {
+                return Err(DecodeError::NoVariantMatch {
+                    found: index as u64,
+                });
+            },
+        };
 
-        Ok(Self {
-            xyz,
-            colour,
-            length,
-            angle,
-            heading,
-        })
+        Ok(Concrete { kind, heading })
     }
 }

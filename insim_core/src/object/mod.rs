@@ -1,13 +1,31 @@
 //! Objects are used in both insim and lyt files
 
+pub mod armco;
+pub mod bale;
+pub mod banner;
+pub mod barrier;
+pub mod bin;
 pub mod chalk;
-// pub mod concrete;
+pub mod concrete;
 pub mod cone;
 pub mod control;
 pub mod insim;
+pub mod kerb;
+pub mod letterboard;
+pub mod marker;
+pub mod marquee;
 pub mod marshal;
 pub mod painted;
+pub mod pit;
+pub mod post;
+pub mod railing;
+pub mod ramp;
+pub mod sign;
+pub mod speed_hump;
+pub mod start_lights;
+pub mod start_position;
 pub mod tyre;
+pub mod vehicle;
 
 use crate::{Decode, DecodeError, Encode, EncodeError};
 
@@ -49,64 +67,64 @@ pub enum ObjectKind {
     TyreStack(tyre::TyreStack),
 
     /// Corner Marker
-    MarkerCorner(),
+    MarkerCorner(marker::MarkerCorner),
 
     /// Distance Marker
-    MarkerDistance(),
+    MarkerDistance(marker::MarkerDistance),
 
     /// Letterboard
-    Letterboard(),
+    Letterboard(letterboard::Letterboard),
 
     /// Armco
-    Armco(),
+    Armco(armco::Armco),
 
     /// Barriers
-    Barrier(),
+    Barrier(barrier::Barrier),
 
     /// Banner
-    Banner(),
+    Banner(banner::Banner),
 
     /// Ramp
-    Ramp(),
+    Ramp(ramp::Ramp),
 
     /// Vehicle
-    Veh(),
+    Veh(vehicle::Vehicle),
 
     /// Speed hump
-    SpeedHump(),
+    SpeedHump(speed_hump::SpeedHump),
 
     /// Kerb
-    Kerb(),
+    Kerb(kerb::Kerb),
 
     /// Post
-    Post(),
+    Post(post::Post),
 
     /// Marquee
-    Marquee(),
+    Marquee(marquee::Marquee),
 
     /// Bale
-    Bale(),
+    Bale(bale::Bale),
 
     /// Bin1 + Bin2
-    Bin(),
+    Bin(bin::Bin),
 
     /// Railings
-    Railing(),
+    Railing(railing::Railing),
 
     /// Start lights 1-3
-    StartLights(),
+    StartLights(start_lights::StartLights),
 
     /// Metal sign, Chevron Left, Chevron Right, Speed
-    Sign(),
+    Sign(sign::Sign),
 
     /// Concrete
-    Concrete,
+    Concrete(concrete::Concrete),
 
     /// Start position
-    StartPosition(),
+    StartPosition(start_position::StartPosition),
 
     /// Pit Startpoint + box
-    Pit(),
+    Pit(pit::Pit),
 
     /// Marshal
     Marshal(marshal::Marshal),
@@ -142,6 +160,11 @@ impl Decode for ObjectInfo {
 
         let kind = match index {
             0 => ObjectKind::Control(control::Control::decode(flags, heading)?),
+            240 => ObjectKind::Marshal(marshal::Marshal::decode(flags, heading)?),
+            252 => ObjectKind::InsimCheckpoint(insim::InsimCheckpoint::decode(flags, heading)?),
+            253 => ObjectKind::InsimCircle(insim::InsimCircle::decode(flags, heading)?),
+            254 => ObjectKind::RestrictedArea(marshal::RestrictedArea::decode(flags, heading)?),
+            255 => ObjectKind::RouteChecker(marshal::RouteChecker::decode(flags, heading)?),
 
             4..=13 => ObjectKind::Chalk(chalk::Chalk::decode(index, flags, heading)?),
             16 => ObjectKind::PaintLetters(painted::Letters::decode(index, flags, heading)?),
@@ -150,114 +173,36 @@ impl Decode for ObjectInfo {
 
             48..=55 => ObjectKind::TyreStack(tyre::TyreStack::decode(index, flags, heading)?),
 
-            62 =>
-            /* MarkerCorner */
-            {
-                todo!()
+            62 => ObjectKind::MarkerCorner(marker::MarkerCorner::decode(index, flags, heading)?),
+            84 => {
+                ObjectKind::MarkerDistance(marker::MarkerDistance::decode(index, flags, heading)?)
             },
-            84 =>
-            /* MarkerDistance */
-            {
-                todo!()
+            92..=93 => {
+                ObjectKind::Letterboard(letterboard::Letterboard::decode(index, flags, heading)?)
             },
-            92..=93 =>
-            /* Letterboard */
-            {
-                todo!()
+            96..=98 => ObjectKind::Armco(armco::Armco::decode(index, flags, heading)?),
+            104..=106 => ObjectKind::Barrier(barrier::Barrier::decode(index, flags, heading)?),
+            112 => ObjectKind::Banner(banner::Banner::decode(index, flags, heading)?),
+            120..=121 => ObjectKind::Ramp(ramp::Ramp::decode(index, flags, heading)?),
+            124..=127 => ObjectKind::Veh(vehicle::Vehicle::decode(index, flags, heading)?),
+            128..=131 => {
+                ObjectKind::SpeedHump(speed_hump::SpeedHump::decode(index, flags, heading)?)
             },
-            96..=98 =>
-            /* Armco */
-            {
-                todo!()
+            132 => ObjectKind::Kerb(kerb::Kerb::decode(index, flags, heading)?),
+            136 => ObjectKind::Post(post::Post::decode(index, flags, heading)?),
+            140 => ObjectKind::Marquee(marquee::Marquee::decode(index, flags, heading)?),
+            144 => ObjectKind::Bale(bale::Bale::decode(index, flags, heading)?),
+            145..=146 => ObjectKind::Bin(bin::Bin::decode(index, flags, heading)?),
+            147..=148 => ObjectKind::Railing(railing::Railing::decode(index, flags, heading)?),
+            149..=151 => {
+                ObjectKind::StartLights(start_lights::StartLights::decode(index, flags, heading)?)
             },
-            104..=106 =>
-            /* Barrier */
-            {
-                todo!()
-            },
-            112 =>
-            /* Banner */
-            {
-                todo!()
-            },
-            120..=121 =>
-            /* Ramp */
-            {
-                todo!()
-            },
-            124..=127 =>
-            /* Vehicles */
-            {
-                todo!()
-            },
-            128..=131 =>
-            /* SpeedHump */
-            {
-                todo!()
-            },
-            132 =>
-            /* Kerb */
-            {
-                todo!()
-            },
-            136 =>
-            /* Post */
-            {
-                todo!()
-            },
-            140 =>
-            /* Marquee */
-            {
-                todo!()
-            },
-            144 =>
-            /* Bale */
-            {
-                todo!()
-            },
-            145..=146 =>
-            /* Bin */
-            {
-                todo!()
-            },
-            147..=148 =>
-            /* Railings */
-            {
-                todo!()
-            },
-            149..=151 =>
-            /* StartLights */
-            {
-                todo!()
-            },
-
-            160 | 164 | 165 | 168 =>
-            /* Signs */
-            {
-                todo!()
-            },
-            172..=179 =>
-            /* Concrete */
-            {
-                todo!()
-            },
-
-            184 =>
-            /* Start Position */
-            {
-                todo!()
-            },
-            185 | 186 =>
-            /* Pit */
-            {
-                todo!()
-            },
-
-            240 => ObjectKind::Marshal(marshal::Marshal::decode(flags, heading)?),
-            252 => ObjectKind::InsimCheckpoint(insim::InsimCheckpoint::decode(flags, heading)?),
-            253 => ObjectKind::InsimCircle(insim::InsimCircle::decode(flags, heading)?),
-            254 => ObjectKind::RestrictedArea(marshal::RestrictedArea::decode(flags, heading)?),
-            255 => ObjectKind::RouteChecker(marshal::RouteChecker::decode(flags, heading)?),
+            160 | 168 => ObjectKind::Sign(sign::Sign::decode(index, flags, heading)?),
+            172..=179 => ObjectKind::Concrete(concrete::Concrete::decode(index, flags, heading)?),
+            184 => ObjectKind::StartPosition(start_position::StartPosition::decode(
+                index, flags, heading,
+            )?),
+            185..=186 => ObjectKind::Pit(pit::Pit::decode(index, flags, heading)?),
 
             _ => {
                 return Err(DecodeError::NoVariantMatch {
@@ -283,11 +228,6 @@ impl Encode for ObjectInfo {
                 let (flags, heading) = control.encode()?;
                 (0, flags, heading)
             },
-            ObjectKind::Chalk(chalk) => chalk.encode()?,
-            ObjectKind::PaintLetters(letters) => letters.encode()?,
-            ObjectKind::PaintArrows(arrows) => arrows.encode()?,
-            ObjectKind::Cone(cone) => cone.encode()?,
-            ObjectKind::TyreStack(tyre_stack) => tyre_stack.encode()?,
             ObjectKind::Marshal(marshal) => {
                 let (flags, heading) = marshal.encode()?;
                 (240, flags, heading)
@@ -308,26 +248,31 @@ impl Encode for ObjectInfo {
                 let (flags, heading) = route_checker.encode()?;
                 (255, flags, heading)
             },
-            ObjectKind::MarkerCorner() => todo!(),
-            ObjectKind::MarkerDistance() => todo!(),
-            ObjectKind::Letterboard() => todo!(),
-            ObjectKind::Armco() => todo!(),
-            ObjectKind::Barrier() => todo!(),
-            ObjectKind::Banner() => todo!(),
-            ObjectKind::Ramp() => todo!(),
-            ObjectKind::Veh() => todo!(),
-            ObjectKind::SpeedHump() => todo!(),
-            ObjectKind::Kerb() => todo!(),
-            ObjectKind::Post() => todo!(),
-            ObjectKind::Marquee() => todo!(),
-            ObjectKind::Bale() => todo!(),
-            ObjectKind::Bin() => todo!(),
-            ObjectKind::Railing() => todo!(),
-            ObjectKind::StartLights() => todo!(),
-            ObjectKind::Sign() => todo!(),
-            ObjectKind::Concrete => todo!(),
-            ObjectKind::StartPosition() => todo!(),
-            ObjectKind::Pit() => todo!(),
+            ObjectKind::Chalk(chalk) => chalk.encode()?,
+            ObjectKind::PaintLetters(letters) => letters.encode()?,
+            ObjectKind::PaintArrows(arrows) => arrows.encode()?,
+            ObjectKind::Cone(cone) => cone.encode()?,
+            ObjectKind::TyreStack(tyre_stack) => tyre_stack.encode()?,
+            ObjectKind::MarkerCorner(marker_corner) => marker_corner.encode()?,
+            ObjectKind::MarkerDistance(marker_distance) => marker_distance.encode()?,
+            ObjectKind::Letterboard(letterboard) => letterboard.encode()?,
+            ObjectKind::Armco(armco) => armco.encode()?,
+            ObjectKind::Barrier(barrier) => barrier.encode()?,
+            ObjectKind::Banner(banner) => banner.encode()?,
+            ObjectKind::Ramp(ramp) => ramp.encode()?,
+            ObjectKind::Veh(veh) => veh.encode()?,
+            ObjectKind::SpeedHump(speed_hump) => speed_hump.encode()?,
+            ObjectKind::Kerb(kerb) => kerb.encode()?,
+            ObjectKind::Post(post) => post.encode()?,
+            ObjectKind::Marquee(marquee) => marquee.encode()?,
+            ObjectKind::Bale(bale) => bale.encode()?,
+            ObjectKind::Bin(bin) => bin.encode()?,
+            ObjectKind::Railing(railing) => railing.encode()?,
+            ObjectKind::StartLights(start_lights) => start_lights.encode()?,
+            ObjectKind::Sign(sign) => sign.encode()?,
+            ObjectKind::Concrete(concrete) => concrete.encode()?,
+            ObjectKind::StartPosition(start_position) => start_position.encode()?,
+            ObjectKind::Pit(pit) => pit.encode()?,
         };
         flags.encode(buf)?;
         index.encode(buf)?;
