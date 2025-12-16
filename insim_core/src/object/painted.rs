@@ -1,4 +1,6 @@
 //! Painted objects
+use std::convert::TryFrom;
+
 use super::ObjectVariant;
 use crate::DecodeError;
 
@@ -273,6 +275,27 @@ pub struct Letters {
     pub heading: u8,
     /// Floating
     pub floating: bool,
+}
+
+impl Letters {
+    /// Create painted letters from a string
+    pub fn from_str(
+        text: &str,
+        colour: PaintColour,
+        heading: u8,
+    ) -> Result<Vec<Letters>, DecodeError> {
+        text.chars()
+            .map(|ch| {
+                let character = Character::try_from(ch)?;
+                Ok(Letters {
+                    colour,
+                    character,
+                    heading,
+                    floating: false,
+                })
+            })
+            .collect()
+    }
 }
 
 impl ObjectVariant for Letters {

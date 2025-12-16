@@ -46,13 +46,23 @@ pub struct ObjectInfo {
     pub kind: ObjectKind,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, from_variants::FromVariants)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 /// Layout Object Kind
 pub enum ObjectKind {
     /// Control - start, finish, checkpoints
     Control(control::Control),
+    /// Marshal
+    Marshal(marshal::Marshal),
+    /// Insim Checkpoint
+    InsimCheckpoint(insim::InsimCheckpoint),
+    /// Insim circle
+    InsimCircle(insim::InsimCircle),
+    /// Restrited area / circle
+    RestrictedArea(marshal::RestrictedArea),
+    /// Route checker
+    RouteChecker(marshal::RouteChecker),
 
     /// Chalk
     Chalk(chalk::Chalk),
@@ -62,84 +72,48 @@ pub enum ObjectKind {
     PaintArrows(painted::Arrows),
     /// Cones
     Cone(cone::Cone),
-
     /// Tyres
     TyreStack(tyre::TyreStack),
-
     /// Corner Marker
     MarkerCorner(marker::MarkerCorner),
-
     /// Distance Marker
     MarkerDistance(marker::MarkerDistance),
-
     /// Letterboard
     Letterboard(letterboard::Letterboard),
-
     /// Armco
     Armco(armco::Armco),
-
     /// Barriers
     Barrier(barrier::Barrier),
-
     /// Banner
     Banner(banner::Banner),
-
     /// Ramp
     Ramp(ramp::Ramp),
-
     /// Vehicle
     Veh(vehicle::Vehicle),
-
     /// Speed hump
     SpeedHump(speed_hump::SpeedHump),
-
     /// Kerb
     Kerb(kerb::Kerb),
-
     /// Post
     Post(post::Post),
-
     /// Marquee
     Marquee(marquee::Marquee),
-
     /// Bale
     Bale(bale::Bale),
-
     /// Bin1 + Bin2
     Bin(bin::Bin),
-
     /// Railings
     Railing(railing::Railing),
-
     /// Start lights 1-3
     StartLights(start_lights::StartLights),
-
     /// Metal sign, Chevron Left, Chevron Right, Speed
     Sign(sign::Sign),
-
     /// Concrete
     Concrete(concrete::Concrete),
-
     /// Start position
     StartPosition(start_position::StartPosition),
-
     /// Pit Startpoint + box
     Pit(pit::Pit),
-
-    /// Marshal
-    Marshal(marshal::Marshal),
-
-    /// Insim Checkpoint
-    InsimCheckpoint(insim::InsimCheckpoint),
-
-    /// Insim circle
-    InsimCircle(insim::InsimCircle),
-
-    /// Restrited area / circle
-    RestrictedArea(marshal::RestrictedArea),
-
-    /// Route checker
-    RouteChecker(marshal::RouteChecker),
 }
 
 impl Default for ObjectKind {
@@ -215,6 +189,83 @@ impl Decode for ObjectInfo {
             xyz: glam::I16Vec3 { x, y, z: z as i16 },
             kind,
         })
+    }
+}
+
+impl ObjectInfo {
+    /// Create spaced-out objects starting from the left (extends to the right)
+    pub fn spaced_from_left(
+        objects: impl IntoIterator<Item = ObjectKind>,
+        start_pos: glam::I16Vec3,
+        spacing: i16,
+    ) -> Vec<ObjectInfo> {
+        let mut result = Vec::new();
+        let mut x = start_pos.x;
+
+        for kind in objects {
+            result.push(ObjectInfo {
+                xyz: glam::I16Vec3 {
+                    x,
+                    y: start_pos.y,
+                    z: start_pos.z,
+                },
+                kind,
+            });
+            x += spacing;
+        }
+        result
+    }
+
+    /// Create spaced-out objects ending at the right (extends to the left)
+    pub fn spaced_from_right(
+        objects: impl IntoIterator<Item = ObjectKind>,
+        end_pos: glam::I16Vec3,
+        spacing: i16,
+    ) -> Vec<ObjectInfo> {
+        let objects_vec: Vec<_> = objects.into_iter().collect();
+        let total_width = (objects_vec.len() as i16 - 1) * spacing;
+        let mut result = Vec::new();
+        let mut x = end_pos.x - total_width;
+
+        for kind in objects_vec {
+            result.push(ObjectInfo {
+                xyz: glam::I16Vec3 {
+                    x,
+                    y: end_pos.y,
+                    z: end_pos.z,
+                },
+                kind,
+            });
+            x += spacing;
+        }
+        result
+    }
+
+    /// Create spaced-out objects centered at the given position
+    pub fn spaced_from_center(
+        objects: impl IntoIterator<Item = ObjectKind>,
+        center_pos: glam::I16Vec3,
+        spacing: i16,
+    ) -> Vec<ObjectInfo> {
+        let objects_vec: Vec<_> = objects.into_iter().collect();
+        let count = objects_vec.len() as i16;
+        let total_width = (count - 1) * spacing;
+        let start_x = center_pos.x - total_width / 2;
+        let mut result = Vec::new();
+        let mut x = start_x;
+
+        for kind in objects_vec {
+            result.push(ObjectInfo {
+                xyz: glam::I16Vec3 {
+                    x,
+                    y: center_pos.y,
+                    z: center_pos.z,
+                },
+                kind,
+            });
+            x += spacing;
+        }
+        result
     }
 }
 
