@@ -23,3 +23,5 @@ macro_rules! impl_encode_decode_for_glam_vec3 {
 
 impl_encode_decode_for_glam_vec3!(::glam::Vec3, f32);
 impl_encode_decode_for_glam_vec3!(::glam::IVec3, i32);
+impl_encode_decode_for_glam_vec3!(::glam::U16Vec3, u16);
+impl_encode_decode_for_glam_vec3!(::glam::UVec3, u32);

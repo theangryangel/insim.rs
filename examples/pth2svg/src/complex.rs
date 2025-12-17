@@ -2,7 +2,7 @@ use std::path;
 
 use anyhow::{Context, Result};
 use clap::Args;
-use insim_pth::Pth;
+use insim_pth::{Pth, node::Node};
 
 use crate::SCALE;
 
@@ -34,10 +34,10 @@ impl ComplexArgs {
         let mut viewbox_y: (f32, f32) = (0.0, 0.0);
 
         for i in self.pth.iter() {
-            let p = Pth::from_pathbuf(i)?;
+            let p = Pth::from_path(i)?;
 
             // wrap around the nodes to avoid missing "notches" in the track drawing
-            let mut nodes = p.nodes.clone();
+            let mut nodes: Vec<Node> = p.iter_nodes().cloned().collect();
             nodes.insert(0, *nodes.last().unwrap());
 
             all_pth_nodes.push(nodes);
@@ -111,14 +111,14 @@ impl ComplexArgs {
         }
 
         if let Some(i) = self.racing_line {
-            let p = Pth::from_pathbuf(&i).context(format!("Failed to read {:?}", &i))?;
+            let p = Pth::from_path(&i).context(format!("Failed to read {:?}", &i))?;
 
             let mut data = svg::node::element::path::Data::new().move_to((
-                p.nodes.first().unwrap().center.x as f32,
-                p.nodes.first().unwrap().center.y as f32,
+                p.iter_nodes().next().unwrap().center.x as f32,
+                p.iter_nodes().next().unwrap().center.y as f32,
             ));
 
-            for node in p.nodes.iter() {
+            for node in p.iter_nodes() {
                 data = data.line_to((node.center.x as f32, node.center.y as f32));
             }
 
