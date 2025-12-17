@@ -20,6 +20,7 @@ all-features = true
 rustdoc-args = ["--cfg", "docrs"]
 
 [dependencies]
+bitflags = { workspace = true }
 bytes = { workspace = true }
 glam = { workspace = true }
 insim_core = { path = "../insim_core", version = "4.0.0" }

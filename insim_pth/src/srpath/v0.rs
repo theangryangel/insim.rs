@@ -8,12 +8,72 @@ use insim_core::{Decode, Encode};
 
 use crate::node::Node;
 
+bitflags::bitflags! {
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
+    /// SrPath0Flags
+    pub struct SrPathFlags: u32 {
+        /// Unknown
+        const LOOP = (1 << 0);
+        /// Rect
+        const RECT = (1 << 1);
+        /// Route
+        const ROUTE = (1 << 2);
+        /// Allow flip?
+        const ALLOW_FLIP = (1 << 3);
+    }
+}
+
+impl Encode for SrPathFlags {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+        let val = self.bits();
+        val.encode(buf)?;
+        Ok(())
+    }
+}
+
+impl Decode for SrPathFlags {
+    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
+        let val = u32::decode(buf)?;
+        Ok(Self::from_bits_truncate(val))
+    }
+}
+
+bitflags::bitflags! {
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
+    /// SrNodeFlags
+    pub struct SrNodeFlags: u8 {
+        /// ??
+        const LEFT = (1 << 0);
+        /// ??
+        const RIGHT = (1 << 1);
+        /// ??
+        const HIGH = (1 << 2);
+        /// ??
+        const WALLED = (1 << 3);
+    }
+}
+
+impl Encode for SrNodeFlags {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+        let val = self.bits();
+        val.encode(buf)?;
+        Ok(())
+    }
+}
+
+impl Decode for SrNodeFlags {
+    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
+        let val = u8::decode(buf)?;
+        Ok(Self::from_bits_truncate(val))
+    }
+}
+
 #[derive(Debug, Default, Clone, PartialEq, insim_core::Decode, insim_core::Encode)]
 /// SRPATH node
 pub struct SrNode {
     /// Node flags
     #[insim(pad_after = 3)]
-    pub flags: u8,
+    pub flags: SrNodeFlags,
     /// Node information, xyz, limits, etc.
     pub node: Node,
 }
@@ -48,8 +108,8 @@ pub struct SrPth {
     /// Original revsion
     pub revision: u8,
 
-    /// FIXME: should be bitflags!
-    pub flags: u32,
+    /// Path flags
+    pub flags: SrPathFlags,
 
     /// mini_rev
     pub mini_rev: u8,
@@ -88,8 +148,15 @@ impl Decode for SrPth {
             });
         }
 
-        let flags = u32::decode(buf)?;
+        let flags = SrPathFlags::decode(buf)?;
         let mini_rev = u8::decode(buf)?;
+
+        if mini_rev > 9 {
+            return Err(insim_core::DecodeError::BadMagic {
+                found: Box::new(mini_rev),
+            });
+        }
+
         buf.advance(3);
 
         let num_main_nodes = u16::decode(buf)?;

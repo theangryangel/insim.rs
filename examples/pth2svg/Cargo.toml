@@ -1,6 +1,6 @@
 [package]
 name = "pth2svg"
-version = "0.1.0-unreleased"
+version = "0.2.0-unreleased"
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -20,13 +20,16 @@
 //! when you are "driving at a reasonable speed".
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+pub mod lfspin;
 pub mod lfspth;
 pub mod srpath;
 
 pub mod error;
 pub mod limit;
 pub mod node;
+pub mod pin;
 pub mod pth;
 
 pub use error::Error;
+pub use pin::Pin;
 pub use pth::Pth;
