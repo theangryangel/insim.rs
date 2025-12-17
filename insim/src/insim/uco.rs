@@ -51,7 +51,7 @@ pub struct Uco {
 
 #[cfg(test)]
 mod test {
-    use insim_core::object::{ObjectPosition, control};
+    use insim_core::object::{ObjectInfo, ObjectKind, insim::InsimCircle};
 
     use super::*;
 
@@ -83,21 +83,25 @@ mod test {
                 207, // info - y (1)
                 249, // info - y (2)
                 8,   // info - zbyte
-                24,  // info - flags
+                0,   // info - flags
                 253, // info - index
                 1,   // info - heading
             ],
             |parsed: Uco| {
-                let expected = ObjectInfo::InsimCircle(control::InsimCircle {
-                    xyz: ObjectPosition {
-                        x: -280,
-                        y: -1585,
-                        z: 8,
-                    },
-                    flags: 24,
-                    index: 1,
-                });
-                assert_eq!(parsed.info, expected);
+                assert!(matches!(
+                    parsed.info,
+                    ObjectInfo {
+                        xyz: glam::I16Vec3 {
+                            x: -280,
+                            y: -1585,
+                            z: 8
+                        },
+                        kind: ObjectKind::InsimCircle(InsimCircle {
+                            index: 1,
+                            floating: false
+                        }),
+                    }
+                ));
                 assert!(matches!(parsed.ucoaction, UcoAction::CircleLeave));
                 assert_eq!(parsed.time, Duration::from_millis(151560));
                 assert_eq!(parsed.c.speed.to_meters_per_sec() as u8, 8);

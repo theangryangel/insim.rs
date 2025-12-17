@@ -142,7 +142,10 @@ impl Encode for Axm {
 
 #[cfg(test)]
 mod test {
-    use insim_core::object::{ObjectPosition, control};
+    use insim_core::object::{
+        ObjectInfo, ObjectKind,
+        control::{self, Control},
+    };
 
     use super::*;
 
@@ -178,15 +181,18 @@ mod test {
                 assert_eq!(axm.info.len(), 2);
                 assert!(matches!(
                     axm.info[0],
-                    ObjectInfo::Start(control::Point {
-                        xyz: ObjectPosition {
+                    ObjectInfo {
+                        xyz: glam::I16Vec3 {
                             x: -9556,
                             y: -30695,
                             z: 8
                         },
-                        heading: 128,
-                        floating: false,
-                    })
+                        kind: ObjectKind::Control(Control {
+                            kind: control::ControlKind::Start,
+                            heading: 128,
+                            floating: false
+                        })
+                    }
                 ));
             }
         )

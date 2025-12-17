@@ -21,6 +21,14 @@ rustdoc-args = ["--cfg", "docrs"]
 bench = false
 doctest = false
 
+[features]
+default = []
+serde = [
+  "dep:serde",
+  "bitflags/serde",
+  "glam/serde",
+]
+
 [dependencies]
 bitflags = { workspace = true }
 bytes = { workspace = true }
