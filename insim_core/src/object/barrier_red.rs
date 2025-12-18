@@ -41,3 +41,16 @@ impl ObjectVariant for BarrierRed {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_barrier_red_round_trip() {
+        let original = BarrierRed::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = BarrierRed::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

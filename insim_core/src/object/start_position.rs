@@ -36,3 +36,16 @@ impl ObjectVariant for StartPosition {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_start_position_round_trip() {
+        let original = StartPosition::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = StartPosition::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

@@ -163,3 +163,24 @@ impl ObjectVariant for MarkerDistance {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_marker_corner_round_trip() {
+        let original = MarkerCorner::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = MarkerCorner::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+
+    #[test]
+    fn test_marker_distance_round_trip() {
+        let original = MarkerDistance::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = MarkerDistance::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

@@ -73,3 +73,16 @@ impl ObjectVariant for ChalkRight {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_chalk_right_round_trip() {
+        let original = ChalkRight::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = ChalkRight::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

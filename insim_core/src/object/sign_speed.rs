@@ -75,3 +75,16 @@ impl ObjectVariant for SignSpeed {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sign_speed_round_trip() {
+        let original = SignSpeed::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = SignSpeed::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

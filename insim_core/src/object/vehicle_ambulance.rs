@@ -41,3 +41,16 @@ impl ObjectVariant for VehicleAmbulance {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_vehicle_ambulance_round_trip() {
+        let original = VehicleAmbulance::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = VehicleAmbulance::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

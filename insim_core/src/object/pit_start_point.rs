@@ -41,3 +41,16 @@ impl ObjectVariant for PitStartPoint {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pit_start_point_round_trip() {
+        let original = PitStartPoint::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = PitStartPoint::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

@@ -41,3 +41,16 @@ impl ObjectVariant for BarrierWhite {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_barrier_white_round_trip() {
+        let original = BarrierWhite::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = BarrierWhite::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

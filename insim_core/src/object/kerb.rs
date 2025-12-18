@@ -107,3 +107,16 @@ impl ObjectVariant for Kerb {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_kerb_round_trip() {
+        let original = Kerb::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = Kerb::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

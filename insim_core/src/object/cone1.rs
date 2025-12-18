@@ -76,3 +76,16 @@ impl ObjectVariant for Cone1 {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cone1_round_trip() {
+        let original = Cone1::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = Cone1::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

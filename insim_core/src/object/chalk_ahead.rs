@@ -73,3 +73,16 @@ impl ObjectVariant for ChalkAhead {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_chalk_ahead_round_trip() {
+        let original = ChalkAhead::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = ChalkAhead::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

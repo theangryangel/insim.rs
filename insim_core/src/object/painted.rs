@@ -378,7 +378,7 @@ pub struct Arrows {
 impl ObjectVariant for Arrows {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = 0;
-        flags |= (self.arrow as u8 & 0x7e) << 1;
+        flags |= (self.arrow as u8) << 1;
         flags |= self.colour as u8 & 0x01;
         if self.floating {
             flags |= 0x80;
@@ -399,5 +399,26 @@ impl ObjectVariant for Arrows {
             heading: Direction::from_objectinfo_heading(wire.heading),
             floating,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_arrows_round_trip() {
+        let original = Arrows::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = Arrows::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+
+    #[test]
+    fn test_letters_round_trip() {
+        let original = Letters::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = Letters::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
     }
 }

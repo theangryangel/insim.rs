@@ -64,3 +64,16 @@ impl ObjectVariant for ConePointer {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cone_pointer_round_trip() {
+        let original = ConePointer::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = ConePointer::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

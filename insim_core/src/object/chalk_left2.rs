@@ -73,3 +73,16 @@ impl ObjectVariant for ChalkLeft2 {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_chalk_left2_round_trip() {
+        let original = ChalkLeft2::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = ChalkLeft2::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

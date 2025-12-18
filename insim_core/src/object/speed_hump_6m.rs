@@ -41,3 +41,16 @@ impl ObjectVariant for SpeedHump6M {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_speed_hump6_m_round_trip() {
+        let original = SpeedHump6M::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = SpeedHump6M::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

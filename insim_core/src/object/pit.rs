@@ -41,3 +41,16 @@ impl ObjectVariant for PitStopBox {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pit_stop_box_round_trip() {
+        let original = PitStopBox::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = PitStopBox::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

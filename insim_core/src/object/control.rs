@@ -42,8 +42,8 @@ impl Control {
             0b00 if half_width == 0 => ControlKind::Start,
             0b00 if half_width != 0 => ControlKind::Finish { half_width },
             0b01 => ControlKind::Checkpoint1 { half_width },
-            0b10 => ControlKind::Checkpoint1 { half_width },
-            0b11 => ControlKind::Checkpoint1 { half_width },
+            0b10 => ControlKind::Checkpoint2 { half_width },
+            0b11 => ControlKind::Checkpoint3 { half_width },
             _ => {
                 return Err(crate::DecodeError::NoVariantMatch {
                     found: position_bits as u64,

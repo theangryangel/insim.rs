@@ -41,3 +41,16 @@ impl ObjectVariant for Bale {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bale_round_trip() {
+        let original = Bale::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = Bale::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

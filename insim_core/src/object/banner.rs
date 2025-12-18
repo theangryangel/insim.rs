@@ -41,3 +41,16 @@ impl ObjectVariant for Banner {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_banner_round_trip() {
+        let original = Banner::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = Banner::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

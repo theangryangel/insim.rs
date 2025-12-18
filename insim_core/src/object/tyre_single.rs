@@ -83,3 +83,16 @@ impl ObjectVariant for TyreSingle {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tyre_single_round_trip() {
+        let original = TyreSingle::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = TyreSingle::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

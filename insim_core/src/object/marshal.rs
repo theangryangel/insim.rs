@@ -55,7 +55,7 @@ impl TryFrom<u8> for MarshalKind {
     type Error = crate::DecodeError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value & 0x02 {
+        match value & 0x03 {
             0 => Ok(MarshalKind::Standing),
             1 => Ok(MarshalKind::Left),
             2 => Ok(MarshalKind::Right),

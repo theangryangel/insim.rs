@@ -64,3 +64,16 @@ impl ObjectVariant for LetterboardWY {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_letterboard_w_y_round_trip() {
+        let original = LetterboardWY::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = LetterboardWY::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

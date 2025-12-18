@@ -83,3 +83,16 @@ impl ObjectVariant for TyreStack3Big {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tyre_stack3_big_round_trip() {
+        let original = TyreStack3Big::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = TyreStack3Big::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

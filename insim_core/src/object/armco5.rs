@@ -41,3 +41,16 @@ impl ObjectVariant for Armco5 {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_armco5_round_trip() {
+        let original = Armco5::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = Armco5::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

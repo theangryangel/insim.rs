@@ -41,3 +41,16 @@ impl ObjectVariant for BarrierLong {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_barrier_long_round_trip() {
+        let original = BarrierLong::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = BarrierLong::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

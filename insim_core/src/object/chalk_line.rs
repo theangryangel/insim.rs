@@ -73,3 +73,16 @@ impl ObjectVariant for ChalkLine {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_chalk_line_round_trip() {
+        let original = ChalkLine::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = ChalkLine::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

@@ -87,3 +87,16 @@ impl ObjectVariant for SignMetal {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sign_metal_round_trip() {
+        let original = SignMetal::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = SignMetal::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

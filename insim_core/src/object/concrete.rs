@@ -633,3 +633,72 @@ impl ObjectVariant for ConcreteWedge {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_concrete_pillar_round_trip() {
+        let original = ConcretePillar::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = ConcretePillar::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+
+    #[test]
+    fn test_concrete_ramp_round_trip() {
+        let original = ConcreteRamp::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = ConcreteRamp::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+
+    #[test]
+    fn test_concrete_ramp_wall_round_trip() {
+        let original = ConcreteRampWall::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = ConcreteRampWall::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+
+    #[test]
+    fn test_concrete_short_slab_wall_round_trip() {
+        let original = ConcreteShortSlabWall::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = ConcreteShortSlabWall::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+
+    #[test]
+    fn test_concrete_slab_round_trip() {
+        let original = ConcreteSlab::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = ConcreteSlab::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+
+    #[test]
+    fn test_concrete_slab_wall_round_trip() {
+        let original = ConcreteSlabWall::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = ConcreteSlabWall::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+
+    #[test]
+    fn test_concrete_wall_round_trip() {
+        let original = ConcreteWall::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = ConcreteWall::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+
+    #[test]
+    fn test_concrete_wedge_round_trip() {
+        let original = ConcreteWedge::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = ConcreteWedge::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

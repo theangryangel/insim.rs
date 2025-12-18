@@ -41,3 +41,16 @@ impl ObjectVariant for Ramp1 {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ramp1_round_trip() {
+        let original = Ramp1::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = Ramp1::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

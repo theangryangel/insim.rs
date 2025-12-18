@@ -41,3 +41,16 @@ impl ObjectVariant for VehicleVan {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_vehicle_van_round_trip() {
+        let original = VehicleVan::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = VehicleVan::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

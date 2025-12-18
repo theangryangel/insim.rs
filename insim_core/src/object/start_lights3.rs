@@ -41,3 +41,16 @@ impl ObjectVariant for StartLights3 {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_start_lights3_round_trip() {
+        let original = StartLights3::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = StartLights3::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

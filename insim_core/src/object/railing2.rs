@@ -41,3 +41,16 @@ impl ObjectVariant for Railing2 {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_railing2_round_trip() {
+        let original = Railing2::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = Railing2::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

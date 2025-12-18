@@ -41,3 +41,16 @@ impl ObjectVariant for Post {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_post_round_trip() {
+        let original = Post::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = Post::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}

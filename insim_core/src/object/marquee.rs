@@ -41,3 +41,16 @@ impl ObjectVariant for Marquee {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_marquee_round_trip() {
+        let original = Marquee::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = Marquee::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
+    }
+}
