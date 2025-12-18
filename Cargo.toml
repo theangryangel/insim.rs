@@ -4,11 +4,11 @@ members = [
   "insim_core",
   "insim_macros",
   "insim_pth",
-  "insim_smx",
   "outgauge",
   "outsim",
   "examples/*",
-  "kitcar", "kitcar_macros",
+  "kitcar",
+  "kitcar_macros",
 ]
 exclude = ['examples/*']
 # Only check / build main crates by default (check all with `--workspace`)

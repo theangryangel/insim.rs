@@ -1,4 +1,6 @@
-//! Pin file
+//! LFSPIN file
+
+pub mod v0;
 
 use std::{
     fs,
@@ -13,7 +15,7 @@ use insim_core::{Decode, Encode};
 /// PIN file
 pub enum Pin {
     /// LFSPIN file, version 0, revision 0
-    LfsPin0(super::lfspin::v0::LfsPin),
+    LfsPin0(v0::LfsPin),
 }
 
 impl Pin {
@@ -40,7 +42,7 @@ impl Pin {
                 let _ = reader.read_to_end(&mut data)?;
                 let mut buf = Bytes::from(data);
 
-                Ok(Self::LfsPin0(super::lfspin::v0::LfsPin::decode(&mut buf)?))
+                Ok(Self::LfsPin0(v0::LfsPin::decode(&mut buf)?))
             },
             _ => Err(super::Error::UnsupportedVersion {
                 magic: magic.to_vec(),
@@ -67,15 +69,7 @@ impl Pin {
 
     /// Read and parse a PIN file into a [Pin] struct.
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, super::Error> {
-        let path = path.as_ref();
-        if !path.exists() {
-            return Err(super::Error::IO {
-                kind: std::io::ErrorKind::NotFound,
-                message: format!("Path {path:?} does not exist"),
-            });
-        }
-
-        let mut input = fs::File::open(path).map_err(super::Error::from)?;
-        Self::read(&mut input)
+        let file = fs::File::open(path)?;
+        Self::read(file)
     }
 }

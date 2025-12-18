@@ -26,13 +26,11 @@ impl Decode for LfsPth {
                 found: Box::new(revision),
             });
         }
-        let mut num_nodes = i32::decode(buf)?;
+        let num_nodes = i32::decode(buf)?;
         let finish_line_node = i32::decode(buf)?;
-        let mut nodes = Vec::new();
-        while num_nodes > 0 {
-            nodes.push(Node::decode(buf)?);
-            num_nodes -= 1;
-        }
+        let nodes: Vec<_> = (0..num_nodes)
+            .map(|_| Node::decode(buf))
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(Self {
             revision,
             finish_line_node,

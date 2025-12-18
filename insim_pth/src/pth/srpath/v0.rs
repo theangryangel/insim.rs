@@ -184,10 +184,6 @@ impl Decode for SrPth {
             .map(|_| SrNode::decode(buf))
             .collect::<Result<Vec<_>, _>>()?;
 
-        assert_eq!(main_nodes.len(), num_main_nodes as usize);
-        assert_eq!(pit0_nodes.len(), num_pit0_nodes as usize);
-        assert_eq!(pit1_nodes.len(), num_pit1_nodes as usize);
-
         Ok(Self {
             revision,
             flags,

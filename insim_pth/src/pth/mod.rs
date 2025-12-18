@@ -1,4 +1,7 @@
-//! Pth file
+//! Pth
+
+pub mod lfspth;
+pub mod srpath;
 
 use std::{
     fs,
@@ -12,12 +15,12 @@ use insim_core::{Decode, Encode};
 use crate::node;
 
 #[derive(Debug, PartialEq)]
-/// PTH file
+/// PTH file, supports both LFSPTH and SRPATH files
 pub enum Pth {
     /// LFSPTH file, version 0, revision 0
-    LfsPth0(super::lfspth::v0::LfsPth),
+    LfsPth0(lfspth::v0::LfsPth),
     /// SRPATH version 0, revision <= 252
-    SrPath0(super::srpath::v0::SrPth),
+    SrPath0(srpath::v0::SrPth),
 }
 
 impl Pth {
@@ -44,7 +47,7 @@ impl Pth {
                 let _ = reader.read_to_end(&mut data)?;
                 let mut buf = Bytes::from(data);
 
-                Ok(Self::LfsPth0(super::lfspth::v0::LfsPth::decode(&mut buf)?))
+                Ok(Self::LfsPth0(lfspth::v0::LfsPth::decode(&mut buf)?))
             },
 
             (b"SRPATH", 0, r) if r <= 252 => {
@@ -52,7 +55,7 @@ impl Pth {
                 data.push(revision);
                 let _ = reader.read_to_end(&mut data)?;
                 let mut buf = Bytes::from(data);
-                Ok(Self::SrPath0(super::srpath::v0::SrPth::decode(&mut buf)?))
+                Ok(Self::SrPath0(srpath::v0::SrPth::decode(&mut buf)?))
             },
             _ => Err(super::Error::UnsupportedVersion {
                 magic: magic.to_vec(),
@@ -84,16 +87,8 @@ impl Pth {
 
     /// Read and parse a PTH file into a [Pth] struct.
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, super::Error> {
-        let path = path.as_ref();
-        if !path.exists() {
-            return Err(super::Error::IO {
-                kind: std::io::ErrorKind::NotFound,
-                message: format!("Path {path:?} does not exist"),
-            });
-        }
-
-        let mut input = fs::File::open(path).map_err(super::Error::from)?;
-        Self::read(&mut input)
+        let file = fs::File::open(path)?;
+        Self::read(file)
     }
 
     /// iter all nodes

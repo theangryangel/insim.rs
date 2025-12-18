@@ -43,27 +43,20 @@ impl Node {
     }
 
     fn calculate_limit_position(&self, limit: &Limit, scale: Option<f32>) -> (Vec3, Vec3) {
-        let left_cos = f32::cos(90.0 * std::f32::consts::PI / 180.0);
-        let left_sin = f32::sin(90.0 * std::f32::consts::PI / 180.0);
-        let right_cos = f32::cos(-90.0 * std::f32::consts::PI / 180.0);
-        let right_sin = f32::sin(-90.0 * std::f32::consts::PI / 180.0);
-
         let center = self.get_center(scale);
 
+        // 90° rotation: (x, y) → (-y, x)
         let left = Vec3 {
-            x: ((self.direction.x * left_cos) - (self.direction.y * left_sin)) * limit.left
-                + (center.x),
-            y: ((self.direction.y * left_cos) + (self.direction.x * left_sin)) * limit.left
-                + (center.y),
-            z: (center.z),
+            x: -self.direction.y * limit.left + center.x,
+            y: self.direction.x * limit.left + center.y,
+            z: center.z,
         };
 
+        // -90° rotation: (x, y) → (y, -x)
         let right = Vec3 {
-            x: ((self.direction.x * right_cos) - (self.direction.y * right_sin)) * -limit.right
-                + (center.x),
-            y: ((self.direction.y * right_cos) + (self.direction.x * right_sin)) * -limit.right
-                + (center.y),
-            z: (center.z),
+            x: self.direction.y * limit.right + center.x,
+            y: -self.direction.x * limit.right + center.y,
+            z: center.z,
         };
 
         (left, right)
