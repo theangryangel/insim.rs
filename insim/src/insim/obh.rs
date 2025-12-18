@@ -4,7 +4,7 @@ use bitflags::bitflags;
 use bytes::{Buf, BufMut};
 use insim_core::{Decode, Encode, direction::Direction, speed::Speed};
 
-use super::contact::{ClosingSpeed, DirectionConInfo, SpeedConInfo};
+use super::contact::DirectionConInfo;
 use crate::identifiers::{PlayerId, RequestId};
 
 pub(crate) fn spclose_strip_high_bits(val: u16) -> u16 {
@@ -49,7 +49,7 @@ pub struct CarContact {
     pub heading: Direction<DirectionConInfo>,
 
     /// Speed in m/s
-    pub speed: Speed<SpeedConInfo>,
+    pub speed: Speed,
 
     /// Z position (1 metre = 16)
     pub z: u8,
@@ -65,7 +65,8 @@ impl Decode for CarContact {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let direction = Direction::decode(buf)?;
         let heading = Direction::decode(buf)?;
-        let speed = Speed::decode(buf)?;
+        let speed = u8::decode(buf)?;
+        let speed = Speed::from_meters_per_sec(speed as f32);
         let z = u8::decode(buf)?;
         let x = i16::decode(buf)?;
         let y = i16::decode(buf)?;
@@ -84,7 +85,7 @@ impl Encode for CarContact {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         self.direction.encode(buf)?;
         self.heading.encode(buf)?;
-        self.speed.encode(buf)?;
+        (self.speed.to_meters_per_sec() as u8).encode(buf)?;
         self.z.encode(buf)?;
         self.x.encode(buf)?;
         self.y.encode(buf)?;
@@ -104,7 +105,7 @@ pub struct Obh {
 
     /// Low 12 bits: closing speed (10 = 1 m/s)
     /// The high 4 bits are automatically stripped.
-    pub spclose: Speed<ClosingSpeed>,
+    pub spclose: Speed,
 
     /// When this occurred. Warning this is looping.
     pub time: Duration,
@@ -134,7 +135,7 @@ impl Decode for Obh {
         let plid = PlayerId::decode(buf)?;
         // automatically strip off the first 4 bits as they're reserved
         let spclose = spclose_strip_high_bits(u16::decode(buf)?);
-        let spclose = Speed::new(spclose);
+        let spclose = Speed::from_meters_per_sec(spclose as f32 / 10.0);
         let time = Duration::from_millis(u32::decode(buf)? as u64);
         let c = CarContact::decode(buf)?;
         let x = i16::decode(buf)?;
@@ -163,7 +164,8 @@ impl Encode for Obh {
         self.reqi.encode(buf)?;
         self.plid.encode(buf)?;
         // automatically strip off the first 4 bits as they're reserved
-        spclose_strip_high_bits(self.spclose.into_inner()).encode(buf)?;
+        let spclose = spclose_strip_high_bits((self.spclose.into_inner() * 10.0) as u16);
+        spclose.encode(buf)?;
         match u32::try_from(self.time.as_millis()) {
             Ok(time) => time.encode(buf)?,
             Err(_) => return Err(insim_core::EncodeError::TooLarge),
@@ -217,7 +219,7 @@ mod tests {
                 assert_eq!(obh.reqi, RequestId(0));
                 assert_eq!(obh.plid, PlayerId(3));
                 assert_eq!(obh.time, Duration::from_millis(4970));
-                assert_eq!(obh.spclose.into_inner(), 23);
+                assert_eq!(obh.spclose.into_inner(), 23.0 / 10.0);
             }
         );
     }

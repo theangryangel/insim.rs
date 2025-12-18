@@ -6,30 +6,11 @@ use bytes::{Buf, BufMut};
 use insim_core::{
     Decode, Encode,
     direction::{Direction, DirectionKind},
-    speed::{Speed, SpeedKind},
+    speed::Speed,
 };
 
 use super::{CompCarInfo, obh::spclose_strip_high_bits};
 use crate::identifiers::{PlayerId, RequestId};
-
-#[derive(Copy, Clone, Debug, Default)]
-pub struct SpeedConInfo;
-
-impl SpeedKind for SpeedConInfo {
-    type Inner = u8;
-
-    fn name() -> &'static str {
-        "m/s"
-    }
-
-    fn from_meters_per_sec(value: f32) -> Self::Inner {
-        value as Self::Inner
-    }
-
-    fn to_meters_per_sec(value: Self::Inner) -> f32 {
-        value as f32
-    }
-}
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct DirectionConInfo;
@@ -82,7 +63,7 @@ pub struct ConInfo {
     pub gearsp: u8,
 
     /// Speed in m/s
-    pub speed: Speed<SpeedConInfo>,
+    pub speed: Speed,
 
     /// Car's motion if Speed > 0: 0 = world y direction, 128 = 180 deg
     pub direction: Direction<DirectionConInfo>,
@@ -122,7 +103,7 @@ impl Decode for ConInfo {
         let gearsp = u8::decode(buf)?;
         let gearsp = (gearsp >> 4) & 0x0F; // gearsp is only first 4 bits
 
-        let speed = Speed::decode(buf)?;
+        let speed = Speed::from_meters_per_sec(u8::decode(buf)? as f32);
         let direction = Direction::decode(buf)?;
         let heading = Direction::decode(buf)?;
         let accelf = u8::decode(buf)?;
@@ -187,7 +168,7 @@ impl Encode for ConInfo {
         let gearsp = self.gearsp << 4;
         gearsp.encode(buf)?;
 
-        self.speed.encode(buf)?;
+        (self.speed.to_meters_per_sec() as u8).encode(buf)?;
         self.direction.encode(buf)?;
         self.heading.encode(buf)?;
         self.accelf.encode(buf)?;
@@ -196,25 +177,6 @@ impl Encode for ConInfo {
         self.y.encode(buf)?;
 
         Ok(())
-    }
-}
-
-#[derive(Copy, Clone, Debug, Default)]
-pub struct ClosingSpeed;
-
-impl SpeedKind for ClosingSpeed {
-    type Inner = u16;
-
-    fn name() -> &'static str {
-        "closing speed (10 = 1 m/s)"
-    }
-
-    fn from_meters_per_sec(value: f32) -> Self::Inner {
-        (value / 10.0) as Self::Inner
-    }
-
-    fn to_meters_per_sec(value: Self::Inner) -> f32 {
-        (value * 10) as f32
     }
 }
 
@@ -227,7 +189,7 @@ pub struct Con {
 
     /// Low 12 bits: closing speed (10 = 1 m/s)
     /// The high 4 bits are automatically stripped.
-    pub spclose: Speed<ClosingSpeed>,
+    pub spclose: Speed,
 
     /// Time since last reset. Warning this is looping.
     pub time: Duration,
@@ -244,7 +206,7 @@ impl Decode for Con {
         let reqi = RequestId::decode(buf)?;
         buf.advance(1);
         let spclose = spclose_strip_high_bits(u16::decode(buf)?);
-        let spclose = Speed::new(spclose);
+        let spclose = Speed::from_meters_per_sec(spclose as f32 / 10.0);
         let time = u32::decode(buf)? as u64;
         let time = Duration::from_millis(time);
 
@@ -265,7 +227,7 @@ impl Encode for Con {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         self.reqi.encode(buf)?;
         buf.put_bytes(0, 1);
-        spclose_strip_high_bits(self.spclose.into_inner()).encode(buf)?;
+        spclose_strip_high_bits((self.spclose.to_meters_per_sec() * 10.0) as u16).encode(buf)?;
         match TryInto::<u32>::try_into(self.time.as_millis()) {
             Ok(time) => time.encode(buf)?,
             Err(_) => return Err(insim_core::EncodeError::TooLarge),

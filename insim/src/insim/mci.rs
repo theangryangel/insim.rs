@@ -5,7 +5,7 @@ use insim_core::{
     Decode, Encode,
     angvel::AngVel,
     direction::{Direction, DirectionKind},
-    speed::{Speed, SpeedKind},
+    speed::Speed,
 };
 
 use crate::identifiers::{PlayerId, RequestId};
@@ -47,25 +47,6 @@ generate_bitflag_helpers! {
 }
 
 impl_bitflags_from_to_bytes!(CompCarInfo, u8);
-
-#[derive(Copy, Clone, Debug, Default)]
-pub struct SpeedCompCar;
-
-impl SpeedKind for SpeedCompCar {
-    type Inner = u16;
-
-    fn name() -> &'static str {
-        "32768 = 100m/s"
-    }
-
-    fn from_meters_per_sec(value: f32) -> Self::Inner {
-        (value * 327.68) as Self::Inner
-    }
-
-    fn to_meters_per_sec(value: Self::Inner) -> f32 {
-        (value as f32) / 327.68
-    }
-}
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct DirectionCompCar;
@@ -111,7 +92,7 @@ pub struct CompCar {
     pub xyz: IVec3,
 
     /// Speed
-    pub speed: Speed<SpeedCompCar>,
+    pub speed: Speed,
 
     /// Direction of car's motion : 0 = world y direction, 32768 = 180 deg
     pub direction: Direction<DirectionCompCar>,
@@ -144,7 +125,8 @@ impl Decode for CompCar {
         let info = CompCarInfo::decode(buf)?;
         buf.advance(1);
         let xyz = IVec3::decode(buf)?;
-        let speed = Speed::decode(buf)?;
+        let speed = (u16::decode(buf)? as f32) / 327.68;
+        let speed = Speed::from_meters_per_sec(speed);
         let direction = Direction::decode(buf)?;
         let heading = Direction::decode(buf)?;
         let angvel = AngVel::decode(buf)?;
@@ -172,7 +154,8 @@ impl Encode for CompCar {
         self.info.encode(buf)?;
         buf.put_bytes(0, 1);
         self.xyz.encode(buf)?;
-        self.speed.encode(buf)?;
+        let speed = (self.speed.to_meters_per_sec() * 327.68) as u16;
+        speed.encode(buf)?;
         self.direction.encode(buf)?;
         self.heading.encode(buf)?;
         self.angvel.encode(buf)?;
