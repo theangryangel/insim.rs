@@ -33,6 +33,7 @@ impl From<u8> for PaintColour {
 #[non_exhaustive]
 /// Letter / Character
 pub enum Character {
+    #[default]
     A = 0,
     B,
     C,
@@ -81,8 +82,7 @@ pub enum Character {
     LParen,
     RParen,
     Ampersand,
-    #[default]
-    Blank,
+    // FIXME: painted has no blank, but letterboard does.
 }
 
 impl From<Character> for char {
@@ -136,7 +136,6 @@ impl From<Character> for char {
             Character::LParen => '(',
             Character::RParen => ')',
             Character::Ampersand => '&',
-            Character::Blank => ' ',
         }
     }
 }
@@ -194,7 +193,6 @@ impl TryFrom<char> for Character {
             '(' => Ok(Character::LParen),
             ')' => Ok(Character::RParen),
             '&' => Ok(Character::Ampersand),
-            ' ' => Ok(Character::Blank),
             found => Err(DecodeError::BadMagic {
                 found: Box::new(found),
             }),
@@ -255,7 +253,6 @@ impl TryFrom<u8> for Character {
             45 => Ok(Character::LParen),
             46 => Ok(Character::RParen),
             47 => Ok(Character::Ampersand),
-            48 => Ok(Character::Blank),
             found => Err(DecodeError::NoVariantMatch {
                 found: found as u64,
             }),
@@ -285,6 +282,7 @@ impl Letters {
         heading: Direction,
     ) -> Result<Vec<Letters>, DecodeError> {
         text.chars()
+            .filter(|ch| *ch != ' ')
             .map(|ch| {
                 let character = Character::try_from(ch)?;
                 Ok(Letters {
@@ -301,7 +299,7 @@ impl Letters {
 impl ObjectVariant for Letters {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = 0;
-        flags |= (self.character as u8 & 0x7e) << 1;
+        flags |= (self.character as u8) << 1;
         flags |= self.colour as u8 & 0x01;
         if self.floating {
             flags |= 0x80;
