@@ -58,7 +58,6 @@ impl ObjectVariant for ChalkRight2 {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index: 12,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })

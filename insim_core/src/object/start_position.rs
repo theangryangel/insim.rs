@@ -16,13 +16,11 @@ pub struct StartPosition {
 
 impl ObjectVariant for StartPosition {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
-        let index = 184;
         let mut flags = self.index & 0x3f;
         if self.floating {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })

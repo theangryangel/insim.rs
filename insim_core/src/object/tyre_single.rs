@@ -68,7 +68,6 @@ impl ObjectVariant for TyreSingle {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index: 48,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })

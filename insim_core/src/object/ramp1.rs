@@ -24,7 +24,6 @@ impl ObjectVariant for Ramp1 {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index: 120,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })

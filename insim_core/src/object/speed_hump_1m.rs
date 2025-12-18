@@ -24,7 +24,6 @@ impl ObjectVariant for SpeedHump1M {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index: 131,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })

@@ -70,13 +70,11 @@ pub struct MarkerCorner {
 
 impl ObjectVariant for MarkerCorner {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
-        let index = 62;
         let mut flags = self.kind as u8 & 0x0f;
         if self.floating {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })
@@ -145,13 +143,11 @@ pub struct MarkerDistance {
 
 impl ObjectVariant for MarkerDistance {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
-        let index = 84;
         let mut flags = self.kind as u8 & 0x0f;
         if self.floating {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })

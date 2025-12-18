@@ -22,7 +22,6 @@ impl Marshal {
         }
 
         Ok(ObjectWire {
-            index: 240,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })
@@ -82,11 +81,7 @@ impl RestrictedArea {
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectWire {
-            index: 254,
-            flags,
-            heading: 0,
-        })
+        Ok(ObjectWire { flags, heading: 0 })
     }
 
     pub(crate) fn decode(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
@@ -116,7 +111,6 @@ impl RouteChecker {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index: 255,
             flags,
             heading: self.route,
         })

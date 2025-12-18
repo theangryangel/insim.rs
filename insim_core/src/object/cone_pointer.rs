@@ -49,7 +49,6 @@ impl ObjectVariant for ConePointer {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index: 40,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })

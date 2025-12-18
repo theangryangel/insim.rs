@@ -67,11 +67,9 @@ pub mod vehicle_van;
 
 use crate::{Decode, DecodeError, Encode, EncodeError};
 
-/// Wire format representation for object encoding/decoding
+/// Wire representation for object encoding/decoding
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ObjectWire {
-    /// Object index/type discriminator
-    pub index: u8,
     /// Flags byte (semantics depend on object type)
     pub flags: u8,
     /// Heading/data byte (semantics depend on object type)
@@ -96,7 +94,7 @@ impl ObjectWire {
 }
 
 trait ObjectVariant: Sized {
-    /// Encode this Object to wire format
+    /// Encode this Object to wire format (returns flags and heading only)
     fn to_wire(&self) -> Result<ObjectWire, EncodeError>;
     /// Decode Object from wire format
     fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError>;
@@ -278,6 +276,514 @@ impl Default for ObjectKind {
     }
 }
 
+impl ObjectKind {
+    /// Encode to wire with index
+    fn to_wire(&self) -> Result<(u8, ObjectWire), EncodeError> {
+        match self {
+            ObjectKind::Control(control) => {
+                let wire = control.encode()?;
+                Ok((0, wire))
+            },
+            ObjectKind::Marshal(marshal) => {
+                let wire = marshal.encode()?;
+                Ok((240, wire))
+            },
+            ObjectKind::InsimCheckpoint(insim_checkpoint) => {
+                let wire = insim_checkpoint.encode()?;
+                Ok((252, wire))
+            },
+            ObjectKind::InsimCircle(insim_circle) => {
+                let wire = insim_circle.encode()?;
+                Ok((253, wire))
+            },
+            ObjectKind::RestrictedArea(restricted_area) => {
+                let wire = restricted_area.encode()?;
+                Ok((254, wire))
+            },
+            ObjectKind::RouteChecker(route_checker) => {
+                let wire = route_checker.encode()?;
+                Ok((255, wire))
+            },
+            ObjectKind::ChalkLine(chalk) => {
+                let wire = chalk.to_wire()?;
+                Ok((4, wire))
+            },
+            ObjectKind::ChalkLine2(chalk) => {
+                let wire = chalk.to_wire()?;
+                Ok((5, wire))
+            },
+            ObjectKind::ChalkAhead(chalk) => {
+                let wire = chalk.to_wire()?;
+                Ok((6, wire))
+            },
+            ObjectKind::ChalkAhead2(chalk) => {
+                let wire = chalk.to_wire()?;
+                Ok((7, wire))
+            },
+            ObjectKind::ChalkLeft(chalk) => {
+                let wire = chalk.to_wire()?;
+                Ok((8, wire))
+            },
+            ObjectKind::ChalkLeft2(chalk) => {
+                let wire = chalk.to_wire()?;
+                Ok((9, wire))
+            },
+            ObjectKind::ChalkLeft3(chalk) => {
+                let wire = chalk.to_wire()?;
+                Ok((10, wire))
+            },
+            ObjectKind::ChalkRight(chalk) => {
+                let wire = chalk.to_wire()?;
+                Ok((11, wire))
+            },
+            ObjectKind::ChalkRight2(chalk) => {
+                let wire = chalk.to_wire()?;
+                Ok((12, wire))
+            },
+            ObjectKind::ChalkRight3(chalk) => {
+                let wire = chalk.to_wire()?;
+                Ok((13, wire))
+            },
+            ObjectKind::PaintLetters(letters) => {
+                let wire = letters.to_wire()?;
+                Ok((16, wire))
+            },
+            ObjectKind::PaintArrows(arrows) => {
+                let wire = arrows.to_wire()?;
+                Ok((17, wire))
+            },
+            ObjectKind::Cone1(cone1) => {
+                let wire = cone1.to_wire()?;
+                Ok((20, wire))
+            },
+            ObjectKind::Cone2(cone2) => {
+                let wire = cone2.to_wire()?;
+                Ok((21, wire))
+            },
+            ObjectKind::ConeTall1(cone_tall1) => {
+                let wire = cone_tall1.to_wire()?;
+                Ok((32, wire))
+            },
+            ObjectKind::ConeTall2(cone_tall2) => {
+                let wire = cone_tall2.to_wire()?;
+                Ok((33, wire))
+            },
+            ObjectKind::ConePointer(cone_pointer) => {
+                let wire = cone_pointer.to_wire()?;
+                Ok((40, wire))
+            },
+            ObjectKind::TyreSingle(tyre) => {
+                let wire = tyre.to_wire()?;
+                Ok((48, wire))
+            },
+            ObjectKind::TyreStack2(tyre) => {
+                let wire = tyre.to_wire()?;
+                Ok((49, wire))
+            },
+            ObjectKind::TyreStack3(tyre) => {
+                let wire = tyre.to_wire()?;
+                Ok((50, wire))
+            },
+            ObjectKind::TyreStack4(tyre) => {
+                let wire = tyre.to_wire()?;
+                Ok((51, wire))
+            },
+            ObjectKind::TyreSingleBig(tyre) => {
+                let wire = tyre.to_wire()?;
+                Ok((52, wire))
+            },
+            ObjectKind::TyreStack2Big(tyre) => {
+                let wire = tyre.to_wire()?;
+                Ok((53, wire))
+            },
+            ObjectKind::TyreStack3Big(tyre) => {
+                let wire = tyre.to_wire()?;
+                Ok((54, wire))
+            },
+            ObjectKind::TyreStack4Big(tyre) => {
+                let wire = tyre.to_wire()?;
+                Ok((55, wire))
+            },
+            ObjectKind::MarkerCorner(marker_corner) => {
+                let wire = marker_corner.to_wire()?;
+                Ok((62, wire))
+            },
+            ObjectKind::MarkerDistance(marker_distance) => {
+                let wire = marker_distance.to_wire()?;
+                Ok((84, wire))
+            },
+            ObjectKind::LetterboardWY(letterboard_wy) => {
+                let wire = letterboard_wy.to_wire()?;
+                Ok((92, wire))
+            },
+            ObjectKind::LetterboardRB(letterboard_rb) => {
+                let wire = letterboard_rb.to_wire()?;
+                Ok((93, wire))
+            },
+            ObjectKind::Armco1(armco1) => {
+                let wire = armco1.to_wire()?;
+                Ok((96, wire))
+            },
+            ObjectKind::Armco3(armco3) => {
+                let wire = armco3.to_wire()?;
+                Ok((97, wire))
+            },
+            ObjectKind::Armco5(armco5) => {
+                let wire = armco5.to_wire()?;
+                Ok((98, wire))
+            },
+            ObjectKind::BarrierLong(barrier) => {
+                let wire = barrier.to_wire()?;
+                Ok((104, wire))
+            },
+            ObjectKind::BarrierRed(barrier) => {
+                let wire = barrier.to_wire()?;
+                Ok((105, wire))
+            },
+            ObjectKind::BarrierWhite(barrier) => {
+                let wire = barrier.to_wire()?;
+                Ok((106, wire))
+            },
+            ObjectKind::Banner(banner) => {
+                let wire = banner.to_wire()?;
+                Ok((112, wire))
+            },
+            ObjectKind::Ramp1(ramp1) => {
+                let wire = ramp1.to_wire()?;
+                Ok((120, wire))
+            },
+            ObjectKind::Ramp2(ramp2) => {
+                let wire = ramp2.to_wire()?;
+                Ok((121, wire))
+            },
+            ObjectKind::VehicleSUV(veh) => {
+                let wire = veh.to_wire()?;
+                Ok((124, wire))
+            },
+            ObjectKind::VehicleVan(veh) => {
+                let wire = veh.to_wire()?;
+                Ok((125, wire))
+            },
+            ObjectKind::VehicleTruck(veh) => {
+                let wire = veh.to_wire()?;
+                Ok((126, wire))
+            },
+            ObjectKind::VehicleAmbulance(veh) => {
+                let wire = veh.to_wire()?;
+                Ok((127, wire))
+            },
+            ObjectKind::SpeedHump10M(speed_hump) => {
+                let wire = speed_hump.to_wire()?;
+                Ok((128, wire))
+            },
+            ObjectKind::SpeedHump6M(speed_hump) => {
+                let wire = speed_hump.to_wire()?;
+                Ok((129, wire))
+            },
+            ObjectKind::SpeedHump2M(speed_hump) => {
+                let wire = speed_hump.to_wire()?;
+                Ok((130, wire))
+            },
+            ObjectKind::SpeedHump1M(speed_hump) => {
+                let wire = speed_hump.to_wire()?;
+                Ok((131, wire))
+            },
+            ObjectKind::Kerb(kerb) => {
+                let wire = kerb.to_wire()?;
+                Ok((132, wire))
+            },
+            ObjectKind::Post(post) => {
+                let wire = post.to_wire()?;
+                Ok((136, wire))
+            },
+            ObjectKind::Marquee(marquee) => {
+                let wire = marquee.to_wire()?;
+                Ok((140, wire))
+            },
+            ObjectKind::Bale(bale) => {
+                let wire = bale.to_wire()?;
+                Ok((144, wire))
+            },
+            ObjectKind::Bin1(bin1) => {
+                let wire = bin1.to_wire()?;
+                Ok((145, wire))
+            },
+            ObjectKind::Bin2(bin2) => {
+                let wire = bin2.to_wire()?;
+                Ok((146, wire))
+            },
+            ObjectKind::Railing1(railing1) => {
+                let wire = railing1.to_wire()?;
+                Ok((147, wire))
+            },
+            ObjectKind::Railing2(railing2) => {
+                let wire = railing2.to_wire()?;
+                Ok((148, wire))
+            },
+            ObjectKind::StartLights1(start_lights1) => {
+                let wire = start_lights1.to_wire()?;
+                Ok((149, wire))
+            },
+            ObjectKind::StartLights2(start_lights2) => {
+                let wire = start_lights2.to_wire()?;
+                Ok((150, wire))
+            },
+            ObjectKind::StartLights3(start_lights3) => {
+                let wire = start_lights3.to_wire()?;
+                Ok((151, wire))
+            },
+            ObjectKind::SignMetal(sign_metal) => {
+                let wire = sign_metal.to_wire()?;
+                Ok((160, wire))
+            },
+            ObjectKind::SignSpeed(sign_speed) => {
+                let wire = sign_speed.to_wire()?;
+                Ok((168, wire))
+            },
+            ObjectKind::ConcreteSlab(concrete_slab) => {
+                let wire = concrete_slab.to_wire()?;
+                Ok((172, wire))
+            },
+            ObjectKind::ConcreteRamp(concrete_ramp) => {
+                let wire = concrete_ramp.to_wire()?;
+                Ok((173, wire))
+            },
+            ObjectKind::ConcreteWall(concrete_wall) => {
+                let wire = concrete_wall.to_wire()?;
+                Ok((174, wire))
+            },
+            ObjectKind::ConcretePillar(concrete_pillar) => {
+                let wire = concrete_pillar.to_wire()?;
+                Ok((175, wire))
+            },
+            ObjectKind::ConcreteSlabWall(concrete_slab_wall) => {
+                let wire = concrete_slab_wall.to_wire()?;
+                Ok((176, wire))
+            },
+            ObjectKind::ConcreteRampWall(concrete_ramp_wall) => {
+                let wire = concrete_ramp_wall.to_wire()?;
+                Ok((177, wire))
+            },
+            ObjectKind::ConcreteShortSlabWall(concrete_short_slab_wall) => {
+                let wire = concrete_short_slab_wall.to_wire()?;
+                Ok((178, wire))
+            },
+            ObjectKind::ConcreteWedge(concrete_wedge) => {
+                let wire = concrete_wedge.to_wire()?;
+                Ok((179, wire))
+            },
+            ObjectKind::StartPosition(start_position) => {
+                let wire = start_position.to_wire()?;
+                Ok((184, wire))
+            },
+            ObjectKind::PitStartPoint(pit_start_point) => {
+                let wire = pit_start_point.to_wire()?;
+                Ok((185, wire))
+            },
+            ObjectKind::PitStopBox(pit_stop_box) => {
+                let wire = pit_stop_box.to_wire()?;
+                Ok((186, wire))
+            },
+        }
+    }
+
+    /// Decode from wire with index
+    fn from_wire(index: u8, wire: ObjectWire) -> Result<Self, DecodeError> {
+        match index {
+            0 => Ok(ObjectKind::Control(control::Control::decode(wire)?)),
+            240 => Ok(ObjectKind::Marshal(marshal::Marshal::decode(wire)?)),
+            252 => Ok(ObjectKind::InsimCheckpoint(insim::InsimCheckpoint::decode(
+                wire,
+            )?)),
+            253 => Ok(ObjectKind::InsimCircle(insim::InsimCircle::decode(wire)?)),
+            254 => Ok(ObjectKind::RestrictedArea(marshal::RestrictedArea::decode(
+                wire,
+            )?)),
+            255 => Ok(ObjectKind::RouteChecker(marshal::RouteChecker::decode(
+                wire,
+            )?)),
+
+            4 => Ok(ObjectKind::ChalkLine(chalk_line::ChalkLine::from_wire(
+                wire,
+            )?)),
+            5 => Ok(ObjectKind::ChalkLine2(chalk_line2::ChalkLine2::from_wire(
+                wire,
+            )?)),
+            6 => Ok(ObjectKind::ChalkAhead(chalk_ahead::ChalkAhead::from_wire(
+                wire,
+            )?)),
+            7 => Ok(ObjectKind::ChalkAhead2(
+                chalk_ahead2::ChalkAhead2::from_wire(wire)?,
+            )),
+            8 => Ok(ObjectKind::ChalkLeft(chalk_left::ChalkLeft::from_wire(
+                wire,
+            )?)),
+            9 => Ok(ObjectKind::ChalkLeft2(chalk_left2::ChalkLeft2::from_wire(
+                wire,
+            )?)),
+            10 => Ok(ObjectKind::ChalkLeft3(chalk_left3::ChalkLeft3::from_wire(
+                wire,
+            )?)),
+            11 => Ok(ObjectKind::ChalkRight(chalk_right::ChalkRight::from_wire(
+                wire,
+            )?)),
+            12 => Ok(ObjectKind::ChalkRight2(
+                chalk_right2::ChalkRight2::from_wire(wire)?,
+            )),
+            13 => Ok(ObjectKind::ChalkRight3(
+                chalk_right3::ChalkRight3::from_wire(wire)?,
+            )),
+            16 => Ok(ObjectKind::PaintLetters(painted::Letters::from_wire(wire)?)),
+            17 => Ok(ObjectKind::PaintArrows(painted::Arrows::from_wire(wire)?)),
+            20 => Ok(ObjectKind::Cone1(cone1::Cone1::from_wire(wire)?)),
+            21 => Ok(ObjectKind::Cone2(cone2::Cone2::from_wire(wire)?)),
+            32 => Ok(ObjectKind::ConeTall1(cone_tall1::ConeTall1::from_wire(
+                wire,
+            )?)),
+            33 => Ok(ObjectKind::ConeTall2(cone_tall2::ConeTall2::from_wire(
+                wire,
+            )?)),
+            40 => Ok(ObjectKind::ConePointer(
+                cone_pointer::ConePointer::from_wire(wire)?,
+            )),
+
+            48 => Ok(ObjectKind::TyreSingle(tyre_single::TyreSingle::from_wire(
+                wire,
+            )?)),
+            49 => Ok(ObjectKind::TyreStack2(tyre_stack2::TyreStack2::from_wire(
+                wire,
+            )?)),
+            50 => Ok(ObjectKind::TyreStack3(tyre_stack3::TyreStack3::from_wire(
+                wire,
+            )?)),
+            51 => Ok(ObjectKind::TyreStack4(tyre_stack4::TyreStack4::from_wire(
+                wire,
+            )?)),
+            52 => Ok(ObjectKind::TyreSingleBig(
+                tyre_single_big::TyreSingleBig::from_wire(wire)?,
+            )),
+            53 => Ok(ObjectKind::TyreStack2Big(
+                tyre_stack2_big::TyreStack2Big::from_wire(wire)?,
+            )),
+            54 => Ok(ObjectKind::TyreStack3Big(
+                tyre_stack3_big::TyreStack3Big::from_wire(wire)?,
+            )),
+            55 => Ok(ObjectKind::TyreStack4Big(
+                tyre_stack4_big::TyreStack4Big::from_wire(wire)?,
+            )),
+
+            62 => Ok(ObjectKind::MarkerCorner(marker::MarkerCorner::from_wire(
+                wire,
+            )?)),
+            84 => Ok(ObjectKind::MarkerDistance(
+                marker::MarkerDistance::from_wire(wire)?,
+            )),
+            92 => Ok(ObjectKind::LetterboardWY(
+                letterboard_wy::LetterboardWY::from_wire(wire)?,
+            )),
+            93 => Ok(ObjectKind::LetterboardRB(
+                letterboard_rb::LetterboardRB::from_wire(wire)?,
+            )),
+            96 => Ok(ObjectKind::Armco1(armco1::Armco1::from_wire(wire)?)),
+            97 => Ok(ObjectKind::Armco3(armco3::Armco3::from_wire(wire)?)),
+            98 => Ok(ObjectKind::Armco5(armco5::Armco5::from_wire(wire)?)),
+            104 => Ok(ObjectKind::BarrierLong(
+                barrier_long::BarrierLong::from_wire(wire)?,
+            )),
+            105 => Ok(ObjectKind::BarrierRed(barrier_red::BarrierRed::from_wire(
+                wire,
+            )?)),
+            106 => Ok(ObjectKind::BarrierWhite(
+                barrier_white::BarrierWhite::from_wire(wire)?,
+            )),
+            112 => Ok(ObjectKind::Banner(banner::Banner::from_wire(wire)?)),
+            120 => Ok(ObjectKind::Ramp1(ramp1::Ramp1::from_wire(wire)?)),
+            121 => Ok(ObjectKind::Ramp2(ramp2::Ramp2::from_wire(wire)?)),
+            124 => Ok(ObjectKind::VehicleSUV(vehicle_suv::VehicleSUV::from_wire(
+                wire,
+            )?)),
+            125 => Ok(ObjectKind::VehicleVan(vehicle_van::VehicleVan::from_wire(
+                wire,
+            )?)),
+            126 => Ok(ObjectKind::VehicleTruck(
+                vehicle_truck::VehicleTruck::from_wire(wire)?,
+            )),
+            127 => Ok(ObjectKind::VehicleAmbulance(
+                vehicle_ambulance::VehicleAmbulance::from_wire(wire)?,
+            )),
+            128 => Ok(ObjectKind::SpeedHump10M(
+                speed_hump_10m::SpeedHump10M::from_wire(wire)?,
+            )),
+            129 => Ok(ObjectKind::SpeedHump6M(
+                speed_hump_6m::SpeedHump6M::from_wire(wire)?,
+            )),
+            130 => Ok(ObjectKind::SpeedHump2M(
+                speed_hump_2m::SpeedHump2M::from_wire(wire)?,
+            )),
+            131 => Ok(ObjectKind::SpeedHump1M(
+                speed_hump_1m::SpeedHump1M::from_wire(wire)?,
+            )),
+            132 => Ok(ObjectKind::Kerb(kerb::Kerb::from_wire(wire)?)),
+            136 => Ok(ObjectKind::Post(post::Post::from_wire(wire)?)),
+            140 => Ok(ObjectKind::Marquee(marquee::Marquee::from_wire(wire)?)),
+            144 => Ok(ObjectKind::Bale(bale::Bale::from_wire(wire)?)),
+            145 => Ok(ObjectKind::Bin1(bin1::Bin1::from_wire(wire)?)),
+            146 => Ok(ObjectKind::Bin2(bin2::Bin2::from_wire(wire)?)),
+            147 => Ok(ObjectKind::Railing1(railing1::Railing1::from_wire(wire)?)),
+            148 => Ok(ObjectKind::Railing2(railing2::Railing2::from_wire(wire)?)),
+            149 => Ok(ObjectKind::StartLights1(
+                start_lights1::StartLights1::from_wire(wire)?,
+            )),
+            150 => Ok(ObjectKind::StartLights2(
+                start_lights2::StartLights2::from_wire(wire)?,
+            )),
+            151 => Ok(ObjectKind::StartLights3(
+                start_lights3::StartLights3::from_wire(wire)?,
+            )),
+            160 => Ok(ObjectKind::SignMetal(sign_metal::SignMetal::from_wire(
+                wire,
+            )?)),
+            168 => Ok(ObjectKind::SignSpeed(sign_speed::SignSpeed::from_wire(
+                wire,
+            )?)),
+            172 => Ok(ObjectKind::ConcreteSlab(concrete::ConcreteSlab::from_wire(
+                wire,
+            )?)),
+            173 => Ok(ObjectKind::ConcreteRamp(concrete::ConcreteRamp::from_wire(
+                wire,
+            )?)),
+            174 => Ok(ObjectKind::ConcreteWall(concrete::ConcreteWall::from_wire(
+                wire,
+            )?)),
+            175 => Ok(ObjectKind::ConcretePillar(
+                concrete::ConcretePillar::from_wire(wire)?,
+            )),
+            176 => Ok(ObjectKind::ConcreteSlabWall(
+                concrete::ConcreteSlabWall::from_wire(wire)?,
+            )),
+            177 => Ok(ObjectKind::ConcreteRampWall(
+                concrete::ConcreteRampWall::from_wire(wire)?,
+            )),
+            178 => Ok(ObjectKind::ConcreteShortSlabWall(
+                concrete::ConcreteShortSlabWall::from_wire(wire)?,
+            )),
+            179 => Ok(ObjectKind::ConcreteWedge(
+                concrete::ConcreteWedge::from_wire(wire)?,
+            )),
+            184 => Ok(ObjectKind::StartPosition(
+                start_position::StartPosition::from_wire(wire)?,
+            )),
+            185 => Ok(ObjectKind::PitStartPoint(
+                pit_start_point::PitStartPoint::from_wire(wire)?,
+            )),
+            186 => Ok(ObjectKind::PitStopBox(pit::PitStopBox::from_wire(wire)?)),
+            _ => Err(DecodeError::NoVariantMatch {
+                found: index as u64,
+            }),
+        }
+    }
+}
+
 impl Decode for ObjectInfo {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, DecodeError> {
         let x = i16::decode(buf)?;
@@ -288,103 +794,9 @@ impl Decode for ObjectInfo {
         let index = u8::decode(buf)?;
         let heading = u8::decode(buf)?;
 
-        let wire = ObjectWire {
-            index,
-            flags,
-            heading,
-        };
+        let wire = ObjectWire { flags, heading };
 
-        let kind = match index {
-            0 => ObjectKind::Control(control::Control::decode(wire)?),
-            240 => ObjectKind::Marshal(marshal::Marshal::decode(wire)?),
-            252 => ObjectKind::InsimCheckpoint(insim::InsimCheckpoint::decode(wire)?),
-            253 => ObjectKind::InsimCircle(insim::InsimCircle::decode(wire)?),
-            254 => ObjectKind::RestrictedArea(marshal::RestrictedArea::decode(wire)?),
-            255 => ObjectKind::RouteChecker(marshal::RouteChecker::decode(wire)?),
-
-            4 => ObjectKind::ChalkLine(chalk_line::ChalkLine::from_wire(wire)?),
-            5 => ObjectKind::ChalkLine2(chalk_line2::ChalkLine2::from_wire(wire)?),
-            6 => ObjectKind::ChalkAhead(chalk_ahead::ChalkAhead::from_wire(wire)?),
-            7 => ObjectKind::ChalkAhead2(chalk_ahead2::ChalkAhead2::from_wire(wire)?),
-            8 => ObjectKind::ChalkLeft(chalk_left::ChalkLeft::from_wire(wire)?),
-            9 => ObjectKind::ChalkLeft2(chalk_left2::ChalkLeft2::from_wire(wire)?),
-            10 => ObjectKind::ChalkLeft3(chalk_left3::ChalkLeft3::from_wire(wire)?),
-            11 => ObjectKind::ChalkRight(chalk_right::ChalkRight::from_wire(wire)?),
-            12 => ObjectKind::ChalkRight2(chalk_right2::ChalkRight2::from_wire(wire)?),
-            13 => ObjectKind::ChalkRight3(chalk_right3::ChalkRight3::from_wire(wire)?),
-            16 => ObjectKind::PaintLetters(painted::Letters::from_wire(wire)?),
-            17 => ObjectKind::PaintArrows(painted::Arrows::from_wire(wire)?),
-            20 => ObjectKind::Cone1(cone1::Cone1::from_wire(wire)?),
-            21 => ObjectKind::Cone2(cone2::Cone2::from_wire(wire)?),
-            32 => ObjectKind::ConeTall1(cone_tall1::ConeTall1::from_wire(wire)?),
-            33 => ObjectKind::ConeTall2(cone_tall2::ConeTall2::from_wire(wire)?),
-            40 => ObjectKind::ConePointer(cone_pointer::ConePointer::from_wire(wire)?),
-
-            48 => ObjectKind::TyreSingle(tyre_single::TyreSingle::from_wire(wire)?),
-            49 => ObjectKind::TyreStack2(tyre_stack2::TyreStack2::from_wire(wire)?),
-            50 => ObjectKind::TyreStack3(tyre_stack3::TyreStack3::from_wire(wire)?),
-            51 => ObjectKind::TyreStack4(tyre_stack4::TyreStack4::from_wire(wire)?),
-            52 => ObjectKind::TyreSingleBig(tyre_single_big::TyreSingleBig::from_wire(wire)?),
-            53 => ObjectKind::TyreStack2Big(tyre_stack2_big::TyreStack2Big::from_wire(wire)?),
-            54 => ObjectKind::TyreStack3Big(tyre_stack3_big::TyreStack3Big::from_wire(wire)?),
-            55 => ObjectKind::TyreStack4Big(tyre_stack4_big::TyreStack4Big::from_wire(wire)?),
-
-            62 => ObjectKind::MarkerCorner(marker::MarkerCorner::from_wire(wire)?),
-            84 => ObjectKind::MarkerDistance(marker::MarkerDistance::from_wire(wire)?),
-            92 => ObjectKind::LetterboardWY(letterboard_wy::LetterboardWY::from_wire(wire)?),
-            93 => ObjectKind::LetterboardRB(letterboard_rb::LetterboardRB::from_wire(wire)?),
-            96 => ObjectKind::Armco1(armco1::Armco1::from_wire(wire)?),
-            97 => ObjectKind::Armco3(armco3::Armco3::from_wire(wire)?),
-            98 => ObjectKind::Armco5(armco5::Armco5::from_wire(wire)?),
-            104 => ObjectKind::BarrierLong(barrier_long::BarrierLong::from_wire(wire)?),
-            105 => ObjectKind::BarrierRed(barrier_red::BarrierRed::from_wire(wire)?),
-            106 => ObjectKind::BarrierWhite(barrier_white::BarrierWhite::from_wire(wire)?),
-            112 => ObjectKind::Banner(banner::Banner::from_wire(wire)?),
-            120 => ObjectKind::Ramp1(ramp1::Ramp1::from_wire(wire)?),
-            121 => ObjectKind::Ramp2(ramp2::Ramp2::from_wire(wire)?),
-            124 => ObjectKind::VehicleSUV(vehicle_suv::VehicleSUV::from_wire(wire)?),
-            125 => ObjectKind::VehicleVan(vehicle_van::VehicleVan::from_wire(wire)?),
-            126 => ObjectKind::VehicleTruck(vehicle_truck::VehicleTruck::from_wire(wire)?),
-            127 => {
-                ObjectKind::VehicleAmbulance(vehicle_ambulance::VehicleAmbulance::from_wire(wire)?)
-            },
-            128 => ObjectKind::SpeedHump10M(speed_hump_10m::SpeedHump10M::from_wire(wire)?),
-            129 => ObjectKind::SpeedHump6M(speed_hump_6m::SpeedHump6M::from_wire(wire)?),
-            130 => ObjectKind::SpeedHump2M(speed_hump_2m::SpeedHump2M::from_wire(wire)?),
-            131 => ObjectKind::SpeedHump1M(speed_hump_1m::SpeedHump1M::from_wire(wire)?),
-            132 => ObjectKind::Kerb(kerb::Kerb::from_wire(wire)?),
-            136 => ObjectKind::Post(post::Post::from_wire(wire)?),
-            140 => ObjectKind::Marquee(marquee::Marquee::from_wire(wire)?),
-            144 => ObjectKind::Bale(bale::Bale::from_wire(wire)?),
-            145 => ObjectKind::Bin1(bin1::Bin1::from_wire(wire)?),
-            146 => ObjectKind::Bin2(bin2::Bin2::from_wire(wire)?),
-            147 => ObjectKind::Railing1(railing1::Railing1::from_wire(wire)?),
-            148 => ObjectKind::Railing2(railing2::Railing2::from_wire(wire)?),
-            149 => ObjectKind::StartLights1(start_lights1::StartLights1::from_wire(wire)?),
-            150 => ObjectKind::StartLights2(start_lights2::StartLights2::from_wire(wire)?),
-            151 => ObjectKind::StartLights3(start_lights3::StartLights3::from_wire(wire)?),
-            160 => ObjectKind::SignMetal(sign_metal::SignMetal::from_wire(wire)?),
-            168 => ObjectKind::SignSpeed(sign_speed::SignSpeed::from_wire(wire)?),
-            172 => ObjectKind::ConcreteSlab(concrete::ConcreteSlab::from_wire(wire)?),
-            173 => ObjectKind::ConcreteRamp(concrete::ConcreteRamp::from_wire(wire)?),
-            174 => ObjectKind::ConcreteWall(concrete::ConcreteWall::from_wire(wire)?),
-            175 => ObjectKind::ConcretePillar(concrete::ConcretePillar::from_wire(wire)?),
-            176 => ObjectKind::ConcreteSlabWall(concrete::ConcreteSlabWall::from_wire(wire)?),
-            177 => ObjectKind::ConcreteRampWall(concrete::ConcreteRampWall::from_wire(wire)?),
-            178 => {
-                ObjectKind::ConcreteShortSlabWall(concrete::ConcreteShortSlabWall::from_wire(wire)?)
-            },
-            179 => ObjectKind::ConcreteWedge(concrete::ConcreteWedge::from_wire(wire)?),
-            184 => ObjectKind::StartPosition(start_position::StartPosition::from_wire(wire)?),
-            185 => ObjectKind::PitStartPoint(pit_start_point::PitStartPoint::from_wire(wire)?),
-            186 => ObjectKind::PitStopBox(pit::PitStopBox::from_wire(wire)?),
-
-            _ => {
-                return Err(DecodeError::NoVariantMatch {
-                    found: index as u64,
-                });
-            },
-        };
+        let kind = ObjectKind::from_wire(index, wire)?;
 
         Ok(Self {
             xyz: glam::I16Vec3 { x, y, z: z as i16 },
@@ -641,88 +1053,9 @@ impl Encode for ObjectInfo {
         self.xyz.x.encode(buf)?;
         self.xyz.y.encode(buf)?;
         (self.xyz.z as u8).encode(buf)?; // FIXME: use TryFrom
-        let wire = match &self.kind {
-            ObjectKind::Control(control) => control.encode()?,
-            ObjectKind::Marshal(marshal) => marshal.encode()?,
-            ObjectKind::InsimCheckpoint(insim_checkpoint) => insim_checkpoint.encode()?,
-            ObjectKind::InsimCircle(insim_circle) => insim_circle.encode()?,
-            ObjectKind::RestrictedArea(restricted_area) => restricted_area.encode()?,
-            ObjectKind::RouteChecker(route_checker) => route_checker.encode()?,
-            ObjectKind::ChalkLine(chalk) => chalk.to_wire()?,
-            ObjectKind::ChalkLine2(chalk) => chalk.to_wire()?,
-            ObjectKind::ChalkAhead(chalk) => chalk.to_wire()?,
-            ObjectKind::ChalkAhead2(chalk) => chalk.to_wire()?,
-            ObjectKind::ChalkLeft(chalk) => chalk.to_wire()?,
-            ObjectKind::ChalkLeft2(chalk) => chalk.to_wire()?,
-            ObjectKind::ChalkLeft3(chalk) => chalk.to_wire()?,
-            ObjectKind::ChalkRight(chalk) => chalk.to_wire()?,
-            ObjectKind::ChalkRight2(chalk) => chalk.to_wire()?,
-            ObjectKind::ChalkRight3(chalk) => chalk.to_wire()?,
-            ObjectKind::PaintLetters(letters) => letters.to_wire()?,
-            ObjectKind::PaintArrows(arrows) => arrows.to_wire()?,
-            ObjectKind::Cone1(cone1) => cone1.to_wire()?,
-            ObjectKind::Cone2(cone2) => cone2.to_wire()?,
-            ObjectKind::ConeTall1(cone_tall1) => cone_tall1.to_wire()?,
-            ObjectKind::ConeTall2(cone_tall2) => cone_tall2.to_wire()?,
-            ObjectKind::ConePointer(cone_pointer) => cone_pointer.to_wire()?,
-            ObjectKind::TyreSingle(tyre) => tyre.to_wire()?,
-            ObjectKind::TyreStack2(tyre) => tyre.to_wire()?,
-            ObjectKind::TyreStack3(tyre) => tyre.to_wire()?,
-            ObjectKind::TyreStack4(tyre) => tyre.to_wire()?,
-            ObjectKind::TyreSingleBig(tyre) => tyre.to_wire()?,
-            ObjectKind::TyreStack2Big(tyre) => tyre.to_wire()?,
-            ObjectKind::TyreStack3Big(tyre) => tyre.to_wire()?,
-            ObjectKind::TyreStack4Big(tyre) => tyre.to_wire()?,
-            ObjectKind::MarkerCorner(marker_corner) => marker_corner.to_wire()?,
-            ObjectKind::MarkerDistance(marker_distance) => marker_distance.to_wire()?,
-            ObjectKind::LetterboardWY(letterboard_wy) => letterboard_wy.to_wire()?,
-            ObjectKind::LetterboardRB(letterboard_rb) => letterboard_rb.to_wire()?,
-            ObjectKind::Armco1(armco1) => armco1.to_wire()?,
-            ObjectKind::Armco3(armco3) => armco3.to_wire()?,
-            ObjectKind::Armco5(armco5) => armco5.to_wire()?,
-            ObjectKind::BarrierLong(barrier) => barrier.to_wire()?,
-            ObjectKind::BarrierRed(barrier) => barrier.to_wire()?,
-            ObjectKind::BarrierWhite(barrier) => barrier.to_wire()?,
-            ObjectKind::Banner(banner) => banner.to_wire()?,
-            ObjectKind::Ramp1(ramp1) => ramp1.to_wire()?,
-            ObjectKind::Ramp2(ramp2) => ramp2.to_wire()?,
-            ObjectKind::VehicleSUV(veh) => veh.to_wire()?,
-            ObjectKind::VehicleVan(veh) => veh.to_wire()?,
-            ObjectKind::VehicleTruck(veh) => veh.to_wire()?,
-            ObjectKind::VehicleAmbulance(veh) => veh.to_wire()?,
-            ObjectKind::SpeedHump10M(speed_hump) => speed_hump.to_wire()?,
-            ObjectKind::SpeedHump6M(speed_hump) => speed_hump.to_wire()?,
-            ObjectKind::SpeedHump2M(speed_hump) => speed_hump.to_wire()?,
-            ObjectKind::SpeedHump1M(speed_hump) => speed_hump.to_wire()?,
-            ObjectKind::Kerb(kerb) => kerb.to_wire()?,
-            ObjectKind::Post(post) => post.to_wire()?,
-            ObjectKind::Marquee(marquee) => marquee.to_wire()?,
-            ObjectKind::Bale(bale) => bale.to_wire()?,
-            ObjectKind::Bin1(bin1) => bin1.to_wire()?,
-            ObjectKind::Bin2(bin2) => bin2.to_wire()?,
-            ObjectKind::Railing1(railing1) => railing1.to_wire()?,
-            ObjectKind::Railing2(railing2) => railing2.to_wire()?,
-            ObjectKind::StartLights1(start_lights1) => start_lights1.to_wire()?,
-            ObjectKind::StartLights2(start_lights2) => start_lights2.to_wire()?,
-            ObjectKind::StartLights3(start_lights3) => start_lights3.to_wire()?,
-            ObjectKind::SignMetal(sign_metal) => sign_metal.to_wire()?,
-            ObjectKind::SignSpeed(sign_speed) => sign_speed.to_wire()?,
-            ObjectKind::ConcreteSlab(concrete_slab) => concrete_slab.to_wire()?,
-            ObjectKind::ConcreteRamp(concrete_ramp) => concrete_ramp.to_wire()?,
-            ObjectKind::ConcreteWall(concrete_wall) => concrete_wall.to_wire()?,
-            ObjectKind::ConcretePillar(concrete_pillar) => concrete_pillar.to_wire()?,
-            ObjectKind::ConcreteSlabWall(concrete_slab_wall) => concrete_slab_wall.to_wire()?,
-            ObjectKind::ConcreteRampWall(concrete_ramp_wall) => concrete_ramp_wall.to_wire()?,
-            ObjectKind::ConcreteShortSlabWall(concrete_short_slab_wall) => {
-                concrete_short_slab_wall.to_wire()?
-            },
-            ObjectKind::ConcreteWedge(concrete_wedge) => concrete_wedge.to_wire()?,
-            ObjectKind::StartPosition(start_position) => start_position.to_wire()?,
-            ObjectKind::PitStartPoint(pit_start_point) => pit_start_point.to_wire()?,
-            ObjectKind::PitStopBox(pit_stop_box) => pit_stop_box.to_wire()?,
-        };
+        let (index, wire) = self.kind.to_wire()?;
         wire.flags.encode(buf)?;
-        wire.index.encode(buf)?;
+        index.encode(buf)?;
         wire.heading.encode(buf)?;
 
         Ok(())

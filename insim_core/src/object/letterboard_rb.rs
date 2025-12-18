@@ -41,14 +41,12 @@ pub struct LetterboardRB {
 
 impl ObjectVariant for LetterboardRB {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
-        let index = 93;
         let mut flags = self.colour as u8 & 0x01;
         flags |= (self.mapping & 0x3f) << 1;
         if self.floating {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })

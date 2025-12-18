@@ -307,7 +307,6 @@ impl ObjectVariant for Letters {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index: 16,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })
@@ -385,7 +384,6 @@ impl ObjectVariant for Arrows {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index: 17,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })

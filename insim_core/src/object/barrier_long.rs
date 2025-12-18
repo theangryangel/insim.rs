@@ -24,7 +24,6 @@ impl ObjectVariant for BarrierLong {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index: 104,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })

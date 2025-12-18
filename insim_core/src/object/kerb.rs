@@ -84,14 +84,12 @@ pub struct Kerb {
 
 impl ObjectVariant for Kerb {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
-        let index = 132;
         let mut flags = self.colour & 0x07;
         flags |= (self.mapping as u8 & 0x0f) << 3;
         if self.floating {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })

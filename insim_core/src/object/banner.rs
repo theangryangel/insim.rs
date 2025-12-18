@@ -18,14 +18,12 @@ pub struct Banner {
 
 impl ObjectVariant for Banner {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
-        let index = 112;
         let mut flags = self.colour & 0x07;
         flags |= (self.mapping & 0x0f) << 3;
         if self.floating {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })

@@ -24,7 +24,6 @@ impl ObjectVariant for VehicleSUV {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index: 124,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })

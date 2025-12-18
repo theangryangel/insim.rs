@@ -363,7 +363,6 @@ impl ObjectVariant for ConcreteSlab {
         flags |= (self.slab.length as u8 & 0x03) << 2;
         flags |= (self.slab.pitch as u8 & 0x0f) << 4;
         Ok(ObjectWire {
-            index: 172,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })
@@ -401,7 +400,6 @@ impl ObjectVariant for ConcreteRamp {
         flags |= (self.ramp.length as u8 & 0x03) << 2;
         flags |= (self.ramp.height as u8 & 0x0f) << 4;
         Ok(ObjectWire {
-            index: 173,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })
@@ -439,7 +437,6 @@ impl ObjectVariant for ConcreteWall {
         flags |= (self.wall.length as u8 & 0x03) << 2;
         flags |= (self.wall.height as u8 & 0x0f) << 4;
         Ok(ObjectWire {
-            index: 174,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })
@@ -477,7 +474,6 @@ impl ObjectVariant for ConcretePillar {
         flags |= (self.pillar.y as u8 & 0x03) << 2;
         flags |= (self.pillar.height as u8 & 0x0f) << 4;
         Ok(ObjectWire {
-            index: 175,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })
@@ -511,7 +507,6 @@ impl ObjectVariant for ConcreteSlabWall {
         flags |= (self.slab_wall.length as u8 & 0x03) << 2;
         flags |= (self.slab_wall.pitch as u8 & 0x0f) << 4;
         Ok(ObjectWire {
-            index: 176,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })
@@ -549,7 +544,6 @@ impl ObjectVariant for ConcreteRampWall {
         flags |= (self.ramp_wall.length as u8 & 0x03) << 2;
         flags |= (self.ramp_wall.height as u8 & 0x0f) << 4;
         Ok(ObjectWire {
-            index: 177,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })
@@ -587,7 +581,6 @@ impl ObjectVariant for ConcreteShortSlabWall {
         flags |= (self.short_slab_wall.y as u8 & 0x03) << 2;
         flags |= (self.short_slab_wall.pitch as u8 & 0x0f) << 4;
         Ok(ObjectWire {
-            index: 178,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })
@@ -621,7 +614,6 @@ impl ObjectVariant for ConcreteWedge {
         flags |= (self.wedge.length as u8 & 0x03) << 2;
         flags |= (self.wedge.angle as u8 & 0x0f) << 4;
         Ok(ObjectWire {
-            index: 179,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })

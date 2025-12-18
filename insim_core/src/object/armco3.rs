@@ -24,7 +24,6 @@ impl ObjectVariant for Armco3 {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index: 97,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })

@@ -29,7 +29,6 @@ impl Control {
         }
 
         Ok(ObjectWire {
-            index: 0,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })

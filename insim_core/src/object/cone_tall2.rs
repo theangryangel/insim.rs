@@ -61,7 +61,6 @@ impl ObjectVariant for ConeTall2 {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index: 33,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })

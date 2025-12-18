@@ -24,7 +24,6 @@ impl ObjectVariant for StartLights1 {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index: 149,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })

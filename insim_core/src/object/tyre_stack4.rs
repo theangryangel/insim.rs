@@ -68,7 +68,6 @@ impl ObjectVariant for TyreStack4 {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index: 51,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })

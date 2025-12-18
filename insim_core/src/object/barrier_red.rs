@@ -24,7 +24,6 @@ impl ObjectVariant for BarrierRed {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index: 105,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })

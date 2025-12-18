@@ -51,7 +51,6 @@ impl InsimCheckpoint {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index: 252,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })
@@ -85,7 +84,6 @@ impl InsimCircle {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index: 253,
             flags,
             heading: self.index,
         })
