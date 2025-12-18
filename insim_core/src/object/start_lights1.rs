@@ -1,11 +1,11 @@
-//! Pit stop box object
+//! StartLights1 object
 use super::{ObjectVariant, ObjectWire};
 use crate::{DecodeError, direction::Direction};
 
-/// Pit stop box
+/// StartLights1
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct PitStopBox {
+pub struct StartLights1 {
     /// Heading / Direction
     pub heading: Direction,
     /// Colour (3 bits, 0-7)
@@ -16,7 +16,7 @@ pub struct PitStopBox {
     pub floating: bool,
 }
 
-impl ObjectVariant for PitStopBox {
+impl ObjectVariant for StartLights1 {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = self.colour & 0x07;
         flags |= (self.mapping & 0x0f) << 3;
@@ -24,7 +24,7 @@ impl ObjectVariant for PitStopBox {
             flags |= 0x80;
         }
         Ok(ObjectWire {
-            index: 186,
+            index: 149,
             flags,
             heading: self.heading.to_objectinfo_heading(),
         })

@@ -176,20 +176,32 @@ impl Direction {
 
     /// Convert from LFS object heading u8 to Direction.
     ///
-    /// LFS encodes object headings as a u8 where:
-    /// - 0 = 0° (world Y direction / forward)
-    /// - 128 = 180° (opposite of world Y direction / backward)
-    /// - 256 = 360° (full rotation back to start)
+    /// LFS encodes object headings as a u8 where 360 degrees is represented in 256 values:
+    /// Heading = (heading_in_degrees + 180) * 256 / 360
+    ///
+    /// Therefore: heading_in_degrees = (heading * 360 / 256) - 180
+    ///
+    /// Examples:
+    /// - 128 = 0° (world Y direction / forward)
+    /// - 192 = 90° (world X direction / right)
+    /// - 0 = 180° (opposite of world Y direction / backward)
+    /// - 64 = -90° (opposite of world X direction / left)
     pub const fn from_objectinfo_heading(heading: u8) -> Self {
-        let degrees = (heading as f64) * (360.0 / 256.0);
+        let degrees = (heading as f64) * (360.0 / 256.0) - 180.0;
         Self::from_degrees(degrees)
     }
 
     /// Convert Direction to LFS object heading u8.
     ///
     /// Returns a u8 in the range 0-255 representing the heading.
+    /// Uses the formula: Heading = (heading_in_degrees + 180) * 256 / 360
     pub fn to_objectinfo_heading(&self) -> u8 {
-        (self.to_degrees() * 256.0 / 360.0).round() as u8
+        let mut value = ((self.to_degrees() + 180.0) * 256.0 / 360.0).round() as i32;
+        // Handle wraparound: 256 should map to 0
+        if value == 256 {
+            value = 0;
+        }
+        value as u8
     }
 }
 
@@ -286,18 +298,20 @@ mod tests {
 
     #[test]
     fn test_from_u8_heading() {
-        // Test conversion from u8 heading (0-256 represents 0-360 degrees)
-        let forward = Direction::from_objectinfo_heading(0);
+        // Test conversion from u8 heading using formula:
+        // heading_in_degrees = (heading * 360 / 256) - 180
+        let forward = Direction::from_objectinfo_heading(128);
         assert!((forward.to_degrees() - 0.0).abs() < 0.0001);
 
-        let backward = Direction::from_objectinfo_heading(128);
-        assert!((backward.to_degrees() - 180.0).abs() < 0.0001);
+        let backward = Direction::from_objectinfo_heading(0);
+        // heading 0 gives -180°, which is equivalent to 180° (differ by 360°)
+        assert!((backward.to_degrees() - (-180.0)).abs() < 0.0001);
 
-        let right = Direction::from_objectinfo_heading(64);
+        let right = Direction::from_objectinfo_heading(192);
         assert!((right.to_degrees() - 90.0).abs() < 0.0001);
 
-        let left = Direction::from_objectinfo_heading(192);
-        assert!((left.to_degrees() - 270.0).abs() < 0.0001);
+        let left = Direction::from_objectinfo_heading(64);
+        assert!((left.to_degrees() - (-90.0)).abs() < 0.0001);
     }
 
     #[test]
@@ -308,9 +322,12 @@ mod tests {
         let restored = Direction::from_objectinfo_heading(heading);
         assert!((original.to_degrees() - restored.to_degrees()).abs() < 0.2);
 
-        // Test specific values
-        assert_eq!(Direction::from_degrees(0.0).to_objectinfo_heading(), 0);
-        assert_eq!(Direction::from_degrees(180.0).to_objectinfo_heading(), 128);
+        // Test specific values using formula: Heading = (heading_in_degrees + 180) * 256 / 360
+        assert_eq!(Direction::from_degrees(0.0).to_objectinfo_heading(), 128);
+        // 180° wraps around: (180 + 180) * 256 / 360 = 256 -> 0
+        assert_eq!(Direction::from_degrees(180.0).to_objectinfo_heading(), 0);
+        assert_eq!(Direction::from_degrees(90.0).to_objectinfo_heading(), 192);
+        assert_eq!(Direction::from_degrees(-90.0).to_objectinfo_heading(), 64);
     }
 
     #[test]

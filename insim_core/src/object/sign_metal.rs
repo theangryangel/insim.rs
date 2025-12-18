@@ -1,4 +1,4 @@
-//! Start lights objects
+//! Metal sign objects
 use super::{ObjectVariant, ObjectWire};
 use crate::{DecodeError, direction::Direction};
 
@@ -7,22 +7,40 @@ use crate::{DecodeError, direction::Direction};
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
-/// Start Lights Kind
-pub enum StartLightsKind {
+/// Metal Sign Mapping
+pub enum MetalSignMapping {
+    /// Keep Left
     #[default]
-    One = 149,
-    Two = 150,
-    Three = 151,
+    KeepLeft = 0,
+    /// Keep Right
+    KeepRight = 1,
+    /// Left
+    Left = 2,
+    /// Right
+    Right = 3,
+    /// Up Left
+    UpLeft = 4,
+    /// Up Right
+    UpRight = 5,
+    /// Forward
+    Forward = 6,
+    /// No Entry
+    NoEntry = 7,
 }
 
-impl TryFrom<u8> for StartLightsKind {
+impl TryFrom<u8> for MetalSignMapping {
     type Error = DecodeError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            149 => Ok(Self::One),
-            150 => Ok(Self::Two),
-            151 => Ok(Self::Three),
+        match value & 0x0f {
+            0 => Ok(Self::KeepLeft),
+            1 => Ok(Self::KeepRight),
+            2 => Ok(Self::Left),
+            3 => Ok(Self::Right),
+            4 => Ok(Self::UpLeft),
+            5 => Ok(Self::UpRight),
+            6 => Ok(Self::Forward),
+            7 => Ok(Self::NoEntry),
             found => Err(DecodeError::NoVariantMatch {
                 found: found as u64,
             }),
@@ -30,27 +48,25 @@ impl TryFrom<u8> for StartLightsKind {
     }
 }
 
-/// Start lights
+/// Metal Sign
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct StartLights {
-    /// Kind of start lights
-    pub kind: StartLightsKind,
+pub struct SignMetal {
+    /// Mapping
+    pub mapping: MetalSignMapping,
     /// Heading / Direction
     pub heading: Direction,
     /// Colour (3 bits, 0-7)
     pub colour: u8,
-    /// Mapping (4 bits, 0-15)
-    pub mapping: u8,
     /// Floating
     pub floating: bool,
 }
 
-impl ObjectVariant for StartLights {
+impl ObjectVariant for SignMetal {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
-        let index = self.kind as u8;
+        let index = 160;
         let mut flags = self.colour & 0x07;
-        flags |= (self.mapping & 0x0f) << 3;
+        flags |= (self.mapping as u8 & 0x0f) << 3;
         if self.floating {
             flags |= 0x80;
         }
@@ -62,15 +78,13 @@ impl ObjectVariant for StartLights {
     }
 
     fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
-        let kind = StartLightsKind::try_from(wire.index)?;
+        let mapping = MetalSignMapping::try_from(wire.mapping())?;
         let colour = wire.colour();
-        let mapping = wire.mapping();
         let floating = wire.floating();
         Ok(Self {
-            kind,
+            mapping,
             heading: Direction::from_objectinfo_heading(wire.heading),
             colour,
-            mapping,
             floating,
         })
     }
