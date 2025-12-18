@@ -92,7 +92,7 @@ impl Colourify for &str {
 /// Strip LFS colours
 pub fn strip(input: &'_ str) -> Cow<'_, str> {
     if !input.chars().any(|c| c.is_lfs_control_char()) {
-        return input.into();
+        return Cow::Borrowed(input);
     }
 
     let mut iter = input.chars().peekable();
@@ -130,7 +130,7 @@ pub fn strip(input: &'_ str) -> Cow<'_, str> {
         output.push(i);
     }
 
-    Cow::Owned(output)
+    output.into()
 }
 
 #[cfg(test)]
