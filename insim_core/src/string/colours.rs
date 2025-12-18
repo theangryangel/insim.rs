@@ -51,41 +51,54 @@ pub trait Colourify {
     fn dark_green(self) -> String;
 }
 
-impl Colourify for &str {
+impl<T: AsRef<str>> Colourify for T {
     fn black(self) -> String {
-        format!("^0{}", self)
+        format!("^0{}", self.as_ref())
     }
 
     fn red(self) -> String {
-        format!("^1{}", self)
+        format!("^1{}", self.as_ref())
     }
 
     fn light_green(self) -> String {
-        format!("^2{}", self)
+        format!("^2{}", self.as_ref())
     }
 
     fn yellow(self) -> String {
-        format!("^3{}", self)
+        format!("^3{}", self.as_ref())
     }
 
     fn blue(self) -> String {
-        format!("^4{}", self)
+        format!("^4{}", self.as_ref())
     }
 
     fn purple(self) -> String {
-        format!("^5{}", self)
+        format!("^5{}", self.as_ref())
     }
 
     fn light_blue(self) -> String {
-        format!("^6{}", self)
+        format!("^6{}", self.as_ref())
     }
 
     fn white(self) -> String {
-        format!("^7{}", self)
+        format!("^7{}", self.as_ref())
     }
 
     fn dark_green(self) -> String {
-        format!("^9{}", self)
+        format!("^9{}", self.as_ref())
+    }
+}
+
+/// ColourifyExt allows chaining, providing an alterntive to format!
+pub trait ColourifyExt {
+    /// Allows chaining
+    fn then(self, other: impl AsRef<str>) -> String;
+}
+
+impl ColourifyExt for String {
+    fn then(mut self, other: impl AsRef<str>) -> String {
+        self.push_str(other.as_ref());
+        self
     }
 }
 
@@ -172,7 +185,23 @@ mod tests {
     }
 
     #[test]
-    fn test_colourify_deref() {
+    fn test_colourify_string() {
         assert_eq!("^4Test", String::from("Test").blue());
+    }
+
+    #[test]
+    fn test_colourify_str() {
+        assert_eq!("^4Test", "Test".blue());
+    }
+
+    #[test]
+    fn test_colourifyext() {
+        assert_eq!(
+            "^4Test ^3Test2",
+            "Test"
+                .blue()
+                .then(" ".to_string())
+                .then("Test2".to_string().yellow())
+        );
     }
 }
