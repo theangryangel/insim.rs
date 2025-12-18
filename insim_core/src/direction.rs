@@ -141,6 +141,24 @@ impl Direction {
         };
         Direction::from_degrees(normalized)
     }
+
+    /// Convert from LFS object heading u8 to Direction.
+    ///
+    /// LFS encodes object headings as a u8 where:
+    /// - 0 = 0° (world Y direction / forward)
+    /// - 128 = 180° (opposite of world Y direction / backward)
+    /// - 256 = 360° (full rotation back to start)
+    pub const fn from_objectinfo_heading(heading: u8) -> Self {
+        let degrees = (heading as f64) * (360.0 / 256.0);
+        Self::from_degrees(degrees)
+    }
+
+    /// Convert Direction to LFS object heading u8.
+    ///
+    /// Returns a u8 in the range 0-255 representing the heading.
+    pub fn to_objectinfo_heading(&self) -> u8 {
+        (self.to_degrees() * 256.0 / 360.0).round() as u8
+    }
 }
 
 impl fmt::Display for Direction {
@@ -232,5 +250,34 @@ mod tests {
         // Verify that construction doesn't auto-normalize
         let over = Direction::from_degrees(450.0);
         assert!((over.to_degrees() - 450.0).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_from_u8_heading() {
+        // Test conversion from u8 heading (0-256 represents 0-360 degrees)
+        let forward = Direction::from_objectinfo_heading(0);
+        assert!((forward.to_degrees() - 0.0).abs() < 0.0001);
+
+        let backward = Direction::from_objectinfo_heading(128);
+        assert!((backward.to_degrees() - 180.0).abs() < 0.0001);
+
+        let right = Direction::from_objectinfo_heading(64);
+        assert!((right.to_degrees() - 90.0).abs() < 0.0001);
+
+        let left = Direction::from_objectinfo_heading(192);
+        assert!((left.to_degrees() - 270.0).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_to_u8_heading() {
+        // Test roundtrip conversion
+        let original = Direction::from_degrees(45.0);
+        let heading = original.to_objectinfo_heading();
+        let restored = Direction::from_objectinfo_heading(heading);
+        assert!((original.to_degrees() - restored.to_degrees()).abs() < 0.2);
+
+        // Test specific values
+        assert_eq!(Direction::from_degrees(0.0).to_objectinfo_heading(), 0);
+        assert_eq!(Direction::from_degrees(180.0).to_objectinfo_heading(), 128);
     }
 }

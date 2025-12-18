@@ -1,6 +1,6 @@
 //! Letterboard objects
 use super::ObjectVariant;
-use crate::DecodeError;
+use crate::{DecodeError, direction::Direction};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -58,7 +58,7 @@ pub struct Letterboard {
     /// Colour
     pub colour: LetterboardColour,
     /// Heading / Direction
-    pub heading: u8,
+    pub heading: Direction,
     /// Mapping (6 bits, 0-63)
     pub mapping: u8,
     /// Floating
@@ -73,7 +73,8 @@ impl ObjectVariant for Letterboard {
         if self.floating {
             flags |= 0x80;
         }
-        Ok((index, flags, self.heading))
+        let heading = self.heading.to_objectinfo_heading();
+        Ok((index, flags, heading))
     }
 
     fn decode(index: u8, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
@@ -84,7 +85,7 @@ impl ObjectVariant for Letterboard {
         Ok(Self {
             kind,
             colour,
-            heading,
+            heading: Direction::from_objectinfo_heading(heading),
             mapping,
             floating,
         })

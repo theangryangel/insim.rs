@@ -1,6 +1,6 @@
 //! Armco barrier objects
 use super::ObjectVariant;
-use crate::DecodeError;
+use crate::{DecodeError, direction::Direction};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -37,7 +37,7 @@ pub struct Armco {
     /// Kind of armco
     pub kind: ArmcoKind,
     /// Heading / Direction
-    pub heading: u8,
+    pub heading: Direction,
     /// Colour (3 bits, 0-7)
     pub colour: u8,
     /// Mapping (4 bits, 0-15)
@@ -54,7 +54,8 @@ impl ObjectVariant for Armco {
         if self.floating {
             flags |= 0x80;
         }
-        Ok((index, flags, self.heading))
+        let heading = self.heading.to_objectinfo_heading();
+        Ok((index, flags, heading))
     }
 
     fn decode(index: u8, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
@@ -64,7 +65,7 @@ impl ObjectVariant for Armco {
         let floating = flags & 0x80 != 0;
         Ok(Self {
             kind,
-            heading,
+            heading: Direction::from_objectinfo_heading(heading),
             colour,
             mapping,
             floating,

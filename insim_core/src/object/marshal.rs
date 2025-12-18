@@ -1,4 +1,5 @@
 //! Marshal objects
+use crate::direction::Direction;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -7,7 +8,7 @@ pub struct Marshal {
     /// Kind of Marshal
     pub kind: MarshalKind,
     /// Heading
-    pub heading: u8,
+    pub heading: Direction,
     /// Floating?
     pub floating: bool,
 }
@@ -19,7 +20,8 @@ impl Marshal {
             flags |= 0x80;
         }
 
-        Ok((flags, self.heading))
+        let heading = self.heading.to_objectinfo_heading();
+        Ok((flags, heading))
     }
 
     pub(crate) fn decode(flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
@@ -28,7 +30,7 @@ impl Marshal {
 
         Ok(Self {
             kind,
-            heading,
+            heading: Direction::from_objectinfo_heading(heading),
             floating,
         })
     }

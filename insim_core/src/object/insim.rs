@@ -1,4 +1,5 @@
 //! Insim objects
+use crate::direction::Direction;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -36,7 +37,7 @@ pub struct InsimCheckpoint {
     /// Kind of checkpoint
     pub kind: InsimCheckpointKind,
     /// Heading / Direction
-    pub heading: u8,
+    pub heading: Direction,
     /// Floating
     pub floating: bool,
 }
@@ -48,7 +49,8 @@ impl InsimCheckpoint {
         if self.floating {
             flags |= 0x80;
         }
-        Ok((flags, self.heading))
+        let heading = self.heading.to_objectinfo_heading();
+        Ok((flags, heading))
     }
 
     pub(crate) fn decode(flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
@@ -56,7 +58,7 @@ impl InsimCheckpoint {
         let floating = flags & 0x80 != 0;
         Ok(Self {
             kind,
-            heading,
+            heading: Direction::from_objectinfo_heading(heading),
             floating,
         })
     }

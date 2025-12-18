@@ -1,6 +1,6 @@
 //! Control objects
 use super::ObjectVariant;
-use crate::DecodeError;
+use crate::{DecodeError, direction::Direction};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -82,7 +82,7 @@ pub struct TyreStack {
     /// Colour
     pub colour: TyreStackColour,
     /// Heading / Direction
-    pub heading: u8,
+    pub heading: Direction,
     /// Floating
     pub floating: bool,
 }
@@ -94,7 +94,8 @@ impl ObjectVariant for TyreStack {
         if self.floating {
             flags |= 0x80;
         }
-        Ok((self.kind as u8, flags, self.heading))
+        let heading = self.heading.to_objectinfo_heading();
+        Ok((self.kind as u8, flags, heading))
     }
 
     fn decode(index: u8, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
@@ -104,7 +105,7 @@ impl ObjectVariant for TyreStack {
         Ok(Self {
             kind,
             colour,
-            heading,
+            heading: Direction::from_objectinfo_heading(heading),
             floating,
         })
     }

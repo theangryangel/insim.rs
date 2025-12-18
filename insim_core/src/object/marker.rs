@@ -1,6 +1,6 @@
 //! Marker objects
 use super::ObjectVariant;
-use crate::DecodeError;
+use crate::{DecodeError, direction::Direction};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -63,7 +63,7 @@ pub struct MarkerCorner {
     /// Kind of marker
     pub kind: MarkerCornerKind,
     /// Heading / Direction
-    pub heading: u8,
+    pub heading: Direction,
     /// Floating
     pub floating: bool,
 }
@@ -75,7 +75,8 @@ impl ObjectVariant for MarkerCorner {
         if self.floating {
             flags |= 0x80;
         }
-        Ok((index, flags, self.heading))
+        let heading = self.heading.to_objectinfo_heading();
+        Ok((index, flags, heading))
     }
 
     fn decode(_index: u8, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
@@ -83,7 +84,7 @@ impl ObjectVariant for MarkerCorner {
         let floating = flags & 0x80 != 0;
         Ok(Self {
             kind,
-            heading,
+            heading: Direction::from_objectinfo_heading(heading),
             floating,
         })
     }
@@ -134,7 +135,7 @@ pub struct MarkerDistance {
     /// Kind of distance marker
     pub kind: MarkerDistanceKind,
     /// Heading / Direction
-    pub heading: u8,
+    pub heading: Direction,
     /// Floating
     pub floating: bool,
 }
@@ -146,7 +147,8 @@ impl ObjectVariant for MarkerDistance {
         if self.floating {
             flags |= 0x80;
         }
-        Ok((index, flags, self.heading))
+        let heading = self.heading.to_objectinfo_heading();
+        Ok((index, flags, heading))
     }
 
     fn decode(_index: u8, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
@@ -154,7 +156,7 @@ impl ObjectVariant for MarkerDistance {
         let floating = flags & 0x80 != 0;
         Ok(Self {
             kind,
-            heading,
+            heading: Direction::from_objectinfo_heading(heading),
             floating,
         })
     }

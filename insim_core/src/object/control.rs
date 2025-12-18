@@ -1,13 +1,15 @@
 //! Control objects
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
+use crate::direction::Direction;
+
+#[derive(Debug, Clone, Default, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Control object
 pub struct Control {
     /// Kind of Control Object
     pub kind: ControlKind,
     /// Heading
-    pub heading: u8,
+    pub heading: Direction,
     /// Floating?
     pub floating: bool,
 }
@@ -25,7 +27,7 @@ impl Control {
             flags |= 0x80;
         }
 
-        Ok((flags, self.heading))
+        Ok((flags, self.heading.to_objectinfo_heading()))
     }
 
     pub(crate) fn decode(flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
@@ -47,7 +49,7 @@ impl Control {
 
         Ok(Self {
             kind,
-            heading,
+            heading: Direction::from_objectinfo_heading(heading),
             floating,
         })
     }

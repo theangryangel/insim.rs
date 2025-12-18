@@ -1,6 +1,6 @@
 //! Control objects
 use super::ObjectVariant;
-use crate::DecodeError;
+use crate::{DecodeError, direction::Direction};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -41,7 +41,7 @@ pub struct Cone {
     /// Kind of cone
     pub kind: ConeKind,
     /// Heading / Direction
-    pub heading: u8,
+    pub heading: Direction,
     /// Floating
     pub floating: bool,
 }

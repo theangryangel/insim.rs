@@ -4,7 +4,7 @@
 //! Whilst this makes it feel slightly awkward, it is an intentional productivity boost.
 
 use super::ObjectVariant;
-use crate::DecodeError;
+use crate::{DecodeError, direction::Direction};
 
 /// Represents Width and Length (2m, 4m, 8m, 16m)
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -141,7 +141,7 @@ pub struct Concrete {
     /// Kind of concrete object
     pub kind: ConcreteKind,
     /// Heading / Direction
-    pub heading: u8,
+    pub heading: Direction,
 }
 
 /// Represents Height in 0.25m steps (0.25m to 4.0m)
@@ -443,7 +443,8 @@ impl ObjectVariant for Concrete {
             },
         }
 
-        Ok((index, flags, self.heading))
+        let heading = self.heading.to_objectinfo_heading();
+        Ok((index, flags, heading))
     }
 
     fn decode(index: u8, flags: u8, heading: u8) -> Result<Self, DecodeError> {
@@ -527,6 +528,9 @@ impl ObjectVariant for Concrete {
             },
         };
 
-        Ok(Concrete { kind, heading })
+        Ok(Concrete {
+            kind,
+            heading: Direction::from_objectinfo_heading(heading),
+        })
     }
 }

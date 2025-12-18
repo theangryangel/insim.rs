@@ -2,7 +2,7 @@
 use std::convert::TryFrom;
 
 use super::ObjectVariant;
-use crate::DecodeError;
+use crate::{DecodeError, direction::Direction};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -272,7 +272,7 @@ pub struct Letters {
     /// Character
     pub character: Character,
     /// Heading / Direction
-    pub heading: u8,
+    pub heading: Direction,
     /// Floating
     pub floating: bool,
 }
@@ -282,7 +282,7 @@ impl Letters {
     pub fn from_str(
         text: &str,
         colour: PaintColour,
-        heading: u8,
+        heading: Direction,
     ) -> Result<Vec<Letters>, DecodeError> {
         text.chars()
             .map(|ch| {
@@ -306,7 +306,8 @@ impl ObjectVariant for Letters {
         if self.floating {
             flags |= 0x80;
         }
-        Ok((16, flags, self.heading))
+        let heading = self.heading.to_objectinfo_heading();
+        Ok((16, flags, heading))
     }
 
     fn decode(_index: u8, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
@@ -316,7 +317,7 @@ impl ObjectVariant for Letters {
         Ok(Self {
             colour,
             character,
-            heading,
+            heading: Direction::from_objectinfo_heading(heading),
             floating,
         })
     }
@@ -367,7 +368,7 @@ pub struct Arrows {
     /// Arrow
     pub arrow: Arrow,
     /// Heading / Direction
-    pub heading: u8,
+    pub heading: Direction,
     /// Floating
     pub floating: bool,
 }
@@ -380,7 +381,8 @@ impl ObjectVariant for Arrows {
         if self.floating {
             flags |= 0x80;
         }
-        Ok((17, flags, self.heading))
+        let heading = self.heading.to_objectinfo_heading();
+        Ok((17, flags, heading))
     }
 
     fn decode(_index: u8, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
@@ -390,7 +392,7 @@ impl ObjectVariant for Arrows {
         Ok(Self {
             colour,
             arrow,
-            heading,
+            heading: Direction::from_objectinfo_heading(heading),
             floating,
         })
     }
