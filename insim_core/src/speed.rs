@@ -47,6 +47,11 @@ impl Speed {
     pub const fn to_miles_per_hour(&self) -> f32 {
         self.inner * 2.23694
     }
+
+    /// Check if speed is zero.
+    pub const fn is_zero(&self) -> bool {
+        self.inner == 0.0
+    }
 }
 
 impl fmt::Display for Speed {
@@ -86,5 +91,13 @@ mod test {
             Speed::from_kilometers_per_hour(100.0).to_miles_per_hour(),
             62.137222
         );
+    }
+
+    #[test]
+    fn test_is_zero() {
+        assert!(Speed::ZERO.is_zero());
+        assert!(Speed::from_meters_per_sec(0.0).is_zero());
+        assert!(!Speed::from_meters_per_sec(0.1).is_zero());
+        assert!(!Speed::from_meters_per_sec(100.0).is_zero());
     }
 }

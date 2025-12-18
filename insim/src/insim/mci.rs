@@ -113,7 +113,7 @@ impl Decode for CompCar {
         let heading_raw = u16::decode(buf)?;
         let heading = Direction::from_degrees((heading_raw as f64) * COMPCAR_DEGREES_PER_UNIT);
 
-        let angvel = AngVel::decode(buf)?;
+        let angvel = AngVel::from_wire_i16(i16::decode(buf)?);
         Ok(Self {
             node,
             lap,
@@ -151,7 +151,7 @@ impl Encode for CompCar {
             .clamp(0.0, 65535.0) as u16;
         heading_units.encode(buf)?;
 
-        self.angvel.encode(buf)?;
+        self.angvel.to_wire_i16().encode(buf)?;
         Ok(())
     }
 }

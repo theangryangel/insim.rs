@@ -1,5 +1,5 @@
 //! Marker objects
-use super::ObjectVariant;
+use super::{ObjectVariant, ObjectWire};
 use crate::{DecodeError, direction::Direction};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
@@ -69,22 +69,25 @@ pub struct MarkerCorner {
 }
 
 impl ObjectVariant for MarkerCorner {
-    fn encode(&self) -> Result<(u8, u8, u8), crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let index = 62;
         let mut flags = self.kind as u8 & 0x0f;
         if self.floating {
             flags |= 0x80;
         }
-        let heading = self.heading.to_objectinfo_heading();
-        Ok((index, flags, heading))
+        Ok(ObjectWire {
+            index,
+            flags,
+            heading: self.heading.to_objectinfo_heading(),
+        })
     }
 
-    fn decode(_index: u8, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
-        let kind = MarkerCornerKind::try_from(flags & 0x0f)?;
-        let floating = flags & 0x80 != 0;
+    fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+        let kind = MarkerCornerKind::try_from(wire.flags & 0x0f)?;
+        let floating = wire.floating();
         Ok(Self {
             kind,
-            heading: Direction::from_objectinfo_heading(heading),
+            heading: Direction::from_objectinfo_heading(wire.heading),
             floating,
         })
     }
@@ -141,22 +144,25 @@ pub struct MarkerDistance {
 }
 
 impl ObjectVariant for MarkerDistance {
-    fn encode(&self) -> Result<(u8, u8, u8), crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let index = 84;
         let mut flags = self.kind as u8 & 0x0f;
         if self.floating {
             flags |= 0x80;
         }
-        let heading = self.heading.to_objectinfo_heading();
-        Ok((index, flags, heading))
+        Ok(ObjectWire {
+            index,
+            flags,
+            heading: self.heading.to_objectinfo_heading(),
+        })
     }
 
-    fn decode(_index: u8, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
-        let kind = MarkerDistanceKind::try_from(flags & 0x0f)?;
-        let floating = flags & 0x80 != 0;
+    fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+        let kind = MarkerDistanceKind::try_from(wire.flags & 0x0f)?;
+        let floating = wire.floating();
         Ok(Self {
             kind,
-            heading: Direction::from_objectinfo_heading(heading),
+            heading: Direction::from_objectinfo_heading(wire.heading),
             floating,
         })
     }

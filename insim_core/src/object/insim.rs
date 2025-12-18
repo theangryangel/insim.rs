@@ -1,4 +1,5 @@
 //! Insim objects
+use super::ObjectWire;
 use crate::direction::Direction;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -43,22 +44,25 @@ pub struct InsimCheckpoint {
 }
 
 impl InsimCheckpoint {
-    pub(crate) fn encode(&self) -> Result<(u8, u8), crate::EncodeError> {
+    pub(crate) fn encode(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = 0;
         flags |= self.kind as u8;
         if self.floating {
             flags |= 0x80;
         }
-        let heading = self.heading.to_objectinfo_heading();
-        Ok((flags, heading))
+        Ok(ObjectWire {
+            index: 252,
+            flags,
+            heading: self.heading.to_objectinfo_heading(),
+        })
     }
 
-    pub(crate) fn decode(flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
-        let kind = InsimCheckpointKind::try_from(flags)?;
-        let floating = flags & 0x80 != 0;
+    pub(crate) fn decode(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+        let kind = InsimCheckpointKind::try_from(wire.flags)?;
+        let floating = wire.floating();
         Ok(Self {
             kind,
-            heading: Direction::from_objectinfo_heading(heading),
+            heading: Direction::from_objectinfo_heading(wire.heading),
             floating,
         })
     }
@@ -68,25 +72,29 @@ impl InsimCheckpoint {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct InsimCircle {
-    /// Index
+    /// Circle index (stored in heading byte on wire)
     pub index: u8,
     /// Floating
     pub floating: bool,
 }
 
 impl InsimCircle {
-    pub(crate) fn encode(&self) -> Result<(u8, u8), crate::EncodeError> {
+    pub(crate) fn encode(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = 0;
         if self.floating {
             flags |= 0x80;
         }
-        Ok((flags, self.index))
+        Ok(ObjectWire {
+            index: 253,
+            flags,
+            heading: self.index,
+        })
     }
 
-    pub(crate) fn decode(flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
-        let floating = flags & 0x80 != 0;
+    pub(crate) fn decode(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+        let floating = wire.floating();
         Ok(Self {
-            index: heading,
+            index: wire.heading,
             floating,
         })
     }

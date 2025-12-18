@@ -1,4 +1,5 @@
 //! Marshal objects
+use super::ObjectWire;
 use crate::direction::Direction;
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -14,23 +15,26 @@ pub struct Marshal {
 }
 
 impl Marshal {
-    pub(crate) fn encode(&self) -> Result<(u8, u8), crate::EncodeError> {
+    pub(crate) fn encode(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags: u8 = self.kind as u8;
         if self.floating {
             flags |= 0x80;
         }
 
-        let heading = self.heading.to_objectinfo_heading();
-        Ok((flags, heading))
+        Ok(ObjectWire {
+            index: 240,
+            flags,
+            heading: self.heading.to_objectinfo_heading(),
+        })
     }
 
-    pub(crate) fn decode(flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
-        let kind = MarshalKind::try_from(flags)?;
-        let floating = flags & 0x80 != 0;
+    pub(crate) fn decode(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+        let kind = MarshalKind::try_from(wire.flags)?;
+        let floating = wire.floating();
 
         Ok(Self {
             kind,
-            heading: Direction::from_objectinfo_heading(heading),
+            heading: Direction::from_objectinfo_heading(wire.heading),
             floating,
         })
     }
@@ -72,18 +76,22 @@ pub struct RestrictedArea {
 }
 
 impl RestrictedArea {
-    pub(crate) fn encode(&self) -> Result<(u8, u8), crate::EncodeError> {
+    pub(crate) fn encode(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = 0;
         flags |= self.radius << 2;
         if self.floating {
             flags |= 0x80;
         }
-        Ok((flags, 0))
+        Ok(ObjectWire {
+            index: 254,
+            flags,
+            heading: 0,
+        })
     }
 
-    pub(crate) fn decode(flags: u8, _heading: u8) -> Result<Self, crate::DecodeError> {
-        let radius = (flags >> 2) & 0b11111;
-        let floating = flags & 0x80 != 0;
+    pub(crate) fn decode(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+        let radius = (wire.flags >> 2) & 0b11111;
+        let floating = wire.floating();
         Ok(Self { radius, floating })
     }
 }
@@ -92,8 +100,8 @@ impl RestrictedArea {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct RouteChecker {
-    /// Index
-    pub index: u8,
+    /// Route index (stored in heading byte on wire)
+    pub route: u8,
     /// Radius
     pub radius: u8,
     /// floating
@@ -101,22 +109,26 @@ pub struct RouteChecker {
 }
 
 impl RouteChecker {
-    pub(crate) fn encode(&self) -> Result<(u8, u8), crate::EncodeError> {
+    pub(crate) fn encode(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = 0;
         flags |= (self.radius << 2) & 0b11111;
         if self.floating {
             flags |= 0x80;
         }
-        Ok((flags, self.index))
+        Ok(ObjectWire {
+            index: 255,
+            flags,
+            heading: self.route,
+        })
     }
 
-    pub(crate) fn decode(flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
-        let radius = (flags >> 2) & 0b11111;
-        let floating = flags & 0x80 != 0;
+    pub(crate) fn decode(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+        let radius = (wire.flags >> 2) & 0b11111;
+        let floating = wire.floating();
         Ok(Self {
             radius,
             floating,
-            index: heading,
+            route: wire.heading,
         })
     }
 }

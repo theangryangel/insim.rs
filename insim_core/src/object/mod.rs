@@ -29,11 +29,39 @@ pub mod vehicle;
 
 use crate::{Decode, DecodeError, Encode, EncodeError};
 
+/// Wire format representation for object encoding/decoding
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ObjectWire {
+    /// Object index/type discriminator
+    pub index: u8,
+    /// Flags byte (semantics depend on object type)
+    pub flags: u8,
+    /// Heading/data byte (semantics depend on object type)
+    pub heading: u8,
+}
+
+impl ObjectWire {
+    /// Check if the floating flag is set
+    pub fn floating(&self) -> bool {
+        self.flags & 0x80 != 0
+    }
+
+    /// Extract colour from flags (bits 0-2)
+    pub fn colour(&self) -> u8 {
+        self.flags & 0x07
+    }
+
+    /// Extract mapping from flags (bits 3-6)
+    pub fn mapping(&self) -> u8 {
+        (self.flags >> 3) & 0x0f
+    }
+}
+
 trait ObjectVariant: Sized {
-    /// Encode this Object, returning (u8, flags, heading)
-    fn encode(&self) -> Result<(u8, u8, u8), EncodeError>;
-    /// Bytes into an Object
-    fn decode(index: u8, flags: u8, heading: u8) -> Result<Self, DecodeError>;
+    /// Encode this Object to wire format
+    fn to_wire(&self) -> Result<ObjectWire, EncodeError>;
+    /// Decode Object from wire format
+    fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError>;
 }
 
 #[derive(Debug, Clone, Default)]
@@ -132,51 +160,47 @@ impl Decode for ObjectInfo {
         let index = u8::decode(buf)?;
         let heading = u8::decode(buf)?;
 
+        let wire = ObjectWire {
+            index,
+            flags,
+            heading,
+        };
+
         let kind = match index {
-            0 => ObjectKind::Control(control::Control::decode(flags, heading)?),
-            240 => ObjectKind::Marshal(marshal::Marshal::decode(flags, heading)?),
-            252 => ObjectKind::InsimCheckpoint(insim::InsimCheckpoint::decode(flags, heading)?),
-            253 => ObjectKind::InsimCircle(insim::InsimCircle::decode(flags, heading)?),
-            254 => ObjectKind::RestrictedArea(marshal::RestrictedArea::decode(flags, heading)?),
-            255 => ObjectKind::RouteChecker(marshal::RouteChecker::decode(flags, heading)?),
+            0 => ObjectKind::Control(control::Control::decode(wire)?),
+            240 => ObjectKind::Marshal(marshal::Marshal::decode(wire)?),
+            252 => ObjectKind::InsimCheckpoint(insim::InsimCheckpoint::decode(wire)?),
+            253 => ObjectKind::InsimCircle(insim::InsimCircle::decode(wire)?),
+            254 => ObjectKind::RestrictedArea(marshal::RestrictedArea::decode(wire)?),
+            255 => ObjectKind::RouteChecker(marshal::RouteChecker::decode(wire)?),
 
-            4..=13 => ObjectKind::Chalk(chalk::Chalk::decode(index, flags, heading)?),
-            16 => ObjectKind::PaintLetters(painted::Letters::decode(index, flags, heading)?),
-            17 => ObjectKind::PaintArrows(painted::Arrows::decode(index, flags, heading)?),
-            20..=21 | 32..=32 | 40 => ObjectKind::Cone(cone::Cone::decode(index, flags, heading)?),
+            4..=13 => ObjectKind::Chalk(chalk::Chalk::from_wire(wire)?),
+            16 => ObjectKind::PaintLetters(painted::Letters::from_wire(wire)?),
+            17 => ObjectKind::PaintArrows(painted::Arrows::from_wire(wire)?),
+            20..=21 | 32..=32 | 40 => ObjectKind::Cone(cone::Cone::from_wire(wire)?),
 
-            48..=55 => ObjectKind::TyreStack(tyre::TyreStack::decode(index, flags, heading)?),
+            48..=55 => ObjectKind::TyreStack(tyre::TyreStack::from_wire(wire)?),
 
-            62 => ObjectKind::MarkerCorner(marker::MarkerCorner::decode(index, flags, heading)?),
-            84 => {
-                ObjectKind::MarkerDistance(marker::MarkerDistance::decode(index, flags, heading)?)
-            },
-            92..=93 => {
-                ObjectKind::Letterboard(letterboard::Letterboard::decode(index, flags, heading)?)
-            },
-            96..=98 => ObjectKind::Armco(armco::Armco::decode(index, flags, heading)?),
-            104..=106 => ObjectKind::Barrier(barrier::Barrier::decode(index, flags, heading)?),
-            112 => ObjectKind::Banner(banner::Banner::decode(index, flags, heading)?),
-            120..=121 => ObjectKind::Ramp(ramp::Ramp::decode(index, flags, heading)?),
-            124..=127 => ObjectKind::Veh(vehicle::Vehicle::decode(index, flags, heading)?),
-            128..=131 => {
-                ObjectKind::SpeedHump(speed_hump::SpeedHump::decode(index, flags, heading)?)
-            },
-            132 => ObjectKind::Kerb(kerb::Kerb::decode(index, flags, heading)?),
-            136 => ObjectKind::Post(post::Post::decode(index, flags, heading)?),
-            140 => ObjectKind::Marquee(marquee::Marquee::decode(index, flags, heading)?),
-            144 => ObjectKind::Bale(bale::Bale::decode(index, flags, heading)?),
-            145..=146 => ObjectKind::Bin(bin::Bin::decode(index, flags, heading)?),
-            147..=148 => ObjectKind::Railing(railing::Railing::decode(index, flags, heading)?),
-            149..=151 => {
-                ObjectKind::StartLights(start_lights::StartLights::decode(index, flags, heading)?)
-            },
-            160 | 168 => ObjectKind::Sign(sign::Sign::decode(index, flags, heading)?),
-            172..=179 => ObjectKind::Concrete(concrete::Concrete::decode(index, flags, heading)?),
-            184 => ObjectKind::StartPosition(start_position::StartPosition::decode(
-                index, flags, heading,
-            )?),
-            185..=186 => ObjectKind::Pit(pit::Pit::decode(index, flags, heading)?),
+            62 => ObjectKind::MarkerCorner(marker::MarkerCorner::from_wire(wire)?),
+            84 => ObjectKind::MarkerDistance(marker::MarkerDistance::from_wire(wire)?),
+            92..=93 => ObjectKind::Letterboard(letterboard::Letterboard::from_wire(wire)?),
+            96..=98 => ObjectKind::Armco(armco::Armco::from_wire(wire)?),
+            104..=106 => ObjectKind::Barrier(barrier::Barrier::from_wire(wire)?),
+            112 => ObjectKind::Banner(banner::Banner::from_wire(wire)?),
+            120..=121 => ObjectKind::Ramp(ramp::Ramp::from_wire(wire)?),
+            124..=127 => ObjectKind::Veh(vehicle::Vehicle::from_wire(wire)?),
+            128..=131 => ObjectKind::SpeedHump(speed_hump::SpeedHump::from_wire(wire)?),
+            132 => ObjectKind::Kerb(kerb::Kerb::from_wire(wire)?),
+            136 => ObjectKind::Post(post::Post::from_wire(wire)?),
+            140 => ObjectKind::Marquee(marquee::Marquee::from_wire(wire)?),
+            144 => ObjectKind::Bale(bale::Bale::from_wire(wire)?),
+            145..=146 => ObjectKind::Bin(bin::Bin::from_wire(wire)?),
+            147..=148 => ObjectKind::Railing(railing::Railing::from_wire(wire)?),
+            149..=151 => ObjectKind::StartLights(start_lights::StartLights::from_wire(wire)?),
+            160 | 168 => ObjectKind::Sign(sign::Sign::from_wire(wire)?),
+            172..=179 => ObjectKind::Concrete(concrete::Concrete::from_wire(wire)?),
+            184 => ObjectKind::StartPosition(start_position::StartPosition::from_wire(wire)?),
+            185..=186 => ObjectKind::Pit(pit::Pit::from_wire(wire)?),
 
             _ => {
                 return Err(DecodeError::NoVariantMatch {
@@ -274,60 +298,66 @@ impl Encode for ObjectInfo {
         self.xyz.x.encode(buf)?;
         self.xyz.y.encode(buf)?;
         (self.xyz.z as u8).encode(buf)?; // FIXME: use TryFrom
-        let (index, flags, heading) = match &self.kind {
+        let wire = match &self.kind {
             ObjectKind::Control(control) => {
-                let (flags, heading) = control.encode()?;
-                (0, flags, heading)
+                let mut wire = control.encode()?;
+                wire.index = 0;
+                wire
             },
             ObjectKind::Marshal(marshal) => {
-                let (flags, heading) = marshal.encode()?;
-                (240, flags, heading)
+                let mut wire = marshal.encode()?;
+                wire.index = 240;
+                wire
             },
             ObjectKind::InsimCheckpoint(insim_checkpoint) => {
-                let (flags, heading) = insim_checkpoint.encode()?;
-                (252, flags, heading)
+                let mut wire = insim_checkpoint.encode()?;
+                wire.index = 252;
+                wire
             },
             ObjectKind::InsimCircle(insim_circle) => {
-                let (flags, heading) = insim_circle.encode()?;
-                (253, flags, heading)
+                let mut wire = insim_circle.encode()?;
+                wire.index = 253;
+                wire
             },
             ObjectKind::RestrictedArea(restricted_area) => {
-                let (flags, heading) = restricted_area.encode()?;
-                (254, flags, heading)
+                let mut wire = restricted_area.encode()?;
+                wire.index = 254;
+                wire
             },
             ObjectKind::RouteChecker(route_checker) => {
-                let (flags, heading) = route_checker.encode()?;
-                (255, flags, heading)
+                let mut wire = route_checker.encode()?;
+                wire.index = 255;
+                wire
             },
-            ObjectKind::Chalk(chalk) => chalk.encode()?,
-            ObjectKind::PaintLetters(letters) => letters.encode()?,
-            ObjectKind::PaintArrows(arrows) => arrows.encode()?,
-            ObjectKind::Cone(cone) => cone.encode()?,
-            ObjectKind::TyreStack(tyre_stack) => tyre_stack.encode()?,
-            ObjectKind::MarkerCorner(marker_corner) => marker_corner.encode()?,
-            ObjectKind::MarkerDistance(marker_distance) => marker_distance.encode()?,
-            ObjectKind::Letterboard(letterboard) => letterboard.encode()?,
-            ObjectKind::Armco(armco) => armco.encode()?,
-            ObjectKind::Barrier(barrier) => barrier.encode()?,
-            ObjectKind::Banner(banner) => banner.encode()?,
-            ObjectKind::Ramp(ramp) => ramp.encode()?,
-            ObjectKind::Veh(veh) => veh.encode()?,
-            ObjectKind::SpeedHump(speed_hump) => speed_hump.encode()?,
-            ObjectKind::Kerb(kerb) => kerb.encode()?,
-            ObjectKind::Post(post) => post.encode()?,
-            ObjectKind::Marquee(marquee) => marquee.encode()?,
-            ObjectKind::Bale(bale) => bale.encode()?,
-            ObjectKind::Bin(bin) => bin.encode()?,
-            ObjectKind::Railing(railing) => railing.encode()?,
-            ObjectKind::StartLights(start_lights) => start_lights.encode()?,
-            ObjectKind::Sign(sign) => sign.encode()?,
-            ObjectKind::Concrete(concrete) => concrete.encode()?,
-            ObjectKind::StartPosition(start_position) => start_position.encode()?,
-            ObjectKind::Pit(pit) => pit.encode()?,
+            ObjectKind::Chalk(chalk) => chalk.to_wire()?,
+            ObjectKind::PaintLetters(letters) => letters.to_wire()?,
+            ObjectKind::PaintArrows(arrows) => arrows.to_wire()?,
+            ObjectKind::Cone(cone) => cone.to_wire()?,
+            ObjectKind::TyreStack(tyre_stack) => tyre_stack.to_wire()?,
+            ObjectKind::MarkerCorner(marker_corner) => marker_corner.to_wire()?,
+            ObjectKind::MarkerDistance(marker_distance) => marker_distance.to_wire()?,
+            ObjectKind::Letterboard(letterboard) => letterboard.to_wire()?,
+            ObjectKind::Armco(armco) => armco.to_wire()?,
+            ObjectKind::Barrier(barrier) => barrier.to_wire()?,
+            ObjectKind::Banner(banner) => banner.to_wire()?,
+            ObjectKind::Ramp(ramp) => ramp.to_wire()?,
+            ObjectKind::Veh(veh) => veh.to_wire()?,
+            ObjectKind::SpeedHump(speed_hump) => speed_hump.to_wire()?,
+            ObjectKind::Kerb(kerb) => kerb.to_wire()?,
+            ObjectKind::Post(post) => post.to_wire()?,
+            ObjectKind::Marquee(marquee) => marquee.to_wire()?,
+            ObjectKind::Bale(bale) => bale.to_wire()?,
+            ObjectKind::Bin(bin) => bin.to_wire()?,
+            ObjectKind::Railing(railing) => railing.to_wire()?,
+            ObjectKind::StartLights(start_lights) => start_lights.to_wire()?,
+            ObjectKind::Sign(sign) => sign.to_wire()?,
+            ObjectKind::Concrete(concrete) => concrete.to_wire()?,
+            ObjectKind::StartPosition(start_position) => start_position.to_wire()?,
+            ObjectKind::Pit(pit) => pit.to_wire()?,
         };
-        flags.encode(buf)?;
-        index.encode(buf)?;
-        heading.encode(buf)?;
+        wire.flags.encode(buf)?;
+        wire.index.encode(buf)?;
+        wire.heading.encode(buf)?;
 
         Ok(())
     }

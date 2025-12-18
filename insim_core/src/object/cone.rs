@@ -1,5 +1,5 @@
 //! Control objects
-use super::ObjectVariant;
+use super::{ObjectVariant, ObjectWire};
 use crate::{DecodeError, direction::Direction};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
@@ -47,11 +47,11 @@ pub struct Cone {
 }
 
 impl ObjectVariant for Cone {
-    fn encode(&self) -> Result<(u8, u8, u8), crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         todo!()
     }
 
-    fn decode(_index: u8, _flags: u8, _heading: u8) -> Result<Self, crate::DecodeError> {
+    fn from_wire(_wire: ObjectWire) -> Result<Self, crate::DecodeError> {
         todo!()
     }
 }

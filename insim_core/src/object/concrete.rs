@@ -3,7 +3,7 @@
 //! LSPs/editors to very clearly indicate to users of the library what is valid and what is not.
 //! Whilst this makes it feel slightly awkward, it is an intentional productivity boost.
 
-use super::ObjectVariant;
+use super::{ObjectVariant, ObjectWire};
 use crate::{DecodeError, direction::Direction};
 
 /// Represents Width and Length (2m, 4m, 8m, 16m)
@@ -396,7 +396,7 @@ pub struct Wedge {
 }
 
 impl ObjectVariant for Concrete {
-    fn encode(&self) -> Result<(u8, u8, u8), crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let index = self.kind.index();
         let mut flags = 0;
 
@@ -443,16 +443,19 @@ impl ObjectVariant for Concrete {
             },
         }
 
-        let heading = self.heading.to_objectinfo_heading();
-        Ok((index, flags, heading))
+        Ok(ObjectWire {
+            index,
+            flags,
+            heading: self.heading.to_objectinfo_heading(),
+        })
     }
 
-    fn decode(index: u8, flags: u8, heading: u8) -> Result<Self, DecodeError> {
-        let kind = match index {
+    fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
+        let kind = match wire.index {
             172 => {
-                let width = WidthLength::try_from(flags & 0x03)?;
-                let length = WidthLength::try_from((flags & 0x0c) >> 2)?;
-                let pitch = Pitch::try_from((flags & 0xf0) >> 4)?;
+                let width = WidthLength::try_from(wire.flags & 0x03)?;
+                let length = WidthLength::try_from((wire.flags & 0x0c) >> 2)?;
+                let pitch = Pitch::try_from((wire.flags & 0xf0) >> 4)?;
                 ConcreteKind::Slab(Slab {
                     width,
                     length,
@@ -460,9 +463,9 @@ impl ObjectVariant for Concrete {
                 })
             },
             173 => {
-                let width = WidthLength::try_from(flags & 0x03)?;
-                let length = WidthLength::try_from((flags & 0x0c) >> 2)?;
-                let height = Height::try_from((flags & 0xf0) >> 4)?;
+                let width = WidthLength::try_from(wire.flags & 0x03)?;
+                let length = WidthLength::try_from((wire.flags & 0x0c) >> 2)?;
+                let height = Height::try_from((wire.flags & 0xf0) >> 4)?;
                 ConcreteKind::Ramp(Ramp {
                     width,
                     length,
@@ -470,9 +473,9 @@ impl ObjectVariant for Concrete {
                 })
             },
             174 => {
-                let colour = Colour::try_from(flags & 0x03)?;
-                let length = WidthLength::try_from((flags & 0x0c) >> 2)?;
-                let height = Height::try_from((flags & 0xf0) >> 4)?;
+                let colour = Colour::try_from(wire.flags & 0x03)?;
+                let length = WidthLength::try_from((wire.flags & 0x0c) >> 2)?;
+                let height = Height::try_from((wire.flags & 0xf0) >> 4)?;
                 ConcreteKind::Wall(Wall {
                     colour,
                     length,
@@ -480,15 +483,15 @@ impl ObjectVariant for Concrete {
                 })
             },
             175 => {
-                let x = Size::try_from(flags & 0x03)?;
-                let y = Size::try_from((flags & 0x0c) >> 2)?;
-                let height = Height::try_from((flags & 0xf0) >> 4)?;
+                let x = Size::try_from(wire.flags & 0x03)?;
+                let y = Size::try_from((wire.flags & 0x0c) >> 2)?;
+                let height = Height::try_from((wire.flags & 0xf0) >> 4)?;
                 ConcreteKind::Pillar(Pillar { x, y, height })
             },
             176 => {
-                let colour = Colour::try_from(flags & 0x03)?;
-                let length = WidthLength::try_from((flags & 0x0c) >> 2)?;
-                let pitch = Pitch::try_from((flags & 0xf0) >> 4)?;
+                let colour = Colour::try_from(wire.flags & 0x03)?;
+                let length = WidthLength::try_from((wire.flags & 0x0c) >> 2)?;
+                let pitch = Pitch::try_from((wire.flags & 0xf0) >> 4)?;
                 ConcreteKind::SlabWall(SlabWall {
                     colour,
                     length,
@@ -496,9 +499,9 @@ impl ObjectVariant for Concrete {
                 })
             },
             177 => {
-                let colour = Colour::try_from(flags & 0x03)?;
-                let length = WidthLength::try_from((flags & 0x0c) >> 2)?;
-                let height = Height::try_from((flags & 0xf0) >> 4)?;
+                let colour = Colour::try_from(wire.flags & 0x03)?;
+                let length = WidthLength::try_from((wire.flags & 0x0c) >> 2)?;
+                let height = Height::try_from((wire.flags & 0xf0) >> 4)?;
                 ConcreteKind::RampWall(RampWall {
                     colour,
                     length,
@@ -506,15 +509,15 @@ impl ObjectVariant for Concrete {
                 })
             },
             178 => {
-                let colour = Colour::try_from(flags & 0x03)?;
-                let y = Size::try_from((flags & 0x0c) >> 2)?;
-                let pitch = Pitch::try_from((flags & 0xf0) >> 4)?;
+                let colour = Colour::try_from(wire.flags & 0x03)?;
+                let y = Size::try_from((wire.flags & 0x0c) >> 2)?;
+                let pitch = Pitch::try_from((wire.flags & 0xf0) >> 4)?;
                 ConcreteKind::ShortSlabWall(ShortSlabWall { colour, y, pitch })
             },
             179 => {
-                let colour = Colour::try_from(flags & 0x03)?;
-                let length = WidthLength::try_from((flags & 0x0c) >> 2)?;
-                let angle = Angle::try_from((flags & 0xf0) >> 4)?;
+                let colour = Colour::try_from(wire.flags & 0x03)?;
+                let length = WidthLength::try_from((wire.flags & 0x0c) >> 2)?;
+                let angle = Angle::try_from((wire.flags & 0xf0) >> 4)?;
                 ConcreteKind::Wedge(Wedge {
                     colour,
                     length,
@@ -523,14 +526,14 @@ impl ObjectVariant for Concrete {
             },
             _ => {
                 return Err(DecodeError::NoVariantMatch {
-                    found: index as u64,
+                    found: wire.index as u64,
                 });
             },
         };
 
         Ok(Concrete {
             kind,
-            heading: Direction::from_objectinfo_heading(heading),
+            heading: Direction::from_objectinfo_heading(wire.heading),
         })
     }
 }

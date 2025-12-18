@@ -1,5 +1,5 @@
 //! Control objects
-use super::ObjectVariant;
+use super::{ObjectVariant, ObjectWire};
 use crate::{DecodeError, direction::Direction};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
@@ -88,24 +88,27 @@ pub struct TyreStack {
 }
 
 impl ObjectVariant for TyreStack {
-    fn encode(&self) -> Result<(u8, u8, u8), crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = 0;
         flags |= self.colour as u8 & 0x07;
         if self.floating {
             flags |= 0x80;
         }
-        let heading = self.heading.to_objectinfo_heading();
-        Ok((self.kind as u8, flags, heading))
+        Ok(ObjectWire {
+            index: self.kind as u8,
+            flags,
+            heading: self.heading.to_objectinfo_heading(),
+        })
     }
 
-    fn decode(index: u8, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
-        let kind = TyreStackKind::try_from(index)?;
-        let colour = TyreStackColour::from(flags & 0x07);
-        let floating = flags & 0x80 != 0;
+    fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+        let kind = TyreStackKind::try_from(wire.index)?;
+        let colour = TyreStackColour::from(wire.colour());
+        let floating = wire.floating();
         Ok(Self {
             kind,
             colour,
-            heading: Direction::from_objectinfo_heading(heading),
+            heading: Direction::from_objectinfo_heading(wire.heading),
             floating,
         })
     }

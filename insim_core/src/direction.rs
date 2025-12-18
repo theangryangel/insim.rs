@@ -63,6 +63,18 @@ impl Direction {
     /// This is typically north/forward in LFS game coordinates.
     pub const ZERO: Self = Self::from_radians(0.0);
 
+    /// Direction pointing north (world Y direction, 0°).
+    pub const NORTH: Self = Self::from_radians(0.0);
+
+    /// Direction pointing east (world X direction, 90°).
+    pub const EAST: Self = Self::from_radians(std::f64::consts::FRAC_PI_2);
+
+    /// Direction pointing south (opposite of world Y, 180°).
+    pub const SOUTH: Self = Self::from_radians(std::f64::consts::PI);
+
+    /// Direction pointing west (opposite of world X, 270°).
+    pub const WEST: Self = Self::from_radians(3.0 * std::f64::consts::FRAC_PI_2);
+
     /// Consumes Direction, returning the inner radian value.
     pub fn into_inner(self) -> f64 {
         self.radians
@@ -140,6 +152,26 @@ impl Direction {
             normalized
         };
         Direction::from_degrees(normalized)
+    }
+
+    /// Get the opposite direction (180° rotation).
+    ///
+    /// Returns the direction that is directly opposite, i.e., rotated 180°.
+    ///
+    /// # Examples
+    /// ```
+    /// use insim_core::direction::Direction;
+    ///
+    /// let north = Direction::NORTH;
+    /// let south = north.opposite();
+    /// assert!((south.to_degrees() - 180.0).abs() < 0.0001);
+    ///
+    /// let east = Direction::EAST;
+    /// let west = east.opposite();
+    /// assert!((west.to_degrees() - 270.0).abs() < 0.0001);
+    /// ```
+    pub fn opposite(&self) -> Direction {
+        Direction::from_radians(self.radians + std::f64::consts::PI)
     }
 
     /// Convert from LFS object heading u8 to Direction.
@@ -279,5 +311,40 @@ mod tests {
         // Test specific values
         assert_eq!(Direction::from_degrees(0.0).to_objectinfo_heading(), 0);
         assert_eq!(Direction::from_degrees(180.0).to_objectinfo_heading(), 128);
+    }
+
+    #[test]
+    fn test_cardinal_directions() {
+        assert!((Direction::NORTH.to_degrees() - 0.0).abs() < 0.0001);
+        assert!((Direction::EAST.to_degrees() - 90.0).abs() < 0.0001);
+        assert!((Direction::SOUTH.to_degrees() - 180.0).abs() < 0.0001);
+        assert!((Direction::WEST.to_degrees() - 270.0).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_opposite() {
+        let north = Direction::NORTH;
+        let south = north.opposite();
+        assert!((south.to_degrees() - 180.0).abs() < 0.0001);
+
+        let east = Direction::EAST;
+        let west = east.opposite();
+        assert!((west.to_degrees() - 270.0).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_opposite_roundtrip() {
+        let original = Direction::from_degrees(45.0);
+        let twice_opposite = original.opposite().opposite();
+        // Note: Direction doesn't auto-normalize, so opposite().opposite() adds 360°
+        assert!((twice_opposite.to_degrees() - (original.to_degrees() + 360.0)).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_opposite_arbitrary_angle() {
+        let dir = Direction::from_degrees(123.45);
+        let opp = dir.opposite();
+        let expected = (123.45 + 180.0) % 360.0;
+        assert!((opp.to_degrees() - expected).abs() < 0.0001);
     }
 }

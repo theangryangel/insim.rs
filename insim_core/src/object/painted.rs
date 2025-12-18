@@ -1,7 +1,7 @@
 //! Painted objects
 use std::convert::TryFrom;
 
-use super::ObjectVariant;
+use super::{ObjectVariant, ObjectWire};
 use crate::{DecodeError, direction::Direction};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
@@ -299,25 +299,28 @@ impl Letters {
 }
 
 impl ObjectVariant for Letters {
-    fn encode(&self) -> Result<(u8, u8, u8), crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = 0;
         flags |= (self.character as u8 & 0x7e) << 1;
         flags |= self.colour as u8 & 0x01;
         if self.floating {
             flags |= 0x80;
         }
-        let heading = self.heading.to_objectinfo_heading();
-        Ok((16, flags, heading))
+        Ok(ObjectWire {
+            index: 16,
+            flags,
+            heading: self.heading.to_objectinfo_heading(),
+        })
     }
 
-    fn decode(_index: u8, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
-        let colour = PaintColour::from(flags);
-        let character = Character::try_from(flags)?;
-        let floating = flags & 0x80 != 0;
+    fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+        let colour = PaintColour::from(wire.flags);
+        let character = Character::try_from(wire.flags)?;
+        let floating = wire.floating();
         Ok(Self {
             colour,
             character,
-            heading: Direction::from_objectinfo_heading(heading),
+            heading: Direction::from_objectinfo_heading(wire.heading),
             floating,
         })
     }
@@ -374,25 +377,28 @@ pub struct Arrows {
 }
 
 impl ObjectVariant for Arrows {
-    fn encode(&self) -> Result<(u8, u8, u8), crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = 0;
         flags |= (self.arrow as u8 & 0x7e) << 1;
         flags |= self.colour as u8 & 0x01;
         if self.floating {
             flags |= 0x80;
         }
-        let heading = self.heading.to_objectinfo_heading();
-        Ok((17, flags, heading))
+        Ok(ObjectWire {
+            index: 17,
+            flags,
+            heading: self.heading.to_objectinfo_heading(),
+        })
     }
 
-    fn decode(_index: u8, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
-        let colour = PaintColour::from(flags);
-        let arrow = Arrow::try_from(flags)?;
-        let floating = flags & 0x80 != 0;
+    fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+        let colour = PaintColour::from(wire.flags);
+        let arrow = Arrow::try_from(wire.flags)?;
+        let floating = wire.floating();
         Ok(Self {
             colour,
             arrow,
-            heading: Direction::from_objectinfo_heading(heading),
+            heading: Direction::from_objectinfo_heading(wire.heading),
             floating,
         })
     }

@@ -1,5 +1,5 @@
 //! Pit objects
-use super::ObjectVariant;
+use super::{ObjectVariant, ObjectWire};
 use crate::{DecodeError, direction::Direction};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
@@ -45,25 +45,28 @@ pub struct Pit {
 }
 
 impl ObjectVariant for Pit {
-    fn encode(&self) -> Result<(u8, u8, u8), crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let index = self.kind as u8;
         let mut flags = self.colour & 0x07;
         flags |= (self.mapping & 0x0f) << 3;
         if self.floating {
             flags |= 0x80;
         }
-        let heading = self.heading.to_objectinfo_heading();
-        Ok((index, flags, heading))
+        Ok(ObjectWire {
+            index,
+            flags,
+            heading: self.heading.to_objectinfo_heading(),
+        })
     }
 
-    fn decode(index: u8, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
-        let kind = PitKind::try_from(index)?;
-        let colour = flags & 0x07;
-        let mapping = (flags >> 3) & 0x0f;
-        let floating = flags & 0x80 != 0;
+    fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+        let kind = PitKind::try_from(wire.index)?;
+        let colour = wire.colour();
+        let mapping = wire.mapping();
+        let floating = wire.floating();
         Ok(Self {
             kind,
-            heading: Direction::from_objectinfo_heading(heading),
+            heading: Direction::from_objectinfo_heading(wire.heading),
             colour,
             mapping,
             floating,

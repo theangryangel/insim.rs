@@ -93,8 +93,8 @@ mod test {
                         },
                         kind: ObjectKind::Control(control::Control {
                             kind: control::ControlKind::Start,
-                            heading: 67,
-                            floating: true
+                            floating: true,
+                            ..
                         })
                     }
                 ));

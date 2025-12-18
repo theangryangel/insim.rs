@@ -1,5 +1,5 @@
 //! Start Position objects
-use super::ObjectVariant;
+use super::{ObjectVariant, ObjectWire};
 use crate::direction::Direction;
 
 /// Start Position
@@ -15,21 +15,24 @@ pub struct StartPosition {
 }
 
 impl ObjectVariant for StartPosition {
-    fn encode(&self) -> Result<(u8, u8, u8), crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let index = 184;
         let mut flags = self.index & 0x3f;
         if self.floating {
             flags |= 0x80;
         }
-        let heading = self.heading.to_objectinfo_heading();
-        Ok((index, flags, heading))
+        Ok(ObjectWire {
+            index,
+            flags,
+            heading: self.heading.to_objectinfo_heading(),
+        })
     }
 
-    fn decode(_index: u8, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
-        let pos_index = flags & 0x3f;
-        let floating = flags & 0x80 != 0;
+    fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+        let pos_index = wire.flags & 0x3f;
+        let floating = wire.floating();
         Ok(Self {
-            heading: Direction::from_objectinfo_heading(heading),
+            heading: Direction::from_objectinfo_heading(wire.heading),
             index: pos_index,
             floating,
         })

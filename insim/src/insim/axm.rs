@@ -144,7 +144,7 @@ impl Encode for Axm {
 mod test {
     use insim_core::object::{
         ObjectInfo, ObjectKind,
-        control::{self, Control},
+        control::{Control, ControlKind},
     };
 
     use super::*;
@@ -188,9 +188,9 @@ mod test {
                             z: 8
                         },
                         kind: ObjectKind::Control(Control {
-                            kind: control::ControlKind::Start,
-                            heading: 128,
-                            floating: false
+                            kind: ControlKind::Start,
+                            floating: false,
+                            ..
                         })
                     }
                 ));

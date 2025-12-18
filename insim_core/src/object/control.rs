@@ -1,5 +1,6 @@
 //! Control objects
 
+use super::ObjectWire;
 use crate::direction::Direction;
 
 #[derive(Debug, Clone, Default, PartialEq, PartialOrd)]
@@ -15,7 +16,7 @@ pub struct Control {
 }
 
 impl Control {
-    pub(crate) fn encode(&self) -> Result<(u8, u8), crate::EncodeError> {
+    pub(crate) fn encode(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = match self.kind {
             ControlKind::Start => 0,
             ControlKind::Checkpoint1 { half_width } => (half_width << 2) | 0b01,
@@ -27,13 +28,17 @@ impl Control {
             flags |= 0x80;
         }
 
-        Ok((flags, self.heading.to_objectinfo_heading()))
+        Ok(ObjectWire {
+            index: 0,
+            flags,
+            heading: self.heading.to_objectinfo_heading(),
+        })
     }
 
-    pub(crate) fn decode(flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
-        let position_bits = flags & 0b11;
-        let half_width = (flags >> 2) & 0b11111;
-        let floating = flags & 0x80 != 0;
+    pub(crate) fn decode(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+        let position_bits = wire.flags & 0b11;
+        let half_width = (wire.flags >> 2) & 0b11111;
+        let floating = wire.floating();
         let kind = match position_bits {
             0b00 if half_width == 0 => ControlKind::Start,
             0b00 if half_width != 0 => ControlKind::Finish { half_width },
@@ -49,7 +54,7 @@ impl Control {
 
         Ok(Self {
             kind,
-            heading: Direction::from_objectinfo_heading(heading),
+            heading: Direction::from_objectinfo_heading(wire.heading),
             floating,
         })
     }
