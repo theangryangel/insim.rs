@@ -3,35 +3,13 @@
 use std::time::Duration;
 
 use bytes::{Buf, BufMut};
-use insim_core::{
-    Decode, Encode,
-    direction::{Direction, DirectionKind},
-    speed::Speed,
-};
+use insim_core::{Decode, Encode, direction::Direction, speed::Speed};
 
 use super::{CompCarInfo, obh::spclose_strip_high_bits};
 use crate::identifiers::{PlayerId, RequestId};
 
-#[derive(Copy, Clone, Debug, Default)]
-pub struct DirectionConInfo;
-
-impl DirectionKind for DirectionConInfo {
-    type Inner = u8;
-
-    fn name() -> &'static str {
-        "128 = 180 deg"
-    }
-
-    fn from_radians(value: f32) -> Self::Inner {
-        ((value * 128.0 / std::f32::consts::PI)
-            .round()
-            .clamp(0.0, 255.0)) as u8
-    }
-
-    fn to_radians(value: Self::Inner) -> f32 {
-        (value as f32) * std::f32::consts::PI / 128.0
-    }
-}
+/// ConInfo direction scale: 128 units = 180°
+const CONINFO_DEGREES_PER_UNIT: f64 = 180.0 / 128.0;
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -66,10 +44,12 @@ pub struct ConInfo {
     pub speed: Speed,
 
     /// Car's motion if Speed > 0: 0 = world y direction, 128 = 180 deg
-    pub direction: Direction<DirectionConInfo>,
+    /// Stored internally as radians
+    pub direction: Direction,
 
     /// direction of forward axis: 0 = world y direction, 128 = 180 deg
-    pub heading: Direction<DirectionConInfo>,
+    /// Stored internally as radians
+    pub heading: Direction,
 
     /// m/s^2 longitudinal acceleration (forward positive)
     pub accelf: u8,
@@ -104,8 +84,13 @@ impl Decode for ConInfo {
         let gearsp = (gearsp >> 4) & 0x0F; // gearsp is only first 4 bits
 
         let speed = Speed::from_meters_per_sec(u8::decode(buf)? as f32);
-        let direction = Direction::decode(buf)?;
-        let heading = Direction::decode(buf)?;
+
+        let direction_raw = u8::decode(buf)?;
+        let direction = Direction::from_degrees((direction_raw as f64) * CONINFO_DEGREES_PER_UNIT);
+
+        let heading_raw = u8::decode(buf)?;
+        let heading = Direction::from_degrees((heading_raw as f64) * CONINFO_DEGREES_PER_UNIT);
+
         let accelf = u8::decode(buf)?;
         let accelr = u8::decode(buf)?;
 
@@ -169,8 +154,17 @@ impl Encode for ConInfo {
         gearsp.encode(buf)?;
 
         (self.speed.to_meters_per_sec() as u8).encode(buf)?;
-        self.direction.encode(buf)?;
-        self.heading.encode(buf)?;
+
+        let direction_units = (self.direction.to_degrees() / CONINFO_DEGREES_PER_UNIT)
+            .round()
+            .clamp(0.0, 255.0) as u8;
+        direction_units.encode(buf)?;
+
+        let heading_units = (self.heading.to_degrees() / CONINFO_DEGREES_PER_UNIT)
+            .round()
+            .clamp(0.0, 255.0) as u8;
+        heading_units.encode(buf)?;
+
         self.accelf.encode(buf)?;
         self.accelr.encode(buf)?;
         self.x.encode(buf)?;

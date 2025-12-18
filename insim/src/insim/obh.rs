@@ -4,8 +4,10 @@ use bitflags::bitflags;
 use bytes::{Buf, BufMut};
 use insim_core::{Decode, Encode, direction::Direction, speed::Speed};
 
-use super::contact::DirectionConInfo;
 use crate::identifiers::{PlayerId, RequestId};
+
+/// CarContact direction scale: 128 units = 180°
+const CARCONTACT_DEGREES_PER_UNIT: f64 = 180.0 / 128.0;
 
 pub(crate) fn spclose_strip_high_bits(val: u16) -> u16 {
     val & !61440
@@ -42,11 +44,13 @@ impl_bitflags_from_to_bytes!(ObhFlags, u8);
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Vehicle made contact with something else
 pub struct CarContact {
-    /// Car's motion if Speed > 0: 0 = world y direction, 128 = 180 deg
-    pub direction: Direction<DirectionConInfo>,
+    /// Car's motion if Speed > 0: 0 = world y direction
+    /// Stored internally as radians
+    pub direction: Direction,
 
-    /// Direction of forward axis: 0 = world y direction, 128 = 180 deg
-    pub heading: Direction<DirectionConInfo>,
+    /// Direction of forward axis: 0 = world y direction
+    /// Stored internally as radians
+    pub heading: Direction,
 
     /// Speed in m/s
     pub speed: Speed,
@@ -63,8 +67,13 @@ pub struct CarContact {
 
 impl Decode for CarContact {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let direction = Direction::decode(buf)?;
-        let heading = Direction::decode(buf)?;
+        let direction_raw = u8::decode(buf)?;
+        let direction =
+            Direction::from_degrees((direction_raw as f64) * CARCONTACT_DEGREES_PER_UNIT);
+
+        let heading_raw = u8::decode(buf)?;
+        let heading = Direction::from_degrees((heading_raw as f64) * CARCONTACT_DEGREES_PER_UNIT);
+
         let speed = u8::decode(buf)?;
         let speed = Speed::from_meters_per_sec(speed as f32);
         let z = u8::decode(buf)?;
@@ -83,8 +92,16 @@ impl Decode for CarContact {
 
 impl Encode for CarContact {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.direction.encode(buf)?;
-        self.heading.encode(buf)?;
+        let direction_units = (self.direction.to_degrees() / CARCONTACT_DEGREES_PER_UNIT)
+            .round()
+            .clamp(0.0, 255.0) as u8;
+        direction_units.encode(buf)?;
+
+        let heading_units = (self.heading.to_degrees() / CARCONTACT_DEGREES_PER_UNIT)
+            .round()
+            .clamp(0.0, 255.0) as u8;
+        heading_units.encode(buf)?;
+
         (self.speed.to_meters_per_sec() as u8).encode(buf)?;
         self.z.encode(buf)?;
         self.x.encode(buf)?;

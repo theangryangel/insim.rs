@@ -1,135 +1,236 @@
-//! Direction
-use std::{fmt, marker::PhantomData};
+//! Angular measurement (heading/direction)
+//!
+//! Direction represents an angle in 3D space, normalized internally to radians.
+//! It follows the LFS game coordinate system convention where:
+//! - **0° is the world Y direction** (typically north/forward)
+//! - **90° is the world X direction** (typically east/right)
+//! - **180° is the opposite of world Y** (typically south/backward)
+//! - **270° is the opposite of world X** (typically west/left)
+//!
+//! Angles increase clockwise when viewed from above (following right-hand rule with Z-up).
+use std::fmt;
 
-use num_traits::Num;
-
-use crate::{Decode, Encode};
-
-/// DirectionKind
-pub trait DirectionKind: Copy {
-    /// Raw/Inner type
-    type Inner: fmt::Display + Copy + Num + Decode + Encode + Default;
-
-    /// Display name, used in Display implementation
-    fn name() -> &'static str;
-
-    /// Convert from radians
-    fn from_radians(value: f32) -> Self::Inner;
-    /// Convert into radians
-    fn to_radians(value: Self::Inner) -> f32;
-}
-
-/// Representation of Direction. The intention is to keep things as close to raw as possible, whilst
-/// allowing to convert to and from human useful terms like mph, kmph, mps, etc. whilst maintaining
-/// type safety.
-/// There is no intention to create a complex uom-style system.
-/// Previous generations of Direction were more akin to Duration from the standard library, but this
-/// exposed a design conflict.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+/// Angular measurement stored as radians (f64).
+///
+/// Represents heading or direction in LFS game space. Internally stored as f64 radians
+/// for consistency across the codebase, with convenient conversions to/from degrees.
+/// Uses double precision to minimize cumulative errors in physics calculations and
+/// integration over time.
+///
+/// # Orientation
+/// - **0° = world Y direction** (forward/north)
+/// - **90° = world X direction** (right/east)
+/// - **180° = -Y direction** (backward/south)
+/// - **270° = -X direction** (left/west)
+///
+/// Angles increase in the clockwise direction when viewed from above (positive Z).
+///
+/// # Wraparound
+/// Angles are **not** automatically normalized. A Direction created from 450° will
+/// preserve that value internally. Use [`normalize()`](Direction::normalize) to wrap
+/// angles to the [0°, 360°) range if needed.
+///
+/// ```
+/// use insim_core::direction::Direction;
+///
+/// let over = Direction::from_degrees(450.0);
+/// assert!((over.to_degrees() - 450.0).abs() < 0.0001);  // Preserved as-is
+///
+/// let normalized = over.normalize();
+/// assert!((normalized.to_degrees() - 90.0).abs() < 0.0001);  // Wrapped to [0, 360)
+/// ```
+///
+/// # Examples
+/// ```
+/// use insim_core::direction::Direction;
+///
+/// let forward = Direction::from_degrees(0.0);    // Y direction
+/// let right = Direction::from_degrees(90.0);     // X direction
+/// let backward = Direction::from_degrees(180.0); // -Y direction
+///
+/// assert_eq!(forward.to_degrees(), 0.0);
+/// assert_eq!(right.to_degrees(), 90.0);
+/// ```
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct Direction<T: DirectionKind> {
-    inner: T::Inner,
-    _marker: PhantomData<T>,
+pub struct Direction {
+    radians: f64,
 }
 
-impl<T> Direction<T>
-where
-    T: DirectionKind,
-{
-    /// New
-    pub fn new(value: T::Inner) -> Self {
+impl Direction {
+    /// Direction pointing along world Y (0°).
+    ///
+    /// This is typically north/forward in LFS game coordinates.
+    pub const ZERO: Self = Self::from_radians(0.0);
+
+    /// Consumes Direction, returning the inner radian value.
+    pub fn into_inner(self) -> f64 {
+        self.radians
+    }
+
+    /// Create Direction from radians.
+    ///
+    /// 0 radians = world Y direction (forward)
+    /// π/2 radians = world X direction (right)
+    /// π radians = -Y direction (backward)
+    /// 3π/2 radians = -X direction (left)
+    pub const fn from_radians(value: f64) -> Self {
+        Self { radians: value }
+    }
+
+    /// Get the angle in radians.
+    ///
+    /// 0 radians = world Y direction (forward)
+    /// π/2 radians = world X direction (right)
+    /// π radians = -Y direction (backward)
+    /// 3π/2 radians = -X direction (left)
+    pub const fn to_radians(&self) -> f64 {
+        self.radians
+    }
+
+    /// Create Direction from degrees.
+    ///
+    /// 0° = world Y direction (forward)
+    /// 90° = world X direction (right)
+    /// 180° = -Y direction (backward)
+    /// 270° = -X direction (left)
+    pub const fn from_degrees(value: f64) -> Self {
         Self {
-            inner: value,
-            _marker: PhantomData,
+            radians: value * std::f64::consts::PI / 180.0,
         }
     }
 
-    /// Consumes Direction, returning the raw wrapped value.
-    pub fn into_inner(self) -> T::Inner {
-        self.inner
+    /// Get the angle in degrees.
+    ///
+    /// 0° = world Y direction (forward)
+    /// 90° = world X direction (right)
+    /// 180° = -Y direction (backward)
+    /// 270° = -X direction (left)
+    pub const fn to_degrees(&self) -> f64 {
+        self.radians * 180.0 / std::f64::consts::PI
     }
 
-    /// Convert from degrees
-    pub fn from_degrees(value: f32) -> Self {
-        Self::new(T::from_radians(value.to_radians()))
-    }
-    /// Convert into degrees
-    pub fn to_degrees(&self) -> f32 {
-        T::to_radians(self.inner).to_degrees()
-    }
-
-    /// Convert from radians
-    pub fn from_radians(value: f32) -> Self {
-        Self::new(T::from_radians(value))
-    }
-    /// Convert into radians
-    pub fn to_radians(&self) -> f32 {
-        T::to_radians(self.inner)
+    /// Normalize the angle to the range [0°, 360°).
+    ///
+    /// Wraps the internal angle so that the result is within [0°, 360°). Useful when
+    /// you need to compare directions or ensure angles are in a canonical form.
+    ///
+    /// # Examples
+    /// ```
+    /// use insim_core::direction::Direction;
+    ///
+    /// // Over-rotation wraps back
+    /// let over = Direction::from_degrees(450.0);
+    /// assert!((over.normalize().to_degrees() - 90.0).abs() < 0.0001);
+    ///
+    /// // Negative angles wrap forward
+    /// let negative = Direction::from_degrees(-90.0);
+    /// assert!((negative.normalize().to_degrees() - 270.0).abs() < 0.0001);
+    ///
+    /// // Already normalized angles unchanged
+    /// let normal = Direction::from_degrees(45.0);
+    /// assert!((normal.normalize().to_degrees() - 45.0).abs() < 0.0001);
+    /// ```
+    pub fn normalize(&self) -> Direction {
+        let degrees = self.to_degrees();
+        let normalized = degrees % 360.0;
+        let normalized = if normalized < 0.0 {
+            normalized + 360.0
+        } else {
+            normalized
+        };
+        Direction::from_degrees(normalized)
     }
 }
 
-impl<T: DirectionKind> fmt::Display for Direction<T> {
+impl fmt::Display for Direction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:.2} {}", self.inner, T::name())
+        write!(f, "{:.2}°", self.to_degrees())
     }
 }
 
-impl<T: DirectionKind> Default for Direction<T> {
+impl Default for Direction {
     fn default() -> Self {
-        Self::new(T::Inner::default())
-    }
-}
-
-impl<T> Encode for Direction<T>
-where
-    T: DirectionKind,
-{
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodeError> {
-        self.inner.encode(buf)
-    }
-}
-
-impl<T> Decode for Direction<T>
-where
-    T: DirectionKind,
-{
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
-        let inner = T::Inner::decode(buf)?;
-        Ok(Self::new(inner))
+        Self::ZERO
     }
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
-    #[derive(Copy, Clone, Debug, Default)]
-    pub struct Direction32768;
-
-    impl DirectionKind for Direction32768 {
-        type Inner = u16;
-
-        fn name() -> &'static str {
-            "32768 = 180 deg"
-        }
-
-        fn from_radians(value: f32) -> Self::Inner {
-            ((value * 32768.0 / std::f32::consts::PI)
-                .round()
-                .clamp(0.0, 65535.0)) as u16
-        }
-
-        fn to_radians(value: Self::Inner) -> f32 {
-            (value as f32) * std::f32::consts::PI / 32768.0
-        }
+    #[test]
+    fn test_radians() {
+        assert_eq!(
+            Direction::from_radians(std::f64::consts::PI).to_degrees(),
+            180.0
+        );
     }
 
     #[test]
-    fn test_direction_game_units() {
-        assert_eq!(Direction::<Direction32768>::new(32768).to_degrees(), 180.0);
-        assert_eq!(
-            Direction::<Direction32768>::from_degrees(180.0).into_inner(),
-            32768
-        );
+    fn test_degrees() {
+        assert!((Direction::from_degrees(180.0).to_radians() - std::f64::consts::PI).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_zero() {
+        assert_eq!(Direction::ZERO.to_degrees(), 0.0);
+        assert_eq!(Direction::ZERO.to_radians(), 0.0);
+    }
+
+    #[test]
+    fn test_roundtrip_degrees() {
+        let original = 45.0;
+        let direction = Direction::from_degrees(original);
+        assert!((direction.to_degrees() - original).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_normalize_over_rotation() {
+        let over = Direction::from_degrees(450.0);
+        let normalized = over.normalize();
+        assert!((normalized.to_degrees() - 90.0).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_normalize_negative() {
+        let negative = Direction::from_degrees(-90.0);
+        let normalized = negative.normalize();
+        assert!((normalized.to_degrees() - 270.0).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_normalize_already_normal() {
+        let normal = Direction::from_degrees(45.0);
+        let normalized = normal.normalize();
+        assert!((normalized.to_degrees() - 45.0).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_normalize_zero() {
+        let zero = Direction::from_degrees(0.0);
+        let normalized = zero.normalize();
+        assert!((normalized.to_degrees() - 0.0).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_normalize_360() {
+        let full_rotation = Direction::from_degrees(360.0);
+        let normalized = full_rotation.normalize();
+        assert!((normalized.to_degrees() - 0.0).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_normalize_large_negative() {
+        let large_negative = Direction::from_degrees(-450.0);
+        let normalized = large_negative.normalize();
+        assert!((normalized.to_degrees() - 270.0).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_no_auto_normalize() {
+        // Verify that construction doesn't auto-normalize
+        let over = Direction::from_degrees(450.0);
+        assert!((over.to_degrees() - 450.0).abs() < 0.0001);
     }
 }
