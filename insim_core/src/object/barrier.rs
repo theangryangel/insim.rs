@@ -1,11 +1,11 @@
-//! Armco3 barrier object
+//! Barrier long object
 use super::{ObjectVariant, ObjectWire};
 use crate::{DecodeError, direction::Direction};
 
-/// Armco3 barrier
+/// Barrier long
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct Armco3 {
+pub struct Barrier {
     /// Heading / Direction
     pub heading: Direction,
     /// Colour (3 bits, 0-7)
@@ -16,7 +16,7 @@ pub struct Armco3 {
     pub floating: bool,
 }
 
-impl ObjectVariant for Armco3 {
+impl ObjectVariant for Barrier {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = self.colour & 0x07;
         flags |= (self.mapping & 0x0f) << 3;
@@ -47,10 +47,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_armco3_round_trip() {
-        let original = Armco3::default();
+    fn test_barrier_long_round_trip() {
+        let original = Barrier::default();
         let wire = original.to_wire().expect("to_wire failed");
-        let decoded = Armco3::from_wire(wire).expect("from_wire failed");
+        let decoded = Barrier::from_wire(wire).expect("from_wire failed");
         assert_eq!(original, decoded);
     }
 }

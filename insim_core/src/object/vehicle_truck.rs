@@ -2,6 +2,37 @@
 use super::{ObjectVariant, ObjectWire};
 use crate::{DecodeError, direction::Direction};
 
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[repr(u8)]
+#[allow(missing_docs)]
+#[non_exhaustive]
+/// Cone Colour
+pub enum VehicleTruckColour {
+    #[default]
+    Black,
+    Orange,
+    White,
+    Yellow,
+    DarkBlue,
+    Red,
+    LightBlue,
+}
+
+impl From<u8> for VehicleTruckColour {
+    fn from(value: u8) -> Self {
+        match value & 0x07 {
+            0 => Self::Black,
+            1 => Self::Orange,
+            2 => Self::White,
+            3 => Self::Yellow,
+            4 => Self::DarkBlue,
+            5 => Self::Red,
+            6 => Self::LightBlue,
+            _ => Self::Black,
+        }
+    }
+}
 /// Vehicle Truck
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -9,7 +40,7 @@ pub struct VehicleTruck {
     /// Heading / Direction
     pub heading: Direction,
     /// Colour (3 bits, 0-7)
-    pub colour: u8,
+    pub colour: VehicleTruckColour,
     /// Mapping (4 bits, 0-15)
     pub mapping: u8,
     /// Floating
@@ -18,7 +49,7 @@ pub struct VehicleTruck {
 
 impl ObjectVariant for VehicleTruck {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
-        let mut flags = self.colour & 0x07;
+        let mut flags = self.colour as u8 & 0x07;
         flags |= (self.mapping & 0x0f) << 3;
         if self.floating {
             flags |= 0x80;
@@ -30,7 +61,7 @@ impl ObjectVariant for VehicleTruck {
     }
 
     fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
-        let colour = wire.colour();
+        let colour = VehicleTruckColour::from(wire.colour());
         let mapping = wire.mapping();
         let floating = wire.floating();
         Ok(Self {

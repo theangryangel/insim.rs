@@ -8,7 +8,7 @@ use crate::{DecodeError, direction::Direction};
 #[allow(missing_docs)]
 #[non_exhaustive]
 /// Metal Sign Mapping
-pub enum MetalSignMapping {
+pub enum MetalSignKind {
     /// Keep Left
     #[default]
     KeepLeft = 0,
@@ -28,7 +28,7 @@ pub enum MetalSignMapping {
     NoEntry = 7,
 }
 
-impl TryFrom<u8> for MetalSignMapping {
+impl TryFrom<u8> for MetalSignKind {
     type Error = DecodeError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
@@ -52,8 +52,8 @@ impl TryFrom<u8> for MetalSignMapping {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SignMetal {
-    /// Mapping
-    pub mapping: MetalSignMapping,
+    /// Kind
+    pub kind: MetalSignKind,
     /// Heading / Direction
     pub heading: Direction,
     /// Colour (3 bits, 0-7)
@@ -65,7 +65,7 @@ pub struct SignMetal {
 impl ObjectVariant for SignMetal {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = self.colour & 0x07;
-        flags |= (self.mapping as u8 & 0x0f) << 3;
+        flags |= (self.kind as u8 & 0x0f) << 3;
         if self.floating {
             flags |= 0x80;
         }
@@ -76,11 +76,11 @@ impl ObjectVariant for SignMetal {
     }
 
     fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
-        let mapping = MetalSignMapping::try_from(wire.mapping())?;
+        let kind = MetalSignKind::try_from(wire.mapping())?;
         let colour = wire.colour();
         let floating = wire.floating();
         Ok(Self {
-            mapping,
+            kind,
             heading: Direction::from_objectinfo_heading(wire.heading),
             colour,
             floating,

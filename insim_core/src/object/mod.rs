@@ -1,31 +1,15 @@
 //! Objects are used in both insim and lyt files
 
-pub mod armco1;
-pub mod armco3;
-pub mod armco5;
+pub mod armco;
 pub mod bale;
 pub mod banner;
-pub mod barrier_long;
-pub mod barrier_red;
-pub mod barrier_white;
+pub mod barrier;
 pub mod bin1;
 pub mod bin2;
-pub mod chalk_ahead;
-pub mod chalk_ahead2;
-pub mod chalk_left;
-pub mod chalk_left2;
-pub mod chalk_left3;
-pub mod chalk_line;
-pub mod chalk_line2;
-pub mod chalk_right;
-pub mod chalk_right2;
-pub mod chalk_right3;
+pub mod chalk;
+pub mod chevron;
 pub mod concrete;
-pub mod cone1;
-pub mod cone2;
-pub mod cone_pointer;
-pub mod cone_tall1;
-pub mod cone_tall2;
+pub mod cones;
 pub mod control;
 pub mod insim;
 pub mod kerb;
@@ -38,28 +22,14 @@ pub mod painted;
 pub mod pit;
 pub mod pit_start_point;
 pub mod post;
-pub mod railing1;
-pub mod railing2;
-pub mod ramp1;
-pub mod ramp2;
+pub mod railing;
+pub mod ramp;
 pub mod sign_metal;
 pub mod sign_speed;
-pub mod speed_hump_10m;
-pub mod speed_hump_1m;
-pub mod speed_hump_2m;
-pub mod speed_hump_6m;
-pub mod start_lights1;
-pub mod start_lights2;
-pub mod start_lights3;
+pub mod speed_hump;
+pub mod start_lights;
 pub mod start_position;
-pub mod tyre_single;
-pub mod tyre_single_big;
-pub mod tyre_stack2;
-pub mod tyre_stack2_big;
-pub mod tyre_stack3;
-pub mod tyre_stack3_big;
-pub mod tyre_stack4;
-pub mod tyre_stack4_big;
+pub mod tyres;
 pub mod vehicle_ambulance;
 pub mod vehicle_suv;
 pub mod vehicle_truck;
@@ -110,7 +80,7 @@ pub struct ObjectInfo {
     pub kind: ObjectKind,
 }
 
-#[derive(Debug, Clone, from_variants::FromVariants)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 /// Layout Object Kind
@@ -129,55 +99,55 @@ pub enum ObjectKind {
     RouteChecker(marshal::RouteChecker),
 
     /// ChalkLine
-    ChalkLine(chalk_line::ChalkLine),
+    ChalkLine(chalk::Chalk),
     /// ChalkLine2
-    ChalkLine2(chalk_line2::ChalkLine2),
+    ChalkLine2(chalk::Chalk),
     /// ChalkAhead
-    ChalkAhead(chalk_ahead::ChalkAhead),
+    ChalkAhead(chalk::Chalk),
     /// ChalkAhead2
-    ChalkAhead2(chalk_ahead2::ChalkAhead2),
+    ChalkAhead2(chalk::Chalk),
     /// ChalkLeft
-    ChalkLeft(chalk_left::ChalkLeft),
+    ChalkLeft(chalk::Chalk),
     /// ChalkLeft2
-    ChalkLeft2(chalk_left2::ChalkLeft2),
+    ChalkLeft2(chalk::Chalk),
     /// ChalkLeft3
-    ChalkLeft3(chalk_left3::ChalkLeft3),
+    ChalkLeft3(chalk::Chalk),
     /// ChalkRight
-    ChalkRight(chalk_right::ChalkRight),
+    ChalkRight(chalk::Chalk),
     /// ChalkRight2
-    ChalkRight2(chalk_right2::ChalkRight2),
+    ChalkRight2(chalk::Chalk),
     /// ChalkRight3
-    ChalkRight3(chalk_right3::ChalkRight3),
+    ChalkRight3(chalk::Chalk),
     /// Painted Letters
     PaintLetters(painted::Letters),
     /// Painted Arrows
     PaintArrows(painted::Arrows),
     /// Cone1
-    Cone1(cone1::Cone1),
+    Cone1(cones::Cone),
     /// Cone2
-    Cone2(cone2::Cone2),
+    Cone2(cones::Cone),
     /// ConeTall1
-    ConeTall1(cone_tall1::ConeTall1),
+    ConeTall1(cones::Cone),
     /// ConeTall2
-    ConeTall2(cone_tall2::ConeTall2),
+    ConeTall2(cones::Cone),
     /// Cone Pointer
-    ConePointer(cone_pointer::ConePointer),
+    ConePointer(cones::Cone),
     /// Tyre Single
-    TyreSingle(tyre_single::TyreSingle),
+    TyreSingle(tyres::Tyres),
     /// Tyre Stack2
-    TyreStack2(tyre_stack2::TyreStack2),
+    TyreStack2(tyres::Tyres),
     /// Tyre Stack3
-    TyreStack3(tyre_stack3::TyreStack3),
+    TyreStack3(tyres::Tyres),
     /// Tyre Stack4
-    TyreStack4(tyre_stack4::TyreStack4),
+    TyreStack4(tyres::Tyres),
     /// Tyre Single Big
-    TyreSingleBig(tyre_single_big::TyreSingleBig),
+    TyreSingleBig(tyres::Tyres),
     /// Tyre Stack2 Big
-    TyreStack2Big(tyre_stack2_big::TyreStack2Big),
+    TyreStack2Big(tyres::Tyres),
     /// Tyre Stack3 Big
-    TyreStack3Big(tyre_stack3_big::TyreStack3Big),
+    TyreStack3Big(tyres::Tyres),
     /// Tyre Stack4 Big
-    TyreStack4Big(tyre_stack4_big::TyreStack4Big),
+    TyreStack4Big(tyres::Tyres),
     /// Corner Marker
     MarkerCorner(marker::MarkerCorner),
     /// Distance Marker
@@ -187,23 +157,23 @@ pub enum ObjectKind {
     /// Letterboard RB
     LetterboardRB(letterboard_rb::LetterboardRB),
     /// Armco1
-    Armco1(armco1::Armco1),
+    Armco1(armco::Armco),
     /// Armco3
-    Armco3(armco3::Armco3),
+    Armco3(armco::Armco),
     /// Armco5
-    Armco5(armco5::Armco5),
+    Armco5(armco::Armco),
     /// Barrier Long
-    BarrierLong(barrier_long::BarrierLong),
+    BarrierLong(barrier::Barrier),
     /// Barrier Red
-    BarrierRed(barrier_red::BarrierRed),
+    BarrierRed(barrier::Barrier),
     /// Barrier White
-    BarrierWhite(barrier_white::BarrierWhite),
+    BarrierWhite(barrier::Barrier),
     /// Banner
     Banner(banner::Banner),
     /// Ramp1
-    Ramp1(ramp1::Ramp1),
+    Ramp1(ramp::Ramp),
     /// Ramp2
-    Ramp2(ramp2::Ramp2),
+    Ramp2(ramp::Ramp),
     /// Vehicle SUV
     VehicleSUV(vehicle_suv::VehicleSUV),
     /// Vehicle Van
@@ -221,29 +191,33 @@ pub enum ObjectKind {
     /// Bale
     Bale(bale::Bale),
     /// Speed hump 10m
-    SpeedHump10M(speed_hump_10m::SpeedHump10M),
+    SpeedHump10M(speed_hump::SpeedHump),
     /// Speed hump 6m
-    SpeedHump6M(speed_hump_6m::SpeedHump6M),
+    SpeedHump6M(speed_hump::SpeedHump),
     /// Speed hump 2m
-    SpeedHump2M(speed_hump_2m::SpeedHump2M),
+    SpeedHump2M(speed_hump::SpeedHump),
     /// Speed hump 1m
-    SpeedHump1M(speed_hump_1m::SpeedHump1M),
+    SpeedHump1M(speed_hump::SpeedHump),
     /// Bin1
     Bin1(bin1::Bin1),
     /// Bin2
     Bin2(bin2::Bin2),
     /// Railing1
-    Railing1(railing1::Railing1),
+    Railing1(railing::Railing),
     /// Railing2
-    Railing2(railing2::Railing2),
+    Railing2(railing::Railing),
     /// Start lights 1
-    StartLights1(start_lights1::StartLights1),
+    StartLights1(start_lights::StartLights),
     /// Start lights 2
-    StartLights2(start_lights2::StartLights2),
+    StartLights2(start_lights::StartLights),
     /// Start lights 3
-    StartLights3(start_lights3::StartLights3),
+    StartLights3(start_lights::StartLights),
     /// Metal Sign
     SignMetal(sign_metal::SignMetal),
+    /// ChevronLeft
+    ChevronLeft(chevron::Chevron),
+    /// ChevronRight
+    ChevronRight(chevron::Chevron),
     /// Speed Sign
     SignSpeed(sign_speed::SignSpeed),
     /// Concrete Slab
@@ -536,6 +510,14 @@ impl ObjectKind {
                 let wire = sign_metal.to_wire()?;
                 Ok((160, wire))
             },
+            ObjectKind::ChevronLeft(chevron) => {
+                let wire = chevron.to_wire()?;
+                Ok((164, wire))
+            },
+            ObjectKind::ChevronRight(chevron) => {
+                let wire = chevron.to_wire()?;
+                Ok((165, wire))
+            },
             ObjectKind::SignSpeed(sign_speed) => {
                 let wire = sign_speed.to_wire()?;
                 Ok((168, wire))
@@ -603,74 +585,32 @@ impl ObjectKind {
                 wire,
             )?)),
 
-            4 => Ok(ObjectKind::ChalkLine(chalk_line::ChalkLine::from_wire(
-                wire,
-            )?)),
-            5 => Ok(ObjectKind::ChalkLine2(chalk_line2::ChalkLine2::from_wire(
-                wire,
-            )?)),
-            6 => Ok(ObjectKind::ChalkAhead(chalk_ahead::ChalkAhead::from_wire(
-                wire,
-            )?)),
-            7 => Ok(ObjectKind::ChalkAhead2(
-                chalk_ahead2::ChalkAhead2::from_wire(wire)?,
-            )),
-            8 => Ok(ObjectKind::ChalkLeft(chalk_left::ChalkLeft::from_wire(
-                wire,
-            )?)),
-            9 => Ok(ObjectKind::ChalkLeft2(chalk_left2::ChalkLeft2::from_wire(
-                wire,
-            )?)),
-            10 => Ok(ObjectKind::ChalkLeft3(chalk_left3::ChalkLeft3::from_wire(
-                wire,
-            )?)),
-            11 => Ok(ObjectKind::ChalkRight(chalk_right::ChalkRight::from_wire(
-                wire,
-            )?)),
-            12 => Ok(ObjectKind::ChalkRight2(
-                chalk_right2::ChalkRight2::from_wire(wire)?,
-            )),
-            13 => Ok(ObjectKind::ChalkRight3(
-                chalk_right3::ChalkRight3::from_wire(wire)?,
-            )),
+            4 => Ok(ObjectKind::ChalkLine(chalk::Chalk::from_wire(wire)?)),
+            5 => Ok(ObjectKind::ChalkLine2(chalk::Chalk::from_wire(wire)?)),
+            6 => Ok(ObjectKind::ChalkAhead(chalk::Chalk::from_wire(wire)?)),
+            7 => Ok(ObjectKind::ChalkAhead2(chalk::Chalk::from_wire(wire)?)),
+            8 => Ok(ObjectKind::ChalkLeft(chalk::Chalk::from_wire(wire)?)),
+            9 => Ok(ObjectKind::ChalkLeft2(chalk::Chalk::from_wire(wire)?)),
+            10 => Ok(ObjectKind::ChalkLeft3(chalk::Chalk::from_wire(wire)?)),
+            11 => Ok(ObjectKind::ChalkRight(chalk::Chalk::from_wire(wire)?)),
+            12 => Ok(ObjectKind::ChalkRight2(chalk::Chalk::from_wire(wire)?)),
+            13 => Ok(ObjectKind::ChalkRight3(chalk::Chalk::from_wire(wire)?)),
             16 => Ok(ObjectKind::PaintLetters(painted::Letters::from_wire(wire)?)),
             17 => Ok(ObjectKind::PaintArrows(painted::Arrows::from_wire(wire)?)),
-            20 => Ok(ObjectKind::Cone1(cone1::Cone1::from_wire(wire)?)),
-            21 => Ok(ObjectKind::Cone2(cone2::Cone2::from_wire(wire)?)),
-            32 => Ok(ObjectKind::ConeTall1(cone_tall1::ConeTall1::from_wire(
-                wire,
-            )?)),
-            33 => Ok(ObjectKind::ConeTall2(cone_tall2::ConeTall2::from_wire(
-                wire,
-            )?)),
-            40 => Ok(ObjectKind::ConePointer(
-                cone_pointer::ConePointer::from_wire(wire)?,
-            )),
+            20 => Ok(ObjectKind::Cone1(cones::Cone::from_wire(wire)?)),
+            21 => Ok(ObjectKind::Cone2(cones::Cone::from_wire(wire)?)),
+            32 => Ok(ObjectKind::ConeTall1(cones::Cone::from_wire(wire)?)),
+            33 => Ok(ObjectKind::ConeTall2(cones::Cone::from_wire(wire)?)),
+            40 => Ok(ObjectKind::ConePointer(cones::Cone::from_wire(wire)?)),
 
-            48 => Ok(ObjectKind::TyreSingle(tyre_single::TyreSingle::from_wire(
-                wire,
-            )?)),
-            49 => Ok(ObjectKind::TyreStack2(tyre_stack2::TyreStack2::from_wire(
-                wire,
-            )?)),
-            50 => Ok(ObjectKind::TyreStack3(tyre_stack3::TyreStack3::from_wire(
-                wire,
-            )?)),
-            51 => Ok(ObjectKind::TyreStack4(tyre_stack4::TyreStack4::from_wire(
-                wire,
-            )?)),
-            52 => Ok(ObjectKind::TyreSingleBig(
-                tyre_single_big::TyreSingleBig::from_wire(wire)?,
-            )),
-            53 => Ok(ObjectKind::TyreStack2Big(
-                tyre_stack2_big::TyreStack2Big::from_wire(wire)?,
-            )),
-            54 => Ok(ObjectKind::TyreStack3Big(
-                tyre_stack3_big::TyreStack3Big::from_wire(wire)?,
-            )),
-            55 => Ok(ObjectKind::TyreStack4Big(
-                tyre_stack4_big::TyreStack4Big::from_wire(wire)?,
-            )),
+            48 => Ok(ObjectKind::TyreSingle(tyres::Tyres::from_wire(wire)?)),
+            49 => Ok(ObjectKind::TyreStack2(tyres::Tyres::from_wire(wire)?)),
+            50 => Ok(ObjectKind::TyreStack3(tyres::Tyres::from_wire(wire)?)),
+            51 => Ok(ObjectKind::TyreStack4(tyres::Tyres::from_wire(wire)?)),
+            52 => Ok(ObjectKind::TyreSingleBig(tyres::Tyres::from_wire(wire)?)),
+            53 => Ok(ObjectKind::TyreStack2Big(tyres::Tyres::from_wire(wire)?)),
+            54 => Ok(ObjectKind::TyreStack3Big(tyres::Tyres::from_wire(wire)?)),
+            55 => Ok(ObjectKind::TyreStack4Big(tyres::Tyres::from_wire(wire)?)),
 
             62 => Ok(ObjectKind::MarkerCorner(marker::MarkerCorner::from_wire(
                 wire,
@@ -684,21 +624,15 @@ impl ObjectKind {
             93 => Ok(ObjectKind::LetterboardRB(
                 letterboard_rb::LetterboardRB::from_wire(wire)?,
             )),
-            96 => Ok(ObjectKind::Armco1(armco1::Armco1::from_wire(wire)?)),
-            97 => Ok(ObjectKind::Armco3(armco3::Armco3::from_wire(wire)?)),
-            98 => Ok(ObjectKind::Armco5(armco5::Armco5::from_wire(wire)?)),
-            104 => Ok(ObjectKind::BarrierLong(
-                barrier_long::BarrierLong::from_wire(wire)?,
-            )),
-            105 => Ok(ObjectKind::BarrierRed(barrier_red::BarrierRed::from_wire(
-                wire,
-            )?)),
-            106 => Ok(ObjectKind::BarrierWhite(
-                barrier_white::BarrierWhite::from_wire(wire)?,
-            )),
+            96 => Ok(ObjectKind::Armco1(armco::Armco::from_wire(wire)?)),
+            97 => Ok(ObjectKind::Armco3(armco::Armco::from_wire(wire)?)),
+            98 => Ok(ObjectKind::Armco5(armco::Armco::from_wire(wire)?)),
+            104 => Ok(ObjectKind::BarrierLong(barrier::Barrier::from_wire(wire)?)),
+            105 => Ok(ObjectKind::BarrierRed(barrier::Barrier::from_wire(wire)?)),
+            106 => Ok(ObjectKind::BarrierWhite(barrier::Barrier::from_wire(wire)?)),
             112 => Ok(ObjectKind::Banner(banner::Banner::from_wire(wire)?)),
-            120 => Ok(ObjectKind::Ramp1(ramp1::Ramp1::from_wire(wire)?)),
-            121 => Ok(ObjectKind::Ramp2(ramp2::Ramp2::from_wire(wire)?)),
+            120 => Ok(ObjectKind::Ramp1(ramp::Ramp::from_wire(wire)?)),
+            121 => Ok(ObjectKind::Ramp2(ramp::Ramp::from_wire(wire)?)),
             124 => Ok(ObjectKind::VehicleSUV(vehicle_suv::VehicleSUV::from_wire(
                 wire,
             )?)),
@@ -711,38 +645,40 @@ impl ObjectKind {
             127 => Ok(ObjectKind::VehicleAmbulance(
                 vehicle_ambulance::VehicleAmbulance::from_wire(wire)?,
             )),
-            128 => Ok(ObjectKind::SpeedHump10M(
-                speed_hump_10m::SpeedHump10M::from_wire(wire)?,
-            )),
-            129 => Ok(ObjectKind::SpeedHump6M(
-                speed_hump_6m::SpeedHump6M::from_wire(wire)?,
-            )),
-            130 => Ok(ObjectKind::SpeedHump2M(
-                speed_hump_2m::SpeedHump2M::from_wire(wire)?,
-            )),
-            131 => Ok(ObjectKind::SpeedHump1M(
-                speed_hump_1m::SpeedHump1M::from_wire(wire)?,
-            )),
+            128 => Ok(ObjectKind::SpeedHump10M(speed_hump::SpeedHump::from_wire(
+                wire,
+            )?)),
+            129 => Ok(ObjectKind::SpeedHump6M(speed_hump::SpeedHump::from_wire(
+                wire,
+            )?)),
+            130 => Ok(ObjectKind::SpeedHump2M(speed_hump::SpeedHump::from_wire(
+                wire,
+            )?)),
+            131 => Ok(ObjectKind::SpeedHump1M(speed_hump::SpeedHump::from_wire(
+                wire,
+            )?)),
             132 => Ok(ObjectKind::Kerb(kerb::Kerb::from_wire(wire)?)),
             136 => Ok(ObjectKind::Post(post::Post::from_wire(wire)?)),
             140 => Ok(ObjectKind::Marquee(marquee::Marquee::from_wire(wire)?)),
             144 => Ok(ObjectKind::Bale(bale::Bale::from_wire(wire)?)),
             145 => Ok(ObjectKind::Bin1(bin1::Bin1::from_wire(wire)?)),
             146 => Ok(ObjectKind::Bin2(bin2::Bin2::from_wire(wire)?)),
-            147 => Ok(ObjectKind::Railing1(railing1::Railing1::from_wire(wire)?)),
-            148 => Ok(ObjectKind::Railing2(railing2::Railing2::from_wire(wire)?)),
+            147 => Ok(ObjectKind::Railing1(railing::Railing::from_wire(wire)?)),
+            148 => Ok(ObjectKind::Railing2(railing::Railing::from_wire(wire)?)),
             149 => Ok(ObjectKind::StartLights1(
-                start_lights1::StartLights1::from_wire(wire)?,
+                start_lights::StartLights::from_wire(wire)?,
             )),
             150 => Ok(ObjectKind::StartLights2(
-                start_lights2::StartLights2::from_wire(wire)?,
+                start_lights::StartLights::from_wire(wire)?,
             )),
             151 => Ok(ObjectKind::StartLights3(
-                start_lights3::StartLights3::from_wire(wire)?,
+                start_lights::StartLights::from_wire(wire)?,
             )),
             160 => Ok(ObjectKind::SignMetal(sign_metal::SignMetal::from_wire(
                 wire,
             )?)),
+            164 => Ok(ObjectKind::ChevronLeft(chevron::Chevron::from_wire(wire)?)),
+            165 => Ok(ObjectKind::ChevronRight(chevron::Chevron::from_wire(wire)?)),
             168 => Ok(ObjectKind::SignSpeed(sign_speed::SignSpeed::from_wire(
                 wire,
             )?)),
@@ -885,6 +821,8 @@ impl ObjectKind {
             ObjectKind::InsimCircle(_) => None,
             ObjectKind::RestrictedArea(_) => None,
             ObjectKind::RouteChecker(_) => None,
+            ObjectKind::ChevronLeft(c) => Some(c.heading),
+            ObjectKind::ChevronRight(c) => Some(c.heading),
         }
     }
 
@@ -967,84 +905,9 @@ impl ObjectKind {
             ObjectKind::StartPosition(s) => Some(s.floating),
             ObjectKind::PitStartPoint(p) => Some(p.floating),
             ObjectKind::PitStopBox(p) => Some(p.floating),
+            ObjectKind::ChevronLeft(p) => Some(p.floating),
+            ObjectKind::ChevronRight(p) => Some(p.floating),
         }
-    }
-}
-
-impl ObjectInfo {
-    /// Create spaced-out objects starting from the left (extends to the right)
-    pub fn spaced_from_left(
-        objects: impl IntoIterator<Item = ObjectKind>,
-        start_pos: glam::I16Vec3,
-        spacing: i16,
-    ) -> Vec<ObjectInfo> {
-        let mut result = Vec::new();
-        let mut x = start_pos.x;
-
-        for kind in objects {
-            result.push(ObjectInfo {
-                xyz: glam::I16Vec3 {
-                    x,
-                    y: start_pos.y,
-                    z: start_pos.z,
-                },
-                kind,
-            });
-            x += spacing;
-        }
-        result
-    }
-
-    /// Create spaced-out objects ending at the right (extends to the left)
-    pub fn spaced_from_right(
-        objects: impl IntoIterator<Item = ObjectKind>,
-        end_pos: glam::I16Vec3,
-        spacing: i16,
-    ) -> Vec<ObjectInfo> {
-        let objects_vec: Vec<_> = objects.into_iter().collect();
-        let total_width = (objects_vec.len() as i16 - 1) * spacing;
-        let mut result = Vec::new();
-        let mut x = end_pos.x - total_width;
-
-        for kind in objects_vec {
-            result.push(ObjectInfo {
-                xyz: glam::I16Vec3 {
-                    x,
-                    y: end_pos.y,
-                    z: end_pos.z,
-                },
-                kind,
-            });
-            x += spacing;
-        }
-        result
-    }
-
-    /// Create spaced-out objects centered at the given position
-    pub fn spaced_from_center(
-        objects: impl IntoIterator<Item = ObjectKind>,
-        center_pos: glam::I16Vec3,
-        spacing: i16,
-    ) -> Vec<ObjectInfo> {
-        let objects_vec: Vec<_> = objects.into_iter().collect();
-        let count = objects_vec.len() as i16;
-        let total_width = (count - 1) * spacing;
-        let start_x = center_pos.x - total_width / 2;
-        let mut result = Vec::new();
-        let mut x = start_x;
-
-        for kind in objects_vec {
-            result.push(ObjectInfo {
-                xyz: glam::I16Vec3 {
-                    x,
-                    y: center_pos.y,
-                    z: center_pos.z,
-                },
-                kind,
-            });
-            x += spacing;
-        }
-        result
     }
 }
 

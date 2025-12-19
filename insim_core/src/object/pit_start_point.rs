@@ -1,25 +1,23 @@
 //! Pit start point object
 use super::{ObjectVariant, ObjectWire};
-use crate::{DecodeError, direction::Direction};
+use crate::direction::Direction;
 
 /// Pit start point
+/// Start Position
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PitStartPoint {
     /// Heading / Direction
     pub heading: Direction,
-    /// Colour (3 bits, 0-7)
-    pub colour: u8,
-    /// Mapping (4 bits, 0-15)
-    pub mapping: u8,
+    /// Position index (0-47, representing start positions 1-48)
+    pub index: u8,
     /// Floating
     pub floating: bool,
 }
 
 impl ObjectVariant for PitStartPoint {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
-        let mut flags = self.colour & 0x07;
-        flags |= (self.mapping & 0x0f) << 3;
+        let mut flags = self.index & 0x3f;
         if self.floating {
             flags |= 0x80;
         }
@@ -29,14 +27,12 @@ impl ObjectVariant for PitStartPoint {
         })
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
-        let colour = wire.colour();
-        let mapping = wire.mapping();
+    fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+        let pos_index = wire.flags & 0x3f;
         let floating = wire.floating();
         Ok(Self {
             heading: Direction::from_objectinfo_heading(wire.heading),
-            colour,
-            mapping,
+            index: pos_index,
             floating,
         })
     }

@@ -1,25 +1,22 @@
-//! Railing1 object
+//! StartLights1 object
 use super::{ObjectVariant, ObjectWire};
 use crate::{DecodeError, direction::Direction};
 
-/// Railing1
+/// StartLights
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct Railing1 {
+pub struct StartLights {
     /// Heading / Direction
     pub heading: Direction,
-    /// Colour (3 bits, 0-7)
-    pub colour: u8,
-    /// Mapping (4 bits, 0-15)
-    pub mapping: u8,
+    /// identifier
+    pub identifier: u8,
     /// Floating
     pub floating: bool,
 }
 
-impl ObjectVariant for Railing1 {
+impl ObjectVariant for StartLights {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
-        let mut flags = self.colour & 0x07;
-        flags |= (self.mapping & 0x0f) << 3;
+        let mut flags = self.identifier & 0x3F;
         if self.floating {
             flags |= 0x80;
         }
@@ -30,13 +27,11 @@ impl ObjectVariant for Railing1 {
     }
 
     fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
-        let colour = wire.colour();
-        let mapping = wire.mapping();
+        let identifier = wire.flags & 0x3F;
         let floating = wire.floating();
         Ok(Self {
             heading: Direction::from_objectinfo_heading(wire.heading),
-            colour,
-            mapping,
+            identifier,
             floating,
         })
     }
@@ -47,10 +42,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_railing1_round_trip() {
-        let original = Railing1::default();
+    fn test_start_lights_round_trip() {
+        let original = StartLights::default();
         let wire = original.to_wire().expect("to_wire failed");
-        let decoded = Railing1::from_wire(wire).expect("from_wire failed");
+        let decoded = StartLights::from_wire(wire).expect("from_wire failed");
         assert_eq!(original, decoded);
     }
 }

@@ -1,11 +1,11 @@
-//! Barrier long object
+//! Ramp1 object
 use super::{ObjectVariant, ObjectWire};
 use crate::{DecodeError, direction::Direction};
 
-/// Barrier long
+/// Ramp1
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct BarrierLong {
+pub struct Ramp {
     /// Heading / Direction
     pub heading: Direction,
     /// Colour (3 bits, 0-7)
@@ -16,7 +16,7 @@ pub struct BarrierLong {
     pub floating: bool,
 }
 
-impl ObjectVariant for BarrierLong {
+impl ObjectVariant for Ramp {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = self.colour & 0x07;
         flags |= (self.mapping & 0x0f) << 3;
@@ -47,10 +47,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_barrier_long_round_trip() {
-        let original = BarrierLong::default();
+    fn test_ramp1_round_trip() {
+        let original = Ramp::default();
         let wire = original.to_wire().expect("to_wire failed");
-        let decoded = BarrierLong::from_wire(wire).expect("from_wire failed");
+        let decoded = Ramp::from_wire(wire).expect("from_wire failed");
         assert_eq!(original, decoded);
     }
 }

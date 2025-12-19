@@ -1,11 +1,11 @@
-//! Speed hump 2m object
+//! Speed hump 10m object
 use super::{ObjectVariant, ObjectWire};
 use crate::{DecodeError, direction::Direction};
 
-/// Speed hump 2m
+/// Speed hump 10m
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct SpeedHump2M {
+pub struct SpeedHump {
     /// Heading / Direction
     pub heading: Direction,
     /// Colour (3 bits, 0-7)
@@ -16,7 +16,7 @@ pub struct SpeedHump2M {
     pub floating: bool,
 }
 
-impl ObjectVariant for SpeedHump2M {
+impl ObjectVariant for SpeedHump {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = self.colour & 0x07;
         flags |= (self.mapping & 0x0f) << 3;
@@ -47,10 +47,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_speed_hump2_m_round_trip() {
-        let original = SpeedHump2M::default();
+    fn test_speed_hump10_m_round_trip() {
+        let original = SpeedHump::default();
         let wire = original.to_wire().expect("to_wire failed");
-        let decoded = SpeedHump2M::from_wire(wire).expect("from_wire failed");
+        let decoded = SpeedHump::from_wire(wire).expect("from_wire failed");
         assert_eq!(original, decoded);
     }
 }

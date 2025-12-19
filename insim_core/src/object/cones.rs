@@ -1,4 +1,4 @@
-//! ConeTall2 objects
+//! Cone1 objects
 use super::{ObjectVariant, ObjectWire};
 use crate::direction::Direction;
 
@@ -41,10 +41,10 @@ impl From<u8> for ConeColour {
     }
 }
 
-/// ConeTall2
+/// Cone1
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct ConeTall2 {
+pub struct Cone {
     /// Colour
     pub colour: ConeColour,
     /// Heading / Direction
@@ -53,7 +53,7 @@ pub struct ConeTall2 {
     pub floating: bool,
 }
 
-impl ObjectVariant for ConeTall2 {
+impl ObjectVariant for Cone {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = 0;
         flags |= self.colour as u8 & 0x07;
@@ -82,10 +82,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_cone_tall2_round_trip() {
-        let original = ConeTall2::default();
+    fn test_cone1_round_trip() {
+        let original = Cone::default();
         let wire = original.to_wire().expect("to_wire failed");
-        let decoded = ConeTall2::from_wire(wire).expect("from_wire failed");
+        let decoded = Cone::from_wire(wire).expect("from_wire failed");
         assert_eq!(original, decoded);
     }
 }

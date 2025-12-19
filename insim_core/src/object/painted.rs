@@ -82,7 +82,6 @@ pub enum Character {
     LParen,
     RParen,
     Ampersand,
-    // FIXME: painted has no blank, but letterboard does.
 }
 
 impl From<Character> for char {
@@ -272,28 +271,6 @@ pub struct Letters {
     pub heading: Direction,
     /// Floating
     pub floating: bool,
-}
-
-impl Letters {
-    /// Create painted letters from a string
-    pub fn from_str(
-        text: &str,
-        colour: PaintColour,
-        heading: Direction,
-    ) -> Result<Vec<Letters>, DecodeError> {
-        text.chars()
-            .filter(|ch| *ch != ' ')
-            .map(|ch| {
-                let character = Character::try_from(ch)?;
-                Ok(Letters {
-                    colour,
-                    character,
-                    heading,
-                    floating: false,
-                })
-            })
-            .collect()
-    }
 }
 
 impl ObjectVariant for Letters {

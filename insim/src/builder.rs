@@ -283,7 +283,6 @@ impl Builder {
                 if self.non_blocking {
                     stream.set_nonblocking(true)?;
                 }
-
                 let mut stream = BlockingFramed::new(Box::new(stream), Codec::new());
                 stream.write(self.isi(None))?;
 

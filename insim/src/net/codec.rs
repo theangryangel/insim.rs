@@ -111,7 +111,7 @@ impl Codec {
         let packet = Packet::decode(&mut data);
         match packet {
             Ok(packet) => {
-                tracing::debug!("{:?}", packet);
+                tracing::debug!("{:?}", &packet);
                 if data.remaining() > 0 {
                     return Err(Error::IncompleteDecode {
                         input: original,

@@ -1,5 +1,5 @@
 //! Letterboard WY (White/Yellow) objects
-use super::{ObjectVariant, ObjectWire};
+use super::{ObjectVariant, ObjectWire, letterboard_rb::Character};
 use crate::direction::Direction;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -34,7 +34,7 @@ pub struct LetterboardWY {
     /// Heading / Direction
     pub heading: Direction,
     /// Mapping (6 bits, 0-63)
-    pub mapping: u8,
+    pub character: Character,
     /// Floating
     pub floating: bool,
 }
@@ -42,7 +42,7 @@ pub struct LetterboardWY {
 impl ObjectVariant for LetterboardWY {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = self.colour as u8 & 0x01;
-        flags |= (self.mapping & 0x3f) << 1;
+        flags |= (self.character as u8 & 0x3f) << 1;
         if self.floating {
             flags |= 0x80;
         }
@@ -55,11 +55,12 @@ impl ObjectVariant for LetterboardWY {
     fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
         let colour = LetterboardWYColour::from(wire.flags);
         let mapping = (wire.flags >> 1) & 0x3f;
+        let character = Character::try_from(mapping)?;
         let floating = wire.floating();
         Ok(Self {
             colour,
             heading: Direction::from_objectinfo_heading(wire.heading),
-            mapping,
+            character,
             floating,
         })
     }

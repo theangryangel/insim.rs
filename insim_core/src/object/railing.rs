@@ -1,11 +1,11 @@
-//! Railing2 object
+//! Railing1 object
 use super::{ObjectVariant, ObjectWire};
 use crate::{DecodeError, direction::Direction};
 
-/// Railing2
+/// Railing1
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct Railing2 {
+pub struct Railing {
     /// Heading / Direction
     pub heading: Direction,
     /// Colour (3 bits, 0-7)
@@ -16,7 +16,7 @@ pub struct Railing2 {
     pub floating: bool,
 }
 
-impl ObjectVariant for Railing2 {
+impl ObjectVariant for Railing {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = self.colour & 0x07;
         flags |= (self.mapping & 0x0f) << 3;
@@ -47,10 +47,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_railing2_round_trip() {
-        let original = Railing2::default();
+    fn test_railing_round_trip() {
+        let original = Railing::default();
         let wire = original.to_wire().expect("to_wire failed");
-        let decoded = Railing2::from_wire(wire).expect("from_wire failed");
+        let decoded = Railing::from_wire(wire).expect("from_wire failed");
         assert_eq!(original, decoded);
     }
 }

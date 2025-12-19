@@ -1,5 +1,5 @@
 [package]
-name = "letters"
+name = "marquee"
 version = "0.1.0-unreleased"
 edition.workspace = true
 rust-version.workspace = true
@@ -7,6 +7,7 @@ license.workspace = true
 publish = false
 
 [dependencies]
+anyhow = "1.0.86"
 clap = { workspace = true, features = ["derive"] }
 if_chain = { workspace = true }
 insim = { path = "../../insim" }

@@ -2,6 +2,35 @@
 use super::{ObjectVariant, ObjectWire};
 use crate::{DecodeError, direction::Direction};
 
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[non_exhaustive]
+#[allow(missing_docs)]
+/// Post Colour
+pub enum Bin1Colour {
+    #[default]
+    Red,
+    Yellow,
+    Blue,
+    Green,
+    White,
+    Orange,
+}
+
+impl From<u8> for Bin1Colour {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => Self::Red,
+            1 => Self::Yellow,
+            2 => Self::Blue,
+            3 => Self::Green,
+            4 => Self::White,
+            5 => Self::Orange,
+            _ => Self::Green,
+        }
+    }
+}
+
 /// Bin1
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -9,7 +38,7 @@ pub struct Bin1 {
     /// Heading / Direction
     pub heading: Direction,
     /// Colour (3 bits, 0-7)
-    pub colour: u8,
+    pub colour: Bin1Colour,
     /// Mapping (4 bits, 0-15)
     pub mapping: u8,
     /// Floating
@@ -18,7 +47,7 @@ pub struct Bin1 {
 
 impl ObjectVariant for Bin1 {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
-        let mut flags = self.colour & 0x07;
+        let mut flags = self.colour as u8 & 0x07;
         flags |= (self.mapping & 0x0f) << 3;
         if self.floating {
             flags |= 0x80;
@@ -30,7 +59,7 @@ impl ObjectVariant for Bin1 {
     }
 
     fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
-        let colour = wire.colour();
+        let colour = Bin1Colour::from(wire.colour());
         let mapping = wire.mapping();
         let floating = wire.floating();
         Ok(Self {

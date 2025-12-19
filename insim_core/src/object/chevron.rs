@@ -1,59 +1,47 @@
-//! Chalk left3 object
+//! Cone1 objects
 use super::{ObjectVariant, ObjectWire};
-use crate::{DecodeError, direction::Direction};
+use crate::direction::Direction;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
-/// Chalk Colour
-pub enum ChalkColour {
+/// Chevron Colour
+pub enum ChevronColour {
+    /// White
     #[default]
-    White,
-    Red,
-    Blue,
-    Yellow,
+    White = 0,
+    /// Black
+    Black = 1,
 }
 
-impl From<u8> for ChalkColour {
+impl From<u8> for ChevronColour {
     fn from(value: u8) -> Self {
-        match value {
+        match value & 0x07 {
             0 => Self::White,
-            1 => Self::Red,
-            2 => Self::Blue,
-            3 => Self::Yellow,
+            1 => Self::Black,
             _ => Self::White,
         }
     }
 }
 
-impl From<ChalkColour> for u8 {
-    fn from(colour: ChalkColour) -> Self {
-        match colour {
-            ChalkColour::White => 0,
-            ChalkColour::Red => 1,
-            ChalkColour::Blue => 2,
-            ChalkColour::Yellow => 3,
-        }
-    }
-}
-
-/// Chalk left3
+/// Chevron
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct ChalkLeft3 {
+pub struct Chevron {
     /// Colour
-    pub colour: ChalkColour,
+    pub colour: ChevronColour,
     /// Heading / Direction
     pub heading: Direction,
     /// Floating
     pub floating: bool,
 }
 
-impl ObjectVariant for ChalkLeft3 {
+impl ObjectVariant for Chevron {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
-        let mut flags = u8::from(self.colour) & 0x07;
+        let mut flags = 0;
+        flags |= self.colour as u8 & 0x07;
         if self.floating {
             flags |= 0x80;
         }
@@ -63,8 +51,8 @@ impl ObjectVariant for ChalkLeft3 {
         })
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
-        let colour = ChalkColour::from(wire.colour());
+    fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+        let colour = ChevronColour::from(wire.colour());
         let floating = wire.floating();
         Ok(Self {
             colour,
@@ -79,10 +67,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_chalk_left3_round_trip() {
-        let original = ChalkLeft3::default();
+    fn test_cone1_round_trip() {
+        let original = Chevron::default();
         let wire = original.to_wire().expect("to_wire failed");
-        let decoded = ChalkLeft3::from_wire(wire).expect("from_wire failed");
+        let decoded = Chevron::from_wire(wire).expect("from_wire failed");
         assert_eq!(original, decoded);
     }
 }

@@ -9,17 +9,17 @@ use crate::{DecodeError, direction::Direction};
 pub enum TyreStackColour {
     /// Black
     #[default]
-    Black,
+    Black = 0,
     /// White
-    White,
+    White = 1,
     /// Red
-    Red,
+    Red = 2,
     /// Blue
-    Blue,
+    Blue = 3,
     /// Green
-    Green,
+    Green = 4,
     /// Yellow
-    Yellow,
+    Yellow = 5,
 }
 
 impl From<u8> for TyreStackColour {
@@ -36,23 +36,10 @@ impl From<u8> for TyreStackColour {
     }
 }
 
-impl From<TyreStackColour> for u8 {
-    fn from(colour: TyreStackColour) -> Self {
-        match colour {
-            TyreStackColour::Black => 0,
-            TyreStackColour::White => 1,
-            TyreStackColour::Red => 2,
-            TyreStackColour::Blue => 3,
-            TyreStackColour::Green => 4,
-            TyreStackColour::Yellow => 5,
-        }
-    }
-}
-
 /// Tyre single
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct TyreSingle {
+pub struct Tyres {
     /// Colour
     pub colour: TyreStackColour,
     /// Heading / Direction
@@ -61,9 +48,9 @@ pub struct TyreSingle {
     pub floating: bool,
 }
 
-impl ObjectVariant for TyreSingle {
+impl ObjectVariant for Tyres {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
-        let mut flags = u8::from(self.colour) & 0x07;
+        let mut flags = self.colour as u8 & 0x07;
         if self.floating {
             flags |= 0x80;
         }
@@ -90,9 +77,9 @@ mod tests {
 
     #[test]
     fn test_tyre_single_round_trip() {
-        let original = TyreSingle::default();
+        let original = Tyres::default();
         let wire = original.to_wire().expect("to_wire failed");
-        let decoded = TyreSingle::from_wire(wire).expect("from_wire failed");
+        let decoded = Tyres::from_wire(wire).expect("from_wire failed");
         assert_eq!(original, decoded);
     }
 }
