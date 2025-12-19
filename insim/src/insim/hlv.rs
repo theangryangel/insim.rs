@@ -34,7 +34,7 @@ pub struct Hlv {
     pub plid: PlayerId,
 
     /// How did we invalidate this hotlap? See [Hlvc].
-    #[insim(pad_after = 1)]
+    #[insim(pad_after = 3)]
     pub hlvc: Hlvc,
 
     #[insim(duration = u32)]
@@ -58,6 +58,8 @@ mod test {
                 3,   // plid
                 1,   // hlvc
                 0,   // sp1
+                0,   // spw
+                0,   // spw
                 228, // c - time (1)
                 77,  // c - time (1)
                 0, 0, 2,   // c - direction

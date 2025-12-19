@@ -201,6 +201,7 @@ impl Decode for Con {
         buf.advance(1);
         let spclose = spclose_strip_high_bits(u16::decode(buf)?);
         let spclose = Speed::from_meters_per_sec(spclose as f32 / 10.0);
+        buf.advance(2);
         let time = u32::decode(buf)? as u64;
         let time = Duration::from_millis(time);
 

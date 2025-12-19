@@ -153,8 +153,11 @@ impl Decode for Obh {
         // automatically strip off the first 4 bits as they're reserved
         let spclose = spclose_strip_high_bits(u16::decode(buf)?);
         let spclose = Speed::from_meters_per_sec(spclose as f32 / 10.0);
+        buf.advance(2);
+
         let time = Duration::from_millis(u32::decode(buf)? as u64);
         let c = CarContact::decode(buf)?;
+        // FIXME: become glam Vec
         let x = i16::decode(buf)?;
         let y = i16::decode(buf)?;
         let zbyte = u8::decode(buf)?;
@@ -183,6 +186,7 @@ impl Encode for Obh {
         // automatically strip off the first 4 bits as they're reserved
         let spclose = spclose_strip_high_bits((self.spclose.into_inner() * 10.0) as u16);
         spclose.encode(buf)?;
+        buf.put_bytes(0, 2);
         match u32::try_from(self.time.as_millis()) {
             Ok(time) => time.encode(buf)?,
             Err(_) => return Err(insim_core::EncodeError::TooLarge),
@@ -211,6 +215,8 @@ mod tests {
                 3,   // plid
                 23,  // spclose (1)
                 0,   // spclose (2)
+                0,   // spw
+                0,   // spw
                 106, // time (1)
                 19,  // time (2)
                 0,   // time (3)
