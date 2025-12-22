@@ -16,7 +16,7 @@ if_chain = { workspace = true }
 insim = { path = "../../insim", features = ["serde", "blocking"] }
 jiff = { version = "0.2.15", features = ["serde"] }
 kitcar = { path = "../../kitcar" }
-rusqlite = { version = "0.37.0", features = ["bundled", "jiff"] }
+rusqlite = { version = "0.38.0", features = ["bundled", "jiff"] }
 rusqlite_migration = "2.3.0"
 serde = { workspace = true, features = ["derive"] }
 serde_norway = { workspace = true }
