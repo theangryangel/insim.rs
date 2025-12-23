@@ -70,12 +70,103 @@ trait ObjectVariant: Sized {
     fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError>;
 }
 
+#[derive(Debug, Copy, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+/// Layout Object Position
+pub struct ObjectCoordinate {
+    x: i16,
+    y: i16,
+    z: u8
+}
+
+impl ObjectCoordinate {
+    // Scale to metres for X and Y
+    const SCALE: i16 = 16;
+
+    /// X (in metres)
+    pub fn x_metres(&self) -> f32 {
+        self.x as f32 / Self::SCALE as f32
+    }
+
+    /// Y (in metres)
+    pub fn y_metres(&self) -> f32 {
+        self.y as f32 / Self::SCALE as f32
+    }
+
+    /// Z (in metres)
+    pub fn z_metres(&self) -> f32 {
+        self.z as f32 / 4.0
+    }
+
+    /// X, Y, Z (in metres)
+    pub fn xyz_metres(&self) -> (f32, f32, f32) {
+        (self.x_metres(), self.y_metres(), self.z_metres())
+    }
+}
+
+#[cfg(feature = "glam")]
+impl ObjectCoordinate {
+    /// Convert to glam Vec3, where xyz are in raw
+    pub fn to_ivec3(&self) -> glam::I16Vec3 {
+        glam::I16Vec3 { 
+            x: self.x, 
+            y: self.y,
+            z: self.z as i16,
+        }
+    }
+
+    /// Convert from glam IVec3, where xyz are in raw
+    pub fn from_ivec3(other: glam::I16Vec3) -> Self {
+        Self {
+            x: other.x,
+            y: other.y,
+            z: other.z as u8,
+        }
+    }
+
+    /// Convert to glam DVec3, where xyz are in metres
+    pub fn to_dvec3_metres(&self) -> glam::DVec3 {
+        glam::DVec3 { 
+            x: (self.x as f64 / 16.0),
+            y: (self.y as f64 / 16.0),
+            z: (self.y as f64 / 4.0),
+        }
+    }
+
+    /// Convert from glam DVec3, where xyz are in metres
+    pub fn from_dvec3_metres(other: glam::DVec3) -> Self {
+        Self {
+            x: (other.x * 16.0).round() as i16,
+            y: (other.y * 16.0).round() as i16,
+            z: (other.z * 4.0).round() as u8,
+        }
+    }
+
+    /// Convert to glam Vec3, where xyz are in metres
+    pub fn to_vec3_metres(&self) -> glam::Vec3 {
+        glam::Vec3 { 
+            x: (self.x as f32 / 16.0),
+            y: (self.y as f32 / 16.0),
+            z: (self.y as f32 / 4.0),
+        }
+    }
+
+    /// Convert from glam Vec3, where xyz are in metres
+    pub fn from_vec3_metres(other: glam::Vec3) -> Self {
+        Self {
+            x: (other.x * 16.0).round() as i16,
+            y: (other.y * 16.0).round() as i16,
+            z: (other.z * 4.0).round() as u8,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Layout Object
 pub struct ObjectInfo {
     /// Object xyz position
-    pub xyz: glam::I16Vec3,
+    pub xyz: ObjectCoordinate,
     /// Kind
     pub kind: ObjectKind,
 }
@@ -725,17 +816,19 @@ impl Decode for ObjectInfo {
         let x = i16::decode(buf)?;
         let y = i16::decode(buf)?;
         let z = u8::decode(buf)?;
+        let xyz = ObjectCoordinate {
+            x, y, z
+        };
 
         let flags = u8::decode(buf)?;
         let index = u8::decode(buf)?;
         let heading = u8::decode(buf)?;
 
         let wire = ObjectWire { flags, heading };
-
         let kind = ObjectKind::from_wire(index, wire)?;
 
         Ok(Self {
-            xyz: glam::I16Vec3 { x, y, z: z as i16 },
+            xyz,
             kind,
         })
     }
@@ -743,7 +836,7 @@ impl Decode for ObjectInfo {
 
 impl ObjectKind {
     /// Get heading if this object has one
-    pub fn heading(&self) -> Option<crate::direction::Direction> {
+    pub fn heading(&self) -> Option<crate::direction::Heading> {
         match self {
             ObjectKind::Control(c) => Some(c.heading),
             ObjectKind::Marshal(m) => Some(m.heading),
@@ -915,7 +1008,7 @@ impl Encode for ObjectInfo {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), EncodeError> {
         self.xyz.x.encode(buf)?;
         self.xyz.y.encode(buf)?;
-        (self.xyz.z as u8).encode(buf)?; // FIXME: use TryFrom
+        self.xyz.z.encode(buf)?;
         let (index, wire) = self.kind.to_wire()?;
         wire.flags.encode(buf)?;
         index.encode(buf)?;

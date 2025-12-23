@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bitflags::bitflags;
 use bytes::{Buf, BufMut};
-use insim_core::{Decode, Encode, direction::Direction, speed::Speed};
+use insim_core::{Decode, Encode, direction::Heading, speed::Speed};
 
 use crate::identifiers::{PlayerId, RequestId};
 
@@ -46,11 +46,11 @@ impl_bitflags_from_to_bytes!(ObhFlags, u8);
 pub struct CarContact {
     /// Car's motion if Speed > 0: 0 = world y direction
     /// Stored internally as radians
-    pub direction: Direction,
+    pub direction: Heading,
 
     /// Direction of forward axis: 0 = world y direction
     /// Stored internally as radians
-    pub heading: Direction,
+    pub heading: Heading,
 
     /// Speed in m/s
     pub speed: Speed,
@@ -69,10 +69,10 @@ impl Decode for CarContact {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let direction_raw = u8::decode(buf)?;
         let direction =
-            Direction::from_degrees((direction_raw as f64) * CARCONTACT_DEGREES_PER_UNIT);
+            Heading::from_degrees((direction_raw as f64) * CARCONTACT_DEGREES_PER_UNIT);
 
         let heading_raw = u8::decode(buf)?;
-        let heading = Direction::from_degrees((heading_raw as f64) * CARCONTACT_DEGREES_PER_UNIT);
+        let heading = Heading::from_degrees((heading_raw as f64) * CARCONTACT_DEGREES_PER_UNIT);
 
         let speed = u8::decode(buf)?;
         let speed = Speed::from_meters_per_sec(speed as f32);

@@ -21,16 +21,17 @@ rustdoc-args = ["--cfg", "docrs"]
 
 [features]
 default = []
+glam = [
+  "insim_core/glam",
+]
 serde = [
   "dep:serde",
   "bitflags/serde",
-  "glam/serde",
   "insim_core/serde",
 ]
 
 [dependencies]
 bitflags = { workspace = true }
 bytes = { workspace = true }
-glam = { workspace = true }
 insim_core = { path = "../insim_core", version = "4.0.0" }
 serde = { workspace = true, features = ["derive"], optional = true }

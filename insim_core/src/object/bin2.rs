@@ -1,6 +1,6 @@
 //! Bin2 object
 use super::{ObjectVariant, ObjectWire};
-use crate::{DecodeError, direction::Direction};
+use crate::{DecodeError, direction::Heading};
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -36,7 +36,7 @@ impl From<u8> for Bin2Colour {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Bin2 {
     /// Heading / Direction
-    pub heading: Direction,
+    pub heading: Heading,
     /// Colour (3 bits, 0-7)
     pub colour: Bin2Colour,
     /// Mapping (4 bits, 0-15)
@@ -54,7 +54,7 @@ impl ObjectVariant for Bin2 {
         }
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -63,7 +63,7 @@ impl ObjectVariant for Bin2 {
         let mapping = wire.mapping();
         let floating = wire.floating();
         Ok(Self {
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
             colour,
             mapping,
             floating,

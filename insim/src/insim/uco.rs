@@ -51,7 +51,7 @@ pub struct Uco {
 
 #[cfg(test)]
 mod test {
-    use insim_core::object::{ObjectInfo, ObjectKind, insim::InsimCircle};
+    use insim_core::object::{insim::InsimCircle, ObjectKind};
 
     use super::*;
 
@@ -88,19 +88,17 @@ mod test {
                 1,   // info - heading
             ],
             |parsed: Uco| {
+                assert_eq!(parsed.info.xyz.xyz_metres(), (
+                    -17.5, // -280 / 16,
+                    -99.0625, // -1585 / 16,
+                    2.0, // 8.0 / 4
+                ));
                 assert!(matches!(
-                    parsed.info,
-                    ObjectInfo {
-                        xyz: glam::I16Vec3 {
-                            x: -280,
-                            y: -1585,
-                            z: 8
-                        },
-                        kind: ObjectKind::InsimCircle(InsimCircle {
-                            index: 1,
-                            floating: false
-                        }),
-                    }
+                    parsed.info.kind,
+                    ObjectKind::InsimCircle(InsimCircle {
+                        index: 1,
+                        floating: false
+                    })
                 ));
                 assert!(matches!(parsed.ucoaction, UcoAction::CircleLeave));
                 assert_eq!(parsed.time, Duration::from_millis(151560));

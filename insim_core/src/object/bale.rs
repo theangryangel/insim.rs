@@ -1,13 +1,13 @@
 //! Bale objects
 use super::{ObjectVariant, ObjectWire};
-use crate::direction::Direction;
+use crate::direction::Heading;
 
 /// Bale
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Bale {
     /// Heading / Direction
-    pub heading: Direction,
+    pub heading: Heading,
     /// Colour (3 bits, 0-7)
     pub colour: u8,
     /// Mapping (4 bits, 0-15)
@@ -25,7 +25,7 @@ impl ObjectVariant for Bale {
         }
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -34,7 +34,7 @@ impl ObjectVariant for Bale {
         let mapping = wire.mapping();
         let floating = wire.floating();
         Ok(Self {
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
             colour,
             mapping,
             floating,

@@ -1,6 +1,6 @@
 //! Insim objects
 use super::ObjectWire;
-use crate::direction::Direction;
+use crate::direction::Heading;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -38,7 +38,7 @@ pub struct InsimCheckpoint {
     /// Kind of checkpoint
     pub kind: InsimCheckpointKind,
     /// Heading / Direction
-    pub heading: Direction,
+    pub heading: Heading,
     /// Floating
     pub floating: bool,
 }
@@ -52,7 +52,7 @@ impl InsimCheckpoint {
         }
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -61,7 +61,7 @@ impl InsimCheckpoint {
         let floating = wire.floating();
         Ok(Self {
             kind,
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
             floating,
         })
     }

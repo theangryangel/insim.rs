@@ -4,7 +4,7 @@
 //! Whilst this makes it feel slightly awkward, it is an intentional productivity boost.
 
 use super::{ObjectVariant, ObjectWire};
-use crate::{DecodeError, direction::Direction};
+use crate::{DecodeError, direction::Heading};
 
 /// Represents Width and Length (2m, 4m, 8m, 16m)
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -353,7 +353,7 @@ pub struct ConcreteSlab {
     /// Slab data
     pub slab: Slab,
     /// Heading / Direction
-    pub heading: Direction,
+    pub heading: Heading,
 }
 
 impl ObjectVariant for ConcreteSlab {
@@ -364,7 +364,7 @@ impl ObjectVariant for ConcreteSlab {
         flags |= (self.slab.pitch as u8 & 0x0f) << 4;
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -378,7 +378,7 @@ impl ObjectVariant for ConcreteSlab {
                 length,
                 pitch,
             },
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
         })
     }
 }
@@ -390,7 +390,7 @@ pub struct ConcreteRamp {
     /// Ramp data
     pub ramp: Ramp,
     /// Heading / Direction
-    pub heading: Direction,
+    pub heading: Heading,
 }
 
 impl ObjectVariant for ConcreteRamp {
@@ -401,7 +401,7 @@ impl ObjectVariant for ConcreteRamp {
         flags |= (self.ramp.height as u8 & 0x0f) << 4;
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -415,7 +415,7 @@ impl ObjectVariant for ConcreteRamp {
                 length,
                 height,
             },
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
         })
     }
 }
@@ -427,7 +427,7 @@ pub struct ConcreteWall {
     /// Wall data
     pub wall: Wall,
     /// Heading / Direction
-    pub heading: Direction,
+    pub heading: Heading,
 }
 
 impl ObjectVariant for ConcreteWall {
@@ -438,7 +438,7 @@ impl ObjectVariant for ConcreteWall {
         flags |= (self.wall.height as u8 & 0x0f) << 4;
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -452,7 +452,7 @@ impl ObjectVariant for ConcreteWall {
                 length,
                 height,
             },
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
         })
     }
 }
@@ -464,7 +464,7 @@ pub struct ConcretePillar {
     /// Pillar data
     pub pillar: Pillar,
     /// Heading / Direction
-    pub heading: Direction,
+    pub heading: Heading,
 }
 
 impl ObjectVariant for ConcretePillar {
@@ -475,7 +475,7 @@ impl ObjectVariant for ConcretePillar {
         flags |= (self.pillar.height as u8 & 0x0f) << 4;
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -485,7 +485,7 @@ impl ObjectVariant for ConcretePillar {
         let height = Height::try_from((wire.flags & 0xf0) >> 4)?;
         Ok(Self {
             pillar: Pillar { x, y, height },
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
         })
     }
 }
@@ -497,7 +497,7 @@ pub struct ConcreteSlabWall {
     /// Slab Wall data
     pub slab_wall: SlabWall,
     /// Heading / Direction
-    pub heading: Direction,
+    pub heading: Heading,
 }
 
 impl ObjectVariant for ConcreteSlabWall {
@@ -508,7 +508,7 @@ impl ObjectVariant for ConcreteSlabWall {
         flags |= (self.slab_wall.pitch as u8 & 0x0f) << 4;
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -522,7 +522,7 @@ impl ObjectVariant for ConcreteSlabWall {
                 length,
                 pitch,
             },
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
         })
     }
 }
@@ -534,7 +534,7 @@ pub struct ConcreteRampWall {
     /// Ramp Wall data
     pub ramp_wall: Wall,
     /// Heading / Direction
-    pub heading: Direction,
+    pub heading: Heading,
 }
 
 impl ObjectVariant for ConcreteRampWall {
@@ -545,7 +545,7 @@ impl ObjectVariant for ConcreteRampWall {
         flags |= (self.ramp_wall.height as u8 & 0x0f) << 4;
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -559,7 +559,7 @@ impl ObjectVariant for ConcreteRampWall {
                 length,
                 height,
             },
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
         })
     }
 }
@@ -571,7 +571,7 @@ pub struct ConcreteShortSlabWall {
     /// Short Slab Wall data
     pub short_slab_wall: ShortSlabWall,
     /// Heading / Direction
-    pub heading: Direction,
+    pub heading: Heading,
 }
 
 impl ObjectVariant for ConcreteShortSlabWall {
@@ -582,7 +582,7 @@ impl ObjectVariant for ConcreteShortSlabWall {
         flags |= (self.short_slab_wall.pitch as u8 & 0x0f) << 4;
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -592,7 +592,7 @@ impl ObjectVariant for ConcreteShortSlabWall {
         let pitch = Pitch::try_from((wire.flags & 0xf0) >> 4)?;
         Ok(Self {
             short_slab_wall: ShortSlabWall { colour, y, pitch },
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
         })
     }
 }
@@ -604,7 +604,7 @@ pub struct ConcreteWedge {
     /// Wedge data
     pub wedge: Wedge,
     /// Heading / Direction
-    pub heading: Direction,
+    pub heading: Heading,
 }
 
 impl ObjectVariant for ConcreteWedge {
@@ -615,7 +615,7 @@ impl ObjectVariant for ConcreteWedge {
         flags |= (self.wedge.angle as u8 & 0x0f) << 4;
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -629,7 +629,7 @@ impl ObjectVariant for ConcreteWedge {
                 length,
                 angle,
             },
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
         })
     }
 }

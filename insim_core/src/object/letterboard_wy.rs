@@ -1,6 +1,6 @@
 //! Letterboard WY (White/Yellow) objects
 use super::{ObjectVariant, ObjectWire, letterboard_rb::Character};
-use crate::direction::Direction;
+use crate::direction::Heading;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -32,7 +32,7 @@ pub struct LetterboardWY {
     /// Colour
     pub colour: LetterboardWYColour,
     /// Heading / Direction
-    pub heading: Direction,
+    pub heading: Heading,
     /// Mapping (6 bits, 0-63)
     pub character: Character,
     /// Floating
@@ -48,7 +48,7 @@ impl ObjectVariant for LetterboardWY {
         }
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -59,7 +59,7 @@ impl ObjectVariant for LetterboardWY {
         let floating = wire.floating();
         Ok(Self {
             colour,
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
             character,
             floating,
         })

@@ -1,6 +1,6 @@
 //! Marshal objects
 use super::ObjectWire;
-use crate::direction::Direction;
+use crate::direction::Heading;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -9,7 +9,7 @@ pub struct Marshal {
     /// Kind of Marshal
     pub kind: MarshalKind,
     /// Heading
-    pub heading: Direction,
+    pub heading: Heading,
     /// Floating?
     pub floating: bool,
 }
@@ -23,7 +23,7 @@ impl Marshal {
 
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -33,7 +33,7 @@ impl Marshal {
 
         Ok(Self {
             kind,
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
             floating,
         })
     }

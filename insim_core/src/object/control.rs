@@ -1,7 +1,7 @@
 //! Control objects
 
 use super::ObjectWire;
-use crate::direction::Direction;
+use crate::direction::Heading;
 
 #[derive(Debug, Clone, Default, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -10,7 +10,7 @@ pub struct Control {
     /// Kind of Control Object
     pub kind: ControlKind,
     /// Heading
-    pub heading: Direction,
+    pub heading: Heading,
     /// Floating?
     pub floating: bool,
 }
@@ -30,7 +30,7 @@ impl Control {
 
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -53,7 +53,7 @@ impl Control {
 
         Ok(Self {
             kind,
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
             floating,
         })
     }

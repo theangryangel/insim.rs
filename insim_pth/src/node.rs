@@ -1,17 +1,29 @@
 //! Node
 
-use glam::{IVec3, Vec3};
+use glam::Vec3;
+use insim_core::vector::Vector;
 
 use crate::limit::Limit;
+
+#[derive(Debug, Copy, Clone, Default, PartialEq, insim_core::Decode, insim_core::Encode)]
+/// Node XYZ Coordinates, stored as a raw value
+pub struct NodeCoordinate {
+    /// X Coordinate, raw value
+    pub x: i32,
+    /// Y Coordinate, raw value
+    pub y: i32,
+    /// Z Coordinate, raw value
+    pub z: i32,
+}
 
 /// Node / or point on a track
 #[derive(Debug, Copy, Clone, Default, PartialEq, insim_core::Decode, insim_core::Encode)]
 pub struct Node {
     /// Center point of this node
-    pub center: IVec3,
+    pub center: NodeCoordinate,
 
     /// Expected direction of travel
-    pub direction: Vec3,
+    pub direction: Vector,
 
     /// Track outer limit, relative to the center point and direction of travel
     pub outer_limit: Limit,
@@ -47,15 +59,15 @@ impl Node {
 
         // 90° rotation: (x, y) → (-y, x)
         let left = Vec3 {
-            x: -self.direction.y * limit.left + center.x,
-            y: self.direction.x * limit.left + center.y,
+            x: -self.direction.1 * limit.left + center.x,
+            y: self.direction.0 * limit.left + center.y,
             z: center.z,
         };
 
         // -90° rotation: (x, y) → (y, -x)
         let right = Vec3 {
-            x: self.direction.y * limit.right + center.x,
-            y: -self.direction.x * limit.right + center.y,
+            x: self.direction.1 * limit.right + center.x,
+            y: -self.direction.0 * limit.right + center.y,
             z: center.z,
         };
 

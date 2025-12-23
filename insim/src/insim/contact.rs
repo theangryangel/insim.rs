@@ -3,7 +3,7 @@
 use std::time::Duration;
 
 use bytes::{Buf, BufMut};
-use insim_core::{Decode, Encode, direction::Direction, speed::Speed};
+use insim_core::{Decode, Encode, direction::Heading, speed::Speed};
 
 use super::{CompCarInfo, obh::spclose_strip_high_bits};
 use crate::identifiers::{PlayerId, RequestId};
@@ -45,11 +45,11 @@ pub struct ConInfo {
 
     /// Car's motion if Speed > 0: 0 = world y direction, 128 = 180 deg
     /// Stored internally as radians
-    pub direction: Direction,
+    pub direction: Heading,
 
     /// direction of forward axis: 0 = world y direction, 128 = 180 deg
     /// Stored internally as radians
-    pub heading: Direction,
+    pub heading: Heading,
 
     /// m/s^2 longitudinal acceleration (forward positive)
     pub accelf: u8,
@@ -86,10 +86,10 @@ impl Decode for ConInfo {
         let speed = Speed::from_meters_per_sec(u8::decode(buf)? as f32);
 
         let direction_raw = u8::decode(buf)?;
-        let direction = Direction::from_degrees((direction_raw as f64) * CONINFO_DEGREES_PER_UNIT);
+        let direction = Heading::from_degrees((direction_raw as f64) * CONINFO_DEGREES_PER_UNIT);
 
         let heading_raw = u8::decode(buf)?;
-        let heading = Direction::from_degrees((heading_raw as f64) * CONINFO_DEGREES_PER_UNIT);
+        let heading = Heading::from_degrees((heading_raw as f64) * CONINFO_DEGREES_PER_UNIT);
 
         let accelf = u8::decode(buf)?;
         let accelr = u8::decode(buf)?;

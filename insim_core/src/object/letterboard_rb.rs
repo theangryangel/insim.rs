@@ -1,6 +1,6 @@
 //! Letterboard RB (Red/Blue) objects
 use super::{ObjectVariant, ObjectWire};
-use crate::{DecodeError, direction::Direction};
+use crate::{DecodeError, direction::Heading};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -269,7 +269,7 @@ pub struct LetterboardRB {
     /// Colour
     pub colour: LetterboardRBColour,
     /// Heading / Direction
-    pub heading: Direction,
+    pub heading: Heading,
     /// Mapping (6 bits, 0-63)
     pub character: Character,
     /// Floating
@@ -285,7 +285,7 @@ impl ObjectVariant for LetterboardRB {
         }
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -296,7 +296,7 @@ impl ObjectVariant for LetterboardRB {
         let floating = wire.floating();
         Ok(Self {
             colour,
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
             character,
             floating,
         })

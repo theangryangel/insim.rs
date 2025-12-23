@@ -10,9 +10,9 @@ use clap::{Parser, Subcommand};
 enum Mode {
     WhereTheFuckIAm,
     Marquee {
-        x: i16,
-        y: i16,
-        z: i16,
+        x: f64,
+        y: f64,
+        z: f64,
         heading: f64,
         text: String,
     },
@@ -30,42 +30,36 @@ struct Cli {
     mode: Mode,
 }
 
-use glam::{I16Vec3, Vec3};
+use glam::{DVec3, I16Vec3, IVec3, Vec3};
 use insim::{
-    Packet, WithRequestId,
     core::{
-        direction::Direction,
-        object::{
-            /* painted::{Character, Letters, PaintColour},  */ ObjectInfo, ObjectKind,
-            letterboard_rb::{Character, LetterboardRB, LetterboardRBColour},
-        },
-    },
-    identifiers::PlayerId,
-    insim::{Axm, PmoAction, TinyType},
+        coordinate::Coordinate, direction::Heading, object::{
+            /* painted::{Character, Letters, PaintColour},  */ letterboard_rb::{Character, LetterboardRB, LetterboardRBColour}, ObjectCoordinate, ObjectInfo, ObjectKind
+        }
+    }, identifiers::PlayerId, insim::{Axm, PmoAction, TinyType}, Packet, WithRequestId
 };
 
 fn position_text(
     text: &str,
-    center: I16Vec3,
-    heading: Direction,
-    spacing_meters: f32,
-    forward_meters: f32,
+    center: DVec3,
+    heading: Heading,
+    spacing_meters: f64,
+    forward_meters: f64,
     elapsed: Duration,
 ) -> Vec<ObjectInfo> {
-    const WORLD_SCALE: f32 = 16.0;
-    const SPEED: f32 = 1.0;
-    const MAX_VISIBLE: f32 = 10.0;
+    const SPEED: f64 = 1.0;
+    const MAX_VISIBLE: f64 = 10.0;
     const PADDING: usize = 2;
 
-    let rad = heading.to_radians() as f32;
-    let forward = Vec3::new(-rad.sin(), rad.cos(), 0.0);
-    let right = Vec3::new(forward.y, -forward.x, 0.0);
+    let rad = heading.to_radians();
+    let forward = DVec3::new(-rad.sin(), rad.cos(), 0.0);
+    let right = DVec3::new(forward.y, -forward.x, 0.0);
 
-    let anchor = center.as_vec3() + (forward * forward_meters * WORLD_SCALE);
-    let spacing = spacing_meters * WORLD_SCALE;
+    let anchor = center + (forward * forward_meters);
+    let spacing = spacing_meters;
 
-    let total_width = (text.len() + PADDING) as f32 * spacing;
-    let scroll = (elapsed.as_secs_f32() * SPEED * WORLD_SCALE) % total_width;
+    let total_width = (text.len() + PADDING) as f64 * spacing;
+    let scroll = (elapsed.as_secs_f64() * SPEED) % total_width;
     let view_limit = (MAX_VISIBLE * spacing) / 2.0;
 
     text.chars()
@@ -73,7 +67,7 @@ fn position_text(
         .flat_map(|(i, ch)| {
             let letter = Character::try_from(ch).ok()?;
 
-            let base_off = (i as f32 * spacing) - scroll;
+            let base_off = (i as f64 * spacing) - scroll;
             let final_off =
                 (base_off + total_width + total_width / 2.0) % total_width - total_width / 2.0;
 
@@ -82,12 +76,12 @@ fn position_text(
             }
 
             Some(ObjectInfo {
-                xyz: (anchor + (right * final_off)).round().as_i16vec3(),
+                xyz: ObjectCoordinate::from_dvec3_metres(anchor + (right * final_off)),
                 kind: ObjectKind::LetterboardRB(LetterboardRB {
                     character: letter,
                     // XXX: for letterboards we need to rotate by 180deg, for painted characters
                     // they're fine as is.
-                    heading: Direction::from_radians(heading.to_radians() + std::f64::consts::PI),
+                    heading: Heading::from_radians(heading.to_radians() + std::f64::consts::PI),
                     colour: LetterboardRBColour::Red,
                     floating: false,
                 }),
@@ -137,14 +131,9 @@ pub async fn main() -> Result<()> {
                             if comp_car.plid != viewed {
                                 continue;
                             }
-                            // FIXME: pointless unit versions. fml. make insim.rs handle this.
-                            // MCI units are 1/65536 of a meter. We want 1/16 of a meter.
-                            let pos = comp_car.xyz.as_vec3() / 4096.0;
-                            let x = pos.x as i16;
-                            let y = pos.y as i16;
-                            let z = pos.z as i16;
+                            let pos = comp_car.xyz.to_dvec3_metres();
 
-                            println!("{x} {y} {z} {}", comp_car.heading.to_radians());
+                            println!("{} {} {} {}", pos.x, pos.y, pos.z, comp_car.heading.to_radians());
                             break;
                         }
                     },
@@ -162,8 +151,8 @@ pub async fn main() -> Result<()> {
         } => {
             let started = Instant::now();
             let mut interval = tokio::time::interval(Duration::from_millis(1000));
-            let center = I16Vec3::new(x, y, z);
-            let dir = Direction::from_radians(heading);
+            let center = DVec3::new(x, y, z);
+            let dir = Heading::from_radians(heading);
             let mut last_objects: Vec<ObjectInfo> = vec![];
 
             loop {
@@ -183,7 +172,7 @@ pub async fn main() -> Result<()> {
                             }).await?;
                         }
 
-                        last_objects = position_text(&text, center, dir, 1.0, 5.0, started.elapsed());
+                        last_objects = position_text(&text, center, dir, 1.0, 10.0, started.elapsed());
 
                         connection.write(Axm {
                             pmoaction: PmoAction::AddObjects,

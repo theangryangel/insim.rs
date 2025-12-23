@@ -142,10 +142,9 @@ impl Encode for Axm {
 
 #[cfg(test)]
 mod test {
-    use insim_core::object::{
-        ObjectInfo, ObjectKind,
-        control::{Control, ControlKind},
-    };
+    use insim_core::{object::{
+        control::{Control, ControlKind}, ObjectKind
+    }};
 
     use super::*;
 
@@ -178,21 +177,24 @@ mod test {
                 128, // info[2] - heading
             ],
             |axm: Axm| {
+
+                        // xyz: Coordinate {
+                        //     x: 
+                        //     y: -1918.4375, // -30695.0 / 16.0
+                        //     z: 2.0 // 8.0 / 4
+                        // },
+
                 assert_eq!(axm.info.len(), 2);
+                assert_eq!(axm.info[0].xyz.x_metres(), -597.25 /* -9556.0 / 16.0 */);
+                assert_eq!(axm.info[0].xyz.y_metres(), -1918.4375 /* -30695.0 / 16.0 */);
+                assert_eq!(axm.info[0].xyz.z_metres(), 2.0 /* 8.0 / 4 */);
                 assert!(matches!(
-                    axm.info[0],
-                    ObjectInfo {
-                        xyz: glam::I16Vec3 {
-                            x: -9556,
-                            y: -30695,
-                            z: 8
-                        },
-                        kind: ObjectKind::Control(Control {
-                            kind: ControlKind::Start,
-                            floating: false,
-                            ..
-                        })
-                    }
+                    axm.info[0].kind,
+                    ObjectKind::Control(Control {
+                        kind: ControlKind::Start,
+                        floating: false,
+                        ..
+                    })
                 ));
             }
         )

@@ -1,6 +1,6 @@
 //! Marker objects
 use super::{ObjectVariant, ObjectWire};
-use crate::{DecodeError, direction::Direction};
+use crate::{DecodeError, direction::Heading};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -63,7 +63,7 @@ pub struct MarkerCorner {
     /// Kind of marker
     pub kind: MarkerCornerKind,
     /// Heading / Direction
-    pub heading: Direction,
+    pub heading: Heading,
     /// Floating
     pub floating: bool,
 }
@@ -76,7 +76,7 @@ impl ObjectVariant for MarkerCorner {
         }
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -85,7 +85,7 @@ impl ObjectVariant for MarkerCorner {
         let floating = wire.floating();
         Ok(Self {
             kind,
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
             floating,
         })
     }
@@ -136,7 +136,7 @@ pub struct MarkerDistance {
     /// Kind of distance marker
     pub kind: MarkerDistanceKind,
     /// Heading / Direction
-    pub heading: Direction,
+    pub heading: Heading,
     /// Floating
     pub floating: bool,
 }
@@ -149,7 +149,7 @@ impl ObjectVariant for MarkerDistance {
         }
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -158,7 +158,7 @@ impl ObjectVariant for MarkerDistance {
         let floating = wire.floating();
         Ok(Self {
             kind,
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
             floating,
         })
     }

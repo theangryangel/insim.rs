@@ -1,6 +1,6 @@
 //! Tyre single object
 use super::{ObjectVariant, ObjectWire};
-use crate::{DecodeError, direction::Direction};
+use crate::{DecodeError, direction::Heading};
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -43,7 +43,7 @@ pub struct Tyres {
     /// Colour
     pub colour: TyreStackColour,
     /// Heading / Direction
-    pub heading: Direction,
+    pub heading: Heading,
     /// Floating
     pub floating: bool,
 }
@@ -56,7 +56,7 @@ impl ObjectVariant for Tyres {
         }
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -65,7 +65,7 @@ impl ObjectVariant for Tyres {
         let floating = wire.floating();
         Ok(Self {
             colour,
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
             floating,
         })
     }

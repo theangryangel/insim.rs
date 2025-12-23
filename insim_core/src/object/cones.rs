@@ -1,6 +1,6 @@
 //! Cone1 objects
 use super::{ObjectVariant, ObjectWire};
-use crate::direction::Direction;
+use crate::direction::Heading;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -48,7 +48,7 @@ pub struct Cone {
     /// Colour
     pub colour: ConeColour,
     /// Heading / Direction
-    pub heading: Direction,
+    pub heading: Heading,
     /// Floating
     pub floating: bool,
 }
@@ -62,7 +62,7 @@ impl ObjectVariant for Cone {
         }
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -71,7 +71,7 @@ impl ObjectVariant for Cone {
         let floating = wire.floating();
         Ok(Self {
             colour,
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
             floating,
         })
     }

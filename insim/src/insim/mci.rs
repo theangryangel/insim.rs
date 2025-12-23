@@ -1,12 +1,11 @@
 use bitflags::bitflags;
 use bytes::{Buf, BufMut};
-use glam::IVec3;
-use insim_core::{Decode, Encode, angvel::AngVel, direction::Direction, speed::Speed};
+use insim_core::{angvel::AngVel, direction::Heading, coordinate::Coordinate, speed::Speed, Decode, Encode};
 
 use crate::identifiers::{PlayerId, RequestId};
 
 /// CompCar direction scale: 32768 units = 180°
-const COMPCAR_DEGREES_PER_UNIT: f64 = 180.0 / 32768.0;
+pub(super) const COMPCAR_DEGREES_PER_UNIT: f64 = 180.0 / 32768.0;
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
@@ -65,19 +64,19 @@ pub struct CompCar {
     /// Additional information that describes this particular Compcar.
     pub info: CompCarInfo,
 
-    /// Positional information for the player, in game units.
-    pub xyz: IVec3,
+    /// Positional information for the player, automatically translated into metres.
+    pub xyz: Coordinate,
 
     /// Speed
     pub speed: Speed,
 
     /// Direction of car's motion : 0 = world y direction
     /// Stored internally as radians
-    pub direction: Direction,
+    pub direction: Heading,
 
     /// Direction of forward axis : 0 = world y direction
     /// Stored internally as radians
-    pub heading: Direction,
+    pub heading: Heading,
 
     /// Signed, rate of change of heading : (16384 = 360 deg/s)
     pub angvel: AngVel,
@@ -103,15 +102,17 @@ impl Decode for CompCar {
         let position = u8::decode(buf)?;
         let info = CompCarInfo::decode(buf)?;
         buf.advance(1);
-        let xyz = IVec3::decode(buf)?;
+
+        let xyz = Coordinate::decode(buf)?;
+
         let speed = (u16::decode(buf)? as f32) / 327.68;
         let speed = Speed::from_meters_per_sec(speed);
 
         let direction_raw = u16::decode(buf)?;
-        let direction = Direction::from_degrees((direction_raw as f64) * COMPCAR_DEGREES_PER_UNIT);
+        let direction = Heading::from_degrees((direction_raw as f64) * COMPCAR_DEGREES_PER_UNIT);
 
         let heading_raw = u16::decode(buf)?;
-        let heading = Direction::from_degrees((heading_raw as f64) * COMPCAR_DEGREES_PER_UNIT);
+        let heading = Heading::from_degrees((heading_raw as f64) * COMPCAR_DEGREES_PER_UNIT);
 
         let angvel = AngVel::from_wire_i16(i16::decode(buf)?);
         Ok(Self {

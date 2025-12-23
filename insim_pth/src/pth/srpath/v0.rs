@@ -3,10 +3,9 @@
 use std::ops::{Deref, DerefMut};
 
 use bytes::{Buf, BufMut, Bytes};
-use glam::IVec3;
 use insim_core::{Decode, Encode};
 
-use crate::node::Node;
+use crate::node::{Node, NodeCoordinate};
 
 bitflags::bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
@@ -97,7 +96,7 @@ impl DerefMut for SrNode {
 /// Where is pole position located?
 pub struct SrPolePosition {
     /// x,y,z
-    pub xyz: IVec3,
+    pub xyz: NodeCoordinate,
     /// heading
     pub heading: f32,
 }

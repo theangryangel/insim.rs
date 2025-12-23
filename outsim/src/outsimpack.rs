@@ -2,8 +2,7 @@
 use std::time::Duration;
 
 use bytes::Buf;
-use glam::{IVec3, Vec3};
-use insim_core::{Decode, Encode};
+use insim_core::{coordinate::Coordinate, vector::Vector, Decode, Encode};
 
 use crate::OutsimId;
 
@@ -15,7 +14,7 @@ pub struct OutsimPack {
     pub time: Duration,
 
     /// Angular velocity
-    pub angvel: Vec3,
+    pub angvel: Vector,
 
     /// Heading
     pub heading: f32,
@@ -27,13 +26,13 @@ pub struct OutsimPack {
     pub roll: f32,
 
     /// Acceleration
-    pub accel: Vec3,
+    pub accel: Vector,
 
     /// Velocity
-    pub vel: Vec3,
+    pub vel: Vector,
 
     /// Position
-    pub pos: IVec3,
+    pub pos: Coordinate,
 
     /// Optional identifier
     pub id: Option<OutsimId>,
@@ -60,13 +59,13 @@ impl Encode for OutsimPack {
 impl Decode for OutsimPack {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let time = Duration::from_millis(u32::decode(buf)? as u64);
-        let angvel = Vec3::decode(buf)?;
+        let angvel = Vector::decode(buf)?;
         let heading = f32::decode(buf)?;
         let pitch = f32::decode(buf)?;
         let roll = f32::decode(buf)?;
-        let accel = Vec3::decode(buf)?;
-        let vel = Vec3::decode(buf)?;
-        let pos = IVec3::decode(buf)?;
+        let accel = Vector::decode(buf)?;
+        let vel = Vector::decode(buf)?;
+        let pos = Coordinate::decode(buf)?;
         let id = if buf.has_remaining() {
             Some(OutsimId::decode(buf)?)
         } else {

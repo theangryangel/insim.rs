@@ -1,6 +1,6 @@
 //! Speed sign objects
 use super::{ObjectVariant, ObjectWire};
-use crate::{DecodeError, direction::Direction};
+use crate::{DecodeError, direction::Heading};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -43,7 +43,7 @@ pub struct SignSpeed {
     /// Mapping
     pub mapping: SpeedSignMapping,
     /// Heading / Direction
-    pub heading: Direction,
+    pub heading: Heading,
     /// Colour (3 bits, 0-7)
     pub colour: u8,
     /// Floating
@@ -59,7 +59,7 @@ impl ObjectVariant for SignSpeed {
         }
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -69,7 +69,7 @@ impl ObjectVariant for SignSpeed {
         let floating = wire.floating();
         Ok(Self {
             mapping,
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
             colour,
             floating,
         })

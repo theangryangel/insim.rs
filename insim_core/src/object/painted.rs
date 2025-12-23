@@ -2,7 +2,7 @@
 use std::convert::TryFrom;
 
 use super::{ObjectVariant, ObjectWire};
-use crate::{DecodeError, direction::Direction};
+use crate::{DecodeError, direction::Heading};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -268,7 +268,7 @@ pub struct Letters {
     /// Character
     pub character: Character,
     /// Heading / Direction
-    pub heading: Direction,
+    pub heading: Heading,
     /// Floating
     pub floating: bool,
 }
@@ -283,7 +283,7 @@ impl ObjectVariant for Letters {
         }
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -294,7 +294,7 @@ impl ObjectVariant for Letters {
         Ok(Self {
             colour,
             character,
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
             floating,
         })
     }
@@ -345,7 +345,7 @@ pub struct Arrows {
     /// Arrow
     pub arrow: Arrow,
     /// Heading / Direction
-    pub heading: Direction,
+    pub heading: Heading,
     /// Floating
     pub floating: bool,
 }
@@ -360,7 +360,7 @@ impl ObjectVariant for Arrows {
         }
         Ok(ObjectWire {
             flags,
-            heading: self.heading.to_objectinfo_heading(),
+            heading: self.heading.to_objectinfo_wire(),
         })
     }
 
@@ -371,7 +371,7 @@ impl ObjectVariant for Arrows {
         Ok(Self {
             colour,
             arrow,
-            heading: Direction::from_objectinfo_heading(wire.heading),
+            heading: Heading::from_objectinfo_wire(wire.heading),
             floating,
         })
     }
