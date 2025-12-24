@@ -76,7 +76,7 @@ trait ObjectVariant: Sized {
 pub struct ObjectCoordinate {
     x: i16,
     y: i16,
-    z: u8
+    z: u8,
 }
 
 impl ObjectCoordinate {
@@ -108,8 +108,8 @@ impl ObjectCoordinate {
 impl ObjectCoordinate {
     /// Convert to glam Vec3, where xyz are in raw
     pub fn to_ivec3(&self) -> glam::I16Vec3 {
-        glam::I16Vec3 { 
-            x: self.x, 
+        glam::I16Vec3 {
+            x: self.x,
             y: self.y,
             z: self.z as i16,
         }
@@ -126,7 +126,7 @@ impl ObjectCoordinate {
 
     /// Convert to glam DVec3, where xyz are in metres
     pub fn to_dvec3_metres(&self) -> glam::DVec3 {
-        glam::DVec3 { 
+        glam::DVec3 {
             x: (self.x as f64 / 16.0),
             y: (self.y as f64 / 16.0),
             z: (self.y as f64 / 4.0),
@@ -144,7 +144,7 @@ impl ObjectCoordinate {
 
     /// Convert to glam Vec3, where xyz are in metres
     pub fn to_vec3_metres(&self) -> glam::Vec3 {
-        glam::Vec3 { 
+        glam::Vec3 {
             x: (self.x as f32 / 16.0),
             y: (self.y as f32 / 16.0),
             z: (self.y as f32 / 4.0),
@@ -816,9 +816,7 @@ impl Decode for ObjectInfo {
         let x = i16::decode(buf)?;
         let y = i16::decode(buf)?;
         let z = u8::decode(buf)?;
-        let xyz = ObjectCoordinate {
-            x, y, z
-        };
+        let xyz = ObjectCoordinate { x, y, z };
 
         let flags = u8::decode(buf)?;
         let index = u8::decode(buf)?;
@@ -827,16 +825,13 @@ impl Decode for ObjectInfo {
         let wire = ObjectWire { flags, heading };
         let kind = ObjectKind::from_wire(index, wire)?;
 
-        Ok(Self {
-            xyz,
-            kind,
-        })
+        Ok(Self { xyz, kind })
     }
 }
 
 impl ObjectKind {
     /// Get heading if this object has one
-    pub fn heading(&self) -> Option<crate::direction::Heading> {
+    pub fn heading(&self) -> Option<crate::heading::Heading> {
         match self {
             ObjectKind::Control(c) => Some(c.heading),
             ObjectKind::Marshal(m) => Some(m.heading),

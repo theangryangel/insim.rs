@@ -44,4 +44,3 @@ impl Encode for Vector {
         Ok(())
     }
 }
-

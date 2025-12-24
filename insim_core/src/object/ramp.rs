@@ -1,6 +1,6 @@
 //! Ramp1 object
 use super::{ObjectVariant, ObjectWire};
-use crate::{DecodeError, direction::Heading};
+use crate::{DecodeError, heading::Heading};
 
 /// Ramp1
 #[derive(Debug, Clone, PartialEq, Default)]

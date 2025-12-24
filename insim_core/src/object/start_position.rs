@@ -1,6 +1,6 @@
 //! Start Position objects
 use super::{ObjectVariant, ObjectWire};
-use crate::direction::Heading;
+use crate::heading::Heading;
 
 /// Start Position
 #[derive(Debug, Clone, PartialEq, Default)]

@@ -1,6 +1,6 @@
 //! Speed hump 10m object
 use super::{ObjectVariant, ObjectWire};
-use crate::{DecodeError, direction::Heading};
+use crate::{DecodeError, heading::Heading};
 
 /// Speed hump 10m
 #[derive(Debug, Clone, PartialEq, Default)]

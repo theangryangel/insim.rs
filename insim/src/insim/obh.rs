@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bitflags::bitflags;
 use bytes::{Buf, BufMut};
-use insim_core::{Decode, Encode, direction::Heading, speed::Speed};
+use insim_core::{Decode, Encode, heading::Heading, speed::Speed};
 
 use crate::identifiers::{PlayerId, RequestId};
 
@@ -68,8 +68,7 @@ pub struct CarContact {
 impl Decode for CarContact {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let direction_raw = u8::decode(buf)?;
-        let direction =
-            Heading::from_degrees((direction_raw as f64) * CARCONTACT_DEGREES_PER_UNIT);
+        let direction = Heading::from_degrees((direction_raw as f64) * CARCONTACT_DEGREES_PER_UNIT);
 
         let heading_raw = u8::decode(buf)?;
         let heading = Heading::from_degrees((heading_raw as f64) * CARCONTACT_DEGREES_PER_UNIT);

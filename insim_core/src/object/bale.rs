@@ -1,6 +1,6 @@
 //! Bale objects
 use super::{ObjectVariant, ObjectWire};
-use crate::direction::Heading;
+use crate::heading::Heading;
 
 /// Bale
 #[derive(Debug, Clone, PartialEq, Default)]

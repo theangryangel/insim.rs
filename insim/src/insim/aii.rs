@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use insim_core::{dash_lights::DashLights, coordinate::Coordinate, vector::Vector, Decode, Encode};
+use insim_core::{Decode, Encode, coordinate::Coordinate, dash_lights::DashLights, vector::Vector};
 
 use crate::identifiers::{PlayerId, RequestId};
 

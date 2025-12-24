@@ -56,7 +56,7 @@ impl_typical_with_request_id!(Jrr);
 
 #[cfg(test)]
 mod test {
-    use insim_core::object::{control, ObjectKind};
+    use insim_core::object::{ObjectKind, control};
 
     use super::*;
 
@@ -83,11 +83,14 @@ mod test {
             |jrr: Jrr| {
                 assert_eq!(jrr.reqi, RequestId(0));
                 assert!(matches!(jrr.jrraction, JrrAction::Spawn));
-                assert_eq!(jrr.startpos.xyz.xyz_metres(), (
-                    -597.25, // -9556 / 16,
-                    -1918.4375, // -30695 / 16,
-                    3.0 // 12.0 / 4,
-                ));
+                assert_eq!(
+                    jrr.startpos.xyz.xyz_metres(),
+                    (
+                        -597.25,    // -9556 / 16,
+                        -1918.4375, // -30695 / 16,
+                        3.0         // 12.0 / 4,
+                    )
+                );
                 assert!(matches!(
                     jrr.startpos.kind,
                     ObjectKind::Control(control::Control {

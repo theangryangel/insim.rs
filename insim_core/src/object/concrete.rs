@@ -1,10 +1,7 @@
-//! Concrete. Welcome to the jungle.
-//! We have intentionally used enums here rather than primitives or newtypes to allow
-//! LSPs/editors to very clearly indicate to users of the library what is valid and what is not.
-//! Whilst this makes it feel slightly awkward, it is an intentional productivity boost.
+//! Concrete
 
 use super::{ObjectVariant, ObjectWire};
-use crate::{DecodeError, direction::Heading};
+use crate::{DecodeError, heading::Heading};
 
 /// Represents Width and Length (2m, 4m, 8m, 16m)
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -12,7 +9,7 @@ use crate::{DecodeError, direction::Heading};
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
-pub enum WidthLength {
+pub enum ConcreteWidthLength {
     #[default]
     Two = 0,
     Four = 1,
@@ -20,15 +17,15 @@ pub enum WidthLength {
     Sixteen = 3,
 }
 
-impl TryFrom<u8> for WidthLength {
+impl TryFrom<u8> for ConcreteWidthLength {
     type Error = crate::DecodeError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0 => Ok(WidthLength::Two),
-            1 => Ok(WidthLength::Four),
-            2 => Ok(WidthLength::Eight),
-            3 => Ok(WidthLength::Sixteen),
+            0 => Ok(ConcreteWidthLength::Two),
+            1 => Ok(ConcreteWidthLength::Four),
+            2 => Ok(ConcreteWidthLength::Eight),
+            3 => Ok(ConcreteWidthLength::Sixteen),
             _ => Err(crate::DecodeError::NoVariantMatch {
                 found: value as u64,
             }),
@@ -71,7 +68,7 @@ impl TryFrom<u8> for Size {
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
-pub enum Colour {
+pub enum ConcreteColour {
     #[default]
     Grey = 0,
     Red = 1,
@@ -79,15 +76,15 @@ pub enum Colour {
     Yellow = 3,
 }
 
-impl TryFrom<u8> for Colour {
+impl TryFrom<u8> for ConcreteColour {
     type Error = crate::DecodeError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0 => Ok(Colour::Grey),
-            1 => Ok(Colour::Red),
-            2 => Ok(Colour::Blue),
-            3 => Ok(Colour::Yellow),
+            0 => Ok(ConcreteColour::Grey),
+            1 => Ok(ConcreteColour::Red),
+            2 => Ok(ConcreteColour::Blue),
+            3 => Ok(ConcreteColour::Yellow),
             _ => Err(crate::DecodeError::NoVariantMatch {
                 found: value as u64,
             }),
@@ -102,7 +99,7 @@ impl TryFrom<u8> for Colour {
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
-pub enum Height {
+pub enum ConcreteHeight {
     #[default]
     M0_25 = 0,
     M0_50 = 1,
@@ -122,27 +119,27 @@ pub enum Height {
     M4_00 = 15,
 }
 
-impl TryFrom<u8> for Height {
+impl TryFrom<u8> for ConcreteHeight {
     type Error = crate::DecodeError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0 => Ok(Height::M0_25),
-            1 => Ok(Height::M0_50),
-            2 => Ok(Height::M0_75),
-            3 => Ok(Height::M1_00),
-            4 => Ok(Height::M1_25),
-            5 => Ok(Height::M1_50),
-            6 => Ok(Height::M1_75),
-            7 => Ok(Height::M2_00),
-            8 => Ok(Height::M2_25),
-            9 => Ok(Height::M2_50),
-            10 => Ok(Height::M2_75),
-            11 => Ok(Height::M3_00),
-            12 => Ok(Height::M3_25),
-            13 => Ok(Height::M3_50),
-            14 => Ok(Height::M3_75),
-            15 => Ok(Height::M4_00),
+            0 => Ok(ConcreteHeight::M0_25),
+            1 => Ok(ConcreteHeight::M0_50),
+            2 => Ok(ConcreteHeight::M0_75),
+            3 => Ok(ConcreteHeight::M1_00),
+            4 => Ok(ConcreteHeight::M1_25),
+            5 => Ok(ConcreteHeight::M1_50),
+            6 => Ok(ConcreteHeight::M1_75),
+            7 => Ok(ConcreteHeight::M2_00),
+            8 => Ok(ConcreteHeight::M2_25),
+            9 => Ok(ConcreteHeight::M2_50),
+            10 => Ok(ConcreteHeight::M2_75),
+            11 => Ok(ConcreteHeight::M3_00),
+            12 => Ok(ConcreteHeight::M3_25),
+            13 => Ok(ConcreteHeight::M3_50),
+            14 => Ok(ConcreteHeight::M3_75),
+            15 => Ok(ConcreteHeight::M4_00),
             _ => Err(crate::DecodeError::NoVariantMatch {
                 found: value as u64,
             }),
@@ -156,7 +153,7 @@ impl TryFrom<u8> for Height {
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
-pub enum Pitch {
+pub enum ConcretePitch {
     #[default]
     Deg0 = 0,
     Deg6 = 1,
@@ -176,27 +173,27 @@ pub enum Pitch {
     Deg90 = 15,
 }
 
-impl TryFrom<u8> for Pitch {
+impl TryFrom<u8> for ConcretePitch {
     type Error = crate::DecodeError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0 => Ok(Pitch::Deg0),
-            1 => Ok(Pitch::Deg6),
-            2 => Ok(Pitch::Deg12),
-            3 => Ok(Pitch::Deg18),
-            4 => Ok(Pitch::Deg24),
-            5 => Ok(Pitch::Deg30),
-            6 => Ok(Pitch::Deg36),
-            7 => Ok(Pitch::Deg42),
-            8 => Ok(Pitch::Deg48),
-            9 => Ok(Pitch::Deg54),
-            10 => Ok(Pitch::Deg60),
-            11 => Ok(Pitch::Deg66),
-            12 => Ok(Pitch::Deg72),
-            13 => Ok(Pitch::Deg78),
-            14 => Ok(Pitch::Deg84),
-            15 => Ok(Pitch::Deg90),
+            0 => Ok(ConcretePitch::Deg0),
+            1 => Ok(ConcretePitch::Deg6),
+            2 => Ok(ConcretePitch::Deg12),
+            3 => Ok(ConcretePitch::Deg18),
+            4 => Ok(ConcretePitch::Deg24),
+            5 => Ok(ConcretePitch::Deg30),
+            6 => Ok(ConcretePitch::Deg36),
+            7 => Ok(ConcretePitch::Deg42),
+            8 => Ok(ConcretePitch::Deg48),
+            9 => Ok(ConcretePitch::Deg54),
+            10 => Ok(ConcretePitch::Deg60),
+            11 => Ok(ConcretePitch::Deg66),
+            12 => Ok(ConcretePitch::Deg72),
+            13 => Ok(ConcretePitch::Deg78),
+            14 => Ok(ConcretePitch::Deg84),
+            15 => Ok(ConcretePitch::Deg90),
             _ => Err(crate::DecodeError::NoVariantMatch {
                 found: value as u64,
             }),
@@ -211,7 +208,7 @@ impl TryFrom<u8> for Pitch {
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
-pub enum Angle {
+pub enum ConcreteAngle {
     #[default]
     Deg5_625 = 0,
     Deg11_25 = 1,
@@ -231,27 +228,27 @@ pub enum Angle {
     Deg90 = 15,
 }
 
-impl TryFrom<u8> for Angle {
+impl TryFrom<u8> for ConcreteAngle {
     type Error = crate::DecodeError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0 => Ok(Angle::Deg5_625),
-            1 => Ok(Angle::Deg11_25),
-            2 => Ok(Angle::Deg16_875),
-            3 => Ok(Angle::Deg22_5),
-            4 => Ok(Angle::Deg28_125),
-            5 => Ok(Angle::Deg33_75),
-            6 => Ok(Angle::Deg39_375),
-            7 => Ok(Angle::Deg45),
-            8 => Ok(Angle::Deg50_625),
-            9 => Ok(Angle::Deg56_25),
-            10 => Ok(Angle::Deg61_875),
-            11 => Ok(Angle::Deg67_5),
-            12 => Ok(Angle::Deg73_125),
-            13 => Ok(Angle::Deg78_75),
-            14 => Ok(Angle::Deg84_375),
-            15 => Ok(Angle::Deg90),
+            0 => Ok(ConcreteAngle::Deg5_625),
+            1 => Ok(ConcreteAngle::Deg11_25),
+            2 => Ok(ConcreteAngle::Deg16_875),
+            3 => Ok(ConcreteAngle::Deg22_5),
+            4 => Ok(ConcreteAngle::Deg28_125),
+            5 => Ok(ConcreteAngle::Deg33_75),
+            6 => Ok(ConcreteAngle::Deg39_375),
+            7 => Ok(ConcreteAngle::Deg45),
+            8 => Ok(ConcreteAngle::Deg50_625),
+            9 => Ok(ConcreteAngle::Deg56_25),
+            10 => Ok(ConcreteAngle::Deg61_875),
+            11 => Ok(ConcreteAngle::Deg67_5),
+            12 => Ok(ConcreteAngle::Deg73_125),
+            13 => Ok(ConcreteAngle::Deg78_75),
+            14 => Ok(ConcreteAngle::Deg84_375),
+            15 => Ok(ConcreteAngle::Deg90),
             _ => Err(crate::DecodeError::NoVariantMatch {
                 found: value as u64,
             }),
@@ -259,99 +256,16 @@ impl TryFrom<u8> for Angle {
     }
 }
 
-/// Slab
-#[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct Slab {
-    /// Width
-    pub width: WidthLength,
-    /// Length
-    pub length: WidthLength,
-    /// Pitch
-    pub pitch: Pitch,
-}
-
-/// Ramp
-#[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct Ramp {
-    /// Width
-    pub width: WidthLength,
-    /// Length
-    pub length: WidthLength,
-    /// Height
-    pub height: Height,
-}
-
-/// Wall
-#[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct Wall {
-    /// Colour
-    pub colour: Colour,
-    /// Length
-    pub length: WidthLength,
-    /// Height
-    pub height: Height,
-}
-
-/// Ramp Wall
-pub type RampWall = Wall;
-
-/// Pillar
-#[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct Pillar {
-    /// SizeX
-    pub x: Size,
-    /// SizeY
-    pub y: Size,
-    /// Height
-    pub height: Height,
-}
-
-/// SlabWall
-#[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct SlabWall {
-    /// Colour
-    pub colour: Colour,
-    /// Length
-    pub length: WidthLength,
-    /// Pitch
-    pub pitch: Pitch,
-}
-
-/// ShortSlabWall
-#[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct ShortSlabWall {
-    /// Colour
-    pub colour: Colour,
-    /// Size Y
-    pub y: Size,
-    /// Pitch
-    pub pitch: Pitch,
-}
-
-/// Wedge
-#[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct Wedge {
-    /// Colour
-    pub colour: Colour,
-    /// Length
-    pub length: WidthLength,
-    /// Angle
-    pub angle: Angle,
-}
-
 /// Concrete Slab
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConcreteSlab {
-    /// Slab data
-    pub slab: Slab,
+    /// Width
+    pub width: ConcreteWidthLength,
+    /// Length
+    pub length: ConcreteWidthLength,
+    /// Pitch
+    pub pitch: ConcretePitch,
     /// Heading / Direction
     pub heading: Heading,
 }
@@ -359,9 +273,9 @@ pub struct ConcreteSlab {
 impl ObjectVariant for ConcreteSlab {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = 0;
-        flags |= self.slab.width as u8 & 0x03;
-        flags |= (self.slab.length as u8 & 0x03) << 2;
-        flags |= (self.slab.pitch as u8 & 0x0f) << 4;
+        flags |= self.width as u8 & 0x03;
+        flags |= (self.length as u8 & 0x03) << 2;
+        flags |= (self.pitch as u8 & 0x0f) << 4;
         Ok(ObjectWire {
             flags,
             heading: self.heading.to_objectinfo_wire(),
@@ -369,15 +283,13 @@ impl ObjectVariant for ConcreteSlab {
     }
 
     fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
-        let width = WidthLength::try_from(wire.flags & 0x03)?;
-        let length = WidthLength::try_from((wire.flags & 0x0c) >> 2)?;
-        let pitch = Pitch::try_from((wire.flags & 0xf0) >> 4)?;
+        let width = ConcreteWidthLength::try_from(wire.flags & 0x03)?;
+        let length = ConcreteWidthLength::try_from((wire.flags & 0x0c) >> 2)?;
+        let pitch = ConcretePitch::try_from((wire.flags & 0xf0) >> 4)?;
         Ok(Self {
-            slab: Slab {
-                width,
-                length,
-                pitch,
-            },
+            width,
+            length,
+            pitch,
             heading: Heading::from_objectinfo_wire(wire.heading),
         })
     }
@@ -387,8 +299,12 @@ impl ObjectVariant for ConcreteSlab {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConcreteRamp {
-    /// Ramp data
-    pub ramp: Ramp,
+    /// Width
+    pub width: ConcreteWidthLength,
+    /// Length
+    pub length: ConcreteWidthLength,
+    /// Height
+    pub height: ConcreteHeight,
     /// Heading / Direction
     pub heading: Heading,
 }
@@ -396,9 +312,9 @@ pub struct ConcreteRamp {
 impl ObjectVariant for ConcreteRamp {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = 0;
-        flags |= self.ramp.width as u8 & 0x03;
-        flags |= (self.ramp.length as u8 & 0x03) << 2;
-        flags |= (self.ramp.height as u8 & 0x0f) << 4;
+        flags |= self.width as u8 & 0x03;
+        flags |= (self.length as u8 & 0x03) << 2;
+        flags |= (self.height as u8 & 0x0f) << 4;
         Ok(ObjectWire {
             flags,
             heading: self.heading.to_objectinfo_wire(),
@@ -406,15 +322,13 @@ impl ObjectVariant for ConcreteRamp {
     }
 
     fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
-        let width = WidthLength::try_from(wire.flags & 0x03)?;
-        let length = WidthLength::try_from((wire.flags & 0x0c) >> 2)?;
-        let height = Height::try_from((wire.flags & 0xf0) >> 4)?;
+        let width = ConcreteWidthLength::try_from(wire.flags & 0x03)?;
+        let length = ConcreteWidthLength::try_from((wire.flags & 0x0c) >> 2)?;
+        let height = ConcreteHeight::try_from((wire.flags & 0xf0) >> 4)?;
         Ok(Self {
-            ramp: Ramp {
-                width,
-                length,
-                height,
-            },
+            width,
+            length,
+            height,
             heading: Heading::from_objectinfo_wire(wire.heading),
         })
     }
@@ -424,8 +338,12 @@ impl ObjectVariant for ConcreteRamp {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConcreteWall {
-    /// Wall data
-    pub wall: Wall,
+    /// Colour
+    pub colour: ConcreteColour,
+    /// Length
+    pub length: ConcreteWidthLength,
+    /// Height
+    pub height: ConcreteHeight,
     /// Heading / Direction
     pub heading: Heading,
 }
@@ -433,9 +351,9 @@ pub struct ConcreteWall {
 impl ObjectVariant for ConcreteWall {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = 0;
-        flags |= self.wall.colour as u8 & 0x03;
-        flags |= (self.wall.length as u8 & 0x03) << 2;
-        flags |= (self.wall.height as u8 & 0x0f) << 4;
+        flags |= self.colour as u8 & 0x03;
+        flags |= (self.length as u8 & 0x03) << 2;
+        flags |= (self.height as u8 & 0x0f) << 4;
         Ok(ObjectWire {
             flags,
             heading: self.heading.to_objectinfo_wire(),
@@ -443,15 +361,13 @@ impl ObjectVariant for ConcreteWall {
     }
 
     fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
-        let colour = Colour::try_from(wire.flags & 0x03)?;
-        let length = WidthLength::try_from((wire.flags & 0x0c) >> 2)?;
-        let height = Height::try_from((wire.flags & 0xf0) >> 4)?;
+        let colour = ConcreteColour::try_from(wire.flags & 0x03)?;
+        let length = ConcreteWidthLength::try_from((wire.flags & 0x0c) >> 2)?;
+        let height = ConcreteHeight::try_from((wire.flags & 0xf0) >> 4)?;
         Ok(Self {
-            wall: Wall {
-                colour,
-                length,
-                height,
-            },
+            colour,
+            length,
+            height,
             heading: Heading::from_objectinfo_wire(wire.heading),
         })
     }
@@ -461,8 +377,12 @@ impl ObjectVariant for ConcreteWall {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConcretePillar {
-    /// Pillar data
-    pub pillar: Pillar,
+    /// SizeX
+    pub x: Size,
+    /// SizeY
+    pub y: Size,
+    /// Height
+    pub height: ConcreteHeight,
     /// Heading / Direction
     pub heading: Heading,
 }
@@ -470,9 +390,9 @@ pub struct ConcretePillar {
 impl ObjectVariant for ConcretePillar {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = 0;
-        flags |= self.pillar.x as u8 & 0x03;
-        flags |= (self.pillar.y as u8 & 0x03) << 2;
-        flags |= (self.pillar.height as u8 & 0x0f) << 4;
+        flags |= self.x as u8 & 0x03;
+        flags |= (self.y as u8 & 0x03) << 2;
+        flags |= (self.height as u8 & 0x0f) << 4;
         Ok(ObjectWire {
             flags,
             heading: self.heading.to_objectinfo_wire(),
@@ -482,9 +402,11 @@ impl ObjectVariant for ConcretePillar {
     fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
         let x = Size::try_from(wire.flags & 0x03)?;
         let y = Size::try_from((wire.flags & 0x0c) >> 2)?;
-        let height = Height::try_from((wire.flags & 0xf0) >> 4)?;
+        let height = ConcreteHeight::try_from((wire.flags & 0xf0) >> 4)?;
         Ok(Self {
-            pillar: Pillar { x, y, height },
+            x,
+            y,
+            height,
             heading: Heading::from_objectinfo_wire(wire.heading),
         })
     }
@@ -494,8 +416,12 @@ impl ObjectVariant for ConcretePillar {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConcreteSlabWall {
-    /// Slab Wall data
-    pub slab_wall: SlabWall,
+    /// Colour
+    pub colour: ConcreteColour,
+    /// Length
+    pub length: ConcreteWidthLength,
+    /// Pitch
+    pub pitch: ConcretePitch,
     /// Heading / Direction
     pub heading: Heading,
 }
@@ -503,9 +429,9 @@ pub struct ConcreteSlabWall {
 impl ObjectVariant for ConcreteSlabWall {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = 0;
-        flags |= self.slab_wall.colour as u8 & 0x03;
-        flags |= (self.slab_wall.length as u8 & 0x03) << 2;
-        flags |= (self.slab_wall.pitch as u8 & 0x0f) << 4;
+        flags |= self.colour as u8 & 0x03;
+        flags |= (self.length as u8 & 0x03) << 2;
+        flags |= (self.pitch as u8 & 0x0f) << 4;
         Ok(ObjectWire {
             flags,
             heading: self.heading.to_objectinfo_wire(),
@@ -513,15 +439,13 @@ impl ObjectVariant for ConcreteSlabWall {
     }
 
     fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
-        let colour = Colour::try_from(wire.flags & 0x03)?;
-        let length = WidthLength::try_from((wire.flags & 0x0c) >> 2)?;
-        let pitch = Pitch::try_from((wire.flags & 0xf0) >> 4)?;
+        let colour = ConcreteColour::try_from(wire.flags & 0x03)?;
+        let length = ConcreteWidthLength::try_from((wire.flags & 0x0c) >> 2)?;
+        let pitch = ConcretePitch::try_from((wire.flags & 0xf0) >> 4)?;
         Ok(Self {
-            slab_wall: SlabWall {
-                colour,
-                length,
-                pitch,
-            },
+            colour,
+            length,
+            pitch,
             heading: Heading::from_objectinfo_wire(wire.heading),
         })
     }
@@ -531,8 +455,12 @@ impl ObjectVariant for ConcreteSlabWall {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConcreteRampWall {
-    /// Ramp Wall data
-    pub ramp_wall: Wall,
+    /// Colour
+    pub colour: ConcreteColour,
+    /// Length
+    pub length: ConcreteWidthLength,
+    /// Height
+    pub height: ConcreteHeight,
     /// Heading / Direction
     pub heading: Heading,
 }
@@ -540,9 +468,9 @@ pub struct ConcreteRampWall {
 impl ObjectVariant for ConcreteRampWall {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = 0;
-        flags |= self.ramp_wall.colour as u8 & 0x03;
-        flags |= (self.ramp_wall.length as u8 & 0x03) << 2;
-        flags |= (self.ramp_wall.height as u8 & 0x0f) << 4;
+        flags |= self.colour as u8 & 0x03;
+        flags |= (self.length as u8 & 0x03) << 2;
+        flags |= (self.height as u8 & 0x0f) << 4;
         Ok(ObjectWire {
             flags,
             heading: self.heading.to_objectinfo_wire(),
@@ -550,15 +478,13 @@ impl ObjectVariant for ConcreteRampWall {
     }
 
     fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
-        let colour = Colour::try_from(wire.flags & 0x03)?;
-        let length = WidthLength::try_from((wire.flags & 0x0c) >> 2)?;
-        let height = Height::try_from((wire.flags & 0xf0) >> 4)?;
+        let colour = ConcreteColour::try_from(wire.flags & 0x03)?;
+        let length = ConcreteWidthLength::try_from((wire.flags & 0x0c) >> 2)?;
+        let height = ConcreteHeight::try_from((wire.flags & 0xf0) >> 4)?;
         Ok(Self {
-            ramp_wall: Wall {
-                colour,
-                length,
-                height,
-            },
+            colour,
+            length,
+            height,
             heading: Heading::from_objectinfo_wire(wire.heading),
         })
     }
@@ -568,8 +494,12 @@ impl ObjectVariant for ConcreteRampWall {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConcreteShortSlabWall {
-    /// Short Slab Wall data
-    pub short_slab_wall: ShortSlabWall,
+    /// Colour
+    pub colour: ConcreteColour,
+    /// Size Y
+    pub y: Size,
+    /// Pitch
+    pub pitch: ConcretePitch,
     /// Heading / Direction
     pub heading: Heading,
 }
@@ -577,9 +507,9 @@ pub struct ConcreteShortSlabWall {
 impl ObjectVariant for ConcreteShortSlabWall {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = 0;
-        flags |= self.short_slab_wall.colour as u8 & 0x03;
-        flags |= (self.short_slab_wall.y as u8 & 0x03) << 2;
-        flags |= (self.short_slab_wall.pitch as u8 & 0x0f) << 4;
+        flags |= self.colour as u8 & 0x03;
+        flags |= (self.y as u8 & 0x03) << 2;
+        flags |= (self.pitch as u8 & 0x0f) << 4;
         Ok(ObjectWire {
             flags,
             heading: self.heading.to_objectinfo_wire(),
@@ -587,11 +517,13 @@ impl ObjectVariant for ConcreteShortSlabWall {
     }
 
     fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
-        let colour = Colour::try_from(wire.flags & 0x03)?;
+        let colour = ConcreteColour::try_from(wire.flags & 0x03)?;
         let y = Size::try_from((wire.flags & 0x0c) >> 2)?;
-        let pitch = Pitch::try_from((wire.flags & 0xf0) >> 4)?;
+        let pitch = ConcretePitch::try_from((wire.flags & 0xf0) >> 4)?;
         Ok(Self {
-            short_slab_wall: ShortSlabWall { colour, y, pitch },
+            colour,
+            y,
+            pitch,
             heading: Heading::from_objectinfo_wire(wire.heading),
         })
     }
@@ -601,8 +533,12 @@ impl ObjectVariant for ConcreteShortSlabWall {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConcreteWedge {
-    /// Wedge data
-    pub wedge: Wedge,
+    /// Colour
+    pub colour: ConcreteColour,
+    /// Length
+    pub length: ConcreteWidthLength,
+    /// Angle
+    pub angle: ConcreteAngle,
     /// Heading / Direction
     pub heading: Heading,
 }
@@ -610,9 +546,9 @@ pub struct ConcreteWedge {
 impl ObjectVariant for ConcreteWedge {
     fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
         let mut flags = 0;
-        flags |= self.wedge.colour as u8 & 0x03;
-        flags |= (self.wedge.length as u8 & 0x03) << 2;
-        flags |= (self.wedge.angle as u8 & 0x0f) << 4;
+        flags |= self.colour as u8 & 0x03;
+        flags |= (self.length as u8 & 0x03) << 2;
+        flags |= (self.angle as u8 & 0x0f) << 4;
         Ok(ObjectWire {
             flags,
             heading: self.heading.to_objectinfo_wire(),
@@ -620,15 +556,13 @@ impl ObjectVariant for ConcreteWedge {
     }
 
     fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
-        let colour = Colour::try_from(wire.flags & 0x03)?;
-        let length = WidthLength::try_from((wire.flags & 0x0c) >> 2)?;
-        let angle = Angle::try_from((wire.flags & 0xf0) >> 4)?;
+        let colour = ConcreteColour::try_from(wire.flags & 0x03)?;
+        let length = ConcreteWidthLength::try_from((wire.flags & 0x0c) >> 2)?;
+        let angle = ConcreteAngle::try_from((wire.flags & 0xf0) >> 4)?;
         Ok(Self {
-            wedge: Wedge {
-                colour,
-                length,
-                angle,
-            },
+            colour,
+            length,
+            angle,
             heading: Heading::from_objectinfo_wire(wire.heading),
         })
     }

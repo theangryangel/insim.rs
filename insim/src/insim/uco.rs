@@ -51,7 +51,7 @@ pub struct Uco {
 
 #[cfg(test)]
 mod test {
-    use insim_core::object::{insim::InsimCircle, ObjectKind};
+    use insim_core::object::{ObjectKind, insim::InsimCircle};
 
     use super::*;
 
@@ -88,11 +88,14 @@ mod test {
                 1,   // info - heading
             ],
             |parsed: Uco| {
-                assert_eq!(parsed.info.xyz.xyz_metres(), (
-                    -17.5, // -280 / 16,
-                    -99.0625, // -1585 / 16,
-                    2.0, // 8.0 / 4
-                ));
+                assert_eq!(
+                    parsed.info.xyz.xyz_metres(),
+                    (
+                        -17.5,    // -280 / 16,
+                        -99.0625, // -1585 / 16,
+                        2.0,      // 8.0 / 4
+                    )
+                );
                 assert!(matches!(
                     parsed.info.kind,
                     ObjectKind::InsimCircle(InsimCircle {

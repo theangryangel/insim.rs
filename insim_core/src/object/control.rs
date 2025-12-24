@@ -1,7 +1,7 @@
 //! Control objects
 
 use super::ObjectWire;
-use crate::direction::Heading;
+use crate::heading::Heading;
 
 #[derive(Debug, Clone, Default, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

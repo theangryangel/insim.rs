@@ -2,7 +2,7 @@
 use std::convert::TryFrom;
 
 use super::{ObjectVariant, ObjectWire};
-use crate::{DecodeError, direction::Heading};
+use crate::{DecodeError, heading::Heading};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

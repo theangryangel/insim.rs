@@ -2,7 +2,7 @@
 
 use crate::{Decode, Encode};
 
-/// Represent position/coordinates in LFS game space. 
+/// Represent position/coordinates in LFS game space.
 /// Internally stored as i32 where 65536 = 1m to ensure zero data loss from upstream.
 ///
 /// It's usual for humans to work in metres, so we provide useful functions to scale to f32 metres, as
@@ -47,9 +47,9 @@ impl Coordinate {
     #[cfg(feature = "glam")]
     pub fn to_vec3_metres(self) -> glam::Vec3 {
         glam::Vec3::new(
-            self.x as f32 / Self::SCALE as f32, 
-            self.y as f32 / Self::SCALE as f32, 
-            self.z as f32 / Self::SCALE as f32
+            self.x as f32 / Self::SCALE as f32,
+            self.y as f32 / Self::SCALE as f32,
+            self.z as f32 / Self::SCALE as f32,
         )
     }
 
@@ -67,9 +67,9 @@ impl Coordinate {
     #[cfg(feature = "glam")]
     pub fn to_dvec3_metres(self) -> glam::DVec3 {
         glam::DVec3::new(
-            self.x as f64 / Self::SCALE as f64, 
-            self.y as f64 / Self::SCALE as f64, 
-            self.z as f64 / Self::SCALE as f64
+            self.x as f64 / Self::SCALE as f64,
+            self.y as f64 / Self::SCALE as f64,
+            self.z as f64 / Self::SCALE as f64,
         )
     }
 
@@ -83,15 +83,10 @@ impl Coordinate {
         }
     }
 
-
     /// Convert to glam Vec3, where xyz are in the internal representation of 63336 = 1m
     #[cfg(feature = "glam")]
     pub fn to_vec3(self) -> glam::Vec3 {
-        glam::Vec3::new(
-            self.x as f32,
-            self.y as f32,
-            self.z as f32,
-        )
+        glam::Vec3::new(self.x as f32, self.y as f32, self.z as f32)
     }
 
     /// Convert from glam Vec3, where the Vec3 represents 63336 = 1m
@@ -107,11 +102,7 @@ impl Coordinate {
     /// Convert to glam IVec3, where xyz are in the internal representation of 63336 = 1m
     #[cfg(feature = "glam")]
     pub fn to_ivec3(self) -> glam::IVec3 {
-        glam::IVec3::new(
-            self.x,
-            self.y,
-            self.z,
-        )
+        glam::IVec3::new(self.x, self.y, self.z)
     }
 
     /// Convert from glam IVec3, where the Vec3 represents 63336 = 1m

@@ -1,6 +1,6 @@
 //! Cone1 objects
 use super::{ObjectVariant, ObjectWire};
-use crate::direction::Heading;
+use crate::heading::Heading;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

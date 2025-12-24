@@ -1,6 +1,6 @@
 //! Pit start point object
 use super::{ObjectVariant, ObjectWire};
-use crate::direction::Heading;
+use crate::heading::Heading;
 
 /// Pit start point
 /// Start Position

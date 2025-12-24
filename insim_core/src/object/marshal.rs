@@ -1,6 +1,6 @@
 //! Marshal objects
 use super::ObjectWire;
-use crate::direction::Heading;
+use crate::heading::Heading;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

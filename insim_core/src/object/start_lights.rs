@@ -1,6 +1,6 @@
 //! StartLights1 object
 use super::{ObjectVariant, ObjectWire};
-use crate::{DecodeError, direction::Heading};
+use crate::{DecodeError, heading::Heading};
 
 /// StartLights
 #[derive(Debug, Clone, PartialEq, Default)]

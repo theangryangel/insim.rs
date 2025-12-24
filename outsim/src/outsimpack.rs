@@ -2,7 +2,7 @@
 use std::time::Duration;
 
 use bytes::Buf;
-use insim_core::{coordinate::Coordinate, vector::Vector, Decode, Encode};
+use insim_core::{Decode, Encode, coordinate::Coordinate, vector::Vector};
 
 use crate::OutsimId;
 

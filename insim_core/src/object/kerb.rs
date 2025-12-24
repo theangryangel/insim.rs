@@ -1,6 +1,6 @@
 //! Kerb objects
 use super::{ObjectVariant, ObjectWire};
-use crate::direction::Heading;
+use crate::heading::Heading;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -8,7 +8,7 @@ use crate::direction::Heading;
 #[allow(missing_docs)]
 #[non_exhaustive]
 /// Kerb Mapping
-pub enum KerbMapping {
+pub enum KerbColour {
     /// White (light)
     #[default]
     White = 0,
@@ -44,7 +44,7 @@ pub enum KerbMapping {
     YellowDark = 15,
 }
 
-impl From<u8> for KerbMapping {
+impl From<u8> for KerbColour {
     fn from(value: u8) -> Self {
         match value & 0x0f {
             0 => Self::White,
@@ -77,7 +77,7 @@ pub struct Kerb {
     /// Colour (3 bits, 0-7)
     pub colour: u8,
     /// Mapping
-    pub mapping: KerbMapping,
+    pub mapping: KerbColour,
     /// Floating
     pub floating: bool,
 }
@@ -97,7 +97,7 @@ impl ObjectVariant for Kerb {
 
     fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
         let colour = wire.colour();
-        let mapping = KerbMapping::from(wire.mapping());
+        let mapping = KerbColour::from(wire.mapping());
         let floating = wire.floating();
         Ok(Self {
             heading: Heading::from_objectinfo_wire(wire.heading),

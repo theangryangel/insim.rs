@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use bytes::{Buf, BufMut};
-use insim_core::{direction::Heading, coordinate::Coordinate, Decode, Encode};
+use insim_core::{Decode, Encode, coordinate::Coordinate, heading::Heading};
 
 use super::{CameraView, StaFlags};
 use crate::identifiers::{PlayerId, RequestId};
@@ -48,7 +48,9 @@ impl Decode for Cpp {
         buf.advance(1);
         let pos = Coordinate::decode(buf)?;
 
-        let h = Heading::from_degrees((u16::decode(buf)? as f64) * super::mci::COMPCAR_DEGREES_PER_UNIT);
+        let h = Heading::from_degrees(
+            (u16::decode(buf)? as f64) * super::mci::COMPCAR_DEGREES_PER_UNIT,
+        );
         let p = u16::decode(buf)?;
         let r = u16::decode(buf)?;
 
@@ -69,9 +71,8 @@ impl Decode for Cpp {
             ingamecam,
             fov,
             time,
-            flags
+            flags,
         })
-
     }
 }
 

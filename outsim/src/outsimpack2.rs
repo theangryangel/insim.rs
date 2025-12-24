@@ -3,7 +3,8 @@ use std::time::Duration;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use insim_core::{
-    coordinate::Coordinate, gear::Gear, vector::Vector, Decode, DecodeError, DecodeString, Encode, EncodeError, EncodeString
+    Decode, DecodeError, DecodeString, Encode, EncodeError, EncodeString, coordinate::Coordinate,
+    gear::Gear, vector::Vector,
 };
 
 use crate::OutsimId;

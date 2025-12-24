@@ -1,6 +1,8 @@
 use bitflags::bitflags;
 use bytes::{Buf, BufMut};
-use insim_core::{angvel::AngVel, direction::Heading, coordinate::Coordinate, speed::Speed, Decode, Encode};
+use insim_core::{
+    Decode, Encode, angvel::AngVel, coordinate::Coordinate, heading::Heading, speed::Speed,
+};
 
 use crate::identifiers::{PlayerId, RequestId};
 

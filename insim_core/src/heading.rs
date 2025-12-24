@@ -22,7 +22,7 @@ use std::fmt;
 /// angles to the 0->360 range if needed.
 ///
 /// ```
-/// use insim_core::direction::Heading;
+/// use insim_core::heading::Heading;
 ///
 /// let over = Heading::from_degrees(450.0);
 /// assert!((over.to_degrees() - 450.0).abs() < 0.0001);  // Preserved as-is
@@ -33,7 +33,7 @@ use std::fmt;
 ///
 /// # Examples
 /// ```
-/// use insim_core::direction::Heading;
+/// use insim_core::heading::Heading;
 ///
 /// let forward = Heading::from_degrees(0.0);    // Y direction
 /// let right = Heading::from_degrees(90.0);     // X direction
@@ -115,12 +115,12 @@ impl Heading {
 
     /// Normalize the angle to the range 0->360.
     ///
-    /// Useful when you need to compare directions or ensure angles are in a 
+    /// Useful when you need to compare directions or ensure angles are in a
     /// canonical form.
     ///
     /// # Examples
     /// ```
-    /// use insim_core::direction::Heading;
+    /// use insim_core::heading::Heading;
     ///
     /// // Over-rotation wraps back
     /// let over = Heading::from_degrees(450.0);
@@ -151,7 +151,7 @@ impl Heading {
     ///
     /// # Examples
     /// ```
-    /// use insim_core::direction::Heading;
+    /// use insim_core::heading::Heading;
     ///
     /// let north = Heading::NORTH;
     /// let south = north.opposite();

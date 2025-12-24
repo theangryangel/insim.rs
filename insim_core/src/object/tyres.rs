@@ -1,12 +1,12 @@
 //! Tyre single object
 use super::{ObjectVariant, ObjectWire};
-use crate::{DecodeError, direction::Heading};
+use crate::{DecodeError, heading::Heading};
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[non_exhaustive]
 /// Tyre Stack Colour
-pub enum TyreStackColour {
+pub enum TyreColour {
     /// Black
     #[default]
     Black = 0,
@@ -22,7 +22,7 @@ pub enum TyreStackColour {
     Yellow = 5,
 }
 
-impl From<u8> for TyreStackColour {
+impl From<u8> for TyreColour {
     fn from(value: u8) -> Self {
         match value {
             0 => Self::Black,
@@ -41,7 +41,7 @@ impl From<u8> for TyreStackColour {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Tyres {
     /// Colour
-    pub colour: TyreStackColour,
+    pub colour: TyreColour,
     /// Heading / Direction
     pub heading: Heading,
     /// Floating
@@ -61,7 +61,7 @@ impl ObjectVariant for Tyres {
     }
 
     fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
-        let colour = TyreStackColour::from(wire.colour());
+        let colour = TyreColour::from(wire.colour());
         let floating = wire.floating();
         Ok(Self {
             colour,
