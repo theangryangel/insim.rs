@@ -77,6 +77,36 @@ impl Vehicle {
             Vehicle::Unknown => License::S3,
         }
     }
+
+    pub fn code(&self) -> String {
+        match self {
+            Vehicle::Xfg => "XFG".to_string(),
+            Vehicle::Xrg => "XRG".to_string(),
+            Vehicle::Fbm => "FBM".to_string(),
+            Vehicle::Xrt => "XRT".to_string(),
+            Vehicle::Rb4 => "RB4".to_string(),
+            Vehicle::Fxo => "FXO".to_string(),
+            Vehicle::Lx4 => "LX4".to_string(),
+            Vehicle::Lx6 => "LX6".to_string(),
+            Vehicle::Mrt => "MRT".to_string(),
+            Vehicle::Uf1 => "UF1".to_string(),
+            Vehicle::Rac => "RAC".to_string(),
+            Vehicle::Fz5 => "FZ5".to_string(),
+            Vehicle::Fox => "FOX".to_string(),
+            Vehicle::Xfr => "XFR".to_string(),
+            Vehicle::Ufr => "UFR".to_string(),
+            Vehicle::Fo8 => "FO8".to_string(),
+            Vehicle::Fxr => "FXR".to_string(),
+            Vehicle::Xrr => "XRR".to_string(),
+            Vehicle::Fzr => "FZR".to_string(),
+            Vehicle::Bf1 => "BF1".to_string(),
+            Vehicle::Mod(vehmod) => {
+                // Determine the mod id. This is only applicable for Insim v9+.
+                format!("{:06X}", vehmod)
+            },
+            Vehicle::Unknown => "Unknown".to_string(),
+        }
+    }
 }
 
 impl Decode for Vehicle {
@@ -147,65 +177,13 @@ impl Encode for Vehicle {
 
 impl std::fmt::Display for Vehicle {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Vehicle::Xfg => write!(f, "XFG"),
-            Vehicle::Xrg => write!(f, "XRG"),
-            Vehicle::Fbm => write!(f, "FBM"),
-            Vehicle::Xrt => write!(f, "XRT"),
-            Vehicle::Rb4 => write!(f, "RB4"),
-            Vehicle::Fxo => write!(f, "FXO"),
-            Vehicle::Lx4 => write!(f, "LX4"),
-            Vehicle::Lx6 => write!(f, "LX6"),
-            Vehicle::Mrt => write!(f, "MRT"),
-            Vehicle::Uf1 => write!(f, "UF1"),
-            Vehicle::Rac => write!(f, "RAC"),
-            Vehicle::Fz5 => write!(f, "FZ5"),
-            Vehicle::Fox => write!(f, "FOX"),
-            Vehicle::Xfr => write!(f, "XFR"),
-            Vehicle::Ufr => write!(f, "UFR"),
-            Vehicle::Fo8 => write!(f, "FO8"),
-            Vehicle::Fxr => write!(f, "FXR"),
-            Vehicle::Xrr => write!(f, "XRR"),
-            Vehicle::Fzr => write!(f, "FZR"),
-            Vehicle::Bf1 => write!(f, "BF1"),
-            Vehicle::Mod(vehmod) => {
-                // Determine the mod id. This is only applicable for Insim v9.
-                write!(f, "{:06X}", vehmod)
-            },
-            Vehicle::Unknown => write!(f, "Unknown"),
-        }
+        write!(f, "{}", self.code())
     }
 }
 
 impl std::fmt::Debug for Vehicle {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Vehicle::Xfg => write!(f, "XFG"),
-            Vehicle::Xrg => write!(f, "XRG"),
-            Vehicle::Fbm => write!(f, "FBM"),
-            Vehicle::Xrt => write!(f, "XRT"),
-            Vehicle::Rb4 => write!(f, "RB4"),
-            Vehicle::Fxo => write!(f, "FXO"),
-            Vehicle::Lx4 => write!(f, "LX4"),
-            Vehicle::Lx6 => write!(f, "LX6"),
-            Vehicle::Mrt => write!(f, "MRT"),
-            Vehicle::Uf1 => write!(f, "UF1"),
-            Vehicle::Rac => write!(f, "RAC"),
-            Vehicle::Fz5 => write!(f, "FZ5"),
-            Vehicle::Fox => write!(f, "FOX"),
-            Vehicle::Xfr => write!(f, "XFR"),
-            Vehicle::Ufr => write!(f, "UFR"),
-            Vehicle::Fo8 => write!(f, "FO8"),
-            Vehicle::Fxr => write!(f, "FXR"),
-            Vehicle::Xrr => write!(f, "XRR"),
-            Vehicle::Fzr => write!(f, "FZR"),
-            Vehicle::Bf1 => write!(f, "BF1"),
-            Vehicle::Mod(vehmod) => {
-                // Determine the mod id. This is only applicable for Insim v9.
-                write!(f, "MOD({:06X})", vehmod)
-            },
-            Vehicle::Unknown => write!(f, "Unknown"),
-        }
+        write!(f, "{}", self.code())
     }
 }
 
@@ -267,8 +245,9 @@ impl<'de> serde::Deserialize<'de> for Vehicle {
     where
         D: serde::de::Deserializer<'de>,
     {
-        // FromStr for Vehicle is Infallible, so I guess unwrap is good enough
-        Ok(String::deserialize(deserializer)?.parse().unwrap())
+        Ok(String::deserialize(deserializer)?
+            .parse()
+            .expect("Vehicle::FromStr should be infallible"))
     }
 }
 

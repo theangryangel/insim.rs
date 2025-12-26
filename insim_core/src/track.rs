@@ -68,7 +68,7 @@ macro_rules! define_tracks {
             /// Is this an open world track?
             pub fn is_open(&self) -> bool {
                 let s = self.code();
-                s.ends_with('X') || s.ends_with('Y')
+                s.ends_with('X') || s.ends_with('Y') || matches!(self, Self::So7)
             }
         }
 
@@ -86,7 +86,7 @@ macro_rules! define_tracks {
 
 #[rustfmt::skip]
 define_tracks!(
-    // Variant, Code, Name,                            License, Distance (Miles)
+    //     Code,    Name,                           License, Distance (Miles)
     Bl1,   "BL1",   "Blackwood GP Track",              Demo, Some(2.0),
     Bl1r,  "BL1R",  "Blackwood GP Track R",            Demo, Some(2.0),
     Bl1x,  "BL1X",  "Blackwood GP Track X",            Demo, None,
@@ -122,10 +122,11 @@ define_tracks!(
     So5r,  "SO5R",  "South City Town Course R",        S1,   Some(2.0),
     So5x,  "SO5X",  "South City Town Course X",        S1,   None,
     So5y,  "SO5Y",  "South City Town Course Y",        S1,   None,
-    So6,   "SO6",   "South City Chicane Course",       S1,   Some(1.8),
-    So6r,  "SO6R",  "South City Chicane Course R",     S1,   Some(1.8),
-    So6x,  "SO6X",  "South City Chicane Course X",     S1,   None,
-    So6y,  "SO6Y",  "South City Chicane Course Y",     S1,   None,
+    So6,   "SO6",   "South City Chicane Route" ,       S1,   Some(1.8),
+    So6r,  "SO6R",  "South City Chicane Route R",      S1,   Some(1.8),
+    So6x,  "SO6X",  "South City Chicane Route X",      S1,   None,
+    So6y,  "SO6Y",  "South City Chicane Route Y",      S1,   None,
+    So7,   "SO7",   "South City",                      S1,   None,
 
     Fe1,   "FE1",   "Fern Bay Club",                   S1,   Some(1.0),
     Fe1r,  "FE1R",  "Fern Bay Club R",                 S1,   Some(1.0),
@@ -158,8 +159,8 @@ define_tracks!(
     Au2x,  "AU2X",  "Skid Pad X",                      S1,   None,
     Au3,   "AU3",   "Drag Strip",                      S1,   None,
     Au3x,  "AU3X",  "Drag Strip X",                    S1,   None,
-    Au4,   "AU4",   "8 Lane Drag Strip",               S1,   None,
-    Au4x,  "AU4X",  "8 Lane Drag Strip X",             S1,   None,
+    Au4,   "AU4",   "8 Lane Drag",                     S1,   None,
+    Au4x,  "AU4X",  "8 Lane Drag X",                   S1,   None,
 
     Ky1,   "KY1",   "Kyoto Oval",                      S2,   Some(1.9),
     Ky1r,  "KY1R",  "Kyoto Oval R",                    S2,   Some(1.9),
@@ -173,6 +174,26 @@ define_tracks!(
     Ky3r,  "KY3R",  "Kyoto GP Long R",                 S2,   Some(4.6),
     Ky3x,  "KY3X",  "Kyoto GP Long X",                 S2,   None,
     Ky3y,  "KY3Y",  "Kyoto GP Long Y",                 S2,   None,
+    Ky4,   "KY4",   "Kyoto Endurance",                 S2,   Some(6.2),
+    Ky4r,  "KY4R",  "Kyoto Endurance",                 S2,   Some(6.2),
+    Ky4x,  "KY4X",  "Kyoto Endurance",                 S2,   None,
+    Ky4y,  "KY4Y",  "Kyoto Endurance",                 S2,   None,
+    Ky5,   "Ky5",   "Kyoto North",                     S2,   Some(1.9),
+    Ky5r,  "KY5R",  "Kyoto North",                     S2,   Some(1.9),
+    Ky5x,  "KY5X",  "Kyoto North",                     S2,   None,
+    Ky5y,  "KY5Y",  "Kyoto North",                     S2,   None,
+    Ky6,   "Ky6",   "Kyoto Oval Chicanes",             S2,   Some(1.9),
+    Ky6r,  "KY6R",  "Kyoto Oval Chicanes",             S2,   Some(1.9),
+    Ky6x,  "KY6X",  "Kyoto Oval Chicanes",             S2,   None,
+    Ky6y,  "KY6Y",  "Kyoto Oval Chicanes",             S2,   None,
+    Ky7,   "Ky7",   "Kyoto Sportscar",                 S2,   Some(4.8),
+    Ky7r,  "KY7R",  "Kyoto Sportscar",                 S2,   Some(4.8),
+    Ky7x,  "KY7X",  "Kyoto Sportscar",                 S2,   None,
+    Ky7y,  "KY7Y",  "Kyoto Sportscar",                 S2,   None,
+    Ky8,   "Ky8",   "Kyoto Kart Indy",                 S2,   Some(1.3),
+    Ky8r,  "KY8R",  "Kyoto Kart Indy",                 S2,   Some(1.3),
+    Ky8x,  "KY8X",  "Kyoto Kart Indy",                 S2,   None,
+    Ky8y,  "KY8Y",  "Kyoto Kart Indy",                 S2,   None,
 
     We1,   "WE1",   "Westhill National",               S2,   Some(2.7),
     We1r,  "WE1R",  "Westhill National R",             S2,   Some(2.7),
@@ -188,10 +209,18 @@ define_tracks!(
     We4r,  "WE4R",  "Westhill Karting R",              S2,   Some(0.3),
     We4x,  "WE4X",  "Westhill Karting X",              S2,   None,
     We4y,  "WE4Y",  "Westhill Karting Y",              S2,   None,
-    We5,   "WE5",   "Westhill Karting Long",           S2,   Some(0.8),
-    We5r,  "WE5R",  "Westhill Karting Long R",         S2,   Some(0.8),
-    We5x,  "WE5X",  "Westhill Karting Long X",         S2,   None,
-    We5y,  "WE5Y",  "Westhill Karting Long Y",         S2,   None,
+    We5,   "WE5",   "Westhill Karting National",       S2,   Some(0.8),
+    We5r,  "WE5R",  "Westhill Karting National R",     S2,   Some(0.8),
+    We5x,  "WE5X",  "Westhill Karting National X",     S2,   None,
+    We5y,  "WE5Y",  "Westhill Karting National Y",     S2,   None,
+    We6,   "WE6",   "Westhill Historic",               S2,   Some(0.8),
+    We6r,  "WE6R",  "Westhill Historic R",             S2,   Some(0.8),
+    We6x,  "WE6X",  "Westhill Historic X",             S2,   None,
+    We6y,  "WE6Y",  "Westhill Historic Y",             S2,   None,
+    We7,   "WE7",   "Westhill National Chicane",       S2,   Some(2.7),
+    We7r,  "WE7R",  "Westhill National Chicane R",     S2,   Some(2.7),
+    We7x,  "WE7X",  "Westhill National Chicane X",     S2,   None,
+    We7y,  "WE7Y",  "Westhill National Chicane Y",     S2,   None,
 
     As1,   "AS1",   "Aston Cadet",                     S2,   Some(1.2),
     As1r,  "AS1R",  "Aston Cadet R",                   S2,   Some(1.2),
@@ -205,8 +234,8 @@ define_tracks!(
     As3r,  "AS3R",  "Aston National R",                S2,   Some(3.5),
     As3x,  "AS3X",  "Aston National X",                S2,   None,
     As3y,  "AS3Y",  "Aston National Y",                S2,   None,
-    As4,   "AS4",   "Aston Historic",                  S2,   Some(5.0),
-    As4r,  "AS4R",  "Aston Historic R",                S2,   Some(5.0),
+    As4,   "AS4",   "Aston Historic",                  S2,   Some(5.1),
+    As4r,  "AS4R",  "Aston Historic R",                S2,   Some(5.1),
     As4x,  "AS4X",  "Aston Historic X",                S2,   None,
     As4y,  "AS4Y",  "Aston Historic Y",                S2,   None,
     As5,   "AS5",   "Aston Grand Prix",                S2,   Some(5.5),
@@ -221,6 +250,14 @@ define_tracks!(
     As7r,  "AS7R",  "Aston North R",                   S2,   Some(3.2),
     As7x,  "AS7X",  "Aston North X",                   S2,   None,
     As7y,  "AS7Y",  "Aston North Y",                   S2,   None,
+    As8,   "AS8",   "Aston Classic Boot",              S2,   Some(3.4),
+    As8r,  "AS8R",  "Aston Classic Boot R",            S2,   Some(3.4),
+    As8x,  "AS8X",  "Aston Classic Boot X",            S2,   None,
+    As8y,  "AS8Y",  "Aston Classic Boot Y",            S2,   None,
+    As9,   "AS9",   "Aston Club Long",                 S2,   Some(2.4),
+    As9r,  "AS9R",  "Aston Club Long R",               S2,   Some(2.4),
+    As9x,  "AS9X",  "Aston Club Long X",               S2,   None,
+    As9y,  "AS9Y",  "Aston Club Long Y",               S2,   None,
 
     Ro1,   "RO1",   "Rockingham ISSC",                 S3,   Some(1.9),
     Ro1x,  "RO1X",  "Rockingham ISSC X",               S3,   None,
@@ -241,7 +278,7 @@ define_tracks!(
     Ro9,   "RO9",   "Rockingham Historic Short",       S3,   Some(1.4),
     Ro9x,  "RO9X",  "Rockingham Historic Short X",     S3,   None,
     Ro10,  "RO10",  "Rockingham International Long",   S3,   Some(2.5),
-    Ro10x, "RO10X", "Rockingham International Long X", S3, None,
+    Ro10x, "RO10X", "Rockingham International Long X", S3,   None,
     Ro11,  "RO11",  "Rockingham Sportscar",            S3,   Some(1.7),
     Ro11x, "RO11X", "Rockingham Sportscar X",          S3,   None,
 
@@ -326,8 +363,15 @@ mod tests {
     fn test_reverse_logic() {
         assert!(Track::Bl1r.is_reverse());
         assert!(!Track::Bl1.is_reverse());
+        assert!(Track::Bl1y.is_reverse());
+    }
+
+    #[test]
+    fn test_open_world() {
+        assert!(!Track::Bl1.is_reverse());
         assert!(!Track::Bl1.is_open());
         assert!(Track::Bl1y.is_reverse());
         assert!(Track::Bl1y.is_open());
+        assert!(Track::So7.is_open());
     }
 }

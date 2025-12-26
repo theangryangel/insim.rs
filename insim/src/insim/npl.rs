@@ -53,7 +53,8 @@ bitflags! {
         const AUTOGEARS = (1 << 3);
         /// Shifter
         const SHIFTER = (1 << 4);
-        // const RESERVED_32 = (1 << 5);
+        /// Flexible steer
+        const FLEXIBLE_STEER = (1 << 5);
         /// "Help_B"
         const HELP_B = (1 << 6);
         /// Axis clutch

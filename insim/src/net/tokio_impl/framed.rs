@@ -13,6 +13,7 @@ impl<T: AsyncRead + AsyncWrite + Debug + Unpin + Send + Sync> AsyncReadWrite for
 use crate::{
     MAX_SIZE_PACKET,
     error::Error,
+    insim::TinyType,
     net::{Codec, DEFAULT_TIMEOUT_SECS},
     packet::Packet,
     result::Result,
@@ -83,6 +84,21 @@ impl Framed {
             self.inner.write_all_buf(&mut buf).await?;
         }
 
+        Ok(())
+    }
+
+    /// Asynchronously flush the inner network
+    pub async fn flush(&mut self) -> Result<()> {
+        self.inner.flush().await?;
+        Ok(())
+    }
+
+    /// Asynchronously flush the inner network and shutdown
+    pub async fn shutdown(&mut self) -> Result<()> {
+        self.write(TinyType::Close).await?;
+        self.flush().await?;
+        self.inner.shutdown().await?;
+        while self.read().await.is_ok() {}
         Ok(())
     }
 }

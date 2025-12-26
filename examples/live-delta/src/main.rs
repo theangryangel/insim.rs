@@ -5,7 +5,7 @@ use std::{
 };
 
 use clap::Parser;
-use glam::IVec3;
+use glam::Vec3;
 use insim::{
     Packet, Result, WithRequestId,
     identifiers::{ClickId, PlayerId, RequestId},
@@ -14,7 +14,7 @@ use insim::{
 
 #[derive(Clone, Debug)]
 pub struct RefPoint {
-    pub position: IVec3,
+    pub position: Vec3,
     pub time: Instant,
 }
 
@@ -37,7 +37,7 @@ impl DeltaTracker {
         }
     }
 
-    pub fn record(&mut self, pos: IVec3, time: Instant) {
+    pub fn record(&mut self, pos: Vec3, time: Instant) {
         self.current_lap.push(RefPoint {
             position: pos,
             time,
@@ -51,7 +51,7 @@ impl DeltaTracker {
     }
 
     /// Delta in seconds
-    pub fn delta(&self, current_pos: IVec3) -> Option<f32> {
+    pub fn delta(&self, current_pos: Vec3) -> Option<f32> {
         let reference_lap = self.reference_lap.as_ref()?;
         let lap_start = self.current_lap.first()?;
 
@@ -75,7 +75,7 @@ impl DeltaTracker {
             let p2 = reference_lap[i + 1].position;
 
             let proj = project_onto_segment(&current_pos, &p1, &p2);
-            let dist = current_pos.as_vec3().distance(proj.as_vec3());
+            let dist = current_pos.distance(proj);
 
             if dist < best_dist {
                 best_dist = dist;
@@ -98,7 +98,7 @@ impl DeltaTracker {
     }
 }
 
-fn project_onto_segment(p: &IVec3, a: &IVec3, b: &IVec3) -> IVec3 {
+fn project_onto_segment(p: &Vec3, a: &Vec3, b: &Vec3) -> Vec3 {
     let ab = b - a;
     let ap = p - a;
 
@@ -110,10 +110,10 @@ fn project_onto_segment(p: &IVec3, a: &IVec3, b: &IVec3) -> IVec3 {
     let t = ap.dot(ab) as f32 / ab_len2;
     let t = t.clamp(0.0, 1.0);
 
-    (a.as_vec3() + ab.as_vec3() * t).as_ivec3()
+    a + ab * t
 }
 
-fn project_ratio(p: &IVec3, a: &IVec3, b: &IVec3) -> f32 {
+fn project_ratio(p: &Vec3, a: &Vec3, b: &Vec3) -> f32 {
     let ab = b - a;
     let ap = p - a;
 
@@ -159,10 +159,10 @@ pub fn main() -> Result<()> {
     // FIXME: tidy this all up.
     // We need a state machine
     let mut plid: Option<PlayerId> = None;
-    let mut pos = IVec3::default();
 
     let mut deltas = DeltaTracker::new();
     let mut recording = false;
+    let mut pos = Vec3::default();
 
     while let Ok(packet) = connection.read() {
         match packet {
@@ -221,9 +221,7 @@ pub fn main() -> Result<()> {
                     if i.speed.to_meters_per_sec() < 1.0 {
                         continue;
                     }
-                    pos.x = i.xyz.x / 65536;
-                    pos.y = i.xyz.y / 65536;
-                    pos.z = i.xyz.z / 65536;
+                    pos = i.xyz.to_vec3_metres();
                     deltas.record(pos.clone(), Instant::now());
                 }
             },

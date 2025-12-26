@@ -31,8 +31,10 @@ pub enum TinyType {
     /// Send state info
     Sst = 7,
 
-    /// Get time in hundredths (i.e. SMALL_RTP)
-    Gth = 8,
+    /// Get time in milliseconds (i.e. SMALL_RTP)
+    /// Insim protocol version <= 9 this was Gth, and LFS would return the time
+    /// in hundreths.
+    Gtm = 8,
 
     /// Multi-player end
     Mpe = 9,
@@ -96,6 +98,9 @@ pub enum TinyType {
 
     /// Request a Ipb packet
     Ipb = 29,
+
+    /// Request a SMALL_LCL for the local car's lights
+    Lcl = 30,
 }
 
 impl From<TinyType> for Packet {

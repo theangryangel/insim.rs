@@ -18,13 +18,13 @@ impl SimpleArgs {
         let mut viewbox_x: (f32, f32) = (0.0, 0.0);
         let mut viewbox_y: (f32, f32) = (0.0, 0.0);
 
-        let p = Pth::from_pathbuf(&self.pth).context(format!("Failed to read {:?}", &self.pth))?;
+        let p = Pth::from_path(&self.pth).context(format!("Failed to read {:?}", &self.pth))?;
 
-        let first = p.nodes.first().unwrap().get_center(SCALE.into());
+        let first = p.iter_nodes().next().unwrap().get_center(SCALE.into());
 
         let mut data = svg::node::element::path::Data::new().move_to((first.x, first.y));
 
-        for node in p.nodes.iter() {
+        for node in p.iter_nodes() {
             let point = node.get_center(SCALE.into());
 
             viewbox_x.0 = viewbox_x.0.min(point.x);

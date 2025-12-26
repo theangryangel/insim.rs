@@ -11,11 +11,8 @@ use std::{
 pub use ::insim_core as core;
 use bytes::{Buf, BufMut};
 use insim_core::{
-    Decode, DecodeString, Encode, EncodeString,
-    dash_lights::DashLights,
-    gear::Gear,
-    identifiers::PlayerId,
-    speed::{Speed, SpeedKind},
+    Decode, DecodeString, Encode, EncodeString, dash_lights::DashLights, gear::Gear,
+    identifiers::PlayerId, speed::Speed,
 };
 
 bitflags::bitflags! {
@@ -46,26 +43,6 @@ impl Encode for OutgaugeFlags {
 impl Decode for OutgaugeFlags {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         Ok(Self::from_bits_truncate(u16::decode(buf)?))
-    }
-}
-
-#[derive(Copy, Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Outgauge speed kind
-pub struct OutgaugeSpeed;
-impl SpeedKind for OutgaugeSpeed {
-    type Inner = f32;
-
-    fn name() -> &'static str {
-        "m/s"
-    }
-
-    fn from_meters_per_sec(value: f32) -> Self::Inner {
-        value
-    }
-
-    fn to_meters_per_sec(value: Self::Inner) -> f32 {
-        value
     }
 }
 
@@ -129,7 +106,7 @@ pub struct Outgauge {
     /// Currently viewed player
     pub plid: PlayerId,
     /// Speed in m/s
-    pub speed: Speed<OutgaugeSpeed>,
+    pub speed: Speed,
     /// RPM
     pub rpm: f32,
     /// Turbo pressure
@@ -169,7 +146,7 @@ impl Encode for Outgauge {
         self.flags.encode(buf)?;
         self.gear.encode(buf)?;
         self.plid.encode(buf)?;
-        self.speed.encode(buf)?;
+        self.speed.to_meters_per_sec().encode(buf)?;
         self.rpm.encode(buf)?;
         self.turbo.encode(buf)?;
         self.engtemp.encode(buf)?;
@@ -197,7 +174,7 @@ impl Decode for Outgauge {
         let flags = OutgaugeFlags::decode(buf)?;
         let gear = Gear::decode(buf)?;
         let plid = PlayerId::decode(buf)?;
-        let speed = Speed::decode(buf)?;
+        let speed = Speed::from_meters_per_sec(f32::decode(buf)?);
         let rpm = f32::decode(buf)?;
         let turbo = f32::decode(buf)?;
         let engtemp = f32::decode(buf)?;

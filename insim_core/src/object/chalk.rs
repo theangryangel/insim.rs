@@ -1,7 +1,8 @@
-//! Control objects
-use super::{ObjectCodec, ObjectPosition};
+//! Chalk ahead object
+use super::{ObjectVariant, ObjectWire};
+use crate::{DecodeError, heading::Heading};
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[allow(missing_docs)]
@@ -9,10 +10,10 @@ use super::{ObjectCodec, ObjectPosition};
 /// Chalk Colour
 pub enum ChalkColour {
     #[default]
-    White = 0,
-    Red = 1,
-    Blue = 2,
-    Yellow = 3,
+    White,
+    Red,
+    Blue,
+    Yellow,
 }
 
 impl From<u8> for ChalkColour {
@@ -27,38 +28,61 @@ impl From<u8> for ChalkColour {
     }
 }
 
-/// Tyre stack
+impl From<ChalkColour> for u8 {
+    fn from(colour: ChalkColour) -> Self {
+        match colour {
+            ChalkColour::White => 0,
+            ChalkColour::Red => 1,
+            ChalkColour::Blue => 2,
+            ChalkColour::Yellow => 3,
+        }
+    }
+}
+
+/// Chalk ahead
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Chalk {
-    /// XYZ position
-    pub xyz: ObjectPosition,
     /// Colour
     pub colour: ChalkColour,
     /// Heading / Direction
-    pub heading: u8,
+    pub heading: Heading,
     /// Floating
     pub floating: bool,
 }
 
-impl ObjectCodec for Chalk {
-    fn encode(&self) -> Result<(&ObjectPosition, u8, u8), crate::EncodeError> {
-        let mut flags = 0;
-        flags |= self.colour as u8 & 0x07;
+impl ObjectVariant for Chalk {
+    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
+        let mut flags = u8::from(self.colour) & 0x07;
         if self.floating {
             flags |= 0x80;
         }
-        Ok((&self.xyz, flags, self.heading))
+        Ok(ObjectWire {
+            flags,
+            heading: self.heading.to_objectinfo_wire(),
+        })
     }
 
-    fn decode(xyz: ObjectPosition, flags: u8, heading: u8) -> Result<Self, crate::DecodeError> {
-        let colour = ChalkColour::from(flags & 0x07);
-        let floating = flags & 0x80 != 0;
+    fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
+        let colour = ChalkColour::from(wire.colour());
+        let floating = wire.floating();
         Ok(Self {
-            xyz,
             colour,
-            heading,
+            heading: Heading::from_objectinfo_wire(wire.heading),
             floating,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_chalk_ahead_round_trip() {
+        let original = Chalk::default();
+        let wire = original.to_wire().expect("to_wire failed");
+        let decoded = Chalk::from_wire(wire).expect("from_wire failed");
+        assert_eq!(original, decoded);
     }
 }

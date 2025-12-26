@@ -93,11 +93,11 @@ pub struct Rip {
     pub options: RipOptions,
 
     /// Request: destination / Reply: position
-    #[insim(duration(milliseconds = u32))]
+    #[insim(duration = u32)]
     pub ctime: Duration,
 
     /// Request: zero / reply: replay length
-    #[insim(duration(milliseconds = u32))]
+    #[insim(duration = u32)]
     pub ttime: Duration,
 
     /// Zero or replay name

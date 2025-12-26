@@ -30,11 +30,11 @@ pub struct Res {
     /// The vehicle they finished in
     pub cname: Vehicle,
 
-    #[insim(duration(milliseconds = u32))]
+    #[insim(duration = u32)]
     /// The total time
     pub ttime: Duration,
 
-    #[insim(duration(milliseconds = u32), pad_after = 1)]
+    #[insim(duration = u32, pad_after = 1)]
     /// The best lap time
     pub btime: Duration,
 

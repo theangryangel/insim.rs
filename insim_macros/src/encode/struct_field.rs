@@ -15,34 +15,6 @@ pub(super) struct CodepageArgs {
     trailing_nul: bool,
 }
 
-#[derive(Debug, darling::FromMeta, Clone)]
-pub(super) enum DurationUoM {
-    Milliseconds(syn::Path),
-    Centiseconds(syn::Path),
-    Deciseconds(syn::Path),
-    Seconds(syn::Path),
-}
-
-impl DurationUoM {
-    fn scale(&self) -> u64 {
-        match self {
-            DurationUoM::Milliseconds(_) => 1,
-            DurationUoM::Centiseconds(_) => 10,
-            DurationUoM::Deciseconds(_) => 100,
-            DurationUoM::Seconds(_) => 1000,
-        }
-    }
-    fn ty(&self) -> syn::Path {
-        match self {
-            DurationUoM::Milliseconds(v) => v,
-            DurationUoM::Centiseconds(v) => v,
-            DurationUoM::Deciseconds(v) => v,
-            DurationUoM::Seconds(v) => v,
-        }
-        .clone()
-    }
-}
-
 #[derive(Debug, darling::FromField)]
 #[darling(attributes(insim))]
 pub(super) struct Field {
@@ -53,7 +25,7 @@ pub(super) struct Field {
     pub skip: Option<bool>,
     pub codepage: Option<CodepageArgs>,
     pub ascii: Option<AsciiArgs>,
-    pub duration: Option<DurationUoM>,
+    pub duration: Option<syn::TypePath>,
 }
 
 impl Field {
@@ -91,14 +63,11 @@ impl Field {
                     buf, #length
                 )?;
             }
-        } else if let Some(duration_args) = f.duration.as_ref() {
-            let duration_repr = duration_args.ty();
-            let scale = duration_args.scale();
-
+        } else if let Some(duration_repr) = f.duration.as_ref() {
             tokens = quote! {
                 #tokens
                 let #field_name = match TryInto::<u64>::try_into(#duration_repr::decode(buf)?) {
-                    Ok(v) => std::time::Duration::from_millis(v * #scale),
+                    Ok(v) => std::time::Duration::from_millis(v),
                     Err(_) => return Err(::insim_core::DecodeError::TooLarge),
                 };
             };
@@ -190,13 +159,10 @@ impl Field {
                     &self.#field_name, buf, #length, #trailing_nul
                 )?;
             };
-        } else if let Some(duration_args) = f.duration.as_ref() {
-            let duration_repr = duration_args.ty().clone();
-            let scale = duration_args.scale();
-
+        } else if let Some(duration_repr) = f.duration.as_ref() {
             tokens = quote! {
                 #tokens
-                match #duration_repr::try_from(self.#field_name.as_millis() / (#scale as u128)) {
+                match #duration_repr::try_from(self.#field_name.as_millis()) {
                     Ok(v) => v.encode(buf)?,
                     Err(_) => return Err(::insim_core::EncodeError::TooLarge)
                 };

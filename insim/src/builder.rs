@@ -17,7 +17,7 @@ use crate::{
     address::Addr,
     identifiers::RequestId,
     insim::{Isi, IsiFlags},
-    net::{Codec, Mode},
+    net::Codec,
     result::Result,
 };
 
@@ -52,7 +52,6 @@ pub struct Builder {
     connect_timeout: Duration,
 
     remote: Addr,
-    mode: Mode,
 
     isi_admin_password: Option<String>,
     isi_flags: IsiFlags,
@@ -80,7 +79,6 @@ impl Default for Builder {
 
             proto: Proto::Tcp,
             remote: ("127.0.0.1", 29999_u16).into(),
-            mode: Mode::Compressed,
 
             tcp_nodelay: true,
             non_blocking: false,
@@ -92,7 +90,7 @@ impl Default for Builder {
             isi_prefix: None,
             isi_iname: None,
             isi_interval: None,
-            isi_reqi: RequestId(0),
+            isi_reqi: RequestId(1),
         }
     }
 }
@@ -128,23 +126,6 @@ impl Builder {
         self
     }
 
-    /// Insim 9+ allows for a "compressed" and "uncompressed" packet size mode.
-    /// When "compressed" the size on the wire is indicated as "true size / 4".
-    pub fn mode(mut self, mode: Mode) -> Self {
-        self.mode = mode;
-        self
-    }
-
-    /// Use "compressed" mode.
-    pub fn compressed(self) -> Self {
-        self.mode(Mode::Compressed)
-    }
-
-    /// Use "uncompressed" mode.
-    pub fn uncompressed(self) -> Self {
-        self.mode(Mode::Uncompressed)
-    }
-
     /// Set whether sockets are non-blocking.
     /// Default is `false` if blocking.
     /// Always forced for tokio implementation.
@@ -169,6 +150,9 @@ impl Builder {
 
     /// Set the [crate::identifiers::RequestId] to be used in the [crate::Packet::Isi] packet during connection
     /// handshake.
+    /// If not provided 1 is used by default. Any non-zero value will result in LFS responding with
+    /// a Ver packet, which will be verified by the library.
+    /// Set to 0 if you wish to circumvent this.
     pub fn isi_reqi(mut self, i: RequestId) -> Self {
         self.isi_reqi = i;
         self
@@ -299,9 +283,7 @@ impl Builder {
                 if self.non_blocking {
                     stream.set_nonblocking(true)?;
                 }
-
-                let mut stream =
-                    BlockingFramed::new(Box::new(stream), Codec::new(self.mode.clone()));
+                let mut stream = BlockingFramed::new(Box::new(stream), Codec::new());
                 stream.write(self.isi(None))?;
 
                 Ok(stream)
@@ -319,10 +301,8 @@ impl Builder {
 
                 let isi = self.isi(Some(local.port()));
 
-                let mut stream = BlockingFramed::new(
-                    Box::new(UdpStream::from(stream)),
-                    Codec::new(self.mode.clone()),
-                );
+                let mut stream =
+                    BlockingFramed::new(Box::new(UdpStream::from(stream)), Codec::new());
                 stream.write(isi)?;
 
                 Ok(stream)
@@ -345,7 +325,7 @@ impl Builder {
                 stream.set_nonblocking(true)?;
                 let stream = tokio::net::TcpStream::from_std(stream)?;
 
-                let mut stream = AsyncFramed::new(Box::new(stream), Codec::new(self.mode.clone()));
+                let mut stream = AsyncFramed::new(Box::new(stream), Codec::new());
                 stream.write(self.isi(None)).await?;
 
                 Ok(stream)
@@ -361,10 +341,7 @@ impl Builder {
 
                 let isi = self.isi(Some(local.port()));
 
-                let mut stream = AsyncFramed::new(
-                    Box::new(UdpStream::from(stream)),
-                    Codec::new(self.mode.clone()),
-                );
+                let mut stream = AsyncFramed::new(Box::new(UdpStream::from(stream)), Codec::new());
                 stream.write(isi).await?;
 
                 Ok(stream)

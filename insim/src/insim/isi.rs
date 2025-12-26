@@ -87,7 +87,7 @@ pub struct Isi {
 
     /// Time in between each [Nlp](super::Nlp) or [Mci](super::Mci) packet when set to a non-zero value and
     /// the relevant flags are set.
-    #[insim(duration(milliseconds = u16))]
+    #[insim(duration = u16)]
     pub interval: Duration,
 
     /// Administrative password.

@@ -1,13 +1,12 @@
 use bitflags::bitflags;
-use glam::{IVec3, Vec3};
-use insim_core::{Decode, Encode, dash_lights::DashLights};
+use insim_core::{Decode, Encode, coordinate::Coordinate, dash_lights::DashLights, vector::Vector};
 
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct OsMain {
-    pub angvel: Vec3,
+    pub angvel: Vector,
 
     pub heading: f32,
 
@@ -15,22 +14,22 @@ pub struct OsMain {
 
     pub roll: f32,
 
-    pub accel: Vec3,
+    pub accel: Vector,
 
-    pub vel: Vec3,
+    pub vel: Vector,
 
-    pub pos: IVec3,
+    pub pos: Coordinate,
 }
 
 impl Decode for OsMain {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let angvel = Vec3::decode(buf)?;
+        let angvel = Vector::decode(buf)?;
         let heading = f32::decode(buf)?;
         let pitch = f32::decode(buf)?;
         let roll = f32::decode(buf)?;
-        let accel = Vec3::decode(buf)?;
-        let vel = Vec3::decode(buf)?;
-        let pos = IVec3::decode(buf)?;
+        let accel = Vector::decode(buf)?;
+        let vel = Vector::decode(buf)?;
+        let pos = Coordinate::decode(buf)?;
         Ok(Self {
             angvel,
             heading,

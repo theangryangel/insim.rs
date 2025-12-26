@@ -86,11 +86,11 @@ pub struct Lap {
     /// Unique player ID
     pub plid: PlayerId,
 
-    #[insim(duration(milliseconds = u32))]
+    #[insim(duration = u32)]
     /// Lap time
     pub ltime: Duration, // lap time (ms)
 
-    #[insim(duration(milliseconds = u32))]
+    #[insim(duration = u32)]
     /// Total elapsed time
     pub etime: Duration,
 

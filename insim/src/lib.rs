@@ -22,7 +22,7 @@ pub mod packet;
 pub mod result;
 
 /// The Insim Protocol Version Number supported by this library
-pub const VERSION: u8 = 9;
+pub const VERSION: u8 = 10;
 
 /// Why 255 * 4? Because the size of a packet is a u8, with a max byte size of 255.
 /// In "compressed" mode the raw size is multiplied by 4.

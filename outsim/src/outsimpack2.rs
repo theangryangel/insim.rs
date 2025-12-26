@@ -2,9 +2,9 @@
 use std::time::Duration;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use glam::{IVec3, Vec3};
 use insim_core::{
-    Decode, DecodeError, DecodeString, Encode, EncodeError, EncodeString, gear::Gear,
+    Decode, DecodeError, DecodeString, Encode, EncodeError, EncodeString, coordinate::Coordinate,
+    gear::Gear, vector::Vector,
 };
 
 use crate::OutsimId;
@@ -41,7 +41,7 @@ bitflags::bitflags! {
 /// OutsimMain packet
 pub struct OutsimMain {
     /// Angular velocity
-    pub angvel: Vec3,
+    pub angvel: Vector,
 
     /// Heading
     pub heading: f32,
@@ -53,13 +53,13 @@ pub struct OutsimMain {
     pub roll: f32,
 
     /// Acceleration
-    pub accel: Vec3,
+    pub accel: Vector,
 
     /// Velocity
-    pub vel: Vec3,
+    pub vel: Vector,
 
     /// Position
-    pub pos: IVec3,
+    pub pos: Coordinate,
 }
 
 impl Encode for OutsimMain {
@@ -77,13 +77,13 @@ impl Encode for OutsimMain {
 
 impl Decode for OutsimMain {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let angvel = Vec3::decode(buf)?;
+        let angvel = Vector::decode(buf)?;
         let heading = f32::decode(buf)?;
         let pitch = f32::decode(buf)?;
         let roll = f32::decode(buf)?;
-        let accel = Vec3::decode(buf)?;
-        let vel = Vec3::decode(buf)?;
-        let pos = IVec3::decode(buf)?;
+        let accel = Vector::decode(buf)?;
+        let vel = Vector::decode(buf)?;
+        let pos = Coordinate::decode(buf)?;
 
         Ok(Self {
             angvel,

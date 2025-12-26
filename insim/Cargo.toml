@@ -32,14 +32,15 @@ serde = [
   "insim_core/serde",
   "bitflags/serde",
   "indexmap/serde",
-  "glam/serde",
+]
+glam = [
+  "insim_core/glam"
 ]
 
 [dependencies]
 bitflags = { workspace = true }
 bytes = { workspace = true }
 from_variants = { workspace = true }
-glam = { workspace = true }
 indexmap = { workspace = true }
 insim_core = { path = "../insim_core", version = "4.0.0" }
 serde = { workspace = true, features = ["derive"], optional = true }
