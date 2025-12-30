@@ -1,6 +1,5 @@
 //! Bale objects
-use super::{ObjectVariant, ObjectIntermediate};
-use crate::{heading::Heading, object::ObjectCoordinate};
+use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}};
 
 /// Bale
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -18,43 +17,26 @@ pub struct Bale {
     pub floating: bool,
 }
 
-impl ObjectVariant for Bale {
-    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
+impl Bale {
+    pub(super) fn to_flags(&self) -> ObjectFlags { 
         let mut flags = self.colour & 0x07;
         flags |= (self.mapping & 0x0f) << 3;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectIntermediate {
-            xyz: self.xyz,
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    fn from_wire(wire: ObjectIntermediate) -> Result<Self, crate::DecodeError> {
-        let colour = wire.colour();
-        let mapping = wire.mapping();
-        let floating = wire.floating();
+    pub(super) fn new(xyz: ObjectCoordinate, flags: ObjectFlags, heading: Heading) -> Result<Self, crate::DecodeError> {
+        let colour = flags.colour();
+        let mapping = flags.mapping();
+        let floating = flags.floating();
         Ok(Self {
-            xyz: wire.xyz,
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            xyz,
+            heading,
             colour,
             mapping,
             floating,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_bale_round_trip() {
-        let original = Bale::default();
-        let wire = original.to_wire().expect("to_wire failed");
-        let decoded = Bale::from_wire(wire).expect("from_wire failed");
-        assert_eq!(original, decoded);
     }
 }

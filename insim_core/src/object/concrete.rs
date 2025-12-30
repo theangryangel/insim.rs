@@ -1,7 +1,6 @@
 //! Concrete
 
-use super::{ObjectVariant, ObjectIntermediate};
-use crate::{DecodeError, heading::Heading};
+use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}, DecodeError};
 
 /// Represents Width and Length (2m, 4m, 8m, 16m)
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -260,6 +259,8 @@ impl TryFrom<u8> for ConcreteAngle {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConcreteSlab {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Width
     pub width: ConcreteWidthLength,
     /// Length
@@ -270,27 +271,25 @@ pub struct ConcreteSlab {
     pub heading: Heading,
 }
 
-impl ObjectVariant for ConcreteSlab {
-    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
+impl ConcreteSlab {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = 0;
         flags |= self.width as u8 & 0x03;
         flags |= (self.length as u8 & 0x03) << 2;
         flags |= (self.pitch as u8 & 0x0f) << 4;
-        Ok(ObjectIntermediate {
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    fn from_wire(wire: ObjectIntermediate) -> Result<Self, DecodeError> {
-        let width = ConcreteWidthLength::try_from(wire.flags & 0x03)?;
-        let length = ConcreteWidthLength::try_from((wire.flags & 0x0c) >> 2)?;
-        let pitch = ConcretePitch::try_from((wire.flags & 0xf0) >> 4)?;
+    pub(super) fn new(xyz: ObjectCoordinate, flags: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+        let width = ConcreteWidthLength::try_from(flags.0 & 0x03)?;
+        let length = ConcreteWidthLength::try_from((flags.0 & 0x0c) >> 2)?;
+        let pitch = ConcretePitch::try_from((flags.0 & 0xf0) >> 4)?;
         Ok(Self {
+            xyz,
             width,
             length,
             pitch,
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            heading,
         })
     }
 }
@@ -299,6 +298,8 @@ impl ObjectVariant for ConcreteSlab {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConcreteRamp {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Width
     pub width: ConcreteWidthLength,
     /// Length
@@ -309,27 +310,25 @@ pub struct ConcreteRamp {
     pub heading: Heading,
 }
 
-impl ObjectVariant for ConcreteRamp {
-    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
+impl ConcreteRamp {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = 0;
         flags |= self.width as u8 & 0x03;
         flags |= (self.length as u8 & 0x03) << 2;
         flags |= (self.height as u8 & 0x0f) << 4;
-        Ok(ObjectIntermediate {
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    fn from_wire(wire: ObjectIntermediate) -> Result<Self, DecodeError> {
-        let width = ConcreteWidthLength::try_from(wire.flags & 0x03)?;
-        let length = ConcreteWidthLength::try_from((wire.flags & 0x0c) >> 2)?;
-        let height = ConcreteHeight::try_from((wire.flags & 0xf0) >> 4)?;
+    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+        let width = ConcreteWidthLength::try_from(wire.0 & 0x03)?;
+        let length = ConcreteWidthLength::try_from((wire.0 & 0x0c) >> 2)?;
+        let height = ConcreteHeight::try_from((wire.0 & 0xf0) >> 4)?;
         Ok(Self {
+            xyz,
             width,
             length,
             height,
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            heading,
         })
     }
 }
@@ -338,6 +337,8 @@ impl ObjectVariant for ConcreteRamp {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConcreteWall {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Colour
     pub colour: ConcreteColour,
     /// Length
@@ -348,27 +349,25 @@ pub struct ConcreteWall {
     pub heading: Heading,
 }
 
-impl ObjectVariant for ConcreteWall {
-    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
+impl ConcreteWall {
+    pub(super) fn to_wire(&self) -> ObjectFlags { 
         let mut flags = 0;
         flags |= self.colour as u8 & 0x03;
         flags |= (self.length as u8 & 0x03) << 2;
         flags |= (self.height as u8 & 0x0f) << 4;
-        Ok(ObjectIntermediate {
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    fn from_wire(wire: ObjectIntermediate) -> Result<Self, DecodeError> {
-        let colour = ConcreteColour::try_from(wire.flags & 0x03)?;
-        let length = ConcreteWidthLength::try_from((wire.flags & 0x0c) >> 2)?;
-        let height = ConcreteHeight::try_from((wire.flags & 0xf0) >> 4)?;
+    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+        let colour = ConcreteColour::try_from(wire.0 & 0x03)?;
+        let length = ConcreteWidthLength::try_from((wire.0 & 0x0c) >> 2)?;
+        let height = ConcreteHeight::try_from((wire.0 & 0xf0) >> 4)?;
         Ok(Self {
+            xyz,
             colour,
             length,
             height,
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            heading,
         })
     }
 }
@@ -377,6 +376,8 @@ impl ObjectVariant for ConcreteWall {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConcretePillar {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// SizeX
     pub x: Size,
     /// SizeY
@@ -387,27 +388,25 @@ pub struct ConcretePillar {
     pub heading: Heading,
 }
 
-impl ObjectVariant for ConcretePillar {
-    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
+impl ConcretePillar {
+    pub(super) fn to_wire(&self) -> ObjectFlags {
         let mut flags = 0;
         flags |= self.x as u8 & 0x03;
         flags |= (self.y as u8 & 0x03) << 2;
         flags |= (self.height as u8 & 0x0f) << 4;
-        Ok(ObjectIntermediate {
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    fn from_wire(wire: ObjectIntermediate) -> Result<Self, DecodeError> {
-        let x = Size::try_from(wire.flags & 0x03)?;
-        let y = Size::try_from((wire.flags & 0x0c) >> 2)?;
-        let height = ConcreteHeight::try_from((wire.flags & 0xf0) >> 4)?;
+    pub(super) fn new(xyz: ObjectCoordinate, flags: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+        let x = Size::try_from(flags.0 & 0x03)?;
+        let y = Size::try_from((flags.0 & 0x0c) >> 2)?;
+        let height = ConcreteHeight::try_from((flags.0 & 0xf0) >> 4)?;
         Ok(Self {
+            xyz,
             x,
             y,
             height,
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            heading,
         })
     }
 }
@@ -416,6 +415,8 @@ impl ObjectVariant for ConcretePillar {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConcreteSlabWall {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Colour
     pub colour: ConcreteColour,
     /// Length
@@ -426,27 +427,25 @@ pub struct ConcreteSlabWall {
     pub heading: Heading,
 }
 
-impl ObjectVariant for ConcreteSlabWall {
-    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
+impl ConcreteSlabWall {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = 0;
         flags |= self.colour as u8 & 0x03;
         flags |= (self.length as u8 & 0x03) << 2;
         flags |= (self.pitch as u8 & 0x0f) << 4;
-        Ok(ObjectIntermediate {
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    fn from_wire(wire: ObjectIntermediate) -> Result<Self, DecodeError> {
-        let colour = ConcreteColour::try_from(wire.flags & 0x03)?;
-        let length = ConcreteWidthLength::try_from((wire.flags & 0x0c) >> 2)?;
-        let pitch = ConcretePitch::try_from((wire.flags & 0xf0) >> 4)?;
+    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+        let colour = ConcreteColour::try_from(wire.0 & 0x03)?;
+        let length = ConcreteWidthLength::try_from((wire.0 & 0x0c) >> 2)?;
+        let pitch = ConcretePitch::try_from((wire.0 & 0xf0) >> 4)?;
         Ok(Self {
+            xyz,
             colour,
             length,
             pitch,
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            heading,
         })
     }
 }
@@ -455,6 +454,8 @@ impl ObjectVariant for ConcreteSlabWall {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConcreteRampWall {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Colour
     pub colour: ConcreteColour,
     /// Length
@@ -465,27 +466,25 @@ pub struct ConcreteRampWall {
     pub heading: Heading,
 }
 
-impl ObjectVariant for ConcreteRampWall {
-    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
+impl ConcreteRampWall {
+    pub(super) fn to_wire(&self) -> ObjectFlags {
         let mut flags = 0;
         flags |= self.colour as u8 & 0x03;
         flags |= (self.length as u8 & 0x03) << 2;
         flags |= (self.height as u8 & 0x0f) << 4;
-        Ok(ObjectIntermediate {
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    fn from_wire(wire: ObjectIntermediate) -> Result<Self, DecodeError> {
-        let colour = ConcreteColour::try_from(wire.flags & 0x03)?;
-        let length = ConcreteWidthLength::try_from((wire.flags & 0x0c) >> 2)?;
-        let height = ConcreteHeight::try_from((wire.flags & 0xf0) >> 4)?;
+    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+        let colour = ConcreteColour::try_from(wire.0 & 0x03)?;
+        let length = ConcreteWidthLength::try_from((wire.0 & 0x0c) >> 2)?;
+        let height = ConcreteHeight::try_from((wire.0 & 0xf0) >> 4)?;
         Ok(Self {
+            xyz,
             colour,
             length,
             height,
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            heading,
         })
     }
 }
@@ -494,6 +493,8 @@ impl ObjectVariant for ConcreteRampWall {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConcreteShortSlabWall {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Colour
     pub colour: ConcreteColour,
     /// Size Y
@@ -504,27 +505,25 @@ pub struct ConcreteShortSlabWall {
     pub heading: Heading,
 }
 
-impl ObjectVariant for ConcreteShortSlabWall {
-    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
+impl ConcreteShortSlabWall {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = 0;
         flags |= self.colour as u8 & 0x03;
         flags |= (self.y as u8 & 0x03) << 2;
         flags |= (self.pitch as u8 & 0x0f) << 4;
-        Ok(ObjectIntermediate {
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    fn from_wire(wire: ObjectIntermediate) -> Result<Self, DecodeError> {
-        let colour = ConcreteColour::try_from(wire.flags & 0x03)?;
-        let y = Size::try_from((wire.flags & 0x0c) >> 2)?;
-        let pitch = ConcretePitch::try_from((wire.flags & 0xf0) >> 4)?;
+    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+        let colour = ConcreteColour::try_from(wire.0 & 0x03)?;
+        let y = Size::try_from((wire.0 & 0x0c) >> 2)?;
+        let pitch = ConcretePitch::try_from((wire.0 & 0xf0) >> 4)?;
         Ok(Self {
+            xyz,
             colour,
             y,
             pitch,
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            heading,
         })
     }
 }
@@ -533,6 +532,8 @@ impl ObjectVariant for ConcreteShortSlabWall {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConcreteWedge {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Colour
     pub colour: ConcreteColour,
     /// Length
@@ -543,96 +544,25 @@ pub struct ConcreteWedge {
     pub heading: Heading,
 }
 
-impl ObjectVariant for ConcreteWedge {
-    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
+impl ConcreteWedge {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = 0;
         flags |= self.colour as u8 & 0x03;
         flags |= (self.length as u8 & 0x03) << 2;
         flags |= (self.angle as u8 & 0x0f) << 4;
-        Ok(ObjectIntermediate {
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    fn from_wire(wire: ObjectIntermediate) -> Result<Self, DecodeError> {
-        let colour = ConcreteColour::try_from(wire.flags & 0x03)?;
-        let length = ConcreteWidthLength::try_from((wire.flags & 0x0c) >> 2)?;
-        let angle = ConcreteAngle::try_from((wire.flags & 0xf0) >> 4)?;
+    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+        let colour = ConcreteColour::try_from(wire.0 & 0x03)?;
+        let length = ConcreteWidthLength::try_from((wire.0 & 0x0c) >> 2)?;
+        let angle = ConcreteAngle::try_from((wire.0 & 0xf0) >> 4)?;
         Ok(Self {
+            xyz,
             colour,
             length,
             angle,
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            heading,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_concrete_pillar_round_trip() {
-        let original = ConcretePillar::default();
-        let wire = original.to_wire().expect("to_wire failed");
-        let decoded = ConcretePillar::from_wire(wire).expect("from_wire failed");
-        assert_eq!(original, decoded);
-    }
-
-    #[test]
-    fn test_concrete_ramp_round_trip() {
-        let original = ConcreteRamp::default();
-        let wire = original.to_wire().expect("to_wire failed");
-        let decoded = ConcreteRamp::from_wire(wire).expect("from_wire failed");
-        assert_eq!(original, decoded);
-    }
-
-    #[test]
-    fn test_concrete_ramp_wall_round_trip() {
-        let original = ConcreteRampWall::default();
-        let wire = original.to_wire().expect("to_wire failed");
-        let decoded = ConcreteRampWall::from_wire(wire).expect("from_wire failed");
-        assert_eq!(original, decoded);
-    }
-
-    #[test]
-    fn test_concrete_short_slab_wall_round_trip() {
-        let original = ConcreteShortSlabWall::default();
-        let wire = original.to_wire().expect("to_wire failed");
-        let decoded = ConcreteShortSlabWall::from_wire(wire).expect("from_wire failed");
-        assert_eq!(original, decoded);
-    }
-
-    #[test]
-    fn test_concrete_slab_round_trip() {
-        let original = ConcreteSlab::default();
-        let wire = original.to_wire().expect("to_wire failed");
-        let decoded = ConcreteSlab::from_wire(wire).expect("from_wire failed");
-        assert_eq!(original, decoded);
-    }
-
-    #[test]
-    fn test_concrete_slab_wall_round_trip() {
-        let original = ConcreteSlabWall::default();
-        let wire = original.to_wire().expect("to_wire failed");
-        let decoded = ConcreteSlabWall::from_wire(wire).expect("from_wire failed");
-        assert_eq!(original, decoded);
-    }
-
-    #[test]
-    fn test_concrete_wall_round_trip() {
-        let original = ConcreteWall::default();
-        let wire = original.to_wire().expect("to_wire failed");
-        let decoded = ConcreteWall::from_wire(wire).expect("from_wire failed");
-        assert_eq!(original, decoded);
-    }
-
-    #[test]
-    fn test_concrete_wedge_round_trip() {
-        let original = ConcreteWedge::default();
-        let wire = original.to_wire().expect("to_wire failed");
-        let decoded = ConcreteWedge::from_wire(wire).expect("from_wire failed");
-        assert_eq!(original, decoded);
     }
 }

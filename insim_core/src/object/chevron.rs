@@ -1,6 +1,5 @@
 //! Cone1 objects
-use super::{ObjectVariant, ObjectIntermediate};
-use crate::heading::Heading;
+use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}};
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -30,6 +29,8 @@ impl From<u8> for ChevronColour {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Chevron {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Colour
     pub colour: ChevronColour,
     /// Heading / Direction
@@ -38,39 +39,24 @@ pub struct Chevron {
     pub floating: bool,
 }
 
-impl ObjectVariant for Chevron {
-    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
+impl Chevron {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = 0;
         flags |= self.colour as u8 & 0x07;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectIntermediate {
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    fn from_wire(wire: ObjectIntermediate) -> Result<Self, crate::DecodeError> {
-        let colour = ChevronColour::from(wire.colour());
-        let floating = wire.floating();
+    pub(super) fn from_wire(xyz: ObjectCoordinate, flags: ObjectFlags, heading: Heading) -> Result<Self, crate::DecodeError> {
+        let colour = ChevronColour::from(flags.colour());
+        let floating = flags.floating();
         Ok(Self {
+            xyz,
             colour,
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            heading,
             floating,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_cone1_round_trip() {
-        let original = Chevron::default();
-        let wire = original.to_wire().expect("to_wire failed");
-        let decoded = Chevron::from_wire(wire).expect("from_wire failed");
-        assert_eq!(original, decoded);
     }
 }

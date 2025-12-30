@@ -1,6 +1,5 @@
 //! Cone1 objects
-use super::{ObjectVariant, ObjectIntermediate};
-use crate::heading::Heading;
+use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}};
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -45,6 +44,8 @@ impl From<u8> for ConeColour {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Cone {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Colour
     pub colour: ConeColour,
     /// Heading / Direction
@@ -53,39 +54,24 @@ pub struct Cone {
     pub floating: bool,
 }
 
-impl ObjectVariant for Cone {
-    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
+impl Cone {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = 0;
         flags |= self.colour as u8 & 0x07;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectIntermediate {
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    fn from_wire(wire: ObjectIntermediate) -> Result<Self, crate::DecodeError> {
+    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, crate::DecodeError> {
         let colour = ConeColour::from(wire.colour());
         let floating = wire.floating();
         Ok(Self {
+            xyz,
             colour,
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            heading,
             floating,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_cone1_round_trip() {
-        let original = Cone::default();
-        let wire = original.to_wire().expect("to_wire failed");
-        let decoded = Cone::from_wire(wire).expect("from_wire failed");
-        assert_eq!(original, decoded);
     }
 }

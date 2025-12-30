@@ -1,8 +1,7 @@
-//! Armco1 barrier object
-use super::{ObjectVariant, ObjectIntermediate};
-use crate::{heading::Heading, object::ObjectCoordinate, DecodeError};
+//! Armco 1-5 barrier object
+use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}, DecodeError};
 
-/// Armco1 barrier
+/// Armco 1-5 barrier
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Armco {
@@ -18,43 +17,26 @@ pub struct Armco {
     pub floating: bool,
 }
 
-impl ObjectVariant for Armco {
-    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
+impl Armco {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = self.colour & 0x07;
         flags |= (self.mapping & 0x0f) << 3;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectIntermediate {
-            xyz: self.xyz,
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    fn from_wire(wire: ObjectIntermediate) -> Result<Self, DecodeError> {
-        let colour = wire.colour();
-        let mapping = wire.mapping();
-        let floating = wire.floating();
+    pub(super) fn new(xyz: ObjectCoordinate, flags: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+        let colour = flags.colour();
+        let mapping = flags.mapping();
+        let floating = flags.floating();
         Ok(Self {
-            xyz: wire.xyz,
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            xyz,
+            heading: Heading::from_objectinfo_wire(flags.heading),
             colour,
             mapping,
             floating,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_armco1_round_trip() {
-        let original = Armco::default();
-        let wire = original.to_wire().expect("to_wire failed");
-        let decoded = Armco::from_wire(wire).expect("from_wire failed");
-        assert_eq!(original, decoded);
     }
 }
