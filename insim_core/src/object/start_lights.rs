@@ -1,5 +1,5 @@
 //! StartLights1 object
-use super::{ObjectVariant, ObjectWire};
+use super::{ObjectVariant, ObjectIntermediate};
 use crate::{DecodeError, heading::Heading};
 
 /// StartLights
@@ -15,18 +15,18 @@ pub struct StartLights {
 }
 
 impl ObjectVariant for StartLights {
-    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
         let mut flags = self.identifier & 0x3F;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectWire {
+        Ok(ObjectIntermediate {
             flags,
             heading: self.heading.to_objectinfo_wire(),
         })
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
+    fn from_wire(wire: ObjectIntermediate) -> Result<Self, DecodeError> {
         let identifier = wire.flags & 0x3F;
         let floating = wire.floating();
         Ok(Self {

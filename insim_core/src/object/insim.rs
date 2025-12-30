@@ -1,5 +1,5 @@
 //! Insim objects
-use super::ObjectWire;
+use super::ObjectIntermediate;
 use crate::heading::Heading;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -44,19 +44,19 @@ pub struct InsimCheckpoint {
 }
 
 impl InsimCheckpoint {
-    pub(crate) fn encode(&self) -> Result<ObjectWire, crate::EncodeError> {
+    pub(crate) fn encode(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
         let mut flags = 0;
         flags |= self.kind as u8;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectWire {
+        Ok(ObjectIntermediate {
             flags,
             heading: self.heading.to_objectinfo_wire(),
         })
     }
 
-    pub(crate) fn decode(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+    pub(crate) fn decode(wire: ObjectIntermediate) -> Result<Self, crate::DecodeError> {
         let kind = InsimCheckpointKind::try_from(wire.flags)?;
         let floating = wire.floating();
         Ok(Self {
@@ -78,18 +78,18 @@ pub struct InsimCircle {
 }
 
 impl InsimCircle {
-    pub(crate) fn encode(&self) -> Result<ObjectWire, crate::EncodeError> {
+    pub(crate) fn encode(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
         let mut flags = 0;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectWire {
+        Ok(ObjectIntermediate {
             flags,
             heading: self.index,
         })
     }
 
-    pub(crate) fn decode(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+    pub(crate) fn decode(wire: ObjectIntermediate) -> Result<Self, crate::DecodeError> {
         let floating = wire.floating();
         Ok(Self {
             index: wire.heading,

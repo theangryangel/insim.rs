@@ -1,5 +1,5 @@
 //! Marker objects
-use super::{ObjectVariant, ObjectWire};
+use super::{ObjectVariant, ObjectIntermediate};
 use crate::{DecodeError, heading::Heading};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
@@ -69,18 +69,18 @@ pub struct MarkerCorner {
 }
 
 impl ObjectVariant for MarkerCorner {
-    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
         let mut flags = self.kind as u8 & 0x0f;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectWire {
+        Ok(ObjectIntermediate {
             flags,
             heading: self.heading.to_objectinfo_wire(),
         })
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+    fn from_wire(wire: ObjectIntermediate) -> Result<Self, crate::DecodeError> {
         let kind = MarkerCornerKind::try_from(wire.flags & 0x0f)?;
         let floating = wire.floating();
         Ok(Self {
@@ -142,18 +142,18 @@ pub struct MarkerDistance {
 }
 
 impl ObjectVariant for MarkerDistance {
-    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
         let mut flags = self.kind as u8 & 0x0f;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectWire {
+        Ok(ObjectIntermediate {
             flags,
             heading: self.heading.to_objectinfo_wire(),
         })
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+    fn from_wire(wire: ObjectIntermediate) -> Result<Self, crate::DecodeError> {
         let kind = MarkerDistanceKind::try_from(wire.flags & 0x0f)?;
         let floating = wire.floating();
         Ok(Self {

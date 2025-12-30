@@ -1,5 +1,5 @@
 //! Marshal objects
-use super::ObjectWire;
+use super::ObjectIntermediate;
 use crate::heading::Heading;
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -15,19 +15,19 @@ pub struct Marshal {
 }
 
 impl Marshal {
-    pub(crate) fn encode(&self) -> Result<ObjectWire, crate::EncodeError> {
+    pub(crate) fn encode(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
         let mut flags: u8 = self.kind as u8;
         if self.floating {
             flags |= 0x80;
         }
 
-        Ok(ObjectWire {
+        Ok(ObjectIntermediate {
             flags,
             heading: self.heading.to_objectinfo_wire(),
         })
     }
 
-    pub(crate) fn decode(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+    pub(crate) fn decode(wire: ObjectIntermediate) -> Result<Self, crate::DecodeError> {
         let kind = MarshalKind::try_from(wire.flags)?;
         let floating = wire.floating();
 
@@ -75,16 +75,16 @@ pub struct RestrictedArea {
 }
 
 impl RestrictedArea {
-    pub(crate) fn encode(&self) -> Result<ObjectWire, crate::EncodeError> {
+    pub(crate) fn encode(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
         let mut flags = 0;
         flags |= self.radius << 2;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectWire { flags, heading: 0 })
+        Ok(ObjectIntermediate { flags, heading: 0 })
     }
 
-    pub(crate) fn decode(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+    pub(crate) fn decode(wire: ObjectIntermediate) -> Result<Self, crate::DecodeError> {
         let radius = (wire.flags >> 2) & 0b11111;
         let floating = wire.floating();
         Ok(Self { radius, floating })
@@ -104,19 +104,19 @@ pub struct RouteChecker {
 }
 
 impl RouteChecker {
-    pub(crate) fn encode(&self) -> Result<ObjectWire, crate::EncodeError> {
+    pub(crate) fn encode(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
         let mut flags = 0;
         flags |= (self.radius << 2) & 0b11111;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectWire {
+        Ok(ObjectIntermediate {
             flags,
             heading: self.route,
         })
     }
 
-    pub(crate) fn decode(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+    pub(crate) fn decode(wire: ObjectIntermediate) -> Result<Self, crate::DecodeError> {
         let radius = (wire.flags >> 2) & 0b11111;
         let floating = wire.floating();
         Ok(Self {

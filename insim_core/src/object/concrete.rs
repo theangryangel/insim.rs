@@ -1,6 +1,6 @@
 //! Concrete
 
-use super::{ObjectVariant, ObjectWire};
+use super::{ObjectVariant, ObjectIntermediate};
 use crate::{DecodeError, heading::Heading};
 
 /// Represents Width and Length (2m, 4m, 8m, 16m)
@@ -271,18 +271,18 @@ pub struct ConcreteSlab {
 }
 
 impl ObjectVariant for ConcreteSlab {
-    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
         let mut flags = 0;
         flags |= self.width as u8 & 0x03;
         flags |= (self.length as u8 & 0x03) << 2;
         flags |= (self.pitch as u8 & 0x0f) << 4;
-        Ok(ObjectWire {
+        Ok(ObjectIntermediate {
             flags,
             heading: self.heading.to_objectinfo_wire(),
         })
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
+    fn from_wire(wire: ObjectIntermediate) -> Result<Self, DecodeError> {
         let width = ConcreteWidthLength::try_from(wire.flags & 0x03)?;
         let length = ConcreteWidthLength::try_from((wire.flags & 0x0c) >> 2)?;
         let pitch = ConcretePitch::try_from((wire.flags & 0xf0) >> 4)?;
@@ -310,18 +310,18 @@ pub struct ConcreteRamp {
 }
 
 impl ObjectVariant for ConcreteRamp {
-    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
         let mut flags = 0;
         flags |= self.width as u8 & 0x03;
         flags |= (self.length as u8 & 0x03) << 2;
         flags |= (self.height as u8 & 0x0f) << 4;
-        Ok(ObjectWire {
+        Ok(ObjectIntermediate {
             flags,
             heading: self.heading.to_objectinfo_wire(),
         })
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
+    fn from_wire(wire: ObjectIntermediate) -> Result<Self, DecodeError> {
         let width = ConcreteWidthLength::try_from(wire.flags & 0x03)?;
         let length = ConcreteWidthLength::try_from((wire.flags & 0x0c) >> 2)?;
         let height = ConcreteHeight::try_from((wire.flags & 0xf0) >> 4)?;
@@ -349,18 +349,18 @@ pub struct ConcreteWall {
 }
 
 impl ObjectVariant for ConcreteWall {
-    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
         let mut flags = 0;
         flags |= self.colour as u8 & 0x03;
         flags |= (self.length as u8 & 0x03) << 2;
         flags |= (self.height as u8 & 0x0f) << 4;
-        Ok(ObjectWire {
+        Ok(ObjectIntermediate {
             flags,
             heading: self.heading.to_objectinfo_wire(),
         })
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
+    fn from_wire(wire: ObjectIntermediate) -> Result<Self, DecodeError> {
         let colour = ConcreteColour::try_from(wire.flags & 0x03)?;
         let length = ConcreteWidthLength::try_from((wire.flags & 0x0c) >> 2)?;
         let height = ConcreteHeight::try_from((wire.flags & 0xf0) >> 4)?;
@@ -388,18 +388,18 @@ pub struct ConcretePillar {
 }
 
 impl ObjectVariant for ConcretePillar {
-    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
         let mut flags = 0;
         flags |= self.x as u8 & 0x03;
         flags |= (self.y as u8 & 0x03) << 2;
         flags |= (self.height as u8 & 0x0f) << 4;
-        Ok(ObjectWire {
+        Ok(ObjectIntermediate {
             flags,
             heading: self.heading.to_objectinfo_wire(),
         })
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
+    fn from_wire(wire: ObjectIntermediate) -> Result<Self, DecodeError> {
         let x = Size::try_from(wire.flags & 0x03)?;
         let y = Size::try_from((wire.flags & 0x0c) >> 2)?;
         let height = ConcreteHeight::try_from((wire.flags & 0xf0) >> 4)?;
@@ -427,18 +427,18 @@ pub struct ConcreteSlabWall {
 }
 
 impl ObjectVariant for ConcreteSlabWall {
-    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
         let mut flags = 0;
         flags |= self.colour as u8 & 0x03;
         flags |= (self.length as u8 & 0x03) << 2;
         flags |= (self.pitch as u8 & 0x0f) << 4;
-        Ok(ObjectWire {
+        Ok(ObjectIntermediate {
             flags,
             heading: self.heading.to_objectinfo_wire(),
         })
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
+    fn from_wire(wire: ObjectIntermediate) -> Result<Self, DecodeError> {
         let colour = ConcreteColour::try_from(wire.flags & 0x03)?;
         let length = ConcreteWidthLength::try_from((wire.flags & 0x0c) >> 2)?;
         let pitch = ConcretePitch::try_from((wire.flags & 0xf0) >> 4)?;
@@ -466,18 +466,18 @@ pub struct ConcreteRampWall {
 }
 
 impl ObjectVariant for ConcreteRampWall {
-    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
         let mut flags = 0;
         flags |= self.colour as u8 & 0x03;
         flags |= (self.length as u8 & 0x03) << 2;
         flags |= (self.height as u8 & 0x0f) << 4;
-        Ok(ObjectWire {
+        Ok(ObjectIntermediate {
             flags,
             heading: self.heading.to_objectinfo_wire(),
         })
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
+    fn from_wire(wire: ObjectIntermediate) -> Result<Self, DecodeError> {
         let colour = ConcreteColour::try_from(wire.flags & 0x03)?;
         let length = ConcreteWidthLength::try_from((wire.flags & 0x0c) >> 2)?;
         let height = ConcreteHeight::try_from((wire.flags & 0xf0) >> 4)?;
@@ -505,18 +505,18 @@ pub struct ConcreteShortSlabWall {
 }
 
 impl ObjectVariant for ConcreteShortSlabWall {
-    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
         let mut flags = 0;
         flags |= self.colour as u8 & 0x03;
         flags |= (self.y as u8 & 0x03) << 2;
         flags |= (self.pitch as u8 & 0x0f) << 4;
-        Ok(ObjectWire {
+        Ok(ObjectIntermediate {
             flags,
             heading: self.heading.to_objectinfo_wire(),
         })
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
+    fn from_wire(wire: ObjectIntermediate) -> Result<Self, DecodeError> {
         let colour = ConcreteColour::try_from(wire.flags & 0x03)?;
         let y = Size::try_from((wire.flags & 0x0c) >> 2)?;
         let pitch = ConcretePitch::try_from((wire.flags & 0xf0) >> 4)?;
@@ -544,18 +544,18 @@ pub struct ConcreteWedge {
 }
 
 impl ObjectVariant for ConcreteWedge {
-    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
         let mut flags = 0;
         flags |= self.colour as u8 & 0x03;
         flags |= (self.length as u8 & 0x03) << 2;
         flags |= (self.angle as u8 & 0x0f) << 4;
-        Ok(ObjectWire {
+        Ok(ObjectIntermediate {
             flags,
             heading: self.heading.to_objectinfo_wire(),
         })
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
+    fn from_wire(wire: ObjectIntermediate) -> Result<Self, DecodeError> {
         let colour = ConcreteColour::try_from(wire.flags & 0x03)?;
         let length = ConcreteWidthLength::try_from((wire.flags & 0x0c) >> 2)?;
         let angle = ConcreteAngle::try_from((wire.flags & 0xf0) >> 4)?;

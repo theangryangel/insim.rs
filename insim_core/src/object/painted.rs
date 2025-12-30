@@ -1,7 +1,7 @@
 //! Painted objects
 use std::convert::TryFrom;
 
-use super::{ObjectVariant, ObjectWire};
+use super::{ObjectVariant, ObjectIntermediate};
 use crate::{DecodeError, heading::Heading};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
@@ -274,20 +274,20 @@ pub struct Letters {
 }
 
 impl ObjectVariant for Letters {
-    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
         let mut flags = 0;
         flags |= (self.character as u8) << 1;
         flags |= self.colour as u8 & 0x01;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectWire {
+        Ok(ObjectIntermediate {
             flags,
             heading: self.heading.to_objectinfo_wire(),
         })
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+    fn from_wire(wire: ObjectIntermediate) -> Result<Self, crate::DecodeError> {
         let colour = PaintColour::from(wire.flags);
         let character = Character::try_from(wire.flags)?;
         let floating = wire.floating();
@@ -351,20 +351,20 @@ pub struct Arrows {
 }
 
 impl ObjectVariant for Arrows {
-    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
         let mut flags = 0;
         flags |= (self.arrow as u8) << 1;
         flags |= self.colour as u8 & 0x01;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectWire {
+        Ok(ObjectIntermediate {
             flags,
             heading: self.heading.to_objectinfo_wire(),
         })
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+    fn from_wire(wire: ObjectIntermediate) -> Result<Self, crate::DecodeError> {
         let colour = PaintColour::from(wire.flags);
         let arrow = Arrow::try_from(wire.flags)?;
         let floating = wire.floating();

@@ -1,5 +1,5 @@
 //! Speed hump 10m object
-use super::{ObjectVariant, ObjectWire};
+use super::{ObjectVariant, ObjectIntermediate};
 use crate::{DecodeError, heading::Heading};
 
 /// Speed hump 10m
@@ -17,19 +17,19 @@ pub struct SpeedHump {
 }
 
 impl ObjectVariant for SpeedHump {
-    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
         let mut flags = self.colour & 0x07;
         flags |= (self.mapping & 0x0f) << 3;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectWire {
+        Ok(ObjectIntermediate {
             flags,
             heading: self.heading.to_objectinfo_wire(),
         })
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, DecodeError> {
+    fn from_wire(wire: ObjectIntermediate) -> Result<Self, DecodeError> {
         let colour = wire.colour();
         let mapping = wire.mapping();
         let floating = wire.floating();

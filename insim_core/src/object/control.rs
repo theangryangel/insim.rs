@@ -1,6 +1,6 @@
 //! Control objects
 
-use super::ObjectWire;
+use super::ObjectIntermediate;
 use crate::heading::Heading;
 
 #[derive(Debug, Clone, Default, PartialEq, PartialOrd)]
@@ -16,7 +16,7 @@ pub struct Control {
 }
 
 impl Control {
-    pub(crate) fn encode(&self) -> Result<ObjectWire, crate::EncodeError> {
+    pub(crate) fn encode(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
         let mut flags = match self.kind {
             ControlKind::Start => 0,
             ControlKind::Checkpoint1 { half_width } => (half_width << 2) | 0b01,
@@ -28,13 +28,13 @@ impl Control {
             flags |= 0x80;
         }
 
-        Ok(ObjectWire {
+        Ok(ObjectIntermediate {
             flags,
             heading: self.heading.to_objectinfo_wire(),
         })
     }
 
-    pub(crate) fn decode(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+    pub(crate) fn decode(wire: ObjectIntermediate) -> Result<Self, crate::DecodeError> {
         let position_bits = wire.flags & 0b11;
         let half_width = (wire.flags >> 2) & 0b11111;
         let floating = wire.floating();

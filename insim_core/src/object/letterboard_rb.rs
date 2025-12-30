@@ -1,5 +1,5 @@
 //! Letterboard RB (Red/Blue) objects
-use super::{ObjectVariant, ObjectWire};
+use super::{ObjectVariant, ObjectIntermediate};
 use crate::{DecodeError, heading::Heading};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
@@ -277,19 +277,19 @@ pub struct LetterboardRB {
 }
 
 impl ObjectVariant for LetterboardRB {
-    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
+    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
         let mut flags = self.colour as u8 & 0x01;
         flags |= ((self.character as u8) & 0x3f) << 1;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectWire {
+        Ok(ObjectIntermediate {
             flags,
             heading: self.heading.to_objectinfo_wire(),
         })
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+    fn from_wire(wire: ObjectIntermediate) -> Result<Self, crate::DecodeError> {
         let colour = LetterboardRBColour::from(wire.flags);
         let mapping = (wire.flags >> 1) & 0x3f;
         let character = Character::try_from(mapping)?;
