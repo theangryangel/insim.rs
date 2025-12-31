@@ -35,120 +35,15 @@ pub mod vehicle_suv;
 pub mod vehicle_truck;
 pub mod vehicle_van;
 
+pub mod object_coordinate;
+mod object_flags;
+#[cfg(test)]
+mod tests;
+
+pub use object_coordinate::ObjectCoordinate;
+use object_flags::ObjectFlags;
+
 use crate::{Decode, DecodeError, Encode, EncodeError, heading::Heading};
-
-#[derive(Debug, Clone, Copy)]
-pub(super) struct ObjectFlags(u8);
-impl ObjectFlags {
-    /// Check if the floating flag is set
-    fn floating(&self) -> bool {
-        self.0 & 0x80 != 0
-    }
-
-    /// Extract colour from flags (bits 0-2)
-    fn colour(&self) -> u8 {
-        self.0 & 0x07
-    }
-
-    /// Extract mapping from flags (bits 3-6)
-    fn mapping(&self) -> u8 {
-        (self.0 >> 3) & 0x0f
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Layout Object Position
-pub struct ObjectCoordinate {
-    /// X coordinate (1:16 scale)
-    pub x: i16,
-    /// Y coordinate (1:16 scale)
-    pub y: i16,
-    /// X coordinate (1:4 scale)
-    pub z: u8,
-}
-
-impl ObjectCoordinate {
-    // Scale to metres for X and Y
-    const SCALE: i16 = 16;
-
-    /// X (in metres)
-    pub fn x_metres(&self) -> f32 {
-        self.x as f32 / Self::SCALE as f32
-    }
-
-    /// Y (in metres)
-    pub fn y_metres(&self) -> f32 {
-        self.y as f32 / Self::SCALE as f32
-    }
-
-    /// Z (in metres)
-    pub fn z_metres(&self) -> f32 {
-        self.z as f32 / 4.0
-    }
-
-    /// X, Y, Z (in metres)
-    pub fn xyz_metres(&self) -> (f32, f32, f32) {
-        (self.x_metres(), self.y_metres(), self.z_metres())
-    }
-}
-
-#[cfg(feature = "glam")]
-impl ObjectCoordinate {
-    /// Convert to glam Vec3, where xyz are in raw
-    pub fn to_ivec3(&self) -> glam::I16Vec3 {
-        glam::I16Vec3 {
-            x: self.x,
-            y: self.y,
-            z: self.z as i16,
-        }
-    }
-
-    /// Convert from glam IVec3, where xyz are in raw
-    pub fn from_ivec3(other: glam::I16Vec3) -> Self {
-        Self {
-            x: other.x,
-            y: other.y,
-            z: other.z as u8,
-        }
-    }
-
-    /// Convert to glam DVec3, where xyz are in metres
-    pub fn to_dvec3_metres(&self) -> glam::DVec3 {
-        glam::DVec3 {
-            x: (self.x as f64 / 16.0),
-            y: (self.y as f64 / 16.0),
-            z: (self.y as f64 / 4.0),
-        }
-    }
-
-    /// Convert from glam DVec3, where xyz are in metres
-    pub fn from_dvec3_metres(other: glam::DVec3) -> Self {
-        Self {
-            x: (other.x * 16.0).round() as i16,
-            y: (other.y * 16.0).round() as i16,
-            z: (other.z * 4.0).round() as u8,
-        }
-    }
-
-    /// Convert to glam Vec3, where xyz are in metres
-    pub fn to_vec3_metres(&self) -> glam::Vec3 {
-        glam::Vec3 {
-            x: (self.x as f32 / 16.0),
-            y: (self.y as f32 / 16.0),
-            z: (self.y as f32 / 4.0),
-        }
-    }
-
-    /// Convert from glam Vec3, where xyz are in metres
-    pub fn from_vec3_metres(other: glam::Vec3) -> Self {
-        Self {
-            x: (other.x * 16.0).round() as i16,
-            y: (other.y * 16.0).round() as i16,
-            z: (other.z * 4.0).round() as u8,
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -312,6 +207,91 @@ pub enum ObjectInfo {
     PitStartPoint(pit_start_point::PitStartPoint),
     /// Pit stop box
     PitStopBox(pit::PitStopBox),
+}
+
+impl From<&ObjectInfo> for u8 {
+    fn from(value: &ObjectInfo) -> Self {
+        match value {
+            ObjectInfo::Control(_) => 0,
+            ObjectInfo::Marshal(_) => 240,
+            ObjectInfo::InsimCheckpoint(_) => 252,
+            ObjectInfo::InsimCircle(_) => 253,
+            ObjectInfo::RestrictedArea(_) => 254,
+            ObjectInfo::RouteChecker(_) => 255,
+            ObjectInfo::ChalkLine(_) => 4,
+            ObjectInfo::ChalkLine2(_) => 5,
+            ObjectInfo::ChalkAhead(_) => 6,
+            ObjectInfo::ChalkAhead2(_) => 7,
+            ObjectInfo::ChalkLeft(_) => 8,
+            ObjectInfo::ChalkLeft2(_) => 9,
+            ObjectInfo::ChalkLeft3(_) => 10,
+            ObjectInfo::ChalkRight(_) => 11,
+            ObjectInfo::ChalkRight2(_) => 12,
+            ObjectInfo::ChalkRight3(_) => 13,
+            ObjectInfo::PaintLetters(_) => 16,
+            ObjectInfo::PaintArrows(_) => 17,
+            ObjectInfo::Cone1(_) => 20,
+            ObjectInfo::Cone2(_) => 21,
+            ObjectInfo::ConeTall1(_) => 32,
+            ObjectInfo::ConeTall2(_) => 33,
+            ObjectInfo::ConePointer(_) => 40,
+            ObjectInfo::TyreSingle(_) => 48,
+            ObjectInfo::TyreStack2(_) => 49,
+            ObjectInfo::TyreStack3(_) => 50,
+            ObjectInfo::TyreStack4(_) => 51,
+            ObjectInfo::TyreSingleBig(_) => 52,
+            ObjectInfo::TyreStack2Big(_) => 53,
+            ObjectInfo::TyreStack3Big(_) => 54,
+            ObjectInfo::TyreStack4Big(_) => 55,
+            ObjectInfo::MarkerCorner(_) => 62,
+            ObjectInfo::MarkerDistance(_) => 84,
+            ObjectInfo::LetterboardWY(_) => 92,
+            ObjectInfo::LetterboardRB(_) => 93,
+            ObjectInfo::Armco1(_) => 96,
+            ObjectInfo::Armco3(_) => 97,
+            ObjectInfo::Armco5(_) => 98,
+            ObjectInfo::BarrierLong(_) => 104,
+            ObjectInfo::BarrierRed(_) => 105,
+            ObjectInfo::BarrierWhite(_) => 106,
+            ObjectInfo::Banner(_) => 112,
+            ObjectInfo::Ramp1(_) => 120,
+            ObjectInfo::Ramp2(_) => 121,
+            ObjectInfo::VehicleSUV(_) => 124,
+            ObjectInfo::VehicleVan(_) => 125,
+            ObjectInfo::VehicleTruck(_) => 126,
+            ObjectInfo::VehicleAmbulance(_) => 127,
+            ObjectInfo::SpeedHump10M(_) => 128,
+            ObjectInfo::SpeedHump6M(_) => 129,
+            ObjectInfo::SpeedHump2M(_) => 130,
+            ObjectInfo::SpeedHump1M(_) => 131,
+            ObjectInfo::Kerb(_) => 132,
+            ObjectInfo::Post(_) => 136,
+            ObjectInfo::Marquee(_) => 140,
+            ObjectInfo::Bale(_) => 144,
+            ObjectInfo::Bin1(_) => 145,
+            ObjectInfo::Bin2(_) => 146,
+            ObjectInfo::Railing1(_) => 147,
+            ObjectInfo::Railing2(_) => 148,
+            ObjectInfo::StartLights1(_) => 149,
+            ObjectInfo::StartLights2(_) => 150,
+            ObjectInfo::StartLights3(_) => 151,
+            ObjectInfo::SignMetal(_) => 160,
+            ObjectInfo::ChevronLeft(_) => 164,
+            ObjectInfo::ChevronRight(_) => 165,
+            ObjectInfo::SignSpeed(_) => 168,
+            ObjectInfo::ConcreteSlab(_) => 172,
+            ObjectInfo::ConcreteRamp(_) => 173,
+            ObjectInfo::ConcreteWall(_) => 174,
+            ObjectInfo::ConcretePillar(_) => 175,
+            ObjectInfo::ConcreteSlabWall(_) => 176,
+            ObjectInfo::ConcreteRampWall(_) => 177,
+            ObjectInfo::ConcreteShortSlabWall(_) => 178,
+            ObjectInfo::ConcreteWedge(_) => 179,
+            ObjectInfo::StartPosition(_) => 184,
+            ObjectInfo::PitStartPoint(_) => 185,
+            ObjectInfo::PitStopBox(_) => 186,
+        }
+    }
 }
 
 impl Decode for ObjectInfo {
@@ -883,464 +863,180 @@ impl ObjectInfo {
             ObjectInfo::PitStopBox(i) => &mut i.xyz,
         }
     }
+
+    fn flags(&self) -> ObjectFlags {
+        match self {
+            ObjectInfo::Control(i) => i.to_flags(),
+            ObjectInfo::Marshal(i) => i.to_flags(),
+            ObjectInfo::InsimCheckpoint(i) => i.to_flags(),
+            ObjectInfo::InsimCircle(i) => i.to_flags(),
+            ObjectInfo::RestrictedArea(i) => i.to_flags(),
+            ObjectInfo::RouteChecker(i) => i.to_flags(),
+            ObjectInfo::ChalkLine(i) => i.to_flags(),
+            ObjectInfo::ChalkLine2(i) => i.to_flags(),
+            ObjectInfo::ChalkAhead(i) => i.to_flags(),
+            ObjectInfo::ChalkAhead2(i) => i.to_flags(),
+            ObjectInfo::ChalkLeft(i) => i.to_flags(),
+            ObjectInfo::ChalkLeft2(i) => i.to_flags(),
+            ObjectInfo::ChalkLeft3(i) => i.to_flags(),
+            ObjectInfo::ChalkRight(i) => i.to_flags(),
+            ObjectInfo::ChalkRight2(i) => i.to_flags(),
+            ObjectInfo::ChalkRight3(i) => i.to_flags(),
+            ObjectInfo::PaintLetters(i) => i.to_flags(),
+            ObjectInfo::PaintArrows(i) => i.to_flags(),
+            ObjectInfo::Cone1(i) => i.to_flags(),
+            ObjectInfo::Cone2(i) => i.to_flags(),
+            ObjectInfo::ConeTall1(i) => i.to_flags(),
+            ObjectInfo::ConeTall2(i) => i.to_flags(),
+            ObjectInfo::ConePointer(i) => i.to_flags(),
+            ObjectInfo::TyreSingle(i) => i.to_flags(),
+            ObjectInfo::TyreStack2(i) => i.to_flags(),
+            ObjectInfo::TyreStack3(i) => i.to_flags(),
+            ObjectInfo::TyreStack4(i) => i.to_flags(),
+            ObjectInfo::TyreSingleBig(i) => i.to_flags(),
+            ObjectInfo::TyreStack2Big(i) => i.to_flags(),
+            ObjectInfo::TyreStack3Big(i) => i.to_flags(),
+            ObjectInfo::TyreStack4Big(i) => i.to_flags(),
+            ObjectInfo::MarkerCorner(i) => i.to_flags(),
+            ObjectInfo::MarkerDistance(i) => i.to_flags(),
+            ObjectInfo::LetterboardWY(i) => i.to_flags(),
+            ObjectInfo::LetterboardRB(i) => i.to_flags(),
+            ObjectInfo::Armco1(i) => i.to_flags(),
+            ObjectInfo::Armco3(i) => i.to_flags(),
+            ObjectInfo::Armco5(i) => i.to_flags(),
+            ObjectInfo::BarrierLong(i) => i.to_flags(),
+            ObjectInfo::BarrierRed(i) => i.to_flags(),
+            ObjectInfo::BarrierWhite(i) => i.to_flags(),
+            ObjectInfo::Banner(i) => i.to_flags(),
+            ObjectInfo::Ramp1(i) => i.to_flags(),
+            ObjectInfo::Ramp2(i) => i.to_flags(),
+            ObjectInfo::VehicleSUV(i) => i.to_flags(),
+            ObjectInfo::VehicleVan(i) => i.to_flags(),
+            ObjectInfo::VehicleTruck(i) => i.to_flags(),
+            ObjectInfo::VehicleAmbulance(i) => i.to_flags(),
+            ObjectInfo::Kerb(i) => i.to_flags(),
+            ObjectInfo::Post(i) => i.to_flags(),
+            ObjectInfo::Marquee(i) => i.to_flags(),
+            ObjectInfo::Bale(i) => i.to_flags(),
+            ObjectInfo::SpeedHump10M(i) => i.to_flags(),
+            ObjectInfo::SpeedHump6M(i) => i.to_flags(),
+            ObjectInfo::SpeedHump2M(i) => i.to_flags(),
+            ObjectInfo::SpeedHump1M(i) => i.to_flags(),
+            ObjectInfo::Bin1(i) => i.to_flags(),
+            ObjectInfo::Bin2(i) => i.to_flags(),
+            ObjectInfo::Railing1(i) => i.to_flags(),
+            ObjectInfo::Railing2(i) => i.to_flags(),
+            ObjectInfo::StartLights1(i) => i.to_flags(),
+            ObjectInfo::StartLights2(i) => i.to_flags(),
+            ObjectInfo::StartLights3(i) => i.to_flags(),
+            ObjectInfo::SignMetal(i) => i.to_flags(),
+            ObjectInfo::ChevronLeft(i) => i.to_flags(),
+            ObjectInfo::ChevronRight(i) => i.to_flags(),
+            ObjectInfo::SignSpeed(i) => i.to_flags(),
+            ObjectInfo::ConcreteSlab(i) => i.to_flags(),
+            ObjectInfo::ConcreteRamp(i) => i.to_flags(),
+            ObjectInfo::ConcreteWall(i) => i.to_flags(),
+            ObjectInfo::ConcretePillar(i) => i.to_flags(),
+            ObjectInfo::ConcreteSlabWall(i) => i.to_flags(),
+            ObjectInfo::ConcreteRampWall(i) => i.to_flags(),
+            ObjectInfo::ConcreteShortSlabWall(i) => i.to_flags(),
+            ObjectInfo::ConcreteWedge(i) => i.to_flags(),
+            ObjectInfo::StartPosition(i) => i.to_flags(),
+            ObjectInfo::PitStartPoint(i) => i.to_flags(),
+            ObjectInfo::PitStopBox(i) => i.to_flags(),
+        }
+    }
+
+    fn heading_objectinfo_wire(&self) -> u8 {
+        match self {
+            ObjectInfo::Control(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::Marshal(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::InsimCheckpoint(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::InsimCircle(i) => i.index,
+            ObjectInfo::RestrictedArea(i) => i.radius,
+            ObjectInfo::RouteChecker(i) => i.radius,
+            ObjectInfo::ChalkLine(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ChalkLine2(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ChalkAhead(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ChalkAhead2(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ChalkLeft(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ChalkLeft2(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ChalkLeft3(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ChalkRight(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ChalkRight2(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ChalkRight3(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::PaintLetters(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::PaintArrows(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::Cone1(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::Cone2(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ConeTall1(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ConeTall2(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ConePointer(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::TyreSingle(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::TyreStack2(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::TyreStack3(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::TyreStack4(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::TyreSingleBig(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::TyreStack2Big(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::TyreStack3Big(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::TyreStack4Big(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::MarkerCorner(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::MarkerDistance(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::LetterboardWY(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::LetterboardRB(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::Armco1(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::Armco3(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::Armco5(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::BarrierLong(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::BarrierRed(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::BarrierWhite(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::Banner(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::Ramp1(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::Ramp2(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::VehicleSUV(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::VehicleVan(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::VehicleTruck(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::VehicleAmbulance(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::Kerb(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::Post(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::Marquee(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::Bale(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::SpeedHump10M(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::SpeedHump6M(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::SpeedHump2M(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::SpeedHump1M(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::Bin1(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::Bin2(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::Railing1(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::Railing2(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::StartLights1(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::StartLights2(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::StartLights3(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::SignMetal(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ChevronLeft(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ChevronRight(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::SignSpeed(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ConcreteSlab(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ConcreteRamp(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ConcreteWall(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ConcretePillar(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ConcreteSlabWall(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ConcreteRampWall(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ConcreteShortSlabWall(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::ConcreteWedge(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::StartPosition(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::PitStartPoint(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::PitStopBox(i) => i.heading.to_objectinfo_wire(),
+        }
+    }
 }
 
 impl Encode for ObjectInfo {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), EncodeError> {
-        let (index, xyz, flags, heading): (u8, ObjectCoordinate, ObjectFlags, u8) = match self {
-            Self::Control(control) => (
-                0,
-                control.xyz,
-                control.to_flags(),
-                control.heading.to_objectinfo_wire(),
-            ),
-            Self::Marshal(marshal) => (
-                240,
-                marshal.xyz,
-                marshal.to_flags(),
-                marshal.heading.to_objectinfo_wire(),
-            ),
-            Self::InsimCheckpoint(insim_checkpoint) => (
-                252,
-                insim_checkpoint.xyz,
-                insim_checkpoint.to_flags(),
-                insim_checkpoint.heading.to_objectinfo_wire(),
-            ),
-            Self::InsimCircle(insim_circle) => (
-                253,
-                insim_circle.xyz,
-                insim_circle.to_flags(),
-                insim_circle.index,
-            ),
-            Self::RestrictedArea(restricted_area) => {
-                (254, restricted_area.xyz, restricted_area.to_flags(), 0)
-            },
-            Self::RouteChecker(route_checker) => {
-                (255, route_checker.xyz, route_checker.to_flags(), 0)
-            },
-            Self::ChalkLine(chalk) => (
-                4,
-                chalk.xyz,
-                chalk.to_flags(),
-                chalk.heading.to_objectinfo_wire(),
-            ),
-            Self::ChalkLine2(chalk) => (
-                5,
-                chalk.xyz,
-                chalk.to_flags(),
-                chalk.heading.to_objectinfo_wire(),
-            ),
-            Self::ChalkAhead(chalk) => (
-                6,
-                chalk.xyz,
-                chalk.to_flags(),
-                chalk.heading.to_objectinfo_wire(),
-            ),
-            Self::ChalkAhead2(chalk) => (
-                7,
-                chalk.xyz,
-                chalk.to_flags(),
-                chalk.heading.to_objectinfo_wire(),
-            ),
-            Self::ChalkLeft(chalk) => (
-                8,
-                chalk.xyz,
-                chalk.to_flags(),
-                chalk.heading.to_objectinfo_wire(),
-            ),
-            Self::ChalkLeft2(chalk) => (
-                9,
-                chalk.xyz,
-                chalk.to_flags(),
-                chalk.heading.to_objectinfo_wire(),
-            ),
-            Self::ChalkLeft3(chalk) => (
-                10,
-                chalk.xyz,
-                chalk.to_flags(),
-                chalk.heading.to_objectinfo_wire(),
-            ),
-            Self::ChalkRight(chalk) => (
-                11,
-                chalk.xyz,
-                chalk.to_flags(),
-                chalk.heading.to_objectinfo_wire(),
-            ),
-            Self::ChalkRight2(chalk) => (
-                12,
-                chalk.xyz,
-                chalk.to_flags(),
-                chalk.heading.to_objectinfo_wire(),
-            ),
-            Self::ChalkRight3(chalk) => (
-                13,
-                chalk.xyz,
-                chalk.to_flags(),
-                chalk.heading.to_objectinfo_wire(),
-            ),
-            Self::PaintLetters(letters) => (
-                16,
-                letters.xyz,
-                letters.to_flags(),
-                letters.heading.to_objectinfo_wire(),
-            ),
-            Self::PaintArrows(arrows) => (
-                17,
-                arrows.xyz,
-                arrows.to_flags(),
-                arrows.heading.to_objectinfo_wire(),
-            ),
-            Self::Cone1(cone) => (
-                20,
-                cone.xyz,
-                cone.to_flags(),
-                cone.heading.to_objectinfo_wire(),
-            ),
-            Self::Cone2(cone) => (
-                21,
-                cone.xyz,
-                cone.to_flags(),
-                cone.heading.to_objectinfo_wire(),
-            ),
-            Self::ConeTall1(cone) => (
-                32,
-                cone.xyz,
-                cone.to_flags(),
-                cone.heading.to_objectinfo_wire(),
-            ),
-            Self::ConeTall2(cone) => (
-                33,
-                cone.xyz,
-                cone.to_flags(),
-                cone.heading.to_objectinfo_wire(),
-            ),
-            Self::ConePointer(cone) => (
-                40,
-                cone.xyz,
-                cone.to_flags(),
-                cone.heading.to_objectinfo_wire(),
-            ),
-            Self::TyreSingle(tyre) => (
-                48,
-                tyre.xyz,
-                tyre.to_flags(),
-                tyre.heading.to_objectinfo_wire(),
-            ),
-            Self::TyreStack2(tyre) => (
-                49,
-                tyre.xyz,
-                tyre.to_flags(),
-                tyre.heading.to_objectinfo_wire(),
-            ),
-            Self::TyreStack3(tyre) => (
-                50,
-                tyre.xyz,
-                tyre.to_flags(),
-                tyre.heading.to_objectinfo_wire(),
-            ),
-            Self::TyreStack4(tyre) => (
-                51,
-                tyre.xyz,
-                tyre.to_flags(),
-                tyre.heading.to_objectinfo_wire(),
-            ),
-            Self::TyreSingleBig(tyre) => (
-                52,
-                tyre.xyz,
-                tyre.to_flags(),
-                tyre.heading.to_objectinfo_wire(),
-            ),
-            Self::TyreStack2Big(tyre) => (
-                53,
-                tyre.xyz,
-                tyre.to_flags(),
-                tyre.heading.to_objectinfo_wire(),
-            ),
-            Self::TyreStack3Big(tyre) => (
-                54,
-                tyre.xyz,
-                tyre.to_flags(),
-                tyre.heading.to_objectinfo_wire(),
-            ),
-            Self::TyreStack4Big(tyre) => (
-                55,
-                tyre.xyz,
-                tyre.to_flags(),
-                tyre.heading.to_objectinfo_wire(),
-            ),
-            Self::MarkerCorner(marker_corner) => (
-                62,
-                marker_corner.xyz,
-                marker_corner.to_flags(),
-                marker_corner.heading.to_objectinfo_wire(),
-            ),
-            Self::MarkerDistance(marker_distance) => (
-                84,
-                marker_distance.xyz,
-                marker_distance.to_flags(),
-                marker_distance.heading.to_objectinfo_wire(),
-            ),
-            Self::LetterboardWY(letterboard_wy) => (
-                92,
-                letterboard_wy.xyz,
-                letterboard_wy.to_flags(),
-                letterboard_wy.heading.to_objectinfo_wire(),
-            ),
-            Self::LetterboardRB(letterboard_rb) => (
-                93,
-                letterboard_rb.xyz,
-                letterboard_rb.to_flags(),
-                letterboard_rb.heading.to_objectinfo_wire(),
-            ),
-            Self::Armco1(armco1) => {
-                let flags = armco1.to_flags();
-                (96, armco1.xyz, flags, armco1.heading.to_objectinfo_wire())
-            },
-            Self::Armco3(armco3) => {
-                let flags = armco3.to_flags();
-                (97, armco3.xyz, flags, armco3.heading.to_objectinfo_wire())
-            },
-            Self::Armco5(armco5) => {
-                let flags = armco5.to_flags();
-                (98, armco5.xyz, flags, armco5.heading.to_objectinfo_wire())
-            },
-            Self::BarrierLong(barrier) => (
-                104,
-                barrier.xyz,
-                barrier.to_flags(),
-                barrier.heading.to_objectinfo_wire(),
-            ),
-            Self::BarrierRed(barrier) => (
-                105,
-                barrier.xyz,
-                barrier.to_flags(),
-                barrier.heading.to_objectinfo_wire(),
-            ),
-            Self::BarrierWhite(barrier) => (
-                106,
-                barrier.xyz,
-                barrier.to_flags(),
-                barrier.heading.to_objectinfo_wire(),
-            ),
-            Self::Banner(banner) => {
-                let wire = banner.to_flags();
-                (112, banner.xyz, wire, banner.heading.to_objectinfo_wire())
-            },
-            Self::Ramp1(ramp) => (
-                120,
-                ramp.xyz,
-                ramp.to_flags(),
-                ramp.heading.to_objectinfo_wire(),
-            ),
-            Self::Ramp2(ramp) => (
-                121,
-                ramp.xyz,
-                ramp.to_flags(),
-                ramp.heading.to_objectinfo_wire(),
-            ),
-            Self::VehicleSUV(veh) => (
-                124,
-                veh.xyz,
-                veh.to_flags(),
-                veh.heading.to_objectinfo_wire(),
-            ),
-            Self::VehicleVan(veh) => (
-                125,
-                veh.xyz,
-                veh.to_flags(),
-                veh.heading.to_objectinfo_wire(),
-            ),
-            Self::VehicleTruck(veh) => (
-                126,
-                veh.xyz,
-                veh.to_flags(),
-                veh.heading.to_objectinfo_wire(),
-            ),
-            Self::VehicleAmbulance(veh) => (
-                127,
-                veh.xyz,
-                veh.to_flags(),
-                veh.heading.to_objectinfo_wire(),
-            ),
-            Self::SpeedHump10M(speed_hump) => (
-                128,
-                speed_hump.xyz,
-                speed_hump.to_flags(),
-                speed_hump.heading.to_objectinfo_wire(),
-            ),
-            Self::SpeedHump6M(speed_hump) => (
-                129,
-                speed_hump.xyz,
-                speed_hump.to_flags(),
-                speed_hump.heading.to_objectinfo_wire(),
-            ),
-            Self::SpeedHump2M(speed_hump) => (
-                130,
-                speed_hump.xyz,
-                speed_hump.to_flags(),
-                speed_hump.heading.to_objectinfo_wire(),
-            ),
-            Self::SpeedHump1M(speed_hump) => (
-                131,
-                speed_hump.xyz,
-                speed_hump.to_flags(),
-                speed_hump.heading.to_objectinfo_wire(),
-            ),
-            Self::Kerb(kerb) => (
-                132,
-                kerb.xyz,
-                kerb.to_flags(),
-                kerb.heading.to_objectinfo_wire(),
-            ),
-            Self::Post(post) => (
-                136,
-                post.xyz,
-                post.to_flags(),
-                post.heading.to_objectinfo_wire(),
-            ),
-            Self::Marquee(marquee) => (
-                140,
-                marquee.xyz,
-                marquee.to_flags(),
-                marquee.heading.to_objectinfo_wire(),
-            ),
-            Self::Bale(bale) => {
-                let flags = bale.to_flags();
-                (144, bale.xyz, flags, bale.heading.to_objectinfo_wire())
-            },
-            Self::Bin1(bin1) => (
-                145,
-                bin1.xyz,
-                bin1.to_flags(),
-                bin1.heading.to_objectinfo_wire(),
-            ),
-            Self::Bin2(bin2) => (
-                146,
-                bin2.xyz,
-                bin2.to_flags(),
-                bin2.heading.to_objectinfo_wire(),
-            ),
-            Self::Railing1(railing) => (
-                147,
-                railing.xyz,
-                railing.to_flags(),
-                railing.heading.to_objectinfo_wire(),
-            ),
-            Self::Railing2(railing) => (
-                148,
-                railing.xyz,
-                railing.to_flags(),
-                railing.heading.to_objectinfo_wire(),
-            ),
-            Self::StartLights1(start_lights) => (
-                149,
-                start_lights.xyz,
-                start_lights.to_flags(),
-                start_lights.heading.to_objectinfo_wire(),
-            ),
-            Self::StartLights2(start_lights) => (
-                150,
-                start_lights.xyz,
-                start_lights.to_flags(),
-                start_lights.heading.to_objectinfo_wire(),
-            ),
-            Self::StartLights3(start_lights) => (
-                151,
-                start_lights.xyz,
-                start_lights.to_flags(),
-                start_lights.heading.to_objectinfo_wire(),
-            ),
-            Self::SignMetal(sign_metal) => (
-                160,
-                sign_metal.xyz,
-                sign_metal.to_flags(),
-                sign_metal.heading.to_objectinfo_wire(),
-            ),
-            Self::ChevronLeft(chevron) => (
-                164,
-                chevron.xyz,
-                chevron.to_flags(),
-                chevron.heading.to_objectinfo_wire(),
-            ),
-            Self::ChevronRight(chevron) => (
-                165,
-                chevron.xyz,
-                chevron.to_flags(),
-                chevron.heading.to_objectinfo_wire(),
-            ),
-            Self::SignSpeed(sign_speed) => (
-                168,
-                sign_speed.xyz,
-                sign_speed.to_flags(),
-                sign_speed.heading.to_objectinfo_wire(),
-            ),
-            Self::ConcreteSlab(concrete) => (
-                172,
-                concrete.xyz,
-                concrete.to_flags(),
-                concrete.heading.to_objectinfo_wire(),
-            ),
-            Self::ConcreteRamp(concrete) => (
-                173,
-                concrete.xyz,
-                concrete.to_flags(),
-                concrete.heading.to_objectinfo_wire(),
-            ),
-            Self::ConcreteWall(concrete) => (
-                174,
-                concrete.xyz,
-                concrete.to_flags(),
-                concrete.heading.to_objectinfo_wire(),
-            ),
-            Self::ConcretePillar(concrete) => (
-                175,
-                concrete.xyz,
-                concrete.to_flags(),
-                concrete.heading.to_objectinfo_wire(),
-            ),
-            Self::ConcreteSlabWall(concrete) => (
-                176,
-                concrete.xyz,
-                concrete.to_flags(),
-                concrete.heading.to_objectinfo_wire(),
-            ),
-            Self::ConcreteRampWall(concrete) => (
-                177,
-                concrete.xyz,
-                concrete.to_flags(),
-                concrete.heading.to_objectinfo_wire(),
-            ),
-            Self::ConcreteShortSlabWall(concrete) => (
-                178,
-                concrete.xyz,
-                concrete.to_flags(),
-                concrete.heading.to_objectinfo_wire(),
-            ),
-            Self::ConcreteWedge(concrete) => (
-                179,
-                concrete.xyz,
-                concrete.to_flags(),
-                concrete.heading.to_objectinfo_wire(),
-            ),
-            Self::StartPosition(start_position) => (
-                184,
-                start_position.xyz,
-                start_position.to_flags(),
-                start_position.heading.to_objectinfo_wire(),
-            ),
-            Self::PitStartPoint(pit_start_point) => (
-                185,
-                pit_start_point.xyz,
-                pit_start_point.to_flags(),
-                pit_start_point.heading.to_objectinfo_wire(),
-            ),
-            Self::PitStopBox(pit_stop_box) => (
-                186,
-                pit_stop_box.xyz,
-                pit_stop_box.to_flags(),
-                pit_stop_box.heading.to_objectinfo_wire(),
-            ),
-        };
+        let index: u8 = self.into();
+        let xyz = self.position();
+        let flags = self.flags();
+        let heading = self.heading_objectinfo_wire();
 
         xyz.x.encode(buf)?;
         xyz.y.encode(buf)?;

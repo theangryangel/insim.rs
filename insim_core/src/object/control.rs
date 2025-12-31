@@ -20,7 +20,7 @@ pub struct Control {
 }
 
 impl Control {
-    pub(crate) fn to_flags(&self) -> ObjectFlags {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = match self.kind {
             ControlKind::Start => 0,
             ControlKind::Checkpoint1 { half_width } => (half_width << 2) | 0b01,
@@ -35,7 +35,7 @@ impl Control {
         ObjectFlags(flags)
     }
 
-    pub(crate) fn new(
+    pub(super) fn new(
         xyz: ObjectCoordinate,
         flags: ObjectFlags,
         heading: Heading,

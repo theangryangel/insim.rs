@@ -57,7 +57,7 @@ impl InsimCheckpoint {
         ObjectFlags(flags)
     }
 
-    pub(crate) fn new(
+    pub(super) fn new(
         xyz: ObjectCoordinate,
         wire: ObjectFlags,
         heading: Heading,
@@ -94,7 +94,7 @@ impl InsimCircle {
         ObjectFlags(flags)
     }
 
-    pub(crate) fn new(
+    pub(super) fn new(
         xyz: ObjectCoordinate,
         wire: ObjectFlags,
         index: u8,
