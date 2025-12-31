@@ -1,59 +1,83 @@
 use std::time::Duration;
 
 use anyhow::Result;
-use rusqlite::params;
+use sqlx::{Executor, SqlitePool};
 
-use super::Repo;
+use super::{models::LeaderboardEntry, repository::Repository};
 use crate::db::game::EventId;
 
-impl Repo {
-    pub fn insert_player_scores(
-        &self,
+impl Repository for LeaderboardEntry {
+    type Model = LeaderboardEntry;
+    type Id = (i64, i64); // event_id, position
+}
+
+impl LeaderboardEntry {
+    pub async fn list_for_event<'e, E>(
+        executor: E,
+        game_id: EventId,
+        max: usize,
+    ) -> Result<Vec<LeaderboardEntry>>
+    where
+        E: Executor<'e, Database = sqlx::Sqlite>,
+    {
+        let max_i64 = max as i64;
+        let results = sqlx::query_as::<_, LeaderboardEntry>(
+            r#"
+            SELECT pname,
+                   total_points,
+                   position
+            FROM leaderboard
+            WHERE event_id = ?
+            ORDER BY position ASC
+            LIMIT ?
+            "#,
+        )
+        .bind(game_id.0)
+        .bind(max_i64)
+        .fetch_all(executor)
+        .await?;
+
+        Ok(results)
+    }
+}
+
+pub struct RoundResult;
+
+impl RoundResult {
+    pub async fn insert_batch(
+        pool: &SqlitePool,
         game_id: EventId,
         round: u32,
         batch: Vec<(String, i32, usize, Duration)>,
     ) -> Result<()> {
-        let mut conn = self.open()?;
-
-        let tx = conn.transaction()?;
+        let mut tx = pool.begin().await?;
 
         for (uname, points, position, delta) in batch.into_iter() {
-            let player_id: i64 = tx.query_row(
-                "SELECT id FROM player WHERE uname = ?1",
-                params![uname],
-                |row| row.get(0),
-            )?;
+            let player_id: i64 = sqlx::query_scalar("SELECT id FROM player WHERE uname = ?")
+                .bind(&uname)
+                .fetch_one(&mut *tx)
+                .await?;
 
-            let _ = tx.execute(
+            let delta_ms = delta.as_millis() as i64;
+            // Schema says position is INTEGER (i64/i32).
+            let position_i64 = position as i64;
+
+            let _ = sqlx::query(
                 "INSERT INTO result (event_id, round, player_id, position, points, delta)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                params![
-                    game_id.0,
-                    round,
-                    player_id,
-                    position,
-                    points,
-                    // XXX: If this overflows, then something horrible has happened. this is good
-                    // enough for now.
-                    delta.as_millis() as i64
-                ],
-            )?;
+                 VALUES (?, ?, ?, ?, ?, ?)",
+            )
+            .bind(game_id.0)
+            .bind(round)
+            .bind(player_id)
+            .bind(position_i64)
+            .bind(points)
+            .bind(delta_ms)
+            .execute(&mut *tx)
+            .await?;
         }
 
-        tx.commit()?;
+        tx.commit().await?;
 
         Ok(())
-    }
-
-    pub fn leaderboard(&self, game_id: EventId, max: usize) -> Result<Vec<(String, i32, i64)>> {
-        let conn = self.open()?;
-        let leaderboard = conn.prepare(
-            "SELECT pname, total_points, position FROM leaderboard WHERE event_id = ? ORDER BY position DESC LIMIT ?",
-        )?.query_map(params![game_id.0, max], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-
-        })?.collect::<Result<Vec<_>, _>>();
-
-        Ok(leaderboard?)
     }
 }

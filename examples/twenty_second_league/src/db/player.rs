@@ -1,20 +1,42 @@
 use anyhow::Result;
-use rusqlite::params;
+use sqlx::Executor;
 
-use super::Repo;
+use super::{
+    models::Player,
+    repository::{Repository, RepositoryCreate},
+};
 
-impl Repo {
-    pub fn upsert_player(&self, uname: &str, pname: &str) -> Result<()> {
-        let conn = self.open()?;
-        let now = jiff::Timestamp::now();
+impl Repository for Player {
+    type Model = Player;
+    type Id = i64;
+}
 
-        let _ = conn.execute(
-            "INSERT INTO player (uname, pname, first_seen_at, last_seen_at)
-             VALUES (?1, ?2, ?3, ?3)
-             ON CONFLICT(uname) DO UPDATE SET pname = ?2, last_seen_at = ?3",
-            params![uname, pname, now],
-        )?;
+impl RepositoryCreate for Player {}
 
-        Ok(())
+impl Player {
+    pub async fn upsert<'e, E>(executor: E, uname: &str, pname: &str) -> Result<Self>
+    where
+        E: Executor<'e, Database = sqlx::Sqlite>,
+    {
+        let now = jiff::Timestamp::now().to_string();
+
+        let player = sqlx::query_as::<_, Player>(
+            r#"
+            INSERT INTO player (uname, pname, first_seen_at, last_seen_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(uname) DO UPDATE SET pname = ?, last_seen_at = ?
+            RETURNING id, uname, pname, first_seen_at, last_seen_at
+            "#,
+        )
+        .bind(uname)
+        .bind(pname)
+        .bind(&now)
+        .bind(&now)
+        .bind(pname)
+        .bind(&now)
+        .fetch_one(executor)
+        .await?;
+
+        Ok(player)
     }
 }

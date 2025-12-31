@@ -1,47 +1,66 @@
 use anyhow::Result;
 use kitcar::combos::Combo;
-use rusqlite::params;
+use sqlx::Executor;
 
-use super::Repo;
+use super::{
+    models::Event,
+    repository::{Repository, RepositoryCreate},
+};
 use crate::combo::ComboExt;
 
 #[derive(Debug, Clone, Copy)]
 pub struct EventId(pub i64);
 
-impl Repo {
-    pub fn new_event(&self, combo: &Combo<ComboExt>) -> Result<EventId> {
-        let conn = self.open()?;
-        let now = jiff::Timestamp::now();
+impl Repository for Event {
+    type Model = Event;
+    type Id = i64;
+}
 
-        // TODO: combo shouldn't be a str?
-        // Question, do we want to store combos in the database? eghasdj.
+impl RepositoryCreate for Event {}
 
-        let id: i64 = conn.query_row(
-            "INSERT INTO event (started_at, name, track, layout, target_time, restart_after, rounds)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-             RETURNING id",
-            params![
-                now,
-                combo.extensions().name,
-                combo.track().code(),
-                combo.layout(),
-                combo.extensions().target_time.to_string(),
-                combo.extensions().restart_after.to_string(),
-                combo.extensions().rounds,
-            ],
-            |row| row.get(0),
-        )?;
+impl Event {
+    pub async fn create<'e, E>(executor: E, combo: &Combo<ComboExt>) -> Result<Event>
+    where
+        E: Executor<'e, Database = sqlx::Sqlite>,
+    {
+        let now = jiff::Timestamp::now().to_string();
+        let target = combo.extensions().target_time.to_string();
+        let restart = combo.extensions().restart_after.to_string();
+        let rounds = combo.extensions().rounds;
+        let track = combo.track().code();
+        let layout = combo.layout();
+        let name = combo.extensions().name.clone();
 
-        Ok(EventId(id))
+        let event = sqlx::query_as::<_, Event>(
+            r#"
+            INSERT INTO event (started_at, name, track, layout, target_time, restart_after, rounds)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            RETURNING id, started_at, completed_at, name, track, layout, target_time, restart_after, rounds
+            "#
+        )
+        .bind(now)
+        .bind(name)
+        .bind(track)
+        .bind(layout)
+        .bind(target)
+        .bind(restart)
+        .bind(rounds)
+        .fetch_one(executor)
+        .await?;
+
+        Ok(event)
     }
 
-    pub fn complete_event(&self, event_id: EventId) -> Result<()> {
-        let conn = self.open()?;
-        let now = jiff::Timestamp::now();
-        let _ = conn.execute(
-            "UPDATE event SET completed_at = ?1 WHERE id = ?2",
-            params![now, event_id.0],
-        )?;
+    pub async fn complete<'e, E>(executor: E, event_id: EventId) -> Result<()>
+    where
+        E: Executor<'e, Database = sqlx::Sqlite>,
+    {
+        let now = jiff::Timestamp::now().to_string();
+        let _ = sqlx::query("UPDATE event SET completed_at = ? WHERE id = ?")
+            .bind(now)
+            .bind(event_id.0)
+            .execute(executor)
+            .await?;
 
         Ok(())
     }

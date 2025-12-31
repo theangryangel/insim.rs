@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO result (event_id, round, player_id, position, points, delta)\n                 VALUES (?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "2fdb3d6846bbd6b906783a32568ba88adb378277cc664758ece4f03a1e7bf16f"
+}
