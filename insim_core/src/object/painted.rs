@@ -1,8 +1,11 @@
 //! Painted objects
 use std::convert::TryFrom;
 
-use super::{ObjectVariant, ObjectWire};
-use crate::{DecodeError, heading::Heading};
+use crate::{
+    DecodeError,
+    heading::Heading,
+    object::{ObjectCoordinate, ObjectFlags},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -263,6 +266,8 @@ impl TryFrom<u8> for Character {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Letters {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Colour
     pub colour: PaintColour,
     /// Character
@@ -273,28 +278,30 @@ pub struct Letters {
     pub floating: bool,
 }
 
-impl ObjectVariant for Letters {
-    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
+impl Letters {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = 0;
         flags |= (self.character as u8) << 1;
         flags |= self.colour as u8 & 0x01;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectWire {
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
-        let colour = PaintColour::from(wire.flags);
-        let character = Character::try_from(wire.flags)?;
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, crate::DecodeError> {
+        let colour = PaintColour::from(wire.0);
+        let character = Character::try_from(wire.0)?;
         let floating = wire.floating();
         Ok(Self {
+            xyz,
             colour,
             character,
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            heading,
             floating,
         })
     }
@@ -340,6 +347,8 @@ impl TryFrom<u8> for Arrow {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Arrows {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Colour
     pub colour: PaintColour,
     /// Arrow
@@ -350,50 +359,31 @@ pub struct Arrows {
     pub floating: bool,
 }
 
-impl ObjectVariant for Arrows {
-    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
+impl Arrows {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = 0;
         flags |= (self.arrow as u8) << 1;
         flags |= self.colour as u8 & 0x01;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectWire {
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
-        let colour = PaintColour::from(wire.flags);
-        let arrow = Arrow::try_from(wire.flags)?;
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, crate::DecodeError> {
+        let colour = PaintColour::from(wire.0);
+        let arrow = Arrow::try_from(wire.0)?;
         let floating = wire.floating();
         Ok(Self {
+            xyz,
             colour,
             arrow,
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            heading,
             floating,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_arrows_round_trip() {
-        let original = Arrows::default();
-        let wire = original.to_wire().expect("to_wire failed");
-        let decoded = Arrows::from_wire(wire).expect("from_wire failed");
-        assert_eq!(original, decoded);
-    }
-
-    #[test]
-    fn test_letters_round_trip() {
-        let original = Letters::default();
-        let wire = original.to_wire().expect("to_wire failed");
-        let decoded = Letters::from_wire(wire).expect("from_wire failed");
-        assert_eq!(original, decoded);
     }
 }

@@ -1,6 +1,9 @@
 //! Letterboard RB (Red/Blue) objects
-use super::{ObjectVariant, ObjectWire};
-use crate::{DecodeError, heading::Heading};
+use crate::{
+    DecodeError,
+    heading::Heading,
+    object::{ObjectCoordinate, ObjectFlags},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -266,6 +269,8 @@ impl From<u8> for LetterboardRBColour {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct LetterboardRB {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Colour
     pub colour: LetterboardRBColour,
     /// Heading / Direction
@@ -276,42 +281,31 @@ pub struct LetterboardRB {
     pub floating: bool,
 }
 
-impl ObjectVariant for LetterboardRB {
-    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
+impl LetterboardRB {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = self.colour as u8 & 0x01;
         flags |= ((self.character as u8) & 0x3f) << 1;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectWire {
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
-        let colour = LetterboardRBColour::from(wire.flags);
-        let mapping = (wire.flags >> 1) & 0x3f;
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, crate::DecodeError> {
+        let colour = LetterboardRBColour::from(wire.0);
+        let mapping = (wire.0 >> 1) & 0x3f;
         let character = Character::try_from(mapping)?;
         let floating = wire.floating();
         Ok(Self {
+            xyz,
             colour,
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            heading,
             character,
             floating,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_letterboard_r_b_round_trip() {
-        let original = LetterboardRB::default();
-        let wire = original.to_wire().expect("to_wire failed");
-        let decoded = LetterboardRB::from_wire(wire).expect("from_wire failed");
-        assert_eq!(original, decoded);
     }
 }

@@ -1,6 +1,9 @@
 //! Marker objects
-use super::{ObjectVariant, ObjectWire};
-use crate::{DecodeError, heading::Heading};
+use crate::{
+    DecodeError,
+    heading::Heading,
+    object::{ObjectCoordinate, ObjectFlags},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -60,6 +63,8 @@ impl TryFrom<u8> for MarkerCornerKind {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct MarkerCorner {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Kind of marker
     pub kind: MarkerCornerKind,
     /// Heading / Direction
@@ -68,24 +73,26 @@ pub struct MarkerCorner {
     pub floating: bool,
 }
 
-impl ObjectVariant for MarkerCorner {
-    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
+impl MarkerCorner {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = self.kind as u8 & 0x0f;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectWire {
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
-        let kind = MarkerCornerKind::try_from(wire.flags & 0x0f)?;
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, crate::DecodeError> {
+        let kind = MarkerCornerKind::try_from(wire.0 & 0x0f)?;
         let floating = wire.floating();
         Ok(Self {
+            xyz,
             kind,
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            heading,
             floating,
         })
     }
@@ -133,6 +140,8 @@ impl TryFrom<u8> for MarkerDistanceKind {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct MarkerDistance {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Kind of distance marker
     pub kind: MarkerDistanceKind,
     /// Heading / Direction
@@ -141,46 +150,27 @@ pub struct MarkerDistance {
     pub floating: bool,
 }
 
-impl ObjectVariant for MarkerDistance {
-    fn to_wire(&self) -> Result<ObjectWire, crate::EncodeError> {
+impl MarkerDistance {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = self.kind as u8 & 0x0f;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectWire {
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    fn from_wire(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
-        let kind = MarkerDistanceKind::try_from(wire.flags & 0x0f)?;
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, crate::DecodeError> {
+        let kind = MarkerDistanceKind::try_from(wire.0 & 0x0f)?;
         let floating = wire.floating();
         Ok(Self {
+            xyz,
             kind,
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            heading,
             floating,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_marker_corner_round_trip() {
-        let original = MarkerCorner::default();
-        let wire = original.to_wire().expect("to_wire failed");
-        let decoded = MarkerCorner::from_wire(wire).expect("from_wire failed");
-        assert_eq!(original, decoded);
-    }
-
-    #[test]
-    fn test_marker_distance_round_trip() {
-        let original = MarkerDistance::default();
-        let wire = original.to_wire().expect("to_wire failed");
-        let decoded = MarkerDistance::from_wire(wire).expect("from_wire failed");
-        assert_eq!(original, decoded);
     }
 }

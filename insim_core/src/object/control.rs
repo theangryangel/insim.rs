@@ -1,12 +1,16 @@
 //! Control objects
 
-use super::ObjectWire;
-use crate::heading::Heading;
+use crate::{
+    heading::Heading,
+    object::{ObjectCoordinate, ObjectFlags},
+};
 
 #[derive(Debug, Clone, Default, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Control object
 pub struct Control {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Kind of Control Object
     pub kind: ControlKind,
     /// Heading
@@ -16,7 +20,7 @@ pub struct Control {
 }
 
 impl Control {
-    pub(crate) fn encode(&self) -> Result<ObjectWire, crate::EncodeError> {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = match self.kind {
             ControlKind::Start => 0,
             ControlKind::Checkpoint1 { half_width } => (half_width << 2) | 0b01,
@@ -28,16 +32,17 @@ impl Control {
             flags |= 0x80;
         }
 
-        Ok(ObjectWire {
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    pub(crate) fn decode(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
-        let position_bits = wire.flags & 0b11;
-        let half_width = (wire.flags >> 2) & 0b11111;
-        let floating = wire.floating();
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        flags: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, crate::DecodeError> {
+        let position_bits = flags.0 & 0b11;
+        let half_width = (flags.0 >> 2) & 0b11111;
+        let floating = flags.floating();
         let kind = match position_bits {
             0b00 if half_width == 0 => ControlKind::Start,
             0b00 if half_width != 0 => ControlKind::Finish { half_width },
@@ -52,8 +57,9 @@ impl Control {
         };
 
         Ok(Self {
+            xyz,
             kind,
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            heading,
             floating,
         })
     }

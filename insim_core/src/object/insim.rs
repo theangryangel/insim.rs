@@ -1,6 +1,8 @@
 //! Insim objects
-use super::ObjectWire;
-use crate::heading::Heading;
+use crate::{
+    heading::Heading,
+    object::{ObjectCoordinate, ObjectFlags},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -35,6 +37,8 @@ impl TryFrom<u8> for InsimCheckpointKind {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct InsimCheckpoint {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Kind of checkpoint
     pub kind: InsimCheckpointKind,
     /// Heading / Direction
@@ -44,24 +48,26 @@ pub struct InsimCheckpoint {
 }
 
 impl InsimCheckpoint {
-    pub(crate) fn encode(&self) -> Result<ObjectWire, crate::EncodeError> {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = 0;
         flags |= self.kind as u8;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectWire {
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    pub(crate) fn decode(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
-        let kind = InsimCheckpointKind::try_from(wire.flags)?;
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, crate::DecodeError> {
+        let kind = InsimCheckpointKind::try_from(wire.0)?;
         let floating = wire.floating();
         Ok(Self {
+            xyz,
             kind,
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            heading,
             floating,
         })
     }
@@ -71,6 +77,8 @@ impl InsimCheckpoint {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct InsimCircle {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Circle index (stored in heading byte on wire)
     pub index: u8,
     /// Floating
@@ -78,21 +86,23 @@ pub struct InsimCircle {
 }
 
 impl InsimCircle {
-    pub(crate) fn encode(&self) -> Result<ObjectWire, crate::EncodeError> {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = 0;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectWire {
-            flags,
-            heading: self.index,
-        })
+        ObjectFlags(flags)
     }
 
-    pub(crate) fn decode(wire: ObjectWire) -> Result<Self, crate::DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        index: u8,
+    ) -> Result<Self, crate::DecodeError> {
         let floating = wire.floating();
         Ok(Self {
-            index: wire.heading,
+            xyz,
+            index,
             floating,
         })
     }
