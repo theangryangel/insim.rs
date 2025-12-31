@@ -57,7 +57,7 @@ use insim::{
     core::{
         heading::Heading,
         object::{
-            ObjectCoordinate, ObjectInfo, ObjectKind, chalk, concrete, letterboard_rb, painted,
+            ObjectCoordinate, ObjectInfo, chalk, concrete, letterboard_rb, painted,
             tyres,
         },
     },
@@ -120,15 +120,13 @@ fn position_letterboard(
     )
     .flat_map(|(_, ch, position, heading)| {
         let letter = letterboard_rb::Character::try_from(ch).ok()?;
-        Some(ObjectInfo {
+        Some(ObjectInfo::LetterboardRB(letterboard_rb::LetterboardRB {
             xyz: ObjectCoordinate::from_dvec3_metres(position),
-            kind: ObjectKind::LetterboardRB(letterboard_rb::LetterboardRB {
-                character: letter,
-                heading: Heading::from_radians(heading.to_radians() + std::f64::consts::PI),
-                colour: letterboard_rb::LetterboardRBColour::Red,
-                floating: false,
-            }),
-        })
+            character: letter,
+            heading: Heading::from_radians(heading.to_radians() + std::f64::consts::PI),
+            colour: letterboard_rb::LetterboardRBColour::Red,
+            floating: false,
+        }))
     })
     .collect()
 }
@@ -155,15 +153,13 @@ fn position_painted(
     )
     .flat_map(|(_, ch, position, heading)| {
         let letter = painted::Character::try_from(ch).ok()?;
-        Some(ObjectInfo {
+        Some(ObjectInfo::PaintLetters(painted::Letters {
             xyz: ObjectCoordinate::from_dvec3_metres(position),
-            kind: ObjectKind::PaintLetters(painted::Letters {
-                character: letter,
-                heading: Heading::from_radians(heading.to_radians()),
-                colour: painted::PaintColour::Yellow,
-                floating: false,
-            }),
-        })
+            character: letter,
+            heading: Heading::from_radians(heading.to_radians()),
+            colour: painted::PaintColour::Yellow,
+            floating: false,
+        }))
     })
     .collect()
 }
@@ -193,18 +189,16 @@ fn position_tyrestack_circle(
             let color_index = ((i as f64 + time_offset) % max as f64).floor() as u8;
             let is_dark = color_index % 2 == 0;
 
-            ObjectInfo {
+            ObjectInfo::TyreStack4(tyres::Tyres {
                 xyz: ObjectCoordinate::from_dvec3_metres(position),
-                kind: ObjectKind::TyreStack4Big(tyres::Tyres {
-                    colour: if is_dark {
-                        tyres::TyreColour::Blue
-                    } else {
-                        tyres::TyreColour::Red
-                    },
-                    floating: false,
-                    heading,
-                }),
-            }
+                colour: if is_dark {
+                    tyres::TyreColour::Blue
+                } else {
+                    tyres::TyreColour::Red
+                },
+                floating: false,
+                heading,
+            })
         })
         .collect()
 }
@@ -214,11 +208,13 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
 
     // Structure: (Local Position, The Object with Local Rotation)
     // Local Rotation: 0.0 for pillars, -90 deg (-PI/2) for arms (facing right)
+    // FIXME: we can probably just move the DVec3 into the ObjectInfo now. But lazy.
     let parts = vec![
         // Pillars
         (
             DVec3::new(0.0, 0.0, -0.25),
-            ObjectKind::ConcretePillar(concrete::ConcretePillar {
+            ObjectInfo::ConcretePillar(concrete::ConcretePillar {
+                xyz: ObjectCoordinate::default(),
                 x: concrete::Size::ThreeQuarter,
                 y: concrete::Size::ThreeQuarter,
                 height: concrete::ConcreteHeight::M4_00,
@@ -227,7 +223,8 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
         ),
         (
             DVec3::new(0.0, 0.0, 3.75),
-            ObjectKind::ConcretePillar(concrete::ConcretePillar {
+            ObjectInfo::ConcretePillar(concrete::ConcretePillar {
+                xyz: ObjectCoordinate::default(),
                 x: concrete::Size::ThreeQuarter,
                 y: concrete::Size::ThreeQuarter,
                 height: concrete::ConcreteHeight::M2_25,
@@ -237,7 +234,8 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
         // Arms (Offset 1.70m Right, Rotated -90 deg) --
         (
             DVec3::new(1.70, 0.0, 3.70),
-            ObjectKind::ConcreteSlabWall(concrete::ConcreteSlabWall {
+            ObjectInfo::ConcreteSlabWall(concrete::ConcreteSlabWall {
+                xyz: ObjectCoordinate::default(),
                 colour: concrete::ConcreteColour::Yellow,
                 length: concrete::ConcreteWidthLength::Four,
                 pitch: concrete::ConcretePitch::Deg42,
@@ -246,7 +244,8 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
         ),
         (
             DVec3::new(1.70, 0.0, 4.70),
-            ObjectKind::ConcreteSlabWall(concrete::ConcreteSlabWall {
+            ObjectInfo::ConcreteSlabWall(concrete::ConcreteSlabWall {
+                xyz: ObjectCoordinate::default(),
                 colour: concrete::ConcreteColour::Red,
                 length: concrete::ConcreteWidthLength::Four,
                 pitch: concrete::ConcretePitch::Deg42,
@@ -255,7 +254,8 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
         ),
         (
             DVec3::new(1.70, 0.0, 5.70),
-            ObjectKind::ConcreteSlabWall(concrete::ConcreteSlabWall {
+            ObjectInfo::ConcreteSlabWall(concrete::ConcreteSlabWall {
+                xyz: ObjectCoordinate::default(),
                 colour: concrete::ConcreteColour::Blue,
                 length: concrete::ConcreteWidthLength::Four,
                 pitch: concrete::ConcretePitch::Deg42,
@@ -265,7 +265,8 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
         // Chalk line on floor
         (
             DVec3::new(4.5, 0.0, 0.00),
-            ObjectKind::ChalkLine(chalk::Chalk {
+            ObjectInfo::ChalkLine(chalk::Chalk {
+                xyz: ObjectCoordinate::default(),
                 heading: heading,
                 colour: chalk::ChalkColour::Yellow,
                 floating: false,
@@ -274,7 +275,8 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
         // Tyres at end of chalk
         (
             DVec3::new(9.0, 0.0, 0.00),
-            ObjectKind::TyreStack4Big(tyres::Tyres {
+            ObjectInfo::TyreStack4Big(tyres::Tyres {
+                xyz: ObjectCoordinate::default(),
                 colour: tyres::TyreColour::Yellow,
                 heading: heading,
                 floating: false,
@@ -282,7 +284,8 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
         ),
         (
             DVec3::new(9.0, 0.0, 0.75),
-            ObjectKind::TyreStack4Big(tyres::Tyres {
+            ObjectInfo::TyreStack4Big(tyres::Tyres {
+                xyz: ObjectCoordinate::default(),
                 colour: tyres::TyreColour::Yellow,
                 heading: heading,
                 floating: true,
@@ -290,7 +293,7 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
         ),
     ];
 
-    // --- 2. Calculate World Matrix (ACW) ---
+    // --- Calculate World Matrix (ACW) ---
     let global_rad = heading.to_radians();
     let (sin, cos) = global_rad.sin_cos();
 
@@ -300,7 +303,7 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
     let right_x = cos; // 90 deg "Starboard"
     let right_y = sin;
 
-    // --- 3. Transform & Build ---
+    // --- Transform & Build ---
     parts
         .into_iter()
         .map(|(local_pos, mut kind)| {
@@ -315,19 +318,16 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
             // B. Transform Rotation
             // We update the 'kind' in place by adding the global heading to its local heading
             match &mut kind {
-                ObjectKind::ConcretePillar(p) => {
+                ObjectInfo::ConcretePillar(p) => {
                     p.heading = Heading::from_radians(global_rad + p.heading.to_radians());
                 },
-                ObjectKind::ConcreteSlabWall(w) => {
+                ObjectInfo::ConcreteSlabWall(w) => {
                     w.heading = Heading::from_radians(global_rad + w.heading.to_radians());
                 },
                 _ => {}, // Handle other types if necessary
             }
-
-            ObjectInfo {
-                xyz: ObjectCoordinate::from_dvec3_metres(world_pos),
-                kind,
-            }
+            *kind.position_mut() = ObjectCoordinate::from_dvec3_metres(world_pos);
+            kind
         })
         .collect()
 }

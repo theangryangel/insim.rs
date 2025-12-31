@@ -1,11 +1,12 @@
 //! Marshal objects
-use super::ObjectIntermediate;
-use crate::heading::Heading;
+use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}};
 
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Marshal
 pub struct Marshal {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Kind of Marshal
     pub kind: MarshalKind,
     /// Heading
@@ -15,25 +16,22 @@ pub struct Marshal {
 }
 
 impl Marshal {
-    pub(crate) fn encode(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags: u8 = self.kind as u8;
         if self.floating {
             flags |= 0x80;
         }
-
-        Ok(ObjectIntermediate {
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    pub(crate) fn decode(wire: ObjectIntermediate) -> Result<Self, crate::DecodeError> {
-        let kind = MarshalKind::try_from(wire.flags)?;
+    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, crate::DecodeError> {
+        let kind = MarshalKind::try_from(wire.0)?;
         let floating = wire.floating();
 
         Ok(Self {
+            xyz,
             kind,
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            heading,
             floating,
         })
     }
@@ -68,6 +66,8 @@ impl TryFrom<u8> for MarshalKind {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct RestrictedArea {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Radius
     pub radius: u8,
     /// floating
@@ -75,19 +75,19 @@ pub struct RestrictedArea {
 }
 
 impl RestrictedArea {
-    pub(crate) fn encode(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = 0;
         flags |= self.radius << 2;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectIntermediate { flags, heading: 0 })
+        ObjectFlags(flags)
     }
 
-    pub(crate) fn decode(wire: ObjectIntermediate) -> Result<Self, crate::DecodeError> {
-        let radius = (wire.flags >> 2) & 0b11111;
+    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags) -> Result<Self, crate::DecodeError> {
+        let radius = (wire.0 >> 2) & 0b11111;
         let floating = wire.floating();
-        Ok(Self { radius, floating })
+        Ok(Self { xyz, radius, floating })
     }
 }
 
@@ -95,6 +95,8 @@ impl RestrictedArea {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct RouteChecker {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Route index (stored in heading byte on wire)
     pub route: u8,
     /// Radius
@@ -104,25 +106,23 @@ pub struct RouteChecker {
 }
 
 impl RouteChecker {
-    pub(crate) fn encode(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = 0;
         flags |= (self.radius << 2) & 0b11111;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectIntermediate {
-            flags,
-            heading: self.route,
-        })
+        ObjectFlags(flags)
     }
 
-    pub(crate) fn decode(wire: ObjectIntermediate) -> Result<Self, crate::DecodeError> {
-        let radius = (wire.flags >> 2) & 0b11111;
+    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, route: u8) -> Result<Self, crate::DecodeError> {
+        let radius = (wire.0 >> 2) & 0b11111;
         let floating = wire.floating();
         Ok(Self {
+            xyz,
             radius,
             floating,
-            route: wire.heading,
+            route,
         })
     }
 }

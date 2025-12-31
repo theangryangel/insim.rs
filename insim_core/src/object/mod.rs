@@ -37,9 +37,8 @@ pub mod vehicle_van;
 
 use crate::{heading::Heading, Decode, DecodeError, Encode, EncodeError};
 
-/// Wire representation for object encoding/decoding of flags
 #[derive(Debug, Clone, Copy)]
-struct ObjectFlags(u8);
+pub(super) struct ObjectFlags(u8);
 impl ObjectFlags {
     /// Check if the floating flag is set
     fn floating(&self) -> bool {
@@ -61,8 +60,11 @@ impl ObjectFlags {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Layout Object Position
 pub struct ObjectCoordinate {
+    /// X coordinate (1:16 scale)
     pub x: i16,
+    /// Y coordinate (1:16 scale)
     pub y: i16,
+    /// X coordinate (1:4 scale)
     pub z: u8,
 }
 
@@ -321,22 +323,23 @@ impl Decode for ObjectInfo {
 
         let flags = ObjectFlags(u8::decode(buf)?);
         let index = u8::decode(buf)?;
-        let heading = Heading::from_objectinfo_wire(u8::decode(buf)?);
+        let heading_u8 = u8::decode(buf)?;
+        let heading = Heading::from_objectinfo_wire(heading_u8);
 
         match index {
             0 => Ok(ObjectInfo::Control(control::Control::new(xyz, flags, heading)?)),
-            240 => Ok(ObjectInfo::Marshal(marshal::Marshal::decode(wire)?)),
+            240 => Ok(ObjectInfo::Marshal(marshal::Marshal::new(xyz, flags, heading)?)),
             252 => Ok(ObjectInfo::InsimCheckpoint(insim::InsimCheckpoint::new(
                 xyz, flags, heading,
             )?)),
             253 => Ok(ObjectInfo::InsimCircle(insim::InsimCircle::new(
-                xyz, flags, heading,
+                xyz, flags, heading_u8,
             )?)),
-            254 => Ok(ObjectInfo::RestrictedArea(marshal::RestrictedArea::decode(
-                wire,
+            254 => Ok(ObjectInfo::RestrictedArea(marshal::RestrictedArea::new(
+                xyz, flags,
             )?)),
-            255 => Ok(ObjectInfo::RouteChecker(marshal::RouteChecker::decode(
-                wire,
+            255 => Ok(ObjectInfo::RouteChecker(marshal::RouteChecker::new(
+                xyz, flags, heading_u8
             )?)),
 
             4 => Ok(ObjectInfo::ChalkLine(chalk::Chalk::new(xyz, flags, heading)?)),
@@ -620,290 +623,418 @@ impl ObjectInfo {
             ObjectInfo::ChevronRight(p) => Some(p.floating),
         }
     }
+
+    /// Raw XYZ position
+    pub fn position(&self) -> ObjectCoordinate {
+        match self {
+            ObjectInfo::Control(i) => i.xyz,
+            ObjectInfo::Marshal(i) => i.xyz,
+            ObjectInfo::InsimCheckpoint(i) => i.xyz,
+            ObjectInfo::InsimCircle(i) => i.xyz,
+            ObjectInfo::RestrictedArea(i) => i.xyz,
+            ObjectInfo::RouteChecker(i) => i.xyz,
+            ObjectInfo::ChalkLine(i) => i.xyz,
+            ObjectInfo::ChalkLine2(i) => i.xyz,
+            ObjectInfo::ChalkAhead(i) => i.xyz,
+            ObjectInfo::ChalkAhead2(i) => i.xyz,
+            ObjectInfo::ChalkLeft(i) => i.xyz,
+            ObjectInfo::ChalkLeft2(i) => i.xyz,
+            ObjectInfo::ChalkLeft3(i) => i.xyz,
+            ObjectInfo::ChalkRight(i) => i.xyz,
+            ObjectInfo::ChalkRight2(i) => i.xyz,
+            ObjectInfo::ChalkRight3(i) => i.xyz,
+            ObjectInfo::PaintLetters(i) => i.xyz,
+            ObjectInfo::PaintArrows(i) => i.xyz,
+            ObjectInfo::Cone1(i) => i.xyz,
+            ObjectInfo::Cone2(i) => i.xyz,
+            ObjectInfo::ConeTall1(i) => i.xyz,
+            ObjectInfo::ConeTall2(i) => i.xyz,
+            ObjectInfo::ConePointer(i) => i.xyz,
+            ObjectInfo::TyreSingle(i) => i.xyz,
+            ObjectInfo::TyreStack2(i) => i.xyz,
+            ObjectInfo::TyreStack3(i) => i.xyz,
+            ObjectInfo::TyreStack4(i) => i.xyz,
+            ObjectInfo::TyreSingleBig(i) => i.xyz,
+            ObjectInfo::TyreStack2Big(i) => i.xyz,
+            ObjectInfo::TyreStack3Big(i) => i.xyz,
+            ObjectInfo::TyreStack4Big(i) => i.xyz,
+            ObjectInfo::MarkerCorner(i) => i.xyz,
+            ObjectInfo::MarkerDistance(i) => i.xyz,
+            ObjectInfo::LetterboardWY(i) => i.xyz,
+            ObjectInfo::LetterboardRB(i) => i.xyz,
+            ObjectInfo::Armco1(i) => i.xyz,
+            ObjectInfo::Armco3(i) => i.xyz,
+            ObjectInfo::Armco5(i) => i.xyz,
+            ObjectInfo::BarrierLong(i) => i.xyz,
+            ObjectInfo::BarrierRed(i) => i.xyz,
+            ObjectInfo::BarrierWhite(i) => i.xyz,
+            ObjectInfo::Banner(i) => i.xyz,
+            ObjectInfo::Ramp1(i) => i.xyz,
+            ObjectInfo::Ramp2(i) => i.xyz,
+            ObjectInfo::VehicleSUV(i) => i.xyz,
+            ObjectInfo::VehicleVan(i) => i.xyz,
+            ObjectInfo::VehicleTruck(i) => i.xyz,
+            ObjectInfo::VehicleAmbulance(i) => i.xyz,
+            ObjectInfo::Kerb(i) => i.xyz,
+            ObjectInfo::Post(i) => i.xyz,
+            ObjectInfo::Marquee(i) => i.xyz,
+            ObjectInfo::Bale(i) => i.xyz,
+            ObjectInfo::SpeedHump10M(i) => i.xyz,
+            ObjectInfo::SpeedHump6M(i) => i.xyz,
+            ObjectInfo::SpeedHump2M(i) => i.xyz,
+            ObjectInfo::SpeedHump1M(i) => i.xyz,
+            ObjectInfo::Bin1(i) => i.xyz,
+            ObjectInfo::Bin2(i) => i.xyz,
+            ObjectInfo::Railing1(i) => i.xyz,
+            ObjectInfo::Railing2(i) => i.xyz,
+            ObjectInfo::StartLights1(i) => i.xyz,
+            ObjectInfo::StartLights2(i) => i.xyz,
+            ObjectInfo::StartLights3(i) => i.xyz,
+            ObjectInfo::SignMetal(i) => i.xyz,
+            ObjectInfo::ChevronLeft(i) => i.xyz,
+            ObjectInfo::ChevronRight(i) => i.xyz,
+            ObjectInfo::SignSpeed(i) => i.xyz,
+            ObjectInfo::ConcreteSlab(i) => i.xyz,
+            ObjectInfo::ConcreteRamp(i) => i.xyz,
+            ObjectInfo::ConcreteWall(i) => i.xyz,
+            ObjectInfo::ConcretePillar(i) => i.xyz,
+            ObjectInfo::ConcreteSlabWall(i) => i.xyz,
+            ObjectInfo::ConcreteRampWall(i) => i.xyz,
+            ObjectInfo::ConcreteShortSlabWall(i) => i.xyz,
+            ObjectInfo::ConcreteWedge(i) => i.xyz,
+            ObjectInfo::StartPosition(i) => i.xyz,
+            ObjectInfo::PitStartPoint(i) => i.xyz,
+            ObjectInfo::PitStopBox(i) => i.xyz,
+        }
+    }
+
+    /// Mutable raw XYZ position 
+    pub fn position_mut(&mut self) -> &mut ObjectCoordinate {
+        match self {
+            ObjectInfo::Control(i) => &mut i.xyz,
+            ObjectInfo::Marshal(i) => &mut i.xyz,
+            ObjectInfo::InsimCheckpoint(i) => &mut i.xyz,
+            ObjectInfo::InsimCircle(i) => &mut i.xyz,
+            ObjectInfo::RestrictedArea(i) => &mut i.xyz,
+            ObjectInfo::RouteChecker(i) => &mut i.xyz,
+            ObjectInfo::ChalkLine(i) => &mut i.xyz,
+            ObjectInfo::ChalkLine2(i) => &mut i.xyz,
+            ObjectInfo::ChalkAhead(i) => &mut i.xyz,
+            ObjectInfo::ChalkAhead2(i) => &mut i.xyz,
+            ObjectInfo::ChalkLeft(i) => &mut i.xyz,
+            ObjectInfo::ChalkLeft2(i) => &mut i.xyz,
+            ObjectInfo::ChalkLeft3(i) => &mut i.xyz,
+            ObjectInfo::ChalkRight(i) => &mut i.xyz,
+            ObjectInfo::ChalkRight2(i) => &mut i.xyz,
+            ObjectInfo::ChalkRight3(i) => &mut i.xyz,
+            ObjectInfo::PaintLetters(i) => &mut i.xyz,
+            ObjectInfo::PaintArrows(i) => &mut i.xyz,
+            ObjectInfo::Cone1(i) => &mut i.xyz,
+            ObjectInfo::Cone2(i) => &mut i.xyz,
+            ObjectInfo::ConeTall1(i) => &mut i.xyz,
+            ObjectInfo::ConeTall2(i) => &mut i.xyz,
+            ObjectInfo::ConePointer(i) => &mut i.xyz,
+            ObjectInfo::TyreSingle(i) => &mut i.xyz,
+            ObjectInfo::TyreStack2(i) => &mut i.xyz,
+            ObjectInfo::TyreStack3(i) => &mut i.xyz,
+            ObjectInfo::TyreStack4(i) => &mut i.xyz,
+            ObjectInfo::TyreSingleBig(i) => &mut i.xyz,
+            ObjectInfo::TyreStack2Big(i) => &mut i.xyz,
+            ObjectInfo::TyreStack3Big(i) => &mut i.xyz,
+            ObjectInfo::TyreStack4Big(i) => &mut i.xyz,
+            ObjectInfo::MarkerCorner(i) => &mut i.xyz,
+            ObjectInfo::MarkerDistance(i) => &mut i.xyz,
+            ObjectInfo::LetterboardWY(i) => &mut i.xyz,
+            ObjectInfo::LetterboardRB(i) => &mut i.xyz,
+            ObjectInfo::Armco1(i) => &mut i.xyz,
+            ObjectInfo::Armco3(i) => &mut i.xyz,
+            ObjectInfo::Armco5(i) => &mut i.xyz,
+            ObjectInfo::BarrierLong(i) => &mut i.xyz,
+            ObjectInfo::BarrierRed(i) => &mut i.xyz,
+            ObjectInfo::BarrierWhite(i) => &mut i.xyz,
+            ObjectInfo::Banner(i) => &mut i.xyz,
+            ObjectInfo::Ramp1(i) => &mut i.xyz,
+            ObjectInfo::Ramp2(i) => &mut i.xyz,
+            ObjectInfo::VehicleSUV(i) => &mut i.xyz,
+            ObjectInfo::VehicleVan(i) => &mut i.xyz,
+            ObjectInfo::VehicleTruck(i) => &mut i.xyz,
+            ObjectInfo::VehicleAmbulance(i) => &mut i.xyz,
+            ObjectInfo::Kerb(i) => &mut i.xyz,
+            ObjectInfo::Post(i) => &mut i.xyz,
+            ObjectInfo::Marquee(i) => &mut i.xyz,
+            ObjectInfo::Bale(i) => &mut i.xyz,
+            ObjectInfo::SpeedHump10M(i) => &mut i.xyz,
+            ObjectInfo::SpeedHump6M(i) => &mut i.xyz,
+            ObjectInfo::SpeedHump2M(i) => &mut i.xyz,
+            ObjectInfo::SpeedHump1M(i) => &mut i.xyz,
+            ObjectInfo::Bin1(i) => &mut i.xyz,
+            ObjectInfo::Bin2(i) => &mut i.xyz,
+            ObjectInfo::Railing1(i) => &mut i.xyz,
+            ObjectInfo::Railing2(i) => &mut i.xyz,
+            ObjectInfo::StartLights1(i) => &mut i.xyz,
+            ObjectInfo::StartLights2(i) => &mut i.xyz,
+            ObjectInfo::StartLights3(i) => &mut i.xyz,
+            ObjectInfo::SignMetal(i) => &mut i.xyz,
+            ObjectInfo::ChevronLeft(i) => &mut i.xyz,
+            ObjectInfo::ChevronRight(i) => &mut i.xyz,
+            ObjectInfo::SignSpeed(i) => &mut i.xyz,
+            ObjectInfo::ConcreteSlab(i) => &mut i.xyz,
+            ObjectInfo::ConcreteRamp(i) => &mut i.xyz,
+            ObjectInfo::ConcreteWall(i) => &mut i.xyz,
+            ObjectInfo::ConcretePillar(i) => &mut i.xyz,
+            ObjectInfo::ConcreteSlabWall(i) => &mut i.xyz,
+            ObjectInfo::ConcreteRampWall(i) => &mut i.xyz,
+            ObjectInfo::ConcreteShortSlabWall(i) => &mut i.xyz,
+            ObjectInfo::ConcreteWedge(i) => &mut i.xyz,
+            ObjectInfo::StartPosition(i) => &mut i.xyz,
+            ObjectInfo::PitStartPoint(i) => &mut i.xyz,
+            ObjectInfo::PitStopBox(i) => &mut i.xyz,
+        }
+    }
+
 }
 
 impl Encode for ObjectInfo {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), EncodeError> {
-        let (index, xyz, flags, heading): (u8, ObjectCoordinate, ObjectFlags, Heading) = match self {
+        let (index, xyz, flags, heading): (u8, ObjectCoordinate, ObjectFlags, u8) = match self {
             Self::Control(control) => {
-                let flags = control.to_flags();
-                (0, control.xyz, flags, control.heading)
+                (0, control.xyz, control.to_flags(), control.heading.to_objectinfo_wire())
             },
             Self::Marshal(marshal) => {
-                let wire = marshal.encode()?;
-                (240, wire)
+                (240, marshal.xyz, marshal.to_flags(), marshal.heading.to_objectinfo_wire())
             },
             Self::InsimCheckpoint(insim_checkpoint) => {
-                let wire = insim_checkpoint.encode()?;
-                (252, wire)
+                (252, insim_checkpoint.xyz, insim_checkpoint.to_flags(), insim_checkpoint.heading.to_objectinfo_wire())
             },
             Self::InsimCircle(insim_circle) => {
-                let wire = insim_circle.encode()?;
-                (253, wire)
+                (253, insim_circle.xyz, insim_circle.to_flags(), insim_circle.index)
             },
             Self::RestrictedArea(restricted_area) => {
-                let wire = restricted_area.encode()?;
-                (254, wire)
+                (254, restricted_area.xyz, restricted_area.to_flags(), 0)
             },
             Self::RouteChecker(route_checker) => {
-                let wire = route_checker.encode()?;
-                (255, wire)
+                (255, route_checker.xyz, route_checker.to_flags(), 0)
             },
             Self::ChalkLine(chalk) => {
-                (4, chalk.xyz, chalk.to_flags(), chalk.heading)
+                (4, chalk.xyz, chalk.to_flags(), chalk.heading.to_objectinfo_wire())
             },
             Self::ChalkLine2(chalk) => {
-                (5, chalk.xyz, chalk.to_flags(), chalk.heading)
+                (5, chalk.xyz, chalk.to_flags(), chalk.heading.to_objectinfo_wire())
             },
             Self::ChalkAhead(chalk) => {
-                (6, chalk.xyz, chalk.to_flags(), chalk.heading)
+                (6, chalk.xyz, chalk.to_flags(), chalk.heading.to_objectinfo_wire())
             },
             Self::ChalkAhead2(chalk) => {
-                (7, chalk.xyz, chalk.to_flags(), chalk.heading)
+                (7, chalk.xyz, chalk.to_flags(), chalk.heading.to_objectinfo_wire())
             },
             Self::ChalkLeft(chalk) => {
-                (8, chalk.xyz, chalk.to_flags(), chalk.heading)
+                (8, chalk.xyz, chalk.to_flags(), chalk.heading.to_objectinfo_wire())
             },
             Self::ChalkLeft2(chalk) => {
-                (9, chalk.xyz, chalk.to_flags(), chalk.heading)
+                (9, chalk.xyz, chalk.to_flags(), chalk.heading.to_objectinfo_wire())
             },
             Self::ChalkLeft3(chalk) => {
-                (10, chalk.xyz, chalk.to_flags(), chalk.heading)
+                (10, chalk.xyz, chalk.to_flags(), chalk.heading.to_objectinfo_wire())
             },
             Self::ChalkRight(chalk) => {
-                (11, chalk.xyz, chalk.to_flags(), chalk.heading)
+                (11, chalk.xyz, chalk.to_flags(), chalk.heading.to_objectinfo_wire())
             },
             Self::ChalkRight2(chalk) => {
-                (12, chalk.xyz, chalk.to_flags(), chalk.heading)
+                (12, chalk.xyz, chalk.to_flags(), chalk.heading.to_objectinfo_wire())
             },
             Self::ChalkRight3(chalk) => {
-                (13, chalk.xyz, chalk.to_flags(), chalk.heading)
+                (13, chalk.xyz, chalk.to_flags(), chalk.heading.to_objectinfo_wire())
             },
             Self::PaintLetters(letters) => {
-                let wire = letters.to_wire()?;
-                (16, wire)
+                (16, letters.xyz, letters.to_flags(), letters.heading.to_objectinfo_wire())
             },
             Self::PaintArrows(arrows) => {
-                let wire = arrows.to_wire()?;
-                (17, wire)
+                (17, arrows.xyz, arrows.to_flags(), arrows.heading.to_objectinfo_wire())
             },
             Self::Cone1(cone) => {
-                (20, cone.xyz, cone.to_flags(), cone.heading)
+                (20, cone.xyz, cone.to_flags(), cone.heading.to_objectinfo_wire())
             },
             Self::Cone2(cone) => {
-                (21, cone.xyz, cone.to_flags(), cone.heading)
+                (21, cone.xyz, cone.to_flags(), cone.heading.to_objectinfo_wire())
             },
             Self::ConeTall1(cone) => {
-                (32, cone.xyz, cone.to_flags(), cone.heading)
+                (32, cone.xyz, cone.to_flags(), cone.heading.to_objectinfo_wire())
             },
             Self::ConeTall2(cone) => {
-                (33, cone.xyz, cone.to_flags(), cone.heading)
+                (33, cone.xyz, cone.to_flags(), cone.heading.to_objectinfo_wire())
             },
             Self::ConePointer(cone) => {
-                (40, cone.xyz, cone.to_flags(), cone.heading)
+                (40, cone.xyz, cone.to_flags(), cone.heading.to_objectinfo_wire())
             },
             Self::TyreSingle(tyre) => {
-                let wire = tyre.to_wire()?;
-                (48, wire)
+                (48, tyre.xyz, tyre.to_flags(), tyre.heading.to_objectinfo_wire())
             },
             Self::TyreStack2(tyre) => {
-                let wire = tyre.to_wire()?;
-                (49, wire)
+                (49, tyre.xyz, tyre.to_flags(), tyre.heading.to_objectinfo_wire())
             },
             Self::TyreStack3(tyre) => {
-                let wire = tyre.to_wire()?;
-                (50, wire)
+                (50, tyre.xyz, tyre.to_flags(), tyre.heading.to_objectinfo_wire())
             },
             Self::TyreStack4(tyre) => {
-                let wire = tyre.to_wire()?;
-                (51, wire)
+                (51, tyre.xyz, tyre.to_flags(), tyre.heading.to_objectinfo_wire())
             },
             Self::TyreSingleBig(tyre) => {
-                let wire = tyre.to_wire()?;
-                (52, wire)
+                (52, tyre.xyz, tyre.to_flags(), tyre.heading.to_objectinfo_wire())
             },
             Self::TyreStack2Big(tyre) => {
-                let wire = tyre.to_wire()?;
-                (53, wire)
+                (53, tyre.xyz, tyre.to_flags(), tyre.heading.to_objectinfo_wire())
             },
             Self::TyreStack3Big(tyre) => {
-                let wire = tyre.to_wire()?;
-                (54, wire)
+                (54, tyre.xyz, tyre.to_flags(), tyre.heading.to_objectinfo_wire())
             },
             Self::TyreStack4Big(tyre) => {
-                let wire = tyre.to_wire()?;
-                (55, wire)
+                (55, tyre.xyz, tyre.to_flags(), tyre.heading.to_objectinfo_wire())
             },
             Self::MarkerCorner(marker_corner) => {
-                (62, marker_corner.xyz, marker_corner.to_flags(), marker_corner.heading)
+                (62, marker_corner.xyz, marker_corner.to_flags(), marker_corner.heading.to_objectinfo_wire())
             },
             Self::MarkerDistance(marker_distance) => {
-                (84, marker_distance.xyz, marker_distance.to_flags(), marker_distance.heading)
+                (84, marker_distance.xyz, marker_distance.to_flags(), marker_distance.heading.to_objectinfo_wire())
             },
             Self::LetterboardWY(letterboard_wy) => {
-                (92, letterboard_wy.xyz, letterboard_wy.to_flags(), letterboard_wy.heading)
+                (92, letterboard_wy.xyz, letterboard_wy.to_flags(), letterboard_wy.heading.to_objectinfo_wire())
             },
             Self::LetterboardRB(letterboard_rb) => {
-                (93, letterboard_rb.xyz, letterboard_rb.to_flags(), letterboard_rb.heading)
+                (93, letterboard_rb.xyz, letterboard_rb.to_flags(), letterboard_rb.heading.to_objectinfo_wire())
             },
             Self::Armco1(armco1) => {
                 let flags = armco1.to_flags();
-                (96, armco1.xyz, flags, armco1.heading)
+                (96, armco1.xyz, flags, armco1.heading.to_objectinfo_wire())
             },
             Self::Armco3(armco3) => {
                 let flags = armco3.to_flags();
-                (97, armco3.xyz, flags, armco3.heading)
+                (97, armco3.xyz, flags, armco3.heading.to_objectinfo_wire())
             },
             Self::Armco5(armco5) => {
                 let flags = armco5.to_flags();
-                (98, armco5.xyz, flags, armco5.heading)
+                (98, armco5.xyz, flags, armco5.heading.to_objectinfo_wire())
             },
             Self::BarrierLong(barrier) => {
-                (104, barrier.xyz, barrier.to_flags(), barrier.heading)
+                (104, barrier.xyz, barrier.to_flags(), barrier.heading.to_objectinfo_wire())
             },
             Self::BarrierRed(barrier) => {
-                let wire = barrier.to_wire()?;
-                (105, barrier.xyz, barrier.to_flags(), barrier.heading)
+                (105, barrier.xyz, barrier.to_flags(), barrier.heading.to_objectinfo_wire())
             },
             Self::BarrierWhite(barrier) => {
-                let wire = barrier.to_wire()?;
-                (106, barrier.xyz, barrier.to_flags(), barrier.heading)
+                (106, barrier.xyz, barrier.to_flags(), barrier.heading.to_objectinfo_wire())
             },
             Self::Banner(banner) => {
                 let wire = banner.to_flags();
-                (112, banner.xyz, wire, banner.heading)
+                (112, banner.xyz, wire, banner.heading.to_objectinfo_wire())
             },
-            Self::Ramp1(ramp1) => {
-                let wire = ramp1.to_wire()?;
-                (120, wire)
+            Self::Ramp1(ramp) => {
+                (120, ramp.xyz, ramp.to_flags(), ramp.heading.to_objectinfo_wire())
             },
-            Self::Ramp2(ramp2) => {
-                let wire = ramp2.to_wire()?;
-                (121, wire)
+            Self::Ramp2(ramp) => {
+                (121, ramp.xyz, ramp.to_flags(), ramp.heading.to_objectinfo_wire())
             },
             Self::VehicleSUV(veh) => {
-                let wire = veh.to_wire()?;
-                (124, wire)
+                (124, veh.xyz, veh.to_flags(), veh.heading.to_objectinfo_wire())
             },
             Self::VehicleVan(veh) => {
-                let wire = veh.to_wire()?;
-                (125, wire)
+                (125, veh.xyz, veh.to_flags(), veh.heading.to_objectinfo_wire())
             },
             Self::VehicleTruck(veh) => {
-                let wire = veh.to_wire()?;
-                (126, wire)
+                (126, veh.xyz, veh.to_flags(), veh.heading.to_objectinfo_wire())
             },
             Self::VehicleAmbulance(veh) => {
-                let wire = veh.to_wire()?;
-                (127, wire)
+                (127, veh.xyz, veh.to_flags(), veh.heading.to_objectinfo_wire())
             },
             Self::SpeedHump10M(speed_hump) => {
-                let wire = speed_hump.to_wire()?;
-                (128, wire)
+                (128, speed_hump.xyz, speed_hump.to_flags(), speed_hump.heading.to_objectinfo_wire())
             },
             Self::SpeedHump6M(speed_hump) => {
-                let wire = speed_hump.to_wire()?;
-                (129, wire)
+                (129, speed_hump.xyz, speed_hump.to_flags(), speed_hump.heading.to_objectinfo_wire())
             },
             Self::SpeedHump2M(speed_hump) => {
-                let wire = speed_hump.to_wire()?;
-                (130, wire)
+                (130, speed_hump.xyz, speed_hump.to_flags(), speed_hump.heading.to_objectinfo_wire())
             },
             Self::SpeedHump1M(speed_hump) => {
-                let wire = speed_hump.to_wire()?;
-                (131, wire)
+                (131, speed_hump.xyz, speed_hump.to_flags(), speed_hump.heading.to_objectinfo_wire())
             },
             Self::Kerb(kerb) => {
-                (132, kerb.xyz, kerb.to_flags(), kerb.heading)
+                (132, kerb.xyz, kerb.to_flags(), kerb.heading.to_objectinfo_wire())
             },
             Self::Post(post) => {
-                let wire = post.to_wire()?;
-                (136, wire)
+                (136, post.xyz, post.to_flags(), post.heading.to_objectinfo_wire())
             },
             Self::Marquee(marquee) => {
-                let wire = marquee.to_wire()?;
-                (140, wire)
+                (140, marquee.xyz, marquee.to_flags(), marquee.heading.to_objectinfo_wire())
             },
             Self::Bale(bale) => {
                 let flags = bale.to_flags();
-                (144, bale.xyz, flags, bale.heading)
+                (144, bale.xyz, flags, bale.heading.to_objectinfo_wire())
             },
             Self::Bin1(bin1) => {
-                let wire = bin1.to_wire()?;
-                (145, bin1.xyz, bin1.to_flags(), bin1.heading)
+                (145, bin1.xyz, bin1.to_flags(), bin1.heading.to_objectinfo_wire())
             },
             Self::Bin2(bin2) => {
-                (146, bin2.xyz, bin2.to_flags(), bin2.heading)
+                (146, bin2.xyz, bin2.to_flags(), bin2.heading.to_objectinfo_wire())
             },
-            Self::Railing1(railing1) => {
-                let wire = railing1.to_wire()?;
-                (147, wire)
+            Self::Railing1(railing) => {
+                (147, railing.xyz, railing.to_flags(), railing.heading.to_objectinfo_wire())
             },
-            Self::Railing2(railing2) => {
-                let wire = railing2.to_wire()?;
-                (148, wire)
+            Self::Railing2(railing) => {
+                (148, railing.xyz, railing.to_flags(), railing.heading.to_objectinfo_wire())
             },
-            Self::StartLights1(start_lights1) => {
-                let wire = start_lights1.to_wire()?;
-                (149, wire)
+            Self::StartLights1(start_lights) => {
+                (149, start_lights.xyz, start_lights.to_flags(), start_lights.heading.to_objectinfo_wire())
             },
-            Self::StartLights2(start_lights2) => {
-                let wire = start_lights2.to_wire()?;
-                (150, wire)
+            Self::StartLights2(start_lights) => {
+                (150, start_lights.xyz, start_lights.to_flags(), start_lights.heading.to_objectinfo_wire())
             },
-            Self::StartLights3(start_lights3) => {
-                let wire = start_lights3.to_wire()?;
-                (151, wire)
+            Self::StartLights3(start_lights) => {
+                (151, start_lights.xyz, start_lights.to_flags(), start_lights.heading.to_objectinfo_wire())
             },
             Self::SignMetal(sign_metal) => {
-                let wire = sign_metal.to_wire()?;
-                (160, wire)
+                (160, sign_metal.xyz, sign_metal.to_flags(), sign_metal.heading.to_objectinfo_wire())
             },
             Self::ChevronLeft(chevron) => {
-                (164, chevron.xyz, chevron.to_flags(), chevron.heading)
+                (164, chevron.xyz, chevron.to_flags(), chevron.heading.to_objectinfo_wire())
             },
             Self::ChevronRight(chevron) => {
-                (165, chevron.xyz, chevron.to_flags(), chevron.heading)
+                (165, chevron.xyz, chevron.to_flags(), chevron.heading.to_objectinfo_wire())
             },
             Self::SignSpeed(sign_speed) => {
-                let wire = sign_speed.to_wire()?;
-                (168, wire)
+                (168, sign_speed.xyz, sign_speed.to_flags(), sign_speed.heading.to_objectinfo_wire())
             },
             Self::ConcreteSlab(concrete) => {
-                (172, concrete.xyz, concrete.to_flags(), concrete.heading)
+                (172, concrete.xyz, concrete.to_flags(), concrete.heading.to_objectinfo_wire())
             },
             Self::ConcreteRamp(concrete) => {
-                (173, concrete.xyz, concrete.to_flags(), concrete.heading)
+                (173, concrete.xyz, concrete.to_flags(), concrete.heading.to_objectinfo_wire())
             },
             Self::ConcreteWall(concrete) => {
-                (174, concrete.xyz, concrete.to_flags(), concrete.heading)
+                (174, concrete.xyz, concrete.to_flags(), concrete.heading.to_objectinfo_wire())
             },
             Self::ConcretePillar(concrete) => {
-                (175, concrete.xyz, concrete.to_flags(), concrete.heading)
+                (175, concrete.xyz, concrete.to_flags(), concrete.heading.to_objectinfo_wire())
             },
             Self::ConcreteSlabWall(concrete) => {
-                (176, concrete.xyz, concrete.to_flags(), concrete.heading)
+                (176, concrete.xyz, concrete.to_flags(), concrete.heading.to_objectinfo_wire())
             },
             Self::ConcreteRampWall(concrete) => {
-                (177, concrete.xyz, concrete.to_flags(), concrete.heading)
+                (177, concrete.xyz, concrete.to_flags(), concrete.heading.to_objectinfo_wire())
             },
             Self::ConcreteShortSlabWall(concrete) => {
-                (178, concrete.xyz, concrete.to_flags(), concrete.heading)
+                (178, concrete.xyz, concrete.to_flags(), concrete.heading.to_objectinfo_wire())
             },
             Self::ConcreteWedge(concrete) => {
-                (179, concrete.xyz, concrete.to_flags(), concrete.heading)
+                (179, concrete.xyz, concrete.to_flags(), concrete.heading.to_objectinfo_wire())
             },
             Self::StartPosition(start_position) => {
-                let wire = start_position.to_wire()?;
-                (184, wire)
+                (184, start_position.xyz, start_position.to_flags(), start_position.heading.to_objectinfo_wire())
             },
             Self::PitStartPoint(pit_start_point) => {
-                let wire = pit_start_point.to_wire()?;
-                (185, wire)
+                (185, pit_start_point.xyz, pit_start_point.to_flags(), pit_start_point.heading.to_objectinfo_wire())
             },
             Self::PitStopBox(pit_stop_box) => {
-                let wire = pit_stop_box.to_wire()?;
-                (186, wire)
+                (186, pit_stop_box.xyz, pit_stop_box.to_flags(), pit_stop_box.heading.to_objectinfo_wire())
             },
         };
 
@@ -912,7 +1043,7 @@ impl Encode for ObjectInfo {
         xyz.z.encode(buf)?;
         flags.0.encode(buf)?;
         index.encode(buf)?;
-        heading.to_objectinfo_wire().encode(buf)?;
+        heading.encode(buf)?;
 
         Ok(())
     }

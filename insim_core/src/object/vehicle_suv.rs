@@ -1,6 +1,5 @@
 //! Vehicle SUV object
-use super::{ObjectVariant, ObjectIntermediate};
-use crate::{DecodeError, heading::Heading};
+use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}, DecodeError};
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -41,6 +40,8 @@ impl From<u8> for VehicleSUVColour {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct VehicleSUV {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Heading / Direction
     pub heading: Heading,
     /// Colour (3 bits, 0-7)
@@ -51,41 +52,26 @@ pub struct VehicleSUV {
     pub floating: bool,
 }
 
-impl ObjectVariant for VehicleSUV {
-    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
+impl VehicleSUV {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = self.colour as u8 & 0x07;
         flags |= (self.mapping & 0x0f) << 3;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectIntermediate {
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    fn from_wire(wire: ObjectIntermediate) -> Result<Self, DecodeError> {
+    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
         let colour = VehicleSUVColour::from(wire.colour());
         let mapping = wire.mapping();
         let floating = wire.floating();
         Ok(Self {
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            xyz,
+            heading,
             colour,
             mapping,
             floating,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_vehicle_s_u_v_round_trip() {
-        let original = VehicleSUV::default();
-        let wire = original.to_wire().expect("to_wire failed");
-        let decoded = VehicleSUV::from_wire(wire).expect("from_wire failed");
-        assert_eq!(original, decoded);
     }
 }

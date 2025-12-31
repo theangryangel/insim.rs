@@ -1,6 +1,5 @@
 //! Speed sign objects
-use super::{ObjectVariant, ObjectIntermediate};
-use crate::{DecodeError, heading::Heading};
+use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}, DecodeError};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -40,6 +39,8 @@ impl TryFrom<u8> for SpeedSignMapping {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SignSpeed {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Mapping
     pub mapping: SpeedSignMapping,
     /// Heading / Direction
@@ -50,41 +51,26 @@ pub struct SignSpeed {
     pub floating: bool,
 }
 
-impl ObjectVariant for SignSpeed {
-    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
+impl SignSpeed {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = self.colour & 0x07;
         flags |= (self.mapping as u8 & 0x0f) << 3;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectIntermediate {
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    fn from_wire(wire: ObjectIntermediate) -> Result<Self, crate::DecodeError> {
+    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, crate::DecodeError> {
         let mapping = SpeedSignMapping::try_from(wire.mapping())?;
         let colour = wire.colour();
         let floating = wire.floating();
         Ok(Self {
+            xyz,
             mapping,
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            heading,
             colour,
             floating,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_sign_speed_round_trip() {
-        let original = SignSpeed::default();
-        let wire = original.to_wire().expect("to_wire failed");
-        let decoded = SignSpeed::from_wire(wire).expect("from_wire failed");
-        assert_eq!(original, decoded);
     }
 }

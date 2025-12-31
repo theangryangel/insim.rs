@@ -33,7 +33,7 @@ impl Armco {
         let floating = flags.floating();
         Ok(Self {
             xyz,
-            heading: Heading::from_objectinfo_wire(flags.heading),
+            heading,
             colour,
             mapping,
             floating,

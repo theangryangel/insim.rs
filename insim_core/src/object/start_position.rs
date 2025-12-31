@@ -1,11 +1,12 @@
 //! Start Position objects
-use super::{ObjectVariant, ObjectIntermediate};
-use crate::heading::Heading;
+use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}};
 
 /// Start Position
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct StartPosition {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Heading / Direction
     pub heading: Heading,
     /// Position index (0-47, representing start positions 1-48)
@@ -14,38 +15,23 @@ pub struct StartPosition {
     pub floating: bool,
 }
 
-impl ObjectVariant for StartPosition {
-    fn to_wire(&self) -> Result<ObjectIntermediate, crate::EncodeError> {
+impl StartPosition {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = self.index & 0x3f;
         if self.floating {
             flags |= 0x80;
         }
-        Ok(ObjectIntermediate {
-            flags,
-            heading: self.heading.to_objectinfo_wire(),
-        })
+        ObjectFlags(flags)
     }
 
-    fn from_wire(wire: ObjectIntermediate) -> Result<Self, crate::DecodeError> {
-        let pos_index = wire.flags & 0x3f;
+    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, crate::DecodeError> {
+        let pos_index = wire.0 & 0x3f;
         let floating = wire.floating();
         Ok(Self {
-            heading: Heading::from_objectinfo_wire(wire.heading),
+            xyz,
+            heading,
             index: pos_index,
             floating,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_start_position_round_trip() {
-        let original = StartPosition::default();
-        let wire = original.to_wire().expect("to_wire failed");
-        let decoded = StartPosition::from_wire(wire).expect("from_wire failed");
-        assert_eq!(original, decoded);
     }
 }

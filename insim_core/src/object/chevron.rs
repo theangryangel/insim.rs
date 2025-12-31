@@ -49,7 +49,7 @@ impl Chevron {
         ObjectFlags(flags)
     }
 
-    pub(super) fn from_wire(xyz: ObjectCoordinate, flags: ObjectFlags, heading: Heading) -> Result<Self, crate::DecodeError> {
+    pub(super) fn new(xyz: ObjectCoordinate, flags: ObjectFlags, heading: Heading) -> Result<Self, crate::DecodeError> {
         let colour = ChevronColour::from(flags.colour());
         let floating = flags.floating();
         Ok(Self {

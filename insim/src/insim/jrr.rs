@@ -21,7 +21,7 @@ pub enum JrrAction {
     ResetNoRepair = 5,
 }
 
-#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
+#[derive(Debug, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Join Request Reply
 /// Set the ISF_REQ_JOIN flag in the IS_ISI to receive join requests
@@ -56,7 +56,7 @@ impl_typical_with_request_id!(Jrr);
 
 #[cfg(test)]
 mod test {
-    use insim_core::object::{ObjectKind, control};
+    use insim_core::object::{ObjectInfo, control};
 
     use super::*;
 
@@ -84,7 +84,7 @@ mod test {
                 assert_eq!(jrr.reqi, RequestId(0));
                 assert!(matches!(jrr.jrraction, JrrAction::Spawn));
                 assert_eq!(
-                    jrr.startpos.xyz.xyz_metres(),
+                    jrr.startpos.position().xyz_metres(),
                     (
                         -597.25,    // -9556 / 16,
                         -1918.4375, // -30695 / 16,
@@ -92,8 +92,8 @@ mod test {
                     )
                 );
                 assert!(matches!(
-                    jrr.startpos.kind,
-                    ObjectKind::Control(control::Control {
+                    jrr.startpos,
+                    ObjectInfo::Control(control::Control {
                         kind: control::ControlKind::Start,
                         floating: true,
                         ..

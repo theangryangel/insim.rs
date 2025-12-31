@@ -54,8 +54,8 @@ impl InsimCheckpoint {
         ObjectFlags(flags)
     }
 
-    pub(crate) fn new(xyz: ObjectCoordinate, wire: ObjectCoordinate, heading: Heading) -> Result<Self, crate::DecodeError> {
-        let kind = InsimCheckpointKind::try_from(wire.flags)?;
+    pub(crate) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, crate::DecodeError> {
+        let kind = InsimCheckpointKind::try_from(wire.0)?;
         let floating = wire.floating();
         Ok(Self {
             xyz,
@@ -87,11 +87,11 @@ impl InsimCircle {
         ObjectFlags(flags)
     }
 
-    pub(crate) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, crate::DecodeError> {
+    pub(crate) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, index: u8) -> Result<Self, crate::DecodeError> {
         let floating = wire.floating();
         Ok(Self {
             xyz,
-            index: wire.heading,
+            index,
             floating,
         })
     }

@@ -61,7 +61,7 @@ impl Chalk {
         ObjectFlags(flags)
     }
 
-    pub(super) fn from_wire(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
         let colour = ChalkColour::from(wire.colour());
         let floating = wire.floating();
         Ok(Self {

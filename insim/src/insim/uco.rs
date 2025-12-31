@@ -23,7 +23,7 @@ pub enum UcoAction {
     CpRev = 3,
 }
 
-#[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
+#[derive(Debug, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// User Control Object - reports crossing an InSim checkpoint / entering an InSim circle (from layout)
 pub struct Uco {
@@ -51,7 +51,7 @@ pub struct Uco {
 
 #[cfg(test)]
 mod test {
-    use insim_core::object::{ObjectKind, insim::InsimCircle};
+    use insim_core::object::{ObjectInfo, insim::InsimCircle};
 
     use super::*;
 
@@ -89,7 +89,7 @@ mod test {
             ],
             |parsed: Uco| {
                 assert_eq!(
-                    parsed.info.xyz.xyz_metres(),
+                    parsed.info.position().xyz_metres(),
                     (
                         -17.5,    // -280 / 16,
                         -99.0625, // -1585 / 16,
@@ -97,10 +97,11 @@ mod test {
                     )
                 );
                 assert!(matches!(
-                    parsed.info.kind,
-                    ObjectKind::InsimCircle(InsimCircle {
+                    parsed.info,
+                    ObjectInfo::InsimCircle(InsimCircle {
                         index: 1,
-                        floating: false
+                        floating: false,
+                        ..
                     })
                 ));
                 assert!(matches!(parsed.ucoaction, UcoAction::CircleLeave));

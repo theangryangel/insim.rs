@@ -6,6 +6,8 @@ use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}};
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 /// Control object
 pub struct Control {
+    /// Position
+    pub xyz: ObjectCoordinate,
     /// Kind of Control Object
     pub kind: ControlKind,
     /// Heading
@@ -48,6 +50,7 @@ impl Control {
         };
 
         Ok(Self {
+            xyz,
             kind,
             heading,
             floating,

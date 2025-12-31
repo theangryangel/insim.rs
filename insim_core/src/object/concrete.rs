@@ -350,7 +350,7 @@ pub struct ConcreteWall {
 }
 
 impl ConcreteWall {
-    pub(super) fn to_wire(&self) -> ObjectFlags { 
+    pub(super) fn to_flags(&self) -> ObjectFlags { 
         let mut flags = 0;
         flags |= self.colour as u8 & 0x03;
         flags |= (self.length as u8 & 0x03) << 2;
@@ -389,7 +389,7 @@ pub struct ConcretePillar {
 }
 
 impl ConcretePillar {
-    pub(super) fn to_wire(&self) -> ObjectFlags {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = 0;
         flags |= self.x as u8 & 0x03;
         flags |= (self.y as u8 & 0x03) << 2;
@@ -467,7 +467,7 @@ pub struct ConcreteRampWall {
 }
 
 impl ConcreteRampWall {
-    pub(super) fn to_wire(&self) -> ObjectFlags {
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = 0;
         flags |= self.colour as u8 & 0x03;
         flags |= (self.length as u8 & 0x03) << 2;
