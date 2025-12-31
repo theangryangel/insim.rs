@@ -207,7 +207,7 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
     // Local Rotation: 0.0 for pillars, -90 deg (-PI/2) for arms (facing right)
     // FIXME: we can probably just move the DVec3 into the ObjectInfo now. But lazy.
     let parts = vec![
-        // Pillars
+        // LEFT Pillars
         (
             DVec3::new(0.0, 0.0, -0.25),
             ObjectInfo::ConcretePillar(concrete::ConcretePillar {
@@ -228,7 +228,7 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
                 heading: Heading::from_radians(0.0),
             }),
         ),
-        // Arms (Offset 1.70m Right, Rotated -90 deg) --
+        // LEFT Arms (Offset 1.70m Right, Rotated -90 deg) --
         (
             DVec3::new(1.70, 0.0, 3.70),
             ObjectInfo::ConcreteSlabWall(concrete::ConcreteSlabWall {
@@ -269,23 +269,76 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
                 floating: false,
             }),
         ),
-        // Tyres at end of chalk
+        // // Tyres at end of chalk
+        // (
+        //     DVec3::new(9.0, 0.0, 0.00),
+        //     ObjectInfo::TyreStack4Big(tyres::Tyres {
+        //         xyz: ObjectCoordinate::default(),
+        //         colour: tyres::TyreColour::Yellow,
+        //         heading: heading,
+        //         floating: false,
+        //     }),
+        // ),
+        // (
+        //     DVec3::new(9.0, 0.0, 0.75),
+        //     ObjectInfo::TyreStack4Big(tyres::Tyres {
+        //         xyz: ObjectCoordinate::default(),
+        //         colour: tyres::TyreColour::Yellow,
+        //         heading: heading,
+        //         floating: true,
+        //     }),
+        // ),
+
+        // RIGHT Pillars
         (
-            DVec3::new(9.0, 0.0, 0.00),
-            ObjectInfo::TyreStack4Big(tyres::Tyres {
+            DVec3::new(9.0, 0.0, -0.25),
+            ObjectInfo::ConcretePillar(concrete::ConcretePillar {
                 xyz: ObjectCoordinate::default(),
-                colour: tyres::TyreColour::Yellow,
-                heading: heading,
-                floating: false,
+                x: concrete::Size::ThreeQuarter,
+                y: concrete::Size::ThreeQuarter,
+                height: concrete::ConcreteHeight::M4_00,
+                heading: Heading::from_radians(0.0),
             }),
         ),
         (
-            DVec3::new(9.0, 0.0, 0.75),
-            ObjectInfo::TyreStack4Big(tyres::Tyres {
+            DVec3::new(9.0, 0.0, 3.75),
+            ObjectInfo::ConcretePillar(concrete::ConcretePillar {
                 xyz: ObjectCoordinate::default(),
-                colour: tyres::TyreColour::Yellow,
-                heading: heading,
-                floating: true,
+                x: concrete::Size::ThreeQuarter,
+                y: concrete::Size::ThreeQuarter,
+                height: concrete::ConcreteHeight::M2_25,
+                heading: Heading::from_radians(0.0),
+            }),
+        ),
+        // LEFT Arms (Offset 1.70m Right, Rotated 90 deg) --
+        (
+            DVec3::new(7.3, 0.0, 3.70),
+            ObjectInfo::ConcreteSlabWall(concrete::ConcreteSlabWall {
+                xyz: ObjectCoordinate::default(),
+                colour: concrete::ConcreteColour::Yellow,
+                length: concrete::ConcreteWidthLength::Four,
+                pitch: concrete::ConcretePitch::Deg42,
+                heading: Heading::from_radians(FRAC_PI_2), // Facing LEFT
+            }),
+        ),
+        (
+            DVec3::new(7.3, 0.0, 4.70),
+            ObjectInfo::ConcreteSlabWall(concrete::ConcreteSlabWall {
+                xyz: ObjectCoordinate::default(),
+                colour: concrete::ConcreteColour::Red,
+                length: concrete::ConcreteWidthLength::Four,
+                pitch: concrete::ConcretePitch::Deg42,
+                heading: Heading::from_radians(FRAC_PI_2),
+            }),
+        ),
+        (
+            DVec3::new(7.3, 0.0, 5.70),
+            ObjectInfo::ConcreteSlabWall(concrete::ConcreteSlabWall {
+                xyz: ObjectCoordinate::default(),
+                colour: concrete::ConcreteColour::Blue,
+                length: concrete::ConcreteWidthLength::Four,
+                pitch: concrete::ConcretePitch::Deg42,
+                heading: Heading::from_radians(FRAC_PI_2),
             }),
         ),
     ];
