@@ -1,5 +1,9 @@
 //! Tyre single object
-use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}, DecodeError};
+use crate::{
+    DecodeError,
+    heading::Heading,
+    object::{ObjectCoordinate, ObjectFlags},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -58,7 +62,11 @@ impl Tyres {
         ObjectFlags(flags)
     }
 
-    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, DecodeError> {
         let colour = TyreColour::from(wire.colour());
         let floating = wire.floating();
         Ok(Self {

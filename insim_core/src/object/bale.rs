@@ -1,5 +1,8 @@
 //! Bale objects
-use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}};
+use crate::{
+    heading::Heading,
+    object::{ObjectCoordinate, ObjectFlags},
+};
 
 /// Bale
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -18,7 +21,7 @@ pub struct Bale {
 }
 
 impl Bale {
-    pub(super) fn to_flags(&self) -> ObjectFlags { 
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = self.colour & 0x07;
         flags |= (self.mapping & 0x0f) << 3;
         if self.floating {
@@ -27,7 +30,11 @@ impl Bale {
         ObjectFlags(flags)
     }
 
-    pub(super) fn new(xyz: ObjectCoordinate, flags: ObjectFlags, heading: Heading) -> Result<Self, crate::DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        flags: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, crate::DecodeError> {
         let colour = flags.colour();
         let mapping = flags.mapping();
         let floating = flags.floating();

@@ -56,10 +56,7 @@ use insim::{
     Packet, WithRequestId,
     core::{
         heading::Heading,
-        object::{
-            ObjectCoordinate, ObjectInfo, chalk, concrete, letterboard_rb, painted,
-            tyres,
-        },
+        object::{ObjectCoordinate, ObjectInfo, chalk, concrete, letterboard_rb, painted, tyres},
     },
     identifiers::PlayerId,
     insim::{Axm, PmoAction, TinyType},

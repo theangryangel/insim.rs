@@ -1,5 +1,8 @@
 //! Post objects
-use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}};
+use crate::{
+    heading::Heading,
+    object::{ObjectCoordinate, ObjectFlags},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -58,7 +61,11 @@ impl Post {
         ObjectFlags(flags)
     }
 
-    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, crate::DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, crate::DecodeError> {
         let colour = PostColour::from(wire.colour());
         let mapping = wire.mapping();
         let floating = wire.floating();

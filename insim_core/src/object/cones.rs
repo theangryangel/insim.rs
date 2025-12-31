@@ -1,5 +1,8 @@
 //! Cone1 objects
-use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}};
+use crate::{
+    heading::Heading,
+    object::{ObjectCoordinate, ObjectFlags},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -64,7 +67,11 @@ impl Cone {
         ObjectFlags(flags)
     }
 
-    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, crate::DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, crate::DecodeError> {
         let colour = ConeColour::from(wire.colour());
         let floating = wire.floating();
         Ok(Self {

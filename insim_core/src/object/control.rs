@@ -1,6 +1,9 @@
 //! Control objects
 
-use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}};
+use crate::{
+    heading::Heading,
+    object::{ObjectCoordinate, ObjectFlags},
+};
 
 #[derive(Debug, Clone, Default, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -32,7 +35,11 @@ impl Control {
         ObjectFlags(flags)
     }
 
-    pub(crate) fn new(xyz: ObjectCoordinate, flags: ObjectFlags, heading: Heading) -> Result<Self, crate::DecodeError> {
+    pub(crate) fn new(
+        xyz: ObjectCoordinate,
+        flags: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, crate::DecodeError> {
         let position_bits = flags.0 & 0b11;
         let half_width = (flags.0 >> 2) & 0b11111;
         let floating = flags.floating();

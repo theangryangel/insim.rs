@@ -1,5 +1,9 @@
 //! StartLights1 object
-use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}, DecodeError};
+use crate::{
+    DecodeError,
+    heading::Heading,
+    object::{ObjectCoordinate, ObjectFlags},
+};
 
 /// StartLights
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -24,7 +28,11 @@ impl StartLights {
         ObjectFlags(flags)
     }
 
-    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, DecodeError> {
         let identifier = wire.0 & 0x3F;
         let floating = wire.floating();
         Ok(Self {

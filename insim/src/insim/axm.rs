@@ -142,9 +142,7 @@ impl Encode for Axm {
 
 #[cfg(test)]
 mod test {
-    use insim_core::object::{
-        control::{Control, ControlKind},
-    };
+    use insim_core::object::control::{Control, ControlKind};
 
     use super::*;
 

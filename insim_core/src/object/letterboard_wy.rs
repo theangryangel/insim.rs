@@ -1,6 +1,9 @@
 //! Letterboard WY (White/Yellow) objects
 use super::letterboard_rb::Character;
-use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}};
+use crate::{
+    heading::Heading,
+    object::{ObjectCoordinate, ObjectFlags},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -51,7 +54,11 @@ impl LetterboardWY {
         ObjectFlags(flags)
     }
 
-    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, crate::DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, crate::DecodeError> {
         let colour = LetterboardWYColour::from(wire.0);
         let mapping = (wire.0 >> 1) & 0x3f;
         let character = Character::try_from(mapping)?;

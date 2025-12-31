@@ -1,5 +1,9 @@
 //! Armco 1-5 barrier object
-use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}, DecodeError};
+use crate::{
+    DecodeError,
+    heading::Heading,
+    object::{ObjectCoordinate, ObjectFlags},
+};
 
 /// Armco 1-5 barrier
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -27,7 +31,11 @@ impl Armco {
         ObjectFlags(flags)
     }
 
-    pub(super) fn new(xyz: ObjectCoordinate, flags: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        flags: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, DecodeError> {
         let colour = flags.colour();
         let mapping = flags.mapping();
         let floating = flags.floating();

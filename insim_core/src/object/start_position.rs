@@ -1,5 +1,8 @@
 //! Start Position objects
-use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}};
+use crate::{
+    heading::Heading,
+    object::{ObjectCoordinate, ObjectFlags},
+};
 
 /// Start Position
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -24,7 +27,11 @@ impl StartPosition {
         ObjectFlags(flags)
     }
 
-    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, crate::DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, crate::DecodeError> {
         let pos_index = wire.0 & 0x3f;
         let floating = wire.floating();
         Ok(Self {

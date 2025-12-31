@@ -1,5 +1,8 @@
 //! Marshal objects
-use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}};
+use crate::{
+    heading::Heading,
+    object::{ObjectCoordinate, ObjectFlags},
+};
 
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -24,7 +27,11 @@ impl Marshal {
         ObjectFlags(flags)
     }
 
-    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, crate::DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, crate::DecodeError> {
         let kind = MarshalKind::try_from(wire.0)?;
         let floating = wire.floating();
 
@@ -84,10 +91,17 @@ impl RestrictedArea {
         ObjectFlags(flags)
     }
 
-    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags) -> Result<Self, crate::DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+    ) -> Result<Self, crate::DecodeError> {
         let radius = (wire.0 >> 2) & 0b11111;
         let floating = wire.floating();
-        Ok(Self { xyz, radius, floating })
+        Ok(Self {
+            xyz,
+            radius,
+            floating,
+        })
     }
 }
 
@@ -115,7 +129,11 @@ impl RouteChecker {
         ObjectFlags(flags)
     }
 
-    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, route: u8) -> Result<Self, crate::DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        route: u8,
+    ) -> Result<Self, crate::DecodeError> {
         let radius = (wire.0 >> 2) & 0b11111;
         let floating = wire.floating();
         Ok(Self {

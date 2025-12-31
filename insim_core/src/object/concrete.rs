@@ -1,6 +1,10 @@
 //! Concrete
 
-use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}, DecodeError};
+use crate::{
+    DecodeError,
+    heading::Heading,
+    object::{ObjectCoordinate, ObjectFlags},
+};
 
 /// Represents Width and Length (2m, 4m, 8m, 16m)
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -280,7 +284,11 @@ impl ConcreteSlab {
         ObjectFlags(flags)
     }
 
-    pub(super) fn new(xyz: ObjectCoordinate, flags: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        flags: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, DecodeError> {
         let width = ConcreteWidthLength::try_from(flags.0 & 0x03)?;
         let length = ConcreteWidthLength::try_from((flags.0 & 0x0c) >> 2)?;
         let pitch = ConcretePitch::try_from((flags.0 & 0xf0) >> 4)?;
@@ -319,7 +327,11 @@ impl ConcreteRamp {
         ObjectFlags(flags)
     }
 
-    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, DecodeError> {
         let width = ConcreteWidthLength::try_from(wire.0 & 0x03)?;
         let length = ConcreteWidthLength::try_from((wire.0 & 0x0c) >> 2)?;
         let height = ConcreteHeight::try_from((wire.0 & 0xf0) >> 4)?;
@@ -350,7 +362,7 @@ pub struct ConcreteWall {
 }
 
 impl ConcreteWall {
-    pub(super) fn to_flags(&self) -> ObjectFlags { 
+    pub(super) fn to_flags(&self) -> ObjectFlags {
         let mut flags = 0;
         flags |= self.colour as u8 & 0x03;
         flags |= (self.length as u8 & 0x03) << 2;
@@ -358,7 +370,11 @@ impl ConcreteWall {
         ObjectFlags(flags)
     }
 
-    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, DecodeError> {
         let colour = ConcreteColour::try_from(wire.0 & 0x03)?;
         let length = ConcreteWidthLength::try_from((wire.0 & 0x0c) >> 2)?;
         let height = ConcreteHeight::try_from((wire.0 & 0xf0) >> 4)?;
@@ -397,7 +413,11 @@ impl ConcretePillar {
         ObjectFlags(flags)
     }
 
-    pub(super) fn new(xyz: ObjectCoordinate, flags: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        flags: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, DecodeError> {
         let x = Size::try_from(flags.0 & 0x03)?;
         let y = Size::try_from((flags.0 & 0x0c) >> 2)?;
         let height = ConcreteHeight::try_from((flags.0 & 0xf0) >> 4)?;
@@ -436,7 +456,11 @@ impl ConcreteSlabWall {
         ObjectFlags(flags)
     }
 
-    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, DecodeError> {
         let colour = ConcreteColour::try_from(wire.0 & 0x03)?;
         let length = ConcreteWidthLength::try_from((wire.0 & 0x0c) >> 2)?;
         let pitch = ConcretePitch::try_from((wire.0 & 0xf0) >> 4)?;
@@ -475,7 +499,11 @@ impl ConcreteRampWall {
         ObjectFlags(flags)
     }
 
-    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, DecodeError> {
         let colour = ConcreteColour::try_from(wire.0 & 0x03)?;
         let length = ConcreteWidthLength::try_from((wire.0 & 0x0c) >> 2)?;
         let height = ConcreteHeight::try_from((wire.0 & 0xf0) >> 4)?;
@@ -514,7 +542,11 @@ impl ConcreteShortSlabWall {
         ObjectFlags(flags)
     }
 
-    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, DecodeError> {
         let colour = ConcreteColour::try_from(wire.0 & 0x03)?;
         let y = Size::try_from((wire.0 & 0x0c) >> 2)?;
         let pitch = ConcretePitch::try_from((wire.0 & 0xf0) >> 4)?;
@@ -553,7 +585,11 @@ impl ConcreteWedge {
         ObjectFlags(flags)
     }
 
-    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, DecodeError> {
         let colour = ConcreteColour::try_from(wire.0 & 0x03)?;
         let length = ConcreteWidthLength::try_from((wire.0 & 0x0c) >> 2)?;
         let angle = ConcreteAngle::try_from((wire.0 & 0xf0) >> 4)?;

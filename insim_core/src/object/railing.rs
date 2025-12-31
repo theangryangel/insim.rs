@@ -1,5 +1,9 @@
 //! Railing1 object
-use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}, DecodeError};
+use crate::{
+    DecodeError,
+    heading::Heading,
+    object::{ObjectCoordinate, ObjectFlags},
+};
 
 /// Railing1
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -27,7 +31,11 @@ impl Railing {
         ObjectFlags(flags)
     }
 
-    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, DecodeError> {
         let colour = wire.colour();
         let mapping = wire.mapping();
         let floating = wire.floating();

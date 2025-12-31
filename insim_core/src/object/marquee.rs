@@ -1,5 +1,8 @@
 //! Marquee objects
-use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}};
+use crate::{
+    heading::Heading,
+    object::{ObjectCoordinate, ObjectFlags},
+};
 
 /// Marquee
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -27,7 +30,11 @@ impl Marquee {
         ObjectFlags(flags)
     }
 
-    pub(super) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, crate::DecodeError> {
+    pub(super) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, crate::DecodeError> {
         let colour = wire.colour();
         let mapping = wire.mapping();
         let floating = wire.floating();

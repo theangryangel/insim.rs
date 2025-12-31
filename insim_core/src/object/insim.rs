@@ -1,5 +1,8 @@
 //! Insim objects
-use crate::{heading::Heading, object::{ObjectCoordinate, ObjectFlags}};
+use crate::{
+    heading::Heading,
+    object::{ObjectCoordinate, ObjectFlags},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -54,7 +57,11 @@ impl InsimCheckpoint {
         ObjectFlags(flags)
     }
 
-    pub(crate) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, heading: Heading) -> Result<Self, crate::DecodeError> {
+    pub(crate) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        heading: Heading,
+    ) -> Result<Self, crate::DecodeError> {
         let kind = InsimCheckpointKind::try_from(wire.0)?;
         let floating = wire.floating();
         Ok(Self {
@@ -87,7 +94,11 @@ impl InsimCircle {
         ObjectFlags(flags)
     }
 
-    pub(crate) fn new(xyz: ObjectCoordinate, wire: ObjectFlags, index: u8) -> Result<Self, crate::DecodeError> {
+    pub(crate) fn new(
+        xyz: ObjectCoordinate,
+        wire: ObjectFlags,
+        index: u8,
+    ) -> Result<Self, crate::DecodeError> {
         let floating = wire.floating();
         Ok(Self {
             xyz,
