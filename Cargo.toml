@@ -40,7 +40,7 @@ broken_intra_doc_links = "deny"
 async-trait = "0.1.89"
 bitflags = "2.10.0"
 bytes = "1.11.0"
-clap = { version = "4.5.53" }
+clap = { version = "4.5.54" }
 darling = "0.21.3"
 encoding_rs = { version = "0.8.35" }
 fixedbitset = "0.5.7"
