@@ -12,11 +12,11 @@ use crate::{Decode, Encode};
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Coordinate {
     /// X coordinate
-    x: i32,
-    // Y coordinate
-    y: i32,
+    pub x: i32,
+    /// Y coordinate
+    pub y: i32,
     /// Z coordinate
-    z: i32,
+    pub z: i32,
 }
 
 impl Coordinate {
