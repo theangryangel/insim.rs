@@ -3,11 +3,96 @@
 
 use std::{fmt::Debug, time::Duration, usize};
 
-use tokio::{sync, time::sleep};
+use insim::{core::track::Track, insim::RaceLaps};
+use tokio::{sync, task::{JoinError, JoinHandle}, time::{interval, sleep}};
 
+trait HasInsim {
+    fn insim(&self) -> insim::builder::SpawnedHandle;
+}
+
+// A stage/layer/scene that orchestrates game flow. long live, delegates to other scene in a
+// waterfall manner
 trait Scene: Send + Sync + 'static {
     type Output: Debug + Send + Sync + 'static;
-    fn call(&mut self) -> impl Future<Output = Self::Output> + Send;
+    type Context: Debug + Send + Sync + Clone;
+    fn call(&mut self, ctx: Self::Context) -> impl Future<Output = Self::Output> + Send;
+}
+
+struct ActionHandle<T> {
+    inner: JoinHandle<T>,
+}
+
+impl<T> ActionHandle<T> {
+    /// poll
+    pub async fn poll(&mut self) -> Result<T, JoinError> {
+        (&mut self.inner).await
+    }
+
+    /// abort
+    pub fn abort(&self) {
+        self.inner.abort();
+    }
+}
+
+impl<T> Drop for ActionHandle<T> {
+    fn drop(&mut self) {
+        self.inner.abort();
+    }
+}
+
+// A self-contained multi-step procedure that runs to completion in a cancel safe way
+// Useful for things like track rotation
+trait Action: Send + Sync + 'static + Sized {
+    type Output: Debug + Send + Sync + 'static;
+    type Context: Debug + Send + Sync + 'static;
+
+    fn call(self, ctx: Self::Context) -> impl Future<Output=Self::Output> + Send;
+
+    fn spawn(self, ctx: Self::Context) -> ActionHandle<Self::Output> {
+        let inner = tokio::spawn(async move { 
+            self.call(ctx).await 
+        });
+
+        ActionHandle {
+            inner
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct TrackRotation {
+    track: Track,
+    layout: Option<String>,
+    laps: RaceLaps,
+    wind: Option<u8>,
+}
+
+impl Action for TrackRotation {
+    type Output = Result<(), ()>;
+    type Context = ();
+
+    async fn call(self, _ctx: Self::Context) -> Self::Output {
+        tracing::info!("/end");
+        tracing::info!("waiting for track selection screen");
+        sleep(Duration::from_secs(1)).await;
+
+        tracing::info!("/track {}", &self.track);
+        tracing::info!("Requesting track change");
+        sleep(Duration::from_secs(1)).await;
+
+        let laps: u8 = self.laps.into();
+
+        tracing::info!("/laps {:?}", laps);
+        tracing::info!("Requesting laps change");
+
+        tracing::info!("/wind {:?}", &self.wind);
+        tracing::info!("Requesting wind change");
+
+        tracing::info!("/axload {:?}", &self.layout);
+        tracing::info!("Requesting layout load");
+
+        Ok(())
+    }
 }
 
 struct Supervisor<L: Scene + Clone> {
@@ -26,8 +111,9 @@ impl<L: Scene + Clone> Supervisor<L> {
 
 impl<L: Scene + Clone> Scene for Supervisor<L> {
     type Output = L::Output;
+    type Context = L::Context;
 
-    async fn call(&mut self) -> Self::Output {
+    async fn call(&mut self, ctx: Self::Context) -> Self::Output {
         loop {
             let min = self.min_players;
             // wait for min_players
@@ -35,8 +121,11 @@ impl<L: Scene + Clone> Scene for Supervisor<L> {
             // and welcome players
             let _ = self.rx.wait_for(|val| *val > min).await;
 
-            let mut inst = self.inner.clone();
-            let mut h = tokio::spawn(async move { inst.call().await });
+            let mut h = tokio::spawn({
+                let mut inst = self.inner.clone();
+                let ctx = ctx.clone();
+                async move { inst.call(ctx).await }
+            });
 
             tokio::select! {
                 result = &mut h => {
@@ -70,12 +159,13 @@ struct ClockworkCarnage;
 
 impl Scene for ClockworkCarnage {
     type Output = anyhow::Result<()>;
+    type Context = ();
 
-    async fn call(&mut self) -> Self::Output {
+    async fn call(&mut self, _ctx: Self::Context) -> Self::Output {
         // TODO: handle admin commands
 
         tracing::info!("Starting...");
-        Lobby.call().await?;
+        Lobby.call(()).await?;
         Ok(())
     }
 }
@@ -83,13 +173,29 @@ impl Scene for ClockworkCarnage {
 struct Lobby;
 impl Scene for Lobby {
     type Output = anyhow::Result<()>;
+    type Context = ();
 
-    async fn call(&mut self) -> Self::Output {
+    async fn call(&mut self, _ctx: Self::Context) -> Self::Output {
         tracing::info!("Lobby started");
-        tokio::time::sleep(Duration::from_secs(2)).await;
+
+        let mut rotation = TrackRotation { track: Track::Bl1, laps: RaceLaps::Practice, ..Default::default() }.spawn(());
+        let mut tick = interval(Duration::from_millis(500));
+
+        loop {
+            tokio::select! {
+                _result = rotation.poll() => {
+                    tracing::info!("Rotation done");
+                    break;
+                },
+                _ = tick.tick() => {
+                    tracing::info!("> Lobby interruption");
+                }
+            }
+        }
+
         tracing::info!("Lobby done");
 
-        Event.call().await?;
+        Event.call(()).await?;
         Ok(())
     }
 }
@@ -97,8 +203,9 @@ impl Scene for Lobby {
 struct Event;
 impl Scene for Event {
     type Output = anyhow::Result<()>;
+    type Context = ();
 
-    async fn call(&mut self) -> Self::Output {
+    async fn call(&mut self, _ctx: Self::Context) -> Self::Output {
         for round in 1..=5 {
             tracing::info!("Round {round}/5");
             sleep(Duration::from_secs(1)).await;
@@ -132,7 +239,9 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    Supervisor::supervise(ClockworkCarnage, 30, rx).call().await?;
+    let ctx = ();
+
+    Supervisor::supervise(ClockworkCarnage, 30, rx).call(ctx).await?;
 
     Ok(())
 }
