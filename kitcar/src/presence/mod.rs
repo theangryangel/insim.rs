@@ -7,7 +7,7 @@ use insim::{
     identifiers::{ConnectionId, PlayerId},
     insim::{PlayerFlags, PlayerType},
 };
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, watch};
 
 #[derive(Debug, Clone)]
 /// PlayerInfo
@@ -59,14 +59,17 @@ pub struct ConnectionInfo {
 pub struct Presence {
     connections: HashMap<ConnectionId, ConnectionInfo>,
     players: HashMap<PlayerId, PlayerInfo>,
+    player_count: watch::Sender<usize>,
 }
 
 impl Presence {
     /// New presence handler
     pub fn new() -> Self {
+        let player_count = watch::channel(0);
         Self {
             connections: HashMap::new(),
             players: HashMap::new(),
+            player_count: player_count.0
         }
     }
 
@@ -123,6 +126,9 @@ impl Presence {
 
             _ => {},
         }
+
+        // TODO: be smarter about this
+        let _ = self.player_count.send(self.players.len());
     }
 
     fn tiny(&mut self, tiny: &insim::insim::Tiny) {
@@ -251,7 +257,9 @@ impl Presence {
                             PresenceQuery::PlayerCount { response_tx } => {
                                 let _ = response_tx.send(inner.player_count());
                             },
-
+                            PresenceQuery::SubscribePlayerCount { response_tx } => {
+                                let _ = response_tx.send(inner.player_count.subscribe());
+                            },
                         }
                     }
                 }
@@ -285,6 +293,9 @@ enum PresenceQuery {
     PlayerCount {
         response_tx: oneshot::Sender<usize>,
     },
+    SubscribePlayerCount {
+        response_tx: oneshot::Sender<watch::Receiver<usize>>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -294,6 +305,16 @@ pub struct PresenceHandle {
 }
 
 impl PresenceHandle {
+    /// Watch player count
+    pub async fn wait_for_player_count(&self, f: impl FnMut(&usize) -> bool) -> usize {
+        // FIXME: no expect/unwrap
+        let (tx, rx) = oneshot::channel();
+        self.query_tx
+            .send(PresenceQuery::SubscribePlayerCount{ response_tx: tx })
+            .await.expect("watch player count handle dead");
+        *rx.await.expect("expect no failure").wait_for(f).await.expect("watch player count wait_for failed")
+    }
+
     /// Player count
     pub async fn player_count(&self) -> usize {
         let (tx, rx) = oneshot::channel();

@@ -1,130 +1,71 @@
 //! Clockwork carnage. PoC to experiment with the "scene" wrapping idea. go look at
 //! twenty_second_league for where this is "going".
 
-use std::{fmt::Debug, time::Duration, usize};
+use std::{fmt::Debug, marker::PhantomData, time::Duration, usize};
 
-use insim::{core::track::Track, insim::RaceLaps};
-use tokio::{sync, task::{JoinError, JoinHandle}, time::{interval, sleep}};
+use clap::Parser;
+use insim::{core::track::Track, insim::{RaceLaps, TinyType}, WithRequestId};
+use kitcar::game::track_rotation::TrackRotation;
+use tokio::time::{interval, sleep};
+
+mod cli;
 
 trait HasInsim {
     fn insim(&self) -> insim::builder::SpawnedHandle;
 }
 
+trait HasPresence {
+    fn presence(&self) -> kitcar::presence::PresenceHandle;
+}
+
+trait HasGame {
+    fn game(&self) -> kitcar::game::GameHandle;
+}
+
 // A stage/layer/scene that orchestrates game flow. long live, delegates to other scene in a
 // waterfall manner
-trait Scene: Send + Sync + 'static {
+trait Scene<C>: Send + Sync + 'static {
     type Output: Debug + Send + Sync + 'static;
-    type Context: Debug + Send + Sync + Clone;
-    fn call(&mut self, ctx: Self::Context) -> impl Future<Output = Self::Output> + Send;
+    fn poll(&mut self, ctx: C) -> impl Future<Output = Self::Output> + Send;
 }
 
-struct ActionHandle<T> {
-    inner: JoinHandle<T>,
-}
-
-impl<T> ActionHandle<T> {
-    /// poll
-    pub async fn poll(&mut self) -> Result<T, JoinError> {
-        (&mut self.inner).await
-    }
-
-    /// abort
-    pub fn abort(&self) {
-        self.inner.abort();
-    }
-}
-
-impl<T> Drop for ActionHandle<T> {
-    fn drop(&mut self) {
-        self.inner.abort();
-    }
-}
-
-// A self-contained multi-step procedure that runs to completion in a cancel safe way
-// Useful for things like track rotation
-trait Action: Send + Sync + 'static + Sized {
-    type Output: Debug + Send + Sync + 'static;
-    type Context: Debug + Send + Sync + 'static;
-
-    fn call(self, ctx: Self::Context) -> impl Future<Output=Self::Output> + Send;
-
-    fn spawn(self, ctx: Self::Context) -> ActionHandle<Self::Output> {
-        let inner = tokio::spawn(async move { 
-            self.call(ctx).await 
-        });
-
-        ActionHandle {
-            inner
-        }
-    }
-}
-
-#[derive(Debug, Default)]
-struct TrackRotation {
-    track: Track,
-    layout: Option<String>,
-    laps: RaceLaps,
-    wind: Option<u8>,
-}
-
-impl Action for TrackRotation {
-    type Output = Result<(), ()>;
-    type Context = ();
-
-    async fn call(self, _ctx: Self::Context) -> Self::Output {
-        tracing::info!("/end");
-        tracing::info!("waiting for track selection screen");
-        sleep(Duration::from_secs(1)).await;
-
-        tracing::info!("/track {}", &self.track);
-        tracing::info!("Requesting track change");
-        sleep(Duration::from_secs(1)).await;
-
-        let laps: u8 = self.laps.into();
-
-        tracing::info!("/laps {:?}", laps);
-        tracing::info!("Requesting laps change");
-
-        tracing::info!("/wind {:?}", &self.wind);
-        tracing::info!("Requesting wind change");
-
-        tracing::info!("/axload {:?}", &self.layout);
-        tracing::info!("Requesting layout load");
-
-        Ok(())
-    }
-}
-
-struct Supervisor<L: Scene + Clone> {
+struct Supervisor<L, C>
+where
+    L: Scene<C> + Clone
+{
     inner: L,
     min_players: usize,
-    rx: sync::watch::Receiver<usize>,
+    _marker: PhantomData<C>,
 }
 
-impl<L: Scene + Clone> Supervisor<L> {
-    fn supervise(inner: L, min_players: usize, rx: sync::watch::Receiver<usize>) -> Self {
+impl<L: Scene<C> + Clone, C> Supervisor<L, C> {
+    fn supervise(inner: L, min_players: usize) -> Self {
         Self {
-            inner, min_players, rx
+            inner, min_players, _marker: PhantomData
         }
     }
 }
 
-impl<L: Scene + Clone> Scene for Supervisor<L> {
+impl<L, C> Scene<C> for Supervisor<L, C>
+where 
+    L: Scene<C> + Clone,
+    C: HasGame + HasPresence + HasInsim + Send + Sync + Clone + 'static
+{
     type Output = L::Output;
-    type Context = L::Context;
 
-    async fn call(&mut self, ctx: Self::Context) -> Self::Output {
+    async fn poll(&mut self, ctx: C) -> Self::Output {
         loop {
             let min = self.min_players;
             // wait for min_players
             // in the "real world" this would be it's own loop where we also listen for Ncn packets
             // and welcome players
-            let _ = self.rx.wait_for(|val| *val > min).await;
+            let presence = ctx.presence();
+            let _ = presence.wait_for_player_count(|count| *count > min).await;
 
             let mut h = tokio::spawn({
                 let mut inst = self.inner.clone();
                 let ctx = ctx.clone();
-                async move { inst.call(ctx).await }
+                async move { inst.poll(ctx).await }
             });
 
             tokio::select! {
@@ -143,7 +84,7 @@ impl<L: Scene + Clone> Scene for Supervisor<L> {
                         }
                     }
                 },
-                _ =  self.rx.wait_for(|val| *val < min) => {
+                _ = presence.wait_for_player_count(|val| *val < min) => {
                     h.abort();
                     tracing::error!("out of players. going back to the start");
                     // run out of players. go back to the start
@@ -157,28 +98,28 @@ impl<L: Scene + Clone> Scene for Supervisor<L> {
 #[derive(Debug, Default, Clone)]
 struct ClockworkCarnage;
 
-impl Scene for ClockworkCarnage {
+impl Scene<Context> for ClockworkCarnage {
     type Output = anyhow::Result<()>;
-    type Context = ();
 
-    async fn call(&mut self, _ctx: Self::Context) -> Self::Output {
+    async fn poll(&mut self, ctx: Context) -> Self::Output {
         // TODO: handle admin commands
 
         tracing::info!("Starting...");
-        Lobby.call(()).await?;
+        Lobby.poll(ctx).await?;
         Ok(())
     }
 }
 
 struct Lobby;
-impl Scene for Lobby {
+impl Scene<Context> for Lobby {
     type Output = anyhow::Result<()>;
-    type Context = ();
 
-    async fn call(&mut self, _ctx: Self::Context) -> Self::Output {
+    async fn poll(&mut self, ctx: Context) -> Self::Output {
         tracing::info!("Lobby started");
 
-        let mut rotation = TrackRotation { track: Track::Bl1, laps: RaceLaps::Practice, ..Default::default() }.spawn(());
+        let mut rotation = TrackRotation::request(
+            ctx.game(), ctx.insim(), Track::Bl1, None, RaceLaps::Practice, None
+        );
         let mut tick = interval(Duration::from_millis(500));
 
         loop {
@@ -195,23 +136,47 @@ impl Scene for Lobby {
 
         tracing::info!("Lobby done");
 
-        Event.call(()).await?;
+        Event.poll(ctx.clone()).await?;
         Ok(())
     }
 }
 
 struct Event;
-impl Scene for Event {
+impl Scene<Context> for Event {
     type Output = anyhow::Result<()>;
-    type Context = ();
 
-    async fn call(&mut self, _ctx: Self::Context) -> Self::Output {
+    async fn poll(&mut self, _ctx: Context) -> Self::Output {
         for round in 1..=5 {
             tracing::info!("Round {round}/5");
             sleep(Duration::from_secs(1)).await;
         }
 
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+struct Context {
+    pub insim: insim::builder::SpawnedHandle,
+    pub presence: kitcar::presence::PresenceHandle,
+    pub game: kitcar::game::GameHandle,
+}
+
+impl HasPresence for Context {
+    fn presence(&self) -> kitcar::presence::PresenceHandle {
+        self.presence.clone()
+    }
+}
+
+impl HasInsim for Context {
+    fn insim(&self) -> insim::builder::SpawnedHandle {
+        self.insim.clone()
+    }
+}
+
+impl HasGame for Context {
+    fn game(&self) -> kitcar::game::GameHandle {
+        self.game.clone()
     }
 }
 
@@ -226,22 +191,28 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
-    tracing::info!("Hello, world!");
+    let args = cli::Args::parse();
 
-    // temporary bullshit to pretend that we have an insim connection
-    let (tx, rx) = sync::watch::channel(10usize);
-    let _ = tokio::spawn(async move {
-        loop {
-            let count = rand::random_range(..47);
-            let _ = tx.send(count);
-            tracing::info!("[SERVER] Player count changed to {count}");
-            sleep(Duration::from_secs(5)).await;
-        }
-    });
+    let (insim, _insim_join_handle) = insim::tcp(args.addr.clone())
+        .isi_admin_password(args.password.clone())
+        .isi_iname("clockwork-carnage".to_owned())
+        .isi_prefix('!')
+        .spawn(100)
+        .await?;
 
-    let ctx = ();
+    tracing::info!("Starting clockwork-carnage");
 
-    Supervisor::supervise(ClockworkCarnage, 30, rx).call(ctx).await?;
+    let ctx = Context {
+        insim: insim.clone(),
+        presence: kitcar::presence::Presence::spawn(insim.clone(), 32),
+        game: kitcar::game::GameInfo::spawn(insim.clone(), 32),
+    };
+
+    insim.send(TinyType::Ncn.with_request_id(1)).await?;
+    insim.send(TinyType::Npl.with_request_id(2)).await?;
+    insim.send(TinyType::Sst.with_request_id(3)).await?;
+
+    Supervisor::supervise(ClockworkCarnage, 30).poll(ctx).await?;
 
     Ok(())
 }

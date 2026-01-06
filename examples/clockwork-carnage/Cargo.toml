@@ -10,8 +10,9 @@ homepage.workspace = true
 
 [dependencies]
 anyhow = "1.0.100"
+clap = { workspace = true, features = ["derive"] }
 insim = { path = "../../insim", features = ["serde", "blocking"] }
-rand = {workspace = true}
+kitcar = { path = "../../kitcar" }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "signal", "time", "sync"]}
 tracing = {workspace = true}
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
