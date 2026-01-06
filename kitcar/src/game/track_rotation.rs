@@ -39,7 +39,9 @@ impl TrackRotation {
             insim.send_command(&format!("/wind {:?}", &wind)).await?;
 
             tracing::info!("Requesting layout load");
-            insim.send_command(&format!("/axload {:?}", &layout)).await?;
+            insim
+                .send_command(&format!("/axload {:?}", &layout))
+                .await?;
 
             tracing::info!("Waiting for all players to hit ready");
             game.wait_for_racing().await;
@@ -47,9 +49,7 @@ impl TrackRotation {
             Ok(())
         });
 
-        Self {
-            handle
-        }
+        Self { handle }
     }
 
     /// Wait for completion

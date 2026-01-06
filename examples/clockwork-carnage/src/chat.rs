@@ -8,4 +8,3 @@ pub enum Chat {
     /// Only valid during Idle scene - start the game
     Start,
 }
-

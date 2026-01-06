@@ -69,7 +69,7 @@ impl Presence {
         Self {
             connections: HashMap::new(),
             players: HashMap::new(),
-            player_count: player_count.0
+            player_count: player_count.0,
         }
     }
 
@@ -310,9 +310,14 @@ impl PresenceHandle {
         // FIXME: no expect/unwrap
         let (tx, rx) = oneshot::channel();
         self.query_tx
-            .send(PresenceQuery::SubscribePlayerCount{ response_tx: tx })
-            .await.expect("watch player count handle dead");
-        *rx.await.expect("expect no failure").wait_for(f).await.expect("watch player count wait_for failed")
+            .send(PresenceQuery::SubscribePlayerCount { response_tx: tx })
+            .await
+            .expect("watch player count handle dead");
+        *rx.await
+            .expect("expect no failure")
+            .wait_for(f)
+            .await
+            .expect("watch player count wait_for failed")
     }
 
     /// Player count

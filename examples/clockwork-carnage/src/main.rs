@@ -4,14 +4,22 @@
 use std::{collections::HashMap, fmt::Debug, time::Duration};
 
 use clap::Parser;
-use insim::{core::{object::insim::{InsimCheckpoint, InsimCheckpointKind}, track::Track}, identifiers::PlayerId, insim::{ObjectInfo, RaceLaps, TinyType}, WithRequestId};
+use insim::{
+    WithRequestId,
+    core::{
+        object::insim::{InsimCheckpoint, InsimCheckpointKind},
+        track::Track,
+    },
+    identifiers::PlayerId,
+    insim::{ObjectInfo, RaceLaps, TinyType},
+};
 use kitcar::{chat::Parse, game::track_rotation::TrackRotation, time::countdown::Countdown};
 use tokio::time::sleep;
 
-mod cli;
-mod wait_for_players;
-mod scene;
 mod chat;
+mod cli;
+mod scene;
+mod wait_for_players;
 
 use scene::Scene;
 
@@ -43,7 +51,12 @@ impl Scene<Context> for ClockworkCarnage {
         }
 
         let mut rotation = TrackRotation::request(
-            ctx.game.clone(), ctx.insim.clone(), Track::Bl1, None, RaceLaps::Practice, None
+            ctx.game.clone(),
+            ctx.insim.clone(),
+            Track::Bl1,
+            None,
+            RaceLaps::Practice,
+            None,
         );
         rotation.poll().await??;
 
@@ -60,10 +73,7 @@ impl Scene<Context> for Lobby {
     async fn poll(&mut self, ctx: Context) -> Self::Output {
         tracing::info!("Lobby started 5 minute warm up");
 
-        let mut countdown = Countdown::new(
-            Duration::from_secs(1),
-            300,
-        );
+        let mut countdown = Countdown::new(Duration::from_secs(1), 300);
 
         loop {
             match countdown.tick().await {
@@ -73,7 +83,7 @@ impl Scene<Context> for Lobby {
                 },
                 None => {
                     break;
-                }
+                },
             }
         }
 
@@ -208,7 +218,7 @@ async fn main() -> anyhow::Result<()> {
         .await?;
 
     tracing::info!("Starting clockwork-carnage");
-    let presence = kitcar::presence::Presence::spawn(insim.clone(), 32); 
+    let presence = kitcar::presence::Presence::spawn(insim.clone(), 32);
 
     let ctx = Context {
         insim: insim.clone(),
@@ -220,11 +230,9 @@ async fn main() -> anyhow::Result<()> {
     insim.send(TinyType::Npl.with_request_id(2)).await?;
     insim.send(TinyType::Sst.with_request_id(3)).await?;
 
-    wait_for_players::WaitForPlayers::new(
-        insim,
-        presence,
-        30
-    ).poll(ClockworkCarnage, ctx).await?;
+    wait_for_players::WaitForPlayers::new(insim, presence, 30)
+        .poll(ClockworkCarnage, ctx)
+        .await?;
 
     Ok(())
 }

@@ -3,8 +3,7 @@ use kitcar::presence::PresenceHandle;
 
 use crate::Scene;
 
-pub struct WaitForPlayers
-{
+pub struct WaitForPlayers {
     insim: SpawnedHandle,
     presence: PresenceHandle,
     min_players: usize,
@@ -13,14 +12,17 @@ pub struct WaitForPlayers
 impl WaitForPlayers {
     pub fn new(insim: SpawnedHandle, presence: PresenceHandle, min_players: usize) -> Self {
         Self {
-            insim, presence, min_players
+            insim,
+            presence,
+            min_players,
         }
     }
 
     pub async fn poll<L, C>(&mut self, inner: L, ctx: C) -> L::Output
-    where 
+    where
         L: Scene<C> + Clone,
-        C: Send + Sync + Clone + 'static {
+        C: Send + Sync + Clone + 'static,
+    {
         loop {
             tracing::info!("Waiting for players...");
             let min = self.min_players;
@@ -60,7 +62,7 @@ impl WaitForPlayers {
                                 tracing::error!("Panicked! {:?}", e);
                             }
                             // If it crashed, we restart the loop
-                            continue; 
+                            continue;
                         }
                     }
                 },
@@ -74,4 +76,3 @@ impl WaitForPlayers {
         }
     }
 }
-
