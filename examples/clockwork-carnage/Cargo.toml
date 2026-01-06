@@ -16,6 +16,7 @@ kitcar = { path = "../../kitcar" }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "signal", "time", "sync"]}
 tracing = {workspace = true}
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
+if_chain = { workspace = true }
 
 [lints]
 workspace = true

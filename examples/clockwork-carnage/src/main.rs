@@ -1,99 +1,19 @@
 //! Clockwork carnage. PoC to experiment with the "scene" wrapping idea. go look at
 //! twenty_second_league for where this is "going".
 
-use std::{fmt::Debug, marker::PhantomData, time::Duration, usize};
+use std::{collections::HashMap, fmt::Debug, time::Duration};
 
 use clap::Parser;
-use insim::{core::track::Track, insim::{RaceLaps, TinyType}, WithRequestId};
-use kitcar::game::track_rotation::TrackRotation;
-use tokio::time::{interval, sleep};
+use insim::{core::{object::insim::{InsimCheckpoint, InsimCheckpointKind}, track::Track}, identifiers::PlayerId, insim::{ObjectInfo, RaceLaps, TinyType}, WithRequestId};
+use kitcar::{chat::Parse, game::track_rotation::TrackRotation, time::countdown::Countdown};
+use tokio::time::sleep;
 
 mod cli;
+mod wait_for_players;
+mod scene;
+mod chat;
 
-trait HasInsim {
-    fn insim(&self) -> insim::builder::SpawnedHandle;
-}
-
-trait HasPresence {
-    fn presence(&self) -> kitcar::presence::PresenceHandle;
-}
-
-trait HasGame {
-    fn game(&self) -> kitcar::game::GameHandle;
-}
-
-// A stage/layer/scene that orchestrates game flow. long live, delegates to other scene in a
-// waterfall manner
-trait Scene<C>: Send + Sync + 'static {
-    type Output: Debug + Send + Sync + 'static;
-    fn poll(&mut self, ctx: C) -> impl Future<Output = Self::Output> + Send;
-}
-
-struct Supervisor<L, C>
-where
-    L: Scene<C> + Clone
-{
-    inner: L,
-    min_players: usize,
-    _marker: PhantomData<C>,
-}
-
-impl<L: Scene<C> + Clone, C> Supervisor<L, C> {
-    fn supervise(inner: L, min_players: usize) -> Self {
-        Self {
-            inner, min_players, _marker: PhantomData
-        }
-    }
-}
-
-impl<L, C> Scene<C> for Supervisor<L, C>
-where 
-    L: Scene<C> + Clone,
-    C: HasGame + HasPresence + HasInsim + Send + Sync + Clone + 'static
-{
-    type Output = L::Output;
-
-    async fn poll(&mut self, ctx: C) -> Self::Output {
-        loop {
-            let min = self.min_players;
-            // wait for min_players
-            // in the "real world" this would be it's own loop where we also listen for Ncn packets
-            // and welcome players
-            let presence = ctx.presence();
-            let _ = presence.wait_for_player_count(|count| *count > min).await;
-
-            let mut h = tokio::spawn({
-                let mut inst = self.inner.clone();
-                let ctx = ctx.clone();
-                async move { inst.poll(ctx).await }
-            });
-
-            tokio::select! {
-                result = &mut h => {
-                    tracing::info!("{:?}", result);
-                    match result {
-                        Ok(result) => return result,
-                        Err(e) => {
-                            if e.is_cancelled() {
-                                tracing::warn!("Game was cancelled.");
-                            } else {
-                                tracing::error!("Panicked! {:?}", e);
-                            }
-                            // If it crashed, we restart the loop
-                            continue; 
-                        }
-                    }
-                },
-                _ = presence.wait_for_player_count(|val| *val < min) => {
-                    h.abort();
-                    tracing::error!("out of players. going back to the start");
-                    // run out of players. go back to the start
-                    continue
-                }
-            }
-        }
-    }
-}
+use scene::Scene;
 
 #[derive(Debug, Default, Clone)]
 struct ClockworkCarnage;
@@ -102,9 +22,32 @@ impl Scene<Context> for ClockworkCarnage {
     type Output = anyhow::Result<()>;
 
     async fn poll(&mut self, ctx: Context) -> Self::Output {
-        // TODO: handle admin commands
+        let mut packets = ctx.insim.subscribe();
 
-        tracing::info!("Starting...");
+        loop {
+            tokio::select! {
+                packet = packets.recv() => match packet? {
+                    insim::Packet::Mso(mso) => {
+                        if_chain::if_chain! {
+                            if let Ok(chat::Chat::Start) = chat::Chat::parse(mso.msg_from_textstart());
+                            if let Some(conn_info) = ctx.presence.connection(&mso.ucid).await;
+                            if conn_info.admin;
+                            then {
+                                break;
+                            }
+                        }
+                    },
+                    _ => {},
+                }
+            }
+        }
+
+        let mut rotation = TrackRotation::request(
+            ctx.game.clone(), ctx.insim.clone(), Track::Bl1, None, RaceLaps::Practice, None
+        );
+        rotation.poll().await??;
+
+        tracing::info!("Starting lobby...");
         Lobby.poll(ctx).await?;
         Ok(())
     }
@@ -115,21 +58,21 @@ impl Scene<Context> for Lobby {
     type Output = anyhow::Result<()>;
 
     async fn poll(&mut self, ctx: Context) -> Self::Output {
-        tracing::info!("Lobby started");
+        tracing::info!("Lobby started 5 minute warm up");
 
-        let mut rotation = TrackRotation::request(
-            ctx.game(), ctx.insim(), Track::Bl1, None, RaceLaps::Practice, None
+        let mut countdown = Countdown::new(
+            Duration::from_secs(1),
+            300,
         );
-        let mut tick = interval(Duration::from_millis(500));
 
         loop {
-            tokio::select! {
-                _result = rotation.poll() => {
-                    tracing::info!("Rotation done");
-                    break;
+            match countdown.tick().await {
+                Some(_) => {
+                    let remaining_duration = countdown.remaining_duration();
+                    tracing::info!("Waiting for lobby to complete! {:?}", remaining_duration);
                 },
-                _ = tick.tick() => {
-                    tracing::info!("> Lobby interruption");
+                None => {
+                    break;
                 }
             }
         }
@@ -145,10 +88,92 @@ struct Event;
 impl Scene<Context> for Event {
     type Output = anyhow::Result<()>;
 
-    async fn poll(&mut self, _ctx: Context) -> Self::Output {
+    async fn poll(&mut self, ctx: Context) -> Self::Output {
         for round in 1..=5 {
-            tracing::info!("Round {round}/5");
+            let mut active_runs: HashMap<PlayerId, Duration> = HashMap::new();
+            let mut round_scores: HashMap<PlayerId, Duration> = HashMap::new();
+
+            ctx.insim.send_command("/restart").await?;
+            ctx.game.wait_for_racing().await;
             sleep(Duration::from_secs(1)).await;
+
+            tracing::info!("Round {round}/5");
+
+            let mut countdown = Countdown::new(Duration::from_secs(1), 60);
+            let mut packets = ctx.insim.subscribe();
+            let target = Duration::from_secs(30);
+
+            loop {
+                tokio::select! {
+                    remaining = countdown.tick() => match remaining {
+                        Some(_) => {
+                            let remaining_duration = countdown.remaining_duration();
+                            tracing::debug!("{:?} remaining!", &remaining_duration);
+                        },
+                        None => {
+                            break;
+                        }
+                    },
+                    packet = packets.recv() => match packet? {
+                        insim::Packet::Ncn(ncn) => {
+                            ctx.insim
+                                .send_message(
+                                    "Welcome to the Clockwork Carnage! Game in currently in progress!",
+                                    ncn.ucid,
+                                )
+                                .await?;
+                        },
+                        insim::Packet::Uco(uco) => match uco.info {
+                            ObjectInfo::InsimCheckpoint(InsimCheckpoint { kind: InsimCheckpointKind::Checkpoint1, .. }) => {
+                                let _ = active_runs.insert(uco.plid, uco.time);
+                            },
+                            ObjectInfo::InsimCheckpoint(InsimCheckpoint { kind: InsimCheckpointKind::Finish, .. }) => {
+                                if_chain::if_chain! {
+                                    if let Some(start) = active_runs.remove(&uco.plid);
+                                    let delta = uco.time.saturating_sub(start);
+                                    if !delta.is_zero();
+                                    if let Some(_conn) = ctx.presence.connection_by_player(&uco.plid).await;
+                                    then {
+                                        let new_diff = target.abs_diff(delta);
+                                        let _ = round_scores
+                                            .entry(uco.plid)
+                                            .and_modify(|existing| {
+                                                let existing_diff = target.abs_diff(*existing);
+                                                if new_diff < existing_diff {
+                                                    *existing = delta;
+                                                }
+                                            })
+                                            .or_insert(delta);
+                                    }
+                                }
+                            },
+
+                            _ => {}
+                        },
+                        _ => {}
+                    }
+                }
+            }
+            let max_scorers = 10;
+
+            // score round
+            let mut ordered = round_scores
+                .drain()
+                .map(|(k, v)| (k, target.abs_diff(v)))
+                .collect::<Vec<(PlayerId, Duration)>>();
+            ordered.sort_by(|a, b| a.1.cmp(&b.1));
+            let top: Vec<(PlayerId, i32, usize, Duration)> = ordered
+                .into_iter()
+                .take(max_scorers)
+                .enumerate()
+                .map(|(i, (uname, delta))| {
+                    let points = (max_scorers - i) as i32;
+                    (uname, points, i, delta)
+                })
+                .collect();
+
+            // TODO: announce scores
+            tracing::info!("Scorers: {:?}", top);
         }
 
         Ok(())
@@ -160,24 +185,6 @@ struct Context {
     pub insim: insim::builder::SpawnedHandle,
     pub presence: kitcar::presence::PresenceHandle,
     pub game: kitcar::game::GameHandle,
-}
-
-impl HasPresence for Context {
-    fn presence(&self) -> kitcar::presence::PresenceHandle {
-        self.presence.clone()
-    }
-}
-
-impl HasInsim for Context {
-    fn insim(&self) -> insim::builder::SpawnedHandle {
-        self.insim.clone()
-    }
-}
-
-impl HasGame for Context {
-    fn game(&self) -> kitcar::game::GameHandle {
-        self.game.clone()
-    }
 }
 
 #[tokio::main]
@@ -195,16 +202,17 @@ async fn main() -> anyhow::Result<()> {
 
     let (insim, _insim_join_handle) = insim::tcp(args.addr.clone())
         .isi_admin_password(args.password.clone())
-        .isi_iname("clockwork-carnage".to_owned())
+        .isi_iname("clockwork".to_owned())
         .isi_prefix('!')
         .spawn(100)
         .await?;
 
     tracing::info!("Starting clockwork-carnage");
+    let presence = kitcar::presence::Presence::spawn(insim.clone(), 32); 
 
     let ctx = Context {
         insim: insim.clone(),
-        presence: kitcar::presence::Presence::spawn(insim.clone(), 32),
+        presence: presence.clone(),
         game: kitcar::game::GameInfo::spawn(insim.clone(), 32),
     };
 
@@ -212,7 +220,11 @@ async fn main() -> anyhow::Result<()> {
     insim.send(TinyType::Npl.with_request_id(2)).await?;
     insim.send(TinyType::Sst.with_request_id(3)).await?;
 
-    Supervisor::supervise(ClockworkCarnage, 30).poll(ctx).await?;
+    wait_for_players::WaitForPlayers::new(
+        insim,
+        presence,
+        30
+    ).poll(ClockworkCarnage, ctx).await?;
 
     Ok(())
 }
