@@ -10,7 +10,7 @@ use insim::{
         object::insim::{InsimCheckpoint, InsimCheckpointKind},
         track::Track,
     },
-    identifiers::PlayerId,
+    identifiers::{ConnectionId, PlayerId},
     insim::{ObjectInfo, RaceLaps, TinyType},
 };
 use kitcar::{chat::Parse, game::track_rotation::TrackRotation, time::countdown::Countdown};
@@ -32,15 +32,23 @@ impl Scene<Context> for ClockworkCarnage {
     async fn poll(&mut self, ctx: Context) -> Self::Output {
         let mut packets = ctx.insim.subscribe();
 
+        let _ = ctx
+            .insim
+            .send_message("Ready for admin start command...", ConnectionId::ALL)
+            .await
+            .expect("Unhandled error");
+
         loop {
             tokio::select! {
                 packet = packets.recv() => match packet? {
                     insim::Packet::Mso(mso) => {
+                        tracing::info!("Chat: {:?}", mso);
                         if_chain::if_chain! {
                             if let Ok(chat::Chat::Start) = chat::Chat::parse(mso.msg_from_textstart());
                             if let Some(conn_info) = ctx.presence.connection(&mso.ucid).await;
                             if conn_info.admin;
                             then {
+                                tracing::info!("Starting..");
                                 break;
                             }
                         }
@@ -53,7 +61,7 @@ impl Scene<Context> for ClockworkCarnage {
         let mut rotation = TrackRotation::request(
             ctx.game.clone(),
             ctx.insim.clone(),
-            Track::Bl1,
+            Track::Fe1x,
             None,
             RaceLaps::Practice,
             None,
@@ -73,13 +81,19 @@ impl Scene<Context> for Lobby {
     async fn poll(&mut self, ctx: Context) -> Self::Output {
         tracing::info!("Lobby started 5 minute warm up");
 
-        let mut countdown = Countdown::new(Duration::from_secs(1), 300);
+        let mut countdown = Countdown::new(Duration::from_secs(1), 20);
 
         loop {
             match countdown.tick().await {
                 Some(_) => {
                     let remaining_duration = countdown.remaining_duration();
                     tracing::info!("Waiting for lobby to complete! {:?}", remaining_duration);
+                    ctx.insim
+                        .send_message(
+                            &format!("Waiting for lobby to complete! {:?}", remaining_duration),
+                            ConnectionId::ALL,
+                        )
+                        .await?;
                 },
                 None => {
                     break;
@@ -230,7 +244,7 @@ async fn main() -> anyhow::Result<()> {
     insim.send(TinyType::Npl.with_request_id(2)).await?;
     insim.send(TinyType::Sst.with_request_id(3)).await?;
 
-    wait_for_players::WaitForPlayers::new(insim, presence, 30)
+    wait_for_players::WaitForPlayers::new(insim, presence, 1)
         .poll(ClockworkCarnage, ctx)
         .await?;
 

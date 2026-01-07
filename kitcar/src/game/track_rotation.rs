@@ -39,9 +39,11 @@ impl TrackRotation {
             insim.send_command(&format!("/wind {:?}", &wind)).await?;
 
             tracing::info!("Requesting layout load");
-            insim
-                .send_command(&format!("/axload {:?}", &layout))
-                .await?;
+            if let Some(layout) = &layout {
+                insim.send_command(&format!("/axload {:?}", layout)).await?;
+            } else {
+                insim.send_command("/axclear").await?;
+            }
 
             tracing::info!("Waiting for all players to hit ready");
             game.wait_for_racing().await;

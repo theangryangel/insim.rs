@@ -1,4 +1,4 @@
-use insim::builder::SpawnedHandle;
+use insim::{builder::SpawnedHandle, identifiers::ConnectionId};
 use kitcar::presence::PresenceHandle;
 
 use crate::Scene;
@@ -25,8 +25,16 @@ impl WaitForPlayers {
     {
         loop {
             tracing::info!("Waiting for players...");
+            let _ = self
+                .insim
+                .send_message("Waiting for players", ConnectionId::ALL)
+                .await
+                .expect("Unhandled error");
+
             let min = self.min_players;
             let mut packets = self.insim.subscribe();
+            let wait_fut = self.presence.wait_for_player_count(|val| *val >= min);
+            tokio::pin!(wait_fut);
             loop {
                 tokio::select! {
                     packet = packets.recv() => match packet {
@@ -38,11 +46,14 @@ impl WaitForPlayers {
 
                         }
                     },
-                    _ = self.presence.wait_for_player_count(|val| *val >= min) => {
+                    _ = &mut wait_fut => {
+                        tracing::info!("Got minimum player count!");
                         break;
                     }
                 }
             }
+
+            tracing::info!("Booting up inner");
 
             let mut h = tokio::spawn({
                 let mut inst = inner.clone();
