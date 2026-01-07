@@ -46,7 +46,7 @@ encoding_rs = { version = "0.8.35" }
 fixedbitset = "0.5.7"
 from_variants = "1.0.2"
 futures = "0.3.31"
-glam = "0.30.9"
+glam = "0.30.10"
 if_chain = "1.0.3"
 indexmap = "2.12.1"
 itertools = { version = "0.14.0" }
