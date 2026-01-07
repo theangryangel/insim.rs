@@ -1,4 +1,7 @@
-# The Cadence Cup
+# Clockwork Carnage
+
+PoC for kitcar crates.
+Currently WIP.
 
 The perfect lap, by any means necessary.
 Forget the fastest lap. The only goal here to hit a precise target time.

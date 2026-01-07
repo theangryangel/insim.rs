@@ -33,20 +33,16 @@ impl WaitForPlayers {
 
             let min = self.min_players;
             let mut packets = self.insim.subscribe();
-            let wait_fut = self.presence.wait_for_player_count(|val| *val >= min);
-            tokio::pin!(wait_fut);
             loop {
                 tokio::select! {
-                    packet = packets.recv() => match packet {
-                        Ok(insim::Packet::Ncn(ncn)) => {
+                    packet = packets.recv() => {
+                        // FIXME expect
+                        if let insim::Packet::Ncn(ncn) = packet.expect("FIXME: packet receiver failed") {
                             tracing::info!("Waiting for players...");
                             let _ = self.insim.send_message("Waiting for players", ncn.ucid).await.expect("Unhandled error");
-                        },
-                        _ => {
-
                         }
                     },
-                    _ = &mut wait_fut => {
+                    _ = self.presence.wait_for_player_count(|val| *val >= min) => {
                         tracing::info!("Got minimum player count!");
                         break;
                     }

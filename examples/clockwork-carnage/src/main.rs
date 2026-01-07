@@ -1,5 +1,5 @@
-//! Clockwork carnage. PoC to experiment with the "scene" wrapping idea. go look at
-//! twenty_second_league for where this is "going".
+//! Clockwork carnage. PoC to experiment with the "scene" wrapping idea.
+//! 60s. 5 Rounds. Complete the point to point in as close to the target time as possible.
 
 use std::{collections::HashMap, fmt::Debug, time::Duration};
 
@@ -10,7 +10,7 @@ use insim::{
         object::insim::{InsimCheckpoint, InsimCheckpointKind},
         track::Track,
     },
-    identifiers::{ConnectionId, PlayerId},
+    identifiers::ConnectionId,
     insim::{ObjectInfo, RaceLaps, TinyType},
 };
 use kitcar::{chat::Parse, game::track_rotation::TrackRotation, time::countdown::Countdown};
@@ -39,21 +39,15 @@ impl Scene<Context> for ClockworkCarnage {
             .expect("Unhandled error");
 
         loop {
-            tokio::select! {
-                packet = packets.recv() => match packet? {
-                    insim::Packet::Mso(mso) => {
-                        tracing::info!("Chat: {:?}", mso);
-                        if_chain::if_chain! {
-                            if let Ok(chat::Chat::Start) = chat::Chat::parse(mso.msg_from_textstart());
-                            if let Some(conn_info) = ctx.presence.connection(&mso.ucid).await;
-                            if conn_info.admin;
-                            then {
-                                tracing::info!("Starting..");
-                                break;
-                            }
-                        }
-                    },
-                    _ => {},
+            let packet = packets.recv().await?;
+            if_chain::if_chain! {
+                if let insim::Packet::Mso(mso) = packet;
+                if let Ok(chat::Chat::Start) = chat::Chat::parse(mso.msg_from_textstart());
+                if let Some(conn_info) = ctx.presence.connection(&mso.ucid).await;
+                if conn_info.admin;
+                then {
+                    tracing::info!("Starting..");
+                    break;
                 }
             }
         }
@@ -90,7 +84,7 @@ impl Scene<Context> for Lobby {
                     tracing::info!("Waiting for lobby to complete! {:?}", remaining_duration);
                     ctx.insim
                         .send_message(
-                            &format!("Waiting for lobby to complete! {:?}", remaining_duration),
+                            format!("Waiting for lobby to complete! {:?}", remaining_duration),
                             ConnectionId::ALL,
                         )
                         .await?;
@@ -103,25 +97,40 @@ impl Scene<Context> for Lobby {
 
         tracing::info!("Lobby done");
 
-        Event.poll(ctx.clone()).await?;
+        Event::new(5).poll(ctx.clone()).await?;
         Ok(())
     }
 }
 
-struct Event;
+#[derive(Debug)]
+struct Event {
+    /// scored by LFS uname (for now)
+    scores: HashMap<String, u32>,
+    rounds: usize,
+}
+
+impl Event {
+    pub fn new(rounds: usize) -> Self {
+        Self {
+            scores: HashMap::new(),
+            rounds,
+        }
+    }
+}
+
 impl Scene<Context> for Event {
     type Output = anyhow::Result<()>;
 
     async fn poll(&mut self, ctx: Context) -> Self::Output {
-        for round in 1..=5 {
-            let mut active_runs: HashMap<PlayerId, Duration> = HashMap::new();
-            let mut round_scores: HashMap<PlayerId, Duration> = HashMap::new();
+        for round in 1..=self.rounds {
+            let mut active_runs: HashMap<String, Duration> = HashMap::new();
+            let mut round_scores: HashMap<String, Duration> = HashMap::new();
 
             ctx.insim.send_command("/restart").await?;
             ctx.game.wait_for_racing().await;
             sleep(Duration::from_secs(1)).await;
 
-            tracing::info!("Round {round}/5");
+            tracing::info!("Round {round}/{}", self.rounds);
 
             let mut countdown = Countdown::new(Duration::from_secs(1), 60);
             let mut packets = ctx.insim.subscribe();
@@ -149,18 +158,29 @@ impl Scene<Context> for Event {
                         },
                         insim::Packet::Uco(uco) => match uco.info {
                             ObjectInfo::InsimCheckpoint(InsimCheckpoint { kind: InsimCheckpointKind::Checkpoint1, .. }) => {
-                                let _ = active_runs.insert(uco.plid, uco.time);
+                                if_chain::if_chain! {
+                                    if let Some(player) = ctx.presence.player(&uco.plid).await;
+                                    if !player.ptype.is_ai();
+                                    if let Some(conn) = ctx.presence.connection_by_player(&uco.plid).await;
+                                    then {
+                                        let _ = active_runs.insert(conn.uname, uco.time);
+                                    }
+                                }
                             },
                             ObjectInfo::InsimCheckpoint(InsimCheckpoint { kind: InsimCheckpointKind::Finish, .. }) => {
                                 if_chain::if_chain! {
-                                    if let Some(start) = active_runs.remove(&uco.plid);
+                                    // FIXME: we need a way to fetch connection and player at the
+                                    // same time
+                                    if let Some(player) = ctx.presence.player(&uco.plid).await;
+                                    if let Some(conn) = ctx.presence.connection_by_player(&uco.plid).await;
+                                    if !player.ptype.is_ai();
+                                    if let Some(start) = active_runs.remove(&conn.uname);
                                     let delta = uco.time.saturating_sub(start);
                                     if !delta.is_zero();
-                                    if let Some(_conn) = ctx.presence.connection_by_player(&uco.plid).await;
                                     then {
                                         let new_diff = target.abs_diff(delta);
                                         let _ = round_scores
-                                            .entry(uco.plid)
+                                            .entry(conn.uname)
                                             .and_modify(|existing| {
                                                 let existing_diff = target.abs_diff(*existing);
                                                 if new_diff < existing_diff {
@@ -180,23 +200,31 @@ impl Scene<Context> for Event {
             }
             let max_scorers = 10;
 
-            // score round
+            // score round by LFS uname
             let mut ordered = round_scores
                 .drain()
                 .map(|(k, v)| (k, target.abs_diff(v)))
-                .collect::<Vec<(PlayerId, Duration)>>();
+                .collect::<Vec<(String, Duration)>>();
             ordered.sort_by(|a, b| a.1.cmp(&b.1));
-            let top: Vec<(PlayerId, i32, usize, Duration)> = ordered
+            let top: Vec<(String, u32, usize, Duration)> = ordered
                 .into_iter()
                 .take(max_scorers)
                 .enumerate()
                 .map(|(i, (uname, delta))| {
-                    let points = (max_scorers - i) as i32;
+                    let points = (max_scorers - i) as u32;
+                    // update global scores
+                    let _ = self
+                        .scores
+                        .entry(uname.clone())
+                        .and_modify(|existing| {
+                            *existing = existing.saturating_add(points);
+                        })
+                        .or_insert(points);
                     (uname, points, i, delta)
                 })
                 .collect();
 
-            // TODO: announce scores
+            // TODO: announce scorers this round
             tracing::info!("Scorers: {:?}", top);
         }
 
@@ -232,6 +260,8 @@ async fn main() -> anyhow::Result<()> {
         .await?;
 
     tracing::info!("Starting clockwork-carnage");
+
+    chat::Chat::spawn(insim.clone());
     let presence = kitcar::presence::Presence::spawn(insim.clone(), 32);
 
     let ctx = Context {

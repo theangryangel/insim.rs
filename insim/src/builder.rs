@@ -451,9 +451,10 @@ impl SpawnedHandle {
     }
 
     /// Shortcut to send a command
-    pub async fn send_command(&self, command: &str) -> crate::Result<()> {
+    pub async fn send_command<S: Into<String>>(&self, command: S) -> crate::Result<()> {
+        let command: String = command.into();
         self.send(crate::insim::Mst {
-            msg: command.into(),
+            msg: command,
             ..Default::default()
         })
         .await
@@ -462,27 +463,32 @@ impl SpawnedHandle {
 
     /// Shortcut to send a message. This will automatically detect what type of packet to send for
     /// you.
-    pub async fn send_message<U: Into<Option<crate::identifiers::ConnectionId>>>(
+    pub async fn send_message<
+        U: Into<Option<crate::identifiers::ConnectionId>>,
+        S: Into<String>,
+    >(
         &self,
-        msg: &str,
+        msg: S,
         ucid: U,
     ) -> crate::Result<()> {
+        let msg: String = msg.into();
+
         let packet: crate::Packet = if let Some(ucid) = ucid.into() {
             crate::insim::Mtc {
                 ucid,
-                text: msg.into(),
+                text: msg,
                 ..Default::default()
             }
             .into()
         } else if msg.len() > 63 {
             crate::insim::Mst {
-                msg: msg.into(),
+                msg,
                 ..Default::default()
             }
             .into()
         } else {
             crate::insim::Msx {
-                msg: msg.into(),
+                msg,
                 ..Default::default()
             }
             .into()
