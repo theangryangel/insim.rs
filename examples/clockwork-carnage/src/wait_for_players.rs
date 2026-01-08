@@ -1,12 +1,13 @@
 use insim::{builder::SpawnedHandle, identifiers::ConnectionId};
-use kitcar::presence::PresenceHandle;
+use kitcar::{game::GameHandle, presence::PresenceHandle};
 
-use crate::Scene;
+use crate::{Scene, scene::SceneError};
 
 pub struct WaitForPlayers {
     insim: SpawnedHandle,
     presence: PresenceHandle,
     min_players: usize,
+    inf: bool,
 }
 
 impl WaitForPlayers {
@@ -15,10 +16,11 @@ impl WaitForPlayers {
             insim,
             presence,
             min_players,
+            inf: true,
         }
     }
 
-    pub async fn poll<L, C>(&mut self, inner: L, ctx: C) -> L::Output
+    pub async fn poll<L, C>(&mut self, inner: L, ctx: C) -> Result<L::Output, L::Error>
     where
         L: Scene<C> + Clone,
         C: Send + Sync + Clone + 'static,
@@ -42,12 +44,13 @@ impl WaitForPlayers {
                             let _ = self.insim.send_message("Waiting for players", ncn.ucid).await.expect("Unhandled error");
                         }
                     },
-                    _ = self.presence.wait_for_player_count(|val| *val >= min) => {
+                    _ = self.presence.wait_for_connection_count(|val| *val >= min) => {
                         tracing::info!("Got minimum player count!");
                         break;
                     }
                 }
             }
+            drop(packets);
 
             tracing::info!("Booting up inner");
 
@@ -61,24 +64,38 @@ impl WaitForPlayers {
                 result = &mut h => {
                     tracing::info!("{:?}", result);
                     match result {
-                        Ok(result) => return result,
+                        Ok(Ok(result)) => {
+                            tracing::info!("Inner completed: {:?}", result);
+                            if self.inf {
+                                continue;
+                            } else {
+                                return Ok(result);
+                            }
+                        },
+                        Ok(Err(e)) => {
+                            if e.is_recoverable() && self.inf {
+                                // If it crashed, we restart the loop
+                                continue;
+                            } else {
+                                return Err(e);
+                            }
+                        },
                         Err(e) => {
                             if e.is_cancelled() {
                                 tracing::warn!("Game was cancelled.");
                             } else {
                                 tracing::error!("Panicked! {:?}", e);
                             }
-                            // If it crashed, we restart the loop
                             continue;
                         }
                     }
                 },
-                _ = self.presence.wait_for_player_count(|val| *val < min) => {
+                _ = self.presence.wait_for_connection_count(|val| *val < min) => {
                     h.abort();
-                    tracing::error!("out of players. going back to the start");
+                    tracing::error!("out of connections. going back to the start");
                     // run out of players. go back to the start
                     continue
-                }
+                },
             }
         }
     }

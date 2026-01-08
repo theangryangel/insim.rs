@@ -1,6 +1,9 @@
 //! Chat commands
 
+use insim::insim::Mso;
 use kitcar::chat::Parse;
+
+use crate::ClockworkCarnageError;
 
 // Just derive and you're done!
 #[derive(Debug, PartialEq, kitcar::chat::Parse)]
@@ -9,6 +12,8 @@ use kitcar::chat::Parse;
 pub enum Chat {
     /// Only valid during Idle scene - start the game
     Start,
+    /// Only valid during Event scene - stops the game
+    End,
     /// Echo a string back from the server
     Echo { message: String },
     /// Help
@@ -19,12 +24,12 @@ impl Chat {
     /// Respond to global commands
     pub fn spawn(insim: insim::builder::SpawnedHandle) {
         let _ = tokio::spawn(async move {
-            let result: anyhow::Result<()> = async {
+            let result: Result<(), ClockworkCarnageError> = async {
                 let mut packets = insim.subscribe();
 
                 loop {
                     if let insim::Packet::Mso(mso) = packets.recv().await? {
-                        match Self::parse(mso.msg_from_textstart()) {
+                        match Self::try_from(&mso) {
                             Ok(Self::Echo { message }) => {
                                 insim
                                     .send_message(format!("Echo: {}", message), mso.ucid)

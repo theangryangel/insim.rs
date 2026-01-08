@@ -23,20 +23,44 @@ mod wait_for_players;
 
 use scene::Scene;
 
+use crate::scene::SceneError;
+
+#[derive(Debug, thiserror::Error)]
+/// ClockworkCarnage Error
+pub enum ClockworkCarnageError {
+    /// RecvError
+    #[error("Receive Failed: {0}")]
+    RecvFailed(#[from] tokio::sync::broadcast::error::RecvError),
+
+    /// Task failed
+    #[error("Join failed: {0}")]
+    JoinFailed(#[from] tokio::task::JoinError),
+
+    /// Some sort of insim error
+    #[error("insim error: {0}")]
+    Insim(#[from] insim::Error),
+}
+
+impl SceneError for ClockworkCarnageError {
+    fn is_recoverable(&self) -> bool {
+        false
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 struct ClockworkCarnage;
 
 impl Scene<Context> for ClockworkCarnage {
-    type Output = anyhow::Result<()>;
+    type Output = ();
+    type Error = ClockworkCarnageError;
 
-    async fn poll(&mut self, ctx: Context) -> Self::Output {
+    async fn poll(&mut self, mut ctx: Context) -> Result<Self::Output, Self::Error> {
         let mut packets = ctx.insim.subscribe();
 
         let _ = ctx
             .insim
             .send_message("Ready for admin start command...", ConnectionId::ALL)
-            .await
-            .expect("Unhandled error");
+            .await?;
 
         loop {
             let packet = packets.recv().await?;
@@ -62,17 +86,62 @@ impl Scene<Context> for ClockworkCarnage {
         );
         rotation.poll().await??;
 
+        packets = packets.resubscribe();
+
         tracing::info!("Starting lobby...");
-        Lobby.poll(ctx).await?;
+        let mut event = Event::new(5, 10);
+        let event_fut = event.poll(ctx.clone());
+        tokio::pin!(event_fut);
+
+        loop {
+            tokio::select! {
+                packet = packets.recv() => {
+                    if_chain::if_chain! {
+                        if let Ok(insim::Packet::Mso(mso)) = packet;
+                        if let Ok(chat::Chat::End) = chat::Chat::parse(mso.msg_from_textstart());
+                        if let Some(conn_info) = ctx.presence.connection(&mso.ucid).await;
+                        if conn_info.admin;
+                        then {
+                            tracing::info!("Ending..");
+                            break;
+                        }
+                    }
+                },
+                _ = ctx.game.wait_for_end() => {
+                    // players all voted to end.. probably shouldn't be here, but eeh if we put it
+                    // into wait_for_players we end up with a loop.. so this'll do for now.
+                    break;
+                },
+                _ = &mut event_fut => {
+                    break;
+                }
+            }
+        }
+
         Ok(())
     }
 }
 
-struct Lobby;
-impl Scene<Context> for Lobby {
-    type Output = anyhow::Result<()>;
+#[derive(Debug)]
+struct Event {
+    /// scored by LFS uname (for now)
+    scores: HashMap<String, u32>,
+    rounds: usize,
+    max_scorers: usize,
+}
 
-    async fn poll(&mut self, ctx: Context) -> Self::Output {
+impl Event {
+    pub fn new(rounds: usize, max_scorers: usize) -> Self {
+        Self {
+            scores: HashMap::new(),
+            rounds,
+            max_scorers,
+        }
+    }
+}
+
+impl Event {
+    async fn lobby(&mut self, ctx: Context) -> Result<(), ClockworkCarnageError> {
         tracing::info!("Lobby started 5 minute warm up");
 
         let mut countdown = Countdown::new(Duration::from_secs(1), 20);
@@ -96,32 +165,10 @@ impl Scene<Context> for Lobby {
         }
 
         tracing::info!("Lobby done");
-
-        Event::new(5).poll(ctx.clone()).await?;
         Ok(())
     }
-}
 
-#[derive(Debug)]
-struct Event {
-    /// scored by LFS uname (for now)
-    scores: HashMap<String, u32>,
-    rounds: usize,
-}
-
-impl Event {
-    pub fn new(rounds: usize) -> Self {
-        Self {
-            scores: HashMap::new(),
-            rounds,
-        }
-    }
-}
-
-impl Scene<Context> for Event {
-    type Output = anyhow::Result<()>;
-
-    async fn poll(&mut self, ctx: Context) -> Self::Output {
+    async fn rounds(&mut self, mut ctx: Context) -> Result<(), ClockworkCarnageError> {
         for round in 1..=self.rounds {
             let mut active_runs: HashMap<String, Duration> = HashMap::new();
             let mut round_scores: HashMap<String, Duration> = HashMap::new();
@@ -141,6 +188,8 @@ impl Scene<Context> for Event {
                     remaining = countdown.tick() => match remaining {
                         Some(_) => {
                             let remaining_duration = countdown.remaining_duration();
+                            ctx.insim.send_message(format!("{:?} remaining, round {}/{}", remaining_duration, round, self.rounds), ConnectionId::ALL).await?;
+
                             tracing::debug!("{:?} remaining!", &remaining_duration);
                         },
                         None => {
@@ -179,15 +228,19 @@ impl Scene<Context> for Event {
                                     if !delta.is_zero();
                                     then {
                                         let new_diff = target.abs_diff(delta);
-                                        let _ = round_scores
-                                            .entry(conn.uname)
+                                        let best = round_scores
+                                            .entry(conn.uname.clone())
                                             .and_modify(|existing| {
-                                                let existing_diff = target.abs_diff(*existing);
-                                                if new_diff < existing_diff {
-                                                    *existing = delta;
+                                                if new_diff < *existing {
+                                                    *existing = new_diff;
                                                 }
                                             })
-                                            .or_insert(delta);
+                                            .or_insert(new_diff);
+
+                                        ctx.insim.send_command(format!("/spec {}", &conn.uname)).await?;
+                                        ctx.insim.send_message(format!("You finished {:?} off the target..", new_diff), conn.ucid).await?;
+                                        ctx.insim.send_message(format!("Your best time was {:?}", best), conn.ucid).await?;
+                                        ctx.insim.send_message("You can rejoin to retry...", conn.ucid).await?;
                                     }
                                 }
                             },
@@ -198,7 +251,6 @@ impl Scene<Context> for Event {
                     }
                 }
             }
-            let max_scorers = 10;
 
             // score round by LFS uname
             let mut ordered = round_scores
@@ -208,10 +260,10 @@ impl Scene<Context> for Event {
             ordered.sort_by(|a, b| a.1.cmp(&b.1));
             let top: Vec<(String, u32, usize, Duration)> = ordered
                 .into_iter()
-                .take(max_scorers)
+                .take(self.max_scorers)
                 .enumerate()
                 .map(|(i, (uname, delta))| {
-                    let points = (max_scorers - i) as u32;
+                    let points = (self.max_scorers - i) as u32;
                     // update global scores
                     let _ = self
                         .scores
@@ -225,9 +277,22 @@ impl Scene<Context> for Event {
                 .collect();
 
             // TODO: announce scorers this round
-            tracing::info!("Scorers: {:?}", top);
+            tracing::info!("Round scorers: {:?}", top);
         }
 
+        tracing::info!("Event scorers: {:?}", self.scores);
+
+        Ok(())
+    }
+}
+
+impl Scene<Context> for Event {
+    type Output = ();
+    type Error = ClockworkCarnageError;
+
+    async fn poll(&mut self, ctx: Context) -> Result<Self::Output, Self::Error> {
+        self.lobby(ctx.clone()).await?;
+        self.rounds(ctx).await?;
         Ok(())
     }
 }
@@ -240,7 +305,7 @@ struct Context {
 }
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Result<(), ClockworkCarnageError> {
     // Setup with a default log level of INFO RUST_LOG is unset
     tracing_subscriber::fmt::fmt()
         .with_env_filter(
@@ -263,18 +328,19 @@ async fn main() -> anyhow::Result<()> {
 
     chat::Chat::spawn(insim.clone());
     let presence = kitcar::presence::Presence::spawn(insim.clone(), 32);
+    let game = kitcar::game::GameInfo::spawn(insim.clone(), 32);
 
     let ctx = Context {
         insim: insim.clone(),
         presence: presence.clone(),
-        game: kitcar::game::GameInfo::spawn(insim.clone(), 32),
+        game,
     };
 
     insim.send(TinyType::Ncn.with_request_id(1)).await?;
     insim.send(TinyType::Npl.with_request_id(2)).await?;
     insim.send(TinyType::Sst.with_request_id(3)).await?;
 
-    wait_for_players::WaitForPlayers::new(insim, presence, 1)
+    wait_for_players::WaitForPlayers::new(insim, presence, 2)
         .poll(ClockworkCarnage, ctx)
         .await?;
 

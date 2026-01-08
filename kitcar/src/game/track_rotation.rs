@@ -13,7 +13,7 @@ pub struct TrackRotation {
 impl TrackRotation {
     /// Request a track rotation
     pub fn request(
-        game: GameHandle,
+        mut game: GameHandle,
         insim: SpawnedHandle,
 
         track: Track,

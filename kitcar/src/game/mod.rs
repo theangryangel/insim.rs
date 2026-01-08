@@ -88,10 +88,10 @@ impl GameInfo {
     /// Spawn a background instance of GameInfo and return a handle so that we can query it
     pub fn spawn(insim: insim::builder::SpawnedHandle, capacity: usize) -> GameHandle {
         let (query_tx, mut query_rx) = mpsc::channel(capacity);
+        let (tx, rx) = watch::channel(Self::new());
 
         let _handle = tokio::spawn(async move {
             let mut packet_rx = insim.subscribe();
-            let (tx, rx) = watch::channel(Self::new());
 
             // Make the relevant background requests that we *must* have. If the user doesnt use
             // spawn it's upto them to handle this.
@@ -107,16 +107,16 @@ impl GameInfo {
                             GameQuery::Get { response_tx } => {
                                 let _ = response_tx.send(tx.borrow().clone());
                             },
-                            GameQuery::Watch { response_tx } => {
-                                let _ = response_tx.send(rx.clone());
-                            },
                         }
                     }
                 }
             }
         });
 
-        GameHandle { query_tx }
+        GameHandle {
+            query_tx,
+            watch: rx,
+        }
     }
 }
 
@@ -125,15 +125,13 @@ enum GameQuery {
     Get {
         response_tx: oneshot::Sender<GameInfo>,
     },
-    Watch {
-        response_tx: oneshot::Sender<watch::Receiver<GameInfo>>,
-    },
 }
 
 #[derive(Debug, Clone)]
 /// Handler for Presence
 pub struct GameHandle {
     query_tx: mpsc::Sender<GameQuery>,
+    watch: watch::Receiver<GameInfo>,
 }
 
 impl GameHandle {
@@ -148,18 +146,12 @@ impl GameHandle {
     }
 
     /// Wait for a given state
-    pub async fn wait_for<F: Fn(&GameInfo) -> bool>(&self, predicate: F) {
-        let (response_tx, rx) = oneshot::channel();
-        self.query_tx
-            .send(GameQuery::Watch { response_tx })
-            .await
-            .unwrap(); // FIXME
-        let mut watcher = rx.await.unwrap();
-        let _ = watcher.wait_for(predicate).await.unwrap(); // FIXME
+    pub async fn wait_for<F: Fn(&GameInfo) -> bool>(&mut self, predicate: F) {
+        let _ = self.watch.wait_for(predicate).await.unwrap(); // FIXME
     }
 
     /// Wait for the end
-    pub async fn wait_for_end(&self) {
+    pub async fn wait_for_end(&mut self) {
         self.wait_for(|info| {
             if_chain::if_chain! {
                     if !info.flags.is_in_game();
@@ -176,7 +168,7 @@ impl GameHandle {
     }
 
     /// Wait for track to load
-    pub async fn wait_for_track(&self, track: Track) {
+    pub async fn wait_for_track(&mut self, track: Track) {
         self.wait_for(|info| {
             tracing::debug!("waiting for track {:?}", info);
             if_chain::if_chain! {
@@ -197,7 +189,7 @@ impl GameHandle {
     }
 
     /// Wait for track to load
-    pub async fn wait_for_racing(&self) {
+    pub async fn wait_for_racing(&mut self) {
         self.wait_for(|info| {
             tracing::debug!("waiting for racing {:?}", info);
             if_chain::if_chain! {

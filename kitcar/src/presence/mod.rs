@@ -60,16 +60,19 @@ pub struct Presence {
     connections: HashMap<ConnectionId, ConnectionInfo>,
     players: HashMap<PlayerId, PlayerInfo>,
     player_count: watch::Sender<usize>,
+    connection_count: watch::Sender<usize>,
 }
 
 impl Presence {
     /// New presence handler
     pub fn new() -> Self {
         let player_count = watch::channel(0);
+        let connection_count = watch::channel(0);
         Self {
             connections: HashMap::new(),
             players: HashMap::new(),
             player_count: player_count.0,
+            connection_count: connection_count.0,
         }
     }
 
@@ -129,6 +132,7 @@ impl Presence {
 
         // TODO: be smarter about this
         let _ = self.player_count.send(self.players.len());
+        let _ = self.connection_count.send(self.connections.len());
     }
 
     fn tiny(&mut self, tiny: &insim::insim::Tiny) {
@@ -232,6 +236,7 @@ impl Presence {
         let (query_tx, mut query_rx) = mpsc::channel(capacity);
         let mut inner = Self::new();
         let player_count = inner.player_count.subscribe();
+        let connection_count = inner.connection_count.subscribe();
 
         let _handle = tokio::spawn(async move {
             let mut packet_rx = insim.subscribe();
@@ -270,6 +275,7 @@ impl Presence {
         PresenceHandle {
             query_tx,
             player_count,
+            connection_count,
         }
     }
 }
@@ -304,9 +310,20 @@ enum PresenceQuery {
 pub struct PresenceHandle {
     query_tx: mpsc::Sender<PresenceQuery>,
     player_count: watch::Receiver<usize>,
+    connection_count: watch::Receiver<usize>,
 }
 
 impl PresenceHandle {
+    /// Watch connection count
+    pub async fn wait_for_connection_count(&mut self, f: impl FnMut(&usize) -> bool) -> usize {
+        // FIXME
+        *self
+            .connection_count
+            .wait_for(f)
+            .await
+            .expect("watch connection count wait_for failed")
+    }
+
     /// Watch player count
     pub async fn wait_for_player_count(&mut self, f: impl FnMut(&usize) -> bool) -> usize {
         // FIXME
