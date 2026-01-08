@@ -2,7 +2,10 @@
 use std::time::Duration;
 
 use insim::{
-    builder::SpawnedHandle, core::{track::Track, wind::Wind}, insim::{RaceInProgress, RaceLaps, StaFlags, TinyType}, WithRequestId
+    WithRequestId,
+    builder::SpawnedHandle,
+    core::{track::Track, wind::Wind},
+    insim::{RaceInProgress, RaceLaps, StaFlags, TinyType},
 };
 use tokio::sync::{mpsc, oneshot, watch};
 
@@ -204,32 +207,56 @@ impl GameHandle {
     }
 
     /// Request track rotation
-    pub async fn track_rotation(&mut self, insim: SpawnedHandle, track: Track, laps: RaceLaps, wind: u8, layout: Option<String>) {
+    pub async fn track_rotation(
+        &mut self,
+        insim: SpawnedHandle,
+        track: Track,
+        laps: RaceLaps,
+        wind: u8,
+        layout: Option<String>,
+    ) {
         tracing::info!("/end");
-        insim.send_command("/end").await.expect("FIXME: do not fail");
+        insim
+            .send_command("/end")
+            .await
+            .expect("FIXME: do not fail");
         tracing::info!("waiting for track selection screen");
         self.wait_for_end().await;
 
         tracing::info!("Requesting track change");
-        insim.send_command(&format!("/track {}", &track)).await.expect("FIXME: do not fail");
+        insim
+            .send_command(&format!("/track {}", &track))
+            .await
+            .expect("FIXME: do not fail");
 
         let laps: u8 = laps.into();
 
         tracing::info!("Requesting laps change");
-        insim.send_command(&format!("/laps {:?}", laps)).await.expect("FIXME: do not fail");
+        insim
+            .send_command(&format!("/laps {:?}", laps))
+            .await
+            .expect("FIXME: do not fail");
 
         tracing::info!("Requesting wind change");
-        insim.send_command(&format!("/wind {:?}", &wind)).await.expect("FIXME: do not fail");
+        insim
+            .send_command(&format!("/wind {:?}", &wind))
+            .await
+            .expect("FIXME: do not fail");
 
         tracing::info!("Requesting layout load");
         if let Some(layout) = &layout {
-            insim.send_command(&format!("/axload {:?}", layout)).await.expect("FIXME: do not fail");
+            insim
+                .send_command(&format!("/axload {:?}", layout))
+                .await
+                .expect("FIXME: do not fail");
         } else {
-            insim.send_command("/axclear").await.expect("FIXME: do not fail");
+            insim
+                .send_command("/axclear")
+                .await
+                .expect("FIXME: do not fail");
         }
 
         tracing::info!("Waiting for all players to hit ready");
         self.wait_for_racing().await;
     }
-
 }

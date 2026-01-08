@@ -1,11 +1,10 @@
 //! Chat commands
 
 use insim::{identifiers::ConnectionId, insim::Mso};
-use kitcar::{chat::Parse, presence::PresenceHandle};
+use kitcar::chat::Parse;
 use tokio::sync::broadcast;
-use tokio_util::sync::CancellationToken;
 
-use crate::ClockworkCarnageError;
+use crate::Error;
 
 // Just derive and you're done!
 #[derive(Debug, Clone, PartialEq, kitcar::chat::Parse)]
@@ -26,7 +25,7 @@ pub enum Chat {
 
 #[derive(Debug, Clone)]
 pub struct ChatHandle {
-    broadcast: broadcast::Sender<(Chat, ConnectionId)>
+    broadcast: broadcast::Sender<(Chat, ConnectionId)>,
 }
 
 impl ChatHandle {
@@ -37,15 +36,15 @@ impl ChatHandle {
 
 impl Chat {
     /// Respond to commands globally and provide a bus
-    pub fn spawn(insim: insim::builder::SpawnedHandle, presence: PresenceHandle) -> (ChatHandle, CancellationToken) {
+    pub fn spawn(insim: insim::builder::SpawnedHandle) -> ChatHandle {
         let (tx, _rx) = broadcast::channel(100);
 
-        let cancel_token = CancellationToken::new();
-        let cancel_token2 = cancel_token.clone();
-        let h = ChatHandle { broadcast: tx.clone() };
+        let h = ChatHandle {
+            broadcast: tx.clone(),
+        };
 
         let _ = tokio::spawn(async move {
-            let result: Result<(), ClockworkCarnageError> = async {
+            let result: Result<(), Error> = async {
                 let mut packets = insim.subscribe();
 
                 loop {
@@ -62,21 +61,10 @@ impl Chat {
                                     insim.send_message(cmd, mso.ucid).await?;
                                 }
                             },
-                            Ok(Self::Quit) => {
-                                if_chain::if_chain! {
-                                    if let Some(conn_info) = presence.connection(&mso.ucid).await;
-                                    if conn_info.admin;
-                                    then {
-                                        tracing::info!("Requested quit..");
-                                        cancel_token2.cancel();
-                                        return Ok(());
-                                    }
-                                }
-                            },
                             Ok(o) => {
                                 let _ = tx.send((o, mso.ucid))?;
                             },
-                            _ => {}
+                            _ => {},
                         }
                     }
                 }
@@ -88,6 +76,6 @@ impl Chat {
             }
         });
 
-        (h, cancel_token)
+        h
     }
 }
