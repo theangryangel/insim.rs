@@ -5,29 +5,30 @@ use std::{collections::HashMap, fmt::Debug, time::Duration};
 
 use clap::Parser;
 use insim::{
-    WithRequestId,
     core::{
         object::insim::{InsimCheckpoint, InsimCheckpointKind},
         track::Track,
-    },
-    identifiers::ConnectionId,
-    insim::{ObjectInfo, RaceLaps, TinyType},
+    }, identifiers::ConnectionId, insim::{ObjectInfo, RaceLaps, TinyType}, WithRequestId
 };
-use kitcar::{chat::Parse, game::track_rotation::TrackRotation, time::countdown::Countdown};
-use tokio::time::sleep;
+use kitcar::time::countdown::Countdown;
+use tokio::{sync::broadcast, time::{sleep, timeout}};
 
 mod chat;
 mod cli;
 mod scene;
-mod wait_for_players;
 
 use scene::Scene;
 
-use crate::scene::SceneError;
-
 #[derive(Debug, thiserror::Error)]
 /// ClockworkCarnage Error
-pub enum ClockworkCarnageError {
+enum ClockworkCarnageError {
+    #[error("Chat bus closed!")]
+    ChatClosed,
+
+    /// SendError
+    #[error("Chat Broadcast Failed: {0}")]
+    ChatBroadcastFailed(#[from] tokio::sync::broadcast::error::SendError<(chat::Chat, ConnectionId)>),
+
     /// RecvError
     #[error("Receive Failed: {0}")]
     RecvFailed(#[from] tokio::sync::broadcast::error::RecvError),
@@ -41,70 +42,121 @@ pub enum ClockworkCarnageError {
     Insim(#[from] insim::Error),
 }
 
-impl SceneError for ClockworkCarnageError {
-    fn is_recoverable(&self) -> bool {
-        false
-    }
+#[derive(Debug)]
+enum ClockworkCarnageExit {
+    Continue,
+    Exit,
 }
 
 #[derive(Debug, Default, Clone)]
-struct ClockworkCarnage;
+struct ClockworkCarnage {
+    min_players: usize,
+}
 
-impl Scene<Context> for ClockworkCarnage {
-    type Output = ();
-    type Error = ClockworkCarnageError;
-
-    async fn poll(&mut self, mut ctx: Context) -> Result<Self::Output, Self::Error> {
+impl ClockworkCarnage {
+    async fn take_over(&self, mut ctx: Context) -> Result<(), ClockworkCarnageError> {
         let mut packets = ctx.insim.subscribe();
+        loop {
+            tokio::select! {
+                packet = packets.recv() => {
+                    // FIXME expect
+                    if let insim::Packet::Ncn(ncn) = packet? {
+                        tracing::info!("Waiting for players...");
+                        let _ = ctx.insim.send_message("Waiting for players", ncn.ucid).await.expect("Unhandled error");
+                    }
+                },
+                _ = ctx.presence.wait_for_connection_count(|val| *val >= self.min_players) => {
+                    tracing::info!("Got minimum player count!");
+                    break;
+                }
+            }
+        }
 
         let _ = ctx
             .insim
             .send_message("Ready for admin start command...", ConnectionId::ALL)
             .await?;
 
+        let mut chat = ctx.chat.subscribe();
+
         loop {
-            let packet = packets.recv().await?;
-            if_chain::if_chain! {
-                if let insim::Packet::Mso(mso) = packet;
-                if let Ok(chat::Chat::Start) = chat::Chat::parse(mso.msg_from_textstart());
-                if let Some(conn_info) = ctx.presence.connection(&mso.ucid).await;
-                if conn_info.admin;
-                then {
-                    tracing::info!("Starting..");
-                    break;
+            match chat.recv().await {
+                Ok((cmd, ucid)) => {
+                    if_chain::if_chain! {
+                        if matches!(cmd, chat::Chat::Start);
+                        if let Some(conn_info) = ctx.presence.connection(&ucid).await;
+                        if conn_info.admin;
+                        then {
+                            tracing::info!("Starting..");
+                            break;
+                        }
+                    }
+                },
+                Err(broadcast::error::RecvError::Lagged(_)) => {
+                    tracing::warn!("Chat commands lost due to lag");
+                },
+                Err(broadcast::error::RecvError::Closed) => {
+                    return Err(ClockworkCarnageError::ChatClosed);
                 }
             }
         }
 
-        let mut rotation = TrackRotation::request(
-            ctx.game.clone(),
-            ctx.insim.clone(),
-            Track::Fe1x,
-            None,
-            RaceLaps::Practice,
-            None,
-        );
-        rotation.poll().await??;
+        Ok(())
+    }
+}
 
-        packets = packets.resubscribe();
+impl Scene<Context> for ClockworkCarnage {
+    type Output = ClockworkCarnageExit;
+    type Error = ClockworkCarnageError;
+
+    async fn poll(&mut self, mut ctx: Context) -> Result<Self::Output, Self::Error> {
+        self.take_over(ctx.clone()).await?;
+
+        tokio::select! {
+            res = timeout(Duration::from_secs(60), ctx.game.track_rotation(
+                ctx.insim.clone(),
+                Track::Fe1x,
+                RaceLaps::Practice,
+                0,
+                None,
+            )) => {
+                if res.is_err() {
+                    // timeout occured
+                    tracing::error!("Timeout changing track and waiting for players");
+                    return Ok(ClockworkCarnageExit::Continue);
+                }
+            },
+            _ = ctx.presence.wait_for_connection_count(|val| *val < self.min_players) => {
+                tracing::info!("less than minimum player count!");
+                return Ok(ClockworkCarnageExit::Continue);
+            }
+        }
 
         tracing::info!("Starting lobby...");
         let mut event = Event::new(5, 10);
         let event_fut = event.poll(ctx.clone());
         tokio::pin!(event_fut);
+        let mut chat = ctx.chat.subscribe();
 
         loop {
             tokio::select! {
-                packet = packets.recv() => {
-                    if_chain::if_chain! {
-                        if let Ok(insim::Packet::Mso(mso)) = packet;
-                        if let Ok(chat::Chat::End) = chat::Chat::parse(mso.msg_from_textstart());
-                        if let Some(conn_info) = ctx.presence.connection(&mso.ucid).await;
-                        if conn_info.admin;
-                        then {
-                            tracing::info!("Ending..");
-                            break;
+                chat = chat.recv() => match chat {
+                    Ok((cmd, ucid)) => {
+                        if_chain::if_chain! {
+                            if matches!(cmd, chat::Chat::End);
+                            if let Some(conn_info) = ctx.presence.connection(&ucid).await;
+                            if conn_info.admin;
+                            then {
+                                tracing::info!("Ending..");
+                                break;
+                            }
                         }
+                    },
+                    Err(broadcast::error::RecvError::Lagged(_)) => {
+                        tracing::warn!("Chat commands lost due to lag");
+                    },
+                    Err(broadcast::error::RecvError::Closed) => {
+                        return Err(ClockworkCarnageError::ChatClosed);
                     }
                 },
                 _ = ctx.game.wait_for_end() => {
@@ -112,13 +164,14 @@ impl Scene<Context> for ClockworkCarnage {
                     // into wait_for_players we end up with a loop.. so this'll do for now.
                     break;
                 },
-                _ = &mut event_fut => {
-                    break;
+                res = &mut event_fut => {
+                    res?;
+                    return Ok(ClockworkCarnageExit::Continue)
                 }
             }
         }
 
-        Ok(())
+        Ok(ClockworkCarnageExit::Exit)
     }
 }
 
@@ -181,7 +234,7 @@ impl Event {
 
             let mut countdown = Countdown::new(Duration::from_secs(1), 60);
             let mut packets = ctx.insim.subscribe();
-            let target = Duration::from_secs(30);
+            let target = Duration::from_secs(20);
 
             loop {
                 tokio::select! {
@@ -302,6 +355,7 @@ struct Context {
     pub insim: insim::builder::SpawnedHandle,
     pub presence: kitcar::presence::PresenceHandle,
     pub game: kitcar::game::GameHandle,
+    pub chat: chat::ChatHandle,
 }
 
 #[tokio::main]
@@ -326,23 +380,34 @@ async fn main() -> Result<(), ClockworkCarnageError> {
 
     tracing::info!("Starting clockwork-carnage");
 
-    chat::Chat::spawn(insim.clone());
     let presence = kitcar::presence::Presence::spawn(insim.clone(), 32);
     let game = kitcar::game::GameInfo::spawn(insim.clone(), 32);
+    let (chat, chat_cancel_token) = chat::Chat::spawn(insim.clone(), presence.clone());
 
     let ctx = Context {
         insim: insim.clone(),
         presence: presence.clone(),
         game,
+        chat,
     };
 
     insim.send(TinyType::Ncn.with_request_id(1)).await?;
     insim.send(TinyType::Npl.with_request_id(2)).await?;
     insim.send(TinyType::Sst.with_request_id(3)).await?;
+    let mut cc = ClockworkCarnage{ min_players: 2 };
 
-    wait_for_players::WaitForPlayers::new(insim, presence, 2)
-        .poll(ClockworkCarnage, ctx)
-        .await?;
+    loop {
+        tokio::select! {
+            _ = chat_cancel_token.cancelled() => {
+                break;
+            },
+            res = cc.poll(ctx.clone()) => {
+                if matches!(res?, ClockworkCarnageExit::Exit) {
+                    break;
+                }
+            }
+        }
+    }
 
     Ok(())
 }

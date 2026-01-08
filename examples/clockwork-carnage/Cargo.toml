@@ -15,6 +15,7 @@ insim = { path = "../../insim", features = ["serde", "blocking"] }
 kitcar = { path = "../../kitcar" }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "signal", "time", "sync"]}
+tokio-util = { workspace = true }
 tracing = {workspace = true}
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 

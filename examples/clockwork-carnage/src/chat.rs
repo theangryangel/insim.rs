@@ -1,12 +1,14 @@
 //! Chat commands
 
-use insim::insim::Mso;
-use kitcar::chat::Parse;
+use insim::{identifiers::ConnectionId, insim::Mso};
+use kitcar::{chat::Parse, presence::PresenceHandle};
+use tokio::sync::broadcast;
+use tokio_util::sync::CancellationToken;
 
 use crate::ClockworkCarnageError;
 
 // Just derive and you're done!
-#[derive(Debug, PartialEq, kitcar::chat::Parse)]
+#[derive(Debug, Clone, PartialEq, kitcar::chat::Parse)]
 #[chat(prefix = '!')]
 /// Chat Commands
 pub enum Chat {
@@ -18,11 +20,30 @@ pub enum Chat {
     Echo { message: String },
     /// Help
     Help,
+    /// Quit
+    Quit,
+}
+
+#[derive(Debug, Clone)]
+pub struct ChatHandle {
+    broadcast: broadcast::Sender<(Chat, ConnectionId)>
+}
+
+impl ChatHandle {
+    pub fn subscribe(&self) -> broadcast::Receiver<(Chat, ConnectionId)> {
+        self.broadcast.subscribe()
+    }
 }
 
 impl Chat {
-    /// Respond to global commands
-    pub fn spawn(insim: insim::builder::SpawnedHandle) {
+    /// Respond to commands globally and provide a bus
+    pub fn spawn(insim: insim::builder::SpawnedHandle, presence: PresenceHandle) -> (ChatHandle, CancellationToken) {
+        let (tx, _rx) = broadcast::channel(100);
+
+        let cancel_token = CancellationToken::new();
+        let cancel_token2 = cancel_token.clone();
+        let h = ChatHandle { broadcast: tx.clone() };
+
         let _ = tokio::spawn(async move {
             let result: Result<(), ClockworkCarnageError> = async {
                 let mut packets = insim.subscribe();
@@ -41,7 +62,21 @@ impl Chat {
                                     insim.send_message(cmd, mso.ucid).await?;
                                 }
                             },
-                            _ => {},
+                            Ok(Self::Quit) => {
+                                if_chain::if_chain! {
+                                    if let Some(conn_info) = presence.connection(&mso.ucid).await;
+                                    if conn_info.admin;
+                                    then {
+                                        tracing::info!("Requested quit..");
+                                        cancel_token2.cancel();
+                                        return Ok(());
+                                    }
+                                }
+                            },
+                            Ok(o) => {
+                                let _ = tx.send((o, mso.ucid))?;
+                            },
+                            _ => {}
                         }
                     }
                 }
@@ -52,5 +87,7 @@ impl Chat {
                 tracing::error!("Chat background task failed: {:?}", e);
             }
         });
+
+        (h, cancel_token)
     }
 }
