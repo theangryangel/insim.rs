@@ -4,7 +4,7 @@ use insim::{identifiers::ConnectionId, insim::Mso};
 use kitcar::chat::Parse;
 use tokio::sync::broadcast;
 
-use crate::Error;
+use crate::scene::SceneError;
 
 // Just derive and you're done!
 #[derive(Debug, Clone, PartialEq, kitcar::chat::Parse)]
@@ -44,11 +44,16 @@ impl Chat {
         };
 
         let _ = tokio::spawn(async move {
-            let result: Result<(), Error> = async {
+            // FIXME: dont use SceneError
+            let result: Result<(), SceneError> = async {
                 let mut packets = insim.subscribe();
 
                 loop {
-                    if let insim::Packet::Mso(mso) = packets.recv().await? {
+                    if let insim::Packet::Mso(mso) = packets
+                        .recv()
+                        .await
+                        .map_err(|_| SceneError::InsimHandleLost)?
+                    {
                         match Self::try_from(&mso) {
                             Ok(Self::Echo { message }) => {
                                 insim
@@ -62,7 +67,9 @@ impl Chat {
                                 }
                             },
                             Ok(o) => {
-                                let _ = tx.send((o, mso.ucid))?;
+                                let _ = tx
+                                    .send((o, mso.ucid))
+                                    .map_err(|_| SceneError::ChatHandleLost);
                             },
                             _ => {},
                         }

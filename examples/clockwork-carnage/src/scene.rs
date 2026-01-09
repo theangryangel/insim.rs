@@ -1,13 +1,12 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, time::Duration};
 
 // A stage/layer/scene that orchestrates game flow. long live, delegates to other scene in a
 // waterfall manner
 /// Scene can succeed, bail (stop chain without error), or error
 pub trait Scene {
     type Output;
-    type Error: std::error::Error + Send + Sync + 'static;
 
-    async fn run(self) -> Result<SceneResult<Self::Output>, Self::Error>
+    async fn run(self) -> Result<SceneResult<Self::Output>, SceneError>
     where
         Self: Sized;
 }
@@ -17,51 +16,52 @@ pub enum SceneResult<T> {
     /// Continue to next scene with this value
     Continue(T),
     /// Stop the chain gracefully (not an error), and allow a repeat
-    Bail,
+    Bail { msg: Option<String> },
     #[allow(unused)]
     /// Quit stops the chain and does not allow a repeat
     Quit,
 }
 
+impl<T> SceneResult<T> {
+    /// Shortcut to make SceneResult::Bail
+    #[allow(unused)]
+    pub fn bail() -> Self {
+        Self::Bail { msg: None }
+    }
+
+    /// Shortcut to make SceneResult::Bail with a reason/msg
+    pub fn bail_with(msg: impl Into<String>) -> Self {
+        Self::Bail {
+            msg: Some(msg.into()),
+        }
+    }
+}
+
 /// Kind of SceneError
 #[derive(Debug, thiserror::Error)]
-pub enum SceneErrorKind {
+pub enum SceneError {
+    /// Insim
     #[error("Insim error: {0}")]
     Insim(#[from] insim::Error),
 
-    // Scene specific error
+    #[error("Insim handle lost")]
+    InsimHandleLost,
+
+    #[error("Chat handle lost")]
+    ChatHandleLost,
+
+    /// Custom error
     #[error("{scene}: {cause}")]
-    Scene {
+    #[allow(unused)]
+    Custom {
         scene: &'static str,
         #[source]
-        cause: Box<dyn std::error::Error + Send + Sync>
-    }
+        cause: Box<dyn std::error::Error + Send + Sync>,
+    },
 }
-
-/// Scene Error
-// FIXME: Drop associated Error type from Scene trait. 
-// everything should return this, and impl it's own conversions
-// Add a WithContext trait to allow context("asdasd").. to both SceneError and SceneErrorKind
-#[derive(Debug)]
-pub struct SceneError {
-    kind: SceneErrorKind,
-    context: String,
-}
-
-impl std::fmt::Display for SceneError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.kind)?;
-        if !self.context.is_empty() {
-            write!(f, ": {}", self.context)?;
-        }
-        Ok(())
-    }
-}
-
-impl std::error::Error for SceneError {}
 
 // Scene Combinators - do this then...
-// No data is passed between Scenes. If you need this with ThenWith.
+// No data is passed between Scenes. If you need this with AndThen
 #[derive(Debug, Clone)]
 pub struct Then<A, B> {
     first: A,
@@ -72,49 +72,67 @@ impl<A, B> Scene for Then<A, B>
 where
     A: Scene + Send + 'static,
     B: Scene + Send + 'static,
-    A::Error: Into<B::Error>,
     A::Output: Send + 'static,
     B::Output: Send + 'static,
 {
     type Output = B::Output;
-    type Error = B::Error;
 
-    async fn run(self) -> Result<SceneResult<Self::Output>, Self::Error> {
-        match self.first.run().await.map_err(Into::into)? {
+    async fn run(self) -> Result<SceneResult<Self::Output>, SceneError> {
+        match self.first.run().await? {
             SceneResult::Continue(_) => self.second.run().await,
-            SceneResult::Bail => Ok(SceneResult::Bail),
+            SceneResult::Bail { msg } => Ok(SceneResult::Bail { msg }),
             SceneResult::Quit => Ok(SceneResult::Quit),
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct ThenWith<A, B, F> {
+pub struct AndThen<A, B, F> {
     first: A,
     next_fn: F,
     _phantom: PhantomData<B>,
 }
 
-impl<A, B, F> Scene for ThenWith<A, B, F>
-where 
+impl<A, B, F> Scene for AndThen<A, B, F>
+where
     A: Scene + Send + 'static,
     B: Scene + Send + 'static,
-    A::Error: Into<B::Error>,
     F: Fn(A::Output) -> B + Clone,
 {
     type Output = B::Output;
-    type Error = B::Error;
 
-    async fn run(self) -> Result<SceneResult<Self::Output>, Self::Error>
+    async fn run(self) -> Result<SceneResult<Self::Output>, SceneError>
     where
-        Self: Sized {
-        match self.first.run().await.map_err(Into::into)? {
+        Self: Sized,
+    {
+        match self.first.run().await? {
             SceneResult::Continue(res) => {
                 let second = (self.next_fn)(res);
                 second.run().await
             },
-            SceneResult::Bail => Ok(SceneResult::Bail),
+            SceneResult::Bail { msg } => Ok(SceneResult::Bail { msg }),
             SceneResult::Quit => Ok(SceneResult::Quit),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct WithTimeout<S> {
+    inner: S,
+    timeout: Duration,
+}
+
+impl<S> Scene for WithTimeout<S>
+where
+    S: Scene + Send + 'static,
+    S::Output: Send + 'static,
+{
+    type Output = S::Output;
+
+    async fn run(self) -> Result<SceneResult<Self::Output>, SceneError> {
+        match tokio::time::timeout(self.timeout, self.inner.run()).await {
+            Ok(result) => result,
+            Err(_) => Ok(SceneResult::bail_with("WithTimeout")),
         }
     }
 }
@@ -130,13 +148,15 @@ where
     S::Output: Send + 'static,
 {
     type Output = ();
-    type Error = S::Error;
 
-    async fn run(self) -> Result<SceneResult<()>, Self::Error> {
+    async fn run(self) -> Result<SceneResult<()>, SceneError> {
         loop {
             match self.scene.clone().run().await? {
                 SceneResult::Continue(_) => continue,
-                SceneResult::Bail => continue,
+                SceneResult::Bail { msg } => {
+                    tracing::info!("Bailed, restarting: {msg:?}");
+                    continue;
+                },
                 SceneResult::Quit => return Ok(SceneResult::Quit),
             }
         }
@@ -155,12 +175,12 @@ pub trait SceneExt: Scene + Sized {
         }
     }
 
-    fn then_with<S, F>(self, f: F) -> ThenWith<Self, S, F>
+    fn and_then<S, F>(self, f: F) -> AndThen<Self, S, F>
     where
         S: Scene,
-        F: Fn(Self::Output) -> S + Clone
+        F: Fn(Self::Output) -> S + Clone,
     {
-        ThenWith {
+        AndThen {
             first: self,
             next_fn: f,
             _phantom: PhantomData,
@@ -172,6 +192,16 @@ pub trait SceneExt: Scene + Sized {
         Self: Clone,
     {
         Repeat { scene: self }
+    }
+
+    fn with_timeout(self, timeout: Duration) -> WithTimeout<Self>
+    where
+        Self: Clone,
+    {
+        WithTimeout {
+            inner: self,
+            timeout,
+        }
     }
 }
 

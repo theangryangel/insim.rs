@@ -24,24 +24,7 @@ mod scene;
 
 use scene::{Scene, SceneExt, SceneResult};
 
-use crate::chat::ChatHandle;
-
-// FIXME: sort out these errors so they're more useful
-#[derive(Debug, thiserror::Error)]
-enum Error {
-    #[error("Chat bus closed")]
-    ChatLost,
-    #[error("Chat broadcast failed: {0}")]
-    ChatBroadcastFailed(
-        #[from] tokio::sync::broadcast::error::SendError<(chat::Chat, ConnectionId)>,
-    ),
-    #[error("Receive failed: {0}")]
-    RecvFailed(#[from] tokio::sync::broadcast::error::RecvError),
-    #[error("Join failed: {0}")]
-    JoinFailed(#[from] tokio::task::JoinError),
-    #[error("insim error: {0}")]
-    Insim(#[from] insim::Error),
-}
+use crate::{chat::ChatHandle, scene::SceneError};
 
 /// Wait for minimum players to connect
 #[derive(Clone)]
@@ -53,16 +36,15 @@ struct WaitForPlayers {
 
 impl Scene for WaitForPlayers {
     type Output = ();
-    type Error = Error;  // FIXME: WaitForPlayersError
 
-    async fn run(mut self) -> Result<SceneResult<()>, Error> {
+    async fn run(mut self) -> Result<SceneResult<()>, SceneError> {
         tracing::info!("Waiting for {} players...", self.min_players);
         let mut packets = self.insim.subscribe();
 
         loop {
             tokio::select! {
                 packet = packets.recv() => {
-                    if let insim::Packet::Ncn(ncn) = packet? {
+                    if let insim::Packet::Ncn(ncn) = packet.map_err(|_| SceneError::InsimHandleLost)? {
                         self.insim.send_message("Waiting for players", ncn.ucid).await?;
                     }
                 }
@@ -85,9 +67,8 @@ struct WaitForAdminStart {
 
 impl Scene for WaitForAdminStart {
     type Output = ();
-    type Error = Error;  // FIXME: WaitForAdminStartError
 
-    async fn run(self) -> Result<SceneResult<()>, Error> {
+    async fn run(self) -> Result<SceneResult<()>, SceneError> {
         self.insim
             .send_message("Ready for admin !start command", ConnectionId::ALL)
             .await?;
@@ -108,7 +89,7 @@ impl Scene for WaitForAdminStart {
                     tracing::warn!("Chat commands lost due to lag");
                 },
                 Err(broadcast::error::RecvError::Closed) => {
-                    return Err(Error::ChatLost);
+                    return Err(SceneError::ChatHandleLost.into());
                 },
             }
         }
@@ -127,9 +108,8 @@ struct SetupTrack {
 
 impl Scene for SetupTrack {
     type Output = ();
-    type Error = Error; // FIXME: SetupTrackError
 
-    async fn run(mut self) -> Result<SceneResult<()>, Error> {
+    async fn run(mut self) -> Result<SceneResult<()>, SceneError> {
         tokio::select! {
             _ = self.game.track_rotation(
                 self.insim.clone(),
@@ -140,13 +120,9 @@ impl Scene for SetupTrack {
             ) => {
                 Ok(SceneResult::Continue(()))
             },
-            _ = tokio::time::sleep(Duration::from_secs(60)) => {
-                tracing::error!("Track change timeout");
-                Ok(SceneResult::Bail)
-            },
             _ = self.presence.wait_for_connection_count(|val| *val < self.min_players) => {
                 tracing::info!("Lost players during track setup");
-                Ok(SceneResult::Bail)
+                Ok(SceneResult::bail_with("Lost players during SetupTrack"))
             }
         }
     }
@@ -168,9 +144,8 @@ struct Clockwork {
 
 impl Scene for Clockwork {
     type Output = ();
-    type Error = Error;
 
-    async fn run(mut self) -> Result<SceneResult<()>, Error> {
+    async fn run(mut self) -> Result<SceneResult<()>, SceneError> {
         let mut event = ClockworkInner {
             max_scorers: self.max_scorers,
             scores: Default::default(),
@@ -189,7 +164,7 @@ impl Scene for Clockwork {
             }
             _ = wait_for_admin_end(&mut chat, self.presence.clone()) => {
                 tracing::info!("Admin ended event");
-                Ok(SceneResult::Bail)
+                Ok(SceneResult::bail_with("Admin ended event"))
             }
             _ = self.game.wait_for_end() => {
                 tracing::info!("Players voted to end");
@@ -197,7 +172,7 @@ impl Scene for Clockwork {
             }
             _ = self.presence.wait_for_connection_count(|val| *val < self.min_players) => {
                 tracing::info!("Lost players during event");
-                Ok(SceneResult::Bail)
+                Ok(SceneResult::bail_with("Clockwork lost players during event"))
             }
         }
     }
@@ -206,7 +181,7 @@ impl Scene for Clockwork {
 async fn wait_for_admin_end(
     chat: &mut broadcast::Receiver<(chat::Chat, ConnectionId)>,
     presence: PresenceHandle,
-) -> Result<(), Error> {
+) -> Result<(), SceneError> {
     loop {
         match chat.recv().await {
             Ok((chat::Chat::End, ucid)) => {
@@ -221,7 +196,7 @@ async fn wait_for_admin_end(
                 tracing::warn!("Chat commands lost due to lag");
             },
             Err(broadcast::error::RecvError::Closed) => {
-                return Err(Error::ChatLost);
+                return Err(SceneError::ChatHandleLost);
             },
         }
     }
@@ -239,7 +214,7 @@ struct ClockworkInner {
 }
 
 impl ClockworkInner {
-    async fn run(&mut self) -> Result<(), Error> {
+    async fn run(&mut self) -> Result<(), SceneError> {
         self.lobby().await?;
         for round in 1..=self.rounds {
             self.round(round).await?;
@@ -248,7 +223,7 @@ impl ClockworkInner {
         Ok(())
     }
 
-    async fn lobby(&self) -> Result<(), Error> {
+    async fn lobby(&self) -> Result<(), SceneError> {
         tracing::info!("Lobby: 20 second warm up");
         let mut countdown = Countdown::new(Duration::from_secs(1), 20);
 
@@ -262,7 +237,7 @@ impl ClockworkInner {
         Ok(())
     }
 
-    async fn round(&mut self, round: usize) -> Result<(), Error> {
+    async fn round(&mut self, round: usize) -> Result<(), SceneError> {
         let mut active_runs: HashMap<String, Duration> = HashMap::new();
         let mut round_scores: HashMap<String, Duration> = HashMap::new();
 
@@ -293,7 +268,7 @@ impl ClockworkInner {
                     }
                 },
                 packet = packets.recv() => {
-                    self.handle_packet(packet?, &mut active_runs, &mut round_scores).await?;
+                    self.handle_packet(packet.map_err(|_| SceneError::InsimHandleLost)?, &mut active_runs, &mut round_scores).await?;
                 }
             }
         }
@@ -307,7 +282,7 @@ impl ClockworkInner {
         packet: insim::Packet,
         active_runs: &mut HashMap<String, Duration>,
         round_scores: &mut HashMap<String, Duration>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), SceneError> {
         match packet {
             insim::Packet::Ncn(ncn) => {
                 self.insim
@@ -396,7 +371,7 @@ impl ClockworkInner {
         tracing::info!("{:?}", self.scores);
     }
 
-    async fn announce_results(&self) -> Result<(), Error> {
+    async fn announce_results(&self) -> Result<(), SceneError> {
         let mut standings: Vec<_> = self.scores.iter().collect();
         standings.sort_by(|a, b| b.1.cmp(a.1));
 
@@ -418,7 +393,7 @@ impl ClockworkInner {
 async fn wait_for_admin_quit(
     chat: chat::ChatHandle,
     presence: PresenceHandle,
-) -> Result<(), Error> {
+) -> Result<(), SceneError> {
     let mut chat = chat.subscribe();
     loop {
         match chat.recv().await {
@@ -435,7 +410,7 @@ async fn wait_for_admin_quit(
                 tracing::warn!("Chat commands lost due to lag");
             },
             Err(broadcast::error::RecvError::Closed) => {
-                return Err(Error::ChatLost);
+                return Err(SceneError::ChatHandleLost);
             },
         }
     }
@@ -445,7 +420,7 @@ async fn wait_for_admin_quit(
 const MIN_PLAYERS: usize = 2;
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<(), SceneError> {
     tracing_subscriber::fmt::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::builder()
@@ -484,32 +459,33 @@ async fn main() -> Result<(), Error> {
         presence: presence.clone(),
         chat: chat.clone(),
     })
-    .then(SetupTrack {
-        insim: insim.clone(),
-        presence: presence.clone(),
-        min_players: MIN_PLAYERS,
-        game: game.clone(),
-        track: Track::Fe1x,
-    })
+    .then(
+        SetupTrack {
+            insim: insim.clone(),
+            presence: presence.clone(),
+            min_players: MIN_PLAYERS,
+            game: game.clone(),
+            track: Track::Fe1x,
+        }
+        .with_timeout(Duration::from_secs(60)),
+    )
     // example/test of using then_with. we don't actually need it in this case
     // but lets imagine that SetupTrack is actually VoteForTrack!
-    .then_with({
+    .and_then({
         let game = game.clone();
         let presence = presence.clone();
         let chat = chat.clone();
         let insim = insim.clone();
 
-        move |_| { 
-            Clockwork {
-                game: game.clone(),
-                presence: presence.clone(),
-                chat: chat.clone(),
-                rounds: 5,
-                max_scorers: 10,
-                min_players: MIN_PLAYERS,
-                target: Duration::from_secs(20),
-                insim: insim.clone(),
-            }
+        move |_| Clockwork {
+            game: game.clone(),
+            presence: presence.clone(),
+            chat: chat.clone(),
+            rounds: 5,
+            max_scorers: 10,
+            min_players: MIN_PLAYERS,
+            target: Duration::from_secs(20),
+            insim: insim.clone(),
         }
     })
     .repeat();
