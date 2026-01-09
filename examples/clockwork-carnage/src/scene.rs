@@ -2,11 +2,10 @@
 // waterfall manner
 /// Scene can succeed, bail (stop chain without error), or error
 pub trait Scene {
-    type Context;
     type Output;
     type Error: std::error::Error + Send + Sync + 'static;
 
-    async fn run(self, ctx: Self::Context) -> Result<SceneResult<Self::Output>, Self::Error>
+    async fn run(self) -> Result<SceneResult<Self::Output>, Self::Error>
     where
         Self: Sized;
 }
@@ -32,19 +31,17 @@ pub struct Then<A, B> {
 impl<A, B> Scene for Then<A, B>
 where
     A: Scene + Send + 'static,
-    B: Scene<Context = A::Context> + Send + 'static,
-    A::Context: Clone + Send + 'static,
+    B: Scene + Send + 'static,
     A::Error: Into<B::Error>,
     A::Output: Send + 'static,
     B::Output: Send + 'static,
 {
-    type Context = A::Context;
     type Output = B::Output;
     type Error = B::Error;
 
-    async fn run(self, ctx: Self::Context) -> Result<SceneResult<Self::Output>, Self::Error> {
-        match self.first.run(ctx.clone()).await.map_err(Into::into)? {
-            SceneResult::Continue(_) => self.second.run(ctx).await,
+    async fn run(self) -> Result<SceneResult<Self::Output>, Self::Error> {
+        match self.first.run().await.map_err(Into::into)? {
+            SceneResult::Continue(_) => self.second.run().await,
             SceneResult::Bail => Ok(SceneResult::Bail),
             SceneResult::Quit => Ok(SceneResult::Quit),
         }
@@ -59,16 +56,14 @@ pub struct Repeat<S> {
 impl<S> Scene for Repeat<S>
 where
     S: Scene + Clone + Send + 'static,
-    S::Context: Clone + Send + 'static,
     S::Output: Send + 'static,
 {
-    type Context = S::Context;
     type Output = ();
     type Error = S::Error;
 
-    async fn run(self, ctx: Self::Context) -> Result<SceneResult<()>, Self::Error> {
+    async fn run(self) -> Result<SceneResult<()>, Self::Error> {
         loop {
-            match self.scene.clone().run(ctx.clone()).await? {
+            match self.scene.clone().run().await? {
                 SceneResult::Continue(_) => continue,
                 SceneResult::Bail => continue,
                 SceneResult::Quit => return Ok(SceneResult::Quit),
@@ -81,7 +76,7 @@ where
 pub trait SceneExt: Scene + Sized {
     fn then<S>(self, next: S) -> Then<Self, S>
     where
-        S: Scene<Context = Self::Context>,
+        S: Scene,
     {
         Then {
             first: self,
