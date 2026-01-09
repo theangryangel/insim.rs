@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 // A stage/layer/scene that orchestrates game flow. long live, delegates to other scene in a
 // waterfall manner
 /// Scene can succeed, bail (stop chain without error), or error
@@ -21,7 +23,45 @@ pub enum SceneResult<T> {
     Quit,
 }
 
+/// Kind of SceneError
+#[derive(Debug, thiserror::Error)]
+pub enum SceneErrorKind {
+    #[error("Insim error: {0}")]
+    Insim(#[from] insim::Error),
+
+    // Scene specific error
+    #[error("{scene}: {cause}")]
+    Scene {
+        scene: &'static str,
+        #[source]
+        cause: Box<dyn std::error::Error + Send + Sync>
+    }
+}
+
+/// Scene Error
+// FIXME: Drop associated Error type from Scene trait. 
+// everything should return this, and impl it's own conversions
+// Add a WithContext trait to allow context("asdasd").. to both SceneError and SceneErrorKind
+#[derive(Debug)]
+pub struct SceneError {
+    kind: SceneErrorKind,
+    context: String,
+}
+
+impl std::fmt::Display for SceneError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.kind)?;
+        if !self.context.is_empty() {
+            write!(f, ": {}", self.context)?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for SceneError {}
+
 // Scene Combinators - do this then...
+// No data is passed between Scenes. If you need this with ThenWith.
 #[derive(Debug, Clone)]
 pub struct Then<A, B> {
     first: A,
@@ -42,6 +82,37 @@ where
     async fn run(self) -> Result<SceneResult<Self::Output>, Self::Error> {
         match self.first.run().await.map_err(Into::into)? {
             SceneResult::Continue(_) => self.second.run().await,
+            SceneResult::Bail => Ok(SceneResult::Bail),
+            SceneResult::Quit => Ok(SceneResult::Quit),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ThenWith<A, B, F> {
+    first: A,
+    next_fn: F,
+    _phantom: PhantomData<B>,
+}
+
+impl<A, B, F> Scene for ThenWith<A, B, F>
+where 
+    A: Scene + Send + 'static,
+    B: Scene + Send + 'static,
+    A::Error: Into<B::Error>,
+    F: Fn(A::Output) -> B + Clone,
+{
+    type Output = B::Output;
+    type Error = B::Error;
+
+    async fn run(self) -> Result<SceneResult<Self::Output>, Self::Error>
+    where
+        Self: Sized {
+        match self.first.run().await.map_err(Into::into)? {
+            SceneResult::Continue(res) => {
+                let second = (self.next_fn)(res);
+                second.run().await
+            },
             SceneResult::Bail => Ok(SceneResult::Bail),
             SceneResult::Quit => Ok(SceneResult::Quit),
         }
@@ -81,6 +152,18 @@ pub trait SceneExt: Scene + Sized {
         Then {
             first: self,
             second: next,
+        }
+    }
+
+    fn then_with<S, F>(self, f: F) -> ThenWith<Self, S, F>
+    where
+        S: Scene,
+        F: Fn(Self::Output) -> S + Clone
+    {
+        ThenWith {
+            first: self,
+            next_fn: f,
+            _phantom: PhantomData,
         }
     }
 

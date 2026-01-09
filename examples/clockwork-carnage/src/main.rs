@@ -53,7 +53,7 @@ struct WaitForPlayers {
 
 impl Scene for WaitForPlayers {
     type Output = ();
-    type Error = Error;
+    type Error = Error;  // FIXME: WaitForPlayersError
 
     async fn run(mut self) -> Result<SceneResult<()>, Error> {
         tracing::info!("Waiting for {} players...", self.min_players);
@@ -85,7 +85,7 @@ struct WaitForAdminStart {
 
 impl Scene for WaitForAdminStart {
     type Output = ();
-    type Error = Error;
+    type Error = Error;  // FIXME: WaitForAdminStartError
 
     async fn run(self) -> Result<SceneResult<()>, Error> {
         self.insim
@@ -127,7 +127,7 @@ struct SetupTrack {
 
 impl Scene for SetupTrack {
     type Output = ();
-    type Error = Error;
+    type Error = Error; // FIXME: SetupTrackError
 
     async fn run(mut self) -> Result<SceneResult<()>, Error> {
         tokio::select! {
@@ -491,15 +491,26 @@ async fn main() -> Result<(), Error> {
         game: game.clone(),
         track: Track::Fe1x,
     })
-    .then(Clockwork {
-        game: game.clone(),
-        presence: presence.clone(),
-        chat: chat.clone(),
-        rounds: 5,
-        max_scorers: 10,
-        min_players: MIN_PLAYERS,
-        target: Duration::from_secs(20),
-        insim: insim.clone(),
+    // example/test of using then_with. we don't actually need it in this case
+    // but lets imagine that SetupTrack is actually VoteForTrack!
+    .then_with({
+        let game = game.clone();
+        let presence = presence.clone();
+        let chat = chat.clone();
+        let insim = insim.clone();
+
+        move |_| { 
+            Clockwork {
+                game: game.clone(),
+                presence: presence.clone(),
+                chat: chat.clone(),
+                rounds: 5,
+                max_scorers: 10,
+                min_players: MIN_PLAYERS,
+                target: Duration::from_secs(20),
+                insim: insim.clone(),
+            }
+        }
     })
     .repeat();
 
