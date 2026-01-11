@@ -129,6 +129,7 @@ impl Scene for SetupTrack {
 }
 
 /// Clockwork Carnage event
+// TODO: split up into Lobby, Rounds, Victory
 #[derive(Clone)]
 struct Clockwork {
     game: GameHandle,
