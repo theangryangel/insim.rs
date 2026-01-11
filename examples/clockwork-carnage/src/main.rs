@@ -488,7 +488,7 @@ async fn main() -> Result<(), SceneError> {
             insim: insim.clone(),
         }
     })
-    .repeat();
+    .loop_until_quit();
 
     tokio::select! {
         res = clockwork.run() => {

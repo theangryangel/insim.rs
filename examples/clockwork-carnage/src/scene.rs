@@ -138,11 +138,11 @@ where
 }
 
 // Scene Combinators - repeat the chain on bail
-pub struct Repeat<S> {
+pub struct LoopUntilQuit<S> {
     scene: S,
 }
 
-impl<S> Scene for Repeat<S>
+impl<S> Scene for LoopUntilQuit<S>
 where
     S: Scene + Clone + Send + 'static,
     S::Output: Send + 'static,
@@ -187,11 +187,11 @@ pub trait SceneExt: Scene + Sized {
         }
     }
 
-    fn repeat(self) -> Repeat<Self>
+    fn loop_until_quit(self) -> LoopUntilQuit<Self>
     where
         Self: Clone,
     {
-        Repeat { scene: self }
+        LoopUntilQuit { scene: self }
     }
 
     fn with_timeout(self, timeout: Duration) -> WithTimeout<Self>
