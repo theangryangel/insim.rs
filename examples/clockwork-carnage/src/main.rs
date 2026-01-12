@@ -21,6 +21,7 @@ use tokio::{sync::broadcast, time::sleep};
 mod chat;
 mod cli;
 mod scene;
+mod ui;
 
 use scene::{Scene, SceneExt, SceneResult};
 
