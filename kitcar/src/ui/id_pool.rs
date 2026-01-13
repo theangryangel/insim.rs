@@ -80,6 +80,13 @@ impl<const MIN: u8, const MAX: u8> IdPool<MIN, MAX> {
         }
     }
 
+    /// Release all
+    pub fn release_all(&mut self) {
+        (MIN..=MAX).for_each(|i| {
+            self.available_ids.set(i as usize, true);
+        });
+    }
+
     /// Get pool statistics
     pub fn stats(&self) -> (usize, usize, usize) {
         let total_capacity = MAX as usize - MIN as usize + 1;

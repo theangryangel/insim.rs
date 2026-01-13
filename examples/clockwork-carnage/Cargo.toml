@@ -11,8 +11,10 @@ homepage.workspace = true
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
 if_chain = { workspace = true }
+
 insim = { path = "../../insim", features = ["serde", "blocking"] }
 kitcar = { path = "../../kitcar" }
+taffy = "0.9.2"
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "signal", "time", "sync"]}
 tracing = {workspace = true}

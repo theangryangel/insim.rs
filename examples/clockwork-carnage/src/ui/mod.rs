@@ -8,7 +8,7 @@ use insim::{
 use kitcar::presence::PresenceHandle;
 use tokio::{
     sync::{Notify, mpsc, watch},
-    task::JoinHandle,
+    task::LocalSet,
 };
 
 pub mod canvas;
@@ -57,6 +57,8 @@ impl<V: View> Drop for Ui<V> {
 
 /// Manager to spawn Ui's for each connection
 /// Dropping the returned Ui handle will result in the UI being cleared
+///
+/// All UI tasks run on a LocalSet, so View implementations don't need to be Send.
 pub fn attach<V: View>(
     insim: insim::builder::SpawnedHandle,
     presence: PresenceHandle,
@@ -72,64 +74,70 @@ pub fn attach<V: View>(
         _phantom: PhantomData,
     };
 
-    let _ = tokio::spawn(async move {
-        let mut packets = insim.subscribe();
-        let mut active: HashMap<ConnectionId, (watch::Sender<V::ConnectionProps>, JoinHandle<()>)> =
-            HashMap::new();
+    // XXX: We run on our own thread because we need to use LocalSet until Taffy Style is Send.
+    // https://github.com/DioxusLabs/taffy/issues/823
+    let _ = std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("Failed to create UI runtime");
 
-        // FIXME: expect
-        for existing in presence.connections().await.expect("FIXME") {
-            spawn_for::<V>(existing.ucid, &global_rx, &insim, &mut active);
-        }
+        let local = LocalSet::new();
+        local.block_on(&rt, async move {
+            let mut packets = insim.subscribe();
+            let mut active: HashMap<ConnectionId, watch::Sender<V::ConnectionProps>> =
+                HashMap::new();
 
-        loop {
-            tokio::select! {
-                packet = packets.recv() => match packet {
-                    Ok(Packet::Ncn(ncn)) => {
-                        if active.contains_key(&ncn.ucid) {
-                            continue;
+            // FIXME: expect
+            for existing in presence.connections().await.expect("FIXME") {
+                spawn_for::<V>(existing.ucid, &global_rx, &insim, &mut active);
+            }
+
+            loop {
+                tokio::select! {
+                    packet = packets.recv() => match packet {
+                        Ok(Packet::Ncn(ncn)) => {
+                            if active.contains_key(&ncn.ucid) {
+                                continue;
+                            }
+
+                            spawn_for::<V>(ncn.ucid, &global_rx, &insim, &mut active);
+                        },
+                        Ok(Packet::Cnl(cnl)) => {
+                            // player left, remove their props sender
+                            let _ = active.remove(&cnl.ucid);
+                        },
+
+                        _ => {
+                            // FIXME: handle Err
                         }
-
-                        spawn_for::<V>(ncn.ucid, &global_rx, &insim, &mut active);
                     },
-                    Ok(Packet::Cnl(cnl)) => {
-                        // if there's an active view abort the per-player task because the
-                        // player left
-                        if let Some((_, handle)) = active.remove(&cnl.ucid) {
-                            handle.abort();
+
+                    res = player_rx.recv() => match res {
+                        Some((ucid, props)) => {
+                            if let Some(entry) = active.get_mut(&ucid) {
+                                let _ = entry.send(props);
+                            }
+                        },
+                        None => {
+                            // FIXME: log, or something
+                            break;
                         }
                     },
 
-                    _ => {
-                        // FIXME: handle Err
-                    }
-                },
-
-                res = player_rx.recv() => match res {
-                    Some((ucid, props)) => {
-                        if let Some((entry, _)) = active.get_mut(&ucid) {
-                            let _ = entry.send(props);
-                        }
-                    },
-                    None => {
-                        // FIXME: log, or something
+                    _ = detach.notified() => {
+                        // for all player connections automatically clear all buttons
+                        // when we loose the UiHandle.
+                        let clear: Vec<Bfn> = active.drain().map(|(ucid, _)| {
+                            Bfn { ucid, subt: BfnType::Clear, ..Default::default() }
+                        }).collect();
+                        // FIXME: no expect
+                        insim.send_all(clear).await.expect("FIXME");
                         break;
                     }
-                },
-
-                _ = detach.notified() => {
-                    // for all player connections automatically clear all buttons and all tasks
-                    // when we loose the UiHandle.
-                    let clear: Vec<Bfn> = active.drain().map(|(ucid, (_, handle))| {
-                        handle.abort();
-                        Bfn { ucid, subt: BfnType::Clear, ..Default::default() }
-                    }).collect();
-                    // FIXME: no expect
-                    insim.send_all(clear).await.expect("FIXME");
-                    break;
                 }
             }
-        }
+        });
     });
 
     handle
@@ -139,15 +147,15 @@ fn spawn_for<V: View>(
     ucid: ConnectionId,
     global_rx: &watch::Receiver<V::GlobalProps>,
     insim: &insim::builder::SpawnedHandle,
-    active: &mut HashMap<ConnectionId, (watch::Sender<V::ConnectionProps>, JoinHandle<()>)>,
+    active: &mut HashMap<ConnectionId, watch::Sender<V::ConnectionProps>>,
 ) {
     let (connection_tx, connection_rx) = watch::channel(V::ConnectionProps::default());
 
-    let conn_handle = run_view::<V>(
+    run_view::<V>(
         ucid.clone(),
         global_rx.clone(),
         connection_rx,
         insim.clone(),
     );
-    let _ = active.insert(ucid, (connection_tx, conn_handle));
+    let _ = active.insert(ucid, connection_tx);
 }

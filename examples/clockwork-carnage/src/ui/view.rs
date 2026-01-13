@@ -4,16 +4,14 @@ use tokio::sync::{mpsc, watch};
 use super::Canvas;
 
 pub trait Component<P> {
-    type Message: Clone + Send + 'static;
+    type Message: Clone + 'static;
     #[allow(unused)]
     fn update(&mut self, msg: Self::Message) {}
     fn render(&self, props: P) -> super::Node<Self::Message>;
 }
 
 /// View
-pub trait View:
-    Component<(Self::GlobalProps, Self::ConnectionProps)> + Sized + Send + 'static
-{
+pub trait View: Component<(Self::GlobalProps, Self::ConnectionProps)> + Sized + 'static {
     type GlobalProps: Clone + Send + Sync + Default + 'static;
     type ConnectionProps: Clone + Send + Sync + Default + 'static;
 
@@ -21,30 +19,31 @@ pub trait View:
     fn mount(tx: mpsc::UnboundedSender<Self::Message>) -> Self;
 }
 
-/// Run the UI
+/// Run the UI on a LocalSet (does not require Send)
 pub(super) fn run_view<V: View>(
     ucid: ConnectionId,
     mut global: watch::Receiver<V::GlobalProps>,
     mut connection: watch::Receiver<V::ConnectionProps>,
     insim: insim::builder::SpawnedHandle,
-) -> tokio::task::JoinHandle<()> {
+) {
     let (internal_tx, mut internal_rx) = mpsc::unbounded_channel();
 
-    let handle = tokio::spawn(async move {
+    let _ = tokio::task::spawn_local(async move {
         let mut root = V::mount(internal_tx);
         let mut packets = insim.subscribe();
         let mut canvas = Canvas::<V>::new(ucid);
+        let mut blocked = false; // user cleared the buttons, do not redraw unless requested
 
         // always draw immediately
         let mut should_render = true;
 
         loop {
-            if should_render {
+            if should_render && !blocked {
                 let vdom = root.render((
                     global.borrow_and_update().clone(),
                     connection.borrow_and_update().clone(),
                 ));
-                if let Some(diff) = canvas.paint(&vdom) {
+                if let Some(diff) = canvas.reconcile(vdom) {
                     dbg!(&diff);
 
                     // FIXME: no expect
@@ -83,11 +82,12 @@ pub(super) fn run_view<V: View>(
                         },
                         Ok(Packet::Bfn(bfn)) if bfn.ucid == ucid => match bfn.subt {
                             BfnType::Clear | BfnType::UserClear => {
-                                canvas.block();
+                                blocked = true;
+                                canvas.clear();
                                 false
                             },
                             BfnType::BtnRequest => {
-                                canvas.unblock();
+                                blocked = false;
                                 true
                             },
                             _ => {
@@ -103,6 +103,4 @@ pub(super) fn run_view<V: View>(
             };
         }
     });
-
-    handle
 }
