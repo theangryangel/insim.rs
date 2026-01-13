@@ -1,7 +1,7 @@
 use insim::{Packet, identifiers::ConnectionId, insim::BfnType};
 use tokio::sync::{mpsc, watch};
 
-use super::Canvas;
+use super::canvas::Canvas;
 
 pub trait Component<P> {
     type Message: Clone + 'static;

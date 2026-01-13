@@ -13,7 +13,7 @@ use kitcar::ui::ClickIdPool;
 use super::{Node, NodeKind, View};
 
 #[derive(Debug, Default)]
-pub struct CanvasDiff {
+pub(super) struct CanvasDiff {
     pub update: Vec<Btn>,
     pub remove: Vec<Bfn>,
 }
@@ -35,7 +35,7 @@ struct ButtonState {
 }
 
 #[derive(Debug)]
-pub struct Canvas<V: View> {
+pub(super) struct Canvas<V: View> {
     ucid: ConnectionId,
     pool: ClickIdPool,
     // map stable hash -> button state (click id + rendered hash for diffing)
@@ -44,7 +44,7 @@ pub struct Canvas<V: View> {
 }
 
 impl<V: View> Canvas<V> {
-    pub fn new(ucid: ConnectionId) -> Self {
+    pub(super) fn new(ucid: ConnectionId) -> Self {
         Self {
             ucid,
             pool: ClickIdPool::new(),
@@ -53,7 +53,7 @@ impl<V: View> Canvas<V> {
         }
     }
 
-    pub fn reconcile(&mut self, root: Node<V::Message>) -> Option<CanvasDiff> {
+    pub(super) fn reconcile(&mut self, root: Node<V::Message>) -> Option<CanvasDiff> {
         let mut click_map = HashMap::new();
         let mut new_buttons = HashMap::new();
 
@@ -61,7 +61,7 @@ impl<V: View> Canvas<V> {
         let mut node_map = Vec::new();
 
         // start traversal with a seed hash (0)
-        let _root_id = Self::visit(
+        let root_id = Self::visit(
             root,
             0,
             self.ucid,
@@ -72,6 +72,11 @@ impl<V: View> Canvas<V> {
             &mut node_map,
             &mut click_map,
         );
+
+        if let Some(root_id) = root_id {
+            tree.compute_layout(root_id, taffy::Size::length(200.0))
+                .expect("taffy compute layout failed");
+        }
 
         // identify ids that were allocated in previous frames but not seen in this one
         let dead_ids: Vec<ClickId> = self
@@ -121,20 +126,26 @@ impl<V: View> Canvas<V> {
             }
         }
 
+        let removals: Vec<Bfn> = dead_ids
+            .into_iter()
+            .map(|clickid| Bfn {
+                ucid: self.ucid,
+                subt: BfnType::DelBtn,
+                clickid,
+                ..Default::default()
+            })
+            .collect();
+
         self.buttons = new_buttons;
 
-        Some(CanvasDiff {
-            update: updates,
-            remove: dead_ids
-                .into_iter()
-                .map(|clickid| Bfn {
-                    ucid: self.ucid,
-                    subt: BfnType::DelBtn,
-                    clickid,
-                    ..Default::default()
-                })
-                .collect(),
-        })
+        if updates.is_empty() && removals.is_empty() {
+            None
+        } else {
+            Some(CanvasDiff {
+                update: updates,
+                remove: removals,
+            })
+        }
     }
 
     fn visit<M: Clone>(
@@ -255,13 +266,13 @@ impl<V: View> Canvas<V> {
     }
 
     // should be called if the user clears buttons
-    pub fn clear(&mut self) {
+    pub(super) fn clear(&mut self) {
         self.buttons.clear();
         self.click_map.clear();
         self.pool.release_all();
     }
 
-    pub fn translate_clickid(&self, clickid: &ClickId) -> Option<V::Message> {
+    pub(super) fn translate_clickid(&self, clickid: &ClickId) -> Option<V::Message> {
         self.click_map.get(clickid).cloned()
     }
 }

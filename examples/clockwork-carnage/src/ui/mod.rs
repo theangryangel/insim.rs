@@ -11,11 +11,10 @@ use tokio::{
     task::LocalSet,
 };
 
-pub mod canvas;
+mod canvas;
 pub mod node;
 pub mod view;
 
-pub use canvas::*;
 pub use node::*;
 pub use view::*;
 
