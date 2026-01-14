@@ -15,24 +15,23 @@ use insim::{
     identifiers::ConnectionId,
     insim::{BtnStyle, ObjectInfo, RaceLaps, TinyType, Uco},
 };
-use kitcar::{game::GameHandle, presence::PresenceHandle, time::countdown::Countdown};
+use kitcar::{
+    game, presence,
+    scenes::{Scene, SceneError, SceneExt, SceneResult},
+    time::Countdown,
+    ui::{self, Component},
+};
 use tokio::{sync::broadcast, time::sleep};
 
 mod chat;
 mod cli;
-mod scene;
-mod ui;
 mod marquee;
-
-use scene::{Scene, SceneExt, SceneResult};
-
-use crate::{chat::ChatHandle, scene::SceneError};
 
 /// Wait for minimum players to connect
 #[derive(Clone)]
 struct WaitForPlayers {
     insim: SpawnedHandle,
-    presence: PresenceHandle,
+    presence: presence::Presence,
     min_players: usize,
 }
 
@@ -64,25 +63,22 @@ enum WaitForAdminStartUiMsg {
     Marquee(marquee::MarqueeMsg),
 }
 
-
 struct WaitForAdminStartUi {
     marquee: marquee::Marquee,
 }
 
 impl ui::View for WaitForAdminStartUi {
     type GlobalProps = ();
-
     type ConnectionProps = ();
+    type Message = WaitForAdminStartUiMsg;
 
     fn mount(tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
         Self {
-            marquee: marquee::Marquee::new("Hello World!!!!!", 10, tx, |m| WaitForAdminStartUiMsg::Marquee(m))
+            marquee: marquee::Marquee::new("Hello World!!!!!", 10, tx, |m| {
+                WaitForAdminStartUiMsg::Marquee(m)
+            }),
         }
     }
-}
-
-impl<P> ui::Component<P> for WaitForAdminStartUi {
-    type Message = WaitForAdminStartUiMsg;
 
     fn update(&mut self, msg: Self::Message) {
         match msg {
@@ -90,41 +86,42 @@ impl<P> ui::Component<P> for WaitForAdminStartUi {
         }
     }
 
-    fn render(&self, _props: P) -> Option<ui::Node<Self::Message>> {
-        // FIXME: this is shit. Option<ui::Node<_>> is whats screwing us here.
-        let mut m = self.marquee.render(()).map(|e| e.map(WaitForAdminStartUiMsg::Marquee));
-        if let Some(i) = m {
-            m = Some(i.w(38.).h(5.));
-        }
+    fn render(
+        &self,
+        global_props: Self::GlobalProps,
+        connection_props: Self::ConnectionProps,
+    ) -> ui::Node<Self::Message> {
+        let m = self
+            .marquee
+            .render(())
+            .map(WaitForAdminStartUiMsg::Marquee)
+            .w(38.)
+            .h(5.);
 
-        Some(
-            ui::container()
-                .with_child(
-                    ui::text("No game in progress", BtnStyle::default().dark())
-                        .w(33.)
-                        .h(5.),
-                )
-                .with_child(
-                    ui::text(
-                        format!("{} {}", "Welcome to Clockwork".white(), "Carnage".red()),
-                        BtnStyle::default().dark(),
-                    )
-                    .w(38.)
+        ui::container()
+            .with_child(
+                ui::text("No game in progress", BtnStyle::default().dark())
+                    .w(33.)
                     .h(5.),
+            )
+            .with_child(
+                ui::text(
+                    format!("{} {}", "Welcome to Clockwork".white(), "Carnage".red()),
+                    BtnStyle::default().dark(),
                 )
-                .with_child(
-                    ui::text("?".white(), BtnStyle::default().dark())
-                        .w(5.)
-                        .h(5.),
-                )
-                .with_child(
-                    m
-                )
-                .flex()
-                .flex_row()
-                .justify_center()
-                .w(200.),
-        )
+                .w(38.)
+                .h(5.),
+            )
+            .with_child(
+                ui::text("?".white(), BtnStyle::default().dark())
+                    .w(5.)
+                    .h(5.),
+            )
+            .with_child(m)
+            .flex()
+            .flex_row()
+            .justify_center()
+            .w(200.)
     }
 }
 
@@ -132,8 +129,8 @@ impl<P> ui::Component<P> for WaitForAdminStartUi {
 #[derive(Clone)]
 struct WaitForAdminStart {
     insim: SpawnedHandle,
-    presence: PresenceHandle,
-    chat: ChatHandle,
+    presence: presence::Presence,
+    chat: chat::Chat,
 }
 
 impl Scene for WaitForAdminStart {
@@ -149,7 +146,7 @@ impl Scene for WaitForAdminStart {
 
         loop {
             match chat.recv().await {
-                Ok((chat::Chat::Start, ucid)) => {
+                Ok((chat::ChatMsg::Start, ucid)) => {
                     if let Some(conn) = self.presence.connection(&ucid).await {
                         if conn.admin {
                             tracing::info!("Admin started game");
@@ -162,7 +159,10 @@ impl Scene for WaitForAdminStart {
                     tracing::warn!("Chat commands lost due to lag");
                 },
                 Err(broadcast::error::RecvError::Closed) => {
-                    return Err(SceneError::ChatHandleLost.into());
+                    return Err(SceneError::Custom {
+                        scene: "WaitForAdminStart",
+                        cause: Box::new(chat::ChatError::HandleLost),
+                    });
                 },
             }
         }
@@ -172,8 +172,8 @@ impl Scene for WaitForAdminStart {
 /// Setup track
 #[derive(Clone)]
 struct SetupTrack {
-    game: GameHandle,
-    presence: PresenceHandle,
+    game: game::Game,
+    presence: presence::Presence,
     insim: SpawnedHandle,
     min_players: usize,
     track: Track,
@@ -205,9 +205,9 @@ impl Scene for SetupTrack {
 // TODO: split up into Lobby, Rounds, Victory
 #[derive(Clone)]
 struct Clockwork {
-    game: GameHandle,
-    presence: PresenceHandle,
-    chat: ChatHandle,
+    game: game::Game,
+    presence: presence::Presence,
+    chat: chat::Chat,
     insim: SpawnedHandle,
 
     rounds: usize,
@@ -253,12 +253,12 @@ impl Scene for Clockwork {
 }
 
 async fn wait_for_admin_end(
-    chat: &mut broadcast::Receiver<(chat::Chat, ConnectionId)>,
-    presence: PresenceHandle,
+    chat: &mut broadcast::Receiver<(chat::ChatMsg, ConnectionId)>,
+    presence: presence::Presence,
 ) -> Result<(), SceneError> {
     loop {
         match chat.recv().await {
-            Ok((chat::Chat::End, ucid)) => {
+            Ok((chat::ChatMsg::End, ucid)) => {
                 if let Some(conn) = presence.connection(&ucid).await {
                     if conn.admin {
                         return Ok(());
@@ -270,7 +270,10 @@ async fn wait_for_admin_end(
                 tracing::warn!("Chat commands lost due to lag");
             },
             Err(broadcast::error::RecvError::Closed) => {
-                return Err(SceneError::ChatHandleLost);
+                return Err(SceneError::Custom {
+                    scene: "wait_for_admin_end",
+                    cause: Box::new(chat::ChatError::HandleLost),
+                });
             },
         }
     }
@@ -279,29 +282,27 @@ async fn wait_for_admin_end(
 struct HelloWorld {}
 impl ui::View for HelloWorld {
     type GlobalProps = ();
-
     type ConnectionProps = ();
+    type Message = ();
 
     fn mount(tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
         Self {}
     }
-}
 
-impl<P> ui::Component<P> for HelloWorld {
-    type Message = ();
-
-    fn render(&self, _props: P) -> Option<ui::Node<Self::Message>> {
-        Some(
-            ui::container()
-                .with_child(
-                    ui::text("Hello world", BtnStyle::default().dark())
-                        .w(15.0)
-                        .h(10.0),
-                )
-                .flex()
-                .justify_center()
-                .w(200.),
-        )
+    fn render(
+        &self,
+        global_props: Self::GlobalProps,
+        connection_props: Self::ConnectionProps,
+    ) -> ui::Node<Self::Message> {
+        ui::container()
+            .with_child(
+                ui::text("Hello world", BtnStyle::default().dark())
+                    .w(15.0)
+                    .h(10.0),
+            )
+            .flex()
+            .justify_center()
+            .w(200.)
     }
 }
 
@@ -312,8 +313,8 @@ struct ClockworkInner {
     target: Duration,
 
     insim: SpawnedHandle,
-    game: GameHandle,
-    presence: PresenceHandle,
+    game: game::Game,
+    presence: presence::Presence,
 }
 
 impl ClockworkInner {
@@ -498,13 +499,13 @@ impl ClockworkInner {
 }
 
 async fn wait_for_admin_quit(
-    chat: chat::ChatHandle,
-    presence: PresenceHandle,
+    chat: chat::Chat,
+    presence: presence::Presence,
 ) -> Result<(), SceneError> {
     let mut chat = chat.subscribe();
     loop {
         match chat.recv().await {
-            Ok((chat::Chat::Quit, ucid)) => {
+            Ok((chat::ChatMsg::Quit, ucid)) => {
                 if let Some(conn) = presence.connection(&ucid).await {
                     if conn.admin {
                         tracing::info!("Admin {} requested quit", conn.uname);
@@ -517,7 +518,10 @@ async fn wait_for_admin_quit(
                 tracing::warn!("Chat commands lost due to lag");
             },
             Err(broadcast::error::RecvError::Closed) => {
-                return Err(SceneError::ChatHandleLost);
+                return Err(SceneError::Custom {
+                    scene: "wait_for_admin_quit",
+                    cause: Box::new(chat::ChatError::HandleLost),
+                });
             },
         }
     }
@@ -547,9 +551,9 @@ async fn main() -> Result<(), SceneError> {
 
     tracing::info!("Starting clockwork carnage");
 
-    let presence = kitcar::presence::Presence::spawn(insim.clone(), 32);
-    let game = kitcar::game::GameInfo::spawn(insim.clone(), 32);
-    let chat = chat::Chat::spawn(insim.clone());
+    let presence = presence::spawn(insim.clone(), 32);
+    let game = game::spawn(insim.clone(), 32);
+    let chat = chat::spawn(insim.clone());
 
     insim.send(TinyType::Ncn.with_request_id(1)).await?;
     insim.send(TinyType::Npl.with_request_id(2)).await?;

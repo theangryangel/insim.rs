@@ -6,21 +6,11 @@ use insim::identifiers::ClickId;
 /// Helper alias for a Btn ClickId Pool
 pub type ClickIdPool = IdPool<1, 239>;
 
-/// How should IdPool handle dishing out available values?
-#[derive(Debug, Copy, Clone)]
-pub enum LeaseStrategy {
-    /// Prefer lowest values first
-    Low,
-    /// Prefer highest values first
-    High,
-}
-
 #[derive(Debug)]
 /// ClickId Pool - handles allocation and deallocation of unique IDs for buttons
 pub struct IdPool<const MIN: u8, const MAX: u8> {
     // Bit set where 1 = available, 0 = allocated
     available_ids: FixedBitSet,
-    strategy: LeaseStrategy,
 }
 
 impl<const MIN: u8, const MAX: u8> IdPool<MIN, MAX> {
@@ -34,32 +24,13 @@ impl<const MIN: u8, const MAX: u8> IdPool<MIN, MAX> {
             available_ids.set(i as usize, true);
         });
 
-        Self {
-            available_ids,
-            strategy: LeaseStrategy::Low,
-        }
-    }
-
-    pub fn set_strategy(&mut self, strategy: LeaseStrategy) {
-        self.strategy = strategy;
+        Self { available_ids }
     }
 
     /// Lease/allocate a click ID with the configured strategy
     pub fn lease(&mut self) -> Option<ClickId> {
-        self.lease_with_strategy(None)
-    }
-
-    /// Lease/allocate a click ID with a requested strategy.
-    pub fn lease_with_strategy(&mut self, strategy: Option<&LeaseStrategy>) -> Option<ClickId> {
-        let strategy = strategy.unwrap_or(&self.strategy);
-
-        let id = match strategy {
-            LeaseStrategy::Low => self.available_ids.ones().next(),
-            LeaseStrategy::High => self.available_ids.ones().next_back(),
-        };
-
         // Find the first available ID by iterating from the beginning.
-        if let Some(id) = id {
+        if let Some(id) = self.available_ids.ones().next() {
             let click_id = id as u8;
             self.available_ids.set(id, false);
             Some(click_id.into())
@@ -361,42 +332,5 @@ mod tests {
         let (_, available, allocated) = pool.stats();
         assert_eq!(available, 2);
         assert_eq!(allocated, 1);
-    }
-
-    #[test]
-    fn test_prefer_high_strategy() {
-        let mut pool: IdPool<1, 5> = IdPool::new();
-        pool.set_strategy(LeaseStrategy::High);
-
-        let id1 = pool.lease().unwrap();
-        let id2 = pool.lease().unwrap();
-        let id3 = pool.lease().unwrap();
-
-        // Should allocate from highest available downward
-        assert_eq!(id1.0, 5);
-        assert_eq!(id2.0, 4);
-        assert_eq!(id3.0, 3);
-    }
-
-    #[test]
-    fn test_strategy_switching() {
-        let mut pool: IdPool<1, 5> = IdPool::new();
-
-        // Start with PreferLow
-        let id1 = pool.lease().unwrap();
-        assert_eq!(id1.0, 1);
-
-        // Switch to PreferHigh
-        pool.set_strategy(LeaseStrategy::High);
-        let id2 = pool.lease().unwrap();
-        assert_eq!(id2.0, 5);
-
-        let id3 = pool.lease().unwrap();
-        assert_eq!(id3.0, 4);
-
-        // Switch back to PreferLow
-        pool.set_strategy(LeaseStrategy::Low);
-        let id4 = pool.lease().unwrap();
-        assert_eq!(id4.0, 2);
     }
 }

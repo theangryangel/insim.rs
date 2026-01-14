@@ -8,9 +8,8 @@ use insim::{
     identifiers::{ClickId, ConnectionId, RequestId},
     insim::{Bfn, BfnType, Btn},
 };
-use kitcar::ui::ClickIdPool;
 
-use super::{Node, NodeKind, View};
+use super::{Node, NodeKind, View, id_pool::ClickIdPool};
 
 #[derive(Debug, Default)]
 pub(super) struct CanvasDiff {
@@ -53,29 +52,25 @@ impl<V: View> Canvas<V> {
         }
     }
 
-    pub(super) fn reconcile(&mut self, root: Option<Node<V::Message>>) -> Option<CanvasDiff> {
+    pub(super) fn reconcile(&mut self, root: Node<V::Message>) -> Option<CanvasDiff> {
         let mut click_map = HashMap::new();
         let mut new_buttons = HashMap::new();
 
         let mut tree = taffy::TaffyTree::new();
         let mut node_map = Vec::new();
 
-        let mut root_id = None;
-
-        if root.is_some() {
-            // start traversal with a seed hash (0)
-            root_id = Self::visit(
-                root.unwrap(),
-                0,
-                self.ucid,
-                &self.buttons,
-                &mut self.pool,
-                &mut new_buttons,
-                &mut tree,
-                &mut node_map,
-                &mut click_map,
-            );
-        }
+        // start traversal with a seed hash (0)
+        let root_id = Self::visit(
+            root,
+            0,
+            self.ucid,
+            &self.buttons,
+            &mut self.pool,
+            &mut new_buttons,
+            &mut tree,
+            &mut node_map,
+            &mut click_map,
+        );
 
         if let Some(root_id) = root_id {
             tree.compute_layout(root_id, taffy::Size::length(200.0))
@@ -152,6 +147,7 @@ impl<V: View> Canvas<V> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn visit<M: Clone>(
         node: Node<M>,
         parent_hash: u64,
@@ -190,7 +186,7 @@ impl<V: View> Canvas<V> {
                     .collect();
 
                 let node_id = tree
-                    .new_with_children(node.style, &child_ids)
+                    .new_with_children(node.style.unwrap_or_default(), &child_ids)
                     .expect("Could not add container to taffy layout");
 
                 Some(node_id)
@@ -202,7 +198,7 @@ impl<V: View> Canvas<V> {
                 text,
                 msg,
                 key,
-                mut bstyle,
+                bstyle,
             } => {
                 // calculate stable identity
                 let mut hasher = DefaultHasher::new();
@@ -246,11 +242,10 @@ impl<V: View> Canvas<V> {
 
                 if let Some(msg) = msg {
                     let _ = click_map.insert(click_id, msg);
-                    bstyle = bstyle.clickable(); // force clickable if the user didnt do it
                 }
 
                 let node_id = tree
-                    .new_leaf(node.style)
+                    .new_leaf(node.style.unwrap_or_default())
                     .expect("Could not add a new child to taffy layout.. too many buttons?");
                 node_map.push((
                     node_id,
@@ -267,6 +262,7 @@ impl<V: View> Canvas<V> {
 
                 Some(node_id)
             },
+            NodeKind::Empty => None,
         }
     }
 

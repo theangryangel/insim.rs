@@ -34,16 +34,18 @@ pub enum MarqueeMsg {
 
 impl Marquee {
     pub fn new<P: Send + Sync + 'static>(
-        text: &str, 
-        width: usize, 
-        tx: mpsc::UnboundedSender<P>, 
-        map: impl Fn(MarqueeMsg) -> P + Send + 'static
+        text: &str,
+        width: usize,
+        tx: mpsc::UnboundedSender<P>,
+        map: impl Fn(MarqueeMsg) -> P + Send + 'static,
     ) -> Self {
         let handle = tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_millis(150));
             loop {
                 let _ = interval.tick().await;
-                if tx.send(map(MarqueeMsg::Tick)).is_err() { break; }
+                if tx.send(map(MarqueeMsg::Tick)).is_err() {
+                    break;
+                }
             }
         });
 
@@ -58,8 +60,9 @@ impl Marquee {
     }
 }
 
-impl ui::Component<()> for Marquee {
+impl ui::Component for Marquee {
     type Message = MarqueeMsg;
+    type Props = ();
 
     fn update(&mut self, msg: Self::Message) {
         match msg {
@@ -69,7 +72,7 @@ impl ui::Component<()> for Marquee {
                         // pad the text with spaces equal to width on both sides
                         // i.e. [   spaces   ][ TEXT ][   spaces   ]
                         let total_len = self.width + self.text.chars().count() + self.width;
-                        
+
                         self.offset += 1;
 
                         // have we scrolled past everything?
@@ -84,27 +87,28 @@ impl ui::Component<()> for Marquee {
                         if Instant::now() >= deadline {
                             self.state = MarqueeState::Scrolling;
                         }
-                    }
+                    },
                 }
-            }
+            },
         }
     }
 
-    fn render(&self, _props: ()) -> Option<ui::Node<Self::Message>> {
+    fn render(&self, _props: Self::Props) -> ui::Node<Self::Message> {
         match self.state {
             MarqueeState::Scrolling => {
                 let padding = " ".repeat(self.width);
                 let full_canvas = format!("{}{}{}", padding, self.text, padding);
-                let visible: String = full_canvas.chars()
+                let visible: String = full_canvas
+                    .chars()
                     .skip(self.offset)
                     .take(self.width)
                     .collect();
 
-                Some(ui::text(visible.white(), BtnStyle::default().dark()))
+                ui::text(visible.white(), BtnStyle::default().dark()).key("marquee")
             },
-            
+
             // If waiting, render an empty button
-            MarqueeState::Waiting(_) => Some(ui::text("", BtnStyle::default().dark()))
+            MarqueeState::Waiting(_) => ui::text("", BtnStyle::default().dark()),
         }
     }
 }

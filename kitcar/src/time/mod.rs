@@ -1,2 +1,4 @@
 //! Time and timer related things
-pub mod countdown;
+mod countdown;
+
+pub use countdown::Countdown;

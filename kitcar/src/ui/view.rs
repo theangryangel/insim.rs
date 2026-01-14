@@ -3,20 +3,42 @@ use tokio::sync::{mpsc, watch};
 
 use super::canvas::Canvas;
 
-pub trait Component<P> {
+/// Reusable Component. Useful for things like self contained clocks, scrollable areas, etc.
+/// that require state.
+/// For stateless components, you can just do something like this:
+/// ```rust
+/// fn player_badge<Msg>(name: &str, score: u32) -> Node<Msg> {
+///     container()
+///         .flex_row()
+///         .with_child(text(name, BtnStyle::default()))
+///         .with_child(text(format!("{score}"), BtnStyle::default()))
+/// }
+// ```
+pub trait Component {
     type Message: Clone + 'static;
+    type Props;
+
     #[allow(unused)]
     fn update(&mut self, msg: Self::Message) {}
-    fn render(&self, props: P) -> Option<super::Node<Self::Message>>;
+    fn render(&self, props: Self::Props) -> super::Node<Self::Message>;
 }
 
-/// View
-pub trait View: Component<(Self::GlobalProps, Self::ConnectionProps)> + Sized + 'static {
+/// View - think of it as the root [Component].
+pub trait View: Sized + 'static {
     type GlobalProps: Clone + Send + Sync + Default + 'static;
     type ConnectionProps: Clone + Send + Sync + Default + 'static;
+    type Message: Clone + 'static;
 
     /// New!
     fn mount(tx: mpsc::UnboundedSender<Self::Message>) -> Self;
+
+    #[allow(unused)]
+    fn update(&mut self, msg: Self::Message) {}
+    fn render(
+        &self,
+        global_props: Self::GlobalProps,
+        connection_props: Self::ConnectionProps,
+    ) -> super::Node<Self::Message>;
 }
 
 /// Run the UI on a LocalSet (does not require Send)
@@ -28,6 +50,7 @@ pub(super) fn run_view<V: View>(
 ) {
     let (internal_tx, mut internal_rx) = mpsc::unbounded_channel();
 
+    #[allow(clippy::let_underscore_future)]
     let _ = tokio::task::spawn_local(async move {
         let mut root = V::mount(internal_tx);
         let mut packets = insim.subscribe();
@@ -39,10 +62,10 @@ pub(super) fn run_view<V: View>(
 
         loop {
             if should_render && !blocked {
-                let vdom = root.render((
+                let vdom = root.render(
                     global.borrow_and_update().clone(),
                     connection.borrow_and_update().clone(),
-                ));
+                );
                 if let Some(diff) = canvas.reconcile(vdom) {
                     // FIXME: no expect
                     insim
@@ -53,18 +76,29 @@ pub(super) fn run_view<V: View>(
             }
 
             should_render = tokio::select! {
-                Ok(_) = global.changed() => {
+                res = global.changed() => {
+                    if res.is_err() {
+                        break;
+                    }
                     true
                 },
 
-                Ok(_) = connection.changed() => {
+                res = connection.changed() => {
+                    if res.is_err() {
+                        break;
+                    }
                     true
                 },
 
                 // internal messages (i.e. clock ticks?)
-                Some(msg) = internal_rx.recv() => {
-                    root.update(msg);
-                    true
+                msg = internal_rx.recv() => {
+                    match msg {
+                        Some(msg) => {
+                            root.update(msg);
+                            true
+                        },
+                        None => { break; }
+                    }
                 },
 
                 // user input (click ids)

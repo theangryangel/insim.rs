@@ -9,15 +9,17 @@ pub enum NodeKind<Msg> {
         key: Option<String>,
         bstyle: BtnStyle,
     },
+    Empty,
 }
 
 #[derive(Debug, Clone)]
 pub struct Node<Msg> {
-    pub(super) style: taffy::Style,
+    pub(super) style: Option<taffy::Style>,
     pub(super) kind: NodeKind<Msg>,
 }
 
 impl<Msg> Node<Msg> {
+    /// Container node: Usually some sort flexbox
     pub fn container() -> Self {
         Self {
             style: Default::default(),
@@ -25,6 +27,7 @@ impl<Msg> Node<Msg> {
         }
     }
 
+    /// A clickable button
     pub fn clickable(text: impl Into<String>, mut bstyle: BtnStyle, msg: Msg) -> Self {
         bstyle = bstyle.clickable();
         Self {
@@ -38,6 +41,7 @@ impl<Msg> Node<Msg> {
         }
     }
 
+    /// A text only button, non-clickable
     pub fn text(text: impl Into<String>, bstyle: BtnStyle) -> Self {
         Self {
             style: Default::default(),
@@ -50,6 +54,26 @@ impl<Msg> Node<Msg> {
         }
     }
 
+    /// No output. Effectively this is the same as Option<Node>, however we don't use Option for
+    /// convenience.
+    pub fn empty() -> Self {
+        Self {
+            style: Default::default(),
+            kind: NodeKind::Empty,
+        }
+    }
+
+    /// For buttons that perhaps have changable text, or siblings, or things in a loop, we ideally
+    /// want to manually set a key to ensure that the system knows what buttons to update more
+    /// sensibly.
+    pub fn key<K: Into<String>>(mut self, val: K) -> Self {
+        if let NodeKind::Button { ref mut key, .. } = self.kind {
+            *key = Some(val.into());
+        }
+
+        self
+    }
+
     pub fn with_child<E: Into<Option<Node<Msg>>>>(mut self, val: E) -> Self {
         let val = if let Some(val) = val.into() {
             val
@@ -57,11 +81,8 @@ impl<Msg> Node<Msg> {
             return self;
         };
 
-        match self.kind {
-            NodeKind::Container(ref mut children) => {
-                children.get_or_insert_default().push(val);
-            },
-            _ => {},
+        if let NodeKind::Container(ref mut children) = self.kind {
+            children.get_or_insert_default().push(val);
         }
 
         self
@@ -94,12 +115,12 @@ impl<Msg> Node<Msg> {
         self
     }
 
-    pub fn style(&self) -> &taffy::Style {
-        &self.style
+    pub fn style(&self) -> Option<&taffy::Style> {
+        self.style.as_ref()
     }
 
     pub fn style_mut(&mut self) -> &mut taffy::Style {
-        &mut self.style
+        self.style.get_or_insert_with(Default::default)
     }
 
     pub fn w(mut self, val: f32) -> Self {
@@ -395,6 +416,7 @@ impl<Msg> Node<Msg> {
                 key,
                 bstyle,
             },
+            NodeKind::Empty => NodeKind::Empty,
         };
 
         Node {

@@ -56,16 +56,16 @@ pub struct ConnectionInfo {
 
 /// Presence state
 #[derive(Debug, Default, Clone)]
-pub struct Presence {
+struct PresenceInner {
     connections: HashMap<ConnectionId, ConnectionInfo>,
     players: HashMap<PlayerId, PlayerInfo>,
     player_count: watch::Sender<usize>,
     connection_count: watch::Sender<usize>,
 }
 
-impl Presence {
+impl PresenceInner {
     /// New presence handler
-    pub fn new() -> Self {
+    fn new() -> Self {
         let player_count = watch::channel(0);
         let connection_count = watch::channel(0);
         Self {
@@ -77,17 +77,17 @@ impl Presence {
     }
 
     /// Fetch all connections
-    pub fn connections(&self) -> impl Iterator<Item = &ConnectionInfo> {
+    fn connections(&self) -> impl Iterator<Item = &ConnectionInfo> {
         self.connections.values()
     }
 
     /// Fetch one connection
-    pub fn connection(&self, ucid: &ConnectionId) -> Option<&ConnectionInfo> {
+    fn connection(&self, ucid: &ConnectionId) -> Option<&ConnectionInfo> {
         self.connections.get(ucid)
     }
 
     /// Fetch one connection by player
-    pub fn connection_by_player(&self, plid: &PlayerId) -> Option<&ConnectionInfo> {
+    fn connection_by_player(&self, plid: &PlayerId) -> Option<&ConnectionInfo> {
         let player = self.players.get(plid);
         if let Some(player) = player {
             self.connections.get(&player.ucid)
@@ -97,22 +97,22 @@ impl Presence {
     }
 
     /// Fetch player count
-    pub fn player_count(&self) -> usize {
+    fn player_count(&self) -> usize {
         self.players.len()
     }
 
     /// Fetch all players
-    pub fn players(&self) -> impl Iterator<Item = &PlayerInfo> {
+    fn players(&self) -> impl Iterator<Item = &PlayerInfo> {
         self.players.values()
     }
 
     /// Fetch one player
-    pub fn player(&self, plid: &PlayerId) -> Option<&PlayerInfo> {
+    fn player(&self, plid: &PlayerId) -> Option<&PlayerInfo> {
         self.players.get(plid)
     }
 
     /// Handle a game packet
-    pub fn handle_packet(&mut self, packet: &insim::Packet) {
+    fn handle_packet(&mut self, packet: &insim::Packet) {
         match packet {
             // Game
             insim::Packet::Tiny(tiny) => self.tiny(tiny),
@@ -230,53 +230,53 @@ impl Presence {
             }
         }
     }
+}
 
-    /// Spawn a background instance of Presence and return a handle so that we can query it
-    pub fn spawn(insim: insim::builder::SpawnedHandle, capacity: usize) -> PresenceHandle {
-        let (query_tx, mut query_rx) = mpsc::channel(capacity);
-        let mut inner = Self::new();
-        let player_count = inner.player_count.subscribe();
-        let connection_count = inner.connection_count.subscribe();
+/// Spawn a background instance of Presence and return a handle so that we can query it
+pub fn spawn(insim: insim::builder::SpawnedHandle, capacity: usize) -> Presence {
+    let (query_tx, mut query_rx) = mpsc::channel(capacity);
+    let mut inner = PresenceInner::new();
+    let player_count = inner.player_count.subscribe();
+    let connection_count = inner.connection_count.subscribe();
 
-        let _handle = tokio::spawn(async move {
-            let mut packet_rx = insim.subscribe();
+    let _handle = tokio::spawn(async move {
+        let mut packet_rx = insim.subscribe();
 
-            loop {
-                tokio::select! {
-                    Ok(packet) = packet_rx.recv() => {
-                        inner.handle_packet(&packet);
-                    }
-                    Some(query) = query_rx.recv() => {
-                        match query {
-                            PresenceQuery::Connections { response_tx } => {
-                                let _ = response_tx.send(inner.connections().cloned().collect());
-                            },
-                            PresenceQuery::Connection { ucid, response_tx } => {
-                                let _ = response_tx.send(inner.connection(&ucid).cloned());
-                            },
-                            PresenceQuery::ConnectionByPlayer { plid, response_tx } => {
-                                let _ = response_tx.send(inner.connection_by_player(&plid).cloned());
-                            },
-                            PresenceQuery::Players { response_tx } => {
-                                let _ = response_tx.send(inner.players().cloned().collect());
-                            },
-                            PresenceQuery::Player { plid, response_tx } => {
-                                let _ = response_tx.send(inner.player(&plid).cloned());
-                            },
-                            PresenceQuery::PlayerCount { response_tx } => {
-                                let _ = response_tx.send(inner.player_count());
-                            }
+        loop {
+            tokio::select! {
+                Ok(packet) = packet_rx.recv() => {
+                    inner.handle_packet(&packet);
+                }
+                Some(query) = query_rx.recv() => {
+                    match query {
+                        PresenceQuery::Connections { response_tx } => {
+                            let _ = response_tx.send(inner.connections().cloned().collect());
+                        },
+                        PresenceQuery::Connection { ucid, response_tx } => {
+                            let _ = response_tx.send(inner.connection(&ucid).cloned());
+                        },
+                        PresenceQuery::ConnectionByPlayer { plid, response_tx } => {
+                            let _ = response_tx.send(inner.connection_by_player(&plid).cloned());
+                        },
+                        PresenceQuery::Players { response_tx } => {
+                            let _ = response_tx.send(inner.players().cloned().collect());
+                        },
+                        PresenceQuery::Player { plid, response_tx } => {
+                            let _ = response_tx.send(inner.player(&plid).cloned());
+                        },
+                        PresenceQuery::PlayerCount { response_tx } => {
+                            let _ = response_tx.send(inner.player_count());
                         }
                     }
                 }
             }
-        });
-
-        PresenceHandle {
-            query_tx,
-            player_count,
-            connection_count,
         }
+    });
+
+    Presence {
+        query_tx,
+        player_count,
+        connection_count,
     }
 }
 
@@ -307,13 +307,13 @@ enum PresenceQuery {
 
 #[derive(Debug, Clone)]
 /// Handler for Presence
-pub struct PresenceHandle {
+pub struct Presence {
     query_tx: mpsc::Sender<PresenceQuery>,
     player_count: watch::Receiver<usize>,
     connection_count: watch::Receiver<usize>,
 }
 
-impl PresenceHandle {
+impl Presence {
     /// Watch connection count
     pub async fn wait_for_connection_count(&mut self, f: impl FnMut(&usize) -> bool) -> usize {
         // FIXME
