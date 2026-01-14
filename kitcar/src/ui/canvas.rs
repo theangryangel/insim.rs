@@ -301,3 +301,287 @@ fn get_taffy_abs_position(taffy: &taffy::TaffyTree, node_id: &taffy::NodeId) -> 
 
     Some(absolute_location)
 }
+
+#[cfg(test)]
+mod tests {
+    use insim::insim::BtnStyle;
+    use tokio::sync::mpsc;
+
+    use super::*;
+
+    #[derive(Debug, Clone, PartialEq)]
+    enum TestMsg {
+        Click,
+    }
+
+    struct TestView;
+
+    impl View for TestView {
+        type GlobalProps = ();
+        type ConnectionProps = ();
+        type Message = TestMsg;
+
+        fn mount(_tx: mpsc::UnboundedSender<Self::Message>) -> Self {
+            TestView
+        }
+
+        fn render(
+            &self,
+            _global_props: Self::GlobalProps,
+            _connection_props: Self::ConnectionProps,
+        ) -> Node<Self::Message> {
+            Node::empty()
+        }
+    }
+
+    #[test]
+    fn test_canvas_diff_merge_empty() {
+        let diff = CanvasDiff::default();
+        let packets = diff.merge();
+        assert!(packets.is_empty());
+    }
+
+    #[test]
+    fn test_canvas_diff_merge_order() {
+        let ucid = ConnectionId(1);
+        let diff = CanvasDiff {
+            update: vec![Btn {
+                ucid,
+                clickid: ClickId(1),
+                text: "test".into(),
+                ..Default::default()
+            }],
+            remove: vec![Bfn {
+                ucid,
+                subt: BfnType::DelBtn,
+                clickid: ClickId(2),
+                ..Default::default()
+            }],
+        };
+
+        let packets = diff.merge();
+        assert_eq!(packets.len(), 2);
+        assert!(matches!(packets[0], Packet::Bfn(_)));
+        assert!(matches!(packets[1], Packet::Btn(_)));
+    }
+
+    #[test]
+    fn test_canvas_new() {
+        let ucid = ConnectionId(5);
+        let canvas = Canvas::<TestView>::new(ucid);
+        assert_eq!(canvas.ucid, ucid);
+        assert!(canvas.buttons.is_empty());
+        assert!(canvas.click_map.is_empty());
+    }
+
+    #[test]
+    fn test_reconcile_empty_tree_returns_none() {
+        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+        let root: Node<TestMsg> = Node::empty();
+        let diff = canvas.reconcile(root);
+        assert!(diff.is_none());
+    }
+
+    #[test]
+    fn test_reconcile_container_only_returns_none() {
+        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+        let root: Node<TestMsg> = Node::container();
+        let diff = canvas.reconcile(root);
+        assert!(diff.is_none());
+    }
+
+    #[test]
+    fn test_reconcile_single_button_returns_update() {
+        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+        let root: Node<TestMsg> = Node::container()
+            .w(200.0)
+            .h(100.0)
+            .with_child(Node::text("Hello", BtnStyle::default()).w(50.0).h(10.0));
+
+        let diff = canvas.reconcile(root);
+        assert!(diff.is_some());
+        let diff = diff.unwrap();
+        assert_eq!(diff.update.len(), 1);
+        assert!(diff.remove.is_empty());
+        assert_eq!(diff.update[0].text, "Hello");
+    }
+
+    #[test]
+    fn test_reconcile_unchanged_returns_none() {
+        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+
+        let make_tree = || {
+            Node::container()
+                .w(200.0)
+                .h(100.0)
+                .with_child(Node::text("Hello", BtnStyle::default()).w(50.0).h(10.0))
+        };
+
+        let diff1 = canvas.reconcile(make_tree());
+        assert!(diff1.is_some());
+
+        let diff2 = canvas.reconcile(make_tree());
+        assert!(diff2.is_none());
+    }
+
+    #[test]
+    fn test_reconcile_text_change_returns_update() {
+        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+
+        let tree1: Node<TestMsg> = Node::container()
+            .w(200.0)
+            .h(100.0)
+            .with_child(Node::text("Hello", BtnStyle::default()).w(50.0).h(10.0));
+
+        let _ = canvas.reconcile(tree1);
+
+        let tree2: Node<TestMsg> = Node::container()
+            .w(200.0)
+            .h(100.0)
+            .with_child(Node::text("World", BtnStyle::default()).w(50.0).h(10.0));
+
+        let diff = canvas.reconcile(tree2);
+        assert!(diff.is_some());
+        let diff = diff.unwrap();
+        assert_eq!(diff.update.len(), 1);
+        assert_eq!(diff.update[0].text, "World");
+    }
+
+    #[test]
+    fn test_reconcile_removed_button_returns_removal() {
+        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+
+        let tree1: Node<TestMsg> = Node::container().w(200.0).h(100.0).with_child(
+            Node::text("Button1", BtnStyle::default())
+                .w(50.0)
+                .h(10.0)
+                .key("btn1"),
+        );
+
+        let _ = canvas.reconcile(tree1);
+
+        let tree2: Node<TestMsg> = Node::container().w(200.0).h(100.0);
+
+        let diff = canvas.reconcile(tree2);
+        assert!(diff.is_some());
+        let diff = diff.unwrap();
+        assert!(diff.update.is_empty());
+        assert_eq!(diff.remove.len(), 1);
+    }
+
+    #[test]
+    fn test_translate_clickid_known() {
+        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+
+        let root: Node<TestMsg> = Node::container().w(200.0).h(100.0).with_child(
+            Node::clickable("Click", BtnStyle::default(), TestMsg::Click)
+                .w(50.0)
+                .h(10.0),
+        );
+
+        let _ = canvas.reconcile(root);
+
+        let click_id = ClickId(1);
+        let msg = canvas.translate_clickid(&click_id);
+        assert_eq!(msg, Some(TestMsg::Click));
+    }
+
+    #[test]
+    fn test_translate_clickid_unknown() {
+        let canvas = Canvas::<TestView>::new(ConnectionId(1));
+
+        let click_id = ClickId(99);
+        let msg = canvas.translate_clickid(&click_id);
+        assert!(msg.is_none());
+    }
+
+    #[test]
+    fn test_clear_resets_canvas() {
+        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+
+        let root: Node<TestMsg> = Node::container().w(200.0).h(100.0).with_child(
+            Node::clickable("Click", BtnStyle::default(), TestMsg::Click)
+                .w(50.0)
+                .h(10.0),
+        );
+
+        let _ = canvas.reconcile(root);
+        assert!(!canvas.buttons.is_empty());
+        assert!(!canvas.click_map.is_empty());
+
+        canvas.clear();
+        assert!(canvas.buttons.is_empty());
+        assert!(canvas.click_map.is_empty());
+    }
+
+    #[test]
+    fn test_reconcile_multiple_buttons() {
+        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+
+        let root: Node<TestMsg> = Node::container()
+            .w(200.0)
+            .h(100.0)
+            .flex()
+            .flex_col()
+            .with_child(Node::text("A", BtnStyle::default()).w(50.0).h(10.0))
+            .with_child(Node::text("B", BtnStyle::default()).w(50.0).h(10.0))
+            .with_child(Node::text("C", BtnStyle::default()).w(50.0).h(10.0));
+
+        let diff = canvas.reconcile(root);
+        assert!(diff.is_some());
+        let diff = diff.unwrap();
+        assert_eq!(diff.update.len(), 3);
+    }
+
+    #[test]
+    fn test_keyed_buttons_maintain_identity() {
+        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+
+        let tree1: Node<TestMsg> = Node::container()
+            .w(200.0)
+            .h(100.0)
+            .flex()
+            .flex_col()
+            .with_child(
+                Node::text("A", BtnStyle::default())
+                    .w(50.0)
+                    .h(10.0)
+                    .key("a"),
+            )
+            .with_child(
+                Node::text("B", BtnStyle::default())
+                    .w(50.0)
+                    .h(10.0)
+                    .key("b"),
+            );
+
+        let _ = canvas.reconcile(tree1);
+        let buttons_after_first = canvas.buttons.clone();
+
+        let tree2: Node<TestMsg> = Node::container()
+            .w(200.0)
+            .h(100.0)
+            .flex()
+            .flex_col()
+            .with_child(
+                Node::text("B", BtnStyle::default())
+                    .w(50.0)
+                    .h(10.0)
+                    .key("b"),
+            )
+            .with_child(
+                Node::text("A", BtnStyle::default())
+                    .w(50.0)
+                    .h(10.0)
+                    .key("a"),
+            );
+
+        let _ = canvas.reconcile(tree2);
+
+        for (hash, state) in &buttons_after_first {
+            if let Some(new_state) = canvas.buttons.get(hash) {
+                assert_eq!(state.click_id, new_state.click_id);
+            }
+        }
+    }
+}

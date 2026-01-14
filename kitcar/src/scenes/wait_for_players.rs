@@ -1,10 +1,10 @@
 //! Scene to wait for minimum players. Useful to handle the situation where LFS is on the
-//! multiplayer lobby screen. 
+//! multiplayer lobby screen.
 
 use insim::builder::SpawnedHandle;
 
+use super::{Scene, SceneError, SceneResult};
 use crate::presence;
-use super::{Scene, SceneResult, SceneError};
 
 /// Wait for minimum players to connect
 #[derive(Clone)]

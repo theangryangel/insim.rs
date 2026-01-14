@@ -5,11 +5,15 @@ use std::{collections::HashMap, time::Duration};
 
 use clap::Parser;
 use insim::{
-    builder::SpawnedHandle, core::{
+    WithRequestId,
+    builder::SpawnedHandle,
+    core::{
         object::insim::{InsimCheckpoint, InsimCheckpointKind},
         string::colours::Colourify,
         track::Track,
-    }, identifiers::ConnectionId, insim::{Btn, BtnStyle, ObjectInfo, TinyType, Uco}, WithRequestId
+    },
+    identifiers::ConnectionId,
+    insim::{BtnStyle, ObjectInfo, TinyType, Uco},
 };
 use kitcar::{
     game, presence,
@@ -22,9 +26,9 @@ use tokio::{sync::broadcast, time::sleep};
 mod chat;
 mod cli;
 mod marquee;
-mod wait_for_admin_start;
 mod setup_track;
 mod topbar;
+mod wait_for_admin_start;
 
 /// Clockwork Carnage event
 // TODO: split up into Lobby, Rounds, Victory
@@ -50,6 +54,8 @@ impl Scene for Clockwork {
             scores: Default::default(),
             rounds: self.rounds,
             target: self.target,
+            round_best: Default::default(),
+            active_runs: Default::default(),
             insim: self.insim.clone(),
             game: self.game.clone(),
             presence: self.presence.clone(),
@@ -110,7 +116,7 @@ impl ui::View for ClockworkLobbyView {
     type ConnectionProps = ();
     type Message = ();
 
-    fn mount(tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
+    fn mount(_tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
         Self {}
     }
 
@@ -130,13 +136,21 @@ struct ClockworkRoundGlobalProps {
     rounds: usize,
 }
 
+#[derive(Debug, Clone, Default)]
+struct ClockworkRoundConnectionProps {
+    points: u32,
+    rank: Option<usize>,
+    in_progress: bool,
+    round_best: Option<Duration>,
+}
+
 struct ClockworkRoundView {}
 impl ui::View for ClockworkRoundView {
     type GlobalProps = ClockworkRoundGlobalProps;
-    type ConnectionProps = u32;
+    type ConnectionProps = ClockworkRoundConnectionProps;
     type Message = ();
 
-    fn mount(tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
+    fn mount(_tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
         Self {}
     }
 
@@ -145,14 +159,31 @@ impl ui::View for ClockworkRoundView {
         global_props: Self::GlobalProps,
         connection_props: Self::ConnectionProps,
     ) -> ui::Node<Self::Message> {
+        let rank_display = match connection_props.rank {
+            Some(r) => format!("#{}", r),
+            None => "-".to_string(),
+        };
+        let status = if connection_props.in_progress {
+            "In progress".dark_green()
+        } else {
+            match connection_props.round_best {
+                Some(d) => format!("Best: {:.2?}", d).white(),
+                None => "No run".red(),
+            }
+        };
         topbar::topbar(&format!(
-            "Round {}/{} - {:?} remaining", 
-            global_props.round,
-            global_props.rounds,
-            global_props.remaining,
-        )).with_child(
-            ui::text(&format!("{} pts", connection_props).white(), BtnStyle::default().dark())
+            "Round {}/{} - {:?} remaining",
+            global_props.round, global_props.rounds, global_props.remaining,
+        ))
+        .with_child(
+            ui::text(
+                &format!("{} {} pts", rank_display, connection_props.points).white(),
+                BtnStyle::default().dark(),
+            )
+            .w(15.)
+            .h(5.),
         )
+        .with_child(ui::text(&status, BtnStyle::default().dark()).w(15.).h(5.))
     }
 }
 
@@ -162,6 +193,9 @@ struct ClockworkInner {
     max_scorers: usize,
     target: Duration,
 
+    round_best: HashMap<String, Duration>,
+    active_runs: HashMap<String, Duration>,
+
     insim: SpawnedHandle,
     game: game::Game,
     presence: presence::Presence,
@@ -170,17 +204,71 @@ struct ClockworkInner {
 impl ClockworkInner {
     async fn run(&mut self) -> Result<(), SceneError> {
         self.lobby().await?;
+
+        let ui = ui::attach::<ClockworkRoundView>(
+            self.insim.clone(),
+            self.presence.clone(),
+            ClockworkRoundGlobalProps::default(),
+        );
         for round in 1..=self.rounds {
-            self.round(round).await?;
+            self.broadcast_rankings(&ui).await;
+            self.round(round, &ui).await?;
+            self.broadcast_rankings(&ui).await;
         }
+        drop(ui);
+
         self.announce_results().await?;
         Ok(())
+    }
+
+    async fn broadcast_rankings(&self, ui: &ui::Ui<ClockworkRoundView>) {
+        let mut standings: Vec<_> = self.scores.iter().collect();
+        standings.sort_by(|a, b| b.1.cmp(a.1));
+
+        let rankings: HashMap<&String, usize> = standings
+            .iter()
+            .enumerate()
+            .map(|(i, (uname, _))| (*uname, i + 1))
+            .collect();
+
+        if let Some(connections) = self.presence.connections().await {
+            for conn in connections {
+                let mut props = self.connection_props(&conn.uname);
+                props.rank = rankings.get(&conn.uname).copied();
+                ui.update_connection_props(conn.ucid, props).await;
+            }
+        }
+    }
+
+    fn compute_rank(&self, uname: &str) -> Option<usize> {
+        if !self.scores.contains_key(uname) {
+            return None;
+        }
+        let mut standings: Vec<_> = self.scores.iter().collect();
+        standings.sort_by(|a, b| b.1.cmp(a.1));
+        standings
+            .iter()
+            .position(|(name, _)| *name == uname)
+            .map(|i| i + 1)
+    }
+
+    fn connection_props(&self, uname: &str) -> ClockworkRoundConnectionProps {
+        ClockworkRoundConnectionProps {
+            points: self.scores.get(uname).copied().unwrap_or(0),
+            rank: self.compute_rank(uname),
+            in_progress: self.active_runs.contains_key(uname),
+            round_best: self.round_best.get(uname).copied(),
+        }
     }
 
     async fn lobby(&self) -> Result<(), SceneError> {
         tracing::info!("Lobby: 20 second warm up");
         let mut countdown = Countdown::new(Duration::from_secs(1), 20);
-        let ui = ui::attach::<ClockworkLobbyView>(self.insim.clone(), self.presence.clone(), Duration::ZERO);
+        let ui = ui::attach::<ClockworkLobbyView>(
+            self.insim.clone(),
+            self.presence.clone(),
+            Duration::ZERO,
+        );
 
         while let Some(_) = countdown.tick().await {
             let remaining = countdown.remaining_duration();
@@ -190,12 +278,13 @@ impl ClockworkInner {
         Ok(())
     }
 
-    async fn round(&mut self, round: usize) -> Result<(), SceneError> {
-        let mut active_runs: HashMap<String, Duration> = HashMap::new();
-        let mut round_scores: HashMap<String, Duration> = HashMap::new();
-        let ui = ui::attach::<ClockworkRoundView>(
-            self.insim.clone(), self.presence.clone(), ClockworkRoundGlobalProps::default()
-        );
+    async fn round(
+        &mut self,
+        round: usize,
+        ui: &ui::Ui<ClockworkRoundView>,
+    ) -> Result<(), SceneError> {
+        self.round_best.clear();
+        self.active_runs.clear();
 
         self.insim.send_command("/restart").await?;
         sleep(Duration::from_secs(5)).await;
@@ -213,9 +302,9 @@ impl ClockworkInner {
                     match remaining {
                         Some(_) => {
                             let dur = countdown.remaining_duration();
-                            ui.update_global_props(ClockworkRoundGlobalProps { 
-                                remaining: dur, 
-                                round, 
+                            ui.update_global_props(ClockworkRoundGlobalProps {
+                                remaining: dur,
+                                round,
                                 rounds: self.rounds
                             });
                             self.insim
@@ -229,26 +318,30 @@ impl ClockworkInner {
                     }
                 },
                 packet = packets.recv() => {
-                    self.handle_packet(packet.map_err(|_| SceneError::InsimHandleLost)?, &mut active_runs, &mut round_scores).await?;
+                    self.handle_packet(packet.map_err(|_| SceneError::InsimHandleLost)?, ui).await?;
                 }
             }
         }
 
-        self.score_round(round_scores);
+        self.score_round();
         Ok(())
     }
 
     async fn handle_packet(
-        &self,
+        &mut self,
         packet: insim::Packet,
-        active_runs: &mut HashMap<String, Duration>,
-        round_scores: &mut HashMap<String, Duration>,
+        ui: &ui::Ui<ClockworkRoundView>,
     ) -> Result<(), SceneError> {
         match packet {
             insim::Packet::Ncn(ncn) => {
                 self.insim
                     .send_message("Welcome! Game in progress", ncn.ucid)
                     .await?;
+
+                if let Some(conn) = self.presence.connection(&ncn.ucid).await {
+                    ui.update_connection_props(ncn.ucid, self.connection_props(&conn.uname))
+                        .await;
+                }
             },
             insim::Packet::Uco(Uco {
                 info:
@@ -265,7 +358,9 @@ impl ClockworkInner {
                     if !player.ptype.is_ai();
                     if let Some(conn) = self.presence.connection_by_player(&plid).await;
                     then {
-                        let _ = active_runs.insert(conn.uname, time);
+                        let _ = self.active_runs.insert(conn.uname.clone(), time);
+                        ui.update_connection_props(conn.ucid, self.connection_props(&conn.uname))
+                            .await;
                     }
                 }
             },
@@ -283,18 +378,24 @@ impl ClockworkInner {
                     if let Some(player) = self.presence.player(&plid).await;
                     if !player.ptype.is_ai();
                     if let Some(conn) = self.presence.connection_by_player(&plid).await;
-                    if let Some(start) = active_runs.remove(&conn.uname);
+                    if let Some(start) = self.active_runs.remove(&conn.uname);
                     then {
                         let delta = time.saturating_sub(start);
                         let diff = self.target.abs_diff(delta);
-                        let best = round_scores
-                            .entry(conn.uname.clone())
-                            .and_modify(|e| {
-                                if diff < *e {
-                                    *e = diff;
-                                }
-                            })
-                            .or_insert(diff);
+                        let best = {
+                            let entry = self.round_best
+                                .entry(conn.uname.clone())
+                                .and_modify(|e| {
+                                    if diff < *e {
+                                        *e = diff;
+                                    }
+                                })
+                                .or_insert(diff);
+                            *entry
+                        };
+
+                        ui.update_connection_props(conn.ucid, self.connection_props(&conn.uname))
+                            .await;
 
                         self.insim
                             .send_command(format!("/spec {}", conn.uname))
@@ -316,8 +417,8 @@ impl ClockworkInner {
         Ok(())
     }
 
-    fn score_round(&mut self, round_scores: HashMap<String, Duration>) {
-        let mut ordered: Vec<_> = round_scores.into_iter().collect();
+    fn score_round(&mut self) {
+        let mut ordered: Vec<_> = self.round_best.drain().collect();
         ordered.sort_by_key(|(_, v)| *v);
 
         for (i, (uname, _)) in ordered.into_iter().take(self.max_scorers).enumerate() {

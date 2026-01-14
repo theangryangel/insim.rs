@@ -1,7 +1,11 @@
-use crate::{chat, marquee, topbar::topbar};
-use kitcar::{presence, scenes, ui::{self, Component}};
-use insim::{builder::SpawnedHandle, core::string::colours::Colourify, identifiers::ConnectionId, insim::BtnStyle};
+use insim::{builder::SpawnedHandle, core::string::colours::Colourify, identifiers::ConnectionId};
+use kitcar::{
+    presence, scenes,
+    ui::{self, Component},
+};
 use tokio::sync::broadcast;
+
+use crate::{chat, marquee, topbar::topbar};
 
 #[derive(Clone, Debug)]
 enum WaitForAdminStartMsg {
@@ -19,7 +23,7 @@ impl ui::View for WaitForAdminStartView {
 
     fn mount(tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
         Self {
-            marquee: marquee::Marquee::new("Hello World!!!!!", 10, tx, |m| {
+            marquee: marquee::Marquee::new(&"Hello World!!!!!".white(), 10, tx, |m| {
                 WaitForAdminStartMsg::Marquee(m)
             }),
         }
@@ -59,7 +63,8 @@ impl scenes::Scene for WaitForAdminStart {
     type Output = ();
 
     async fn run(self) -> Result<scenes::SceneResult<()>, scenes::SceneError> {
-        let _ui = ui::attach::<WaitForAdminStartView>(self.insim.clone(), self.presence.clone(), ());
+        let _ui =
+            ui::attach::<WaitForAdminStartView>(self.insim.clone(), self.presence.clone(), ());
 
         self.insim
             .send_message("Ready for admin !start command", ConnectionId::ALL)
@@ -91,5 +96,3 @@ impl scenes::Scene for WaitForAdminStart {
         }
     }
 }
-
-
