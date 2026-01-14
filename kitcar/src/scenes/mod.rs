@@ -2,6 +2,8 @@
 //! manner and can optionally automatically recover.
 use std::{marker::PhantomData, time::Duration};
 
+pub mod wait_for_players;
+
 /// A stage/layer/scene that orchestrates game flow. long live, delegates to other scene in a
 /// waterfall manner
 /// Scene can succeed, bail (stop chain without error), or error
