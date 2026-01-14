@@ -92,6 +92,10 @@ pub(super) fn run_view<V: View>(
                                 false
                             }
                         },
+                        Err(e) => {
+                            tracing::error!("Failed to receive packets from insim: {e}");
+                            false
+                        }
                         _ => {
                             // FIXME: handle Err
                             false

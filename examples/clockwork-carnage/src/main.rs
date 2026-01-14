@@ -22,6 +22,7 @@ mod chat;
 mod cli;
 mod scene;
 mod ui;
+mod marquee;
 
 use scene::{Scene, SceneExt, SceneResult};
 
@@ -58,21 +59,44 @@ impl Scene for WaitForPlayers {
     }
 }
 
-struct WaitForAdminStartUi {}
+#[derive(Clone, Debug)]
+enum WaitForAdminStartUiMsg {
+    Marquee(marquee::MarqueeMsg),
+}
+
+
+struct WaitForAdminStartUi {
+    marquee: marquee::Marquee,
+}
+
 impl ui::View for WaitForAdminStartUi {
     type GlobalProps = ();
 
     type ConnectionProps = ();
 
     fn mount(tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
-        Self {}
+        Self {
+            marquee: marquee::Marquee::new("Hello World!!!!!", 10, tx, |m| WaitForAdminStartUiMsg::Marquee(m))
+        }
     }
 }
 
 impl<P> ui::Component<P> for WaitForAdminStartUi {
-    type Message = ();
+    type Message = WaitForAdminStartUiMsg;
+
+    fn update(&mut self, msg: Self::Message) {
+        match msg {
+            WaitForAdminStartUiMsg::Marquee(m) => ui::Component::update(&mut self.marquee, m),
+        }
+    }
 
     fn render(&self, _props: P) -> Option<ui::Node<Self::Message>> {
+        // FIXME: this is shit. Option<ui::Node<_>> is whats screwing us here.
+        let mut m = self.marquee.render(()).map(|e| e.map(WaitForAdminStartUiMsg::Marquee));
+        if let Some(i) = m {
+            m = Some(i.w(38.).h(5.));
+        }
+
         Some(
             ui::container()
                 .with_child(
@@ -92,6 +116,9 @@ impl<P> ui::Component<P> for WaitForAdminStartUi {
                     ui::text("?".white(), BtnStyle::default().dark())
                         .w(5.)
                         .h(5.),
+                )
+                .with_child(
+                    m
                 )
                 .flex()
                 .flex_row()
