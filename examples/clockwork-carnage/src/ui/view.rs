@@ -7,7 +7,7 @@ pub trait Component<P> {
     type Message: Clone + 'static;
     #[allow(unused)]
     fn update(&mut self, msg: Self::Message) {}
-    fn render(&self, props: P) -> super::Node<Self::Message>;
+    fn render(&self, props: P) -> Option<super::Node<Self::Message>>;
 }
 
 /// View
@@ -44,8 +44,6 @@ pub(super) fn run_view<V: View>(
                     connection.borrow_and_update().clone(),
                 ));
                 if let Some(diff) = canvas.reconcile(vdom) {
-                    dbg!(&diff);
-
                     // FIXME: no expect
                     insim
                         .send_all(diff.merge())

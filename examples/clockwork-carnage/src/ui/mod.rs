@@ -1,4 +1,4 @@
-use std::{collections::HashMap, marker::PhantomData, sync::Arc};
+use std::{collections::HashMap, marker::PhantomData};
 
 use insim::{
     Packet,
@@ -7,7 +7,7 @@ use insim::{
 };
 use kitcar::presence::PresenceHandle;
 use tokio::{
-    sync::{Notify, mpsc, watch},
+    sync::{mpsc, watch},
     task::LocalSet,
 };
 
@@ -18,10 +18,11 @@ pub mod view;
 pub use node::*;
 pub use view::*;
 
+/// Ui handle. Create using [attach]. When dropped all insim buttons will be automatically removed.
+/// Intended for multi-player/multi-connection UIs
 pub struct Ui<V: View> {
     global: watch::Sender<V::GlobalProps>,
     connection: mpsc::Sender<(ConnectionId, V::ConnectionProps)>,
-    detach: Arc<Notify>,
     _phantom: PhantomData<V>,
 }
 
@@ -40,24 +41,13 @@ impl<V: View> Ui<V> {
             .await
             .expect("FIXME: expect connection to work");
     }
-
-    /// Detach the view from all ConnectionIds
-    /// This does not need to be manually called, it will automatically be called on Drop.
-    pub fn detach(&self) {
-        self.detach.notify_waiters();
-    }
-}
-
-impl<V: View> Drop for Ui<V> {
-    fn drop(&mut self) {
-        self.detach();
-    }
 }
 
 /// Manager to spawn Ui's for each connection
 /// Dropping the returned Ui handle will result in the UI being cleared
 ///
-/// All UI tasks run on a LocalSet, so View implementations don't need to be Send.
+/// All UI tasks run on a LocalSet, so View implementations don't need to be Send to accomodate
+/// taffy
 pub fn attach<V: View>(
     insim: insim::builder::SpawnedHandle,
     presence: PresenceHandle,
@@ -65,11 +55,9 @@ pub fn attach<V: View>(
 ) -> Ui<V> {
     let (global_tx, global_rx) = watch::channel(props);
     let (player_tx, mut player_rx) = mpsc::channel(100);
-    let detach = Arc::new(Notify::new());
     let handle = Ui {
         global: global_tx,
         connection: player_tx,
-        detach: detach.clone(),
         _phantom: PhantomData,
     };
 
@@ -119,23 +107,26 @@ pub fn attach<V: View>(
                             }
                         },
                         None => {
-                            // FIXME: log, or something
+                            // FIXME: log, or something. we've probably just dropped the ui handle
                             break;
                         }
                     },
-
-                    _ = detach.notified() => {
-                        // for all player connections automatically clear all buttons
-                        // when we loose the UiHandle.
-                        let clear: Vec<Bfn> = active.drain().map(|(ucid, _)| {
-                            Bfn { ucid, subt: BfnType::Clear, ..Default::default() }
-                        }).collect();
-                        // FIXME: no expect
-                        insim.send_all(clear).await.expect("FIXME");
-                        break;
-                    }
                 }
             }
+
+            // for all player connections automatically clear all buttons
+            // when we loose the UiHandle.
+            // this should happen when we loose the player_rx receiver.
+            let clear: Vec<Bfn> = active
+                .drain()
+                .map(|(ucid, _)| Bfn {
+                    ucid,
+                    subt: BfnType::Clear,
+                    ..Default::default()
+                })
+                .collect();
+            // FIXME: no expect
+            insim.send_all(clear).await.expect("FIXME");
         });
     });
 
@@ -157,4 +148,23 @@ fn spawn_for<V: View>(
         insim.clone(),
     );
     let _ = active.insert(ucid, connection_tx);
+}
+
+/// Shortcut to make a container [node::Node]
+pub fn container<Msg>() -> node::Node<Msg> {
+    node::Node::container()
+}
+
+/// Shortcut to make a clickable button [node::Node]
+pub fn clickable<Msg>(
+    text: impl Into<String>,
+    bstyle: insim::insim::BtnStyle,
+    msg: Msg,
+) -> node::Node<Msg> {
+    node::Node::clickable(text, bstyle, msg)
+}
+
+/// Shortcut to make a text only (non-clickable) [node::Node]
+pub fn text<Msg>(text: impl Into<String>, bstyle: insim::insim::BtnStyle) -> node::Node<Msg> {
+    node::Node::text(text, bstyle)
 }

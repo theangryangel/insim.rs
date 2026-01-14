@@ -2,14 +2,13 @@ use insim::insim::BtnStyle;
 
 #[derive(Debug, Clone)]
 pub enum NodeKind<Msg> {
-    Container(Vec<Node<Msg>>),
+    Container(Option<Vec<Node<Msg>>>),
     Button {
         text: String,
         msg: Option<Msg>,
         key: Option<String>,
         bstyle: BtnStyle,
     },
-    Empty,
 }
 
 #[derive(Debug, Clone)]
@@ -19,12 +18,13 @@ pub struct Node<Msg> {
 }
 
 impl<Msg> Node<Msg> {
-    pub fn container(children: Vec<Node<Msg>>) -> Self {
+    pub fn container() -> Self {
         Self {
             style: Default::default(),
-            kind: NodeKind::Container(children),
+            kind: NodeKind::Container(None),
         }
     }
+
     pub fn clickable(text: impl Into<String>, mut bstyle: BtnStyle, msg: Msg) -> Self {
         bstyle = bstyle.clickable();
         Self {
@@ -37,6 +37,7 @@ impl<Msg> Node<Msg> {
             },
         }
     }
+
     pub fn text(text: impl Into<String>, bstyle: BtnStyle) -> Self {
         Self {
             style: Default::default(),
@@ -49,11 +50,48 @@ impl<Msg> Node<Msg> {
         }
     }
 
-    pub fn empty() -> Self {
-        Self {
-            style: Default::default(),
-            kind: NodeKind::Empty,
+    pub fn with_child<E: Into<Option<Node<Msg>>>>(mut self, val: E) -> Self {
+        let val = if let Some(val) = val.into() {
+            val
+        } else {
+            return self;
+        };
+
+        match self.kind {
+            NodeKind::Container(ref mut children) => {
+                children.get_or_insert_default().push(val);
+            },
+            _ => {},
         }
+
+        self
+    }
+
+    pub fn with_child_if(mut self, val: Self, condition: bool) -> Self {
+        if condition {
+            self = self.with_child(val);
+        }
+        self
+    }
+
+    pub fn with_children<I>(mut self, children: I) -> Self
+    where
+        I: IntoIterator<Item = Self>,
+    {
+        for child in children.into_iter() {
+            self = self.with_child(child);
+        }
+        self
+    }
+
+    pub fn with_children_if<I>(mut self, children: I, condition: bool) -> Self
+    where
+        I: IntoIterator<Item = Self>,
+    {
+        if condition {
+            self = self.with_children(children);
+        }
+        self
     }
 
     pub fn style(&self) -> &taffy::Style {
@@ -342,9 +380,10 @@ impl<Msg> Node<Msg> {
         F: Fn(Msg) -> ParentMsg + Clone,
     {
         let kind = match self.kind {
-            NodeKind::Container(c) => {
-                NodeKind::Container(c.into_iter().map(|k| k.map(f.clone())).collect())
+            NodeKind::Container(Some(c)) => {
+                NodeKind::Container(Some(c.into_iter().map(|k| k.map(f.clone())).collect()))
             },
+            NodeKind::Container(None) => NodeKind::Container(None),
             NodeKind::Button {
                 text,
                 msg,
@@ -356,7 +395,6 @@ impl<Msg> Node<Msg> {
                 key,
                 bstyle,
             },
-            NodeKind::Empty => NodeKind::Empty,
         };
 
         Node {

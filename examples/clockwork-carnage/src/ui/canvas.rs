@@ -53,25 +53,29 @@ impl<V: View> Canvas<V> {
         }
     }
 
-    pub(super) fn reconcile(&mut self, root: Node<V::Message>) -> Option<CanvasDiff> {
+    pub(super) fn reconcile(&mut self, root: Option<Node<V::Message>>) -> Option<CanvasDiff> {
         let mut click_map = HashMap::new();
         let mut new_buttons = HashMap::new();
 
         let mut tree = taffy::TaffyTree::new();
         let mut node_map = Vec::new();
 
-        // start traversal with a seed hash (0)
-        let root_id = Self::visit(
-            root,
-            0,
-            self.ucid,
-            &self.buttons,
-            &mut self.pool,
-            &mut new_buttons,
-            &mut tree,
-            &mut node_map,
-            &mut click_map,
-        );
+        let mut root_id = None;
+
+        if root.is_some() {
+            // start traversal with a seed hash (0)
+            root_id = Self::visit(
+                root.unwrap(),
+                0,
+                self.ucid,
+                &self.buttons,
+                &mut self.pool,
+                &mut new_buttons,
+                &mut tree,
+                &mut node_map,
+                &mut click_map,
+            );
+        }
 
         if let Some(root_id) = root_id {
             tree.compute_layout(root_id, taffy::Size::length(200.0))
@@ -160,7 +164,7 @@ impl<V: View> Canvas<V> {
         click_map: &mut HashMap<ClickId, M>,
     ) -> Option<taffy::NodeId> {
         match node.kind {
-            NodeKind::Container(children) => {
+            NodeKind::Container(Some(children)) => {
                 let child_ids: Vec<taffy::NodeId> = children
                     .into_iter()
                     .enumerate()
@@ -191,6 +195,8 @@ impl<V: View> Canvas<V> {
 
                 Some(node_id)
             },
+
+            NodeKind::Container(None) => None,
 
             NodeKind::Button {
                 text,
@@ -261,7 +267,6 @@ impl<V: View> Canvas<V> {
 
                 Some(node_id)
             },
-            NodeKind::Empty => None,
         }
     }
 

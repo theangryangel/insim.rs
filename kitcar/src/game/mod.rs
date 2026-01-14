@@ -215,19 +215,23 @@ impl GameHandle {
         wind: u8,
         layout: Option<String>,
     ) {
-        tracing::info!("/end");
-        insim
-            .send_command("/end")
-            .await
-            .expect("FIXME: do not fail");
-        tracing::info!("waiting for track selection screen");
-        self.wait_for_end().await;
+        let current = self.get().await;
 
-        tracing::info!("Requesting track change");
-        insim
-            .send_command(&format!("/track {}", &track))
-            .await
-            .expect("FIXME: do not fail");
+        if current.track != Some(track) {
+            tracing::info!("/end");
+            insim
+                .send_command("/end")
+                .await
+                .expect("FIXME: do not fail");
+            tracing::info!("waiting for track selection screen");
+            self.wait_for_end().await;
+
+            tracing::info!("Requesting track change");
+            insim
+                .send_command(&format!("/track {}", &track))
+                .await
+                .expect("FIXME: do not fail");
+        }
 
         let laps: u8 = laps.into();
 
@@ -243,15 +247,15 @@ impl GameHandle {
             .await
             .expect("FIXME: do not fail");
 
+        insim
+            .send_command("/axclear")
+            .await
+            .expect("FIXME: do not fail");
+
         tracing::info!("Requesting layout load");
         if let Some(layout) = &layout {
             insim
                 .send_command(&format!("/axload {:?}", layout))
-                .await
-                .expect("FIXME: do not fail");
-        } else {
-            insim
-                .send_command("/axclear")
                 .await
                 .expect("FIXME: do not fail");
         }

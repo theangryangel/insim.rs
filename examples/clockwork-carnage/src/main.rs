@@ -13,7 +13,7 @@ use insim::{
         track::Track,
     },
     identifiers::ConnectionId,
-    insim::{ObjectInfo, RaceLaps, TinyType, Uco},
+    insim::{BtnStyle, ObjectInfo, RaceLaps, TinyType, Uco},
 };
 use kitcar::{game::GameHandle, presence::PresenceHandle, time::countdown::Countdown};
 use tokio::{sync::broadcast, time::sleep};
@@ -58,6 +58,49 @@ impl Scene for WaitForPlayers {
     }
 }
 
+struct WaitForAdminStartUi {}
+impl ui::View for WaitForAdminStartUi {
+    type GlobalProps = ();
+
+    type ConnectionProps = ();
+
+    fn mount(tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
+        Self {}
+    }
+}
+
+impl<P> ui::Component<P> for WaitForAdminStartUi {
+    type Message = ();
+
+    fn render(&self, _props: P) -> Option<ui::Node<Self::Message>> {
+        Some(
+            ui::container()
+                .with_child(
+                    ui::text("No game in progress", BtnStyle::default().dark())
+                        .w(33.)
+                        .h(5.),
+                )
+                .with_child(
+                    ui::text(
+                        format!("{} {}", "Welcome to Clockwork".white(), "Carnage".red()),
+                        BtnStyle::default().dark(),
+                    )
+                    .w(38.)
+                    .h(5.),
+                )
+                .with_child(
+                    ui::text("?".white(), BtnStyle::default().dark())
+                        .w(5.)
+                        .h(5.),
+                )
+                .flex()
+                .flex_row()
+                .justify_center()
+                .w(200.),
+        )
+    }
+}
+
 /// Wait for admin to start
 #[derive(Clone)]
 struct WaitForAdminStart {
@@ -70,6 +113,8 @@ impl Scene for WaitForAdminStart {
     type Output = ();
 
     async fn run(self) -> Result<SceneResult<()>, SceneError> {
+        let _ui = ui::attach::<WaitForAdminStartUi>(self.insim.clone(), self.presence.clone(), ());
+
         self.insim
             .send_message("Ready for admin !start command", ConnectionId::ALL)
             .await?;
@@ -204,6 +249,35 @@ async fn wait_for_admin_end(
     }
 }
 
+struct HelloWorld {}
+impl ui::View for HelloWorld {
+    type GlobalProps = ();
+
+    type ConnectionProps = ();
+
+    fn mount(tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
+        Self {}
+    }
+}
+
+impl<P> ui::Component<P> for HelloWorld {
+    type Message = ();
+
+    fn render(&self, _props: P) -> Option<ui::Node<Self::Message>> {
+        Some(
+            ui::container()
+                .with_child(
+                    ui::text("Hello world", BtnStyle::default().dark())
+                        .w(15.0)
+                        .h(10.0),
+                )
+                .flex()
+                .justify_center()
+                .w(200.),
+        )
+    }
+}
+
 struct ClockworkInner {
     scores: HashMap<String, u32>,
     rounds: usize,
@@ -217,11 +291,15 @@ struct ClockworkInner {
 
 impl ClockworkInner {
     async fn run(&mut self) -> Result<(), SceneError> {
+        let ui = ui::attach::<HelloWorld>(self.insim.clone(), self.presence.clone(), ());
+
         self.lobby().await?;
         for round in 1..=self.rounds {
             self.round(round).await?;
         }
         self.announce_results().await?;
+
+        drop(ui);
         Ok(())
     }
 
