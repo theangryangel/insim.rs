@@ -28,6 +28,7 @@ mod cli;
 mod marquee;
 mod setup_track;
 mod topbar;
+mod leaderboard;
 mod wait_for_admin_start;
 
 /// Clockwork Carnage event
@@ -134,12 +135,11 @@ struct ClockworkRoundGlobalProps {
     remaining: Duration,
     round: usize,
     rounds: usize,
+    leaderboard: leaderboard::LeaderboardRanking,
 }
 
 #[derive(Debug, Clone, Default)]
 struct ClockworkRoundConnectionProps {
-    points: u32,
-    rank: Option<usize>,
     in_progress: bool,
     round_best: Option<Duration>,
 }
@@ -159,36 +159,55 @@ impl ui::View for ClockworkRoundView {
         global_props: Self::GlobalProps,
         connection_props: Self::ConnectionProps,
     ) -> ui::Node<Self::Message> {
-        let rank_display = match connection_props.rank {
-            Some(r) => format!("#{}", r),
-            None => "-".to_string(),
-        };
         let status = if connection_props.in_progress {
-            "In progress".dark_green()
+            "In progress".light_green()
         } else {
             match connection_props.round_best {
                 Some(d) => format!("Best: {:.2?}", d).white(),
-                None => "No run".red(),
+                None => "Waiting for start".red(),
             }
         };
-        topbar::topbar(&format!(
-            "Round {}/{} - {:?} remaining",
-            global_props.round, global_props.rounds, global_props.remaining,
-        ))
-        .with_child(
-            ui::text(
-                &format!("{} {} pts", rank_display, connection_props.points).white(),
-                BtnStyle::default().dark(),
+
+        let players: Vec<ui::Node<Self::Message>> = global_props.leaderboard.iter().enumerate().map(|(index, (uname, pts))| {
+            ui::container()
+                .flex()
+                .flex_row()
+                .with_children([
+                    ui::text(format!("#{}", index + 1), BtnStyle::default().dark()).w(5.).h(5.),
+                    ui::text(uname.yellow(), BtnStyle::default().dark()).w(25.).h(5.),
+                    ui::text(format!("{}", pts), BtnStyle::default().dark()).w(5.).h(5.),
+                ])
+        }).collect();
+
+        ui::container()
+            .flex()
+            .flex_col()
+            .with_child(
+                topbar::topbar(&format!(
+                    "Round {}/{} - {:?} remaining",
+                    global_props.round, global_props.rounds, global_props.remaining,
+                ))
+                .with_child(ui::text(&status, BtnStyle::default().dark()).w(15.).h(5.))
             )
-            .w(15.)
-            .h(5.),
-        )
-        .with_child(ui::text(&status, BtnStyle::default().dark()).w(15.).h(5.))
+            .with_child(
+                ui::container()
+                .flex()
+                .mt(20.)
+                .w(200.)
+                .flex_col()
+                .items_end()
+                .with_child(
+                    ui::text("Scores!".yellow(), BtnStyle::default().dark())
+                    .w(35.)
+                    .h(5.)
+                )
+                .with_children(players)
+            )
     }
 }
 
 struct ClockworkInner {
-    scores: HashMap<String, u32>,
+    scores: leaderboard::Leaderboard,
     rounds: usize,
     max_scorers: usize,
     target: Duration,
@@ -222,40 +241,16 @@ impl ClockworkInner {
     }
 
     async fn broadcast_rankings(&self, ui: &ui::Ui<ClockworkRoundView>) {
-        let mut standings: Vec<_> = self.scores.iter().collect();
-        standings.sort_by(|a, b| b.1.cmp(a.1));
-
-        let rankings: HashMap<&String, usize> = standings
-            .iter()
-            .enumerate()
-            .map(|(i, (uname, _))| (*uname, i + 1))
-            .collect();
-
         if let Some(connections) = self.presence.connections().await {
             for conn in connections {
-                let mut props = self.connection_props(&conn.uname);
-                props.rank = rankings.get(&conn.uname).copied();
+                let props = self.connection_props(&conn.uname);
                 ui.update_connection_props(conn.ucid, props).await;
             }
         }
     }
 
-    fn compute_rank(&self, uname: &str) -> Option<usize> {
-        if !self.scores.contains_key(uname) {
-            return None;
-        }
-        let mut standings: Vec<_> = self.scores.iter().collect();
-        standings.sort_by(|a, b| b.1.cmp(a.1));
-        standings
-            .iter()
-            .position(|(name, _)| *name == uname)
-            .map(|i| i + 1)
-    }
-
     fn connection_props(&self, uname: &str) -> ClockworkRoundConnectionProps {
         ClockworkRoundConnectionProps {
-            points: self.scores.get(uname).copied().unwrap_or(0),
-            rank: self.compute_rank(uname),
             in_progress: self.active_runs.contains_key(uname),
             round_best: self.round_best.get(uname).copied(),
         }
@@ -272,6 +267,7 @@ impl ClockworkInner {
 
         while let Some(_) = countdown.tick().await {
             let remaining = countdown.remaining_duration();
+            tracing::info!("updating global props");
             ui.update_global_props(remaining);
         }
 
@@ -305,14 +301,9 @@ impl ClockworkInner {
                             ui.update_global_props(ClockworkRoundGlobalProps {
                                 remaining: dur,
                                 round,
-                                rounds: self.rounds
+                                rounds: self.rounds,
+                                leaderboard: self.scores.ranking(),
                             });
-                            self.insim
-                                .send_message(
-                                    format!("{:?} left, round {}/{}", dur, round, self.rounds),
-                                    ConnectionId::ALL
-                                )
-                                .await?;
                         }
                         None => break,
                     }
@@ -425,17 +416,16 @@ impl ClockworkInner {
             let points = (self.max_scorers - i) as u32;
             let _ = self
                 .scores
-                .entry(uname)
-                .and_modify(|e| *e = e.saturating_add(points))
-                .or_insert(points);
+                .add_points(uname, points);
         }
+
+        self.scores.rank();
 
         tracing::info!("{:?}", self.scores);
     }
 
     async fn announce_results(&self) -> Result<(), SceneError> {
-        let mut standings: Vec<_> = self.scores.iter().collect();
-        standings.sort_by(|a, b| b.1.cmp(a.1));
+        let standings = self.scores.ranking();
 
         self.insim
             .send_message("Final standings".yellow(), ConnectionId::ALL)
@@ -496,7 +486,7 @@ async fn main() -> Result<(), SceneError> {
 
     let args = cli::Args::parse();
 
-    let (insim, _) = insim::tcp(args.addr.clone())
+    let (insim, insim_handle) = insim::tcp(args.addr.clone())
         .isi_admin_password(args.password.clone())
         .isi_iname("clockwork".to_owned())
         .isi_prefix('!')
@@ -556,6 +546,9 @@ async fn main() -> Result<(), SceneError> {
     .loop_until_quit();
 
     tokio::select! {
+        res = insim_handle => {
+            let _ = res.expect("Did not expect insim to die");
+        },
         res = clockwork.run() => {
             tracing::info!("{:?}", res);
         },

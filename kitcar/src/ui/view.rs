@@ -56,6 +56,7 @@ pub(super) fn run_view<V: View>(
         let mut packets = insim.subscribe();
         let mut canvas = Canvas::<V>::new(ucid);
         let mut blocked = false; // user cleared the buttons, do not redraw unless requested
+        let mut internal_closed = false;
 
         // always draw immediately
         let mut should_render = true;
@@ -66,6 +67,7 @@ pub(super) fn run_view<V: View>(
                     global.borrow_and_update().clone(),
                     connection.borrow_and_update().clone(),
                 );
+                tracing::info!("rendering?");
                 if let Some(diff) = canvas.reconcile(vdom) {
                     // FIXME: no expect
                     insim
@@ -91,13 +93,16 @@ pub(super) fn run_view<V: View>(
                 },
 
                 // internal messages (i.e. clock ticks?)
-                msg = internal_rx.recv() => {
+                msg = internal_rx.recv(), if !internal_closed => {
                     match msg {
                         Some(msg) => {
                             root.update(msg);
                             true
                         },
-                        None => { break; }
+                        None => {
+                            internal_closed = true;
+                            false
+                        }
                     }
                 },
 
@@ -138,5 +143,7 @@ pub(super) fn run_view<V: View>(
                 }
             };
         }
+
+        tracing::error!("Child shutdown");
     });
 }

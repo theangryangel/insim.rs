@@ -367,18 +367,22 @@ impl Decode for Btn {
 impl Encode for Btn {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         if self.l > 200 {
+            tracing::debug!("length too large {}", self.l);
             return Err(insim_core::EncodeError::TooLarge);
         }
 
         if self.t > 200 {
+            tracing::debug!("top too large");
             return Err(insim_core::EncodeError::TooLarge);
         }
 
         if self.w > 200 {
+            tracing::debug!("width too large");
             return Err(insim_core::EncodeError::TooLarge);
         }
 
         if self.h > 200 {
+            tracing::debug!("height too large");
             return Err(insim_core::EncodeError::TooLarge);
         }
 
@@ -402,6 +406,7 @@ impl Encode for Btn {
             let text = insim_core::string::codepages::to_lossy_bytes(&self.text);
 
             if (caption.len() + text.len()) > (BTN_TEXT_MAX_LEN - 2) {
+                tracing::debug!("caption + text too large");
                 return Err(insim_core::EncodeError::TooLarge);
             }
 

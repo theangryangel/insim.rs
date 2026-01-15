@@ -31,9 +31,10 @@ pub struct Ui<V: View> {
 
 impl<V: View> Ui<V> {
     pub fn update_global_props(&self, value: V::GlobalProps) {
-        self.global
-            .send(value)
-            .expect("FIXME: expected global to work"); // FIXME: check returned value
+        tracing::info!("Sending global props update, receiver_count = {}", self.global.receiver_count());
+        let res = self.global
+            .send(value);
+        tracing::info!("Send result: {:?}", res);
     }
 
     pub async fn update_connection_props(&self, ucid: ConnectionId, value: V::ConnectionProps) {
@@ -54,13 +55,15 @@ pub fn attach<V: View>(
     presence: Presence,
     props: V::GlobalProps,
 ) -> Ui<V> {
-    let (global_tx, global_rx) = watch::channel(props);
+    let (global_tx, _global_rx) = watch::channel(props);
     let (player_tx, mut player_rx) = mpsc::channel(100);
     let handle = Ui {
-        global: global_tx,
+        global: global_tx.clone(),
         connection: player_tx,
         _phantom: PhantomData,
     };
+
+    drop(_global_rx);
 
     // XXX: We run on our own thread because we need to use LocalSet until Taffy Style is Send.
     // https://github.com/DioxusLabs/taffy/issues/823
@@ -78,7 +81,7 @@ pub fn attach<V: View>(
 
             // FIXME: expect
             for existing in presence.connections().await.expect("FIXME") {
-                spawn_for::<V>(existing.ucid, &global_rx, &insim, &mut active);
+                spawn_for::<V>(existing.ucid, global_tx.subscribe(), &insim, &mut active);
             }
 
             loop {
@@ -89,7 +92,7 @@ pub fn attach<V: View>(
                                 continue;
                             }
 
-                            spawn_for::<V>(ncn.ucid, &global_rx, &insim, &mut active);
+                            spawn_for::<V>(ncn.ucid, global_tx.subscribe(), &insim, &mut active);
                         },
                         Ok(Packet::Cnl(cnl)) => {
                             // player left, remove their props sender
@@ -136,13 +139,13 @@ pub fn attach<V: View>(
 
 fn spawn_for<V: View>(
     ucid: ConnectionId,
-    global_rx: &watch::Receiver<V::GlobalProps>,
+    global_rx: watch::Receiver<V::GlobalProps>,
     insim: &insim::builder::SpawnedHandle,
     active: &mut HashMap<ConnectionId, watch::Sender<V::ConnectionProps>>,
 ) {
     let (connection_tx, connection_rx) = watch::channel(V::ConnectionProps::default());
 
-    run_view::<V>(ucid, global_rx.clone(), connection_rx, insim.clone());
+    run_view::<V>(ucid, global_rx, connection_rx, insim.clone());
     let _ = active.insert(ucid, connection_tx);
 }
 
