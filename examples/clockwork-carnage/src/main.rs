@@ -57,6 +57,7 @@ impl Scene for Clockwork {
             target: self.target,
             round_best: Default::default(),
             active_runs: Default::default(),
+            name_cache: Default::default(),
             insim: self.insim.clone(),
             game: self.game.clone(),
             presence: self.presence.clone(),
@@ -130,12 +131,15 @@ impl ui::View for ClockworkLobbyView {
     }
 }
 
+/// (uname, pname, pts)
+type EnrichedLeaderboard = Vec<(String, String, u32)>;
+
 #[derive(Debug, Clone, Default)]
 struct ClockworkRoundGlobalProps {
     remaining: Duration,
     round: usize,
     rounds: usize,
-    leaderboard: leaderboard::LeaderboardRanking,
+    leaderboard: EnrichedLeaderboard,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -168,13 +172,13 @@ impl ui::View for ClockworkRoundView {
             }
         };
 
-        let players: Vec<ui::Node<Self::Message>> = global_props.leaderboard.iter().enumerate().map(|(index, (uname, pts))| {
+        let players: Vec<ui::Node<Self::Message>> = global_props.leaderboard.iter().enumerate().map(|(index, (_uname, pname, pts))| {
             ui::container()
                 .flex()
                 .flex_row()
                 .with_children([
                     ui::text(format!("#{}", index + 1), BtnStyle::default().dark()).w(5.).h(5.),
-                    ui::text(uname.yellow(), BtnStyle::default().dark()).w(25.).h(5.),
+                    ui::text(pname, BtnStyle::default().dark()).w(25.).h(5.),
                     ui::text(format!("{}", pts), BtnStyle::default().dark()).w(5.).h(5.),
                 ])
         }).collect();
@@ -214,6 +218,7 @@ struct ClockworkInner {
 
     round_best: HashMap<String, Duration>,
     active_runs: HashMap<String, Duration>,
+    name_cache: HashMap<String, String>,
 
     insim: SpawnedHandle,
     game: game::Game,
@@ -240,13 +245,27 @@ impl ClockworkInner {
         Ok(())
     }
 
-    async fn broadcast_rankings(&self, ui: &ui::Ui<ClockworkRoundView>) {
+    async fn broadcast_rankings(&mut self, ui: &ui::Ui<ClockworkRoundView>) {
         if let Some(connections) = self.presence.connections().await {
+            for conn in &connections {
+                let _ = self.name_cache.insert(conn.uname.clone(), conn.pname.clone());
+            }
             for conn in connections {
                 let props = self.connection_props(&conn.uname);
                 ui.update_connection_props(conn.ucid, props).await;
             }
         }
+    }
+
+    fn enriched_leaderboard(&self) -> EnrichedLeaderboard {
+        self.scores
+            .ranking()
+            .iter()
+            .map(|(uname, pts)| {
+                let pname = self.name_cache.get(uname).cloned().unwrap_or_else(|| uname.clone());
+                (uname.clone(), pname, *pts)
+            })
+            .collect()
     }
 
     fn connection_props(&self, uname: &str) -> ClockworkRoundConnectionProps {
@@ -302,7 +321,7 @@ impl ClockworkInner {
                                 remaining: dur,
                                 round,
                                 rounds: self.rounds,
-                                leaderboard: self.scores.ranking(),
+                                leaderboard: self.enriched_leaderboard(),
                             });
                         }
                         None => break,
@@ -490,6 +509,7 @@ async fn main() -> Result<(), SceneError> {
         .isi_admin_password(args.password.clone())
         .isi_iname("clockwork".to_owned())
         .isi_prefix('!')
+        .isi_flag_mso_cols(true)
         .spawn(100)
         .await?;
 
