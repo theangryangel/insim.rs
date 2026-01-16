@@ -252,10 +252,10 @@ impl Game {
             .await
             .expect("FIXME: do not fail");
 
-        tracing::info!("Requesting layout load");
-        if let Some(layout) = &layout {
+        if let Some(layout) = layout {
+            tracing::info!("Requesting layout load: {}", layout);
             insim
-                .send_command(&format!("/axload {:?}", layout))
+                .send_command(&format!("/axload {}", layout))
                 .await
                 .expect("FIXME: do not fail");
         }

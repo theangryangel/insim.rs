@@ -195,7 +195,7 @@ impl ui::View for ClockworkRoundView {
                 .mt(20.)
                 .w(200.)
                 .flex_col()
-                .items_end()
+                .items_start()
                 .with_child(
                     ui::text("Scores!".yellow(), BtnStyle::default().dark())
                     .w(35.)
@@ -521,6 +521,7 @@ async fn main() -> Result<(), SceneError> {
             min_players: MIN_PLAYERS,
             game: game.clone(),
             track: Track::Fe1x,
+            layout: Some("CC".to_string()),
         }
         .with_timeout(Duration::from_secs(60)),
     )

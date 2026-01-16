@@ -38,6 +38,7 @@ pub struct SetupTrack {
     pub insim: SpawnedHandle,
     pub min_players: usize,
     pub track: Track,
+    pub layout: Option<String>,
 }
 
 impl Scene for SetupTrack {
@@ -51,7 +52,7 @@ impl Scene for SetupTrack {
                 self.track,
                 RaceLaps::Practice,
                 0,
-                None,
+                self.layout.clone(),
             ) => {
                 Ok(SceneResult::Continue(()))
             },

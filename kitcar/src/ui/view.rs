@@ -67,7 +67,6 @@ pub(super) fn run_view<V: View>(
                     global.borrow_and_update().clone(),
                     connection.borrow_and_update().clone(),
                 );
-                tracing::info!("rendering?");
                 if let Some(diff) = canvas.reconcile(vdom) {
                     // FIXME: no expect
                     insim

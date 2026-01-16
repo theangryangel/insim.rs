@@ -31,10 +31,8 @@ pub struct Ui<V: View> {
 
 impl<V: View> Ui<V> {
     pub fn update_global_props(&self, value: V::GlobalProps) {
-        tracing::info!("Sending global props update, receiver_count = {}", self.global.receiver_count());
-        let res = self.global
-            .send(value);
-        tracing::info!("Send result: {:?}", res);
+        self.global
+            .send(value).expect("FIXME: expect global to work");
     }
 
     pub async fn update_connection_props(&self, ucid: ConnectionId, value: V::ConnectionProps) {
