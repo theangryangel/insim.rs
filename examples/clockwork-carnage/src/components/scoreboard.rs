@@ -6,7 +6,10 @@ use kitcar::ui;
 /// (uname, pname, pts)
 pub type EnrichedLeaderboard = Vec<(String, String, u32)>;
 
-pub fn scoreboard<Msg>(leaderboard: &EnrichedLeaderboard, current_uname: &str) -> Vec<ui::Node<Msg>> {
+pub fn scoreboard<Msg>(
+    leaderboard: &EnrichedLeaderboard,
+    current_uname: &str,
+) -> Vec<ui::Node<Msg>> {
     let total = leaderboard.len();
     let player_pos = leaderboard
         .iter()
@@ -28,7 +31,9 @@ pub fn scoreboard<Msg>(leaderboard: &EnrichedLeaderboard, current_uname: &str) -
         while positions.len() < 7 {
             let next = (3..total).find(|i| !positions.contains(i));
             match next {
-                Some(i) => { let _ = positions.insert(i); }
+                Some(i) => {
+                    let _ = positions.insert(i);
+                },
                 None => break,
             }
         }

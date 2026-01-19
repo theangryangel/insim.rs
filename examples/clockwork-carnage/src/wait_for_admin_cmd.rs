@@ -21,19 +21,17 @@ where
                         return Ok(());
                     }
                 }
-            }
-            Ok(_) => {}
+            },
+            Ok(_) => {},
             Err(broadcast::error::RecvError::Lagged(_)) => {
                 tracing::warn!("Chat commands lost due to lag");
-            }
+            },
             Err(broadcast::error::RecvError::Closed) => {
                 return Err(SceneError::Custom {
                     scene: "wait_for_admin_cmd",
                     cause: Box::new(chat::ChatError::HandleLost),
                 });
-            }
+            },
         }
     }
 }
-
-

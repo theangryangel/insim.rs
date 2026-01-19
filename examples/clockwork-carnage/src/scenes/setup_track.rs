@@ -9,7 +9,7 @@ use kitcar::{
     ui,
 };
 
-use super::topbar;
+use crate::components::topbar;
 
 struct SetupTrackView {}
 impl ui::View for SetupTrackView {
@@ -26,7 +26,7 @@ impl ui::View for SetupTrackView {
         _global_props: Self::GlobalProps,
         _connection_props: Self::ConnectionProps,
     ) -> ui::Node<Self::Message> {
-        topbar::topbar(&"Waiting for player ready".white())
+        topbar(&"Waiting for player ready".white())
     }
 }
 

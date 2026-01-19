@@ -51,7 +51,6 @@ pub fn spawn(insim: insim::builder::SpawnedHandle) -> Chat {
     };
 
     let _ = tokio::spawn(async move {
-        // FIXME: dont use SceneError
         let result: Result<(), ChatError> = async {
             let mut packets = insim.subscribe();
 

@@ -1,9 +1,8 @@
 use std::time::{Duration, Instant};
 
 use insim::{core::string::colours::Colourify, insim::BtnStyle};
+use kitcar::ui;
 use tokio::{sync::mpsc, task::JoinHandle};
-
-use super::ui;
 
 #[derive(Clone)]
 enum MarqueeState {
