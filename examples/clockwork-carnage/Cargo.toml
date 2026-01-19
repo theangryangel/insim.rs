@@ -9,9 +9,9 @@ license.workspace = true
 homepage.workspace = true
 
 [dependencies]
+anyhow = "1.0.86"
 clap = { workspace = true, features = ["derive"] }
 if_chain = { workspace = true }
-
 insim = { path = "../../insim", features = ["serde", "blocking"] }
 kitcar = { path = "../../kitcar" }
 thiserror = { workspace = true }

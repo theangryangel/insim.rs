@@ -494,7 +494,7 @@ async fn wait_for_admin_quit(
 const MIN_PLAYERS: usize = 2;
 
 #[tokio::main]
-async fn main() -> Result<(), SceneError> {
+async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::builder()

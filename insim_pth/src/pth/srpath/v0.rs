@@ -213,13 +213,13 @@ impl Encode for SrPth {
             }.context("SRPATH unsupported revision"));
         }
         if self.main_nodes.len() > (u16::MAX as usize) {
-            return Err(insim_core::EncodeErrorKind::OutOfRange { min: 0, max: u16::MAX as usize }.context(""));
+            return Err(insim_core::EncodeErrorKind::OutOfRange { min: 0, max: u16::MAX as usize, found: self.main_nodes.len() }.context("SRPATH too many main nodes"));
         }
         if self.pit0_nodes.len() > (u16::MAX as usize) {
-            return Err(insim_core::EncodeError::OutOfRange { min: 0, max: u16::MAX as usize });
+            return Err(insim_core::EncodeErrorKind::OutOfRange { min: 0, max: u16::MAX as usize, found: self.pit0_nodes.len() }.context("SRPATH too many pit0 nodes"));
         }
         if self.pit1_nodes.len() > (u16::MAX as usize) {
-            return Err(insim_core::EncodeError::OutOfRange { min: 0, max: u16::MAX as usize });
+            return Err(insim_core::EncodeErrorKind::OutOfRange { min: 0, max: u16::MAX as usize, found: self.pit1_nodes.len() }.context("SRPATH too many pit1 nodes"));
         }
 
         self.revision.encode(buf)?;
