@@ -3,9 +3,9 @@ use kitcar::{
     presence, scenes,
     ui::{self, Component},
 };
-use tokio::sync::broadcast;
 
-use crate::{chat, marquee, topbar::topbar};
+
+use crate::{chat, marquee, topbar::topbar, wait_for_admin_cmd::wait_for_admin_cmd};
 
 #[derive(Clone, Debug)]
 enum WaitForAdminStartMsg {
@@ -72,27 +72,12 @@ impl scenes::Scene for WaitForAdminStart {
 
         let mut chat = self.chat.subscribe();
 
-        loop {
-            match chat.recv().await {
-                Ok((chat::ChatMsg::Start, ucid)) => {
-                    if let Some(conn) = self.presence.connection(&ucid).await {
-                        if conn.admin {
-                            tracing::info!("Admin started game");
-                            return Ok(scenes::SceneResult::Continue(()));
-                        }
-                    }
-                },
-                Ok(_) => {},
-                Err(broadcast::error::RecvError::Lagged(_)) => {
-                    tracing::warn!("Chat commands lost due to lag");
-                },
-                Err(broadcast::error::RecvError::Closed) => {
-                    return Err(scenes::SceneError::Custom {
-                        scene: "WaitForAdminStart",
-                        cause: Box::new(chat::ChatError::HandleLost),
-                    });
-                },
-            }
-        }
+        wait_for_admin_cmd(&mut chat, self.presence.clone(), |msg| {
+            matches!(msg, chat::ChatMsg::Start)
+        })
+        .await?;
+
+        tracing::info!("Admin started game");
+        Ok(scenes::SceneResult::Continue(()))
     }
 }

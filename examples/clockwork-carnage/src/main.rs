@@ -12,7 +12,7 @@ use insim::{
         string::colours::Colourify,
         track::Track,
     },
-    identifiers::ConnectionId,
+
     insim::{BtnStyle, ObjectInfo, TinyType, Uco},
 };
 use kitcar::{
@@ -21,15 +21,17 @@ use kitcar::{
     time::Countdown,
     ui,
 };
-use tokio::{sync::broadcast, time::sleep};
+use tokio::time::sleep;
 
 mod chat;
 mod cli;
 mod leaderboard;
 mod marquee;
+mod scoreboard;
 mod setup_track;
 mod topbar;
 mod wait_for_admin_start;
+mod wait_for_admin_cmd;
 
 /// Clockwork Carnage event
 // TODO: split up into Lobby, Rounds, Victory
@@ -68,7 +70,7 @@ impl Scene for Clockwork {
                 res?;
                 Ok(SceneResult::Continue(()))
             }
-            _ = wait_for_admin_end(&mut chat, self.presence.clone()) => {
+            _ = wait_for_admin_cmd::wait_for_admin_cmd(&mut chat, self.presence.clone(), |msg| matches!(msg, chat::ChatMsg::End)) => {
                 tracing::info!("Admin ended event");
                 Ok(SceneResult::bail_with("Admin ended event"))
             }
@@ -80,33 +82,6 @@ impl Scene for Clockwork {
                 tracing::info!("Lost players during event");
                 Ok(SceneResult::bail_with("Clockwork lost players during event"))
             }
-        }
-    }
-}
-
-async fn wait_for_admin_end(
-    chat: &mut broadcast::Receiver<(chat::ChatMsg, ConnectionId)>,
-    presence: presence::Presence,
-) -> Result<(), SceneError> {
-    loop {
-        match chat.recv().await {
-            Ok((chat::ChatMsg::End, ucid)) => {
-                if let Some(conn) = presence.connection(&ucid).await {
-                    if conn.admin {
-                        return Ok(());
-                    }
-                }
-            },
-            Ok(_) => {},
-            Err(broadcast::error::RecvError::Lagged(_)) => {
-                tracing::warn!("Chat commands lost due to lag");
-            },
-            Err(broadcast::error::RecvError::Closed) => {
-                return Err(SceneError::Custom {
-                    scene: "wait_for_admin_end",
-                    cause: Box::new(chat::ChatError::HandleLost),
-                });
-            },
         }
     }
 }
@@ -130,8 +105,7 @@ impl ui::View for ClockworkLobbyView {
     }
 }
 
-/// (uname, pname, pts)
-type EnrichedLeaderboard = Vec<(String, String, u32)>;
+use scoreboard::EnrichedLeaderboard;
 
 #[derive(Debug, Clone, Default)]
 struct ClockworkRoundGlobalProps {
@@ -172,35 +146,7 @@ impl ui::View for ClockworkRoundView {
             }
         };
 
-        let leaderboard = &global_props.leaderboard;
-        let total = leaderboard.len();
-        let current_player_pos = leaderboard
-            .iter()
-            .position(|(uname, _, _)| uname == &connection_props.uname);
-
-        let indices_to_show: Vec<usize> = if total <= 5 {
-            (0..total).collect()
-        } else if current_player_pos.map_or(true, |p| p < 4 || p == total - 1) {
-            vec![0, 1, 2, 3, total - 1]
-        } else {
-            vec![0, 1, 2, current_player_pos.unwrap(), total - 1]
-        };
-
-        let players: Vec<ui::Node<Self::Message>> = indices_to_show
-            .into_iter()
-            .map(|index| {
-                let (_, pname, pts) = &leaderboard[index];
-                ui::container().flex().flex_row().with_children([
-                    ui::text(format!("#{}", index + 1), BtnStyle::default().dark())
-                        .w(5.)
-                        .h(5.),
-                    ui::text(pname, BtnStyle::default().dark()).w(25.).h(5.),
-                    ui::text(format!("{}", pts), BtnStyle::default().dark())
-                        .w(5.)
-                        .h(5.),
-                ])
-            })
-            .collect();
+        let players = scoreboard::scoreboard(&global_props.leaderboard, &connection_props.uname);
 
         ui::container()
             .flex()
@@ -221,6 +167,58 @@ impl ui::View for ClockworkRoundView {
                     .items_start()
                     .with_child(
                         ui::text("Scores!".yellow(), BtnStyle::default().dark())
+                            .w(35.)
+                            .h(5.),
+                    )
+                    .with_children(players),
+            )
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct ClockworkVictoryGlobalProps {
+    standings: EnrichedLeaderboard,
+    countdown: Duration,
+}
+
+#[derive(Debug, Clone, Default)]
+struct ClockworkVictoryConnectionProps {
+    uname: String,
+}
+
+struct ClockworkVictoryView {}
+impl ui::View for ClockworkVictoryView {
+    type GlobalProps = ClockworkVictoryGlobalProps;
+    type ConnectionProps = ClockworkVictoryConnectionProps;
+    type Message = ();
+
+    fn mount(_tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
+        Self {}
+    }
+
+    fn render(
+        &self,
+        global_props: Self::GlobalProps,
+        connection_props: Self::ConnectionProps,
+    ) -> ui::Node<Self::Message> {
+        let players = scoreboard::scoreboard(&global_props.standings, &connection_props.uname);
+
+        ui::container()
+            .flex()
+            .flex_col()
+            .with_child(topbar::topbar(&format!(
+                "Final Standings! - Next game in {:?}",
+                global_props.countdown
+            )))
+            .with_child(
+                ui::container()
+                    .flex()
+                    .mt(20.)
+                    .w(200.)
+                    .flex_col()
+                    .items_start()
+                    .with_child(
+                        ui::text("Victory!".yellow(), BtnStyle::default().dark())
                             .w(35.)
                             .h(5.),
                     )
@@ -378,7 +376,7 @@ impl ClockworkInner {
             insim::Packet::Uco(Uco {
                 info:
                     ObjectInfo::InsimCheckpoint(InsimCheckpoint {
-                        kind: InsimCheckpointKind::Checkpoint1,
+                        kind: InsimCheckpointKind::Checkpoint1, 
                         ..
                     }),
                 plid,
@@ -463,52 +461,38 @@ impl ClockworkInner {
         tracing::info!("{:?}", self.scores);
     }
 
-    async fn announce_results(&self) -> Result<(), SceneError> {
-        let standings = self.scores.ranking();
+    async fn announce_results(&mut self) -> Result<(), SceneError> {
+        let ui = ui::attach::<ClockworkVictoryView>(
+            self.insim.clone(),
+            self.presence.clone(),
+            ClockworkVictoryGlobalProps::default(),
+        );
 
-        self.insim
-            .send_message("Final standings".yellow(), ConnectionId::ALL)
-            .await?;
-        for (i, (name, score)) in standings.iter().take(10).enumerate() {
-            self.insim
-                .send_message(
-                    format!("{}. {} - {} pts", i + 1, name, score).yellow(),
-                    ConnectionId::ALL,
+        if let Some(connections) = self.presence.connections().await {
+            for conn in connections {
+                ui.update_connection_props(
+                    conn.ucid,
+                    ClockworkVictoryConnectionProps {
+                        uname: conn.uname.clone(),
+                    },
                 )
-                .await?;
+                .await;
+            }
         }
+
+        let mut countdown = Countdown::new(Duration::from_secs(1), 15);
+        while let Some(remaining) = countdown.tick().await {
+            ui.update_global_props(ClockworkVictoryGlobalProps {
+                standings: self.enriched_leaderboard().await,
+                countdown: Duration::from_secs(remaining.into()),
+            });
+        }
+
         Ok(())
     }
 }
 
-async fn wait_for_admin_quit(
-    chat: chat::Chat,
-    presence: presence::Presence,
-) -> Result<(), SceneError> {
-    let mut chat = chat.subscribe();
-    loop {
-        match chat.recv().await {
-            Ok((chat::ChatMsg::Quit, ucid)) => {
-                if let Some(conn) = presence.connection(&ucid).await {
-                    if conn.admin {
-                        tracing::info!("Admin {} requested quit", conn.uname);
-                        return Ok(());
-                    }
-                }
-            },
-            Ok(_) => {},
-            Err(broadcast::error::RecvError::Lagged(_)) => {
-                tracing::warn!("Chat commands lost due to lag");
-            },
-            Err(broadcast::error::RecvError::Closed) => {
-                return Err(SceneError::Custom {
-                    scene: "wait_for_admin_quit",
-                    cause: Box::new(chat::ChatError::HandleLost),
-                });
-            },
-        }
-    }
-}
+
 
 // host + 1 player
 const MIN_PLAYERS: usize = 2;
@@ -586,6 +570,7 @@ async fn main() -> anyhow::Result<()> {
     })
     .loop_until_quit();
 
+    let mut chat_rx = chat.subscribe();
     tokio::select! {
         res = insim_handle => {
             let _ = res.expect("Did not expect insim to die");
@@ -593,7 +578,7 @@ async fn main() -> anyhow::Result<()> {
         res = clockwork.run() => {
             tracing::info!("{:?}", res);
         },
-        _ = wait_for_admin_quit(chat, presence) => {}
+        _ = wait_for_admin_cmd::wait_for_admin_cmd(&mut chat_rx, presence, |msg| matches!(msg, chat::ChatMsg::Quit)) => {}
     }
 
     Ok(())
