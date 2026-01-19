@@ -59,6 +59,7 @@ pub struct ConnectionInfo {
 struct PresenceInner {
     connections: HashMap<ConnectionId, ConnectionInfo>,
     players: HashMap<PlayerId, PlayerInfo>,
+    last_known_names: HashMap<String, String>,
     player_count: watch::Sender<usize>,
     connection_count: watch::Sender<usize>,
 }
@@ -71,6 +72,7 @@ impl PresenceInner {
         Self {
             connections: HashMap::new(),
             players: HashMap::new(),
+            last_known_names: HashMap::new(),
             player_count: player_count.0,
             connection_count: connection_count.0,
         }
@@ -111,6 +113,11 @@ impl PresenceInner {
         self.players.get(plid)
     }
 
+    /// Fetch last known display name by uname
+    fn last_known_name(&self, uname: &str) -> Option<&String> {
+        self.last_known_names.get(uname)
+    }
+
     /// Handle a game packet
     fn handle_packet(&mut self, packet: &insim::Packet) {
         match packet {
@@ -145,6 +152,10 @@ impl PresenceInner {
     }
 
     fn ncn(&mut self, ncn: &insim::insim::Ncn) {
+        let _ = self
+            .last_known_names
+            .insert(ncn.uname.clone(), ncn.pname.clone());
+
         let _ = self.connections.insert(
             ncn.ucid,
             ConnectionInfo {
@@ -169,6 +180,10 @@ impl PresenceInner {
     fn cpr(&mut self, cpr: &insim::insim::Cpr) {
         if let Some(connection) = self.connections.get_mut(&cpr.ucid) {
             connection.pname = cpr.pname.clone();
+
+            let _ = self
+                .last_known_names
+                .insert(connection.uname.clone(), cpr.pname.clone());
         }
     }
 
@@ -267,6 +282,18 @@ pub fn spawn(insim: insim::builder::SpawnedHandle, capacity: usize) -> Presence 
                         PresenceQuery::PlayerCount { response_tx } => {
                             let _ = response_tx.send(inner.player_count());
                         }
+                        PresenceQuery::LastKnownName { uname, response_tx } => {
+                            let _ = response_tx.send(inner.last_known_name(&uname).cloned());
+                        }
+                        PresenceQuery::LastKnownNames { unames, response_tx } => {
+                            let results = unames
+                                .iter()
+                                .filter_map(|uname| {
+                                    inner.last_known_name(uname).map(|pname| (uname.clone(), pname.clone()))
+                                })
+                                .collect();
+                            let _ = response_tx.send(results);
+                        }
                     }
                 }
             }
@@ -302,6 +329,14 @@ enum PresenceQuery {
     },
     PlayerCount {
         response_tx: oneshot::Sender<usize>,
+    },
+    LastKnownName {
+        uname: String,
+        response_tx: oneshot::Sender<Option<String>>,
+    },
+    LastKnownNames {
+        unames: Vec<String>,
+        response_tx: oneshot::Sender<HashMap<String, String>>,
     },
 }
 
@@ -400,5 +435,35 @@ impl Presence {
             .await
             .ok()?;
         rx.await.ok()?
+    }
+
+    /// get last known display name by uname (persists after disconnect)
+    pub async fn last_known_name(&self, uname: &str) -> Option<String> {
+        let (tx, rx) = oneshot::channel();
+        self.query_tx
+            .send(PresenceQuery::LastKnownName {
+                uname: uname.to_string(),
+                response_tx: tx,
+            })
+            .await
+            .ok()?;
+        rx.await.ok()?
+    }
+
+    /// batch fetch last known display names by unames (persists after disconnect)
+    pub async fn last_known_names<I, S>(&self, unames: I) -> Option<HashMap<String, String>>
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let (tx, rx) = oneshot::channel();
+        self.query_tx
+            .send(PresenceQuery::LastKnownNames {
+                unames: unames.into_iter().map(Into::into).collect(),
+                response_tx: tx,
+            })
+            .await
+            .ok()?;
+        rx.await.ok()
     }
 }
