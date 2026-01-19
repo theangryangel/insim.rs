@@ -15,7 +15,6 @@ mod cli;
 mod components;
 mod leaderboard;
 mod scenes;
-mod wait_for_admin_cmd;
 
 // host + 1 player
 const MIN_PLAYERS: usize = 2;
@@ -98,7 +97,7 @@ async fn main() -> anyhow::Result<()> {
         res = clockwork.run() => {
             tracing::info!("{:?}", res);
         },
-        _ = wait_for_admin_cmd::wait_for_admin_cmd(&mut chat_rx, presence, |msg| matches!(msg, chat::ChatMsg::Quit)) => {}
+        _ = chat::wait_for_admin_cmd(&mut chat_rx, presence, |msg| matches!(msg, chat::ChatMsg::Quit)) => {}
     }
 
     Ok(())

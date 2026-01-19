@@ -7,7 +7,6 @@ use kitcar::{
 use crate::{
     chat,
     components::{Marquee, MarqueeMsg, topbar},
-    wait_for_admin_cmd::wait_for_admin_cmd,
 };
 
 #[derive(Clone, Debug)]
@@ -74,7 +73,7 @@ impl scenes::Scene for WaitForAdminStart {
 
         let mut chat = self.chat.subscribe();
 
-        wait_for_admin_cmd(&mut chat, self.presence.clone(), |msg| {
+        chat::wait_for_admin_cmd(&mut chat, self.presence.clone(), |msg| {
             matches!(msg, chat::ChatMsg::Start)
         })
         .await?;

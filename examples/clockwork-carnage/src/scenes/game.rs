@@ -57,7 +57,7 @@ impl Scene for Clockwork {
             },
             // TODO: if this all we care about.. do we want to handle this here? it's contextually
             // sensitive.. so maybe this is the right place?
-            _ = crate::wait_for_admin_cmd::wait_for_admin_cmd(&mut chat, self.presence.clone(), |msg| matches!(msg, chat::ChatMsg::End)) => {
+            _ = chat::wait_for_admin_cmd(&mut chat, self.presence.clone(), |msg| matches!(msg, chat::ChatMsg::End)) => {
                 tracing::info!("Admin ended event");
                 Ok(SceneResult::bail_with("Admin ended event"))
             },
