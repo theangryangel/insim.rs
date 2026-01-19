@@ -1,6 +1,8 @@
 //! Speed sign objects
 use crate::{
-    heading::Heading, object::{ObjectCoordinate, ObjectFlags}, DecodeError, DecodeErrorKind
+    DecodeError, DecodeErrorKind,
+    heading::Heading,
+    object::{ObjectCoordinate, ObjectFlags},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
@@ -32,7 +34,8 @@ impl TryFrom<u8> for SpeedSignMapping {
             3 => Ok(Self::Speed40Mph),
             found => Err(DecodeErrorKind::NoVariantMatch {
                 found: found as u64,
-            }.into()),
+            }
+            .into()),
         }
     }
 }

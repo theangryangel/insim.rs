@@ -125,7 +125,12 @@ impl Encode for Axm {
         self.reqi.encode(buf)?;
         let len = self.info.len();
         if len > AXM_MAX_OBJECTS {
-            return Err(insim_core::EncodeErrorKind::OutOfRange { min: 0, max: AXM_MAX_OBJECTS, found: len }.context("Too many AXM objects"));
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: AXM_MAX_OBJECTS,
+                found: len,
+            }
+            .context("Too many AXM objects"));
         }
         (len as u8).encode(buf)?;
         self.ucid.encode(buf)?;

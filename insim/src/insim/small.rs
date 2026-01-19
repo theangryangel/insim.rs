@@ -273,7 +273,8 @@ impl Decode for SmallType {
             found => {
                 return Err(insim_core::DecodeErrorKind::NoVariantMatch {
                     found: found as u64,
-                }.into());
+                }
+                .into());
             },
         };
         Ok(res)

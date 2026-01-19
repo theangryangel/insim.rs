@@ -25,7 +25,8 @@ impl DecodeError {
 impl From<DecodeErrorKind> for DecodeError {
     fn from(value: DecodeErrorKind) -> Self {
         Self {
-            context: None, kind: value
+            context: None,
+            kind: value,
         }
     }
 }
@@ -73,7 +74,7 @@ impl DecodeErrorKind {
     pub fn context(self, ctx: impl Into<Cow<'static, str>>) -> DecodeError {
         DecodeError {
             kind: self,
-            context: Some(ctx.into())
+            context: Some(ctx.into()),
         }
     }
 }

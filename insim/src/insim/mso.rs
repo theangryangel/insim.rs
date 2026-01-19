@@ -104,7 +104,12 @@ impl Encode for Mso {
             let msg = codepages::to_lossy_bytes(msg);
 
             if (name.len() + msg.len()) > (MSO_MSG_MAX_LEN - 1) {
-                return Err(insim_core::EncodeErrorKind::OutOfRange { min: 0, max: MSO_MSG_ALIGN, found: name.len() + msg.len() }.context("Mso name and msg out of range"));
+                return Err(insim_core::EncodeErrorKind::OutOfRange {
+                    min: 0,
+                    max: MSO_MSG_ALIGN,
+                    found: name.len() + msg.len(),
+                }
+                .context("Mso name and msg out of range"));
             }
 
             let textstart = name.len() as u8;

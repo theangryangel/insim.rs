@@ -25,10 +25,10 @@ use tokio::{sync::broadcast, time::sleep};
 
 mod chat;
 mod cli;
+mod leaderboard;
 mod marquee;
 mod setup_track;
 mod topbar;
-mod leaderboard;
 mod wait_for_admin_start;
 
 /// Clockwork Carnage event
@@ -172,16 +172,22 @@ impl ui::View for ClockworkRoundView {
             }
         };
 
-        let players: Vec<ui::Node<Self::Message>> = global_props.leaderboard.iter().enumerate().map(|(index, (_uname, pname, pts))| {
-            ui::container()
-                .flex()
-                .flex_row()
-                .with_children([
-                    ui::text(format!("#{}", index + 1), BtnStyle::default().dark()).w(5.).h(5.),
+        let players: Vec<ui::Node<Self::Message>> = global_props
+            .leaderboard
+            .iter()
+            .enumerate()
+            .map(|(index, (_uname, pname, pts))| {
+                ui::container().flex().flex_row().with_children([
+                    ui::text(format!("#{}", index + 1), BtnStyle::default().dark())
+                        .w(5.)
+                        .h(5.),
                     ui::text(pname, BtnStyle::default().dark()).w(25.).h(5.),
-                    ui::text(format!("{}", pts), BtnStyle::default().dark()).w(5.).h(5.),
+                    ui::text(format!("{}", pts), BtnStyle::default().dark())
+                        .w(5.)
+                        .h(5.),
                 ])
-        }).collect();
+            })
+            .collect();
 
         ui::container()
             .flex()
@@ -191,21 +197,21 @@ impl ui::View for ClockworkRoundView {
                     "Round {}/{} - {:?} remaining",
                     global_props.round, global_props.rounds, global_props.remaining,
                 ))
-                .with_child(ui::text(&status, BtnStyle::default().dark()).w(15.).h(5.))
+                .with_child(ui::text(&status, BtnStyle::default().dark()).w(15.).h(5.)),
             )
             .with_child(
                 ui::container()
-                .flex()
-                .mt(20.)
-                .w(200.)
-                .flex_col()
-                .items_start()
-                .with_child(
-                    ui::text("Scores!".yellow(), BtnStyle::default().dark())
-                    .w(35.)
-                    .h(5.)
-                )
-                .with_children(players)
+                    .flex()
+                    .mt(20.)
+                    .w(200.)
+                    .flex_col()
+                    .items_start()
+                    .with_child(
+                        ui::text("Scores!".yellow(), BtnStyle::default().dark())
+                            .w(35.)
+                            .h(5.),
+                    )
+                    .with_children(players),
             )
     }
 }
@@ -248,7 +254,9 @@ impl ClockworkInner {
     async fn broadcast_rankings(&mut self, ui: &ui::Ui<ClockworkRoundView>) {
         if let Some(connections) = self.presence.connections().await {
             for conn in &connections {
-                let _ = self.name_cache.insert(conn.uname.clone(), conn.pname.clone());
+                let _ = self
+                    .name_cache
+                    .insert(conn.uname.clone(), conn.pname.clone());
             }
             for conn in connections {
                 let props = self.connection_props(&conn.uname);
@@ -262,7 +270,11 @@ impl ClockworkInner {
             .ranking()
             .iter()
             .map(|(uname, pts)| {
-                let pname = self.name_cache.get(uname).cloned().unwrap_or_else(|| uname.clone());
+                let pname = self
+                    .name_cache
+                    .get(uname)
+                    .cloned()
+                    .unwrap_or_else(|| uname.clone());
                 (uname.clone(), pname, *pts)
             })
             .collect()
@@ -433,9 +445,7 @@ impl ClockworkInner {
 
         for (i, (uname, _)) in ordered.into_iter().take(self.max_scorers).enumerate() {
             let points = (self.max_scorers - i) as u32;
-            let _ = self
-                .scores
-                .add_points(uname, points);
+            let _ = self.scores.add_points(uname, points);
         }
 
         self.scores.rank();

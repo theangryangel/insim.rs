@@ -1,6 +1,8 @@
 //! Marker objects
 use crate::{
-    heading::Heading, object::{ObjectCoordinate, ObjectFlags}, DecodeError, DecodeErrorKind
+    DecodeError, DecodeErrorKind,
+    heading::Heading,
+    object::{ObjectCoordinate, ObjectFlags},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
@@ -52,7 +54,8 @@ impl TryFrom<u8> for MarkerCornerKind {
             15 => Ok(Self::KinkR),
             found => Err(DecodeErrorKind::NoVariantMatch {
                 found: found as u64,
-            }.into()),
+            }
+            .into()),
         }
     }
 }
@@ -129,7 +132,8 @@ impl TryFrom<u8> for MarkerDistanceKind {
             7 => Ok(Self::D250),
             found => Err(DecodeErrorKind::NoVariantMatch {
                 found: found as u64,
-            }.into()),
+            }
+            .into()),
         }
     }
 }

@@ -31,7 +31,8 @@ impl Decode for LfsPin {
         if revision > 0 {
             return Err(insim_core::DecodeErrorKind::BadMagic {
                 found: Box::new(revision),
-            }.context("LFSPIN unsupported revision"));
+            }
+            .context("LFSPIN unsupported revision"));
         }
 
         let _reserved = i32::decode(buf)?;
@@ -61,7 +62,8 @@ impl Encode for LfsPin {
         if self.revision > 0 {
             return Err(insim_core::EncodeErrorKind::NoVariantMatch {
                 found: self.revision as u64,
-            }.context("LFSPIN unsupported revision"));
+            }
+            .context("LFSPIN unsupported revision"));
         }
 
         self.revision.encode(buf)?;

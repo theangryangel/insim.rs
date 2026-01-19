@@ -146,7 +146,8 @@ impl Decode for SrPth {
                 min: 0,
                 max: 252,
                 found: revision as usize,
-            }.context("SRPATH unsupported revision"));
+            }
+            .context("SRPATH unsupported revision"));
         }
 
         let flags = SrPathFlags::decode(buf)?;
@@ -157,7 +158,8 @@ impl Decode for SrPth {
                 min: 0,
                 max: 9,
                 found: mini_rev as usize,
-            }.context("SRPATH unsupported mini_rev"));
+            }
+            .context("SRPATH unsupported mini_rev"));
         }
 
         buf.advance(3);
@@ -210,16 +212,32 @@ impl Encode for SrPth {
                 min: 0,
                 max: 252,
                 found: self.revision as usize,
-            }.context("SRPATH unsupported revision"));
+            }
+            .context("SRPATH unsupported revision"));
         }
         if self.main_nodes.len() > (u16::MAX as usize) {
-            return Err(insim_core::EncodeErrorKind::OutOfRange { min: 0, max: u16::MAX as usize, found: self.main_nodes.len() }.context("SRPATH too many main nodes"));
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: u16::MAX as usize,
+                found: self.main_nodes.len(),
+            }
+            .context("SRPATH too many main nodes"));
         }
         if self.pit0_nodes.len() > (u16::MAX as usize) {
-            return Err(insim_core::EncodeErrorKind::OutOfRange { min: 0, max: u16::MAX as usize, found: self.pit0_nodes.len() }.context("SRPATH too many pit0 nodes"));
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: u16::MAX as usize,
+                found: self.pit0_nodes.len(),
+            }
+            .context("SRPATH too many pit0 nodes"));
         }
         if self.pit1_nodes.len() > (u16::MAX as usize) {
-            return Err(insim_core::EncodeErrorKind::OutOfRange { min: 0, max: u16::MAX as usize, found: self.pit1_nodes.len() }.context("SRPATH too many pit1 nodes"));
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: u16::MAX as usize,
+                found: self.pit1_nodes.len(),
+            }
+            .context("SRPATH too many pit1 nodes"));
         }
 
         self.revision.encode(buf)?;

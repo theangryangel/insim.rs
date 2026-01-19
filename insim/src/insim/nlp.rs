@@ -48,7 +48,12 @@ impl Encode for Nlp {
         self.reqi.encode(buf).map_err(|e| e.context("Nlp reqi"))?;
         let nump = self.info.len();
         if nump > 255 {
-            return Err(insim_core::EncodeErrorKind::OutOfRange { min: 0, max: 255, found: nump }.context("Nlp too many players"));
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: 255,
+                found: nump,
+            }
+            .context("Nlp too many players"));
         }
         (nump as u8).encode(buf)?;
         for i in self.info.iter() {

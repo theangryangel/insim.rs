@@ -25,7 +25,8 @@ impl EncodeError {
 impl From<EncodeErrorKind> for EncodeError {
     fn from(value: EncodeErrorKind) -> Self {
         Self {
-            context: None, kind: value
+            context: None,
+            kind: value,
         }
     }
 }
@@ -61,7 +62,7 @@ pub enum EncodeErrorKind {
         max: usize,
         /// found
         found: usize,
-    }
+    },
 }
 
 impl EncodeErrorKind {
@@ -69,7 +70,7 @@ impl EncodeErrorKind {
     pub fn context(self, ctx: impl Into<Cow<'static, str>>) -> EncodeError {
         EncodeError {
             kind: self,
-            context: Some(ctx.into())
+            context: Some(ctx.into()),
         }
     }
 }
@@ -212,7 +213,12 @@ where
         let new = self.as_ref().as_bytes();
         let max_len = if trailing_nul { len - 1 } else { len };
         if new.len() > max_len {
-            return Err(EncodeErrorKind::OutOfRange { min: 0, max: max_len, found: new.len() }.into());
+            return Err(EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: max_len,
+                found: new.len(),
+            }
+            .into());
         }
         let len_to_write = new.len().min(max_len);
         buf.extend_from_slice(&new[..len_to_write]);
@@ -229,7 +235,12 @@ where
         let new = crate::string::codepages::to_lossy_bytes(self.as_ref());
         let max_len = if trailing_nul { len - 1 } else { len };
         if new.len() > max_len {
-            return Err(EncodeErrorKind::OutOfRange { min: 0, max: max_len, found: new.len() }.into());
+            return Err(EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: max_len,
+                found: new.len(),
+            }
+            .into());
         }
         let len_to_write = new.len().min(max_len);
 
@@ -248,7 +259,12 @@ where
         let new = crate::string::codepages::to_lossy_bytes(self.as_ref());
         let max_len = if trailing_nul { len - 1 } else { len };
         if new.len() > max_len {
-            return Err(EncodeErrorKind::OutOfRange { min: 0, max: max_len, found: new.len() }.into());
+            return Err(EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: max_len,
+                found: new.len(),
+            }
+            .into());
         }
         let len_to_write = new.len().min(max_len);
         buf.extend_from_slice(&new[..len_to_write]);

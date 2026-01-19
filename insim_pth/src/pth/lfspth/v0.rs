@@ -22,11 +22,12 @@ impl Decode for LfsPth {
     fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
         let revision = u8::decode(buf)?;
         if revision > 0 {
-            return Err(insim_core::DecodeErrorKind::OutOfRange { 
+            return Err(insim_core::DecodeErrorKind::OutOfRange {
                 min: 0,
                 max: 0,
                 found: revision as usize,
-            }.context("LFSPTH unsupported revision"));
+            }
+            .context("LFSPTH unsupported revision"));
         }
         let num_nodes = i32::decode(buf)?;
         let finish_line_node = i32::decode(buf)?;
@@ -44,15 +45,21 @@ impl Decode for LfsPth {
 impl Encode for LfsPth {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         if self.revision > 0 {
-            return Err(insim_core::EncodeErrorKind::OutOfRange { 
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
                 min: 0,
                 max: 0,
                 found: self.revision as usize,
-            }.context("LFSPTH unsupported revision"));
+            }
+            .context("LFSPTH unsupported revision"));
         }
         self.revision.encode(buf)?;
         if self.nodes.len() > (i32::MAX as usize) {
-            return Err(insim_core::EncodeErrorKind::OutOfRange { min: 0, max: i32::MAX as usize, found: self.nodes.len() as usize }.context("LFSPTH too many nodes"));
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: i32::MAX as usize,
+                found: self.nodes.len(),
+            }
+            .context("LFSPTH too many nodes"));
         }
         (self.nodes.len() as i32).encode(buf)?;
         self.finish_line_node.encode(buf)?;

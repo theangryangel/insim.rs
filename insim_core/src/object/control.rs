@@ -52,7 +52,8 @@ impl Control {
             _ => {
                 return Err(crate::DecodeErrorKind::NoVariantMatch {
                     found: position_bits as u64,
-                }.into());
+                }
+                .into());
             },
         };
 

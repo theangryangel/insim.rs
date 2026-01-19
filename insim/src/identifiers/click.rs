@@ -48,7 +48,12 @@ impl Decode for ClickId {
     fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
         let clickid = buf.get_u8();
         if clickid > Self::MAX {
-            Err(insim_core::DecodeErrorKind::OutOfRange { min: 1, max: Self::MAX as usize, found: clickid as usize }.into())
+            Err(insim_core::DecodeErrorKind::OutOfRange {
+                min: 1,
+                max: Self::MAX as usize,
+                found: clickid as usize,
+            }
+            .into())
         } else {
             Ok(ClickId(clickid))
         }
@@ -58,7 +63,12 @@ impl Decode for ClickId {
 impl Encode for ClickId {
     fn encode(&self, buf: &mut BytesMut) -> Result<(), insim_core::EncodeError> {
         if self.0 > Self::MAX {
-            Err(insim_core::EncodeErrorKind::OutOfRange { min: 1, max: Self::MAX as usize, found: self.0 as usize }.into())
+            Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 1,
+                max: Self::MAX as usize,
+                found: self.0 as usize,
+            }
+            .into())
         } else {
             buf.put_u8(self.0);
             Ok(())

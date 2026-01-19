@@ -31,7 +31,8 @@ impl TryFrom<u8> for ConcreteWidthLength {
             3 => Ok(ConcreteWidthLength::Sixteen),
             _ => Err(crate::DecodeErrorKind::NoVariantMatch {
                 found: value as u64,
-            }.into()),
+            }
+            .into()),
         }
     }
 }
@@ -60,7 +61,8 @@ impl TryFrom<u8> for Size {
             3 => Ok(Size::Full),
             _ => Err(crate::DecodeErrorKind::NoVariantMatch {
                 found: value as u64,
-            }.into()),
+            }
+            .into()),
         }
     }
 }
@@ -90,7 +92,8 @@ impl TryFrom<u8> for ConcreteColour {
             3 => Ok(ConcreteColour::Yellow),
             _ => Err(crate::DecodeErrorKind::NoVariantMatch {
                 found: value as u64,
-            }.into()),
+            }
+            .into()),
         }
     }
 }
@@ -145,7 +148,8 @@ impl TryFrom<u8> for ConcreteHeight {
             15 => Ok(ConcreteHeight::M4_00),
             _ => Err(crate::DecodeErrorKind::NoVariantMatch {
                 found: value as u64,
-            }.into()),
+            }
+            .into()),
         }
     }
 }
@@ -199,7 +203,8 @@ impl TryFrom<u8> for ConcretePitch {
             15 => Ok(ConcretePitch::Deg90),
             _ => Err(crate::DecodeErrorKind::NoVariantMatch {
                 found: value as u64,
-            }.into()),
+            }
+            .into()),
         }
     }
 }
@@ -254,7 +259,8 @@ impl TryFrom<u8> for ConcreteAngle {
             15 => Ok(ConcreteAngle::Deg90),
             _ => Err(crate::DecodeErrorKind::NoVariantMatch {
                 found: value as u64,
-            }.into()),
+            }
+            .into()),
         }
     }
 }

@@ -32,7 +32,8 @@ pub struct Ui<V: View> {
 impl<V: View> Ui<V> {
     pub fn update_global_props(&self, value: V::GlobalProps) {
         self.global
-            .send(value).expect("FIXME: expect global to work");
+            .send(value)
+            .expect("FIXME: expect global to work");
     }
 
     pub async fn update_connection_props(&self, ucid: ConnectionId, value: V::ConnectionProps) {

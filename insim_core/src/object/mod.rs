@@ -43,7 +43,7 @@ mod tests;
 pub use object_coordinate::ObjectCoordinate;
 use object_flags::ObjectFlags;
 
-use crate::{heading::Heading, Decode, DecodeError, DecodeErrorKind, Encode, EncodeError};
+use crate::{Decode, DecodeError, DecodeErrorKind, Encode, EncodeError, heading::Heading};
 
 // TODO: We could probably DRY this up with a proc macro to make life a lot easier now that we're
 // happy with this. However, I have no desire to do this right now. I'd rather build something.
@@ -525,7 +525,8 @@ impl Decode for ObjectInfo {
             )?)),
             _ => Err(DecodeErrorKind::NoVariantMatch {
                 found: index as u64,
-            }.into()),
+            }
+            .into()),
         }
     }
 }

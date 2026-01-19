@@ -188,7 +188,14 @@ impl Encode for Obh {
         buf.put_bytes(0, 2);
         match u32::try_from(self.time.as_millis()) {
             Ok(time) => time.encode(buf)?,
-            Err(_) => return Err(insim_core::EncodeErrorKind::OutOfRange { min: 0, max: u32::MAX as usize, found: self.time.as_millis() as usize }.context("Obh time out of range")),
+            Err(_) => {
+                return Err(insim_core::EncodeErrorKind::OutOfRange {
+                    min: 0,
+                    max: u32::MAX as usize,
+                    found: self.time.as_millis() as usize,
+                }
+                .context("Obh time out of range"));
+            },
         }
         self.c.encode(buf)?;
         self.x.encode(buf)?;

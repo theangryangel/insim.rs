@@ -40,7 +40,8 @@ impl Decode for License {
             3 => Ok(Self::S3),
             other => Err(crate::DecodeErrorKind::NoVariantMatch {
                 found: other as u64,
-            }.into()),
+            }
+            .into()),
         }
     }
 }
