@@ -48,7 +48,7 @@ from_variants = "1.0.2"
 futures = "0.3.31"
 glam = "0.30.9"
 if_chain = "1.0.3"
-indexmap = "2.12.1"
+indexmap = "2.13.0"
 itertools = { version = "0.14.0" }
 num-traits = "0.2.19"
 proc-macro2 = "1.0.104"
