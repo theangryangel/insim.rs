@@ -253,11 +253,6 @@ impl ClockworkInner {
 
     async fn broadcast_rankings(&mut self, ui: &ui::Ui<ClockworkRoundView>) {
         if let Some(connections) = self.presence.connections().await {
-            for conn in &connections {
-                let _ = self
-                    .name_cache
-                    .insert(conn.uname.clone(), conn.pname.clone());
-            }
             for conn in connections {
                 let props = self.connection_props(&conn.uname);
                 ui.update_connection_props(conn.ucid, props).await;
@@ -265,13 +260,16 @@ impl ClockworkInner {
         }
     }
 
-    fn enriched_leaderboard(&self) -> EnrichedLeaderboard {
+    async fn enriched_leaderboard(&self) -> EnrichedLeaderboard {
+        let ranking = self.scores.ranking();
+        let names = self.presence.last_known_names(ranking.iter().map(|(uname, _)| {
+            uname
+        })).await.unwrap_or_default();
         self.scores
             .ranking()
             .iter()
             .map(|(uname, pts)| {
-                let pname = self
-                    .name_cache
+                let pname = names 
                     .get(uname)
                     .cloned()
                     .unwrap_or_else(|| uname.clone());
@@ -333,7 +331,7 @@ impl ClockworkInner {
                                 remaining: dur,
                                 round,
                                 rounds: self.rounds,
-                                leaderboard: self.enriched_leaderboard(),
+                                leaderboard: self.enriched_leaderboard().await,
                             });
                         }
                         None => break,
