@@ -1,6 +1,6 @@
 //! Letterboard RB (Red/Blue) objects
 use crate::{
-    DecodeError,
+    DecodeError, DecodeErrorKind,
     heading::Heading,
     object::{ObjectCoordinate, ObjectFlags},
 };
@@ -174,9 +174,10 @@ impl TryFrom<char> for Character {
             ')' => Ok(Character::RParen),
             '&' => Ok(Character::Ampersand),
             ' ' => Ok(Character::Blank),
-            found => Err(DecodeError::BadMagic {
+            found => Err(DecodeErrorKind::BadMagic {
                 found: Box::new(found),
-            }),
+            }
+            .into()),
         }
     }
 }
@@ -235,9 +236,10 @@ impl TryFrom<u8> for Character {
             46 => Ok(Character::RParen),
             47 => Ok(Character::Ampersand),
             48 => Ok(Character::Blank),
-            found => Err(DecodeError::NoVariantMatch {
+            found => Err(DecodeErrorKind::NoVariantMatch {
                 found: found as u64,
-            }),
+            }
+            .into()),
         }
     }
 }

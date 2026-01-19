@@ -271,9 +271,10 @@ impl Decode for SmallType {
             10 => Self::Lcl(LclFlags::from_bits_truncate(uval)),
             11 => Self::Aii(PlayerId(uval as u8)),
             found => {
-                return Err(insim_core::DecodeError::NoVariantMatch {
+                return Err(insim_core::DecodeErrorKind::NoVariantMatch {
                     found: found as u64,
-                });
+                }
+                .into());
             },
         };
         Ok(res)

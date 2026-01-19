@@ -64,9 +64,10 @@ impl Decode for CimMode {
                 seltype,
             },
             found => {
-                return Err(insim_core::DecodeError::NoVariantMatch {
+                return Err(insim_core::DecodeErrorKind::NoVariantMatch {
                     found: found as u64,
-                });
+                }
+                .into());
             },
         };
 

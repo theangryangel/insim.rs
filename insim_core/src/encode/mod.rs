@@ -1,14 +1,41 @@
 //! Encode trait
 
-use std::net::Ipv4Addr;
+use std::{borrow::Cow, net::Ipv4Addr};
 
 use bytes::{BufMut, BytesMut};
 
+#[derive(Debug, thiserror::Error)]
+#[error("{kind}{}", context.as_ref().map(|c| format!(" ({c})")).unwrap_or_default())]
+/// Encoding Error
+pub struct EncodeError {
+    /// Optional contextual information
+    pub context: Option<Cow<'static, str>>,
+    /// Kind of error
+    pub kind: EncodeErrorKind,
+}
+
+impl EncodeError {
+    /// Add context to this error
+    pub fn context(mut self, ctx: impl Into<Cow<'static, str>>) -> Self {
+        self.context = Some(ctx.into());
+        self
+    }
+}
+
+impl From<EncodeErrorKind> for EncodeError {
+    fn from(value: EncodeErrorKind) -> Self {
+        Self {
+            context: None,
+            kind: value,
+        }
+    }
+}
+
 #[non_exhaustive]
-/// Read/Write Error
 #[derive(thiserror::Error, Debug)]
-pub enum EncodeError {
-    #[error("no variant match: {:?}", found)]
+/// Kind of EncodeError
+pub enum EncodeErrorKind {
+    #[error("No variant match: {:?}", found)]
     /// No Variant
     NoVariantMatch {
         /// found
@@ -16,23 +43,36 @@ pub enum EncodeError {
     },
 
     /// String is not completely Ascii
-    #[error("not an ascii string")]
+    #[error("Not an ascii string")]
     NotAsciiString,
 
     /// Cannot convert
-    #[error("not an ascii char: {:?}", found)]
+    #[error("Not an ascii char: {:?}", found)]
     NotAsciiChar {
         /// Found character
         found: char,
     },
 
-    /// Value too large for field
-    #[error("too large")]
-    TooLarge,
+    /// Value too large or small for field
+    #[error("Out of valid range")]
+    OutOfRange {
+        /// Minimum valid size
+        min: usize,
+        /// Maximum valid size
+        max: usize,
+        /// found
+        found: usize,
+    },
+}
 
-    /// Value too small for field
-    #[error("too small")]
-    TooSmall,
+impl EncodeErrorKind {
+    /// Add context to this error
+    pub fn context(self, ctx: impl Into<Cow<'static, str>>) -> EncodeError {
+        EncodeError {
+            kind: self,
+            context: Some(ctx.into()),
+        }
+    }
 }
 
 /// Enable to bytes
@@ -78,7 +118,7 @@ impl Encode for char {
             return Ok(());
         }
 
-        Err(EncodeError::NotAsciiChar { found: *self })
+        Err(EncodeErrorKind::NotAsciiChar { found: *self }.into())
     }
 }
 
@@ -168,12 +208,17 @@ where
         trailing_nul: bool,
     ) -> Result<(), EncodeError> {
         if !self.as_ref().is_ascii() {
-            return Err(EncodeError::NotAsciiString);
+            return Err(EncodeErrorKind::NotAsciiString.into());
         }
         let new = self.as_ref().as_bytes();
         let max_len = if trailing_nul { len - 1 } else { len };
         if new.len() > max_len {
-            return Err(EncodeError::TooLarge);
+            return Err(EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: max_len,
+                found: new.len(),
+            }
+            .into());
         }
         let len_to_write = new.len().min(max_len);
         buf.extend_from_slice(&new[..len_to_write]);
@@ -190,7 +235,12 @@ where
         let new = crate::string::codepages::to_lossy_bytes(self.as_ref());
         let max_len = if trailing_nul { len - 1 } else { len };
         if new.len() > max_len {
-            return Err(EncodeError::TooLarge);
+            return Err(EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: max_len,
+                found: new.len(),
+            }
+            .into());
         }
         let len_to_write = new.len().min(max_len);
 
@@ -209,7 +259,12 @@ where
         let new = crate::string::codepages::to_lossy_bytes(self.as_ref());
         let max_len = if trailing_nul { len - 1 } else { len };
         if new.len() > max_len {
-            return Err(EncodeError::TooLarge);
+            return Err(EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: max_len,
+                found: new.len(),
+            }
+            .into());
         }
         let len_to_write = new.len().min(max_len);
         buf.extend_from_slice(&new[..len_to_write]);

@@ -1,6 +1,6 @@
 //! Metal sign objects
 use crate::{
-    DecodeError,
+    DecodeError, DecodeErrorKind,
     heading::Heading,
     object::{ObjectCoordinate, ObjectFlags},
 };
@@ -44,9 +44,10 @@ impl TryFrom<u8> for MetalSignKind {
             5 => Ok(Self::UpRight),
             6 => Ok(Self::Forward),
             7 => Ok(Self::NoEntry),
-            found => Err(DecodeError::NoVariantMatch {
+            found => Err(DecodeErrorKind::NoVariantMatch {
                 found: found as u64,
-            }),
+            }
+            .into()),
         }
     }
 }

@@ -1,12 +1,40 @@
 //! Decode trait
 
-use std::net::Ipv4Addr;
+use std::{borrow::Cow, net::Ipv4Addr};
 
 use bytes::{Buf, Bytes};
 
-/// DecodeError
 #[derive(Debug, thiserror::Error)]
-pub enum DecodeError {
+#[error("{kind}{}", context.as_ref().map(|c| format!(" ({c})")).unwrap_or_default())]
+/// Decoding error
+pub struct DecodeError {
+    /// Optional contextual information
+    pub context: Option<Cow<'static, str>>,
+    /// Kind of error
+    pub kind: DecodeErrorKind,
+}
+
+impl DecodeError {
+    /// Add context to this error
+    pub fn context(mut self, ctx: impl Into<Cow<'static, str>>) -> Self {
+        self.context = Some(ctx.into());
+        self
+    }
+}
+
+impl From<DecodeErrorKind> for DecodeError {
+    fn from(value: DecodeErrorKind) -> Self {
+        Self {
+            context: None,
+            kind: value,
+        }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+/// Kind of DecodeError
+pub enum DecodeErrorKind {
     /// Bad Magic
     #[error("Bad magic. Found: {:?}", found)]
     BadMagic {
@@ -25,13 +53,30 @@ pub enum DecodeError {
     #[error("could not parse game version: {0}")]
     GameVersionParseError(#[from] crate::game_version::GameVersionParseError),
 
-    /// Value too large for field
-    #[error("too large")]
-    TooLarge,
+    /// Value too large or small for field
+    #[error("Out of valid range")]
+    OutOfRange {
+        /// Minimum valid size
+        min: usize,
+        /// Maximum valid size
+        max: usize,
+        /// found
+        found: usize,
+    },
 
     /// Expected \0 character
     #[error("Expected \0 character")]
     ExpectedNull,
+}
+
+impl DecodeErrorKind {
+    /// Add context to this error
+    pub fn context(self, ctx: impl Into<Cow<'static, str>>) -> DecodeError {
+        DecodeError {
+            kind: self,
+            context: Some(ctx.into()),
+        }
+    }
 }
 
 /// Decode from bytes

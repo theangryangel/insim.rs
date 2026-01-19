@@ -24,9 +24,10 @@ impl Decode for Wind {
             0 => Ok(Wind::None),
             1 => Ok(Self::Weak),
             2 => Ok(Self::Strong),
-            other => Err(crate::DecodeError::NoVariantMatch {
+            other => Err(crate::DecodeErrorKind::NoVariantMatch {
                 found: other as u64,
-            }),
+            }
+            .into()),
         }
     }
 }

@@ -125,29 +125,54 @@ impl Encode for ConInfo {
         self.steer.encode(buf)?;
 
         if self.thr > 15 {
-            return Err(insim_core::EncodeError::TooLarge);
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: 15,
+                found: self.thr as usize,
+            }
+            .context("Thr out of range"));
         }
 
         if self.brk > 15 {
-            return Err(insim_core::EncodeError::TooLarge);
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: 15,
+                found: self.brk as usize,
+            }
+            .context("Brk out of range"));
         }
 
         let thrbrk = (self.thr << 4) | self.brk;
         thrbrk.encode(buf)?;
 
         if self.clu > 15 {
-            return Err(insim_core::EncodeError::TooLarge);
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: 15,
+                found: self.clu as usize,
+            }
+            .context("Clu out of range"));
         }
 
         if self.han > 15 {
-            return Err(insim_core::EncodeError::TooLarge);
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: 15,
+                found: self.han as usize,
+            }
+            .context("Han out of range"));
         }
 
         let cluhan = (self.clu << 4) | self.han;
         cluhan.encode(buf)?;
 
         if self.gearsp > 15 {
-            return Err(insim_core::EncodeError::TooLarge);
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: 15,
+                found: self.gearsp as usize,
+            }
+            .context("Gearsp out of range"));
         }
 
         let gearsp = self.gearsp << 4;
@@ -225,7 +250,14 @@ impl Encode for Con {
         spclose_strip_high_bits((self.spclose.to_meters_per_sec() * 10.0) as u16).encode(buf)?;
         match TryInto::<u32>::try_into(self.time.as_millis()) {
             Ok(time) => time.encode(buf)?,
-            Err(_) => return Err(insim_core::EncodeError::TooLarge),
+            Err(_) => {
+                return Err(insim_core::EncodeErrorKind::OutOfRange {
+                    min: 0,
+                    max: u32::MAX as usize,
+                    found: self.time.as_millis() as usize,
+                }
+                .context("Time out of range"));
+            },
         }
         self.a.encode(buf)?;
         self.b.encode(buf)?;

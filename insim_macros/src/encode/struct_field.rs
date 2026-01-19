@@ -39,6 +39,7 @@ impl Field {
         let pad_after = f.pad_after.unwrap_or(0);
         let pad_before = f.pad_before.unwrap_or(0);
         let field_type = f.ty.clone();
+        let context = format!("{}", field_name);
 
         let mut tokens = quote! {};
 
@@ -66,9 +67,10 @@ impl Field {
         } else if let Some(duration_repr) = f.duration.as_ref() {
             tokens = quote! {
                 #tokens
-                let #field_name = match TryInto::<u64>::try_into(#duration_repr::decode(buf)?) {
+                let __raw_field_name = #duration_repr::decode(buf)?;
+                let #field_name = match TryInto::<u64>::try_into(__raw_field_name) {
                     Ok(v) => std::time::Duration::from_millis(v),
-                    Err(_) => return Err(::insim_core::DecodeError::TooLarge),
+                    Err(_) => return Err(::insim_core::DecodeErrorKind::OutOfRange { min: 0, max: u64::MAX as usize, found: __raw_field_name as usize }.context(#context)),
                 };
             };
         } else {
@@ -112,6 +114,7 @@ impl Field {
         let pad_after = f.pad_after.unwrap_or(0);
         let pad_before = f.pad_before.unwrap_or(0);
         let field_type = f.ty.clone();
+        let context = format!("{}", field_name);
         let mut tokens = quote! {};
 
         if pad_before > 0 {
@@ -164,7 +167,7 @@ impl Field {
                 #tokens
                 match #duration_repr::try_from(self.#field_name.as_millis()) {
                     Ok(v) => v.encode(buf)?,
-                    Err(_) => return Err(::insim_core::EncodeError::TooLarge)
+                    Err(_) => return Err(::insim_core::EncodeErrorKind::OutOfRange { min: 0, max: #duration_repr::MAX as usize, found: self.#field_name.as_millis() as usize}.context(#context))
                 };
             };
         } else {

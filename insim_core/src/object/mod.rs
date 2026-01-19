@@ -43,7 +43,7 @@ mod tests;
 pub use object_coordinate::ObjectCoordinate;
 use object_flags::ObjectFlags;
 
-use crate::{Decode, DecodeError, Encode, EncodeError, heading::Heading};
+use crate::{Decode, DecodeError, DecodeErrorKind, Encode, EncodeError, heading::Heading};
 
 // TODO: We could probably DRY this up with a proc macro to make life a lot easier now that we're
 // happy with this. However, I have no desire to do this right now. I'd rather build something.
@@ -523,9 +523,10 @@ impl Decode for ObjectInfo {
             186 => Ok(ObjectInfo::PitStopBox(pit::PitStopBox::new(
                 xyz, flags, heading,
             )?)),
-            _ => Err(DecodeError::NoVariantMatch {
+            _ => Err(DecodeErrorKind::NoVariantMatch {
                 found: index as u64,
-            }),
+            }
+            .into()),
         }
     }
 }

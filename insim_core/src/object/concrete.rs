@@ -29,9 +29,10 @@ impl TryFrom<u8> for ConcreteWidthLength {
             1 => Ok(ConcreteWidthLength::Four),
             2 => Ok(ConcreteWidthLength::Eight),
             3 => Ok(ConcreteWidthLength::Sixteen),
-            _ => Err(crate::DecodeError::NoVariantMatch {
+            _ => Err(crate::DecodeErrorKind::NoVariantMatch {
                 found: value as u64,
-            }),
+            }
+            .into()),
         }
     }
 }
@@ -58,9 +59,10 @@ impl TryFrom<u8> for Size {
             1 => Ok(Size::Half),
             2 => Ok(Size::ThreeQuarter),
             3 => Ok(Size::Full),
-            _ => Err(crate::DecodeError::NoVariantMatch {
+            _ => Err(crate::DecodeErrorKind::NoVariantMatch {
                 found: value as u64,
-            }),
+            }
+            .into()),
         }
     }
 }
@@ -88,9 +90,10 @@ impl TryFrom<u8> for ConcreteColour {
             1 => Ok(ConcreteColour::Red),
             2 => Ok(ConcreteColour::Blue),
             3 => Ok(ConcreteColour::Yellow),
-            _ => Err(crate::DecodeError::NoVariantMatch {
+            _ => Err(crate::DecodeErrorKind::NoVariantMatch {
                 found: value as u64,
-            }),
+            }
+            .into()),
         }
     }
 }
@@ -143,9 +146,10 @@ impl TryFrom<u8> for ConcreteHeight {
             13 => Ok(ConcreteHeight::M3_50),
             14 => Ok(ConcreteHeight::M3_75),
             15 => Ok(ConcreteHeight::M4_00),
-            _ => Err(crate::DecodeError::NoVariantMatch {
+            _ => Err(crate::DecodeErrorKind::NoVariantMatch {
                 found: value as u64,
-            }),
+            }
+            .into()),
         }
     }
 }
@@ -197,9 +201,10 @@ impl TryFrom<u8> for ConcretePitch {
             13 => Ok(ConcretePitch::Deg78),
             14 => Ok(ConcretePitch::Deg84),
             15 => Ok(ConcretePitch::Deg90),
-            _ => Err(crate::DecodeError::NoVariantMatch {
+            _ => Err(crate::DecodeErrorKind::NoVariantMatch {
                 found: value as u64,
-            }),
+            }
+            .into()),
         }
     }
 }
@@ -252,9 +257,10 @@ impl TryFrom<u8> for ConcreteAngle {
             13 => Ok(ConcreteAngle::Deg78_75),
             14 => Ok(ConcreteAngle::Deg84_375),
             15 => Ok(ConcreteAngle::Deg90),
-            _ => Err(crate::DecodeError::NoVariantMatch {
+            _ => Err(crate::DecodeErrorKind::NoVariantMatch {
                 found: value as u64,
-            }),
+            }
+            .into()),
         }
     }
 }

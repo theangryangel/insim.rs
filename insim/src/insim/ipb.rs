@@ -77,7 +77,12 @@ impl Encode for Ipb {
         self.reqi.encode(buf)?;
         let numb = self.banips.len();
         if numb > IPB_MAX_BANS {
-            return Err(insim_core::EncodeError::TooLarge);
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: IPB_MAX_BANS,
+                found: numb,
+            }
+            .context("IPB bans out of range"));
         }
         (numb as u8).encode(buf)?;
         buf.put_bytes(0, 4);

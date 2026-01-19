@@ -164,12 +164,12 @@ impl Decode for GameVersion {
         let new = buf.split_to(8);
 
         match std::str::from_utf8(&new) {
-            Ok(s) => {
-                GameVersion::from_str(s.trim_end_matches('\0')).map_err(crate::DecodeError::from)
-            },
-            Err(_) => Err(crate::DecodeError::GameVersionParseError(
+            Ok(s) => GameVersion::from_str(s.trim_end_matches('\0'))
+                .map_err(|e| crate::DecodeErrorKind::from(e).into()),
+            Err(_) => Err(crate::DecodeErrorKind::GameVersionParseError(
                 GameVersionParseError::NotUtf8String(new.clone()),
-            )),
+            )
+            .into()),
         }
     }
 }

@@ -6,8 +6,9 @@ pub mod ui;
 
 pub mod combos;
 pub mod game;
-pub mod leaderboard;
 pub mod presence;
+#[allow(missing_debug_implementations)]
+pub mod scenes;
 pub mod time;
 
 #[allow(missing_docs)]

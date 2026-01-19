@@ -438,9 +438,10 @@ impl Decode for AiInput {
             254 => AiInputType::ResetAll,
             255 => AiInputType::StopControl,
             found => {
-                return Err(insim_core::DecodeError::NoVariantMatch {
+                return Err(insim_core::DecodeErrorKind::NoVariantMatch {
                     found: found as u64,
-                });
+                }
+                .context("Unknown AiInputType"));
             },
         };
 
@@ -489,7 +490,14 @@ impl Encode for AiInput {
         if let Some(time) = self.time {
             match u8::try_from(time.as_millis() / 10) {
                 Ok(time) => time.encode(buf)?,
-                Err(_) => return Err(insim_core::EncodeError::TooLarge),
+                Err(_) => {
+                    return Err(insim_core::EncodeErrorKind::OutOfRange {
+                        min: 0,
+                        max: u8::MAX as usize,
+                        found: (time.as_millis() / 10) as usize,
+                    }
+                    .context("Time too large on AIC"));
+                },
             }
         } else {
             0_u8.encode(buf)?;
@@ -534,7 +542,12 @@ impl Encode for Aic {
         self.reqi.encode(buf)?;
         self.plid.encode(buf)?;
         if self.inputs.len() > AIC_MAX_INPUTS {
-            return Err(insim_core::EncodeError::TooLarge);
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: AIC_MAX_INPUTS,
+                found: self.inputs.len(),
+            }
+            .context("Too many inputs on AIC"));
         }
         for i in self.inputs.iter() {
             i.encode(buf)?;

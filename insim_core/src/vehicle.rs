@@ -136,9 +136,10 @@ impl Decode for Vehicle {
             ([b'X', b'R', b'R', 0], true) => Ok(Vehicle::Xrr),
             ([b'F', b'Z', b'R', 0], true) => Ok(Vehicle::Fzr),
             ([b'B', b'F', b'1', 0], true) => Ok(Vehicle::Bf1),
-            (_, true) => Err(crate::DecodeError::BadMagic {
+            (_, true) => Err(crate::DecodeErrorKind::BadMagic {
                 found: Box::new(bytes),
-            }),
+            }
+            .into()),
             (_, false) => Ok(Vehicle::Mod(u32::decode(&mut bytes)?)),
         }
     }

@@ -1,5 +1,5 @@
 use bytes::{Buf, BufMut};
-use insim_core::{Decode, DecodeError, DecodeString, Encode, EncodeString};
+use insim_core::{Decode, DecodeErrorKind, DecodeString, Encode, EncodeString};
 
 use crate::identifiers::{ClickId, ConnectionId, RequestId};
 
@@ -323,7 +323,8 @@ impl Decode for Btn {
             let split = if let Some(split) = buf.iter().position(|c| c == &0_u8) {
                 split
             } else {
-                return Err(DecodeError::ExpectedNull);
+                return Err(DecodeErrorKind::ExpectedNull
+                    .context("Expected caption in BTN text field, but found no \0"));
             };
 
             let caption = buf.split_to(split);
@@ -367,19 +368,39 @@ impl Decode for Btn {
 impl Encode for Btn {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         if self.l > 200 {
-            return Err(insim_core::EncodeError::TooLarge);
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 1,
+                max: 200,
+                found: self.l as usize,
+            }
+            .context("Length out of range on BTN"));
         }
 
         if self.t > 200 {
-            return Err(insim_core::EncodeError::TooLarge);
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: 200,
+                found: self.t as usize,
+            }
+            .context("Top out of range"));
         }
 
         if self.w > 200 {
-            return Err(insim_core::EncodeError::TooLarge);
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 1,
+                max: 200,
+                found: self.w as usize,
+            }
+            .context("Width out of range"));
         }
 
         if self.h > 200 {
-            return Err(insim_core::EncodeError::TooLarge);
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: 200,
+                found: self.t as usize,
+            }
+            .context("Height out of range"));
         }
 
         self.reqi.encode(buf)?;
@@ -402,7 +423,12 @@ impl Encode for Btn {
             let text = insim_core::string::codepages::to_lossy_bytes(&self.text);
 
             if (caption.len() + text.len()) > (BTN_TEXT_MAX_LEN - 2) {
-                return Err(insim_core::EncodeError::TooLarge);
+                return Err(insim_core::EncodeErrorKind::OutOfRange {
+                    min: 0,
+                    max: BTN_TEXT_MAX_LEN - 2,
+                    found: caption.len() + text.len(),
+                }
+                .context("Caption + text too large"));
             }
 
             buf.put_u8(0);
@@ -477,7 +503,12 @@ impl Decode for Btt {
         let inst = BtnInst::decode(buf)?;
         let typein = u8::decode(buf)?;
         if typein > 96 {
-            return Err(insim_core::DecodeError::TooLarge);
+            return Err(insim_core::DecodeErrorKind::OutOfRange {
+                min: 0,
+                max: 96,
+                found: typein as usize,
+            }
+            .context("Typein too large"));
         }
         let typein = if typein > 0 { Some(typein) } else { None };
         buf.advance(1);
@@ -501,7 +532,12 @@ impl Encode for Btt {
         self.inst.encode(buf)?;
         let typein = self.typein.unwrap_or(0_u8);
         if typein > 96 {
-            return Err(insim_core::EncodeError::TooLarge);
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: 96,
+                found: typein as usize,
+            }
+            .context("Typein too large"));
         }
         typein.encode(buf)?;
         buf.put_bytes(0, 1);

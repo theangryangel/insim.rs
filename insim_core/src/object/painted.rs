@@ -2,7 +2,7 @@
 use std::convert::TryFrom;
 
 use crate::{
-    DecodeError,
+    DecodeError, DecodeErrorKind,
     heading::Heading,
     object::{ObjectCoordinate, ObjectFlags},
 };
@@ -195,9 +195,10 @@ impl TryFrom<char> for Character {
             '(' => Ok(Character::LParen),
             ')' => Ok(Character::RParen),
             '&' => Ok(Character::Ampersand),
-            found => Err(DecodeError::BadMagic {
+            found => Err(DecodeErrorKind::BadMagic {
                 found: Box::new(found),
-            }),
+            }
+            .into()),
         }
     }
 }
@@ -255,9 +256,10 @@ impl TryFrom<u8> for Character {
             45 => Ok(Character::LParen),
             46 => Ok(Character::RParen),
             47 => Ok(Character::Ampersand),
-            found => Err(DecodeError::NoVariantMatch {
+            found => Err(DecodeErrorKind::NoVariantMatch {
                 found: found as u64,
-            }),
+            }
+            .into()),
         }
     }
 }
@@ -336,9 +338,10 @@ impl TryFrom<u8> for Arrow {
             4 => Ok(Self::CurveL),
             5 => Ok(Self::CurveR),
             6 => Ok(Self::StraightOn),
-            found => Err(DecodeError::NoVariantMatch {
+            found => Err(DecodeErrorKind::NoVariantMatch {
                 found: found as u64,
-            }),
+            }
+            .into()),
         }
     }
 }

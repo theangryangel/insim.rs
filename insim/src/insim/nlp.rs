@@ -45,10 +45,15 @@ impl Decode for Nlp {
 
 impl Encode for Nlp {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi.encode(buf)?;
+        self.reqi.encode(buf).map_err(|e| e.context("Nlp reqi"))?;
         let nump = self.info.len();
         if nump > 255 {
-            return Err(insim_core::EncodeError::TooLarge);
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: 255,
+                found: nump,
+            }
+            .context("Nlp too many players"));
         }
         (nump as u8).encode(buf)?;
         for i in self.info.iter() {

@@ -1,114 +1,168 @@
-//! An implementation of a retained immediate mode UI that looks somewhat like React.
-//! We diff the output to minimise the the button updates via insim.
-//! The manager and player connection tasks run on it's own thread in the background, and each player
-//! connection task is on the same tokio localset, allowing for !Send states within components, etc.
-pub mod component;
-pub mod component_state;
+use std::{collections::HashMap, marker::PhantomData};
+
+use insim::{
+    Packet,
+    identifiers::ConnectionId,
+    insim::{Bfn, BfnType},
+};
+use tokio::{
+    sync::{mpsc, watch},
+    task::LocalSet,
+};
+
+use crate::presence::Presence;
+
+mod canvas;
 pub mod id_pool;
-pub mod manager;
-pub mod runtime;
-pub mod scope;
-pub mod vdom;
+mod node;
+mod view;
 
-pub use component::{Component, ComponentPath};
-pub use id_pool::ClickIdPool;
-pub use kitcar_macros::component;
-pub use manager::{Manager, ManagerHandle};
-pub use runtime::{RenderDiff, Runtime};
-pub use scope::Scope;
-pub use vdom::Element;
+pub use node::*;
+pub use view::*;
 
-const MAGIC_TEXT_RATIO: f32 = 0.2;
-
-#[derive(Debug, Clone)]
-pub struct WrapTextIter<'a> {
-    remaining_text: &'a str,
-    line_width: usize,
-    lines_yielded: usize,
-    max_lines: usize,
+/// Ui handle. Create using [attach]. When dropped all insim buttons will be automatically removed.
+/// Intended for multi-player/multi-connection UIs
+#[derive(Debug)]
+pub struct Ui<V: View> {
+    global: watch::Sender<V::GlobalProps>,
+    connection: mpsc::Sender<(ConnectionId, V::ConnectionProps)>,
+    _phantom: PhantomData<V>,
 }
 
-impl<'a> Iterator for WrapTextIter<'a> {
-    type Item = &'a str;
+impl<V: View> Ui<V> {
+    pub fn update_global_props(&self, value: V::GlobalProps) {
+        self.global
+            .send(value)
+            .expect("FIXME: expect global to work");
+    }
 
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.remaining_text.is_empty() || self.lines_yielded >= self.max_lines {
-            return None;
-        }
-
-        // Check for explicit newlines
-        let mut scan_end_byte = self.remaining_text.len();
-        if self.remaining_text.chars().count() > self.line_width {
-            // This unwrap is safe because we've confirmed the character count is > line_width
-            scan_end_byte = self
-                .remaining_text
-                .char_indices()
-                .nth(self.line_width)
-                .expect("It's all gone wonky.")
-                .0;
-        }
-
-        if let Some(newline_byte_index) = &self.remaining_text[..scan_end_byte].find('\n') {
-            self.lines_yielded += 1;
-            let (line, rest) = self.remaining_text.split_at(*newline_byte_index);
-            // Update remaining text to start *after* the newline character.
-            self.remaining_text = &rest[1..];
-            return Some(line);
-        }
-
-        self.lines_yielded += 1;
-
-        // If the rest of the text fits on one line (and we know it has no early newline), this is the last piece.
-        if self.remaining_text.chars().count() <= self.line_width {
-            let line = self.remaining_text;
-            self.remaining_text = ""; // Exhaust the iterator for the next call.
-            return Some(line);
-        }
-
-        // Find whitespace to wrap at
-        // Find the potential split point. We look for a space *before* the line_width limit.
-        // We check a slice that is up to `line_width` characters long.
-        let mut potential_end_byte = self.remaining_text.len();
-        if let Some((byte_index, _)) = self.remaining_text.char_indices().nth(self.line_width) {
-            // This is the byte index right at the character limit.
-            potential_end_byte = byte_index;
-        }
-
-        let candidate_slice = &self.remaining_text[..potential_end_byte];
-
-        // Find the last space within our candidate slice.
-        let split_byte_index = if let Some(space_byte_index) = candidate_slice.rfind(' ') {
-            // Found a space! This is our preferred split point.
-            space_byte_index
-        } else {
-            // No space found, so we are forced to split the word at the character limit.
-            potential_end_byte
-        };
-
-        // Create the line slice and update the remaining text state.
-        let (line, rest) = self.remaining_text.split_at(split_byte_index);
-
-        // The rest of the string needs to be trimmed of leading whitespace for the next iteration.
-        self.remaining_text = rest.trim_start();
-
-        // Return the current line, trimmed of any trailing space from the split.
-        Some(line.trim_end())
+    pub async fn update_connection_props(&self, ucid: ConnectionId, value: V::ConnectionProps) {
+        self.connection
+            .send((ucid, value))
+            .await
+            .expect("FIXME: expect connection to work");
     }
 }
 
-impl<'a> WrapTextIter<'a> {
-    pub fn has_remaining_text(&self) -> bool {
-        !self.remaining_text.is_empty()
-    }
+/// Manager to spawn Ui's for each connection
+/// Dropping the returned Ui handle will result in the UI being cleared
+///
+/// All UI tasks run on a LocalSet, so View implementations don't need to be Send to accomodate
+/// taffy
+pub fn attach<V: View>(
+    insim: insim::builder::SpawnedHandle,
+    presence: Presence,
+    props: V::GlobalProps,
+) -> Ui<V> {
+    let (global_tx, _global_rx) = watch::channel(props);
+    let (player_tx, mut player_rx) = mpsc::channel(100);
+    let handle = Ui {
+        global: global_tx.clone(),
+        connection: player_tx,
+        _phantom: PhantomData,
+    };
+
+    drop(_global_rx);
+
+    // XXX: We run on our own thread because we need to use LocalSet until Taffy Style is Send.
+    // https://github.com/DioxusLabs/taffy/issues/823
+    let _ = std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("Failed to create UI runtime");
+
+        let local = LocalSet::new();
+        local.block_on(&rt, async move {
+            let mut packets = insim.subscribe();
+            let mut active: HashMap<ConnectionId, watch::Sender<V::ConnectionProps>> =
+                HashMap::new();
+
+            // FIXME: expect
+            for existing in presence.connections().await.expect("FIXME") {
+                spawn_for::<V>(existing.ucid, global_tx.subscribe(), &insim, &mut active);
+            }
+
+            loop {
+                tokio::select! {
+                    packet = packets.recv() => match packet {
+                        Ok(Packet::Ncn(ncn)) => {
+                            if active.contains_key(&ncn.ucid) {
+                                continue;
+                            }
+
+                            spawn_for::<V>(ncn.ucid, global_tx.subscribe(), &insim, &mut active);
+                        },
+                        Ok(Packet::Cnl(cnl)) => {
+                            // player left, remove their props sender
+                            let _ = active.remove(&cnl.ucid);
+                        },
+
+                        _ => {
+                            // FIXME: handle Err
+                        }
+                    },
+
+                    res = player_rx.recv() => match res {
+                        Some((ucid, props)) => {
+                            if let Some(entry) = active.get_mut(&ucid) {
+                                let _ = entry.send(props);
+                            }
+                        },
+                        None => {
+                            // FIXME: log, or something. we've probably just dropped the ui handle
+                            break;
+                        }
+                    },
+                }
+            }
+
+            // for all player connections automatically clear all buttons
+            // when we loose the UiHandle.
+            // this should happen when we loose the player_rx receiver.
+            let clear: Vec<Bfn> = active
+                .drain()
+                .map(|(ucid, _)| Bfn {
+                    ucid,
+                    subt: BfnType::Clear,
+                    ..Default::default()
+                })
+                .collect();
+            // FIXME: no expect
+            insim.send_all(clear).await.expect("FIXME");
+        });
+    });
+
+    handle
 }
 
-pub fn wrap_text<'a>(input: &'a str, height: u8, width: u8, max_lines: usize) -> WrapTextIter<'a> {
-    let max_per_button = (width as f32 / (height as f32 * MAGIC_TEXT_RATIO)).floor();
+fn spawn_for<V: View>(
+    ucid: ConnectionId,
+    global_rx: watch::Receiver<V::GlobalProps>,
+    insim: &insim::builder::SpawnedHandle,
+    active: &mut HashMap<ConnectionId, watch::Sender<V::ConnectionProps>>,
+) {
+    let (connection_tx, connection_rx) = watch::channel(V::ConnectionProps::default());
 
-    WrapTextIter {
-        remaining_text: input,
-        line_width: max_per_button as usize,
-        lines_yielded: 0,
-        max_lines,
-    }
+    run_view::<V>(ucid, global_rx, connection_rx, insim.clone());
+    let _ = active.insert(ucid, connection_tx);
+}
+
+/// Shortcut to make a container [node::Node]
+pub fn container<Msg>() -> node::Node<Msg> {
+    node::Node::container()
+}
+
+/// Shortcut to make a clickable button [node::Node]
+pub fn clickable<Msg>(
+    text: impl Into<String>,
+    bstyle: insim::insim::BtnStyle,
+    msg: Msg,
+) -> node::Node<Msg> {
+    node::Node::clickable(text, bstyle, msg)
+}
+
+/// Shortcut to make a text only (non-clickable) [node::Node]
+pub fn text<Msg>(text: impl Into<String>, bstyle: insim::insim::BtnStyle) -> node::Node<Msg> {
+    node::Node::text(text, bstyle)
 }

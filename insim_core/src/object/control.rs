@@ -50,9 +50,10 @@ impl Control {
             0b10 => ControlKind::Checkpoint2 { half_width },
             0b11 => ControlKind::Checkpoint3 { half_width },
             _ => {
-                return Err(crate::DecodeError::NoVariantMatch {
+                return Err(crate::DecodeErrorKind::NoVariantMatch {
                     found: position_bits as u64,
-                });
+                }
+                .into());
             },
         };
 

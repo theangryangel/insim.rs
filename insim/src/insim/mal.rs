@@ -90,7 +90,12 @@ impl Encode for Mal {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         self.reqi.encode(buf)?;
         if self.allowed_mods.len() > MAX_MAL_SIZE {
-            return Err(insim_core::EncodeError::TooLarge);
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: MAX_MAL_SIZE,
+                found: self.allowed_mods.len(),
+            }
+            .context("Mal allowed_mods out of range"));
         }
         (self.allowed_mods.len() as u8).encode(buf)?;
         self.ucid.encode(buf)?;

@@ -29,9 +29,10 @@ impl Decode for LfsPin {
     fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
         let revision = u8::decode(buf)?;
         if revision > 0 {
-            return Err(insim_core::DecodeError::BadMagic {
+            return Err(insim_core::DecodeErrorKind::BadMagic {
                 found: Box::new(revision),
-            });
+            }
+            .context("LFSPIN unsupported revision"));
         }
 
         let _reserved = i32::decode(buf)?;
@@ -59,9 +60,10 @@ impl Decode for LfsPin {
 impl Encode for LfsPin {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         if self.revision > 0 {
-            return Err(insim_core::EncodeError::NoVariantMatch {
+            return Err(insim_core::EncodeErrorKind::NoVariantMatch {
                 found: self.revision as u64,
-            });
+            }
+            .context("LFSPIN unsupported revision"));
         }
 
         self.revision.encode(buf)?;
