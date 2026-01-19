@@ -71,12 +71,11 @@ impl scenes::Scene for WaitForAdminStart {
             .send_message("Ready for admin !start command", ConnectionId::ALL)
             .await?;
 
-        let mut chat = self.chat.subscribe();
-
-        chat::wait_for_admin_cmd(&mut chat, self.presence.clone(), |msg| {
-            matches!(msg, chat::ChatMsg::Start)
-        })
-        .await?;
+        self.chat
+            .wait_for_admin_cmd(self.presence.clone(), |msg| {
+                matches!(msg, chat::ChatMsg::Start)
+            })
+            .await?;
 
         tracing::info!("Admin started game");
         Ok(scenes::SceneResult::Continue(()))

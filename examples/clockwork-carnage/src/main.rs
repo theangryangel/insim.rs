@@ -89,7 +89,6 @@ async fn main() -> anyhow::Result<()> {
     })
     .loop_until_quit();
 
-    let mut chat_rx = chat.subscribe();
     tokio::select! {
         res = insim_handle => {
             let _ = res.expect("Did not expect insim to die");
@@ -97,7 +96,7 @@ async fn main() -> anyhow::Result<()> {
         res = clockwork.run() => {
             tracing::info!("{:?}", res);
         },
-        _ = chat::wait_for_admin_cmd(&mut chat_rx, presence, |msg| matches!(msg, chat::ChatMsg::Quit)) => {}
+        _ = chat.wait_for_admin_cmd(presence, |msg| matches!(msg, chat::ChatMsg::Quit)) => {}
     }
 
     Ok(())

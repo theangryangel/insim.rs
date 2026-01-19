@@ -25,8 +25,6 @@ impl Scene for Clockwork {
     type Output = ();
 
     async fn run(self) -> Result<SceneResult<()>, SceneError> {
-        let mut chat = self.chat.subscribe();
-
         // Scenes inside scenes inside scenes..
         let event = super::Lobby {
             insim: self.insim.clone(),
@@ -57,7 +55,7 @@ impl Scene for Clockwork {
             },
             // TODO: if this all we care about.. do we want to handle this here? it's contextually
             // sensitive.. so maybe this is the right place?
-            _ = chat::wait_for_admin_cmd(&mut chat, self.presence.clone(), |msg| matches!(msg, chat::ChatMsg::End)) => {
+            _ = self.chat.wait_for_admin_cmd(self.presence.clone(), |msg| matches!(msg, chat::ChatMsg::End)) => {
                 tracing::info!("Admin ended event");
                 Ok(SceneResult::bail_with("Admin ended event"))
             },
