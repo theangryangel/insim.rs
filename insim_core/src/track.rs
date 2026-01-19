@@ -292,9 +292,9 @@ impl Decode for Track {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
         let raw = buf.split_to(6);
         let s = std::str::from_utf8(&raw).unwrap_or("").trim_matches('\0');
-        s.parse().map_err(|_| crate::DecodeError::BadMagic {
+        s.parse().map_err(|_| crate::DecodeErrorKind::BadMagic {
             found: Box::new(raw),
-        })
+        }.into())
     }
 }
 
@@ -304,7 +304,7 @@ impl Encode for Track {
         let bytes = s.as_bytes();
 
         if bytes.len() > 6 {
-            return Err(crate::EncodeError::TooLarge);
+            return Err(crate::EncodeErrorKind::OutOfRange { min: 6, max: 6, found: bytes.len() }.into());
         }
         buf.extend_from_slice(bytes);
         buf.resize(buf.len() + (6 - bytes.len()), 0);

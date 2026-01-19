@@ -53,10 +53,10 @@ impl Decode for PlayerHandicap {
 impl Encode for PlayerHandicap {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         if self.h_mass > 200 {
-            return Err(insim_core::EncodeError::TooLarge);
+            return Err(insim_core::EncodeErrorKind::OutOfRange { min: 0, max: 200, found: self.h_mass as usize }.context("PlayerHandicap h_mass out of range"));
         }
         if self.h_tres > 50 {
-            return Err(insim_core::EncodeError::TooLarge);
+            return Err(insim_core::EncodeErrorKind::OutOfRange { min: 0, max: 50, found: self.h_tres as usize }.context("PlayerHandicap h_tres out of range"));
         }
 
         self.plid.encode(buf)?;
@@ -99,7 +99,7 @@ impl Encode for Plh {
         self.reqi.encode(buf)?;
         let nump = self.hcaps.len();
         if nump > PLH_MAX_PLAYERS {
-            return Err(insim_core::EncodeError::TooLarge);
+            return Err(insim_core::EncodeErrorKind::OutOfRange { min: 0, max: PLH_MAX_PLAYERS, found: nump }.context("Plh handicaps out of range"));
         }
         (nump as u8).encode(buf)?;
         for i in self.hcaps.iter() {

@@ -43,6 +43,7 @@ pub enum Error {
     Decode {
         offset: usize,
         input: Bytes,
+        #[source]
         error: insim_core::DecodeError,
     },
 

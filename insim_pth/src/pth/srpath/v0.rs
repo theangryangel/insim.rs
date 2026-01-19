@@ -142,18 +142,22 @@ impl Decode for SrPth {
     fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
         let revision = u8::decode(buf)?;
         if revision > 252 {
-            return Err(insim_core::DecodeError::BadMagic {
-                found: Box::new(revision),
-            });
+            return Err(insim_core::DecodeErrorKind::OutOfRange {
+                min: 0,
+                max: 252,
+                found: revision as usize,
+            }.context("SRPATH unsupported revision"));
         }
 
         let flags = SrPathFlags::decode(buf)?;
         let mini_rev = u8::decode(buf)?;
 
         if mini_rev > 9 {
-            return Err(insim_core::DecodeError::BadMagic {
-                found: Box::new(mini_rev),
-            });
+            return Err(insim_core::DecodeErrorKind::OutOfRange {
+                min: 0,
+                max: 9,
+                found: mini_rev as usize,
+            }.context("SRPATH unsupported mini_rev"));
         }
 
         buf.advance(3);
@@ -202,18 +206,20 @@ impl Decode for SrPth {
 impl Encode for SrPth {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         if self.revision > 252 {
-            return Err(insim_core::EncodeError::NoVariantMatch {
-                found: self.revision as u64,
-            });
+            return Err(insim_core::EncodeErrorKind::OutOfRange {
+                min: 0,
+                max: 252,
+                found: self.revision as usize,
+            }.context("SRPATH unsupported revision"));
         }
         if self.main_nodes.len() > (u16::MAX as usize) {
-            return Err(insim_core::EncodeError::TooLarge);
+            return Err(insim_core::EncodeErrorKind::OutOfRange { min: 0, max: u16::MAX as usize }.context(""));
         }
         if self.pit0_nodes.len() > (u16::MAX as usize) {
-            return Err(insim_core::EncodeError::TooLarge);
+            return Err(insim_core::EncodeError::OutOfRange { min: 0, max: u16::MAX as usize });
         }
         if self.pit1_nodes.len() > (u16::MAX as usize) {
-            return Err(insim_core::EncodeError::TooLarge);
+            return Err(insim_core::EncodeError::OutOfRange { min: 0, max: u16::MAX as usize });
         }
 
         self.revision.encode(buf)?;

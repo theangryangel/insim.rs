@@ -473,7 +473,7 @@ impl Decode for Packet {
             67 => Self::Ipb(Ipb::decode(buf)?),
             68 => Self::Aic(Aic::decode(buf)?),
             69 => Self::Aii(Aii::decode(buf)?),
-            i => return Err(insim_core::DecodeError::NoVariantMatch { found: i.into() }),
+            i => return Err(insim_core::DecodeErrorKind::NoVariantMatch { found: i.into() }.context("Unknown packet identifier")),
         };
 
         Ok(packet)

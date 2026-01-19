@@ -202,7 +202,7 @@ impl Encode for Mci {
         self.reqi.encode(buf)?;
         let numc = self.info.len();
         if numc > 255 {
-            return Err(insim_core::EncodeError::TooLarge);
+            return Err(insim_core::EncodeErrorKind::OutOfRange { min: 0, max: 255, found: numc }.context("Mci too many infos"));
         }
         (numc as u8).encode(buf)?;
         for i in self.info.iter() {

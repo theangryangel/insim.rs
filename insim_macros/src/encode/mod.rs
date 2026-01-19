@@ -126,7 +126,7 @@ impl Receiver {
                 fn decode(buf: &mut ::bytes::Bytes) -> Result<Self, ::insim_core::DecodeError> {
                     let val: Self = match #repr_ty::decode(buf)? {
                         #(#from_variants)*
-                        found => return Err(::insim_core::DecodeError::NoVariantMatch { found: found as u64 })
+                        found => return Err(::insim_core::DecodeErrorKind::NoVariantMatch { found: found as u64 }.into())
                     };
                     Ok(val)
                 }
