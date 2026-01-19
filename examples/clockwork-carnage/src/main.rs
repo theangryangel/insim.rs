@@ -57,7 +57,6 @@ impl Scene for Clockwork {
             target: self.target,
             round_best: Default::default(),
             active_runs: Default::default(),
-            name_cache: Default::default(),
             insim: self.insim.clone(),
             game: self.game.clone(),
             presence: self.presence.clone(),
@@ -144,6 +143,7 @@ struct ClockworkRoundGlobalProps {
 
 #[derive(Debug, Clone, Default)]
 struct ClockworkRoundConnectionProps {
+    uname: String,
     in_progress: bool,
     round_best: Option<Duration>,
 }
@@ -172,11 +172,24 @@ impl ui::View for ClockworkRoundView {
             }
         };
 
-        let players: Vec<ui::Node<Self::Message>> = global_props
-            .leaderboard
+        let leaderboard = &global_props.leaderboard;
+        let total = leaderboard.len();
+        let current_player_pos = leaderboard
             .iter()
-            .enumerate()
-            .map(|(index, (_uname, pname, pts))| {
+            .position(|(uname, _, _)| uname == &connection_props.uname);
+
+        let indices_to_show: Vec<usize> = if total <= 5 {
+            (0..total).collect()
+        } else if current_player_pos.map_or(true, |p| p < 4 || p == total - 1) {
+            vec![0, 1, 2, 3, total - 1]
+        } else {
+            vec![0, 1, 2, current_player_pos.unwrap(), total - 1]
+        };
+
+        let players: Vec<ui::Node<Self::Message>> = indices_to_show
+            .into_iter()
+            .map(|index| {
+                let (_, pname, pts) = &leaderboard[index];
                 ui::container().flex().flex_row().with_children([
                     ui::text(format!("#{}", index + 1), BtnStyle::default().dark())
                         .w(5.)
@@ -224,7 +237,6 @@ struct ClockworkInner {
 
     round_best: HashMap<String, Duration>,
     active_runs: HashMap<String, Duration>,
-    name_cache: HashMap<String, String>,
 
     insim: SpawnedHandle,
     game: game::Game,
@@ -243,7 +255,6 @@ impl ClockworkInner {
         for round in 1..=self.rounds {
             self.broadcast_rankings(&ui).await;
             self.round(round, &ui).await?;
-            self.broadcast_rankings(&ui).await;
         }
         drop(ui);
 
@@ -280,6 +291,7 @@ impl ClockworkInner {
 
     fn connection_props(&self, uname: &str) -> ClockworkRoundConnectionProps {
         ClockworkRoundConnectionProps {
+            uname: uname.to_string(),
             in_progress: self.active_runs.contains_key(uname),
             round_best: self.round_best.get(uname).copied(),
         }
