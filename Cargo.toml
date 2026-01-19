@@ -59,7 +59,7 @@ serde_norway = "0.9.42"
 syn = { version = "2.0.114" }
 thiserror = "2.0.18"
 tokio = { version = "1.49.0" }
-tokio-test = "0.4.4"
+tokio-test = "0.4.5"
 tokio-util = "0.7.18"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22" }
