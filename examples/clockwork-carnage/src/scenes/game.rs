@@ -41,10 +41,13 @@ impl Scene for Clockwork {
         .and_then({
             let insim = self.insim.clone();
             let presence = self.presence.clone();
-            move |scores| super::Victory {
-                insim: insim.clone(),
-                presence: presence.clone(),
-                scores,
+            move |scores| {
+                tracing::info!("scores = {:?}", scores);
+                super::Victory {
+                    insim: insim.clone(),
+                    presence: presence.clone(),
+                    scores,
+                }
             }
         });
 

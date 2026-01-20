@@ -74,7 +74,8 @@ impl Scene for Victory {
 
     async fn run(self) -> Result<SceneResult<Self::Output>, SceneError> {
         let enriched_leaderboard = self.enriched_leaderboard().await;
-        let _ = ui::attach::<ClockworkVictoryView>(
+        tracing::info!("leaderboard: {:?}", enriched_leaderboard);
+        let ui = ui::attach::<ClockworkVictoryView>(
             self.insim.clone(),
             self.presence.clone(),
             ClockworkVictoryGlobalProps {
@@ -82,6 +83,7 @@ impl Scene for Victory {
             },
         );
         sleep(Duration::from_secs(120)).await;
+        drop(ui);
         Ok(SceneResult::Continue(()))
     }
 }
