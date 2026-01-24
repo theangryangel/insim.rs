@@ -17,7 +17,7 @@ use super::canvas::Canvas;
 /// }
 // ```
 pub trait Component {
-    type Message: Clone + 'static;
+    type Message: Send + Clone + 'static;
     type Props;
 
     #[allow(unused)]
@@ -29,7 +29,7 @@ pub trait Component {
 pub trait View: Sized + 'static {
     type GlobalProps: Clone + Send + Sync + Default + 'static;
     type ConnectionProps: Clone + Send + Sync + Default + 'static;
-    type Message: Clone + 'static;
+    type Message: Clone + Send + 'static;
 
     /// New!
     fn mount(tx: mpsc::UnboundedSender<Self::Message>) -> Self;
@@ -48,10 +48,10 @@ pub(super) fn run_view<V: View>(
     ucid: ConnectionId,
     mut global: watch::Receiver<V::GlobalProps>,
     mut connection: watch::Receiver<V::ConnectionProps>,
+    internal_tx: mpsc::UnboundedSender<V::Message>,
+    mut internal_rx: mpsc::UnboundedReceiver<V::Message>,
     insim: insim::builder::InsimTask,
 ) {
-    let (internal_tx, mut internal_rx) = mpsc::unbounded_channel();
-
     #[allow(clippy::let_underscore_future)]
     let _ = tokio::task::spawn_local(async move {
         let mut root = V::mount(internal_tx);

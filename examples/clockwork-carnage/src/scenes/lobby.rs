@@ -50,7 +50,7 @@ impl Scene for Lobby {
 
         while let Some(_) = countdown.tick().await {
             let remaining = countdown.remaining_duration();
-            ui.update_global_props(remaining);
+            ui.set_global_state(remaining);
         }
 
         Ok(SceneResult::Continue(()))

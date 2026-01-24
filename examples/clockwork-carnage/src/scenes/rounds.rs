@@ -136,7 +136,7 @@ impl RoundsState {
         if let Some(connections) = config.presence.connections().await {
             for conn in connections {
                 let props = self.connection_props(&conn.uname);
-                ui.update_connection_props(conn.ucid, props).await;
+                ui.set_player_state(conn.ucid, props).await;
             }
         }
     }
@@ -191,7 +191,7 @@ impl RoundsState {
                     match remaining {
                         Some(_) => {
                             let dur = countdown.remaining_duration();
-                            ui.update_global_props(ClockworkRoundGlobalProps {
+                            ui.set_global_state(ClockworkRoundGlobalProps {
                                 remaining: dur,
                                 round,
                                 rounds: config.rounds,
@@ -225,7 +225,7 @@ impl RoundsState {
                     .await?;
 
                 if let Some(conn) = config.presence.connection(&ncn.ucid).await {
-                    ui.update_connection_props(ncn.ucid, self.connection_props(&conn.uname))
+                    ui.set_player_state(ncn.ucid, self.connection_props(&conn.uname))
                         .await;
                 }
             },
@@ -288,7 +288,7 @@ impl RoundsState {
                         },
                         _ => {},
                     }
-                    ui.update_connection_props(conn.ucid, self.connection_props(&conn.uname))
+                    ui.set_player_state(conn.ucid, self.connection_props(&conn.uname))
                         .await;
                 }
             },

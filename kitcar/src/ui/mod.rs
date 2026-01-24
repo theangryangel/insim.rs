@@ -34,29 +34,95 @@ pub enum UiError {
 pub struct Ui<V: View> {
     global: watch::Sender<V::GlobalProps>,
     connection: mpsc::Sender<(ConnectionId, V::ConnectionProps)>,
+    message: mpsc::Sender<(ConnectionId, V::Message)>,
     _phantom: PhantomData<V>,
 }
 
 impl<V: View> Ui<V> {
-    pub fn update_global_props(&self, value: V::GlobalProps) {
+    /// Update the global state for all connections, triggering a re-render.
+    /// Global state is shared state visible to all connected players.
+    pub fn set_global_state(&self, value: V::GlobalProps) {
         self.global
             .send(value)
             .expect("FIXME: expect global to work");
     }
 
-    pub async fn update_connection_props(&self, ucid: ConnectionId, value: V::ConnectionProps) {
+    /// Update the state for a specific connection, triggering a re-render for that player.
+    /// Player state is per-player state, useful for player-specific UI elements.
+    pub async fn set_player_state(&self, ucid: ConnectionId, value: V::ConnectionProps) {
         self.connection
             .send((ucid, value))
             .await
             .expect("FIXME: expect connection to work");
     }
+
+    /// Get a clonable sender for injecting messages into views.
+    /// This sender can be moved into spawned tasks without affecting UI lifecycle.
+    /// Sending will fail once the [`Ui`] handle is dropped.
+    ///
+    /// Cloning this sender does not keep the UI alive—the UI lifecycle is controlled
+    /// by the main [`Ui`] handle. When [`Ui`] is dropped, the UI runtime shuts down
+    /// and subsequent sends will return `Err`.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let (ui, _handle) = attach::<MyView>(insim, presence, props);
+    /// let sender = ui.sender();
+    /// let mut chat_rx = chat.subscribe();
+    ///
+    /// tokio::spawn(async move {
+    ///     while let Ok((cmd, ucid)) = chat_rx.recv().await {
+    ///         if let Some(msg) = map_to_view_msg(cmd) {
+    ///             if sender.send((ucid, msg)).await.is_err() {
+    ///                 break; // UI dropped, exit loop
+    ///             }
+    ///         }
+    ///     }
+    /// });
+    ///
+    /// // ui can still be used here
+    /// ui.set_global_state(new_state);
+    /// ```
+    pub fn sender(&self) -> mpsc::Sender<(ConnectionId, V::Message)> {
+        self.message.clone()
+    }
 }
 
-/// Manager to spawn Ui's for each connection
-/// Dropping the returned Ui handle will result in the UI being cleared
+/// Attach a UI view to an insim connection, spawning a view instance for each connected player.
+/// Dropping the returned [`Ui`] handle will result in the UI being cleared for all players.
 ///
-/// All UI tasks run on a LocalSet, so View implementations don't need to be Send to accomodate
-/// taffy
+/// All UI tasks run on a LocalSet, so View implementations don't need to be Send to accommodate
+/// taffy.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// struct MyView;
+///
+/// impl View for MyView {
+///     type GlobalProps = GameState;
+///     type ConnectionProps = PlayerState;
+///     type Message = MyMsg;
+///
+///     fn mount(_tx: mpsc::UnboundedSender<Self::Message>) -> Self {
+///         Self
+///     }
+///
+///     fn render(&self, global: GameState, connection: PlayerState) -> Node<Self::Message> {
+///         container()
+///             .with_child(text(format!("Score: {}", global.score), BtnStyle::default()))
+///     }
+/// }
+///
+/// let (ui, handle) = attach::<MyView>(insim, presence, GameState::default());
+///
+/// // Update global state (re-renders for all players)
+/// ui.set_global_state(GameState { score: 100 });
+///
+/// // Update per-player state
+/// ui.set_player_state(player_ucid, PlayerState { ready: true }).await;
+/// ```
 pub fn attach<V: View>(
     insim: insim::builder::InsimTask,
     presence: Presence,
@@ -64,9 +130,11 @@ pub fn attach<V: View>(
 ) -> (Ui<V>, JoinHandle<Result<(), UiError>>) {
     let (global_tx, _global_rx) = watch::channel(props);
     let (player_tx, mut player_rx) = mpsc::channel(100);
+    let (message_tx, mut message_rx) = mpsc::channel::<(ConnectionId, V::Message)>(100);
     let ui_handle = Ui {
         global: global_tx.clone(),
         connection: player_tx,
+        message: message_tx,
         _phantom: PhantomData,
     };
 
@@ -89,8 +157,14 @@ pub fn attach<V: View>(
         let local = LocalSet::new();
         local.block_on(&rt, async move {
             let mut packets = insim.subscribe();
-            let mut active: HashMap<ConnectionId, watch::Sender<V::ConnectionProps>> =
-                HashMap::new();
+            #[allow(clippy::type_complexity)]
+            let mut active: HashMap<
+                ConnectionId,
+                (
+                    watch::Sender<V::ConnectionProps>,
+                    mpsc::UnboundedSender<V::Message>,
+                ),
+            > = HashMap::new();
 
             // FIXME: expect
             for existing in presence.connections().await.expect("FIXME") {
@@ -119,13 +193,29 @@ pub fn attach<V: View>(
 
                     res = player_rx.recv() => match res {
                         Some((ucid, props)) => {
-                            if let Some(entry) = active.get_mut(&ucid) {
-                                let _ = entry.send(props);
+                            if let Some((props_tx, _)) = active.get_mut(&ucid) {
+                                let _ = props_tx.send(props);
                             }
                         },
                         None => {
                             // FIXME: log, or something. we've probably just dropped the ui handle
                             break;
+                        }
+                    },
+
+                    // Message channel is separate from lifecycle—UiSender clones keep this
+                    // channel open, but we shut down based on player_rx (connection props).
+                    // Once Ui is dropped and we exit this loop, message_rx is dropped and
+                    // UiSender::send() will return Err.
+                    res = message_rx.recv() => match res {
+                        Some((ucid, msg)) => {
+                            if let Some((_, msg_tx)) = active.get(&ucid) {
+                                let _ = msg_tx.send(msg);
+                            }
+                        },
+                        None => {
+                            // All senders dropped (Ui + all UiSender clones), but we don't
+                            // shut down here—lifecycle is tied to player_rx.
                         }
                     },
                 }
@@ -161,16 +251,31 @@ pub fn attach<V: View>(
     (ui_handle, handle)
 }
 
+#[allow(clippy::type_complexity)]
 fn spawn_for<V: View>(
     ucid: ConnectionId,
     global_rx: watch::Receiver<V::GlobalProps>,
     insim: &insim::builder::InsimTask,
-    active: &mut HashMap<ConnectionId, watch::Sender<V::ConnectionProps>>,
+    active: &mut HashMap<
+        ConnectionId,
+        (
+            watch::Sender<V::ConnectionProps>,
+            mpsc::UnboundedSender<V::Message>,
+        ),
+    >,
 ) {
     let (connection_tx, connection_rx) = watch::channel(V::ConnectionProps::default());
+    let (internal_tx, internal_rx) = mpsc::unbounded_channel();
 
-    run_view::<V>(ucid, global_rx, connection_rx, insim.clone());
-    let _ = active.insert(ucid, connection_tx);
+    run_view::<V>(
+        ucid,
+        global_rx,
+        connection_rx,
+        internal_tx.clone(),
+        internal_rx,
+        insim.clone(),
+    );
+    let _ = active.insert(ucid, (connection_tx, internal_tx));
 }
 
 /// Shortcut to make a container [node::Node]
