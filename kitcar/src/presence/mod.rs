@@ -7,8 +7,10 @@ use insim::{
     identifiers::{ConnectionId, PlayerId},
     insim::{PlayerFlags, PlayerType},
 };
-use tokio::sync::{mpsc, oneshot, watch};
-use tokio::task::JoinHandle;
+use tokio::{
+    sync::{mpsc, oneshot, watch},
+    task::JoinHandle,
+};
 
 #[derive(Debug, Clone)]
 /// PlayerInfo
@@ -257,7 +259,10 @@ pub enum PresenceError {
 }
 
 /// Spawn a background instance of Presence and return a handle so that we can query it
-pub fn spawn(insim: insim::builder::InsimTask, capacity: usize) -> (Presence, JoinHandle<Result<(), PresenceError>>) {
+pub fn spawn(
+    insim: insim::builder::InsimTask,
+    capacity: usize,
+) -> (Presence, JoinHandle<Result<(), PresenceError>>) {
     let (query_tx, mut query_rx) = mpsc::channel(capacity);
     let mut inner = PresenceInner::new();
     let player_count = inner.player_count.subscribe();
@@ -313,11 +318,14 @@ pub fn spawn(insim: insim::builder::InsimTask, capacity: usize) -> (Presence, Jo
         result
     });
 
-    (Presence {
-        query_tx,
-        player_count,
-        connection_count,
-    }, handle)
+    (
+        Presence {
+            query_tx,
+            player_count,
+            connection_count,
+        },
+        handle,
+    )
 }
 
 #[derive(Debug)]

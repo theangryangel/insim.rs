@@ -7,8 +7,10 @@ use insim::{
     core::{track::Track, wind::Wind},
     insim::{RaceInProgress, RaceLaps, StaFlags, TinyType},
 };
-use tokio::sync::{mpsc, oneshot, watch};
-use tokio::task::JoinHandle;
+use tokio::{
+    sync::{mpsc, oneshot, watch},
+    task::JoinHandle,
+};
 
 #[derive(Debug, Default, Clone)]
 /// GameInfo
@@ -95,7 +97,10 @@ pub enum GameError {
 }
 
 /// Spawn a background instance of GameInfo and return a handle so that we can query it
-pub fn spawn(insim: insim::builder::InsimTask, capacity: usize) -> (Game, JoinHandle<Result<(), GameError>>) {
+pub fn spawn(
+    insim: insim::builder::InsimTask,
+    capacity: usize,
+) -> (Game, JoinHandle<Result<(), GameError>>) {
     let (query_tx, mut query_rx) = mpsc::channel(capacity);
     let (tx, rx) = watch::channel(GameInfo::new());
 
@@ -126,10 +131,13 @@ pub fn spawn(insim: insim::builder::InsimTask, capacity: usize) -> (Game, JoinHa
         result
     });
 
-    (Game {
-        query_tx,
-        watch: rx,
-    }, handle)
+    (
+        Game {
+            query_tx,
+            watch: rx,
+        },
+        handle,
+    )
 }
 
 #[derive(Debug)]

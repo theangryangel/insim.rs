@@ -350,7 +350,7 @@ impl Builder {
     }
 
     /// Connect and spawn a background Tokio task to manage the insim connection.
-    /// A [SpawnedHandle] is returned to allow you to interact with the background task to send and
+    /// An [InsimTask] is returned to allow you to interact with the background task to send and
     /// receive packets.
     /// Automatic reconnection is not handled at this time.
     #[cfg(feature = "tokio")]

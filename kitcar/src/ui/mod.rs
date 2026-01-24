@@ -7,7 +7,7 @@ use insim::{
 };
 use tokio::{
     sync::{mpsc, watch},
-    task::{LocalSet, JoinHandle},
+    task::{JoinHandle, LocalSet},
 };
 
 use crate::presence::Presence;
@@ -83,7 +83,7 @@ pub fn attach<V: View>(
             Err(e) => {
                 tracing::error!("Failed to create UI runtime: {}", e);
                 return Err::<(), UiError>(UiError::RuntimeCreationFailed);
-            }
+            },
         };
 
         let local = LocalSet::new();
@@ -154,7 +154,7 @@ pub fn attach<V: View>(
             Err(_) => {
                 tracing::error!("UI thread panicked");
                 Err(UiError::RuntimeCreationFailed)
-            }
+            },
         }
     });
 
