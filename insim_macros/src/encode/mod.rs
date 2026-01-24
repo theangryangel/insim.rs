@@ -77,7 +77,7 @@ impl Receiver {
 
         let to_bytes_fields = fields
             .iter()
-            .filter_map(|f| if f.skip() { None } else { Some(f.encode()) });
+            .filter_map(|f| if f.skip() { None } else { Some(f.encode(name)) });
 
         Ok(quote! {
             impl ::insim_core::Encode for #name {
@@ -142,7 +142,7 @@ impl Receiver {
 
         let from_bytes_fields = fields
             .iter()
-            .filter_map(|f| if f.skip() { None } else { Some(f.decode()) });
+            .filter_map(|f| if f.skip() { None } else { Some(f.decode(name)) });
 
         let from_bytes_fields_init = fields.iter().filter_map(|f| {
             if f.skip() {

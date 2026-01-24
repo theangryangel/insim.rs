@@ -5,7 +5,6 @@ use std::{borrow::Cow, net::Ipv4Addr};
 use bytes::{BufMut, BytesMut};
 
 #[derive(Debug, thiserror::Error)]
-#[error("{kind}{}", context.as_ref().map(|c| format!(" ({c})")).unwrap_or_default())]
 /// Encoding Error
 pub struct EncodeError {
     /// Optional contextual information
@@ -19,6 +18,41 @@ impl EncodeError {
     pub fn context(mut self, ctx: impl Into<Cow<'static, str>>) -> Self {
         self.context = Some(ctx.into());
         self
+    }
+
+    /// Create a nested error quickly
+    pub fn nested(self) -> Self {
+        Self {
+            context: None,
+            kind: EncodeErrorKind::Nested {
+                source: Box::new(self),
+            },
+        }
+    }
+}
+
+impl std::fmt::Display for EncodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut chain = vec![];
+        let mut current: Option<&EncodeError> = Some(self);
+
+        while let Some(err) = current {
+            if let Some(ctx) = &err.context {
+                chain.push(ctx.as_ref().to_string());
+            }
+
+            match &err.kind {
+                EncodeErrorKind::Nested { source } => {
+                    current = Some(source);
+                },
+                _ => {
+                    chain.push(err.kind.to_string());
+                    break;
+                },
+            }
+        }
+
+        write!(f, "{}", chain.join(" > "))
     }
 }
 
@@ -62,6 +96,14 @@ pub enum EncodeErrorKind {
         max: usize,
         /// found
         found: usize,
+    },
+
+    /// Nested error - designed to preserve the full chain of errors
+    #[error("{source}")]
+    Nested {
+        /// Source
+        #[source]
+        source: Box<EncodeError>,
     },
 }
 

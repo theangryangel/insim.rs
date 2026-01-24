@@ -33,13 +33,13 @@ impl Field {
         self.skip.unwrap_or(false)
     }
 
-    pub(super) fn decode(&self) -> proc_macro2::TokenStream {
+    pub(super) fn decode(&self, parent: &syn::Ident) -> proc_macro2::TokenStream {
         let f = self;
         let field_name = f.ident.as_ref().expect("Missing field name?");
         let pad_after = f.pad_after.unwrap_or(0);
         let pad_before = f.pad_before.unwrap_or(0);
         let field_type = f.ty.clone();
-        let context = format!("{}", field_name);
+        let context = format!("{}::{}", parent, field_name);
 
         let mut tokens = quote! {};
 
@@ -55,6 +55,8 @@ impl Field {
                 #tokens
                 let #field_name = <#field_type as ::insim_core::DecodeString>::decode_codepage(
                     buf, #length
+                ).map_err(|e|
+                    e.nested().context(#context)
                 )?;
             }
         } else if let Some(AsciiArgs { length, .. }) = f.ascii.as_ref() {
@@ -62,12 +64,16 @@ impl Field {
                 #tokens
                 let #field_name = <#field_type as ::insim_core::DecodeString>::decode_ascii(
                     buf, #length
+                ).map_err(|e|
+                    e.nested().context(#context)
                 )?;
             }
         } else if let Some(duration_repr) = f.duration.as_ref() {
             tokens = quote! {
                 #tokens
-                let __raw_field_name = #duration_repr::decode(buf)?;
+                let __raw_field_name = #duration_repr::decode(buf).map_err(|e|
+                    e.nested().context(#context)
+                )?;
                 let #field_name = match TryInto::<u64>::try_into(__raw_field_name) {
                     Ok(v) => std::time::Duration::from_millis(v),
                     Err(_) => return Err(::insim_core::DecodeErrorKind::OutOfRange { min: 0, max: u64::MAX as usize, found: __raw_field_name as usize }.context(#context)),
@@ -95,7 +101,9 @@ impl Field {
 
             tokens = quote! {
                 #tokens
-                let #field_name = <#typ>::decode(buf)?;
+                let #field_name = <#typ>::decode(buf).map_err(|e|
+                    e.nested().context(#context)
+                )?;
             };
         }
 
@@ -108,13 +116,13 @@ impl Field {
         tokens
     }
 
-    pub(super) fn encode(&self) -> proc_macro2::TokenStream {
+    pub(super) fn encode(&self, parent: &syn::Ident) -> proc_macro2::TokenStream {
         let f = self;
         let field_name = f.ident.as_ref().expect("Missing field name");
         let pad_after = f.pad_after.unwrap_or(0);
         let pad_before = f.pad_before.unwrap_or(0);
         let field_type = f.ty.clone();
-        let context = format!("{}", field_name);
+        let context = format!("{}::{}", parent, field_name);
         let mut tokens = quote! {};
 
         if pad_before > 0 {
@@ -135,6 +143,8 @@ impl Field {
                         #tokens
                         <#field_type as ::insim_core::EncodeString>::encode_codepage(
                             &self.#field_name, buf, #length, #trailing_nul
+                        ).map_err(|e|
+                            e.nested().context(#context)
                         )?;
                     }
                 },
@@ -147,6 +157,8 @@ impl Field {
                         #tokens
                         <#field_type as ::insim_core::EncodeString>::encode_codepage_with_alignment(
                             &self.#field_name, buf, #length, #align_to, #trailing_nul
+                        ).map_err(|e|
+                            e.nested().context(#context)
                         )?;
                     }
                 },
@@ -160,20 +172,24 @@ impl Field {
                 #tokens
                 <#field_type as ::insim_core::EncodeString>::encode_ascii(
                     &self.#field_name, buf, #length, #trailing_nul
+                ).map_err(|e|
+                    e.nested().context(#context)
                 )?;
             };
         } else if let Some(duration_repr) = f.duration.as_ref() {
             tokens = quote! {
                 #tokens
                 match #duration_repr::try_from(self.#field_name.as_millis()) {
-                    Ok(v) => v.encode(buf)?,
+                    Ok(v) => v.encode(buf).map_err(|e|
+                        e.nested().context(#context)
+                    )?,
                     Err(_) => return Err(::insim_core::EncodeErrorKind::OutOfRange { min: 0, max: #duration_repr::MAX as usize, found: self.#field_name.as_millis() as usize}.context(#context))
                 };
             };
         } else {
             tokens = quote! {
                 #tokens
-                self.#field_name.encode(buf)?;
+                self.#field_name.encode(buf).map_err(|e| e.nested().context(#context))?;
             };
         }
 

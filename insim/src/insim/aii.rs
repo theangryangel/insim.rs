@@ -23,13 +23,13 @@ pub struct OsMain {
 
 impl Decode for OsMain {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let angvel = Vector::decode(buf)?;
-        let heading = f32::decode(buf)?;
-        let pitch = f32::decode(buf)?;
-        let roll = f32::decode(buf)?;
-        let accel = Vector::decode(buf)?;
-        let vel = Vector::decode(buf)?;
-        let pos = Coordinate::decode(buf)?;
+        let angvel = Vector::decode(buf).map_err(|e| e.nested().context("OsMain::angvel"))?;
+        let heading = f32::decode(buf).map_err(|e| e.nested().context("OsMain::heading"))?;
+        let pitch = f32::decode(buf).map_err(|e| e.nested().context("OsMain::pitch"))?;
+        let roll = f32::decode(buf).map_err(|e| e.nested().context("OsMain::roll"))?;
+        let accel = Vector::decode(buf).map_err(|e| e.nested().context("OsMain::accel"))?;
+        let vel = Vector::decode(buf).map_err(|e| e.nested().context("OsMain::vel"))?;
+        let pos = Coordinate::decode(buf).map_err(|e| e.nested().context("OsMain::pos"))?;
         Ok(Self {
             angvel,
             heading,
@@ -44,13 +44,27 @@ impl Decode for OsMain {
 
 impl Encode for OsMain {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.angvel.encode(buf)?;
-        self.heading.encode(buf)?;
-        self.pitch.encode(buf)?;
-        self.roll.encode(buf)?;
-        self.accel.encode(buf)?;
-        self.vel.encode(buf)?;
-        self.pos.encode(buf)?;
+        self.angvel
+            .encode(buf)
+            .map_err(|e| e.nested().context("OsMain::angvel"))?;
+        self.heading
+            .encode(buf)
+            .map_err(|e| e.nested().context("OsMain::heading"))?;
+        self.pitch
+            .encode(buf)
+            .map_err(|e| e.nested().context("OsMain::pitch"))?;
+        self.roll
+            .encode(buf)
+            .map_err(|e| e.nested().context("OsMain::roll"))?;
+        self.accel
+            .encode(buf)
+            .map_err(|e| e.nested().context("OsMain::accel"))?;
+        self.vel
+            .encode(buf)
+            .map_err(|e| e.nested().context("OsMain::vel"))?;
+        self.pos
+            .encode(buf)
+            .map_err(|e| e.nested().context("OsMain::pos"))?;
         Ok(())
     }
 }

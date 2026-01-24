@@ -170,13 +170,15 @@ impl Encode for BtnStyle {
         };
         let flags = self.flags.bits();
 
-        (colour | flags).encode(buf)
+        (colour | flags)
+            .encode(buf)
+            .map_err(|e| e.nested().context("BtnStyle::value"))
     }
 }
 
 impl Decode for BtnStyle {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let val = u8::decode(buf)?;
+        let val = u8::decode(buf).map_err(|e| e.nested().context("BtnStyle::value"))?;
 
         let colour = match val & !248 {
             1 => BtnStyleColour::Title,
@@ -324,7 +326,7 @@ impl Decode for Btn {
                 split
             } else {
                 return Err(DecodeErrorKind::ExpectedNull
-                    .context("Expected caption in BTN text field, but found no \0"));
+                    .context("Btn: Expected caption but found no \0 in text field"));
             };
 
             let caption = buf.split_to(split);
@@ -373,7 +375,7 @@ impl Encode for Btn {
                 max: 200,
                 found: self.l as usize,
             }
-            .context("Length out of range on BTN"));
+            .context("Btn::l"));
         }
 
         if self.t > 200 {
@@ -382,7 +384,7 @@ impl Encode for Btn {
                 max: 200,
                 found: self.t as usize,
             }
-            .context("Top out of range"));
+            .context("Btn::t"));
         }
 
         if self.w > 200 {
@@ -391,7 +393,7 @@ impl Encode for Btn {
                 max: 200,
                 found: self.w as usize,
             }
-            .context("Width out of range"));
+            .context("Btn::w"));
         }
 
         if self.h > 200 {
@@ -400,7 +402,7 @@ impl Encode for Btn {
                 max: 200,
                 found: self.t as usize,
             }
-            .context("Height out of range"));
+            .context("Btn::h"));
         }
 
         self.reqi.encode(buf)?;
@@ -428,7 +430,7 @@ impl Encode for Btn {
                     max: BTN_TEXT_MAX_LEN - 2,
                     found: caption.len() + text.len(),
                 }
-                .context("Caption + text too large"));
+                .context("Btn: Caption + text too large"));
             }
 
             buf.put_u8(0);
@@ -508,7 +510,7 @@ impl Decode for Btt {
                 max: 96,
                 found: typein as usize,
             }
-            .context("Typein too large"));
+            .context("Btn::typein"));
         }
         let typein = if typein > 0 { Some(typein) } else { None };
         buf.advance(1);
@@ -537,7 +539,7 @@ impl Encode for Btt {
                 max: 96,
                 found: typein as usize,
             }
-            .context("Typein too large"));
+            .context("Btn::typein"));
         }
         typein.encode(buf)?;
         buf.put_bytes(0, 1);

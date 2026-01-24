@@ -98,15 +98,15 @@ impl_typical_with_request_id!(Axm);
 
 impl Decode for Axm {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf)?;
-        let mut numo = u8::decode(buf)?;
-        let ucid = ConnectionId::decode(buf)?;
-        let pmoaction = PmoAction::decode(buf)?;
-        let pmoflags = PmoFlags::decode(buf)?;
+        let reqi = RequestId::decode(buf).map_err(|e| e.nested().context("Axm::reqi"))?;
+        let mut numo = u8::decode(buf).map_err(|e| e.nested().context("Axm::numo"))?;
+        let ucid = ConnectionId::decode(buf).map_err(|e| e.nested().context("Axm::ucid"))?;
+        let pmoaction = PmoAction::decode(buf).map_err(|e| e.nested().context("Axm::pmoaction"))?;
+        let pmoflags = PmoFlags::decode(buf).map_err(|e| e.nested().context("Axm::pmoflags"))?;
         buf.advance(1);
         let mut info = Vec::with_capacity(numo as usize);
         while numo > 0 {
-            info.push(ObjectInfo::decode(buf)?);
+            info.push(ObjectInfo::decode(buf).map_err(|e| e.nested().context("Axm::info"))?);
             numo -= 1;
         }
 
@@ -122,7 +122,9 @@ impl Decode for Axm {
 
 impl Encode for Axm {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi.encode(buf)?;
+        self.reqi
+            .encode(buf)
+            .map_err(|e| e.nested().context("Axm::reqi"))?;
         let len = self.info.len();
         if len > AXM_MAX_OBJECTS {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
@@ -130,15 +132,23 @@ impl Encode for Axm {
                 max: AXM_MAX_OBJECTS,
                 found: len,
             }
-            .context("Too many AXM objects"));
+            .context("Axm: Too many AXM objects"));
         }
-        (len as u8).encode(buf)?;
-        self.ucid.encode(buf)?;
-        self.pmoaction.encode(buf)?;
-        self.pmoflags.encode(buf)?;
+        (len as u8)
+            .encode(buf)
+            .map_err(|e| e.nested().context("Axm::len"))?;
+        self.ucid
+            .encode(buf)
+            .map_err(|e| e.nested().context("Axm::ucid"))?;
+        self.pmoaction
+            .encode(buf)
+            .map_err(|e| e.nested().context("Axm::pmoaction"))?;
+        self.pmoflags
+            .encode(buf)
+            .map_err(|e| e.nested().context("Axm::pmoflags"))?;
         buf.put_bytes(0, 1);
         for i in self.info.iter() {
-            i.encode(buf)?;
+            i.encode(buf).map_err(|e| e.nested().context("Axm::info"))?;
         }
 
         Ok(())

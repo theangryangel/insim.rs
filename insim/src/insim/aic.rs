@@ -441,7 +441,7 @@ impl Decode for AiInput {
                 return Err(insim_core::DecodeErrorKind::NoVariantMatch {
                     found: found as u64,
                 }
-                .context("Unknown AiInputType"));
+                .context("AiInputType"));
             },
         };
 
@@ -496,7 +496,7 @@ impl Encode for AiInput {
                         max: u8::MAX as usize,
                         found: (time.as_millis() / 10) as usize,
                     }
-                    .context("Time too large on AIC"));
+                    .context("Aic::time"));
                 },
             }
         } else {
@@ -547,7 +547,7 @@ impl Encode for Aic {
                 max: AIC_MAX_INPUTS,
                 found: self.inputs.len(),
             }
-            .context("Too many inputs on AIC"));
+            .context("AIC::inputs"));
         }
         for i in self.inputs.iter() {
             i.encode(buf)?;

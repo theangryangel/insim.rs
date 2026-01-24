@@ -5,7 +5,6 @@ use std::{borrow::Cow, net::Ipv4Addr};
 use bytes::{Buf, Bytes};
 
 #[derive(Debug, thiserror::Error)]
-#[error("{kind}{}", context.as_ref().map(|c| format!(" ({c})")).unwrap_or_default())]
 /// Decoding error
 pub struct DecodeError {
     /// Optional contextual information
@@ -19,6 +18,41 @@ impl DecodeError {
     pub fn context(mut self, ctx: impl Into<Cow<'static, str>>) -> Self {
         self.context = Some(ctx.into());
         self
+    }
+
+    /// Create a nested error quickly
+    pub fn nested(self) -> Self {
+        Self {
+            context: None,
+            kind: DecodeErrorKind::Nested {
+                source: Box::new(self),
+            },
+        }
+    }
+}
+
+impl std::fmt::Display for DecodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut chain = vec![];
+        let mut current: Option<&DecodeError> = Some(self);
+
+        while let Some(err) = current {
+            if let Some(ctx) = &err.context {
+                chain.push(ctx.as_ref().to_string());
+            }
+
+            match &err.kind {
+                DecodeErrorKind::Nested { source } => {
+                    current = Some(source);
+                },
+                _ => {
+                    chain.push(err.kind.to_string());
+                    break;
+                },
+            }
+        }
+
+        write!(f, "{}", chain.join(" > "))
     }
 }
 
@@ -67,6 +101,14 @@ pub enum DecodeErrorKind {
     /// Expected \0 character
     #[error("Expected \0 character")]
     ExpectedNull,
+
+    /// Nested error - designed to preserve the full chain of errors
+    #[error("{source}")]
+    Nested {
+        /// Source
+        #[source]
+        source: Box<DecodeError>,
+    },
 }
 
 impl DecodeErrorKind {
@@ -181,5 +223,56 @@ impl DecodeString for String {
         let new =
             crate::string::codepages::to_lossy_string(crate::string::strip_trailing_nul(&new));
         Ok(new.to_string())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use bytes::Bytes;
+
+    use super::*;
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[repr(u8)]
+    enum Status {
+        Active = 1,
+        Inactive = 2,
+    }
+
+    impl Decode for Status {
+        fn decode(buf: &mut Bytes) -> Result<Self, DecodeError> {
+            match u8::decode(buf)? {
+                1 => Ok(Status::Active),
+                2 => Ok(Status::Inactive),
+                found => Err(DecodeErrorKind::NoVariantMatch {
+                    found: found as u64,
+                }
+                .into()),
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    struct Outer {
+        #[allow(unused)]
+        status: Status,
+    }
+
+    impl Decode for Outer {
+        fn decode(buf: &mut Bytes) -> Result<Self, DecodeError> {
+            let status = Status::decode(buf).map_err(|e| e.nested().context("Outer::status"))?;
+            Ok(Self { status })
+        }
+    }
+
+    #[test]
+    fn test_nested_error_chain() {
+        // Invalid status byte (99 doesn't match any variant)
+        let mut buf = Bytes::from_static(&[99]);
+        let result = Outer::decode(&mut buf);
+
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Outer::status"));
+        assert!(err_msg.contains("no variant match"));
     }
 }

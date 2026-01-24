@@ -7,6 +7,8 @@ use super::canvas::Canvas;
 /// that require state.
 /// For stateless components, you can just do something like this:
 /// ```rust
+/// use kitcar::ui::{Node, container, text};
+/// use insim::insim::BtnStyle;
 /// fn player_badge<Msg>(name: &str, score: u32) -> Node<Msg> {
 ///     container()
 ///         .flex_row()
