@@ -2,8 +2,6 @@
 
 use std::borrow::Cow;
 
-use if_chain::if_chain;
-
 use super::{colours::Colour, control::ControlCharacter};
 
 trait Escape {
@@ -64,16 +62,14 @@ pub fn unescape(input: &'_ str) -> Cow<'_, str> {
     let mut chars = input.chars().peekable();
 
     while let Some(i) = chars.next() {
-        if_chain! {
-            if i.is_lfs_control_char();
-            if let Some(j) = chars.peek();
-            if let Some(k) = j.try_lfs_unescape();
-            then {
-                output.push(k);
-                let _ = chars.next(); // advance the iter
-            } else {
-                output.push(i);
-            }
+        if i.is_lfs_control_char()
+            && let Some(j) = chars.peek()
+            && let Some(k) = j.try_lfs_unescape()
+        {
+            output.push(k);
+            let _ = chars.next(); // advance the iter
+        } else {
+            output.push(i);
         }
     }
 
@@ -91,19 +87,16 @@ pub fn escape(input: &'_ str) -> Cow<'_, str> {
 
     while let Some(c) = chars.next() {
         // is the current char a marker? and do we have a follow up character?
-        if_chain! {
-            if c.is_lfs_control_char();
-            if let Some(d) = chars.peek();
-            if d.is_lfs_colour();
-            if let Some(d) = chars.next();  // to appease no unwrap lint, this should be infallible
-                                            // due to peek above.
-            then {
-                // is this a colour?
-                // just push the colour and move on
-                output.push(c);
-                output.push(d);
-                continue;
-            }
+        if c.is_lfs_control_char()
+            && let Some(d) = chars.peek()
+            && d.is_lfs_colour()
+            && let Some(d) = chars.next()
+        {
+            // is this a colour?
+            // just push the colour and move on
+            output.push(c);
+            output.push(d);
+            continue;
         }
 
         // do we have a character that needs escaping?

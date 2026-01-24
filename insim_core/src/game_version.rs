@@ -4,7 +4,6 @@
 use std::{cmp::Ordering, fmt::Display, str::FromStr};
 
 use bytes::Bytes;
-use if_chain::if_chain;
 use itertools::Itertools;
 
 use crate::{Decode, Encode, EncodeString};
@@ -131,18 +130,16 @@ impl FromStr for GameVersion {
                 Position::Minor => {
                     let next = iter.next();
 
-                    if_chain! {
-                        if let Some(patch) = next;
-                        if patch.is_ascii_alphabetic();
-                        then {
-                            data.minor = patch.to_ascii_uppercase();
-                            pos = Position::Patch;
-
-                        } else {
-                            return Err(GameVersionParseError::Minor(
-                                format!("Expected A-Z character, found {:?}", next)
-                            ));
-                        }
+                    if let Some(patch) = next
+                        && patch.is_ascii_alphabetic()
+                    {
+                        data.minor = patch.to_ascii_uppercase();
+                        pos = Position::Patch;
+                    } else {
+                        return Err(GameVersionParseError::Minor(format!(
+                            "Expected A-Z character, found {:?}",
+                            next
+                        )));
                     }
                 },
                 Position::Patch => {

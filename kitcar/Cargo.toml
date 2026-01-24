@@ -10,7 +10,6 @@ homepage.workspace = true
 
 [dependencies]
 fixedbitset = { workspace = true }
-if_chain = { workspace = true }
 insim = { path = "../insim", version = "5.0.0", features = ["tokio", "serde"] }
 kitcar_macros = { path = "../kitcar_macros", version = "*" }
 rand = { workspace = true }

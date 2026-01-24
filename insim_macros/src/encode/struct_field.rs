@@ -90,13 +90,12 @@ impl Field {
                 ref path,
                 ..
             }) = field_type
+                && path.leading_colon.is_none()
+                && path.segments.len() == 1
+                && let syn::PathArguments::AngleBracketed(ang) = &path.segments[0].arguments
             {
-                if path.leading_colon.is_none() && path.segments.len() == 1 {
-                    if let syn::PathArguments::AngleBracketed(ang) = &path.segments[0].arguments {
-                        let ident = &path.segments[0].ident;
-                        typ = quote! { #ident::#ang };
-                    }
-                }
+                let ident = &path.segments[0].ident;
+                typ = quote! { #ident::#ang };
             }
 
             tokens = quote! {
