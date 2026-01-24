@@ -350,7 +350,7 @@ impl Builder {
     }
 
     /// Connect and spawn a background Tokio task to manage the insim connection.
-    /// A [SpawnedHandle] is returned to allow you to interact with the background task to send and
+    /// An [InsimTask] is returned to allow you to interact with the background task to send and
     /// receive packets.
     /// Automatic reconnection is not handled at this time.
     #[cfg(feature = "tokio")]
@@ -358,7 +358,7 @@ impl Builder {
     pub async fn spawn<C: Into<Option<usize>>>(
         self,
         capacity: C,
-    ) -> Result<(SpawnedHandle, tokio::task::JoinHandle<crate::Result<()>>)> {
+    ) -> Result<(InsimTask, tokio::task::JoinHandle<crate::Result<()>>)> {
         let mut net = self.connect_async().await?;
 
         let cap = capacity.into().unwrap_or(100);
@@ -401,7 +401,7 @@ impl Builder {
             Ok(())
         });
 
-        let handle = SpawnedHandle {
+        let handle = InsimTask {
             events: cloned_event_sender,
             commands: cloned_command_sender,
             cancellation_token: cloned_token,
@@ -415,7 +415,7 @@ impl Builder {
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 #[derive(Debug, Clone)]
 /// Handle for a spawned insim connection
-pub struct SpawnedHandle {
+pub struct InsimTask {
     /// Receiver for packets
     events: tokio::sync::broadcast::Sender<Packet>,
     // Sender for packets
@@ -425,7 +425,7 @@ pub struct SpawnedHandle {
 }
 
 #[cfg(feature = "tokio")]
-impl SpawnedHandle {
+impl InsimTask {
     /// Subscribe to a stream of Packets
     pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<crate::Packet> {
         self.events.subscribe()

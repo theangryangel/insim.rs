@@ -2,7 +2,7 @@
 
 use insim::{identifiers::ConnectionId, insim::Mso};
 use kitcar::{chat::Parse, presence, scenes::SceneError};
-use tokio::sync::broadcast;
+use tokio::{sync::broadcast, task::JoinHandle};
 
 // Just derive and you're done!
 #[derive(Debug, Clone, PartialEq, kitcar::chat::Parse)]
@@ -78,14 +78,14 @@ pub enum ChatError {
 }
 
 /// Respond to commands globally and provide a bus
-pub fn spawn(insim: insim::builder::SpawnedHandle) -> Chat {
+pub fn spawn(insim: insim::builder::InsimTask) -> (Chat, JoinHandle<()>) {
     let (tx, _rx) = broadcast::channel(100);
 
     let h = Chat {
         broadcast: tx.clone(),
     };
 
-    let _ = tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
         let result: Result<(), ChatError> = async {
             let mut packets = insim.subscribe();
 
@@ -122,5 +122,5 @@ pub fn spawn(insim: insim::builder::SpawnedHandle) -> Chat {
         }
     });
 
-    h
+    (h, handle)
 }

@@ -58,12 +58,12 @@ impl Ipb {
 
 impl Decode for Ipb {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf)?;
-        let mut numb = u8::decode(buf)?;
+        let reqi = RequestId::decode(buf).map_err(|e| e.nested().context("Ipb::reqi"))?;
+        let mut numb = u8::decode(buf).map_err(|e| e.nested().context("Ipb::numb"))?;
         buf.advance(4);
         let mut banips = IndexSet::with_capacity(numb as usize);
         while numb > 0 {
-            let ip = Ipv4Addr::from(u32::decode(buf)?);
+            let ip = Ipv4Addr::from(u32::decode(buf).map_err(|e| e.nested().context("Ipb::ip"))?);
             let _ = banips.insert(ip);
             numb -= 1;
         }
@@ -74,7 +74,9 @@ impl Decode for Ipb {
 
 impl Encode for Ipb {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi.encode(buf)?;
+        self.reqi
+            .encode(buf)
+            .map_err(|e| e.nested().context("Ipb::reqi"))?;
         let numb = self.banips.len();
         if numb > IPB_MAX_BANS {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
@@ -82,12 +84,16 @@ impl Encode for Ipb {
                 max: IPB_MAX_BANS,
                 found: numb,
             }
-            .context("IPB bans out of range"));
+            .context("Ipb::numb"));
         }
-        (numb as u8).encode(buf)?;
+        (numb as u8)
+            .encode(buf)
+            .map_err(|e| e.nested().context("Ipb::numb"))?;
         buf.put_bytes(0, 4);
         for i in self.banips.iter() {
-            u32::from(*i).encode(buf)?;
+            u32::from(*i)
+                .encode(buf)
+                .map_err(|e| e.nested().context("Ipb::ip"))?;
         }
 
         Ok(())

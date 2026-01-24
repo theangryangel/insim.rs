@@ -44,22 +44,26 @@ pub struct Cpp {
 
 impl Decode for Cpp {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf)?;
+        let reqi = RequestId::decode(buf).map_err(|e| e.nested().context("Cpp::reqi"))?;
         buf.advance(1);
-        let pos = Coordinate::decode(buf)?;
+        let pos = Coordinate::decode(buf).map_err(|e| e.nested().context("Cpp::pos"))?;
 
         let h = Heading::from_degrees(
-            (u16::decode(buf)? as f64) * super::mci::COMPCAR_DEGREES_PER_UNIT,
+            (u16::decode(buf).map_err(|e| e.nested().context("Cpp::h"))? as f64)
+                * super::mci::COMPCAR_DEGREES_PER_UNIT,
         );
-        let p = u16::decode(buf)?;
-        let r = u16::decode(buf)?;
+        let p = u16::decode(buf).map_err(|e| e.nested().context("Cpp::p"))?;
+        let r = u16::decode(buf).map_err(|e| e.nested().context("Cpp::r"))?;
 
-        let viewplid = PlayerId::decode(buf)?;
-        let ingamecam = CameraView::decode(buf)?;
+        let viewplid = PlayerId::decode(buf).map_err(|e| e.nested().context("Cpp::viewplid"))?;
+        let ingamecam =
+            CameraView::decode(buf).map_err(|e| e.nested().context("Cpp::ingamecam"))?;
 
-        let fov = f32::decode(buf)?;
-        let time = Duration::from_millis(u16::decode(buf)? as u64);
-        let flags = StaFlags::decode(buf)?;
+        let fov = f32::decode(buf).map_err(|e| e.nested().context("Cpp::fov"))?;
+        let time = Duration::from_millis(
+            u16::decode(buf).map_err(|e| e.nested().context("Cpp::time"))? as u64,
+        );
+        let flags = StaFlags::decode(buf).map_err(|e| e.nested().context("Cpp::flags"))?;
 
         Ok(Self {
             reqi,
@@ -78,20 +82,38 @@ impl Decode for Cpp {
 
 impl Encode for Cpp {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi.encode(buf)?;
+        self.reqi
+            .encode(buf)
+            .map_err(|e| e.nested().context("Cpp::reqi"))?;
         buf.put_bytes(0, 1);
-        self.pos.encode(buf)?;
+        self.pos
+            .encode(buf)
+            .map_err(|e| e.nested().context("Cpp::pos"))?;
         let h = (self.h.to_degrees() / super::mci::COMPCAR_DEGREES_PER_UNIT)
             .round()
             .clamp(0.0, 65535.0) as u16;
-        h.encode(buf)?;
-        self.p.encode(buf)?;
-        self.r.encode(buf)?;
-        self.viewplid.encode(buf)?;
-        self.ingamecam.encode(buf)?;
-        self.fov.encode(buf)?;
-        (self.time.as_millis() as u16).encode(buf)?;
-        self.flags.encode(buf)?;
+        h.encode(buf).map_err(|e| e.nested().context("Cpp::h"))?;
+        self.p
+            .encode(buf)
+            .map_err(|e| e.nested().context("Cpp::p"))?;
+        self.r
+            .encode(buf)
+            .map_err(|e| e.nested().context("Cpp::r"))?;
+        self.viewplid
+            .encode(buf)
+            .map_err(|e| e.nested().context("Cpp::viewplid"))?;
+        self.ingamecam
+            .encode(buf)
+            .map_err(|e| e.nested().context("Cpp::ingamecam"))?;
+        self.fov
+            .encode(buf)
+            .map_err(|e| e.nested().context("Cpp::fov"))?;
+        (self.time.as_millis() as u16)
+            .encode(buf)
+            .map_err(|e| e.nested().context("Cpp::time"))?;
+        self.flags
+            .encode(buf)
+            .map_err(|e| e.nested().context("Cpp::flags"))?;
 
         Ok(())
     }

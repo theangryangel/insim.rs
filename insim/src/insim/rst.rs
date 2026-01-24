@@ -13,7 +13,7 @@ bitflags! {
         const CAN_VOTE = (1 << 0);
         /// Can select
         const CAN_SELECT = (1 << 1);
-        /// Can joint mid-race
+        /// Can join mid-race
         const MID_RACE = (1 << 5);
         /// Mandatory pit stop
         const MUST_PIT = (1 << 6);
@@ -23,6 +23,18 @@ bitflags! {
         const FCV = (1 << 8);
         /// "Cruise" (no race, just free drive)
         const CRUISE = (1 << 9);
+        /// Show fuel
+        const SHOW_FUEL = (1 << 10);
+        /// Can Refuel
+        const CAN_REFUEL = (1 << 11);
+        /// Allow mods?
+        const ALLOW_MODS = (1 << 12);
+        /// Allow unapproved mods?
+        const UNAPPROVED = (1 << 13);
+        /// Team arrows?
+        const TEAM_ARROWS = (1 << 14);
+        /// No Floodlights
+        const NO_FLOOD = (1 << 15);
     }
 }
 
@@ -33,7 +45,13 @@ generate_bitflag_helpers!(
     pub can_mid_race_join => MID_RACE,
     pub can_reset => CAN_RESET,
     pub forces_cockpit_view => FCV,
-    pub is_cruise => CRUISE
+    pub is_cruise => CRUISE,
+    pub show_fuel => SHOW_FUEL,
+    pub can_refuel => CAN_REFUEL,
+    pub allow_mods => ALLOW_MODS,
+    pub allow_unapproved_mods => UNAPPROVED,
+    pub team_arrows => TEAM_ARROWS,
+    pub no_flood_lights => NO_FLOOD
 );
 
 impl_bitflags_from_to_bytes!(RaceFlags, u16);
@@ -74,13 +92,17 @@ impl LapTimingInfo {
 
 impl Decode for LapTimingInfo {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        Ok(LapTimingInfo::from_u8(u8::decode(buf)?))
+        Ok(LapTimingInfo::from_u8(
+            u8::decode(buf).map_err(|e| e.nested().context("LapTimingInfo::value"))?,
+        ))
     }
 }
 
 impl Encode for LapTimingInfo {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.to_u8().encode(buf)
+        self.to_u8()
+            .encode(buf)
+            .map_err(|e| e.nested().context("LapTimingInfo::value"))
     }
 }
 

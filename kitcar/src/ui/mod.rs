@@ -7,7 +7,7 @@ use insim::{
 };
 use tokio::{
     sync::{mpsc, watch},
-    task::LocalSet,
+    task::{JoinHandle, LocalSet},
 };
 
 use crate::presence::Presence;
@@ -19,6 +19,14 @@ mod view;
 
 pub use node::*;
 pub use view::*;
+
+#[derive(Debug, thiserror::Error)]
+/// UiError
+pub enum UiError {
+    /// Failed to create UI runtime
+    #[error("Failed to create UI runtime")]
+    RuntimeCreationFailed,
+}
 
 /// Ui handle. Create using [attach]. When dropped all insim buttons will be automatically removed.
 /// Intended for multi-player/multi-connection UIs
@@ -50,13 +58,13 @@ impl<V: View> Ui<V> {
 /// All UI tasks run on a LocalSet, so View implementations don't need to be Send to accomodate
 /// taffy
 pub fn attach<V: View>(
-    insim: insim::builder::SpawnedHandle,
+    insim: insim::builder::InsimTask,
     presence: Presence,
     props: V::GlobalProps,
-) -> Ui<V> {
+) -> (Ui<V>, JoinHandle<Result<(), UiError>>) {
     let (global_tx, _global_rx) = watch::channel(props);
     let (player_tx, mut player_rx) = mpsc::channel(100);
-    let handle = Ui {
+    let ui_handle = Ui {
         global: global_tx.clone(),
         connection: player_tx,
         _phantom: PhantomData,
@@ -66,11 +74,17 @@ pub fn attach<V: View>(
 
     // XXX: We run on our own thread because we need to use LocalSet until Taffy Style is Send.
     // https://github.com/DioxusLabs/taffy/issues/823
-    let _ = std::thread::spawn(move || {
-        let rt = tokio::runtime::Builder::new_current_thread()
+    let thread_handle = std::thread::spawn(move || {
+        let rt = match tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
-            .expect("Failed to create UI runtime");
+        {
+            Ok(rt) => rt,
+            Err(e) => {
+                tracing::error!("Failed to create UI runtime: {}", e);
+                return Err::<(), UiError>(UiError::RuntimeCreationFailed);
+            },
+        };
 
         let local = LocalSet::new();
         local.block_on(&rt, async move {
@@ -131,15 +145,26 @@ pub fn attach<V: View>(
             // FIXME: no expect
             insim.send_all(clear).await.expect("FIXME");
         });
+        Ok::<(), UiError>(())
     });
 
-    handle
+    let handle = tokio::spawn(async move {
+        match thread_handle.join() {
+            Ok(result) => result,
+            Err(_) => {
+                tracing::error!("UI thread panicked");
+                Err(UiError::RuntimeCreationFailed)
+            },
+        }
+    });
+
+    (ui_handle, handle)
 }
 
 fn spawn_for<V: View>(
     ucid: ConnectionId,
     global_rx: watch::Receiver<V::GlobalProps>,
-    insim: &insim::builder::SpawnedHandle,
+    insim: &insim::builder::InsimTask,
     active: &mut HashMap<ConnectionId, watch::Sender<V::ConnectionProps>>,
 ) {
     let (connection_tx, connection_rx) = watch::channel(V::ConnectionProps::default());

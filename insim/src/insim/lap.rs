@@ -20,7 +20,7 @@ pub enum Fuel200 {
 
 impl Decode for Fuel200 {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let data = u8::decode(buf)?;
+        let data = u8::decode(buf).map_err(|e| e.nested().context("Fuel200::data"))?;
 
         if data == 255 {
             Ok(Self::No)
@@ -38,6 +38,7 @@ impl Encode for Fuel200 {
         };
 
         data.encode(buf)
+            .map_err(|e| e.nested().context("Fuel200::data"))
     }
 }
 
@@ -56,7 +57,7 @@ pub enum Fuel {
 
 impl Decode for Fuel {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let data = u8::decode(buf)?;
+        let data = u8::decode(buf).map_err(|e| e.nested().context("Fuel::data"))?;
         if data == 255 {
             Ok(Self::No)
         } else {
@@ -71,7 +72,8 @@ impl Encode for Fuel {
             Self::Percentage(data) => *data,
             Self::No => 255_u8,
         };
-        data.encode(buf)?;
+        data.encode(buf)
+            .map_err(|e| e.nested().context("Fuel::data"))?;
         Ok(())
     }
 }

@@ -60,21 +60,27 @@ impl Mso {
 
 impl Decode for Mso {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf)?;
+        let reqi = RequestId::decode(buf).map_err(|e| e.nested().context("Mso::reqi"))?;
         buf.advance(1);
-        let ucid = ConnectionId::decode(buf)?;
-        let plid = PlayerId::decode(buf)?;
-        let usertype = MsoUserType::decode(buf)?;
-        let textstart = u8::decode(buf)?;
+        let ucid = ConnectionId::decode(buf).map_err(|e| e.nested().context("Mso::ucid"))?;
+        let plid = PlayerId::decode(buf).map_err(|e| e.nested().context("Mso::plid"))?;
+        let usertype = MsoUserType::decode(buf).map_err(|e| e.nested().context("Mso::usertype"))?;
+        let textstart = u8::decode(buf).map_err(|e| e.nested().context("Mso::textstart"))?;
 
         let (textstart, msg) = if textstart > 0 {
             let mut name = buf.split_to(textstart as usize);
             let name_len = name.len();
-            let name = String::decode_codepage(&mut name, name_len)?;
-            let msg = String::decode_codepage(buf, buf.len())?;
+            let name = String::decode_codepage(&mut name, name_len)
+                .map_err(|e| e.nested().context("Mso::name"))?;
+            let msg = String::decode_codepage(buf, buf.len())
+                .map_err(|e| e.nested().context("Mso::msg"))?;
             (name.len() as u8, format!("{name}{msg}"))
         } else {
-            (0_u8, String::decode_codepage(buf, buf.len())?)
+            (
+                0_u8,
+                String::decode_codepage(buf, buf.len())
+                    .map_err(|e| e.nested().context("Mso::msg"))?,
+            )
         };
 
         Ok(Self {
@@ -90,11 +96,19 @@ impl Decode for Mso {
 
 impl Encode for Mso {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi.encode(buf)?;
+        self.reqi
+            .encode(buf)
+            .map_err(|e| e.nested().context("Mso::reqi"))?;
         buf.put_bytes(0, 1);
-        self.ucid.encode(buf)?;
-        self.plid.encode(buf)?;
-        self.usertype.encode(buf)?;
+        self.ucid
+            .encode(buf)
+            .map_err(|e| e.nested().context("Mso::ucid"))?;
+        self.plid
+            .encode(buf)
+            .map_err(|e| e.nested().context("Mso::plid"))?;
+        self.usertype
+            .encode(buf)
+            .map_err(|e| e.nested().context("Mso::usertype"))?;
 
         if self.textstart > 0 {
             let name = &self.msg[..self.textstart as usize];
@@ -109,7 +123,7 @@ impl Encode for Mso {
                     max: MSO_MSG_ALIGN,
                     found: name.len() + msg.len(),
                 }
-                .context("Mso name and msg out of range"));
+                .context("Mso: name + msg"));
             }
 
             let textstart = name.len() as u8;
@@ -135,7 +149,8 @@ impl Encode for Mso {
         } else {
             buf.put_u8(0);
             self.msg
-                .encode_codepage_with_alignment(buf, MSO_MSG_MAX_LEN, MSO_MSG_ALIGN, true)?;
+                .encode_codepage_with_alignment(buf, MSO_MSG_MAX_LEN, MSO_MSG_ALIGN, true)
+                .map_err(|e| e.nested().context("Mso::msg"))?;
         }
 
         Ok(())

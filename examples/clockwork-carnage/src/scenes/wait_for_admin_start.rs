@@ -1,4 +1,4 @@
-use insim::{builder::SpawnedHandle, core::string::colours::Colourify, identifiers::ConnectionId};
+use insim::{builder::InsimTask, core::string::colours::Colourify, identifiers::ConnectionId};
 use kitcar::{
     presence, scenes,
     ui::{self, Component},
@@ -56,7 +56,7 @@ impl ui::View for WaitForAdminStartView {
 /// Wait for admin to start
 #[derive(Clone)]
 pub struct WaitForAdminStart {
-    pub insim: SpawnedHandle,
+    pub insim: InsimTask,
     pub presence: presence::Presence,
     pub chat: chat::Chat,
 }

@@ -1,5 +1,5 @@
 use insim::{
-    builder::SpawnedHandle,
+    builder::InsimTask,
     core::{string::colours::Colourify, track::Track},
     insim::RaceLaps,
 };
@@ -35,7 +35,7 @@ impl ui::View for SetupTrackView {
 pub struct SetupTrack {
     pub game: game::Game,
     pub presence: presence::Presence,
-    pub insim: SpawnedHandle,
+    pub insim: InsimTask,
     pub min_players: usize,
     pub track: Track,
     pub layout: Option<String>,

@@ -7,6 +7,8 @@ use super::canvas::Canvas;
 /// that require state.
 /// For stateless components, you can just do something like this:
 /// ```rust
+/// use kitcar::ui::{Node, container, text};
+/// use insim::insim::BtnStyle;
 /// fn player_badge<Msg>(name: &str, score: u32) -> Node<Msg> {
 ///     container()
 ///         .flex_row()
@@ -46,7 +48,7 @@ pub(super) fn run_view<V: View>(
     ucid: ConnectionId,
     mut global: watch::Receiver<V::GlobalProps>,
     mut connection: watch::Receiver<V::ConnectionProps>,
-    insim: insim::builder::SpawnedHandle,
+    insim: insim::builder::InsimTask,
 ) {
     let (internal_tx, mut internal_rx) = mpsc::unbounded_channel();
 

@@ -67,14 +67,16 @@ impl Mal {
 
 impl Decode for Mal {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf)?;
-        let mut numm = u8::decode(buf)?;
-        let ucid = ConnectionId::decode(buf)?;
+        let reqi = RequestId::decode(buf).map_err(|e| e.nested().context("Mal::reqi"))?;
+        let mut numm = u8::decode(buf).map_err(|e| e.nested().context("Mal::numm"))?;
+        let ucid = ConnectionId::decode(buf).map_err(|e| e.nested().context("Mal::ucid"))?;
         buf.advance(3);
         let mut set = IndexSet::with_capacity(numm as usize);
 
         while numm > 0 {
-            let _ = set.insert(Vehicle::Mod(u32::decode(buf)?));
+            let _ = set.insert(Vehicle::Mod(
+                u32::decode(buf).map_err(|e| e.nested().context("Mal::mod_id"))?,
+            ));
             numm -= 1;
         }
 
@@ -88,21 +90,29 @@ impl Decode for Mal {
 
 impl Encode for Mal {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi.encode(buf)?;
+        self.reqi
+            .encode(buf)
+            .map_err(|e| e.nested().context("Mal::reqi"))?;
         if self.allowed_mods.len() > MAX_MAL_SIZE {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
                 min: 0,
                 max: MAX_MAL_SIZE,
                 found: self.allowed_mods.len(),
             }
-            .context("Mal allowed_mods out of range"));
+            .context("Mal::allowed_mods"));
         }
-        (self.allowed_mods.len() as u8).encode(buf)?;
-        self.ucid.encode(buf)?;
+        (self.allowed_mods.len() as u8)
+            .encode(buf)
+            .map_err(|e| e.nested().context("Mal::numm"))?;
+        self.ucid
+            .encode(buf)
+            .map_err(|e| e.nested().context("Mal::ucid"))?;
         buf.put_bytes(0, 3);
         for i in self.allowed_mods.iter() {
             match i {
-                Vehicle::Mod(ident) => ident.encode(buf)?,
+                Vehicle::Mod(ident) => ident
+                    .encode(buf)
+                    .map_err(|e| e.nested().context("Mal::mod_id"))?,
                 _ => unreachable!(
                     "Non-Mod vehicle managed to get into the HashSet. Should not be possible."
                 ),

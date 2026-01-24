@@ -36,10 +36,11 @@ pub struct PlayerHandicap {
 
 impl Decode for PlayerHandicap {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let plid = PlayerId::decode(buf)?;
-        let flags = PlayerHandicapFlags::decode(buf)?;
-        let h_mass = u8::decode(buf)?;
-        let h_tres = u8::decode(buf)?;
+        let plid = PlayerId::decode(buf).map_err(|e| e.nested().context("PlayerHandicap::plid"))?;
+        let flags = PlayerHandicapFlags::decode(buf)
+            .map_err(|e| e.nested().context("PlayerHandicap::flags"))?;
+        let h_mass = u8::decode(buf).map_err(|e| e.nested().context("PlayerHandicap::h_mass"))?;
+        let h_tres = u8::decode(buf).map_err(|e| e.nested().context("PlayerHandicap::h_tres"))?;
 
         Ok(Self {
             plid,
@@ -58,7 +59,7 @@ impl Encode for PlayerHandicap {
                 max: 200,
                 found: self.h_mass as usize,
             }
-            .context("PlayerHandicap h_mass out of range"));
+            .context("PlayerHandicap::h_mass"));
         }
         if self.h_tres > 50 {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
@@ -66,13 +67,21 @@ impl Encode for PlayerHandicap {
                 max: 50,
                 found: self.h_tres as usize,
             }
-            .context("PlayerHandicap h_tres out of range"));
+            .context("PlayerHandicap::h_tres"));
         }
 
-        self.plid.encode(buf)?;
-        self.flags.encode(buf)?;
-        self.h_mass.encode(buf)?;
-        self.h_tres.encode(buf)?;
+        self.plid
+            .encode(buf)
+            .map_err(|e| e.nested().context("PlayerHandicap::plid"))?;
+        self.flags
+            .encode(buf)
+            .map_err(|e| e.nested().context("PlayerHandicap::flags"))?;
+        self.h_mass
+            .encode(buf)
+            .map_err(|e| e.nested().context("PlayerHandicap::h_mass"))?;
+        self.h_tres
+            .encode(buf)
+            .map_err(|e| e.nested().context("PlayerHandicap::h_tres"))?;
         Ok(())
     }
 }
@@ -92,11 +101,11 @@ impl_typical_with_request_id!(Plh);
 
 impl Decode for Plh {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf)?;
-        let mut nump = u8::decode(buf)?;
+        let reqi = RequestId::decode(buf).map_err(|e| e.nested().context("Plh::reqi"))?;
+        let mut nump = u8::decode(buf).map_err(|e| e.nested().context("Plh::nump"))?;
         let mut hcaps = Vec::with_capacity(nump as usize);
         while nump > 0 {
-            hcaps.push(PlayerHandicap::decode(buf)?);
+            hcaps.push(PlayerHandicap::decode(buf).map_err(|e| e.nested().context("Plh::hcaps"))?);
             nump -= 1;
         }
 
@@ -106,7 +115,9 @@ impl Decode for Plh {
 
 impl Encode for Plh {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi.encode(buf)?;
+        self.reqi
+            .encode(buf)
+            .map_err(|e| e.nested().context("Plh::reqi"))?;
         let nump = self.hcaps.len();
         if nump > PLH_MAX_PLAYERS {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
@@ -116,9 +127,12 @@ impl Encode for Plh {
             }
             .context("Plh handicaps out of range"));
         }
-        (nump as u8).encode(buf)?;
+        (nump as u8)
+            .encode(buf)
+            .map_err(|e| e.nested().context("Plh::nump"))?;
         for i in self.hcaps.iter() {
-            i.encode(buf)?;
+            i.encode(buf)
+                .map_err(|e| e.nested().context("Plh::hcaps"))?;
         }
         Ok(())
     }

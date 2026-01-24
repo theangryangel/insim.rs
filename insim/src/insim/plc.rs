@@ -195,22 +195,31 @@ impl_typical_with_request_id!(Plc);
 
 impl Decode for Plc {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf)?;
+        let reqi = RequestId::decode(buf).map_err(|e| e.nested().context("Plc::reqi"))?;
         buf.advance(1);
-        let ucid = ConnectionId::decode(buf)?;
+        let ucid = ConnectionId::decode(buf).map_err(|e| e.nested().context("Plc::ucid"))?;
         buf.advance(3);
-        let cars = PlcAllowedCarsSet::from_bits_truncate(u32::decode(buf)?);
+        let cars = PlcAllowedCarsSet::from_bits_truncate(
+            u32::decode(buf).map_err(|e| e.nested().context("Plc::cars"))?,
+        );
         Ok(Self { reqi, ucid, cars })
     }
 }
 
 impl Encode for Plc {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi.encode(buf)?;
+        self.reqi
+            .encode(buf)
+            .map_err(|e| e.nested().context("Plc::reqi"))?;
         buf.put_bytes(0, 1);
-        self.ucid.encode(buf)?;
+        self.ucid
+            .encode(buf)
+            .map_err(|e| e.nested().context("Plc::ucid"))?;
         buf.put_bytes(0, 3);
-        self.cars.bits().encode(buf)?;
+        self.cars
+            .bits()
+            .encode(buf)
+            .map_err(|e| e.nested().context("Plc::cars"))?;
         Ok(())
     }
 }
