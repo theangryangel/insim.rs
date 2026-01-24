@@ -248,7 +248,7 @@ impl PresenceInner {
 }
 
 /// Spawn a background instance of Presence and return a handle so that we can query it
-pub fn spawn(insim: insim::builder::SpawnedHandle, capacity: usize) -> Presence {
+pub fn spawn(insim: insim::builder::InsimTask, capacity: usize) -> Presence {
     let (query_tx, mut query_rx) = mpsc::channel(capacity);
     let mut inner = PresenceInner::new();
     let player_count = inner.player_count.subscribe();

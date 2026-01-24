@@ -48,7 +48,7 @@ pub(super) fn run_view<V: View>(
     ucid: ConnectionId,
     mut global: watch::Receiver<V::GlobalProps>,
     mut connection: watch::Receiver<V::ConnectionProps>,
-    insim: insim::builder::SpawnedHandle,
+    insim: insim::builder::InsimTask,
 ) {
     let (internal_tx, mut internal_rx) = mpsc::unbounded_channel();
 

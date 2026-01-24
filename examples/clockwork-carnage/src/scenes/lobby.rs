@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use insim::builder::SpawnedHandle;
+use insim::builder::InsimTask;
 use kitcar::{
     presence,
     scenes::{Scene, SceneError, SceneResult},
@@ -32,7 +32,7 @@ impl ui::View for ClockworkLobbyView {
 /// Lobby scene - 20 second warm up period
 #[derive(Clone)]
 pub struct Lobby {
-    pub insim: SpawnedHandle,
+    pub insim: InsimTask,
     pub presence: presence::Presence,
 }
 

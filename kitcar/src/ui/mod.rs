@@ -50,7 +50,7 @@ impl<V: View> Ui<V> {
 /// All UI tasks run on a LocalSet, so View implementations don't need to be Send to accomodate
 /// taffy
 pub fn attach<V: View>(
-    insim: insim::builder::SpawnedHandle,
+    insim: insim::builder::InsimTask,
     presence: Presence,
     props: V::GlobalProps,
 ) -> Ui<V> {
@@ -139,7 +139,7 @@ pub fn attach<V: View>(
 fn spawn_for<V: View>(
     ucid: ConnectionId,
     global_rx: watch::Receiver<V::GlobalProps>,
-    insim: &insim::builder::SpawnedHandle,
+    insim: &insim::builder::InsimTask,
     active: &mut HashMap<ConnectionId, watch::Sender<V::ConnectionProps>>,
 ) {
     let (connection_tx, connection_rx) = watch::channel(V::ConnectionProps::default());

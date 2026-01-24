@@ -1,7 +1,7 @@
 //! Scene to wait for minimum players. Useful to handle the situation where LFS is on the
 //! multiplayer lobby screen.
 
-use insim::builder::SpawnedHandle;
+use insim::builder::InsimTask;
 
 use super::{Scene, SceneError, SceneResult};
 use crate::presence;
@@ -10,7 +10,7 @@ use crate::presence;
 #[derive(Clone)]
 pub struct WaitForPlayers {
     /// Insim handle
-    pub insim: SpawnedHandle,
+    pub insim: InsimTask,
     /// Presence handle
     pub presence: presence::Presence,
     /// Minimum number of players required. It should include the dedicated server itself.

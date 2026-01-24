@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use insim::builder::SpawnedHandle;
+use insim::builder::InsimTask;
 use kitcar::{
     game, presence,
     scenes::{Scene, SceneError, SceneExt, SceneResult},
@@ -14,7 +14,7 @@ pub struct Clockwork {
     pub game: game::Game,
     pub presence: presence::Presence,
     pub chat: chat::Chat,
-    pub insim: SpawnedHandle,
+    pub insim: InsimTask,
 
     pub rounds: usize,
     pub target: Duration,

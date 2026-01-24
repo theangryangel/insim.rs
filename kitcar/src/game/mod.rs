@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use insim::{
     WithRequestId,
-    builder::SpawnedHandle,
+    builder::InsimTask,
     core::{track::Track, wind::Wind},
     insim::{RaceInProgress, RaceLaps, StaFlags, TinyType},
 };
@@ -86,7 +86,7 @@ impl GameInfo {
 }
 
 /// Spawn a background instance of GameInfo and return a handle so that we can query it
-pub fn spawn(insim: insim::builder::SpawnedHandle, capacity: usize) -> Game {
+pub fn spawn(insim: insim::builder::InsimTask, capacity: usize) -> Game {
     let (query_tx, mut query_rx) = mpsc::channel(capacity);
     let (tx, rx) = watch::channel(GameInfo::new());
 
@@ -209,7 +209,7 @@ impl Game {
     /// Request track rotation
     pub async fn track_rotation(
         &mut self,
-        insim: SpawnedHandle,
+        insim: InsimTask,
         track: Track,
         laps: RaceLaps,
         wind: u8,

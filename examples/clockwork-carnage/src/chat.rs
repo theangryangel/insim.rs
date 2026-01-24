@@ -78,7 +78,7 @@ pub enum ChatError {
 }
 
 /// Respond to commands globally and provide a bus
-pub fn spawn(insim: insim::builder::SpawnedHandle) -> Chat {
+pub fn spawn(insim: insim::builder::InsimTask) -> Chat {
     let (tx, _rx) = broadcast::channel(100);
 
     let h = Chat {

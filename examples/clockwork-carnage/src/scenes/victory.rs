@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use insim::{builder::SpawnedHandle, core::string::colours::Colourify, insim::BtnStyle};
+use insim::{builder::InsimTask, core::string::colours::Colourify, insim::BtnStyle};
 use kitcar::{
     presence,
     scenes::{Scene, SceneError, SceneResult},
@@ -64,7 +64,7 @@ impl ui::View for ClockworkVictoryView {
 /// Victory scene - displays final standings
 #[derive(Clone)]
 pub struct Victory {
-    pub insim: SpawnedHandle,
+    pub insim: InsimTask,
     pub presence: presence::Presence,
     pub scores: leaderboard::Leaderboard,
 }

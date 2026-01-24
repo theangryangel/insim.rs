@@ -1,7 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 
 use insim::{
-    builder::SpawnedHandle,
+    builder::InsimTask,
     core::{
         object::insim::{InsimCheckpoint, InsimCheckpointKind},
         string::colours::Colourify,
@@ -92,7 +92,7 @@ impl ui::View for ClockworkRoundView {
 /// Rounds scene - runs multiple rounds and tracks scores
 #[derive(Clone)]
 pub struct Rounds {
-    pub insim: SpawnedHandle,
+    pub insim: InsimTask,
     pub game: game::Game,
     pub presence: presence::Presence,
     pub rounds: usize,
