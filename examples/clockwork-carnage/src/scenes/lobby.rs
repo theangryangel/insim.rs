@@ -42,7 +42,7 @@ impl Scene for Lobby {
     async fn run(self) -> Result<SceneResult<Self::Output>, SceneError> {
         tracing::info!("Lobby: 20 second warm up");
         let mut countdown = Countdown::new(Duration::from_secs(1), 20);
-        let ui = ui::attach::<ClockworkLobbyView>(
+        let (ui, _ui_handle) = ui::attach::<ClockworkLobbyView>(
             self.insim.clone(),
             self.presence.clone(),
             Duration::ZERO,

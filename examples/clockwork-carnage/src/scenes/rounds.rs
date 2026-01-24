@@ -110,7 +110,7 @@ impl Scene for Rounds {
             active_runs: HashMap::new(),
         };
 
-        let ui = ui::attach::<ClockworkRoundView>(
+        let (ui, _ui_handle) = ui::attach::<ClockworkRoundView>(
             self.insim.clone(),
             self.presence.clone(),
             ClockworkRoundGlobalProps::default(),

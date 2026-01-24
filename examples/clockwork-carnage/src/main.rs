@@ -41,9 +41,9 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Starting clockwork carnage");
 
-    let presence = presence::spawn(insim.clone(), 32);
-    let game = game::spawn(insim.clone(), 32);
-    let chat = chat::spawn(insim.clone());
+    let (presence, presence_handle) = presence::spawn(insim.clone(), 32);
+    let (game, game_handle) = game::spawn(insim.clone(), 32);
+    let (chat, chat_handle) = chat::spawn(insim.clone());
 
     insim.send(TinyType::Ncn.with_request_id(1)).await?;
     insim.send(TinyType::Npl.with_request_id(2)).await?;
@@ -92,6 +92,19 @@ async fn main() -> anyhow::Result<()> {
     tokio::select! {
         res = insim_handle => {
             let _ = res.expect("Did not expect insim to die");
+        },
+        res = presence_handle => {
+            if let Err(e) = res {
+                tracing::error!("Presence background task failed: {:?}", e);
+            }
+        },
+        res = game_handle => {
+            if let Err(e) = res {
+                tracing::error!("Game background task failed: {:?}", e);
+            }
+        },
+        _res = chat_handle => {
+            tracing::error!("Chat background task failed");
         },
         res = clockwork.run() => {
             tracing::info!("{:?}", res);

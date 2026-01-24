@@ -8,6 +8,7 @@ use insim::{
     insim::{PlayerFlags, PlayerType},
 };
 use tokio::sync::{mpsc, oneshot, watch};
+use tokio::task::JoinHandle;
 
 #[derive(Debug, Clone)]
 /// PlayerInfo
@@ -247,64 +248,76 @@ impl PresenceInner {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+/// PresenceError
+pub enum PresenceError {
+    /// Insim subscription failed
+    #[error("Insim subscription failed")]
+    SubscriptionFailed,
+}
+
 /// Spawn a background instance of Presence and return a handle so that we can query it
-pub fn spawn(insim: insim::builder::InsimTask, capacity: usize) -> Presence {
+pub fn spawn(insim: insim::builder::InsimTask, capacity: usize) -> (Presence, JoinHandle<Result<(), PresenceError>>) {
     let (query_tx, mut query_rx) = mpsc::channel(capacity);
     let mut inner = PresenceInner::new();
     let player_count = inner.player_count.subscribe();
     let connection_count = inner.connection_count.subscribe();
 
-    let _handle = tokio::spawn(async move {
-        let mut packet_rx = insim.subscribe();
+    let handle = tokio::spawn(async move {
+        let result: Result<(), PresenceError> = async {
+            let mut packet_rx = insim.subscribe();
 
-        loop {
-            tokio::select! {
-                Ok(packet) = packet_rx.recv() => {
-                    inner.handle_packet(&packet);
-                }
-                Some(query) = query_rx.recv() => {
-                    match query {
-                        PresenceQuery::Connections { response_tx } => {
-                            let _ = response_tx.send(inner.connections().cloned().collect());
-                        },
-                        PresenceQuery::Connection { ucid, response_tx } => {
-                            let _ = response_tx.send(inner.connection(&ucid).cloned());
-                        },
-                        PresenceQuery::ConnectionByPlayer { plid, response_tx } => {
-                            let _ = response_tx.send(inner.connection_by_player(&plid).cloned());
-                        },
-                        PresenceQuery::Players { response_tx } => {
-                            let _ = response_tx.send(inner.players().cloned().collect());
-                        },
-                        PresenceQuery::Player { plid, response_tx } => {
-                            let _ = response_tx.send(inner.player(&plid).cloned());
-                        },
-                        PresenceQuery::PlayerCount { response_tx } => {
-                            let _ = response_tx.send(inner.player_count());
-                        }
-                        PresenceQuery::LastKnownName { uname, response_tx } => {
-                            let _ = response_tx.send(inner.last_known_name(&uname).cloned());
-                        }
-                        PresenceQuery::LastKnownNames { unames, response_tx } => {
-                            let results = unames
-                                .iter()
-                                .filter_map(|uname| {
-                                    inner.last_known_name(uname).map(|pname| (uname.clone(), pname.clone()))
-                                })
-                                .collect();
-                            let _ = response_tx.send(results);
+            loop {
+                tokio::select! {
+                    Ok(packet) = packet_rx.recv() => {
+                        inner.handle_packet(&packet);
+                    }
+                    Some(query) = query_rx.recv() => {
+                        match query {
+                            PresenceQuery::Connections { response_tx } => {
+                                let _ = response_tx.send(inner.connections().cloned().collect());
+                            },
+                            PresenceQuery::Connection { ucid, response_tx } => {
+                                let _ = response_tx.send(inner.connection(&ucid).cloned());
+                            },
+                            PresenceQuery::ConnectionByPlayer { plid, response_tx } => {
+                                let _ = response_tx.send(inner.connection_by_player(&plid).cloned());
+                            },
+                            PresenceQuery::Players { response_tx } => {
+                                let _ = response_tx.send(inner.players().cloned().collect());
+                            },
+                            PresenceQuery::Player { plid, response_tx } => {
+                                let _ = response_tx.send(inner.player(&plid).cloned());
+                            },
+                            PresenceQuery::PlayerCount { response_tx } => {
+                                let _ = response_tx.send(inner.player_count());
+                            }
+                            PresenceQuery::LastKnownName { uname, response_tx } => {
+                                let _ = response_tx.send(inner.last_known_name(&uname).cloned());
+                            }
+                            PresenceQuery::LastKnownNames { unames, response_tx } => {
+                                let results = unames
+                                    .iter()
+                                    .filter_map(|uname| {
+                                        inner.last_known_name(uname).map(|pname| (uname.clone(), pname.clone()))
+                                    })
+                                    .collect();
+                                let _ = response_tx.send(results);
+                            }
                         }
                     }
                 }
             }
         }
+        .await;
+        result
     });
 
-    Presence {
+    (Presence {
         query_tx,
         player_count,
         connection_count,
-    }
+    }, handle)
 }
 
 #[derive(Debug)]

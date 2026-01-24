@@ -8,6 +8,7 @@ use insim::{
     insim::{RaceInProgress, RaceLaps, StaFlags, TinyType},
 };
 use tokio::sync::{mpsc, oneshot, watch};
+use tokio::task::JoinHandle;
 
 #[derive(Debug, Default, Clone)]
 /// GameInfo
@@ -85,38 +86,50 @@ impl GameInfo {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+/// GameError
+pub enum GameError {
+    /// Insim subscription failed
+    #[error("Insim subscription failed")]
+    SubscriptionFailed,
+}
+
 /// Spawn a background instance of GameInfo and return a handle so that we can query it
-pub fn spawn(insim: insim::builder::InsimTask, capacity: usize) -> Game {
+pub fn spawn(insim: insim::builder::InsimTask, capacity: usize) -> (Game, JoinHandle<Result<(), GameError>>) {
     let (query_tx, mut query_rx) = mpsc::channel(capacity);
     let (tx, rx) = watch::channel(GameInfo::new());
 
-    let _handle = tokio::spawn(async move {
-        let mut packet_rx = insim.subscribe();
+    let handle = tokio::spawn(async move {
+        let result: Result<(), GameError> = async {
+            let mut packet_rx = insim.subscribe();
 
-        // Make the relevant background requests that we *must* have. If the user doesnt use
-        // spawn it's upto them to handle this.
-        let _ = insim.send(TinyType::Sst.with_request_id(1)).await;
+            // Make the relevant background requests that we *must* have. If the user doesnt use
+            // spawn it's upto them to handle this.
+            let _ = insim.send(TinyType::Sst.with_request_id(1)).await;
 
-        loop {
-            tokio::select! {
-                Ok(packet) = packet_rx.recv() => {
-                    tx.send_modify(|inner| inner.handle_packet(&packet) );
-                }
-                Some(query) = query_rx.recv() => {
-                    match query {
-                        GameQuery::Get { response_tx } => {
-                            let _ = response_tx.send(tx.borrow().clone());
-                        },
+            loop {
+                tokio::select! {
+                    Ok(packet) = packet_rx.recv() => {
+                        tx.send_modify(|inner| inner.handle_packet(&packet) );
+                    }
+                    Some(query) = query_rx.recv() => {
+                        match query {
+                            GameQuery::Get { response_tx } => {
+                                let _ = response_tx.send(tx.borrow().clone());
+                            },
+                        }
                     }
                 }
             }
         }
+        .await;
+        result
     });
 
-    Game {
+    (Game {
         query_tx,
         watch: rx,
-    }
+    }, handle)
 }
 
 #[derive(Debug)]
