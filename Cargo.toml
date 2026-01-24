@@ -18,7 +18,7 @@ resolver = "2"
 [workspace.package]
 authors = ["Karl Southern <karl@theangryangel.co.uk>"]
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 repository = "https://github.com/theangryangel/insim.rs"
 license = "MIT"
 homepage = "https://github.com/theangryangel/insim.rs"
@@ -47,7 +47,6 @@ fixedbitset = "0.5.7"
 from_variants = "1.0.2"
 futures = "0.3.31"
 glam = "0.30.10"
-if_chain = "1.0.3"
 indexmap = "2.13.0"
 itertools = { version = "0.14.0" }
 num-traits = "0.2.19"

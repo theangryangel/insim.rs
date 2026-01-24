@@ -172,37 +172,22 @@ impl Game {
 
     /// Wait for the end
     pub async fn wait_for_end(&mut self) {
-        self.wait_for(|info| {
-            if_chain::if_chain! {
-                    if !info.flags.is_in_game();
-                    if matches!(info.racing, RaceInProgress::No);
-                    then {
-                        true
-                    }
-                    else {
-                        false
-                    }
-            }
-        })
-        .await
+        self.wait_for(|info| !info.flags.is_in_game() && matches!(info.racing, RaceInProgress::No))
+            .await
     }
 
     /// Wait for track to load
     pub async fn wait_for_track(&mut self, track: Track) {
         self.wait_for(|info| {
             tracing::debug!("waiting for track {:?}", info);
-            if_chain::if_chain! {
-                    if let Some(state_track) = info.track.as_ref();
-                    if state_track == &track;
-                    if !info.flags.is_in_game();
-                    if matches!(info.racing, RaceInProgress::No);
-                    then {
-                        true
-                    }
-                    else {
-                        false
-                    }
-
+            if let Some(state_track) = info.track.as_ref()
+                && state_track == &track
+                && !info.flags.is_in_game()
+                && matches!(info.racing, RaceInProgress::No)
+            {
+                true
+            } else {
+                false
             }
         })
         .await
@@ -212,17 +197,7 @@ impl Game {
     pub async fn wait_for_racing(&mut self) {
         self.wait_for(|info| {
             tracing::debug!("waiting for racing {:?}", info);
-            if_chain::if_chain! {
-                    if info.flags.is_in_game();
-                    if matches!(info.racing, RaceInProgress::Racing);
-                    then {
-                        true
-                    }
-                    else {
-                        false
-                    }
-
-            }
+            info.flags.is_in_game() && matches!(info.racing, RaceInProgress::Racing)
         })
         .await
     }

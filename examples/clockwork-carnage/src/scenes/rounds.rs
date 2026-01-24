@@ -240,50 +240,56 @@ impl RoundsState {
                 time,
                 ..
             }) => {
-                if_chain::if_chain! {
-                    if let Some(player) = config.presence.player(&plid).await;
-                    if !player.ptype.is_ai();
-                    if let Some(conn) = config.presence.connection_by_player(&plid).await;
-                    then {
-                        match kind {
-                            InsimCheckpointKind::Checkpoint1 => {
-                                let _ = self.active_runs.insert(conn.uname.clone(), time);
-                            }
-                            InsimCheckpointKind::Finish => {
-                                if let Some(start) = self.active_runs.remove(&conn.uname) {
-                                    let delta = time.saturating_sub(start);
-                                    let diff = config.target.abs_diff(delta);
-                                    let best = {
-                                        let entry = self.round_best
-                                            .entry(conn.uname.clone())
-                                            .and_modify(|e| {
-                                                if diff < *e {
-                                                    *e = diff;
-                                                }
-                                            })
-                                            .or_insert(diff);
-                                        *entry
-                                    };
+                if let Some(player) = config.presence.player(&plid).await
+                    && !player.ptype.is_ai()
+                    && let Some(conn) = config.presence.connection_by_player(&plid).await
+                {
+                    match kind {
+                        InsimCheckpointKind::Checkpoint1 => {
+                            let _ = self.active_runs.insert(conn.uname.clone(), time);
+                        },
+                        InsimCheckpointKind::Finish => {
+                            if let Some(start) = self.active_runs.remove(&conn.uname) {
+                                let delta = time.saturating_sub(start);
+                                let diff = config.target.abs_diff(delta);
+                                let best = {
+                                    let entry = self
+                                        .round_best
+                                        .entry(conn.uname.clone())
+                                        .and_modify(|e| {
+                                            if diff < *e {
+                                                *e = diff;
+                                            }
+                                        })
+                                        .or_insert(diff);
+                                    *entry
+                                };
 
-                                    config.insim
-                                        .send_command(format!("/spec {}", conn.uname))
-                                        .await?;
-                                    config.insim
-                                        .send_message(format!("Off by: {:?}", diff).yellow(), conn.ucid)
-                                        .await?;
-                                    config.insim
-                                        .send_message(format!("Best: {:?}", best).light_green(), conn.ucid)
-                                        .await?;
-                                    config.insim
-                                        .send_message("Rejoin to retry".yellow(), conn.ucid)
-                                        .await?;
-                                }
+                                config
+                                    .insim
+                                    .send_command(format!("/spec {}", conn.uname))
+                                    .await?;
+                                config
+                                    .insim
+                                    .send_message(format!("Off by: {:?}", diff).yellow(), conn.ucid)
+                                    .await?;
+                                config
+                                    .insim
+                                    .send_message(
+                                        format!("Best: {:?}", best).light_green(),
+                                        conn.ucid,
+                                    )
+                                    .await?;
+                                config
+                                    .insim
+                                    .send_message("Rejoin to retry".yellow(), conn.ucid)
+                                    .await?;
                             }
-                            _ => {}
-                        }
-                        ui.update_connection_props(conn.ucid, self.connection_props(&conn.uname))
-                            .await;
+                        },
+                        _ => {},
                     }
+                    ui.update_connection_props(conn.ucid, self.connection_props(&conn.uname))
+                        .await;
                 }
             },
             _ => {},

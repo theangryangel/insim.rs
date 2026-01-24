@@ -2,8 +2,6 @@
 
 use std::borrow::Cow;
 
-use if_chain::if_chain;
-
 use super::control::ControlCharacter;
 
 /// Trait to help identify colour markers/identifiers
@@ -114,30 +112,26 @@ pub fn strip(input: &'_ str) -> Cow<'_, str> {
     while let Some(i) = iter.next() {
         let j = iter.peek();
 
-        if_chain! {
-            if i.is_lfs_control_char();
-            if let Some(k) = j;
-            if k.is_lfs_control_char();
-            then {
-                // Special case, ignore escaped markers (AKA ^^)
-                // If we don't do this now, and just fall through the next check, something like ^^1
-                // wont be handled correctly!
+        if i.is_lfs_control_char()
+            && let Some(k) = j
+            && k.is_lfs_control_char()
+        {
+            // Special case, ignore escaped markers (AKA ^^)
+            // If we don't do this now, and just fall through the next check, something like ^^1
+            // wont be handled correctly!
 
-                output.push(i);
-                output.push(*k);
-                let _ = iter.next();
-                continue;
-            }
+            output.push(i);
+            output.push(*k);
+            let _ = iter.next();
+            continue;
         }
 
-        if_chain! {
-            if i.is_lfs_control_char();
-            if let Some(k) = j;
-            if k.is_lfs_colour();
-            then {
-                let _ = iter.next();
-                continue;
-            }
+        if i.is_lfs_control_char()
+            && let Some(k) = j
+            && k.is_lfs_colour()
+        {
+            let _ = iter.next();
+            continue;
         }
 
         output.push(i);

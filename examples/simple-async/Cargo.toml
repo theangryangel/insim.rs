@@ -8,7 +8,6 @@ publish = false
 
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
-if_chain = { workspace = true }
 insim = { path = "../../insim", default-features = false, features = ["tokio"] }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }

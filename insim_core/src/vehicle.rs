@@ -215,15 +215,12 @@ impl FromStr for Vehicle {
             "FZR" => Ok(Self::Fzr),
             "BF1" => Ok(Self::Bf1),
             o => {
-                if_chain::if_chain! {
-                    if o.len() == 6;
-                    if let Ok(i) = u32::from_str_radix(o, 16);
-                    then {
-                        Ok(Vehicle::Mod(i))
-                    } else {
-                        Ok(Vehicle::Unknown)
-
-                    }
+                if o.len() == 6
+                    && let Ok(i) = u32::from_str_radix(o, 16)
+                {
+                    Ok(Vehicle::Mod(i))
+                } else {
+                    Ok(Vehicle::Unknown)
                 }
             },
         }

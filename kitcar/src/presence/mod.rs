@@ -210,10 +210,10 @@ impl PresenceInner {
     }
 
     fn pll(&mut self, pll: &insim::insim::Pll) {
-        if let Some(player) = self.players.remove(&pll.plid) {
-            if let Some(connection) = self.connections.get_mut(&player.ucid) {
-                let _ = connection.players.remove(&player.plid);
-            }
+        if let Some(player) = self.players.remove(&pll.plid)
+            && let Some(connection) = self.connections.get_mut(&player.ucid)
+        {
+            let _ = connection.players.remove(&player.plid);
         }
     }
 

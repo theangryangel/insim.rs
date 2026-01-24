@@ -201,25 +201,22 @@ pub fn derive_command_parser(input: TokenStream) -> TokenStream {
 }
 
 fn is_option_type(ty: &syn::Type) -> bool {
-    if let syn::Type::Path(type_path) = ty {
-        if let Some(segment) = type_path.path.segments.last() {
-            return segment.ident == "Option";
-        }
+    if let syn::Type::Path(type_path) = ty
+        && let Some(segment) = type_path.path.segments.last()
+    {
+        return segment.ident == "Option";
     }
     false
 }
 
 fn extract_option_inner(ty: &syn::Type) -> &syn::Type {
-    if let syn::Type::Path(type_path) = ty {
-        if let Some(segment) = type_path.path.segments.last() {
-            if segment.ident == "Option" {
-                if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-                    if let Some(syn::GenericArgument::Type(inner)) = args.args.first() {
-                        return inner;
-                    }
-                }
-            }
-        }
+    if let syn::Type::Path(type_path) = ty
+        && let Some(segment) = type_path.path.segments.last()
+        && segment.ident == "Option"
+        && let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+        && let Some(syn::GenericArgument::Type(inner)) = args.args.first()
+    {
+        return inner;
     }
     ty
 }
@@ -228,14 +225,12 @@ fn extract_doc_comments(attrs: &[syn::Attribute]) -> Option<String> {
     let docs: Vec<String> = attrs
         .iter()
         .filter_map(|attr| {
-            if attr.path().is_ident("doc") {
-                if let syn::Meta::NameValue(meta) = &attr.meta {
-                    if let syn::Expr::Lit(expr_lit) = &meta.value {
-                        if let syn::Lit::Str(lit_str) = &expr_lit.lit {
-                            return Some(lit_str.value().trim().to_string());
-                        }
-                    }
-                }
+            if attr.path().is_ident("doc")
+                && let syn::Meta::NameValue(meta) = &attr.meta
+                && let syn::Expr::Lit(expr_lit) = &meta.value
+                && let syn::Lit::Str(lit_str) = &expr_lit.lit
+            {
+                return Some(lit_str.value().trim().to_string());
             }
             None
         })
@@ -250,26 +245,24 @@ fn extract_doc_comments(attrs: &[syn::Attribute]) -> Option<String> {
 
 fn extract_prefix(attrs: &[syn::Attribute]) -> Option<char> {
     for attr in attrs {
-        if attr.path().is_ident("chat") {
-            if let Ok(meta_list) = attr.meta.require_list() {
-                if let Ok(nested_metas) = meta_list.parse_args_with(
-                    syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
-                ) {
-                    for nested in nested_metas {
-                        if let syn::Meta::NameValue(nv) = nested {
-                            if nv.path.is_ident("prefix") {
-                                if let syn::Expr::Lit(expr_lit) = &nv.value {
-                                    if let syn::Lit::Char(lit_char) = &expr_lit.lit {
-                                        return Some(lit_char.value());
-                                    }
-                                    if let syn::Lit::Str(lit_str) = &expr_lit.lit {
-                                        let s = lit_str.value();
-                                        if s.len() == 1 {
-                                            return s.chars().next();
-                                        }
-                                    }
-                                }
-                            }
+        if attr.path().is_ident("chat")
+            && let Ok(meta_list) = attr.meta.require_list()
+            && let Ok(nested_metas) = meta_list.parse_args_with(
+                syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
+            )
+        {
+            for nested in nested_metas {
+                if let syn::Meta::NameValue(nv) = nested
+                    && nv.path.is_ident("prefix")
+                    && let syn::Expr::Lit(expr_lit) = &nv.value
+                {
+                    if let syn::Lit::Char(lit_char) = &expr_lit.lit {
+                        return Some(lit_char.value());
+                    }
+                    if let syn::Lit::Str(lit_str) = &expr_lit.lit {
+                        let s = lit_str.value();
+                        if s.len() == 1 {
+                            return s.chars().next();
                         }
                     }
                 }
