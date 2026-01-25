@@ -29,11 +29,13 @@ impl Scene for Clockwork {
         let event = super::Lobby {
             insim: self.insim.clone(),
             presence: self.presence.clone(),
+            chat: self.chat.clone(),
         }
         .then(super::Rounds {
             insim: self.insim.clone(),
             game: self.game.clone(),
             presence: self.presence.clone(),
+            chat: self.chat.clone(),
             rounds: self.rounds,
             target: self.target,
             max_scorers: self.max_scorers,

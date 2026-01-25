@@ -5,19 +5,40 @@ use kitcar::{
     presence,
     scenes::{Scene, SceneError, SceneResult},
     time::Countdown,
-    ui,
+    ui::{self, Component},
 };
 
-use crate::components::topbar;
+use crate::{
+    chat,
+    components::{HelpDialog, HelpDialogMsg, topbar},
+};
 
-struct ClockworkLobbyView {}
+#[derive(Clone, Debug)]
+enum ClockworkLobbyMessage {
+    Help(HelpDialogMsg),
+}
+
+struct ClockworkLobbyView {
+    help_dialog: HelpDialog,
+}
+
 impl ui::View for ClockworkLobbyView {
     type GlobalProps = Duration;
     type ConnectionProps = ();
-    type Message = ();
+    type Message = ClockworkLobbyMessage;
 
     fn mount(_tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
-        Self {}
+        Self {
+            help_dialog: HelpDialog::default(),
+        }
+    }
+
+    fn update(&mut self, msg: Self::Message) {
+        match msg {
+            ClockworkLobbyMessage::Help(help_msg) => {
+                Component::update(&mut self.help_dialog, help_msg);
+            },
+        }
     }
 
     fn render(
@@ -25,7 +46,11 @@ impl ui::View for ClockworkLobbyView {
         global_props: Self::GlobalProps,
         _connection_props: Self::ConnectionProps,
     ) -> ui::Node<Self::Message> {
-        topbar(&format!("Warm up - {:?} remaining", global_props))
+        ui::container()
+            .flex()
+            .flex_col()
+            .with_child(topbar(&format!("Warm up - {:?} remaining", global_props)))
+            .with_child(self.help_dialog.render(()).map(ClockworkLobbyMessage::Help))
     }
 }
 
@@ -33,6 +58,7 @@ impl ui::View for ClockworkLobbyView {
 #[derive(Clone)]
 pub struct Lobby {
     pub insim: InsimTask,
+    pub chat: chat::Chat,
     pub presence: presence::Presence,
 }
 
@@ -48,9 +74,14 @@ impl Scene for Lobby {
             Duration::ZERO,
         );
 
+        let _chat_task = ui.update_from_broadcast(self.chat.subscribe(), |msg, _ucid| {
+            matches!(msg, chat::ChatMsg::Help)
+                .then_some(ClockworkLobbyMessage::Help(HelpDialogMsg::Show))
+        });
+
         while let Some(_) = countdown.tick().await {
             let remaining = countdown.remaining_duration();
-            ui.update_global_props(remaining);
+            ui.set_global_state(remaining);
         }
 
         Ok(SceneResult::Continue(()))

@@ -4,7 +4,6 @@
 #[allow(missing_docs)]
 pub mod ui;
 
-pub mod combos;
 pub mod game;
 pub mod presence;
 #[allow(missing_debug_implementations)]

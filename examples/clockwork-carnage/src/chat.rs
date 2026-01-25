@@ -78,7 +78,7 @@ pub enum ChatError {
 }
 
 /// Respond to commands globally and provide a bus
-pub fn spawn(insim: insim::builder::InsimTask) -> (Chat, JoinHandle<()>) {
+pub fn spawn(insim: insim::builder::InsimTask) -> (Chat, JoinHandle<Result<(), ChatError>>) {
     let (tx, _rx) = broadcast::channel(100);
 
     let h = Chat {
@@ -106,6 +106,9 @@ pub fn spawn(insim: insim::builder::InsimTask) -> (Chat, JoinHandle<()>) {
                             for cmd in ChatMsg::help() {
                                 insim.send_message(cmd, mso.ucid).await?;
                             }
+                            let _ = tx
+                                .send((ChatMsg::Help, mso.ucid))
+                                .map_err(|_| ChatError::HandleLost);
                         },
                         Ok(o) => {
                             let _ = tx.send((o, mso.ucid)).map_err(|_| ChatError::HandleLost);
@@ -117,9 +120,7 @@ pub fn spawn(insim: insim::builder::InsimTask) -> (Chat, JoinHandle<()>) {
         }
         .await;
 
-        if let Err(e) = result {
-            tracing::error!("Chat background task failed: {:?}", e);
-        }
+        result
     });
 
     (h, handle)
