@@ -106,6 +106,9 @@ pub fn spawn(insim: insim::builder::InsimTask) -> (Chat, JoinHandle<Result<(), C
                             for cmd in ChatMsg::help() {
                                 insim.send_message(cmd, mso.ucid).await?;
                             }
+                            let _ = tx
+                                .send((ChatMsg::Help, mso.ucid))
+                                .map_err(|_| ChatError::HandleLost);
                         },
                         Ok(o) => {
                             let _ = tx.send((o, mso.ucid)).map_err(|_| ChatError::HandleLost);

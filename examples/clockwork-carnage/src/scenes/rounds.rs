@@ -12,12 +12,13 @@ use kitcar::{
     game, presence,
     scenes::{Scene, SceneError, SceneResult},
     time::Countdown,
-    ui,
+    ui::{self, Component},
 };
 use tokio::time::sleep;
 
 use crate::{
-    components::{EnrichedLeaderboard, scoreboard, topbar},
+    chat,
+    components::{EnrichedLeaderboard, HelpDialog, HelpDialogMsg, scoreboard, topbar},
     leaderboard,
 };
 
@@ -36,14 +37,32 @@ struct ClockworkRoundConnectionProps {
     round_best: Option<Duration>,
 }
 
-struct ClockworkRoundView {}
+#[derive(Clone, Debug)]
+enum ClockworkRoundMessage {
+    Help(HelpDialogMsg),
+}
+
+struct ClockworkRoundView {
+    help_dialog: HelpDialog,
+}
+
 impl ui::View for ClockworkRoundView {
     type GlobalProps = ClockworkRoundGlobalProps;
     type ConnectionProps = ClockworkRoundConnectionProps;
-    type Message = ();
+    type Message = ClockworkRoundMessage;
 
     fn mount(_tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
-        Self {}
+        Self {
+            help_dialog: HelpDialog::default(),
+        }
+    }
+
+    fn update(&mut self, msg: Self::Message) {
+        match msg {
+            ClockworkRoundMessage::Help(help_msg) => {
+                Component::update(&mut self.help_dialog, help_msg);
+            },
+        }
     }
 
     fn render(
@@ -86,6 +105,7 @@ impl ui::View for ClockworkRoundView {
                     )
                     .with_children(players),
             )
+            .with_child(self.help_dialog.render(()).map(ClockworkRoundMessage::Help))
     }
 }
 
@@ -95,6 +115,7 @@ pub struct Rounds {
     pub insim: InsimTask,
     pub game: game::Game,
     pub presence: presence::Presence,
+    pub chat: chat::Chat,
     pub rounds: usize,
     pub target: Duration,
     pub max_scorers: usize,
@@ -115,6 +136,11 @@ impl Scene for Rounds {
             self.presence.clone(),
             ClockworkRoundGlobalProps::default(),
         );
+
+        let _chat_task = ui.update_from_broadcast(self.chat.subscribe(), |msg, _ucid| {
+            matches!(msg, chat::ChatMsg::Help)
+                .then_some(ClockworkRoundMessage::Help(HelpDialogMsg::Show))
+        });
 
         for round in 1..=self.rounds {
             state.broadcast_rankings(&self, &ui).await;

@@ -6,7 +6,7 @@ use insim::{
     insim::{Bfn, BfnType},
 };
 use tokio::{
-    sync::{mpsc, watch},
+    sync::{broadcast, mpsc, watch},
     task::{JoinHandle, LocalSet},
 };
 
@@ -64,6 +64,8 @@ impl<V: View> Ui<V> {
     /// by the main [`Ui`] handle. When [`Ui`] is dropped, the UI runtime shuts down
     /// and subsequent sends will return `Err`.
     ///
+    /// You likely want to use the listen function.
+    ///
     /// # Example
     ///
     /// ```rust,ignore
@@ -86,6 +88,43 @@ impl<V: View> Ui<V> {
     /// ```
     pub fn sender(&self) -> mpsc::Sender<(ConnectionId, V::Message)> {
         self.message.clone()
+    }
+
+    /// Utility function to reduce boilerplate when injecting messages from external sources,
+    /// usually chat.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let _chat_task = ui.update_from_broadcast(self.chat.subscribe(), |msg, _ucid| {
+    ///     matches!(msg, chat::ChatMsg::Help)
+    ///         .then_some(ClockworkLobbyMessage::Help(HelpDialogMsg::Show))
+    /// });
+    /// ```
+    pub fn update_from_broadcast<F, M>(
+        &self,
+        mut rx: broadcast::Receiver<(M, ConnectionId)>,
+        mut filter_map: F,
+    ) -> JoinHandle<()>
+    where
+        M: Clone + Send + 'static,
+        F: FnMut(M, ConnectionId) -> Option<V::Message> + Send + 'static,
+    {
+        let tx = self.sender();
+        tokio::spawn(async move {
+            while let Ok((msg, ucid)) = rx.recv().await {
+                if let Some(ui_msg) = filter_map(msg, ucid)
+                    && tx.send((ucid, ui_msg)).await.is_err()
+                {
+                    break;
+                }
+            }
+        })
+    }
+
+    /// Inject message into view for a given ucid.
+    pub async fn update<M>(&self, ucid: ConnectionId, msg: V::Message) {
+        let _ = self.message.send((ucid, msg)).await;
     }
 }
 
