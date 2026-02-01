@@ -2,14 +2,14 @@
 
 use std::borrow::Cow;
 
-use super::{colours::Colour, control::ControlCharacter};
+use super::{colours::ColourMarker, control::ControlMarker};
 
-trait Escape {
+trait EscapeMarker {
     fn try_lfs_escape(self) -> Option<char>;
     fn try_lfs_unescape(self) -> Option<char>;
 }
 
-impl Escape for char {
+impl EscapeMarker for char {
     fn try_lfs_unescape(self) -> Option<char> {
         if self.is_lfs_control_char() {
             return Some(char::lfs_control_char());

@@ -1,6 +1,6 @@
 use insim::{
     builder::InsimTask,
-    core::{string::colours::Colourify, track::Track},
+    core::{string::colours::Colour, track::Track},
     insim::RaceLaps,
 };
 use kitcar::{

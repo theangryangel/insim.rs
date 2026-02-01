@@ -1,4 +1,4 @@
-use insim::{core::string::colours::Colourify, insim::BtnStyle};
+use insim::{core::string::colours::Colour, insim::BtnStyle};
 use kitcar::ui;
 
 #[derive(Default)]

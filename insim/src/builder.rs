@@ -445,8 +445,9 @@ impl InsimTask {
         I: IntoIterator<Item = P> + Send,
         P: Into<crate::Packet> + Send + Debug,
     {
-        let futures = packets.into_iter().map(|p| self.send(p.into()));
-        let _ = futures::future::try_join_all(futures).await?;
+        for packet in packets {
+            self.send(packet.into()).await?;
+        }
         Ok(())
     }
 
@@ -501,6 +502,6 @@ impl InsimTask {
 
     /// Request cancellation / shutdown
     pub async fn shutdown(&self) {
-        self.cancellation_token.cancelled().await
+        self.cancellation_token.cancel();
     }
 }

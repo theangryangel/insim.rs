@@ -25,7 +25,6 @@ blocking = []
 tokio = [
   "dep:tokio",
   "dep:tokio-util",
-  "dep:futures",
 ]
 serde = [
   "dep:serde",
@@ -48,7 +47,6 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt", "time", "net", "macros", "sync", "tracing", "io-util"], optional = true }
 tokio-util = { workspace = true, optional = true }
 tracing = { workspace = true }
-futures = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio-test = { workspace = true }

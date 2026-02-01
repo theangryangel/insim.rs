@@ -4,7 +4,7 @@ use std::{
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use insim_core::{Decode, Encode};
+use insim_core::{Decode, Encode, EncodeErrorKind};
 
 use super::DEFAULT_TIMEOUT_SECS;
 use crate::{
@@ -103,6 +103,7 @@ impl Codec {
         // cloning Bytes is cheap:
         // Bytes values facilitate zero-copy network programming by allowing multiple Bytes objects to point to the same underlying memory.
         let original = data.clone();
+        let original_len = original.len();
 
         // skip over the size field now that we know we have a full packet
         // none of the packet definitions include the size
@@ -137,7 +138,7 @@ impl Codec {
                 Ok(Some(packet))
             },
             Err(e) => Err(crate::Error::Decode {
-                offset: data.as_ptr() as usize - original.as_ptr() as usize,
+                offset: original_len - data.remaining(),
                 error: e,
                 input: original,
             }),
@@ -167,31 +168,28 @@ impl Codec {
     /// Given a single packet in dst, encode it's length, and ensure that it does not
     /// exceed maximum limits
     #[tracing::instrument]
-    fn encode_length(&self, len: usize) -> io::Result<u8> {
-        if len < MIN_PACKET_SIZE {
-            // probably a programming error. lets bail.
-            panic!("Failed to encode any data. Possible programming error.");
+    fn encode_length(&self, len: usize) -> Result<u8> {
+        if !(MIN_PACKET_SIZE..=MAX_PACKET_SIZE).contains(&len) {
+            return Err(EncodeErrorKind::OutOfRange {
+                min: MIN_PACKET_SIZE,
+                max: MAX_PACKET_SIZE,
+                found: len,
+            }
+            .context("Failed to encode packet length")
+            .into());
         }
 
         let n = if let Some(0) = len.checked_rem(4) {
             len / 4
         } else {
-            // probably a programming error, lets bail.
-            panic!(
-                "Packet length is not divisible by 4!
-                This is probably a programming error."
-            );
+            return Err(EncodeErrorKind::OutOfRange {
+                min: MIN_PACKET_SIZE,
+                max: MAX_PACKET_SIZE,
+                found: len,
+            }
+            .context("Packet length is not divisible by 4! This is probably a programming error.")
+            .into());
         };
-
-        if n > MAX_PACKET_SIZE {
-            // probably a programming error. lets bail.
-            panic!(
-                "Provided length would overflow the maximum byte size of {}.
-                This is probably a programming error, or a change in the
-                packet definition.",
-                MAX_PACKET_SIZE
-            );
-        }
 
         Ok(n as u8)
     }

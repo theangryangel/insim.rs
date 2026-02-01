@@ -2,17 +2,17 @@
 
 use std::borrow::Cow;
 
-use super::control::ControlCharacter;
+use super::control::ControlMarker;
 
 /// Trait to help identify colour markers/identifiers
 /// Left public to allow users to implement their own variation on colour stripping or replacement.
 /// i.e. ASCII or HTML.
-pub trait Colour {
+pub(super) trait ColourMarker {
     /// Is this a supported colour control character within LFS
     fn is_lfs_colour(&self) -> bool;
 }
 
-impl Colour for char {
+impl ColourMarker for char {
     fn is_lfs_colour(&self) -> bool {
         matches!(
             self,
@@ -21,14 +21,14 @@ impl Colour for char {
     }
 }
 
-impl Colour for u8 {
+impl ColourMarker for u8 {
     fn is_lfs_colour(&self) -> bool {
         (*self as char).is_lfs_colour()
     }
 }
 
 /// Trait to help build coloured strings. API is heavily inspired by colored-rs/colored.
-pub trait Colourify {
+pub trait Colour {
     /// Make this black
     fn black(self) -> String;
     /// Make this red
@@ -49,7 +49,7 @@ pub trait Colourify {
     fn dark_green(self) -> String;
 }
 
-impl<T: AsRef<str>> Colourify for T {
+impl<T: AsRef<str>> Colour for T {
     fn black(self) -> String {
         format!("^0{}", self.as_ref())
     }
@@ -88,12 +88,12 @@ impl<T: AsRef<str>> Colourify for T {
 }
 
 /// ColourifyExt allows chaining, providing an alterntive to format!
-pub trait ColourifyExt {
+pub trait ColourExt {
     /// Allows chaining
     fn then(self, other: impl AsRef<str>) -> String;
 }
 
-impl ColourifyExt for String {
+impl ColourExt for String {
     fn then(mut self, other: impl AsRef<str>) -> String {
         self.push_str(other.as_ref());
         self

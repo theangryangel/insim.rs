@@ -2,15 +2,16 @@
 
 use std::{borrow::Cow, vec::Vec};
 
+use itertools::Itertools;
+use smallvec::SmallVec;
+
 /// LFS strings are a sequence of u8 bytes, with an optional trailing \0.
 /// The bytes are conventionally compromised of characters from multiple code pages, indicated by a `^` and
 /// a following code page identifier character. i.e. `^L` indicates Latin1.
 ///
 /// The common practise is to use the function `to_lossy_string` to convert to a standard Rust
 /// String.
-use itertools::Itertools;
-
-use super::control::ControlCharacter;
+use super::control::ControlMarker;
 
 const DEFAULT_CODEPAGE: char = 'L';
 // 8 is left off this by design to prevent double checking LATIN1
@@ -98,7 +99,6 @@ pub fn to_lossy_bytes(input: &'_ str) -> Cow<'_, [u8]> {
             continue;
         }
 
-        buf.fill(0);
         let char_as_bytes = c.encode_utf8(&mut buf);
 
         // allowing unwrap because we should never get to a position where we cannot have one
@@ -158,8 +158,28 @@ pub fn to_lossy_string(input: &'_ [u8]) -> Cow<'_, str> {
         return "".into();
     }
 
+    // allowing unwrap because if this panics we're screwed
+    let default_lfs_codepage = DEFAULT_CODEPAGE
+        .as_lfs_codepage()
+        .unwrap_or_else(|| unreachable!());
+
+    // fastest possible path - we have no *potential* control characters at all
+    if !input.iter().any(|b| b.is_lfs_control_char()) {
+        if input.is_ascii() {
+            return Cow::Borrowed(
+                str::from_utf8(input)
+                    .expect("we already checked if this was only ascii characters"),
+            );
+        }
+
+        let (cow, _, _) = default_lfs_codepage.decode(input);
+        return cow;
+    }
+
+    // slowest path
     // find the positions in the input for each ^L, ^B...
-    let mut indices: Vec<usize> = input
+    // XXX: Using SmallVec here to avoid an allocation
+    let mut indices: SmallVec<[usize; 8]> = input
         .iter()
         .tuple_windows()
         .positions(|(elem, next)| elem.is_lfs_control_char() && next.is_lfs_codepage())

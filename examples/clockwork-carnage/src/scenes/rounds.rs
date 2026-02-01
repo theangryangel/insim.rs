@@ -4,7 +4,7 @@ use insim::{
     builder::InsimTask,
     core::{
         object::insim::{InsimCheckpoint, InsimCheckpointKind},
-        string::colours::Colourify,
+        string::colours::Colour,
     },
     insim::{BtnStyle, ObjectInfo, Uco},
 };

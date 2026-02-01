@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use insim::{builder::InsimTask, core::string::colours::Colourify, insim::BtnStyle};
+use insim::{builder::InsimTask, core::string::colours::Colour, insim::BtnStyle};
 use kitcar::{
     presence,
     scenes::{Scene, SceneError, SceneResult},

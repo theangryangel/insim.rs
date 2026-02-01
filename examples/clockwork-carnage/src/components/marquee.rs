@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use insim::{core::string::colours::Colourify, insim::BtnStyle};
+use insim::{core::string::colours::Colour, insim::BtnStyle};
 use kitcar::ui;
 use tokio::{sync::mpsc, task::JoinHandle};
 

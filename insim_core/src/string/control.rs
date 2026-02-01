@@ -1,12 +1,12 @@
 /// Control Character is used to identify LFS' escaping and special character
-pub(super) trait ControlCharacter {
+pub(super) trait ControlMarker {
     /// Builder to return the LFS control character
     fn lfs_control_char() -> Self;
     /// Is this a LFS control character?
     fn is_lfs_control_char(&self) -> bool;
 }
 
-impl ControlCharacter for u8 {
+impl ControlMarker for u8 {
     fn lfs_control_char() -> u8 {
         char::lfs_control_char() as u8
     }
@@ -16,7 +16,7 @@ impl ControlCharacter for u8 {
     }
 }
 
-impl ControlCharacter for char {
+impl ControlMarker for char {
     fn lfs_control_char() -> char {
         '^'
     }

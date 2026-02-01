@@ -1,4 +1,4 @@
-use insim::{builder::InsimTask, core::string::colours::Colourify, identifiers::ConnectionId};
+use insim::{builder::InsimTask, core::string::colours::Colour, identifiers::ConnectionId};
 use kitcar::{
     presence, scenes,
     ui::{self, Component},
