@@ -17,7 +17,7 @@ const DEFAULT_CODEPAGE: char = 'L';
 // 8 is left off this by design to prevent double checking LATIN1
 const VALID_CODEPAGES_FOR_ENCODING: [char; 10] = ['L', 'G', 'C', 'E', 'T', 'B', 'J', 'H', 'S', 'K'];
 
-trait Codepage {
+trait CodepageMarker {
     /// This is a valid codepage marker/identifier?
     fn is_lfs_codepage(&self) -> bool;
     /// Get the encoding_rs lookup table
@@ -26,7 +26,7 @@ trait Codepage {
     fn propagate_lfs_codepage(self) -> bool;
 }
 
-impl Codepage for char {
+impl CodepageMarker for char {
     fn is_lfs_codepage(&self) -> bool {
         matches!(
             self,
@@ -59,7 +59,7 @@ impl Codepage for char {
     }
 }
 
-impl Codepage for u8 {
+impl CodepageMarker for u8 {
     fn is_lfs_codepage(&self) -> bool {
         (*self as char).is_lfs_codepage()
     }
