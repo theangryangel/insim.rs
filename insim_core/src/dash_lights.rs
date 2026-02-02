@@ -41,6 +41,8 @@ bitflags::bitflags! {
         const SIDELIGHTS = (1 << 16);
         /// Neutral
         const NEUTRAL = (1 << 17);
+        /// Severe engine damage
+        const ENGINE_SEVERE = (1 << 28);
     }
 }
 
