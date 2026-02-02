@@ -371,7 +371,7 @@ impl Encode for Btn {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         if self.l > 200 {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
-                min: 1,
+                min: 0,
                 max: 200,
                 found: self.l as usize,
             }
@@ -387,7 +387,7 @@ impl Encode for Btn {
             .context("Btn::t"));
         }
 
-        if self.w > 200 {
+        if self.w < 1 || self.w > 200 {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
                 min: 1,
                 max: 200,
@@ -396,9 +396,9 @@ impl Encode for Btn {
             .context("Btn::w"));
         }
 
-        if self.h > 200 {
+        if self.h < 1 || self.h > 200 {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
-                min: 0,
+                min: 1,
                 max: 200,
                 found: self.t as usize,
             }
@@ -550,6 +550,8 @@ impl Encode for Btt {
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
+
     use bytes::{BufMut, BytesMut};
 
     use super::*;
@@ -718,5 +720,28 @@ mod tests {
             assert!(matches!(parsed.typein, Some(7)));
             assert_eq!(parsed.text, "123456|^$");
         });
+    }
+
+    #[test]
+    fn test_contextual_error() {
+        let btn = Btn {
+            ..Default::default()
+        };
+
+        let mut buf = BytesMut::new();
+        let res = btn.encode(&mut buf);
+
+        assert!(res.is_err());
+        assert!(matches!(
+            res,
+            Err(insim_core::encode::EncodeError {
+                context: Some(Cow::Borrowed("Btn::w")),
+                kind: insim_core::encode::EncodeErrorKind::OutOfRange {
+                    min: 1,
+                    max: 200,
+                    found: 0
+                }
+            })
+        ));
     }
 }
