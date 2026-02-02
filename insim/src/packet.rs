@@ -6,225 +6,234 @@ use insim_core::{Decode, Encode};
 
 use crate::insim::*;
 
-#[derive(Debug, Clone, from_variants::FromVariants)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[cfg_attr(feature = "serde", serde(tag = "type"))]
-#[non_exhaustive]
-/// Enum representing all possible packets receivable via an Insim connection.
-/// Each variant may either be instructional (tell LFS to do something), informational (you are
-/// told something about LFS), or both.
-pub enum Packet {
-    /// Instruction - handshake or init
-    Isi(Isi),
-
-    /// Information - version info
-    Ver(Ver),
-
-    /// Both - multi-purpose
-    Tiny(Tiny),
-
-    /// Both - multi-purpose
-    Small(Small),
-
-    /// Information - State info
-    Sta(Sta),
-
-    /// Instruction - Single character
-    Sch(Sch),
-
-    /// Instruction - State Flags Pack
-    Sfp(Sfp),
-
-    /// Both - Set Car Cam
-    Scc(Scc),
-
-    /// Both - Camera position pack
-    Cpp(Cpp),
-
-    /// Information - Start multiplayer
-    Ism(Ism),
-
-    /// Information - Message out
-    Mso(Mso),
-
-    /// Information - Hidden /i message
-    Iii(Iii),
-
-    /// Instruction - Type a message or /command
-    Mst(Mst),
-
-    /// Instruction - Message to connection
-    Mtc(Mtc),
-
-    /// Instruction - set screen mode
-    Mod(Mod),
-
-    /// Information - Vote notification
-    Vtn(Vtn),
-
-    /// Information - Race start
-    Rst(Rst),
-
-    /// Information - New connection
-    Ncn(Ncn),
-
-    /// Information - Connection left
-    Cnl(Cnl),
-
-    /// Information - Connection renamed
-    Cpr(Cpr),
-
-    /// Information - New player (player joined)
-    Npl(Npl),
-
-    /// Information - Player telepits
-    Plp(Plp),
-
-    /// Information - Player left
-    Pll(Pll),
-
-    /// Information - Lap time
-    Lap(Lap),
-
-    /// Information - Split time
-    Spx(Spx),
-
-    /// Information - Pit stop start
-    Pit(Pit),
-
-    /// Information - Pit stop finish
-    Psf(Psf),
-
-    /// Information - Player entered pit lane
-    Pla(Pla),
-
-    /// Information - Camera changed
-    Cch(Cch),
-
-    /// Information - Penalty
-    Pen(Pen),
-
-    /// Information - Take over
-    Toc(Toc),
-
-    /// Information - Flag
-    Flg(Flg),
-
-    /// Information - Player flags
-    Pfl(Pfl),
-
-    /// Information - Finished race - unverified result
-    Fin(Fin),
-
-    /// Information - Verified finish result
-    Res(Res),
-
-    /// Both - Player reorder
-    Reo(Reo),
-
-    /// Information - Node and lap
-    Nlp(Nlp),
-
-    /// Information - Multi-car info
-    Mci(Mci),
-
-    /// Instruction - Type a message
-    Msx(Msx),
-
-    /// Instruction - Message to local computer
-    Msl(Msl),
-
-    /// Information - Car reset
-    Crs(Crs),
-
-    /// Both - Delete or receive buttons
-    Bfn(Bfn),
-
-    /// Information - AutoX layout info
-    Axi(Axi),
-
-    /// Information - Player hit an AutoX object
-    Axo(Axo),
-
-    /// Instruction - Show a button
-    Btn(Btn),
-
-    /// Information - Button clicked
-    Btc(Btc),
-
-    /// Information - Button was typed into
-    Btt(Btt),
-
-    /// Both - Replay information
-    Rip(Rip),
-
-    /// Both - screenshot
-    Ssh(Ssh),
-
-    /// Information - contact between vehicles
-    Con(Con),
-
-    /// Information - Object hit
-    Obh(Obh),
-
-    /// Information - Hot lap validity violation
-    Hlv(Hlv),
-
-    /// Instruction - Restrict player vehicles
-    Plc(Plc),
-
-    /// Both - AutoX - multiple object
-    Axm(Axm),
-
-    /// Information - Admin command report
-    Acr(Acr),
-
-    /// Instruction - Handicap
-    Hcp(Hcp),
-
-    /// Information - New connection information
-    Nci(Nci),
-
-    /// Instruction - Join reply response
-    Jrr(Jrr),
-
-    /// Information - report insim checkpoint/circle
-    Uco(Uco),
-
-    /// Instruction - Object control
-    Oco(Oco),
-
-    /// Instruction - Multi-purpose, target to connection
-    Ttc(Ttc),
-
-    /// Information - Player selected vehicle
-    Slc(Slc),
-
-    /// Information - Vehicle changed state
-    Csc(Csc),
-
-    /// Information - Connection interface mode
-    Cim(Cim),
-
-    /// Both - Set mods a player is allowed
-    Mal(Mal),
-
-    /// Both - Set/receive player handicap
-    Plh(Plh),
-
-    /// Both - Set/receive player bans
-    Ipb(Ipb),
-
-    /// Instruction - Set AI control value
-    Aic(Aic),
-
-    /// Information - AI information
-    Aii(Aii),
+/// Helper method to assist in converting the inner part of a [Packet] variant into [Packet] with a
+/// request identifier set. Mostly useful for things like [Packet::Tiny].
+pub trait WithRequestId
+where
+    Self: std::fmt::Debug,
+{
+    /// Convert something into a Packet with a request identifier
+    fn with_request_id<R: Into<crate::identifiers::RequestId>>(
+        self,
+        reqi: R,
+    ) -> impl Into<crate::Packet> + std::fmt::Debug;
 }
 
+macro_rules! define_packet {
+    (
+        $(
+            $(#[$variant_attr:meta])*
+            $variant:ident = $disc:expr
+        ),* $(,)?
+    ) => {
+        /// Enum representing all possible packets receivable via an Insim connection.
+        /// Each variant may either be instructional (tell LFS to do something), informational (you are
+        /// told something about LFS), or both.
+        #[derive(Debug, Clone, from_variants::FromVariants)]
+        #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+        #[cfg_attr(feature = "serde", serde(tag = "type"))]
+        #[non_exhaustive]
+        pub enum Packet {
+            $(
+                $(#[$variant_attr])*
+                $variant($variant),
+            )*
+        }
+
+        impl WithRequestId for Packet {
+            fn with_request_id<R: Into<crate::identifiers::RequestId>>(
+                mut self,
+                reqi: R,
+            ) -> impl Into<crate::Packet> + std::fmt::Debug {
+                let reqi = reqi.into();
+                match &mut self {
+                    $(
+                        Self::$variant(inner) => inner.reqi = reqi,
+                    )*
+                }
+                self
+            }
+        }
+
+        impl Decode for Packet {
+            fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
+                let discriminator = u8::decode(buf)?;
+                match discriminator {
+                    $(
+                        $disc => Ok(Self::$variant(<$variant>::decode(buf)?)),
+                    )*
+                    i => {
+                        return Err(
+                            insim_core::DecodeErrorKind::NoVariantMatch { found: i.into() }
+                                .context("Unknown packet identifier"),
+                        );
+                    },
+                }
+            }
+        }
+
+        impl Encode for Packet {
+            fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+                match self {
+                    $(
+                        Self::$variant(inner) => {
+                            ($disc as u8).encode(buf)?;
+                            inner.encode(buf)?;
+                        },
+                    )*
+                }
+                Ok(())
+            }
+        }
+    };
+}
+
+define_packet! (
+    /// Instruction - handshake or init
+    Isi = 1,
+    /// Information - version info
+    Ver = 2,
+    /// Both - multi-purpose
+    Tiny = 3,
+    /// Both - multi-purpose
+    Small = 4,
+    /// Information - State info
+    Sta = 5,
+    /// Instruction - Single character
+    Sch = 6,
+    /// Instruction - State Flags Pack
+    Sfp = 7,
+    /// Both - Set Car Cam
+    Scc = 8,
+    /// Both - Camera position pack
+    Cpp = 9,
+    /// Information - Start multiplayer
+    Ism = 10,
+    /// Information - Message out
+    Mso = 11,
+    /// Information - Hidden /i message
+    Iii = 12,
+    /// Instruction - Type a message or /command
+    Mst = 13,
+    /// Instruction - Message to connection
+    Mtc = 14,
+    /// Instruction - set screen mode
+    Mod = 15,
+    /// Information - Vote notification
+    Vtn = 16,
+    /// Information - Race start
+    Rst = 17,
+    /// Information - New connection
+    Ncn = 18,
+    /// Information - Connection left
+    Cnl = 19,
+    /// Information - Connection renamed
+    Cpr = 20,
+    /// Information - New player (player joined)
+    Npl = 21,
+    /// Information - Player telepits
+    Plp = 22,
+    /// Information - Player left
+    Pll = 23,
+    /// Information - Lap time
+    Lap = 24,
+    /// Information - Split time
+    Spx = 25,
+    /// Information - Pit stop start
+    Pit = 26,
+    /// Information - Pit stop finish
+    Psf = 27,
+    /// Information - Player entered pit lane
+    Pla = 28,
+    /// Information - Camera changed
+    Cch = 29,
+    /// Information - Penalty
+    Pen = 30,
+    /// Information - Take over
+    Toc = 31,
+    /// Information - Flag
+    Flg = 32,
+    /// Information - Player flags
+    Pfl = 33,
+    /// Information - Finished race - unverified result
+    Fin = 34,
+    /// Information - Verified finish result
+    Res = 35,
+    /// Both - Player reorder
+    Reo = 36,
+    /// Information - Node and lap
+    Nlp = 37,
+    /// Information - Multi-car info
+    Mci = 38,
+    /// Instruction - Type a message
+    Msx = 39,
+    /// Instruction - Message to local computer
+    Msl = 40,
+    /// Information - Car reset
+    Crs = 41,
+    /// Both - Delete or receive buttons
+    Bfn = 42,
+    /// Information - AutoX layout info
+    Axi = 43,
+    /// Information - Player hit an AutoX object
+    Axo = 44,
+    /// Instruction - Show a button
+    Btn = 45,
+    /// Information - Button clicked
+    Btc = 46,
+    /// Information - Button was typed into
+    Btt = 47,
+    /// Both - Replay information
+    Rip = 48,
+    /// Both - screenshot
+    Ssh = 49,
+    /// Information - contact between vehicles
+    Con = 50,
+    /// Information - Object hit
+    Obh = 51,
+    /// Information - Hot lap validity violation
+    Hlv = 52,
+    /// Instruction - Restrict player vehicles
+    Plc = 53,
+    /// Both - AutoX - multiple object
+    Axm = 54,
+    /// Information - Admin command report
+    Acr = 55,
+    /// Instruction - Handicap
+    Hcp = 56,
+    /// Information - New connection information
+    Nci = 57,
+    /// Instruction - Join reply response
+    Jrr = 58,
+    /// Information - report insim checkpoint/circle
+    Uco = 59,
+    /// Instruction - Object control
+    Oco = 60,
+    /// Instruction - Multi-purpose, target to connection
+    Ttc = 61,
+    /// Information - Player selected vehicle
+    Slc = 62,
+    /// Information - Vehicle changed state
+    Csc = 63,
+    /// Information - Connection interface mode
+    Cim = 64,
+    /// Both - Set mods a player is allowed
+    Mal = 65,
+    /// Both - Set/receive player handicap
+    Plh = 66,
+    /// Both - Set/receive player bans
+    Ipb = 67,
+    /// Instruction - Set AI control value
+    Aic = 68,
+    /// Information - AI information
+    Aii = 69
+);
+
 impl Default for Packet {
+    /// A Tiny with Type of None was selected as the default as it's a non-damaging packet
+    /// (keepalive)
     fn default() -> Self {
-        Self::Tiny(Tiny::default())
+        TinyType::None.into()
     }
 }
 
@@ -304,469 +313,6 @@ impl Packet {
                 4
             },
         }
-    }
-}
-
-/// Helper method to assist in converting the inner part of a [Packet] variant into [Packet] with a
-/// request identifier set. Mostly useful for things like [Packet::Tiny].
-pub trait WithRequestId
-where
-    Self: std::fmt::Debug,
-{
-    /// Convert something into a Packet with a request identifier
-    fn with_request_id<R: Into<crate::identifiers::RequestId>>(
-        self,
-        reqi: R,
-    ) -> impl Into<crate::Packet> + std::fmt::Debug;
-}
-
-impl WithRequestId for Packet {
-    fn with_request_id<R: Into<crate::identifiers::RequestId>>(
-        mut self,
-        reqi: R,
-    ) -> impl Into<crate::Packet> + std::fmt::Debug {
-        match &mut self {
-            Packet::Isi(i) => i.reqi = reqi.into(),
-            Packet::Ver(i) => i.reqi = reqi.into(),
-            Packet::Tiny(i) => i.reqi = reqi.into(),
-            Packet::Small(i) => i.reqi = reqi.into(),
-            Packet::Sta(i) => i.reqi = reqi.into(),
-            Packet::Sch(i) => i.reqi = reqi.into(),
-            Packet::Sfp(i) => i.reqi = reqi.into(),
-            Packet::Scc(i) => i.reqi = reqi.into(),
-            Packet::Cpp(i) => i.reqi = reqi.into(),
-            Packet::Ism(i) => i.reqi = reqi.into(),
-            Packet::Mso(i) => i.reqi = reqi.into(),
-            Packet::Iii(i) => i.reqi = reqi.into(),
-            Packet::Mst(i) => i.reqi = reqi.into(),
-            Packet::Mtc(i) => i.reqi = reqi.into(),
-            Packet::Mod(i) => i.reqi = reqi.into(),
-            Packet::Vtn(i) => i.reqi = reqi.into(),
-            Packet::Rst(i) => i.reqi = reqi.into(),
-            Packet::Ncn(i) => i.reqi = reqi.into(),
-            Packet::Cnl(i) => i.reqi = reqi.into(),
-            Packet::Cpr(i) => i.reqi = reqi.into(),
-            Packet::Npl(i) => i.reqi = reqi.into(),
-            Packet::Plp(i) => i.reqi = reqi.into(),
-            Packet::Pll(i) => i.reqi = reqi.into(),
-            Packet::Lap(i) => i.reqi = reqi.into(),
-            Packet::Spx(i) => i.reqi = reqi.into(),
-            Packet::Pit(i) => i.reqi = reqi.into(),
-            Packet::Psf(i) => i.reqi = reqi.into(),
-            Packet::Pla(i) => i.reqi = reqi.into(),
-            Packet::Cch(i) => i.reqi = reqi.into(),
-            Packet::Pen(i) => i.reqi = reqi.into(),
-            Packet::Toc(i) => i.reqi = reqi.into(),
-            Packet::Flg(i) => i.reqi = reqi.into(),
-            Packet::Pfl(i) => i.reqi = reqi.into(),
-            Packet::Fin(i) => i.reqi = reqi.into(),
-            Packet::Res(i) => i.reqi = reqi.into(),
-            Packet::Reo(i) => i.reqi = reqi.into(),
-            Packet::Nlp(i) => i.reqi = reqi.into(),
-            Packet::Mci(i) => i.reqi = reqi.into(),
-            Packet::Msx(i) => i.reqi = reqi.into(),
-            Packet::Msl(i) => i.reqi = reqi.into(),
-            Packet::Crs(i) => i.reqi = reqi.into(),
-            Packet::Bfn(i) => i.reqi = reqi.into(),
-            Packet::Axi(i) => i.reqi = reqi.into(),
-            Packet::Axo(i) => i.reqi = reqi.into(),
-            Packet::Btn(i) => i.reqi = reqi.into(),
-            Packet::Btc(i) => i.reqi = reqi.into(),
-            Packet::Btt(i) => i.reqi = reqi.into(),
-            Packet::Rip(i) => i.reqi = reqi.into(),
-            Packet::Ssh(i) => i.reqi = reqi.into(),
-            Packet::Con(i) => i.reqi = reqi.into(),
-            Packet::Obh(i) => i.reqi = reqi.into(),
-            Packet::Hlv(i) => i.reqi = reqi.into(),
-            Packet::Plc(i) => i.reqi = reqi.into(),
-            Packet::Axm(i) => i.reqi = reqi.into(),
-            Packet::Acr(i) => i.reqi = reqi.into(),
-            Packet::Hcp(i) => i.reqi = reqi.into(),
-            Packet::Nci(i) => i.reqi = reqi.into(),
-            Packet::Jrr(i) => i.reqi = reqi.into(),
-            Packet::Uco(i) => i.reqi = reqi.into(),
-            Packet::Oco(i) => i.reqi = reqi.into(),
-            Packet::Ttc(i) => i.reqi = reqi.into(),
-            Packet::Slc(i) => i.reqi = reqi.into(),
-            Packet::Csc(i) => i.reqi = reqi.into(),
-            Packet::Cim(i) => i.reqi = reqi.into(),
-            Packet::Mal(i) => i.reqi = reqi.into(),
-            Packet::Plh(i) => i.reqi = reqi.into(),
-            Packet::Ipb(i) => i.reqi = reqi.into(),
-            Packet::Aic(i) => i.reqi = reqi.into(),
-            Packet::Aii(i) => i.reqi = reqi.into(),
-        };
-        self
-    }
-}
-
-impl Decode for Packet {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let discrimator = u8::decode(buf)?;
-        let packet = match discrimator {
-            1 => Self::Isi(Isi::decode(buf)?),
-            2 => Self::Ver(Ver::decode(buf)?),
-            3 => Self::Tiny(Tiny::decode(buf)?),
-            4 => Self::Small(Small::decode(buf)?),
-            5 => Self::Sta(Sta::decode(buf)?),
-            6 => Self::Sch(Sch::decode(buf)?),
-            7 => Self::Sfp(Sfp::decode(buf)?),
-            8 => Self::Scc(Scc::decode(buf)?),
-            9 => Self::Cpp(Cpp::decode(buf)?),
-            10 => Self::Ism(Ism::decode(buf)?),
-            11 => Self::Mso(Mso::decode(buf)?),
-            12 => Self::Iii(Iii::decode(buf)?),
-            13 => Self::Mst(Mst::decode(buf)?),
-            14 => Self::Mtc(Mtc::decode(buf)?),
-            15 => Self::Mod(Mod::decode(buf)?),
-            16 => Self::Vtn(Vtn::decode(buf)?),
-            17 => Self::Rst(Rst::decode(buf)?),
-            18 => Self::Ncn(Ncn::decode(buf)?),
-            19 => Self::Cnl(Cnl::decode(buf)?),
-            20 => Self::Cpr(Cpr::decode(buf)?),
-            21 => Self::Npl(Npl::decode(buf)?),
-            22 => Self::Plp(Plp::decode(buf)?),
-            23 => Self::Pll(Pll::decode(buf)?),
-            24 => Self::Lap(Lap::decode(buf)?),
-            25 => Self::Spx(Spx::decode(buf)?),
-            26 => Self::Pit(Pit::decode(buf)?),
-            27 => Self::Psf(Psf::decode(buf)?),
-            28 => Self::Pla(Pla::decode(buf)?),
-            29 => Self::Cch(Cch::decode(buf)?),
-            30 => Self::Pen(Pen::decode(buf)?),
-            31 => Self::Toc(Toc::decode(buf)?),
-            32 => Self::Flg(Flg::decode(buf)?),
-            33 => Self::Pfl(Pfl::decode(buf)?),
-            34 => Self::Fin(Fin::decode(buf)?),
-            35 => Self::Res(Res::decode(buf)?),
-            36 => Self::Reo(Reo::decode(buf)?),
-            37 => Self::Nlp(Nlp::decode(buf)?),
-            38 => Self::Mci(Mci::decode(buf)?),
-            39 => Self::Msx(Msx::decode(buf)?),
-            40 => Self::Msl(Msl::decode(buf)?),
-            41 => Self::Crs(Crs::decode(buf)?),
-            42 => Self::Bfn(Bfn::decode(buf)?),
-            43 => Self::Axi(Axi::decode(buf)?),
-            44 => Self::Axo(Axo::decode(buf)?),
-            45 => Self::Btn(Btn::decode(buf)?),
-            46 => Self::Btc(Btc::decode(buf)?),
-            47 => Self::Btt(Btt::decode(buf)?),
-            48 => Self::Rip(Rip::decode(buf)?),
-            49 => Self::Ssh(Ssh::decode(buf)?),
-            50 => Self::Con(Con::decode(buf)?),
-            51 => Self::Obh(Obh::decode(buf)?),
-            52 => Self::Hlv(Hlv::decode(buf)?),
-            53 => Self::Plc(Plc::decode(buf)?),
-            54 => Self::Axm(Axm::decode(buf)?),
-            55 => Self::Acr(Acr::decode(buf)?),
-            56 => Self::Hcp(Hcp::decode(buf)?),
-            57 => Self::Nci(Nci::decode(buf)?),
-            58 => Self::Jrr(Jrr::decode(buf)?),
-            59 => Self::Uco(Uco::decode(buf)?),
-            60 => Self::Oco(Oco::decode(buf)?),
-            61 => Self::Ttc(Ttc::decode(buf)?),
-            62 => Self::Slc(Slc::decode(buf)?),
-            63 => Self::Csc(Csc::decode(buf)?),
-            64 => Self::Cim(Cim::decode(buf)?),
-            65 => Self::Mal(Mal::decode(buf)?),
-            66 => Self::Plh(Plh::decode(buf)?),
-            67 => Self::Ipb(Ipb::decode(buf)?),
-            68 => Self::Aic(Aic::decode(buf)?),
-            69 => Self::Aii(Aii::decode(buf)?),
-            i => {
-                return Err(
-                    insim_core::DecodeErrorKind::NoVariantMatch { found: i.into() }
-                        .context("Unknown packet identifier"),
-                );
-            },
-        };
-
-        Ok(packet)
-    }
-}
-
-impl Encode for Packet {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        match self {
-            Self::Isi(i) => {
-                1_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Ver(i) => {
-                2_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Tiny(i) => {
-                3_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Small(i) => {
-                4_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Sta(i) => {
-                5_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Sch(i) => {
-                6_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Sfp(i) => {
-                7_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Scc(i) => {
-                8_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Cpp(i) => {
-                9_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Ism(i) => {
-                10_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Mso(i) => {
-                11_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Iii(i) => {
-                12_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Mst(i) => {
-                13_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Mtc(i) => {
-                14_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Mod(i) => {
-                15_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Vtn(i) => {
-                16_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Rst(i) => {
-                17_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Ncn(i) => {
-                18_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Cnl(i) => {
-                19_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Cpr(i) => {
-                20_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Npl(i) => {
-                21_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Plp(i) => {
-                22_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Pll(i) => {
-                23_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Lap(i) => {
-                24_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Spx(i) => {
-                25_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Pit(i) => {
-                26_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Psf(i) => {
-                27_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Pla(i) => {
-                28_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Cch(i) => {
-                29_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Pen(i) => {
-                30_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Toc(i) => {
-                31_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Flg(i) => {
-                32_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Pfl(i) => {
-                33_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Fin(i) => {
-                34_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Res(i) => {
-                35_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Reo(i) => {
-                36_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Nlp(i) => {
-                37_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Mci(i) => {
-                38_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Msx(i) => {
-                39_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Msl(i) => {
-                40_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Crs(i) => {
-                41_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Bfn(i) => {
-                42_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Axi(i) => {
-                43_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Axo(i) => {
-                44_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Btn(i) => {
-                45_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Btc(i) => {
-                46_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Btt(i) => {
-                47_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Rip(i) => {
-                48_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Ssh(i) => {
-                49_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Con(i) => {
-                50_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Obh(i) => {
-                51_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Hlv(i) => {
-                52_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Plc(i) => {
-                53_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Axm(i) => {
-                54_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Acr(i) => {
-                55_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Hcp(i) => {
-                56_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Nci(i) => {
-                57_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Jrr(i) => {
-                58_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Uco(i) => {
-                59_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Oco(i) => {
-                60_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Ttc(i) => {
-                61_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Slc(i) => {
-                62_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Csc(i) => {
-                63_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Cim(i) => {
-                64_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Mal(i) => {
-                65_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Plh(i) => {
-                66_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Ipb(i) => {
-                67_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Aic(i) => {
-                68_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-            Self::Aii(i) => {
-                69_u8.encode(buf)?;
-                i.encode(buf)?;
-            },
-        };
-
-        Ok(())
     }
 }
 
