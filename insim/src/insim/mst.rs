@@ -2,13 +2,15 @@ use crate::identifiers::RequestId;
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Send a message to LFS as if typed by a user
+/// Send a message to LFS as if typed by a user.
+///
+/// - Supports chat messages and slash commands.
 pub struct Mst {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
-    /// Message
+    /// Message text.
     #[insim(codepage(length = 64, trailing_nul = true))]
     pub msg: String,
 }

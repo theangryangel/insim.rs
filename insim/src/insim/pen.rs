@@ -16,7 +16,7 @@ use crate::identifiers::{PlayerId, RequestId};
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]
-/// Penalty types
+/// Penalty state.
 pub enum PenaltyInfo {
     /// None, or cleared
     #[default]
@@ -44,7 +44,7 @@ pub enum PenaltyInfo {
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
-/// Enum of reasons for a penalty being applied to a player
+/// Reason for a penalty change.
 pub enum PenaltyReason {
     /// Unknown or cleared penalty
     #[default]
@@ -71,21 +71,23 @@ pub enum PenaltyReason {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Penalty received or cleared by player
+/// Penalty state change for a player.
+///
+/// - Reports a penalty being applied, updated, or cleared.
 pub struct Pen {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Unique player id which changed
+    /// Player whose penalty changed.
     pub plid: PlayerId,
 
-    /// The original penalty state
+    /// Previous penalty state.
     pub oldpen: PenaltyInfo,
 
-    /// The new penalty state
+    /// New penalty state.
     pub newpen: PenaltyInfo,
 
-    /// The reason for the change
+    /// Reason for the change.
     #[insim(pad_after = 1)]
     pub reason: PenaltyReason,
 }

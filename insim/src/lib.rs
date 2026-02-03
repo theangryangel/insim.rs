@@ -30,12 +30,13 @@ pub(crate) const MAX_SIZE_PACKET: usize = (u8::MAX as usize) * 4;
 
 pub(crate) const DEFAULT_BUFFER_CAPACITY: usize = MAX_SIZE_PACKET * 6;
 
+pub use core::string::{colours::Colour, escaping::Escape};
+
 pub use error::Error;
 /// Rexport insim_core
 pub use insim_core as core;
 pub use packet::{Packet, WithRequestId};
 pub use result::Result;
-pub use core::string::{colours::Colour, escaping::Escape};
 
 /// Shortcut method to create a TCP connection
 ///

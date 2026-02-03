@@ -7,40 +7,42 @@ use crate::{
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]
-/// [Ttc] subtype.
+/// Subtype for the [Ttc] packet.
 pub enum TtcType {
-    /// Send Axm for the current layout editor selection
+    /// Request the current layout editor selection ([`Axm`](crate::insim::Axm)).
     #[default]
     Sel = 1,
 
-    /// Send Axm every time the selection changes
+    /// Start streaming layout selection changes.
     SelStart = 2,
 
-    /// Stop sending Axm's
+    /// Stop streaming layout selection changes.
     SelStop = 3,
 }
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// General purpose Target To Connection packet
-/// b1..b3 may be used in various ways, depending on the subtype
+/// Target-to-connection packet for selection-related requests.
+///
+/// - Routes a request to a specific connection.
+/// - The meaning of `b1`..`b3` depends on the subtype.
 pub struct Ttc {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Subtype
+    /// Subtype describing the request.
     pub subt: TtcType,
 
-    /// Connection unique ID to target
+    /// Connection unique id to target (0 = local).
     pub ucid: ConnectionId,
 
-    /// B1, B2, B3 may be used in various ways depending on SubT
+    /// Extra data byte (meaning depends on `subt`).
     pub b1: u8,
 
-    /// B1, B2, B3 may be used in various ways depending on SubT
+    /// Extra data byte (meaning depends on `subt`).
     pub b2: u8,
 
-    /// B1, B2, B3 may be used in various ways depending on SubT
+    /// Extra data byte (meaning depends on `subt`).
     pub b3: u8,
 }
 

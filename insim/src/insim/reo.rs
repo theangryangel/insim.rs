@@ -21,15 +21,18 @@ const REO_MAX_PLAYERS: usize = 48;
 
 #[derive(Debug, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Reorder the players
+/// Starting order information or instruction.
+///
+/// - Sent at the start of a race or qualifying session.
+/// - Can be requested via [`TinyType::Reo`](crate::insim::TinyType::Reo).
 pub struct Reo {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Number of players
+    /// Number of players in the order list.
     pub nump: u8,
 
-    /// Order the players
+    /// Player order (first `nump` entries are used).
     #[cfg_attr(feature = "serde", serde(serialize_with = "serialize_playerids"))]
     pub plid: [PlayerId; REO_MAX_PLAYERS],
 }

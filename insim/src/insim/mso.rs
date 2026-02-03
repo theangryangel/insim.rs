@@ -3,7 +3,7 @@ use insim_core::{Decode, DecodeString, Encode, EncodeString, string::codepages};
 
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
-/// Enum for the sound field of [Mso].
+/// Source/type of a message reported by [Mso].
 #[derive(
     Debug, Default, Clone, Eq, PartialEq, PartialOrd, Ord, insim_core::Decode, insim_core::Encode,
 )]
@@ -18,10 +18,10 @@ pub enum MsoUserType {
     /// Normal, visible, user message.
     User = 1,
 
-    /// Was this message received with the prefix character from the [Isi](super::Isi) message?
+    /// Message received with the prefix character from [Isi](super::Isi).
     Prefix = 2,
 
-    /// Hidden message (due to be retired in Insim v9?)
+    /// Hidden message typed with the `/o` command.
     O = 3,
 }
 
@@ -30,29 +30,32 @@ const MSO_MSG_ALIGN: usize = 4;
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// System messages and user messages, variable sized.
+/// System and user messages reported by LFS.
+///
+/// - Variable-length packet with a message payload.
+/// - `textstart` marks where user-entered text begins within `msg`.
 pub struct Mso {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Unique connection id
+    /// Connection that sent the message (0 = host).
     pub ucid: ConnectionId,
 
-    /// Unique player id
+    /// Player that sent the message (0 = use `ucid`).
     pub plid: PlayerId,
 
-    /// Set if typed by a user
+    /// Message origin and visibility.
     pub usertype: MsoUserType,
 
-    /// Index of the first character of user entered text, in msg field.
+    /// Index of the first user-entered character within `msg`.
     pub textstart: u8,
 
-    /// Message
+    /// Full message text (may include name prefix before `textstart`).
     pub msg: String,
 }
 
 impl Mso {
-    /// Return msg with the textstart stripped
+    /// Return the message starting from `textstart`.
     pub fn msg_from_textstart(&self) -> &str {
         &self.msg[self.textstart as usize..]
     }

@@ -19,12 +19,15 @@ impl_bitflags_from_to_bytes!(NcnFlags, u8);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// New Connection
+/// Connection joined notification.
+///
+/// - Sent when a connection joins the host.
+/// - Can be requested via [`TinyType::Ncn`](crate::insim::TinyType::Ncn).
 pub struct Ncn {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Unique connection id of new connection
+    /// Connection identifier for the new connection.
     pub ucid: ConnectionId,
 
     /// LFS.net username.
@@ -32,17 +35,17 @@ pub struct Ncn {
     pub uname: String,
 
     #[insim(codepage(length = 24))]
-    /// Player Name.
+    /// Player nickname.
     pub pname: String,
 
-    /// true if administrative user.
+    /// Whether the connection has admin privileges.
     pub admin: bool,
 
-    /// Total number of connections now this player has joined, plus host
+    /// Total number of connections including host.
     pub total: u8,
 
     #[insim(pad_after = 1)]
-    /// Flags describing additional facts about this connection
+    /// Additional facts about the connection.
     pub flags: NcnFlags,
 }
 

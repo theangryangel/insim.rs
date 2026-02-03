@@ -4,29 +4,32 @@ use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Information about a specific vehicle/player. Used within [Nlp].
+/// Node/lap snapshot for a player.
 pub struct NodeLapInfo {
-    /// Current path node
+    /// Current path node.
     pub node: u16,
 
-    /// Current lap
+    /// Current lap.
     pub lap: u16,
 
-    /// Player's unique ID
+    /// Player identifier.
     pub plid: PlayerId,
 
-    /// Player's race position
+    /// Player's race position.
     pub position: u8,
 }
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Node and Lap packet - similar to Mci without positional information
+/// Node/lap updates without positional coordinates.
+///
+/// - Similar to [Mci](super::Mci) but without coordinates.
+/// - May be requested via [`TinyType::Nlp`](crate::insim::TinyType::Nlp).
 pub struct Nlp {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Node, lap and position of each player.
+    /// Node, lap, and position for each player.
     pub info: Vec<NodeLapInfo>,
 }
 

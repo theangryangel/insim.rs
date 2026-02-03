@@ -2,17 +2,20 @@ use crate::identifiers::RequestId;
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Insim Multiplayer - LFS sends this when a host is started or joined
+/// Multiplayer host information.
+///
+/// - Sent when a host is started or joined.
+/// - Can be requested via [`TinyType::Ism`](crate::insim::TinyType::Ism).
 pub struct Ism {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
-    /// Are we a host? false = guest, true = host
+    /// Whether we are the host (true) or a guest (false).
     #[insim(pad_after = 3)]
     pub host: bool,
 
-    /// Name of server joined/started
+    /// Host name of the server.
     #[insim(codepage(length = 32))]
     pub hname: String,
 }

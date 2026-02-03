@@ -2,13 +2,15 @@ use crate::identifiers::RequestId;
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Extended Message (like [Mst](super::Mst), but longer)
+/// Extended message (like [Mst](super::Mst), but longer).
+///
+/// - For chat text only (not for commands).
 pub struct Msx {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
-    /// Message
+    /// Message text.
     #[insim(codepage(length = 96, trailing_nul = true))]
     pub msg: String,
 }

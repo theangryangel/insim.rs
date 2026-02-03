@@ -3,16 +3,19 @@ use crate::identifiers::RequestId;
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// State Flags Pack
+/// Set a game state flag.
+///
+/// - Updates a single [StaFlags] value.
+/// - Some states can only be toggled via text commands.
 pub struct Sfp {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
-    /// The state to set/change. See [StaFlags].
+    /// State flag to set or clear.
     pub flag: StaFlags,
 
-    /// Turn the state on or off
+    /// Whether to enable (true) or disable (false) the flag.
     #[insim(pad_after = 1)]
     pub onoff: bool,
 }

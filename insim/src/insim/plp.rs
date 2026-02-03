@@ -2,12 +2,12 @@ use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Player Tele-pits (shift+P in game)
+/// Player tele-pitted (Shift+P).
 pub struct Plp {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Unique player ID which tele-pitted
+    /// Player that tele-pitted.
     pub plid: PlayerId,
 }
 

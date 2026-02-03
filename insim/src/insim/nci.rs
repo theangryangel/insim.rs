@@ -52,26 +52,28 @@ pub enum Language {
 
 #[derive(Debug, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Extra information about the new connection. This is only sent when connected to a game server,
-/// and only if an administrative password has been set and used by Insim.
+/// Extra information about a connection (host only).
+///
+/// - Requires an admin password on the host.
+/// - Can be requested via [`TinyType::Nci`](crate::insim::TinyType::Nci).
 pub struct Nci {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Unique connection ID
+    /// Connection identifier.
     pub ucid: ConnectionId,
 
-    /// Language
+    /// Preferred language.
     pub language: Language,
 
     /// License level.
     #[insim(pad_after = 2)]
     pub license: License,
 
-    /// LFS.net player ID
+    /// LFS.net user id.
     pub userid: u32,
 
-    /// Originating IP address
+    /// Originating IP address.
     pub ipaddress: Ipv4Addr,
 }
 

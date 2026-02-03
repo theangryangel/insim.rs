@@ -7,57 +7,59 @@ use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Race Result - qualifying or confirmed result
+/// Confirmed race or qualifying result.
+///
+/// - Includes player identity, car, and timing details.
 pub struct Res {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// The unique player ID that this race result is for
+    /// Player this result belongs to.
     pub plid: PlayerId,
 
     #[insim(codepage(length = 24))]
-    /// The LFS.net username of the player
+    /// LFS.net username.
     pub uname: String,
 
     #[insim(codepage(length = 24))]
-    /// The name of the player
+    /// Player nickname.
     pub pname: String,
 
     #[insim(codepage(length = 8))]
-    /// The number plate of the player
+    /// Number plate.
     pub plate: String,
 
-    /// The vehicle they finished in
+    /// Vehicle used for the result.
     pub cname: Vehicle,
 
     #[insim(duration = u32)]
-    /// The total time
+    /// Total time.
     pub ttime: Duration,
 
     #[insim(duration = u32, pad_after = 1)]
-    /// The best lap time
+    /// Best lap time.
     pub btime: Duration,
 
-    /// The number of pit stops taken
+    /// Number of pit stops.
     pub numstops: u8,
 
-    /// The result flags. Where they DNF?
+    /// Confirmation flags and penalties.
     #[insim(pad_after = 1)]
     pub confirm: RaceConfirmFlags,
 
-    /// The number of laps done
+    /// Laps completed.
     pub lapsdone: u16,
 
-    /// Additional information about the player.
+    /// Player flags (help settings).
     pub flags: PlayerFlags,
 
-    /// Finish or qualify pos (0 = win / 255 = not added to table)
+    /// Finish or qualify position (0 = win, 255 = not in table).
     pub resultnum: u8,
 
-    /// Total number of results (qualify doesn't always add a new one)
+    /// Total number of results.
     pub numres: u8,
 
-    /// Penalty time in seconds (already included in race time)
+    /// Penalty time (already included in `ttime`).
     pub pseconds: u16,
 }
 

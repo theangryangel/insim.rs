@@ -6,11 +6,11 @@ use super::{Fuel, PenaltyInfo, PlayerFlags, TyreCompound};
 use crate::identifiers::{PlayerId, RequestId};
 
 bitflags! {
-    /// Work which was carried out at a pitstop. Used in [Pit].
+    /// Work carried out during a pit stop.
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     pub struct PitStopWorkFlags: u32 {
-        /// Nothing asd
+        /// No work carried out.
         const NOTHING = 0;
         /// Stop only
         const STOP = (1 << 0);
@@ -53,50 +53,52 @@ impl_bitflags_from_to_bytes!(PitStopWorkFlags, u32);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Pit stop (stop at the garage, not "tele-pit")
+/// Pit stop at the garage (not a teleport).
+///
+/// - Reports work done and tyres used.
 pub struct Pit {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Players unique ID
+    /// Player that pitted.
     pub plid: PlayerId,
 
-    /// Laps completed
+    /// Laps completed.
     pub lapsdone: u16,
 
-    /// Player Flags. See [PlayerFlags].
+    /// Player flags (help settings).
     pub flags: PlayerFlags,
 
-    /// When /showfuel yes: fuel added percent / no: 255
+    /// Fuel added during the stop.
     pub fueladd: Fuel,
 
-    /// Any penalties that were cleared
+    /// Penalty state after the stop.
     pub penalty: PenaltyInfo,
 
-    /// Total number of stops
+    /// Total number of pit stops.
     #[insim(pad_after = 1)]
     pub numstops: u8,
 
-    /// Tyres!
+    /// Tyre compounds used (rear-left, rear-right, front-left, front-right).
     pub tyres: [TyreCompound; 4],
 
-    /// What work was carried out?
+    /// Work performed during the stop.
     #[insim(pad_after = 4)]
     pub work: PitStopWorkFlags,
 }
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Pit Stop Finished
+/// Pit stop finished event.
 pub struct Psf {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Player's unique ID
+    /// Player that finished the stop.
     pub plid: PlayerId,
 
     #[insim(duration= u32, pad_after = 4)]
-    /// How long were they pitting for?
+    /// Total stop time.
     pub stime: Duration,
 }
 
@@ -104,7 +106,7 @@ pub struct Psf {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]
-/// Pit lane fact, or info. Used in [Pla].
+/// Pit lane event type used by [Pla].
 pub enum PitLaneFact {
     #[default]
     /// Left pitlane
@@ -113,33 +115,33 @@ pub enum PitLaneFact {
     /// Entered pitlane
     Enter = 1,
 
-    /// Entered for no known reason
+    /// Entered for no known reason.
     NoPurpose = 2,
 
-    /// Entered for Drive-through penalty
+    /// Entered for a drive-through penalty.
     Dt = 3,
 
-    /// Entered for a stop-go (time) penalty
+    /// Entered for a stop-go penalty.
     Sg = 4,
 }
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// PitLane
+/// Pit lane enter/exit event.
 pub struct Pla {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Player's unique ID
+    /// Player involved in the pit lane event.
     pub plid: PlayerId,
 
-    /// Fact
+    /// Pit lane event type.
     #[insim(pad_after = 3)]
     pub fact: PitLaneFact,
 }
 
 impl Pla {
-    /// Did the player enter the pitlate?
+    /// Did the player enter the pit lane?
     pub fn entered_pitlane(&self) -> bool {
         self.fact != PitLaneFact::Exit
     }

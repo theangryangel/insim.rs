@@ -4,7 +4,7 @@ use crate::{WithRequestId, identifiers::RequestId};
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]
-/// Errors occurred during a [Ssh] request.
+/// Result of a screenshot request.
 pub enum SshError {
     #[default]
     /// No error
@@ -22,18 +22,18 @@ pub enum SshError {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Send Screenshot - instructional and informational.
+/// Screenshot request and response.
+///
+/// - Send to request a screenshot, receive to learn the saved filename.
 pub struct Ssh {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Result code
+    /// Result of the request.
     #[insim(pad_after = 4)]
     pub error: SshError,
 
-    /// Screenshot name.
-    /// Not really ascii, but given we dont have control over the naming convention we can
-    /// probably just abuse the fact that LFS only generates ASCII compatible file names.
+    /// Screenshot filename.
     #[insim(ascii(length = 32, trailing_nul = true))]
     pub name: String,
 }

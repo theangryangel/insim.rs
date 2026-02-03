@@ -2,20 +2,23 @@ use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// InsIm Info -  a /i message from user to hosts Insim
+/// Message sent by a user with the `/i` command.
+///
+/// - Delivered to the host's InSim connection.
+/// - Contains the raw message text.
 pub struct Iii {
     #[insim(pad_after = 1)]
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Unique connection ID that the message was received from
+    /// Connection that sent the message.
     pub ucid: ConnectionId,
 
-    /// Unique player iD that the message was received from
+    /// Player that sent the message.
     #[insim(pad_after = 2)]
     pub plid: PlayerId,
 
-    /// The message
+    /// Message text.
     #[insim(codepage(length = 64, align_to = 4, trailing_nul = true))]
     pub msg: String,
 }

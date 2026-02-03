@@ -94,53 +94,56 @@ impl_bitflags_from_to_bytes!(StaFlags, u16);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// State
+/// Game state snapshot.
+///
+/// - Sent when state changes.
+/// - Can be requested via [`TinyType::Sst`](crate::insim::TinyType::Sst).
 pub struct Sta {
     #[insim(pad_after = 1)]
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// 1.0 is normal speed
+    /// Replay playback speed (1.0 is normal speed).
     pub replayspeed: f32,
 
-    /// State of the game
+    /// Overall game state flags.
     pub flags: StaFlags,
 
-    /// Which type of camera is selected
+    /// Selected in-game camera (even if free view is active).
     pub ingamecam: CameraView,
 
-    /// Currently viewing player
+    /// Player currently being viewed.
     pub viewplid: PlayerId,
 
-    /// Number of players in race
+    /// Number of players in race.
     pub nump: u8,
 
-    /// Number of connections, including host
+    /// Number of connections, including host.
     pub numconns: u8,
 
-    /// Number of finished or qualifying players
+    /// Number of finished or qualifying players.
     pub numfinished: u8,
 
-    /// Race status
+    /// Race status (practice/racing/qualifying).
     pub raceinprog: RaceInProgress,
 
-    /// Qualifying minutes
+    /// Qualifying duration in minutes.
     pub qualmins: u8,
 
     #[insim(pad_after = 1)]
-    /// Number of laps
+    /// Race laps or session duration.
     pub racelaps: RaceLaps,
 
-    /// Server status
+    /// Server status indicator (1 = ok, 0 = unknown, >1 = failure).
     pub serverstatus: u8, // serverstatus isn't an enum, unfortunately
 
-    /// The track
+    /// Selected track.
     pub track: Track,
 
-    /// Weather conditions
+    /// Weather identifier.
     pub weather: u8,
 
-    /// Wind conditions
+    /// Wind conditions.
     pub wind: Wind,
 }
 

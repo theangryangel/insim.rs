@@ -5,21 +5,21 @@ use crate::identifiers::RequestId;
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Version packet - informational
-/// It is advisable to request version information as soon as you have connected, to
-/// avoid problems when connecting to a host with a later or earlier version.  You will
-/// be sent a version packet on connection if you set ReqI in the IS_ISI packet.
+/// Version information about the connected LFS instance.
+///
+/// - Sent in response to [`TinyType::Ver`](crate::insim::TinyType::Ver).
+/// - Also sent on connection if `Isi::reqi` is non-zero.
 pub struct Ver {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed from the request.
     pub reqi: RequestId,
 
-    /// LFS version, e.g. 0.3G
+    /// LFS game version string.
     pub version: GameVersion,
 
-    /// Product: DEMO / S1 / S2 / S3
+    /// Product identifier (e.g., DEMO/S1/S2/S3).
     pub product: String,
 
-    /// InSim version
+    /// InSim protocol version reported by LFS.
     pub insimver: u8,
 }
 

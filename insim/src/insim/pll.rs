@@ -2,12 +2,12 @@ use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Player Leaves race
+/// Player left the race (spectating).
 pub struct Pll {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Unique player id which left
+    /// Player that left the race.
     pub plid: PlayerId,
 }
 

@@ -1,6 +1,6 @@
 use crate::identifiers::{ConnectionId, RequestId};
 
-/// Enum for the result field of [Acr].
+/// Result of an admin command.
 #[repr(u8)]
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -17,25 +17,27 @@ pub enum AcrResult {
     UnknownCommand = 3,
 }
 
-/// Admin Command Report: A user typed an admin command - variable size
+/// Admin command report.
+///
+/// - Contains the raw command text and result.
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Acr {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
-    /// Unique connection identifier
+    /// Connection that issued the command.
     pub ucid: ConnectionId,
 
-    /// Is the user an admin?
+    /// Whether the user is an admin.
     pub admin: bool,
 
-    /// Result
+    /// Command result.
     #[insim(pad_after = 1)]
     pub result: AcrResult,
 
-    /// Command
+    /// Command text.
     #[insim(codepage(length = 64, align_to = 4, trailing_nul = true))]
     pub text: String,
 }

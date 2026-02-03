@@ -3,15 +3,17 @@ use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Player flags changed
+/// Player flags changed.
+///
+/// - Reports changes to assist and input settings.
 pub struct Pfl {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Player unique Id
+    /// Player whose flags changed.
     pub plid: PlayerId,
 
-    /// Flags which were altered. See [PlayerFlags].
+    /// Updated player flags.
     #[insim(pad_after = 2)]
     pub flags: PlayerFlags,
 }

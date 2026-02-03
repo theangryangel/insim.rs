@@ -6,7 +6,7 @@ use crate::identifiers::RequestId;
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(u8)]
 #[non_exhaustive]
-/// Replay Information Error
+/// Replay control result.
 pub enum RipError {
     #[default]
     /// Ok - No error!
@@ -47,7 +47,7 @@ pub enum RipError {
 }
 
 bitflags::bitflags! {
-    /// Bitwise flags used within the [Rip] packet
+    /// Options for replay playback and loading.
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     pub struct RipOptions: u8 {
@@ -74,33 +74,36 @@ impl_bitflags_from_to_bytes!(RipOptions, u8);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Replay Information
+/// Replay control and status packet.
+///
+/// - Used to request replay actions and receive replay status.
+/// - Can be requested via [`TinyType::Rip`](crate::insim::TinyType::Rip).
 pub struct Rip {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// 0 or 1 = OK
+    /// Result of the replay request.
     pub error: RipError,
 
-    /// Multiplayer replay?
+    /// Whether the replay is multiplayer.
     pub mpr: bool,
 
-    /// Paused playback
+    /// Whether playback is paused.
     pub paused: bool,
 
-    /// Misc options. See [RipOptions].
+    /// Replay options.
     #[insim(pad_after = 1)]
     pub options: RipOptions,
 
-    /// Request: destination / Reply: position
+    /// Requested destination time (request) or current position (reply).
     #[insim(duration = u32)]
     pub ctime: Duration,
 
-    /// Request: zero / reply: replay length
+    /// Replay length (reply) or zero when requesting.
     #[insim(duration = u32)]
     pub ttime: Duration,
 
-    /// Zero or replay name
+    /// Replay name (empty when querying current replay).
     #[insim(codepage(length = 64, trailing_nul = true))]
     pub rname: String,
 }

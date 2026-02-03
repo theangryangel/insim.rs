@@ -6,7 +6,7 @@ use crate::identifiers::{PlayerId, RequestId};
 bitflags::bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    /// Race result confirmation flags
+    /// Result confirmation flags for finishes and results.
     pub struct RaceConfirmFlags: u8 {
         /// Mentioned
         const MENTIONED = (1 << 0);
@@ -67,33 +67,35 @@ impl RaceConfirmFlags {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Provisional finish notification: This is not a final result, you should use the [Res](super::Res) packet for this instead.
+/// Provisional finish notification.
+///
+/// - Not a final result; use [Res](super::Res) for confirmed results.
 pub struct Fin {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Unique player id for this finish notification
+    /// Player that finished.
     pub plid: PlayerId,
 
     #[insim(duration = u32)]
-    /// Total time elapsed
+    /// Total race time.
     pub ttime: Duration,
 
     #[insim(duration = u32, pad_after = 1)]
-    /// Best lap time
+    /// Best lap time.
     pub btime: Duration,
 
-    /// Total number of stops
+    /// Number of pit stops.
     pub numstops: u8,
 
     #[insim(pad_after = 1)]
-    /// Confirmation flags give extra context to the result
+    /// Confirmation flags and penalties.
     pub confirm: RaceConfirmFlags,
 
-    /// Total laps completed
+    /// Total laps completed.
     pub lapsdone: u16,
 
-    /// Player flags (help settings)
+    /// Player flags (help settings).
     pub flags: PlayerFlags,
 }
 

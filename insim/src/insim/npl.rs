@@ -161,71 +161,75 @@ impl_bitflags_from_to_bytes!(Passengers, u8);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Sent when a New Player joins.
+/// Player joined race notification.
+///
+/// - Sent when a player joins the race (or returns from pits).
+/// - Can be requested via [`TinyType::Npl`](crate::insim::TinyType::Npl).
 pub struct Npl {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Unique player id given to this new player
+    /// Player identifier assigned for this race.
     pub plid: PlayerId,
 
-    /// Unique connection id of this player
+    /// Connection identifier for the player.
     pub ucid: ConnectionId,
 
-    /// See [PlayerType].
+    /// Player type flags (AI/remote/female).
     pub ptype: PlayerType,
 
-    /// See [PlayerFlags].
+    /// Player flags (assists, controller, view settings).
     pub flags: PlayerFlags,
 
     #[insim(codepage(length = 24))]
-    /// Player name
+    /// Player nickname.
     pub pname: String,
 
     #[insim(codepage(length = 8))]
-    /// Number plate
+    /// Number plate.
     pub plate: String,
 
-    /// Vehicle they've joined with.
+    /// Vehicle used.
     pub cname: Vehicle,
 
     #[insim(codepage(length = 16))]
     /// Skin name.
     pub sname: String,
 
-    /// TyreCompound for each tyre.
+    /// Tyre compound per wheel.
     pub tyres: [TyreCompound; 4],
 
-    /// added mass (kg)
+    /// Added mass handicap.
     pub h_mass: u8,
-    /// intake restriction
+    /// Intake restriction handicap.
     pub h_tres: u8,
 
-    /// Driver model
+    /// Driver model identifier.
     pub model: u8,
 
-    /// Passengers
+    /// Passenger layout.
     pub pass: Passengers,
 
-    /// low 4 bits: tyre width reduction (rear)
+    /// Rear tyre width adjustment.
     pub rwadj: u8,
 
-    /// low 4 bits: tyre width reduction (front)
+    /// Front tyre width adjustment.
     #[insim(pad_after = 2)]
     pub fwadj: u8,
 
-    /// Setup flags, see [SetFlags].
+    /// Setup flags.
     pub setf: SetFlags,
 
-    /// Total number of players in server
+    /// Total number of players in the race.
     pub nump: u8,
 
-    /// Configuration.
-    /// UF1 / LX4 / LX6: 0 = DEFAULT / 1 = OPEN ROOF
-    /// GTR racing cars: 0 = DEFAULT / 1 = ALTERNATE
+    /// Vehicle configuration selection.
+    ///
+    /// - UF1 / LX4 / LX6: 0 = default, 1 = open roof.
+    /// - GTR racing cars: 0 = default, 1 = alternate.
     pub config: u8,
 
-    /// When /showfuel yes: fuel percent / no: 255
+    /// Fuel percent (if enabled).
     pub fuel: Fuel,
 }
 

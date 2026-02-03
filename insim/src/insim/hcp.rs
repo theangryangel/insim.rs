@@ -4,38 +4,27 @@ use crate::identifiers::RequestId;
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Used within [Hcp] to apply handicaps to a vehicle.
+/// Handicap settings for a single vehicle.
 pub struct HcpCarHandicap {
-    /// 0 to 200 - added mass (kg)
+    /// Added mass (0-200 kg).
     pub h_mass: u8,
 
-    /// 0 to  50 - intake restriction
+    /// Intake restriction (0-50).
     pub h_tres: u8,
 }
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Vehicle Handicaps
-/// You can send a packet to add mass and restrict the intake on each car model
-/// The same restriction applies to all drivers using a particular car model
-/// This can be useful for creating multi class hosts.
-/// The info field is indexed by the vehicle. i.e. XF GTI = 0, XR GT = 1, etc.
-/// You should probably use the [`set`] and [`get`] functions which allow you to
-/// use [Vehicle].
+/// Per-vehicle handicap settings.
 ///
-/// [`set`]: Hcp::set
-/// [`get`]: Hcp::get
+/// - Applies mass and intake restrictions per car model.
+/// - Use [`set`](Hcp::set) and [`get`](Hcp::get) for [Vehicle] indexing.
 pub struct Hcp {
     #[insim(pad_after = 1)]
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// H_Mass and H_TRes for each car: : XF GTI = 0 / XR GT = 1 etc. You should probably use the
-    /// You should probably use the [`set`] and [`get`] functions which allow you to
-    /// use [Vehicle].
-    ///
-    /// [`set`]: Hcp::set
-    /// [`get`]: Hcp::get
+    /// Handicaps for each car model (indexed by [Vehicle]).
     pub info: [HcpCarHandicap; 32],
 }
 

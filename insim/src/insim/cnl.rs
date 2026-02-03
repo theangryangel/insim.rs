@@ -40,18 +40,20 @@ pub enum CnlReason {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Connection Leave
+/// Connection left notification.
+///
+/// - Reports the reason and current connection count.
 pub struct Cnl {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Unique connection ID that left
+    /// Connection that left.
     pub ucid: ConnectionId,
 
-    /// Reason for disconnection
+    /// Reason for disconnection.
     pub reason: CnlReason,
 
-    /// Number of remaining connections including host
+    /// Remaining connections including host.
     #[insim(pad_after = 2)]
     pub total: u8,
 }

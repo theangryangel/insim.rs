@@ -8,7 +8,7 @@ use crate::identifiers::{PlayerId, RequestId};
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
-/// When /showfuel yes: double fuel percent / no: 255
+/// Fuel percentage with the `/showfuel` multiplier applied.
 pub enum Fuel200 {
     /// Double fuel percent
     Percentage(u8),
@@ -45,7 +45,7 @@ impl Encode for Fuel200 {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
-/// When /showfuel yes: fuel added percent / no: 255
+/// Fuel percentage for pit stops.
 pub enum Fuel {
     /// Double fuel percent
     Percentage(u8),
@@ -80,36 +80,38 @@ impl Encode for Fuel {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Lap Time for a given player.
+/// Lap timing information for a player.
+///
+/// - Sent when a lap is completed.
 pub struct Lap {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Unique player ID
+    /// Player that completed the lap.
     pub plid: PlayerId,
 
     #[insim(duration = u32)]
-    /// Lap time
+    /// Lap time.
     pub ltime: Duration, // lap time (ms)
 
     #[insim(duration = u32)]
-    /// Total elapsed time
+    /// Total elapsed time since session start.
     pub etime: Duration,
 
     /// Number of laps completed.
     pub lapsdone: u16,
 
-    /// See [PlayerFlags].
+    /// Player flags (help settings).
     #[insim(pad_after = 1)]
     pub flags: PlayerFlags,
 
-    /// Current penalty
+    /// Current penalty state.
     pub penalty: PenaltyInfo,
 
     /// Number of pit stops.
     pub numstops: u8,
 
-    /// See [Fuel200].
+    /// Fuel remaining (double-percentage when enabled).
     pub fuel200: Fuel200,
 }
 

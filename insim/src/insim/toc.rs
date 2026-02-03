@@ -2,20 +2,20 @@ use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Take Over Car - informational - when a 2 connections swap drivers
-/// Insim indicates this by sending this packet which describes a transfer of the relationship
-/// between this PlayerId and two ConnectionId's.
+/// Driver swap notification.
+///
+/// - Indicates a player moved between connections.
 pub struct Toc {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Players unique Id
+    /// Player identifier.
     pub plid: PlayerId,
 
-    /// The original connection ID
+    /// Original connection id.
     pub olducid: ConnectionId,
 
-    /// The new connection ID for this `plid`
+    /// New connection id for this player.
     #[insim(pad_after = 2)]
     pub newucid: ConnectionId,
 }

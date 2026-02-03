@@ -2,22 +2,24 @@ use crate::identifiers::RequestId;
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Screen Mode (referred to as originally IS_MOD within Insim.txt)
+/// Screen mode configuration.
+///
+/// - Set resolution and refresh rate, or switch to windowed mode.
 pub struct Mod {
     #[insim(pad_after = 1)]
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Set to choose 16-bit
+    /// Set to choose 16-bit mode.
     pub bit16: i32,
 
-    /// Refresh rate, zero for default
+    /// Refresh rate (0 = default).
     pub rr: i32,
 
-    /// Screen width. Zero to switch to windowed mode.
+    /// Screen width (0 = windowed mode).
     pub width: i32,
 
-    /// Screen height. Zero to switch to windowed mode.
+    /// Screen height (0 = windowed mode).
     pub height: i32,
 }
 
