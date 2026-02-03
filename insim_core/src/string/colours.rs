@@ -47,6 +47,9 @@ pub trait Colour {
     fn white(self) -> String;
     /// Make this dark green (default colour)
     fn dark_green(self) -> String;
+
+    /// Strip colours from a string
+    fn strip_colours(&self) -> Cow<'_, str>;
 }
 
 impl<T: AsRef<str>> Colour for T {
@@ -85,22 +88,14 @@ impl<T: AsRef<str>> Colour for T {
     fn dark_green(self) -> String {
         format!("^9{}", self.as_ref())
     }
-}
 
-/// ColourifyExt allows chaining, providing an alterntive to format!
-pub trait ColourExt {
-    /// Allows chaining
-    fn then(self, other: impl AsRef<str>) -> String;
-}
-
-impl ColourExt for String {
-    fn then(mut self, other: impl AsRef<str>) -> String {
-        self.push_str(other.as_ref());
-        self
+    fn strip_colours(&self) -> Cow<'_, str> {
+        strip(self.as_ref())
     }
 }
 
 /// Strip LFS colours
+/// Prefer the [`Colour::strip_colours`] trait function
 pub fn strip(input: &'_ str) -> Cow<'_, str> {
     if !input.chars().any(|c| c.is_lfs_control_char()) {
         return Cow::Borrowed(input);
@@ -147,11 +142,13 @@ mod tests {
     #[test]
     fn test_strip_colours_only() {
         assert_eq!(strip("^1^2^3^4^5^6^7^8^9"), "");
+        assert_eq!("^1^2^3^4^5^6^7^8^9".strip_colours(), "");
     }
 
     #[test]
     fn test_strip_colours() {
         assert_eq!(strip("^1234^56789"), "2346789");
+        assert_eq!("^1234^56789".strip_colours(), "2346789");
     }
 
     #[test]
@@ -186,16 +183,5 @@ mod tests {
     #[test]
     fn test_colourify_str() {
         assert_eq!("^4Test", "Test".blue());
-    }
-
-    #[test]
-    fn test_colourifyext() {
-        assert_eq!(
-            "^4Test ^3Test2",
-            "Test"
-                .blue()
-                .then(" ".to_string())
-                .then("Test2".to_string().yellow())
-        );
     }
 }
