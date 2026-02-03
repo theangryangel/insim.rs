@@ -16,17 +16,29 @@ pub(super) struct Receiver {
 }
 
 impl Receiver {
-    fn repr_type(&self) -> Option<syn::Ident> {
-        let attr = self.attrs.iter().find(|a| a.path().is_ident("repr"))?;
+    fn repr_type(&self) -> Result<Option<syn::Ident>, darling::Error> {
+        let attr = match self.attrs.iter().find(|a| a.path().is_ident("repr")) {
+            Some(attr) => attr,
+            None => return Ok(None),
+        };
         let mut repr_ty = None;
         attr.parse_nested_meta(|m| {
-            repr_ty = Some(m.path.get_ident().expect("Missing ident").clone());
+            let ident = m
+                .path
+                .get_ident()
+                .ok_or_else(|| darling::Error::custom("repr must be an ident").with_span(&m.path))?
+                .clone();
+            repr_ty = Some(ident);
             Ok(())
         })
-        .expect("Expected to parse nested meta");
-        match repr_ty.as_ref()?.to_string().as_str() {
-            "u8" | "u16" | "u32" | "u64" => Some(repr_ty?),
-            _ => None,
+        .map_err(|e| {
+            darling::Error::custom(format!("failed to parse repr: {}", e)).with_span(attr)
+        })?;
+
+        match repr_ty.as_ref().map(|repr| repr.to_string()) {
+            Some(ref name) if matches!(name.as_str(), "u8" | "u16" | "u32" | "u64") => Ok(repr_ty),
+            Some(_) => Err(darling::Error::custom("repr must be u8/u16/u32/u64").with_span(attr)),
+            None => Ok(None),
         }
     }
 
@@ -35,25 +47,26 @@ impl Receiver {
         variants: &[Variant],
     ) -> Result<proc_macro2::TokenStream, darling::Error> {
         let name = &self.ident;
-        let repr_ty = &self
-            .repr_type()
-            .expect("ReadWriteBuf requires a repr type of u8..u64");
+        let repr_ty = self
+            .repr_type()?
+            .ok_or_else(|| darling::Error::custom("repr must be u8/u16/u32/u64").with_span(name))?;
 
-        let to_variants = variants.iter().filter_map(|f| {
+        let mut to_variants = Vec::new();
+        for f in variants.iter() {
             if f.skip() {
-                return None;
+                continue;
             }
 
             let variant_name = &f.ident;
-            let discrim = f
-                .discriminant
-                .as_ref()
-                .expect("ReadWriteBuf only works with discriminants");
+            let discrim = f.discriminant.as_ref().ok_or_else(|| {
+                darling::Error::custom("enum variants must have explicit discriminants")
+                    .with_span(&f.ident)
+            })?;
 
-            Some(quote! {
+            to_variants.push(quote! {
                 Self::#variant_name => #discrim,
-            })
-        });
+            });
+        }
 
         Ok(quote! {
             impl ::insim_core::Encode for #name {
@@ -75,9 +88,13 @@ impl Receiver {
     ) -> Result<proc_macro2::TokenStream, darling::Error> {
         let name = &self.ident;
 
-        let to_bytes_fields = fields
-            .iter()
-            .filter_map(|f| if f.skip() { None } else { Some(f.encode(name)) });
+        let mut to_bytes_fields = Vec::new();
+        for f in fields.iter() {
+            if f.skip() {
+                continue;
+            }
+            to_bytes_fields.push(f.encode(name)?);
+        }
 
         Ok(quote! {
             impl ::insim_core::Encode for #name {
@@ -102,23 +119,24 @@ impl Receiver {
         variants: &[Variant],
     ) -> Result<proc_macro2::TokenStream, darling::Error> {
         let name = &self.ident;
-        let repr_ty = &self
-            .repr_type()
-            .expect("ReadWriteBuf requires a repr type of u8..u64");
-        let from_variants = variants.iter().filter_map(|f| {
+        let repr_ty = self
+            .repr_type()?
+            .ok_or_else(|| darling::Error::custom("repr must be u8/u16/u32/u64").with_span(name))?;
+        let mut from_variants = Vec::new();
+        for f in variants.iter() {
             if f.skip() {
-                return None;
+                continue;
             }
             let variant_name = f.ident.clone();
-            let discrim = f
-                .discriminant
-                .clone()
-                .expect("ReadWriteBuf only works with discriminants");
+            let discrim = f.discriminant.clone().ok_or_else(|| {
+                darling::Error::custom("enum variants must have explicit discriminants")
+                    .with_span(&f.ident)
+            })?;
 
-            Some(quote! {
+            from_variants.push(quote! {
                 #discrim => Self::#variant_name,
-            })
-        });
+            });
+        }
 
         Ok(quote! {
             impl ::insim_core::Decode for #name {
@@ -140,20 +158,28 @@ impl Receiver {
     ) -> Result<proc_macro2::TokenStream, darling::Error> {
         let name = &self.ident;
 
-        let from_bytes_fields = fields
-            .iter()
-            .filter_map(|f| if f.skip() { None } else { Some(f.decode(name)) });
-
-        let from_bytes_fields_init = fields.iter().filter_map(|f| {
+        let mut from_bytes_fields = Vec::new();
+        for f in fields.iter() {
             if f.skip() {
-                return None;
+                continue;
             }
-            let field_name = f.ident.as_ref().expect("Missing field name");
+            from_bytes_fields.push(f.decode(name)?);
+        }
 
-            Some(quote! {
+        let mut from_bytes_fields_init = Vec::new();
+        for f in fields.iter() {
+            if f.skip() {
+                continue;
+            }
+            let field_name = f
+                .ident
+                .as_ref()
+                .ok_or_else(|| darling::Error::custom("missing field name").with_span(name))?;
+
+            from_bytes_fields_init.push(quote! {
                 #field_name
-            })
-        });
+            });
+        }
 
         Ok(quote! {
             impl ::insim_core::Decode for #name {

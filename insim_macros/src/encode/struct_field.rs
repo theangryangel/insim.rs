@@ -33,9 +33,15 @@ impl Field {
         self.skip.unwrap_or(false)
     }
 
-    pub(super) fn decode(&self, parent: &syn::Ident) -> proc_macro2::TokenStream {
+    pub(super) fn decode(
+        &self,
+        parent: &syn::Ident,
+    ) -> Result<proc_macro2::TokenStream, darling::Error> {
         let f = self;
-        let field_name = f.ident.as_ref().expect("Missing field name?");
+        let field_name = f
+            .ident
+            .as_ref()
+            .ok_or_else(|| darling::Error::custom("missing field name").with_span(&f.ty))?;
         let pad_after = f.pad_after.unwrap_or(0);
         let pad_before = f.pad_before.unwrap_or(0);
         let field_type = f.ty.clone();
@@ -112,12 +118,18 @@ impl Field {
                 <::bytes::Bytes as ::bytes::buf::Buf>::advance(buf, #pad_after);
             }
         }
-        tokens
+        Ok(tokens)
     }
 
-    pub(super) fn encode(&self, parent: &syn::Ident) -> proc_macro2::TokenStream {
+    pub(super) fn encode(
+        &self,
+        parent: &syn::Ident,
+    ) -> Result<proc_macro2::TokenStream, darling::Error> {
         let f = self;
-        let field_name = f.ident.as_ref().expect("Missing field name");
+        let field_name = f
+            .ident
+            .as_ref()
+            .ok_or_else(|| darling::Error::custom("missing field name").with_span(&f.ty))?;
         let pad_after = f.pad_after.unwrap_or(0);
         let pad_before = f.pad_before.unwrap_or(0);
         let field_type = f.ty.clone();
@@ -199,6 +211,6 @@ impl Field {
             }
         }
 
-        tokens
+        Ok(tokens)
     }
 }
