@@ -186,7 +186,7 @@ pub fn to_lossy_string(input: &'_ [u8]) -> Cow<'_, str> {
 
     // slowest path
     // find the positions in the input for each ^L, ^B...
-    // XXX: Using SmallVec here to avoid an allocation
+    // XXX: Using SmallVec here to avoid an allocation if possible
     let mut indices: SmallVec<[usize; 8]> = input
         .iter()
         .tuple_windows()

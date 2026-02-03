@@ -1,10 +1,7 @@
-use std::{
-    io,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use insim_core::{Decode, Encode, EncodeErrorKind};
+use insim_core::{Decode, DecodeErrorKind, Encode, EncodeErrorKind};
 
 use super::DEFAULT_TIMEOUT_SECS;
 use crate::{
@@ -197,7 +194,7 @@ impl Codec {
     /// Decode the length of the next packet in the buffer src, ensuring that it does
     /// not exceed limits.
     #[tracing::instrument]
-    fn decode_length(&self, src: &BytesMut) -> io::Result<Option<usize>> {
+    fn decode_length(&self, src: &BytesMut) -> Result<Option<usize>> {
         if src.len() < MIN_PACKET_SIZE {
             // Not enough data for even the header
             return Ok(None);
@@ -210,11 +207,19 @@ impl Codec {
         };
 
         // does this exceed the max possible packet?
-        if n > MAX_PACKET_SIZE {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "frame exceeds max_bytes",
-            ));
+        if !(MIN_PACKET_SIZE..=MAX_PACKET_SIZE).contains(&n) {
+            let len_to_copy = 4.min(src.len());
+
+            return Err(Error::Decode {
+                offset: 0,
+                input: Bytes::copy_from_slice(&src[0..len_to_copy]),
+                error: DecodeErrorKind::OutOfRange {
+                    min: MIN_PACKET_SIZE,
+                    max: MAX_PACKET_SIZE,
+                    found: n,
+                }
+                .context("Decoded packet size is out of range"),
+            });
         }
 
         if src.len() < n {
