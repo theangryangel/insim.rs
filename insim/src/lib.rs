@@ -35,6 +35,7 @@ pub use error::Error;
 pub use insim_core as core;
 pub use packet::{Packet, WithRequestId};
 pub use result::Result;
+pub use core::string::{colours::Colour, escaping::Escape};
 
 /// Shortcut method to create a TCP connection
 ///
