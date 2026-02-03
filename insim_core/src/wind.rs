@@ -7,7 +7,10 @@ use crate::{Decode, Encode};
 #[derive(Debug, Default, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[repr(u8)]
-/// Wind strength levels within LFS
+/// Wind strength levels.
+///
+/// - Discrete values (not a continuous scale).
+/// - Reported in session state packets.
 pub enum Wind {
     #[default]
     /// No wind

@@ -27,10 +27,10 @@ pub struct PlayerHandicap {
     /// Which handicap values are set.
     pub flags: PlayerHandicapFlags,
 
-    /// Added mass (requires [PlayerHandicapFlags::MASS]).
+    /// Added mass (requires MASS flag).
     pub h_mass: u8,
 
-    /// Intake restriction (requires [PlayerHandicapFlags::TRES]).
+    /// Intake restriction (requires TRES flag).
     pub h_tres: u8,
 }
 

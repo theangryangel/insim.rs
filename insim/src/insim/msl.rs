@@ -1,6 +1,6 @@
 use crate::identifiers::RequestId;
 
-/// Sound effect used when delivering [Msl] or [Mtc] messages.
+/// Sound effect used when delivering [Msl] or [Mtc](super::Mtc) messages.
 #[derive(
     Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, insim_core::Decode, insim_core::Encode,
 )]

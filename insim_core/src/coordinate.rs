@@ -2,20 +2,19 @@
 
 use crate::{Decode, Encode};
 
-/// Represent position/coordinates in LFS game space.
-/// Internally stored as i32 where 65536 = 1m to ensure zero data loss from upstream.
+/// Position in LFS world space.
 ///
-/// It's usual for humans to work in metres, so we provide useful functions to scale to f32 metres, as
-/// well as to convert to glam::{DVec3, IVec3, Vec3} (other library integrations may be
-/// available later).
+/// - Internal units use fixed-point where 65536 = 1 meter.
+/// - Use the `*_metres()` helpers for human-scale values.
+/// - Optional `glam` conversions are provided.
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Coordinate {
-    /// X coordinate
+    /// X coordinate in internal units.
     pub x: i32,
-    /// Y coordinate
+    /// Y coordinate in internal units.
     pub y: i32,
-    /// Z coordinate
+    /// Z coordinate in internal units.
     pub z: i32,
 }
 

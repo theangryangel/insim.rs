@@ -3,6 +3,10 @@ use std::fmt;
 
 /// Angular measurement stored as radians (f64).
 ///
+/// - 0° points along world Y, 90° along world X.
+/// - Values are not auto-normalized; use `normalize()` when needed.
+/// - Includes object-heading wire conversions.
+///
 /// Represents heading or direction in LFS game space. Internally stored as f64 radians
 /// for consistency across the codebase, with convenient conversions to/from degrees.
 /// Uses double precision to minimize cumulative errors in physics calculations and

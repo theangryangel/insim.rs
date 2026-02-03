@@ -15,7 +15,11 @@ macro_rules! define_tracks {
         ),* $(,)?
     ) => {
         #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, Default)]
-        /// Handles parsing a Track name.
+        /// Track identifier and metadata.
+        ///
+        /// - `code()` returns the LFS track code (e.g., `BL1`, `SO4R`).
+        /// - `license()` reports the required content tier.
+        /// - `is_reverse()` / `is_open()` are derived from the track code.
         #[non_exhaustive]
         #[allow(missing_docs)]
         #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]

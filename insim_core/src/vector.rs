@@ -2,11 +2,10 @@
 
 use crate::{Decode, Encode};
 
-/// 3D vector (used for velocity, acceleration, direction, etc.)
-/// Units depend on context - see individual field documentation
+/// 3D vector used for motion and forces.
 ///
-/// You'll almost certainly want to convert to glam::Vec3 (other library integrations may be
-/// available later).
+/// - Units depend on context (velocity, acceleration, direction).
+/// - Use the optional `glam` conversions when enabled.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Vector(pub f32, pub f32, pub f32);

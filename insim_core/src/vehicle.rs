@@ -3,7 +3,12 @@ use std::{borrow::Cow, convert::Infallible, str::FromStr};
 
 use crate::{Decode, Encode, license::License};
 
-/// Handles parsing a vehicle name according to the Insim v9 rules.
+/// Vehicle identifier for standard cars and mods.
+///
+/// - Standard vehicles use 3-character codes (e.g., `XFG`).
+/// - Mods are encoded as 6-character hex ids.
+/// - `license()` reports the required content tier.
+///
 /// See <https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info>
 #[derive(PartialEq, Eq, Clone, Copy, Default, Hash)]
 #[non_exhaustive]

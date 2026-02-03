@@ -1,7 +1,10 @@
 //! Dashlights
 
 bitflags::bitflags! {
-    /// Dashboard lights
+    /// Dashboard indicator lights.
+    ///
+    /// - Bitflags can be combined and queried with `.contains`.
+    /// - Typically reported in telemetry packets.
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize))]
     pub struct DashLights: u32 {

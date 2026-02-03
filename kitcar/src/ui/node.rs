@@ -54,7 +54,7 @@ impl<Msg> Node<Msg> {
         }
     }
 
-    /// No output. Effectively this is the same as Option<Node>, however we don't use Option for
+    /// No output. Effectively this is the same as `Option<Node>`, however we don't use Option for
     /// convenience.
     pub fn empty() -> Self {
         Self {

@@ -10,10 +10,10 @@ use std::fmt;
 
 /// Angular velocity stored as radians per second (f32).
 ///
-/// Represents the rate of change of heading. Positive values indicate clockwise rotation
-/// when viewed from above (following the same convention as Direction). Negative values
-/// indicate anticlockwise rotation.
-/// Internally stored as f32 radians per second for consistency with Direction and Speed.
+/// - `from_wire_i16` / `to_wire_i16` use the LFS scaling (16384 = 360°/s).
+/// - Positive values indicate clockwise rotation when viewed from above.
+/// - Stored as `f32` radians/sec for consistency with [`Heading`](crate::heading::Heading)
+///   and [`Speed`](crate::speed::Speed).
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct AngVel {
