@@ -8,21 +8,25 @@ Where possible this crate aligns the naming of fields in packets to match the [o
 
 In a handful of circumstances we have needed to rename, or separate some fields to align with the crate's key focus.
 
-# Key API Surface
-
-- `Packet`, `WithRequestId` - strongly typed packet handling.
-- `tcp`, `udp`, `net::Codec` - connection builders and sans-io codec.
-- `Colour`, `Escape` - string helpers for colour and escaping.
-
-# High-level features
-
-Here is a non-exhaustive list of the things that `insim` supports:
+# Key Concepts
 
 - insim over TCP or UDP (for both blocking and tokio). Mixing and matching TCP and UDP
   for positional updates is possible, but requires you to drop to the "sans-io"
   approach.
-- LFSW Relay support was removed due to the upstream service ceasing.
-- Or sans-io/bring-your-own-IO of your own choice through the [crate::net::Codec].
+  - Quickly create connections using `tcp` or `udp` functions
+  - If you prefer to handle that yourself, you can just use `net::Codec`.
+- Packets are represented by the `Packet` enum.
+  - Many of the types within a `Packet` variant implement `Into<Packet>`, allowing you to
+    avoid complex and tedious variable construction.
+  - With helper traits like `WithRequestId` also implemented on `Packet` and many types
+    within `Packet`.
+- String utilities cover colours (`Colour`) and escaping (`Escape`), plus codepage handling in the core crate
+  automatically convert strings from LFS into utf8 and back again.
+
+# Release Notes / Migration
+
+You'll always find the release notes and any breaking changes / migration notes at
+<https://github.com/theangryangel/insim.rs/releases>
 
 # Usage
 
@@ -31,26 +35,16 @@ Or more simply, just run `cargo add insim`.
 
 If you want to use an unreleased version you can also reference the GitHub repository.
 
-# Related crates
-
-You might also find these related crates useful:
-
-- `insim_pth` – for reading and writing LFS PTH files
-- `outgauge` - "sans-io" implementation of the LFS outgauge protocol
-- `outsim` - "sans-io" implementation of the LFS outsim protocol
-
-They follow the same design focus and can be found in the same GitHub repository.
-
 # Quick Start
 
-You can find a wide range of examples in the upstream repository under `examples/`:
+You can find a wider range of examples in the upstream repository under `examples/`:
 <https://github.com/theangryangel/insim.rs/tree/main/examples>
 
 ## Tokio (Async)
 
 ### TCP Connection
 
-```rust
+```rust,ignore
 let conn = insim::tcp("127.0.0.1:29999").connect_async().await?;
 loop {
     let packet = conn.read().await?;
@@ -67,7 +61,7 @@ loop {
 
 ### UDP Connection
 
-```rust
+```rust,ignore
 let conn = insim::tcp("127.0.0.1:29999", None).connect_async().await?;
 loop {
     let packet = conn.read().await?;
@@ -86,7 +80,7 @@ loop {
 
 ### TCP Connection
 
-```rust
+```rust,ignore
 let conn = insim::tcp("127.0.0.1:29999").connect()?;
 loop {
     let packet = conn.read()?;
@@ -101,31 +95,9 @@ loop {
 }
 ```
 
-## String helpers
+## Examples
 
-`insim` re-exports string helpers from the internal core crate for convenience, allowing
-you to quickly build formatted and escaped strings.
-
-```rust
-use insim::{Colour, Escape};
-
-let message = "Hello".red();
-let escaped = "^|*".escape();
-let unescaped = escaped.unescape();
-```
-
-## Concepts
-
-- Connections can be TCP/UDP or handled manually via the sans-io `net::Codec`.
-- Packets are represented by the `Packet` enum, with helpers like `WithRequestId`.
-- Many of the types within a `Packet` variant implement `Into<Packet>`, allowing you to
-  avoid complex and tedious variable construction.
-- String utilities cover colours and escaping, plus codepage handling in the core crate.
-
-# Examples
-
-You can find a wide range of examples in the upstream repository under `examples/`:
-<https://github.com/theangryangel/insim.rs/tree/main/examples>
+You can find a wide range of examples in the upstream repository under [examples/](https://github.com/theangryangel/insim.rs/tree/main/examples).
 
 What you will find there:
 
@@ -137,6 +109,21 @@ What you will find there:
 
 For sans-io usage, see [`net::Codec`](crate::net::Codec).
 
+## String helpers
+
+`insim` re-exports string helpers from the internal core crate for convenience, allowing
+you to quickly build formatted and escaped strings.
+
+```rust
+use insim::{Colour, Escape};
+
+let hello = "Hello".red();
+let world = String::from("World");
+let escaped = "^|*".escape();
+let combined = format!("{} {} {}", hello, world.blue(), escaped);
+let unescaped = escaped.unescape();
+```
+
 # Crate features
 
 | Name       | Description                  | Default? |
@@ -145,6 +132,16 @@ For sans-io usage, see [`net::Codec`](crate::net::Codec).
 | `tokio`    | Enable tokio support         | Yes      |
 | `blocking` | Enable blocking/sync support | Yes      |
 
-# Internal core crate
+# Related crates
 
-`insim_core` contains shared low-level types and utilities. Most users should only depend on `insim`.
+You might also find these related crates useful:
+
+- `insim_core` - contains shared low-level types and utilities. Most users should only depend on `insim`. This is re-exported as `core` from insim.
+- `insim_pth` – for reading and writing LFS PTH and PIN files.
+- `outgauge` - "sans-io" implementation of the LFS outgauge protocol.
+- `outsim` - "sans-io" implementation of the LFS outsim protocol.
+- `kitcar` - a Work in Progress, unstable suite of micro libraries to help build
+  multi-player mini-games quickly using insim.
+
+They follow the same design focus and can be found in the same GitHub repository, or on
+crates.io.

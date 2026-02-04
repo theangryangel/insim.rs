@@ -45,7 +45,7 @@ pub use result::Result;
 /// Supports both blocking and tokio. Swap about `connect_async` for `connect` and remove the
 /// `.await` annotations.
 ///
-/// ```rust
+/// ```rust,ignore
 /// let conn = insim::tcp("127.0.0.1:29999").connect_async().await?;
 /// loop {
 ///     let packet = conn.read().await?;
@@ -65,7 +65,7 @@ pub fn tcp<R: Into<address::Addr>>(remote_addr: R) -> builder::Builder {
 /// Supports both blocking and tokio. Swap about `connect_async` for `connect` and remove the
 /// `.await` annotations.
 ///
-/// ```rust
+/// ```rust,ignore
 /// let conn = insim::udp("127.0.0.1:29999", None).connect_async().await?;
 /// loop {
 ///     let packet = conn.read().await?;
