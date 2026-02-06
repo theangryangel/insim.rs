@@ -73,7 +73,10 @@ pub async fn main() -> insim::Result<()> {
     builder = builder
         .isi_flag_mci(true)
         .isi_flag_con(true)
-        .isi_flag_obh(true);
+        .isi_flag_obh(true)
+        .isi_flag_axm_load(true)
+        .isi_flag_axm_edit(true)
+        .isi_interval(Duration::from_secs(1));
     if let Some(interval) = &cli.isi_interval {
         builder = builder.isi_interval(Duration::from_secs((*interval).into()));
     }

@@ -246,7 +246,7 @@ impl From<&ObjectInfo> for u8 {
             ObjectInfo::TyreStack2Big(_) => 53,
             ObjectInfo::TyreStack3Big(_) => 54,
             ObjectInfo::TyreStack4Big(_) => 55,
-            ObjectInfo::MarkerCorner(_) => 62,
+            ObjectInfo::MarkerCorner(_) => 64,
             ObjectInfo::MarkerDistance(_) => 84,
             ObjectInfo::LetterboardWY(_) => 92,
             ObjectInfo::LetterboardRB(_) => 93,
@@ -402,7 +402,7 @@ impl Decode for ObjectInfo {
                 xyz, flags, heading,
             )?)),
 
-            62 => Ok(ObjectInfo::MarkerCorner(marker::MarkerCorner::new(
+            64 => Ok(ObjectInfo::MarkerCorner(marker::MarkerCorner::new(
                 xyz, flags, heading,
             )?)),
             84 => Ok(ObjectInfo::MarkerDistance(marker::MarkerDistance::new(
