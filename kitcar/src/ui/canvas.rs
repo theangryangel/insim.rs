@@ -9,7 +9,7 @@ use insim::{
     insim::{Bfn, BfnType, Btn},
 };
 
-use super::{Node, NodeKind, View, id_pool::ClickIdPool};
+use super::{Node, NodeKind, TypeInMapper, View, id_pool::ClickIdPool};
 
 #[derive(Debug, Default)]
 pub(super) struct CanvasDiff {
@@ -33,13 +33,18 @@ struct ButtonState {
     rendered_hash: u64,
 }
 
-#[derive(Debug)]
+#[derive(Clone)]
+struct ButtonBinding<Msg> {
+    click: Option<Msg>,
+    typein: Option<TypeInMapper<Msg>>,
+}
+
 pub(super) struct Canvas<V: View> {
     ucid: ConnectionId,
     pool: ClickIdPool,
     // map stable hash -> button state (click id + rendered hash for diffing)
     buttons: HashMap<u64, ButtonState>,
-    click_map: HashMap<ClickId, V::Message>,
+    click_map: HashMap<ClickId, ButtonBinding<V::Message>>,
 }
 
 impl<V: View> Canvas<V> {
@@ -148,7 +153,7 @@ impl<V: View> Canvas<V> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn visit<M: Clone>(
+    fn visit<M: Clone + 'static>(
         node: Node<M>,
         parent_hash: u64,
         ucid: ConnectionId,
@@ -157,7 +162,7 @@ impl<V: View> Canvas<V> {
         new_buttons: &mut HashMap<u64, ButtonState>,
         tree: &mut taffy::TaffyTree,
         node_map: &mut Vec<(taffy::NodeId, u64, Btn)>,
-        click_map: &mut HashMap<ClickId, M>,
+        click_map: &mut HashMap<ClickId, ButtonBinding<M>>,
     ) -> Option<taffy::NodeId> {
         match node.kind {
             NodeKind::Container(Some(children)) => {
@@ -199,6 +204,7 @@ impl<V: View> Canvas<V> {
                 msg,
                 key,
                 bstyle,
+                typein,
             } => {
                 // calculate stable identity
                 let mut hasher = DefaultHasher::new();
@@ -240,8 +246,17 @@ impl<V: View> Canvas<V> {
                     },
                 );
 
-                if let Some(msg) = msg {
-                    let _ = click_map.insert(click_id, msg);
+                let typein_limit = typein.as_ref().map(|(limit, _)| *limit);
+                let typein_mapper = typein.map(|(_, mapper)| mapper);
+
+                if msg.is_some() || typein_mapper.is_some() {
+                    let _ = click_map.insert(
+                        click_id,
+                        ButtonBinding {
+                            click: msg,
+                            typein: typein_mapper,
+                        },
+                    );
                 }
 
                 let node_id = tree
@@ -255,6 +270,7 @@ impl<V: View> Canvas<V> {
                         ucid,
                         reqi: RequestId(click_id.0),
                         clickid: click_id,
+                        typein: typein_limit,
                         bstyle,
                         ..Default::default()
                     },
@@ -274,7 +290,20 @@ impl<V: View> Canvas<V> {
     }
 
     pub(super) fn translate_clickid(&self, clickid: &ClickId) -> Option<V::Message> {
-        self.click_map.get(clickid).cloned()
+        self.click_map
+            .get(clickid)
+            .and_then(|binding| binding.click.clone())
+    }
+
+    pub(super) fn translate_typein_clickid(
+        &self,
+        clickid: &ClickId,
+        text: String,
+    ) -> Option<V::Message> {
+        self.click_map
+            .get(clickid)
+            .and_then(|binding| binding.typein.as_ref())
+            .map(|mapper| mapper(text))
     }
 }
 
@@ -312,6 +341,7 @@ mod tests {
     #[derive(Debug, Clone, PartialEq)]
     enum TestMsg {
         Click,
+        TypeIn(String),
     }
 
     struct TestView;
@@ -493,6 +523,24 @@ mod tests {
         let click_id = ClickId(99);
         let msg = canvas.translate_clickid(&click_id);
         assert!(msg.is_none());
+    }
+
+    #[test]
+    fn test_translate_typein_clickid_known() {
+        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+
+        let root: Node<TestMsg> = Node::container().w(200.0).h(100.0).with_child(
+            Node::text("Input", BtnStyle::default())
+                .typein(32, TestMsg::TypeIn)
+                .w(50.0)
+                .h(10.0),
+        );
+
+        let _ = canvas.reconcile(root);
+
+        let click_id = ClickId(1);
+        let msg = canvas.translate_typein_clickid(&click_id, "hello".to_string());
+        assert_eq!(msg, Some(TestMsg::TypeIn("hello".to_string())));
     }
 
     #[test]

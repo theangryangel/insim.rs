@@ -51,6 +51,7 @@ pub(super) fn run_view<V: View>(
     internal_tx: mpsc::UnboundedSender<V::Message>,
     mut internal_rx: mpsc::UnboundedReceiver<V::Message>,
     insim: insim::builder::InsimTask,
+    outbound: tokio::sync::broadcast::Sender<(ConnectionId, V::Message)>,
 ) {
     #[allow(clippy::let_underscore_future)]
     let _ = tokio::task::spawn_local(async move {
@@ -112,12 +113,22 @@ pub(super) fn run_view<V: View>(
                     match packet {
                         Ok(Packet::Btc(btc)) if btc.ucid == ucid => {
                             if let Some(msg) = canvas.translate_clickid(&btc.clickid) {
+                                let _ = outbound.send((ucid, msg.clone()));
                                 root.update(msg);
                                 true
                             } else {
                                 false
                             }
                         },
+                        Ok(Packet::Btt(btt)) if btt.ucid == ucid => {
+                            if let Some(msg) = canvas.translate_typein_clickid(&btt.clickid, btt.text.clone()) {
+                                let _ = outbound.send((ucid, msg.clone()));
+                                root.update(msg);
+                                true
+                            } else {
+                                false
+                            }
+                        }
                         Ok(Packet::Bfn(bfn)) if bfn.ucid == ucid => match bfn.subt {
                             BfnType::Clear | BfnType::UserClear => {
                                 blocked = true;

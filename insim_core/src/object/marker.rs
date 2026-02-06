@@ -76,7 +76,7 @@ pub struct MarkerCorner {
 
 impl MarkerCorner {
     pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = self.kind as u8 & 0x0f;
+        let mut flags = (self.kind as u8 & 0x0f) << 3;
         if self.floating {
             flags |= 0x80;
         }
@@ -88,7 +88,7 @@ impl MarkerCorner {
         wire: ObjectFlags,
         heading: Heading,
     ) -> Result<Self, crate::DecodeError> {
-        let kind = MarkerCornerKind::try_from(wire.0 & 0x0f)?;
+        let kind = MarkerCornerKind::try_from(wire.mapping())?;
         let floating = wire.floating();
         Ok(Self {
             xyz,
@@ -154,7 +154,7 @@ pub struct MarkerDistance {
 
 impl MarkerDistance {
     pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = self.kind as u8 & 0x0f;
+        let mut flags = (self.kind as u8 & 0x0f) << 3;
         if self.floating {
             flags |= 0x80;
         }
@@ -166,7 +166,7 @@ impl MarkerDistance {
         wire: ObjectFlags,
         heading: Heading,
     ) -> Result<Self, crate::DecodeError> {
-        let kind = MarkerDistanceKind::try_from(wire.0 & 0x0f)?;
+        let kind = MarkerDistanceKind::try_from(wire.mapping())?;
         let floating = wire.floating();
         Ok(Self {
             xyz,

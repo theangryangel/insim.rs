@@ -35,6 +35,7 @@ pub struct Ui<V: View> {
     global: watch::Sender<V::GlobalProps>,
     connection: mpsc::Sender<(ConnectionId, V::ConnectionProps)>,
     message: mpsc::Sender<(ConnectionId, V::Message)>,
+    outbound: broadcast::Sender<(ConnectionId, V::Message)>,
     _phantom: PhantomData<V>,
 }
 
@@ -88,6 +89,11 @@ impl<V: View> Ui<V> {
     /// ```
     pub fn sender(&self) -> mpsc::Sender<(ConnectionId, V::Message)> {
         self.message.clone()
+    }
+
+    /// Subscribe to messages produced by user UI interactions (e.g. button click / type-in).
+    pub fn subscribe(&self) -> broadcast::Receiver<(ConnectionId, V::Message)> {
+        self.outbound.subscribe()
     }
 
     /// Utility function to reduce boilerplate when injecting messages from external sources,
@@ -170,10 +176,12 @@ pub fn attach<V: View>(
     let (global_tx, _global_rx) = watch::channel(props);
     let (player_tx, mut player_rx) = mpsc::channel(100);
     let (message_tx, mut message_rx) = mpsc::channel::<(ConnectionId, V::Message)>(100);
+    let (outbound_tx, _outbound_rx) = broadcast::channel::<(ConnectionId, V::Message)>(100);
     let ui_handle = Ui {
         global: global_tx.clone(),
         connection: player_tx,
         message: message_tx,
+        outbound: outbound_tx.clone(),
         _phantom: PhantomData,
     };
 
@@ -207,7 +215,13 @@ pub fn attach<V: View>(
 
             // FIXME: expect
             for existing in presence.connections().await.expect("FIXME") {
-                spawn_for::<V>(existing.ucid, global_tx.subscribe(), &insim, &mut active);
+                spawn_for::<V>(
+                    existing.ucid,
+                    global_tx.subscribe(),
+                    &insim,
+                    &mut active,
+                    outbound_tx.clone(),
+                );
             }
 
             loop {
@@ -218,7 +232,13 @@ pub fn attach<V: View>(
                                 continue;
                             }
 
-                            spawn_for::<V>(ncn.ucid, global_tx.subscribe(), &insim, &mut active);
+                            spawn_for::<V>(
+                                ncn.ucid,
+                                global_tx.subscribe(),
+                                &insim,
+                                &mut active,
+                                outbound_tx.clone(),
+                            );
                         },
                         Ok(Packet::Cnl(cnl)) => {
                             // player left, remove their props sender
@@ -302,6 +322,7 @@ fn spawn_for<V: View>(
             mpsc::UnboundedSender<V::Message>,
         ),
     >,
+    outbound: broadcast::Sender<(ConnectionId, V::Message)>,
 ) {
     let (connection_tx, connection_rx) = watch::channel(V::ConnectionProps::default());
     let (internal_tx, internal_rx) = mpsc::unbounded_channel();
@@ -313,6 +334,7 @@ fn spawn_for<V: View>(
         internal_tx.clone(),
         internal_rx,
         insim.clone(),
+        outbound,
     );
     let _ = active.insert(ucid, (connection_tx, internal_tx));
 }

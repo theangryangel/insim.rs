@@ -1,6 +1,18 @@
+use std::sync::Arc;
+
 use insim::insim::BtnStyle;
 
-#[derive(Debug, Clone)]
+pub type TypeInMapper<Msg> = Arc<dyn Fn(String) -> Msg + 'static>;
+
+fn map_typein_mapper<Msg, ParentMsg, F>(mapper: TypeInMapper<Msg>, f: F) -> TypeInMapper<ParentMsg>
+where
+    F: Fn(Msg) -> ParentMsg + Clone + 'static,
+    Msg: 'static,
+{
+    Arc::new(move |text| f(mapper(text)))
+}
+
+#[derive(Clone)]
 pub enum NodeKind<Msg> {
     Container(Option<Vec<Node<Msg>>>),
     Button {
@@ -8,8 +20,35 @@ pub enum NodeKind<Msg> {
         msg: Option<Msg>,
         key: Option<String>,
         bstyle: BtnStyle,
+        typein: Option<(u8, TypeInMapper<Msg>)>,
     },
     Empty,
+}
+
+impl<Msg> std::fmt::Debug for NodeKind<Msg> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Container(Some(children)) => f
+                .debug_tuple("Container")
+                .field(&format_args!("Some({} children)", children.len()))
+                .finish(),
+            Self::Container(None) => f.debug_tuple("Container").field(&"None").finish(),
+            Self::Button {
+                text,
+                key,
+                bstyle,
+                typein,
+                ..
+            } => f
+                .debug_struct("Button")
+                .field("text", text)
+                .field("key", key)
+                .field("bstyle", bstyle)
+                .field("typein", &typein.as_ref().map(|(limit, _)| *limit))
+                .finish(),
+            Self::Empty => f.write_str("Empty"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -37,6 +76,7 @@ impl<Msg> Node<Msg> {
                 msg: Some(msg),
                 key: None,
                 bstyle,
+                typein: None,
             },
         }
     }
@@ -50,8 +90,21 @@ impl<Msg> Node<Msg> {
                 msg: None,
                 key: None,
                 bstyle,
+                typein: None,
             },
         }
+    }
+
+    /// Add type-in handling for this button.
+    pub fn typein<F>(mut self, limit: u8, mapper: F) -> Self
+    where
+        F: Fn(String) -> Msg + 'static,
+    {
+        if let NodeKind::Button { ref mut typein, .. } = self.kind {
+            *typein = Some((limit, Arc::new(mapper)));
+        }
+
+        self
     }
 
     /// No output. Effectively this is the same as `Option<Node>`, however we don't use Option for
@@ -398,7 +451,8 @@ impl<Msg> Node<Msg> {
     // Usage: component.render(ctx).map(RootMsg::ParentVariant)
     pub fn map<F, ParentMsg>(self, f: F) -> Node<ParentMsg>
     where
-        F: Fn(Msg) -> ParentMsg + Clone,
+        F: Fn(Msg) -> ParentMsg + Clone + 'static,
+        Msg: 'static,
     {
         let kind = match self.kind {
             NodeKind::Container(Some(c)) => {
@@ -410,11 +464,13 @@ impl<Msg> Node<Msg> {
                 msg,
                 key,
                 bstyle,
+                typein,
             } => NodeKind::Button {
                 text,
                 msg: msg.map(&f),
                 key,
                 bstyle,
+                typein: typein.map(|(limit, mapper)| (limit, map_typein_mapper(mapper, f.clone()))),
             },
             NodeKind::Empty => NodeKind::Empty,
         };
