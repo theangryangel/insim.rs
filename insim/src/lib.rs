@@ -21,6 +21,9 @@ pub mod packet;
 #[doc(hidden)]
 pub mod result;
 
+#[doc = include_str!("../docs/book.md")]
+pub mod _book {}
+
 /// The Insim Protocol Version Number supported by this library
 pub const VERSION: u8 = 10;
 
