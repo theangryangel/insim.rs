@@ -8,7 +8,7 @@ use crate::{Decode, Encode};
 /// - Use the `*_metres()` helpers for human-scale values.
 /// - Optional `glam` conversions are provided.
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Coordinate {
     /// X coordinate in internal units.
     pub x: i32,

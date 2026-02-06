@@ -1,7 +1,7 @@
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Player left the race (spectating).
 pub struct Pll {
     /// Request identifier echoed by replies.

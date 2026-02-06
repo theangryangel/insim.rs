@@ -9,7 +9,7 @@ pub use insim_core::object::ObjectInfo;
 
 /// Actions that can be taken as part of [Axm].
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum PmoAction {
@@ -44,7 +44,7 @@ pub enum PmoAction {
 
 bitflags::bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// AutoX object flags.
     pub struct PmoFlags: u8 {
         /// LFS has reached the end of a layout file which it is loading. The added objects will then be optimised.
@@ -78,7 +78,7 @@ impl_bitflags_from_to_bytes!(PmoFlags, u8);
 /// - Adds, removes, or reports layout objects.
 /// - Carries a list of [ObjectInfo] entries.
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Axm {
     /// Request identifier echoed by replies.
     pub reqi: RequestId,

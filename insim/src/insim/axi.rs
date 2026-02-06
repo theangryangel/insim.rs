@@ -5,7 +5,7 @@ use crate::identifiers::RequestId;
 /// - Reports counts for objects and checkpoints plus the last loaded layout name.
 /// - Can be requested via [`TinyType::Axi`](crate::insim::TinyType::Axi).
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Axi {
     /// Request identifier echoed by replies.
     #[insim(pad_after = 1)]

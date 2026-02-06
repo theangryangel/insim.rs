@@ -17,7 +17,7 @@ use insim_core::{
 
 bitflags::bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Describes the setup of a player and the various helpers that may be enabled, such as
     /// auto-clutch, etc.
     pub struct OutgaugeFlags: u16 {
@@ -48,7 +48,7 @@ impl Decode for OutgaugeFlags {
 
 /// Unique Player Identifier, commonly referred to as PLID in Insim.txt
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OutgaugeId(pub i32);
 
 impl fmt::Display for OutgaugeId {
@@ -92,7 +92,7 @@ impl Encode for OutgaugeId {
 }
 
 #[derive(Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Outgauge packet
 pub struct Outgauge {
     /// Time, useful for ordering

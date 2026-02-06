@@ -2,7 +2,7 @@ use super::CameraView;
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Set the in-game camera for a player.
 ///
 /// - Updates the camera view for the target player.

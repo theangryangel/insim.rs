@@ -5,12 +5,10 @@ use std::{
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use insim_core::{Decode, Encode};
-#[cfg(feature = "serde")]
-use serde::Serialize;
 
 /// Button Click Identifier
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ClickId(pub u8);
 
 impl ClickId {

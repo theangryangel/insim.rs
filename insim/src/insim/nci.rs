@@ -5,7 +5,7 @@ use insim_core::license::License;
 use crate::identifiers::{ConnectionId, RequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[allow(missing_docs)]
 /// Language
@@ -51,7 +51,7 @@ pub enum Language {
 }
 
 #[derive(Debug, Clone, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Extra information about a connection (host only).
 ///
 /// - Requires an admin password on the host.

@@ -4,7 +4,7 @@ use super::{Fuel200, PenaltyInfo};
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Split timing for a player.
 ///
 /// - Sent when a player crosses a split.

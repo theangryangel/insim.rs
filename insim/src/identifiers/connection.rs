@@ -8,7 +8,7 @@ use insim_core::{Decode, Encode};
 
 /// Unique Connection Identifier, commonly referred to as UCID in Insim.txt
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectionId(pub u8);
 
 impl ConnectionId {

@@ -7,7 +7,7 @@ use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 #[derive(
     Debug, Default, Clone, Eq, PartialEq, PartialOrd, Ord, insim_core::Decode, insim_core::Encode,
 )]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum MsoUserType {
@@ -29,7 +29,7 @@ const MSO_MSG_MAX_LEN: usize = 128;
 const MSO_MSG_ALIGN: usize = 4;
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// System and user messages reported by LFS.
 ///
 /// - Variable-length packet with a message payload.

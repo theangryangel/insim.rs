@@ -1,7 +1,7 @@
 use crate::{Packet, WithRequestId, identifiers::RequestId};
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Subtype for the [Tiny] packet.
@@ -120,7 +120,7 @@ impl WithRequestId for TinyType {
 }
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// General purpose request/reply packet.
 ///
 /// - Used for lightweight requests and notifications.

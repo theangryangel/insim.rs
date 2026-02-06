@@ -8,7 +8,7 @@ use crate::{
 };
 
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Set of allowed standard vehicles for [Plc].
 pub struct PlcAllowedCarsSet {
     inner: IndexSet<Vehicle>,
@@ -178,7 +178,7 @@ impl PlcAllowedCarsSet {
 }
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Restrict which standard vehicles a connection may select.
 ///
 /// - Applies to standard (non-mod) vehicles only.

@@ -30,7 +30,7 @@ macro_rules! define_packet {
         /// Each variant may either be instructional (tell LFS to do something), informational (you are
         /// told something about LFS), or both.
         #[derive(Debug, Clone, from_variants::FromVariants)]
-        #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+        #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
         #[cfg_attr(feature = "serde", serde(tag = "type"))]
         #[non_exhaustive]
         pub enum Packet {

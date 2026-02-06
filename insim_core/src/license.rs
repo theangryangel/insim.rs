@@ -7,7 +7,7 @@ use crate::{Decode, Encode};
 /// - See <https://www.lfs.net/contents> for details.
 #[non_exhaustive]
 #[derive(Default, PartialEq, PartialOrd, Eq, Debug, Copy, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 pub enum License {
     #[default]

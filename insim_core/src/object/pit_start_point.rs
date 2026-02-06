@@ -7,7 +7,7 @@ use crate::{
 /// Pit start point
 /// Start Position
 #[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PitStartPoint {
     /// Position
     pub xyz: ObjectCoordinate,

@@ -6,7 +6,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -42,7 +42,7 @@ impl TryFrom<u8> for SpeedSignMapping {
 
 /// Speed Sign
 #[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SignSpeed {
     /// Position
     pub xyz: ObjectCoordinate,

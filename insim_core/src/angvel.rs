@@ -15,7 +15,7 @@ use std::fmt;
 /// - Stored as `f32` radians/sec for consistency with [`Heading`](crate::heading::Heading)
 ///   and [`Speed`](crate::speed::Speed).
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AngVel {
     radians_per_sec: f32,
 }

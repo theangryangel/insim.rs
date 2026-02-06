@@ -7,7 +7,7 @@ use insim_core::{Decode, Encode, coordinate::Coordinate, vector::Vector};
 use crate::OutsimId;
 
 #[derive(Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Outsim packet
 pub struct OutsimPack {
     /// Time, useful for ordering

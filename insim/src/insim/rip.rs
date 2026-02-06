@@ -3,7 +3,7 @@ use std::time::Duration;
 use crate::identifiers::RequestId;
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Replay control result.
@@ -49,7 +49,7 @@ pub enum RipError {
 bitflags::bitflags! {
     /// Options for replay playback and loading.
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct RipOptions: u8 {
         /// Replay will loop
         const LOOP = (1 << 0);
@@ -73,7 +73,7 @@ generate_bitflag_helpers! {
 impl_bitflags_from_to_bytes!(RipOptions, u8);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Replay control and status packet.
 ///
 /// - Used to request replay actions and receive replay status.

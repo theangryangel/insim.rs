@@ -4,7 +4,7 @@ use insim_core::{Decode, DecodeString, Encode, EncodeString, game_version::GameV
 use crate::identifiers::RequestId;
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Version information about the connected LFS instance.
 ///
 /// - Sent in response to [`TinyType::Ver`](crate::insim::TinyType::Ver).

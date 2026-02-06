@@ -9,7 +9,7 @@ use crate::identifiers::RequestId;
 const IPB_MAX_BANS: usize = 120;
 
 #[derive(Debug, Clone, Default, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// IP ban list (host only).
 ///
 /// - Used to set or retrieve banned IP addresses.

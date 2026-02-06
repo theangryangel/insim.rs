@@ -49,7 +49,7 @@ use crate::{Decode, DecodeError, DecodeErrorKind, Encode, EncodeError, heading::
 // happy with this. However, I have no desire to do this right now. I'd rather build something.
 
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 /// Layout Object
 pub enum ObjectInfo {

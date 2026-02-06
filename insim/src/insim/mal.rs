@@ -12,7 +12,7 @@ use crate::{
 const MAX_MAL_SIZE: usize = 120;
 
 #[derive(Debug, Clone, Default, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Restrict which mods can be used.
 ///
 /// - Contains a list of allowed mod ids.

@@ -4,7 +4,7 @@ use super::CarContact;
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Hot lap validity failure reason.
@@ -24,7 +24,7 @@ pub enum Hlvc {
 }
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Hot lap validity violation report.
 ///
 /// - Sent when HLVC is enabled in [IsiFlags](crate::insim::IsiFlags).

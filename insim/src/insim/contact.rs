@@ -12,7 +12,7 @@ use crate::identifiers::{PlayerId, RequestId};
 const CONINFO_DEGREES_PER_UNIT: f64 = 180.0 / 128.0;
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Per-car contact details used in [Con].
 pub struct ConInfo {
     /// Player identifier.
@@ -228,7 +228,7 @@ impl Encode for ConInfo {
 }
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Vehicle-to-vehicle contact report.
 ///
 /// - Sent when collision reporting is enabled in [IsiFlags](crate::insim::IsiFlags).

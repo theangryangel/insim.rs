@@ -47,7 +47,7 @@ use std::fmt;
 /// assert_eq!(right.to_degrees(), 90.0);
 /// ```
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Heading {
     radians: f64,
 }

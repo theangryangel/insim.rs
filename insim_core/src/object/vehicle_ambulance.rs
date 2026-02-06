@@ -7,7 +7,7 @@ use crate::{
 
 /// Vehicle Ambulance
 #[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VehicleAmbulance {
     /// Position
     pub xyz: ObjectCoordinate,

@@ -6,7 +6,7 @@ use crate::{
 
 /// Start Position
 #[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StartPosition {
     /// Position
     pub xyz: ObjectCoordinate,

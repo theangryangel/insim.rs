@@ -5,7 +5,7 @@ use super::{CameraView, RaceLaps};
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Game racing state
@@ -23,7 +23,7 @@ pub enum RaceInProgress {
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Describes the game state
     pub struct StaFlags: u16 {
         /// In Game (or Multiplayer Replay)
@@ -93,7 +93,7 @@ generate_bitflag_helpers! {
 impl_bitflags_from_to_bytes!(StaFlags, u16);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Game state snapshot.
 ///
 /// - Sent when state changes.

@@ -3,7 +3,7 @@ use insim_core::vehicle::Vehicle;
 use crate::identifiers::{ConnectionId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Connection selected a car.
 ///
 /// - Sent when a connection selects a car.

@@ -6,7 +6,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -44,7 +44,7 @@ impl From<ChalkColour> for u8 {
 
 /// Chalk ahead
 #[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Chalk {
     /// Position
     pub xyz: ObjectCoordinate,

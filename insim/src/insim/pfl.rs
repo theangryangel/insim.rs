@@ -2,7 +2,7 @@ use super::PlayerFlags;
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Player flags changed.
 ///
 /// - Reports changes to assist and input settings.

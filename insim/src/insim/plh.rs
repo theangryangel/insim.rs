@@ -6,7 +6,7 @@ const PLH_MAX_PLAYERS: usize = 48;
 
 bitflags::bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Flags to indicate which handicap fields are set.
     pub struct PlayerHandicapFlags: u8 {
          const MASS = (1 << 0);
@@ -18,7 +18,7 @@ bitflags::bitflags! {
 impl_bitflags_from_to_bytes!(PlayerHandicapFlags, u8);
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Handicap settings for a single player.
 pub struct PlayerHandicap {
     /// Player identifier.
@@ -87,7 +87,7 @@ impl Encode for PlayerHandicap {
 }
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Player handicap updates.
 ///
 /// - Sets or reports per-player handicaps.

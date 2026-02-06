@@ -11,7 +11,7 @@ use crate::OutsimId;
 
 bitflags::bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Describes the setup of a player and the various helpers that may be enabled, such as
     /// auto-clutch, etc.
     pub struct OutSimOpts: u16 {
@@ -37,7 +37,7 @@ bitflags::bitflags! {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// OutsimMain packet
 pub struct OutsimMain {
     /// Angular velocity

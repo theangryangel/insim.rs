@@ -11,7 +11,7 @@ use crate::{
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Local car switches flags.
     ///
     /// - Kept for backwards compatibility; prefer [LclFlags].
@@ -77,7 +77,7 @@ bitflags! {
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Local car lights flags.
     ///
     /// - Used with [`SmallType::Lcl`].
@@ -129,7 +129,7 @@ bitflags! {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 /// Subtype for the [Small] packet.
 pub enum SmallType {
@@ -307,7 +307,7 @@ impl Encode for SmallType {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// General purpose packet carrying a subtype and an integer value.
 ///
 /// - Used for requests, replies, and small control messages.

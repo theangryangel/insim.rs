@@ -5,7 +5,7 @@ use super::Fuel;
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Tyre compounds/types
@@ -41,7 +41,7 @@ pub enum TyreCompound {
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Describes the setup of a player and the various helpers that may be enabled, such as
     /// auto-clutch, etc.
     pub struct PlayerFlags: u16 {
@@ -90,7 +90,7 @@ impl_bitflags_from_to_bytes!(PlayerFlags, u16);
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Setup Flags
     pub struct SetFlags: u8 {
         /// Symmetric wheels
@@ -112,7 +112,7 @@ generate_bitflag_helpers!(SetFlags,
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Player model and type information
     pub struct PlayerType: u8 {
         /// Female, if not set assume male
@@ -135,7 +135,7 @@ generate_bitflag_helpers!(
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Passenger flags
     pub struct Passengers: u8 {
         /// Front male, opposite side from driver
@@ -160,7 +160,7 @@ bitflags! {
 impl_bitflags_from_to_bytes!(Passengers, u8);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Player joined race notification.
 ///
 /// - Sent when a player joins the race (or returns from pits).

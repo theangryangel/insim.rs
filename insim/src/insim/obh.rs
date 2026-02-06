@@ -15,7 +15,7 @@ pub(crate) fn spclose_strip_high_bits(val: u16) -> u16 {
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Additional information for an object hit.
     pub struct ObhFlags: u8 {
         /// An added object was hit
@@ -41,7 +41,7 @@ generate_bitflag_helpers! {
 impl_bitflags_from_to_bytes!(ObhFlags, u8);
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Contact details used by collision reports.
 pub struct CarContact {
     /// Direction of motion.
@@ -122,7 +122,7 @@ impl Encode for CarContact {
 }
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Object hit report.
 ///
 /// - Sent when object hit reporting is enabled in [IsiFlags](crate::insim::IsiFlags).

@@ -7,7 +7,7 @@ use crate::{Decode, Encode};
 /// - Units depend on context (velocity, acceleration, direction).
 /// - Use the optional `glam` conversions when enabled.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Vector(pub f32, pub f32, pub f32);
 
 impl Vector {

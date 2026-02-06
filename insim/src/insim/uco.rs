@@ -4,7 +4,7 @@ use super::{CarContact, ObjectInfo};
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Action reported by [Uco].
@@ -24,7 +24,7 @@ pub enum UcoAction {
 }
 
 #[derive(Debug, Clone, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// User control object event.
 ///
 /// - Reports crossing a checkpoint or entering/leaving a circle.

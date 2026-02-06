@@ -4,7 +4,7 @@ use insim_core::{Decode, Encode};
 
 /// Handles the rules around how RaceLaps are described within Insim automatically for you.
 #[derive(Debug, Default, Clone, Copy)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum RaceLaps {
     /// This is a practise session

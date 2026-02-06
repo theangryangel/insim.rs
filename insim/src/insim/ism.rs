@@ -1,7 +1,7 @@
 use crate::identifiers::RequestId;
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Multiplayer host information.
 ///
 /// - Sent when a host is started or joined.

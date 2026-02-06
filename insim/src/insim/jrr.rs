@@ -2,7 +2,7 @@ use super::ObjectInfo;
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Used within the [Jrr] packet.
@@ -22,7 +22,7 @@ pub enum JrrAction {
 }
 
 #[derive(Debug, Clone, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Join Request Reply
 /// Set the ISF_REQ_JOIN flag in the IS_ISI to receive join requests
 ///

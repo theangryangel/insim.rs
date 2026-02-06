@@ -7,7 +7,7 @@ use crate::{
 
 /// Pit stop box
 #[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PitStopBox {
     /// Position
     pub xyz: ObjectCoordinate,

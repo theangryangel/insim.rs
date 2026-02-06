@@ -6,7 +6,7 @@ use super::{PlayerFlags, RaceConfirmFlags};
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Confirmed race or qualifying result.
 ///
 /// - Includes player identity, car, and timing details.

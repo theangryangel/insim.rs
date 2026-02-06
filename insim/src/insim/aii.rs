@@ -4,7 +4,7 @@ use insim_core::{Decode, Encode, coordinate::Coordinate, dash_lights::DashLights
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Physical state snapshot used by [Aii].
 pub struct OsMain {
     /// Angular velocity vector.
@@ -80,7 +80,7 @@ impl Encode for OsMain {
 bitflags! {
     /// AI state flags.
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AiFlags: u8 {
         /// Detect if engine running
         const IGNITION = (1 << 0);
@@ -94,7 +94,7 @@ bitflags! {
 impl_bitflags_from_to_bytes!(AiFlags, u8);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// AI telemetry snapshot.
 ///
 /// - Returned in response to AI info requests.
