@@ -517,8 +517,7 @@ mod tests {
         let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
 
         let root: Node<TestMsg> = Node::container().w(200.0).h(100.0).with_child(
-            Node::text("Input", BtnStyle::default())
-                .typein(32, TestMsg::TypeIn)
+            Node::typein("Input", BtnStyle::default(), 32, TestMsg::TypeIn)
                 .w(50.0)
                 .h(10.0),
         );

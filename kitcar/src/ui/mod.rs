@@ -381,3 +381,12 @@ pub fn clickable<Msg>(
 pub fn text<Msg>(text: impl Into<String>, bstyle: insim::insim::BtnStyle) -> node::Node<Msg> {
     node::Node::text(text, bstyle)
 }
+
+/// Shortcut to make a type-in-able [node::Node]
+pub fn typein<Msg, F>(text: impl Into<String>, bstyle: insim::insim::BtnStyle, limit: u8, mapper: F) -> node::Node<Msg> 
+where
+    F: Fn(String) -> Msg + 'static,
+{
+    node::Node::typein(text, bstyle, limit, mapper)
+}
+

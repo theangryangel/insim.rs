@@ -95,16 +95,23 @@ impl<Msg> Node<Msg> {
         }
     }
 
-    /// Add type-in handling for this button.
-    pub fn typein<F>(mut self, limit: u8, mapper: F) -> Self
+    /// A type-in-able button
+    pub fn typein<F>(text: impl Into<String>, mut bstyle: BtnStyle, limit: u8, mapper: F) -> Self
     where
         F: Fn(String) -> Msg + 'static,
     {
-        if let NodeKind::Button { ref mut typein, .. } = self.kind {
-            *typein = Some((limit, Arc::new(mapper)));
-        }
+        bstyle = bstyle.clickable();
 
-        self
+        Self {
+            style: Default::default(),
+            kind: NodeKind::Button {
+                text: text.into(),
+                msg: None,
+                key: None,
+                bstyle,
+                typein: Some((limit, Arc::new(mapper))),
+            },
+        }
     }
 
     /// No output. Effectively this is the same as `Option<Node>`, however we don't use Option for

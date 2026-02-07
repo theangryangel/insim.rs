@@ -67,8 +67,6 @@ struct State {
     selection: Vec<ObjectInfo>,
     pending_name: String,
     awaiting_prefab_name: bool,
-    pending_painted_text: String,
-    awaiting_painted_text: bool,
     active_tab: ActiveTab,
 }
 
@@ -96,8 +94,6 @@ struct PrefabViewProps {
     prefabs: Vec<PrefabListItem>,
     pending_name: String,
     awaiting_prefab_name: bool,
-    pending_painted_text: String,
-    awaiting_painted_text: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -109,7 +105,6 @@ enum PrefabViewMessage {
     BeginSavePrefab,
     PrefabNameInput(String),
     SpawnPrefab(usize),
-    BeginPaintText,
     PaintedTextInput(String),
 }
 
@@ -166,15 +161,16 @@ impl ui::Component for PrefabView {
                         ),
                 )
                 .with_child_if(
-                    ui::text(
+                    ui::typein(
                         if props.pending_name.is_empty() {
                             "new-prefab-name"
                         } else {
                             &props.pending_name
                         },
                         BtnStyle::default().white().dark(),
+                        32, 
+                        PrefabViewMessage::PrefabNameInput
                     )
-                    .typein(32, PrefabViewMessage::PrefabNameInput)
                     .w(48.)
                     .h(5.),
                     props.awaiting_prefab_name,
@@ -194,27 +190,14 @@ impl ui::Component for PrefabView {
                 .flex_col()
                 .w(48.)
                 .with_child(
-                    ui::clickable(
+                    ui::typein(
                         "Paint Text",
                         BtnStyle::default().yellow().light(),
-                        PrefabViewMessage::BeginPaintText,
+                        64, 
+                        PrefabViewMessage::PaintedTextInput
                     )
                     .w(48.)
                     .h(5.),
-                )
-                .with_child_if(
-                    ui::text(
-                        if props.pending_painted_text.is_empty() {
-                            "type text and press enter"
-                        } else {
-                            &props.pending_painted_text
-                        },
-                        BtnStyle::default().white().dark(),
-                    )
-                    .typein(64, PrefabViewMessage::PaintedTextInput)
-                    .w(48.)
-                    .h(5.),
-                    props.awaiting_painted_text,
                 ),
             ActiveTab::Tools => ui::container().flex().flex_col().w(48.).with_child(
                 ui::text(
@@ -229,11 +212,13 @@ impl ui::Component for PrefabView {
         ui::container()
             .flex()
             .flex_col()
-            .w(48.)
+            .w(175.)
+            .items_end()
             .with_child(
                 ui::text("Prefab Toolbox", BtnStyle::default().yellow().light())
                     .w(48.)
-                    .h(5.),
+                    .h(5.)
+                    .mt(7.),
             )
             .with_child(
                 ui::container()
@@ -320,8 +305,6 @@ fn build_props(state: &State) -> PrefabViewProps {
             .collect(),
         pending_name: state.pending_name.clone(),
         awaiting_prefab_name: state.awaiting_prefab_name,
-        pending_painted_text: state.pending_painted_text.clone(),
-        awaiting_painted_text: state.awaiting_painted_text,
     }
 }
 
@@ -512,7 +495,6 @@ async fn handle_ui_message(
         },
         PrefabViewMessage::BeginSavePrefab => {
             state.awaiting_prefab_name = true;
-            state.awaiting_painted_text = false;
             state.active_tab = ActiveTab::Prefabs;
         },
         PrefabViewMessage::PrefabNameInput(name) => {
@@ -536,15 +518,8 @@ async fn handle_ui_message(
                 let _ = spawn_at_selection(connection, state, placed).await?;
             }
         },
-        PrefabViewMessage::BeginPaintText => {
-            state.awaiting_painted_text = true;
-            state.awaiting_prefab_name = false;
-            state.active_tab = ActiveTab::Text;
-        },
         PrefabViewMessage::PaintedTextInput(text) => {
             let text = text.trim().to_string();
-            state.pending_painted_text = text.clone();
-            state.awaiting_painted_text = false;
 
             if text.is_empty() {
                 tracing::warn!("paint skipped: text input is empty");
@@ -607,8 +582,6 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
         selection: Vec::new(),
         pending_name: String::new(),
         awaiting_prefab_name: false,
-        pending_painted_text: String::new(),
-        awaiting_painted_text: false,
         active_tab: ActiveTab::Prefabs,
     };
 
@@ -646,6 +619,8 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         if matches!(axm.pmoaction, PmoAction::TtcSel) && axm.reqi == REQI_SELECTION {
                             state.selection = axm.info;
                             dirty = true;
+                            tracing::info!("Got Selection!");
+
                         }
                     }
                     Packet::Btc(btc) => {
