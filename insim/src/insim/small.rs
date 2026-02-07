@@ -11,10 +11,11 @@ use crate::{
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    /// Local Car Switches Flags. You probably want to use [LclFlags] instead. This is deprecated,
-    /// but kept for backwards compatibility.
-    /// Configure and control lights on a vehicle using a [Small] packet.
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    /// Local car switches flags.
+    ///
+    /// - Kept for backwards compatibility; prefer [LclFlags].
+    /// - Used with [`SmallType::Lcs`].
     pub struct LcsFlags: u32 {
         /// Set indicators/turn signals. You probably want to look at the shortcut options,
         /// prefixed with `SIGNAL_`.
@@ -76,9 +77,10 @@ bitflags! {
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    /// Local Car Lights Flags.
-    /// Configure and control lights on a vehicle using a [Small] packet.
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    /// Local car lights flags.
+    ///
+    /// - Used with [`SmallType::Lcl`].
     pub struct LclFlags: u32 {
         /// Set signals. Take a look at the helper options prefixed `SIGNAL_`.
         const SET_SIGNALS = (1 << 0);
@@ -127,45 +129,45 @@ bitflags! {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
-/// [Small] packet subtype.
+/// Subtype for the [Small] packet.
 pub enum SmallType {
-    /// Nothing!
+    /// No-op.
     #[default]
     None,
 
-    /// Request LFS to start sending positions
+    /// Request node and lap updates at the specified interval.
     Ssp(Duration),
 
-    /// Request LFS to start sending gauges
+    /// Request outgauge-style updates at the specified interval.
     Ssg(Duration),
 
-    /// Vote action
+    /// Vote action notification or request.
     Vta(VtnAction),
 
-    /// Time stop
+    /// Time stop (true = stop, false = resume).
     Tms(bool),
 
-    /// Time step
+    /// Time step duration.
     Stp(Duration),
 
-    /// Race time packet (reply to Gth)
+    /// Race time reply to [`TinyType::Gtm`](crate::insim::TinyType::Gtm).
     Rtp(Duration),
 
-    /// Set node lap interval
+    /// Set the node/lap interval used for [Nlp](super::Nlp).
     Nli(Duration),
 
-    /// Set or get allowed cars (Tiny, type = Alc)
+    /// Set or reply with allowed cars.
     Alc(PlcAllowedCarsSet),
 
-    /// Set local car switches
+    /// Set local car switches (signals, horn, siren).
     Lcs(LcsFlags),
 
-    /// Set local vehicle lights
+    /// Set local vehicle lights.
     Lcl(LclFlags),
 
-    /// Get local AI information
+    /// Request local AI info for the given player id.
     Aii(PlayerId),
 }
 
@@ -305,13 +307,16 @@ impl Encode for SmallType {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// General purpose Small packet
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// General purpose packet carrying a subtype and an integer value.
+///
+/// - Used for requests, replies, and small control messages.
+/// - The meaning depends on `subt`.
 pub struct Small {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Small subtype.
+    /// Subtype describing the request or value.
     pub subt: SmallType,
 }
 

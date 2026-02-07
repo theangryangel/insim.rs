@@ -1,21 +1,26 @@
 use crate::identifiers::RequestId;
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Extended Message (like [Mst](super::Mst), but longer)
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Extended message (like [Mst](super::Mst), but longer).
+///
+/// - For chat text only (not for commands).
 pub struct Msx {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
-    /// Message
+    /// Message text.
     #[insim(codepage(length = 96, trailing_nul = true))]
     pub msg: String,
 }
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
+
     use bytes::{BufMut, BytesMut};
+    use insim_core::Encode;
 
     use super::*;
 
@@ -33,5 +38,27 @@ mod tests {
         assert_from_to_bytes!(Msx, data.as_ref(), |msx: Msx| {
             assert_eq!(&msx.msg, "aaaaaa");
         });
+    }
+
+    #[test]
+    fn test_contextual_error() {
+        let msx = Msx {
+            msg: ("xK9#mZ2$vL!pQ@nR&wJ*yT(hB)cF+dA-eG=sU/iO\\uX{jY}lN|oP~qS
+                xK9#mZ2$vL!pQ@nR&wJ*yT(hB)cF+dA-eG=sU/iO\\uX{jY}lN|oP~qS")
+                .to_string(),
+            ..Default::default()
+        };
+
+        let mut buf = BytesMut::new();
+        let res = msx.encode(&mut buf);
+
+        assert!(res.is_err());
+        assert!(matches!(
+            res,
+            Err(insim_core::EncodeError {
+                context: Some(Cow::Borrowed("Msx::msg")),
+                kind: insim_core::EncodeErrorKind::Nested { .. }
+            })
+        ));
     }
 }

@@ -3,9 +3,9 @@ use insim_core::{Decode, Encode};
 use crate::identifiers::{ConnectionId, RequestId};
 
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
-/// Used within the [Cim] packet to indicate the mode.
+/// Interface mode reported by [Cim].
 pub enum CimMode {
     /// Not in a special mode
     Normal(CimSubModeNormal),
@@ -30,12 +30,8 @@ pub enum CimMode {
         /// ShiftU submode
         submode: CimSubModeShiftU,
 
-        /// SelType is the selected object type or zero if unselected
-        /// It may be an AXO_x as in ObjectInfo or one of these:
-        /// const int MARSH_IS_CP = 252; // insim checkpoint
-        /// const int MARSH_IS_AREA = 253; // insim circle
-        /// const int MARSH_MARSHAL = 254; // restricted area
-        /// const int MARSH_ROUTE = 255; // route checker
+        /// Selected object type (0 if none).
+        /// Special values are used for InSim checkpoints, circles, marshal zones, and routes.
         seltype: u8,
     },
 }
@@ -99,9 +95,9 @@ impl Encode for CimMode {
 
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
-/// CimMode::Normal, submode
+/// Submode for `CimMode::Normal`.
 pub enum CimSubModeNormal {
     #[default]
     /// Not in a special mode
@@ -140,9 +136,9 @@ impl From<u8> for CimSubModeNormal {
 
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
-/// CimMode::Garage, submode
+/// Submode for `CimMode::Garage`.
 pub enum CimSubModeGarage {
     #[default]
     /// Info tab of setup screen
@@ -201,9 +197,9 @@ impl From<u8> for CimSubModeGarage {
 
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
-/// CimMode::ShiftU, submode
+/// Submode for `CimMode::ShiftU`.
 pub enum CimSubModeShiftU {
     #[default]
     /// No buttons displayed
@@ -227,16 +223,18 @@ impl From<u8> for CimSubModeShiftU {
 }
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Connection Interface Mode
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Connection interface mode report.
+///
+/// - Indicates which UI screen/mode a connection is in.
 pub struct Cim {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// connection's unique id (0 = local)
+    /// Connection identifier (0 = local).
     pub ucid: ConnectionId,
 
-    /// Mode & submode
+    /// Mode and submode information.
     #[insim(pad_after = 1)]
     pub mode: CimMode,
 }

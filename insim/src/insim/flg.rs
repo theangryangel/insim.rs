@@ -1,8 +1,8 @@
 use crate::identifiers::{PlayerId, RequestId};
 
-/// Enum for the flag field of [Flg].
+/// Flag type reported by [Flg].
 #[derive(Default, Debug, Clone, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum FlgType {
@@ -15,22 +15,24 @@ pub enum FlgType {
 }
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Race Flag is sent when a flag is waved at a player.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Flag state change for a player.
+///
+/// - Reports when blue or yellow flags are applied or cleared.
 pub struct Flg {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Unique player ID
+    /// Player receiving the flag.
     pub plid: PlayerId,
 
-    /// Flag on/off
+    /// Flag on/off state.
     pub offon: bool,
 
-    /// What type of flag is being waved
+    /// Flag type.
     pub flag: FlgType,
 
-    /// Player behind
+    /// Player behind (for blue flags).
     #[insim(pad_after = 1)]
     pub carbehind: PlayerId,
 }

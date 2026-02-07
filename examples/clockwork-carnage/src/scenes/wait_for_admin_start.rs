@@ -1,8 +1,5 @@
-use insim::{builder::InsimTask, core::string::colours::Colourify, identifiers::ConnectionId};
-use kitcar::{
-    presence, scenes,
-    ui::{self, Component},
-};
+use insim::{builder::InsimTask, core::string::colours::Colour, identifiers::ConnectionId};
+use kitcar::{presence, scenes, ui};
 
 use crate::{
     chat,
@@ -18,18 +15,19 @@ struct WaitForAdminStartView {
     marquee: Marquee,
 }
 
-impl ui::View for WaitForAdminStartView {
-    type GlobalProps = ();
-    type ConnectionProps = ();
-    type Message = WaitForAdminStartMsg;
-
-    fn mount(tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
+impl WaitForAdminStartView {
+    fn new(tx: tokio::sync::mpsc::UnboundedSender<WaitForAdminStartMsg>) -> Self {
         Self {
             marquee: Marquee::new(&"Hello World!!!!!".white(), 10, tx, |m| {
                 WaitForAdminStartMsg::Marquee(m)
             }),
         }
     }
+}
+
+impl ui::Component for WaitForAdminStartView {
+    type Props = ();
+    type Message = WaitForAdminStartMsg;
 
     fn update(&mut self, msg: Self::Message) {
         match msg {
@@ -37,11 +35,7 @@ impl ui::View for WaitForAdminStartView {
         }
     }
 
-    fn render(
-        &self,
-        _global_props: Self::GlobalProps,
-        _connection_props: Self::ConnectionProps,
-    ) -> ui::Node<Self::Message> {
+    fn render(&self, _props: Self::Props) -> ui::Node<Self::Message> {
         let m = self
             .marquee
             .render(())
@@ -50,6 +44,19 @@ impl ui::View for WaitForAdminStartView {
             .h(5.);
 
         topbar("No game in progress").with_child(m)
+    }
+}
+
+impl ui::View for WaitForAdminStartView {
+    type GlobalState = ();
+    type ConnectionState = ();
+
+    fn mount(tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
+        Self::new(tx)
+    }
+
+    fn compose(_global: Self::GlobalState, _connection: Self::ConnectionState) -> Self::Props {
+        ()
     }
 }
 

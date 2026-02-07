@@ -1,6 +1,9 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+#[cfg(test)]
+extern crate criterion as _; // Needed for cargo bench. BARF.
+
 pub mod angvel;
 pub mod coordinate;
 pub mod dash_lights;

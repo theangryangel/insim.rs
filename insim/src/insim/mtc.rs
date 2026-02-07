@@ -2,23 +2,26 @@ use super::SoundType;
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Message to Connection - Send a message to a specific connection, restricted to hosts only
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Send a message to a specific connection (host only).
+///
+/// - Can target a connection or a player.
+/// - Supports a sound effect on delivery.
 pub struct Mtc {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// See [SoundType].
+    /// Sound effect to play with the message.
     pub sound: SoundType,
 
-    /// Unique connection id
+    /// Connection to receive the message (0 = host, 255 = all).
     pub ucid: ConnectionId,
 
-    /// Unique player id
+    /// Player to receive the message (0 = use `ucid`).
     #[insim(pad_after = 2)]
     pub plid: PlayerId,
 
-    /// Message
+    /// Message text.
     #[insim(codepage(length = 128, align_to = 4, trailing_nul = true))]
     pub text: String,
 }

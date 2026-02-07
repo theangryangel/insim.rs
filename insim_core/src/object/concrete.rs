@@ -8,7 +8,7 @@ use crate::{
 
 /// Represents Width and Length (2m, 4m, 8m, 16m)
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -38,7 +38,7 @@ impl TryFrom<u8> for ConcreteWidthLength {
 }
 /// Represents Size X/Y (0.25x to 1.0x)
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -69,7 +69,7 @@ impl TryFrom<u8> for Size {
 
 /// Represents Colour options
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -101,7 +101,7 @@ impl TryFrom<u8> for ConcreteColour {
 /// Represents Height in 0.25m steps (0.25m to 4.0m)
 /// Using specific enum variants allows IDE autocomplete to guide the user.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -156,7 +156,7 @@ impl TryFrom<u8> for ConcreteHeight {
 
 /// Represents Pitch from 0 to 90 degrees in 6-degree steps.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -212,7 +212,7 @@ impl TryFrom<u8> for ConcretePitch {
 /// Represents Angle from 5.625 to 90 degrees in 5.625 steps.
 /// Naming simplifies the fractional decimals for readability.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -267,7 +267,7 @@ impl TryFrom<u8> for ConcreteAngle {
 
 /// Concrete Slab
 #[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConcreteSlab {
     /// Position
     pub xyz: ObjectCoordinate,
@@ -310,7 +310,7 @@ impl ConcreteSlab {
 
 /// Concrete Ramp
 #[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConcreteRamp {
     /// Position
     pub xyz: ObjectCoordinate,
@@ -353,7 +353,7 @@ impl ConcreteRamp {
 
 /// Concrete Wall
 #[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConcreteWall {
     /// Position
     pub xyz: ObjectCoordinate,
@@ -396,7 +396,7 @@ impl ConcreteWall {
 
 /// Concrete Pillar
 #[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConcretePillar {
     /// Position
     pub xyz: ObjectCoordinate,
@@ -439,7 +439,7 @@ impl ConcretePillar {
 
 /// Concrete Slab Wall
 #[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConcreteSlabWall {
     /// Position
     pub xyz: ObjectCoordinate,
@@ -482,7 +482,7 @@ impl ConcreteSlabWall {
 
 /// Concrete Ramp Wall
 #[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConcreteRampWall {
     /// Position
     pub xyz: ObjectCoordinate,
@@ -525,7 +525,7 @@ impl ConcreteRampWall {
 
 /// Concrete Short Slab Wall
 #[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConcreteShortSlabWall {
     /// Position
     pub xyz: ObjectCoordinate,
@@ -568,7 +568,7 @@ impl ConcreteShortSlabWall {
 
 /// Concrete Wedge
 #[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConcreteWedge {
     /// Position
     pub xyz: ObjectCoordinate,

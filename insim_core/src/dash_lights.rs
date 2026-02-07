@@ -1,9 +1,12 @@
 //! Dashlights
 
 bitflags::bitflags! {
-    /// Dashboard lights
+    /// Dashboard indicator lights.
+    ///
+    /// - Bitflags can be combined and queried with `.contains`.
+    /// - Typically reported in telemetry packets.
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DashLights: u32 {
         /// Shift light
         const SHIFT = 1;
@@ -41,6 +44,8 @@ bitflags::bitflags! {
         const SIDELIGHTS = (1 << 16);
         /// Neutral
         const NEUTRAL = (1 << 17);
+        /// Severe engine damage
+        const ENGINE_SEVERE = (1 << 28);
     }
 }
 

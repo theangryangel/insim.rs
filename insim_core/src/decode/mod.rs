@@ -2,6 +2,7 @@
 
 use std::{borrow::Cow, net::Ipv4Addr};
 
+use arrayvec::ArrayVec;
 use bytes::{Buf, Bytes};
 
 #[derive(Debug, thiserror::Error)]
@@ -33,26 +34,30 @@ impl DecodeError {
 
 impl std::fmt::Display for DecodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut chain = vec![];
         let mut current: Option<&DecodeError> = Some(self);
+        let mut first = true;
 
         while let Some(err) = current {
             if let Some(ctx) = &err.context {
-                chain.push(ctx.as_ref().to_string());
+                if !first {
+                    f.write_str(" > ")?;
+                }
+                f.write_str(ctx)?;
+                first = false;
             }
 
             match &err.kind {
-                DecodeErrorKind::Nested { source } => {
-                    current = Some(source);
-                },
-                _ => {
-                    chain.push(err.kind.to_string());
+                DecodeErrorKind::Nested { source } => current = Some(source),
+                kind => {
+                    if !first {
+                        f.write_str(" > ")?;
+                    }
+                    write!(f, "{kind}")?;
                     break;
                 },
             }
         }
-
-        write!(f, "{}", chain.join(" > "))
+        Ok(())
     }
 }
 
@@ -191,15 +196,18 @@ where
     T: Decode,
 {
     fn decode(buf: &mut Bytes) -> Result<Self, DecodeError> {
-        // If T::decode returns Err(BadMagic), collect stops and returns Err(BadMagic) immediately.
-        let items: Vec<T> = (0..N)
-            .map(|_| T::decode(buf))
-            .collect::<Result<Vec<T>, DecodeError>>()?;
+        // TODO: waiting for `std::array::try_from_fn` to stablise.
+        // For now we'll use ArrayVec to reduce the allocation count that the previous
+        // implementation using Vec had.
+        // This is a choice based on reducing handling higher frequency packets, such as MCI.
 
-        // We use .ok().expect() because if this fails, it's a bug in the code,
-        // not a problem with the input data.
-        Ok(items
-            .try_into()
+        let mut vec = ArrayVec::<T, N>::new();
+        for _ in 0..N {
+            vec.push(T::decode(buf)?);
+        }
+        // expect is safe since we pushed exactly N
+        Ok(vec
+            .into_inner()
             .ok()
             .expect("size must match N because we looped N times"))
     }

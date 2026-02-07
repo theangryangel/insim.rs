@@ -9,48 +9,49 @@ use crate::identifiers::RequestId;
 const IPB_MAX_BANS: usize = 120;
 
 #[derive(Debug, Clone, Default, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Player Bans - Receive or set player bans, by IP address
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// IP ban list (host only).
+///
+/// - Used to set or retrieve banned IP addresses.
 pub struct Ipb {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
     banips: IndexSet<Ipv4Addr>,
 }
 
 impl Ipb {
-    /// Returns `true` if a Vehicle is contained in this packet
+    /// Returns `true` if an IP is contained in this list.
     pub fn contains(&self, v: &Ipv4Addr) -> bool {
         self.banips.contains(v)
     }
 
-    /// Push a compressed form of a mod onto the list of allowed mods
-    /// and update the count.
+    /// Add an IP address to the ban list.
     pub fn insert(&mut self, ip: Ipv4Addr) -> bool {
         self.banips.insert(ip)
     }
 
-    /// Remove a Vehicle from this packet
+    /// Remove an IP address from the ban list.
     pub fn remove(&mut self, ip: &Ipv4Addr) -> bool {
         self.banips.shift_remove(ip)
     }
 
-    /// Does this packet have no vehicles associated?
+    /// Is the ban list empty?
     pub fn is_empty(&self) -> bool {
         self.banips.is_empty()
     }
 
-    /// Clear any previously allowed mods.
+    /// Clear the ban list.
     pub fn clear(&mut self) {
         self.banips.clear()
     }
 
-    /// Iterator for all allowed mods
+    /// Iterator for all banned IPs.
     pub fn iter(&self) -> IndexSetIter<'_, Ipv4Addr> {
         self.banips.iter()
     }
 
-    /// Returns the number of allowed mods
+    /// Returns the number of banned IPs.
     pub fn len(&self) -> usize {
         self.banips.len()
     }

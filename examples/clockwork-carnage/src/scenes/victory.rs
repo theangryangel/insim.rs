@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use insim::{builder::InsimTask, core::string::colours::Colourify, insim::BtnStyle};
+use insim::{builder::InsimTask, core::string::colours::Colour, insim::BtnStyle};
 use kitcar::{
     presence,
     scenes::{Scene, SceneError, SceneResult},
@@ -24,21 +24,19 @@ struct ClockworkVictoryConnectionProps {
 }
 
 struct ClockworkVictoryView {}
-impl ui::View for ClockworkVictoryView {
-    type GlobalProps = ClockworkVictoryGlobalProps;
-    type ConnectionProps = ClockworkVictoryConnectionProps;
+
+#[derive(Debug, Clone, Default)]
+struct ClockworkVictoryProps {
+    global: ClockworkVictoryGlobalProps,
+    connection: ClockworkVictoryConnectionProps,
+}
+
+impl ui::Component for ClockworkVictoryView {
+    type Props = ClockworkVictoryProps;
     type Message = ();
 
-    fn mount(_tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
-        Self {}
-    }
-
-    fn render(
-        &self,
-        global_props: Self::GlobalProps,
-        connection_props: Self::ConnectionProps,
-    ) -> ui::Node<Self::Message> {
-        let players = scoreboard(&global_props.standings, &connection_props.uname);
+    fn render(&self, props: Self::Props) -> ui::Node<Self::Message> {
+        let players = scoreboard(&props.global.standings, &props.connection.uname);
 
         ui::container()
             .flex()
@@ -58,6 +56,19 @@ impl ui::View for ClockworkVictoryView {
                     )
                     .with_children(players),
             )
+    }
+}
+
+impl ui::View for ClockworkVictoryView {
+    type GlobalState = ClockworkVictoryGlobalProps;
+    type ConnectionState = ClockworkVictoryConnectionProps;
+
+    fn mount(_tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
+        Self {}
+    }
+
+    fn compose(global: Self::GlobalState, connection: Self::ConnectionState) -> Self::Props {
+        ClockworkVictoryProps { global, connection }
     }
 }
 

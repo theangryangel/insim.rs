@@ -4,10 +4,10 @@ use super::CarContact;
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[non_exhaustive]
-/// Used within the [Csc] packet to indicate the type of state change.
+/// Action type reported by [Csc].
 pub enum CscAction {
     #[default]
     /// Stopped
@@ -18,25 +18,27 @@ pub enum CscAction {
 }
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Car State Changed - reports a change in a car's state (currently start or stop)
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Car state changed event.
+///
+/// - Reports start/stop transitions for a car.
 pub struct Csc {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Unique player ID
+    /// Player that changed state.
     #[insim(pad_after = 1)]
     pub plid: PlayerId,
 
-    /// Action that was taken
+    /// State change action.
     #[insim(pad_after = 2)]
     pub cscaction: CscAction,
 
-    /// Time since start (warning: this is looping)
+    /// Time since session start (wraps periodically).
     #[insim(duration = u32)]
     pub time: Duration,
 
-    /// Any contact that may have happened
+    /// Contact details, if relevant.
     pub c: CarContact,
 }
 

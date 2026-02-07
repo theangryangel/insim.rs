@@ -1,13 +1,14 @@
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Car Reset packet indicates a vehicle has been reset or that a vehicle should be reset by the
-/// server.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Car reset event or reset request.
+///
+/// - Sent when a car is reset, or used to request a reset.
 pub struct Crs {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
-    /// Unique player ID that was reset, or should be reset
+    /// Player that was reset (or should be reset).
     pub plid: PlayerId,
 }
 

@@ -12,26 +12,27 @@ use crate::{
 const MAX_MAL_SIZE: usize = 120;
 
 #[derive(Debug, Clone, Default, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Mods Allowed - restrict the mods that can be used
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Restrict which mods can be used.
+///
+/// - Contains a list of allowed mod ids.
 pub struct Mal {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// UCID to change
+    /// Connection that updated the list.
     pub ucid: ConnectionId,
 
     allowed_mods: IndexSet<Vehicle>,
 }
 
 impl Mal {
-    /// Returns `true` if a Vehicle is contained in this packet
+    /// Returns `true` if a mod is contained in this packet.
     pub fn contains(&self, v: &Vehicle) -> bool {
         self.allowed_mods.contains(v)
     }
 
-    /// Push a compressed form of a mod onto the list of allowed mods
-    /// and update the count.
+    /// Add a mod to the allowed list.
     pub fn insert(&mut self, vehicle: Vehicle) -> Result<bool, Error> {
         match vehicle {
             Vehicle::Mod(_) => Ok(self.allowed_mods.insert(vehicle)),
@@ -39,27 +40,27 @@ impl Mal {
         }
     }
 
-    /// Remove a Vehicle from this packet
+    /// Remove a mod from the allowed list.
     pub fn remove(&mut self, vehicle: &Vehicle) -> bool {
         self.allowed_mods.shift_remove(vehicle)
     }
 
-    /// Does this packet have no vehicles associated?
+    /// Is the allowed mod list empty?
     pub fn is_empty(&self) -> bool {
         self.allowed_mods.is_empty()
     }
 
-    /// Clear any previously allowed mods.
+    /// Clear the allowed mod list.
     pub fn clear(&mut self) {
         self.allowed_mods.clear()
     }
 
-    /// Iterator for all allowed mods
+    /// Iterator for all allowed mods.
     pub fn iter(&self) -> IndexSetIter<'_, Vehicle> {
         self.allowed_mods.iter()
     }
 
-    /// Returns the number of allowed mods
+    /// Returns the number of allowed mods.
     pub fn len(&self) -> usize {
         self.allowed_mods.len()
     }

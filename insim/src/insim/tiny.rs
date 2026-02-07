@@ -1,105 +1,103 @@
 use crate::{Packet, WithRequestId, identifiers::RequestId};
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[non_exhaustive]
-/// [Tiny] Subtype
+/// Subtype for the [Tiny] packet.
 pub enum TinyType {
-    /// Keepalive request/response
+    /// Keepalive request/response.
     #[default]
     None = 0,
 
-    /// Get Version
+    /// Request version information.
     Ver = 1,
 
-    /// Close
+    /// Close the InSim connection.
     Close = 2,
 
-    /// External program requesting a reply (Pong)
+    /// Request a ping reply.
     Ping = 3,
 
-    /// Reply to a ping
+    /// Reply to a ping request.
     Reply = 4,
 
-    /// Vote Cancel
+    /// Vote cancelled or request vote cancellation.
     Vtc = 5,
 
-    /// Send camera position
+    /// Request camera position.
     Scp = 6,
 
-    /// Send state info
+    /// Request state information.
     Sst = 7,
 
-    /// Get time in milliseconds (i.e. SMALL_RTP)
-    /// Insim protocol version <= 9 this was Gth, and LFS would return the time
-    /// in hundreths.
+    /// Request race time (reply is [`SmallType::Rtp`](crate::insim::SmallType::Rtp)).
     Gtm = 8,
 
-    /// Multi-player end
+    /// Multiplayer ended.
     Mpe = 9,
 
-    /// Get multi-player info
+    /// Request multiplayer info (reply is [`Ism`](crate::insim::Ism)).
     Ism = 10,
 
-    /// Race end
+    /// Race end.
     Ren = 11,
 
-    /// All players cleared from race
+    /// All players cleared from race.
     Clr = 12,
 
-    /// Request NCN for all connections
+    /// Request all connection info ([`Ncn`](crate::insim::Ncn)).
     Ncn = 13,
 
-    /// Request NPL for all players
+    /// Request all players ([`Npl`](crate::insim::Npl)).
     Npl = 14,
 
-    /// Get all results
+    /// Request all results ([`Res`](crate::insim::Res)).
     Res = 15,
 
-    /// Request a Nlp packet
+    /// Request node and lap info ([`Nlp`](crate::insim::Nlp)).
     Nlp = 16,
 
-    /// Request a Mci packet
+    /// Request multi-car info ([`Mci`](crate::insim::Mci)).
     Mci = 17,
 
-    /// Request a Reo packet
+    /// Request reorder information ([`Reo`](crate::insim::Reo)).
     Reo = 18,
 
-    /// Request a Rst packet
+    /// Request race start info ([`Rst`](crate::insim::Rst)).
     Rst = 19,
 
-    /// Request a Axi packet
+    /// Request autocross layout info ([`Axi`](crate::insim::Axi)).
     Axi = 20,
 
-    /// Autocross cleared
+    /// Autocross cleared.
     Axc = 21,
 
-    /// Request a Rip packet
+    /// Request replay info ([`Rip`](crate::insim::Rip)).
     Rip = 22,
 
-    /// Request a Nci packet for all guests
+    /// Request all connection info (host only) ([`Nci`](crate::insim::Nci)).
     Nci = 23,
 
-    /// Request a Small packet, type = Alc
+    /// Request allowed cars ([`SmallType::Alc`](crate::insim::SmallType::Alc)).
     Alc = 24,
 
-    /// Request a Axm packet, for the entire layout
+    /// Request the full layout ([`Axm`](crate::insim::Axm)).
     Axm = 25,
 
-    /// Request a Slc packet for all connections
+    /// Request all selected cars ([`Slc`](crate::insim::Slc)).
     Slc = 26,
 
-    /// Request a Mal packet
+    /// Request allowed mods ([`Mal`](crate::insim::Mal)).
     Mal = 27,
 
-    /// Request a Plh packet
+    /// Request player handicaps ([`Plh`](crate::insim::Plh)).
     Plh = 28,
 
-    /// Request a Ipb packet
+    /// Request IP bans ([`Ipb`](crate::insim::Ipb)).
     Ipb = 29,
 
-    /// Request a SMALL_LCL for the local car's lights
+    /// Request local car lights ([`SmallType::Lcl`](crate::insim::SmallType::Lcl)).
     Lcl = 30,
 }
 
@@ -122,13 +120,16 @@ impl WithRequestId for TinyType {
 }
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// General purpose Tiny packet
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// General purpose request/reply packet.
+///
+/// - Used for lightweight requests and notifications.
+/// - The meaning is defined by the `subt` value.
 pub struct Tiny {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Packet subtype
+    /// Subtype describing the request or notification.
     pub subt: TinyType,
 }
 

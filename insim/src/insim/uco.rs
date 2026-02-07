@@ -4,10 +4,10 @@ use super::{CarContact, ObjectInfo};
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[non_exhaustive]
-/// Action for a [Uco] packet.
+/// Action reported by [Uco].
 pub enum UcoAction {
     #[default]
     /// Entered a circle
@@ -24,28 +24,30 @@ pub enum UcoAction {
 }
 
 #[derive(Debug, Clone, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// User Control Object - reports crossing an InSim checkpoint / entering an InSim circle (from layout)
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// User control object event.
+///
+/// - Reports crossing a checkpoint or entering/leaving a circle.
 pub struct Uco {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Player's unique ID that this report corresponds to.
+    /// Player the event applies to.
     #[insim(pad_after = 1)]
     pub plid: PlayerId,
 
-    /// What happened
+    /// Event type.
     #[insim(pad_after = 2)]
     pub ucoaction: UcoAction,
 
-    /// When this happened
+    /// Time since session start (wraps periodically).
     #[insim(duration = u32)]
     pub time: Duration,
 
-    /// Was there any car contact?
+    /// Contact details, if relevant.
     pub c: CarContact,
 
-    /// Info about the checkpoint or circle (see below)
+    /// Checkpoint/circle object details.
     pub info: ObjectInfo,
 }
 

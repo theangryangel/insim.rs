@@ -8,8 +8,8 @@ use crate::{
 };
 
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Wrapper for IndexSet to allow the management of allowed vehicles, for the [Plc] packet.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Set of allowed standard vehicles for [Plc].
 pub struct PlcAllowedCarsSet {
     inner: IndexSet<Vehicle>,
 }
@@ -178,16 +178,18 @@ impl PlcAllowedCarsSet {
 }
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Player ALlowed Cars. Allows you to restrict access to the standard (non-mod) vehicles.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Restrict which standard vehicles a connection may select.
+///
+/// - Applies to standard (non-mod) vehicles only.
 pub struct Plc {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Unique connection id to change
+    /// Connection to restrict.
     pub ucid: ConnectionId,
 
-    /// Player's allow cars
+    /// Allowed vehicle set.
     pub cars: PlcAllowedCarsSet,
 }
 

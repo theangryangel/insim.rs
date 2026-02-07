@@ -4,10 +4,10 @@ use super::CarContact;
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[non_exhaustive]
-/// Used within [Hlv] to indicate the hotlap validity failure reason.
+/// Hot lap validity failure reason.
 pub enum Hlvc {
     /// Ground
     #[default]
@@ -24,24 +24,26 @@ pub enum Hlvc {
 }
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Reports incidents that would violate Hot Lap Validity checks.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Hot lap validity violation report.
+///
+/// - Sent when HLVC is enabled in [IsiFlags](crate::insim::IsiFlags).
 pub struct Hlv {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Unique ID of player
+    /// Player involved in the incident.
     pub plid: PlayerId,
 
-    /// How did we invalidate this hotlap? See [Hlvc].
+    /// Reason the lap was invalidated.
     #[insim(pad_after = 3)]
     pub hlvc: Hlvc,
 
     #[insim(duration = u32)]
-    /// When the violation occurred. Warning: this is looping.
+    /// Time since session start (wraps periodically).
     pub time: Duration,
 
-    /// Additional contact information. See [CarContact].
+    /// Contact details, if relevant.
     pub c: CarContact,
 }
 

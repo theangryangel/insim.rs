@@ -2,17 +2,19 @@ use super::CameraView;
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Set Car Camera
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Set the in-game camera for a player.
+///
+/// - Updates the camera view for the target player.
 pub struct Scc {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
-    /// Player ID
+    /// Player whose camera should change.
     pub viewplid: PlayerId,
 
-    /// How to manipulate the camera. See [CameraView].
+    /// Camera view to apply.
     #[insim(pad_after = 2)]
     pub ingamecam: CameraView,
 }

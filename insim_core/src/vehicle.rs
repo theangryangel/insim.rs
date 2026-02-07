@@ -1,9 +1,14 @@
 //! Strongly typed Vehicles for both standard and mods
-use std::{convert::Infallible, str::FromStr};
+use std::{borrow::Cow, convert::Infallible, str::FromStr};
 
 use crate::{Decode, Encode, license::License};
 
-/// Handles parsing a vehicle name according to the Insim v9 rules.
+/// Vehicle identifier for standard cars and mods.
+///
+/// - Standard vehicles use 3-character codes (e.g., `XFG`).
+/// - Mods are encoded as 6-character hex ids.
+/// - `license()` reports the required content tier.
+///
 /// See <https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info>
 #[derive(PartialEq, Eq, Clone, Copy, Default, Hash)]
 #[non_exhaustive]
@@ -79,32 +84,36 @@ impl Vehicle {
     }
 
     pub fn code(&self) -> String {
+        self.code_cow().to_string()
+    }
+
+    fn code_cow(&self) -> Cow<'static, str> {
         match self {
-            Vehicle::Xfg => "XFG".to_string(),
-            Vehicle::Xrg => "XRG".to_string(),
-            Vehicle::Fbm => "FBM".to_string(),
-            Vehicle::Xrt => "XRT".to_string(),
-            Vehicle::Rb4 => "RB4".to_string(),
-            Vehicle::Fxo => "FXO".to_string(),
-            Vehicle::Lx4 => "LX4".to_string(),
-            Vehicle::Lx6 => "LX6".to_string(),
-            Vehicle::Mrt => "MRT".to_string(),
-            Vehicle::Uf1 => "UF1".to_string(),
-            Vehicle::Rac => "RAC".to_string(),
-            Vehicle::Fz5 => "FZ5".to_string(),
-            Vehicle::Fox => "FOX".to_string(),
-            Vehicle::Xfr => "XFR".to_string(),
-            Vehicle::Ufr => "UFR".to_string(),
-            Vehicle::Fo8 => "FO8".to_string(),
-            Vehicle::Fxr => "FXR".to_string(),
-            Vehicle::Xrr => "XRR".to_string(),
-            Vehicle::Fzr => "FZR".to_string(),
-            Vehicle::Bf1 => "BF1".to_string(),
+            Vehicle::Xfg => Cow::Borrowed("XFG"),
+            Vehicle::Xrg => Cow::Borrowed("XRG"),
+            Vehicle::Fbm => Cow::Borrowed("FBM"),
+            Vehicle::Xrt => Cow::Borrowed("XRT"),
+            Vehicle::Rb4 => Cow::Borrowed("RB4"),
+            Vehicle::Fxo => Cow::Borrowed("FXO"),
+            Vehicle::Lx4 => Cow::Borrowed("LX4"),
+            Vehicle::Lx6 => Cow::Borrowed("LX6"),
+            Vehicle::Mrt => Cow::Borrowed("MRT"),
+            Vehicle::Uf1 => Cow::Borrowed("UF1"),
+            Vehicle::Rac => Cow::Borrowed("RAC"),
+            Vehicle::Fz5 => Cow::Borrowed("FZ5"),
+            Vehicle::Fox => Cow::Borrowed("FOX"),
+            Vehicle::Xfr => Cow::Borrowed("XFR"),
+            Vehicle::Ufr => Cow::Borrowed("UFR"),
+            Vehicle::Fo8 => Cow::Borrowed("FO8"),
+            Vehicle::Fxr => Cow::Borrowed("FXR"),
+            Vehicle::Xrr => Cow::Borrowed("XRR"),
+            Vehicle::Fzr => Cow::Borrowed("FZR"),
+            Vehicle::Bf1 => Cow::Borrowed("BF1"),
             Vehicle::Mod(vehmod) => {
                 // Determine the mod id. This is only applicable for Insim v9+.
-                format!("{:06X}", vehmod)
+                Cow::Owned(format!("{:06X}", vehmod))
             },
-            Vehicle::Unknown => "Unknown".to_string(),
+            Vehicle::Unknown => Cow::Borrowed("Unknown"),
         }
     }
 }
@@ -178,13 +187,13 @@ impl Encode for Vehicle {
 
 impl std::fmt::Display for Vehicle {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.code())
+        write!(f, "{}", self.code_cow())
     }
 }
 
 impl std::fmt::Debug for Vehicle {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.code())
+        write!(f, "{}", self.code_cow())
     }
 }
 

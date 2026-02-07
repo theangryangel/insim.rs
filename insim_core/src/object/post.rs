@@ -5,7 +5,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 #[allow(missing_docs)]
 /// Post Colour
@@ -37,7 +37,7 @@ impl From<u8> for PostColour {
 
 /// Post
 #[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Post {
     /// Position
     pub xyz: ObjectCoordinate,

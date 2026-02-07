@@ -6,8 +6,8 @@ use crate::identifiers::RequestId;
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    /// Facts about a server, or race
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    /// Server and race configuration flags.
     pub struct RaceFlags: u16 {
         /// Can vote
         const CAN_VOTE = (1 << 0);
@@ -57,15 +57,15 @@ generate_bitflag_helpers!(
 impl_bitflags_from_to_bytes!(RaceFlags, u16);
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Lap timing information
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Lap timing configuration for the current session.
 pub enum LapTimingInfo {
-    /// Standard lap timing, with a given number of checkpoints
+    /// Standard lap timing with a given number of checkpoints.
     Standard(u8), // 0x40 + checkpoint count (0–3)
-    /// Custom timing, with user placed checkpoints
+    /// Custom timing with user-placed checkpoints.
     Custom(u8), // 0x80 + checkpoint count (0–3)
     #[default]
-    /// No lap timing, open configuration without checkpoints
+    /// No lap timing (open configuration without checkpoints).
     None, // 0xC0
 }
 
@@ -107,50 +107,53 @@ impl Encode for LapTimingInfo {
 }
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Race Start - informational - sent when a race starts
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Race start information and session configuration.
+///
+/// - Sent when a race or qualifying session begins.
+/// - Can be requested via [`TinyType::Rst`](crate::insim::TinyType::Rst).
 pub struct Rst {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
-    /// Total number of race laps
+    /// Race laps or session duration.
     pub racelaps: RaceLaps,
 
-    /// Qualifying minutes, 0 if racing
+    /// Qualifying minutes (0 if racing).
     pub qualmins: u8,
 
-    /// Total number of players
+    /// Number of players in the race.
     pub nump: u8,
 
-    /// Lap timing
+    /// Lap timing configuration.
     pub timing: LapTimingInfo,
 
-    /// The track
+    /// Track identifier.
     pub track: Track,
 
-    /// The weather
+    /// Weather identifier.
     pub weather: u8,
 
-    /// The wind conditions
+    /// Wind conditions.
     pub wind: Wind,
 
-    /// The race/host facts (i.e. can pit, etc.)
+    /// Host and race settings.
     pub flags: RaceFlags,
 
-    /// Total number of nodes in the path
+    /// Total number of nodes in the path.
     pub numnodes: u16,
 
-    /// The index of the finish node
+    /// Node index for the finish line.
     pub finish: u16,
 
-    /// The index of the split1 node
+    /// Node index for split 1.
     pub split1: u16,
 
-    /// The index of the split2 node
+    /// Node index for split 2.
     pub split2: u16,
 
-    /// The index of the split3 node
+    /// Node index for split 3.
     pub split3: u16,
 }
 

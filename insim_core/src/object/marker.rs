@@ -6,7 +6,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -62,7 +62,7 @@ impl TryFrom<u8> for MarkerCornerKind {
 
 /// Corner Marker
 #[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MarkerCorner {
     /// Position
     pub xyz: ObjectCoordinate,
@@ -76,7 +76,7 @@ pub struct MarkerCorner {
 
 impl MarkerCorner {
     pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = self.kind as u8 & 0x0f;
+        let mut flags = (self.kind as u8 & 0x0f) << 3;
         if self.floating {
             flags |= 0x80;
         }
@@ -88,7 +88,7 @@ impl MarkerCorner {
         wire: ObjectFlags,
         heading: Heading,
     ) -> Result<Self, crate::DecodeError> {
-        let kind = MarkerCornerKind::try_from(wire.0 & 0x0f)?;
+        let kind = MarkerCornerKind::try_from(wire.mapping())?;
         let floating = wire.floating();
         Ok(Self {
             xyz,
@@ -100,7 +100,7 @@ impl MarkerCorner {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -140,7 +140,7 @@ impl TryFrom<u8> for MarkerDistanceKind {
 
 /// Distance Marker
 #[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MarkerDistance {
     /// Position
     pub xyz: ObjectCoordinate,
@@ -154,7 +154,7 @@ pub struct MarkerDistance {
 
 impl MarkerDistance {
     pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = self.kind as u8 & 0x0f;
+        let mut flags = (self.kind as u8 & 0x0f) << 3;
         if self.floating {
             flags |= 0x80;
         }
@@ -166,7 +166,7 @@ impl MarkerDistance {
         wire: ObjectFlags,
         heading: Heading,
     ) -> Result<Self, crate::DecodeError> {
-        let kind = MarkerDistanceKind::try_from(wire.0 & 0x0f)?;
+        let kind = MarkerDistanceKind::try_from(wire.mapping())?;
         let floating = wire.floating();
         Ok(Self {
             xyz,

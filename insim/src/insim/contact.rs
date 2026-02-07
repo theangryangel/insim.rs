@@ -12,55 +12,52 @@ use crate::identifiers::{PlayerId, RequestId};
 const CONINFO_DEGREES_PER_UNIT: f64 = 180.0 / 128.0;
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Used within [Con] packet to give a break down of information about the Contact between the two
-/// players.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Per-car contact details used in [Con].
 pub struct ConInfo {
-    /// Unique player id
+    /// Player identifier.
     pub plid: PlayerId,
 
-    /// Additional information
+    /// Additional car state flags.
     pub info: CompCarInfo,
 
-    /// Front wheel steer in degrees (right positive)
+    /// Front wheel steering angle (right positive).
     pub steer: u8,
 
-    /// Throttle - Insim defines this as a u4, insim.rs will silently truncate this u8.
+    /// Throttle input (0-15).
     pub thr: u8,
 
-    /// Brake - Insim defines this as a u4, insim.rs will validate this on encoding.
+    /// Brake input (0-15).
     pub brk: u8,
 
-    /// Clutch (0-15) - Insim defines this as a u4, insim.rs will validate this on encoding.
+    /// Clutch input (0-15).
     pub clu: u8,
 
-    /// Handbrake - Insim defines this as a u4, insim.rs will validate this on encoding.
+    /// Handbrake input (0-15).
     pub han: u8,
 
-    /// Gear (15=R) - Insim defines this as a u4, insim.rs will validate this on encoding.
+    /// Gear selector (0-15).
     pub gearsp: u8,
 
-    /// Speed in m/s
+    /// Speed.
     pub speed: Speed,
 
-    /// Car's motion if Speed > 0: 0 = world y direction, 128 = 180 deg
-    /// Stored internally as radians
+    /// Direction of motion.
     pub direction: Heading,
 
-    /// direction of forward axis: 0 = world y direction, 128 = 180 deg
-    /// Stored internally as radians
+    /// Car facing direction.
     pub heading: Heading,
 
-    /// m/s^2 longitudinal acceleration (forward positive)
+    /// Longitudinal acceleration.
     pub accelf: u8,
 
-    /// m/s^2 lateral acceleration (right positive)
+    /// Lateral acceleration.
     pub accelr: u8,
 
-    /// position (1 metre = 16)
+    /// X position.
     pub x: i16,
 
-    /// position (1 metre = 16)
+    /// Y position.
     pub y: i16,
 }
 
@@ -231,23 +228,24 @@ impl Encode for ConInfo {
 }
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Contact between 2 vehicles
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Vehicle-to-vehicle contact report.
+///
+/// - Sent when collision reporting is enabled in [IsiFlags](crate::insim::IsiFlags).
 pub struct Con {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Low 12 bits: closing speed (10 = 1 m/s)
-    /// The high 4 bits are automatically stripped.
+    /// Closing speed at impact.
     pub spclose: Speed,
 
-    /// Time since last reset. Warning this is looping.
+    /// Time since session start (wraps periodically).
     pub time: Duration,
 
-    /// Contact information for vehicle A
+    /// Contact information for vehicle A.
     pub a: ConInfo,
 
-    /// Contact information for vehicle B
+    /// Contact information for vehicle B.
     pub b: ConInfo,
 }
 

@@ -8,9 +8,10 @@ const BTN_TEXT_ALIGN: usize = 4;
 
 bitflags::bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    /// Bitwise flags used within the [Btn] packet
-    /// Mainly used internally by InSim but also provides some extra user flags
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    /// Bitwise flags used within [Btn], [Btc], and [Btt].
+    ///
+    /// - Mostly internal, but includes user-visible behavior.
     pub struct BtnInst: u8 {
         /// If this bit is set the button is visible in all screens
         const ALWAYSON = (1 << 7);
@@ -21,7 +22,7 @@ impl_bitflags_from_to_bytes!(BtnInst, u8);
 
 /// Colour
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum BtnStyleColour {
     /// NotEditable, defaults to light grey
     #[default]
@@ -43,11 +44,11 @@ pub enum BtnStyleColour {
 }
 
 bitflags::bitflags! {
-    /// Bitwise flags used within the [Btn] packet
+    /// Button style flags for [Btn].
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BtnStyleFlags: u8 {
-        /// Click this button to send IS_BTC
+        /// Clickable button (sends [Btc]).
         const CLICK = (1 << 3);
 
         /// Light button
@@ -65,12 +66,12 @@ bitflags::bitflags! {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Button style
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Button style configuration (colour + flags).
 pub struct BtnStyle {
-    /// Colour
+    /// Colour selection.
     pub colour: BtnStyleColour,
-    /// Behavioural flags
+    /// Behavioral flags (alignment, clickability, light/dark).
     pub flags: BtnStyleFlags,
 }
 
@@ -197,9 +198,9 @@ impl Decode for BtnStyle {
 }
 
 bitflags::bitflags! {
-    /// Bitwise flags used within the [Sta] packet
+    /// Bitwise flags reported for a button click.
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BtnClickFlags: u8 {
         /// Left click
         const LMB = (1 << 0);
@@ -218,88 +219,93 @@ bitflags::bitflags! {
 impl_bitflags_from_to_bytes!(BtnClickFlags, u8);
 
 #[derive(Debug, Default, Clone, PartialEq, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[non_exhaustive]
-/// Used within [Bfn] to specify the action to take.
+/// Action type for [Bfn].
 pub enum BfnType {
     #[default]
-    /// Instruction - delete one button or range of buttons (must set ClickID)
+    /// Delete one button or a range of buttons.
     DelBtn = 0,
 
-    /// Instruction - clear all buttons
+    /// Clear all buttons.
     Clear = 1,
 
-    /// Report - user cleared all buttons
+    /// User cleared all buttons.
     UserClear = 2,
 
-    /// Report - user requested buttons
+    /// User requested buttons.
     BtnRequest = 3,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Button Function
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Button management command or notification.
+///
+/// - Deletes or clears buttons, or reports user button actions.
 pub struct Bfn {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Button function type
+    /// Action to perform or report.
     pub subt: BfnType,
 
-    /// Unique connection ID to send to or received from (0 = local / 255 = all)
+    /// Target connection (0 = local, 255 = all).
     pub ucid: ConnectionId,
 
-    /// If subt is BFN_DEL_BTN: ID of single button to delete or first button in range
+    /// Button id or start of range (for delete actions).
     pub clickid: ClickId,
 
-    /// If subt is BFN_DEL_BTN: ID of last button in range (if greater than ClickID)
+    /// End of range for delete actions.
     pub clickmax: u8,
 
-    /// Priarmily used internally by LFS
+    /// Internal button instance flags.
     pub inst: BtnInst,
 }
 
 impl_typical_with_request_id!(Bfn);
 
 #[derive(Debug, Clone, PartialEq, Default, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Button - Instructional to create a button
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Create or update a button.
+///
+/// - Buttons can include optional captions and input fields.
+/// - Position and size are specified in screen-relative units.
 pub struct Btn {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Connection to display the button (0 = local / 255 = all)
+    /// Connection to display the button (0 = local, 255 = all).
     pub ucid: ConnectionId,
 
-    /// Button ID (0 to 239)
+    /// Button id (0 to 239).
     pub clickid: ClickId,
 
-    /// Primarily used internally by LFS
+    /// Internal button instance flags.
     pub inst: BtnInst,
 
-    /// Button style,
+    /// Button style.
     pub bstyle: BtnStyle,
 
-    /// Max chars permitted for a button with input
+    /// Max chars permitted for a button with input.
     pub typein: Option<u8>,
 
-    /// Position - left (0-200)
+    /// Position: left (0-200).
     pub l: u8,
 
-    /// Position - top (0-200)
+    /// Position: top (0-200).
     pub t: u8,
 
-    /// Position - width (0-200)
+    /// Position: width (1-200).
     pub w: u8,
 
-    /// Position - height (0-200)
+    /// Position: height (1-200).
     pub h: u8,
 
-    /// Optional caption
+    /// Optional caption displayed before the main text.
     pub caption: Option<String>,
 
-    /// Text
+    /// Button text.
     pub text: String,
 }
 
@@ -371,7 +377,7 @@ impl Encode for Btn {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         if self.l > 200 {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
-                min: 1,
+                min: 0,
                 max: 200,
                 found: self.l as usize,
             }
@@ -387,7 +393,7 @@ impl Encode for Btn {
             .context("Btn::t"));
         }
 
-        if self.w > 200 {
+        if self.w < 1 || self.w > 200 {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
                 min: 1,
                 max: 200,
@@ -396,9 +402,9 @@ impl Encode for Btn {
             .context("Btn::w"));
         }
 
-        if self.h > 200 {
+        if self.h < 1 || self.h > 200 {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
-                min: 0,
+                min: 1,
                 max: 200,
                 found: self.t as usize,
             }
@@ -457,43 +463,47 @@ impl Encode for Btn {
 impl_typical_with_request_id!(Btn);
 
 #[derive(Debug, Clone, Default, PartialEq, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Button Click - Sent back when a user clicks a button
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Sent when a user clicks a button.
+///
+/// - Reports the button id and click modifiers.
 pub struct Btc {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
-    /// Connection that clicked the button (zero if local)
+    /// Connection that clicked the button (0 = local).
     pub ucid: ConnectionId,
-    /// Button identifier originally sent in IS_BTN
+    /// Button id that was clicked.
     pub clickid: ClickId,
 
-    /// Primarily used internally by LFS
+    /// Internal button instance flags.
     pub inst: BtnInst,
 
-    /// Button click flags
+    /// Click modifiers (left/right/ctrl/shift).
     #[insim(pad_after = 1)]
     pub cflags: BtnClickFlags,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Button Type - Sent back when a user types into a text entry "button"
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Sent when a user types into a text entry button.
+///
+/// - Includes the input text and the original `typein` limit.
 pub struct Btt {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
-    /// Connection that typed into the button (zero if local)
+    /// Connection that typed into the button (0 = local).
     pub ucid: ConnectionId,
 
-    /// Button identifier originally sent in IS_BTN
+    /// Button id that received input.
     pub clickid: ClickId,
 
-    /// Primarily used internally by LFS
+    /// Internal button instance flags.
     pub inst: BtnInst,
 
-    /// From original button specification (IS_BTN)
+    /// Original input limit from [Btn].
     pub typein: Option<u8>,
 
-    /// Typed text, zero to TypeIn specified in IS_BTN
+    /// Entered text.
     pub text: String,
 }
 
@@ -550,6 +560,8 @@ impl Encode for Btt {
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
+
     use bytes::{BufMut, BytesMut};
 
     use super::*;
@@ -718,5 +730,28 @@ mod tests {
             assert!(matches!(parsed.typein, Some(7)));
             assert_eq!(parsed.text, "123456|^$");
         });
+    }
+
+    #[test]
+    fn test_contextual_error() {
+        let btn = Btn {
+            ..Default::default()
+        };
+
+        let mut buf = BytesMut::new();
+        let res = btn.encode(&mut buf);
+
+        assert!(res.is_err());
+        assert!(matches!(
+            res,
+            Err(insim_core::encode::EncodeError {
+                context: Some(Cow::Borrowed("Btn::w")),
+                kind: insim_core::encode::EncodeErrorKind::OutOfRange {
+                    min: 1,
+                    max: 200,
+                    found: 0
+                }
+            })
+        ));
     }
 }

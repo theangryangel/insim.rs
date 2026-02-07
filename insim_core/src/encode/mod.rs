@@ -33,26 +33,30 @@ impl EncodeError {
 
 impl std::fmt::Display for EncodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut chain = vec![];
         let mut current: Option<&EncodeError> = Some(self);
+        let mut first = true;
 
         while let Some(err) = current {
             if let Some(ctx) = &err.context {
-                chain.push(ctx.as_ref().to_string());
+                if !first {
+                    f.write_str(" > ")?;
+                }
+                f.write_str(ctx)?;
+                first = false;
             }
 
             match &err.kind {
-                EncodeErrorKind::Nested { source } => {
-                    current = Some(source);
-                },
-                _ => {
-                    chain.push(err.kind.to_string());
+                EncodeErrorKind::Nested { source } => current = Some(source),
+                kind => {
+                    if !first {
+                        f.write_str(" > ")?;
+                    }
+                    write!(f, "{kind}")?;
                     break;
                 },
             }
         }
-
-        write!(f, "{}", chain.join(" > "))
+        Ok(())
     }
 }
 

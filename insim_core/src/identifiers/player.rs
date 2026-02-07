@@ -4,12 +4,10 @@ use std::{
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-#[cfg(feature = "serde")]
-use serde::Serialize;
 
 /// Unique Player Identifier, commonly referred to as PLID in Insim.txt
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PlayerId(pub u8);
 
 impl fmt::Display for PlayerId {

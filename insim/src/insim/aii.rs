@@ -4,20 +4,28 @@ use insim_core::{Decode, Encode, coordinate::Coordinate, dash_lights::DashLights
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Physical state snapshot used by [Aii].
 pub struct OsMain {
+    /// Angular velocity vector.
     pub angvel: Vector,
 
+    /// Heading angle.
     pub heading: f32,
 
+    /// Pitch angle.
     pub pitch: f32,
 
+    /// Roll angle.
     pub roll: f32,
 
+    /// Acceleration vector.
     pub accel: Vector,
 
+    /// Velocity vector.
     pub vel: Vector,
 
+    /// World position.
     pub pos: Coordinate,
 }
 
@@ -70,9 +78,9 @@ impl Encode for OsMain {
 }
 
 bitflags! {
-    /// Flags for AI Detection
+    /// AI state flags.
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AiFlags: u8 {
         /// Detect if engine running
         const IGNITION = (1 << 0);
@@ -86,31 +94,33 @@ bitflags! {
 impl_bitflags_from_to_bytes!(AiFlags, u8);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// AI Info
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// AI telemetry snapshot.
+///
+/// - Returned in response to AI info requests.
 pub struct Aii {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Set to choose 16-bit
+    /// Player id of the AI car.
     pub plid: PlayerId,
 
-    /// Outsim main packet
+    /// Outsim-style physical state.
     pub osmain: OsMain,
 
-    /// Flags
+    /// AI state flags.
     pub flags: AiFlags,
 
     #[insim(pad_after = 2)]
-    /// Current gear
+    /// Current gear.
     pub gear: u8,
 
     #[insim(pad_after = 8)]
-    /// Current RPM
+    /// Engine RPM.
     pub rpm: f32,
 
     #[insim(pad_after = 12)]
-    /// Current lights
+    /// Current dash lights.
     pub showlights: DashLights,
 }
 

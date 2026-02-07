@@ -6,7 +6,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Default, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Control object
 pub struct Control {
     /// Position
@@ -68,7 +68,7 @@ impl Control {
 
 /// Control Kind
 #[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Kind of Control Object
 pub enum ControlKind {
     #[default]

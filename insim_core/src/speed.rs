@@ -1,10 +1,12 @@
 //! Utilities for speed
 use std::fmt;
 
-/// Representation of Speed. This is a revert to the last major release.
-/// Speed is akin to Duration from the standard library.
+/// Speed stored as meters per second.
+///
+/// - Internal units are m/s.
+/// - Helper methods convert to and from kph and mph.
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Speed {
     inner: f32,
 }

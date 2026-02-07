@@ -22,16 +22,14 @@ struct ClockworkLobbyView {
     help_dialog: HelpDialog,
 }
 
-impl ui::View for ClockworkLobbyView {
-    type GlobalProps = Duration;
-    type ConnectionProps = ();
-    type Message = ClockworkLobbyMessage;
+#[derive(Debug, Clone, Default)]
+struct ClockworkLobbyProps {
+    remaining: Duration,
+}
 
-    fn mount(_tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
-        Self {
-            help_dialog: HelpDialog::default(),
-        }
-    }
+impl ui::Component for ClockworkLobbyView {
+    type Props = ClockworkLobbyProps;
+    type Message = ClockworkLobbyMessage;
 
     fn update(&mut self, msg: Self::Message) {
         match msg {
@@ -41,16 +39,30 @@ impl ui::View for ClockworkLobbyView {
         }
     }
 
-    fn render(
-        &self,
-        global_props: Self::GlobalProps,
-        _connection_props: Self::ConnectionProps,
-    ) -> ui::Node<Self::Message> {
+    fn render(&self, props: Self::Props) -> ui::Node<Self::Message> {
         ui::container()
             .flex()
             .flex_col()
-            .with_child(topbar(&format!("Warm up - {:?} remaining", global_props)))
+            .with_child(topbar(&format!(
+                "Warm up - {:?} remaining",
+                props.remaining
+            )))
             .with_child(self.help_dialog.render(()).map(ClockworkLobbyMessage::Help))
+    }
+}
+
+impl ui::View for ClockworkLobbyView {
+    type GlobalState = Duration;
+    type ConnectionState = ();
+
+    fn mount(_tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
+        Self {
+            help_dialog: HelpDialog::default(),
+        }
+    }
+
+    fn compose(global: Self::GlobalState, _connection: Self::ConnectionState) -> Self::Props {
+        ClockworkLobbyProps { remaining: global }
     }
 }
 

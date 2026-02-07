@@ -4,7 +4,7 @@ use insim::{
     builder::InsimTask,
     core::{
         object::insim::{InsimCheckpoint, InsimCheckpointKind},
-        string::colours::Colourify,
+        string::colours::Colour,
     },
     insim::{BtnStyle, ObjectInfo, Uco},
 };
@@ -46,16 +46,15 @@ struct ClockworkRoundView {
     help_dialog: HelpDialog,
 }
 
-impl ui::View for ClockworkRoundView {
-    type GlobalProps = ClockworkRoundGlobalProps;
-    type ConnectionProps = ClockworkRoundConnectionProps;
-    type Message = ClockworkRoundMessage;
+#[derive(Debug, Clone, Default)]
+struct ClockworkRoundProps {
+    global: ClockworkRoundGlobalProps,
+    connection: ClockworkRoundConnectionProps,
+}
 
-    fn mount(_tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
-        Self {
-            help_dialog: HelpDialog::default(),
-        }
-    }
+impl ui::Component for ClockworkRoundView {
+    type Props = ClockworkRoundProps;
+    type Message = ClockworkRoundMessage;
 
     fn update(&mut self, msg: Self::Message) {
         match msg {
@@ -65,21 +64,17 @@ impl ui::View for ClockworkRoundView {
         }
     }
 
-    fn render(
-        &self,
-        global_props: Self::GlobalProps,
-        connection_props: Self::ConnectionProps,
-    ) -> ui::Node<Self::Message> {
-        let status = if connection_props.in_progress {
+    fn render(&self, props: Self::Props) -> ui::Node<Self::Message> {
+        let status = if props.connection.in_progress {
             "In progress".light_green()
         } else {
-            match connection_props.round_best {
+            match props.connection.round_best {
                 Some(d) => format!("Best: {:.2?}", d).white(),
                 None => "Waiting for start".red(),
             }
         };
 
-        let players = scoreboard(&global_props.leaderboard, &connection_props.uname);
+        let players = scoreboard(&props.global.leaderboard, &props.connection.uname);
 
         ui::container()
             .flex()
@@ -87,7 +82,7 @@ impl ui::View for ClockworkRoundView {
             .with_child(
                 topbar(&format!(
                     "Round {}/{} - {:?} remaining",
-                    global_props.round, global_props.rounds, global_props.remaining,
+                    props.global.round, props.global.rounds, props.global.remaining,
                 ))
                 .with_child(ui::text(&status, BtnStyle::default().dark()).w(15.).h(5.)),
             )
@@ -106,6 +101,21 @@ impl ui::View for ClockworkRoundView {
                     .with_children(players),
             )
             .with_child(self.help_dialog.render(()).map(ClockworkRoundMessage::Help))
+    }
+}
+
+impl ui::View for ClockworkRoundView {
+    type GlobalState = ClockworkRoundGlobalProps;
+    type ConnectionState = ClockworkRoundConnectionProps;
+
+    fn mount(_tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
+        Self {
+            help_dialog: HelpDialog::default(),
+        }
+    }
+
+    fn compose(global: Self::GlobalState, connection: Self::ConnectionState) -> Self::Props {
+        ClockworkRoundProps { global, connection }
     }
 }
 
@@ -158,7 +168,15 @@ struct RoundsState {
 }
 
 impl RoundsState {
-    async fn broadcast_rankings(&mut self, config: &Rounds, ui: &ui::Ui<ClockworkRoundView>) {
+    async fn broadcast_rankings(
+        &mut self,
+        config: &Rounds,
+        ui: &ui::Ui<
+            ClockworkRoundMessage,
+            ClockworkRoundGlobalProps,
+            ClockworkRoundConnectionProps,
+        >,
+    ) {
         if let Some(connections) = config.presence.connections().await {
             for conn in connections {
                 let props = self.connection_props(&conn.uname);
@@ -196,7 +214,11 @@ impl RoundsState {
         &mut self,
         round: usize,
         config: &mut Rounds,
-        ui: &ui::Ui<ClockworkRoundView>,
+        ui: &ui::Ui<
+            ClockworkRoundMessage,
+            ClockworkRoundGlobalProps,
+            ClockworkRoundConnectionProps,
+        >,
     ) -> Result<(), SceneError> {
         self.round_best.clear();
         self.active_runs.clear();
@@ -241,7 +263,11 @@ impl RoundsState {
         &mut self,
         packet: insim::Packet,
         config: &Rounds,
-        ui: &ui::Ui<ClockworkRoundView>,
+        ui: &ui::Ui<
+            ClockworkRoundMessage,
+            ClockworkRoundGlobalProps,
+            ClockworkRoundConnectionProps,
+        >,
     ) -> Result<(), SceneError> {
         match packet {
             insim::Packet::Ncn(ncn) => {

@@ -1,21 +1,23 @@
 use crate::identifiers::{ConnectionId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Connection Player Renamed indicates that a player has changed their name or number plate.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Connection rename or plate change notification.
+///
+/// - Sent when a player changes their name or number plate.
 pub struct Cpr {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Unique connection ID of the connection that was renamed
+    /// Connection that changed name or plate.
     pub ucid: ConnectionId,
 
     #[insim(codepage(length = 24))]
-    /// New player name
+    /// New player name.
     pub pname: String,
 
     #[insim(codepage(length = 8))]
-    /// New number plate
+    /// New number plate.
     pub plate: String,
 }
 

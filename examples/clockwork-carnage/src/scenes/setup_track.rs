@@ -1,6 +1,6 @@
 use insim::{
     builder::InsimTask,
-    core::{string::colours::Colourify, track::Track},
+    core::{string::colours::Colour, track::Track},
     insim::RaceLaps,
 };
 use kitcar::{
@@ -12,21 +12,25 @@ use kitcar::{
 use crate::components::topbar;
 
 struct SetupTrackView {}
-impl ui::View for SetupTrackView {
-    type GlobalProps = ();
-    type ConnectionProps = ();
+impl ui::Component for SetupTrackView {
+    type Props = ();
     type Message = ();
+
+    fn render(&self, _props: Self::Props) -> ui::Node<Self::Message> {
+        topbar(&"Waiting for player ready".white())
+    }
+}
+
+impl ui::View for SetupTrackView {
+    type GlobalState = ();
+    type ConnectionState = ();
 
     fn mount(_tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
         Self {}
     }
 
-    fn render(
-        &self,
-        _global_props: Self::GlobalProps,
-        _connection_props: Self::ConnectionProps,
-    ) -> ui::Node<Self::Message> {
-        topbar(&"Waiting for player ready".white())
+    fn compose(_global: Self::GlobalState, _connection: Self::ConnectionState) -> Self::Props {
+        ()
     }
 }
 

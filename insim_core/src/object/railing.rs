@@ -7,7 +7,7 @@ use crate::{
 
 /// Railing1
 #[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Railing {
     /// Position
     pub xyz: ObjectCoordinate,

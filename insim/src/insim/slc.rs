@@ -3,16 +3,18 @@ use insim_core::vehicle::Vehicle;
 use crate::identifiers::{ConnectionId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// User Selected Car - sent when a connection selects a car (empty if no car)
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Connection selected a car.
+///
+/// - Sent when a connection selects a car.
 pub struct Slc {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Unique connection ID which selected a vehicle
+    /// Connection that selected the car.
     pub ucid: ConnectionId,
 
-    /// Vehicle which the connection selected
+    /// Selected vehicle.
     pub cname: Vehicle,
 }
 

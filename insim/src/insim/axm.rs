@@ -9,43 +9,43 @@ pub use insim_core::object::ObjectInfo;
 
 /// Actions that can be taken as part of [Axm].
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum PmoAction {
     #[default]
-    /// Sent by the layout loading system only
+    /// Sent by the layout loading system only.
     LoadingFile = 0,
 
-    /// Add objects
+    /// Add objects.
     AddObjects = 1,
 
-    /// Delete objects
+    /// Delete objects.
     DelObjects = 2,
 
-    /// Remove/clear all objects
+    /// Remove/clear all objects.
     ClearAll = 3,
 
-    /// Indicates a reply to a TINY_AXM packet
+    /// Reply to [`TinyType::Axm`](crate::insim::TinyType::Axm).
     TinyAxm = 4,
 
-    /// Indicates a reply to a TTC_SEL packet
+    /// Reply to [`TtcType::Sel`](crate::insim::TtcType::Sel).
     TtcSel = 5,
 
-    /// Set a connection's layout editor selection
+    /// Set a connection's layout editor selection.
     Selection = 6,
 
-    /// User pressed O without anything selected
+    /// User pressed 'O' without anything selected.
     Position = 7,
 
-    /// Request Z values / reply with Z values
+    /// Request or reply with Z values.
     GetZ = 8,
 }
 
 bitflags::bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    /// AutoX object flags
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    /// AutoX object flags.
     pub struct PmoFlags: u8 {
         /// LFS has reached the end of a layout file which it is loading. The added objects will then be optimised.
         const FILE_END = (1 << 0);
@@ -73,24 +73,26 @@ bitflags::bitflags! {
 
 impl_bitflags_from_to_bytes!(PmoFlags, u8);
 
-/// AutoX Multiple Objects - Report on/add/remove multiple AutoX objects
+/// AutoX multiple objects update.
+///
+/// - Adds, removes, or reports layout objects.
+/// - Carries a list of [ObjectInfo] entries.
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Axm {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Unique id of the connection that sent the packet
+    /// Connection that sent or requested the update.
     pub ucid: ConnectionId,
 
-    /// Action that was taken
+    /// Action taken or requested.
     pub pmoaction: PmoAction,
 
-    /// Bitflags providing additional information about what has happened, or what you want to
-    /// happen
+    /// Additional flags for the action.
     pub pmoflags: PmoFlags,
 
-    /// List of information about the affected objects
+    /// Object list for the action.
     pub info: Vec<ObjectInfo>,
 }
 

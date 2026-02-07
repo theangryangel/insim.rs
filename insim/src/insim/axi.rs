@@ -1,26 +1,26 @@
 use crate::identifiers::RequestId;
 
-/// Auto X Info - Return information about the current layout.
-// You can request information about the current layout with this IS_TINY:
-// reqi: non-zero (returned in the reply)
-// subtype: TINY_AXI (AutoX Info)
+/// AutoX layout summary.
+///
+/// - Reports counts for objects and checkpoints plus the last loaded layout name.
+/// - Can be requested via [`TinyType::Axi`](crate::insim::TinyType::Axi).
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Axi {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
-    /// Autocross start position
+    /// Autocross start position index.
     pub axstart: u8,
 
-    /// Number of checkpoints
+    /// Number of checkpoints.
     pub numcp: u8,
 
-    /// Number of objects
+    /// Number of objects.
     pub numo: u16,
 
-    /// The name of the layout last loaded (if loaded locally)
+    /// Name of the last loaded layout (if loaded locally).
     #[insim(codepage(length = 32))]
     pub lname: String,
 }

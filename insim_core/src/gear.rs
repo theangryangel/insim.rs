@@ -1,7 +1,7 @@
 //! Gear
 
 #[derive(Debug, Copy, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Gear
 pub enum Gear {
     /// Reverse

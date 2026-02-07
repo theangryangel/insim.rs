@@ -28,20 +28,24 @@ pub enum GameVersionParseError {
     NotUtf8String(Bytes),
 }
 
-/// GameVersion
+/// LFS game version parsed from the version string.
+///
+/// - Parses values like `0.7F` and `0.7E15`.
+/// - `major` is the numeric prefix; `minor` is the letter; `patch` is optional digits.
+/// - Display and encoding use the canonical string form.
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GameVersion {
-    /// Version
+    /// Numeric prefix (e.g., `0.7`).
     // XXX: Why a float? Because as far as I can tell Scawen treats LFS versions like a number, not
     // as a version, based on the existence of 0.04k. Version numbers tend not to have leading
     // zeros.
     pub major: f32,
 
-    /// Patch
+    /// Letter suffix (e.g., `F`).
     pub minor: char,
 
-    /// Patch revision
+    /// Optional patch number (e.g., `15`).
     pub patch: Option<usize>,
 }
 

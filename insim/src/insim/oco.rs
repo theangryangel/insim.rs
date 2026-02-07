@@ -3,10 +3,10 @@ use bitflags::bitflags;
 use crate::identifiers::RequestId;
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[non_exhaustive]
-/// Object Control action to take. Used within [Oco].
+/// Action type for [Oco].
 pub enum OcoAction {
     #[default]
     /// Give up control of all lights
@@ -20,10 +20,10 @@ pub enum OcoAction {
 }
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[non_exhaustive]
-/// Which lights to manipulate. See [Oco].
+/// Which start lights to manipulate.
 pub enum OcoIndex {
     /// Layout lights 1
     AxoStartLights1 = 149,
@@ -39,8 +39,8 @@ pub enum OcoIndex {
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    /// Which blubs to manipulate. See [Oco].
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    /// Which bulbs to manipulate.
     pub struct OcoLights: u8 {
         /// Red1
         const RED1 = (1 << 0);
@@ -56,24 +56,25 @@ bitflags! {
 impl_bitflags_from_to_bytes!(OcoLights, u8);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Object Control
-/// Used to switch start lights
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Start light control packet.
+///
+/// - Controls main or layout start lights.
 pub struct Oco {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
-    /// Action to take
+    /// Action to take.
     pub ocoaction: OcoAction,
 
-    /// Lights to manipulate
+    /// Which light group to control.
     pub index: OcoIndex,
 
-    /// Optional identifier
+    /// Optional identifier (layout light index).
     pub identifier: u8,
 
-    /// Bulbs/lights to manipulate
+    /// Bulbs to enable/disable.
     pub data: OcoLights,
 }
 

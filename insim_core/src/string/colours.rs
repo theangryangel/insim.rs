@@ -2,17 +2,17 @@
 
 use std::borrow::Cow;
 
-use super::control::ControlCharacter;
+use super::control::ControlMarker;
 
 /// Trait to help identify colour markers/identifiers
 /// Left public to allow users to implement their own variation on colour stripping or replacement.
 /// i.e. ASCII or HTML.
-pub trait Colour {
+pub(super) trait ColourMarker {
     /// Is this a supported colour control character within LFS
     fn is_lfs_colour(&self) -> bool;
 }
 
-impl Colour for char {
+impl ColourMarker for char {
     fn is_lfs_colour(&self) -> bool {
         matches!(
             self,
@@ -21,14 +21,14 @@ impl Colour for char {
     }
 }
 
-impl Colour for u8 {
+impl ColourMarker for u8 {
     fn is_lfs_colour(&self) -> bool {
         (*self as char).is_lfs_colour()
     }
 }
 
 /// Trait to help build coloured strings. API is heavily inspired by colored-rs/colored.
-pub trait Colourify {
+pub trait Colour {
     /// Make this black
     fn black(self) -> String;
     /// Make this red
@@ -47,9 +47,12 @@ pub trait Colourify {
     fn white(self) -> String;
     /// Make this dark green (default colour)
     fn dark_green(self) -> String;
+
+    /// Strip colours from a string
+    fn strip_colours(&self) -> Cow<'_, str>;
 }
 
-impl<T: AsRef<str>> Colourify for T {
+impl<T: AsRef<str>> Colour for T {
     fn black(self) -> String {
         format!("^0{}", self.as_ref())
     }
@@ -85,22 +88,14 @@ impl<T: AsRef<str>> Colourify for T {
     fn dark_green(self) -> String {
         format!("^9{}", self.as_ref())
     }
-}
 
-/// ColourifyExt allows chaining, providing an alterntive to format!
-pub trait ColourifyExt {
-    /// Allows chaining
-    fn then(self, other: impl AsRef<str>) -> String;
-}
-
-impl ColourifyExt for String {
-    fn then(mut self, other: impl AsRef<str>) -> String {
-        self.push_str(other.as_ref());
-        self
+    fn strip_colours(&self) -> Cow<'_, str> {
+        strip(self.as_ref())
     }
 }
 
 /// Strip LFS colours
+/// Prefer the [`Colour::strip_colours`] trait function
 pub fn strip(input: &'_ str) -> Cow<'_, str> {
     if !input.chars().any(|c| c.is_lfs_control_char()) {
         return Cow::Borrowed(input);
@@ -147,11 +142,13 @@ mod tests {
     #[test]
     fn test_strip_colours_only() {
         assert_eq!(strip("^1^2^3^4^5^6^7^8^9"), "");
+        assert_eq!("^1^2^3^4^5^6^7^8^9".strip_colours(), "");
     }
 
     #[test]
     fn test_strip_colours() {
         assert_eq!(strip("^1234^56789"), "2346789");
+        assert_eq!("^1234^56789".strip_colours(), "2346789");
     }
 
     #[test]
@@ -186,16 +183,5 @@ mod tests {
     #[test]
     fn test_colourify_str() {
         assert_eq!("^4Test", "Test".blue());
-    }
-
-    #[test]
-    fn test_colourifyext() {
-        assert_eq!(
-            "^4Test ^3Test2",
-            "Test"
-                .blue()
-                .then(" ".to_string())
-                .then("Test2".to_string().yellow())
-        );
     }
 }

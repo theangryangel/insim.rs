@@ -4,33 +4,35 @@ use super::{Fuel200, PenaltyInfo};
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Split X timing
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Split timing for a player.
+///
+/// - Sent when a player crosses a split.
 pub struct Spx {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Unique player id for this the split timing
+    /// Player for this split.
     pub plid: PlayerId,
 
     #[insim(duration = u32)]
-    /// Split duration
+    /// Split time.
     pub stime: Duration,
 
     #[insim(duration = u32)]
-    /// Total elapsed time
+    /// Total elapsed time since session start.
     pub etime: Duration,
 
-    /// Split number
+    /// Split index (1-3).
     pub split: u8,
 
-    /// Any penalties the user has received
+    /// Current penalty state.
     pub penalty: PenaltyInfo,
 
-    /// The number of stops taken
+    /// Number of pit stops.
     pub numstops: u8,
 
-    /// When /showfuel yes: double fuel percent / no: 255
+    /// Fuel remaining (double-percentage when enabled).
     pub fuel200: Fuel200,
 }
 

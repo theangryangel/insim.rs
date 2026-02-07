@@ -15,8 +15,8 @@ pub(crate) fn spclose_strip_high_bits(val: u16) -> u16 {
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    /// Additional information for the object hit, used within the [Obh] packet.
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    /// Additional information for an object hit.
     pub struct ObhFlags: u8 {
         /// An added object was hit
         const LAYOUT = (1 << 0);
@@ -41,27 +41,25 @@ generate_bitflag_helpers! {
 impl_bitflags_from_to_bytes!(ObhFlags, u8);
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Vehicle made contact with something else
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Contact details used by collision reports.
 pub struct CarContact {
-    /// Car's motion if Speed > 0: 0 = world y direction
-    /// Stored internally as radians
+    /// Direction of motion.
     pub direction: Heading,
 
-    /// Direction of forward axis: 0 = world y direction
-    /// Stored internally as radians
+    /// Car facing direction.
     pub heading: Heading,
 
-    /// Speed in m/s
+    /// Speed.
     pub speed: Speed,
 
-    /// Z position (1 metre = 16)
+    /// Z position.
     pub z: u8,
 
-    /// X position (1 metre = 16)
+    /// X position.
     pub x: i16,
 
-    /// Y position (1 metre = 16)
+    /// Y position.
     pub y: i16,
 }
 
@@ -124,38 +122,39 @@ impl Encode for CarContact {
 }
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Object Hit
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Object hit report.
+///
+/// - Sent when object hit reporting is enabled in [IsiFlags](crate::insim::IsiFlags).
 pub struct Obh {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Unique player id
+    /// Player that hit the object.
     pub plid: PlayerId,
 
-    /// Low 12 bits: closing speed (10 = 1 m/s)
-    /// The high 4 bits are automatically stripped.
+    /// Closing speed at impact.
     pub spclose: Speed,
 
-    /// When this occurred. Warning this is looping.
+    /// Time since session start (wraps periodically).
     pub time: Duration,
 
-    /// Additional information about the contact.
+    /// Contact details.
     pub c: CarContact,
 
-    /// The X position of the object
+    /// Object X position.
     pub x: i16,
 
-    /// The Y position of the object
+    /// Object Y position.
     pub y: i16,
 
-    /// The Z position of the object
+    /// Object Z position.
     pub zbyte: u8,
 
-    /// The object index
+    /// Object index in the layout.
     pub index: u8,
 
-    /// Additional flags and information about the object
+    /// Additional object flags.
     pub flags: ObhFlags,
 }
 

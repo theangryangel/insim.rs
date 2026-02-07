@@ -1,13 +1,13 @@
 //! Strongly typed wind strength
-#[cfg(feature = "serde")]
-use serde::Serialize;
-
 use crate::{Decode, Encode};
 
 #[derive(Debug, Default, Clone, Copy)]
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
-/// Wind strength levels within LFS
+/// Wind strength levels.
+///
+/// - Discrete values (not a continuous scale).
+/// - Reported in session state packets.
 pub enum Wind {
     #[default]
     /// No wind

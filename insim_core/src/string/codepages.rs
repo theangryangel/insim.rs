@@ -2,21 +2,22 @@
 
 use std::{borrow::Cow, vec::Vec};
 
+use itertools::Itertools;
+use smallvec::SmallVec;
+
 /// LFS strings are a sequence of u8 bytes, with an optional trailing \0.
 /// The bytes are conventionally compromised of characters from multiple code pages, indicated by a `^` and
 /// a following code page identifier character. i.e. `^L` indicates Latin1.
 ///
 /// The common practise is to use the function `to_lossy_string` to convert to a standard Rust
 /// String.
-use itertools::Itertools;
-
-use super::control::ControlCharacter;
+use super::control::ControlMarker;
 
 const DEFAULT_CODEPAGE: char = 'L';
 // 8 is left off this by design to prevent double checking LATIN1
 const VALID_CODEPAGES_FOR_ENCODING: [char; 10] = ['L', 'G', 'C', 'E', 'T', 'B', 'J', 'H', 'S', 'K'];
 
-trait Codepage {
+trait CodepageMarker {
     /// This is a valid codepage marker/identifier?
     fn is_lfs_codepage(&self) -> bool;
     /// Get the encoding_rs lookup table
@@ -25,7 +26,7 @@ trait Codepage {
     fn propagate_lfs_codepage(self) -> bool;
 }
 
-impl Codepage for char {
+impl CodepageMarker for char {
     fn is_lfs_codepage(&self) -> bool {
         matches!(
             self,
@@ -58,7 +59,7 @@ impl Codepage for char {
     }
 }
 
-impl Codepage for u8 {
+impl CodepageMarker for u8 {
     fn is_lfs_codepage(&self) -> bool {
         (*self as char).is_lfs_codepage()
     }
@@ -87,64 +88,71 @@ pub fn to_lossy_bytes(input: &'_ str) -> Cow<'_, [u8]> {
     let mut current_encoding = current_control
         .as_lfs_codepage()
         .unwrap_or_else(|| unreachable!());
-    // a succulent buffer for reuse, we'll zero it before each use.
-    // all utf-8 characters are no longer than 4 bytes.
-    let mut buf = [0; 4];
+    let mut encoder = current_encoding.new_encoder();
 
-    'outer: for c in input.chars() {
-        // all codepages share ascii values
-        if c.is_ascii() {
-            output.push(c as u8);
-            continue;
+    let mut src_offset = 0;
+    // worst case output size: multi-byte encodings can expand, but 2x /probably/ is safe enough
+    // without being too wasteful?
+    let mut dst = vec![0u8; input.len() * 2];
+
+    while src_offset < input.len() {
+        let (res, src_read, dst_written) = encoder.encode_from_utf8_without_replacement(
+            &input[src_offset..],
+            &mut dst,
+            true, // we always have the full input
+        );
+
+        // push whatever was successfully encoded
+        output.extend_from_slice(&dst[..dst_written]);
+        src_offset += src_read;
+
+        match res {
+            encoding_rs::EncoderResult::InputEmpty => break,
+            encoding_rs::EncoderResult::Unmappable(c) => {
+                // current codepage can't handle this character, try the others
+                let mut buf = [0u8; 4];
+                let char_as_bytes = c.encode_utf8(&mut buf);
+                let mut found = false;
+
+                for candidate_control in VALID_CODEPAGES_FOR_ENCODING {
+                    // we've already checked the current codepage and failed, don't
+                    // check again, try the next codepage
+                    if candidate_control == current_control {
+                        continue;
+                    }
+                    let candidate_encoding = candidate_control
+                        .as_lfs_codepage()
+                        .unwrap_or_else(|| unreachable!());
+                    // try to encode the current character
+                    let (cow, _, error) = candidate_encoding.encode(char_as_bytes);
+                    if error {
+                        // this codepage doesnt match, try the next one
+                        continue;
+                    }
+                    // this one matched, push the control character and codepage
+                    // control character
+                    output.push(u8::lfs_control_char());
+                    output.push(candidate_control as u8);
+                    // then push the new character
+                    output.extend_from_slice(&cow);
+                    // switch the encoder to the new codepage for the remainder
+                    current_control = candidate_control;
+                    current_encoding = candidate_encoding;
+                    encoder = current_encoding.new_encoder();
+                    found = true;
+                    break;
+                }
+
+                if !found {
+                    // We found nothing, post the fallback character
+                    output.push(b'?');
+                }
+            },
+            encoding_rs::EncoderResult::OutputFull => {
+                // dst wasn't big enough resize and retry from the same offset
+                dst.resize(dst.len() * 2, 0);
+            },
         }
-
-        buf.fill(0);
-        let char_as_bytes = c.encode_utf8(&mut buf);
-
-        // allowing unwrap because we should never get to a position where we cannot have one
-        let (cow, _, error) = current_encoding.encode(char_as_bytes);
-
-        if !error {
-            output.extend_from_slice(&cow);
-            continue;
-        }
-
-        // try to find an encoding we can use
-        for candidate_control in VALID_CODEPAGES_FOR_ENCODING {
-            // we've already checked the current codepage and failed, don't check again, try the
-            // next codepage
-            if candidate_control == current_control {
-                continue;
-            }
-
-            let candidate_encoding = candidate_control
-                .as_lfs_codepage()
-                .unwrap_or_else(|| unreachable!());
-
-            // try to encode the current character
-            let (cow, _, error) = candidate_encoding.encode(char_as_bytes);
-            if error {
-                // this codepage doesnt match, try the next one
-                continue;
-            }
-
-            // this one matched, push the control character and codepage control character
-            output.push(u8::lfs_control_char());
-            output.push(candidate_control as u8);
-
-            // then push the new character
-            output.extend_from_slice(&cow);
-            // make sure for the next loop that we're going to try the same codepage again
-            current_encoding = candidate_encoding;
-            current_control = candidate_control;
-
-            // continue the outer loop
-            continue 'outer;
-        }
-
-        // We found nothing, post the fallback character
-        // fallback char
-        output.push(b'?');
     }
 
     output.into()
@@ -158,8 +166,28 @@ pub fn to_lossy_string(input: &'_ [u8]) -> Cow<'_, str> {
         return "".into();
     }
 
+    // allowing unwrap because if this panics we're screwed
+    let default_lfs_codepage = DEFAULT_CODEPAGE
+        .as_lfs_codepage()
+        .unwrap_or_else(|| unreachable!());
+
+    // fastest possible path - we have no *potential* control characters at all
+    if !input.iter().any(|b| b.is_lfs_control_char()) {
+        if input.is_ascii() {
+            return Cow::Borrowed(
+                str::from_utf8(input)
+                    .expect("we already checked if this was only ascii characters"),
+            );
+        }
+
+        let (cow, _, _) = default_lfs_codepage.decode(input);
+        return cow;
+    }
+
+    // slowest path
     // find the positions in the input for each ^L, ^B...
-    let mut indices: Vec<usize> = input
+    // XXX: Using SmallVec here to avoid an allocation if possible
+    let mut indices: SmallVec<[usize; 8]> = input
         .iter()
         .tuple_windows()
         .positions(|(elem, next)| elem.is_lfs_control_char() && next.is_lfs_codepage())

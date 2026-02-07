@@ -7,7 +7,7 @@ use crate::{
 
 /// StartLights
 #[derive(Debug, Clone, PartialEq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StartLights {
     /// Position
     pub xyz: ObjectCoordinate,

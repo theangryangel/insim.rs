@@ -3,9 +3,9 @@ use bitflags::bitflags;
 use crate::identifiers::RequestId;
 
 bitflags! {
-    /// Bitwise flags used within the [Sch] packet
+    /// Modifier flags used with [Sch].
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SchFlags: u8 {
         /// Shift
         const SHIFT = (1 << 0);
@@ -24,17 +24,19 @@ generate_bitflag_helpers! {
 impl_bitflags_from_to_bytes!(SchFlags, u8);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Send Single Character
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Send a single key press.
+///
+/// - Best for simple keys; some special keys may not work.
 pub struct Sch {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
-    /// Character
+    /// Character to send.
     pub charb: char,
 
-    /// Character modifiers/flags
+    /// Key modifiers (shift/ctrl).
     #[insim(pad_after = 2)]
     pub flags: SchFlags,
 }

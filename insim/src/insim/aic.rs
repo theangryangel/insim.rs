@@ -10,9 +10,8 @@ const AIC_MAX_INPUTS: usize = 20;
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    /// Describes the setup of a player and the various helpers that may be enabled, such as
-    /// auto-clutch, etc.
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    /// AI help and assist flags.
     pub struct AiHelpFlags: u16 {
         /// Autogears
         const AUTOGEARS = (1 << 3);
@@ -26,9 +25,9 @@ bitflags! {
 impl_bitflags_from_to_bytes!(AiHelpFlags, u16);
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
-/// Special toggle-able helper for [AiInputType]
+/// Toggle mode for AI controls.
 pub enum AiInputToggle {
     /// Toggle on/off
     #[default]
@@ -60,9 +59,9 @@ impl From<AiInputToggle> for u16 {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
-/// AI input type
+/// AI input command.
 pub enum AiInputType {
     /// Steering
     Msx(u16),
@@ -142,13 +141,13 @@ pub enum AiInputType {
 }
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// AI Input Control, value
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// AI input control value with optional duration.
 pub struct AiInput {
-    /// Input
+    /// Input command.
     pub input: AiInputType,
 
-    /// Duration
+    /// Duration for the input (if supported).
     pub time: Option<Duration>,
 }
 
@@ -509,16 +508,18 @@ impl Encode for AiInput {
 }
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// AI Input Control
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// AI input control packet.
+///
+/// - Sends a sequence of AI input commands.
 pub struct Aic {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Set to choose
+    /// Player id to control.
     pub plid: PlayerId,
 
-    /// Inputs to send, there are helper methods on [AiInput] to assist building these
+    /// Inputs to send (use [AiInput] helpers to build common inputs).
     pub inputs: Vec<AiInput>,
 }
 

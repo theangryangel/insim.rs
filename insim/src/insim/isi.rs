@@ -5,10 +5,10 @@ use bitflags::bitflags;
 use crate::{VERSION, WithRequestId, identifiers::RequestId};
 
 bitflags! {
-    /// Flags for the [Init] packet flags field.
+    /// Flags for the [Isi] options field.
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    /// Flags for [Isi], used to indicate what behaviours we want to opt into
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    /// Flags for [Isi], used to indicate which updates and behaviours to enable.
     pub struct IsiFlags: u16 {
         /// Guest or single player
         const LOCAL = (1_u16 << 2);
@@ -31,7 +31,7 @@ bitflags! {
         /// Receive HLV packets
         const HLV = (1 << 8);
 
-        /// Rceive AXM when loading a layout
+        /// Receive AXM when loading a layout
         const AXM_LOAD = (1 << 9);
 
         /// Receive AXM when changing objects
@@ -61,40 +61,44 @@ impl From<IsiFlags> for Isi {
 impl_bitflags_from_to_bytes!(IsiFlags, u16);
 
 #[derive(Debug, Clone, Eq, PartialEq, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Insim Init, or handshake packet.
-/// Required to be sent to the server before any other packets.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// InSim init/handshake packet sent to start communication.
+///
+/// - Sends initial connection options (which updates you want and how often).
+/// - Controls where updates are delivered when using UDP.
+/// - Requests a version reply when `reqi` is non-zero.
 pub struct Isi {
-    /// When set to a non-zero value the server will send a [crate::Packet::Ver] packet in response.
-    ///packet in response.
+    /// If non-zero, requests a [crate::insim::Ver] reply and is echoed back.
     #[insim(pad_after = 1)]
     pub reqi: RequestId,
 
-    /// UDP Port
+    /// UDP port for replies.
+    /// - UDP: `0` = reply to the source port; non-zero = reply to this port.
+    /// - TCP: `0` = NLP/MCI over TCP; non-zero = NLP/MCI over UDP.
     pub udpport: u16,
 
-    /// Options for the Insim Connection. See [IsiFlags] for more information.
+    /// Connection options (e.g., NLP/MCI updates, collision reports, join handling).
+    ///
+    /// Prefer [Mci](super::Mci) over [Nlp](super::Nlp) as it includes all NLP data.
     pub flags: IsiFlags,
 
-    /// Insim protocol version. Unless you have a good reason you should probably leave this as the
-    /// default value of [crate::VERSION].
+    /// Protocol version your program expects.
+    /// Defaults to [crate::VERSION].
     pub version: u8,
 
-    /// Messages typed with this prefix will be sent to your InSim program
-    /// on the host (in IS_MSO) and not displayed on anyone's screen.
-    /// This should be a single ascii character. i.e. '!'.
+    /// Special host message prefix (single ASCII character).
+    /// Messages typed with this prefix are forwarded to InSim and not shown in chat.
     pub prefix: char,
 
-    /// Time in between each [Nlp](super::Nlp) or [Mci](super::Mci) packet when set to a non-zero value and
-    /// the relevant flags are set.
+    /// Interval between [Nlp](super::Nlp) or [Mci](super::Mci) updates (0 = disabled).
     #[insim(duration = u16)]
     pub interval: Duration,
 
-    /// Administrative password.
+    /// Admin password (empty if none).
     #[insim(codepage(length = 16))]
     pub admin: String,
 
-    /// Name of the program.
+    /// Short program name shown to LFS.
     #[insim(codepage(length = 16, trailing_nul = true))]
     pub iname: String,
 }

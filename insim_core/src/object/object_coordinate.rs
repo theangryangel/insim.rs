@@ -1,7 +1,7 @@
 //! Object Position
 
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Layout Object Position
 pub struct ObjectCoordinate {
     /// X coordinate (1:16 scale)

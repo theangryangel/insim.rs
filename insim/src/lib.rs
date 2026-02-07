@@ -21,6 +21,9 @@ pub mod packet;
 #[doc(hidden)]
 pub mod result;
 
+#[doc = include_str!("../docs/book.md")]
+pub mod _book {}
+
 /// The Insim Protocol Version Number supported by this library
 pub const VERSION: u8 = 10;
 
@@ -29,6 +32,8 @@ pub const VERSION: u8 = 10;
 pub(crate) const MAX_SIZE_PACKET: usize = (u8::MAX as usize) * 4;
 
 pub(crate) const DEFAULT_BUFFER_CAPACITY: usize = MAX_SIZE_PACKET * 6;
+
+pub use core::string::{colours::Colour, escaping::Escape};
 
 pub use error::Error;
 /// Rexport insim_core
@@ -43,7 +48,7 @@ pub use result::Result;
 /// Supports both blocking and tokio. Swap about `connect_async` for `connect` and remove the
 /// `.await` annotations.
 ///
-/// ```rust
+/// ```rust,ignore
 /// let conn = insim::tcp("127.0.0.1:29999").connect_async().await?;
 /// loop {
 ///     let packet = conn.read().await?;
@@ -63,7 +68,7 @@ pub fn tcp<R: Into<address::Addr>>(remote_addr: R) -> builder::Builder {
 /// Supports both blocking and tokio. Swap about `connect_async` for `connect` and remove the
 /// `.await` annotations.
 ///
-/// ```rust
+/// ```rust,ignore
 /// let conn = insim::udp("127.0.0.1:29999", None).connect_async().await?;
 /// loop {
 ///     let packet = conn.read().await?;

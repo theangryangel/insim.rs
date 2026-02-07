@@ -11,8 +11,8 @@ pub(super) const COMPCAR_DEGREES_PER_UNIT: f64 = 180.0 / 32768.0;
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-    /// Additional Car Info.
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    /// Additional state for a car in [Mci].
     pub struct CompCarInfo: u8 {
         /// This car is in the way of a driver who is a lap ahead
         const BLUE = (1 << 0);
@@ -48,39 +48,37 @@ generate_bitflag_helpers! {
 impl_bitflags_from_to_bytes!(CompCarInfo, u8);
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Used within the [Mci] packet info field.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Per-car telemetry entry used by [Mci].
 pub struct CompCar {
-    /// Index of the last "node" that the player passed through.
+    /// Index of the last node the player passed.
     pub node: u16,
 
-    /// The player's current lap.
+    /// Current lap number.
     pub lap: u16,
 
-    /// The current player's ID.
+    /// Player identifier.
     pub plid: PlayerId,
 
-    /// Race position
+    /// Race position.
     pub position: u8,
 
-    /// Additional information that describes this particular Compcar.
+    /// Additional state flags.
     pub info: CompCarInfo,
 
-    /// Positional information for the player, automatically translated into metres.
+    /// World position in meters.
     pub xyz: Coordinate,
 
-    /// Speed
+    /// Speed.
     pub speed: Speed,
 
-    /// Direction of car's motion : 0 = world y direction
-    /// Stored internally as radians
+    /// Direction of motion (heading of velocity).
     pub direction: Heading,
 
-    /// Direction of forward axis : 0 = world y direction
-    /// Stored internally as radians
+    /// Car facing direction.
     pub heading: Heading,
 
-    /// Signed, rate of change of heading : (16384 = 360 deg/s)
+    /// Angular velocity of the car.
     pub angvel: AngVel,
 }
 
@@ -185,15 +183,16 @@ impl Encode for CompCar {
 }
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Multi Car Info - positional information for players/vehicles.
-/// The MCI packet does not contain the positional information for all players. Only some. The
-/// maximum number of players depends on the version of Insim.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Multi-car telemetry updates.
+///
+/// - Contains position, speed, and heading for a subset of players.
+/// - Large grids are sent across multiple packets.
 pub struct Mci {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// Node and lap for a subset of players. Not all players may be included in a single packet.
+    /// Telemetry entries for a subset of players.
     pub info: Vec<CompCar>,
 }
 

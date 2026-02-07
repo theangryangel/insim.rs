@@ -2,14 +2,14 @@
 
 use std::borrow::Cow;
 
-use super::{colours::Colour, control::ControlCharacter};
+use super::{colours::ColourMarker, control::ControlMarker};
 
-trait Escape {
+trait EscapeMarker {
     fn try_lfs_escape(self) -> Option<char>;
     fn try_lfs_unescape(self) -> Option<char>;
 }
 
-impl Escape for char {
+impl EscapeMarker for char {
     fn try_lfs_unescape(self) -> Option<char> {
         if self.is_lfs_control_char() {
             return Some(char::lfs_control_char());
@@ -51,7 +51,27 @@ impl Escape for char {
     }
 }
 
+/// Trait to help escape and unescape strings.
+pub trait Escape {
+    /// Escape a string according to LFS' rules.
+    fn escape(&self) -> Cow<'_, str>;
+    /// Unescape a string according to LFS' rules.
+    fn unescape(&self) -> Cow<'_, str>;
+}
+
+impl<T: AsRef<str>> Escape for T {
+    fn escape(&self) -> Cow<'_, str> {
+        crate::string::escaping::escape(self.as_ref())
+    }
+
+    fn unescape(&self) -> Cow<'_, str> {
+        #[allow(deprecated)]
+        crate::string::escaping::unescape(self.as_ref())
+    }
+}
+
 /// Unescape a u8 slice according to LFS' rules.
+/// Prefer using the [`Escape::unescape`] trait function.
 pub fn unescape(input: &'_ str) -> Cow<'_, str> {
     // do we need to unescape?
     if !input.chars().any(|c| c.is_lfs_control_char()) {
@@ -77,6 +97,7 @@ pub fn unescape(input: &'_ str) -> Cow<'_, str> {
 }
 
 /// Unescape a string
+/// Prefer using the [`Escape::escape`] trait function.
 pub fn escape(input: &'_ str) -> Cow<'_, str> {
     if !input.chars().any(|c| c.try_lfs_escape().is_some()) {
         return input.into();
@@ -125,5 +146,27 @@ mod tests {
 
         let unescaped = unescape(&escaped);
         assert_eq!(unescaped, original);
+    }
+
+    #[test]
+    fn test_escaping_and_unescaping_trait() {
+        let original = "^|*:\\/?\"<>#123^945";
+
+        let escaped = original.escape();
+        assert_eq!(escaped, "^^^v^a^c^d^s^q^t^l^r^h123^945");
+
+        let unescaped = &escaped.unescape();
+        assert_eq!(unescaped, original);
+    }
+
+    #[test]
+    fn test_escaping_and_unescaping_trait_in_format() {
+        let original = "^|*:\\/?\"<>#123^945";
+
+        let escaped = format!("HELLO WORLD: {}", original.escape());
+        assert_eq!(escaped, "HELLO WORLD: ^^^v^a^c^d^s^q^t^l^r^h123^945");
+
+        let unescaped = &escaped.unescape();
+        assert_eq!(unescaped, "HELLO WORLD: ^|*:\\/?\"<>#123^945");
     }
 }

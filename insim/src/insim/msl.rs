@@ -1,10 +1,10 @@
 use crate::identifiers::RequestId;
 
-/// Enum for the sound field of [Msl].
+/// Sound effect used when delivering [Msl] or [Mtc](super::Mtc) messages.
 #[derive(
     Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, insim_core::Decode, insim_core::Encode,
 )]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum SoundType {
@@ -26,17 +26,19 @@ pub enum SoundType {
 }
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-/// Send a message to the local computer only. If you are connected to a server this means the
-/// console. If you are connected to a client this means to the local client only.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Send a message to the local computer only.
+///
+/// - On a dedicated host this appears in the host console.
+/// - On a client this appears only to the local player.
 pub struct Msl {
-    /// Non-zero if the packet is a packet request or a reply to a request
+    /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    /// See [SoundType]
+    /// Sound effect to play with the message.
     pub sound: SoundType,
 
-    /// Message
+    /// Message text.
     #[insim(codepage(length = 128, trailing_nul = true))]
     pub msg: String,
 }
