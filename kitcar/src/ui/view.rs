@@ -25,29 +25,20 @@ pub trait Component {
     fn render(&self, props: Self::Props) -> super::Node<Self::Message>;
 }
 
-/// View - think of it as the root [Component].
-pub trait View: Sized + 'static {
-    type GlobalProps: Clone + Send + Sync + Default + 'static;
-    type ConnectionProps: Clone + Send + Sync + Default + 'static;
-    type Message: Clone + Send + 'static;
+/// Root multiplayer UI type.
+pub trait View: Component + Sized + 'static {
+    type GlobalState: Clone + Send + Sync + Default + 'static;
+    type ConnectionState: Clone + Send + Sync + Default + 'static;
 
-    /// New!
     fn mount(tx: mpsc::UnboundedSender<Self::Message>) -> Self;
-
-    #[allow(unused)]
-    fn update(&mut self, msg: Self::Message) {}
-    fn render(
-        &self,
-        global_props: Self::GlobalProps,
-        connection_props: Self::ConnectionProps,
-    ) -> super::Node<Self::Message>;
+    fn compose(global: Self::GlobalState, connection: Self::ConnectionState) -> Self::Props;
 }
 
 /// Run the UI on a LocalSet (does not require Send)
 pub(super) fn run_view<V: View>(
     ucid: ConnectionId,
-    mut global: watch::Receiver<V::GlobalProps>,
-    mut connection: watch::Receiver<V::ConnectionProps>,
+    mut global: watch::Receiver<V::GlobalState>,
+    mut connection: watch::Receiver<V::ConnectionState>,
     internal_tx: mpsc::UnboundedSender<V::Message>,
     mut internal_rx: mpsc::UnboundedReceiver<V::Message>,
     insim: insim::builder::InsimTask,
@@ -57,7 +48,7 @@ pub(super) fn run_view<V: View>(
     let _ = tokio::task::spawn_local(async move {
         let mut root = V::mount(internal_tx);
         let mut packets = insim.subscribe();
-        let mut canvas = Canvas::<V>::new(ucid);
+        let mut canvas = Canvas::<V::Message>::new(ucid);
         let mut blocked = false; // user cleared the buttons, do not redraw unless requested
         let mut internal_closed = false;
 
@@ -66,10 +57,10 @@ pub(super) fn run_view<V: View>(
 
         loop {
             if should_render && !blocked {
-                let vdom = root.render(
+                let vdom = root.render(V::compose(
                     global.borrow_and_update().clone(),
                     connection.borrow_and_update().clone(),
-                );
+                ));
                 if let Some(diff) = canvas.reconcile(vdom) {
                     // FIXME: no expect
                     insim

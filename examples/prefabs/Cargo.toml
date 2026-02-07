@@ -9,6 +9,7 @@ publish = false
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
 insim = { path = "../../insim", default-features = false, features = ["tokio", "serde"] }
+kitcar = { path = "../../kitcar" }
 serde = { workspace = true, features = ["derive"] }
 serde_yaml = "0.9"
 tokio = { workspace = true, features = ["full"] }

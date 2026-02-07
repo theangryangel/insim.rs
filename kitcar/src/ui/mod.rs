@@ -1,4 +1,4 @@
-use std::{collections::HashMap, marker::PhantomData};
+use std::collections::HashMap;
 
 use insim::{
     Packet,
@@ -12,11 +12,12 @@ use tokio::{
 
 use crate::presence::Presence;
 
-mod canvas;
+pub mod canvas;
 pub mod id_pool;
 mod node;
 mod view;
 
+pub use canvas::{Canvas, CanvasDiff};
 pub use node::*;
 pub use view::*;
 
@@ -31,18 +32,22 @@ pub enum UiError {
 /// Ui handle. Create using [attach]. When dropped all insim buttons will be automatically removed.
 /// Intended for multi-player/multi-connection UIs
 #[derive(Debug)]
-pub struct Ui<V: View> {
-    global: watch::Sender<V::GlobalProps>,
-    connection: mpsc::Sender<(ConnectionId, V::ConnectionProps)>,
-    message: mpsc::Sender<(ConnectionId, V::Message)>,
-    outbound: broadcast::Sender<(ConnectionId, V::Message)>,
-    _phantom: PhantomData<V>,
+pub struct Ui<M: Clone + Send + 'static, G, C> {
+    global: watch::Sender<G>,
+    connection: mpsc::Sender<(ConnectionId, C)>,
+    message: mpsc::Sender<(ConnectionId, M)>,
+    outbound: broadcast::Sender<(ConnectionId, M)>,
 }
 
-impl<V: View> Ui<V> {
+impl<M, G, C> Ui<M, G, C>
+where
+    M: Clone + Send + 'static,
+    G: Clone + Send + Sync + Default + 'static,
+    C: Clone + Send + Sync + Default + 'static,
+{
     /// Update the global state for all connections, triggering a re-render.
     /// Global state is shared state visible to all connected players.
-    pub fn set_global_state(&self, value: V::GlobalProps) {
+    pub fn set_global_state(&self, value: G) {
         self.global
             .send(value)
             .expect("FIXME: expect global to work");
@@ -50,14 +55,14 @@ impl<V: View> Ui<V> {
 
     /// Update the state for a specific connection, triggering a re-render for that player.
     /// Player state is per-player state, useful for player-specific UI elements.
-    pub async fn set_player_state(&self, ucid: ConnectionId, value: V::ConnectionProps) {
+    pub async fn set_player_state(&self, ucid: ConnectionId, value: C) {
         self.connection
             .send((ucid, value))
             .await
             .expect("FIXME: expect connection to work");
     }
 
-    /// Get a clonable sender for injecting messages into views.
+    /// Get a clonable sender for injecting messages into UI components.
     /// This sender can be moved into spawned tasks without affecting UI lifecycle.
     /// Sending will fail once the [`Ui`] handle is dropped.
     ///
@@ -87,12 +92,12 @@ impl<V: View> Ui<V> {
     /// // ui can still be used here
     /// ui.set_global_state(new_state);
     /// ```
-    pub fn sender(&self) -> mpsc::Sender<(ConnectionId, V::Message)> {
+    pub fn sender(&self) -> mpsc::Sender<(ConnectionId, M)> {
         self.message.clone()
     }
 
     /// Subscribe to messages produced by user UI interactions (e.g. button click / type-in).
-    pub fn subscribe(&self) -> broadcast::Receiver<(ConnectionId, V::Message)> {
+    pub fn subscribe(&self) -> broadcast::Receiver<(ConnectionId, M)> {
         self.outbound.subscribe()
     }
 
@@ -107,14 +112,14 @@ impl<V: View> Ui<V> {
     ///         .then_some(ClockworkLobbyMessage::Help(HelpDialogMsg::Show))
     /// });
     /// ```
-    pub fn update_from_broadcast<F, M>(
+    pub fn update_from_broadcast<F, N>(
         &self,
-        mut rx: broadcast::Receiver<(M, ConnectionId)>,
+        mut rx: broadcast::Receiver<(N, ConnectionId)>,
         mut filter_map: F,
     ) -> JoinHandle<()>
     where
-        M: Clone + Send + 'static,
-        F: FnMut(M, ConnectionId) -> Option<V::Message> + Send + 'static,
+        N: Clone + Send + 'static,
+        F: FnMut(N, ConnectionId) -> Option<M> + Send + 'static,
     {
         let tx = self.sender();
         tokio::spawn(async move {
@@ -128,8 +133,8 @@ impl<V: View> Ui<V> {
         })
     }
 
-    /// Inject message into view for a given ucid.
-    pub async fn update<M>(&self, ucid: ConnectionId, msg: V::Message) {
+    /// Inject message into UI for a given ucid.
+    pub async fn update(&self, ucid: ConnectionId, msg: M) {
         let _ = self.message.send((ucid, msg)).await;
     }
 }
@@ -137,7 +142,7 @@ impl<V: View> Ui<V> {
 /// Attach a UI view to an insim connection, spawning a view instance for each connected player.
 /// Dropping the returned [`Ui`] handle will result in the UI being cleared for all players.
 ///
-/// All UI tasks run on a LocalSet, so View implementations don't need to be Send to accommodate
+/// All UI tasks run on a LocalSet, so view implementations don't need to be Send to accommodate
 /// taffy.
 ///
 /// # Example
@@ -145,20 +150,34 @@ impl<V: View> Ui<V> {
 /// ```rust,ignore
 /// struct MyView;
 ///
-/// impl View for MyView {
-///     type GlobalProps = GameState;
-///     type ConnectionProps = PlayerState;
+/// impl Component for MyView {
+///     type Props = Props;
 ///     type Message = MyMsg;
+///
+///     fn render(&self, props: Props) -> Node<Self::Message> {
+///         container()
+///             .with_child(text(format!("Score: {}", props.global.score), BtnStyle::default()))
+///     }
+/// }
+/// impl View for MyView {
+///     type GlobalState = GameState;
+///     type ConnectionState = PlayerState;
 ///
 ///     fn mount(_tx: mpsc::UnboundedSender<Self::Message>) -> Self {
 ///         Self
 ///     }
 ///
-///     fn render(&self, global: GameState, connection: PlayerState) -> Node<Self::Message> {
-///         container()
-///             .with_child(text(format!("Score: {}", global.score), BtnStyle::default()))
+///     fn compose(global: Self::GlobalState, player: Self::ConnectionState) -> Self::Props {
+///         Props { global, player }
 ///     }
 /// }
+///
+/// #[derive(Clone, Default)]
+/// struct GameState { score: u32 }
+/// #[derive(Clone, Default)]
+/// struct PlayerState { ready: bool }
+/// #[derive(Clone)]
+/// struct Props { global: GameState, player: PlayerState }
 ///
 /// let (ui, handle) = attach::<MyView>(insim, presence, GameState::default());
 ///
@@ -168,11 +187,17 @@ impl<V: View> Ui<V> {
 /// // Update per-player state
 /// ui.set_player_state(player_ucid, PlayerState { ready: true }).await;
 /// ```
-pub fn attach<V: View>(
+pub fn attach<V>(
     insim: insim::builder::InsimTask,
     presence: Presence,
-    props: V::GlobalProps,
-) -> (Ui<V>, JoinHandle<Result<(), UiError>>) {
+    props: V::GlobalState,
+) -> (
+    Ui<V::Message, V::GlobalState, V::ConnectionState>,
+    JoinHandle<Result<(), UiError>>,
+)
+where
+    V: View,
+{
     let (global_tx, _global_rx) = watch::channel(props);
     let (player_tx, mut player_rx) = mpsc::channel(100);
     let (message_tx, mut message_rx) = mpsc::channel::<(ConnectionId, V::Message)>(100);
@@ -182,7 +207,6 @@ pub fn attach<V: View>(
         connection: player_tx,
         message: message_tx,
         outbound: outbound_tx.clone(),
-        _phantom: PhantomData,
     };
 
     drop(_global_rx);
@@ -208,7 +232,7 @@ pub fn attach<V: View>(
             let mut active: HashMap<
                 ConnectionId,
                 (
-                    watch::Sender<V::ConnectionProps>,
+                    watch::Sender<V::ConnectionState>,
                     mpsc::UnboundedSender<V::Message>,
                 ),
             > = HashMap::new();
@@ -313,18 +337,18 @@ pub fn attach<V: View>(
 #[allow(clippy::type_complexity)]
 fn spawn_for<V: View>(
     ucid: ConnectionId,
-    global_rx: watch::Receiver<V::GlobalProps>,
+    global_rx: watch::Receiver<V::GlobalState>,
     insim: &insim::builder::InsimTask,
     active: &mut HashMap<
         ConnectionId,
         (
-            watch::Sender<V::ConnectionProps>,
+            watch::Sender<V::ConnectionState>,
             mpsc::UnboundedSender<V::Message>,
         ),
     >,
     outbound: broadcast::Sender<(ConnectionId, V::Message)>,
 ) {
-    let (connection_tx, connection_rx) = watch::channel(V::ConnectionProps::default());
+    let (connection_tx, connection_rx) = watch::channel(V::ConnectionState::default());
     let (internal_tx, internal_rx) = mpsc::unbounded_channel();
 
     run_view::<V>(

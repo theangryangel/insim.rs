@@ -9,15 +9,16 @@ use insim::{
     insim::{Bfn, BfnType, Btn},
 };
 
-use super::{Node, NodeKind, TypeInMapper, View, id_pool::ClickIdPool};
+use super::{Node, NodeKind, TypeInMapper, id_pool::ClickIdPool};
 
 #[derive(Debug, Default)]
-pub(super) struct CanvasDiff {
+pub struct CanvasDiff {
     pub update: Vec<Btn>,
     pub remove: Vec<Bfn>,
 }
 
 impl CanvasDiff {
+    #[must_use]
     pub fn merge(self) -> Vec<Packet> {
         self.remove
             .into_iter()
@@ -39,16 +40,27 @@ struct ButtonBinding<Msg> {
     typein: Option<TypeInMapper<Msg>>,
 }
 
-pub(super) struct Canvas<V: View> {
+#[allow(missing_debug_implementations)]
+pub struct Canvas<M: Clone + 'static> {
     ucid: ConnectionId,
     pool: ClickIdPool,
     // map stable hash -> button state (click id + rendered hash for diffing)
     buttons: HashMap<u64, ButtonState>,
-    click_map: HashMap<ClickId, ButtonBinding<V::Message>>,
+    click_map: HashMap<ClickId, ButtonBinding<M>>,
 }
 
-impl<V: View> Canvas<V> {
-    pub(super) fn new(ucid: ConnectionId) -> Self {
+impl<M: Clone + 'static> std::fmt::Debug for Canvas<M> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Canvas")
+            .field("ucid", &self.ucid)
+            .field("buttons", &self.buttons.len())
+            .field("click_map", &self.click_map.len())
+            .finish()
+    }
+}
+
+impl<M: Clone + 'static> Canvas<M> {
+    pub fn new(ucid: ConnectionId) -> Self {
         Self {
             ucid,
             pool: ClickIdPool::new(),
@@ -57,7 +69,7 @@ impl<V: View> Canvas<V> {
         }
     }
 
-    pub(super) fn reconcile(&mut self, root: Node<V::Message>) -> Option<CanvasDiff> {
+    pub fn reconcile(&mut self, root: Node<M>) -> Option<CanvasDiff> {
         let mut click_map = HashMap::new();
         let mut new_buttons = HashMap::new();
 
@@ -153,7 +165,7 @@ impl<V: View> Canvas<V> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn visit<M: Clone + 'static>(
+    fn visit(
         node: Node<M>,
         parent_hash: u64,
         ucid: ConnectionId,
@@ -283,23 +295,19 @@ impl<V: View> Canvas<V> {
     }
 
     // should be called if the user clears buttons
-    pub(super) fn clear(&mut self) {
+    pub fn clear(&mut self) {
         self.buttons.clear();
         self.click_map.clear();
         self.pool.release_all();
     }
 
-    pub(super) fn translate_clickid(&self, clickid: &ClickId) -> Option<V::Message> {
+    pub fn translate_clickid(&self, clickid: &ClickId) -> Option<M> {
         self.click_map
             .get(clickid)
             .and_then(|binding| binding.click.clone())
     }
 
-    pub(super) fn translate_typein_clickid(
-        &self,
-        clickid: &ClickId,
-        text: String,
-    ) -> Option<V::Message> {
+    pub fn translate_typein_clickid(&self, clickid: &ClickId, text: String) -> Option<M> {
         self.click_map
             .get(clickid)
             .and_then(|binding| binding.typein.as_ref())
@@ -334,7 +342,6 @@ fn get_taffy_abs_position(taffy: &taffy::TaffyTree, node_id: &taffy::NodeId) -> 
 #[cfg(test)]
 mod tests {
     use insim::insim::BtnStyle;
-    use tokio::sync::mpsc;
 
     use super::*;
 
@@ -342,26 +349,6 @@ mod tests {
     enum TestMsg {
         Click,
         TypeIn(String),
-    }
-
-    struct TestView;
-
-    impl View for TestView {
-        type GlobalProps = ();
-        type ConnectionProps = ();
-        type Message = TestMsg;
-
-        fn mount(_tx: mpsc::UnboundedSender<Self::Message>) -> Self {
-            TestView
-        }
-
-        fn render(
-            &self,
-            _global_props: Self::GlobalProps,
-            _connection_props: Self::ConnectionProps,
-        ) -> Node<Self::Message> {
-            Node::empty()
-        }
     }
 
     #[test]
@@ -398,7 +385,7 @@ mod tests {
     #[test]
     fn test_canvas_new() {
         let ucid = ConnectionId(5);
-        let canvas = Canvas::<TestView>::new(ucid);
+        let canvas = Canvas::<TestMsg>::new(ucid);
         assert_eq!(canvas.ucid, ucid);
         assert!(canvas.buttons.is_empty());
         assert!(canvas.click_map.is_empty());
@@ -406,7 +393,7 @@ mod tests {
 
     #[test]
     fn test_reconcile_empty_tree_returns_none() {
-        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
         let root: Node<TestMsg> = Node::empty();
         let diff = canvas.reconcile(root);
         assert!(diff.is_none());
@@ -414,7 +401,7 @@ mod tests {
 
     #[test]
     fn test_reconcile_container_only_returns_none() {
-        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
         let root: Node<TestMsg> = Node::container();
         let diff = canvas.reconcile(root);
         assert!(diff.is_none());
@@ -422,7 +409,7 @@ mod tests {
 
     #[test]
     fn test_reconcile_single_button_returns_update() {
-        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
         let root: Node<TestMsg> = Node::container()
             .w(200.0)
             .h(100.0)
@@ -438,7 +425,7 @@ mod tests {
 
     #[test]
     fn test_reconcile_unchanged_returns_none() {
-        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
 
         let make_tree = || {
             Node::container()
@@ -456,7 +443,7 @@ mod tests {
 
     #[test]
     fn test_reconcile_text_change_returns_update() {
-        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
 
         let tree1: Node<TestMsg> = Node::container()
             .w(200.0)
@@ -479,7 +466,7 @@ mod tests {
 
     #[test]
     fn test_reconcile_removed_button_returns_removal() {
-        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
 
         let tree1: Node<TestMsg> = Node::container().w(200.0).h(100.0).with_child(
             Node::text("Button1", BtnStyle::default())
@@ -501,7 +488,7 @@ mod tests {
 
     #[test]
     fn test_translate_clickid_known() {
-        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
 
         let root: Node<TestMsg> = Node::container().w(200.0).h(100.0).with_child(
             Node::clickable("Click", BtnStyle::default(), TestMsg::Click)
@@ -518,7 +505,7 @@ mod tests {
 
     #[test]
     fn test_translate_clickid_unknown() {
-        let canvas = Canvas::<TestView>::new(ConnectionId(1));
+        let canvas = Canvas::<TestMsg>::new(ConnectionId(1));
 
         let click_id = ClickId(99);
         let msg = canvas.translate_clickid(&click_id);
@@ -527,7 +514,7 @@ mod tests {
 
     #[test]
     fn test_translate_typein_clickid_known() {
-        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
 
         let root: Node<TestMsg> = Node::container().w(200.0).h(100.0).with_child(
             Node::text("Input", BtnStyle::default())
@@ -545,7 +532,7 @@ mod tests {
 
     #[test]
     fn test_clear_resets_canvas() {
-        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
 
         let root: Node<TestMsg> = Node::container().w(200.0).h(100.0).with_child(
             Node::clickable("Click", BtnStyle::default(), TestMsg::Click)
@@ -564,7 +551,7 @@ mod tests {
 
     #[test]
     fn test_reconcile_multiple_buttons() {
-        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
 
         let root: Node<TestMsg> = Node::container()
             .w(200.0)
@@ -583,7 +570,7 @@ mod tests {
 
     #[test]
     fn test_keyed_buttons_maintain_identity() {
-        let mut canvas = Canvas::<TestView>::new(ConnectionId(1));
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
 
         let tree1: Node<TestMsg> = Node::container()
             .w(200.0)
