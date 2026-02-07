@@ -187,6 +187,7 @@ where
 /// // Update per-player state
 /// ui.set_player_state(player_ucid, PlayerState { ready: true }).await;
 /// ```
+#[allow(clippy::type_complexity)]
 pub fn attach<V>(
     insim: insim::builder::InsimTask,
     presence: Presence,
@@ -383,10 +384,14 @@ pub fn text<Msg>(text: impl Into<String>, bstyle: insim::insim::BtnStyle) -> nod
 }
 
 /// Shortcut to make a type-in-able [node::Node]
-pub fn typein<Msg, F>(text: impl Into<String>, bstyle: insim::insim::BtnStyle, limit: u8, mapper: F) -> node::Node<Msg> 
+pub fn typein<Msg, F>(
+    text: impl Into<String>,
+    bstyle: insim::insim::BtnStyle,
+    limit: u8,
+    mapper: F,
+) -> node::Node<Msg>
 where
     F: Fn(String) -> Msg + 'static,
 {
     node::Node::typein(text, bstyle, limit, mapper)
 }
-

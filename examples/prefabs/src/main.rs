@@ -168,8 +168,8 @@ impl ui::Component for PrefabView {
                             &props.pending_name
                         },
                         BtnStyle::default().white().dark(),
-                        32, 
-                        PrefabViewMessage::PrefabNameInput
+                        32,
+                        PrefabViewMessage::PrefabNameInput,
                     )
                     .w(48.)
                     .h(5.),
@@ -185,20 +185,16 @@ impl ui::Component for PrefabView {
                     .w(48.)
                     .h(4.)
                 })),
-            ActiveTab::Text => ui::container()
-                .flex()
-                .flex_col()
+            ActiveTab::Text => ui::container().flex().flex_col().w(48.).with_child(
+                ui::typein(
+                    "Paint Text",
+                    BtnStyle::default().yellow().light(),
+                    64,
+                    PrefabViewMessage::PaintedTextInput,
+                )
                 .w(48.)
-                .with_child(
-                    ui::typein(
-                        "Paint Text",
-                        BtnStyle::default().yellow().light(),
-                        64, 
-                        PrefabViewMessage::PaintedTextInput
-                    )
-                    .w(48.)
-                    .h(5.),
-                ),
+                .h(5.),
+            ),
             ActiveTab::Tools => ui::container().flex().flex_col().w(48.).with_child(
                 ui::text(
                     "Tools palette reserved for future actions",
@@ -276,7 +272,7 @@ fn load_prefabs(path: &Path) -> Result<Vec<Prefab>, String> {
         return Ok(Vec::new());
     }
 
-    let data: PrefabFile = serde_yaml::from_str(&raw)
+    let data: PrefabFile = serde_norway::from_str(&raw)
         .map_err(|e| format!("failed to parse '{}': {e}", path.display()))?;
 
     Ok(data.prefabs)
@@ -286,41 +282,9 @@ fn save_prefabs(path: &Path, prefabs: &[Prefab]) -> Result<(), String> {
     let data = PrefabFile {
         prefabs: prefabs.to_vec(),
     };
-    let yaml = serde_yaml::to_string(&data)
+    let yaml = serde_norway::to_string(&data)
         .map_err(|e| format!("failed to serialize prefab yaml: {e}"))?;
     fs::write(path, yaml).map_err(|e| format!("failed to write '{}': {e}", path.display()))
-}
-
-fn build_props(state: &State) -> PrefabViewProps {
-    PrefabViewProps {
-        active_tab: state.active_tab,
-        selection_count: state.selection.len(),
-        prefabs: state
-            .prefabs
-            .iter()
-            .map(|prefab| PrefabListItem {
-                name: prefab.name.clone(),
-                count: prefab.objects.len(),
-            })
-            .collect(),
-        pending_name: state.pending_name.clone(),
-        awaiting_prefab_name: state.awaiting_prefab_name,
-    }
-}
-
-async fn render_ui(
-    connection: &mut FramedConnection,
-    canvas: &mut Canvas<PrefabViewMessage>,
-    view: &PrefabView,
-    state: &State,
-) -> insim::Result<()> {
-    if let Some(diff) = canvas.reconcile(view.render(build_props(state))) {
-        for packet in diff.merge() {
-            connection.write(packet).await?;
-        }
-    }
-
-    Ok(())
 }
 
 fn unique_prefab_name(existing: &[Prefab], requested: &str) -> String {
@@ -596,7 +560,26 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         if dirty && !blocked {
-            render_ui(&mut connection, &mut canvas, &view, &state).await?;
+            if let Some(diff) = canvas.reconcile(
+                view.render(PrefabViewProps {
+                    active_tab: state.active_tab,
+                    selection_count: state.selection.len(),
+                    prefabs: state
+                        .prefabs
+                        .iter()
+                        .map(|prefab| PrefabListItem {
+                            name: prefab.name.clone(),
+                            count: prefab.objects.len(),
+                        })
+                        .collect(),
+                    pending_name: state.pending_name.clone(),
+                    awaiting_prefab_name: state.awaiting_prefab_name,
+                }),
+            ) {
+                for packet in diff.merge() {
+                    connection.write(packet).await?;
+                }
+            }
             dirty = false;
         }
 
