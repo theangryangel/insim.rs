@@ -1,232 +1,285 @@
-prefabs:
-  - name: checkpoint_signal
-    objects:
-      - !ConcretePillar
-        xyz:
-          x: 0
-          y: 0
-          z: 0
-        x: ThreeQuarter
-        y: ThreeQuarter
-        height: M4_00
-        heading:
-          radians: 0.0
-      - !ConcretePillar
-        xyz:
-          x: 0
-          y: 0
-          z: 16
-        x: ThreeQuarter
-        y: ThreeQuarter
-        height: M2_25
-        heading:
-          radians: 0.0
-      - !ConcreteSlabWall
-        xyz:
-          x: 27
-          y: 0
-          z: 16
-        colour: Yellow
-        length: Four
-        pitch: Deg42
-        heading:
-          radians: -1.5707963267948966
-      - !ConcreteSlabWall
-        xyz:
-          x: 27
-          y: 0
-          z: 20
-        colour: Red
-        length: Four
-        pitch: Deg42
-        heading:
-          radians: -1.5707963267948966
-      - !ConcreteSlabWall
-        xyz:
-          x: 27
-          y: 0
-          z: 24
-        colour: Blue
-        length: Four
-        pitch: Deg42
-        heading:
-          radians: -1.5707963267948966
-      - !ChalkLine
-        xyz:
-          x: 72
-          y: 0
-          z: 1
-        colour: Yellow
-        heading:
-          radians: 0.0
-        floating: false
-      - !ConcretePillar
-        xyz:
-          x: 144
-          y: 0
-          z: 0
-        x: ThreeQuarter
-        y: ThreeQuarter
-        height: M4_00
-        heading:
-          radians: 0.0
-      - !ConcretePillar
-        xyz:
-          x: 144
-          y: 0
-          z: 16
-        x: ThreeQuarter
-        y: ThreeQuarter
-        height: M2_25
-        heading:
-          radians: 0.0
-      - !ConcreteSlabWall
-        xyz:
-          x: 117
-          y: 0
-          z: 16
-        colour: Yellow
-        length: Four
-        pitch: Deg42
-        heading:
-          radians: 1.5707963267948966
-      - !ConcreteSlabWall
-        xyz:
-          x: 117
-          y: 0
-          z: 20
-        colour: Red
-        length: Four
-        pitch: Deg42
-        heading:
-          radians: 1.5707963267948966
-      - !ConcreteSlabWall
-        xyz:
-          x: 117
-          y: 0
-          z: 24
-        colour: Blue
-        length: Four
-        pitch: Deg42
-        heading:
-          radians: 1.5707963267948966
-  - name: quick_chicane
-    objects:
-      - !TyreStack4
-        xyz:
-          x: 0
-          y: 0
-          z: 0
-        colour: Red
-        heading:
-          radians: 0.0
-        floating: false
-      - !TyreStack4
-        xyz:
-          x: 32
-          y: 16
-          z: 0
-        colour: Blue
-        heading:
-          radians: 0.0
-        floating: false
-      - !TyreStack4
-        xyz:
-          x: 64
-          y: -16
-          z: 0
-        colour: Red
-        heading:
-          radians: 0.0
-        floating: false
-      - !TyreStack4
-        xyz:
-          x: 96
-          y: 16
-          z: 0
-        colour: Blue
-        heading:
-          radians: 0.0
-        floating: false
-      - !ChalkLine
-        xyz:
-          x: 16
-          y: 0
-          z: 0
-        colour: White
-        heading:
-          radians: 0.0
-        floating: false
-      - !ChalkLine
-        xyz:
-          x: 48
-          y: 0
-          z: 0
-        colour: White
-        heading:
-          radians: 0.0
-        floating: false
-      - !ChalkLine
-        xyz:
-          x: 80
-          y: 0
-          z: 0
-        colour: White
-        heading:
-          radians: 0.0
-        floating: false
-  - name: asdasd
-    objects:
-      - !MarkerDistance
-        xyz:
-          x: 0
-          y: 0
-          z: 0
-        kind: D25
-        heading:
-          radians: -2.380738182798515
-        floating: false
-  - name: asdasd-2
-    objects:
-      - !PaintLetters
-        xyz:
-          x: 0
-          y: 0
-          z: 0
-        colour: Yellow
-        character: S
-        heading:
-          radians: -2.6261751088602177
-        floating: false
-      - !PaintLetters
-        xyz:
-          x: -14
-          y: -8
-          z: 0
-        colour: Yellow
-        character: D
-        heading:
-          radians: -2.6261751088602177
-        floating: false
-  - name: qq
-    objects:
-      - !PaintLetters
-        xyz:
-          x: 0
-          y: 0
-          z: 0
-        colour: Yellow
-        character: S
-        heading:
-          radians: -2.6261751088602177
-        floating: false
-      - !PaintLetters
-        xyz:
-          x: -14
-          y: -8
-          z: 0
-        colour: Yellow
-        character: D
-        heading:
-          radians: -2.6261751088602177
-        floating: false
+- name: checkpoint_signal
+  objects:
+    - !ConcretePillar
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      x: ThreeQuarter
+      y: ThreeQuarter
+      height: M4_00
+      heading:
+        radians: 0.0
+    - !ConcretePillar
+      xyz:
+        x: 0
+        y: 0
+        z: 16
+      x: ThreeQuarter
+      y: ThreeQuarter
+      height: M2_25
+      heading:
+        radians: 0.0
+    - !ConcreteSlabWall
+      xyz:
+        x: 27
+        y: 0
+        z: 16
+      colour: Yellow
+      length: Four
+      pitch: Deg42
+      heading:
+        radians: -1.5707963267948966
+    - !ConcreteSlabWall
+      xyz:
+        x: 27
+        y: 0
+        z: 20
+      colour: Red
+      length: Four
+      pitch: Deg42
+      heading:
+        radians: -1.5707963267948966
+    - !ConcreteSlabWall
+      xyz:
+        x: 27
+        y: 0
+        z: 24
+      colour: Blue
+      length: Four
+      pitch: Deg42
+      heading:
+        radians: -1.5707963267948966
+    - !ChalkLine
+      xyz:
+        x: 72
+        y: 0
+        z: 1
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !ConcretePillar
+      xyz:
+        x: 144
+        y: 0
+        z: 0
+      x: ThreeQuarter
+      y: ThreeQuarter
+      height: M4_00
+      heading:
+        radians: 0.0
+    - !ConcretePillar
+      xyz:
+        x: 144
+        y: 0
+        z: 16
+      x: ThreeQuarter
+      y: ThreeQuarter
+      height: M2_25
+      heading:
+        radians: 0.0
+    - !ConcreteSlabWall
+      xyz:
+        x: 117
+        y: 0
+        z: 16
+      colour: Yellow
+      length: Four
+      pitch: Deg42
+      heading:
+        radians: 1.5707963267948966
+    - !ConcreteSlabWall
+      xyz:
+        x: 117
+        y: 0
+        z: 20
+      colour: Red
+      length: Four
+      pitch: Deg42
+      heading:
+        radians: 1.5707963267948966
+    - !ConcreteSlabWall
+      xyz:
+        x: 117
+        y: 0
+        z: 24
+      colour: Blue
+      length: Four
+      pitch: Deg42
+      heading:
+        radians: 1.5707963267948966
+- name: quick_chicane
+  objects:
+    - !TyreStack4
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      colour: Red
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4
+      xyz:
+        x: 32
+        y: 16
+        z: 0
+      colour: Blue
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4
+      xyz:
+        x: 64
+        y: -16
+        z: 0
+      colour: Red
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4
+      xyz:
+        x: 96
+        y: 16
+        z: 0
+      colour: Blue
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkLine
+      xyz:
+        x: 16
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkLine
+      xyz:
+        x: 48
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkLine
+      xyz:
+        x: 80
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+- name: asdasd
+  objects:
+    - !MarkerDistance
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      kind: D25
+      heading:
+        radians: -2.380738182798515
+      floating: false
+- name: asdasd-2
+  objects:
+    - !PaintLetters
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      colour: Yellow
+      character: S
+      heading:
+        radians: -2.6261751088602177
+      floating: false
+    - !PaintLetters
+      xyz:
+        x: -14
+        y: -8
+        z: 0
+      colour: Yellow
+      character: D
+      heading:
+        radians: -2.6261751088602177
+      floating: false
+- name: qq
+  objects:
+    - !PaintLetters
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      colour: Yellow
+      character: S
+      heading:
+        radians: -2.6261751088602177
+      floating: false
+    - !PaintLetters
+      xyz:
+        x: -14
+        y: -8
+        z: 0
+      colour: Yellow
+      character: D
+      heading:
+        radians: -2.6261751088602177
+      floating: false
+- name: asdasd-3
+  objects:
+    - !BarrierRed
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      heading:
+        radians: 0.6872233929727672
+      colour: 0
+      mapping: 0
+      floating: false
+- name: "4"
+  objects:
+    - !Banner
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      heading:
+        radians: -1.055378782065321
+      colour: White
+      mapping: 0
+      floating: false
+    - !Banner
+      xyz:
+        x: 50
+        y: -84
+        z: 0
+      heading:
+        radians: -1.055378782065321
+      colour: White
+      mapping: 0
+      floating: false
+    - !Banner
+      xyz:
+        x: 146
+        y: -158
+        z: 1
+      heading:
+        radians: -1.055378782065321
+      colour: White
+      mapping: 0
+      floating: false
+    - !Banner
+      xyz:
+        x: 132
+        y: -277
+        z: 1
+      heading:
+        radians: -1.055378782065321
+      colour: White
+      mapping: 0
+      floating: false

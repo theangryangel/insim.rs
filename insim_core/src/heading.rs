@@ -3,7 +3,7 @@ use std::fmt;
 
 /// Angular measurement stored as radians (f64).
 ///
-/// - 0° points along world Y, 90° along world X.
+/// - 0° points along world Y, 90° along world -X.
 /// - Values are not auto-normalized; use `normalize()` when needed.
 /// - Includes object-heading wire conversions.
 ///
@@ -14,9 +14,9 @@ use std::fmt;
 ///
 /// # Orientation
 /// - 0 = world Y direction** (forward/north)
-/// - 90 = world X direction** (right/east)
+/// - 90 = world -X direction** (left/west)
 /// - 180 = -Y direction** (backward/south)
-/// - 270 = -X direction** (left/west)
+/// - 270 = world X direction** (right/east)
 ///
 /// Angles increase in the anti-clockwise direction when viewed from above.
 ///
@@ -40,11 +40,11 @@ use std::fmt;
 /// use insim_core::heading::Heading;
 ///
 /// let forward = Heading::from_degrees(0.0);    // Y direction
-/// let right = Heading::from_degrees(90.0);     // X direction
+/// let left = Heading::from_degrees(90.0);      // -X direction
 /// let backward = Heading::from_degrees(180.0); // -Y direction
 ///
 /// assert_eq!(forward.to_degrees(), 0.0);
-/// assert_eq!(right.to_degrees(), 90.0);
+/// assert_eq!(left.to_degrees(), 90.0);
 /// ```
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -61,14 +61,14 @@ impl Heading {
     /// Heading pointing north (world Y direction, 0).
     pub const NORTH: Self = Self::from_radians(0.0);
 
-    /// Heading pointing east (world X direction, 90).
-    pub const EAST: Self = Self::from_radians(std::f64::consts::FRAC_PI_2);
+    /// Heading pointing east (world X direction, 270).
+    pub const EAST: Self = Self::from_radians(3.0 * std::f64::consts::FRAC_PI_2);
 
     /// Heading pointing south (opposite of world Y, 180).
     pub const SOUTH: Self = Self::from_radians(std::f64::consts::PI);
 
-    /// Heading pointing west (opposite of world X, 270).
-    pub const WEST: Self = Self::from_radians(3.0 * std::f64::consts::FRAC_PI_2);
+    /// Heading pointing west (opposite of world X, 90).
+    pub const WEST: Self = Self::from_radians(std::f64::consts::FRAC_PI_2);
 
     /// Consumes Heading, returning the inner radian value.
     pub fn into_inner(self) -> f64 {
@@ -78,9 +78,9 @@ impl Heading {
     /// Create Heading from radians.
     ///
     /// 0 radians = world Y direction (forward)
-    /// π/2 radians = world X direction (right)
+    /// π/2 radians = world -X direction (left)
     /// π radians = -Y direction (backward)
-    /// 3π/2 radians = -X direction (left)
+    /// 3π/2 radians = world X direction (right)
     pub const fn from_radians(value: f64) -> Self {
         Self { radians: value }
     }
@@ -88,9 +88,9 @@ impl Heading {
     /// Get the angle in radians.
     ///
     /// 0 radians = world Y direction (forward)
-    /// π/2 radians = world X direction (right)
+    /// π/2 radians = world -X direction (left)
     /// π radians = -Y direction (backward)
-    /// 3π/2 radians = -X direction (left)
+    /// 3π/2 radians = world X direction (right)
     pub const fn to_radians(&self) -> f64 {
         self.radians
     }
@@ -98,9 +98,9 @@ impl Heading {
     /// Create Heading from degrees.
     ///
     /// 0 = world Y direction (forward)
-    /// 90 = world X direction (right)
+    /// 90 = world -X direction (left)
     /// 180 = -Y direction (backward)
-    /// 270 = -X direction (left)
+    /// 270 = world X direction (right)
     pub const fn from_degrees(value: f64) -> Self {
         Self {
             radians: value * std::f64::consts::PI / 180.0,
@@ -110,9 +110,9 @@ impl Heading {
     /// Get the angle in degrees.
     ///
     /// 0 = world Y direction (forward)
-    /// 90 = world X direction (right)
+    /// 90 = world -X direction (left)
     /// 180 = -Y direction (backward)
-    /// 270 = -X direction (left)
+    /// 270 = world X direction (right)
     pub const fn to_degrees(&self) -> f64 {
         self.radians * 180.0 / std::f64::consts::PI
     }
@@ -162,8 +162,8 @@ impl Heading {
     /// assert!((south.to_degrees() - 180.0).abs() < 0.0001);
     ///
     /// let east = Heading::EAST;
-    /// let west = east.opposite();
-    /// assert!((west.to_degrees() - 270.0).abs() < 0.0001);
+    /// let west = east.opposite().normalize();
+    /// assert!((west.to_degrees() - 90.0).abs() < 0.0001);
     /// ```
     pub fn opposite(&self) -> Heading {
         Heading::from_radians(self.radians + std::f64::consts::PI)
@@ -178,9 +178,9 @@ impl Heading {
     ///
     /// Examples:
     /// - 128 = 0 (world Y direction / forward)
-    /// - 192 = 90 (world X direction / right)
+    /// - 192 = 90 (world -X direction / left)
     /// - 0 = 180 (opposite of world Y direction / backward)
-    /// - 64 = -90 (opposite of world X direction / left)
+    /// - 64 = -90 (world X direction / right)
     pub const fn from_objectinfo_wire(heading: u8) -> Self {
         let degrees = (heading as f64) * (360.0 / 256.0) - 180.0;
         Self::from_degrees(degrees)
@@ -302,11 +302,11 @@ mod tests {
         // heading 0 gives -180, which is equivalent to 180 (differ by 360)
         assert!((backward.to_degrees() - (-180.0)).abs() < 0.0001);
 
-        let right = Heading::from_objectinfo_wire(192);
-        assert!((right.to_degrees() - 90.0).abs() < 0.0001);
+        let left = Heading::from_objectinfo_wire(192);
+        assert!((left.to_degrees() - 90.0).abs() < 0.0001);
 
-        let left = Heading::from_objectinfo_wire(64);
-        assert!((left.to_degrees() - (-90.0)).abs() < 0.0001);
+        let right = Heading::from_objectinfo_wire(64);
+        assert!((right.to_degrees() - (-90.0)).abs() < 0.0001);
     }
 
     #[test]
@@ -328,9 +328,9 @@ mod tests {
     #[test]
     fn test_cardinal_directions() {
         assert!((Heading::NORTH.to_degrees() - 0.0).abs() < 0.0001);
-        assert!((Heading::EAST.to_degrees() - 90.0).abs() < 0.0001);
+        assert!((Heading::EAST.to_degrees() - 270.0).abs() < 0.0001);
         assert!((Heading::SOUTH.to_degrees() - 180.0).abs() < 0.0001);
-        assert!((Heading::WEST.to_degrees() - 270.0).abs() < 0.0001);
+        assert!((Heading::WEST.to_degrees() - 90.0).abs() < 0.0001);
     }
 
     #[test]
@@ -340,8 +340,8 @@ mod tests {
         assert!((south.to_degrees() - 180.0).abs() < 0.0001);
 
         let east = Heading::EAST;
-        let west = east.opposite();
-        assert!((west.to_degrees() - 270.0).abs() < 0.0001);
+        let west = east.opposite().normalize();
+        assert!((west.to_degrees() - 90.0).abs() < 0.0001);
     }
 
     #[test]

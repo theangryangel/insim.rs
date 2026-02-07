@@ -7,8 +7,10 @@ license.workspace = true
 publish = false
 
 [dependencies]
+anyhow = "1.0.101"
 clap = { workspace = true, features = ["derive"] }
-insim = { path = "../../insim", default-features = false, features = ["tokio", "serde"] }
+glam = { workspace = true }
+insim = { path = "../../insim", default-features = false, features = ["tokio", "serde", "glam"] }
 kitcar = { path = "../../kitcar" }
 serde = { workspace = true, features = ["derive"] }
 serde_norway = "0.9.42"

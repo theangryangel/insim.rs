@@ -1,22 +1,15 @@
 //! Prefab toolbox for LFS layout editing.
-use std::{
-    fs,
-    net::SocketAddr,
-    path::{Path, PathBuf},
-};
+use std::{net::SocketAddr, path::PathBuf};
 
-use clap::{Parser, Subcommand};
+use clap::Parser;
 use insim::{
     Packet, WithRequestId,
-    core::{
-        heading::Heading,
-        object::{ObjectCoordinate, painted},
-    },
     identifiers::{ConnectionId, RequestId},
     insim::{Axm, BfnType, BtnStyle, ObjectInfo, PmoAction, TtcType},
 };
 use kitcar::ui::{self, Canvas, Component};
-use serde::{Deserialize, Serialize};
+
+mod tools;
 
 const REQI_SELECTION: RequestId = RequestId(200);
 
@@ -24,61 +17,27 @@ const REQI_SELECTION: RequestId = RequestId(200);
 #[command(author, version, about, long_about = None)]
 #[command(propagate_version = true)]
 struct Cli {
-    #[command(subcommand)]
-    command: Commands,
+    #[arg(long)]
+    /// host:port of LFS to connect to
+    addr: SocketAddr,
 
     /// Path to prefabs.yaml
+    #[arg(long)]
     prefabs: PathBuf,
-}
-
-#[derive(Subcommand)]
-enum Commands {
-    /// Connect via UDP
-    Udp {
-        #[arg(long)]
-        /// Local address to bind to. If not provided a random port will be used.
-        bind: Option<SocketAddr>,
-
-        #[arg(long)]
-        /// host:port of LFS to connect to
-        addr: SocketAddr,
-    },
-
-    /// Connect via TCP
-    Tcp {
-        #[arg(long)]
-        /// host:port of LFS to connect to
-        addr: SocketAddr,
-    },
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 enum ActiveTab {
     #[default]
     Prefabs,
-    Text,
     Tools,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct State {
-    prefabs_path: PathBuf,
-    prefabs: Vec<Prefab>,
+    prefabs: tools::prefabs::Prefabs,
     selection: Vec<ObjectInfo>,
-    pending_name: String,
-    awaiting_prefab_name: bool,
     active_tab: ActiveTab,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct PrefabFile {
-    prefabs: Vec<Prefab>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct Prefab {
-    name: String,
-    objects: Vec<ObjectInfo>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -92,20 +51,17 @@ struct PrefabViewProps {
     active_tab: ActiveTab,
     selection_count: usize,
     prefabs: Vec<PrefabListItem>,
-    pending_name: String,
-    awaiting_prefab_name: bool,
 }
 
 #[derive(Debug, Clone)]
 enum PrefabViewMessage {
     ShowPrefabs,
-    ShowText,
     ShowTools,
     ReloadYaml,
-    BeginSavePrefab,
-    PrefabNameInput(String),
+    SavePrefab(String),
     SpawnPrefab(usize),
     PaintedTextInput(String),
+    SplineDistribInput(String),
 }
 
 struct PrefabView;
@@ -116,11 +72,6 @@ impl ui::Component for PrefabView {
 
     fn render(&self, props: Self::Props) -> ui::Node<Self::Message> {
         let tab_prefabs_style = if matches!(props.active_tab, ActiveTab::Prefabs) {
-            BtnStyle::default().yellow().light().clickable()
-        } else {
-            BtnStyle::default().pale_blue().light().clickable()
-        };
-        let tab_text_style = if matches!(props.active_tab, ActiveTab::Text) {
             BtnStyle::default().yellow().light().clickable()
         } else {
             BtnStyle::default().pale_blue().light().clickable()
@@ -151,29 +102,15 @@ impl ui::Component for PrefabView {
                             .h(5.),
                         )
                         .with_child(
-                            ui::clickable(
+                            ui::typein(
                                 "Save Selection",
                                 BtnStyle::default().green().light(),
-                                PrefabViewMessage::BeginSavePrefab,
+                                64,
+                                PrefabViewMessage::SavePrefab,
                             )
                             .w(24.)
                             .h(5.),
                         ),
-                )
-                .with_child_if(
-                    ui::typein(
-                        if props.pending_name.is_empty() {
-                            "new-prefab-name"
-                        } else {
-                            &props.pending_name
-                        },
-                        BtnStyle::default().white().dark(),
-                        32,
-                        PrefabViewMessage::PrefabNameInput,
-                    )
-                    .w(48.)
-                    .h(5.),
-                    props.awaiting_prefab_name,
                 )
                 .with_children(props.prefabs.iter().enumerate().map(|(idx, prefab)| {
                     ui::clickable(
@@ -183,26 +120,32 @@ impl ui::Component for PrefabView {
                     )
                     .key(format!("prefab-{idx}"))
                     .w(48.)
-                    .h(4.)
+                    .h(5.)
                 })),
-            ActiveTab::Text => ui::container().flex().flex_col().w(48.).with_child(
-                ui::typein(
-                    "Paint Text",
-                    BtnStyle::default().yellow().light(),
-                    64,
-                    PrefabViewMessage::PaintedTextInput,
-                )
+            ActiveTab::Tools => ui::container()
+                .flex()
+                .flex_col()
                 .w(48.)
-                .h(5.),
-            ),
-            ActiveTab::Tools => ui::container().flex().flex_col().w(48.).with_child(
-                ui::text(
-                    "Tools palette reserved for future actions",
-                    BtnStyle::default().black().light(),
+                .with_child(
+                    ui::typein(
+                        "Spline Distribution (m)",
+                        BtnStyle::default().black().light(),
+                        32,
+                        PrefabViewMessage::SplineDistribInput,
+                    )
+                    .block()
+                    .h(5.),
                 )
-                .w(48.)
-                .h(5.),
-            ),
+                .with_child(
+                    ui::typein(
+                        "Paint Text",
+                        BtnStyle::default().black().light(),
+                        64,
+                        PrefabViewMessage::PaintedTextInput,
+                    )
+                    .block()
+                    .h(5.),
+                ),
         };
 
         ui::container()
@@ -211,30 +154,20 @@ impl ui::Component for PrefabView {
             .w(175.)
             .items_end()
             .with_child(
-                ui::text("Prefab Toolbox", BtnStyle::default().yellow().light())
-                    .w(48.)
-                    .h(5.)
-                    .mt(7.),
-            )
-            .with_child(
                 ui::container()
+                    .mt(7.)
                     .flex()
                     .flex_row()
                     .w(48.)
                     .with_child(
                         ui::clickable("Prefabs", tab_prefabs_style, PrefabViewMessage::ShowPrefabs)
-                            .w(16.)
-                            .h(5.),
-                    )
-                    .with_child(
-                        ui::clickable("Text", tab_text_style, PrefabViewMessage::ShowText)
-                            .w(16.)
-                            .h(5.),
+                            .h(5.)
+                            .w(24.),
                     )
                     .with_child(
                         ui::clickable("Tools", tab_tools_style, PrefabViewMessage::ShowTools)
-                            .w(16.)
-                            .h(5.),
+                            .h(5.)
+                            .w(24.),
                     ),
             )
             .with_child(
@@ -261,122 +194,6 @@ fn setup_tracing_subscriber() {
         .init();
 }
 
-fn load_prefabs(path: &Path) -> Result<Vec<Prefab>, String> {
-    if !path.exists() {
-        return Ok(Vec::new());
-    }
-
-    let raw = fs::read_to_string(path)
-        .map_err(|e| format!("failed to read '{}': {e}", path.display()))?;
-    if raw.trim().is_empty() {
-        return Ok(Vec::new());
-    }
-
-    let data: PrefabFile = serde_norway::from_str(&raw)
-        .map_err(|e| format!("failed to parse '{}': {e}", path.display()))?;
-
-    Ok(data.prefabs)
-}
-
-fn save_prefabs(path: &Path, prefabs: &[Prefab]) -> Result<(), String> {
-    let data = PrefabFile {
-        prefabs: prefabs.to_vec(),
-    };
-    let yaml = serde_norway::to_string(&data)
-        .map_err(|e| format!("failed to serialize prefab yaml: {e}"))?;
-    fs::write(path, yaml).map_err(|e| format!("failed to write '{}': {e}", path.display()))
-}
-
-fn unique_prefab_name(existing: &[Prefab], requested: &str) -> String {
-    let trimmed = requested.trim();
-    let base = if trimmed.is_empty() {
-        "prefab".to_string()
-    } else {
-        trimmed.to_string()
-    };
-
-    if !existing.iter().any(|p| p.name == base) {
-        return base;
-    }
-
-    let mut n = 2_u32;
-    loop {
-        let candidate = format!("{}-{n}", base);
-        if !existing.iter().any(|p| p.name == candidate) {
-            return candidate;
-        }
-        n = n.saturating_add(1);
-    }
-}
-
-fn to_relative(selection: &[ObjectInfo]) -> Vec<ObjectInfo> {
-    if selection.is_empty() {
-        return Vec::new();
-    }
-
-    let anchor = *selection[0].position();
-    selection
-        .iter()
-        .cloned()
-        .map(|mut obj| {
-            let pos = obj.position_mut();
-            pos.x = clamp_i16(i32::from(pos.x) - i32::from(anchor.x));
-            pos.y = clamp_i16(i32::from(pos.y) - i32::from(anchor.y));
-            pos.z = clamp_u8(i32::from(pos.z) - i32::from(anchor.z));
-            obj
-        })
-        .collect()
-}
-
-fn place_at_anchor(objects: &[ObjectInfo], anchor: ObjectCoordinate) -> Vec<ObjectInfo> {
-    objects
-        .iter()
-        .cloned()
-        .map(|mut obj| {
-            let pos = obj.position_mut();
-            pos.x = clamp_i16(i32::from(anchor.x) + i32::from(pos.x));
-            pos.y = clamp_i16(i32::from(anchor.y) + i32::from(pos.y));
-            pos.z = clamp_u8(i32::from(anchor.z) + i32::from(pos.z));
-            obj
-        })
-        .collect()
-}
-
-fn painted_letters_from_text(
-    text: &str,
-    anchor: ObjectCoordinate,
-    heading: Heading,
-) -> Vec<ObjectInfo> {
-    const SPACING_RAW_UNITS: i32 = 16;
-    const PADDING_SLOTS: i32 = 2;
-
-    let radians = heading.to_radians();
-    let right_x = radians.cos();
-    let right_y = radians.sin();
-    let anchor_x = f64::from(anchor.x);
-    let anchor_y = f64::from(anchor.y);
-
-    text.chars()
-        .enumerate()
-        .filter_map(|(index, ch)| {
-            let character = painted::Character::try_from(ch).ok()?;
-            let slot = i32::try_from(index).ok()?.saturating_add(PADDING_SLOTS);
-            let offset = f64::from(slot.saturating_mul(SPACING_RAW_UNITS));
-
-            let x = clamp_i16((anchor_x + (right_x * offset)).round() as i32);
-            let y = clamp_i16((anchor_y + (right_y * offset)).round() as i32);
-
-            Some(ObjectInfo::PaintLetters(painted::Letters {
-                xyz: ObjectCoordinate { x, y, z: anchor.z },
-                colour: painted::PaintColour::Yellow,
-                character,
-                heading,
-                floating: false,
-            }))
-        })
-        .collect()
-}
-
 fn clamp_i16(value: i32) -> i16 {
     value.clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16
 }
@@ -389,9 +206,9 @@ async fn spawn_at_selection(
     connection: &mut FramedConnection,
     state: &State,
     objects: Vec<ObjectInfo>,
+    pmoaction: PmoAction,
 ) -> insim::Result<usize> {
-    let count = objects.len();
-    if count == 0 {
+    if objects.is_empty() {
         return Ok(0);
     }
 
@@ -406,80 +223,60 @@ async fn spawn_at_selection(
             .await?;
     }
 
-    connection
-        .write(Axm {
-            ucid: ConnectionId::LOCAL,
-            pmoaction: PmoAction::Selection,
-            info: objects,
-            ..Default::default()
-        })
-        .await?;
-
-    Ok(count)
-}
-
-fn save_current_selection(state: &mut State) -> Result<String, String> {
-    if state.selection.is_empty() {
-        return Err("cannot save prefab: selection is empty".to_string());
+    for chunk in objects.chunks(60) {
+        connection
+            .write(Axm {
+                ucid: ConnectionId::LOCAL,
+                pmoaction: pmoaction.clone(),
+                info: chunk.to_vec(),
+                ..Default::default()
+            })
+            .await?;
     }
 
-    let name = unique_prefab_name(&state.prefabs, &state.pending_name);
-    let relative = to_relative(&state.selection);
-    state.prefabs.push(Prefab {
-        name: name.clone(),
-        objects: relative,
-    });
-    save_prefabs(&state.prefabs_path, &state.prefabs)?;
-    state.pending_name = name.clone();
-
-    Ok(name)
+    Ok(objects.len())
 }
 
 async fn handle_ui_message(
     connection: &mut FramedConnection,
     state: &mut State,
     msg: PrefabViewMessage,
-) -> insim::Result<()> {
+) -> anyhow::Result<()> {
     match msg {
         PrefabViewMessage::ShowPrefabs => {
             state.active_tab = ActiveTab::Prefabs;
         },
-        PrefabViewMessage::ShowText => {
-            state.active_tab = ActiveTab::Text;
-        },
         PrefabViewMessage::ShowTools => {
             state.active_tab = ActiveTab::Tools;
         },
-        PrefabViewMessage::ReloadYaml => match load_prefabs(&state.prefabs_path) {
-            Ok(prefabs) => {
-                state.prefabs = prefabs;
-                tracing::info!("Reloaded prefabs from disk");
-            },
-            Err(err) => tracing::error!("reload failed: {err}"),
+        PrefabViewMessage::ReloadYaml => {
+            let path = state.prefabs.path.clone();
+            state.prefabs = tools::prefabs::Prefabs::load(path)?;
         },
-        PrefabViewMessage::BeginSavePrefab => {
-            state.awaiting_prefab_name = true;
-            state.active_tab = ActiveTab::Prefabs;
-        },
-        PrefabViewMessage::PrefabNameInput(name) => {
-            state.pending_name = name.trim().to_string();
-            if state.awaiting_prefab_name {
-                match save_current_selection(state) {
-                    Ok(saved) => tracing::info!("Saved prefab '{saved}'"),
-                    Err(err) => tracing::warn!("save skipped: {err}"),
-                }
-                state.awaiting_prefab_name = false;
+        PrefabViewMessage::SavePrefab(name) => {
+            let pending_name = name.trim().to_string();
+            match state
+                .prefabs
+                .add_and_save_selection(&pending_name, &state.selection)
+            {
+                Ok(saved) => tracing::info!("Saved prefab '{saved}'"),
+                Err(err) => tracing::warn!("save skipped: {err}"),
             }
         },
         PrefabViewMessage::SpawnPrefab(idx) => {
-            if let Some(prefab) = state.prefabs.get(idx) {
+            if let Some(prefab) = state.prefabs.data.get(idx) {
                 let anchor = state
                     .selection
                     .first()
                     .map(|obj| *obj.position())
                     .unwrap_or_default();
-                let placed = place_at_anchor(&prefab.objects, anchor);
-                let _ = spawn_at_selection(connection, state, placed).await?;
+                let _ = spawn_at_selection(
+                    connection,
+                    state,
+                    prefab.place_at_anchor(anchor),
+                    PmoAction::Selection,
+                )
+                .await?;
             }
         },
         PrefabViewMessage::PaintedTextInput(text) => {
@@ -498,8 +295,10 @@ async fn handle_ui_message(
                     .first()
                     .and_then(ObjectInfo::heading)
                     .unwrap_or_default();
-                let painted_text = painted_letters_from_text(&text, anchor, heading);
-                let painted_count = spawn_at_selection(connection, state, painted_text).await?;
+                let painted_text = tools::painted_letters::build(&text, anchor, heading);
+                let painted_count =
+                    spawn_at_selection(connection, state, painted_text, PmoAction::Selection)
+                        .await?;
 
                 if painted_count == 0 {
                     tracing::warn!(
@@ -510,42 +309,58 @@ async fn handle_ui_message(
                 }
             }
         },
+        PrefabViewMessage::SplineDistribInput(input) => {
+            let trimmed = input.trim();
+
+            if trimmed.is_empty() {
+                tracing::warn!("spacing skipped: input is empty");
+            } else {
+                match trimmed.parse::<f64>() {
+                    Ok(value) if value > 0.0 => {
+                        match tools::spline_distrib::build(&state.selection, value, None) {
+                            Ok(objects) => {
+                                let placed = spawn_at_selection(
+                                    connection,
+                                    state,
+                                    objects,
+                                    PmoAction::AddObjects,
+                                )
+                                .await?;
+                                tracing::info!("Placed {placed} spaced objects");
+                            },
+                            Err(err) => tracing::warn!("spacing skipped: {err}"),
+                        }
+                    },
+                    Ok(_) => tracing::warn!("spacing skipped: value must be greater than zero"),
+                    Err(_) => tracing::warn!("spacing skipped: input is not a number"),
+                }
+            }
+        },
     }
 
     Ok(())
 }
 
 #[tokio::main]
-pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
+pub async fn main() -> anyhow::Result<()> {
     setup_tracing_subscriber();
 
     let cli = Cli::parse();
-    let prefabs = load_prefabs(&cli.prefabs).map_err(std::io::Error::other)?;
+    let prefabs = tools::prefabs::Prefabs::load(cli.prefabs.clone())?;
 
-    let mut builder = match &cli.command {
-        Commands::Udp { bind, addr } => {
-            tracing::info!("Connecting via UDP to {addr}");
-            insim::udp(*addr, *bind)
-        },
-        Commands::Tcp { addr } => {
-            tracing::info!("Connecting via TCP to {addr}");
-            insim::tcp(*addr)
-        },
-    };
-    builder = builder
+    tracing::info!("Connecting via TCP to {}", &cli.addr);
+    let mut connection = insim::tcp(cli.addr)
         .isi_iname(Some("prefab-toolbox".to_string()))
         .isi_flag_local(true)
-        .isi_flag_axm_edit(true);
+        .isi_flag_axm_edit(true)
+        .connect_async()
+        .await?;
 
-    let mut connection = builder.connect_async().await?;
     tracing::info!("Connected");
 
     let mut state = State {
-        prefabs_path: cli.prefabs,
         prefabs,
         selection: Vec::new(),
-        pending_name: String::new(),
-        awaiting_prefab_name: false,
         active_tab: ActiveTab::Prefabs,
     };
 
@@ -566,14 +381,13 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     selection_count: state.selection.len(),
                     prefabs: state
                         .prefabs
+                        .data
                         .iter()
                         .map(|prefab| PrefabListItem {
                             name: prefab.name.clone(),
                             count: prefab.objects.len(),
                         })
                         .collect(),
-                    pending_name: state.pending_name.clone(),
-                    awaiting_prefab_name: state.awaiting_prefab_name,
                 }),
             ) {
                 for packet in diff.merge() {
@@ -603,21 +417,20 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             state.selection = axm.info;
                             dirty = true;
                             tracing::info!("Got Selection!");
-
                         }
-                    }
+                    },
                     Packet::Btc(btc) => {
                         if let Some(msg) = canvas.translate_clickid(&btc.clickid) {
                             handle_ui_message(&mut connection, &mut state, msg).await?;
                             dirty = true;
                         }
-                    }
+                    },
                     Packet::Btt(btt) => {
                         if let Some(msg) = canvas.translate_typein_clickid(&btt.clickid, btt.text) {
                             handle_ui_message(&mut connection, &mut state, msg).await?;
                             dirty = true;
                         }
-                    }
+                    },
                     Packet::Bfn(bfn) => {
                         match bfn.subt {
                             BfnType::Clear | BfnType::UserClear => {
@@ -630,7 +443,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             }
                             _ => {}
                         }
-                    }
+                    },
                     _ => {}
                 }
             }
