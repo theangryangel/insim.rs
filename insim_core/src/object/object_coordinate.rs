@@ -67,7 +67,7 @@ impl ObjectCoordinate {
         glam::DVec3 {
             x: (self.x as f64 / 16.0),
             y: (self.y as f64 / 16.0),
-            z: (self.y as f64 / 4.0),
+            z: (self.z as f64 / 4.0),
         }
     }
 
@@ -85,7 +85,7 @@ impl ObjectCoordinate {
         glam::Vec3 {
             x: (self.x as f32 / 16.0),
             y: (self.y as f32 / 16.0),
-            z: (self.y as f32 / 4.0),
+            z: (self.z as f32 / 4.0),
         }
     }
 

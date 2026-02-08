@@ -145,7 +145,9 @@ pub fn build(
 
         let mut obj = prototype.clone();
         *obj.position_mut() = ObjectCoordinate::from_dvec3_metres(pos);
-        let _ = obj.set_heading(final_heading);
+        if let Some(heading) = obj.heading_mut() {
+            *heading = final_heading;
+        }
         output.push(obj);
     }
 

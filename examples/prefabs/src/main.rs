@@ -61,6 +61,7 @@ enum PrefabViewMessage {
     SavePrefab(String),
     SpawnPrefab(usize),
     PaintedTextInput(String),
+    RotateInput(String),
     SplineDistribInput(String),
 }
 
@@ -142,6 +143,16 @@ impl ui::Component for PrefabView {
                         BtnStyle::default().black().light(),
                         64,
                         PrefabViewMessage::PaintedTextInput,
+                    )
+                    .block()
+                    .h(5.),
+                )
+                .with_child(
+                    ui::typein(
+                        "Rotate Selection (deg)",
+                        BtnStyle::default().black().light(),
+                        16,
+                        PrefabViewMessage::RotateInput,
                     )
                     .block()
                     .h(5.),
@@ -333,6 +344,33 @@ async fn handle_ui_message(
                     },
                     Ok(_) => tracing::warn!("spacing skipped: value must be greater than zero"),
                     Err(_) => tracing::warn!("spacing skipped: input is not a number"),
+                }
+            }
+        },
+        PrefabViewMessage::RotateInput(input) => {
+            let trimmed = input.trim();
+
+            if trimmed.is_empty() {
+                tracing::warn!("rotation skipped: input is empty");
+            } else {
+                match trimmed.parse::<f64>() {
+                    Ok(value) if value.is_finite() => {
+                        match tools::rotate::build(&state.selection, value) {
+                            Ok(objects) => {
+                                let rotated = spawn_at_selection(
+                                    connection,
+                                    state,
+                                    objects,
+                                    PmoAction::AddObjects,
+                                )
+                                .await?;
+                                tracing::info!("Rotated {rotated} objects by {value} degrees");
+                            },
+                            Err(err) => tracing::warn!("rotation skipped: {err}"),
+                        }
+                    },
+                    Ok(_) => tracing::warn!("rotation skipped: value must be finite"),
+                    Err(_) => tracing::warn!("rotation skipped: input is not a number"),
                 }
             }
         },

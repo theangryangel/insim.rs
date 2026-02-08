@@ -186,7 +186,7 @@ impl TryFrom<u8> for Character {
     type Error = DecodeError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match (value & 0x7e) >> 1 {
+        match value {
             0 => Ok(Character::A),
             1 => Ok(Character::B),
             2 => Ok(Character::C),
