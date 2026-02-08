@@ -1,39 +1,34 @@
-use anyhow::{Result, anyhow};
-use glam::DVec2;
+use anyhow::{Result, ensure};
+use glam::{DMat2, DVec2};
 use insim::{core::heading::Heading, insim::ObjectInfo};
 
 pub fn build(selection: &[ObjectInfo], degrees: f64) -> Result<Vec<ObjectInfo>> {
-    if selection.is_empty() {
-        return Err(anyhow!("rotation skipped: selection is empty"));
-    }
-    if !degrees.is_finite() {
-        return Err(anyhow!("rotation skipped: degrees must be finite"));
-    }
+    ensure!(
+        !selection.is_empty(),
+        "rotation skipped: selection is empty"
+    );
+    ensure!(
+        degrees.is_finite(),
+        "rotation skipped: degrees must be finite"
+    );
 
-    let len = selection.len() as f64;
-    let sum = selection.iter().fold(DVec2::ZERO, |acc, obj| {
-        let pos = obj.position().to_dvec3_metres();
-        acc + DVec2::new(pos.x, pos.y)
-    });
-    let pivot = sum / len;
+    let sum: DVec2 = selection
+        .iter()
+        .map(|obj| obj.position().to_dvec3_metres().truncate())
+        .sum();
+    let pivot = sum / selection.len() as f64;
 
     let radians = degrees.to_radians();
-    let cos_theta = radians.cos();
-    let sin_theta = radians.sin();
+    let rotation_mat = DMat2::from_angle(radians);
 
     let rotated = selection
         .iter()
         .cloned()
         .map(|mut obj| {
-            let pos = obj.position().to_dvec3_metres();
-            let current = DVec2::new(pos.x, pos.y);
-            let delta = current - pivot;
+            let current_pos = obj.position().to_dvec3_metres().truncate();
 
-            let rotated = DVec2::new(
-                delta.x * cos_theta - delta.y * sin_theta,
-                delta.x * sin_theta + delta.y * cos_theta,
-            );
-            let final_pos = pivot + rotated;
+            let relative_pos = current_pos - pivot;
+            let final_pos = pivot + (rotation_mat * relative_pos);
 
             let pos = obj.position_mut();
             pos.x = crate::clamp_i16((final_pos.x * 16.0).round() as i32);
