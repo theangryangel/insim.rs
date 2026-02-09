@@ -101,20 +101,18 @@ impl fmt::Display for SpawnOrigin {
     }
 }
 
-fn reduce_ui_message(state: &mut State, msg: ui::PrefabViewMessage) -> Vec<Command> {
+fn reduce_ui_message(state: &mut State, msg: ui::PrefabViewMessage) -> Option<Command> {
     match msg {
-        ui::PrefabViewMessage::ShowToolboxTab
-        | ui::PrefabViewMessage::ShowOptionsTab
-        | ui::PrefabViewMessage::TogglePrefabsSection
-        | ui::PrefabViewMessage::ToggleNudgeSection
-        | ui::PrefabViewMessage::ToggleSelectionInfo => Vec::new(),
-        ui::PrefabViewMessage::ReloadYaml => vec![Command::ReloadPrefabs],
+        ui::PrefabViewMessage::TopTab(_)
+        | ui::PrefabViewMessage::ExpandToolboxSection(_)
+        | ui::PrefabViewMessage::ToggleSelectionInfo => None,
+        ui::PrefabViewMessage::ReloadYaml => Some(Command::ReloadPrefabs),
         ui::PrefabViewMessage::SavePrefab(name) => {
-            vec![Command::SavePrefabs(name.trim().to_string())]
+            Some(Command::SavePrefabs(name.trim().to_string()))
         },
         ui::PrefabViewMessage::SpawnPrefab(idx) => {
             let Some(prefab) = state.prefabs.data.get(idx) else {
-                return Vec::new();
+                return None;
             };
 
             let anchor = state
@@ -123,17 +121,17 @@ fn reduce_ui_message(state: &mut State, msg: ui::PrefabViewMessage) -> Vec<Comma
                 .map(|obj| *obj.position())
                 .unwrap_or_default();
 
-            vec![Command::SpawnObjects {
+            Some(Command::SpawnObjects {
                 objects: prefab.place_at_anchor(anchor),
                 action: PmoAction::Selection,
                 origin: SpawnOrigin::Prefab,
-            }]
+            })
         },
         ui::PrefabViewMessage::PaintedTextInput(text) => {
             let text = text.trim().to_string();
             if text.is_empty() {
                 tracing::warn!("paint skipped: text input is empty");
-                return Vec::new();
+                return None;
             }
 
             let anchor = state
@@ -150,13 +148,13 @@ fn reduce_ui_message(state: &mut State, msg: ui::PrefabViewMessage) -> Vec<Comma
 
             if objects.is_empty() {
                 tracing::warn!("paint skipped: text has no supported painted-letter characters");
-                Vec::new()
+                None
             } else {
-                vec![Command::SpawnObjects {
+                Some(Command::SpawnObjects {
                     objects,
                     action: PmoAction::Selection,
                     origin: SpawnOrigin::PaintedText,
-                }]
+                })
             }
         },
         ui::PrefabViewMessage::SplineDistribInput(input) => {
@@ -164,32 +162,32 @@ fn reduce_ui_message(state: &mut State, msg: ui::PrefabViewMessage) -> Vec<Comma
 
             if trimmed.is_empty() {
                 tracing::warn!("spacing skipped: input is empty");
-                return Vec::new();
+                return None;
             }
 
             match trimmed.parse::<f64>() {
                 Ok(value) if value > 0.0 => {
                     match tools::spline_distrib::build(&state.selection, value, None) {
-                        Ok(objects) => vec![Command::SpawnObjects {
+                        Ok(objects) => Some(Command::SpawnObjects {
                             objects,
                             action: PmoAction::AddObjects,
                             origin: SpawnOrigin::SplineDistrib {
                                 spacing_metres: value,
                             },
-                        }],
+                        }),
                         Err(err) => {
                             tracing::warn!("spacing skipped: {err}");
-                            Vec::new()
+                            None
                         },
                     }
                 },
                 Ok(_) => {
                     tracing::warn!("spacing skipped: value must be greater than zero");
-                    Vec::new()
+                    None
                 },
                 Err(_) => {
                     tracing::warn!("spacing skipped: input is not a number");
-                    Vec::new()
+                    None
                 },
             }
         },
@@ -198,30 +196,30 @@ fn reduce_ui_message(state: &mut State, msg: ui::PrefabViewMessage) -> Vec<Comma
 
             if trimmed.is_empty() {
                 tracing::warn!("rotation skipped: input is empty");
-                return Vec::new();
+                return None;
             }
 
             match trimmed.parse::<f64>() {
                 Ok(value) if value.is_finite() => {
                     match tools::rotate::build(&state.selection, value) {
-                        Ok(objects) => vec![Command::SpawnObjects {
+                        Ok(objects) => Some(Command::SpawnObjects {
                             objects,
                             action: PmoAction::AddObjects,
                             origin: SpawnOrigin::Rotate { degrees: value },
-                        }],
+                        }),
                         Err(err) => {
                             tracing::warn!("rotation skipped: {err}");
-                            Vec::new()
+                            None
                         },
                     }
                 },
                 Ok(_) => {
                     tracing::warn!("rotation skipped: value must be finite");
-                    Vec::new()
+                    None
                 },
                 Err(_) => {
                     tracing::warn!("rotation skipped: input is not a number");
-                    Vec::new()
+                    None
                 },
             }
         },
@@ -230,7 +228,7 @@ fn reduce_ui_message(state: &mut State, msg: ui::PrefabViewMessage) -> Vec<Comma
 
             if trimmed.is_empty() {
                 tracing::warn!("nudge skipped: input is empty");
-                return Vec::new();
+                return None;
             }
 
             match trimmed.parse::<f64>() {
@@ -246,66 +244,26 @@ fn reduce_ui_message(state: &mut State, msg: ui::PrefabViewMessage) -> Vec<Comma
                 },
             }
 
-            Vec::new()
+            None
         },
-        ui::PrefabViewMessage::NudgeNorth => vec![Command::SpawnObjects {
-            objects: tools::nudge::nudge(
-                &state.selection,
-                Heading::NORTH,
-                state.nudge_distance_metres,
-            ),
+        ui::PrefabViewMessage::Nudge(h) => Some(Command::SpawnObjects {
+            objects: tools::nudge::nudge(&state.selection, h.clone(), state.nudge_distance_metres),
             action: PmoAction::AddObjects,
             origin: SpawnOrigin::Nudge {
-                heading: Heading::NORTH,
+                heading: h,
                 distance_metres: state.nudge_distance_metres,
             },
-        }],
-        ui::PrefabViewMessage::NudgeSouth => vec![Command::SpawnObjects {
-            objects: tools::nudge::nudge(
-                &state.selection,
-                Heading::SOUTH,
-                state.nudge_distance_metres,
-            ),
-            action: PmoAction::AddObjects,
-            origin: SpawnOrigin::Nudge {
-                heading: Heading::SOUTH,
-                distance_metres: state.nudge_distance_metres,
-            },
-        }],
-        ui::PrefabViewMessage::NudgeEast => vec![Command::SpawnObjects {
-            objects: tools::nudge::nudge(
-                &state.selection,
-                Heading::EAST,
-                state.nudge_distance_metres,
-            ),
-            action: PmoAction::AddObjects,
-            origin: SpawnOrigin::Nudge {
-                heading: Heading::EAST,
-                distance_metres: state.nudge_distance_metres,
-            },
-        }],
-        ui::PrefabViewMessage::NudgeWest => vec![Command::SpawnObjects {
-            objects: tools::nudge::nudge(
-                &state.selection,
-                Heading::WEST,
-                state.nudge_distance_metres,
-            ),
-            action: PmoAction::AddObjects,
-            origin: SpawnOrigin::Nudge {
-                heading: Heading::WEST,
-                distance_metres: state.nudge_distance_metres,
-            },
-        }],
+        }),
         ui::PrefabViewMessage::JiggleSelection => {
             if state.selection.is_empty() {
                 tracing::warn!("jiggle skipped: selection is empty");
-                Vec::new()
+                None
             } else {
-                vec![Command::SpawnObjects {
+                Some(Command::SpawnObjects {
                     objects: tools::jiggle::jiggle(&state.selection, 5.0, 3.5),
                     action: PmoAction::AddObjects,
                     origin: SpawnOrigin::JiggleSelection,
-                }]
+                })
             }
         },
         ui::PrefabViewMessage::ToggleCompass => {
@@ -322,7 +280,7 @@ fn reduce_ui_message(state: &mut State, msg: ui::PrefabViewMessage) -> Vec<Comma
                 }
             );
 
-            Vec::new()
+            None
         },
     }
 }
@@ -356,18 +314,6 @@ async fn run_command(
                 tracing::info!("Spawned {spawned} objects ({origin})");
             }
         },
-    }
-
-    Ok(())
-}
-
-async fn handle_ui_message(
-    connection: &mut FramedConnection,
-    state: &mut State,
-    msg: ui::PrefabViewMessage,
-) -> anyhow::Result<()> {
-    for command in reduce_ui_message(state, msg) {
-        run_command(connection, state, command).await?;
     }
 
     Ok(())
@@ -526,7 +472,7 @@ pub async fn main() -> anyhow::Result<()> {
                     }
                 };
 
-                match packet {
+                let msg = match packet {
                     Packet::Sta(sta) => {
                         let now_visible = sta.flags.is_shiftu() || sta.flags.is_shiftu_following();
 
@@ -548,57 +494,45 @@ pub async fn main() -> anyhow::Result<()> {
                                     .await?;
                             }
                         }
-                    },
-                    Packet::Cpp(cpp) => if state.compass_visible {
-                        let next = Some(tools::compass::generate(cpp.h, COMPASS_WIDTH));
 
-                        if state.compass_text != next {
-                            state.compass_text = next;
-                            dirty = true;
+                        None
+                    },
+                    Packet::Cpp(cpp) => {
+                        if state.compass_visible {
+                            let next = Some(tools::compass::generate(cpp.h, COMPASS_WIDTH));
+
+                            if state.compass_text != next {
+                                state.compass_text = next;
+                                dirty = true;
+                            }
                         }
+                        None
                     },
                     Packet::Axm(axm) => {
                         if matches!(axm.pmoaction, PmoAction::TtcSel) && axm.reqi == REQI_SELECTION {
                             state.selection = axm.info;
                             dirty = true;
                         }
+
+                        None
                     },
                     Packet::Btc(btc) => {
                         if let Some(msg) = canvas.translate_clickid(&btc.clickid) {
-                            let selection_info_toggled =
-                                matches!(&msg, ui::PrefabViewMessage::ToggleSelectionInfo);
                             view.update(msg.clone());
-                            if selection_info_toggled {
-                                tracing::info!(
-                                    "Selection info display {}",
-                                    if view.display_selection_info() {
-                                        "enabled"
-                                    } else {
-                                        "disabled"
-                                    }
-                                );
-                            }
-                            handle_ui_message(&mut connection, &mut state, msg).await?;
                             dirty = true;
+                            Some(msg)
+                        } else {
+                            None
                         }
+
                     },
                     Packet::Btt(btt) => {
                         if let Some(msg) = canvas.translate_typein_clickid(&btt.clickid, btt.text) {
-                            let selection_info_toggled =
-                                matches!(&msg, ui::PrefabViewMessage::ToggleSelectionInfo);
                             view.update(msg.clone());
-                            if selection_info_toggled {
-                                tracing::info!(
-                                    "Selection info display {}",
-                                    if view.display_selection_info() {
-                                        "enabled"
-                                    } else {
-                                        "disabled"
-                                    }
-                                );
-                            }
-                            handle_ui_message(&mut connection, &mut state, msg).await?;
                             dirty = true;
+                            Some(msg)
+                        } else {
+                            None
                         }
                     },
                     Packet::Bfn(bfn) => {
@@ -613,8 +547,17 @@ pub async fn main() -> anyhow::Result<()> {
                             }
                             _ => {}
                         }
+
+                        None
                     },
-                    _ => {}
+                    _ => {
+                        None
+                    }
+                };
+
+                if let Some(msg) = msg &&
+                let Some(command) = reduce_ui_message(&mut state, msg) {
+                    run_command(&mut connection, &mut state, command).await?;
                 }
             }
         }
