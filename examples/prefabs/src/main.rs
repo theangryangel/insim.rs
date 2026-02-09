@@ -1,5 +1,5 @@
 //! Prefab toolbox for LFS layout editing.
-use std::{net::SocketAddr, path::PathBuf, time::Duration};
+use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
 use clap::Parser;
 use insim::{
@@ -36,101 +36,127 @@ struct Cli {
 struct State {
     prefabs: tools::prefabs::Prefabs,
     selection: Vec<ObjectInfo>,
-    top_tab: ui::TopTab,
-    expanded_section: ui::ExpandedSection,
     ui_visible: bool,
-    display_selection_info: bool,
     nudge_distance_metres: f64,
     compass_visible: bool,
     compass_text: Option<String>,
 }
 
-async fn handle_ui_message(
-    connection: &mut FramedConnection,
-    state: &mut State,
-    msg: ui::PrefabViewMessage,
-) -> anyhow::Result<()> {
-    match msg {
-        ui::PrefabViewMessage::ShowToolboxTab => {
-            state.top_tab = ui::TopTab::Toolbox;
-        },
-        ui::PrefabViewMessage::ShowOptionsTab => {
-            state.top_tab = ui::TopTab::Options;
-        },
-        ui::PrefabViewMessage::TogglePrefabsSection => {
-            state.expanded_section =
-                if matches!(state.expanded_section, ui::ExpandedSection::Prefabs) {
-                    ui::ExpandedSection::None
+#[derive(Debug)]
+enum Command {
+    ReloadPrefabs,
+    SavePrefabs(String),
+    SpawnObjects {
+        objects: Vec<ObjectInfo>,
+        action: PmoAction,
+        origin: SpawnOrigin,
+    },
+}
+
+#[derive(Debug, Clone, Copy)]
+enum SpawnOrigin {
+    Prefab,
+    PaintedText,
+    SplineDistrib {
+        spacing_metres: f64,
+    },
+    Rotate {
+        degrees: f64,
+    },
+    Nudge {
+        heading: Heading,
+        distance_metres: f64,
+    },
+    JiggleSelection,
+}
+
+impl fmt::Display for SpawnOrigin {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SpawnOrigin::Prefab => write!(f, "prefab"),
+            SpawnOrigin::PaintedText => write!(f, "painted text"),
+            SpawnOrigin::SplineDistrib { spacing_metres } => {
+                write!(f, "spline distribution ({spacing_metres}m spacing)")
+            },
+            SpawnOrigin::Rotate { degrees } => write!(f, "rotation ({degrees} degrees)"),
+            SpawnOrigin::Nudge {
+                heading,
+                distance_metres,
+            } => {
+                let heading = if *heading == Heading::NORTH {
+                    "north"
+                } else if *heading == Heading::SOUTH {
+                    "south"
+                } else if *heading == Heading::EAST {
+                    "east"
+                } else if *heading == Heading::WEST {
+                    "west"
                 } else {
-                    ui::ExpandedSection::Prefabs
+                    "unknown"
                 };
-        },
-        ui::PrefabViewMessage::ToggleNudgeSection => {
-            state.expanded_section = if matches!(state.expanded_section, ui::ExpandedSection::Nudge)
-            {
-                ui::ExpandedSection::None
-            } else {
-                ui::ExpandedSection::Nudge
-            };
-        },
-        ui::PrefabViewMessage::ReloadYaml => {
-            let path = state.prefabs.path.clone();
-            state.prefabs = tools::prefabs::Prefabs::load(path)?;
-        },
+                write!(f, "nudge {heading} by {distance_metres} metres")
+            },
+            SpawnOrigin::JiggleSelection => write!(f, "jiggle selection"),
+        }
+    }
+}
+
+fn reduce_ui_message(state: &mut State, msg: ui::PrefabViewMessage) -> Vec<Command> {
+    match msg {
+        ui::PrefabViewMessage::ShowToolboxTab
+        | ui::PrefabViewMessage::ShowOptionsTab
+        | ui::PrefabViewMessage::TogglePrefabsSection
+        | ui::PrefabViewMessage::ToggleNudgeSection
+        | ui::PrefabViewMessage::ToggleSelectionInfo => Vec::new(),
+        ui::PrefabViewMessage::ReloadYaml => vec![Command::ReloadPrefabs],
         ui::PrefabViewMessage::SavePrefab(name) => {
-            let pending_name = name.trim().to_string();
-            match state
-                .prefabs
-                .add_and_save_selection(&pending_name, &state.selection)
-            {
-                Ok(saved) => tracing::info!("Saved prefab '{saved}'"),
-                Err(err) => tracing::warn!("save skipped: {err}"),
-            }
+            vec![Command::SavePrefabs(name.trim().to_string())]
         },
         ui::PrefabViewMessage::SpawnPrefab(idx) => {
-            if let Some(prefab) = state.prefabs.data.get(idx) {
-                let anchor = state
-                    .selection
-                    .first()
-                    .map(|obj| *obj.position())
-                    .unwrap_or_default();
-                let _ = spawn_at_selection(
-                    connection,
-                    state,
-                    prefab.place_at_anchor(anchor),
-                    PmoAction::Selection,
-                )
-                .await?;
-            }
+            let Some(prefab) = state.prefabs.data.get(idx) else {
+                return Vec::new();
+            };
+
+            let anchor = state
+                .selection
+                .first()
+                .map(|obj| *obj.position())
+                .unwrap_or_default();
+
+            vec![Command::SpawnObjects {
+                objects: prefab.place_at_anchor(anchor),
+                action: PmoAction::Selection,
+                origin: SpawnOrigin::Prefab,
+            }]
         },
         ui::PrefabViewMessage::PaintedTextInput(text) => {
             let text = text.trim().to_string();
-
             if text.is_empty() {
                 tracing::warn!("paint skipped: text input is empty");
-            } else {
-                let anchor = state
-                    .selection
-                    .first()
-                    .map(|obj| *obj.position())
-                    .unwrap_or_default();
-                let heading = state
-                    .selection
-                    .first()
-                    .and_then(ObjectInfo::heading)
-                    .unwrap_or_default();
-                let painted_text = tools::painted_letters::build(&text, anchor, heading);
-                let painted_count =
-                    spawn_at_selection(connection, state, painted_text, PmoAction::Selection)
-                        .await?;
+                return Vec::new();
+            }
 
-                if painted_count == 0 {
-                    tracing::warn!(
-                        "paint skipped: text has no supported painted-letter characters"
-                    );
-                } else {
-                    tracing::info!("Painted {painted_count} letter objects into selection");
-                }
+            let anchor = state
+                .selection
+                .first()
+                .map(|obj| *obj.position())
+                .unwrap_or_default();
+            let heading = state
+                .selection
+                .first()
+                .and_then(ObjectInfo::heading)
+                .unwrap_or_default();
+            let objects = tools::painted_letters::build(&text, anchor, heading);
+
+            if objects.is_empty() {
+                tracing::warn!("paint skipped: text has no supported painted-letter characters");
+                Vec::new()
+            } else {
+                vec![Command::SpawnObjects {
+                    objects,
+                    action: PmoAction::Selection,
+                    origin: SpawnOrigin::PaintedText,
+                }]
             }
         },
         ui::PrefabViewMessage::SplineDistribInput(input) => {
@@ -138,26 +164,33 @@ async fn handle_ui_message(
 
             if trimmed.is_empty() {
                 tracing::warn!("spacing skipped: input is empty");
-            } else {
-                match trimmed.parse::<f64>() {
-                    Ok(value) if value > 0.0 => {
-                        match tools::spline_distrib::build(&state.selection, value, None) {
-                            Ok(objects) => {
-                                let placed = spawn_at_selection(
-                                    connection,
-                                    state,
-                                    objects,
-                                    PmoAction::AddObjects,
-                                )
-                                .await?;
-                                tracing::info!("Placed {placed} spaced objects");
+                return Vec::new();
+            }
+
+            match trimmed.parse::<f64>() {
+                Ok(value) if value > 0.0 => {
+                    match tools::spline_distrib::build(&state.selection, value, None) {
+                        Ok(objects) => vec![Command::SpawnObjects {
+                            objects,
+                            action: PmoAction::AddObjects,
+                            origin: SpawnOrigin::SplineDistrib {
+                                spacing_metres: value,
                             },
-                            Err(err) => tracing::warn!("spacing skipped: {err}"),
-                        }
-                    },
-                    Ok(_) => tracing::warn!("spacing skipped: value must be greater than zero"),
-                    Err(_) => tracing::warn!("spacing skipped: input is not a number"),
-                }
+                        }],
+                        Err(err) => {
+                            tracing::warn!("spacing skipped: {err}");
+                            Vec::new()
+                        },
+                    }
+                },
+                Ok(_) => {
+                    tracing::warn!("spacing skipped: value must be greater than zero");
+                    Vec::new()
+                },
+                Err(_) => {
+                    tracing::warn!("spacing skipped: input is not a number");
+                    Vec::new()
+                },
             }
         },
         ui::PrefabViewMessage::RotateInput(input) => {
@@ -165,26 +198,31 @@ async fn handle_ui_message(
 
             if trimmed.is_empty() {
                 tracing::warn!("rotation skipped: input is empty");
-            } else {
-                match trimmed.parse::<f64>() {
-                    Ok(value) if value.is_finite() => {
-                        match tools::rotate::build(&state.selection, value) {
-                            Ok(objects) => {
-                                let rotated = spawn_at_selection(
-                                    connection,
-                                    state,
-                                    objects,
-                                    PmoAction::AddObjects,
-                                )
-                                .await?;
-                                tracing::info!("Rotated {rotated} objects by {value} degrees");
-                            },
-                            Err(err) => tracing::warn!("rotation skipped: {err}"),
-                        }
-                    },
-                    Ok(_) => tracing::warn!("rotation skipped: value must be finite"),
-                    Err(_) => tracing::warn!("rotation skipped: input is not a number"),
-                }
+                return Vec::new();
+            }
+
+            match trimmed.parse::<f64>() {
+                Ok(value) if value.is_finite() => {
+                    match tools::rotate::build(&state.selection, value) {
+                        Ok(objects) => vec![Command::SpawnObjects {
+                            objects,
+                            action: PmoAction::AddObjects,
+                            origin: SpawnOrigin::Rotate { degrees: value },
+                        }],
+                        Err(err) => {
+                            tracing::warn!("rotation skipped: {err}");
+                            Vec::new()
+                        },
+                    }
+                },
+                Ok(_) => {
+                    tracing::warn!("rotation skipped: value must be finite");
+                    Vec::new()
+                },
+                Err(_) => {
+                    tracing::warn!("rotation skipped: input is not a number");
+                    Vec::new()
+                },
             }
         },
         ui::PrefabViewMessage::NudgeDistanceInput(input) => {
@@ -192,77 +230,82 @@ async fn handle_ui_message(
 
             if trimmed.is_empty() {
                 tracing::warn!("nudge skipped: input is empty");
-            } else {
-                match trimmed.parse::<f64>() {
-                    Ok(value) if value.is_finite() && value > 0.0 => {
-                        state.nudge_distance_metres = value;
-                        tracing::info!("Set nudge distance to {value} metres");
-                    },
-                    Ok(_) => {
-                        tracing::warn!("nudge skipped: value must be finite and greater than zero")
-                    },
-                    Err(_) => tracing::warn!("nudge skipped: input is not a number"),
-                }
+                return Vec::new();
             }
+
+            match trimmed.parse::<f64>() {
+                Ok(value) if value.is_finite() && value > 0.0 => {
+                    state.nudge_distance_metres = value;
+                    tracing::info!("Set nudge distance to {value} metres");
+                },
+                Ok(_) => {
+                    tracing::warn!("nudge skipped: value must be finite and greater than zero");
+                },
+                Err(_) => {
+                    tracing::warn!("nudge skipped: input is not a number");
+                },
+            }
+
+            Vec::new()
         },
-        ui::PrefabViewMessage::NudgeNorth => {
-            let nudged = tools::nudge::nudge(
+        ui::PrefabViewMessage::NudgeNorth => vec![Command::SpawnObjects {
+            objects: tools::nudge::nudge(
                 &state.selection,
                 Heading::NORTH,
                 state.nudge_distance_metres,
-            );
-            let moved =
-                spawn_at_selection(connection, state, nudged.clone(), PmoAction::AddObjects)
-                    .await?;
-            tracing::info!(
-                "Nudged {moved} objects north by {} metres",
-                state.nudge_distance_metres
-            );
-        },
-        ui::PrefabViewMessage::NudgeSouth => {
-            let nudged = tools::nudge::nudge(
+            ),
+            action: PmoAction::AddObjects,
+            origin: SpawnOrigin::Nudge {
+                heading: Heading::NORTH,
+                distance_metres: state.nudge_distance_metres,
+            },
+        }],
+        ui::PrefabViewMessage::NudgeSouth => vec![Command::SpawnObjects {
+            objects: tools::nudge::nudge(
                 &state.selection,
                 Heading::SOUTH,
                 state.nudge_distance_metres,
-            );
-            let moved =
-                spawn_at_selection(connection, state, nudged.clone(), PmoAction::AddObjects)
-                    .await?;
-            tracing::info!(
-                "Nudged {moved} objects south by {} metres",
-                state.nudge_distance_metres
-            );
-        },
-        ui::PrefabViewMessage::NudgeEast => {
-            let nudged =
-                tools::nudge::nudge(&state.selection, Heading::EAST, state.nudge_distance_metres);
-            let moved =
-                spawn_at_selection(connection, state, nudged.clone(), PmoAction::AddObjects)
-                    .await?;
-            tracing::info!(
-                "Nudged {moved} objects east by {} metres",
-                state.nudge_distance_metres
-            );
-        },
-        ui::PrefabViewMessage::NudgeWest => {
-            let nudged =
-                tools::nudge::nudge(&state.selection, Heading::WEST, state.nudge_distance_metres);
-            let moved =
-                spawn_at_selection(connection, state, nudged.clone(), PmoAction::AddObjects)
-                    .await?;
-            tracing::info!(
-                "Nudged {moved} objects west by {} metres",
-                state.nudge_distance_metres
-            );
-        },
+            ),
+            action: PmoAction::AddObjects,
+            origin: SpawnOrigin::Nudge {
+                heading: Heading::SOUTH,
+                distance_metres: state.nudge_distance_metres,
+            },
+        }],
+        ui::PrefabViewMessage::NudgeEast => vec![Command::SpawnObjects {
+            objects: tools::nudge::nudge(
+                &state.selection,
+                Heading::EAST,
+                state.nudge_distance_metres,
+            ),
+            action: PmoAction::AddObjects,
+            origin: SpawnOrigin::Nudge {
+                heading: Heading::EAST,
+                distance_metres: state.nudge_distance_metres,
+            },
+        }],
+        ui::PrefabViewMessage::NudgeWest => vec![Command::SpawnObjects {
+            objects: tools::nudge::nudge(
+                &state.selection,
+                Heading::WEST,
+                state.nudge_distance_metres,
+            ),
+            action: PmoAction::AddObjects,
+            origin: SpawnOrigin::Nudge {
+                heading: Heading::WEST,
+                distance_metres: state.nudge_distance_metres,
+            },
+        }],
         ui::PrefabViewMessage::JiggleSelection => {
             if state.selection.is_empty() {
                 tracing::warn!("jiggle skipped: selection is empty");
+                Vec::new()
             } else {
-                let jiggled = tools::jiggle::jiggle(&state.selection, 5.0, 3.5);
-                let moved =
-                    spawn_at_selection(connection, state, jiggled, PmoAction::AddObjects).await?;
-                tracing::info!("Jiggled {moved} objects");
+                vec![Command::SpawnObjects {
+                    objects: tools::jiggle::jiggle(&state.selection, 5.0, 3.5),
+                    action: PmoAction::AddObjects,
+                    origin: SpawnOrigin::JiggleSelection,
+                }]
             }
         },
         ui::PrefabViewMessage::ToggleCompass => {
@@ -278,18 +321,53 @@ async fn handle_ui_message(
                     "disabled"
                 }
             );
+
+            Vec::new()
         },
-        ui::PrefabViewMessage::ToggleSelectionInfo => {
-            state.display_selection_info = !state.display_selection_info;
-            tracing::info!(
-                "Selection info display {}",
-                if state.display_selection_info {
-                    "enabled"
-                } else {
-                    "disabled"
-                }
-            );
+    }
+}
+
+async fn run_command(
+    connection: &mut FramedConnection,
+    state: &mut State,
+    command: Command,
+) -> anyhow::Result<()> {
+    match command {
+        Command::ReloadPrefabs => {
+            let path = state.prefabs.path.clone();
+            state.prefabs = tools::prefabs::Prefabs::load(path)?;
         },
+        Command::SavePrefabs(name) => {
+            match state
+                .prefabs
+                .add_and_save_selection(&name, &state.selection)
+            {
+                Ok(saved) => tracing::info!("Saved prefab '{saved}'"),
+                Err(err) => tracing::warn!("save skipped: {err}"),
+            }
+        },
+        Command::SpawnObjects {
+            objects,
+            action,
+            origin,
+        } => {
+            let spawned = spawn_at_selection(connection, state, objects, action).await?;
+            if spawned > 0 {
+                tracing::info!("Spawned {spawned} objects ({origin})");
+            }
+        },
+    }
+
+    Ok(())
+}
+
+async fn handle_ui_message(
+    connection: &mut FramedConnection,
+    state: &mut State,
+    msg: ui::PrefabViewMessage,
+) -> anyhow::Result<()> {
+    for command in reduce_ui_message(state, msg) {
+        run_command(connection, state, command).await?;
     }
 
     Ok(())
@@ -385,16 +463,13 @@ pub async fn main() -> anyhow::Result<()> {
     let mut state = State {
         prefabs,
         selection: Vec::new(),
-        top_tab: ui::TopTab::Toolbox,
-        expanded_section: ui::ExpandedSection::None,
         ui_visible: false,
-        display_selection_info: true,
         compass_visible: false,
         nudge_distance_metres: 1.0,
         compass_text: None,
     };
 
-    let view = ui::PrefabView;
+    let mut view = ui::PrefabView::default();
     let mut canvas = Canvas::<ui::PrefabViewMessage>::new(ConnectionId::LOCAL);
     let mut blocked = false;
     let mut dirty = true;
@@ -409,10 +484,7 @@ pub async fn main() -> anyhow::Result<()> {
         if dirty && !blocked {
             if let Some(diff) = canvas.reconcile(
                 view.render(ui::PrefabViewProps {
-                    top_tab: state.top_tab,
-                    expanded_section: state.expanded_section,
                     ui_visible: state.ui_visible,
-                    display_selection_info: state.display_selection_info,
                     selection_count: state.selection.len(),
                     prefabs: state
                         .prefabs
@@ -493,12 +565,38 @@ pub async fn main() -> anyhow::Result<()> {
                     },
                     Packet::Btc(btc) => {
                         if let Some(msg) = canvas.translate_clickid(&btc.clickid) {
+                            let selection_info_toggled =
+                                matches!(&msg, ui::PrefabViewMessage::ToggleSelectionInfo);
+                            view.update(msg.clone());
+                            if selection_info_toggled {
+                                tracing::info!(
+                                    "Selection info display {}",
+                                    if view.display_selection_info() {
+                                        "enabled"
+                                    } else {
+                                        "disabled"
+                                    }
+                                );
+                            }
                             handle_ui_message(&mut connection, &mut state, msg).await?;
                             dirty = true;
                         }
                     },
                     Packet::Btt(btt) => {
                         if let Some(msg) = canvas.translate_typein_clickid(&btt.clickid, btt.text) {
+                            let selection_info_toggled =
+                                matches!(&msg, ui::PrefabViewMessage::ToggleSelectionInfo);
+                            view.update(msg.clone());
+                            if selection_info_toggled {
+                                tracing::info!(
+                                    "Selection info display {}",
+                                    if view.display_selection_info() {
+                                        "enabled"
+                                    } else {
+                                        "disabled"
+                                    }
+                                );
+                            }
                             handle_ui_message(&mut connection, &mut state, msg).await?;
                             dirty = true;
                         }

@@ -26,10 +26,7 @@ pub struct PrefabListItem {
 
 #[derive(Debug, Clone, Default)]
 pub struct PrefabViewProps {
-    pub top_tab: TopTab,
-    pub expanded_section: ExpandedSection,
     pub ui_visible: bool,
-    pub display_selection_info: bool,
     pub selection_count: usize,
     pub prefabs: Vec<PrefabListItem>,
     pub nudge_distance_metres: f64,
@@ -59,33 +56,83 @@ pub enum PrefabViewMessage {
     ToggleSelectionInfo,
 }
 
-pub struct PrefabView;
+pub struct PrefabView {
+    top_tab: TopTab,
+    expanded_section: ExpandedSection,
+    display_selection_info: bool,
+}
+
+impl Default for PrefabView {
+    fn default() -> Self {
+        Self {
+            top_tab: TopTab::Toolbox,
+            expanded_section: ExpandedSection::None,
+            display_selection_info: true,
+        }
+    }
+}
+
+impl PrefabView {
+    pub fn display_selection_info(&self) -> bool {
+        self.display_selection_info
+    }
+}
 
 impl kitcar::ui::Component for PrefabView {
     type Props = PrefabViewProps;
     type Message = PrefabViewMessage;
+
+    fn update(&mut self, msg: Self::Message) {
+        match msg {
+            PrefabViewMessage::ShowToolboxTab => {
+                self.top_tab = TopTab::Toolbox;
+            },
+            PrefabViewMessage::ShowOptionsTab => {
+                self.top_tab = TopTab::Options;
+            },
+            PrefabViewMessage::TogglePrefabsSection => {
+                self.expanded_section = if matches!(self.expanded_section, ExpandedSection::Prefabs)
+                {
+                    ExpandedSection::None
+                } else {
+                    ExpandedSection::Prefabs
+                };
+            },
+            PrefabViewMessage::ToggleNudgeSection => {
+                self.expanded_section = if matches!(self.expanded_section, ExpandedSection::Nudge) {
+                    ExpandedSection::None
+                } else {
+                    ExpandedSection::Nudge
+                };
+            },
+            PrefabViewMessage::ToggleSelectionInfo => {
+                self.display_selection_info = !self.display_selection_info;
+            },
+            _ => {},
+        }
+    }
 
     fn render(&self, props: Self::Props) -> ui::Node<Self::Message> {
         if !props.ui_visible {
             return ui::empty();
         }
 
-        let prefabs_section_style = if matches!(props.expanded_section, ExpandedSection::Prefabs) {
+        let prefabs_section_style = if matches!(self.expanded_section, ExpandedSection::Prefabs) {
             BtnStyle::default().yellow().light().clickable()
         } else {
             BtnStyle::default().pale_blue().light().clickable()
         };
-        let nudge_section_style = if matches!(props.expanded_section, ExpandedSection::Nudge) {
+        let nudge_section_style = if matches!(self.expanded_section, ExpandedSection::Nudge) {
             BtnStyle::default().yellow().light().clickable()
         } else {
             BtnStyle::default().pale_blue().light().clickable()
         };
-        let toolbox_tab_style = if matches!(props.top_tab, TopTab::Toolbox) {
+        let toolbox_tab_style = if matches!(self.top_tab, TopTab::Toolbox) {
             BtnStyle::default().yellow().light().clickable()
         } else {
             BtnStyle::default().pale_blue().light().clickable()
         };
-        let options_tab_style = if matches!(props.top_tab, TopTab::Options) {
+        let options_tab_style = if matches!(self.top_tab, TopTab::Options) {
             BtnStyle::default().yellow().light().clickable()
         } else {
             BtnStyle::default().pale_blue().light().clickable()
@@ -94,7 +141,7 @@ impl kitcar::ui::Component for PrefabView {
         let prefabs_panel = panels::prefabs_panel(&props.prefabs);
         let nudge_panel = panels::nudge_panel(props.nudge_distance_metres);
         let options_panel =
-            panels::options_panel(props.compass_visible, props.display_selection_info);
+            panels::options_panel(props.compass_visible, self.display_selection_info);
 
         let compass_text = if let Some(compass_text) = props.compass_text.as_ref() {
             ui::text(compass_text, BtnStyle::default().dark().white())
@@ -120,7 +167,7 @@ impl kitcar::ui::Component for PrefabView {
             )
             .with_child_if(
                 prefabs_panel,
-                matches!(props.expanded_section, ExpandedSection::Prefabs),
+                matches!(self.expanded_section, ExpandedSection::Prefabs),
             )
             .with_child(
                 ui::typein(
@@ -175,7 +222,7 @@ impl kitcar::ui::Component for PrefabView {
             )
             .with_child_if(
                 nudge_panel,
-                matches!(props.expanded_section, ExpandedSection::Nudge),
+                matches!(self.expanded_section, ExpandedSection::Nudge),
             );
 
         ui::container()
@@ -184,7 +231,7 @@ impl kitcar::ui::Component for PrefabView {
             .w(170.)
             .pt(7.)
             .items_end()
-            .with_child(if props.display_selection_info {
+            .with_child(if self.display_selection_info {
                 ui::text(
                     format!("Selection: {} object(s)", props.selection_count),
                     BtnStyle::default().dark().white(),
@@ -220,7 +267,7 @@ impl kitcar::ui::Component for PrefabView {
                         .flex_grow(1.0),
                     ),
             )
-            .with_child(if matches!(props.top_tab, TopTab::Toolbox) {
+            .with_child(if matches!(self.top_tab, TopTab::Toolbox) {
                 toolbox_panel
             } else {
                 options_panel
