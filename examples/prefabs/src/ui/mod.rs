@@ -54,6 +54,7 @@ pub enum PrefabViewMessage {
     NudgeSouth,
     NudgeEast,
     NudgeWest,
+    JiggleSelection,
     ToggleCompass,
     ToggleSelectionInfo,
 }
@@ -152,6 +153,15 @@ impl kitcar::ui::Component for PrefabView {
                 )
                 .mt(1.)
                 .block()
+                .h(5.),
+            )
+            .with_child(
+                ui::clickable(
+                    "Jiggle Selection",
+                    BtnStyle::default().pale_blue().light().clickable(),
+                    PrefabViewMessage::JiggleSelection,
+                )
+                .mt(1.)
                 .h(5.),
             )
             .with_child(

@@ -255,6 +255,16 @@ async fn handle_ui_message(
                 state.nudge_distance_metres
             );
         },
+        ui::PrefabViewMessage::JiggleSelection => {
+            if state.selection.is_empty() {
+                tracing::warn!("jiggle skipped: selection is empty");
+            } else {
+                let jiggled = tools::jiggle::jiggle(&state.selection, 5.0, 3.5);
+                let moved =
+                    spawn_at_selection(connection, state, jiggled, PmoAction::AddObjects).await?;
+                tracing::info!("Jiggled {moved} objects");
+            }
+        },
         ui::PrefabViewMessage::ToggleCompass => {
             state.compass_visible = !state.compass_visible;
             if !state.compass_visible {

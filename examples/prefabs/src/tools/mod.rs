@@ -1,4 +1,5 @@
 pub mod compass;
+pub mod jiggle;
 pub mod nudge;
 pub mod painted_letters;
 pub mod prefabs;
