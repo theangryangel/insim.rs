@@ -57,19 +57,35 @@ impl Node {
     fn calculate_limit_position(&self, limit: &Limit, scale: Option<f32>) -> (Vec3, Vec3) {
         let center = self.get_center(scale);
 
-        // 90° rotation: (x, y) → (-y, x)
-        let left = Vec3 {
-            x: -self.direction.1 * limit.left + center.x,
-            y: self.direction.0 * limit.left + center.y,
-            z: center.z,
-        };
+        // Calculate the length of the direction vector
+        let dx = self.direction.1;
+        let dy = self.direction.0;
+        let length = (dx*dx + dy*dy).sqrt();
 
-        // -90° rotation: (x, y) → (y, -x)
-        let right = Vec3 {
-            x: self.direction.1 * limit.right + center.x,
-            y: -self.direction.0 * limit.right + center.y,
-            z: center.z,
-        };
+        let mut left: Vec3 = Vec3::ZERO;
+        let mut right: Vec3 = Vec3::ZERO;
+
+        // length of the direction vector should not be zero
+        // but we check to avoid division by zero
+        if length > 0.0 {
+
+            // Normalize the direction vector
+            let cos_theta = dx / length;
+            let sin_theta = dy / length;
+
+            // Calculate the left and right limit positions
+            left = Vec3 {
+                x: center.x + limit.left * cos_theta,
+                y: center.y + limit.left * -sin_theta,
+                z: center.z,
+            };
+
+            right = Vec3 {
+                x: center.x + limit.right * cos_theta,
+                y: center.y + limit.right * -sin_theta,
+                z: center.z,
+            };
+        }
 
         (left, right)
     }
