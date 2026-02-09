@@ -395,3 +395,8 @@ where
 {
     node::Node::typein(text, bstyle, limit, mapper)
 }
+
+/// Shortcut to make an empty [node::Node]
+pub fn empty<Msg>() -> node::Node<Msg> {
+    node::Node::empty()
+}

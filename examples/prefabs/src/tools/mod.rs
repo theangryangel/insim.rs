@@ -1,3 +1,5 @@
+pub mod compass;
+pub mod nudge;
 pub mod painted_letters;
 pub mod prefabs;
 pub mod rotate;
