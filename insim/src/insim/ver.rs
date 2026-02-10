@@ -1,5 +1,5 @@
 use bytes::{Buf, BufMut};
-use insim_core::{Decode, DecodeString, Encode, EncodeString, game_version::GameVersion};
+use insim_core::{game_version::GameVersion, Decode, DecodeString, Encode, EncodeString};
 
 use crate::identifiers::RequestId;
 

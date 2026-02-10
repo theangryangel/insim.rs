@@ -1,5 +1,5 @@
 use bytes::BufMut;
-use insim_core::{Decode, Encode, heading::Heading, object::ObjectCoordinate};
+use insim_core::{heading::Heading, object::ObjectCoordinate, Decode, Encode};
 
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
@@ -25,14 +25,17 @@ pub enum JrrAction {
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Start position selection used by [`Jrr`].
 pub enum JrrStartPosition {
+    /// Use the default spawn location selected by LFS.
     DefaultStartPosition,
+    /// Use a custom spawn location and heading.
     Custom {
         /// Position
         xyz: ObjectCoordinate,
         /// Heading / Direction
         heading: Heading,
-    }
+    },
 }
 
 impl Decode for JrrStartPosition {
@@ -48,9 +51,10 @@ impl Decode for JrrStartPosition {
         if x == 0 && y == 0 && z == 8 && flags == 0 && index == 0 && heading == 0 {
             Ok(Self::DefaultStartPosition)
         } else {
-            Ok(Self::Custom { xyz: ObjectCoordinate {
-                x, y, z
-            }, heading: Heading::from_objectinfo_wire(heading) })
+            Ok(Self::Custom {
+                xyz: ObjectCoordinate { x, y, z },
+                heading: Heading::from_objectinfo_wire(heading),
+            })
         }
     }
 }

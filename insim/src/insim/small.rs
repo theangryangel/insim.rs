@@ -5,8 +5,8 @@ use insim_core::{Decode, Encode};
 
 use super::{PlcAllowedCarsSet, VtnAction};
 use crate::{
-    Packet, WithRequestId,
     identifiers::{PlayerId, RequestId},
+    Packet, WithRequestId,
 };
 
 bitflags! {

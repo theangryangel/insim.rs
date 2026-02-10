@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bitflags::bitflags;
 use bytes::{Buf, BufMut};
-use insim_core::{Decode, Encode, heading::Heading, speed::Speed};
+use insim_core::{heading::Heading, speed::Speed, Decode, Encode};
 
 use crate::identifiers::{PlayerId, RequestId};
 

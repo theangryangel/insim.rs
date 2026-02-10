@@ -15,6 +15,7 @@ mod cli;
 mod components;
 mod leaderboard;
 mod scenes;
+mod spawn_control;
 
 // host + 1 player
 const MIN_PLAYERS: usize = 2;

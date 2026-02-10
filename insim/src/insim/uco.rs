@@ -53,7 +53,7 @@ pub struct Uco {
 
 #[cfg(test)]
 mod test {
-    use insim_core::object::{ObjectInfo, insim::InsimCircle};
+    use insim_core::object::{insim::InsimCircle, ObjectInfo};
 
     use super::*;
 
