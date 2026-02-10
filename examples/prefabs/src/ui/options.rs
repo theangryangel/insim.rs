@@ -9,10 +9,8 @@ pub enum OptionsMsg {
     ToggleSelectionInfo,
 }
 
-pub(super) fn tab(compass_visible: bool, display_selection_info: bool) -> ui::Node<OptionsMsg> {
+pub(super) fn panel(compass_visible: bool, display_selection_info: bool) -> ui::Node<OptionsMsg> {
     ui::container()
-        .mt(1.)
-        .mb(2.)
         .flex()
         .flex_col()
         .w(48.)
@@ -24,9 +22,9 @@ pub(super) fn tab(compass_visible: bool, display_selection_info: bool) -> ui::No
                     "Compass: Off"
                 },
                 if compass_visible {
-                    BtnStyle::default().green().light().clickable()
+                    BtnStyle::style_active()
                 } else {
-                    BtnStyle::default().pale_blue().light().clickable()
+                    BtnStyle::style_interactive()
                 },
                 OptionsMsg::ToggleCompass,
             )
@@ -40,20 +38,31 @@ pub(super) fn tab(compass_visible: bool, display_selection_info: bool) -> ui::No
                     "Selected Objects: No"
                 },
                 if display_selection_info {
-                    BtnStyle::default().green().light().clickable()
+                    BtnStyle::style_active()
                 } else {
-                    BtnStyle::default().pale_blue().light().clickable()
+                    BtnStyle::style_interactive()
                 },
                 OptionsMsg::ToggleSelectionInfo,
             )
-            .mt(1.)
             .h(5.),
         )
 }
 
 pub(super) fn reduce(state: &mut State, msg: OptionsMsg) -> Option<Command> {
     match msg {
-        OptionsMsg::ToggleSelectionInfo => None,
+        OptionsMsg::ToggleSelectionInfo => {
+            state.display_selection_info = !state.display_selection_info;
+            tracing::info!(
+                "Selection info {}",
+                if state.display_selection_info {
+                    "enabled"
+                } else {
+                    "disabled"
+                }
+            );
+
+            None
+        },
         OptionsMsg::ToggleCompass => {
             state.compass_visible = !state.compass_visible;
             if !state.compass_visible {

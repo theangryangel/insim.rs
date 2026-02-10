@@ -37,7 +37,10 @@ struct State {
     prefabs: tools::prefabs::Prefabs,
     selection: Vec<ObjectInfo>,
     ui_visible: bool,
+    display_selection_info: bool,
     nudge_distance_metres: f64,
+    ramp_mode: tools::ramp::RampMode,
+    ramp_roll_degrees: f64,
     compass_visible: bool,
     compass_text: Option<String>,
 }
@@ -63,6 +66,10 @@ enum SpawnOrigin {
     Rotate {
         degrees: f64,
     },
+    Ramp {
+        mode: tools::ramp::RampMode,
+        roll_degrees: f64,
+    },
     Nudge {
         heading: Heading,
         distance_metres: f64,
@@ -79,6 +86,14 @@ impl fmt::Display for SpawnOrigin {
                 write!(f, "spline distribution ({spacing_metres}m spacing)")
             },
             SpawnOrigin::Rotate { degrees } => write!(f, "rotation ({degrees} degrees)"),
+            SpawnOrigin::Ramp { mode, roll_degrees } => match mode {
+                tools::ramp::RampMode::AlongPath => {
+                    write!(f, "concrete ramp/slab blend (grade along path)")
+                },
+                tools::ramp::RampMode::AcrossPath => {
+                    write!(f, "concrete slab banking (roll {} degrees)", roll_degrees)
+                },
+            },
             SpawnOrigin::Nudge {
                 heading,
                 distance_metres,
@@ -226,13 +241,16 @@ pub async fn main() -> anyhow::Result<()> {
         prefabs,
         selection: Vec::new(),
         ui_visible: false,
+        display_selection_info: true,
         compass_visible: false,
         nudge_distance_metres: 1.0,
+        ramp_mode: tools::ramp::RampMode::AlongPath,
+        ramp_roll_degrees: 18.0,
         compass_text: None,
     };
 
-    let mut view = ui::PrefabView::default();
-    let mut canvas = Canvas::<ui::PrefabViewMessage>::new(ConnectionId::LOCAL);
+    let mut ui_root = ui::Toolbox::default();
+    let mut canvas = Canvas::<ui::ToolboxMsg>::new(ConnectionId::LOCAL);
     let mut blocked = false;
     let mut dirty = true;
     let mut camera_tick = tokio::time::interval(Duration::from_millis(100));
@@ -245,19 +263,22 @@ pub async fn main() -> anyhow::Result<()> {
     loop {
         if dirty && !blocked {
             if let Some(diff) = canvas.reconcile(
-                view.render(ui::PrefabViewProps {
+                ui_root.render(ui::ToolboxProps {
                     ui_visible: state.ui_visible,
+                    display_selection_info: state.display_selection_info,
                     selection_count: state.selection.len(),
                     prefabs: state
                         .prefabs
                         .data
                         .iter()
-                        .map(|prefab| ui::PrefabListItem {
+                        .map(|prefab| ui::PrefabSummary {
                             name: prefab.name.clone(),
                             count: prefab.objects.len(),
                         })
                         .collect(),
                     nudge_distance_metres: state.nudge_distance_metres,
+                    ramp_mode: state.ramp_mode,
+                    ramp_roll_degrees: state.ramp_roll_degrees,
                     compass_visible: state.compass_visible,
                     compass_text: state.compass_text.clone(),
                 }),
@@ -334,7 +355,7 @@ pub async fn main() -> anyhow::Result<()> {
                     },
                     Packet::Btc(btc) => {
                         if let Some(msg) = canvas.translate_clickid(&btc.clickid) {
-                            view.update(msg.clone());
+                            ui_root.update(msg.clone());
                             dirty = true;
                             Some(msg)
                         } else {
@@ -344,7 +365,7 @@ pub async fn main() -> anyhow::Result<()> {
                     },
                     Packet::Btt(btt) => {
                         if let Some(msg) = canvas.translate_typein_clickid(&btt.clickid, btt.text) {
-                            view.update(msg.clone());
+                            ui_root.update(msg.clone());
                             dirty = true;
                             Some(msg)
                         } else {

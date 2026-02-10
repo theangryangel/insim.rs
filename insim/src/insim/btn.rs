@@ -124,6 +124,31 @@ impl BtnStyle {
         self
     }
 
+    /// Common interactive style: light button with black text.
+    pub fn style_interactive() -> Self {
+        Self::default().light().black()
+    }
+
+    /// Common active style: light button with white text.
+    pub fn style_active() -> Self {
+        Self::default().light().white()
+    }
+
+    /// Common read-only style: light button with light-grey text.
+    pub fn style_readonly() -> Self {
+        Self::default().light().light_grey()
+    }
+
+    /// Common title style: light button with yellow text.
+    pub fn style_title() -> Self {
+        Self::default().light().yellow()
+    }
+
+    /// Common unavailable style: light button with grey text.
+    pub fn style_unavailable() -> Self {
+        Self::default().light().grey()
+    }
+
     /// Set button as clickable
     pub fn clickable(mut self) -> Self {
         self.flags.set(BtnStyleFlags::CLICK, true);
