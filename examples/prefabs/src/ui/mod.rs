@@ -1,16 +1,10 @@
-mod panels;
-mod tabs;
+mod options;
+mod toolbox;
 
-use insim::{core::heading::Heading, insim::BtnStyle};
+use insim::insim::BtnStyle;
 use kitcar::ui;
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum ExpandedSection {
-    #[default]
-    None,
-    Prefabs,
-    Nudge,
-}
+pub use options::OptionsMsg;
+pub use toolbox::ToolboxMsg;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum TopTab {
@@ -36,35 +30,15 @@ pub struct PrefabViewProps {
 }
 
 #[derive(Debug, Clone)]
-pub enum ToolboxMsg {
-    ExpandToolboxSection(ExpandedSection),
-    ReloadYaml,
-    SavePrefab(String),
-    SpawnPrefab(usize),
-    PaintedTextInput(String),
-    RotateInput(String),
-    SplineDistribInput(String),
-    NudgeDistanceInput(String),
-    Nudge(Heading),
-    JiggleSelection,
-}
-
-#[derive(Debug, Clone)]
 pub enum PrefabViewMessage {
     TopTab(TopTab),
     Toolbox(ToolboxMsg),
     Options(OptionsMsg),
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum OptionsMsg {
-    ToggleCompass,
-    ToggleSelectionInfo,
-}
-
 pub struct PrefabView {
     top_tab: TopTab,
-    expanded_section: ExpandedSection,
+    toolbox: toolbox::Toolbox,
     display_selection_info: bool,
 }
 
@@ -72,7 +46,7 @@ impl Default for PrefabView {
     fn default() -> Self {
         Self {
             top_tab: TopTab::Toolbox,
-            expanded_section: ExpandedSection::None,
+            toolbox: toolbox::Toolbox::default(),
             display_selection_info: true,
         }
     }
@@ -84,15 +58,11 @@ impl kitcar::ui::Component for PrefabView {
 
     fn update(&mut self, msg: Self::Message) {
         match msg {
-            PrefabViewMessage::TopTab(i) => {
-                self.top_tab = i;
+            PrefabViewMessage::TopTab(tab) => {
+                self.top_tab = tab;
             },
-            PrefabViewMessage::Toolbox(ToolboxMsg::ExpandToolboxSection(e)) => {
-                self.expanded_section = if self.expanded_section == e {
-                    ExpandedSection::None
-                } else {
-                    e
-                };
+            PrefabViewMessage::Toolbox(toolbox_msg) => {
+                kitcar::ui::Component::update(&mut self.toolbox, toolbox_msg);
             },
             PrefabViewMessage::Options(OptionsMsg::ToggleSelectionInfo) => {
                 self.display_selection_info = !self.display_selection_info;
@@ -167,13 +137,21 @@ impl kitcar::ui::Component for PrefabView {
                     ),
             )
             .with_child(match self.top_tab {
-                TopTab::Toolbox => {
-                    tabs::toolbox_tab(&props, self.expanded_section).map(PrefabViewMessage::Toolbox)
-                },
-                TopTab::Options => {
-                    tabs::options_tab(props.compass_visible, self.display_selection_info)
-                        .map(PrefabViewMessage::Options)
-                },
+                TopTab::Toolbox => kitcar::ui::Component::render(&self.toolbox, props.clone())
+                    .map(PrefabViewMessage::Toolbox),
+                TopTab::Options => options::tab(props.compass_visible, self.display_selection_info)
+                    .map(PrefabViewMessage::Options),
             })
+    }
+}
+
+pub(crate) fn reduce_message(
+    state: &mut crate::State,
+    msg: PrefabViewMessage,
+) -> Option<crate::Command> {
+    match msg {
+        PrefabViewMessage::TopTab(_) => None,
+        PrefabViewMessage::Toolbox(toolbox_msg) => toolbox::reduce(state, toolbox_msg),
+        PrefabViewMessage::Options(options_msg) => options::reduce(state, options_msg),
     }
 }
