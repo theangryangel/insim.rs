@@ -3,9 +3,9 @@
 use std::time::Duration;
 
 use bytes::{Buf, BufMut};
-use insim_core::{heading::Heading, speed::Speed, Decode, Encode};
+use insim_core::{Decode, Encode, heading::Heading, speed::Speed};
 
-use super::{obh::spclose_strip_high_bits, CompCarInfo};
+use super::{CompCarInfo, obh::spclose_strip_high_bits};
 use crate::identifiers::{PlayerId, RequestId};
 
 /// ConInfo direction scale: 128 units = 180°

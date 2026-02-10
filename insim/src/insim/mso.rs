@@ -1,5 +1,5 @@
 use bytes::{Buf, BufMut};
-use insim_core::{string::codepages, Decode, DecodeString, Encode, EncodeString};
+use insim_core::{Decode, DecodeString, Encode, EncodeString, string::codepages};
 
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
@@ -198,10 +198,10 @@ mod tests {
         raw.put_u8(0); // usertype
         raw.put_u8(0); // textstart
         raw.extend_from_slice(&"Downloaded Skin : XFG_PRO38".to_string().as_bytes()); // ms
-                                                                                      // We are intentionally dropping the trailing nul byte here to ensure that we handle
-                                                                                      // packets that are too short somehow. For this reason we're not using
-                                                                                      // assert_from_to_bytes!
-                                                                                      //raw.put_bytes(0, 1);
+        // We are intentionally dropping the trailing nul byte here to ensure that we handle
+        // packets that are too short somehow. For this reason we're not using
+        // assert_from_to_bytes!
+        //raw.put_bytes(0, 1);
         let raw = raw.freeze();
 
         let res = Mso::decode(&mut Bytes::from(raw.clone())).unwrap();

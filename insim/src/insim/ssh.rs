@@ -1,4 +1,4 @@
-use crate::{identifiers::RequestId, WithRequestId};
+use crate::{WithRequestId, identifiers::RequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

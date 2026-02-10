@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bitflags::bitflags;
 
-use crate::{identifiers::RequestId, WithRequestId, VERSION};
+use crate::{VERSION, WithRequestId, identifiers::RequestId};
 
 bitflags! {
     /// Flags for the [Isi] options field.

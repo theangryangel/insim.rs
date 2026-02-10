@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use bytes::{Buf, BufMut};
-use insim_core::{coordinate::Coordinate, heading::Heading, Decode, Encode};
+use insim_core::{Decode, Encode, coordinate::Coordinate, heading::Heading};
 
 use super::{CameraView, StaFlags};
 use crate::identifiers::{PlayerId, RequestId};

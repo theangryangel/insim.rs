@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use insim_core::{track::Track, wind::Wind, Decode, Encode};
+use insim_core::{Decode, Encode, track::Track, wind::Wind};
 
 use super::RaceLaps;
 use crate::identifiers::RequestId;

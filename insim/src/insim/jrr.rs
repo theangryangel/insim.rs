@@ -1,5 +1,5 @@
 use bytes::BufMut;
-use insim_core::{heading::Heading, object::ObjectCoordinate, Decode, Encode};
+use insim_core::{Decode, Encode, heading::Heading, object::ObjectCoordinate};
 
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
