@@ -1,10 +1,20 @@
 use std::collections::BTreeSet;
 
-use insim::{core::string::colours::Colour, insim::BtnStyle};
+use insim::insim::BtnStyle;
 use kitcar::ui;
+
+use super::{hud_active, hud_text};
 
 /// (uname, pname, pts)
 pub type EnrichedLeaderboard = Vec<(String, String, u32)>;
+
+fn row_style(uname: &str, current_uname: &str) -> BtnStyle {
+    if uname == current_uname {
+        hud_active()
+    } else {
+        hud_text()
+    }
+}
 
 pub fn scoreboard<Msg>(
     leaderboard: &EnrichedLeaderboard,
@@ -43,20 +53,15 @@ pub fn scoreboard<Msg>(
     indices_to_show
         .into_iter()
         .map(|index| {
-            let (_, pname, pts) = &leaderboard[index];
+            let (uname, pname, pts) = &leaderboard[index];
             let rank = format!("#{}", index + 1);
             let pts_str = format!("{}", pts);
-            let (rank, name, pts_str): (String, String, String) = match index {
-                0 => (rank.yellow(), pname.yellow(), pts_str.yellow()),
-                1 => (rank.white(), pname.white(), pts_str.white()),
-                2 => (rank.red(), pname.red(), pts_str.red()),
-                _ => (rank, pname.clone(), pts_str),
-            };
-            let style = BtnStyle::default().dark();
+            let style = row_style(uname, current_uname);
+
             ui::container().flex().flex_row().with_children([
                 ui::text(rank, style).w(5.).h(5.),
-                ui::text(name, style.align_left()).w(25.).h(5.),
-                ui::text(pts_str, style).w(5.).h(5.),
+                ui::text(pname.as_str(), style.align_left()).w(25.).h(5.),
+                ui::text(pts_str, style.align_right()).w(5.).h(5.),
             ])
         })
         .collect()

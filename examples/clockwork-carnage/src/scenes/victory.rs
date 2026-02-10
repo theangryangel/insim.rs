@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use insim::{builder::InsimTask, core::string::colours::Colour, insim::BtnStyle};
+use insim::builder::InsimTask;
 use kitcar::{
     presence,
     scenes::{Scene, SceneError, SceneResult},
@@ -9,7 +9,7 @@ use kitcar::{
 use tokio::time::sleep;
 
 use crate::{
-    components::{EnrichedLeaderboard, scoreboard, topbar},
+    components::{EnrichedLeaderboard, hud_title, scoreboard, topbar},
     leaderboard,
 };
 
@@ -45,15 +45,12 @@ impl ui::Component for ClockworkVictoryView {
             .with_child(
                 ui::container()
                     .flex()
-                    .mt(20.)
+                    .mt(90.)
+                    .pr(5.)
                     .w(200.)
                     .flex_col()
-                    .items_start()
-                    .with_child(
-                        ui::text("Victory!".yellow(), BtnStyle::default().dark())
-                            .w(35.)
-                            .h(5.),
-                    )
+                    .items_end()
+                    .with_child(ui::text("Victory!", hud_title()).w(35.).h(5.))
                     .with_children(players),
             )
     }

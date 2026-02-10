@@ -3,7 +3,10 @@ use std::collections::{HashMap, VecDeque};
 use insim::{
     WithRequestId,
     builder::InsimTask,
-    core::{heading::Heading, object::{ObjectCoordinate, insim::InsimCheckpointKind}},
+    core::{
+        heading::Heading,
+        object::{ObjectCoordinate, insim::InsimCheckpointKind},
+    },
     identifiers::{ConnectionId, RequestId},
     insim::{Jrr, JrrAction, JrrStartPosition, ObjectInfo, PmoAction, PmoFlags, TinyType},
 };
@@ -32,9 +35,7 @@ pub enum SpawnControlError {
     Insim(#[from] insim::Error),
     #[error("Lost Insim handle")]
     InsimHandleLost,
-    #[error(
-        "Layout requires at least {required} StartPosition objects, found {found}"
-    )]
+    #[error("Layout requires at least {required} StartPosition objects, found {found}")]
     TooFewStartPositions { found: usize, required: usize },
     #[error("Layout requires at least one Insim Checkpoint1 object")]
     MissingCheckpoint1,
@@ -66,7 +67,9 @@ pub(crate) async fn spawn(insim: InsimTask) -> Result<SpawnControlHandle, SpawnC
         let mut available = layout.spawn_points;
         let mut leases: HashMap<ConnectionId, SpawnPoint> = HashMap::new();
 
-        request_player_snapshot(&insim).await;
+        let _ = insim
+            .send(TinyType::Npl.with_request_id(NPL_SYNC_REQUEST_ID))
+            .await;
 
         loop {
             match packets.recv().await {
@@ -124,7 +127,9 @@ pub(crate) async fn spawn(insim: InsimTask) -> Result<SpawnControlHandle, SpawnC
                     }
                 },
                 Ok(insim::Packet::Rst(_)) => {
-                    request_player_snapshot(&insim).await;
+                    let _ = insim
+                        .send(TinyType::Npl.with_request_id(NPL_SYNC_REQUEST_ID))
+                        .await;
                 },
                 Ok(_) => {},
                 Err(broadcast::error::RecvError::Lagged(skipped)) => {
@@ -211,13 +216,4 @@ async fn scan_layout(insim: &InsimTask) -> Result<LayoutScan, SpawnControlError>
         checkpoint1_count,
         finish_count,
     })
-}
-
-async fn request_player_snapshot(insim: &InsimTask) {
-    if let Err(err) = insim
-        .send(TinyType::Npl.with_request_id(NPL_SYNC_REQUEST_ID))
-        .await
-    {
-        tracing::warn!("Failed to request NPL player snapshot: {err}");
-    }
 }

@@ -1,9 +1,16 @@
-use insim::{core::string::colours::Colour, insim::BtnStyle};
 use kitcar::ui;
+
+use super::{hud_action, hud_text, hud_title};
 
 #[derive(Default)]
 pub struct HelpDialog {
     visible: bool,
+}
+
+impl HelpDialog {
+    pub fn is_visible(&self) -> bool {
+        self.visible
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -28,7 +35,6 @@ impl ui::Component for HelpDialog {
             return ui::Node::empty();
         }
 
-        // Help dialog content
         ui::container()
             .flex()
             .flex_col()
@@ -36,35 +42,21 @@ impl ui::Component for HelpDialog {
             .items_center()
             .w(200.)
             .h(100.)
+            .with_child(ui::text("HELP", hud_title()).w(50.).h(5.))
             .with_child(
-                ui::text("HELP".yellow(), BtnStyle::default().dark())
-                    .w(50.)
+                ui::text("Get as close as possible to the target time!", hud_text())
+                    .w(100.)
                     .h(5.),
             )
             .with_child(
-                ui::text(
-                    "Get as close as possible to the target time!".white(),
-                    BtnStyle::default().dark(),
-                )
-                .w(100.)
-                .h(5.),
+                ui::text("Closest time gets more points!", hud_text())
+                    .w(100.)
+                    .h(5.),
             )
             .with_child(
-                ui::text(
-                    "Closest time gets more points!".white(),
-                    BtnStyle::default().dark(),
-                )
-                .w(100.)
-                .h(5.),
-            )
-            .with_child(
-                ui::clickable(
-                    "Close",
-                    BtnStyle::default().dark().green(),
-                    HelpDialogMsg::Hide,
-                )
-                .w(100.)
-                .h(5.),
+                ui::clickable("Close", hud_action(), HelpDialogMsg::Hide)
+                    .w(100.)
+                    .h(5.),
             )
     }
 }
