@@ -191,6 +191,13 @@ impl PresenceInner {
     }
 
     fn npl(&mut self, npl: &insim::insim::Npl) {
+        if npl.nump == 0 {
+            // A join request is seen as an IS_NPL packet with ZERO in the NumP field
+            // An immediate response (e.g. within 1 second) is required using an IS_JRR packet
+            // If you allow the join and it is successful you will then get a normal IS_NPL with NumP set.
+            return;
+        }
+
         let _ = self.players.insert(
             npl.plid,
             PlayerInfo {
