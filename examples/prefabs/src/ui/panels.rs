@@ -1,9 +1,9 @@
 use insim::{core::heading::Heading, insim::BtnStyle};
 use kitcar::ui;
 
-use super::{PrefabListItem, PrefabViewMessage};
+use super::{PrefabListItem, ToolboxMsg};
 
-pub(super) fn prefabs_panel(prefabs: &[PrefabListItem]) -> ui::Node<PrefabViewMessage> {
+pub(super) fn prefabs_panel(prefabs: &[PrefabListItem]) -> ui::Node<ToolboxMsg> {
     ui::container()
         .mt(1.)
         .mb(2.)
@@ -17,7 +17,7 @@ pub(super) fn prefabs_panel(prefabs: &[PrefabListItem]) -> ui::Node<PrefabViewMe
                     ui::clickable(
                         "Reload YAML",
                         BtnStyle::default().pale_blue().light(),
-                        PrefabViewMessage::ReloadYaml,
+                        ToolboxMsg::ReloadYaml,
                     )
                     .flex_grow(1.0)
                     .h(5.),
@@ -27,7 +27,7 @@ pub(super) fn prefabs_panel(prefabs: &[PrefabListItem]) -> ui::Node<PrefabViewMe
                         "Save Selection",
                         BtnStyle::default().green().light(),
                         64,
-                        PrefabViewMessage::SavePrefab,
+                        ToolboxMsg::SavePrefab,
                     )
                     .flex_grow(1.0)
                     .h(5.),
@@ -37,14 +37,14 @@ pub(super) fn prefabs_panel(prefabs: &[PrefabListItem]) -> ui::Node<PrefabViewMe
             ui::clickable(
                 format!("{} [{}]", prefab.name, prefab.count),
                 BtnStyle::default().black().light().align_left(),
-                PrefabViewMessage::SpawnPrefab(idx),
+                ToolboxMsg::SpawnPrefab(idx),
             )
             .key(format!("prefab-{idx}"))
             .h(5.)
         }))
 }
 
-pub(super) fn nudge_panel(nudge_distance_metres: f64) -> ui::Node<PrefabViewMessage> {
+pub(super) fn nudge_panel(nudge_distance_metres: f64) -> ui::Node<ToolboxMsg> {
     ui::container()
         .mt(1.)
         .mb(2.)
@@ -55,7 +55,7 @@ pub(super) fn nudge_panel(nudge_distance_metres: f64) -> ui::Node<PrefabViewMess
                 format!("Nudge Distance ({:.2}m)", nudge_distance_metres),
                 BtnStyle::default().black().light(),
                 16,
-                PrefabViewMessage::NudgeDistanceInput,
+                ToolboxMsg::NudgeDistanceInput,
             )
             .block()
             .h(5.),
@@ -69,7 +69,7 @@ pub(super) fn nudge_panel(nudge_distance_metres: f64) -> ui::Node<PrefabViewMess
                     ui::clickable(
                         "N",
                         BtnStyle::default().pale_blue().light(),
-                        PrefabViewMessage::Nudge(Heading::NORTH),
+                        ToolboxMsg::Nudge(Heading::NORTH),
                     )
                     .flex_grow(1.0)
                     .h(5.),
@@ -78,7 +78,7 @@ pub(super) fn nudge_panel(nudge_distance_metres: f64) -> ui::Node<PrefabViewMess
                     ui::clickable(
                         "W",
                         BtnStyle::default().pale_blue().light(),
-                        PrefabViewMessage::Nudge(Heading::WEST),
+                        ToolboxMsg::Nudge(Heading::WEST),
                     )
                     .flex_grow(1.0)
                     .h(5.),
@@ -87,7 +87,7 @@ pub(super) fn nudge_panel(nudge_distance_metres: f64) -> ui::Node<PrefabViewMess
                     ui::clickable(
                         "S",
                         BtnStyle::default().pale_blue().light(),
-                        PrefabViewMessage::Nudge(Heading::SOUTH),
+                        ToolboxMsg::Nudge(Heading::SOUTH),
                     )
                     .flex_grow(1.0)
                     .h(5.),
@@ -96,7 +96,7 @@ pub(super) fn nudge_panel(nudge_distance_metres: f64) -> ui::Node<PrefabViewMess
                     ui::clickable(
                         "E",
                         BtnStyle::default().pale_blue().light(),
-                        PrefabViewMessage::Nudge(Heading::EAST),
+                        ToolboxMsg::Nudge(Heading::EAST),
                     )
                     .flex_grow(1.0)
                     .h(5.),

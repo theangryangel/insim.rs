@@ -36,8 +36,7 @@ pub struct PrefabViewProps {
 }
 
 #[derive(Debug, Clone)]
-pub enum PrefabViewMessage {
-    TopTab(TopTab),
+pub enum ToolboxMsg {
     ExpandToolboxSection(ExpandedSection),
     ReloadYaml,
     SavePrefab(String),
@@ -48,6 +47,17 @@ pub enum PrefabViewMessage {
     NudgeDistanceInput(String),
     Nudge(Heading),
     JiggleSelection,
+}
+
+#[derive(Debug, Clone)]
+pub enum PrefabViewMessage {
+    TopTab(TopTab),
+    Toolbox(ToolboxMsg),
+    Options(OptionsMsg),
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum OptionsMsg {
     ToggleCompass,
     ToggleSelectionInfo,
 }
@@ -77,14 +87,14 @@ impl kitcar::ui::Component for PrefabView {
             PrefabViewMessage::TopTab(i) => {
                 self.top_tab = i;
             },
-            PrefabViewMessage::ExpandToolboxSection(e) => {
+            PrefabViewMessage::Toolbox(ToolboxMsg::ExpandToolboxSection(e)) => {
                 self.expanded_section = if self.expanded_section == e {
                     ExpandedSection::None
                 } else {
                     e
                 };
             },
-            PrefabViewMessage::ToggleSelectionInfo => {
+            PrefabViewMessage::Options(OptionsMsg::ToggleSelectionInfo) => {
                 self.display_selection_info = !self.display_selection_info;
             },
             _ => {},
@@ -157,9 +167,12 @@ impl kitcar::ui::Component for PrefabView {
                     ),
             )
             .with_child(match self.top_tab {
-                TopTab::Toolbox => tabs::toolbox_tab(&props, self.expanded_section),
+                TopTab::Toolbox => {
+                    tabs::toolbox_tab(&props, self.expanded_section).map(PrefabViewMessage::Toolbox)
+                },
                 TopTab::Options => {
                     tabs::options_tab(props.compass_visible, self.display_selection_info)
+                        .map(PrefabViewMessage::Options)
                 },
             })
     }

@@ -1,13 +1,13 @@
 use insim::insim::BtnStyle;
 use kitcar::ui;
 
-use super::{PrefabViewMessage, panels};
+use super::{OptionsMsg, ToolboxMsg, panels};
 use crate::ui::{ExpandedSection, PrefabViewProps};
 
 pub(super) fn toolbox_tab(
     props: &PrefabViewProps,
     expanded_section: ExpandedSection,
-) -> ui::Node<PrefabViewMessage> {
+) -> ui::Node<ToolboxMsg> {
     let prefabs_section_style = if matches!(expanded_section, ExpandedSection::Prefabs) {
         BtnStyle::default().yellow().light().clickable()
     } else {
@@ -24,7 +24,7 @@ pub(super) fn toolbox_tab(
         ui::clickable(
             "Prefabs",
             prefabs_section_style,
-            PrefabViewMessage::ExpandToolboxSection(ExpandedSection::Prefabs),
+            ToolboxMsg::ExpandToolboxSection(ExpandedSection::Prefabs),
         )
         .mt(1.)
         .h(5.),
@@ -39,7 +39,7 @@ pub(super) fn toolbox_tab(
             "Spline Distribution (m)",
             BtnStyle::default().black().light(),
             32,
-            PrefabViewMessage::SplineDistribInput,
+            ToolboxMsg::SplineDistribInput,
         )
         .mt(1.)
         .block()
@@ -48,7 +48,7 @@ pub(super) fn toolbox_tab(
             "Paint Text",
             BtnStyle::default().black().light(),
             64,
-            PrefabViewMessage::PaintedTextInput,
+            ToolboxMsg::PaintedTextInput,
         )
         .mt(1.)
         .block()
@@ -57,7 +57,7 @@ pub(super) fn toolbox_tab(
             "Rotate Selection (deg)",
             BtnStyle::default().black().light(),
             16,
-            PrefabViewMessage::RotateInput,
+            ToolboxMsg::RotateInput,
         )
         .mt(1.)
         .block()
@@ -65,14 +65,14 @@ pub(super) fn toolbox_tab(
         ui::clickable(
             "Jiggle Selection",
             BtnStyle::default().pale_blue().light().clickable(),
-            PrefabViewMessage::JiggleSelection,
+            ToolboxMsg::JiggleSelection,
         )
         .mt(1.)
         .h(5.),
         ui::clickable(
             "Nudge Selection",
             nudge_section_style,
-            PrefabViewMessage::ExpandToolboxSection(ExpandedSection::Nudge),
+            ToolboxMsg::ExpandToolboxSection(ExpandedSection::Nudge),
         )
         .mt(1.)
         .h(5.),
@@ -92,7 +92,7 @@ pub(super) fn toolbox_tab(
 pub(super) fn options_tab(
     compass_visible: bool,
     display_selection_info: bool,
-) -> ui::Node<PrefabViewMessage> {
+) -> ui::Node<OptionsMsg> {
     ui::container()
         .mt(1.)
         .mb(2.)
@@ -111,7 +111,7 @@ pub(super) fn options_tab(
                 } else {
                     BtnStyle::default().pale_blue().light().clickable()
                 },
-                PrefabViewMessage::ToggleCompass,
+                OptionsMsg::ToggleCompass,
             )
             .h(5.),
         )
@@ -127,7 +127,7 @@ pub(super) fn options_tab(
                 } else {
                     BtnStyle::default().pale_blue().light().clickable()
                 },
-                PrefabViewMessage::ToggleSelectionInfo,
+                OptionsMsg::ToggleSelectionInfo,
             )
             .mt(1.)
             .h(5.),

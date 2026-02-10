@@ -101,16 +101,12 @@ impl fmt::Display for SpawnOrigin {
     }
 }
 
-fn reduce_ui_message(state: &mut State, msg: ui::PrefabViewMessage) -> Option<Command> {
+fn reduce_toolbox_message(state: &mut State, msg: ui::ToolboxMsg) -> Option<Command> {
     match msg {
-        ui::PrefabViewMessage::TopTab(_)
-        | ui::PrefabViewMessage::ExpandToolboxSection(_)
-        | ui::PrefabViewMessage::ToggleSelectionInfo => None,
-        ui::PrefabViewMessage::ReloadYaml => Some(Command::ReloadPrefabs),
-        ui::PrefabViewMessage::SavePrefab(name) => {
-            Some(Command::SavePrefabs(name.trim().to_string()))
-        },
-        ui::PrefabViewMessage::SpawnPrefab(idx) => {
+        ui::ToolboxMsg::ExpandToolboxSection(_) => None,
+        ui::ToolboxMsg::ReloadYaml => Some(Command::ReloadPrefabs),
+        ui::ToolboxMsg::SavePrefab(name) => Some(Command::SavePrefabs(name.trim().to_string())),
+        ui::ToolboxMsg::SpawnPrefab(idx) => {
             let Some(prefab) = state.prefabs.data.get(idx) else {
                 return None;
             };
@@ -127,7 +123,7 @@ fn reduce_ui_message(state: &mut State, msg: ui::PrefabViewMessage) -> Option<Co
                 origin: SpawnOrigin::Prefab,
             })
         },
-        ui::PrefabViewMessage::PaintedTextInput(text) => {
+        ui::ToolboxMsg::PaintedTextInput(text) => {
             let text = text.trim().to_string();
             if text.is_empty() {
                 tracing::warn!("paint skipped: text input is empty");
@@ -157,7 +153,7 @@ fn reduce_ui_message(state: &mut State, msg: ui::PrefabViewMessage) -> Option<Co
                 })
             }
         },
-        ui::PrefabViewMessage::SplineDistribInput(input) => {
+        ui::ToolboxMsg::SplineDistribInput(input) => {
             let trimmed = input.trim();
 
             if trimmed.is_empty() {
@@ -191,7 +187,7 @@ fn reduce_ui_message(state: &mut State, msg: ui::PrefabViewMessage) -> Option<Co
                 },
             }
         },
-        ui::PrefabViewMessage::RotateInput(input) => {
+        ui::ToolboxMsg::RotateInput(input) => {
             let trimmed = input.trim();
 
             if trimmed.is_empty() {
@@ -223,7 +219,7 @@ fn reduce_ui_message(state: &mut State, msg: ui::PrefabViewMessage) -> Option<Co
                 },
             }
         },
-        ui::PrefabViewMessage::NudgeDistanceInput(input) => {
+        ui::ToolboxMsg::NudgeDistanceInput(input) => {
             let trimmed = input.trim();
 
             if trimmed.is_empty() {
@@ -246,15 +242,19 @@ fn reduce_ui_message(state: &mut State, msg: ui::PrefabViewMessage) -> Option<Co
 
             None
         },
-        ui::PrefabViewMessage::Nudge(h) => Some(Command::SpawnObjects {
-            objects: tools::nudge::nudge(&state.selection, h.clone(), state.nudge_distance_metres),
+        ui::ToolboxMsg::Nudge(heading) => Some(Command::SpawnObjects {
+            objects: tools::nudge::nudge(
+                &state.selection,
+                heading.clone(),
+                state.nudge_distance_metres,
+            ),
             action: PmoAction::AddObjects,
             origin: SpawnOrigin::Nudge {
-                heading: h,
+                heading,
                 distance_metres: state.nudge_distance_metres,
             },
         }),
-        ui::PrefabViewMessage::JiggleSelection => {
+        ui::ToolboxMsg::JiggleSelection => {
             if state.selection.is_empty() {
                 tracing::warn!("jiggle skipped: selection is empty");
                 None
@@ -266,7 +266,13 @@ fn reduce_ui_message(state: &mut State, msg: ui::PrefabViewMessage) -> Option<Co
                 })
             }
         },
-        ui::PrefabViewMessage::ToggleCompass => {
+    }
+}
+
+fn reduce_options_message(state: &mut State, msg: ui::OptionsMsg) -> Option<Command> {
+    match msg {
+        ui::OptionsMsg::ToggleSelectionInfo => None,
+        ui::OptionsMsg::ToggleCompass => {
             state.compass_visible = !state.compass_visible;
             if !state.compass_visible {
                 state.compass_text = None;
@@ -282,6 +288,14 @@ fn reduce_ui_message(state: &mut State, msg: ui::PrefabViewMessage) -> Option<Co
 
             None
         },
+    }
+}
+
+fn reduce_ui_message(state: &mut State, msg: ui::PrefabViewMessage) -> Option<Command> {
+    match msg {
+        ui::PrefabViewMessage::TopTab(_) => None,
+        ui::PrefabViewMessage::Toolbox(toolbox_msg) => reduce_toolbox_message(state, toolbox_msg),
+        ui::PrefabViewMessage::Options(options_msg) => reduce_options_message(state, options_msg),
     }
 }
 
