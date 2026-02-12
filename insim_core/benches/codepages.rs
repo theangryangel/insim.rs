@@ -1,6 +1,8 @@
 #![allow(missing_docs, missing_debug_implementations, unused_results)]
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use std::hint::black_box;
+
+use criterion::{Criterion, criterion_group, criterion_main};
 use insim_core::string::codepages::{to_lossy_bytes, to_lossy_string};
 
 fn bench_to_lossy_string(c: &mut Criterion) {
