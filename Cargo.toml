@@ -50,11 +50,11 @@ futures = "0.3.31"
 glam = "0.31.0"
 indexmap = "2.13.0"
 itertools = { version = "0.14.0" }
-proc-macro2 = "1.0.106"
-quote = "1.0.44"
+proc-macro2 = "1"
+quote = "1"
 serde = { version = "1.0.228" }
 smallvec = "1.15.1"
-syn = { version = "2.0.114" }
+syn = { version = "2" }
 thiserror = "2.0.18"
 tokio = { version = "1.49.0" }
 tokio-test = "0.4.5"

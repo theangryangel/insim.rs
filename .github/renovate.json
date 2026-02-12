@@ -10,6 +10,14 @@
       "enabled": true,
       "separateMajorMinor": true,
       "separateMultipleMajor": true
+    },
+    {
+      "description": "Only major updates for specific crates",
+      "matchManagers": ["cargo"],
+      "matchDepTypes": ["workspace.dependencies"],
+      "matchPackageNames": ["syn", "quote", "proc-macro2"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "enabled": false
     }
   ]
 }
