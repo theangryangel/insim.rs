@@ -43,10 +43,32 @@ mod tests;
 pub use object_coordinate::ObjectCoordinate;
 use object_flags::ObjectFlags;
 
-use crate::{Decode, DecodeError, DecodeErrorKind, Encode, EncodeError, heading::Heading};
+use crate::{Decode, DecodeError, Encode, EncodeError, heading::Heading};
 
 // TODO: We could probably DRY this up with a proc macro to make life a lot easier now that we're
 // happy with this. However, I have no desire to do this right now. I'd rather build something.
+//
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// An unknown layout objects. This is likely either a backwards compatible layout object that LFS
+/// has sent information on, or a object that this library does not yet know about.
+pub struct Unknown {
+    /// Index
+    pub index: u8,
+    /// Position
+    pub xyz: ObjectCoordinate,
+    /// Flags
+    pub flags: u8,
+    /// Raw heading
+    pub heading: u8,
+}
+
+impl Unknown {
+    fn to_flags(&self) -> ObjectFlags {
+        ObjectFlags(self.flags)
+    }
+}
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -210,6 +232,8 @@ pub enum ObjectInfo {
     PitStartPoint(pit_start_point::PitStartPoint),
     /// Pit stop box
     PitStopBox(pit::PitStopBox),
+    /// Fallback
+    Unknown(Unknown),
 }
 
 impl From<&ObjectInfo> for u8 {
@@ -293,6 +317,7 @@ impl From<&ObjectInfo> for u8 {
             ObjectInfo::StartPosition(_) => 184,
             ObjectInfo::PitStartPoint(_) => 185,
             ObjectInfo::PitStopBox(_) => 186,
+            ObjectInfo::Unknown(Unknown { index, .. }) => *index,
         }
     }
 }
@@ -304,7 +329,8 @@ impl Decode for ObjectInfo {
         let z = u8::decode(buf)?;
         let xyz = ObjectCoordinate { x, y, z };
 
-        let flags = ObjectFlags(u8::decode(buf)?);
+        let flags_u8 = u8::decode(buf)?;
+        let flags = ObjectFlags(flags_u8);
         let index = u8::decode(buf)?;
         let heading_u8 = u8::decode(buf)?;
         let heading = Heading::from_objectinfo_wire(heading_u8);
@@ -523,10 +549,12 @@ impl Decode for ObjectInfo {
             186 => Ok(ObjectInfo::PitStopBox(pit::PitStopBox::new(
                 xyz, flags, heading,
             )?)),
-            _ => Err(DecodeErrorKind::NoVariantMatch {
-                found: index as u64,
-            }
-            .into()),
+            _ => Ok(ObjectInfo::Unknown(Unknown {
+                index,
+                xyz,
+                flags: flags_u8,
+                heading: heading_u8,
+            })),
         }
     }
 }
@@ -612,6 +640,7 @@ impl ObjectInfo {
             ObjectInfo::ChevronRight(o) => Some(&mut o.heading),
             ObjectInfo::InsimCircle(_)
             | ObjectInfo::RestrictedArea(_)
+            | ObjectInfo::Unknown(_)
             | ObjectInfo::RouteChecker(_) => None,
         }
     }
@@ -697,6 +726,7 @@ impl ObjectInfo {
             ObjectInfo::RouteChecker(_) => None,
             ObjectInfo::ChevronLeft(c) => Some(c.heading),
             ObjectInfo::ChevronRight(c) => Some(c.heading),
+            ObjectInfo::Unknown(_) => None,
         }
     }
 
@@ -781,6 +811,7 @@ impl ObjectInfo {
             ObjectInfo::PitStopBox(p) => Some(p.floating),
             ObjectInfo::ChevronLeft(p) => Some(p.floating),
             ObjectInfo::ChevronRight(p) => Some(p.floating),
+            ObjectInfo::Unknown(_) => None,
         }
     }
 
@@ -864,6 +895,7 @@ impl ObjectInfo {
             ObjectInfo::StartPosition(i) => i.heading.to_objectinfo_wire(),
             ObjectInfo::PitStartPoint(i) => i.heading.to_objectinfo_wire(),
             ObjectInfo::PitStopBox(i) => i.heading.to_objectinfo_wire(),
+            ObjectInfo::Unknown(Unknown { heading, .. }) => *heading,
         }
     }
 }
@@ -978,7 +1010,8 @@ generate_object_info_accessors!(
     ConcreteWedge,
     StartPosition,
     PitStartPoint,
-    PitStopBox
+    PitStopBox,
+    Unknown
 );
 
 impl Encode for ObjectInfo {
