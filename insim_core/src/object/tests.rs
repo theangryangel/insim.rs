@@ -1,5 +1,32 @@
 use crate::{heading::Heading, object::*};
 
+fn raw_flags(flags: u8) -> Raw {
+    Raw {
+        index: 0,
+        xyz: ObjectCoordinate::new(0, 0, 0),
+        flags,
+        heading: 0,
+    }
+}
+
+fn raw_with(xyz: ObjectCoordinate, flags: u8, heading: Heading) -> Raw {
+    Raw {
+        index: 0,
+        xyz,
+        flags,
+        heading: heading.to_objectinfo_wire(),
+    }
+}
+
+fn raw_with_heading_u8(xyz: ObjectCoordinate, flags: u8, heading: u8) -> Raw {
+    Raw {
+        index: 0,
+        xyz,
+        flags,
+        heading,
+    }
+}
+
 #[test]
 fn test_armco1_basic_creation() {
     let coord = ObjectCoordinate::new(100, 200, 50);
@@ -43,13 +70,13 @@ fn test_armco1_flags_conversion() {
         floating: true,
     };
 
-    let flags = armco.to_flags();
+    let flags = armco.flags();
     // colour (3 bits): 0-7
     // mapping (4 bits at bits 3-6): 0-15
     // floating (bit 7): 0-1
-    assert_eq!(flags.colour(), 3);
-    assert_eq!(flags.mapping(), 5);
-    assert!(flags.floating());
+    assert_eq!(raw_flags(flags).raw_colour(), 3);
+    assert_eq!(raw_flags(flags).raw_mapping(), 5);
+    assert!(raw_flags(flags).raw_floating());
 }
 
 #[test]
@@ -124,8 +151,8 @@ fn test_chalk_colour_conversion() {
         floating: false,
     };
 
-    let flags = chalk_white.to_flags();
-    assert_eq!(flags.colour(), 0);
+    let flags = chalk_white.flags();
+    assert_eq!(raw_flags(flags).raw_colour(), 0);
 }
 
 #[test]
@@ -137,15 +164,19 @@ fn test_chalk_floating_flag() {
         floating: true,
     };
 
-    let flags = chalk.to_flags();
-    assert!(flags.floating());
+    let flags = chalk.flags();
+    assert!(raw_flags(flags).raw_floating());
 }
 
 #[test]
 fn test_chalk_from_flags() {
-    let flags = ObjectFlags(0x82); // floating + colour 2 (blue)
+    let flags = raw_flags(0x82); // floating + colour 2 (blue)
     let heading = Heading::from_degrees(45.0);
-    let result = chalk::Chalk::new(ObjectCoordinate::new(100, 100, 10), flags, heading);
+    let result = chalk::Chalk::new(raw_with(
+        ObjectCoordinate::new(100, 100, 10),
+        flags.flags,
+        heading,
+    ));
 
     assert!(result.is_ok());
     let chalk = result.unwrap();
@@ -195,15 +226,19 @@ fn test_insim_checkpoint_floating() {
     };
 
     assert!(checkpoint.floating);
-    let flags = checkpoint.to_flags();
-    assert!(flags.floating());
+    let flags = checkpoint.flags();
+    assert!(raw_flags(flags).raw_floating());
 }
 
 #[test]
 fn test_insim_checkpoint_from_flags() {
-    let flags = ObjectFlags(0x82); // floating + kind checkpoint2
+    let flags = raw_flags(0x82); // floating + kind checkpoint2
     let heading = Heading::from_degrees(90.0);
-    let result = insim::InsimCheckpoint::new(ObjectCoordinate::new(200, 300, 5), flags, heading);
+    let result = insim::InsimCheckpoint::new(raw_with(
+        ObjectCoordinate::new(200, 300, 5),
+        flags.flags,
+        heading,
+    ));
 
     assert!(result.is_ok());
     let checkpoint = result.unwrap();
@@ -244,14 +279,18 @@ fn test_insim_circle_floating() {
     };
 
     assert!(circle.floating);
-    let flags = circle.to_flags();
-    assert!(flags.floating());
+    let flags = circle.flags();
+    assert!(raw_flags(flags).raw_floating());
 }
 
 #[test]
 fn test_insim_circle_from_flags() {
-    let flags = ObjectFlags(0x80); // floating only
-    let result = insim::InsimCircle::new(ObjectCoordinate::new(100, 100, 10), flags, 42);
+    let flags = raw_flags(0x80); // floating only
+    let result = insim::InsimCircle::new(raw_with_heading_u8(
+        ObjectCoordinate::new(100, 100, 10),
+        flags.flags,
+        42,
+    ));
 
     assert!(result.is_ok());
     let circle = result.unwrap();
@@ -397,15 +436,19 @@ fn test_letterboard_rb_floating() {
     };
 
     assert!(board.floating);
-    let flags = board.to_flags();
-    assert!(flags.floating());
+    let flags = board.flags();
+    assert!(raw_flags(flags).raw_floating());
 }
 
 #[test]
 fn test_letterboard_rb_from_flags() {
-    let flags = ObjectFlags(0x81); // floating + colour blue + character A
+    let flags = raw_flags(0x81); // floating + colour blue + character A
     let heading = Heading::from_degrees(0.0);
-    let result = letterboard_rb::LetterboardRB::new(ObjectCoordinate::new(0, 0, 0), flags, heading);
+    let result = letterboard_rb::LetterboardRB::new(raw_with(
+        ObjectCoordinate::new(0, 0, 0),
+        flags.flags,
+        heading,
+    ));
 
     assert!(result.is_ok());
     let board = result.unwrap();
@@ -456,8 +499,8 @@ fn test_tyre_stack2_flags_conversion() {
         floating: false,
     };
 
-    let flags = tyre.to_flags();
-    assert_eq!(flags.colour(), 2); // Red is value 2
+    let flags = tyre.flags();
+    assert_eq!(raw_flags(flags).raw_colour(), 2); // Red is value 2
 }
 
 #[test]
@@ -470,15 +513,19 @@ fn test_tyre_stack2_floating() {
     };
 
     assert!(tyre.floating);
-    let flags = tyre.to_flags();
-    assert!(flags.floating());
+    let flags = tyre.flags();
+    assert!(raw_flags(flags).raw_floating());
 }
 
 #[test]
 fn test_tyre_stack2_from_flags() {
-    let flags = ObjectFlags(0x83); // floating + colour green (4)
+    let flags = raw_flags(0x83); // floating + colour green (4)
     let heading = Heading::from_degrees(180.0);
-    let result = tyres::Tyres::new(ObjectCoordinate::new(50, 50, 0), flags, heading);
+    let result = tyres::Tyres::new(raw_with(
+        ObjectCoordinate::new(50, 50, 0),
+        flags.flags,
+        heading,
+    ));
 
     assert!(result.is_ok());
     let tyre = result.unwrap();
@@ -548,15 +595,19 @@ fn test_post_floating() {
     };
 
     assert!(post.floating);
-    let flags = post.to_flags();
-    assert!(flags.floating());
+    let flags = post.flags();
+    assert!(raw_flags(flags).raw_floating());
 }
 
 #[test]
 fn test_post_from_flags() {
-    let flags = ObjectFlags(0x8A); // floating + colour 2 (red) + mapping 1
+    let flags = raw_flags(0x8A); // floating + colour 2 (red) + mapping 1
     let heading = Heading::from_degrees(270.0);
-    let result = post::Post::new(ObjectCoordinate::new(0, 0, 0), flags, heading);
+    let result = post::Post::new(raw_with(
+        ObjectCoordinate::new(0, 0, 0),
+        flags.flags,
+        heading,
+    ));
 
     assert!(result.is_ok());
     let post = result.unwrap();
@@ -599,8 +650,8 @@ fn test_start_lights_flags_conversion() {
         floating: false,
     };
 
-    let flags = lights.to_flags();
-    assert_eq!(flags.0 & 0x3F, 42); // Lower 6 bits should be identifier
+    let flags = lights.flags();
+    assert_eq!(flags & 0x3F, 42); // Lower 6 bits should be identifier
 }
 
 #[test]
@@ -613,15 +664,19 @@ fn test_start_lights_floating() {
     };
 
     assert!(lights.floating);
-    let flags = lights.to_flags();
-    assert!(flags.floating());
+    let flags = lights.flags();
+    assert!(raw_flags(flags).raw_floating());
 }
 
 #[test]
 fn test_start_lights_from_flags() {
-    let flags = ObjectFlags(0xAA); // floating + identifier 42 (0x2A)
+    let flags = raw_flags(0xAA); // floating + identifier 42 (0x2A)
     let heading = Heading::from_degrees(45.0);
-    let result = start_lights::StartLights::new(ObjectCoordinate::new(0, 0, 0), flags, heading);
+    let result = start_lights::StartLights::new(raw_with(
+        ObjectCoordinate::new(0, 0, 0),
+        flags.flags,
+        heading,
+    ));
 
     assert!(result.is_ok());
     let lights = result.unwrap();
@@ -692,15 +747,19 @@ fn test_vehicle_van_floating() {
     };
 
     assert!(van.floating);
-    let flags = van.to_flags();
-    assert!(flags.floating());
+    let flags = van.flags();
+    assert!(raw_flags(flags).raw_floating());
 }
 
 #[test]
 fn test_vehicle_van_from_flags() {
-    let flags = ObjectFlags(0x89); // floating + colour 1 (red) + mapping 1
+    let flags = raw_flags(0x89); // floating + colour 1 (red) + mapping 1
     let heading = Heading::from_degrees(315.0);
-    let result = vehicle_van::VehicleVan::new(ObjectCoordinate::new(0, 0, 0), flags, heading);
+    let result = vehicle_van::VehicleVan::new(raw_with(
+        ObjectCoordinate::new(0, 0, 0),
+        flags.flags,
+        heading,
+    ));
 
     assert!(result.is_ok());
     let van = result.unwrap();

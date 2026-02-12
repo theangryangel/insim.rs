@@ -1,8 +1,9 @@
 use std::time::{Duration, Instant};
 
-use insim::{core::string::colours::Colour, insim::BtnStyle};
 use kitcar::ui;
 use tokio::{sync::mpsc, task::JoinHandle};
+
+use super::hud_text;
 
 #[derive(Clone)]
 enum MarqueeState {
@@ -103,11 +104,11 @@ impl ui::Component for Marquee {
                     .take(self.width)
                     .collect();
 
-                ui::text(visible.white(), BtnStyle::default().dark()).key("marquee")
+                ui::text(visible, hud_text().align_left()).key("marquee")
             },
 
             // If waiting, render an empty button
-            MarqueeState::Waiting(_) => ui::text("", BtnStyle::default().dark()),
+            MarqueeState::Waiting(_) => ui::text("", hud_text()),
         }
     }
 }

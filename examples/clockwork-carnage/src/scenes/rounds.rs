@@ -6,7 +6,7 @@ use insim::{
         object::insim::{InsimCheckpoint, InsimCheckpointKind},
         string::colours::Colour,
     },
-    insim::{BtnStyle, ObjectInfo, Uco},
+    insim::{ObjectInfo, Uco},
 };
 use kitcar::{
     game, presence,
@@ -18,7 +18,10 @@ use tokio::time::sleep;
 
 use crate::{
     chat,
-    components::{EnrichedLeaderboard, HelpDialog, HelpDialogMsg, scoreboard, topbar},
+    components::{
+        EnrichedLeaderboard, HelpDialog, HelpDialogMsg, hud_active, hud_muted, hud_text, hud_title,
+        scoreboard, topbar,
+    },
     leaderboard,
 };
 
@@ -65,12 +68,16 @@ impl ui::Component for ClockworkRoundView {
     }
 
     fn render(&self, props: Self::Props) -> ui::Node<Self::Message> {
-        let status = if props.connection.in_progress {
-            "In progress".light_green()
+        if self.help_dialog.is_visible() {
+            return self.help_dialog.render(()).map(ClockworkRoundMessage::Help);
+        }
+
+        let (status, status_style) = if props.connection.in_progress {
+            ("In progress".to_string(), hud_active())
         } else {
             match props.connection.round_best {
-                Some(d) => format!("Best: {:.2?}", d).white(),
-                None => "Waiting for start".red(),
+                Some(d) => (format!("Best: {:.2?}", d), hud_text()),
+                None => ("Waiting for start".to_string(), hud_muted()),
             }
         };
 
@@ -84,23 +91,19 @@ impl ui::Component for ClockworkRoundView {
                     "Round {}/{} - {:?} remaining",
                     props.global.round, props.global.rounds, props.global.remaining,
                 ))
-                .with_child(ui::text(&status, BtnStyle::default().dark()).w(15.).h(5.)),
+                .with_child(ui::text(status, status_style).w(20.).h(5.)),
             )
             .with_child(
                 ui::container()
                     .flex()
-                    .mt(20.)
+                    .pr(5.)
                     .w(200.)
+                    .mt(90.)
                     .flex_col()
-                    .items_start()
-                    .with_child(
-                        ui::text("Scores!".yellow(), BtnStyle::default().dark())
-                            .w(35.)
-                            .h(5.),
-                    )
+                    .items_end()
+                    .with_child(ui::text("Scores!", hud_title()).w(35.).h(5.))
                     .with_children(players),
             )
-            .with_child(self.help_dialog.render(()).map(ClockworkRoundMessage::Help))
     }
 }
 

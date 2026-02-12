@@ -1,8 +1,4 @@
-use insim::{
-    builder::InsimTask,
-    core::{string::colours::Colour, track::Track},
-    insim::RaceLaps,
-};
+use insim::{builder::InsimTask, core::track::Track, insim::RaceLaps};
 use kitcar::{
     game, presence,
     scenes::{Scene, SceneError, SceneResult},
@@ -17,7 +13,7 @@ impl ui::Component for SetupTrackView {
     type Message = ();
 
     fn render(&self, _props: Self::Props) -> ui::Node<Self::Message> {
-        topbar(&"Waiting for player ready".white())
+        topbar("Waiting for player ready")
     }
 }
 

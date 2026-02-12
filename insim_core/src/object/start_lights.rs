@@ -2,7 +2,7 @@
 use crate::{
     DecodeError,
     heading::Heading,
-    object::{ObjectCoordinate, ObjectFlags},
+    object::{ObjectCoordinate, ObjectInfoInner, Raw},
 };
 
 /// StartLights
@@ -20,26 +20,41 @@ pub struct StartLights {
 }
 
 impl StartLights {
-    pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = self.identifier & 0x3F;
-        if self.floating {
-            flags |= 0x80;
-        }
-        ObjectFlags(flags)
-    }
-
-    pub(super) fn new(
-        xyz: ObjectCoordinate,
-        wire: ObjectFlags,
-        heading: Heading,
-    ) -> Result<Self, DecodeError> {
-        let identifier = wire.0 & 0x3F;
-        let floating = wire.floating();
+    pub(super) fn new(raw: Raw) -> Result<Self, DecodeError> {
+        let xyz = raw.xyz;
+        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let identifier = raw.flags & 0x3F;
+        let floating = raw.raw_floating();
         Ok(Self {
             xyz,
             heading,
             identifier,
             floating,
         })
+    }
+}
+impl ObjectInfoInner for StartLights {
+    fn flags(&self) -> u8 {
+        let mut flags = self.identifier & 0x3F;
+        if self.floating {
+            flags |= 0x80;
+        }
+        flags
+    }
+
+    fn heading_mut(&mut self) -> Option<&mut Heading> {
+        Some(&mut self.heading)
+    }
+
+    fn heading(&self) -> Option<Heading> {
+        Some(self.heading)
+    }
+
+    fn floating(&self) -> Option<bool> {
+        Some(self.floating)
+    }
+
+    fn heading_objectinfo_wire(&self) -> u8 {
+        self.heading.to_objectinfo_wire()
     }
 }

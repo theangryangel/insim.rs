@@ -1,7 +1,7 @@
 //! Banner objects
 use crate::{
     heading::Heading,
-    object::{ObjectCoordinate, ObjectFlags},
+    object::{ObjectCoordinate, ObjectInfoInner, Raw},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -51,23 +51,12 @@ pub struct Banner {
 }
 
 impl Banner {
-    pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = self.colour as u8 & 0x07;
-        flags |= (self.mapping & 0x0f) << 3;
-        if self.floating {
-            flags |= 0x80;
-        }
-        ObjectFlags(flags)
-    }
-
-    pub(super) fn new(
-        xyz: ObjectCoordinate,
-        flags: ObjectFlags,
-        heading: Heading,
-    ) -> Result<Self, crate::DecodeError> {
-        let colour = BannerColour::from(flags.colour());
-        let mapping = flags.mapping();
-        let floating = flags.floating();
+    pub(super) fn new(raw: Raw) -> Result<Self, crate::DecodeError> {
+        let xyz = raw.xyz;
+        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let colour = BannerColour::from(raw.raw_colour());
+        let mapping = raw.raw_mapping();
+        let floating = raw.raw_floating();
         Ok(Self {
             xyz,
             heading,
@@ -75,5 +64,31 @@ impl Banner {
             mapping,
             floating,
         })
+    }
+}
+impl ObjectInfoInner for Banner {
+    fn flags(&self) -> u8 {
+        let mut flags = self.colour as u8 & 0x07;
+        flags |= (self.mapping & 0x0f) << 3;
+        if self.floating {
+            flags |= 0x80;
+        }
+        flags
+    }
+
+    fn heading_mut(&mut self) -> Option<&mut Heading> {
+        Some(&mut self.heading)
+    }
+
+    fn heading(&self) -> Option<Heading> {
+        Some(self.heading)
+    }
+
+    fn floating(&self) -> Option<bool> {
+        Some(self.floating)
+    }
+
+    fn heading_objectinfo_wire(&self) -> u8 {
+        self.heading.to_objectinfo_wire()
     }
 }

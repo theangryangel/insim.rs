@@ -92,7 +92,7 @@ pub use iii::Iii;
 pub use ipb::Ipb;
 pub use isi::{Isi, IsiFlags};
 pub use ism::Ism;
-pub use jrr::{Jrr, JrrAction};
+pub use jrr::{Jrr, JrrAction, JrrStartPosition};
 pub use lap::{Fuel, Fuel200, Lap};
 pub use mal::Mal;
 pub use mci::{CompCar, CompCarInfo, Mci};

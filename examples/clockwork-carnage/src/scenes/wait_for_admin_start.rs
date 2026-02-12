@@ -1,4 +1,4 @@
-use insim::{builder::InsimTask, core::string::colours::Colour, identifiers::ConnectionId};
+use insim::{builder::InsimTask, identifiers::ConnectionId};
 use kitcar::{presence, scenes, ui};
 
 use crate::{
@@ -18,7 +18,7 @@ struct WaitForAdminStartView {
 impl WaitForAdminStartView {
     fn new(tx: tokio::sync::mpsc::UnboundedSender<WaitForAdminStartMsg>) -> Self {
         Self {
-            marquee: Marquee::new(&"Hello World!!!!!".white(), 10, tx, |m| {
+            marquee: Marquee::new("Hello World!!!!!", 10, tx, |m| {
                 WaitForAdminStartMsg::Marquee(m)
             }),
         }

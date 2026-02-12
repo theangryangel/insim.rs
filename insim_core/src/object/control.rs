@@ -2,7 +2,7 @@
 
 use crate::{
     heading::Heading,
-    object::{ObjectCoordinate, ObjectFlags},
+    object::{ObjectCoordinate, ObjectInfoInner, Raw},
 };
 
 #[derive(Debug, Clone, Default, PartialEq, PartialOrd)]
@@ -20,29 +20,12 @@ pub struct Control {
 }
 
 impl Control {
-    pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = match self.kind {
-            ControlKind::Start => 0,
-            ControlKind::Checkpoint1 { half_width } => (half_width << 2) | 0b01,
-            ControlKind::Checkpoint2 { half_width } => (half_width << 2) | 0b10,
-            ControlKind::Checkpoint3 { half_width } => (half_width << 2) | 0b11,
-            ControlKind::Finish { half_width } => half_width << 2,
-        };
-        if self.floating {
-            flags |= 0x80;
-        }
-
-        ObjectFlags(flags)
-    }
-
-    pub(super) fn new(
-        xyz: ObjectCoordinate,
-        flags: ObjectFlags,
-        heading: Heading,
-    ) -> Result<Self, crate::DecodeError> {
-        let position_bits = flags.0 & 0b11;
-        let half_width = (flags.0 >> 2) & 0b11111;
-        let floating = flags.floating();
+    pub(super) fn new(raw: Raw) -> Result<Self, crate::DecodeError> {
+        let xyz = raw.xyz;
+        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let position_bits = raw.flags & 0b11;
+        let half_width = (raw.flags >> 2) & 0b11111;
+        let floating = raw.raw_floating();
         let kind = match position_bits {
             0b00 if half_width == 0 => ControlKind::Start,
             0b00 if half_width != 0 => ControlKind::Finish { half_width },
@@ -63,6 +46,38 @@ impl Control {
             heading,
             floating,
         })
+    }
+}
+impl ObjectInfoInner for Control {
+    fn flags(&self) -> u8 {
+        let mut flags = match self.kind {
+            ControlKind::Start => 0,
+            ControlKind::Checkpoint1 { half_width } => (half_width << 2) | 0b01,
+            ControlKind::Checkpoint2 { half_width } => (half_width << 2) | 0b10,
+            ControlKind::Checkpoint3 { half_width } => (half_width << 2) | 0b11,
+            ControlKind::Finish { half_width } => half_width << 2,
+        };
+        if self.floating {
+            flags |= 0x80;
+        }
+
+        flags
+    }
+
+    fn heading_mut(&mut self) -> Option<&mut Heading> {
+        Some(&mut self.heading)
+    }
+
+    fn heading(&self) -> Option<Heading> {
+        Some(self.heading)
+    }
+
+    fn floating(&self) -> Option<bool> {
+        Some(self.floating)
+    }
+
+    fn heading_objectinfo_wire(&self) -> u8 {
+        self.heading.to_objectinfo_wire()
     }
 }
 

@@ -1,7 +1,7 @@
 //! Insim objects
 use crate::{
     heading::Heading,
-    object::{ObjectCoordinate, ObjectFlags},
+    object::{ObjectCoordinate, ObjectInfoInner, Raw},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -48,28 +48,43 @@ pub struct InsimCheckpoint {
 }
 
 impl InsimCheckpoint {
-    pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = 0;
-        flags |= self.kind as u8;
-        if self.floating {
-            flags |= 0x80;
-        }
-        ObjectFlags(flags)
-    }
-
-    pub(super) fn new(
-        xyz: ObjectCoordinate,
-        wire: ObjectFlags,
-        heading: Heading,
-    ) -> Result<Self, crate::DecodeError> {
-        let kind = InsimCheckpointKind::try_from(wire.0)?;
-        let floating = wire.floating();
+    pub(super) fn new(raw: Raw) -> Result<Self, crate::DecodeError> {
+        let xyz = raw.xyz;
+        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let kind = InsimCheckpointKind::try_from(raw.flags)?;
+        let floating = raw.raw_floating();
         Ok(Self {
             xyz,
             kind,
             heading,
             floating,
         })
+    }
+}
+impl ObjectInfoInner for InsimCheckpoint {
+    fn flags(&self) -> u8 {
+        let mut flags = 0;
+        flags |= self.kind as u8;
+        if self.floating {
+            flags |= 0x80;
+        }
+        flags
+    }
+
+    fn heading_mut(&mut self) -> Option<&mut Heading> {
+        Some(&mut self.heading)
+    }
+
+    fn heading(&self) -> Option<Heading> {
+        Some(self.heading)
+    }
+
+    fn floating(&self) -> Option<bool> {
+        Some(self.floating)
+    }
+
+    fn heading_objectinfo_wire(&self) -> u8 {
+        self.heading.to_objectinfo_wire()
     }
 }
 
@@ -86,24 +101,31 @@ pub struct InsimCircle {
 }
 
 impl InsimCircle {
-    pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = 0;
-        if self.floating {
-            flags |= 0x80;
-        }
-        ObjectFlags(flags)
-    }
-
-    pub(super) fn new(
-        xyz: ObjectCoordinate,
-        wire: ObjectFlags,
-        index: u8,
-    ) -> Result<Self, crate::DecodeError> {
-        let floating = wire.floating();
+    pub(super) fn new(raw: Raw) -> Result<Self, crate::DecodeError> {
+        let xyz = raw.xyz;
+        let index = raw.heading;
+        let floating = raw.raw_floating();
         Ok(Self {
             xyz,
             index,
             floating,
         })
+    }
+}
+impl ObjectInfoInner for InsimCircle {
+    fn flags(&self) -> u8 {
+        let mut flags = 0;
+        if self.floating {
+            flags |= 0x80;
+        }
+        flags
+    }
+
+    fn floating(&self) -> Option<bool> {
+        Some(self.floating)
+    }
+
+    fn heading_objectinfo_wire(&self) -> u8 {
+        self.index
     }
 }

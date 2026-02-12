@@ -25,6 +25,13 @@ impl Scene for Clockwork {
     type Output = ();
 
     async fn run(self) -> Result<SceneResult<()>, SceneError> {
+        let _spawn_control = crate::spawn_control::spawn(self.insim.clone())
+            .await
+            .map_err(|cause| SceneError::Custom {
+                scene: "clockwork::spawn_control",
+                cause: Box::new(cause),
+            })?;
+
         // Scenes inside scenes inside scenes..
         let event = super::Lobby {
             insim: self.insim.clone(),

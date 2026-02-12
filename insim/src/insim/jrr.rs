@@ -1,4 +1,6 @@
-use super::ObjectInfo;
+use bytes::BufMut;
+use insim_core::{Decode, Encode, heading::Heading, object::ObjectCoordinate};
+
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
@@ -19,6 +21,59 @@ pub enum JrrAction {
 
     /// Move the player, but do not repair
     ResetNoRepair = 5,
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// Start position selection used by [`Jrr`].
+pub enum JrrStartPosition {
+    /// Use the default spawn location selected by LFS.
+    DefaultStartPosition,
+    /// Use a custom spawn location and heading.
+    Custom {
+        /// Position
+        xyz: ObjectCoordinate,
+        /// Heading / Direction
+        heading: Heading,
+    },
+}
+
+impl Decode for JrrStartPosition {
+    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
+        let x = i16::decode(buf)?;
+        let y = i16::decode(buf)?;
+        let z = u8::decode(buf)?;
+
+        let flags = u8::decode(buf)?;
+        let index = u8::decode(buf)?;
+        let heading = u8::decode(buf)?;
+
+        if x == 0 && y == 0 && z == 8 && flags == 0 && index == 0 && heading == 0 {
+            Ok(Self::DefaultStartPosition)
+        } else {
+            Ok(Self::Custom {
+                xyz: ObjectCoordinate { x, y, z },
+                heading: Heading::from_objectinfo_wire(heading),
+            })
+        }
+    }
+}
+
+impl Encode for JrrStartPosition {
+    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+        match self {
+            JrrStartPosition::DefaultStartPosition => buf.put_bytes(0, 8),
+            JrrStartPosition::Custom { xyz, heading } => {
+                xyz.x.encode(buf)?;
+                xyz.y.encode(buf)?;
+                xyz.z.encode(buf)?;
+                0x80u8.encode(buf)?; // flags
+                buf.put_u8(0); // index
+                heading.to_objectinfo_wire().encode(buf)?;
+            },
+        };
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, insim_core::Decode, insim_core::Encode)]
@@ -48,16 +103,14 @@ pub struct Jrr {
     /// Action taken/to take
     pub jrraction: JrrAction,
 
-    /// 0: use default start point / Flags = 0x80: set start point
-    pub startpos: ObjectInfo,
+    /// Start position
+    pub startpos: JrrStartPosition,
 }
 
 impl_typical_with_request_id!(Jrr);
 
 #[cfg(test)]
 mod test {
-    use insim_core::object::{ObjectInfo, control};
-
     use super::*;
 
     #[test]
@@ -83,21 +136,16 @@ mod test {
             |jrr: Jrr| {
                 assert_eq!(jrr.reqi, RequestId(0));
                 assert!(matches!(jrr.jrraction, JrrAction::Spawn));
-                assert_eq!(
-                    jrr.startpos.position().xyz_metres(),
-                    (
-                        -597.25,    // -9556 / 16,
-                        -1918.4375, // -30695 / 16,
-                        3.0         // 12.0 / 4,
-                    )
-                );
                 assert!(matches!(
                     jrr.startpos,
-                    ObjectInfo::Control(control::Control {
-                        kind: control::ControlKind::Start,
-                        floating: true,
+                    JrrStartPosition::Custom {
+                        xyz: ObjectCoordinate {
+                            x: -9556,
+                            y: -30695,
+                            z: 12,
+                        },
                         ..
-                    })
+                    }
                 ));
             }
         );

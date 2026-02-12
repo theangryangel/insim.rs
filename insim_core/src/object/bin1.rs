@@ -2,7 +2,7 @@
 use crate::{
     DecodeError,
     heading::Heading,
-    object::{ObjectCoordinate, ObjectFlags},
+    object::{ObjectCoordinate, ObjectInfoInner, Raw},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -51,23 +51,12 @@ pub struct Bin1 {
 }
 
 impl Bin1 {
-    pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = self.colour as u8 & 0x07;
-        flags |= (self.mapping & 0x0f) << 3;
-        if self.floating {
-            flags |= 0x80;
-        }
-        ObjectFlags(flags)
-    }
-
-    pub(super) fn new(
-        xyz: ObjectCoordinate,
-        flags: ObjectFlags,
-        heading: Heading,
-    ) -> Result<Self, DecodeError> {
-        let colour = Bin1Colour::from(flags.colour());
-        let mapping = flags.mapping();
-        let floating = flags.floating();
+    pub(super) fn new(raw: Raw) -> Result<Self, DecodeError> {
+        let xyz = raw.xyz;
+        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let colour = Bin1Colour::from(raw.raw_colour());
+        let mapping = raw.raw_mapping();
+        let floating = raw.raw_floating();
         Ok(Self {
             xyz,
             heading,
@@ -75,5 +64,31 @@ impl Bin1 {
             mapping,
             floating,
         })
+    }
+}
+impl ObjectInfoInner for Bin1 {
+    fn flags(&self) -> u8 {
+        let mut flags = self.colour as u8 & 0x07;
+        flags |= (self.mapping & 0x0f) << 3;
+        if self.floating {
+            flags |= 0x80;
+        }
+        flags
+    }
+
+    fn heading_mut(&mut self) -> Option<&mut Heading> {
+        Some(&mut self.heading)
+    }
+
+    fn heading(&self) -> Option<Heading> {
+        Some(self.heading)
+    }
+
+    fn floating(&self) -> Option<bool> {
+        Some(self.floating)
+    }
+
+    fn heading_objectinfo_wire(&self) -> u8 {
+        self.heading.to_objectinfo_wire()
     }
 }

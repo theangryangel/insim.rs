@@ -283,3 +283,25 @@
       colour: White
       mapping: 0
       floating: false
+- name: woot
+  objects:
+    - !Banner
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      heading:
+        radians: -1.055378782065321
+      colour: White
+      mapping: 0
+      floating: false
+    - !Banner
+      xyz:
+        x: -14
+        y: -119
+        z: 0
+      heading:
+        radians: -1.055378782065321
+      colour: White
+      mapping: 0
+      floating: false

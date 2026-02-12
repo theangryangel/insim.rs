@@ -48,18 +48,13 @@ where
     /// Update the global state for all connections, triggering a re-render.
     /// Global state is shared state visible to all connected players.
     pub fn set_global_state(&self, value: G) {
-        self.global
-            .send(value)
-            .expect("FIXME: expect global to work");
+        let _ = self.global.send(value);
     }
 
     /// Update the state for a specific connection, triggering a re-render for that player.
     /// Player state is per-player state, useful for player-specific UI elements.
     pub async fn set_player_state(&self, ucid: ConnectionId, value: C) {
-        self.connection
-            .send((ucid, value))
-            .await
-            .expect("FIXME: expect connection to work");
+        let _ = self.connection.send((ucid, value)).await;
     }
 
     /// Get a clonable sender for injecting messages into UI components.
@@ -394,4 +389,9 @@ where
     F: Fn(String) -> Msg + 'static,
 {
     node::Node::typein(text, bstyle, limit, mapper)
+}
+
+/// Shortcut to make an empty [node::Node]
+pub fn empty<Msg>() -> node::Node<Msg> {
+    node::Node::empty()
 }

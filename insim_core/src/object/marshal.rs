@@ -1,7 +1,7 @@
 //! Marshal objects
 use crate::{
     heading::Heading,
-    object::{ObjectCoordinate, ObjectFlags},
+    object::{ObjectCoordinate, ObjectInfoInner, Raw},
 };
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -19,21 +19,11 @@ pub struct Marshal {
 }
 
 impl Marshal {
-    pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags: u8 = self.kind as u8;
-        if self.floating {
-            flags |= 0x80;
-        }
-        ObjectFlags(flags)
-    }
-
-    pub(super) fn new(
-        xyz: ObjectCoordinate,
-        wire: ObjectFlags,
-        heading: Heading,
-    ) -> Result<Self, crate::DecodeError> {
-        let kind = MarshalKind::try_from(wire.0)?;
-        let floating = wire.floating();
+    pub(super) fn new(raw: Raw) -> Result<Self, crate::DecodeError> {
+        let xyz = raw.xyz;
+        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let kind = MarshalKind::try_from(raw.flags)?;
+        let floating = raw.raw_floating();
 
         Ok(Self {
             xyz,
@@ -41,6 +31,31 @@ impl Marshal {
             heading,
             floating,
         })
+    }
+}
+impl ObjectInfoInner for Marshal {
+    fn flags(&self) -> u8 {
+        let mut flags: u8 = self.kind as u8;
+        if self.floating {
+            flags |= 0x80;
+        }
+        flags
+    }
+
+    fn heading_mut(&mut self) -> Option<&mut Heading> {
+        Some(&mut self.heading)
+    }
+
+    fn heading(&self) -> Option<Heading> {
+        Some(self.heading)
+    }
+
+    fn floating(&self) -> Option<bool> {
+        Some(self.floating)
+    }
+
+    fn heading_objectinfo_wire(&self) -> u8 {
+        self.heading.to_objectinfo_wire()
     }
 }
 
@@ -82,26 +97,33 @@ pub struct RestrictedArea {
 }
 
 impl RestrictedArea {
-    pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = 0;
-        flags |= self.radius << 2;
-        if self.floating {
-            flags |= 0x80;
-        }
-        ObjectFlags(flags)
-    }
-
-    pub(super) fn new(
-        xyz: ObjectCoordinate,
-        wire: ObjectFlags,
-    ) -> Result<Self, crate::DecodeError> {
-        let radius = (wire.0 >> 2) & 0b11111;
-        let floating = wire.floating();
+    pub(super) fn new(raw: Raw) -> Result<Self, crate::DecodeError> {
+        let xyz = raw.xyz;
+        let radius = (raw.flags >> 2) & 0b11111;
+        let floating = raw.raw_floating();
         Ok(Self {
             xyz,
             radius,
             floating,
         })
+    }
+}
+impl ObjectInfoInner for RestrictedArea {
+    fn flags(&self) -> u8 {
+        let mut flags = 0;
+        flags |= self.radius << 2;
+        if self.floating {
+            flags |= 0x80;
+        }
+        flags
+    }
+
+    fn floating(&self) -> Option<bool> {
+        Some(self.floating)
+    }
+
+    fn heading_objectinfo_wire(&self) -> u8 {
+        self.radius
     }
 }
 
@@ -120,27 +142,34 @@ pub struct RouteChecker {
 }
 
 impl RouteChecker {
-    pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = 0;
-        flags |= (self.radius << 2) & 0b11111;
-        if self.floating {
-            flags |= 0x80;
-        }
-        ObjectFlags(flags)
-    }
-
-    pub(super) fn new(
-        xyz: ObjectCoordinate,
-        wire: ObjectFlags,
-        route: u8,
-    ) -> Result<Self, crate::DecodeError> {
-        let radius = (wire.0 >> 2) & 0b11111;
-        let floating = wire.floating();
+    pub(super) fn new(raw: Raw) -> Result<Self, crate::DecodeError> {
+        let xyz = raw.xyz;
+        let route = raw.heading;
+        let radius = (raw.flags >> 2) & 0b11111;
+        let floating = raw.raw_floating();
         Ok(Self {
             xyz,
             radius,
             floating,
             route,
         })
+    }
+}
+impl ObjectInfoInner for RouteChecker {
+    fn flags(&self) -> u8 {
+        let mut flags = 0;
+        flags |= (self.radius << 2) & 0b11111;
+        if self.floating {
+            flags |= 0x80;
+        }
+        flags
+    }
+
+    fn floating(&self) -> Option<bool> {
+        Some(self.floating)
+    }
+
+    fn heading_objectinfo_wire(&self) -> u8 {
+        self.radius
     }
 }
