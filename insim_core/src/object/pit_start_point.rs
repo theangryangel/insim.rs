@@ -1,7 +1,7 @@
 //! Pit start point object
 use crate::{
     heading::Heading,
-    object::{ObjectCoordinate, ObjectFlags},
+    object::{ObjectCoordinate, ObjectInfoInner, Raw},
 };
 
 /// Pit start point
@@ -20,26 +20,41 @@ pub struct PitStartPoint {
 }
 
 impl PitStartPoint {
-    pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = self.index & 0x3f;
-        if self.floating {
-            flags |= 0x80;
-        }
-        ObjectFlags(flags)
-    }
-
-    pub(super) fn new(
-        xyz: ObjectCoordinate,
-        wire: ObjectFlags,
-        heading: Heading,
-    ) -> Result<Self, crate::DecodeError> {
-        let pos_index = wire.0 & 0x3f;
-        let floating = wire.floating();
+    pub(super) fn new(raw: Raw) -> Result<Self, crate::DecodeError> {
+        let xyz = raw.xyz;
+        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let pos_index = raw.flags & 0x3f;
+        let floating = raw.raw_floating();
         Ok(Self {
             xyz,
             heading,
             index: pos_index,
             floating,
         })
+    }
+}
+impl ObjectInfoInner for PitStartPoint {
+    fn flags(&self) -> u8 {
+        let mut flags = self.index & 0x3f;
+        if self.floating {
+            flags |= 0x80;
+        }
+        flags
+    }
+
+    fn heading_mut(&mut self) -> Option<&mut Heading> {
+        Some(&mut self.heading)
+    }
+
+    fn heading(&self) -> Option<Heading> {
+        Some(self.heading)
+    }
+
+    fn floating(&self) -> Option<bool> {
+        Some(self.floating)
+    }
+
+    fn heading_objectinfo_wire(&self) -> u8 {
+        self.heading.to_objectinfo_wire()
     }
 }

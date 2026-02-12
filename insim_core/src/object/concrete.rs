@@ -3,7 +3,7 @@
 use crate::{
     DecodeError,
     heading::Heading,
-    object::{ObjectCoordinate, ObjectFlags},
+    object::{ObjectCoordinate, ObjectInfoInner, Raw},
 };
 
 /// Represents Width and Length (2m, 4m, 8m, 16m)
@@ -282,22 +282,12 @@ pub struct ConcreteSlab {
 }
 
 impl ConcreteSlab {
-    pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = 0;
-        flags |= self.width as u8 & 0x03;
-        flags |= (self.length as u8 & 0x03) << 2;
-        flags |= (self.pitch as u8 & 0x0f) << 4;
-        ObjectFlags(flags)
-    }
-
-    pub(super) fn new(
-        xyz: ObjectCoordinate,
-        flags: ObjectFlags,
-        heading: Heading,
-    ) -> Result<Self, DecodeError> {
-        let width = ConcreteWidthLength::try_from(flags.0 & 0x03)?;
-        let length = ConcreteWidthLength::try_from((flags.0 & 0x0c) >> 2)?;
-        let pitch = ConcretePitch::try_from((flags.0 & 0xf0) >> 4)?;
+    pub(super) fn new(raw: Raw) -> Result<Self, DecodeError> {
+        let xyz = raw.xyz;
+        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let width = ConcreteWidthLength::try_from(raw.flags & 0x03)?;
+        let length = ConcreteWidthLength::try_from((raw.flags & 0x0c) >> 2)?;
+        let pitch = ConcretePitch::try_from((raw.flags & 0xf0) >> 4)?;
         Ok(Self {
             xyz,
             width,
@@ -305,6 +295,27 @@ impl ConcreteSlab {
             pitch,
             heading,
         })
+    }
+}
+impl ObjectInfoInner for ConcreteSlab {
+    fn flags(&self) -> u8 {
+        let mut flags = 0;
+        flags |= self.width as u8 & 0x03;
+        flags |= (self.length as u8 & 0x03) << 2;
+        flags |= (self.pitch as u8 & 0x0f) << 4;
+        flags
+    }
+
+    fn heading_mut(&mut self) -> Option<&mut Heading> {
+        Some(&mut self.heading)
+    }
+
+    fn heading(&self) -> Option<Heading> {
+        Some(self.heading)
+    }
+
+    fn heading_objectinfo_wire(&self) -> u8 {
+        self.heading.to_objectinfo_wire()
     }
 }
 
@@ -325,22 +336,12 @@ pub struct ConcreteRamp {
 }
 
 impl ConcreteRamp {
-    pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = 0;
-        flags |= self.width as u8 & 0x03;
-        flags |= (self.length as u8 & 0x03) << 2;
-        flags |= (self.height as u8 & 0x0f) << 4;
-        ObjectFlags(flags)
-    }
-
-    pub(super) fn new(
-        xyz: ObjectCoordinate,
-        wire: ObjectFlags,
-        heading: Heading,
-    ) -> Result<Self, DecodeError> {
-        let width = ConcreteWidthLength::try_from(wire.0 & 0x03)?;
-        let length = ConcreteWidthLength::try_from((wire.0 & 0x0c) >> 2)?;
-        let height = ConcreteHeight::try_from((wire.0 & 0xf0) >> 4)?;
+    pub(super) fn new(raw: Raw) -> Result<Self, DecodeError> {
+        let xyz = raw.xyz;
+        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let width = ConcreteWidthLength::try_from(raw.flags & 0x03)?;
+        let length = ConcreteWidthLength::try_from((raw.flags & 0x0c) >> 2)?;
+        let height = ConcreteHeight::try_from((raw.flags & 0xf0) >> 4)?;
         Ok(Self {
             xyz,
             width,
@@ -348,6 +349,27 @@ impl ConcreteRamp {
             height,
             heading,
         })
+    }
+}
+impl ObjectInfoInner for ConcreteRamp {
+    fn flags(&self) -> u8 {
+        let mut flags = 0;
+        flags |= self.width as u8 & 0x03;
+        flags |= (self.length as u8 & 0x03) << 2;
+        flags |= (self.height as u8 & 0x0f) << 4;
+        flags
+    }
+
+    fn heading_mut(&mut self) -> Option<&mut Heading> {
+        Some(&mut self.heading)
+    }
+
+    fn heading(&self) -> Option<Heading> {
+        Some(self.heading)
+    }
+
+    fn heading_objectinfo_wire(&self) -> u8 {
+        self.heading.to_objectinfo_wire()
     }
 }
 
@@ -368,22 +390,12 @@ pub struct ConcreteWall {
 }
 
 impl ConcreteWall {
-    pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = 0;
-        flags |= self.colour as u8 & 0x03;
-        flags |= (self.length as u8 & 0x03) << 2;
-        flags |= (self.height as u8 & 0x0f) << 4;
-        ObjectFlags(flags)
-    }
-
-    pub(super) fn new(
-        xyz: ObjectCoordinate,
-        wire: ObjectFlags,
-        heading: Heading,
-    ) -> Result<Self, DecodeError> {
-        let colour = ConcreteColour::try_from(wire.0 & 0x03)?;
-        let length = ConcreteWidthLength::try_from((wire.0 & 0x0c) >> 2)?;
-        let height = ConcreteHeight::try_from((wire.0 & 0xf0) >> 4)?;
+    pub(super) fn new(raw: Raw) -> Result<Self, DecodeError> {
+        let xyz = raw.xyz;
+        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let colour = ConcreteColour::try_from(raw.flags & 0x03)?;
+        let length = ConcreteWidthLength::try_from((raw.flags & 0x0c) >> 2)?;
+        let height = ConcreteHeight::try_from((raw.flags & 0xf0) >> 4)?;
         Ok(Self {
             xyz,
             colour,
@@ -391,6 +403,27 @@ impl ConcreteWall {
             height,
             heading,
         })
+    }
+}
+impl ObjectInfoInner for ConcreteWall {
+    fn flags(&self) -> u8 {
+        let mut flags = 0;
+        flags |= self.colour as u8 & 0x03;
+        flags |= (self.length as u8 & 0x03) << 2;
+        flags |= (self.height as u8 & 0x0f) << 4;
+        flags
+    }
+
+    fn heading_mut(&mut self) -> Option<&mut Heading> {
+        Some(&mut self.heading)
+    }
+
+    fn heading(&self) -> Option<Heading> {
+        Some(self.heading)
+    }
+
+    fn heading_objectinfo_wire(&self) -> u8 {
+        self.heading.to_objectinfo_wire()
     }
 }
 
@@ -411,22 +444,12 @@ pub struct ConcretePillar {
 }
 
 impl ConcretePillar {
-    pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = 0;
-        flags |= self.x as u8 & 0x03;
-        flags |= (self.y as u8 & 0x03) << 2;
-        flags |= (self.height as u8 & 0x0f) << 4;
-        ObjectFlags(flags)
-    }
-
-    pub(super) fn new(
-        xyz: ObjectCoordinate,
-        flags: ObjectFlags,
-        heading: Heading,
-    ) -> Result<Self, DecodeError> {
-        let x = Size::try_from(flags.0 & 0x03)?;
-        let y = Size::try_from((flags.0 & 0x0c) >> 2)?;
-        let height = ConcreteHeight::try_from((flags.0 & 0xf0) >> 4)?;
+    pub(super) fn new(raw: Raw) -> Result<Self, DecodeError> {
+        let xyz = raw.xyz;
+        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let x = Size::try_from(raw.flags & 0x03)?;
+        let y = Size::try_from((raw.flags & 0x0c) >> 2)?;
+        let height = ConcreteHeight::try_from((raw.flags & 0xf0) >> 4)?;
         Ok(Self {
             xyz,
             x,
@@ -434,6 +457,27 @@ impl ConcretePillar {
             height,
             heading,
         })
+    }
+}
+impl ObjectInfoInner for ConcretePillar {
+    fn flags(&self) -> u8 {
+        let mut flags = 0;
+        flags |= self.x as u8 & 0x03;
+        flags |= (self.y as u8 & 0x03) << 2;
+        flags |= (self.height as u8 & 0x0f) << 4;
+        flags
+    }
+
+    fn heading_mut(&mut self) -> Option<&mut Heading> {
+        Some(&mut self.heading)
+    }
+
+    fn heading(&self) -> Option<Heading> {
+        Some(self.heading)
+    }
+
+    fn heading_objectinfo_wire(&self) -> u8 {
+        self.heading.to_objectinfo_wire()
     }
 }
 
@@ -454,22 +498,12 @@ pub struct ConcreteSlabWall {
 }
 
 impl ConcreteSlabWall {
-    pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = 0;
-        flags |= self.colour as u8 & 0x03;
-        flags |= (self.length as u8 & 0x03) << 2;
-        flags |= (self.pitch as u8 & 0x0f) << 4;
-        ObjectFlags(flags)
-    }
-
-    pub(super) fn new(
-        xyz: ObjectCoordinate,
-        wire: ObjectFlags,
-        heading: Heading,
-    ) -> Result<Self, DecodeError> {
-        let colour = ConcreteColour::try_from(wire.0 & 0x03)?;
-        let length = ConcreteWidthLength::try_from((wire.0 & 0x0c) >> 2)?;
-        let pitch = ConcretePitch::try_from((wire.0 & 0xf0) >> 4)?;
+    pub(super) fn new(raw: Raw) -> Result<Self, DecodeError> {
+        let xyz = raw.xyz;
+        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let colour = ConcreteColour::try_from(raw.flags & 0x03)?;
+        let length = ConcreteWidthLength::try_from((raw.flags & 0x0c) >> 2)?;
+        let pitch = ConcretePitch::try_from((raw.flags & 0xf0) >> 4)?;
         Ok(Self {
             xyz,
             colour,
@@ -477,6 +511,27 @@ impl ConcreteSlabWall {
             pitch,
             heading,
         })
+    }
+}
+impl ObjectInfoInner for ConcreteSlabWall {
+    fn flags(&self) -> u8 {
+        let mut flags = 0;
+        flags |= self.colour as u8 & 0x03;
+        flags |= (self.length as u8 & 0x03) << 2;
+        flags |= (self.pitch as u8 & 0x0f) << 4;
+        flags
+    }
+
+    fn heading_mut(&mut self) -> Option<&mut Heading> {
+        Some(&mut self.heading)
+    }
+
+    fn heading(&self) -> Option<Heading> {
+        Some(self.heading)
+    }
+
+    fn heading_objectinfo_wire(&self) -> u8 {
+        self.heading.to_objectinfo_wire()
     }
 }
 
@@ -497,22 +552,12 @@ pub struct ConcreteRampWall {
 }
 
 impl ConcreteRampWall {
-    pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = 0;
-        flags |= self.colour as u8 & 0x03;
-        flags |= (self.length as u8 & 0x03) << 2;
-        flags |= (self.height as u8 & 0x0f) << 4;
-        ObjectFlags(flags)
-    }
-
-    pub(super) fn new(
-        xyz: ObjectCoordinate,
-        wire: ObjectFlags,
-        heading: Heading,
-    ) -> Result<Self, DecodeError> {
-        let colour = ConcreteColour::try_from(wire.0 & 0x03)?;
-        let length = ConcreteWidthLength::try_from((wire.0 & 0x0c) >> 2)?;
-        let height = ConcreteHeight::try_from((wire.0 & 0xf0) >> 4)?;
+    pub(super) fn new(raw: Raw) -> Result<Self, DecodeError> {
+        let xyz = raw.xyz;
+        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let colour = ConcreteColour::try_from(raw.flags & 0x03)?;
+        let length = ConcreteWidthLength::try_from((raw.flags & 0x0c) >> 2)?;
+        let height = ConcreteHeight::try_from((raw.flags & 0xf0) >> 4)?;
         Ok(Self {
             xyz,
             colour,
@@ -520,6 +565,27 @@ impl ConcreteRampWall {
             height,
             heading,
         })
+    }
+}
+impl ObjectInfoInner for ConcreteRampWall {
+    fn flags(&self) -> u8 {
+        let mut flags = 0;
+        flags |= self.colour as u8 & 0x03;
+        flags |= (self.length as u8 & 0x03) << 2;
+        flags |= (self.height as u8 & 0x0f) << 4;
+        flags
+    }
+
+    fn heading_mut(&mut self) -> Option<&mut Heading> {
+        Some(&mut self.heading)
+    }
+
+    fn heading(&self) -> Option<Heading> {
+        Some(self.heading)
+    }
+
+    fn heading_objectinfo_wire(&self) -> u8 {
+        self.heading.to_objectinfo_wire()
     }
 }
 
@@ -540,22 +606,12 @@ pub struct ConcreteShortSlabWall {
 }
 
 impl ConcreteShortSlabWall {
-    pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = 0;
-        flags |= self.colour as u8 & 0x03;
-        flags |= (self.y as u8 & 0x03) << 2;
-        flags |= (self.pitch as u8 & 0x0f) << 4;
-        ObjectFlags(flags)
-    }
-
-    pub(super) fn new(
-        xyz: ObjectCoordinate,
-        wire: ObjectFlags,
-        heading: Heading,
-    ) -> Result<Self, DecodeError> {
-        let colour = ConcreteColour::try_from(wire.0 & 0x03)?;
-        let y = Size::try_from((wire.0 & 0x0c) >> 2)?;
-        let pitch = ConcretePitch::try_from((wire.0 & 0xf0) >> 4)?;
+    pub(super) fn new(raw: Raw) -> Result<Self, DecodeError> {
+        let xyz = raw.xyz;
+        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let colour = ConcreteColour::try_from(raw.flags & 0x03)?;
+        let y = Size::try_from((raw.flags & 0x0c) >> 2)?;
+        let pitch = ConcretePitch::try_from((raw.flags & 0xf0) >> 4)?;
         Ok(Self {
             xyz,
             colour,
@@ -563,6 +619,27 @@ impl ConcreteShortSlabWall {
             pitch,
             heading,
         })
+    }
+}
+impl ObjectInfoInner for ConcreteShortSlabWall {
+    fn flags(&self) -> u8 {
+        let mut flags = 0;
+        flags |= self.colour as u8 & 0x03;
+        flags |= (self.y as u8 & 0x03) << 2;
+        flags |= (self.pitch as u8 & 0x0f) << 4;
+        flags
+    }
+
+    fn heading_mut(&mut self) -> Option<&mut Heading> {
+        Some(&mut self.heading)
+    }
+
+    fn heading(&self) -> Option<Heading> {
+        Some(self.heading)
+    }
+
+    fn heading_objectinfo_wire(&self) -> u8 {
+        self.heading.to_objectinfo_wire()
     }
 }
 
@@ -583,22 +660,12 @@ pub struct ConcreteWedge {
 }
 
 impl ConcreteWedge {
-    pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = 0;
-        flags |= self.colour as u8 & 0x03;
-        flags |= (self.length as u8 & 0x03) << 2;
-        flags |= (self.angle as u8 & 0x0f) << 4;
-        ObjectFlags(flags)
-    }
-
-    pub(super) fn new(
-        xyz: ObjectCoordinate,
-        wire: ObjectFlags,
-        heading: Heading,
-    ) -> Result<Self, DecodeError> {
-        let colour = ConcreteColour::try_from(wire.0 & 0x03)?;
-        let length = ConcreteWidthLength::try_from((wire.0 & 0x0c) >> 2)?;
-        let angle = ConcreteAngle::try_from((wire.0 & 0xf0) >> 4)?;
+    pub(super) fn new(raw: Raw) -> Result<Self, DecodeError> {
+        let xyz = raw.xyz;
+        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let colour = ConcreteColour::try_from(raw.flags & 0x03)?;
+        let length = ConcreteWidthLength::try_from((raw.flags & 0x0c) >> 2)?;
+        let angle = ConcreteAngle::try_from((raw.flags & 0xf0) >> 4)?;
         Ok(Self {
             xyz,
             colour,
@@ -606,5 +673,26 @@ impl ConcreteWedge {
             angle,
             heading,
         })
+    }
+}
+impl ObjectInfoInner for ConcreteWedge {
+    fn flags(&self) -> u8 {
+        let mut flags = 0;
+        flags |= self.colour as u8 & 0x03;
+        flags |= (self.length as u8 & 0x03) << 2;
+        flags |= (self.angle as u8 & 0x0f) << 4;
+        flags
+    }
+
+    fn heading_mut(&mut self) -> Option<&mut Heading> {
+        Some(&mut self.heading)
+    }
+
+    fn heading(&self) -> Option<Heading> {
+        Some(self.heading)
+    }
+
+    fn heading_objectinfo_wire(&self) -> u8 {
+        self.heading.to_objectinfo_wire()
     }
 }

@@ -2,7 +2,7 @@
 use crate::{
     DecodeError, DecodeErrorKind,
     heading::Heading,
-    object::{ObjectCoordinate, ObjectFlags},
+    object::{ObjectCoordinate, ObjectInfoInner, Raw},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
@@ -284,24 +284,13 @@ pub struct LetterboardRB {
 }
 
 impl LetterboardRB {
-    pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = self.colour as u8 & 0x01;
-        flags |= ((self.character as u8) & 0x3f) << 1;
-        if self.floating {
-            flags |= 0x80;
-        }
-        ObjectFlags(flags)
-    }
-
-    pub(super) fn new(
-        xyz: ObjectCoordinate,
-        wire: ObjectFlags,
-        heading: Heading,
-    ) -> Result<Self, crate::DecodeError> {
-        let colour = LetterboardRBColour::from(wire.0);
-        let mapping = (wire.0 >> 1) & 0x3f;
+    pub(super) fn new(raw: Raw) -> Result<Self, crate::DecodeError> {
+        let xyz = raw.xyz;
+        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let colour = LetterboardRBColour::from(raw.flags);
+        let mapping = (raw.flags >> 1) & 0x3f;
         let character = Character::try_from(mapping)?;
-        let floating = wire.floating();
+        let floating = raw.raw_floating();
         Ok(Self {
             xyz,
             colour,
@@ -309,5 +298,31 @@ impl LetterboardRB {
             character,
             floating,
         })
+    }
+}
+impl ObjectInfoInner for LetterboardRB {
+    fn flags(&self) -> u8 {
+        let mut flags = self.colour as u8 & 0x01;
+        flags |= ((self.character as u8) & 0x3f) << 1;
+        if self.floating {
+            flags |= 0x80;
+        }
+        flags
+    }
+
+    fn heading_mut(&mut self) -> Option<&mut Heading> {
+        Some(&mut self.heading)
+    }
+
+    fn heading(&self) -> Option<Heading> {
+        Some(self.heading)
+    }
+
+    fn floating(&self) -> Option<bool> {
+        Some(self.floating)
+    }
+
+    fn heading_objectinfo_wire(&self) -> u8 {
+        self.heading.to_objectinfo_wire()
     }
 }

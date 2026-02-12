@@ -2,7 +2,7 @@
 use crate::{
     DecodeError, DecodeErrorKind,
     heading::Heading,
-    object::{ObjectCoordinate, ObjectFlags},
+    object::{ObjectCoordinate, ObjectInfoInner, Raw},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
@@ -57,23 +57,12 @@ pub struct SignSpeed {
 }
 
 impl SignSpeed {
-    pub(super) fn to_flags(&self) -> ObjectFlags {
-        let mut flags = self.colour & 0x07;
-        flags |= (self.mapping as u8 & 0x0f) << 3;
-        if self.floating {
-            flags |= 0x80;
-        }
-        ObjectFlags(flags)
-    }
-
-    pub(super) fn new(
-        xyz: ObjectCoordinate,
-        wire: ObjectFlags,
-        heading: Heading,
-    ) -> Result<Self, crate::DecodeError> {
-        let mapping = SpeedSignMapping::try_from(wire.mapping())?;
-        let colour = wire.colour();
-        let floating = wire.floating();
+    pub(super) fn new(raw: Raw) -> Result<Self, crate::DecodeError> {
+        let xyz = raw.xyz;
+        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let mapping = SpeedSignMapping::try_from(raw.raw_mapping())?;
+        let colour = raw.raw_colour();
+        let floating = raw.raw_floating();
         Ok(Self {
             xyz,
             mapping,
@@ -81,5 +70,31 @@ impl SignSpeed {
             colour,
             floating,
         })
+    }
+}
+impl ObjectInfoInner for SignSpeed {
+    fn flags(&self) -> u8 {
+        let mut flags = self.colour & 0x07;
+        flags |= (self.mapping as u8 & 0x0f) << 3;
+        if self.floating {
+            flags |= 0x80;
+        }
+        flags
+    }
+
+    fn heading_mut(&mut self) -> Option<&mut Heading> {
+        Some(&mut self.heading)
+    }
+
+    fn heading(&self) -> Option<Heading> {
+        Some(self.heading)
+    }
+
+    fn floating(&self) -> Option<bool> {
+        Some(self.floating)
+    }
+
+    fn heading_objectinfo_wire(&self) -> u8 {
+        self.heading.to_objectinfo_wire()
     }
 }
