@@ -11,7 +11,6 @@ pub trait AsyncReadWrite: AsyncRead + AsyncWrite + Debug + Unpin + Send + Sync {
 impl<T: AsyncRead + AsyncWrite + Debug + Unpin + Send + Sync> AsyncReadWrite for T {}
 
 use crate::{
-    MAX_SIZE_PACKET,
     error::Error,
     insim::TinyType,
     net::{Codec, DEFAULT_TIMEOUT_SECS},
@@ -43,7 +42,6 @@ impl Framed {
             }
 
             // ensure that we exhaust the buffer first
-
             let packet = self.codec.decode()?;
 
             if let Some(keepalive) = self.codec.keepalive() {
@@ -55,24 +53,17 @@ impl Framed {
                 return Ok(packet);
             }
 
-            let mut buf = [0u8; MAX_SIZE_PACKET];
-
-            match timeout(
+            let amt = timeout(
                 Duration::from_secs(DEFAULT_TIMEOUT_SECS),
-                self.inner.read(&mut buf),
+                self.inner.read_buf(self.codec.buf_mut()),
             )
-            .await??
-            {
-                0 => {
-                    // The remote closed the connection. For this to be a clean
-                    // shutdown, there should be no data in the read buffer. If
-                    // there is, this means that the peer closed the socket while
-                    // sending a frame.
-                    return Err(Error::Disconnected);
-                },
-                amt => {
-                    self.codec.feed(&buf[..amt]);
-                },
+            .await??;
+            if amt == 0 {
+                // The remote closed the connection. For this to be a clean
+                // shutdown, there should be no data in the read buffer. If
+                // there is, this means that the peer closed the socket while
+                // sending a frame.
+                return Err(Error::Disconnected);
             }
         }
     }

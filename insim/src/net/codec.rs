@@ -5,7 +5,7 @@ use insim_core::{Decode, DecodeErrorKind, Encode, EncodeErrorKind};
 
 use super::DEFAULT_TIMEOUT_SECS;
 use crate::{
-    DEFAULT_BUFFER_CAPACITY, Error, VERSION, WithRequestId,
+    DEFAULT_BUFFER_CAPACITY, Error, MAX_SIZE_PACKET, VERSION, WithRequestId,
     identifiers::RequestId,
     insim::{Tiny, TinyType, Ver},
     packet::Packet,
@@ -69,7 +69,7 @@ impl Codec {
         Ok(buf.freeze())
     }
 
-    /// Feed
+    /// Feed the codec with bytes
     #[tracing::instrument]
     pub fn feed(&mut self, src: &[u8]) {
         if src.is_empty() {
@@ -77,6 +77,21 @@ impl Codec {
         }
 
         self.buffer.extend_from_slice(src);
+    }
+
+    /// Mutably borrow the internal buffer, which allows you to directly feed the codec with bytes
+    /// from a `read_buf` call. This allows you to avoid an additional copy.
+    /// It is critical that you do not attempt to mutate the buffer, except for passing to
+    /// read_buf.
+    /// This function will automatically to see if there is space in the buffer for a full insim
+    /// packet. If there is not it reserves the required space to do so. This is a safety mechanism
+    /// to ensure that usage with UdpSocket does not fail.
+    #[tracing::instrument]
+    pub fn buf_mut(&mut self) -> &mut BytesMut {
+        if self.buffer.remaining_mut() < MAX_SIZE_PACKET {
+            self.buffer.reserve(MAX_SIZE_PACKET);
+        }
+        &mut self.buffer
     }
 
     /// Decode any complete packet in the buffer into a [Packet]

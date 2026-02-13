@@ -74,6 +74,8 @@ pub fn main() -> insim::Result<()> {
         .isi_flag_mci(true)
         .isi_flag_con(true)
         .isi_flag_obh(true)
+        .isi_flag_axm_load(true)
+        .isi_flag_axm_edit(true)
         .isi_flag_hlv(true);
 
     if let Some(interval) = &cli.isi_interval {

@@ -11,12 +11,17 @@ use crate::{Error, MAX_SIZE_PACKET, Packet, insim::TinyType, net::Codec, result:
 pub struct Framed {
     inner: Box<dyn ReadWrite>,
     codec: Codec,
+    buf: [u8; MAX_SIZE_PACKET],
 }
 
 impl Framed {
     /// Create a new FramedInner, which wraps some kind of network transport.
     pub fn new(inner: Box<dyn ReadWrite>, codec: Codec) -> Self {
-        Self { inner, codec }
+        Self {
+            inner,
+            codec,
+            buf: [0u8; MAX_SIZE_PACKET],
+        }
     }
 
     /// Wait for a packet from the inner network.
@@ -41,8 +46,7 @@ impl Framed {
                 return Ok(packet);
             }
 
-            let mut buf = [0u8; MAX_SIZE_PACKET];
-            match self.inner.read(&mut buf)? {
+            match self.inner.read(&mut self.buf)? {
                 0 => {
                     // The remote closed the connection. For this to be a clean
                     // shutdown, there should be no data in the read buffer. If
@@ -52,7 +56,7 @@ impl Framed {
                 },
                 amt => {
                     // data
-                    self.codec.feed(&buf[..amt]);
+                    self.codec.feed(&self.buf[..amt]);
                 },
             }
         }
@@ -62,7 +66,7 @@ impl Framed {
     pub fn write<P: Into<Packet>>(&mut self, packet: P) -> Result<()> {
         let buf = self.codec.encode(&packet.into())?;
         if !buf.is_empty() {
-            let _ = self.inner.write_all(&buf)?;
+            self.inner.write_all(&buf)?;
         }
 
         Ok(())
