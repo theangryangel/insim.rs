@@ -62,8 +62,7 @@ impl Framed {
     pub fn write<P: Into<Packet>>(&mut self, packet: P) -> Result<()> {
         let buf = self.codec.encode(&packet.into())?;
         if !buf.is_empty() {
-            let _ = self.inner.write(&buf)?;
-            self.inner.flush()?;
+            let _ = self.inner.write_all(&buf)?;
         }
 
         Ok(())

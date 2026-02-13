@@ -3,236 +3,164 @@ use std::{borrow::Cow, convert::Infallible, str::FromStr};
 
 use crate::{Decode, Encode, license::License};
 
-/// Vehicle identifier for standard cars and mods.
-///
-/// - Standard vehicles use 3-character codes (e.g., `XFG`).
-/// - Mods are encoded as 6-character hex ids.
-/// - `license()` reports the required content tier.
-///
-/// See <https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info>
-#[derive(PartialEq, Eq, Clone, Copy, Default, Hash)]
-#[non_exhaustive]
-#[allow(missing_docs)]
-pub enum Vehicle {
-    #[default]
-    Xfg,
-    Xrg,
-    Fbm,
+macro_rules! define_vehicles {
+    (
+        $(
+            $variant:ident, // Enum Variant (e.g., Xfg)
+            $code:literal,  // String Code (e.g., "XFG")
+            $license:ident  // License Enum (e.g., Demo)
+        ),* $(,)?
+    ) => {
+        /// Vehicle identifier for standard cars and mods.
+        ///
+        /// - Standard vehicles use 3-character codes (e.g., `XFG`).
+        /// - Mods are encoded as 6-character hex ids.
+        /// - `license()` reports the required content tier.
+        ///
+        /// See <https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info>
+        #[derive(PartialEq, Eq, Clone, Copy, Hash)]
+        #[non_exhaustive]
+        #[allow(missing_docs)]
+        pub enum Vehicle {
+            $($variant,)*
 
-    Xrt,
-    Rb4,
-    Fxo,
-    Lx4,
-    Lx6,
-    Mrt,
+            Mod(u32),
 
-    Uf1,
-    Rac,
-    Fz5,
-    Fox,
-    Xfr,
-    Ufr,
-    Fo8,
-    Fxr,
-    Xrr,
-    Fzr,
-    Bf1,
-
-    Mod(u32),
-
-    /// Unknown vehicle. *Probably* a private mod?
-    Unknown,
-}
-
-#[allow(missing_docs)]
-impl Vehicle {
-    pub fn is_builtin(&self) -> bool {
-        !matches!(self, Vehicle::Mod(_))
-    }
-
-    pub fn is_mod(&self) -> bool {
-        matches!(self, Vehicle::Mod(_))
-    }
-
-    pub fn license(&self) -> License {
-        match self {
-            Vehicle::Xfg => License::Demo,
-            Vehicle::Xrg => License::Demo,
-            Vehicle::Fbm => License::Demo,
-
-            Vehicle::Xrt => License::S1,
-            Vehicle::Rb4 => License::S1,
-            Vehicle::Fxo => License::S1,
-            Vehicle::Lx4 => License::S1,
-            Vehicle::Lx6 => License::S1,
-            Vehicle::Mrt => License::S1,
-
-            Vehicle::Uf1 => License::S2,
-            Vehicle::Rac => License::S2,
-            Vehicle::Fz5 => License::S2,
-            Vehicle::Fox => License::S2,
-            Vehicle::Xfr => License::S2,
-            Vehicle::Ufr => License::S2,
-            Vehicle::Fo8 => License::S2,
-            Vehicle::Fxr => License::S2,
-            Vehicle::Xrr => License::S2,
-            Vehicle::Fzr => License::S2,
-            Vehicle::Bf1 => License::S2,
-            Vehicle::Mod(_) => License::S3,
-            Vehicle::Unknown => License::S3,
+            /// Unknown vehicle. *Probably* a private mod?
+            Unknown,
         }
-    }
 
-    pub fn code(&self) -> String {
-        self.code_cow().to_string()
-    }
-
-    fn code_cow(&self) -> Cow<'static, str> {
-        match self {
-            Vehicle::Xfg => Cow::Borrowed("XFG"),
-            Vehicle::Xrg => Cow::Borrowed("XRG"),
-            Vehicle::Fbm => Cow::Borrowed("FBM"),
-            Vehicle::Xrt => Cow::Borrowed("XRT"),
-            Vehicle::Rb4 => Cow::Borrowed("RB4"),
-            Vehicle::Fxo => Cow::Borrowed("FXO"),
-            Vehicle::Lx4 => Cow::Borrowed("LX4"),
-            Vehicle::Lx6 => Cow::Borrowed("LX6"),
-            Vehicle::Mrt => Cow::Borrowed("MRT"),
-            Vehicle::Uf1 => Cow::Borrowed("UF1"),
-            Vehicle::Rac => Cow::Borrowed("RAC"),
-            Vehicle::Fz5 => Cow::Borrowed("FZ5"),
-            Vehicle::Fox => Cow::Borrowed("FOX"),
-            Vehicle::Xfr => Cow::Borrowed("XFR"),
-            Vehicle::Ufr => Cow::Borrowed("UFR"),
-            Vehicle::Fo8 => Cow::Borrowed("FO8"),
-            Vehicle::Fxr => Cow::Borrowed("FXR"),
-            Vehicle::Xrr => Cow::Borrowed("XRR"),
-            Vehicle::Fzr => Cow::Borrowed("FZR"),
-            Vehicle::Bf1 => Cow::Borrowed("BF1"),
-            Vehicle::Mod(vehmod) => {
-                // Determine the mod id. This is only applicable for Insim v9+.
-                Cow::Owned(format!("{:06X}", vehmod))
-            },
-            Vehicle::Unknown => Cow::Borrowed("Unknown"),
-        }
-    }
-}
-
-impl Decode for Vehicle {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
-        let mut bytes = buf.split_to(4);
-        let is_builtin = bytes[0..=2].iter().all(|c| c.is_ascii_alphanumeric()) && bytes[3] == 0;
-
-        match (bytes.as_ref(), is_builtin) {
-            ([0, 0, 0, 0], _) => Ok(Vehicle::Unknown),
-            ([b'X', b'F', b'G', 0], true) => Ok(Vehicle::Xfg),
-            ([b'X', b'R', b'G', 0], true) => Ok(Vehicle::Xrg),
-            ([b'F', b'B', b'M', 0], true) => Ok(Vehicle::Fbm),
-            ([b'X', b'R', b'T', 0], true) => Ok(Vehicle::Xrt),
-            ([b'R', b'B', b'4', 0], true) => Ok(Vehicle::Rb4),
-            ([b'F', b'X', b'O', 0], true) => Ok(Vehicle::Fxo),
-            ([b'L', b'X', b'4', 0], true) => Ok(Vehicle::Lx4),
-            ([b'L', b'X', b'6', 0], true) => Ok(Vehicle::Lx6),
-            ([b'M', b'R', b'T', 0], true) => Ok(Vehicle::Mrt),
-            ([b'U', b'F', b'1', 0], true) => Ok(Vehicle::Uf1),
-            ([b'R', b'A', b'C', 0], true) => Ok(Vehicle::Rac),
-            ([b'F', b'Z', b'5', 0], true) => Ok(Vehicle::Fz5),
-            ([b'F', b'O', b'X', 0], true) => Ok(Vehicle::Fox),
-            ([b'X', b'F', b'R', 0], true) => Ok(Vehicle::Xfr),
-            ([b'U', b'F', b'R', 0], true) => Ok(Vehicle::Ufr),
-            ([b'F', b'O', b'8', 0], true) => Ok(Vehicle::Fo8),
-            ([b'F', b'X', b'R', 0], true) => Ok(Vehicle::Fxr),
-            ([b'X', b'R', b'R', 0], true) => Ok(Vehicle::Xrr),
-            ([b'F', b'Z', b'R', 0], true) => Ok(Vehicle::Fzr),
-            ([b'B', b'F', b'1', 0], true) => Ok(Vehicle::Bf1),
-            (_, true) => Err(crate::DecodeErrorKind::BadMagic {
-                found: Box::new(bytes),
+        impl Vehicle {
+            /// This is a built-in vehicle?
+            pub fn is_builtin(&self) -> bool {
+                !matches!(self, Vehicle::Mod(_))
             }
-            .into()),
-            (_, false) => Ok(Vehicle::Mod(u32::decode(&mut bytes)?)),
-        }
-    }
-}
 
-impl Encode for Vehicle {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodeError> {
-        match self {
-            Vehicle::Xfg => buf.extend_from_slice(&[b'X', b'F', b'G', 0]),
-            Vehicle::Xrg => buf.extend_from_slice(&[b'X', b'R', b'G', 0]),
-            Vehicle::Fbm => buf.extend_from_slice(&[b'F', b'B', b'M', 0]),
-            Vehicle::Xrt => buf.extend_from_slice(&[b'X', b'R', b'T', 0]),
-            Vehicle::Rb4 => buf.extend_from_slice(&[b'R', b'B', b'4', 0]),
-            Vehicle::Fxo => buf.extend_from_slice(&[b'F', b'X', b'O', 0]),
-            Vehicle::Lx4 => buf.extend_from_slice(&[b'L', b'X', b'4', 0]),
-            Vehicle::Lx6 => buf.extend_from_slice(&[b'L', b'X', b'6', 0]),
-            Vehicle::Mrt => buf.extend_from_slice(&[b'M', b'R', b'T', 0]),
-            Vehicle::Uf1 => buf.extend_from_slice(&[b'U', b'F', b'1', 0]),
-            Vehicle::Rac => buf.extend_from_slice(&[b'R', b'A', b'C', 0]),
-            Vehicle::Fz5 => buf.extend_from_slice(&[b'F', b'Z', b'5', 0]),
-            Vehicle::Fox => buf.extend_from_slice(&[b'F', b'O', b'X', 0]),
-            Vehicle::Xfr => buf.extend_from_slice(&[b'X', b'F', b'R', 0]),
-            Vehicle::Ufr => buf.extend_from_slice(&[b'U', b'F', b'R', 0]),
-            Vehicle::Fo8 => buf.extend_from_slice(&[b'F', b'O', b'8', 0]),
-            Vehicle::Fxr => buf.extend_from_slice(&[b'F', b'X', b'R', 0]),
-            Vehicle::Xrr => buf.extend_from_slice(&[b'X', b'R', b'R', 0]),
-            Vehicle::Fzr => buf.extend_from_slice(&[b'F', b'Z', b'R', 0]),
-            Vehicle::Bf1 => buf.extend_from_slice(&[b'B', b'F', b'1', 0]),
-            Vehicle::Mod(vehmod) => vehmod.encode(buf)?,
-            Vehicle::Unknown => buf.extend_from_slice(&[0_u8, 0_u8, 0_u8, 0_u8]),
-        };
+            /// Is this a user modification?
+            pub fn is_mod(&self) -> bool {
+                matches!(self, Vehicle::Mod(_))
+            }
 
-        Ok(())
-    }
-}
-
-impl std::fmt::Display for Vehicle {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.code_cow())
-    }
-}
-
-impl std::fmt::Debug for Vehicle {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.code_cow())
-    }
-}
-
-impl FromStr for Vehicle {
-    // Unknown tracks are always Vehicle::Unknown
-    type Err = Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "XFG" => Ok(Self::Xfg),
-            "XRG" => Ok(Self::Xrg),
-            "FBM" => Ok(Self::Fbm),
-            "XRT" => Ok(Self::Xrt),
-            "RB4" => Ok(Self::Rb4),
-            "FXO" => Ok(Self::Fxo),
-            "LX4" => Ok(Self::Lx4),
-            "LX6" => Ok(Self::Lx6),
-            "MRT" => Ok(Self::Mrt),
-            "UF1" => Ok(Self::Uf1),
-            "RAC" => Ok(Self::Rac),
-            "FZ5" => Ok(Self::Fz5),
-            "FOX" => Ok(Self::Fox),
-            "XFR" => Ok(Self::Xfr),
-            "UFR" => Ok(Self::Ufr),
-            "FO8" => Ok(Self::Fo8),
-            "FXR" => Ok(Self::Fxr),
-            "XRR" => Ok(Self::Xrr),
-            "FZR" => Ok(Self::Fzr),
-            "BF1" => Ok(Self::Bf1),
-            o => {
-                if o.len() == 6
-                    && let Ok(i) = u32::from_str_radix(o, 16)
-                {
-                    Ok(Vehicle::Mod(i))
-                } else {
-                    Ok(Vehicle::Unknown)
+            /// What content tier is required for this vehicle?
+            pub fn license(&self) -> License {
+                match self {
+                    $(Vehicle::$variant => License::$license,)*
+                    Vehicle::Mod(_) => License::S3,
+                    Vehicle::Unknown => License::S3,
                 }
-            },
+            }
+
+            /// The shortcode for this vehicle.
+            fn code(&self) -> Cow<'static, str> {
+                match self {
+                    $(Vehicle::$variant => Cow::Borrowed($code),)*
+                    Vehicle::Mod(vehmod) => {
+                        // Determine the mod id. This is only applicable for Insim v9+.
+                        Cow::Owned(format!("{:06X}", vehmod))
+                    },
+                    Vehicle::Unknown => Cow::Borrowed("Unknown"),
+                }
+            }
         }
+
+        impl Decode for Vehicle {
+            fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
+                let mut bytes = buf.split_to(4);
+                // conventionally builtins are 3 ascii characters with a \0.
+                // so we can take our string input and use this.
+                let is_builtin = bytes[0..=2].iter().all(|c| c.is_ascii_alphanumeric()) && bytes[3] == 0;
+
+                match (bytes.as_ref(), is_builtin) {
+                    (b"\0\0\0\0", _) => Ok(Vehicle::Unknown),
+                    $((value, true) if &value[..3] == $code.as_bytes() => Ok(Vehicle::$variant),)*
+                    (_, true) => Err(crate::DecodeErrorKind::BadMagic {
+                        found: Box::new(bytes),
+                    }
+                    .into()),
+                    (_, false) => Ok(Vehicle::Mod(u32::decode(&mut bytes)?)),
+                }
+            }
+        }
+
+        impl Encode for Vehicle {
+            fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodeError> {
+                match self {
+                    $(Vehicle::$variant => {
+                        buf.extend_from_slice($code.as_bytes());
+                        ::bytes::BufMut::put_u8(buf, 0);
+                    },)*
+                    Vehicle::Mod(vehmod) => vehmod.encode(buf)?,
+                    Vehicle::Unknown => ::bytes::BufMut::put_bytes(buf, 0, 4),
+                };
+
+                Ok(())
+            }
+        }
+
+        impl std::fmt::Display for Vehicle {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(f, "{}", self.code())
+            }
+        }
+
+        impl std::fmt::Debug for Vehicle {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(f, "{}", self.code())
+            }
+        }
+
+        impl FromStr for Vehicle {
+            // Unknown vehicles are always Vehicle::Unknown
+            type Err = Infallible;
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                match s {
+                    $($code => Ok(Self::$variant),)*
+                    o => {
+                        if o.len() == 6
+                            && let Ok(i) = u32::from_str_radix(o, 16)
+                        {
+                            Ok(Vehicle::Mod(i))
+                        } else {
+                            Ok(Vehicle::Unknown)
+                        }
+                    },
+                }
+            }
+        }
+    };
+}
+
+#[rustfmt::skip]
+define_vehicles!(
+    Xfg, "XFG", Demo,
+    Xrg, "XRG", Demo,
+    Fbm, "FBM", Demo,
+
+    Xrt, "XRT", S1,
+    Rb4, "RB4", S1,
+    Fxo, "FXO", S1,
+    Lx4, "LX4", S1,
+    Lx6, "LX6", S1,
+    Mrt, "MRT", S1,
+
+    Uf1, "UF1", S2,
+    Rac, "RAC", S2,
+    Fz5, "FZ5", S2,
+    Fox, "FOX", S2,
+    Xfr, "XFR", S2,
+    Ufr, "UFR", S2,
+    Fo8, "FO8", S2,
+    Fxr, "FXR", S2,
+    Xrr, "XRR", S2,
+    Fzr, "FZR", S2,
+    Bf1, "BF1", S2,
+);
+
+#[allow(clippy::derivable_impls)]
+impl Default for Vehicle {
+    fn default() -> Self {
+        Vehicle::Xfg
     }
 }
 
@@ -260,24 +188,82 @@ impl<'de> serde::Deserialize<'de> for Vehicle {
 
 #[cfg(test)]
 mod tests {
+    use bytes::{Bytes, BytesMut};
+
     use super::*;
+    use crate::{Decode, Encode};
 
     #[test]
-    fn test_xrt_from_str() {
+    fn test_xrt() {
         let v = Vehicle::from_str("XRT").expect("Expected to handle XRT");
         assert_eq!(v, Vehicle::Xrt);
         assert_eq!("XRT", v.to_string());
+
+        let raw = b"XRT\0";
+        let mut decode_buf = Bytes::copy_from_slice(raw);
+        let decoded = Vehicle::decode(&mut decode_buf).expect("Expected to decode XRT");
+        assert_eq!(decoded, Vehicle::Xrt);
+
+        let mut encode_buf = BytesMut::new();
+        decoded
+            .encode(&mut encode_buf)
+            .expect("Expected to encode XRT");
+        assert_eq!(encode_buf.as_ref(), raw);
     }
 
     #[test]
-    fn test_mod_from_str() {
-        let v = Vehicle::from_str("728419").expect("Expected to handle Mod");
-        assert_eq!(v, Vehicle::Mod(7504921));
+    fn test_fraud_wheeler_e2_rx_manual() {
+        let mod_id = 7504921;
+
+        let v = Vehicle::from_str("728419").expect("Expected to parse Fraud Wheeler E2 RX Manual");
+        assert_eq!(v, Vehicle::Mod(mod_id));
+
+        let raw = 7_504_921_u32.to_le_bytes();
+        let mut decode_buf = Bytes::copy_from_slice(&raw);
+        let decoded = Vehicle::decode(&mut decode_buf)
+            .expect("Expected to decode Fraud Wheeler E2 RX Manual");
+        assert_eq!(decoded, Vehicle::Mod(mod_id));
+
+        let mut encode_buf = bytes::BytesMut::new();
+        decoded
+            .encode(&mut encode_buf)
+            .expect("Expected to encode Fraud Wheeler E2 RX Manual");
+        assert_eq!(encode_buf.as_ref(), raw.as_slice());
     }
 
     #[test]
-    fn test_unknown_from_str() {
-        let v = Vehicle::from_str("").expect("Expected to handle blank");
+    fn test_piran_firefly_200() {
+        let mod_id = 4301472;
+        let v = Vehicle::from_str("41A2A0").expect("Expected to parse Piran Firefly 200");
+        assert_eq!(v, Vehicle::Mod(mod_id));
+
+        let raw = 4_301_472_u32.to_le_bytes();
+        let mut decode_buf = Bytes::copy_from_slice(&raw);
+        let decoded =
+            Vehicle::decode(&mut decode_buf).expect("Expected to decode Piran Firefly 200");
+        assert_eq!(decoded, Vehicle::Mod(mod_id));
+
+        let mut encode_buf = BytesMut::new();
+        decoded
+            .encode(&mut encode_buf)
+            .expect("Expected to encode Piran Firefly 200");
+        assert_eq!(encode_buf.as_ref(), raw.as_slice());
+    }
+
+    #[test]
+    fn test_unknown() {
+        let v = Vehicle::from_str("").expect("Expected to parse Unknown");
         assert_eq!(v, Vehicle::Unknown);
+
+        let raw = b"\0\0\0\0";
+        let mut decode_buf = Bytes::copy_from_slice(raw);
+        let decoded = Vehicle::decode(&mut decode_buf).expect("Expected to decode Unknown");
+        assert_eq!(decoded, Vehicle::Unknown);
+
+        let mut encode_buf = BytesMut::new();
+        decoded
+            .encode(&mut encode_buf)
+            .expect("Expected to encode Unknown");
+        assert_eq!(encode_buf.as_ref(), raw);
     }
 }
