@@ -14,8 +14,6 @@ use smallvec::SmallVec;
 use super::control::ControlMarker;
 
 const DEFAULT_CODEPAGE: char = 'L';
-// 8 is left off this by design to prevent double checking LATIN1
-const VALID_CODEPAGES_FOR_ENCODING: [char; 10] = ['L', 'G', 'C', 'E', 'T', 'B', 'J', 'H', 'S', 'K'];
 
 trait CodepageMarker {
     /// This is a valid codepage marker/identifier?
@@ -109,44 +107,39 @@ pub fn to_lossy_bytes(input: &'_ str) -> Cow<'_, [u8]> {
         match res {
             encoding_rs::EncoderResult::InputEmpty => break,
             encoding_rs::EncoderResult::Unmappable(c) => {
-                // current codepage can't handle this character, try the others
                 let mut buf = [0u8; 4];
                 let char_as_bytes = c.encode_utf8(&mut buf);
-                let mut found = false;
 
-                for candidate_control in VALID_CODEPAGES_FOR_ENCODING {
-                    // we've already checked the current codepage and failed, don't
-                    // check again, try the next codepage
-                    if candidate_control == current_control {
-                        continue;
-                    }
-                    let candidate_encoding = candidate_control
-                        .as_lfs_codepage()
-                        .unwrap_or_else(|| unreachable!());
-                    // try to encode the current character
-                    let (cow, _, error) = candidate_encoding.encode(char_as_bytes);
-                    if error {
-                        // this codepage doesnt match, try the next one
-                        continue;
-                    }
-                    // this one matched, push the control character and codepage
-                    // control character
-                    output.push(u8::lfs_control_char());
-                    output.push(candidate_control as u8);
-                    // then push the new character
-                    output.extend_from_slice(&cow);
-                    // switch the encoder to the new codepage for the remainder
-                    current_control = candidate_control;
-                    current_encoding = candidate_encoding;
-                    encoder = current_encoding.new_encoder();
-                    found = true;
-                    break;
-                }
-
-                if !found {
+                let Some(&candidate_control) = super::codepages_lut::lookup(c)
+                    .iter()
+                    .find(|&&candidate| candidate != current_control)
+                else {
                     // We found nothing, post the fallback character
                     output.push(b'?');
+                    continue;
+                };
+
+                let candidate_encoding = candidate_control
+                    .as_lfs_codepage()
+                    .unwrap_or_else(|| unreachable!());
+                let (cow, _, error) = candidate_encoding.encode(char_as_bytes);
+
+                // Lookup table guarantees this, but be defensive in case of drift.
+                if error {
+                    output.push(b'?');
+                    continue;
                 }
+
+                // this one matched, push the control character and codepage
+                // control character
+                output.push(u8::lfs_control_char());
+                output.push(candidate_control as u8);
+                // then push the new character
+                output.extend_from_slice(&cow);
+                // switch the encoder to the new codepage for the remainder
+                current_control = candidate_control;
+                current_encoding = candidate_encoding;
+                encoder = current_encoding.new_encoder();
             },
             encoding_rs::EncoderResult::OutputFull => {
                 // dst wasn't big enough resize and retry from the same offset

@@ -19,9 +19,18 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: pre-commit/action@v3.0.1
 
+  check_codepage_lut:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Check generated codepage LUT (lookup table) is up to date
+        run: cargo run -p xtask -- codepage-lut --check
+
   test:
     runs-on: ubuntu-latest
-    needs: [pre-commit]
+    needs: [pre-commit, check_codepage_lut]
     strategy:
       matrix:
         channel: [stable, nightly]
@@ -36,7 +45,7 @@ jobs:
 
   docs:
     runs-on: ubuntu-latest
-    needs: [pre-commit, test]
+    needs: [test]
     strategy:
       matrix:
         channel: [stable, nightly]
@@ -51,7 +60,7 @@ jobs:
 
   msrv:
     runs-on: ubuntu-latest
-    needs: [pre-commit, test]
+    needs: [test]
     steps:
       - uses: actions/checkout@v6
       - name: Get MSRV from package metadata

@@ -1,6 +1,7 @@
 //! Utilities for working with various strings from Insim.
 
 pub mod codepages;
+mod codepages_lut;
 pub mod colours;
 mod control;
 pub mod escaping;
