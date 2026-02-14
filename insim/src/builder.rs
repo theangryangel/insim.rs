@@ -17,7 +17,6 @@ use crate::{
     address::Addr,
     identifiers::RequestId,
     insim::{Isi, IsiFlags},
-    net::Codec,
     result::Result,
 };
 
@@ -272,7 +271,7 @@ impl Builder {
     #[cfg(feature = "blocking")]
     #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
     pub fn connect_blocking(&self) -> Result<BlockingFramed> {
-        use crate::net::{DEFAULT_TIMEOUT_SECS, blocking_impl::UdpStream};
+        use crate::net::DEFAULT_TIMEOUT_SECS;
 
         match self.proto {
             Proto::Tcp => {
@@ -283,7 +282,7 @@ impl Builder {
                 if self.non_blocking {
                     stream.set_nonblocking(true)?;
                 }
-                let mut stream = BlockingFramed::new(Box::new(stream), Codec::new());
+                let mut stream: BlockingFramed = stream.into();
                 stream.write(self.isi(None))?;
 
                 Ok(stream)
@@ -301,8 +300,7 @@ impl Builder {
 
                 let isi = self.isi(Some(local.port()));
 
-                let mut stream =
-                    BlockingFramed::new(Box::new(UdpStream::from(stream)), Codec::new());
+                let mut stream: BlockingFramed = stream.into();
                 stream.write(isi)?;
 
                 Ok(stream)
@@ -316,8 +314,6 @@ impl Builder {
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
     pub async fn connect_async(&self) -> Result<AsyncFramed> {
-        use crate::net::tokio_impl::udp::UdpStream;
-
         match self.proto {
             Proto::Tcp => {
                 let stream = tcpstream_connect_to_any(&self.remote, self.connect_timeout)?;
@@ -325,7 +321,7 @@ impl Builder {
                 stream.set_nonblocking(true)?;
                 let stream = tokio::net::TcpStream::from_std(stream)?;
 
-                let mut stream = AsyncFramed::new(Box::new(stream), Codec::new());
+                let mut stream: AsyncFramed = stream.into();
                 stream.write(self.isi(None)).await?;
 
                 Ok(stream)
@@ -341,7 +337,7 @@ impl Builder {
 
                 let isi = self.isi(Some(local.port()));
 
-                let mut stream = AsyncFramed::new(Box::new(UdpStream::from(stream)), Codec::new());
+                let mut stream: AsyncFramed = stream.into();
                 stream.write(isi).await?;
 
                 Ok(stream)
