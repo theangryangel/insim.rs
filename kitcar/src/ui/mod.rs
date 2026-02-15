@@ -224,6 +224,7 @@ where
         let local = LocalSet::new();
         local.block_on(&rt, async move {
             let mut packets = insim.subscribe();
+            let mut message_rx_closed = false;
             #[allow(clippy::type_complexity)]
             let mut active: HashMap<
                 ConnectionId,
@@ -233,15 +234,21 @@ where
                 ),
             > = HashMap::new();
 
-            // FIXME: expect
-            for existing in presence.connections().await.expect("FIXME") {
-                spawn_for::<V>(
-                    existing.ucid,
-                    global_tx.subscribe(),
-                    &insim,
-                    &mut active,
-                    outbound_tx.clone(),
-                );
+            match presence.connections().await {
+                Some(existing_connections) => {
+                    for existing in existing_connections {
+                        spawn_for::<V>(
+                            existing.ucid,
+                            global_tx.subscribe(),
+                            &insim,
+                            &mut active,
+                            outbound_tx.clone(),
+                        );
+                    }
+                },
+                None => {
+                    tracing::warn!("UI attach: failed to load existing connections");
+                },
             }
 
             loop {
@@ -264,9 +271,12 @@ where
                             // player left, remove their props sender
                             let _ = active.remove(&cnl.ucid);
                         },
-
+                        Err(e) => {
+                            tracing::error!("UI attach: failed to receive packet: {e}");
+                            break;
+                        },
                         _ => {
-                            // FIXME: handle Err
+                            // ignore unrelated packets
                         }
                     },
 
@@ -277,7 +287,7 @@ where
                             }
                         },
                         None => {
-                            // FIXME: log, or something. we've probably just dropped the ui handle
+                            tracing::debug!("UI attach: player state channel closed");
                             break;
                         }
                     },
@@ -286,7 +296,7 @@ where
                     // channel open, but we shut down based on player_rx (connection props).
                     // Once Ui is dropped and we exit this loop, message_rx is dropped and
                     // UiSender::send() will return Err.
-                    res = message_rx.recv() => match res {
+                    res = message_rx.recv(), if !message_rx_closed => match res {
                         Some((ucid, msg)) => {
                             if let Some((_, msg_tx)) = active.get(&ucid) {
                                 let _ = msg_tx.send(msg);
@@ -295,6 +305,7 @@ where
                         None => {
                             // All senders dropped (Ui + all UiSender clones), but we don't
                             // shut down here—lifecycle is tied to player_rx.
+                            message_rx_closed = true;
                         }
                     },
                 }
@@ -311,8 +322,9 @@ where
                     ..Default::default()
                 })
                 .collect();
-            // FIXME: no expect
-            insim.send_all(clear).await.expect("FIXME");
+            if let Err(e) = insim.send_all(clear).await {
+                tracing::warn!("UI attach: failed to clear buttons on shutdown: {e}");
+            }
         });
         Ok::<(), UiError>(())
     });

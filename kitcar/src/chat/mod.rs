@@ -32,11 +32,15 @@ impl FromArg for f32 {
 
 impl FromArg for bool {
     fn from_arg(s: &str) -> Result<Self, String> {
-        match s.to_lowercase().as_str() {
-            "true" | "yes" | "1" => Ok(true),
-            "false" | "no" | "0" => Ok(false),
-            _ => Err(format!("'{}' is not a valid boolean", s)),
+        if s == "1" || s.eq_ignore_ascii_case("true") || s.eq_ignore_ascii_case("yes") {
+            return Ok(true);
         }
+
+        if s == "0" || s.eq_ignore_ascii_case("false") || s.eq_ignore_ascii_case("no") {
+            return Ok(false);
+        }
+
+        Err(format!("'{}' is not a valid boolean", s))
     }
 }
 

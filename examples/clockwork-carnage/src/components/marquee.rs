@@ -12,9 +12,10 @@ enum MarqueeState {
 }
 
 pub struct Marquee {
-    text: String,
     width: usize,
     offset: usize,
+    scroll_limit: usize,
+    canvas: Vec<char>,
     state: MarqueeState,
     wait_duration: Duration,
     handle: JoinHandle<()>,
@@ -49,10 +50,17 @@ impl Marquee {
             }
         });
 
+        let mut canvas = Vec::new();
+        canvas.extend(std::iter::repeat_n(' ', width));
+        canvas.extend(text.chars());
+        canvas.extend(std::iter::repeat_n(' ', width));
+        let scroll_limit = canvas.len().saturating_sub(width);
+
         Self {
-            text: text.to_string(),
             width,
             offset: 0,
+            scroll_limit,
+            canvas,
             state: MarqueeState::Scrolling,
             wait_duration: Duration::from_secs(3),
             handle,
@@ -66,29 +74,26 @@ impl ui::Component for Marquee {
 
     fn update(&mut self, msg: Self::Message) {
         match msg {
-            MarqueeMsg::Tick => {
-                match self.state {
-                    MarqueeState::Scrolling => {
-                        // pad the text with spaces equal to width on both sides
-                        // i.e. [   spaces   ][ TEXT ][   spaces   ]
-                        let total_len = self.width + self.text.chars().count() + self.width;
+            MarqueeMsg::Tick => match self.state {
+                MarqueeState::Scrolling => {
+                    if self.scroll_limit == 0 {
+                        return;
+                    }
 
-                        self.offset += 1;
+                    self.offset += 1;
 
-                        // have we scrolled past everything?
-                        if self.offset >= total_len - self.width {
-                            let deadline = Instant::now() + self.wait_duration;
-                            self.state = MarqueeState::Waiting(deadline);
-                            self.offset = 0; // reset for next time
-                        }
-                    },
+                    if self.offset >= self.scroll_limit {
+                        let deadline = Instant::now() + self.wait_duration;
+                        self.state = MarqueeState::Waiting(deadline);
+                        self.offset = 0;
+                    }
+                },
 
-                    MarqueeState::Waiting(deadline) => {
-                        if Instant::now() >= deadline {
-                            self.state = MarqueeState::Scrolling;
-                        }
-                    },
-                }
+                MarqueeState::Waiting(deadline) => {
+                    if Instant::now() >= deadline {
+                        self.state = MarqueeState::Scrolling;
+                    }
+                },
             },
         }
     }
@@ -96,13 +101,8 @@ impl ui::Component for Marquee {
     fn render(&self, _props: Self::Props) -> ui::Node<Self::Message> {
         match self.state {
             MarqueeState::Scrolling => {
-                let padding = " ".repeat(self.width);
-                let full_canvas = format!("{}{}{}", padding, self.text, padding);
-                let visible: String = full_canvas
-                    .chars()
-                    .skip(self.offset)
-                    .take(self.width)
-                    .collect();
+                let end = (self.offset + self.width).min(self.canvas.len());
+                let visible: String = self.canvas[self.offset..end].iter().collect();
 
                 ui::text(visible, hud_text().align_left()).key("marquee")
             },

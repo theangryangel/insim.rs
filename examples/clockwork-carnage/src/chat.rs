@@ -46,10 +46,10 @@ impl Chat {
         loop {
             match chat.recv().await {
                 Ok((msg, ucid)) if matches(&msg) => {
-                    if let Some(conn) = presence.connection(&ucid).await {
-                        if conn.admin {
-                            return Ok(());
-                        }
+                    if let Some(conn) = presence.connection(&ucid).await
+                        && conn.admin
+                    {
+                        return Ok(());
                     }
                 },
                 Ok(_) => {},

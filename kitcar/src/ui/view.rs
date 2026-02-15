@@ -61,12 +61,11 @@ pub(super) fn run_view<V: View>(
                     global.borrow_and_update().clone(),
                     connection.borrow_and_update().clone(),
                 ));
-                if let Some(diff) = canvas.reconcile(vdom) {
-                    // FIXME: no expect
-                    insim
-                        .send_all(diff.merge())
-                        .await
-                        .expect("FIXME: send_all failed");
+                if let Some(diff) = canvas.reconcile(vdom)
+                    && let Err(e) = insim.send_all(diff.merge()).await
+                {
+                    tracing::error!("Failed to send UI diff packets: {e}");
+                    break;
                 }
             }
 
@@ -136,10 +135,10 @@ pub(super) fn run_view<V: View>(
                         },
                         Err(e) => {
                             tracing::error!("Failed to receive packets from insim: {e}");
-                            false
+                            break;
                         }
                         _ => {
-                            // FIXME: handle Err
+                            // ignore unrelated packets
                             false
                         }
                     }
@@ -147,6 +146,6 @@ pub(super) fn run_view<V: View>(
             };
         }
 
-        tracing::error!("Child shutdown");
+        tracing::debug!("Child UI view shutdown");
     });
 }

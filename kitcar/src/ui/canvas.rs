@@ -89,9 +89,11 @@ impl<M: Clone + 'static> Canvas<M> {
             &mut click_map,
         );
 
-        if let Some(root_id) = root_id {
-            tree.compute_layout(root_id, taffy::Size::length(200.0))
-                .expect("taffy compute layout failed");
+        if let Some(root_id) = root_id
+            && let Err(e) = tree.compute_layout(root_id, taffy::Size::length(200.0))
+        {
+            tracing::error!("Failed to compute UI layout: {e}");
+            return None;
         }
 
         // identify ids that were allocated in previous frames but not seen in this one
@@ -112,8 +114,20 @@ impl<M: Clone + 'static> Canvas<M> {
         let mut updates = Vec::new();
 
         for (nodeid, stable_hash, mut btn) in node_map {
-            let (x, y) = get_taffy_abs_position(&tree, &nodeid).expect("");
-            let layout = tree.layout(nodeid).expect("");
+            let (x, y) = match get_taffy_abs_position(&tree, &nodeid) {
+                Some(position) => position,
+                None => {
+                    tracing::warn!("Failed to resolve absolute UI position for button");
+                    continue;
+                },
+            };
+            let layout = match tree.layout(nodeid) {
+                Ok(layout) => layout,
+                Err(e) => {
+                    tracing::warn!("Failed to resolve UI layout for button: {e}");
+                    continue;
+                },
+            };
 
             btn.l = x as u8;
             btn.t = y as u8;
@@ -204,7 +218,10 @@ impl<M: Clone + 'static> Canvas<M> {
 
                 let node_id = tree
                     .new_with_children(node.style.unwrap_or_default(), &child_ids)
-                    .expect("Could not add container to taffy layout");
+                    .map_err(|e| {
+                        tracing::warn!("Could not add container to taffy layout: {e}");
+                    })
+                    .ok()?;
 
                 Some(node_id)
             },
@@ -228,10 +245,9 @@ impl<M: Clone + 'static> Canvas<M> {
                     // in the list while keeping the same id.
                     k.hash(&mut hasher);
                 } else {
-                    // weak identity: fallback to text + "btn" marker
-                    // note: in a container, the 'parent_hash' already includes the index,
-                    // so this unique enough for static lists.
-                    text.hash(&mut hasher);
+                    // weak identity: fallback to structural position only.
+                    // note: in a container, parent_hash already includes sibling index,
+                    // so this is stable across text updates.
                     "btn".hash(&mut hasher);
                 }
 
@@ -245,7 +261,13 @@ impl<M: Clone + 'static> Canvas<M> {
                 } else {
                     match pool.lease() {
                         Some(new_id) => new_id,
-                        None => unimplemented!("pool exhausted"),
+                        None => {
+                            tracing::warn!(
+                                "UI click-id pool exhausted for UCID {}, skipping button",
+                                ucid
+                            );
+                            return None;
+                        },
                     }
                 };
 
@@ -273,7 +295,10 @@ impl<M: Clone + 'static> Canvas<M> {
 
                 let node_id = tree
                     .new_leaf(node.style.unwrap_or_default())
-                    .expect("Could not add a new child to taffy layout.. too many buttons?");
+                    .map_err(|e| {
+                        tracing::warn!("Could not add button to taffy layout: {e}");
+                    })
+                    .ok()?;
                 node_map.push((
                     node_id,
                     stable_hash,

@@ -195,8 +195,7 @@ impl RoundsState {
             .last_known_names(ranking.iter().map(|(uname, _)| uname))
             .await
             .unwrap_or_default();
-        self.scores
-            .ranking()
+        ranking
             .iter()
             .map(|(uname, pts)| {
                 let pname = names.get(uname).cloned().unwrap_or_else(|| uname.clone());
@@ -228,13 +227,21 @@ impl RoundsState {
 
         config.insim.send_command("/restart").await?;
         sleep(Duration::from_secs(5)).await;
-        config.game.wait_for_racing().await;
+        config
+            .game
+            .wait_for_racing()
+            .await
+            .map_err(|cause| SceneError::Custom {
+                scene: "rounds::wait_for_racing",
+                cause: Box::new(cause),
+            })?;
         sleep(Duration::from_secs(1)).await;
 
         tracing::info!("Round {}/{}", round, config.rounds);
 
         let mut countdown = Countdown::new(Duration::from_secs(1), 60);
         let mut packets = config.insim.subscribe();
+        let leaderboard = self.enriched_leaderboard(config).await;
 
         loop {
             tokio::select! {
@@ -246,7 +253,7 @@ impl RoundsState {
                                 remaining: dur,
                                 round,
                                 rounds: config.rounds,
-                                leaderboard: self.enriched_leaderboard(config).await,
+                                leaderboard: leaderboard.clone(),
                             });
                         }
                         None => break,
@@ -358,7 +365,7 @@ impl RoundsState {
 
         for (i, (uname, _)) in ordered.into_iter().take(config.max_scorers).enumerate() {
             let points = (config.max_scorers - i) as u32;
-            let _ = self.scores.add_points(uname, points);
+            self.scores.add_points(uname, points);
         }
 
         self.scores.rank();

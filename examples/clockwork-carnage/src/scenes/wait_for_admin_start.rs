@@ -55,9 +55,7 @@ impl ui::View for WaitForAdminStartView {
         Self::new(tx)
     }
 
-    fn compose(_global: Self::GlobalState, _connection: Self::ConnectionState) -> Self::Props {
-        ()
-    }
+    fn compose(_global: Self::GlobalState, _connection: Self::ConnectionState) -> Self::Props {}
 }
 
 /// Wait for admin to start
@@ -72,7 +70,8 @@ impl scenes::Scene for WaitForAdminStart {
     type Output = ();
 
     async fn run(self) -> Result<scenes::SceneResult<()>, scenes::SceneError> {
-        let _ = ui::attach::<WaitForAdminStartView>(self.insim.clone(), self.presence.clone(), ());
+        let (_ui, _ui_handle) =
+            ui::attach::<WaitForAdminStartView>(self.insim.clone(), self.presence.clone(), ());
 
         self.insim
             .send_message("Ready for admin !start command", ConnectionId::ALL)

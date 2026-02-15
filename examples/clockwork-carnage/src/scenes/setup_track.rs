@@ -25,9 +25,7 @@ impl ui::View for SetupTrackView {
         Self {}
     }
 
-    fn compose(_global: Self::GlobalState, _connection: Self::ConnectionState) -> Self::Props {
-        ()
-    }
+    fn compose(_global: Self::GlobalState, _connection: Self::ConnectionState) -> Self::Props {}
 }
 
 /// Setup track
@@ -45,18 +43,27 @@ impl Scene for SetupTrack {
     type Output = ();
 
     async fn run(mut self) -> Result<SceneResult<()>, SceneError> {
-        let _ = ui::attach::<SetupTrackView>(self.insim.clone(), self.presence.clone(), ());
+        let (_ui, _ui_handle) =
+            ui::attach::<SetupTrackView>(self.insim.clone(), self.presence.clone(), ());
         tokio::select! {
-            _ = self.game.track_rotation(
+            res = self.game.track_rotation(
                 self.insim.clone(),
                 self.track,
                 RaceLaps::Practice,
                 0,
                 self.layout.clone(),
             ) => {
+                res.map_err(|cause| SceneError::Custom {
+                    scene: "setup_track::track_rotation",
+                    cause: Box::new(cause),
+                })?;
                 Ok(SceneResult::Continue(()))
             },
-            _ = self.presence.wait_for_connection_count(|val| *val < self.min_players) => {
+            res = self.presence.wait_for_connection_count(|val| *val < self.min_players) => {
+                let _ = res.map_err(|cause| SceneError::Custom {
+                    scene: "setup_track::wait_for_connection_count",
+                    cause: Box::new(cause),
+                })?;
                 tracing::info!("Lost players during track setup");
                 Ok(SceneResult::bail_with("Lost players during SetupTrack"))
             }
