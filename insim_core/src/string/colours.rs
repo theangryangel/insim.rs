@@ -48,8 +48,22 @@ pub trait Colour {
     /// Make this dark green (default colour)
     fn dark_green(self) -> String;
 
-    /// Strip colours from a string
+    /// Strip colours from a string.
+    ///
+    /// If you also need to unescape, strip colours first while marker intent is still preserved.
     fn strip_colours(&self) -> Cow<'_, str>;
+
+    /// Split an escaped LFS string into colour spans/chunks.
+    ///
+    /// This parses colour markers (`^0`..`^9`) while preserving escaped control markers (`^^`) as
+    /// literal text. Chunks are yielded as `(colour, text)` where `colour` is `0..=9` and `text` is a
+    /// slice of the original input. Empty chunks are skipped.
+    ///
+    /// The yielded spans maybe raw escape sequences (like ^^): You must call unescape
+    /// on the text to obtain the final display string.
+    ///
+    /// Use cases include converting to ansi colours, or html, etc.
+    fn colour_spans(&self) -> impl Iterator<Item = (u8, &str)>;
 }
 
 impl<T: AsRef<str>> Colour for T {
@@ -92,9 +106,78 @@ impl<T: AsRef<str>> Colour for T {
     fn strip_colours(&self) -> Cow<'_, str> {
         strip(self.as_ref())
     }
+
+    fn colour_spans(&self) -> impl Iterator<Item = (u8, &str)> {
+        spans(self.as_ref())
+    }
+}
+
+/// Split an escaped LFS string into colour chunks.
+///
+/// This parses colour markers (`^0`..`^9`) while preserving escaped control markers (`^^`) as
+/// literal text. Chunks are yielded as `(colour, text)` where `colour` is `0..=9` and `text` is a
+/// slice of the original input. Empty chunks are skipped.
+///
+/// The yielded spans maybe raw escape sequences (like ^^): You must call .unescape()
+/// on the text to obtain the final display string.
+///
+/// Use cases include converting to ansi colours, or html, etc.
+pub fn spans(input: &str) -> impl Iterator<Item = (u8, &str)> + '_ {
+    let mut iter = input.char_indices().peekable();
+    let mut chunk_start = 0;
+    let mut current_colour = 9;
+
+    std::iter::from_fn(move || {
+        while let Some((idx, ch)) = iter.next() {
+            if !ch.is_lfs_control_char() {
+                continue;
+            }
+
+            match iter.peek() {
+                // ^^ (escaped control char)
+                Some(&(_, next)) if next.is_lfs_control_char() => {
+                    // we consume the second caret so it isn't processed as a start.
+                    // we do not update chunk_start, effectively keeping "^^" in the text.
+                    let _ = iter.next();
+                },
+
+                // ^n (color code)
+                Some(&(next_idx, next)) if next.is_lfs_colour() => {
+                    let chunk = &input[chunk_start..idx];
+                    let yielded_colour = current_colour;
+
+                    // update state for the *next* iteration
+                    current_colour = next.to_digit(10).unwrap_or(0) as u8;
+                    chunk_start = next_idx + next.len_utf8();
+                    let _ = iter.next(); // consume the color digit
+
+                    // only yield if there is actual text (skips empty chunks like ^1^2)
+                    if !chunk.is_empty() {
+                        return Some((yielded_colour, chunk));
+                    }
+                },
+
+                // everything else
+                _ => {},
+            }
+        }
+
+        // yield any remaining text
+        if chunk_start < input.len() {
+            let chunk = &input[chunk_start..];
+            chunk_start = input.len();
+            return Some((current_colour, chunk));
+        }
+
+        // jobs done
+        None
+    })
 }
 
 /// Strip LFS colours
+///
+/// If you also need to unescape, call this before unescaping so escaped markers (`^^`) are still
+/// distinguishable from real colour markers.
 /// Prefer the [`Colour::strip_colours`] trait function
 pub fn strip(input: &'_ str) -> Cow<'_, str> {
     if !input.chars().any(|c| c.is_lfs_control_char()) {
@@ -154,6 +237,50 @@ mod tests {
     #[test]
     fn test_strip_colours_escaped() {
         assert_eq!(strip("^^1234^56789"), "^^12346789");
+    }
+
+    #[test]
+    fn test_colour_spans_default() {
+        assert_eq!(spans("abc").collect::<Vec<_>>(), vec![(9, "abc")]);
+    }
+
+    #[test]
+    fn test_colour_spans_with_markers() {
+        assert_eq!(
+            spans("^1abc ^2efg").collect::<Vec<_>>(),
+            vec![(1, "abc "), (2, "efg")]
+        );
+    }
+
+    #[test]
+    fn test_colour_spans_escaped_marker_not_colour() {
+        assert_eq!(spans("^^0").collect::<Vec<_>>(), vec![(9, "^^0")]);
+    }
+
+    #[test]
+    fn test_colour_spans_with_markers_escaped() {
+        assert_eq!(
+            spans("^1a^^0bc ^2efg").collect::<Vec<_>>(),
+            vec![(1, "a^^0bc "), (2, "efg")]
+        );
+    }
+
+    #[test]
+    fn test_colour_spans_greedy_escape_then_colour() {
+        assert_eq!(
+            spans("^^^1abc").collect::<Vec<_>>(),
+            vec![(9, "^^"), (1, "abc")]
+        );
+    }
+
+    #[test]
+    fn test_colour_spans_skip_empty_segments() {
+        assert_eq!(spans("^1^2abc").collect::<Vec<_>>(), vec![(2, "abc")]);
+    }
+
+    #[test]
+    fn test_colour_spans_trailing_colour_marker() {
+        assert_eq!(spans("abc^1").collect::<Vec<_>>(), vec![(9, "abc")]);
     }
 
     #[test]

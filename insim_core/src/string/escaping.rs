@@ -56,6 +56,9 @@ pub trait Escape {
     /// Escape a string according to LFS' rules.
     fn escape(&self) -> Cow<'_, str>;
     /// Unescape a string according to LFS' rules.
+    ///
+    /// This is lossy with respect to control-marker intent. For example, `^^0` becomes `^0`.
+    /// If you need colour-aware handling, process colours before unescaping.
     fn unescape(&self) -> Cow<'_, str>;
 }
 
@@ -70,7 +73,10 @@ impl<T: AsRef<str>> Escape for T {
     }
 }
 
-/// Unescape a u8 slice according to LFS' rules.
+/// Unescape a string according to LFS' rules.
+///
+/// This is lossy with respect to control-marker intent. For example, `^^0` becomes `^0`.
+/// If you need colour-aware handling, process colours before unescaping.
 /// Prefer using the [`Escape::unescape`] trait function.
 pub fn unescape(input: &'_ str) -> Cow<'_, str> {
     // do we need to unescape?

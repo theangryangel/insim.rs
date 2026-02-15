@@ -2,7 +2,6 @@
 
 use std::{borrow::Cow, vec::Vec};
 
-use itertools::Itertools;
 use smallvec::SmallVec;
 
 /// LFS strings are a sequence of u8 bytes, with an optional trailing \0.
@@ -28,12 +27,12 @@ impl CodepageMarker for char {
     fn is_lfs_codepage(&self) -> bool {
         matches!(
             self,
-            'L' | 'G' | 'C' | 'E' | 'T' | 'B' | 'J' | 'H' | 'S' | 'K' | '8'
+            'L' | 'G' | 'C' | 'E' | 'T' | 'B' | 'J' | 'H' | 'S' | 'K' | '9'
         )
     }
 
     fn propagate_lfs_codepage(self) -> bool {
-        self == '8'
+        self == '9'
     }
 
     fn as_lfs_codepage(&self) -> Option<&'static encoding_rs::Encoding> {
@@ -42,7 +41,7 @@ impl CodepageMarker for char {
         // https://github.com/hsivonen/encoding_rs/blob/acae06412c97df212797bebee9845b9b1c12569b/generate-encoding-data.py
 
         match self {
-            'L' | '8' => Some(encoding_rs::WINDOWS_1252), // Latin-1 CP1252
+            'L' | '9' => Some(encoding_rs::WINDOWS_1252), // Latin-1 CP1252
             'G' => Some(encoding_rs::ISO_8859_7),         // Greek ISO-8859-7
             'C' => Some(encoding_rs::WINDOWS_1251),       // Cyrillic CP1251
             'E' => Some(encoding_rs::ISO_8859_2),         // Central Europe ISO-8859-2
@@ -153,6 +152,8 @@ pub fn to_lossy_bytes(input: &'_ str) -> Cow<'_, [u8]> {
 
 /// Convert a InsimString into a native rust String, with potential lossy conversion from codepages
 /// Assumes any \0 characters have been stripped ahead of time
+///
+/// This decodes codepage markers only. It does not unescape LFS escape sequences.
 pub fn to_lossy_string(input: &'_ [u8]) -> Cow<'_, str> {
     // empty string
     if input.is_empty() {
@@ -180,11 +181,28 @@ pub fn to_lossy_string(input: &'_ [u8]) -> Cow<'_, str> {
     // slowest path
     // find the positions in the input for each ^L, ^B...
     // XXX: Using SmallVec here to avoid an allocation if possible
-    let mut indices: SmallVec<[usize; 8]> = input
-        .iter()
-        .tuple_windows()
-        .positions(|(elem, next)| elem.is_lfs_control_char() && next.is_lfs_codepage())
-        .collect();
+    let mut indices: SmallVec<[usize; 8]> = SmallVec::new();
+    let mut iter = input.iter().enumerate().peekable();
+
+    while let Some((i, &cur)) = iter.next() {
+        // we only care if the current char is a control char
+        if !cur.is_lfs_control_char() {
+            continue;
+        }
+
+        if let Some((_, next)) = iter.peek() {
+            if next.is_lfs_control_char() {
+                // greedy handling for escaped control markers (^^)
+                // we consume the next char so we don't process it again
+                let _ = iter.next();
+            } else if next.is_lfs_codepage() {
+                // found a valid codepage marker (^L, ^B, etc)
+                indices.push(i);
+                // consume the next char as part of this marker
+                let _ = iter.next();
+            }
+        }
+    }
 
     // allowing unwrap because if this panics we're screwed
     let default_lfs_codepage = DEFAULT_CODEPAGE
@@ -238,7 +256,7 @@ pub fn to_lossy_string(input: &'_ [u8]) -> Cow<'_, str> {
                 // Has a control character and next character is a codepage
 
                 // do we need to propagate the codepage because it has dual meaning?
-                // i.e. ^8
+                // i.e. ^9
                 if range[1].propagate_lfs_codepage() {
                     result.push(char::lfs_control_char());
                     result.push(range[1] as char);
@@ -332,11 +350,11 @@ mod tests {
     }
 
     #[test]
-    fn test_propagate_eight() {
+    fn test_propagate_nine() {
         // flood-proof mirror-drilling machine
-        let as_bytes = to_lossy_bytes("^8TEST");
+        let as_bytes = to_lossy_bytes("^9TEST");
 
-        assert_eq!(to_lossy_string(&as_bytes), "^8TEST",);
+        assert_eq!(to_lossy_string(&as_bytes), "^9TEST",);
     }
 
     #[test]
@@ -351,8 +369,17 @@ mod tests {
     fn test_retain_escaping() {
         let raw = "^^";
         let as_bytes = to_lossy_bytes(&raw);
-
         assert_eq!(as_bytes, raw.as_bytes());
+        assert_eq!(raw, to_lossy_string(&as_bytes));
+    }
+
+    #[test]
+    fn test_escaped_codepage_does_not_convert() {
+        for codepage in ['L', 'G', 'C', 'E', 'T', 'B', 'J', 'H', 'S', 'K', '9'] {
+            let raw = format!("^^{}1", codepage);
+            let as_string = to_lossy_string(raw.as_bytes());
+            assert_eq!(as_string, raw);
+        }
     }
 
     #[test]
