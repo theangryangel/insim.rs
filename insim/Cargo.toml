@@ -21,6 +21,7 @@ rustdoc-args = ["--cfg", "docrs"]
 
 [features]
 default = ["tokio", "blocking"]
+allow-unknown-packet = []
 blocking = []
 tokio = [
   "dep:tokio",
@@ -31,6 +32,7 @@ serde = [
   "insim_core/serde",
   "bitflags/serde",
   "indexmap/serde",
+  "bytes/serde",
 ]
 glam = [
   "insim_core/glam"

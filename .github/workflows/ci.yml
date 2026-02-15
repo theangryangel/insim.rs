@@ -40,8 +40,10 @@ jobs:
         with:
           toolchain: ${{ matrix.channel }}
       - uses: Swatinem/rust-cache@v2
-      - name: Run cargo test
+      - name: Run cargo test (all-features)
         run: cargo test --all --all-targets --all-features
+      - name: Run cargo test (default features)
+        run: cargo test --all --all-targets
 
   docs:
     runs-on: ubuntu-latest
