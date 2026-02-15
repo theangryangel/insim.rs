@@ -19,6 +19,21 @@ where
     ) -> impl Into<crate::Packet> + std::fmt::Debug;
 }
 
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg(feature = "allow-unknown-packet")]
+/// Raw binary capture of an unknown packet.
+///
+/// - Prevents the decoder from returning an error on unknown packets.
+/// - Contains the remaining unconsumed bytes from the stream.
+/// - Allows you to create packets that the library does not yet know about.
+pub struct Raw {
+    /// Packet id / discriminator / identifier
+    pub discriminator: u8,
+    /// Raw bytes, without the discriminator and without the length prefix
+    pub data: bytes::Bytes,
+}
+
 macro_rules! define_packet {
     (
         $(
@@ -38,6 +53,9 @@ macro_rules! define_packet {
                 $(#[$variant_attr])*
                 $variant($variant),
             )*
+            #[cfg(feature = "allow-unknown-packet")]
+            /// Raw binary capture of an unknown packet.
+            Unknown(Raw)
         }
 
         impl WithRequestId for Packet {
@@ -50,6 +68,8 @@ macro_rules! define_packet {
                     $(
                         Self::$variant(inner) => inner.reqi = reqi,
                     )*
+                    #[cfg(feature = "allow-unknown-packet")]
+                    Self::Unknown(_) => {},
                 }
                 self
             }
@@ -63,10 +83,22 @@ macro_rules! define_packet {
                         $disc => Ok(Self::$variant(<$variant>::decode(buf)?)),
                     )*
                     i => {
-                        return Err(
-                            insim_core::DecodeErrorKind::NoVariantMatch { found: i.into() }
-                                .context("Unknown packet identifier"),
-                        );
+                        #[cfg(feature = "allow-unknown-packet")]
+                        {
+                            Ok(Self::Unknown(
+                                Raw {
+                                    discriminator: i,
+                                    data: buf.clone(),
+                                }
+                            ))
+                        }
+                        #[cfg(not(feature = "allow-unknown-packet"))]
+                        {
+                            Err(
+                                insim_core::DecodeErrorKind::NoVariantMatch { found: i.into() }
+                                    .context("Unknown packet identifier"),
+                            )
+                        }
                     },
                 }
             }
@@ -81,6 +113,11 @@ macro_rules! define_packet {
                             inner.encode(buf)?;
                         },
                     )*
+                    #[cfg(feature = "allow-unknown-packet")]
+                    Self::Unknown(Raw { discriminator, data }) => {
+                        discriminator.encode(buf)?;
+                        buf.extend_from_slice(&data);
+                    },
                 }
                 Ok(())
             }
@@ -318,11 +355,40 @@ impl Packet {
 
 #[cfg(test)]
 mod test {
+    use bytes::Bytes;
+    use insim_core::Decode;
+
     use super::Packet;
+
     fn assert_send<T: Send>() {}
 
     #[test]
     fn ensure_packet_is_send() {
         assert_send::<Packet>();
+    }
+
+    #[cfg(feature = "allow-unknown-packet")]
+    #[test]
+    fn test_unknown_packet() {
+        use super::Raw;
+
+        let mut buf = Bytes::from_static(&[255, 1]);
+        let res = Packet::decode(&mut buf)
+            .expect("Expected to handle unknown packet with allow-unknown-packet feature enabled`");
+        assert!(matches!(
+            res,
+            Packet::Unknown(Raw {
+                discriminator: 255,
+                ..
+            })
+        ));
+    }
+
+    #[cfg(not(feature = "allow-unknown-packet"))]
+    #[test]
+    fn test_unknown_packet() {
+        let mut buf = Bytes::from_static(&[255, 1]);
+        let res = Packet::decode(&mut buf);
+        assert!(res.is_err());
     }
 }

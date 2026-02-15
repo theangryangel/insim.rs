@@ -26,6 +26,7 @@ serde = [
   "dep:serde",
   "bitflags/serde",
   "glam?/serde",
+  "bytes/serde",
 ]
 glam = [
   "dep:glam"

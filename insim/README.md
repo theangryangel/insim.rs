@@ -68,11 +68,12 @@ A more comprehensive guide can be found within the [book / cookbook / guide](_bo
 
 # Crate features
 
-| Name       | Description                  | Default? |
-| ---------- | ---------------------------- | -------- |
-| `serde`    | Enable serde support         | No       |
-| `tokio`    | Enable tokio support         | Yes      |
-| `blocking` | Enable blocking/sync support | Yes      |
+| Name                   | Description                            | Default? |
+| ---------------------- | -------------------------------------- | -------- |
+| `serde`                | Enable serde support                   | No       |
+| `tokio`                | Enable tokio support                   | Yes      |
+| `blocking`             | Enable blocking/sync support           | Yes      |
+| `allow-unknown-packet` | Unknown packets do not return an error | No       |
 
 # Release Notes / Migration
 
