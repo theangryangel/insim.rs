@@ -112,6 +112,7 @@ impl Framed {
     /// Asynchronously flush the inner network and shutdown
     pub async fn shutdown(&mut self) -> Result<()> {
         self.write(TinyType::Close).await?;
+        self.flush().await?;
         if let Transport::Tcp(stream) = &mut self.inner {
             stream.shutdown().await?;
         }
