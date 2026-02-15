@@ -105,6 +105,10 @@ impl Framed {
     pub fn shutdown(&mut self) -> Result<()> {
         self.write(TinyType::Close)?;
         self.flush()?;
+        if let Transport::Tcp(stream) = &mut self.inner {
+            let _ = stream.shutdown(std::net::Shutdown::Both);
+        }
+
         Ok(())
     }
 }

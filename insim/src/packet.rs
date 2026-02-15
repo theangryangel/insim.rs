@@ -275,26 +275,27 @@ impl Packet {
             Packet::Flg(_) => 8,
             Packet::Pfl(_) => 8,
             Packet::Fin(_) => 20,
-            Packet::Res(_) => 86,
-            Packet::Reo(_) => 44,
-            Packet::Nlp(_) => 10,
-            Packet::Mci(_) => 32,
+            Packet::Res(_) => 84,
+            Packet::Reo(_) => 52,
+            Packet::Nlp(n) => {
+                let count = n.info.len();
+                4 + (count * 6)
+            },
+            Packet::Mci(m) => 4 + (m.info.len() * 28),
             Packet::Msx(_) => 100,
             Packet::Msl(_) => 132,
-            Packet::Crs(_) => 4,
             Packet::Bfn(_) => 8,
             Packet::Axi(_) => 40,
-            Packet::Axo(_) => 4,
             Packet::Btn(_) => 16,
             Packet::Btc(_) => 8,
             Packet::Btt(_) => 104,
             Packet::Rip(_) => 80,
             Packet::Ssh(_) => 40,
-            Packet::Con(_) => 40,
-            Packet::Obh(_) => 24,
-            Packet::Hlv(_) => 16,
+            Packet::Con(_) => 44,
+            Packet::Obh(_) => 28,
+            Packet::Hlv(_) => 20,
             Packet::Plc(_) => 8,
-            Packet::Axm(_) => 16,
+            Packet::Axm(a) => 8 + (a.info.len() * 8),
             Packet::Acr(_) => 12,
             Packet::Hcp(_) => 68,
             Packet::Nci(_) => 16,
@@ -305,13 +306,12 @@ impl Packet {
             Packet::Slc(_) => 8,
             Packet::Csc(_) => 20,
             Packet::Cim(_) => 8,
-            Packet::Mal(_) => 12,
+            Packet::Mal(m) => 8 + (m.len() * 4),
+            Packet::Plh(p) => 4 + (p.hcaps.len() * 4),
+            Packet::Ipb(i) => 8 + (i.len() * 4),
             Packet::Aic(i) => 4 + (i.inputs.len() * 4),
             Packet::Aii(_) => 96,
-            _ => {
-                // a sensible default for everything else
-                4
-            },
+            _ => 4, // a sensible default for everything else
         }
     }
 }
