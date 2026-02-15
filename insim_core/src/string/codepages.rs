@@ -2,7 +2,6 @@
 
 use std::{borrow::Cow, vec::Vec};
 
-use itertools::Itertools;
 use smallvec::SmallVec;
 
 /// LFS strings are a sequence of u8 bytes, with an optional trailing \0.
@@ -180,11 +179,28 @@ pub fn to_lossy_string(input: &'_ [u8]) -> Cow<'_, str> {
     // slowest path
     // find the positions in the input for each ^L, ^B...
     // XXX: Using SmallVec here to avoid an allocation if possible
-    let mut indices: SmallVec<[usize; 8]> = input
-        .iter()
-        .tuple_windows()
-        .positions(|(elem, next)| elem.is_lfs_control_char() && next.is_lfs_codepage())
-        .collect();
+    let mut indices: SmallVec<[usize; 8]> = SmallVec::new();
+    let mut iter = input.iter().enumerate().peekable();
+
+    while let Some((i, &cur)) = iter.next() {
+        // we only care if the current char is a control char
+        if !cur.is_lfs_control_char() {
+            continue;
+        }
+
+        if let Some((_, next)) = iter.peek() {
+            if next.is_lfs_control_char() {
+                // greedy handling for escaped control markers (^^)
+                // we consume the next char so we don't process it again
+                let _ = iter.next();
+            } else if next.is_lfs_codepage() {
+                // found a valid codepage marker (^L, ^B, etc)
+                indices.push(i);
+                // consume the next char as part of this marker
+                let _ = iter.next();
+            }
+        }
+    }
 
     // allowing unwrap because if this panics we're screwed
     let default_lfs_codepage = DEFAULT_CODEPAGE
@@ -351,8 +367,17 @@ mod tests {
     fn test_retain_escaping() {
         let raw = "^^";
         let as_bytes = to_lossy_bytes(&raw);
-
         assert_eq!(as_bytes, raw.as_bytes());
+        assert_eq!(raw, to_lossy_string(&as_bytes));
+    }
+
+    #[test]
+    fn test_escaped_codepage_does_not_convert() {
+        for codepage in ['L', 'G', 'C', 'E', 'T', 'B', 'J', 'H', 'S', 'K', '8'] {
+            let raw = format!("^^{}1", codepage);
+            let as_string = to_lossy_string(raw.as_bytes());
+            assert_eq!(as_string, raw);
+        }
     }
 
     #[test]
