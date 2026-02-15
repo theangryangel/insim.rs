@@ -224,6 +224,21 @@ let escaped = "^|*".escape();
 let unescaped = escaped.unescape();
 ```
 
+### Recommended processing order for incoming text
+
+LFS text can contain codepages, colours, and escape sequences at the same time.
+The safest order is:
+
+1. Decode codepages first (if you're using the insim crate, not insim_core this happens
+   automatically).
+2. Perform colour-aware operations while the string is still escaped.
+3. Unescape last.
+
+This matters because unescaping is lossy with respect to control-marker intent.
+For example, `^^0` unescapes to `^0`, which looks like a valid colour marker.
+If you unescape first, later colour parsing can no longer tell whether that marker
+was originally escaped text or a real colour control sequence.
+
 ## Layout objects
 
 The insim crate now provides higher level layout object abstraction, allowing you to

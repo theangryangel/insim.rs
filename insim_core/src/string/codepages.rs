@@ -152,6 +152,8 @@ pub fn to_lossy_bytes(input: &'_ str) -> Cow<'_, [u8]> {
 
 /// Convert a InsimString into a native rust String, with potential lossy conversion from codepages
 /// Assumes any \0 characters have been stripped ahead of time
+///
+/// This decodes codepage markers only. It does not unescape LFS escape sequences.
 pub fn to_lossy_string(input: &'_ [u8]) -> Cow<'_, str> {
     // empty string
     if input.is_empty() {

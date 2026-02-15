@@ -48,7 +48,9 @@ pub trait Colour {
     /// Make this dark green (default colour)
     fn dark_green(self) -> String;
 
-    /// Strip colours from a string
+    /// Strip colours from a string.
+    ///
+    /// If you also need to unescape, strip colours first while marker intent is still preserved.
     fn strip_colours(&self) -> Cow<'_, str>;
 }
 
@@ -95,6 +97,9 @@ impl<T: AsRef<str>> Colour for T {
 }
 
 /// Strip LFS colours
+///
+/// If you also need to unescape, call this before unescaping so escaped markers (`^^`) are still
+/// distinguishable from real colour markers.
 /// Prefer the [`Colour::strip_colours`] trait function
 pub fn strip(input: &'_ str) -> Cow<'_, str> {
     if !input.chars().any(|c| c.is_lfs_control_char()) {
