@@ -27,13 +27,23 @@ pub enum UiError {
     RuntimeCreationFailed,
 }
 
+// per-connection channels owned by the attach loop and forwarded into a spawned view task.
+struct ActiveViewChannels<V: View> {
+    // per-connection props updates (`ui::set_player_state`).
+    connection_props_tx: watch::Sender<V::ConnectionState>,
+    // per-connection view messages (`ui::update` and `update_from_broadcast`).
+    view_msg_tx: mpsc::UnboundedSender<V::Message>,
+    // per-connection ui input events demuxed from insim packets.
+    ui_input_tx: mpsc::UnboundedSender<view::ViewInput>,
+}
+
 /// Ui handle. Create using [attach]. When dropped all insim buttons will be automatically removed.
 /// Intended for multi-player/multi-connection UIs
 #[derive(Debug)]
 pub struct Ui<M: Clone + Send + 'static, G, C> {
     global: watch::Sender<G>,
-    connection: mpsc::Sender<(ConnectionId, C)>,
-    message: mpsc::Sender<(ConnectionId, M)>,
+    connection_props: mpsc::Sender<(ConnectionId, C)>,
+    view_messages: mpsc::Sender<(ConnectionId, M)>,
     outbound: broadcast::Sender<(ConnectionId, M)>,
 }
 
@@ -52,7 +62,7 @@ where
     /// Update the state for a specific connection, triggering a re-render for that player.
     /// Player state is per-player state, useful for player-specific UI elements.
     pub async fn set_player_state(&self, ucid: ConnectionId, value: C) {
-        let _ = self.connection.send((ucid, value)).await;
+        let _ = self.connection_props.send((ucid, value)).await;
     }
 
     /// Get a clonable sender for injecting messages into UI components.
@@ -86,7 +96,7 @@ where
     /// ui.set_global_state(new_state);
     /// ```
     pub fn sender(&self) -> mpsc::Sender<(ConnectionId, M)> {
-        self.message.clone()
+        self.view_messages.clone()
     }
 
     /// Subscribe to messages produced by user UI interactions (e.g. button click / type-in).
@@ -128,7 +138,7 @@ where
 
     /// Inject message into UI for a given ucid.
     pub async fn update(&self, ucid: ConnectionId, msg: M) {
-        let _ = self.message.send((ucid, msg)).await;
+        let _ = self.view_messages.send((ucid, msg)).await;
     }
 }
 
@@ -192,13 +202,15 @@ where
     V: View,
 {
     let (global_tx, _global_rx) = watch::channel(props);
-    let (player_tx, mut player_rx) = mpsc::channel(100);
-    let (message_tx, mut message_rx) = mpsc::channel::<(ConnectionId, V::Message)>(100);
+    // Outside-in connection props updates (`Ui::set_player_state`).
+    let (connection_props_tx, mut connection_props_rx) = mpsc::channel(100);
+    // Outside-in per-player messages (`Ui::update`, `update_from_broadcast`, `Ui::sender`).
+    let (view_msg_tx, mut view_msg_rx) = mpsc::channel::<(ConnectionId, V::Message)>(100);
     let (outbound_tx, _outbound_rx) = broadcast::channel::<(ConnectionId, V::Message)>(100);
     let ui_handle = Ui {
         global: global_tx.clone(),
-        connection: player_tx,
-        message: message_tx,
+        connection_props: connection_props_tx,
+        view_messages: view_msg_tx,
         outbound: outbound_tx.clone(),
     };
 
@@ -221,16 +233,8 @@ where
         let local = LocalSet::new();
         local.block_on(&rt, async move {
             let mut packets = insim.subscribe();
-            let mut message_rx_closed = false;
-            #[allow(clippy::type_complexity)]
-            let mut active: HashMap<
-                ConnectionId,
-                (
-                    watch::Sender<V::ConnectionState>,
-                    mpsc::UnboundedSender<V::Message>,
-                    mpsc::UnboundedSender<view::ViewInput>,
-                ),
-            > = HashMap::new();
+            let mut view_msg_rx_closed = false;
+            let mut active: HashMap<ConnectionId, ActiveViewChannels<V>> = HashMap::new();
 
             if let Err(e) = insim.send(TinyType::Ncn.with_request_id(1)).await {
                 tracing::warn!("UI attach: failed to request current connections: {e}");
@@ -257,23 +261,23 @@ where
                             let _ = active.remove(&cnl.ucid);
                         },
                         Ok(Packet::Btc(btc)) => {
-                            if let Some((_, _, input_tx)) = active.get(&btc.ucid) {
-                                let _ = input_tx.send(view::ViewInput::Click {
+                            if let Some(channels) = active.get(&btc.ucid) {
+                                let _ = channels.ui_input_tx.send(view::ViewInput::Click {
                                     clickid: btc.clickid,
                                 });
                             }
                         }
                         Ok(Packet::Btt(btt)) => {
-                            if let Some((_, _, input_tx)) = active.get(&btt.ucid) {
-                                let _ = input_tx.send(view::ViewInput::TypeIn {
+                            if let Some(channels) = active.get(&btt.ucid) {
+                                let _ = channels.ui_input_tx.send(view::ViewInput::TypeIn {
                                     clickid: btt.clickid,
                                     text: btt.text,
                                 });
                             }
                         }
                         Ok(Packet::Bfn(bfn)) => {
-                            if let Some((_, _, input_tx)) = active.get(&bfn.ucid) {
-                                let _ = input_tx.send(view::ViewInput::Bfn {
+                            if let Some(channels) = active.get(&bfn.ucid) {
+                                let _ = channels.ui_input_tx.send(view::ViewInput::Bfn {
                                     subt: bfn.subt,
                                 });
                             }
@@ -290,40 +294,39 @@ where
                         }
                     },
 
-                    res = player_rx.recv() => match res {
+                    res = connection_props_rx.recv() => match res {
                         Some((ucid, props)) => {
-                            if let Some((props_tx, _, _)) = active.get_mut(&ucid) {
-                                let _ = props_tx.send(props);
+                            if let Some(channels) = active.get_mut(&ucid) {
+                                let _ = channels.connection_props_tx.send(props);
                             }
                         },
                         None => {
-                            tracing::debug!("UI attach: player state channel closed");
+                            tracing::debug!("UI attach: connection props channel closed");
                             break;
                         }
                     },
 
-                    // Message channel is separate from lifecycle—UiSender clones keep this
-                    // channel open, but we shut down based on player_rx (connection props).
-                    // Once Ui is dropped and we exit this loop, message_rx is dropped and
-                    // UiSender::send() will return Err.
-                    res = message_rx.recv(), if !message_rx_closed => match res {
+                    // The per-player message channel is separate from lifecycle.
+                    // UiSender clones can keep it open, but we shut down based on
+                    // connection_props_rx (driven by the main Ui handle).
+                    res = view_msg_rx.recv(), if !view_msg_rx_closed => match res {
                         Some((ucid, msg)) => {
-                            if let Some((_, msg_tx, _)) = active.get(&ucid) {
-                                let _ = msg_tx.send(msg);
+                            if let Some(channels) = active.get(&ucid) {
+                                let _ = channels.view_msg_tx.send(msg);
                             }
                         },
                         None => {
-                            // All senders dropped (Ui + all UiSender clones), but we don't
-                            // shut down here—lifecycle is tied to player_rx.
-                            message_rx_closed = true;
+                            // All message senders dropped (Ui + Ui::sender clones), but we don't
+                            // shut down here—lifecycle is tied to connection_props_rx.
+                            view_msg_rx_closed = true;
                         }
                     },
                 }
             }
 
             // for all player connections automatically clear all buttons
-            // when we loose the UiHandle.
-            // this should happen when we loose the player_rx receiver.
+            // when we lose the UiHandle.
+            // this should happen when we lose the connection_props_rx receiver.
             let clear: Vec<Bfn> = active
                 .drain()
                 .map(|(ucid, _)| Bfn {
@@ -357,31 +360,34 @@ fn spawn_for<V: View>(
     ucid: ConnectionId,
     global_rx: watch::Receiver<V::GlobalState>,
     insim: &insim::builder::InsimTask,
-    active: &mut HashMap<
-        ConnectionId,
-        (
-            watch::Sender<V::ConnectionState>,
-            mpsc::UnboundedSender<V::Message>,
-            mpsc::UnboundedSender<view::ViewInput>,
-        ),
-    >,
+    active: &mut HashMap<ConnectionId, ActiveViewChannels<V>>,
     outbound: broadcast::Sender<(ConnectionId, V::Message)>,
 ) {
-    let (connection_tx, connection_rx) = watch::channel(V::ConnectionState::default());
-    let (internal_tx, internal_rx) = mpsc::unbounded_channel();
-    let (input_tx, input_rx) = mpsc::unbounded_channel();
+    // per-view connection props stream (targeted by ucid).
+    let (connection_props_tx, connection_props_rx) = watch::channel(V::ConnectionState::default());
+    // per-view message stream consumed by `view::update`.
+    let (view_msg_tx, view_msg_rx) = mpsc::unbounded_channel();
+    // per-view ui input stream (demuxed btc/btt/bfn events).
+    let (ui_input_tx, ui_input_rx) = mpsc::unbounded_channel();
 
     run_view::<V>(view::RunViewArgs {
         ucid,
-        global: global_rx,
-        connection: connection_rx,
-        internal_tx: internal_tx.clone(),
-        internal_rx,
-        input_rx,
+        global_props: global_rx,
+        connection_props: connection_props_rx,
+        view_msg_tx: view_msg_tx.clone(),
+        view_msg_rx,
+        ui_input_rx,
         insim: insim.clone(),
         outbound,
     });
-    let _ = active.insert(ucid, (connection_tx, internal_tx, input_tx));
+    let _ = active.insert(
+        ucid,
+        ActiveViewChannels {
+            connection_props_tx,
+            view_msg_tx,
+            ui_input_tx,
+        },
+    );
 }
 
 /// Shortcut to make a container [node::Node]

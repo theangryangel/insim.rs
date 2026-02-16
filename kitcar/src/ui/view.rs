@@ -46,11 +46,16 @@ pub(super) enum ViewInput {
 
 pub(super) struct RunViewArgs<V: View> {
     pub ucid: ConnectionId,
-    pub global: watch::Receiver<V::GlobalState>,
-    pub connection: watch::Receiver<V::ConnectionState>,
-    pub internal_tx: mpsc::UnboundedSender<V::Message>,
-    pub internal_rx: mpsc::UnboundedReceiver<V::Message>,
-    pub input_rx: mpsc::UnboundedReceiver<ViewInput>,
+    // global props stream shared by all connected players.
+    pub global_props: watch::Receiver<V::GlobalState>,
+    // per-connection props stream for this specific `ucid`.
+    pub connection_props: watch::Receiver<V::ConnectionState>,
+    // sender passed to `view::mount` so components can enqueue messages for themselves.
+    pub view_msg_tx: mpsc::UnboundedSender<V::Message>,
+    // receiver of per-view messages (from component tasks and external `ui::update`).
+    pub view_msg_rx: mpsc::UnboundedReceiver<V::Message>,
+    // demuxed ui input events for this `ucid`.
+    pub ui_input_rx: mpsc::UnboundedReceiver<ViewInput>,
     pub insim: insim::builder::InsimTask,
     pub outbound: tokio::sync::broadcast::Sender<(ConnectionId, V::Message)>,
 }
@@ -59,22 +64,22 @@ pub(super) struct RunViewArgs<V: View> {
 pub(super) fn run_view<V: View>(args: RunViewArgs<V>) {
     let RunViewArgs {
         ucid,
-        mut global,
-        mut connection,
-        internal_tx,
-        mut internal_rx,
-        mut input_rx,
+        mut global_props,
+        mut connection_props,
+        view_msg_tx,
+        mut view_msg_rx,
+        mut ui_input_rx,
         insim,
         outbound,
     } = args;
 
     #[allow(clippy::let_underscore_future)]
     let _ = tokio::task::spawn_local(async move {
-        let mut root = V::mount(internal_tx);
+        let mut root = V::mount(view_msg_tx);
         let mut canvas = Canvas::<V::Message>::new(ucid);
         let mut blocked = false; // user cleared the buttons, do not redraw unless requested
-        let mut internal_closed = false;
-        let mut input_closed = false;
+        let mut view_msg_rx_closed = false;
+        let mut ui_input_rx_closed = false;
 
         // always draw immediately
         let mut should_render = true;
@@ -82,8 +87,8 @@ pub(super) fn run_view<V: View>(args: RunViewArgs<V>) {
         loop {
             if should_render && !blocked {
                 let vdom = root.render(V::compose(
-                    global.borrow_and_update().clone(),
-                    connection.borrow_and_update().clone(),
+                    global_props.borrow_and_update().clone(),
+                    connection_props.borrow_and_update().clone(),
                 ));
                 if let Some(diff) = canvas.reconcile(vdom)
                     && let Err(e) = insim.send_all(diff.merge()).await
@@ -94,36 +99,36 @@ pub(super) fn run_view<V: View>(args: RunViewArgs<V>) {
             }
 
             should_render = tokio::select! {
-                res = global.changed() => {
+                res = global_props.changed() => {
                     if res.is_err() {
                         break;
                     }
                     true
                 },
 
-                res = connection.changed() => {
+                res = connection_props.changed() => {
                     if res.is_err() {
                         break;
                     }
                     true
                 },
 
-                // internal messages (i.e. clock ticks?)
-                msg = internal_rx.recv(), if !internal_closed => {
+                // view messages (component self-messages and external Ui::update messages)
+                msg = view_msg_rx.recv(), if !view_msg_rx_closed => {
                     match msg {
                         Some(msg) => {
                             root.update(msg);
                             true
                         },
                         None => {
-                            internal_closed = true;
+                            view_msg_rx_closed = true;
                             false
                         }
                     }
                 },
 
                 // user input from demux (click ids)
-                packet = input_rx.recv(), if !input_closed => {
+                packet = ui_input_rx.recv(), if !ui_input_rx_closed => {
                     match packet {
                         Some(ViewInput::Click { clickid }) => {
                             if let Some(msg) = canvas.translate_clickid(&clickid) {
@@ -158,7 +163,7 @@ pub(super) fn run_view<V: View>(args: RunViewArgs<V>) {
                             }
                         },
                         None => {
-                            input_closed = true;
+                            ui_input_rx_closed = true;
                             false
                         }
                     }
