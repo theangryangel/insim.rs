@@ -13,7 +13,7 @@ glam = { workspace = true }
 insim = { path = "../../insim", default-features = false, features = ["tokio", "serde", "glam"] }
 kitcar = { path = "../../kitcar" }
 noise = "0.9.0"
-rand = { version = "0.9", features = ["thread_rng"] }
+rand = { version = "0.10", features = ["thread_rng"] }
 rand_distr = "0.5.1"
 serde = { workspace = true, features = ["derive"] }
 serde_norway = "0.9.42"
