@@ -156,7 +156,7 @@ impl Scene for Rounds {
         });
 
         for round in 1..=self.rounds {
-            state.broadcast_rankings(&self, &ui).await;
+            state.broadcast_rankings(&self, &ui).await?;
             state.run_round(round, &mut self, &ui).await?;
         }
 
@@ -179,29 +179,42 @@ impl RoundsState {
             ClockworkRoundGlobalProps,
             ClockworkRoundConnectionProps,
         >,
-    ) {
-        if let Some(connections) = config.presence.connections().await {
-            for conn in connections {
-                let props = self.connection_props(&conn.uname);
-                ui.set_player_state(conn.ucid, props).await;
-            }
+    ) -> Result<(), SceneError> {
+        let connections = config
+            .presence
+            .connections()
+            .await
+            .map_err(|cause| SceneError::Custom {
+                scene: "rounds::broadcast_rankings::connections",
+                cause: Box::new(cause),
+            })?;
+
+        for conn in connections {
+            let props = self.connection_props(&conn.uname);
+            ui.set_player_state(conn.ucid, props).await;
         }
+
+        Ok(())
     }
 
-    async fn enriched_leaderboard(&self, config: &Rounds) -> EnrichedLeaderboard {
+    async fn enriched_leaderboard(&self, config: &Rounds) -> Result<EnrichedLeaderboard, SceneError> {
         let ranking = self.scores.ranking();
         let names = config
             .presence
             .last_known_names(ranking.iter().map(|(uname, _)| uname))
             .await
-            .unwrap_or_default();
-        ranking
+            .map_err(|cause| SceneError::Custom {
+                scene: "rounds::enriched_leaderboard::last_known_names",
+                cause: Box::new(cause),
+            })?;
+
+        Ok(ranking
             .iter()
             .map(|(uname, pts)| {
                 let pname = names.get(uname).cloned().unwrap_or_else(|| uname.clone());
                 (uname.clone(), pname, *pts)
             })
-            .collect()
+            .collect())
     }
 
     fn connection_props(&self, uname: &str) -> ClockworkRoundConnectionProps {
@@ -241,7 +254,7 @@ impl RoundsState {
 
         let mut countdown = Countdown::new(Duration::from_secs(1), 60);
         let mut packets = config.insim.subscribe();
-        let leaderboard = self.enriched_leaderboard(config).await;
+        let leaderboard = self.enriched_leaderboard(config).await?;
 
         loop {
             tokio::select! {
@@ -286,7 +299,15 @@ impl RoundsState {
                     .send_message("Welcome! Game in progress", ncn.ucid)
                     .await?;
 
-                if let Some(conn) = config.presence.connection(&ncn.ucid).await {
+                if let Some(conn) = config
+                    .presence
+                    .connection(&ncn.ucid)
+                    .await
+                    .map_err(|cause| SceneError::Custom {
+                        scene: "rounds::handle_packet::connection",
+                        cause: Box::new(cause),
+                    })?
+                {
                     ui.set_player_state(ncn.ucid, self.connection_props(&conn.uname))
                         .await;
                 }
@@ -302,9 +323,23 @@ impl RoundsState {
                 time,
                 ..
             }) => {
-                if let Some(player) = config.presence.player(&plid).await
+                if let Some(player) = config
+                    .presence
+                    .player(&plid)
+                    .await
+                    .map_err(|cause| SceneError::Custom {
+                        scene: "rounds::handle_packet::player",
+                        cause: Box::new(cause),
+                    })?
                     && !player.ptype.is_ai()
-                    && let Some(conn) = config.presence.connection_by_player(&plid).await
+                    && let Some(conn) = config
+                        .presence
+                        .connection_by_player(&plid)
+                        .await
+                        .map_err(|cause| SceneError::Custom {
+                            scene: "rounds::handle_packet::connection_by_player",
+                            cause: Box::new(cause),
+                        })?
                 {
                     match kind {
                         InsimCheckpointKind::Checkpoint1 => {

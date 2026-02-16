@@ -276,6 +276,14 @@ pub enum PresenceError {
     /// Lost presence watch channel
     #[error("Lost presence watch channel")]
     WatchChannelClosed,
+
+    /// Lost presence query channel
+    #[error("Lost presence query channel")]
+    QueryChannelClosed,
+
+    /// Lost presence response channel
+    #[error("Lost presence response channel")]
+    ResponseChannelClosed,
 }
 
 /// Spawn a background instance of Presence and return a handle so that we can query it
@@ -423,27 +431,30 @@ impl Presence {
     }
 
     /// Player count
-    pub async fn player_count(&self) -> usize {
+    pub async fn player_count(&self) -> Result<usize, PresenceError> {
         let (tx, rx) = oneshot::channel();
         self.query_tx
             .send(PresenceQuery::PlayerCount { response_tx: tx })
             .await
-            .unwrap_or_default();
-        rx.await.unwrap_or_default()
+            .map_err(|_| PresenceError::QueryChannelClosed)?;
+        rx.await.map_err(|_| PresenceError::ResponseChannelClosed)
     }
 
     /// get all connections
-    pub async fn connections(&self) -> Option<Vec<ConnectionInfo>> {
+    pub async fn connections(&self) -> Result<Vec<ConnectionInfo>, PresenceError> {
         let (tx, rx) = oneshot::channel();
         self.query_tx
             .send(PresenceQuery::Connections { response_tx: tx })
             .await
-            .ok()?;
-        rx.await.ok()
+            .map_err(|_| PresenceError::QueryChannelClosed)?;
+        rx.await.map_err(|_| PresenceError::ResponseChannelClosed)
     }
 
     /// get a connection
-    pub async fn connection(&self, ucid: &ConnectionId) -> Option<ConnectionInfo> {
+    pub async fn connection(
+        &self,
+        ucid: &ConnectionId,
+    ) -> Result<Option<ConnectionInfo>, PresenceError> {
         let (tx, rx) = oneshot::channel();
         self.query_tx
             .send(PresenceQuery::Connection {
@@ -451,11 +462,14 @@ impl Presence {
                 response_tx: tx,
             })
             .await
-            .ok()?;
-        rx.await.ok()?
+            .map_err(|_| PresenceError::QueryChannelClosed)?;
+        rx.await.map_err(|_| PresenceError::ResponseChannelClosed)
     }
     /// get a connection by player
-    pub async fn connection_by_player(&self, plid: &PlayerId) -> Option<ConnectionInfo> {
+    pub async fn connection_by_player(
+        &self,
+        plid: &PlayerId,
+    ) -> Result<Option<ConnectionInfo>, PresenceError> {
         let (tx, rx) = oneshot::channel();
         self.query_tx
             .send(PresenceQuery::ConnectionByPlayer {
@@ -463,22 +477,22 @@ impl Presence {
                 response_tx: tx,
             })
             .await
-            .ok()?;
-        rx.await.ok()?
+            .map_err(|_| PresenceError::QueryChannelClosed)?;
+        rx.await.map_err(|_| PresenceError::ResponseChannelClosed)
     }
 
     /// get all players
-    pub async fn players(&self) -> Option<Vec<PlayerInfo>> {
+    pub async fn players(&self) -> Result<Vec<PlayerInfo>, PresenceError> {
         let (tx, rx) = oneshot::channel();
         self.query_tx
             .send(PresenceQuery::Players { response_tx: tx })
             .await
-            .ok()?;
-        rx.await.ok()
+            .map_err(|_| PresenceError::QueryChannelClosed)?;
+        rx.await.map_err(|_| PresenceError::ResponseChannelClosed)
     }
 
     /// get a player
-    pub async fn player(&self, plid: &PlayerId) -> Option<PlayerInfo> {
+    pub async fn player(&self, plid: &PlayerId) -> Result<Option<PlayerInfo>, PresenceError> {
         let (tx, rx) = oneshot::channel();
         self.query_tx
             .send(PresenceQuery::Player {
@@ -486,12 +500,12 @@ impl Presence {
                 response_tx: tx,
             })
             .await
-            .ok()?;
-        rx.await.ok()?
+            .map_err(|_| PresenceError::QueryChannelClosed)?;
+        rx.await.map_err(|_| PresenceError::ResponseChannelClosed)
     }
 
     /// get last known display name by uname (persists after disconnect)
-    pub async fn last_known_name(&self, uname: &str) -> Option<String> {
+    pub async fn last_known_name(&self, uname: &str) -> Result<Option<String>, PresenceError> {
         let (tx, rx) = oneshot::channel();
         self.query_tx
             .send(PresenceQuery::LastKnownName {
@@ -499,12 +513,15 @@ impl Presence {
                 response_tx: tx,
             })
             .await
-            .ok()?;
-        rx.await.ok()?
+            .map_err(|_| PresenceError::QueryChannelClosed)?;
+        rx.await.map_err(|_| PresenceError::ResponseChannelClosed)
     }
 
     /// batch fetch last known display names by unames (persists after disconnect)
-    pub async fn last_known_names<I, S>(&self, unames: I) -> Option<HashMap<String, String>>
+    pub async fn last_known_names<I, S>(
+        &self,
+        unames: I,
+    ) -> Result<HashMap<String, String>, PresenceError>
     where
         I: IntoIterator<Item = S>,
         S: Into<String>,
@@ -516,7 +533,7 @@ impl Presence {
                 response_tx: tx,
             })
             .await
-            .ok()?;
-        rx.await.ok()
+            .map_err(|_| PresenceError::QueryChannelClosed)?;
+        rx.await.map_err(|_| PresenceError::ResponseChannelClosed)
     }
 }

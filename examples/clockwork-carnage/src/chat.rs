@@ -46,7 +46,13 @@ impl Chat {
         loop {
             match chat.recv().await {
                 Ok((msg, ucid)) if matches(&msg) => {
-                    if let Some(conn) = presence.connection(&ucid).await
+                    if let Some(conn) = presence
+                        .connection(&ucid)
+                        .await
+                        .map_err(|cause| SceneError::Custom {
+                            scene: "wait_for_admin_cmd::connection",
+                            cause: Box::new(cause),
+                        })?
                         && conn.admin
                     {
                         return Ok(());

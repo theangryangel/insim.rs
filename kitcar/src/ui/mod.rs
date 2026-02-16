@@ -235,7 +235,7 @@ where
             > = HashMap::new();
 
             match presence.connections().await {
-                Some(existing_connections) => {
+                Ok(existing_connections) => {
                     for existing in existing_connections {
                         spawn_for::<V>(
                             existing.ucid,
@@ -246,8 +246,8 @@ where
                         );
                     }
                 },
-                None => {
-                    tracing::warn!("UI attach: failed to load existing connections");
+                Err(e) => {
+                    tracing::warn!("UI attach: failed to load existing connections: {e}");
                 },
             }
 

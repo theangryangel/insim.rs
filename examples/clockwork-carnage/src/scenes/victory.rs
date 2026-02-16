@@ -81,7 +81,7 @@ impl Scene for Victory {
     type Output = ();
 
     async fn run(self) -> Result<SceneResult<Self::Output>, SceneError> {
-        let enriched_leaderboard = self.enriched_leaderboard().await;
+        let enriched_leaderboard = self.enriched_leaderboard().await?;
         tracing::info!("leaderboard: {:?}", enriched_leaderboard);
         let ui = ui::attach::<ClockworkVictoryView>(
             self.insim.clone(),
@@ -97,20 +97,23 @@ impl Scene for Victory {
 }
 
 impl Victory {
-    async fn enriched_leaderboard(&self) -> EnrichedLeaderboard {
+    async fn enriched_leaderboard(&self) -> Result<EnrichedLeaderboard, SceneError> {
         let ranking = self.scores.ranking();
         let names = self
             .presence
             .last_known_names(ranking.iter().map(|(uname, _)| uname))
             .await
-            .unwrap_or_default();
-        self.scores
-            .ranking()
+            .map_err(|cause| SceneError::Custom {
+                scene: "victory::enriched_leaderboard::last_known_names",
+                cause: Box::new(cause),
+            })?;
+
+        Ok(ranking
             .iter()
             .map(|(uname, pts)| {
                 let pname = names.get(uname).cloned().unwrap_or_else(|| uname.clone());
                 (uname.clone(), pname, *pts)
             })
-            .collect()
+            .collect())
     }
 }
