@@ -12,7 +12,7 @@ pub use ::insim_core as core;
 use bytes::{Buf, BufMut};
 use insim_core::{
     Decode, DecodeString, Encode, EncodeString, dash_lights::DashLights, gear::Gear,
-    identifiers::PlayerId, speed::Speed,
+    identifiers::PlayerId, speed::Speed, vehicle::Vehicle,
 };
 
 bitflags::bitflags! {
@@ -98,7 +98,7 @@ pub struct Outgauge {
     /// Time, useful for ordering
     pub time: Duration,
     /// Vehicle name
-    pub car: String,
+    pub car: Vehicle,
     /// Flags describing what and how to display
     pub flags: OutgaugeFlags,
     /// Current gear: reverse=0, neutral=1, first=2...
@@ -142,7 +142,7 @@ impl Encode for Outgauge {
     fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
         let time = self.time.as_millis();
         (time as u32).encode(buf)?;
-        self.car.encode_ascii(buf, 4, false)?;
+        self.car.encode(buf)?;
         self.flags.encode(buf)?;
         self.gear.encode(buf)?;
         self.plid.encode(buf)?;
@@ -170,7 +170,7 @@ impl Encode for Outgauge {
 impl Decode for Outgauge {
     fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
         let time = Duration::from_millis(u32::decode(buf)? as u64);
-        let car = String::decode_ascii(buf, 4)?;
+        let car = Vehicle::decode(buf)?;
         let flags = OutgaugeFlags::decode(buf)?;
         let gear = Gear::decode(buf)?;
         let plid = PlayerId::decode(buf)?;
@@ -314,7 +314,7 @@ mod test {
             "assert reads and writes. left=actual, right=expected"
         );
 
-        assert_eq!(&outgauge.car, "XRT");
+        assert_eq!(outgauge.car, Vehicle::Xrt);
         assert!(matches!(outgauge.gear, Gear::Gear(2)));
         assert_eq!(outgauge.plid, PlayerId(1));
         assert_eq!(outgauge.rpm, 2450.390625);
