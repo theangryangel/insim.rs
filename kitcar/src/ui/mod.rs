@@ -231,6 +231,7 @@ where
                 (
                     watch::Sender<V::ConnectionState>,
                     mpsc::UnboundedSender<V::Message>,
+                    mpsc::UnboundedSender<view::ViewInput>,
                 ),
             > = HashMap::new();
 
@@ -271,8 +272,33 @@ where
                             // player left, remove their props sender
                             let _ = active.remove(&cnl.ucid);
                         },
-                        Err(e) => {
-                            tracing::error!("UI attach: failed to receive packet: {e}");
+                        Ok(Packet::Btc(btc)) => {
+                            if let Some((_, _, input_tx)) = active.get(&btc.ucid) {
+                                let _ = input_tx.send(view::ViewInput::Click {
+                                    clickid: btc.clickid,
+                                });
+                            }
+                        }
+                        Ok(Packet::Btt(btt)) => {
+                            if let Some((_, _, input_tx)) = active.get(&btt.ucid) {
+                                let _ = input_tx.send(view::ViewInput::TypeIn {
+                                    clickid: btt.clickid,
+                                    text: btt.text,
+                                });
+                            }
+                        }
+                        Ok(Packet::Bfn(bfn)) => {
+                            if let Some((_, _, input_tx)) = active.get(&bfn.ucid) {
+                                let _ = input_tx.send(view::ViewInput::Bfn {
+                                    subt: bfn.subt,
+                                });
+                            }
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                            tracing::warn!("UI attach: packet stream lagged by {skipped} packets");
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                            tracing::error!("UI attach: packet stream closed");
                             break;
                         },
                         _ => {
@@ -282,7 +308,7 @@ where
 
                     res = player_rx.recv() => match res {
                         Some((ucid, props)) => {
-                            if let Some((props_tx, _)) = active.get_mut(&ucid) {
+                            if let Some((props_tx, _, _)) = active.get_mut(&ucid) {
                                 let _ = props_tx.send(props);
                             }
                         },
@@ -298,7 +324,7 @@ where
                     // UiSender::send() will return Err.
                     res = message_rx.recv(), if !message_rx_closed => match res {
                         Some((ucid, msg)) => {
-                            if let Some((_, msg_tx)) = active.get(&ucid) {
+                            if let Some((_, msg_tx, _)) = active.get(&ucid) {
                                 let _ = msg_tx.send(msg);
                             }
                         },
@@ -352,23 +378,26 @@ fn spawn_for<V: View>(
         (
             watch::Sender<V::ConnectionState>,
             mpsc::UnboundedSender<V::Message>,
+            mpsc::UnboundedSender<view::ViewInput>,
         ),
     >,
     outbound: broadcast::Sender<(ConnectionId, V::Message)>,
 ) {
     let (connection_tx, connection_rx) = watch::channel(V::ConnectionState::default());
     let (internal_tx, internal_rx) = mpsc::unbounded_channel();
+    let (input_tx, input_rx) = mpsc::unbounded_channel();
 
-    run_view::<V>(
+    run_view::<V>(view::RunViewArgs {
         ucid,
-        global_rx,
-        connection_rx,
-        internal_tx.clone(),
+        global: global_rx,
+        connection: connection_rx,
+        internal_tx: internal_tx.clone(),
         internal_rx,
-        insim.clone(),
+        input_rx,
+        insim: insim.clone(),
         outbound,
-    );
-    let _ = active.insert(ucid, (connection_tx, internal_tx));
+    });
+    let _ = active.insert(ucid, (connection_tx, internal_tx, input_tx));
 }
 
 /// Shortcut to make a container [node::Node]

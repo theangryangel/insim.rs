@@ -1,4 +1,7 @@
-use insim::{Packet, identifiers::ConnectionId, insim::BfnType};
+use insim::{
+    identifiers::{ClickId, ConnectionId},
+    insim::BfnType,
+};
 use tokio::sync::{mpsc, watch};
 
 use super::canvas::Canvas;
@@ -34,23 +37,44 @@ pub trait View: Component + Sized + 'static {
     fn compose(global: Self::GlobalState, connection: Self::ConnectionState) -> Self::Props;
 }
 
+#[derive(Debug)]
+pub(super) enum ViewInput {
+    Click { clickid: ClickId },
+    TypeIn { clickid: ClickId, text: String },
+    Bfn { subt: BfnType },
+}
+
+pub(super) struct RunViewArgs<V: View> {
+    pub ucid: ConnectionId,
+    pub global: watch::Receiver<V::GlobalState>,
+    pub connection: watch::Receiver<V::ConnectionState>,
+    pub internal_tx: mpsc::UnboundedSender<V::Message>,
+    pub internal_rx: mpsc::UnboundedReceiver<V::Message>,
+    pub input_rx: mpsc::UnboundedReceiver<ViewInput>,
+    pub insim: insim::builder::InsimTask,
+    pub outbound: tokio::sync::broadcast::Sender<(ConnectionId, V::Message)>,
+}
+
 /// Run the UI on a LocalSet (does not require Send)
-pub(super) fn run_view<V: View>(
-    ucid: ConnectionId,
-    mut global: watch::Receiver<V::GlobalState>,
-    mut connection: watch::Receiver<V::ConnectionState>,
-    internal_tx: mpsc::UnboundedSender<V::Message>,
-    mut internal_rx: mpsc::UnboundedReceiver<V::Message>,
-    insim: insim::builder::InsimTask,
-    outbound: tokio::sync::broadcast::Sender<(ConnectionId, V::Message)>,
-) {
+pub(super) fn run_view<V: View>(args: RunViewArgs<V>) {
+    let RunViewArgs {
+        ucid,
+        mut global,
+        mut connection,
+        internal_tx,
+        mut internal_rx,
+        mut input_rx,
+        insim,
+        outbound,
+    } = args;
+
     #[allow(clippy::let_underscore_future)]
     let _ = tokio::task::spawn_local(async move {
         let mut root = V::mount(internal_tx);
-        let mut packets = insim.subscribe();
         let mut canvas = Canvas::<V::Message>::new(ucid);
         let mut blocked = false; // user cleared the buttons, do not redraw unless requested
         let mut internal_closed = false;
+        let mut input_closed = false;
 
         // always draw immediately
         let mut should_render = true;
@@ -98,11 +122,11 @@ pub(super) fn run_view<V: View>(
                     }
                 },
 
-                // user input (click ids)
-                packet = packets.recv() => {
+                // user input from demux (click ids)
+                packet = input_rx.recv(), if !input_closed => {
                     match packet {
-                        Ok(Packet::Btc(btc)) if btc.ucid == ucid => {
-                            if let Some(msg) = canvas.translate_clickid(&btc.clickid) {
+                        Some(ViewInput::Click { clickid }) => {
+                            if let Some(msg) = canvas.translate_clickid(&clickid) {
                                 let _ = outbound.send((ucid, msg.clone()));
                                 root.update(msg);
                                 true
@@ -110,8 +134,8 @@ pub(super) fn run_view<V: View>(
                                 false
                             }
                         },
-                        Ok(Packet::Btt(btt)) if btt.ucid == ucid => {
-                            if let Some(msg) = canvas.translate_typein_clickid(&btt.clickid, btt.text.clone()) {
+                        Some(ViewInput::TypeIn { clickid, text }) => {
+                            if let Some(msg) = canvas.translate_typein_clickid(&clickid, text) {
                                 let _ = outbound.send((ucid, msg.clone()));
                                 root.update(msg);
                                 true
@@ -119,7 +143,7 @@ pub(super) fn run_view<V: View>(
                                 false
                             }
                         }
-                        Ok(Packet::Bfn(bfn)) if bfn.ucid == ucid => match bfn.subt {
+                        Some(ViewInput::Bfn { subt }) => match subt {
                             BfnType::Clear | BfnType::UserClear => {
                                 blocked = true;
                                 canvas.clear();
@@ -133,12 +157,8 @@ pub(super) fn run_view<V: View>(
                                 false
                             }
                         },
-                        Err(e) => {
-                            tracing::error!("Failed to receive packets from insim: {e}");
-                            break;
-                        }
-                        _ => {
-                            // ignore unrelated packets
+                        None => {
+                            input_closed = true;
                             false
                         }
                     }
