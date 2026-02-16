@@ -57,7 +57,7 @@ impl ui::View for ClockworkLobbyView {
     type GlobalState = Duration;
     type ConnectionState = ();
 
-    fn mount(_tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
+    fn mount(_invalidator: ui::InvalidateHandle) -> Self {
         Self {
             help_dialog: HelpDialog::default(),
         }

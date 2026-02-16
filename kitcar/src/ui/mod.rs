@@ -166,7 +166,7 @@ where
 ///     type GlobalState = GameState;
 ///     type ConnectionState = PlayerState;
 ///
-///     fn mount(_tx: mpsc::UnboundedSender<Self::Message>) -> Self {
+///     fn mount(_invalidator: InvalidateHandle) -> Self {
 ///         Self
 ///     }
 ///
@@ -365,7 +365,7 @@ fn spawn_for<V: View>(
 ) {
     // per-view connection props stream (targeted by ucid).
     let (connection_props_tx, connection_props_rx) = watch::channel(V::ConnectionState::default());
-    // per-view message stream consumed by `view::update`.
+    // per-view external message stream consumed by `view::update`.
     let (view_msg_tx, view_msg_rx) = mpsc::unbounded_channel();
     // per-view ui input stream (demuxed btc/btt/bfn events).
     let (ui_input_tx, ui_input_rx) = mpsc::unbounded_channel();
@@ -374,7 +374,6 @@ fn spawn_for<V: View>(
         ucid,
         global_props: global_rx,
         connection_props: connection_props_rx,
-        view_msg_tx: view_msg_tx.clone(),
         view_msg_rx,
         ui_input_rx,
         insim: insim.clone(),

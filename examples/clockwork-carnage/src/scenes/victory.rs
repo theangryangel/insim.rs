@@ -60,7 +60,7 @@ impl ui::View for ClockworkVictoryView {
     type GlobalState = ClockworkVictoryGlobalProps;
     type ConnectionState = ClockworkVictoryConnectionProps;
 
-    fn mount(_tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
+    fn mount(_invalidator: ui::InvalidateHandle) -> Self {
         Self {}
     }
 

@@ -2,7 +2,9 @@ use insim::{
     identifiers::{ClickId, ConnectionId},
     insim::BfnType,
 };
-use tokio::sync::{mpsc, watch};
+use std::sync::Arc;
+
+use tokio::sync::{Notify, mpsc, watch};
 
 use super::canvas::Canvas;
 
@@ -33,8 +35,29 @@ pub trait View: Component + Sized + 'static {
     type GlobalState: Clone + Send + Sync + Default + 'static;
     type ConnectionState: Clone + Send + Sync + Default + 'static;
 
-    fn mount(tx: mpsc::UnboundedSender<Self::Message>) -> Self;
+    /// Called once when a per-connection view instance is spawned.
+    ///
+    /// Use [`InvalidateHandle`] for time-based components (marquees, clocks, stopwatches)
+    /// to request a re-render without routing synthetic messages through `update`.
+    fn mount(invalidator: InvalidateHandle) -> Self;
     fn compose(global: Self::GlobalState, connection: Self::ConnectionState) -> Self::Props;
+}
+
+/// Handle to request a redraw of the current view instance.
+#[derive(Clone, Debug)]
+pub struct InvalidateHandle {
+    notify: Arc<Notify>,
+}
+
+impl InvalidateHandle {
+    pub(super) fn new(notify: Arc<Notify>) -> Self {
+        Self { notify }
+    }
+
+    /// Request a re-render of the current view instance.
+    pub fn invalidate(&self) {
+        self.notify.notify_one();
+    }
 }
 
 #[derive(Debug)]
@@ -50,9 +73,7 @@ pub(super) struct RunViewArgs<V: View> {
     pub global_props: watch::Receiver<V::GlobalState>,
     // per-connection props stream for this specific `ucid`.
     pub connection_props: watch::Receiver<V::ConnectionState>,
-    // sender passed to `view::mount` so components can enqueue messages for themselves.
-    pub view_msg_tx: mpsc::UnboundedSender<V::Message>,
-    // receiver of per-view messages (from component tasks and external `ui::update`).
+    // receiver of per-view messages from external `Ui::update`/`Ui::sender`.
     pub view_msg_rx: mpsc::UnboundedReceiver<V::Message>,
     // demuxed ui input events for this `ucid`.
     pub ui_input_rx: mpsc::UnboundedReceiver<ViewInput>,
@@ -66,7 +87,6 @@ pub(super) fn run_view<V: View>(args: RunViewArgs<V>) {
         ucid,
         mut global_props,
         mut connection_props,
-        view_msg_tx,
         mut view_msg_rx,
         mut ui_input_rx,
         insim,
@@ -75,7 +95,8 @@ pub(super) fn run_view<V: View>(args: RunViewArgs<V>) {
 
     #[allow(clippy::let_underscore_future)]
     let _ = tokio::task::spawn_local(async move {
-        let mut root = V::mount(view_msg_tx);
+        let invalidation_notify = Arc::new(Notify::new());
+        let mut root = V::mount(InvalidateHandle::new(invalidation_notify.clone()));
         let mut canvas = Canvas::<V::Message>::new(ucid);
         let mut blocked = false; // user cleared the buttons, do not redraw unless requested
         let mut view_msg_rx_closed = false;
@@ -125,6 +146,11 @@ pub(super) fn run_view<V: View>(args: RunViewArgs<V>) {
                             false
                         }
                     }
+                },
+
+                // in-view invalidation requests (e.g. timers/marquees)
+                _ = invalidation_notify.notified() => {
+                    true
                 },
 
                 // user input from demux (click ids)

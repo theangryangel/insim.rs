@@ -5,7 +5,7 @@ mod theme;
 mod topbar;
 
 pub use help_dialog::{HelpDialog, HelpDialogMsg};
-pub use marquee::{Marquee, MarqueeMsg};
+pub use marquee::Marquee;
 pub use scoreboard::{EnrichedLeaderboard, scoreboard};
 pub use theme::{
     hud_active, hud_muted, hud_overlay_action, hud_overlay_muted, hud_overlay_text,

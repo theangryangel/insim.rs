@@ -111,7 +111,7 @@ impl ui::View for ClockworkRoundView {
     type GlobalState = ClockworkRoundGlobalProps;
     type ConnectionState = ClockworkRoundConnectionProps;
 
-    fn mount(_tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
+    fn mount(_invalidator: ui::InvalidateHandle) -> Self {
         Self {
             help_dialog: HelpDialog::default(),
         }
