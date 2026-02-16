@@ -85,7 +85,6 @@ impl Scene for Victory {
         tracing::info!("leaderboard: {:?}", enriched_leaderboard);
         let ui = ui::attach::<ClockworkVictoryView>(
             self.insim.clone(),
-            self.presence.clone(),
             ClockworkVictoryGlobalProps {
                 standings: enriched_leaderboard.clone(),
             },

@@ -70,8 +70,7 @@ impl scenes::Scene for WaitForAdminStart {
     type Output = ();
 
     async fn run(self) -> Result<scenes::SceneResult<()>, scenes::SceneError> {
-        let (_ui, _ui_handle) =
-            ui::attach::<WaitForAdminStartView>(self.insim.clone(), self.presence.clone(), ());
+        let (_ui, _ui_handle) = ui::attach::<WaitForAdminStartView>(self.insim.clone(), ());
 
         self.insim
             .send_message("Ready for admin !start command", ConnectionId::ALL)

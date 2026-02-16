@@ -35,7 +35,6 @@ impl Scene for Clockwork {
         // Scenes inside scenes inside scenes..
         let event = super::Lobby {
             insim: self.insim.clone(),
-            presence: self.presence.clone(),
             chat: self.chat.clone(),
         }
         .then(super::Rounds {

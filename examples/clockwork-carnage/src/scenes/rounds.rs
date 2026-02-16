@@ -146,7 +146,6 @@ impl Scene for Rounds {
 
         let (ui, _ui_handle) = ui::attach::<ClockworkRoundView>(
             self.insim.clone(),
-            self.presence.clone(),
             ClockworkRoundGlobalProps::default(),
         );
 

@@ -43,8 +43,7 @@ impl Scene for SetupTrack {
     type Output = ();
 
     async fn run(mut self) -> Result<SceneResult<()>, SceneError> {
-        let (_ui, _ui_handle) =
-            ui::attach::<SetupTrackView>(self.insim.clone(), self.presence.clone(), ());
+        let (_ui, _ui_handle) = ui::attach::<SetupTrackView>(self.insim.clone(), ());
         tokio::select! {
             res = self.game.track_rotation(
                 self.insim.clone(),

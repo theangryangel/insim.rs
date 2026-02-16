@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use insim::builder::InsimTask;
 use kitcar::{
-    presence,
     scenes::{Scene, SceneError, SceneResult},
     time::Countdown,
     ui::{self, Component},
@@ -74,7 +73,6 @@ impl ui::View for ClockworkLobbyView {
 pub struct Lobby {
     pub insim: InsimTask,
     pub chat: chat::Chat,
-    pub presence: presence::Presence,
 }
 
 impl Scene for Lobby {
@@ -83,11 +81,7 @@ impl Scene for Lobby {
     async fn run(self) -> Result<SceneResult<Self::Output>, SceneError> {
         tracing::info!("Lobby: 20 second warm up");
         let mut countdown = Countdown::new(Duration::from_secs(1), 20);
-        let (ui, _ui_handle) = ui::attach::<ClockworkLobbyView>(
-            self.insim.clone(),
-            self.presence.clone(),
-            Duration::ZERO,
-        );
+        let (ui, _ui_handle) = ui::attach::<ClockworkLobbyView>(self.insim.clone(), Duration::ZERO);
 
         let _chat_task = ui.update_from_broadcast(self.chat.subscribe(), |msg, _ucid| {
             matches!(msg, chat::ChatMsg::Help)

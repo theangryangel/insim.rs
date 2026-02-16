@@ -1,16 +1,14 @@
 use std::collections::HashMap;
 
 use insim::{
-    Packet,
+    Packet, WithRequestId,
     identifiers::ConnectionId,
-    insim::{Bfn, BfnType},
+    insim::{Bfn, BfnType, TinyType},
 };
 use tokio::{
     sync::{broadcast, mpsc, watch},
     task::{JoinHandle, LocalSet},
 };
-
-use crate::presence::Presence;
 
 pub mod canvas;
 pub mod id_pool;
@@ -70,7 +68,7 @@ where
     /// # Example
     ///
     /// ```rust,ignore
-    /// let (ui, _handle) = attach::<MyView>(insim, presence, props);
+    /// let (ui, _handle) = attach::<MyView>(insim, props);
     /// let sender = ui.sender();
     /// let mut chat_rx = chat.subscribe();
     ///
@@ -174,7 +172,7 @@ where
 /// #[derive(Clone)]
 /// struct Props { global: GameState, player: PlayerState }
 ///
-/// let (ui, handle) = attach::<MyView>(insim, presence, GameState::default());
+/// let (ui, handle) = attach::<MyView>(insim, GameState::default());
 ///
 /// // Update global state (re-renders for all players)
 /// ui.set_global_state(GameState { score: 100 });
@@ -185,7 +183,6 @@ where
 #[allow(clippy::type_complexity)]
 pub fn attach<V>(
     insim: insim::builder::InsimTask,
-    presence: Presence,
     props: V::GlobalState,
 ) -> (
     Ui<V::Message, V::GlobalState, V::ConnectionState>,
@@ -235,21 +232,8 @@ where
                 ),
             > = HashMap::new();
 
-            match presence.connections().await {
-                Ok(existing_connections) => {
-                    for existing in existing_connections {
-                        spawn_for::<V>(
-                            existing.ucid,
-                            global_tx.subscribe(),
-                            &insim,
-                            &mut active,
-                            outbound_tx.clone(),
-                        );
-                    }
-                },
-                Err(e) => {
-                    tracing::warn!("UI attach: failed to load existing connections: {e}");
-                },
+            if let Err(e) = insim.send(TinyType::Ncn.with_request_id(1)).await {
+                tracing::warn!("UI attach: failed to request current connections: {e}");
             }
 
             loop {
