@@ -114,6 +114,7 @@ impl Victory {
                 let pname = names.get(uname).cloned().unwrap_or_else(|| uname.clone());
                 (uname.clone(), pname, *pts)
             })
-            .collect())
+            .collect::<Vec<_>>()
+            .into())
     }
 }

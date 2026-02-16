@@ -180,14 +180,15 @@ impl RoundsState {
             ClockworkRoundConnectionProps,
         >,
     ) -> Result<(), SceneError> {
-        let connections = config
-            .presence
-            .connections()
-            .await
-            .map_err(|cause| SceneError::Custom {
-                scene: "rounds::broadcast_rankings::connections",
-                cause: Box::new(cause),
-            })?;
+        let connections =
+            config
+                .presence
+                .connections()
+                .await
+                .map_err(|cause| SceneError::Custom {
+                    scene: "rounds::broadcast_rankings::connections",
+                    cause: Box::new(cause),
+                })?;
 
         for conn in connections {
             let props = self.connection_props(&conn.uname);
@@ -197,7 +198,10 @@ impl RoundsState {
         Ok(())
     }
 
-    async fn enriched_leaderboard(&self, config: &Rounds) -> Result<EnrichedLeaderboard, SceneError> {
+    async fn enriched_leaderboard(
+        &self,
+        config: &Rounds,
+    ) -> Result<EnrichedLeaderboard, SceneError> {
         let ranking = self.scores.ranking();
         let names = config
             .presence
@@ -214,7 +218,8 @@ impl RoundsState {
                 let pname = names.get(uname).cloned().unwrap_or_else(|| uname.clone());
                 (uname.clone(), pname, *pts)
             })
-            .collect())
+            .collect::<Vec<_>>()
+            .into())
     }
 
     fn connection_props(&self, uname: &str) -> ClockworkRoundConnectionProps {
@@ -299,14 +304,15 @@ impl RoundsState {
                     .send_message("Welcome! Game in progress", ncn.ucid)
                     .await?;
 
-                if let Some(conn) = config
-                    .presence
-                    .connection(&ncn.ucid)
-                    .await
-                    .map_err(|cause| SceneError::Custom {
-                        scene: "rounds::handle_packet::connection",
-                        cause: Box::new(cause),
-                    })?
+                if let Some(conn) =
+                    config
+                        .presence
+                        .connection(&ncn.ucid)
+                        .await
+                        .map_err(|cause| SceneError::Custom {
+                            scene: "rounds::handle_packet::connection",
+                            cause: Box::new(cause),
+                        })?
                 {
                     ui.set_player_state(ncn.ucid, self.connection_props(&conn.uname))
                         .await;
@@ -323,23 +329,25 @@ impl RoundsState {
                 time,
                 ..
             }) => {
-                if let Some(player) = config
-                    .presence
-                    .player(&plid)
-                    .await
-                    .map_err(|cause| SceneError::Custom {
-                        scene: "rounds::handle_packet::player",
-                        cause: Box::new(cause),
-                    })?
-                    && !player.ptype.is_ai()
-                    && let Some(conn) = config
+                if let Some(player) =
+                    config
                         .presence
-                        .connection_by_player(&plid)
+                        .player(&plid)
                         .await
                         .map_err(|cause| SceneError::Custom {
-                            scene: "rounds::handle_packet::connection_by_player",
+                            scene: "rounds::handle_packet::player",
                             cause: Box::new(cause),
                         })?
+                    && !player.ptype.is_ai()
+                    && let Some(conn) =
+                        config
+                            .presence
+                            .connection_by_player(&plid)
+                            .await
+                            .map_err(|cause| SceneError::Custom {
+                                scene: "rounds::handle_packet::connection_by_player",
+                                cause: Box::new(cause),
+                            })?
                 {
                     match kind {
                         InsimCheckpointKind::Checkpoint1 => {
