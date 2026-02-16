@@ -31,10 +31,8 @@ pub enum UiError {
 struct ActiveViewChannels<V: View> {
     // per-connection props updates (`ui::set_player_state`).
     connection_props_tx: watch::Sender<V::ConnectionState>,
-    // per-connection view messages (`ui::update` and `update_from_broadcast`).
-    view_msg_tx: mpsc::UnboundedSender<V::Message>,
-    // per-connection ui input events demuxed from insim packets.
-    ui_input_tx: mpsc::UnboundedSender<view::ViewInput>,
+    // per-connection event stream (external messages + demuxed UI input).
+    view_event_tx: mpsc::UnboundedSender<view::ViewInput<V::Message>>,
 }
 
 /// Ui handle. Create using [attach]. When dropped all insim buttons will be automatically removed.
@@ -262,14 +260,14 @@ where
                         },
                         Ok(Packet::Btc(btc)) => {
                             if let Some(channels) = active.get(&btc.ucid) {
-                                let _ = channels.ui_input_tx.send(view::ViewInput::Click {
+                                let _ = channels.view_event_tx.send(view::ViewInput::Click {
                                     clickid: btc.clickid,
                                 });
                             }
                         }
                         Ok(Packet::Btt(btt)) => {
                             if let Some(channels) = active.get(&btt.ucid) {
-                                let _ = channels.ui_input_tx.send(view::ViewInput::TypeIn {
+                                let _ = channels.view_event_tx.send(view::ViewInput::TypeIn {
                                     clickid: btt.clickid,
                                     text: btt.text,
                                 });
@@ -277,7 +275,7 @@ where
                         }
                         Ok(Packet::Bfn(bfn)) => {
                             if let Some(channels) = active.get(&bfn.ucid) {
-                                let _ = channels.ui_input_tx.send(view::ViewInput::Bfn {
+                                let _ = channels.view_event_tx.send(view::ViewInput::Bfn {
                                     subt: bfn.subt,
                                 });
                             }
@@ -306,13 +304,13 @@ where
                         }
                     },
 
-                    // The per-player message channel is separate from lifecycle.
-                    // UiSender clones can keep it open, but we shut down based on
+                    // External message ingress is separate from lifecycle.
+                    // `Ui::sender` clones can keep it open, but we shut down based on
                     // connection_props_rx (driven by the main Ui handle).
                     res = view_msg_rx.recv(), if !view_msg_rx_closed => match res {
                         Some((ucid, msg)) => {
                             if let Some(channels) = active.get(&ucid) {
-                                let _ = channels.view_msg_tx.send(msg);
+                                let _ = channels.view_event_tx.send(view::ViewInput::Message(msg));
                             }
                         },
                         None => {
@@ -365,17 +363,14 @@ fn spawn_for<V: View>(
 ) {
     // per-view connection props stream (targeted by ucid).
     let (connection_props_tx, connection_props_rx) = watch::channel(V::ConnectionState::default());
-    // per-view external message stream consumed by `view::update`.
-    let (view_msg_tx, view_msg_rx) = mpsc::unbounded_channel();
-    // per-view ui input stream (demuxed btc/btt/bfn events).
-    let (ui_input_tx, ui_input_rx) = mpsc::unbounded_channel();
+    // per-view event stream (external messages + demuxed btc/btt/bfn events).
+    let (view_event_tx, view_event_rx) = mpsc::unbounded_channel();
 
     run_view::<V>(view::RunViewArgs {
         ucid,
         global_props: global_rx,
         connection_props: connection_props_rx,
-        view_msg_rx,
-        ui_input_rx,
+        view_event_rx,
         insim: insim.clone(),
         outbound,
     });
@@ -383,8 +378,7 @@ fn spawn_for<V: View>(
         ucid,
         ActiveViewChannels {
             connection_props_tx,
-            view_msg_tx,
-            ui_input_tx,
+            view_event_tx,
         },
     );
 }

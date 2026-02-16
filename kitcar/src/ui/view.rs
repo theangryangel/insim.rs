@@ -61,7 +61,8 @@ impl InvalidateHandle {
 }
 
 #[derive(Debug)]
-pub(super) enum ViewInput {
+pub(super) enum ViewInput<M> {
+    Message(M),
     Click { clickid: ClickId },
     TypeIn { clickid: ClickId, text: String },
     Bfn { subt: BfnType },
@@ -73,10 +74,8 @@ pub(super) struct RunViewArgs<V: View> {
     pub global_props: watch::Receiver<V::GlobalState>,
     // per-connection props stream for this specific `ucid`.
     pub connection_props: watch::Receiver<V::ConnectionState>,
-    // receiver of per-view messages from external `Ui::update`/`Ui::sender`.
-    pub view_msg_rx: mpsc::UnboundedReceiver<V::Message>,
-    // demuxed ui input events for this `ucid`.
-    pub ui_input_rx: mpsc::UnboundedReceiver<ViewInput>,
+    // per-view event stream (external messages + demuxed UI input).
+    pub view_event_rx: mpsc::UnboundedReceiver<ViewInput<V::Message>>,
     pub insim: insim::builder::InsimTask,
     pub outbound: tokio::sync::broadcast::Sender<(ConnectionId, V::Message)>,
 }
@@ -87,8 +86,7 @@ pub(super) fn run_view<V: View>(args: RunViewArgs<V>) {
         ucid,
         mut global_props,
         mut connection_props,
-        mut view_msg_rx,
-        mut ui_input_rx,
+        mut view_event_rx,
         insim,
         outbound,
     } = args;
@@ -99,8 +97,7 @@ pub(super) fn run_view<V: View>(args: RunViewArgs<V>) {
         let mut root = V::mount(InvalidateHandle::new(invalidation_notify.clone()));
         let mut canvas = Canvas::<V::Message>::new(ucid);
         let mut blocked = false; // user cleared the buttons, do not redraw unless requested
-        let mut view_msg_rx_closed = false;
-        let mut ui_input_rx_closed = false;
+        let mut view_event_rx_closed = false;
 
         // always draw immediately
         let mut should_render = true;
@@ -134,28 +131,13 @@ pub(super) fn run_view<V: View>(args: RunViewArgs<V>) {
                     true
                 },
 
-                // view messages (component self-messages and external Ui::update messages)
-                msg = view_msg_rx.recv(), if !view_msg_rx_closed => {
-                    match msg {
-                        Some(msg) => {
+                // per-view events (external messages + demuxed UI input)
+                event = view_event_rx.recv(), if !view_event_rx_closed => {
+                    match event {
+                        Some(ViewInput::Message(msg)) => {
                             root.update(msg);
                             true
                         },
-                        None => {
-                            view_msg_rx_closed = true;
-                            false
-                        }
-                    }
-                },
-
-                // in-view invalidation requests (e.g. timers/marquees)
-                _ = invalidation_notify.notified() => {
-                    true
-                },
-
-                // user input from demux (click ids)
-                packet = ui_input_rx.recv(), if !ui_input_rx_closed => {
-                    match packet {
                         Some(ViewInput::Click { clickid }) => {
                             if let Some(msg) = canvas.translate_clickid(&clickid) {
                                 let _ = outbound.send((ucid, msg.clone()));
@@ -189,10 +171,15 @@ pub(super) fn run_view<V: View>(args: RunViewArgs<V>) {
                             }
                         },
                         None => {
-                            ui_input_rx_closed = true;
+                            view_event_rx_closed = true;
                             false
                         }
                     }
+                },
+
+                // in-view invalidation requests (e.g. timers/marquees)
+                _ = invalidation_notify.notified() => {
+                    true
                 }
             };
         }
