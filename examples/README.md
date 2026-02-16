@@ -20,3 +20,5 @@ Each example is setup as its own crate so its dependencies are clear.
 - `simple-outsim` - Basic outsim usage.
 - `simple-outgauge` - Basic outgauge usage.
 - `pth2svg` - Convert a LFS PTH file to an SVG.
+- `ssg-manual` - Handle split TCP and UDP connection to LFS, manually, allowing you to receive
+  Mci, Nlp, Outsim and Outgauge packets via UDP, and everything else via TCP.
