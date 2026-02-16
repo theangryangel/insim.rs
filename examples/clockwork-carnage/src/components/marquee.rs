@@ -79,7 +79,7 @@ impl ui::Component for Marquee {
             let offset = phase as usize;
             let end = (offset + self.width).min(self.canvas.len());
             let visible: String = self.canvas[offset..end].iter().collect();
-            return ui::text(visible, hud_text().align_left()).key("marquee");
+            return ui::text(visible, hud_text()).key("marquee");
         }
 
         // waiting phase at the end of each loop

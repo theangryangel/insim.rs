@@ -23,9 +23,14 @@ impl ui::Component for WaitForAdminStartView {
     type Message = ();
 
     fn render(&self, _props: Self::Props) -> ui::Node<Self::Message> {
-        let m = self.marquee.render(()).w(38.).h(5.);
+        let m = self.marquee.render(()).w(12.).h(5.);
 
-        topbar("No game in progress").with_child(m)
+        ui::container()
+            .flex()
+            .flex_col()
+            .w(200.)
+            .with_child(topbar("No game in progress").with_child(m))
+            
     }
 }
 

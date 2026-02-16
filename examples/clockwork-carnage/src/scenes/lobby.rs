@@ -54,6 +54,7 @@ impl ui::Component for ClockworkLobbyView {
         ui::container()
             .flex()
             .flex_col()
+            .w(200.)
             .with_child(topbar(&format!(
                 "Warm up - {:?} remaining",
                 props.remaining
