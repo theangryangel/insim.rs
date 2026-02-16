@@ -58,6 +58,7 @@ pub struct Builder {
     isi_interval: Option<Duration>,
     isi_iname: Option<String>,
     isi_reqi: RequestId,
+    isi_udpport: Option<u16>,
 
     // Choosing to use separate fields with a prefix, rather than an enum because when this was
     // originally implemented it supported LFSW Relay, which no longer exists, and if you were to do
@@ -89,6 +90,7 @@ impl Default for Builder {
             isi_iname: None,
             isi_interval: None,
             isi_reqi: RequestId(0),
+            isi_udpport: None,
         }
     }
 }
@@ -252,11 +254,31 @@ impl Builder {
         self
     }
 
+    /// Explicitly set the udpport to be used in the [crate::Packet::Isi] packet during connection
+    /// handshake.
+    ///
+    /// If you explicitly set this then it will override any values derived from the `udp_local_address`.
+    /// You may wish to do this in one of 2 scenarios:
+    /// - NAT/PAT (read: port forwarding) reasons
+    /// - You want to receive positional and other information over UDP, whilst using TCP.
+    ///
+    /// If you choose to use a combination of Tcp and Udp (insim protocol dictates that if a udpport is provided
+    /// then [crate::Packet::Mci], [crate::Packet::Nlp], Outgauge and Outsim packets will be sent to the
+    /// udpport) be aware that this library *does not* currently automatically handle this protocol split for
+    /// you. You **must** spawn the relevant UdpSocket by hand. You can find an example of this in
+    /// the examples/ssg-manual/ directory.
+    ///
+    /// This may change in future versions.
+    pub fn isi_udpport<P: Into<Option<u16>>>(mut self, udpport: P) -> Self {
+        self.isi_udpport = udpport.into();
+        self
+    }
+
     /// Create a [crate::insim::Isi] from this configuration.
     pub fn isi(&self) -> Isi {
         let udpport = match self.proto {
             Proto::Udp => self.udp_local_address.unwrap().port(),
-            _ => 0,
+            Proto::Tcp => self.isi_udpport.unwrap_or(0),
         };
 
         Isi {

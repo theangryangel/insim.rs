@@ -1,7 +1,7 @@
 [package]
 name = "insim"
 description = "LiveForSpeed Insim implementation that focuses on ergonomics and strong typing"
-version = "4.0.0"
+version = "4.1.0"
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
