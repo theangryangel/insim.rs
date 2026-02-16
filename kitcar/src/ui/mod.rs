@@ -45,6 +45,15 @@ pub struct Ui<M: Clone + Send + 'static, G, C> {
     outbound: broadcast::Sender<(ConnectionId, M)>,
 }
 
+/// Converts a broadcast event into a targeted UI message.
+///
+/// This is primarily intended for chat-style command buses where each event already
+/// carries a `ConnectionId`.
+pub trait IntoViewInput<M> {
+    /// Return the target connection id and UI message, or `None` to ignore the event.
+    fn into_view_input(self) -> Option<(ConnectionId, M)>;
+}
+
 impl<M, G, C> Ui<M, G, C>
 where
     M: Clone + Send + 'static,
@@ -63,40 +72,6 @@ where
         let _ = self.connection_props.send((ucid, value)).await;
     }
 
-    /// Get a clonable sender for injecting messages into UI components.
-    /// This sender can be moved into spawned tasks without affecting UI lifecycle.
-    /// Sending will fail once the [`Ui`] handle is dropped.
-    ///
-    /// Cloning this sender does not keep the UI alive—the UI lifecycle is controlled
-    /// by the main [`Ui`] handle. When [`Ui`] is dropped, the UI runtime shuts down
-    /// and subsequent sends will return `Err`.
-    ///
-    /// You likely want to use the listen function.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// let (ui, _handle) = attach::<MyView>(insim, props);
-    /// let sender = ui.sender();
-    /// let mut chat_rx = chat.subscribe();
-    ///
-    /// tokio::spawn(async move {
-    ///     while let Ok((cmd, ucid)) = chat_rx.recv().await {
-    ///         if let Some(msg) = map_to_view_msg(cmd) {
-    ///             if sender.send((ucid, msg)).await.is_err() {
-    ///                 break; // UI dropped, exit loop
-    ///             }
-    ///         }
-    ///     }
-    /// });
-    ///
-    /// // ui can still be used here
-    /// ui.set_global_state(new_state);
-    /// ```
-    pub fn sender(&self) -> mpsc::Sender<(ConnectionId, M)> {
-        self.view_messages.clone()
-    }
-
     /// Subscribe to messages produced by user UI interactions (e.g. button click / type-in).
     pub fn subscribe(&self) -> broadcast::Receiver<(ConnectionId, M)> {
         self.outbound.subscribe()
@@ -108,27 +83,35 @@ where
     /// # Example
     ///
     /// ```rust,ignore
-    /// let _chat_task = ui.update_from_broadcast(self.chat.subscribe(), |msg, _ucid| {
-    ///     matches!(msg, chat::ChatMsg::Help)
-    ///         .then_some(ClockworkLobbyMessage::Help(HelpDialogMsg::Show))
-    /// });
+    /// impl ui::IntoViewInput<ClockworkLobbyMessage> for (ConnectionId, chat::ChatMsg) {
+    ///     fn into_view_input(self) -> Option<(ConnectionId, ClockworkLobbyMessage)> {
+    ///         let (ucid, msg) = self;
+    ///         matches!(msg, chat::ChatMsg::Help)
+    ///             .then_some((ucid, ClockworkLobbyMessage::Help(HelpDialogMsg::Show)))
+    ///     }
+    /// }
+    ///
+    /// let _chat_task = ui.update_from_broadcast(self.chat.subscribe());
     /// ```
-    pub fn update_from_broadcast<F, N>(
-        &self,
-        mut rx: broadcast::Receiver<(N, ConnectionId)>,
-        mut filter_map: F,
-    ) -> JoinHandle<()>
+    pub fn update_from_broadcast<N>(&self, mut rx: broadcast::Receiver<N>) -> JoinHandle<()>
     where
-        N: Clone + Send + 'static,
-        F: FnMut(N, ConnectionId) -> Option<M> + Send + 'static,
+        N: IntoViewInput<M> + Clone + Send + 'static,
     {
-        let tx = self.sender();
+        let tx = self.view_messages.clone();
         tokio::spawn(async move {
-            while let Ok((msg, ucid)) = rx.recv().await {
-                if let Some(ui_msg) = filter_map(msg, ucid)
-                    && tx.send((ucid, ui_msg)).await.is_err()
-                {
-                    break;
+            loop {
+                match rx.recv().await {
+                    Ok(event) => {
+                        if let Some((ucid, msg)) = event.into_view_input()
+                            && tx.send((ucid, msg)).await.is_err()
+                        {
+                            break;
+                        }
+                    },
+                    Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                        tracing::warn!("UI update_from_broadcast lagged by {skipped} events");
+                    },
+                    Err(broadcast::error::RecvError::Closed) => break,
                 }
             }
         })
@@ -202,7 +185,7 @@ where
     let (global_tx, _global_rx) = watch::channel(props);
     // Outside-in connection props updates (`Ui::set_player_state`).
     let (connection_props_tx, mut connection_props_rx) = mpsc::channel(100);
-    // Outside-in per-player messages (`Ui::update`, `update_from_broadcast`, `Ui::sender`).
+    // Outside-in per-player messages (`Ui::update`, `update_from_broadcast`).
     let (view_msg_tx, mut view_msg_rx) = mpsc::channel::<(ConnectionId, V::Message)>(100);
     let (outbound_tx, _outbound_rx) = broadcast::channel::<(ConnectionId, V::Message)>(100);
     let ui_handle = Ui {
@@ -305,7 +288,7 @@ where
                     },
 
                     // External message ingress is separate from lifecycle.
-                    // `Ui::sender` clones can keep it open, but we shut down based on
+                    // Senders cloned via `Ui` can keep it open, but we shut down based on
                     // connection_props_rx (driven by the main Ui handle).
                     res = view_msg_rx.recv(), if !view_msg_rx_closed => match res {
                         Some((ucid, msg)) => {
@@ -314,7 +297,7 @@ where
                             }
                         },
                         None => {
-                            // All message senders dropped (Ui + Ui::sender clones), but we don't
+                            // All message senders dropped, but we don't
                             // shut down here—lifecycle is tied to connection_props_rx.
                             view_msg_rx_closed = true;
                         }

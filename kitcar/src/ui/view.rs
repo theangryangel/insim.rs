@@ -1,9 +1,9 @@
+use std::sync::Arc;
+
 use insim::{
     identifiers::{ClickId, ConnectionId},
     insim::BfnType,
 };
-use std::sync::Arc;
-
 use tokio::sync::{Notify, mpsc, watch};
 
 use super::canvas::Canvas;

@@ -23,11 +23,11 @@ pub enum ChatMsg {
 
 #[derive(Debug, Clone)]
 pub struct Chat {
-    broadcast: broadcast::Sender<(ChatMsg, ConnectionId)>,
+    broadcast: broadcast::Sender<(ConnectionId, ChatMsg)>,
 }
 
 impl Chat {
-    pub fn subscribe(&self) -> broadcast::Receiver<(ChatMsg, ConnectionId)> {
+    pub fn subscribe(&self) -> broadcast::Receiver<(ConnectionId, ChatMsg)> {
         self.broadcast.subscribe()
     }
 
@@ -45,7 +45,7 @@ impl Chat {
 
         loop {
             match chat.recv().await {
-                Ok((msg, ucid)) if matches(&msg) => {
+                Ok((ucid, msg)) if matches(&msg) => {
                     if let Some(conn) =
                         presence
                             .connection(&ucid)
@@ -114,11 +114,11 @@ pub fn spawn(insim: insim::builder::InsimTask) -> (Chat, JoinHandle<Result<(), C
                                 insim.send_message(cmd, mso.ucid).await?;
                             }
                             let _ = tx
-                                .send((ChatMsg::Help, mso.ucid))
+                                .send((mso.ucid, ChatMsg::Help))
                                 .map_err(|_| ChatError::HandleLost);
                         },
                         Ok(o) => {
-                            let _ = tx.send((o, mso.ucid)).map_err(|_| ChatError::HandleLost);
+                            let _ = tx.send((mso.ucid, o)).map_err(|_| ChatError::HandleLost);
                         },
                         _ => {},
                     }
