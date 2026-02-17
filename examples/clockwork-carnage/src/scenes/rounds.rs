@@ -20,7 +20,7 @@ use tokio::time::sleep;
 use crate::{
     chat,
     components::{
-        EnrichedLeaderboard, HelpDialog, HelpDialogMsg, hud_active, hud_muted, hud_text, hud_title,
+        EnrichedLeaderboard, HelpDialog, HelpDialogMsg, theme::{hud_active, hud_muted, hud_text, hud_title},
         scoreboard, topbar,
     },
     leaderboard,

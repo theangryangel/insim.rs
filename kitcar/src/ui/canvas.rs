@@ -6,7 +6,7 @@ use std::{
 use insim::{
     Packet,
     identifiers::{ClickId, ConnectionId, RequestId},
-    insim::{Bfn, BfnType, Btn},
+    insim::{Bfn, BfnType, Btn, BtnStyleFlags},
 };
 
 use super::{Node, NodeKind, TypeInMapper, id_pool::ClickIdPool};
@@ -178,6 +178,42 @@ impl<M: Clone + 'static> Canvas<M> {
         }
     }
 
+    fn child_hash(parent_hash: u64, idx: usize) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        parent_hash.hash(&mut hasher);
+        idx.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    fn stable_hash_with_tag(parent_hash: u64, tag: &'static str) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        parent_hash.hash(&mut hasher);
+        tag.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    fn allocate_click_id(
+        stable_hash: u64,
+        ucid: ConnectionId,
+        buttons: &HashMap<u64, ButtonState>,
+        new_buttons: &HashMap<u64, ButtonState>,
+        pool: &mut ClickIdPool,
+    ) -> Option<ClickId> {
+        if let Some(state) = buttons.get(&stable_hash) {
+            Some(state.click_id)
+        } else if let Some(state) = new_buttons.get(&stable_hash) {
+            Some(state.click_id)
+        } else {
+            pool.lease().or_else(|| {
+                tracing::warn!(
+                    "UI click-id pool exhausted for UCID {}, skipping button",
+                    ucid
+                );
+                None
+            })
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn visit(
         node: Node<M>,
@@ -191,42 +227,117 @@ impl<M: Clone + 'static> Canvas<M> {
         click_map: &mut HashMap<ClickId, ButtonBinding<M>>,
     ) -> Option<taffy::NodeId> {
         match node.kind {
-            NodeKind::Container(Some(children)) => {
-                let child_ids: Vec<taffy::NodeId> = children
-                    .into_iter()
-                    .enumerate()
-                    .filter_map(|(idx, child)| {
-                        // mix index into parent hash to differentiate siblings
-                        let mut hasher = DefaultHasher::new();
-                        parent_hash.hash(&mut hasher);
-                        idx.hash(&mut hasher);
-                        let my_hash = hasher.finish();
+            NodeKind::Container {
+                children,
+                visible,
+                mut bstyle,
+            } => match children {
+                Some(children) => {
+                    let mut subtree_node_map = Vec::new();
+                    let child_ids: Vec<taffy::NodeId> = children
+                        .into_iter()
+                        .enumerate()
+                        .filter_map(|(idx, child)| {
+                            let my_hash = Self::child_hash(parent_hash, idx);
 
-                        Self::visit(
-                            child,
-                            my_hash,
-                            ucid,
-                            buttons,
-                            pool,
-                            new_buttons,
-                            tree,
-                            node_map,
-                            click_map,
-                        )
-                    })
-                    .collect();
+                            Self::visit(
+                                child,
+                                my_hash,
+                                ucid,
+                                buttons,
+                                pool,
+                                new_buttons,
+                                tree,
+                                &mut subtree_node_map,
+                                click_map,
+                            )
+                        })
+                        .collect();
 
-                let node_id = tree
-                    .new_with_children(node.style.unwrap_or_default(), &child_ids)
-                    .map_err(|e| {
-                        tracing::warn!("Could not add container to taffy layout: {e}");
-                    })
-                    .ok()?;
+                    let node_id = tree
+                        .new_with_children(node.style.unwrap_or_default(), &child_ids)
+                        .map_err(|e| {
+                            tracing::warn!("Could not add container to taffy layout: {e}");
+                        })
+                        .ok()?;
 
-                Some(node_id)
+                    if visible {
+                        let stable_hash = Self::stable_hash_with_tag(parent_hash, "container");
+
+                        if let Some(click_id) =
+                            Self::allocate_click_id(stable_hash, ucid, buttons, new_buttons, pool)
+                        {
+                            let _ = new_buttons.insert(
+                                stable_hash,
+                                ButtonState {
+                                    click_id,
+                                    rendered_hash: 0,
+                                },
+                            );
+
+                            bstyle.flags.set(BtnStyleFlags::CLICK, false);
+                            node_map.push((
+                                node_id,
+                                stable_hash,
+                                Btn {
+                                    text: String::new(),
+                                    ucid,
+                                    reqi: RequestId(click_id.0),
+                                    clickid: click_id,
+                                    bstyle,
+                                    ..Default::default()
+                                },
+                            ));
+                        }
+                    }
+
+                    node_map.extend(subtree_node_map);
+
+                    Some(node_id)
+                },
+
+                None if visible => {
+                    let node_id = tree
+                        .new_leaf(node.style.unwrap_or_default())
+                        .map_err(|e| {
+                            tracing::warn!(
+                                "Could not add container background to taffy layout: {e}"
+                            );
+                        })
+                        .ok()?;
+
+                    let stable_hash = Self::stable_hash_with_tag(parent_hash, "container");
+                    if let Some(click_id) =
+                        Self::allocate_click_id(stable_hash, ucid, buttons, new_buttons, pool)
+                    {
+                        let _ = new_buttons.insert(
+                            stable_hash,
+                            ButtonState {
+                                click_id,
+                                rendered_hash: 0,
+                            },
+                        );
+
+                        bstyle.flags.set(BtnStyleFlags::CLICK, false);
+                        node_map.push((
+                            node_id,
+                            stable_hash,
+                            Btn {
+                                text: String::new(),
+                                ucid,
+                                reqi: RequestId(click_id.0),
+                                clickid: click_id,
+                                bstyle,
+                                ..Default::default()
+                            },
+                        ));
+                    }
+
+                    Some(node_id)
+                },
+
+                None => None,
             },
-
-            NodeKind::Container(None) => None,
 
             NodeKind::Button {
                 text,
@@ -254,21 +365,10 @@ impl<M: Clone + 'static> Canvas<M> {
                 let stable_hash = hasher.finish();
 
                 // allocate or reuse click id
-                let click_id = if let Some(state) = buttons.get(&stable_hash) {
-                    state.click_id
-                } else if let Some(state) = new_buttons.get(&stable_hash) {
-                    state.click_id
-                } else {
-                    match pool.lease() {
-                        Some(new_id) => new_id,
-                        None => {
-                            tracing::warn!(
-                                "UI click-id pool exhausted for UCID {}, skipping button",
-                                ucid
-                            );
-                            return None;
-                        },
-                    }
+                let Some(click_id) =
+                    Self::allocate_click_id(stable_hash, ucid, buttons, new_buttons, pool)
+                else {
+                    return None;
                 };
 
                 // track this button (rendered_hash will be set after layout)
@@ -366,7 +466,7 @@ fn get_taffy_abs_position(taffy: &taffy::TaffyTree, node_id: &taffy::NodeId) -> 
 
 #[cfg(test)]
 mod tests {
-    use insim::insim::BtnStyle;
+    use insim::insim::{BtnStyle, BtnStyleFlags};
 
     use super::*;
 
@@ -430,6 +530,47 @@ mod tests {
         let root: Node<TestMsg> = Node::container();
         let diff = canvas.reconcile(root);
         assert!(diff.is_none());
+    }
+
+    #[test]
+    fn test_reconcile_visible_container_without_children_returns_update() {
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
+        let root: Node<TestMsg> = Node::background(BtnStyle::default()).w(200.0).h(100.0);
+
+        let diff = canvas.reconcile(root);
+        assert!(diff.is_some());
+        let diff = diff.unwrap();
+        assert_eq!(diff.update.len(), 1);
+        assert!(diff.remove.is_empty());
+        assert_eq!(diff.update[0].text, "");
+    }
+
+    #[test]
+    fn test_visible_container_renders_before_children_and_is_non_clickable() {
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
+        let root: Node<TestMsg> = Node::background(BtnStyle::default().clickable())
+            .w(200.0)
+            .h(100.0)
+            .with_child(Node::text("Child", BtnStyle::default()).w(50.0).h(10.0));
+
+        let diff = canvas.reconcile(root).unwrap();
+        assert_eq!(diff.update.len(), 2);
+        assert_eq!(diff.update[0].text, "");
+        assert_eq!(diff.update[1].text, "Child");
+        assert!(!diff.update[0].bstyle.flags.contains(BtnStyleFlags::CLICK));
+    }
+
+    #[test]
+    fn test_reconcile_visible_container_removed_returns_removal() {
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
+
+        let _ = canvas.reconcile(Node::background(BtnStyle::default()).w(200.0).h(100.0));
+
+        let diff = canvas.reconcile(Node::container().w(200.0).h(100.0));
+        assert!(diff.is_some());
+        let diff = diff.unwrap();
+        assert!(diff.update.is_empty());
+        assert_eq!(diff.remove.len(), 1);
     }
 
     #[test]

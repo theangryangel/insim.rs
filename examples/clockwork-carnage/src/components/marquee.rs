@@ -9,7 +9,7 @@ use std::{
 use kitcar::ui;
 use tokio::{task::JoinHandle, time::Instant as TokioInstant};
 
-use super::hud_text;
+use super::theme::hud_text;
 
 pub struct Marquee {
     width: usize,

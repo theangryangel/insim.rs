@@ -366,9 +366,14 @@ fn spawn_for<V: View>(
     );
 }
 
-/// Shortcut to make a container [node::Node]
+/// Shortcut to make a non-visible container [node::Node]
 pub fn container<Msg>() -> node::Node<Msg> {
     node::Node::container()
+}
+
+/// Shortcut to make a visible container [node::Node]
+pub fn background<Msg>(bstyle: insim::insim::BtnStyle) -> node::Node<Msg> {
+    node::Node::background(bstyle)
 }
 
 /// Shortcut to make a clickable button [node::Node]

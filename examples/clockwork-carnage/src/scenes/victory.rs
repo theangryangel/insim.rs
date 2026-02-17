@@ -9,7 +9,7 @@ use kitcar::{
 use tokio::time::sleep;
 
 use crate::{
-    components::{EnrichedLeaderboard, hud_title, scoreboard, topbar},
+    components::{EnrichedLeaderboard, theme::hud_title, scoreboard, topbar},
     leaderboard,
 };
 

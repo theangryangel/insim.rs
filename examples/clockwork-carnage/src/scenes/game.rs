@@ -24,7 +24,7 @@ pub struct Clockwork {
 impl Scene for Clockwork {
     type Output = ();
 
-    async fn run(self) -> Result<SceneResult<()>, SceneError> {
+    async fn run(mut self) -> Result<SceneResult<()>, SceneError> {
         let _spawn_control = crate::spawn_control::spawn(self.insim.clone())
             .await
             .map_err(|cause| SceneError::Custom {
@@ -70,12 +70,11 @@ impl Scene for Clockwork {
                 tracing::info!("Admin ended event");
                 Ok(SceneResult::bail_with("Admin ended event"))
             },
-            // FIXME: not required with `/vote no` in main. verify if that does what it says on the
-            // tin
-            // _ = self.game.wait_for_end() => {
-            //     tracing::info!("Players voted to end");
-            //     Ok(SceneResult::Continue(()))
-            // }
+            // XXX: not required with `/vote no` in main *technically*, however an admin can still /end!
+            _ = self.game.wait_for_end() => {
+                tracing::info!("Players voted to end");
+                Ok(SceneResult::Continue(()))
+            }
         }
     }
 }

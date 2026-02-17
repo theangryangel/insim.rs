@@ -3,7 +3,7 @@ use std::{collections::BTreeSet, sync::Arc};
 use insim::insim::BtnStyle;
 use kitcar::ui;
 
-use super::{hud_active, hud_text};
+use super::theme::{hud_active, hud_text};
 
 /// (uname, pname, pts)
 pub type EnrichedLeaderboard = Arc<[(String, String, u32)]>;
