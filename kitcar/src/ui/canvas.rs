@@ -32,6 +32,7 @@ impl CanvasDiff {
 struct ButtonState {
     click_id: ClickId,
     rendered_hash: u64,
+    clickable: bool,
 }
 
 #[derive(Clone)]
@@ -112,6 +113,7 @@ impl<M: Clone + 'static> Canvas<M> {
         self.click_map = click_map;
 
         let mut updates = Vec::new();
+        let mut transition_removals = Vec::new();
 
         for (nodeid, stable_hash, mut btn) in node_map {
             let (x, y) = match get_taffy_abs_position(&tree, &nodeid) {
@@ -146,25 +148,37 @@ impl<M: Clone + 'static> Canvas<M> {
 
             // only update if changed
             let prev_state = self.buttons.get(&stable_hash);
+
+            // LFS quirk: transitioning an existing click id from clickable -> non-clickable can
+            // leave the mouse cursor in pointer mode unless we delete that click id first.
+            let is_clickable = btn.bstyle.flags.contains(BtnStyleFlags::CLICK);
+            if prev_state.is_some_and(|state| state.clickable && !is_clickable) {
+                transition_removals.push(Bfn {
+                    ucid: self.ucid,
+                    subt: BfnType::DelBtn,
+                    clickid: btn.clickid,
+                    ..Default::default()
+                });
+            }
+
             if prev_state.map(|s| s.rendered_hash) != Some(rendered_hash) {
                 updates.push(btn);
             }
 
-            // update the rendered hash in new_buttons
+            // update the rendered state in new_buttons
             if let Some(state) = new_buttons.get_mut(&stable_hash) {
                 state.rendered_hash = rendered_hash;
+                state.clickable = is_clickable;
             }
         }
 
-        let removals: Vec<Bfn> = dead_ids
-            .into_iter()
-            .map(|clickid| Bfn {
-                ucid: self.ucid,
-                subt: BfnType::DelBtn,
-                clickid,
-                ..Default::default()
-            })
-            .collect();
+        let mut removals = transition_removals;
+        removals.extend(dead_ids.into_iter().map(|clickid| Bfn {
+            ucid: self.ucid,
+            subt: BfnType::DelBtn,
+            clickid,
+            ..Default::default()
+        }));
 
         self.buttons = new_buttons;
 
@@ -272,6 +286,7 @@ impl<M: Clone + 'static> Canvas<M> {
                                 ButtonState {
                                     click_id,
                                     rendered_hash: 0,
+                                    clickable: false,
                                 },
                             );
 
@@ -315,6 +330,7 @@ impl<M: Clone + 'static> Canvas<M> {
                             ButtonState {
                                 click_id,
                                 rendered_hash: 0,
+                                clickable: false,
                             },
                         );
 
@@ -374,6 +390,7 @@ impl<M: Clone + 'static> Canvas<M> {
                     ButtonState {
                         click_id,
                         rendered_hash: 0,
+                        clickable: false,
                     },
                 );
 
@@ -728,6 +745,56 @@ mod tests {
         assert!(diff.is_some());
         let diff = diff.unwrap();
         assert_eq!(diff.update.len(), 3);
+    }
+
+    #[test]
+    fn test_clickable_to_non_clickable_same_clickid_deletes_then_updates() {
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
+
+        let clickable_tree: Node<TestMsg> = Node::container().w(200.0).h(100.0).with_child(
+            Node::clickable("Hello", BtnStyle::default(), TestMsg::Click)
+                .w(50.0)
+                .h(10.0),
+        );
+
+        let _ = canvas.reconcile(clickable_tree);
+
+        let non_clickable_tree: Node<TestMsg> = Node::container()
+            .w(200.0)
+            .h(100.0)
+            .with_child(Node::text("Hello", BtnStyle::default()).w(50.0).h(10.0));
+
+        let diff = canvas.reconcile(non_clickable_tree).unwrap();
+        assert_eq!(diff.remove.len(), 1);
+        assert_eq!(diff.update.len(), 1);
+        assert_eq!(diff.remove[0].clickid, diff.update[0].clickid);
+
+        let packets = diff.merge();
+        assert!(matches!(packets[0], Packet::Bfn(_)));
+        assert!(matches!(packets[1], Packet::Btn(_)));
+    }
+
+    #[test]
+    fn test_non_clickable_to_clickable_same_clickid_does_not_force_delete() {
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
+
+        let non_clickable_tree: Node<TestMsg> = Node::container()
+            .w(200.0)
+            .h(100.0)
+            .with_child(Node::text("Hello", BtnStyle::default()).w(50.0).h(10.0));
+
+        let _ = canvas.reconcile(non_clickable_tree);
+
+        let clickable_tree: Node<TestMsg> = Node::container().w(200.0).h(100.0).with_child(
+            Node::clickable("Hello", BtnStyle::default(), TestMsg::Click)
+                .w(50.0)
+                .h(10.0),
+        );
+
+        let diff = canvas.reconcile(clickable_tree).unwrap();
+        assert!(diff.remove.is_empty());
+        assert_eq!(diff.update.len(), 1);
+        assert!(diff.update[0].bstyle.flags.contains(BtnStyleFlags::CLICK));
     }
 
     #[test]
