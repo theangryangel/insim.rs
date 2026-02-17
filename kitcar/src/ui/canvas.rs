@@ -365,11 +365,8 @@ impl<M: Clone + 'static> Canvas<M> {
                 let stable_hash = hasher.finish();
 
                 // allocate or reuse click id
-                let Some(click_id) =
-                    Self::allocate_click_id(stable_hash, ucid, buttons, new_buttons, pool)
-                else {
-                    return None;
-                };
+                let click_id =
+                    Self::allocate_click_id(stable_hash, ucid, buttons, new_buttons, pool)?;
 
                 // track this button (rendered_hash will be set after layout)
                 let _ = new_buttons.insert(

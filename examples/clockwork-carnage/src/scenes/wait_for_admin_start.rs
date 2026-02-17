@@ -30,7 +30,6 @@ impl ui::Component for WaitForAdminStartView {
             .flex_col()
             .w(200.)
             .with_child(topbar("No game in progress").with_child(m))
-            
     }
 }
 

@@ -1,8 +1,6 @@
 use kitcar::ui;
 
-use super::theme::{
-    hud_overlay_action, hud_overlay_text, hud_panel_bg,
-};
+use super::theme::{hud_overlay_action, hud_overlay_text, hud_panel_bg};
 
 #[derive(Default)]
 pub struct HelpDialog {
@@ -83,6 +81,7 @@ impl ui::Component for HelpDialog {
                     .w(12.)
                     .h(8.)
                     .mt(2.)
+                    .key("help-close")
                 )
 
             )
