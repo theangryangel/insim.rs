@@ -108,18 +108,14 @@ impl ui::Component for ClockworkRoundView {
     }
 }
 
-impl ui::View for ClockworkRoundView {
-    type GlobalState = ClockworkRoundGlobalProps;
-    type ConnectionState = ClockworkRoundConnectionProps;
-
-    fn mount(_invalidator: ui::InvalidateHandle) -> Self {
+impl From<ui::UiState<ClockworkRoundGlobalProps, ClockworkRoundConnectionProps>>
+    for ClockworkRoundProps
+{
+    fn from(state: ui::UiState<ClockworkRoundGlobalProps, ClockworkRoundConnectionProps>) -> Self {
         Self {
-            help_dialog: HelpDialog::default(),
+            global: state.global,
+            connection: state.connection,
         }
-    }
-
-    fn compose(global: Self::GlobalState, connection: Self::ConnectionState) -> Self::Props {
-        ClockworkRoundProps { global, connection }
     }
 }
 
@@ -145,9 +141,12 @@ impl Scene for Rounds {
             active_runs: HashMap::new(),
         };
 
-        let (ui, _ui_handle) = ui::attach_with::<ClockworkRoundView, _, _>(
+        let (ui, _ui_handle) = ui::mount_with(
             self.insim.clone(),
             ClockworkRoundGlobalProps::default(),
+            |_ucid, _invalidator| ClockworkRoundView {
+                help_dialog: HelpDialog::default(),
+            },
             self.chat.subscribe(),
             |(ucid, msg)| {
                 matches!(msg, chat::ChatMsg::Help)

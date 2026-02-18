@@ -56,16 +56,16 @@ impl ui::Component for ClockworkVictoryView {
     }
 }
 
-impl ui::View for ClockworkVictoryView {
-    type GlobalState = ClockworkVictoryGlobalProps;
-    type ConnectionState = ClockworkVictoryConnectionProps;
-
-    fn mount(_invalidator: ui::InvalidateHandle) -> Self {
-        Self {}
-    }
-
-    fn compose(global: Self::GlobalState, connection: Self::ConnectionState) -> Self::Props {
-        ClockworkVictoryProps { global, connection }
+impl From<ui::UiState<ClockworkVictoryGlobalProps, ClockworkVictoryConnectionProps>>
+    for ClockworkVictoryProps
+{
+    fn from(
+        state: ui::UiState<ClockworkVictoryGlobalProps, ClockworkVictoryConnectionProps>,
+    ) -> Self {
+        Self {
+            global: state.global,
+            connection: state.connection,
+        }
     }
 }
 
@@ -83,11 +83,12 @@ impl Scene for Victory {
     async fn run(self) -> Result<SceneResult<Self::Output>, SceneError> {
         let enriched_leaderboard = self.enriched_leaderboard().await?;
         tracing::info!("leaderboard: {:?}", enriched_leaderboard);
-        let ui = ui::attach::<ClockworkVictoryView>(
+        let ui = ui::mount(
             self.insim.clone(),
             ClockworkVictoryGlobalProps {
                 standings: enriched_leaderboard.clone(),
             },
+            |_ucid, _invalidator| ClockworkVictoryView {},
         );
         sleep(Duration::from_secs(120)).await;
         drop(ui);

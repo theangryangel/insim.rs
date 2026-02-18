@@ -30,17 +30,15 @@ pub trait Component {
     fn render(&self, props: Self::Props) -> super::Node<Self::Message>;
 }
 
-/// Root multiplayer UI type.
-pub trait View: Component + Sized + 'static {
-    type GlobalState: Clone + Send + Sync + Default + 'static;
-    type ConnectionState: Clone + Send + Sync + Default + 'static;
+/// Pair of global and per-connection state values used to derive root component props.
+#[derive(Debug, Clone)]
+pub struct UiState<G, C> {
+    pub global: G,
+    pub connection: C,
+}
 
-    /// Called once when a per-connection view instance is spawned.
-    ///
-    /// Use [`InvalidateHandle`] for time-based components (marquees, clocks, stopwatches)
-    /// to request a re-render without routing synthetic messages through `update`.
-    fn mount(invalidator: InvalidateHandle) -> Self;
-    fn compose(global: Self::GlobalState, connection: Self::ConnectionState) -> Self::Props;
+impl From<UiState<(), ()>> for () {
+    fn from(_val: UiState<(), ()>) {}
 }
 
 /// Handle to request a redraw of the current view instance.
@@ -68,22 +66,35 @@ pub(super) enum ViewInput<M> {
     Bfn { subt: BfnType },
 }
 
-pub(super) struct RunViewArgs<V: View> {
+pub(super) struct RunViewArgs<Cmp, G, C>
+where
+    Cmp: Component,
+{
     pub ucid: ConnectionId,
+    pub root: Cmp,
+    pub invalidation_notify: Arc<Notify>,
     // global props stream shared by all connected players.
-    pub global_props: watch::Receiver<V::GlobalState>,
+    pub global_props: watch::Receiver<G>,
     // per-connection props stream for this specific `ucid`.
-    pub connection_props: watch::Receiver<V::ConnectionState>,
+    pub connection_props: watch::Receiver<C>,
     // per-view event stream (external messages + demuxed UI input).
-    pub view_event_rx: mpsc::UnboundedReceiver<ViewInput<V::Message>>,
+    pub view_event_rx: mpsc::UnboundedReceiver<ViewInput<Cmp::Message>>,
     pub insim: insim::builder::InsimTask,
-    pub outbound: tokio::sync::broadcast::Sender<(ConnectionId, V::Message)>,
+    pub outbound: tokio::sync::broadcast::Sender<(ConnectionId, Cmp::Message)>,
 }
 
 /// Run the UI on a LocalSet (does not require Send)
-pub(super) fn run_view<V: View>(args: RunViewArgs<V>) {
+pub(super) fn run_view<Cmp, G, C>(args: RunViewArgs<Cmp, G, C>)
+where
+    Cmp: Component + 'static,
+    UiState<G, C>: Into<Cmp::Props>,
+    G: Clone + Send + Sync + 'static,
+    C: Clone + Send + Sync + 'static,
+{
     let RunViewArgs {
         ucid,
+        root,
+        invalidation_notify,
         mut global_props,
         mut connection_props,
         mut view_event_rx,
@@ -93,9 +104,8 @@ pub(super) fn run_view<V: View>(args: RunViewArgs<V>) {
 
     #[allow(clippy::let_underscore_future)]
     let _ = tokio::task::spawn_local(async move {
-        let invalidation_notify = Arc::new(Notify::new());
-        let mut root = V::mount(InvalidateHandle::new(invalidation_notify.clone()));
-        let mut canvas = Canvas::<V::Message>::new(ucid);
+        let mut root = root;
+        let mut canvas = Canvas::<Cmp::Message>::new(ucid);
         let mut blocked = false; // user cleared the buttons, do not redraw unless requested
         let mut view_event_rx_closed = false;
 
@@ -104,10 +114,13 @@ pub(super) fn run_view<V: View>(args: RunViewArgs<V>) {
 
         loop {
             if should_render && !blocked {
-                let vdom = root.render(V::compose(
-                    global_props.borrow_and_update().clone(),
-                    connection_props.borrow_and_update().clone(),
-                ));
+                let props: Cmp::Props = UiState {
+                    global: global_props.borrow_and_update().clone(),
+                    connection: connection_props.borrow_and_update().clone(),
+                }
+                .into();
+
+                let vdom = root.render(props);
                 if let Some(diff) = canvas.reconcile(vdom)
                     && let Err(e) = insim.send_all(diff.merge()).await
                 {

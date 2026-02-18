@@ -17,17 +17,6 @@ impl ui::Component for SetupTrackView {
     }
 }
 
-impl ui::View for SetupTrackView {
-    type GlobalState = ();
-    type ConnectionState = ();
-
-    fn mount(_invalidator: ui::InvalidateHandle) -> Self {
-        Self {}
-    }
-
-    fn compose(_global: Self::GlobalState, _connection: Self::ConnectionState) -> Self::Props {}
-}
-
 /// Setup track
 #[derive(Clone)]
 pub struct SetupTrack {
@@ -43,7 +32,9 @@ impl Scene for SetupTrack {
     type Output = ();
 
     async fn run(mut self) -> Result<SceneResult<()>, SceneError> {
-        let (_ui, _ui_handle) = ui::attach::<SetupTrackView>(self.insim.clone(), ());
+        let (_ui, _ui_handle) = ui::mount(self.insim.clone(), (), |_ucid, _invalidator| {
+            SetupTrackView {}
+        });
         tokio::select! {
             res = self.game.track_rotation(
                 self.insim.clone(),

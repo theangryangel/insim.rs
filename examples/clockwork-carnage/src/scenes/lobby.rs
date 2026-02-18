@@ -54,18 +54,11 @@ impl ui::Component for ClockworkLobbyView {
     }
 }
 
-impl ui::View for ClockworkLobbyView {
-    type GlobalState = Duration;
-    type ConnectionState = ();
-
-    fn mount(_invalidator: ui::InvalidateHandle) -> Self {
+impl From<ui::UiState<Duration, ()>> for ClockworkLobbyProps {
+    fn from(state: ui::UiState<Duration, ()>) -> Self {
         Self {
-            help_dialog: HelpDialog::default(),
+            remaining: state.global,
         }
-    }
-
-    fn compose(global: Self::GlobalState, _connection: Self::ConnectionState) -> Self::Props {
-        ClockworkLobbyProps { remaining: global }
     }
 }
 
@@ -82,9 +75,12 @@ impl Scene for Lobby {
     async fn run(self) -> Result<SceneResult<Self::Output>, SceneError> {
         tracing::info!("Lobby: 20 second warm up");
         let mut countdown = Countdown::new(Duration::from_secs(1), 20);
-        let (ui, _ui_handle) = ui::attach_with::<ClockworkLobbyView, _, _>(
+        let (ui, _ui_handle) = ui::mount_with(
             self.insim.clone(),
             Duration::ZERO,
+            |_ucid, _invalidator| ClockworkLobbyView {
+                help_dialog: HelpDialog::default(),
+            },
             self.chat.subscribe(),
             |(ucid, msg)| {
                 matches!(msg, chat::ChatMsg::Help)

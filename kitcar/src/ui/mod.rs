@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use insim::{
     Packet, WithRequestId,
@@ -6,7 +6,7 @@ use insim::{
     insim::{Bfn, BfnType, TinyType},
 };
 use tokio::{
-    sync::{broadcast, mpsc, watch},
+    sync::{Notify, broadcast, mpsc, watch},
     task::{JoinHandle, LocalSet},
 };
 
@@ -27,15 +27,15 @@ pub enum UiError {
     RuntimeCreationFailed,
 }
 
-// per-connection channels owned by the attach loop and forwarded into a spawned view task.
-struct ActiveViewChannels<V: View> {
+// per-connection channels owned by the mount loop and forwarded into a spawned view task.
+struct ActiveViewChannels<M: Clone + Send + 'static, C: Clone + Send + Sync + 'static> {
     // per-connection props updates (`ui::set_player_state`).
-    connection_props_tx: watch::Sender<V::ConnectionState>,
+    connection_props_tx: watch::Sender<C>,
     // per-connection event stream (external messages + demuxed UI input).
-    view_event_tx: mpsc::UnboundedSender<view::ViewInput<V::Message>>,
+    view_event_tx: mpsc::UnboundedSender<view::ViewInput<M>>,
 }
 
-/// Ui handle. Create using [attach] or [attach_with].
+/// Ui handle. Create using [mount] or [mount_with].
 /// When dropped all insim buttons will be automatically removed.
 /// Intended for multi-player/multi-connection UIs
 #[derive(Debug)]
@@ -49,8 +49,8 @@ pub struct Ui<M: Clone + Send + 'static, G, C> {
 impl<M, G, C> Ui<M, G, C>
 where
     M: Clone + Send + 'static,
-    G: Clone + Send + Sync + Default + 'static,
-    C: Clone + Send + Sync + Default + 'static,
+    G: Clone + Send + Sync + 'static,
+    C: Clone + Send + Sync + 'static,
 {
     /// Update the global state for all connections, triggering a re-render.
     /// Global state is shared state visible to all connected players.
@@ -75,10 +75,12 @@ where
     }
 }
 
-/// Attach a UI view to an insim connection, spawning a view instance for each connected player.
+/// Mount a UI root component to an insim connection, spawning an instance for each
+/// connected player.
 /// Dropping the returned [`Ui`] handle will result in the UI being cleared for all players.
 ///
-/// All UI tasks run on a LocalSet, so view implementations don't need to be Send to accommodate
+/// All UI tasks run on a LocalSet, so root component implementations don't need to be Send to
+/// accommodate
 /// taffy.
 ///
 /// # Example
@@ -95,18 +97,6 @@ where
 ///             .with_child(text(format!("Score: {}", props.global.score), BtnStyle::default()))
 ///     }
 /// }
-/// impl View for MyView {
-///     type GlobalState = GameState;
-///     type ConnectionState = PlayerState;
-///
-///     fn mount(_invalidator: InvalidateHandle) -> Self {
-///         Self
-///     }
-///
-///     fn compose(global: Self::GlobalState, player: Self::ConnectionState) -> Self::Props {
-///         Props { global, player }
-///     }
-/// }
 ///
 /// #[derive(Clone, Default)]
 /// struct GameState { score: u32 }
@@ -115,7 +105,20 @@ where
 /// #[derive(Clone)]
 /// struct Props { global: GameState, player: PlayerState }
 ///
-/// let (ui, handle) = attach::<MyView>(insim, GameState::default());
+/// impl From<UiState<GameState, PlayerState>> for Props {
+///     fn from(state: UiState<GameState, PlayerState>) -> Self {
+///         Self {
+///             global: state.global,
+///             player: state.connection,
+///         }
+///     }
+/// }
+///
+/// let (ui, handle) = mount::<MyView, _, _, _>(
+///     insim,
+///     GameState::default(),
+///     |_ucid, _invalidator| MyView,
+/// );
 ///
 /// // Update global state (re-renders for all players)
 /// ui.set_global_state(GameState { score: 100 });
@@ -124,48 +127,49 @@ where
 /// ui.set_player_state(player_ucid, PlayerState { ready: true }).await;
 /// ```
 #[allow(clippy::type_complexity)]
-pub fn attach<V>(
+pub fn mount<Cmp, G, C, Make>(
     insim: insim::builder::InsimTask,
-    props: V::GlobalState,
-) -> (
-    Ui<V::Message, V::GlobalState, V::ConnectionState>,
-    JoinHandle<Result<(), UiError>>,
-)
+    props: G,
+    make_root: Make,
+) -> (Ui<Cmp::Message, G, C>, JoinHandle<Result<(), UiError>>)
 where
-    V: View,
+    Cmp: Component + 'static,
+    UiState<G, C>: Into<Cmp::Props>,
+    G: Clone + Send + Sync + 'static,
+    C: Clone + Send + Sync + Default + 'static,
+    Make: FnMut(ConnectionId, InvalidateHandle) -> Cmp + Send + 'static,
 {
     let (ingress_tx, ingress_rx) = broadcast::channel::<()>(1);
     drop(ingress_tx);
 
-    attach_with::<V, _, _>(insim, props, ingress_rx, |_| None)
+    mount_with(insim, props, make_root, ingress_rx, |_| None)
 }
 
-/// Attach a UI view to an insim connection and map an external broadcast stream into
+/// Mount a UI root component to an insim connection and map an external ingress source into
 /// targeted per-player UI messages.
-///
-/// This is useful for feeding parsed chat commands (or any other command/event bus)
-/// directly into UI state updates without an extra forwarding task.
 #[allow(clippy::type_complexity)]
-pub fn attach_with<V, E, F>(
+pub fn mount_with<Cmp, G, C, Make, E, F>(
     insim: insim::builder::InsimTask,
-    props: V::GlobalState,
+    props: G,
+    mut make_root: Make,
     mut ingress_rx: broadcast::Receiver<E>,
     mut map_ingress: F,
-) -> (
-    Ui<V::Message, V::GlobalState, V::ConnectionState>,
-    JoinHandle<Result<(), UiError>>,
-)
+) -> (Ui<Cmp::Message, G, C>, JoinHandle<Result<(), UiError>>)
 where
-    V: View,
+    Cmp: Component + 'static,
+    UiState<G, C>: Into<Cmp::Props>,
+    G: Clone + Send + Sync + 'static,
+    C: Clone + Send + Sync + Default + 'static,
+    Make: FnMut(ConnectionId, InvalidateHandle) -> Cmp + Send + 'static,
     E: Clone + Send + 'static,
-    F: FnMut(E) -> Option<(ConnectionId, V::Message)> + Send + 'static,
+    F: FnMut(E) -> Option<(ConnectionId, Cmp::Message)> + Send + 'static,
 {
     let (global_tx, _global_rx) = watch::channel(props);
     // Outside-in connection props updates (`Ui::set_player_state`).
     let (connection_props_tx, mut connection_props_rx) = mpsc::channel(100);
     // Outside-in per-player messages (`Ui::update`).
-    let (view_msg_tx, mut view_msg_rx) = mpsc::channel::<(ConnectionId, V::Message)>(100);
-    let (outbound_tx, _outbound_rx) = broadcast::channel::<(ConnectionId, V::Message)>(100);
+    let (view_msg_tx, mut view_msg_rx) = mpsc::channel::<(ConnectionId, Cmp::Message)>(100);
+    let (outbound_tx, _outbound_rx) = broadcast::channel::<(ConnectionId, Cmp::Message)>(100);
     let ui_handle = Ui {
         global: global_tx.clone(),
         connection_props: connection_props_tx,
@@ -194,10 +198,11 @@ where
             let mut packets = insim.subscribe();
             let mut view_msg_rx_closed = false;
             let mut ingress_rx_closed = false;
-            let mut active: HashMap<ConnectionId, ActiveViewChannels<V>> = HashMap::new();
+            let mut active: HashMap<ConnectionId, ActiveViewChannels<Cmp::Message, C>> =
+                HashMap::new();
 
             if let Err(e) = insim.send(TinyType::Ncn.with_request_id(1)).await {
-                tracing::warn!("UI attach: failed to request current connections: {e}");
+                tracing::warn!("UI mount: failed to request current connections: {e}");
             }
 
             loop {
@@ -208,12 +213,20 @@ where
                                 continue;
                             }
 
-                            spawn_for::<V>(
+                            let invalidation_notify = Arc::new(Notify::new());
+                            let root = make_root(
+                                ncn.ucid,
+                                InvalidateHandle::new(invalidation_notify.clone()),
+                            );
+
+                            spawn_for::<Cmp, G, C>(
                                 ncn.ucid,
                                 global_tx.subscribe(),
                                 &insim,
                                 &mut active,
                                 outbound_tx.clone(),
+                                root,
+                                invalidation_notify,
                             );
                         },
                         Ok(Packet::Cnl(cnl)) => {
@@ -243,10 +256,10 @@ where
                             }
                         }
                         Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
-                            tracing::warn!("UI attach: packet stream lagged by {skipped} packets");
+                            tracing::warn!("UI mount: packet stream lagged by {skipped} packets");
                         }
                         Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                            tracing::error!("UI attach: packet stream closed");
+                            tracing::error!("UI mount: packet stream closed");
                             break;
                         },
                         _ => {
@@ -261,7 +274,7 @@ where
                             }
                         },
                         None => {
-                            tracing::debug!("UI attach: connection props channel closed");
+                            tracing::debug!("UI mount: connection props channel closed");
                             break;
                         }
                     },
@@ -282,7 +295,7 @@ where
                         }
                     },
 
-                    // Mapped external ingress (`attach_with`) routed into per-player views.
+                    // Mapped external ingress (`mount_with`) routed into per-player views.
                     res = ingress_rx.recv(), if !ingress_rx_closed => match res {
                         Ok(event) => {
                             if let Some((ucid, msg)) = map_ingress(event)
@@ -292,7 +305,7 @@ where
                             }
                         },
                         Err(broadcast::error::RecvError::Lagged(skipped)) => {
-                            tracing::warn!("UI attach_with: ingress stream lagged by {skipped} events");
+                            tracing::warn!("UI mount_with: ingress stream lagged by {skipped} events");
                         },
                         Err(broadcast::error::RecvError::Closed) => {
                             ingress_rx_closed = true;
@@ -313,7 +326,7 @@ where
                 })
                 .collect();
             if let Err(e) = insim.send_all(clear).await {
-                tracing::warn!("UI attach: failed to clear buttons on shutdown: {e}");
+                tracing::warn!("UI mount: failed to clear buttons on shutdown: {e}");
             }
         });
         Ok::<(), UiError>(())
@@ -333,20 +346,29 @@ where
 }
 
 #[allow(clippy::type_complexity)]
-fn spawn_for<V: View>(
+fn spawn_for<Cmp, G, C>(
     ucid: ConnectionId,
-    global_rx: watch::Receiver<V::GlobalState>,
+    global_rx: watch::Receiver<G>,
     insim: &insim::builder::InsimTask,
-    active: &mut HashMap<ConnectionId, ActiveViewChannels<V>>,
-    outbound: broadcast::Sender<(ConnectionId, V::Message)>,
-) {
+    active: &mut HashMap<ConnectionId, ActiveViewChannels<Cmp::Message, C>>,
+    outbound: broadcast::Sender<(ConnectionId, Cmp::Message)>,
+    root: Cmp,
+    invalidation_notify: Arc<Notify>,
+) where
+    Cmp: Component + 'static,
+    UiState<G, C>: Into<Cmp::Props>,
+    G: Clone + Send + Sync + 'static,
+    C: Clone + Send + Sync + Default + 'static,
+{
     // per-view connection props stream (targeted by ucid).
-    let (connection_props_tx, connection_props_rx) = watch::channel(V::ConnectionState::default());
+    let (connection_props_tx, connection_props_rx) = watch::channel(C::default());
     // per-view event stream (external messages + demuxed btc/btt/bfn events).
     let (view_event_tx, view_event_rx) = mpsc::unbounded_channel();
 
-    run_view::<V>(view::RunViewArgs {
+    run_view::<Cmp, G, C>(view::RunViewArgs {
         ucid,
+        root,
+        invalidation_notify,
         global_props: global_rx,
         connection_props: connection_props_rx,
         view_event_rx,
