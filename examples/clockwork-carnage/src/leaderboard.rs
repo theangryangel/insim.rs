@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-pub type LeaderboardRanking = Arc<Vec<(String, u32)>>;
+pub type LeaderboardRanking = Arc<[(String, u32)]>;
 
 #[derive(Debug, Clone, Default)]
 pub struct Leaderboard {
@@ -16,7 +16,7 @@ impl Leaderboard {
     pub fn rank(&mut self) {
         let mut ranked: Vec<_> = self.scores.iter().map(|(k, v)| (k.clone(), *v)).collect();
         ranked.sort_by(|a, b| b.1.cmp(&a.1));
-        self.ranked = Arc::new(ranked);
+        self.ranked = ranked.into();
     }
 
     pub fn ranking(&self) -> LeaderboardRanking {

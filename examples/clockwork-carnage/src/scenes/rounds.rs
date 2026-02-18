@@ -19,8 +19,9 @@ use tokio::time::sleep;
 use crate::{
     chat,
     components::{
-        EnrichedLeaderboard, HelpDialog, HelpDialogMsg, hud_active, hud_muted, hud_text, hud_title,
-        scoreboard, topbar,
+        EnrichedLeaderboard, HelpDialog, HelpDialogMsg, scoreboard,
+        theme::{hud_active, hud_muted, hud_text, hud_title},
+        topbar,
     },
     leaderboard,
 };
@@ -107,18 +108,14 @@ impl ui::Component for ClockworkRoundView {
     }
 }
 
-impl ui::View for ClockworkRoundView {
-    type GlobalState = ClockworkRoundGlobalProps;
-    type ConnectionState = ClockworkRoundConnectionProps;
-
-    fn mount(_tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
+impl From<ui::UiState<ClockworkRoundGlobalProps, ClockworkRoundConnectionProps>>
+    for ClockworkRoundProps
+{
+    fn from(state: ui::UiState<ClockworkRoundGlobalProps, ClockworkRoundConnectionProps>) -> Self {
         Self {
-            help_dialog: HelpDialog::default(),
+            global: state.global,
+            connection: state.connection,
         }
-    }
-
-    fn compose(global: Self::GlobalState, connection: Self::ConnectionState) -> Self::Props {
-        ClockworkRoundProps { global, connection }
     }
 }
 
@@ -144,19 +141,21 @@ impl Scene for Rounds {
             active_runs: HashMap::new(),
         };
 
-        let (ui, _ui_handle) = ui::attach::<ClockworkRoundView>(
+        let (ui, _ui_handle) = ui::mount_with(
             self.insim.clone(),
-            self.presence.clone(),
             ClockworkRoundGlobalProps::default(),
+            |_ucid, _invalidator| ClockworkRoundView {
+                help_dialog: HelpDialog::default(),
+            },
+            self.chat.subscribe(),
+            |(ucid, msg)| {
+                matches!(msg, chat::ChatMsg::Help)
+                    .then_some((ucid, ClockworkRoundMessage::Help(HelpDialogMsg::Show)))
+            },
         );
 
-        let _chat_task = ui.update_from_broadcast(self.chat.subscribe(), |msg, _ucid| {
-            matches!(msg, chat::ChatMsg::Help)
-                .then_some(ClockworkRoundMessage::Help(HelpDialogMsg::Show))
-        });
-
         for round in 1..=self.rounds {
-            state.broadcast_rankings(&self, &ui).await;
+            state.broadcast_rankings(&self, &ui).await?;
             state.run_round(round, &mut self, &ui).await?;
         }
 
@@ -179,30 +178,47 @@ impl RoundsState {
             ClockworkRoundGlobalProps,
             ClockworkRoundConnectionProps,
         >,
-    ) {
-        if let Some(connections) = config.presence.connections().await {
-            for conn in connections {
-                let props = self.connection_props(&conn.uname);
-                ui.set_player_state(conn.ucid, props).await;
-            }
+    ) -> Result<(), SceneError> {
+        let connections =
+            config
+                .presence
+                .connections()
+                .await
+                .map_err(|cause| SceneError::Custom {
+                    scene: "rounds::broadcast_rankings::connections",
+                    cause: Box::new(cause),
+                })?;
+
+        for conn in connections {
+            let props = self.connection_props(&conn.uname);
+            ui.set_player_state(conn.ucid, props).await;
         }
+
+        Ok(())
     }
 
-    async fn enriched_leaderboard(&self, config: &Rounds) -> EnrichedLeaderboard {
+    async fn enriched_leaderboard(
+        &self,
+        config: &Rounds,
+    ) -> Result<EnrichedLeaderboard, SceneError> {
         let ranking = self.scores.ranking();
         let names = config
             .presence
             .last_known_names(ranking.iter().map(|(uname, _)| uname))
             .await
-            .unwrap_or_default();
-        self.scores
-            .ranking()
+            .map_err(|cause| SceneError::Custom {
+                scene: "rounds::enriched_leaderboard::last_known_names",
+                cause: Box::new(cause),
+            })?;
+
+        Ok(ranking
             .iter()
             .map(|(uname, pts)| {
                 let pname = names.get(uname).cloned().unwrap_or_else(|| uname.clone());
                 (uname.clone(), pname, *pts)
             })
-            .collect()
+            .collect::<Vec<_>>()
+            .into())
     }
 
     fn connection_props(&self, uname: &str) -> ClockworkRoundConnectionProps {
@@ -228,13 +244,21 @@ impl RoundsState {
 
         config.insim.send_command("/restart").await?;
         sleep(Duration::from_secs(5)).await;
-        config.game.wait_for_racing().await;
+        config
+            .game
+            .wait_for_racing()
+            .await
+            .map_err(|cause| SceneError::Custom {
+                scene: "rounds::wait_for_racing",
+                cause: Box::new(cause),
+            })?;
         sleep(Duration::from_secs(1)).await;
 
         tracing::info!("Round {}/{}", round, config.rounds);
 
         let mut countdown = Countdown::new(Duration::from_secs(1), 60);
         let mut packets = config.insim.subscribe();
+        let leaderboard = self.enriched_leaderboard(config).await?;
 
         loop {
             tokio::select! {
@@ -246,7 +270,7 @@ impl RoundsState {
                                 remaining: dur,
                                 round,
                                 rounds: config.rounds,
-                                leaderboard: self.enriched_leaderboard(config).await,
+                                leaderboard: leaderboard.clone(),
                             });
                         }
                         None => break,
@@ -279,7 +303,16 @@ impl RoundsState {
                     .send_message("Welcome! Game in progress", ncn.ucid)
                     .await?;
 
-                if let Some(conn) = config.presence.connection(&ncn.ucid).await {
+                if let Some(conn) =
+                    config
+                        .presence
+                        .connection(&ncn.ucid)
+                        .await
+                        .map_err(|cause| SceneError::Custom {
+                            scene: "rounds::handle_packet::connection",
+                            cause: Box::new(cause),
+                        })?
+                {
                     ui.set_player_state(ncn.ucid, self.connection_props(&conn.uname))
                         .await;
                 }
@@ -295,9 +328,25 @@ impl RoundsState {
                 time,
                 ..
             }) => {
-                if let Some(player) = config.presence.player(&plid).await
+                if let Some(player) =
+                    config
+                        .presence
+                        .player(&plid)
+                        .await
+                        .map_err(|cause| SceneError::Custom {
+                            scene: "rounds::handle_packet::player",
+                            cause: Box::new(cause),
+                        })?
                     && !player.ptype.is_ai()
-                    && let Some(conn) = config.presence.connection_by_player(&plid).await
+                    && let Some(conn) =
+                        config
+                            .presence
+                            .connection_by_player(&plid)
+                            .await
+                            .map_err(|cause| SceneError::Custom {
+                                scene: "rounds::handle_packet::connection_by_player",
+                                cause: Box::new(cause),
+                            })?
                 {
                     match kind {
                         InsimCheckpointKind::Checkpoint1 => {
@@ -358,7 +407,7 @@ impl RoundsState {
 
         for (i, (uname, _)) in ordered.into_iter().take(config.max_scorers).enumerate() {
             let points = (config.max_scorers - i) as u32;
-            let _ = self.scores.add_points(uname, points);
+            self.scores.add_points(uname, points);
         }
 
         self.scores.rank();

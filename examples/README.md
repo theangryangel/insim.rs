@@ -16,6 +16,7 @@ Each example is setup as its own crate so its dependencies are clear.
 - `strobe` - Toggle local vehicle lights in a sequence.
 - `marquee` - Layout objects and AXM packet tooling experiments.
 - `live-delta` - Live delta timing displayed with in-game buttons.
+- `btn-clickid-mangled-mvp` - Minimal repro: update same ClickID from clickable to non-clickable.
 - `clockwork-carnage` - Kitcar proof-of-concept (WIP).
 - `simple-outsim` - Basic outsim usage.
 - `simple-outgauge` - Basic outgauge usage.

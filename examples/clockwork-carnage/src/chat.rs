@@ -1,8 +1,8 @@
 //! Chat commands
 
-use insim::{identifiers::ConnectionId, insim::Mso};
-use kitcar::{chat::Parse, presence, scenes::SceneError};
-use tokio::{sync::broadcast, task::JoinHandle};
+use insim::{builder::InsimTask, insim::Mso};
+use kitcar::chat::Parse;
+use tokio::task::JoinHandle;
 
 // Just derive and you're done!
 #[derive(Debug, Clone, PartialEq, kitcar::chat::Parse)]
@@ -21,107 +21,31 @@ pub enum ChatMsg {
     Quit,
 }
 
-#[derive(Debug, Clone)]
-pub struct Chat {
-    broadcast: broadcast::Sender<(ChatMsg, ConnectionId)>,
-}
+/// Chat command bus.
+pub type Chat = kitcar::chat::Chat<ChatMsg>;
 
-impl Chat {
-    pub fn subscribe(&self) -> broadcast::Receiver<(ChatMsg, ConnectionId)> {
-        self.broadcast.subscribe()
-    }
-
-    /// Wait for an admin to send a specific chat command.
-    /// Reminder, you should probably pin this if its use in a loop { tokio::select! { .. } }
-    pub async fn wait_for_admin_cmd<F>(
-        &self,
-        presence: presence::Presence,
-        matches: F,
-    ) -> Result<(), SceneError>
-    where
-        F: Fn(&ChatMsg) -> bool,
-    {
-        let mut chat = self.subscribe();
-
-        loop {
-            match chat.recv().await {
-                Ok((msg, ucid)) if matches(&msg) => {
-                    if let Some(conn) = presence.connection(&ucid).await {
-                        if conn.admin {
-                            return Ok(());
-                        }
-                    }
-                },
-                Ok(_) => {},
-                Err(broadcast::error::RecvError::Lagged(_)) => {
-                    tracing::warn!("Chat commands lost due to lag");
-                },
-                Err(broadcast::error::RecvError::Closed) => {
-                    return Err(SceneError::Custom {
-                        scene: "wait_for_admin_cmd",
-                        cause: Box::new(ChatError::HandleLost),
-                    });
-                },
-            }
-        }
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum ChatError {
-    #[error("Insim: {0}")]
-    Insim(#[from] insim::Error),
-    #[error("Lost Insim Handle")]
-    InsimHandleLost,
-    #[error("Lost Chat chandle")]
-    HandleLost,
-}
+/// Chat runtime error.
+pub type ChatError = kitcar::chat::RuntimeError;
 
 /// Respond to commands globally and provide a bus
-pub fn spawn(insim: insim::builder::InsimTask) -> (Chat, JoinHandle<Result<(), ChatError>>) {
-    let (tx, _rx) = broadcast::channel(100);
+pub fn spawn(insim: InsimTask) -> (Chat, JoinHandle<Result<(), ChatError>>) {
+    kitcar::chat::spawn_with_handler(insim, 100, handle_chat_command)
+}
 
-    let h = Chat {
-        broadcast: tx.clone(),
-    };
-
-    let handle = tokio::spawn(async move {
-        let result: Result<(), ChatError> = async {
-            let mut packets = insim.subscribe();
-
-            loop {
-                if let insim::Packet::Mso(mso) = packets
-                    .recv()
-                    .await
-                    .map_err(|_| ChatError::InsimHandleLost)?
-                {
-                    match ChatMsg::try_from(&mso) {
-                        Ok(ChatMsg::Echo { message }) => {
-                            insim
-                                .send_message(format!("Echo: {}", message), mso.ucid)
-                                .await?;
-                        },
-                        Ok(ChatMsg::Help) => {
-                            insim.send_message("Available commands:", mso.ucid).await?;
-                            for cmd in ChatMsg::help() {
-                                insim.send_message(cmd, mso.ucid).await?;
-                            }
-                            let _ = tx
-                                .send((ChatMsg::Help, mso.ucid))
-                                .map_err(|_| ChatError::HandleLost);
-                        },
-                        Ok(o) => {
-                            let _ = tx.send((o, mso.ucid)).map_err(|_| ChatError::HandleLost);
-                        },
-                        _ => {},
-                    }
-                }
+async fn handle_chat_command(insim: InsimTask, mso: Mso, msg: ChatMsg) -> Result<(), ChatError> {
+    match msg {
+        ChatMsg::Echo { message } => {
+            insim
+                .send_message(format!("Echo: {message}"), mso.ucid)
+                .await?;
+        },
+        ChatMsg::Help => {
+            insim.send_message("Available commands:", mso.ucid).await?;
+            for cmd in ChatMsg::help() {
+                insim.send_message(cmd, mso.ucid).await?;
             }
-        }
-        .await;
-
-        result
-    });
-
-    (h, handle)
+        },
+        _ => {},
+    }
+    Ok(())
 }

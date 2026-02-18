@@ -9,7 +9,7 @@ use kitcar::{
 use tokio::time::sleep;
 
 use crate::{
-    components::{EnrichedLeaderboard, hud_title, scoreboard, topbar},
+    components::{EnrichedLeaderboard, scoreboard, theme::hud_title, topbar},
     leaderboard,
 };
 
@@ -56,16 +56,16 @@ impl ui::Component for ClockworkVictoryView {
     }
 }
 
-impl ui::View for ClockworkVictoryView {
-    type GlobalState = ClockworkVictoryGlobalProps;
-    type ConnectionState = ClockworkVictoryConnectionProps;
-
-    fn mount(_tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
-        Self {}
-    }
-
-    fn compose(global: Self::GlobalState, connection: Self::ConnectionState) -> Self::Props {
-        ClockworkVictoryProps { global, connection }
+impl From<ui::UiState<ClockworkVictoryGlobalProps, ClockworkVictoryConnectionProps>>
+    for ClockworkVictoryProps
+{
+    fn from(
+        state: ui::UiState<ClockworkVictoryGlobalProps, ClockworkVictoryConnectionProps>,
+    ) -> Self {
+        Self {
+            global: state.global,
+            connection: state.connection,
+        }
     }
 }
 
@@ -81,14 +81,14 @@ impl Scene for Victory {
     type Output = ();
 
     async fn run(self) -> Result<SceneResult<Self::Output>, SceneError> {
-        let enriched_leaderboard = self.enriched_leaderboard().await;
+        let enriched_leaderboard = self.enriched_leaderboard().await?;
         tracing::info!("leaderboard: {:?}", enriched_leaderboard);
-        let ui = ui::attach::<ClockworkVictoryView>(
+        let ui = ui::mount(
             self.insim.clone(),
-            self.presence.clone(),
             ClockworkVictoryGlobalProps {
                 standings: enriched_leaderboard.clone(),
             },
+            |_ucid, _invalidator| ClockworkVictoryView {},
         );
         sleep(Duration::from_secs(120)).await;
         drop(ui);
@@ -97,20 +97,24 @@ impl Scene for Victory {
 }
 
 impl Victory {
-    async fn enriched_leaderboard(&self) -> EnrichedLeaderboard {
+    async fn enriched_leaderboard(&self) -> Result<EnrichedLeaderboard, SceneError> {
         let ranking = self.scores.ranking();
         let names = self
             .presence
             .last_known_names(ranking.iter().map(|(uname, _)| uname))
             .await
-            .unwrap_or_default();
-        self.scores
-            .ranking()
+            .map_err(|cause| SceneError::Custom {
+                scene: "victory::enriched_leaderboard::last_known_names",
+                cause: Box::new(cause),
+            })?;
+
+        Ok(ranking
             .iter()
             .map(|(uname, pts)| {
                 let pname = names.get(uname).cloned().unwrap_or_else(|| uname.clone());
                 (uname.clone(), pname, *pts)
             })
-            .collect()
+            .collect::<Vec<_>>()
+            .into())
     }
 }

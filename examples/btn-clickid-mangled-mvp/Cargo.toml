@@ -1,0 +1,11 @@
+[package]
+name = "btn-clickid-mangled-mvp"
+version = "0.1.0-unreleased"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+insim = { path = "../../insim", default-features = false, features = ["tokio"] }
+tokio = { workspace = true, features = ["full"] }

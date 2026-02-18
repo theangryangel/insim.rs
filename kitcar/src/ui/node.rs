@@ -14,7 +14,11 @@ where
 
 #[derive(Clone)]
 pub enum NodeKind<Msg> {
-    Container(Option<Vec<Node<Msg>>>),
+    Container {
+        children: Option<Vec<Node<Msg>>>,
+        visible: bool,
+        bstyle: BtnStyle,
+    },
     Button {
         text: String,
         msg: Option<Msg>,
@@ -28,11 +32,22 @@ pub enum NodeKind<Msg> {
 impl<Msg> std::fmt::Debug for NodeKind<Msg> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Container(Some(children)) => f
-                .debug_tuple("Container")
-                .field(&format_args!("Some({} children)", children.len()))
+            Self::Container {
+                children,
+                visible,
+                bstyle,
+            } => f
+                .debug_struct("Container")
+                .field(
+                    "children",
+                    &children
+                        .as_ref()
+                        .map(|c| format!("Some({} children)", c.len()))
+                        .unwrap_or_else(|| "None".to_string()),
+                )
+                .field("visible", visible)
+                .field("bstyle", bstyle)
                 .finish(),
-            Self::Container(None) => f.debug_tuple("Container").field(&"None").finish(),
             Self::Button {
                 text,
                 key,
@@ -62,7 +77,23 @@ impl<Msg> Node<Msg> {
     pub fn container() -> Self {
         Self {
             style: Default::default(),
-            kind: NodeKind::Container(None),
+            kind: NodeKind::Container {
+                children: None,
+                visible: false,
+                bstyle: BtnStyle::default(),
+            },
+        }
+    }
+
+    /// Visible container rendered as a non-interactive background button.
+    pub fn background(bstyle: BtnStyle) -> Self {
+        Self {
+            style: Default::default(),
+            kind: NodeKind::Container {
+                children: None,
+                visible: true,
+                bstyle,
+            },
         }
     }
 
@@ -141,7 +172,10 @@ impl<Msg> Node<Msg> {
             return self;
         };
 
-        if let NodeKind::Container(ref mut children) = self.kind {
+        if let NodeKind::Container {
+            ref mut children, ..
+        } = self.kind
+        {
             children.get_or_insert_default().push(val);
         }
 
@@ -462,10 +496,15 @@ impl<Msg> Node<Msg> {
         Msg: 'static,
     {
         let kind = match self.kind {
-            NodeKind::Container(Some(c)) => {
-                NodeKind::Container(Some(c.into_iter().map(|k| k.map(f.clone())).collect()))
+            NodeKind::Container {
+                children,
+                visible,
+                bstyle,
+            } => NodeKind::Container {
+                children: children.map(|c| c.into_iter().map(|k| k.map(f.clone())).collect()),
+                visible,
+                bstyle,
             },
-            NodeKind::Container(None) => NodeKind::Container(None),
             NodeKind::Button {
                 text,
                 msg,
@@ -506,7 +545,32 @@ mod tests {
     #[test]
     fn test_container_creation() {
         let node: Node<TestMsg> = Node::container();
-        assert!(matches!(node.kind, NodeKind::Container(None)));
+        assert!(matches!(
+            node.kind,
+            NodeKind::Container {
+                children: None,
+                visible: false,
+                ..
+            }
+        ));
+        assert!(node.style.is_none());
+    }
+
+    #[test]
+    fn test_background_creation() {
+        let node: Node<TestMsg> = Node::background(BtnStyle::default().dark());
+        match node.kind {
+            NodeKind::Container {
+                children,
+                visible,
+                bstyle,
+            } => {
+                assert!(children.is_none());
+                assert!(visible);
+                assert_eq!(bstyle, BtnStyle::default().dark());
+            },
+            _ => panic!("Expected Container node"),
+        }
         assert!(node.style.is_none());
     }
 
@@ -548,7 +612,10 @@ mod tests {
         let container: Node<TestMsg> = Node::container().with_child(child);
 
         match container.kind {
-            NodeKind::Container(Some(children)) => {
+            NodeKind::Container {
+                children: Some(children),
+                ..
+            } => {
                 assert_eq!(children.len(), 1);
             },
             _ => panic!("Expected Container with children"),
@@ -570,7 +637,10 @@ mod tests {
         let container: Node<TestMsg> = Node::container().with_child_if(child, true);
 
         match container.kind {
-            NodeKind::Container(Some(children)) => {
+            NodeKind::Container {
+                children: Some(children),
+                ..
+            } => {
                 assert_eq!(children.len(), 1);
             },
             _ => panic!("Expected Container with children"),
@@ -582,7 +652,14 @@ mod tests {
         let child: Node<TestMsg> = Node::text("child", BtnStyle::default());
         let container: Node<TestMsg> = Node::container().with_child_if(child, false);
 
-        assert!(matches!(container.kind, NodeKind::Container(None)));
+        assert!(matches!(
+            container.kind,
+            NodeKind::Container {
+                children: None,
+                visible: false,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -595,7 +672,10 @@ mod tests {
         let container: Node<TestMsg> = Node::container().with_children(children);
 
         match container.kind {
-            NodeKind::Container(Some(children)) => {
+            NodeKind::Container {
+                children: Some(children),
+                ..
+            } => {
                 assert_eq!(children.len(), 3);
             },
             _ => panic!("Expected Container with children"),
@@ -611,7 +691,10 @@ mod tests {
         let container: Node<TestMsg> = Node::container().with_children_if(children, true);
 
         match container.kind {
-            NodeKind::Container(Some(children)) => {
+            NodeKind::Container {
+                children: Some(children),
+                ..
+            } => {
                 assert_eq!(children.len(), 2);
             },
             _ => panic!("Expected Container with children"),
@@ -626,7 +709,14 @@ mod tests {
         ];
         let container: Node<TestMsg> = Node::container().with_children_if(children, false);
 
-        assert!(matches!(container.kind, NodeKind::Container(None)));
+        assert!(matches!(
+            container.kind,
+            NodeKind::Container {
+                children: None,
+                visible: false,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -644,7 +734,11 @@ mod tests {
     fn test_key_on_container_noop() {
         let node: Node<TestMsg> = Node::container().key("my-key");
         match node.kind {
-            NodeKind::Container(None) => {},
+            NodeKind::Container {
+                children: None,
+                visible: false,
+                ..
+            } => {},
             _ => panic!("Expected Container without key modification"),
         }
     }
@@ -671,7 +765,10 @@ mod tests {
         let mapped: Node<ParentMsg> = container.map(ParentMsg::Child);
 
         match mapped.kind {
-            NodeKind::Container(Some(children)) => {
+            NodeKind::Container {
+                children: Some(children),
+                ..
+            } => {
                 assert_eq!(children.len(), 2);
             },
             _ => panic!("Expected Container with children"),
@@ -689,7 +786,32 @@ mod tests {
     fn test_map_preserves_empty_container() {
         let node: Node<TestMsg> = Node::container();
         let mapped: Node<ParentMsg> = node.map(ParentMsg::Child);
-        assert!(matches!(mapped.kind, NodeKind::Container(None)));
+        assert!(matches!(
+            mapped.kind,
+            NodeKind::Container {
+                children: None,
+                visible: false,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn test_map_preserves_visible_container() {
+        let node: Node<TestMsg> = Node::background(BtnStyle::default().dark());
+        let mapped: Node<ParentMsg> = node.map(ParentMsg::Child);
+        match mapped.kind {
+            NodeKind::Container {
+                children,
+                visible,
+                bstyle,
+            } => {
+                assert!(children.is_none());
+                assert!(visible);
+                assert_eq!(bstyle, BtnStyle::default().dark());
+            },
+            _ => panic!("Expected Container node"),
+        }
     }
 
     #[test]

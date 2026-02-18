@@ -1,22 +1,22 @@
-use std::time::{Duration, Instant};
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+    time::Duration,
+};
 
 use kitcar::ui;
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::{task::JoinHandle, time::Instant as TokioInstant};
 
-use super::hud_text;
-
-#[derive(Clone)]
-enum MarqueeState {
-    Scrolling,
-    Waiting(Instant),
-}
+use super::theme::hud_text;
 
 pub struct Marquee {
-    text: String,
     width: usize,
-    offset: usize,
-    state: MarqueeState,
-    wait_duration: Duration,
+    scroll_limit: usize,
+    wait_ticks: u64,
+    canvas: Vec<char>,
+    tick_count: Arc<AtomicU64>,
     handle: JoinHandle<()>,
 }
 
@@ -27,88 +27,62 @@ impl Drop for Marquee {
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum MarqueeMsg {
-    Tick,
-}
-
 impl Marquee {
-    pub fn new<P: Send + Sync + 'static>(
-        text: &str,
-        width: usize,
-        tx: mpsc::UnboundedSender<P>,
-        map: impl Fn(MarqueeMsg) -> P + Send + 'static,
-    ) -> Self {
+    pub fn new(text: &str, width: usize, invalidator: ui::InvalidateHandle) -> Self {
+        let period = Duration::from_millis(150);
+        let wait_duration = Duration::from_secs(3);
+        let wait_ticks = (wait_duration.as_millis() as u64).div_ceil(period.as_millis() as u64);
+
+        let tick_count = Arc::new(AtomicU64::new(0));
+        let tick_counter = tick_count.clone();
         let handle = tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_millis(150));
+            let mut interval = tokio::time::interval_at(TokioInstant::now() + period, period);
             loop {
                 let _ = interval.tick().await;
-                if tx.send(map(MarqueeMsg::Tick)).is_err() {
-                    break;
-                }
+                let _ = tick_counter.fetch_add(1, Ordering::Relaxed);
+                invalidator.invalidate();
             }
         });
 
+        let mut canvas = Vec::new();
+        canvas.extend(std::iter::repeat_n(' ', width));
+        canvas.extend(text.chars());
+        canvas.extend(std::iter::repeat_n(' ', width));
+        let scroll_limit = canvas.len().saturating_sub(width);
+
         Self {
-            text: text.to_string(),
             width,
-            offset: 0,
-            state: MarqueeState::Scrolling,
-            wait_duration: Duration::from_secs(3),
+            scroll_limit,
+            wait_ticks,
+            canvas,
+            tick_count,
             handle,
         }
     }
 }
 
 impl ui::Component for Marquee {
-    type Message = MarqueeMsg;
+    type Message = ();
     type Props = ();
 
-    fn update(&mut self, msg: Self::Message) {
-        match msg {
-            MarqueeMsg::Tick => {
-                match self.state {
-                    MarqueeState::Scrolling => {
-                        // pad the text with spaces equal to width on both sides
-                        // i.e. [   spaces   ][ TEXT ][   spaces   ]
-                        let total_len = self.width + self.text.chars().count() + self.width;
-
-                        self.offset += 1;
-
-                        // have we scrolled past everything?
-                        if self.offset >= total_len - self.width {
-                            let deadline = Instant::now() + self.wait_duration;
-                            self.state = MarqueeState::Waiting(deadline);
-                            self.offset = 0; // reset for next time
-                        }
-                    },
-
-                    MarqueeState::Waiting(deadline) => {
-                        if Instant::now() >= deadline {
-                            self.state = MarqueeState::Scrolling;
-                        }
-                    },
-                }
-            },
-        }
-    }
-
     fn render(&self, _props: Self::Props) -> ui::Node<Self::Message> {
-        match self.state {
-            MarqueeState::Scrolling => {
-                let padding = " ".repeat(self.width);
-                let full_canvas = format!("{}{}{}", padding, self.text, padding);
-                let visible: String = full_canvas
-                    .chars()
-                    .skip(self.offset)
-                    .take(self.width)
-                    .collect();
-
-                ui::text(visible, hud_text().align_left()).key("marquee")
-            },
-
-            // If waiting, render an empty button
-            MarqueeState::Waiting(_) => ui::text("", hud_text()),
+        if self.scroll_limit == 0 {
+            let end = self.width.min(self.canvas.len());
+            let visible: String = self.canvas[..end].iter().collect();
+            return ui::text(visible, hud_text().align_left()).key("marquee");
         }
+
+        let cycle_ticks = self.scroll_limit as u64 + self.wait_ticks;
+        let phase = self.tick_count.load(Ordering::Relaxed) % cycle_ticks;
+
+        if phase < self.scroll_limit as u64 {
+            let offset = phase as usize;
+            let end = (offset + self.width).min(self.canvas.len());
+            let visible: String = self.canvas[offset..end].iter().collect();
+            return ui::text(visible, hud_text()).key("marquee");
+        }
+
+        // waiting phase at the end of each loop
+        ui::text("", hud_text())
     }
 }

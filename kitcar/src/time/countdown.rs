@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use tokio::time::Interval;
+use tokio::time::{Instant, Interval};
 
 /// A countdown timer that ticks a specific number of times at a given interval.
 ///
@@ -17,7 +17,7 @@ pub struct Countdown {
 impl Countdown {
     /// Creates a new `Countdown`
     pub fn new(period: Duration, ticks: u32) -> Self {
-        let interval = tokio::time::interval(period);
+        let interval = tokio::time::interval_at(Instant::now() + period, period);
         Self {
             interval,
             remaining_ticks: ticks,

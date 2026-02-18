@@ -264,7 +264,7 @@ pub fn derive_command_parser(input: TokenStream) -> TokenStream {
         impl TryFrom<&insim::insim::Mso> for #enum_name {
             type Error = kitcar::chat::ParseError;
 
-            fn try_from(value: &Mso) -> Result<Self, Self::Error> {
+            fn try_from(value: &insim::insim::Mso) -> Result<Self, Self::Error> {
                 Self::parse(value.msg_from_textstart())
             }
         }
