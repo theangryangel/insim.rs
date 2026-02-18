@@ -14,10 +14,7 @@ pub(super) trait ColourMarker {
 
 impl ColourMarker for char {
     fn is_lfs_colour(&self) -> bool {
-        matches!(
-            self,
-            '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
-        )
+        matches!(self, '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8')
     }
 }
 
@@ -100,7 +97,7 @@ impl<T: AsRef<str>> Colour for T {
     }
 
     fn dark_green(self) -> String {
-        format!("^9{}", self.as_ref())
+        format!("^8{}", self.as_ref())
     }
 
     fn strip_colours(&self) -> Cow<'_, str> {
@@ -114,7 +111,7 @@ impl<T: AsRef<str>> Colour for T {
 
 /// Split an escaped LFS string into colour chunks.
 ///
-/// This parses colour markers (`^0`..`^9`) while preserving escaped control markers (`^^`) as
+/// This parses colour markers (`^0`..`^8`) while preserving escaped control markers (`^^`) as
 /// literal text. Chunks are yielded as `(colour, text)` where `colour` is `0..=9` and `text` is a
 /// slice of the original input. Empty chunks are skipped.
 ///
@@ -125,7 +122,7 @@ impl<T: AsRef<str>> Colour for T {
 pub fn spans(input: &str) -> impl Iterator<Item = (u8, &str)> + '_ {
     let mut iter = input.char_indices().peekable();
     let mut chunk_start = 0;
-    let mut current_colour = 9;
+    let mut current_colour = 8;
 
     std::iter::from_fn(move || {
         while let Some((idx, ch)) = iter.next() {
@@ -224,8 +221,8 @@ mod tests {
 
     #[test]
     fn test_strip_colours_only() {
-        assert_eq!(strip("^1^2^3^4^5^6^7^8^9"), "");
-        assert_eq!("^1^2^3^4^5^6^7^8^9".strip_colours(), "");
+        assert_eq!(strip("^1^2^3^4^5^6^7^8"), "");
+        assert_eq!("^1^2^3^4^5^6^7^8".strip_colours(), "");
     }
 
     #[test]
@@ -241,7 +238,7 @@ mod tests {
 
     #[test]
     fn test_colour_spans_default() {
-        assert_eq!(spans("abc").collect::<Vec<_>>(), vec![(9, "abc")]);
+        assert_eq!(spans("abc").collect::<Vec<_>>(), vec![(8, "abc")]);
     }
 
     #[test]
@@ -254,7 +251,7 @@ mod tests {
 
     #[test]
     fn test_colour_spans_escaped_marker_not_colour() {
-        assert_eq!(spans("^^0").collect::<Vec<_>>(), vec![(9, "^^0")]);
+        assert_eq!(spans("^^0").collect::<Vec<_>>(), vec![(8, "^^0")]);
     }
 
     #[test]
@@ -269,7 +266,7 @@ mod tests {
     fn test_colour_spans_greedy_escape_then_colour() {
         assert_eq!(
             spans("^^^1abc").collect::<Vec<_>>(),
-            vec![(9, "^^"), (1, "abc")]
+            vec![(8, "^^"), (1, "abc")]
         );
     }
 
@@ -280,13 +277,13 @@ mod tests {
 
     #[test]
     fn test_colour_spans_trailing_colour_marker() {
-        assert_eq!(spans("abc^1").collect::<Vec<_>>(), vec![(9, "abc")]);
+        assert_eq!(spans("abc^1").collect::<Vec<_>>(), vec![(8, "abc")]);
     }
 
     #[test]
     fn test_colourify() {
         assert_eq!(
-            "^9The ^0quick ^1brown ^2fox ^3jumps ^4over ^5the ^6lazy ^7dog",
+            "^8The ^0quick ^1brown ^2fox ^3jumps ^4over ^5the ^6lazy ^7dog",
             format!(
                 "{} {} {} {} {} {} {} {} {}",
                 "The".dark_green(),

@@ -3,7 +3,7 @@ use std::{collections::BTreeSet, fmt::Write, fs, path::PathBuf};
 use encoding_rs::Encoding;
 
 const MAX_UNICODE: u32 = 0x10FFFF;
-// XXX: 9 is left off this by design to prevent double checking LATIN1
+// XXX: 8 is left off this by design to prevent double checking LATIN1
 const CODEPAGES: [(char, &Encoding); 10] = [
     ('L', encoding_rs::WINDOWS_1252),
     ('G', encoding_rs::ISO_8859_7),

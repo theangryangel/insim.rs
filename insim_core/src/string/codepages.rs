@@ -27,12 +27,12 @@ impl CodepageMarker for char {
     fn is_lfs_codepage(&self) -> bool {
         matches!(
             self,
-            'L' | 'G' | 'C' | 'E' | 'T' | 'B' | 'J' | 'H' | 'S' | 'K' | '9'
+            'L' | 'G' | 'C' | 'E' | 'T' | 'B' | 'J' | 'H' | 'S' | 'K' | '8'
         )
     }
 
     fn propagate_lfs_codepage(self) -> bool {
-        self == '9'
+        self == '8'
     }
 
     fn as_lfs_codepage(&self) -> Option<&'static encoding_rs::Encoding> {
@@ -41,7 +41,7 @@ impl CodepageMarker for char {
         // https://github.com/hsivonen/encoding_rs/blob/acae06412c97df212797bebee9845b9b1c12569b/generate-encoding-data.py
 
         match self {
-            'L' | '9' => Some(encoding_rs::WINDOWS_1252), // Latin-1 CP1252
+            'L' | '8' => Some(encoding_rs::WINDOWS_1252), // Latin-1 CP1252
             'G' => Some(encoding_rs::ISO_8859_7),         // Greek ISO-8859-7
             'C' => Some(encoding_rs::WINDOWS_1251),       // Cyrillic CP1251
             'E' => Some(encoding_rs::ISO_8859_2),         // Central Europe ISO-8859-2
@@ -256,7 +256,7 @@ pub fn to_lossy_string(input: &'_ [u8]) -> Cow<'_, str> {
                 // Has a control character and next character is a codepage
 
                 // do we need to propagate the codepage because it has dual meaning?
-                // i.e. ^9
+                // i.e. ^8
                 if range[1].propagate_lfs_codepage() {
                     result.push(char::lfs_control_char());
                     result.push(range[1] as char);
@@ -350,11 +350,11 @@ mod tests {
     }
 
     #[test]
-    fn test_propagate_nine() {
+    fn test_propagate_eight() {
         // flood-proof mirror-drilling machine
-        let as_bytes = to_lossy_bytes("^9TEST");
+        let as_bytes = to_lossy_bytes("^8TEST");
 
-        assert_eq!(to_lossy_string(&as_bytes), "^9TEST",);
+        assert_eq!(to_lossy_string(&as_bytes), "^8TEST",);
     }
 
     #[test]
@@ -375,7 +375,7 @@ mod tests {
 
     #[test]
     fn test_escaped_codepage_does_not_convert() {
-        for codepage in ['L', 'G', 'C', 'E', 'T', 'B', 'J', 'H', 'S', 'K', '9'] {
+        for codepage in ['L', 'G', 'C', 'E', 'T', 'B', 'J', 'H', 'S', 'K', '8'] {
             let raw = format!("^^{}1", codepage);
             let as_string = to_lossy_string(raw.as_bytes());
             assert_eq!(as_string, raw);

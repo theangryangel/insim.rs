@@ -145,10 +145,10 @@ mod tests {
 
     #[test]
     fn test_escaping_and_unescaping() {
-        let original = "^|*:\\/?\"<>#123^945";
+        let original = "^|*:\\/?\"<>#123^845";
 
         let escaped = escape(original);
-        assert_eq!(escaped, "^^^v^a^c^d^s^q^t^l^r^h123^945");
+        assert_eq!(escaped, "^^^v^a^c^d^s^q^t^l^r^h123^845");
 
         let unescaped = unescape(&escaped);
         assert_eq!(unescaped, original);
@@ -156,10 +156,10 @@ mod tests {
 
     #[test]
     fn test_escaping_and_unescaping_trait() {
-        let original = "^|*:\\/?\"<>#123^945";
+        let original = "^|*:\\/?\"<>#123^845";
 
         let escaped = original.escape();
-        assert_eq!(escaped, "^^^v^a^c^d^s^q^t^l^r^h123^945");
+        assert_eq!(escaped, "^^^v^a^c^d^s^q^t^l^r^h123^845");
 
         let unescaped = &escaped.unescape();
         assert_eq!(unescaped, original);
@@ -167,12 +167,12 @@ mod tests {
 
     #[test]
     fn test_escaping_and_unescaping_trait_in_format() {
-        let original = "^|*:\\/?\"<>#123^945";
+        let original = "^|*:\\/?\"<>#123^845";
 
         let escaped = format!("HELLO WORLD: {}", original.escape());
-        assert_eq!(escaped, "HELLO WORLD: ^^^v^a^c^d^s^q^t^l^r^h123^945");
+        assert_eq!(escaped, "HELLO WORLD: ^^^v^a^c^d^s^q^t^l^r^h123^845");
 
         let unescaped = &escaped.unescape();
-        assert_eq!(unescaped, "HELLO WORLD: ^|*:\\/?\"<>#123^945");
+        assert_eq!(unescaped, "HELLO WORLD: ^|*:\\/?\"<>#123^845");
     }
 }
