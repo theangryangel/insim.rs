@@ -1,6 +1,6 @@
 use kitcar::ui;
 
-use super::hud_title;
+use super::theme::hud_title;
 
 pub fn topbar<Msg>(state: &str) -> ui::Node<Msg> {
     ui::container()

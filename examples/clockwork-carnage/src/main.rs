@@ -32,7 +32,7 @@ async fn main() -> anyhow::Result<()> {
 
     let args = cli::Args::parse();
 
-    let (insim, insim_handle) = insim::tcp(args.addr.clone())
+    let (insim, insim_handle) = insim::tcp(args.addr)
         .isi_admin_password(args.password.clone())
         .isi_iname("clockwork".to_owned())
         .isi_prefix('!')
@@ -52,9 +52,8 @@ async fn main() -> anyhow::Result<()> {
 
     // Take over.
     // TODO: Probably want to consider if this is right.
-    for cmd in ["/select no", "/vote no", "/autokick no"].iter() {
-        // FIXME: we want to avoid the explicit to_string here
-        insim.send_command(cmd.to_string()).await?;
+    for &cmd in &["/select no", "/vote no", "/autokick no"] {
+        insim.send_command(cmd).await?;
     }
 
     // Composible/reusable scenes snap together, "just like little lego"!
@@ -92,23 +91,35 @@ async fn main() -> anyhow::Result<()> {
 
     tokio::select! {
         res = insim_handle => {
-            let _ = res.expect("Did not expect insim to die");
+            match res {
+                Ok(Ok(())) => tracing::info!("Insim background task exited"),
+                Ok(Err(e)) => tracing::error!("Insim background task failed: {e:?}"),
+                Err(e) => tracing::error!("Insim background task join failed: {e}"),
+            }
         },
         res = presence_handle => {
-            if let Err(e) = res {
-                tracing::error!("Presence background task failed: {:?}", e);
+            match res {
+                Ok(Ok(())) => tracing::info!("Presence background task exited"),
+                Ok(Err(e)) => tracing::error!("Presence background task failed: {e}"),
+                Err(e) => tracing::error!("Presence background task join failed: {e}"),
             }
         },
         res = game_handle => {
-            if let Err(e) = res {
-                tracing::error!("Game background task failed: {:?}", e);
+            match res {
+                Ok(Ok(())) => tracing::info!("Game background task exited"),
+                Ok(Err(e)) => tracing::error!("Game background task failed: {e}"),
+                Err(e) => tracing::error!("Game background task join failed: {e}"),
             }
         },
-        _res = chat_handle => {
-            tracing::error!("Chat background task failed");
+        res = chat_handle => {
+            match res {
+                Ok(Ok(())) => tracing::info!("Chat background task exited"),
+                Ok(Err(e)) => tracing::error!("Chat background task failed: {e}"),
+                Err(e) => tracing::error!("Chat background task join failed: {e}"),
+            }
         },
         res = clockwork.run() => {
-            tracing::info!("{:?}", res);
+            tracing::info!("{res:?}");
         },
         _ = chat.wait_for_admin_cmd(presence, |msg| matches!(msg, chat::ChatMsg::Quit)) => {}
     }

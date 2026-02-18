@@ -123,6 +123,9 @@ impl PresenceInner {
 
     /// Handle a game packet
     fn handle_packet(&mut self, packet: &insim::Packet) {
+        let old_player_count = self.players.len();
+        let old_connection_count = self.connections.len();
+
         match packet {
             // Game
             insim::Packet::Tiny(tiny) => self.tiny(tiny),
@@ -140,9 +143,15 @@ impl PresenceInner {
             _ => {},
         }
 
-        // TODO: be smarter about this
-        let _ = self.player_count.send(self.players.len());
-        let _ = self.connection_count.send(self.connections.len());
+        let new_player_count = self.players.len();
+        if new_player_count != old_player_count {
+            let _ = self.player_count.send(new_player_count);
+        }
+
+        let new_connection_count = self.connections.len();
+        if new_connection_count != old_connection_count {
+            let _ = self.connection_count.send(new_connection_count);
+        }
     }
 
     fn tiny(&mut self, tiny: &insim::insim::Tiny) {
@@ -260,9 +269,21 @@ impl PresenceInner {
 #[derive(Debug, thiserror::Error)]
 /// PresenceError
 pub enum PresenceError {
-    /// Insim subscription failed
-    #[error("Insim subscription failed")]
-    SubscriptionFailed,
+    /// Lost Insim packet stream
+    #[error("Lost Insim packet stream")]
+    InsimHandleLost,
+
+    /// Lost presence watch channel
+    #[error("Lost presence watch channel")]
+    WatchChannelClosed,
+
+    /// Lost presence query channel
+    #[error("Lost presence query channel")]
+    QueryChannelClosed,
+
+    /// Lost presence response channel
+    #[error("Lost presence response channel")]
+    ResponseChannelClosed,
 }
 
 /// Spawn a background instance of Presence and return a handle so that we can query it
@@ -281,45 +302,53 @@ pub fn spawn(
 
             loop {
                 tokio::select! {
-                    Ok(packet) = packet_rx.recv() => {
-                        inner.handle_packet(&packet);
+                    packet = packet_rx.recv() => {
+                        match packet {
+                            Ok(packet) => inner.handle_packet(&packet),
+                            Err(_) => return Err(PresenceError::InsimHandleLost),
+                        }
                     }
-                    Some(query) = query_rx.recv() => {
+                    query = query_rx.recv() => {
                         match query {
-                            PresenceQuery::Connections { response_tx } => {
+                            Some(PresenceQuery::Connections { response_tx }) => {
                                 let _ = response_tx.send(inner.connections().cloned().collect());
                             },
-                            PresenceQuery::Connection { ucid, response_tx } => {
+                            Some(PresenceQuery::Connection { ucid, response_tx }) => {
                                 let _ = response_tx.send(inner.connection(&ucid).cloned());
                             },
-                            PresenceQuery::ConnectionByPlayer { plid, response_tx } => {
+                            Some(PresenceQuery::ConnectionByPlayer { plid, response_tx }) => {
                                 let _ = response_tx.send(inner.connection_by_player(&plid).cloned());
                             },
-                            PresenceQuery::Players { response_tx } => {
+                            Some(PresenceQuery::Players { response_tx }) => {
                                 let _ = response_tx.send(inner.players().cloned().collect());
                             },
-                            PresenceQuery::Player { plid, response_tx } => {
+                            Some(PresenceQuery::Player { plid, response_tx }) => {
                                 let _ = response_tx.send(inner.player(&plid).cloned());
                             },
-                            PresenceQuery::PlayerCount { response_tx } => {
+                            Some(PresenceQuery::PlayerCount { response_tx }) => {
                                 let _ = response_tx.send(inner.player_count());
                             }
-                            PresenceQuery::LastKnownName { uname, response_tx } => {
+                            Some(PresenceQuery::LastKnownName { uname, response_tx }) => {
                                 let _ = response_tx.send(inner.last_known_name(&uname).cloned());
                             }
-                            PresenceQuery::LastKnownNames { unames, response_tx } => {
+                            Some(PresenceQuery::LastKnownNames { unames, response_tx }) => {
                                 let results = unames
                                     .iter()
                                     .filter_map(|uname| {
-                                        inner.last_known_name(uname).map(|pname| (uname.clone(), pname.clone()))
+                                        inner
+                                            .last_known_name(uname)
+                                            .map(|pname| (uname.clone(), pname.clone()))
                                     })
                                     .collect();
                                 let _ = response_tx.send(results);
                             }
+                            None => break,
                         }
                     }
                 }
             }
+
+            Ok(())
         }
         .await;
         result
@@ -378,47 +407,54 @@ pub struct Presence {
 
 impl Presence {
     /// Watch connection count
-    pub async fn wait_for_connection_count(&mut self, f: impl FnMut(&usize) -> bool) -> usize {
-        // FIXME
-        *self
-            .connection_count
+    pub async fn wait_for_connection_count(
+        &mut self,
+        f: impl FnMut(&usize) -> bool,
+    ) -> Result<usize, PresenceError> {
+        self.connection_count
             .wait_for(f)
             .await
-            .expect("watch connection count wait_for failed")
+            .map(|val| *val)
+            .map_err(|_| PresenceError::WatchChannelClosed)
     }
 
     /// Watch player count
-    pub async fn wait_for_player_count(&mut self, f: impl FnMut(&usize) -> bool) -> usize {
-        // FIXME
-        *self
-            .player_count
+    pub async fn wait_for_player_count(
+        &mut self,
+        f: impl FnMut(&usize) -> bool,
+    ) -> Result<usize, PresenceError> {
+        self.player_count
             .wait_for(f)
             .await
-            .expect("watch player count wait_for failed")
+            .map(|val| *val)
+            .map_err(|_| PresenceError::WatchChannelClosed)
     }
 
     /// Player count
-    pub async fn player_count(&self) -> usize {
+    pub async fn player_count(&self) -> Result<usize, PresenceError> {
         let (tx, rx) = oneshot::channel();
         self.query_tx
             .send(PresenceQuery::PlayerCount { response_tx: tx })
             .await
-            .unwrap_or_default();
-        rx.await.unwrap_or_default()
+            .map_err(|_| PresenceError::QueryChannelClosed)?;
+        rx.await.map_err(|_| PresenceError::ResponseChannelClosed)
     }
 
     /// get all connections
-    pub async fn connections(&self) -> Option<Vec<ConnectionInfo>> {
+    pub async fn connections(&self) -> Result<Vec<ConnectionInfo>, PresenceError> {
         let (tx, rx) = oneshot::channel();
         self.query_tx
             .send(PresenceQuery::Connections { response_tx: tx })
             .await
-            .ok()?;
-        rx.await.ok()
+            .map_err(|_| PresenceError::QueryChannelClosed)?;
+        rx.await.map_err(|_| PresenceError::ResponseChannelClosed)
     }
 
     /// get a connection
-    pub async fn connection(&self, ucid: &ConnectionId) -> Option<ConnectionInfo> {
+    pub async fn connection(
+        &self,
+        ucid: &ConnectionId,
+    ) -> Result<Option<ConnectionInfo>, PresenceError> {
         let (tx, rx) = oneshot::channel();
         self.query_tx
             .send(PresenceQuery::Connection {
@@ -426,11 +462,14 @@ impl Presence {
                 response_tx: tx,
             })
             .await
-            .ok()?;
-        rx.await.ok()?
+            .map_err(|_| PresenceError::QueryChannelClosed)?;
+        rx.await.map_err(|_| PresenceError::ResponseChannelClosed)
     }
     /// get a connection by player
-    pub async fn connection_by_player(&self, plid: &PlayerId) -> Option<ConnectionInfo> {
+    pub async fn connection_by_player(
+        &self,
+        plid: &PlayerId,
+    ) -> Result<Option<ConnectionInfo>, PresenceError> {
         let (tx, rx) = oneshot::channel();
         self.query_tx
             .send(PresenceQuery::ConnectionByPlayer {
@@ -438,22 +477,22 @@ impl Presence {
                 response_tx: tx,
             })
             .await
-            .ok()?;
-        rx.await.ok()?
+            .map_err(|_| PresenceError::QueryChannelClosed)?;
+        rx.await.map_err(|_| PresenceError::ResponseChannelClosed)
     }
 
     /// get all players
-    pub async fn players(&self) -> Option<Vec<PlayerInfo>> {
+    pub async fn players(&self) -> Result<Vec<PlayerInfo>, PresenceError> {
         let (tx, rx) = oneshot::channel();
         self.query_tx
             .send(PresenceQuery::Players { response_tx: tx })
             .await
-            .ok()?;
-        rx.await.ok()
+            .map_err(|_| PresenceError::QueryChannelClosed)?;
+        rx.await.map_err(|_| PresenceError::ResponseChannelClosed)
     }
 
     /// get a player
-    pub async fn player(&self, plid: &PlayerId) -> Option<PlayerInfo> {
+    pub async fn player(&self, plid: &PlayerId) -> Result<Option<PlayerInfo>, PresenceError> {
         let (tx, rx) = oneshot::channel();
         self.query_tx
             .send(PresenceQuery::Player {
@@ -461,12 +500,12 @@ impl Presence {
                 response_tx: tx,
             })
             .await
-            .ok()?;
-        rx.await.ok()?
+            .map_err(|_| PresenceError::QueryChannelClosed)?;
+        rx.await.map_err(|_| PresenceError::ResponseChannelClosed)
     }
 
     /// get last known display name by uname (persists after disconnect)
-    pub async fn last_known_name(&self, uname: &str) -> Option<String> {
+    pub async fn last_known_name(&self, uname: &str) -> Result<Option<String>, PresenceError> {
         let (tx, rx) = oneshot::channel();
         self.query_tx
             .send(PresenceQuery::LastKnownName {
@@ -474,12 +513,15 @@ impl Presence {
                 response_tx: tx,
             })
             .await
-            .ok()?;
-        rx.await.ok()?
+            .map_err(|_| PresenceError::QueryChannelClosed)?;
+        rx.await.map_err(|_| PresenceError::ResponseChannelClosed)
     }
 
     /// batch fetch last known display names by unames (persists after disconnect)
-    pub async fn last_known_names<I, S>(&self, unames: I) -> Option<HashMap<String, String>>
+    pub async fn last_known_names<I, S>(
+        &self,
+        unames: I,
+    ) -> Result<HashMap<String, String>, PresenceError>
     where
         I: IntoIterator<Item = S>,
         S: Into<String>,
@@ -491,7 +533,7 @@ impl Presence {
                 response_tx: tx,
             })
             .await
-            .ok()?;
-        rx.await.ok()
+            .map_err(|_| PresenceError::QueryChannelClosed)?;
+        rx.await.map_err(|_| PresenceError::ResponseChannelClosed)
     }
 }

@@ -31,7 +31,11 @@ impl Scene for WaitForPlayers {
                         self.insim.send_message("Waiting for players", ncn.ucid).await?;
                     }
                 }
-                _ = self.presence.wait_for_connection_count(|val| *val >= self.min_players) => {
+                res = self.presence.wait_for_connection_count(|val| *val >= self.min_players) => {
+                    let _ = res.map_err(|cause| SceneError::Custom {
+                        scene: "wait_for_players::wait_for_connection_count",
+                        cause: Box::new(cause),
+                    })?;
                     tracing::info!("Got minimum player count!");
                     return Ok(SceneResult::Continue(()));
                 }

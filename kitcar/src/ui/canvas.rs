@@ -6,7 +6,7 @@ use std::{
 use insim::{
     Packet,
     identifiers::{ClickId, ConnectionId, RequestId},
-    insim::{Bfn, BfnType, Btn},
+    insim::{Bfn, BfnType, Btn, BtnStyleFlags},
 };
 
 use super::{Node, NodeKind, TypeInMapper, id_pool::ClickIdPool};
@@ -32,6 +32,7 @@ impl CanvasDiff {
 struct ButtonState {
     click_id: ClickId,
     rendered_hash: u64,
+    clickable: bool,
 }
 
 #[derive(Clone)]
@@ -89,9 +90,11 @@ impl<M: Clone + 'static> Canvas<M> {
             &mut click_map,
         );
 
-        if let Some(root_id) = root_id {
-            tree.compute_layout(root_id, taffy::Size::length(200.0))
-                .expect("taffy compute layout failed");
+        if let Some(root_id) = root_id
+            && let Err(e) = tree.compute_layout(root_id, taffy::Size::length(200.0))
+        {
+            tracing::error!("Failed to compute UI layout: {e}");
+            return None;
         }
 
         // identify ids that were allocated in previous frames but not seen in this one
@@ -110,10 +113,23 @@ impl<M: Clone + 'static> Canvas<M> {
         self.click_map = click_map;
 
         let mut updates = Vec::new();
+        let mut transition_removals = Vec::new();
 
         for (nodeid, stable_hash, mut btn) in node_map {
-            let (x, y) = get_taffy_abs_position(&tree, &nodeid).expect("");
-            let layout = tree.layout(nodeid).expect("");
+            let (x, y) = match get_taffy_abs_position(&tree, &nodeid) {
+                Some(position) => position,
+                None => {
+                    tracing::warn!("Failed to resolve absolute UI position for button");
+                    continue;
+                },
+            };
+            let layout = match tree.layout(nodeid) {
+                Ok(layout) => layout,
+                Err(e) => {
+                    tracing::warn!("Failed to resolve UI layout for button: {e}");
+                    continue;
+                },
+            };
 
             btn.l = x as u8;
             btn.t = y as u8;
@@ -132,25 +148,37 @@ impl<M: Clone + 'static> Canvas<M> {
 
             // only update if changed
             let prev_state = self.buttons.get(&stable_hash);
+
+            // LFS quirk: transitioning an existing click id from clickable -> non-clickable can
+            // leave the mouse cursor in pointer mode unless we delete that click id first.
+            let is_clickable = btn.bstyle.flags.contains(BtnStyleFlags::CLICK);
+            if prev_state.is_some_and(|state| state.clickable && !is_clickable) {
+                transition_removals.push(Bfn {
+                    ucid: self.ucid,
+                    subt: BfnType::DelBtn,
+                    clickid: btn.clickid,
+                    ..Default::default()
+                });
+            }
+
             if prev_state.map(|s| s.rendered_hash) != Some(rendered_hash) {
                 updates.push(btn);
             }
 
-            // update the rendered hash in new_buttons
+            // update the rendered state in new_buttons
             if let Some(state) = new_buttons.get_mut(&stable_hash) {
                 state.rendered_hash = rendered_hash;
+                state.clickable = is_clickable;
             }
         }
 
-        let removals: Vec<Bfn> = dead_ids
-            .into_iter()
-            .map(|clickid| Bfn {
-                ucid: self.ucid,
-                subt: BfnType::DelBtn,
-                clickid,
-                ..Default::default()
-            })
-            .collect();
+        let mut removals = transition_removals;
+        removals.extend(dead_ids.into_iter().map(|clickid| Bfn {
+            ucid: self.ucid,
+            subt: BfnType::DelBtn,
+            clickid,
+            ..Default::default()
+        }));
 
         self.buttons = new_buttons;
 
@@ -160,6 +188,42 @@ impl<M: Clone + 'static> Canvas<M> {
             Some(CanvasDiff {
                 update: updates,
                 remove: removals,
+            })
+        }
+    }
+
+    fn child_hash(parent_hash: u64, idx: usize) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        parent_hash.hash(&mut hasher);
+        idx.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    fn stable_hash_with_tag(parent_hash: u64, tag: &'static str) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        parent_hash.hash(&mut hasher);
+        tag.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    fn allocate_click_id(
+        stable_hash: u64,
+        ucid: ConnectionId,
+        buttons: &HashMap<u64, ButtonState>,
+        new_buttons: &HashMap<u64, ButtonState>,
+        pool: &mut ClickIdPool,
+    ) -> Option<ClickId> {
+        if let Some(state) = buttons.get(&stable_hash) {
+            Some(state.click_id)
+        } else if let Some(state) = new_buttons.get(&stable_hash) {
+            Some(state.click_id)
+        } else {
+            pool.lease().or_else(|| {
+                tracing::warn!(
+                    "UI click-id pool exhausted for UCID {}, skipping button",
+                    ucid
+                );
+                None
             })
         }
     }
@@ -177,39 +241,119 @@ impl<M: Clone + 'static> Canvas<M> {
         click_map: &mut HashMap<ClickId, ButtonBinding<M>>,
     ) -> Option<taffy::NodeId> {
         match node.kind {
-            NodeKind::Container(Some(children)) => {
-                let child_ids: Vec<taffy::NodeId> = children
-                    .into_iter()
-                    .enumerate()
-                    .filter_map(|(idx, child)| {
-                        // mix index into parent hash to differentiate siblings
-                        let mut hasher = DefaultHasher::new();
-                        parent_hash.hash(&mut hasher);
-                        idx.hash(&mut hasher);
-                        let my_hash = hasher.finish();
+            NodeKind::Container {
+                children,
+                visible,
+                mut bstyle,
+            } => match children {
+                Some(children) => {
+                    let mut subtree_node_map = Vec::new();
+                    let child_ids: Vec<taffy::NodeId> = children
+                        .into_iter()
+                        .enumerate()
+                        .filter_map(|(idx, child)| {
+                            let my_hash = Self::child_hash(parent_hash, idx);
 
-                        Self::visit(
-                            child,
-                            my_hash,
-                            ucid,
-                            buttons,
-                            pool,
-                            new_buttons,
-                            tree,
-                            node_map,
-                            click_map,
-                        )
-                    })
-                    .collect();
+                            Self::visit(
+                                child,
+                                my_hash,
+                                ucid,
+                                buttons,
+                                pool,
+                                new_buttons,
+                                tree,
+                                &mut subtree_node_map,
+                                click_map,
+                            )
+                        })
+                        .collect();
 
-                let node_id = tree
-                    .new_with_children(node.style.unwrap_or_default(), &child_ids)
-                    .expect("Could not add container to taffy layout");
+                    let node_id = tree
+                        .new_with_children(node.style.unwrap_or_default(), &child_ids)
+                        .map_err(|e| {
+                            tracing::warn!("Could not add container to taffy layout: {e}");
+                        })
+                        .ok()?;
 
-                Some(node_id)
+                    if visible {
+                        let stable_hash = Self::stable_hash_with_tag(parent_hash, "container");
+
+                        if let Some(click_id) =
+                            Self::allocate_click_id(stable_hash, ucid, buttons, new_buttons, pool)
+                        {
+                            let _ = new_buttons.insert(
+                                stable_hash,
+                                ButtonState {
+                                    click_id,
+                                    rendered_hash: 0,
+                                    clickable: false,
+                                },
+                            );
+
+                            bstyle.flags.set(BtnStyleFlags::CLICK, false);
+                            node_map.push((
+                                node_id,
+                                stable_hash,
+                                Btn {
+                                    text: String::new(),
+                                    ucid,
+                                    reqi: RequestId(click_id.0),
+                                    clickid: click_id,
+                                    bstyle,
+                                    ..Default::default()
+                                },
+                            ));
+                        }
+                    }
+
+                    node_map.extend(subtree_node_map);
+
+                    Some(node_id)
+                },
+
+                None if visible => {
+                    let node_id = tree
+                        .new_leaf(node.style.unwrap_or_default())
+                        .map_err(|e| {
+                            tracing::warn!(
+                                "Could not add container background to taffy layout: {e}"
+                            );
+                        })
+                        .ok()?;
+
+                    let stable_hash = Self::stable_hash_with_tag(parent_hash, "container");
+                    if let Some(click_id) =
+                        Self::allocate_click_id(stable_hash, ucid, buttons, new_buttons, pool)
+                    {
+                        let _ = new_buttons.insert(
+                            stable_hash,
+                            ButtonState {
+                                click_id,
+                                rendered_hash: 0,
+                                clickable: false,
+                            },
+                        );
+
+                        bstyle.flags.set(BtnStyleFlags::CLICK, false);
+                        node_map.push((
+                            node_id,
+                            stable_hash,
+                            Btn {
+                                text: String::new(),
+                                ucid,
+                                reqi: RequestId(click_id.0),
+                                clickid: click_id,
+                                bstyle,
+                                ..Default::default()
+                            },
+                        ));
+                    }
+
+                    Some(node_id)
+                },
+
+                None => None,
             },
-
-            NodeKind::Container(None) => None,
 
             NodeKind::Button {
                 text,
@@ -228,26 +372,17 @@ impl<M: Clone + 'static> Canvas<M> {
                     // in the list while keeping the same id.
                     k.hash(&mut hasher);
                 } else {
-                    // weak identity: fallback to text + "btn" marker
-                    // note: in a container, the 'parent_hash' already includes the index,
-                    // so this unique enough for static lists.
-                    text.hash(&mut hasher);
+                    // weak identity: fallback to structural position only.
+                    // note: in a container, parent_hash already includes sibling index,
+                    // so this is stable across text updates.
                     "btn".hash(&mut hasher);
                 }
 
                 let stable_hash = hasher.finish();
 
                 // allocate or reuse click id
-                let click_id = if let Some(state) = buttons.get(&stable_hash) {
-                    state.click_id
-                } else if let Some(state) = new_buttons.get(&stable_hash) {
-                    state.click_id
-                } else {
-                    match pool.lease() {
-                        Some(new_id) => new_id,
-                        None => unimplemented!("pool exhausted"),
-                    }
-                };
+                let click_id =
+                    Self::allocate_click_id(stable_hash, ucid, buttons, new_buttons, pool)?;
 
                 // track this button (rendered_hash will be set after layout)
                 let _ = new_buttons.insert(
@@ -255,6 +390,7 @@ impl<M: Clone + 'static> Canvas<M> {
                     ButtonState {
                         click_id,
                         rendered_hash: 0,
+                        clickable: false,
                     },
                 );
 
@@ -273,7 +409,10 @@ impl<M: Clone + 'static> Canvas<M> {
 
                 let node_id = tree
                     .new_leaf(node.style.unwrap_or_default())
-                    .expect("Could not add a new child to taffy layout.. too many buttons?");
+                    .map_err(|e| {
+                        tracing::warn!("Could not add button to taffy layout: {e}");
+                    })
+                    .ok()?;
                 node_map.push((
                     node_id,
                     stable_hash,
@@ -341,7 +480,7 @@ fn get_taffy_abs_position(taffy: &taffy::TaffyTree, node_id: &taffy::NodeId) -> 
 
 #[cfg(test)]
 mod tests {
-    use insim::insim::BtnStyle;
+    use insim::insim::{BtnStyle, BtnStyleFlags};
 
     use super::*;
 
@@ -405,6 +544,47 @@ mod tests {
         let root: Node<TestMsg> = Node::container();
         let diff = canvas.reconcile(root);
         assert!(diff.is_none());
+    }
+
+    #[test]
+    fn test_reconcile_visible_container_without_children_returns_update() {
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
+        let root: Node<TestMsg> = Node::background(BtnStyle::default()).w(200.0).h(100.0);
+
+        let diff = canvas.reconcile(root);
+        assert!(diff.is_some());
+        let diff = diff.unwrap();
+        assert_eq!(diff.update.len(), 1);
+        assert!(diff.remove.is_empty());
+        assert_eq!(diff.update[0].text, "");
+    }
+
+    #[test]
+    fn test_visible_container_renders_before_children_and_is_non_clickable() {
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
+        let root: Node<TestMsg> = Node::background(BtnStyle::default().clickable())
+            .w(200.0)
+            .h(100.0)
+            .with_child(Node::text("Child", BtnStyle::default()).w(50.0).h(10.0));
+
+        let diff = canvas.reconcile(root).unwrap();
+        assert_eq!(diff.update.len(), 2);
+        assert_eq!(diff.update[0].text, "");
+        assert_eq!(diff.update[1].text, "Child");
+        assert!(!diff.update[0].bstyle.flags.contains(BtnStyleFlags::CLICK));
+    }
+
+    #[test]
+    fn test_reconcile_visible_container_removed_returns_removal() {
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
+
+        let _ = canvas.reconcile(Node::background(BtnStyle::default()).w(200.0).h(100.0));
+
+        let diff = canvas.reconcile(Node::container().w(200.0).h(100.0));
+        assert!(diff.is_some());
+        let diff = diff.unwrap();
+        assert!(diff.update.is_empty());
+        assert_eq!(diff.remove.len(), 1);
     }
 
     #[test]
@@ -565,6 +745,56 @@ mod tests {
         assert!(diff.is_some());
         let diff = diff.unwrap();
         assert_eq!(diff.update.len(), 3);
+    }
+
+    #[test]
+    fn test_clickable_to_non_clickable_same_clickid_deletes_then_updates() {
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
+
+        let clickable_tree: Node<TestMsg> = Node::container().w(200.0).h(100.0).with_child(
+            Node::clickable("Hello", BtnStyle::default(), TestMsg::Click)
+                .w(50.0)
+                .h(10.0),
+        );
+
+        let _ = canvas.reconcile(clickable_tree);
+
+        let non_clickable_tree: Node<TestMsg> = Node::container()
+            .w(200.0)
+            .h(100.0)
+            .with_child(Node::text("Hello", BtnStyle::default()).w(50.0).h(10.0));
+
+        let diff = canvas.reconcile(non_clickable_tree).unwrap();
+        assert_eq!(diff.remove.len(), 1);
+        assert_eq!(diff.update.len(), 1);
+        assert_eq!(diff.remove[0].clickid, diff.update[0].clickid);
+
+        let packets = diff.merge();
+        assert!(matches!(packets[0], Packet::Bfn(_)));
+        assert!(matches!(packets[1], Packet::Btn(_)));
+    }
+
+    #[test]
+    fn test_non_clickable_to_clickable_same_clickid_does_not_force_delete() {
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
+
+        let non_clickable_tree: Node<TestMsg> = Node::container()
+            .w(200.0)
+            .h(100.0)
+            .with_child(Node::text("Hello", BtnStyle::default()).w(50.0).h(10.0));
+
+        let _ = canvas.reconcile(non_clickable_tree);
+
+        let clickable_tree: Node<TestMsg> = Node::container().w(200.0).h(100.0).with_child(
+            Node::clickable("Hello", BtnStyle::default(), TestMsg::Click)
+                .w(50.0)
+                .h(10.0),
+        );
+
+        let diff = canvas.reconcile(clickable_tree).unwrap();
+        assert!(diff.remove.is_empty());
+        assert_eq!(diff.update.len(), 1);
+        assert!(diff.update[0].bstyle.flags.contains(BtnStyleFlags::CLICK));
     }
 
     #[test]

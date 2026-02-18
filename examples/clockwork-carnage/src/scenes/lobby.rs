@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use insim::builder::InsimTask;
 use kitcar::{
-    presence,
     scenes::{Scene, SceneError, SceneResult},
     time::Countdown,
     ui::{self, Component},
@@ -47,6 +46,7 @@ impl ui::Component for ClockworkLobbyView {
         ui::container()
             .flex()
             .flex_col()
+            .w(200.)
             .with_child(topbar(&format!(
                 "Warm up - {:?} remaining",
                 props.remaining
@@ -54,18 +54,11 @@ impl ui::Component for ClockworkLobbyView {
     }
 }
 
-impl ui::View for ClockworkLobbyView {
-    type GlobalState = Duration;
-    type ConnectionState = ();
-
-    fn mount(_tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
+impl From<ui::UiState<Duration, ()>> for ClockworkLobbyProps {
+    fn from(state: ui::UiState<Duration, ()>) -> Self {
         Self {
-            help_dialog: HelpDialog::default(),
+            remaining: state.global,
         }
-    }
-
-    fn compose(global: Self::GlobalState, _connection: Self::ConnectionState) -> Self::Props {
-        ClockworkLobbyProps { remaining: global }
     }
 }
 
@@ -74,7 +67,6 @@ impl ui::View for ClockworkLobbyView {
 pub struct Lobby {
     pub insim: InsimTask,
     pub chat: chat::Chat,
-    pub presence: presence::Presence,
 }
 
 impl Scene for Lobby {
@@ -82,19 +74,21 @@ impl Scene for Lobby {
 
     async fn run(self) -> Result<SceneResult<Self::Output>, SceneError> {
         tracing::info!("Lobby: 20 second warm up");
-        let mut countdown = Countdown::new(Duration::from_secs(1), 1);
-        let (ui, _ui_handle) = ui::attach::<ClockworkLobbyView>(
+        let mut countdown = Countdown::new(Duration::from_secs(1), 20);
+        let (ui, _ui_handle) = ui::mount_with(
             self.insim.clone(),
-            self.presence.clone(),
             Duration::ZERO,
+            |_ucid, _invalidator| ClockworkLobbyView {
+                help_dialog: HelpDialog::default(),
+            },
+            self.chat.subscribe(),
+            |(ucid, msg)| {
+                matches!(msg, chat::ChatMsg::Help)
+                    .then_some((ucid, ClockworkLobbyMessage::Help(HelpDialogMsg::Show)))
+            },
         );
 
-        let _chat_task = ui.update_from_broadcast(self.chat.subscribe(), |msg, _ucid| {
-            matches!(msg, chat::ChatMsg::Help)
-                .then_some(ClockworkLobbyMessage::Help(HelpDialogMsg::Show))
-        });
-
-        while let Some(_) = countdown.tick().await {
+        while countdown.tick().await.is_some() {
             let remaining = countdown.remaining_duration();
             ui.set_global_state(remaining);
         }

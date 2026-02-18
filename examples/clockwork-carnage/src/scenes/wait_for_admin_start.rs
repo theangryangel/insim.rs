@@ -3,60 +3,33 @@ use kitcar::{presence, scenes, ui};
 
 use crate::{
     chat,
-    components::{Marquee, MarqueeMsg, topbar},
+    components::{Marquee, topbar},
 };
-
-#[derive(Clone, Debug)]
-enum WaitForAdminStartMsg {
-    Marquee(MarqueeMsg),
-}
 
 struct WaitForAdminStartView {
     marquee: Marquee,
 }
 
 impl WaitForAdminStartView {
-    fn new(tx: tokio::sync::mpsc::UnboundedSender<WaitForAdminStartMsg>) -> Self {
+    fn new(invalidator: ui::InvalidateHandle) -> Self {
         Self {
-            marquee: Marquee::new("Hello World!!!!!", 10, tx, |m| {
-                WaitForAdminStartMsg::Marquee(m)
-            }),
+            marquee: Marquee::new("Hello World!!!!!", 10, invalidator),
         }
     }
 }
 
 impl ui::Component for WaitForAdminStartView {
     type Props = ();
-    type Message = WaitForAdminStartMsg;
-
-    fn update(&mut self, msg: Self::Message) {
-        match msg {
-            WaitForAdminStartMsg::Marquee(m) => ui::Component::update(&mut self.marquee, m),
-        }
-    }
+    type Message = ();
 
     fn render(&self, _props: Self::Props) -> ui::Node<Self::Message> {
-        let m = self
-            .marquee
-            .render(())
-            .map(WaitForAdminStartMsg::Marquee)
-            .w(38.)
-            .h(5.);
+        let m = self.marquee.render(()).w(12.).h(5.);
 
-        topbar("No game in progress").with_child(m)
-    }
-}
-
-impl ui::View for WaitForAdminStartView {
-    type GlobalState = ();
-    type ConnectionState = ();
-
-    fn mount(tx: tokio::sync::mpsc::UnboundedSender<Self::Message>) -> Self {
-        Self::new(tx)
-    }
-
-    fn compose(_global: Self::GlobalState, _connection: Self::ConnectionState) -> Self::Props {
-        ()
+        ui::container()
+            .flex()
+            .flex_col()
+            .w(200.)
+            .with_child(topbar("No game in progress").with_child(m))
     }
 }
 
@@ -72,7 +45,9 @@ impl scenes::Scene for WaitForAdminStart {
     type Output = ();
 
     async fn run(self) -> Result<scenes::SceneResult<()>, scenes::SceneError> {
-        let _ = ui::attach::<WaitForAdminStartView>(self.insim.clone(), self.presence.clone(), ());
+        let (_ui, _ui_handle) = ui::mount(self.insim.clone(), (), |_ucid, invalidator| {
+            WaitForAdminStartView::new(invalidator)
+        });
 
         self.insim
             .send_message("Ready for admin !start command", ConnectionId::ALL)
