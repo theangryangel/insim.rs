@@ -6,7 +6,6 @@ use insim::{
         object::insim::{InsimCheckpoint, InsimCheckpointKind},
         string::colours::Colour,
     },
-    identifiers::ConnectionId,
     insim::{ObjectInfo, Uco},
 };
 use kitcar::{
@@ -45,14 +44,6 @@ struct ClockworkRoundConnectionProps {
 #[derive(Clone, Debug)]
 enum ClockworkRoundMessage {
     Help(HelpDialogMsg),
-}
-
-impl ui::IntoViewInput<ClockworkRoundMessage> for (ConnectionId, chat::ChatMsg) {
-    fn into_view_input(self) -> Option<(ConnectionId, ClockworkRoundMessage)> {
-        let (ucid, msg) = self;
-        matches!(msg, chat::ChatMsg::Help)
-            .then_some((ucid, ClockworkRoundMessage::Help(HelpDialogMsg::Show)))
-    }
 }
 
 struct ClockworkRoundView {
@@ -154,12 +145,15 @@ impl Scene for Rounds {
             active_runs: HashMap::new(),
         };
 
-        let (ui, _ui_handle) = ui::attach::<ClockworkRoundView>(
+        let (ui, _ui_handle) = ui::attach_with::<ClockworkRoundView, _, _>(
             self.insim.clone(),
             ClockworkRoundGlobalProps::default(),
+            self.chat.subscribe(),
+            |(ucid, msg)| {
+                matches!(msg, chat::ChatMsg::Help)
+                    .then_some((ucid, ClockworkRoundMessage::Help(HelpDialogMsg::Show)))
+            },
         );
-
-        let _chat_task = ui.update_from_broadcast(self.chat.subscribe());
 
         for round in 1..=self.rounds {
             state.broadcast_rankings(&self, &ui).await?;

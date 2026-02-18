@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use insim::{builder::InsimTask, identifiers::ConnectionId};
+use insim::builder::InsimTask;
 use kitcar::{
     scenes::{Scene, SceneError, SceneResult},
     time::Countdown,
@@ -15,14 +15,6 @@ use crate::{
 #[derive(Clone, Debug)]
 enum ClockworkLobbyMessage {
     Help(HelpDialogMsg),
-}
-
-impl ui::IntoViewInput<ClockworkLobbyMessage> for (ConnectionId, chat::ChatMsg) {
-    fn into_view_input(self) -> Option<(ConnectionId, ClockworkLobbyMessage)> {
-        let (ucid, msg) = self;
-        matches!(msg, chat::ChatMsg::Help)
-            .then_some((ucid, ClockworkLobbyMessage::Help(HelpDialogMsg::Show)))
-    }
 }
 
 struct ClockworkLobbyView {
@@ -90,9 +82,15 @@ impl Scene for Lobby {
     async fn run(self) -> Result<SceneResult<Self::Output>, SceneError> {
         tracing::info!("Lobby: 20 second warm up");
         let mut countdown = Countdown::new(Duration::from_secs(1), 20);
-        let (ui, _ui_handle) = ui::attach::<ClockworkLobbyView>(self.insim.clone(), Duration::ZERO);
-
-        let _chat_task = ui.update_from_broadcast(self.chat.subscribe());
+        let (ui, _ui_handle) = ui::attach_with::<ClockworkLobbyView, _, _>(
+            self.insim.clone(),
+            Duration::ZERO,
+            self.chat.subscribe(),
+            |(ucid, msg)| {
+                matches!(msg, chat::ChatMsg::Help)
+                    .then_some((ucid, ClockworkLobbyMessage::Help(HelpDialogMsg::Show)))
+            },
+        );
 
         while countdown.tick().await.is_some() {
             let remaining = countdown.remaining_duration();

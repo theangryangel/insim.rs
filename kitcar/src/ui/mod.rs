@@ -35,7 +35,8 @@ struct ActiveViewChannels<V: View> {
     view_event_tx: mpsc::UnboundedSender<view::ViewInput<V::Message>>,
 }
 
-/// Ui handle. Create using [attach]. When dropped all insim buttons will be automatically removed.
+/// Ui handle. Create using [attach] or [attach_with].
+/// When dropped all insim buttons will be automatically removed.
 /// Intended for multi-player/multi-connection UIs
 #[derive(Debug)]
 pub struct Ui<M: Clone + Send + 'static, G, C> {
@@ -43,15 +44,6 @@ pub struct Ui<M: Clone + Send + 'static, G, C> {
     connection_props: mpsc::Sender<(ConnectionId, C)>,
     view_messages: mpsc::Sender<(ConnectionId, M)>,
     outbound: broadcast::Sender<(ConnectionId, M)>,
-}
-
-/// Converts a broadcast event into a targeted UI message.
-///
-/// This is primarily intended for chat-style command buses where each event already
-/// carries a `ConnectionId`.
-pub trait IntoViewInput<M> {
-    /// Return the target connection id and UI message, or `None` to ignore the event.
-    fn into_view_input(self) -> Option<(ConnectionId, M)>;
 }
 
 impl<M, G, C> Ui<M, G, C>
@@ -75,46 +67,6 @@ where
     /// Subscribe to messages produced by user UI interactions (e.g. button click / type-in).
     pub fn subscribe(&self) -> broadcast::Receiver<(ConnectionId, M)> {
         self.outbound.subscribe()
-    }
-
-    /// Utility function to reduce boilerplate when injecting messages from external sources,
-    /// usually chat.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// impl ui::IntoViewInput<ClockworkLobbyMessage> for (ConnectionId, chat::ChatMsg) {
-    ///     fn into_view_input(self) -> Option<(ConnectionId, ClockworkLobbyMessage)> {
-    ///         let (ucid, msg) = self;
-    ///         matches!(msg, chat::ChatMsg::Help)
-    ///             .then_some((ucid, ClockworkLobbyMessage::Help(HelpDialogMsg::Show)))
-    ///     }
-    /// }
-    ///
-    /// let _chat_task = ui.update_from_broadcast(self.chat.subscribe());
-    /// ```
-    pub fn update_from_broadcast<N>(&self, mut rx: broadcast::Receiver<N>) -> JoinHandle<()>
-    where
-        N: IntoViewInput<M> + Clone + Send + 'static,
-    {
-        let tx = self.view_messages.clone();
-        tokio::spawn(async move {
-            loop {
-                match rx.recv().await {
-                    Ok(event) => {
-                        if let Some((ucid, msg)) = event.into_view_input()
-                            && tx.send((ucid, msg)).await.is_err()
-                        {
-                            break;
-                        }
-                    },
-                    Err(broadcast::error::RecvError::Lagged(skipped)) => {
-                        tracing::warn!("UI update_from_broadcast lagged by {skipped} events");
-                    },
-                    Err(broadcast::error::RecvError::Closed) => break,
-                }
-            }
-        })
     }
 
     /// Inject message into UI for a given ucid.
@@ -182,10 +134,36 @@ pub fn attach<V>(
 where
     V: View,
 {
+    let (ingress_tx, ingress_rx) = broadcast::channel::<()>(1);
+    drop(ingress_tx);
+
+    attach_with::<V, _, _>(insim, props, ingress_rx, |_| None)
+}
+
+/// Attach a UI view to an insim connection and map an external broadcast stream into
+/// targeted per-player UI messages.
+///
+/// This is useful for feeding parsed chat commands (or any other command/event bus)
+/// directly into UI state updates without an extra forwarding task.
+#[allow(clippy::type_complexity)]
+pub fn attach_with<V, E, F>(
+    insim: insim::builder::InsimTask,
+    props: V::GlobalState,
+    mut ingress_rx: broadcast::Receiver<E>,
+    mut map_ingress: F,
+) -> (
+    Ui<V::Message, V::GlobalState, V::ConnectionState>,
+    JoinHandle<Result<(), UiError>>,
+)
+where
+    V: View,
+    E: Clone + Send + 'static,
+    F: FnMut(E) -> Option<(ConnectionId, V::Message)> + Send + 'static,
+{
     let (global_tx, _global_rx) = watch::channel(props);
     // Outside-in connection props updates (`Ui::set_player_state`).
     let (connection_props_tx, mut connection_props_rx) = mpsc::channel(100);
-    // Outside-in per-player messages (`Ui::update`, `update_from_broadcast`).
+    // Outside-in per-player messages (`Ui::update`).
     let (view_msg_tx, mut view_msg_rx) = mpsc::channel::<(ConnectionId, V::Message)>(100);
     let (outbound_tx, _outbound_rx) = broadcast::channel::<(ConnectionId, V::Message)>(100);
     let ui_handle = Ui {
@@ -215,6 +193,7 @@ where
         local.block_on(&rt, async move {
             let mut packets = insim.subscribe();
             let mut view_msg_rx_closed = false;
+            let mut ingress_rx_closed = false;
             let mut active: HashMap<ConnectionId, ActiveViewChannels<V>> = HashMap::new();
 
             if let Err(e) = insim.send(TinyType::Ncn.with_request_id(1)).await {
@@ -301,6 +280,23 @@ where
                             // shut down here—lifecycle is tied to connection_props_rx.
                             view_msg_rx_closed = true;
                         }
+                    },
+
+                    // Mapped external ingress (`attach_with`) routed into per-player views.
+                    res = ingress_rx.recv(), if !ingress_rx_closed => match res {
+                        Ok(event) => {
+                            if let Some((ucid, msg)) = map_ingress(event)
+                                && let Some(channels) = active.get(&ucid)
+                            {
+                                let _ = channels.view_event_tx.send(view::ViewInput::Message(msg));
+                            }
+                        },
+                        Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                            tracing::warn!("UI attach_with: ingress stream lagged by {skipped} events");
+                        },
+                        Err(broadcast::error::RecvError::Closed) => {
+                            ingress_rx_closed = true;
+                        },
                     },
                 }
             }
