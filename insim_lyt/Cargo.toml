@@ -1,0 +1,17 @@
+[package]
+name = "insim_lyt"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+homepage.workspace = true
+
+[dependencies]
+bytes = { workspace = true }
+thiserror = { workspace = true }
+insim_core = { path = "../insim_core", version = "4.0.0" }
+
+[lints]
+workspace = true
