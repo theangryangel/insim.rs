@@ -2,10 +2,18 @@
 #[allow(missing_docs, unused_results)]
 use eframe::egui;
 use egui_plot::{Plot, PlotImage, PlotPoint, PlotPoints, Points};
-use insim_core::object::{ObjectCoordinate, ObjectInfo, Raw};
+use insim_core::object::ObjectInfo;
 use insim_lyt::Lyt;
 use std::path::{Path, PathBuf};
 
+#[allow(missing_docs)]
+/// Inspector UI helpers.
+mod inspector;
+#[allow(missing_docs)]
+/// Object library picker widget.
+mod object_library_widget;
+/// Placeable object catalog.
+mod object_catalog;
 pub mod tools;
 
 const CLICK_RADIUS_UNITS: i64 = 160;
@@ -72,25 +80,30 @@ impl TrackEditor {
         }
     }
 
-    fn insert_object(&mut self, object: ObjectInfo) {
+    fn insert_object(&mut self, object: ObjectInfo) -> u64 {
+        let object_id = self.next_object_id;
         self.objects.push(object);
-        self.object_ids.push(self.next_object_id);
+        self.object_ids.push(object_id);
         self.next_object_id += 1;
+        object_id
     }
 
-    fn delete_selected_objects(&mut self) {
+    fn delete_objects_by_ids(&mut self, ids: &[u64]) -> usize {
         use std::collections::HashSet;
 
-        let selected: HashSet<u64> = self.tools.select.selected_object_ids.drain(..).collect();
-        if selected.is_empty() {
-            return;
+        let targets: HashSet<u64> = ids.iter().copied().collect();
+        if targets.is_empty() {
+            return 0;
         }
 
         let mut kept_objects = Vec::with_capacity(self.objects.len());
         let mut kept_ids = Vec::with_capacity(self.object_ids.len());
+        let mut removed = 0_usize;
 
         for (object_id, object) in self.object_ids.drain(..).zip(self.objects.drain(..)) {
-            if !selected.contains(&object_id) {
+            if targets.contains(&object_id) {
+                removed += 1;
+            } else {
                 kept_ids.push(object_id);
                 kept_objects.push(object);
             }
@@ -98,6 +111,20 @@ impl TrackEditor {
 
         self.object_ids = kept_ids;
         self.objects = kept_objects;
+        self.tools
+            .select
+            .selected_object_ids
+            .retain(|id| !targets.contains(id));
+        self.tools
+            .spline_path
+            .generated_object_ids
+            .retain(|id| !targets.contains(id));
+        removed
+    }
+
+    fn delete_selected_objects(&mut self) {
+        let selected_ids = std::mem::take(&mut self.tools.select.selected_object_ids);
+        let _ = self.delete_objects_by_ids(&selected_ids);
     }
 
     fn replace_objects(&mut self, objects: Vec<ObjectInfo>) {
@@ -106,6 +133,54 @@ impl TrackEditor {
         self.object_ids = (0..len).collect();
         self.next_object_id = len;
         self.tools.select.selected_object_ids.clear();
+        self.tools.spline_path.generated_object_ids.clear();
+    }
+
+    fn clear_spline_generated_objects(&mut self) -> usize {
+        let ids = std::mem::take(&mut self.tools.spline_path.generated_object_ids);
+        self.delete_objects_by_ids(&ids)
+    }
+
+    fn apply_spline_objects(&mut self) {
+        let control_points = self.tools.spline_path.control_points.clone();
+        if control_points.len() < 2 {
+            self.status_line = Some("Spline apply needs at least 2 control points.".to_owned());
+            return;
+        }
+
+        let spacing_units = self.tools.spline_path.spacing_units;
+        if spacing_units <= 0 {
+            self.status_line = Some("Spline spacing must be greater than 0.".to_owned());
+            return;
+        }
+
+        let new_positions = sample_spline_points_raw(&control_points, spacing_units);
+        if new_positions.is_empty() {
+            self.status_line = Some("Spline apply produced no points.".to_owned());
+            return;
+        }
+
+        let old_generated = self.tools.spline_path.generated_object_ids.clone();
+        let removed = self.delete_objects_by_ids(&old_generated);
+
+        let template = self.tools.spline_path.object_template.clone();
+        let mut new_generated_ids = Vec::with_capacity(new_positions.len());
+        for [x, y] in new_positions {
+            let mut object = template.clone();
+            let position = object.position_mut();
+            position.x = x;
+            position.y = y;
+            let object_id = self.insert_object(object);
+            new_generated_ids.push(object_id);
+        }
+
+        self.tools.select.selected_object_ids = new_generated_ids.clone();
+        self.tools.spline_path.generated_object_ids = new_generated_ids;
+        self.status_line = Some(format!(
+            "Spline applied: {} object(s) generated, {} cleared.",
+            self.tools.spline_path.generated_object_ids.len(),
+            removed
+        ));
     }
 
     fn load_background_image(&mut self, ctx: &egui::Context, path: PathBuf) {
@@ -257,6 +332,9 @@ impl eframe::App for TrackEditor {
             self.delete_selected_objects();
         }
 
+        let mut spline_apply_requested = false;
+        let mut spline_clear_generated_requested = false;
+
         egui::SidePanel::left("tools")
             .resizable(false)
             .exact_width(45.0)
@@ -292,50 +370,87 @@ impl eframe::App for TrackEditor {
 
                 match self.tools.active {
                     tools::ToolKind::Select => {
-                        ui.heading("Selection Tool");
-                        ui.label("Click an object on the map to edit its properties.");
-                        ui.label(format!(
-                            "Selected objects: {}",
-                            self.tools.select.selected_object_ids.len()
-                        ));
+                        inspector::show_selection_inspector(
+                            ui,
+                            &self.object_ids,
+                            &mut self.objects,
+                            &self.tools.select.selected_object_ids,
+                        );
                     },
                     tools::ToolKind::Place => {
                         let place = &mut self.tools.place;
                         ui.heading("Object Library");
-                        ui.horizontal(|ui| {
-                            ui.label("🔍");
-                            ui.text_edit_singleline(&mut place.search_query);
-                        });
-                        ui.separator();
-
-                        egui::ScrollArea::vertical().show(ui, |ui| {
-                            // Dummy list of objects to demonstrate filtering
-                            let dummy_objects = [
-                                (16_u8, "Painted Letters"),
-                                (17_u8, "Painted Arrows"),
-                                (20_u8, "Cone"),
-                                (49_u8, "Tyre Stack 2"),
-                                (104_u8, "Barrier Long"),
-                                (172_u8, "Concrete Slab"),
-                            ];
-
-                            let query = place.search_query.to_lowercase();
-                            for (id, name) in dummy_objects {
-                                if query.is_empty() || name.to_lowercase().contains(&query) {
-                                    ui.selectable_value(&mut place.selected_object_type, id, name);
-                                }
-                            }
-                        });
+                        let _ = ui.add(object_library_widget::ObjectLibraryWidget::new(
+                            &mut place.search_query,
+                            &mut place.selected_object_kind,
+                            &mut place.open_categories,
+                        ));
                     },
                     tools::ToolKind::SplinePath => {
                         ui.heading("Catmull-Rom Spline");
-                        ui.label("Click the map to place control nodes.");
+                        let spline = &mut self.tools.spline_path;
+
+                        ui.label("Click the map to place control points.");
+                        ui.label(format!("Control points: {}", spline.control_points.len()));
+                        ui.label(format!(
+                            "Generated objects: {}",
+                            spline.generated_object_ids.len()
+                        ));
+
+                        let _ = ui.add(
+                            egui::DragValue::new(&mut spline.spacing_units)
+                                .range(1..=5000)
+                                .speed(1)
+                                .prefix("Spacing: ")
+                                .suffix(" units"),
+                        );
+
                         ui.separator();
-                        if ui.button("Clear Nodes").clicked() {
-                            //self.spline_nodes.clear();
+                        ui.label("Object Library");
+                        let kind_changed = ui
+                            .add(object_library_widget::ObjectLibraryWidget::new(
+                                &mut spline.search_query,
+                                &mut spline.selected_object_kind,
+                                &mut spline.open_categories,
+                            ))
+                            .changed();
+                        if kind_changed {
+                            spline.object_template = spline.selected_object_kind.create_default();
                         }
-                        // ui.label(format!("Nodes placed: {}", self.spline_nodes.len()));
-                        // We will add the "Generate Objects" button here next!
+
+                        ui.separator();
+                        ui.label("Object Template");
+                        let _ = ui.add(
+                            inspector::ObjectEditorWidget::new(&mut spline.object_template)
+                                .options(inspector::ObjectEditorOptions::template()),
+                        );
+
+                        ui.separator();
+                        if ui.button("Undo Last Point").clicked() {
+                            let _ = spline.control_points.pop();
+                        }
+                        if ui.button("Clear Points").clicked() {
+                            spline.control_points.clear();
+                            spline.generated_object_ids.clear();
+                        }
+                        if ui
+                            .add_enabled(
+                                !spline.generated_object_ids.is_empty(),
+                                egui::Button::new("Clear Generated"),
+                            )
+                            .clicked()
+                        {
+                            spline_clear_generated_requested = true;
+                        }
+                        if ui
+                            .add_enabled(
+                                spline.control_points.len() >= 2,
+                                egui::Button::new("Apply"),
+                            )
+                            .clicked()
+                        {
+                            spline_apply_requested = true;
+                        }
                     },
                     tools::ToolKind::RampGen => {
                         ui.heading("Ramp Generator");
@@ -343,6 +458,15 @@ impl eframe::App for TrackEditor {
                     },
                 }
             });
+
+        if spline_clear_generated_requested {
+            let removed = self.clear_spline_generated_objects();
+            self.status_line = Some(format!("Spline generated objects cleared: {}", removed));
+        }
+
+        if spline_apply_requested {
+            self.apply_spline_objects();
+        }
 
         // -- CENTRAL PANEL: THE 2D MAP --
         let _ = egui::CentralPanel::default().show(ctx, |ui| {
@@ -359,6 +483,11 @@ impl eframe::App for TrackEditor {
                 .iter()
                 .copied()
                 .collect();
+
+            let spline_control_points = self.tools.spline_path.control_points.clone();
+            let spline_curve = sample_catmull_rom_polyline(&spline_control_points);
+            let spline_preview_positions =
+                sample_spline_points_raw(&spline_control_points, self.tools.spline_path.spacing_units);
 
             // 1. Create a variable outside the closure to hold the coordinate
             let mut pointer_coord = None;
@@ -405,6 +534,37 @@ impl eframe::App for TrackEditor {
                         .color(egui::Color32::YELLOW)
                         .name("Selected"),
                 );
+
+                if !spline_curve.is_empty() {
+                    plot_ui.line(
+                        egui_plot::Line::new("Spline", PlotPoints::new(spline_curve.clone()))
+                            .color(egui::Color32::from_rgb(80, 180, 255)),
+                    );
+                }
+
+                if !spline_control_points.is_empty() {
+                    let control_plot_points: Vec<[f64; 2]> = spline_control_points
+                        .iter()
+                        .map(|point| [f64::from(point[0]), f64::from(point[1])])
+                        .collect();
+                    plot_ui.points(
+                        Points::new("Spline Control", PlotPoints::new(control_plot_points))
+                            .radius(5.0)
+                            .color(egui::Color32::from_rgb(0, 200, 255)),
+                    );
+                }
+
+                if !spline_preview_positions.is_empty() {
+                    let preview_plot_points: Vec<[f64; 2]> = spline_preview_positions
+                        .iter()
+                        .map(|point| [f64::from(point[0]), f64::from(point[1])])
+                        .collect();
+                    plot_ui.points(
+                        Points::new("Spline Preview", PlotPoints::new(preview_plot_points))
+                            .radius(3.5)
+                            .color(egui::Color32::from_rgb(255, 160, 50)),
+                    );
+                }
             });
 
             // 3. Handle Interaction using the variable we captured
@@ -454,15 +614,24 @@ impl eframe::App for TrackEditor {
                             }
                         },
                         tools::ToolKind::Place => {
-                            let object = make_object_raw(
-                                self.tools.place.selected_object_type,
+                            let object = make_object_for_kind(
+                                self.tools.place.selected_object_kind,
                                 click_x_raw,
                                 click_y_raw,
                                 DEFAULT_PLACE_Z_UNITS,
                             );
-                            self.insert_object(object);
+                            let object_id = self.insert_object(object);
+                            self.tools.select.selected_object_ids.clear();
+                            self.tools.select.selected_object_ids.push(object_id);
+                            self.tools.activate(tools::ToolKind::Select);
                         },
-                        tools::ToolKind::SplinePath | tools::ToolKind::RampGen => {},
+                        tools::ToolKind::SplinePath => {
+                            self.tools
+                                .spline_path
+                                .control_points
+                                .push([click_x_raw, click_y_raw]);
+                        },
+                        tools::ToolKind::RampGen => {},
                     }
                 }
             }
@@ -472,13 +641,154 @@ impl eframe::App for TrackEditor {
 
 // --- 3. UTILITY FUNCTIONS ---
 
-fn make_object_raw(type_id: u8, x_raw: i16, y_raw: i16, z_raw: u8) -> ObjectInfo {
-    ObjectInfo::Unknown(Raw {
-        index: type_id,
-        xyz: ObjectCoordinate::new(x_raw, y_raw, z_raw),
-        flags: 0,
-        heading: 0,
-    })
+fn sample_spline_points_raw(control_points: &[[i16; 2]], spacing_units: i32) -> Vec<[i16; 2]> {
+    if control_points.len() < 2 || spacing_units <= 0 {
+        return Vec::new();
+    }
+
+    let curve = sample_catmull_rom_polyline(control_points);
+    if curve.len() < 2 {
+        return Vec::new();
+    }
+
+    let sampled = resample_polyline(&curve, f64::from(spacing_units));
+    let mut out = Vec::with_capacity(sampled.len());
+    for point in sampled {
+        let x = point[0].round().clamp(i16::MIN as f64, i16::MAX as f64) as i16;
+        let y = point[1].round().clamp(i16::MIN as f64, i16::MAX as f64) as i16;
+        let raw = [x, y];
+        if out.last().copied() != Some(raw) {
+            out.push(raw);
+        }
+    }
+    out
+}
+
+fn sample_catmull_rom_polyline(control_points: &[[i16; 2]]) -> Vec<[f64; 2]> {
+    if control_points.len() < 2 {
+        return Vec::new();
+    }
+
+    if control_points.len() == 2 {
+        return vec![
+            [f64::from(control_points[0][0]), f64::from(control_points[0][1])],
+            [f64::from(control_points[1][0]), f64::from(control_points[1][1])],
+        ];
+    }
+
+    let points: Vec<[f64; 2]> = control_points
+        .iter()
+        .map(|point| [f64::from(point[0]), f64::from(point[1])])
+        .collect();
+
+    let mut out = Vec::new();
+    for i in 0..(points.len() - 1) {
+        let p0 = if i == 0 { points[i] } else { points[i - 1] };
+        let p1 = points[i];
+        let p2 = points[i + 1];
+        let p3 = if i + 2 < points.len() {
+            points[i + 2]
+        } else {
+            points[i + 1]
+        };
+
+        let seg_dx = p2[0] - p1[0];
+        let seg_dy = p2[1] - p1[1];
+        let seg_len = (seg_dx * seg_dx + seg_dy * seg_dy).sqrt();
+        let samples = ((seg_len / 16.0).ceil() as usize).clamp(8, 128);
+
+        for step in 0..samples {
+            let t = step as f64 / samples as f64;
+            out.push(catmull_rom(p0, p1, p2, p3, t));
+        }
+    }
+
+    if let Some(last) = points.last().copied() {
+        out.push(last);
+    }
+
+    out
+}
+
+fn catmull_rom(p0: [f64; 2], p1: [f64; 2], p2: [f64; 2], p3: [f64; 2], t: f64) -> [f64; 2] {
+    let t2 = t * t;
+    let t3 = t2 * t;
+
+    let x = 0.5
+        * ((2.0 * p1[0])
+            + (-p0[0] + p2[0]) * t
+            + (2.0 * p0[0] - 5.0 * p1[0] + 4.0 * p2[0] - p3[0]) * t2
+            + (-p0[0] + 3.0 * p1[0] - 3.0 * p2[0] + p3[0]) * t3);
+    let y = 0.5
+        * ((2.0 * p1[1])
+            + (-p0[1] + p2[1]) * t
+            + (2.0 * p0[1] - 5.0 * p1[1] + 4.0 * p2[1] - p3[1]) * t2
+            + (-p0[1] + 3.0 * p1[1] - 3.0 * p2[1] + p3[1]) * t3);
+
+    [x, y]
+}
+
+fn resample_polyline(polyline: &[[f64; 2]], spacing: f64) -> Vec<[f64; 2]> {
+    if polyline.is_empty() || spacing <= 0.0 {
+        return Vec::new();
+    }
+
+    let mut out = vec![polyline[0]];
+    let mut distance_since_last = 0.0;
+    let mut previous = polyline[0];
+
+    for &current in &polyline[1..] {
+        let mut segment_start = previous;
+        let mut dx = current[0] - segment_start[0];
+        let mut dy = current[1] - segment_start[1];
+        let mut segment_length = (dx * dx + dy * dy).sqrt();
+
+        while segment_length > 0.0 && distance_since_last + segment_length >= spacing {
+            let remaining = spacing - distance_since_last;
+            let ratio = remaining / segment_length;
+            let point = [segment_start[0] + dx * ratio, segment_start[1] + dy * ratio];
+            out.push(point);
+
+            segment_start = point;
+            dx = current[0] - segment_start[0];
+            dy = current[1] - segment_start[1];
+            segment_length = (dx * dx + dy * dy).sqrt();
+            distance_since_last = 0.0;
+        }
+
+        distance_since_last += segment_length;
+        previous = current;
+    }
+
+    if let Some(last) = polyline.last().copied() {
+        let should_push_last = out
+            .last()
+            .map(|point| {
+                let dx = point[0] - last[0];
+                let dy = point[1] - last[1];
+                (dx * dx + dy * dy).sqrt() > 0.5
+            })
+            .unwrap_or(true);
+        if should_push_last {
+            out.push(last);
+        }
+    }
+
+    out
+}
+
+fn make_object_for_kind(
+    kind: object_catalog::ObjectCatalogKind,
+    x_raw: i16,
+    y_raw: i16,
+    z_raw: u8,
+) -> ObjectInfo {
+    let mut object = kind.create_default();
+    let position = object.position_mut();
+    position.x = x_raw;
+    position.y = y_raw;
+    position.z = z_raw;
+    object
 }
 
 fn object_xy_units(object: &ObjectInfo) -> (f64, f64) {
