@@ -3,18 +3,52 @@
 use eframe::egui;
 use egui_plot::{Plot, PlotImage, PlotPoint, PlotPoints, Points};
 use insim_core::object::{ObjectCoordinate, ObjectInfo, Raw};
+use insim_lyt::Lyt;
+use std::path::{Path, PathBuf};
 
 pub mod tools;
 
 const CLICK_RADIUS_UNITS: i64 = 160;
 const DEFAULT_PLACE_Z_UNITS: u8 = 0;
-const SEED_OBJECT_TYPE: u8 = 16;
-const MAP_SIZE_UNITS: f32 = 4000.0;
+const RAW_UNITS_PER_METRE: f32 = 16.0;
+const DEFAULT_LYT_VERSION: u8 = 0;
+const DEFAULT_LYT_REVISION: u8 = 252;
+const DEFAULT_LYT_LAPS: u8 = 0;
+const DEFAULT_LYT_MINI_REV: u8 = 9;
+
+#[derive(Debug, Clone, Copy)]
+struct LytHeader {
+    version: u8,
+    revision: u8,
+    laps: u8,
+    mini_rev: u8,
+}
+
+impl Default for LytHeader {
+    fn default() -> Self {
+        Self {
+            version: DEFAULT_LYT_VERSION,
+            revision: DEFAULT_LYT_REVISION,
+            laps: DEFAULT_LYT_LAPS,
+            mini_rev: DEFAULT_LYT_MINI_REV,
+        }
+    }
+}
+
+struct LoadedBackground {
+    texture: egui::TextureHandle,
+    size_units: [f32; 2],
+    source_size_px: [u32; 2],
+}
 
 // --- 1. DATA STRUCTURES ---
 
 struct TrackEditor {
-    map_texture: Option<egui::TextureHandle>,
+    background: Option<LoadedBackground>,
+    background_image_path: Option<PathBuf>,
+    lyt_path: Option<PathBuf>,
+    lyt_header: LytHeader,
+    status_line: Option<String>,
     tools: tools::Tools,
     objects: Vec<ObjectInfo>,
     object_ids: Vec<u64>,
@@ -23,24 +57,17 @@ struct TrackEditor {
 
 impl TrackEditor {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        // Attempt to load the background map on startup
-        let map_texture = load_image_to_texture(&cc.egui_ctx, "/home/karl/Downloads/BL_2560.png");
-
-        // Seed with some dummy data so we have something to click on
-        let dummy_objects = vec![
-            make_object_raw(SEED_OBJECT_TYPE, 1600, 2400, DEFAULT_PLACE_Z_UNITS),
-            make_object_raw(SEED_OBJECT_TYPE, 1920, 2560, DEFAULT_PLACE_Z_UNITS),
-            make_object_raw(SEED_OBJECT_TYPE, 2240, 2880, DEFAULT_PLACE_Z_UNITS),
-        ];
-
-        let next_object_id = dummy_objects.len() as u64;
-        let object_ids = (0..next_object_id).collect();
+        let _ = cc;
 
         Self {
-            objects: dummy_objects,
-            object_ids,
-            next_object_id,
-            map_texture,
+            objects: Vec::new(),
+            object_ids: Vec::new(),
+            next_object_id: 0,
+            background: None,
+            background_image_path: None,
+            lyt_path: None,
+            lyt_header: LytHeader::default(),
+            status_line: None,
             tools: tools::Tools::default(),
         }
     }
@@ -72,6 +99,89 @@ impl TrackEditor {
         self.object_ids = kept_ids;
         self.objects = kept_objects;
     }
+
+    fn replace_objects(&mut self, objects: Vec<ObjectInfo>) {
+        let len = objects.len() as u64;
+        self.objects = objects;
+        self.object_ids = (0..len).collect();
+        self.next_object_id = len;
+        self.tools.select.selected_object_ids.clear();
+    }
+
+    fn load_background_image(&mut self, ctx: &egui::Context, path: PathBuf) {
+        match load_image_to_texture(ctx, &path) {
+            Ok(background) => {
+                self.background = Some(background);
+                self.background_image_path = Some(path.clone());
+                if let Some(background) = &self.background {
+                    self.status_line = Some(format!(
+                        "Loaded background image: {} ({}x{} px -> {}x{} raw units)",
+                        path.display(),
+                        background.source_size_px[0],
+                        background.source_size_px[1],
+                        background.size_units[0] as i64,
+                        background.size_units[1] as i64,
+                    ));
+                }
+            },
+            Err(err) => {
+                self.status_line = Some(format!("Failed to load background image: {err}"));
+            },
+        }
+    }
+
+    fn load_lyt(&mut self, path: PathBuf) {
+        match Lyt::from_path(&path) {
+            Ok(lyt) => {
+                self.lyt_header = LytHeader {
+                    version: lyt.version,
+                    revision: lyt.revision,
+                    laps: lyt.laps,
+                    mini_rev: lyt.mini_rev,
+                };
+                let count = lyt.objects.len();
+                self.replace_objects(lyt.objects);
+                self.lyt_path = Some(path.clone());
+                self.status_line = Some(format!("Loaded LYT ({} objects): {}", count, path.display()));
+            },
+            Err(err) => {
+                self.status_line = Some(format!("Failed to load LYT: {err}"));
+            },
+        }
+    }
+
+    fn save_lyt(&mut self, path: PathBuf) {
+        let output_path = normalize_lyt_path(path);
+        let lyt = Lyt {
+            version: self.lyt_header.version,
+            revision: self.lyt_header.revision,
+            laps: self.lyt_header.laps,
+            mini_rev: self.lyt_header.mini_rev,
+            objects: self.objects.clone(),
+        };
+
+        match std::fs::File::create(&output_path) {
+            Ok(file) => match lyt.write(file) {
+                Ok(_) => {
+                    self.lyt_path = Some(output_path.clone());
+                    self.status_line = Some(format!(
+                        "Saved LYT ({} objects): {}",
+                        self.objects.len(),
+                        output_path.display()
+                    ));
+                },
+                Err(err) => {
+                    self.status_line = Some(format!("Failed to save LYT: {err}"));
+                },
+            },
+            Err(err) => {
+                self.status_line = Some(format!(
+                    "Failed to create '{}': {err}",
+                    output_path.display()
+                ));
+            },
+        }
+    }
 }
 
 // --- 2. THE UI UPDATE LOOP ---
@@ -79,6 +189,68 @@ impl TrackEditor {
 impl eframe::App for TrackEditor {
     #[allow(missing_docs, unused_results)]
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::TopBottomPanel::top("file_bar").show(ctx, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                if ui.button("Load Background Image...").clicked()
+                    && let Some(path) = rfd::FileDialog::new()
+                        .add_filter("Image", &["png", "jpg", "jpeg", "bmp", "webp"])
+                        .pick_file()
+                {
+                    self.load_background_image(ctx, path);
+                }
+
+                if let Some(path) = &self.background_image_path {
+                    ui.label(format!("Background: {}", path.display()));
+                } else {
+                    ui.label("Background: not loaded");
+                }
+
+                ui.separator();
+
+                if ui.button("Load LYT...").clicked()
+                    && let Some(path) = rfd::FileDialog::new()
+                        .add_filter("Layout", &["lyt"])
+                        .pick_file()
+                {
+                    self.load_lyt(path);
+                }
+
+                let save_clicked = ui
+                    .add_enabled(self.lyt_path.is_some(), egui::Button::new("Save LYT"))
+                    .clicked();
+                if save_clicked && let Some(path) = self.lyt_path.clone() {
+                    self.save_lyt(path);
+                }
+
+                if ui.button("Save LYT As...").clicked() {
+                    let mut file_dialog = rfd::FileDialog::new().add_filter("Layout", &["lyt"]);
+                    if let Some(path) = &self.lyt_path {
+                        if let Some(parent) = path.parent() {
+                            file_dialog = file_dialog.set_directory(parent);
+                        }
+                        if let Some(file_name) = path.file_name().and_then(std::ffi::OsStr::to_str)
+                        {
+                            file_dialog = file_dialog.set_file_name(file_name);
+                        }
+                    }
+
+                    if let Some(path) = file_dialog.save_file() {
+                        self.save_lyt(path);
+                    }
+                }
+
+                if let Some(path) = &self.lyt_path {
+                    ui.label(format!("LYT: {}", path.display()));
+                } else {
+                    ui.label("LYT: not loaded");
+                }
+            });
+
+            if let Some(status_line) = &self.status_line {
+                ui.label(status_line);
+            }
+        });
+
         if self.tools.active == tools::ToolKind::Select
             && ctx.input(|i| i.key_pressed(egui::Key::Delete))
         {
@@ -196,12 +368,12 @@ impl eframe::App for TrackEditor {
                 pointer_coord = plot_ui.pointer_coordinate();
 
                 // Draw Background Map
-                if let Some(texture) = &self.map_texture {
+                if let Some(background) = &self.background {
                     let bg_image = PlotImage::new(
                         "Background",
-                        texture.id(),
+                        background.texture.id(),
                         PlotPoint::new(0.0, 0.0),
-                        [MAP_SIZE_UNITS, MAP_SIZE_UNITS],
+                        background.size_units,
                     );
                     plot_ui.image(bg_image);
                 }
@@ -318,49 +490,44 @@ fn plot_to_raw_units(plot_value: f64) -> i16 {
     plot_value.round().clamp(i16::MIN as f64, i16::MAX as f64) as i16
 }
 
-/// Reads a PNG from disk, decodes it, and uploads it to the GPU via egui.
-fn load_image_to_texture(ctx: &egui::Context, path: &str) -> Option<egui::TextureHandle> {
-    let image_data = match std::fs::read(path) {
-        Ok(data) => data,
-        Err(e) => {
-            eprintln!("❌ Failed to find image file '{}': {}", path, e);
-            return None;
-        },
-    };
+fn normalize_lyt_path(mut path: PathBuf) -> PathBuf {
+    if path.extension().is_none() {
+        let _ = path.set_extension("lyt");
+    }
+    path
+}
+
+/// Reads an image from disk and uploads it to the GPU via egui.
+fn load_image_to_texture(ctx: &egui::Context, path: &Path) -> Result<LoadedBackground, String> {
+    let image_data = std::fs::read(path)
+        .map_err(|e| format!("could not read '{}': {e}", path.display()))?;
 
     // Load as a DynamicImage first so we can check its size before converting to RGBA
-    let mut dyn_image = match image::load_from_memory(&image_data) {
-        Ok(img) => img,
-        Err(e) => {
-            eprintln!("❌ Failed to decode image: {}", e);
-            return None;
-        },
-    };
+    let mut dyn_image = image::load_from_memory(&image_data)
+        .map_err(|e| format!("could not decode '{}': {e}", path.display()))?;
+
+    let source_size_px = [dyn_image.width(), dyn_image.height()];
 
     let max_size = 2048;
     if dyn_image.width() > max_size || dyn_image.height() > max_size {
-        println!(
-            "⚠️ Image too large ({}x{}). Downscaling to {}...",
-            dyn_image.width(),
-            dyn_image.height(),
-            max_size
-        );
         // Resize keeping aspect ratio, using a fast filter
         dyn_image = dyn_image.resize(max_size, max_size, image::imageops::FilterType::Triangle);
     }
 
     let image = dyn_image.into_rgba8();
-    println!(
-        "✅ Successfully loaded map image: {}x{} pixels",
-        image.width(),
-        image.height()
-    );
 
     let size = [image.width() as usize, image.height() as usize];
     let pixels = image.as_flat_samples();
     let color_image = egui::ColorImage::from_rgba_unmultiplied(size, pixels.as_slice());
 
-    Some(ctx.load_texture("track_map_bg", color_image, egui::TextureOptions::LINEAR))
+    Ok(LoadedBackground {
+        texture: ctx.load_texture("track_map_bg", color_image, egui::TextureOptions::LINEAR),
+        size_units: [
+            source_size_px[0] as f32 * RAW_UNITS_PER_METRE,
+            source_size_px[1] as f32 * RAW_UNITS_PER_METRE,
+        ],
+        source_size_px,
+    })
 }
 
 fn main() -> eframe::Result<()> {

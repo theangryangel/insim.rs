@@ -13,6 +13,8 @@ eframe = "0.33.3"
 egui_plot = "0.34.1"
 image = { version = "0.24", features = ["png"] }
 insim_core = { path = "../../insim_core" }
+insim_lyt = { path = "../../insim_lyt" }
+rfd = "0.15"
 
 [lints]
 workspace = true
