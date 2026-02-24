@@ -14,6 +14,8 @@ mod inspector;
 mod object_library_widget;
 /// Placeable object catalog.
 mod object_catalog;
+/// Ramp generation utilities.
+mod ramp_gen;
 pub mod tools;
 
 const CLICK_RADIUS_UNITS: i64 = 160;
@@ -162,6 +164,10 @@ impl TrackEditor {
             .spline_path
             .generated_object_ids
             .retain(|id| !targets.contains(id));
+        self.tools
+            .ramp_gen
+            .generated_object_ids
+            .retain(|id| !targets.contains(id));
         removed
     }
 
@@ -177,10 +183,16 @@ impl TrackEditor {
         self.next_object_id = len;
         self.tools.select.selected_object_ids.clear();
         self.tools.spline_path.generated_object_ids.clear();
+        self.tools.ramp_gen.generated_object_ids.clear();
     }
 
     fn clear_spline_generated_objects(&mut self) -> usize {
         let ids = std::mem::take(&mut self.tools.spline_path.generated_object_ids);
+        self.delete_objects_by_ids(&ids)
+    }
+
+    fn clear_ramp_generated_objects(&mut self) -> usize {
+        let ids = std::mem::take(&mut self.tools.ramp_gen.generated_object_ids);
         self.delete_objects_by_ids(&ids)
     }
 
@@ -234,6 +246,46 @@ impl TrackEditor {
         self.status_line = Some(format!(
             "Spline applied: {} object(s) generated, {} cleared.",
             self.tools.spline_path.generated_object_ids.len(),
+            removed
+        ));
+    }
+
+    fn apply_ramp_objects(&mut self) {
+        let control_points = self.tools.ramp_gen.control_points.clone();
+        if control_points.len() < 2 {
+            self.status_line = Some("Ramp apply needs at least 2 control points.".to_owned());
+            return;
+        }
+
+        let template = self.tools.ramp_gen.object_template.clone();
+        let steps = self.tools.ramp_gen.steps_per_segment;
+
+        let generated = match ramp_gen::build(&control_points, &template, steps) {
+            Ok(objects) => objects,
+            Err(err) => {
+                self.status_line = Some(format!("Ramp apply failed: {err}"));
+                return;
+            },
+        };
+
+        if generated.is_empty() {
+            self.status_line = Some("Ramp apply produced no objects.".to_owned());
+            return;
+        }
+
+        let old_generated = self.tools.ramp_gen.generated_object_ids.clone();
+        let removed = self.delete_objects_by_ids(&old_generated);
+
+        let mut generated_ids = Vec::with_capacity(generated.len());
+        for object in generated {
+            generated_ids.push(self.insert_object(object));
+        }
+
+        self.tools.select.selected_object_ids = generated_ids.clone();
+        self.tools.ramp_gen.generated_object_ids = generated_ids;
+        self.status_line = Some(format!(
+            "Ramp applied: {} object(s) generated, {} cleared.",
+            self.tools.ramp_gen.generated_object_ids.len(),
             removed
         ));
     }
@@ -393,6 +445,8 @@ impl eframe::App for TrackEditor {
 
         let mut spline_apply_requested = false;
         let mut spline_clear_generated_requested = false;
+        let mut ramp_apply_requested = false;
+        let mut ramp_clear_generated_requested = false;
 
         egui::SidePanel::left("tools")
             .resizable(false)
@@ -513,7 +567,142 @@ impl eframe::App for TrackEditor {
                     },
                     tools::ToolKind::RampGen => {
                         ui.heading("Ramp Generator");
-                        ui.label("Select Start/End to build a ramp.");
+                        let ramp = &mut self.tools.ramp_gen;
+
+                        ui.label("Click map to place 3D guide points.");
+                        ui.label(format!("Control points: {}", ramp.control_points.len()));
+                        ui.label(format!(
+                            "Generated objects: {}",
+                            ramp.generated_object_ids.len()
+                        ));
+
+                        let _ = ui.add(
+                            egui::DragValue::new(&mut ramp.steps_per_segment)
+                                .range(8..=400)
+                                .speed(1)
+                                .prefix("Steps: "),
+                        );
+
+                        ui.label("Profile Y uses Z raw units (1 = 0.25m).");
+
+                        let (profile_distances, profile_points) =
+                            ramp_profile_points(&ramp.control_points);
+                        let mut profile_pointer = None;
+                        let profile_response = Plot::new("ramp_profile_plot")
+                            .height(120.0)
+                            .allow_boxed_zoom(false)
+                            .allow_scroll(false)
+                            .show(ui, |plot_ui| {
+                                profile_pointer = plot_ui.pointer_coordinate();
+                                if !profile_points.is_empty() {
+                                    plot_ui.line(
+                                        egui_plot::Line::new(
+                                            "Ramp Profile",
+                                            PlotPoints::new(profile_points.clone()),
+                                        )
+                                        .color(egui::Color32::from_rgb(140, 220, 120)),
+                                    );
+                                    plot_ui.points(
+                                        Points::new(
+                                            "Ramp Profile Points",
+                                            PlotPoints::new(profile_points.clone()),
+                                        )
+                                        .radius(4.0)
+                                        .color(egui::Color32::from_rgb(180, 255, 140)),
+                                    );
+
+                                    if let Some(selected_idx) = ramp.selected_node
+                                        && selected_idx < profile_points.len()
+                                    {
+                                        plot_ui.points(
+                                            Points::new(
+                                                "Selected Ramp Profile Point",
+                                                PlotPoints::new(vec![profile_points[selected_idx]]),
+                                            )
+                                            .radius(6.0)
+                                            .color(egui::Color32::YELLOW),
+                                        );
+                                    }
+                                }
+                            });
+
+                        if profile_response.response.clicked()
+                            && !profile_distances.is_empty()
+                            && let Some(pointer) = profile_pointer
+                        {
+                            let mut best = None;
+                            let mut best_dist = f64::MAX;
+                            for (idx, distance) in profile_distances.iter().copied().enumerate() {
+                                let dx = (distance - pointer.x).abs();
+                                let dy = (profile_points[idx][1] - pointer.y).abs();
+                                let metric = dx + dy * 0.5;
+                                if metric < best_dist {
+                                    best = Some(idx);
+                                    best_dist = metric;
+                                }
+                            }
+                            ramp.selected_node = best;
+                        }
+
+                        if profile_response.response.dragged()
+                            && let Some(pointer) = profile_pointer
+                            && let Some(selected_idx) = ramp.selected_node
+                            && let Some(node) = ramp.control_points.get_mut(selected_idx)
+                        {
+                            node.z = profile_y_to_z_raw(pointer.y);
+                        }
+
+                        if let Some(selected_idx) = ramp.selected_node
+                            && let Some(node) = ramp.control_points.get_mut(selected_idx)
+                        {
+                            ui.separator();
+                            ui.label(format!("Selected point #{}", selected_idx + 1));
+                            let _ = ui.horizontal(|ui| {
+                                let _ = ui.label("X");
+                                let _ = ui.add(egui::DragValue::new(&mut node.x).speed(1));
+                                let _ = ui.label("Y");
+                                let _ = ui.add(egui::DragValue::new(&mut node.y).speed(1));
+                                let _ = ui.label("Z");
+                                let _ = ui.add(egui::DragValue::new(&mut node.z).speed(1));
+                            });
+                        }
+
+                        ui.separator();
+                        ui.label("Template (Concrete Slab/Ramp)");
+                        let _ = ui.add(
+                            inspector::ObjectEditorWidget::new(&mut ramp.object_template)
+                                .options(inspector::ObjectEditorOptions::template()),
+                        );
+
+                        ui.separator();
+                        if ui.button("Undo Last Point").clicked() {
+                            let _ = ramp.control_points.pop();
+                            if let Some(selected) = ramp.selected_node
+                                && selected >= ramp.control_points.len()
+                            {
+                                ramp.selected_node = ramp.control_points.len().checked_sub(1);
+                            }
+                        }
+                        if ui.button("Clear Points").clicked() {
+                            ramp.control_points.clear();
+                            ramp.selected_node = None;
+                            ramp.generated_object_ids.clear();
+                        }
+                        if ui
+                            .add_enabled(
+                                !ramp.generated_object_ids.is_empty(),
+                                egui::Button::new("Clear Generated"),
+                            )
+                            .clicked()
+                        {
+                            ramp_clear_generated_requested = true;
+                        }
+                        if ui
+                            .add_enabled(ramp.control_points.len() >= 2, egui::Button::new("Apply"))
+                            .clicked()
+                        {
+                            ramp_apply_requested = true;
+                        }
                     },
                 }
             });
@@ -525,6 +714,15 @@ impl eframe::App for TrackEditor {
 
         if spline_apply_requested {
             self.apply_spline_objects();
+        }
+
+        if ramp_clear_generated_requested {
+            let removed = self.clear_ramp_generated_objects();
+            self.status_line = Some(format!("Ramp generated objects cleared: {}", removed));
+        }
+
+        if ramp_apply_requested {
+            self.apply_ramp_objects();
         }
 
         // -- CENTRAL PANEL: THE 2D MAP --
@@ -547,6 +745,14 @@ impl eframe::App for TrackEditor {
             let spline_curve = sample_catmull_rom_polyline(&spline_control_points);
             let spline_preview_samples =
                 sample_spline_samples_raw(&spline_control_points, self.tools.spline_path.spacing_units);
+
+            let ramp_control_points = self.tools.ramp_gen.control_points.clone();
+            let ramp_selected_node = self.tools.ramp_gen.selected_node;
+            let ramp_xy_points: Vec<[i16; 2]> = ramp_control_points
+                .iter()
+                .map(|node| [node.x, node.y])
+                .collect();
+            let ramp_curve = sample_catmull_rom_polyline(&ramp_xy_points);
 
             // 1. Create a variable outside the closure to hold the coordinate
             let mut pointer_coord = None;
@@ -636,6 +842,38 @@ impl eframe::App for TrackEditor {
                             .radius(3.5)
                             .color(egui::Color32::from_rgb(255, 160, 50)),
                     );
+                }
+
+                if !ramp_curve.is_empty() {
+                    plot_ui.line(
+                        egui_plot::Line::new("Ramp Curve", PlotPoints::new(ramp_curve.clone()))
+                            .color(egui::Color32::from_rgb(120, 220, 120)),
+                    );
+                }
+
+                if !ramp_control_points.is_empty() {
+                    let ramp_points: Vec<[f64; 2]> = ramp_control_points
+                        .iter()
+                        .map(|node| [f64::from(node.x), f64::from(node.y)])
+                        .collect();
+                    plot_ui.points(
+                        Points::new("Ramp Control", PlotPoints::new(ramp_points.clone()))
+                            .radius(5.0)
+                            .color(egui::Color32::from_rgb(160, 255, 140)),
+                    );
+
+                    if let Some(selected_idx) = ramp_selected_node
+                        && selected_idx < ramp_points.len()
+                    {
+                        plot_ui.points(
+                            Points::new(
+                                "Ramp Selected Control",
+                                PlotPoints::new(vec![ramp_points[selected_idx]]),
+                            )
+                            .radius(7.0)
+                            .color(egui::Color32::YELLOW),
+                        );
+                    }
                 }
             });
 
@@ -734,7 +972,38 @@ impl eframe::App for TrackEditor {
                                 .control_points
                                 .push([click_x_raw, click_y_raw]);
                         },
-                        tools::ToolKind::RampGen => {},
+                        tools::ToolKind::RampGen => {
+                            let mut closest_idx = None;
+                            let mut closest_dist_sq = i64::MAX;
+                            for (idx, node) in self.tools.ramp_gen.control_points.iter().enumerate() {
+                                let dx = i64::from(node.x) - i64::from(click_x_raw);
+                                let dy = i64::from(node.y) - i64::from(click_y_raw);
+                                let dist_sq = dx * dx + dy * dy;
+                                if dist_sq < click_radius_sq && dist_sq < closest_dist_sq {
+                                    closest_dist_sq = dist_sq;
+                                    closest_idx = Some(idx);
+                                }
+                            }
+
+                            if let Some(idx) = closest_idx {
+                                self.tools.ramp_gen.selected_node = Some(idx);
+                            } else {
+                                let inherited_z = self
+                                    .tools
+                                    .ramp_gen
+                                    .control_points
+                                    .last()
+                                    .map(|node| node.z)
+                                    .unwrap_or(DEFAULT_PLACE_Z_UNITS);
+                                self.tools.ramp_gen.control_points.push(tools::RampNode {
+                                    x: click_x_raw,
+                                    y: click_y_raw,
+                                    z: inherited_z,
+                                });
+                                self.tools.ramp_gen.selected_node =
+                                    Some(self.tools.ramp_gen.control_points.len() - 1);
+                            }
+                        },
                     }
                 }
             }
@@ -743,6 +1012,35 @@ impl eframe::App for TrackEditor {
 }
 
 // --- 3. UTILITY FUNCTIONS ---
+
+fn ramp_profile_points(control_points: &[tools::RampNode]) -> (Vec<f64>, Vec<[f64; 2]>) {
+    if control_points.is_empty() {
+        return (Vec::new(), Vec::new());
+    }
+
+    let mut distances = Vec::with_capacity(control_points.len());
+    let mut profile_points = Vec::with_capacity(control_points.len());
+
+    let mut cumulative = 0.0;
+    distances.push(cumulative);
+    profile_points.push([cumulative, f64::from(control_points[0].z)]);
+
+    for pair in control_points.windows(2) {
+        let a = pair[0];
+        let b = pair[1];
+        let dx = f64::from(b.x - a.x);
+        let dy = f64::from(b.y - a.y);
+        cumulative += (dx * dx + dy * dy).sqrt();
+        distances.push(cumulative);
+        profile_points.push([cumulative, f64::from(b.z)]);
+    }
+
+    (distances, profile_points)
+}
+
+fn profile_y_to_z_raw(y_value: f64) -> u8 {
+    y_value.round().clamp(0.0, f64::from(u8::MAX)) as u8
+}
 
 #[derive(Clone, Copy)]
 struct SplineSampleRaw {
