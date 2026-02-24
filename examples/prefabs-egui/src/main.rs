@@ -2,7 +2,7 @@
 #[allow(missing_docs, unused_results)]
 use eframe::egui;
 use egui_plot::{Plot, PlotImage, PlotPoint, PlotPoints, Points};
-use insim_core::object::ObjectInfo;
+use insim_core::{heading::Heading, object::ObjectInfo};
 use insim_lyt::Lyt;
 use std::path::{Path, PathBuf};
 
@@ -61,6 +61,9 @@ struct TrackEditor {
     objects: Vec<ObjectInfo>,
     object_ids: Vec<u64>,
     next_object_id: u64,
+    select_drag_start: Option<[i16; 2]>,
+    select_drag_current: Option<[i16; 2]>,
+    select_drag_additive: bool,
 }
 
 impl TrackEditor {
@@ -71,6 +74,9 @@ impl TrackEditor {
             objects: Vec::new(),
             object_ids: Vec::new(),
             next_object_id: 0,
+            select_drag_start: None,
+            select_drag_current: None,
+            select_drag_additive: false,
             background: None,
             background_image_path: None,
             lyt_path: None,
@@ -86,6 +92,43 @@ impl TrackEditor {
         self.object_ids.push(object_id);
         self.next_object_id += 1;
         object_id
+    }
+
+    fn clear_select_drag(&mut self) {
+        self.select_drag_start = None;
+        self.select_drag_current = None;
+        self.select_drag_additive = false;
+    }
+
+    fn commit_select_drag_selection(&mut self) {
+        let (Some(start), Some(end)) = (self.select_drag_start, self.select_drag_current) else {
+            self.clear_select_drag();
+            return;
+        };
+
+        let min_x = start[0].min(end[0]);
+        let max_x = start[0].max(end[0]);
+        let min_y = start[1].min(end[1]);
+        let max_y = start[1].max(end[1]);
+
+        let selected = &mut self.tools.select.selected_object_ids;
+        if !self.select_drag_additive {
+            selected.clear();
+        }
+
+        for (object_id, object) in self.object_ids.iter().copied().zip(self.objects.iter()) {
+            let pos = object.position();
+            if pos.x >= min_x
+                && pos.x <= max_x
+                && pos.y >= min_y
+                && pos.y <= max_y
+                && !selected.contains(&object_id)
+            {
+                selected.push(object_id);
+            }
+        }
+
+        self.clear_select_drag();
     }
 
     fn delete_objects_by_ids(&mut self, ids: &[u64]) -> usize {
@@ -154,8 +197,8 @@ impl TrackEditor {
             return;
         }
 
-        let new_positions = sample_spline_points_raw(&control_points, spacing_units);
-        if new_positions.is_empty() {
+        let samples = sample_spline_samples_raw(&control_points, spacing_units);
+        if samples.is_empty() {
             self.status_line = Some("Spline apply produced no points.".to_owned());
             return;
         }
@@ -164,12 +207,24 @@ impl TrackEditor {
         let removed = self.delete_objects_by_ids(&old_generated);
 
         let template = self.tools.spline_path.object_template.clone();
-        let mut new_generated_ids = Vec::with_capacity(new_positions.len());
-        for [x, y] in new_positions {
+        let heading_offset = template
+            .heading()
+            .map(|heading| {
+                heading.to_radians() - heading_from_vec2(samples[0].tangent).to_radians()
+            })
+            .unwrap_or(0.0);
+
+        let mut new_generated_ids = Vec::with_capacity(samples.len());
+        for sample in samples {
             let mut object = template.clone();
             let position = object.position_mut();
-            position.x = x;
-            position.y = y;
+            position.x = sample.pos[0];
+            position.y = sample.pos[1];
+            if let Some(heading) = object.heading_mut() {
+                *heading = Heading::from_radians(
+                    heading_from_vec2(sample.tangent).to_radians() + heading_offset,
+                );
+            }
             let object_id = self.insert_object(object);
             new_generated_ids.push(object_id);
         }
@@ -332,6 +387,10 @@ impl eframe::App for TrackEditor {
             self.delete_selected_objects();
         }
 
+        if self.tools.active != tools::ToolKind::Select {
+            self.clear_select_drag();
+        }
+
         let mut spline_apply_requested = false;
         let mut spline_clear_generated_requested = false;
 
@@ -486,8 +545,8 @@ impl eframe::App for TrackEditor {
 
             let spline_control_points = self.tools.spline_path.control_points.clone();
             let spline_curve = sample_catmull_rom_polyline(&spline_control_points);
-            let spline_preview_positions =
-                sample_spline_points_raw(&spline_control_points, self.tools.spline_path.spacing_units);
+            let spline_preview_samples =
+                sample_spline_samples_raw(&spline_control_points, self.tools.spline_path.spacing_units);
 
             // 1. Create a variable outside the closure to hold the coordinate
             let mut pointer_coord = None;
@@ -535,6 +594,19 @@ impl eframe::App for TrackEditor {
                         .name("Selected"),
                 );
 
+                if let (Some(start), Some(current)) = (self.select_drag_start, self.select_drag_current)
+                {
+                    let sx = f64::from(start[0]);
+                    let sy = f64::from(start[1]);
+                    let cx = f64::from(current[0]);
+                    let cy = f64::from(current[1]);
+                    let rect_points = vec![[sx, sy], [cx, sy], [cx, cy], [sx, cy], [sx, sy]];
+                    plot_ui.line(
+                        egui_plot::Line::new("Select Box", PlotPoints::new(rect_points))
+                            .color(egui::Color32::from_rgb(120, 200, 255)),
+                    );
+                }
+
                 if !spline_curve.is_empty() {
                     plot_ui.line(
                         egui_plot::Line::new("Spline", PlotPoints::new(spline_curve.clone()))
@@ -554,10 +626,10 @@ impl eframe::App for TrackEditor {
                     );
                 }
 
-                if !spline_preview_positions.is_empty() {
-                    let preview_plot_points: Vec<[f64; 2]> = spline_preview_positions
+                if !spline_preview_samples.is_empty() {
+                    let preview_plot_points: Vec<[f64; 2]> = spline_preview_samples
                         .iter()
-                        .map(|point| [f64::from(point[0]), f64::from(point[1])])
+                        .map(|sample| [f64::from(sample.pos[0]), f64::from(sample.pos[1])])
                         .collect();
                     plot_ui.points(
                         Points::new("Spline Preview", PlotPoints::new(preview_plot_points))
@@ -567,8 +639,39 @@ impl eframe::App for TrackEditor {
                 }
             });
 
+            let mut consumed_drag_select = false;
+
+            if self.tools.active == tools::ToolKind::Select {
+                let command_drag = ctx.input(|i| i.modifiers.command);
+                if plot_response.response.drag_started() && command_drag {
+                    if let Some(pointer_pos) = pointer_coord {
+                        let drag_start = [
+                            plot_to_raw_units(pointer_pos.x),
+                            plot_to_raw_units(pointer_pos.y),
+                        ];
+                        self.select_drag_start = Some(drag_start);
+                        self.select_drag_current = Some(drag_start);
+                        self.select_drag_additive = true;
+                    }
+                }
+
+                if self.select_drag_start.is_some() && plot_response.response.dragged() {
+                    if let Some(pointer_pos) = pointer_coord {
+                        self.select_drag_current = Some([
+                            plot_to_raw_units(pointer_pos.x),
+                            plot_to_raw_units(pointer_pos.y),
+                        ]);
+                    }
+                }
+
+                if self.select_drag_start.is_some() && plot_response.response.drag_stopped() {
+                    self.commit_select_drag_selection();
+                    consumed_drag_select = true;
+                }
+            }
+
             // 3. Handle Interaction using the variable we captured
-            if plot_response.response.clicked() {
+            if !consumed_drag_select && plot_response.response.clicked() {
                 if let Some(pointer_pos) = pointer_coord {
                     let click_x_raw = plot_to_raw_units(pointer_pos.x);
                     let click_y_raw = plot_to_raw_units(pointer_pos.y);
@@ -641,7 +744,13 @@ impl eframe::App for TrackEditor {
 
 // --- 3. UTILITY FUNCTIONS ---
 
-fn sample_spline_points_raw(control_points: &[[i16; 2]], spacing_units: i32) -> Vec<[i16; 2]> {
+#[derive(Clone, Copy)]
+struct SplineSampleRaw {
+    pos: [i16; 2],
+    tangent: [f64; 2],
+}
+
+fn sample_spline_samples_raw(control_points: &[[i16; 2]], spacing_units: i32) -> Vec<SplineSampleRaw> {
     if control_points.len() < 2 || spacing_units <= 0 {
         return Vec::new();
     }
@@ -653,15 +762,45 @@ fn sample_spline_points_raw(control_points: &[[i16; 2]], spacing_units: i32) -> 
 
     let sampled = resample_polyline(&curve, f64::from(spacing_units));
     let mut out = Vec::with_capacity(sampled.len());
-    for point in sampled {
+    let mut tangent_fallback = [0.0, 1.0];
+    for (idx, point) in sampled.iter().copied().enumerate() {
+        let prev = if idx > 0 { sampled[idx - 1] } else { point };
+        let next = if idx + 1 < sampled.len() {
+            sampled[idx + 1]
+        } else {
+            point
+        };
+        let tangent = normalize_vec2([next[0] - prev[0], next[1] - prev[1]], tangent_fallback);
+
         let x = point[0].round().clamp(i16::MIN as f64, i16::MAX as f64) as i16;
         let y = point[1].round().clamp(i16::MIN as f64, i16::MAX as f64) as i16;
         let raw = [x, y];
-        if out.last().copied() != Some(raw) {
-            out.push(raw);
+        if out
+            .last()
+            .map(|sample: &SplineSampleRaw| sample.pos == raw)
+            .unwrap_or(false)
+        {
+            tangent_fallback = tangent;
+            continue;
         }
+
+        out.push(SplineSampleRaw { pos: raw, tangent });
+        tangent_fallback = tangent;
     }
     out
+}
+
+fn normalize_vec2(vector: [f64; 2], fallback: [f64; 2]) -> [f64; 2] {
+    let len_sq = vector[0] * vector[0] + vector[1] * vector[1];
+    if len_sq <= f64::EPSILON {
+        return fallback;
+    }
+    let len = len_sq.sqrt();
+    [vector[0] / len, vector[1] / len]
+}
+
+fn heading_from_vec2(vector: [f64; 2]) -> Heading {
+    Heading::from_radians((-vector[0]).atan2(vector[1]))
 }
 
 fn sample_catmull_rom_polyline(control_points: &[[i16; 2]]) -> Vec<[f64; 2]> {
