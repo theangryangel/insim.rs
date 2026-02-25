@@ -1,7 +1,9 @@
 use eframe::egui;
 use insim_core::{
     heading::Heading,
-    object::{concrete, control, insim, marker, marshal, painted, sign_metal, sign_speed, ObjectInfo},
+    object::{
+        ObjectInfo, concrete, control, insim, marker, marshal, painted, sign_metal, sign_speed,
+    },
 };
 
 /// Shared object editor options.

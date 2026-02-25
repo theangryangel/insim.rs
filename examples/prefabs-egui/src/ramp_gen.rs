@@ -4,10 +4,10 @@ use glam::{DVec2, DVec3};
 use insim_core::{
     heading::Heading,
     object::{
+        ObjectCoordinate, ObjectInfo,
         concrete::{
             ConcreteHeight, ConcretePitch, ConcreteRamp, ConcreteSlab, ConcreteWidthLength,
         },
-        ObjectCoordinate, ObjectInfo,
     },
 };
 

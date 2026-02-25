@@ -2,9 +2,15 @@
 
 use std::collections::BTreeSet;
 
-use insim_core::object::{concrete::ConcreteSlab, ObjectCoordinate, ObjectInfo};
+use eframe::egui;
+use egui_plot::{Plot, PlotPoints, Points};
+use insim_core::object::{ObjectCoordinate, ObjectInfo, concrete::ConcreteSlab};
 
-use crate::object_catalog::{ObjectCatalogKind, ObjectCategory, CATEGORY_ORDER};
+use crate::{
+    inspector,
+    object_catalog::{CATEGORY_ORDER, ObjectCatalogKind, ObjectCategory},
+    object_library_widget,
+};
 
 /// ToolKind
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,6 +30,70 @@ pub enum ToolKind {
 pub struct SelectState {
     /// Selected object IDs.
     pub selected_object_ids: Vec<u64>,
+    /// Drag selection start (raw units).
+    pub drag_start: Option<[i16; 2]>,
+    /// Drag selection current point (raw units).
+    pub drag_current: Option<[i16; 2]>,
+    /// Whether drag-add should keep existing selection.
+    pub drag_additive: bool,
+}
+
+impl SelectState {
+    /// Shows selection inspector UI.
+    #[allow(unused_results)]
+    pub fn show_ui(&mut self, ui: &mut egui::Ui, object_ids: &[u64], objects: &mut [ObjectInfo]) {
+        inspector::show_selection_inspector(ui, object_ids, objects, &self.selected_object_ids);
+    }
+
+    /// Clears selection drag state.
+    pub fn clear_drag(&mut self) {
+        self.drag_start = None;
+        self.drag_current = None;
+        self.drag_additive = false;
+    }
+
+    /// Starts a selection drag.
+    pub fn begin_drag(&mut self, start: [i16; 2], additive: bool) {
+        self.drag_start = Some(start);
+        self.drag_current = Some(start);
+        self.drag_additive = additive;
+    }
+
+    /// Updates selection drag position.
+    pub fn update_drag(&mut self, current: [i16; 2]) {
+        self.drag_current = Some(current);
+    }
+
+    /// Commits drag box selection.
+    pub fn commit_drag_selection(&mut self, object_ids: &[u64], objects: &[ObjectInfo]) {
+        let (Some(start), Some(end)) = (self.drag_start, self.drag_current) else {
+            self.clear_drag();
+            return;
+        };
+
+        let min_x = start[0].min(end[0]);
+        let max_x = start[0].max(end[0]);
+        let min_y = start[1].min(end[1]);
+        let max_y = start[1].max(end[1]);
+
+        if !self.drag_additive {
+            self.selected_object_ids.clear();
+        }
+
+        for (object_id, object) in object_ids.iter().copied().zip(objects.iter()) {
+            let pos = object.position();
+            if pos.x >= min_x
+                && pos.x <= max_x
+                && pos.y >= min_y
+                && pos.y <= max_y
+                && !self.selected_object_ids.contains(&object_id)
+            {
+                self.selected_object_ids.push(object_id);
+            }
+        }
+
+        self.clear_drag();
+    }
 }
 
 /// Placement tool state.
@@ -44,6 +114,19 @@ impl Default for PlaceState {
             selected_object_kind: ObjectCatalogKind::default(),
             open_categories: CATEGORY_ORDER.iter().copied().collect(),
         }
+    }
+}
+
+impl PlaceState {
+    /// Shows place tool UI.
+    #[allow(unused_results)]
+    pub fn show_ui(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Object Library");
+        let _ = ui.add(object_library_widget::ObjectLibraryWidget::new(
+            &mut self.search_query,
+            &mut self.selected_object_kind,
+            &mut self.open_categories,
+        ));
     }
 }
 
@@ -76,6 +159,73 @@ impl Default for SplinePathState {
             open_categories: CATEGORY_ORDER.iter().copied().collect(),
             spacing_units: 160,
             generated_object_ids: Vec::new(),
+        }
+    }
+}
+
+impl SplinePathState {
+    /// Shows spline tool UI and emits requested actions.
+    #[allow(unused_results)]
+    pub fn show_ui(&mut self, ui: &mut egui::Ui, events: &mut Vec<ToolEvent>) {
+        ui.heading("Catmull-Rom Spline");
+
+        ui.label("Click the map to place control points.");
+        ui.label(format!("Control points: {}", self.control_points.len()));
+        ui.label(format!(
+            "Generated objects: {}",
+            self.generated_object_ids.len()
+        ));
+
+        let _ = ui.add(
+            egui::DragValue::new(&mut self.spacing_units)
+                .range(1..=5000)
+                .speed(1)
+                .prefix("Spacing: ")
+                .suffix(" units"),
+        );
+
+        ui.separator();
+        ui.label("Object Library");
+        let kind_changed = ui
+            .add(object_library_widget::ObjectLibraryWidget::new(
+                &mut self.search_query,
+                &mut self.selected_object_kind,
+                &mut self.open_categories,
+            ))
+            .changed();
+        if kind_changed {
+            self.object_template = self.selected_object_kind.create_default();
+        }
+
+        ui.separator();
+        ui.label("Object Template");
+        let _ = ui.add(
+            inspector::ObjectEditorWidget::new(&mut self.object_template)
+                .options(inspector::ObjectEditorOptions::template()),
+        );
+
+        ui.separator();
+        if ui.button("Undo Last Point").clicked() {
+            let _ = self.control_points.pop();
+        }
+        if ui.button("Clear Points").clicked() {
+            self.control_points.clear();
+            self.generated_object_ids.clear();
+        }
+        if ui
+            .add_enabled(
+                !self.generated_object_ids.is_empty(),
+                egui::Button::new("Clear Generated"),
+            )
+            .clicked()
+        {
+            events.push(ToolEvent::ClearSplineGeneratedObjects);
+        }
+        if ui
+            .add_enabled(self.control_points.len() >= 2, egui::Button::new("Apply"))
+            .clicked()
+        {
+            events.push(ToolEvent::ApplySplineObjects);
         }
     }
 }
@@ -121,6 +271,210 @@ impl Default for RampGenState {
     }
 }
 
+impl RampGenState {
+    /// Shows ramp tool UI and emits requested actions.
+    #[allow(unused_results)]
+    pub fn show_ui(&mut self, ui: &mut egui::Ui, events: &mut Vec<ToolEvent>) {
+        ui.heading("Ramp Generator");
+
+        ui.label("Click map to place 3D guide points.");
+        ui.label(format!("Control points: {}", self.control_points.len()));
+        ui.label(format!(
+            "Generated objects: {}",
+            self.generated_object_ids.len()
+        ));
+
+        let _ = ui.add(
+            egui::DragValue::new(&mut self.steps_per_segment)
+                .range(8..=400)
+                .speed(1)
+                .prefix("Steps: "),
+        );
+
+        ui.label("Profile Y uses Z raw units (1 = 0.25m).");
+
+        let (profile_distances, profile_points) = ramp_profile_points(&self.control_points);
+        let mut profile_pointer = None;
+        let profile_response = Plot::new("ramp_profile_plot")
+            .height(120.0)
+            .allow_boxed_zoom(false)
+            .allow_scroll(false)
+            .show(ui, |plot_ui| {
+                profile_pointer = plot_ui.pointer_coordinate();
+                if !profile_points.is_empty() {
+                    plot_ui.line(
+                        egui_plot::Line::new(
+                            "Ramp Profile",
+                            PlotPoints::new(profile_points.clone()),
+                        )
+                        .color(egui::Color32::from_rgb(140, 220, 120)),
+                    );
+                    plot_ui.points(
+                        Points::new(
+                            "Ramp Profile Points",
+                            PlotPoints::new(profile_points.clone()),
+                        )
+                        .radius(4.0)
+                        .color(egui::Color32::from_rgb(180, 255, 140)),
+                    );
+
+                    if let Some(selected_idx) = self.selected_node
+                        && selected_idx < profile_points.len()
+                    {
+                        plot_ui.points(
+                            Points::new(
+                                "Selected Ramp Profile Point",
+                                PlotPoints::new(vec![profile_points[selected_idx]]),
+                            )
+                            .radius(6.0)
+                            .color(egui::Color32::YELLOW),
+                        );
+                    }
+                }
+            });
+
+        if profile_response.response.clicked()
+            && !profile_distances.is_empty()
+            && let Some(pointer) = profile_pointer
+        {
+            let mut best = None;
+            let mut best_dist = f64::MAX;
+            for (idx, distance) in profile_distances.iter().copied().enumerate() {
+                let dx = (distance - pointer.x).abs();
+                let dy = (profile_points[idx][1] - pointer.y).abs();
+                let metric = dx + dy * 0.5;
+                if metric < best_dist {
+                    best = Some(idx);
+                    best_dist = metric;
+                }
+            }
+            self.selected_node = best;
+        }
+
+        if profile_response.response.dragged()
+            && let Some(pointer) = profile_pointer
+            && let Some(selected_idx) = self.selected_node
+            && let Some(node) = self.control_points.get_mut(selected_idx)
+        {
+            node.z = profile_y_to_z_raw(pointer.y);
+        }
+
+        if let Some(selected_idx) = self.selected_node
+            && let Some(node) = self.control_points.get_mut(selected_idx)
+        {
+            ui.separator();
+            ui.label(format!("Selected point #{}", selected_idx + 1));
+            let _ = ui.horizontal(|ui| {
+                let _ = ui.label("X");
+                let _ = ui.add(egui::DragValue::new(&mut node.x).speed(1));
+                let _ = ui.label("Y");
+                let _ = ui.add(egui::DragValue::new(&mut node.y).speed(1));
+                let _ = ui.label("Z");
+                let _ = ui.add(egui::DragValue::new(&mut node.z).speed(1));
+            });
+        }
+
+        ui.separator();
+        ui.label("Template (Concrete Slab/Ramp)");
+        let _ = ui.add(
+            inspector::ObjectEditorWidget::new(&mut self.object_template)
+                .options(inspector::ObjectEditorOptions::template()),
+        );
+
+        ui.separator();
+        if ui.button("Undo Last Point").clicked() {
+            let _ = self.control_points.pop();
+            if let Some(selected) = self.selected_node
+                && selected >= self.control_points.len()
+            {
+                self.selected_node = self.control_points.len().checked_sub(1);
+            }
+        }
+        if ui.button("Clear Points").clicked() {
+            self.control_points.clear();
+            self.selected_node = None;
+            self.generated_object_ids.clear();
+        }
+        if ui
+            .add_enabled(
+                !self.generated_object_ids.is_empty(),
+                egui::Button::new("Clear Generated"),
+            )
+            .clicked()
+        {
+            events.push(ToolEvent::ClearRampGeneratedObjects);
+        }
+        if ui
+            .add_enabled(self.control_points.len() >= 2, egui::Button::new("Apply"))
+            .clicked()
+        {
+            events.push(ToolEvent::ApplyRampObjects);
+        }
+    }
+}
+
+/// Events emitted by tool UI/input handling.
+#[derive(Debug, Clone, Copy)]
+pub enum ToolEvent {
+    /// Delete selected objects.
+    DeleteSelectedObjects,
+    /// Apply spline generation.
+    ApplySplineObjects,
+    /// Clear spline-generated objects.
+    ClearSplineGeneratedObjects,
+    /// Apply ramp generation.
+    ApplyRampObjects,
+    /// Clear ramp-generated objects.
+    ClearRampGeneratedObjects,
+    /// Update selection from nearest clicked object.
+    SetSelectionFromClick {
+        /// Nearest object ID (if any).
+        object_id: Option<u64>,
+        /// Whether click is additive/toggle selection.
+        additive: bool,
+    },
+    /// Place an object and select it.
+    PlaceObject(PlaceObjectRequest),
+    /// Add a spline control point.
+    AddSplineControlPoint([i16; 2]),
+    /// Update ramp control-point selection/insertion from map click.
+    UpsertRampControlPoint {
+        /// X coordinate in raw units.
+        x_raw: i16,
+        /// Y coordinate in raw units.
+        y_raw: i16,
+        /// Click radius squared in raw units.
+        click_radius_sq: i64,
+        /// Default Z coordinate in raw units.
+        default_z_raw: u8,
+    },
+}
+
+/// Request to place a new object on the map.
+#[derive(Debug, Clone, Copy)]
+pub struct PlaceObjectRequest {
+    /// Object kind to place.
+    pub kind: ObjectCatalogKind,
+    /// X coordinate in raw units.
+    pub x_raw: i16,
+    /// Y coordinate in raw units.
+    pub y_raw: i16,
+    /// Z coordinate in raw units.
+    pub z_raw: u8,
+}
+
+impl PlaceObjectRequest {
+    /// Builds an object instance to place.
+    pub fn into_object(self) -> ObjectInfo {
+        let mut object = self.kind.create_default();
+        let position = object.position_mut();
+        position.x = self.x_raw;
+        position.y = self.y_raw;
+        position.z = self.z_raw;
+        object
+    }
+}
+
 /// All editor tool state.
 #[derive(Debug, Default)]
 pub struct Tools {
@@ -141,10 +495,145 @@ impl Tools {
     pub fn activate(&mut self, kind: ToolKind) {
         self.active = kind;
     }
+
+    /// Handles global tool shortcuts.
+    pub fn gather_shortcut_events(&self, ctx: &egui::Context) -> Vec<ToolEvent> {
+        let mut events = Vec::new();
+        if self.active == ToolKind::Select && ctx.input(|i| i.key_pressed(egui::Key::Delete)) {
+            events.push(ToolEvent::DeleteSelectedObjects);
+        }
+        events
+    }
+
+    /// Clears transient state when switching away from tools.
+    pub fn clear_transient_state(&mut self) {
+        if self.active != ToolKind::Select {
+            self.select.clear_drag();
+        }
+    }
+
+    /// Renders the left-side tool palette.
+    #[allow(unused_results)]
+    pub fn show_tool_palette_panel(&mut self, ctx: &egui::Context) {
+        egui::SidePanel::left("tools")
+            .resizable(false)
+            .exact_width(45.0)
+            .show(ctx, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(10.0);
+
+                    let mut tool_button = |kind: ToolKind, icon: &str, tooltip: &str| {
+                        let is_active = self.active == kind;
+                        let btn = egui::Button::selectable(is_active, icon);
+                        if ui
+                            .add_sized([30.0, 30.0], btn)
+                            .on_hover_text(tooltip)
+                            .clicked()
+                        {
+                            self.activate(kind);
+                        }
+                        ui.add_space(5.0);
+                    };
+
+                    tool_button(ToolKind::Select, "🖱", "Select Object (V)");
+                    tool_button(ToolKind::Place, "📦", "Place Object (B)");
+                    tool_button(ToolKind::SplinePath, "〰", "Draw Spline (P)");
+                    tool_button(ToolKind::RampGen, "📐", "Ramp Generator (R)");
+                });
+            });
+    }
+
+    /// Renders the context panel for the active tool.
+    #[allow(unused_results)]
+    pub fn show_context_panel(
+        &mut self,
+        ctx: &egui::Context,
+        object_ids: &[u64],
+        objects: &mut [ObjectInfo],
+    ) -> Vec<ToolEvent> {
+        let mut events = Vec::new();
+
+        egui::SidePanel::left("context_panel")
+            .exact_width(220.0)
+            .show(ctx, |ui| {
+                ui.add_space(10.0);
+
+                match self.active {
+                    ToolKind::Select => self.select.show_ui(ui, object_ids, objects),
+                    ToolKind::Place => self.place.show_ui(ui),
+                    ToolKind::SplinePath => self.spline_path.show_ui(ui, &mut events),
+                    ToolKind::RampGen => self.ramp_gen.show_ui(ui, &mut events),
+                }
+            });
+
+        events
+    }
+
+    /// Produces tool events for a map click.
+    pub fn map_click_events(
+        &self,
+        click_x_raw: i16,
+        click_y_raw: i16,
+        closest_object_id: Option<u64>,
+        additive_selection: bool,
+        default_place_z_raw: u8,
+        click_radius_sq: i64,
+    ) -> Vec<ToolEvent> {
+        match self.active {
+            ToolKind::Select => vec![ToolEvent::SetSelectionFromClick {
+                object_id: closest_object_id,
+                additive: additive_selection,
+            }],
+            ToolKind::Place => vec![ToolEvent::PlaceObject(PlaceObjectRequest {
+                kind: self.place.selected_object_kind,
+                x_raw: click_x_raw,
+                y_raw: click_y_raw,
+                z_raw: default_place_z_raw,
+            })],
+            ToolKind::SplinePath => {
+                vec![ToolEvent::AddSplineControlPoint([click_x_raw, click_y_raw])]
+            },
+            ToolKind::RampGen => vec![ToolEvent::UpsertRampControlPoint {
+                x_raw: click_x_raw,
+                y_raw: click_y_raw,
+                click_radius_sq,
+                default_z_raw: default_place_z_raw,
+            }],
+        }
+    }
 }
 
 impl Default for ToolKind {
     fn default() -> Self {
         Self::Select
     }
+}
+
+fn ramp_profile_points(control_points: &[RampNode]) -> (Vec<f64>, Vec<[f64; 2]>) {
+    if control_points.is_empty() {
+        return (Vec::new(), Vec::new());
+    }
+
+    let mut distances = Vec::with_capacity(control_points.len());
+    let mut profile_points = Vec::with_capacity(control_points.len());
+
+    let mut cumulative = 0.0;
+    distances.push(cumulative);
+    profile_points.push([cumulative, f64::from(control_points[0].z)]);
+
+    for pair in control_points.windows(2) {
+        let a = pair[0];
+        let b = pair[1];
+        let dx = f64::from(b.x - a.x);
+        let dy = f64::from(b.y - a.y);
+        cumulative += (dx * dx + dy * dy).sqrt();
+        distances.push(cumulative);
+        profile_points.push([cumulative, f64::from(b.z)]);
+    }
+
+    (distances, profile_points)
+}
+
+fn profile_y_to_z_raw(y_value: f64) -> u8 {
+    y_value.round().clamp(0.0, f64::from(u8::MAX)) as u8
 }
