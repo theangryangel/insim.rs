@@ -1,4 +1,4 @@
-use insim::{Colour, core::heading::Heading};
+use insim::{core::heading::Heading, Colour};
 
 pub fn generate(heading: Heading, width: usize) -> String {
     if width == 0 {

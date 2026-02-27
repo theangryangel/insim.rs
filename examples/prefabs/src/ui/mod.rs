@@ -21,6 +21,7 @@ pub struct ToolboxProps {
     pub ramp_roll_degrees: f64,
     pub compass_visible: bool,
     pub compass_text: Option<String>,
+    pub active_view: crate::tools::camera::ActiveView,
 }
 
 pub(crate) fn reduce_message(state: &mut crate::State, msg: ToolboxMsg) -> Option<crate::Command> {

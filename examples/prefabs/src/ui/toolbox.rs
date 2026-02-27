@@ -4,8 +4,8 @@ use insim::{
 };
 use kitcar::ui;
 
-use super::{OptionsMsg, PrefabSummary, ToolboxProps, options};
-use crate::{Command, SpawnOrigin, State, tools};
+use super::{options, OptionsMsg, PrefabSummary, ToolboxProps};
+use crate::{tools, Command, SpawnOrigin, State};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InspectorTool {
@@ -50,6 +50,8 @@ pub enum ToolboxMsg {
     NudgeDistanceInput(String),
     Nudge(Heading),
     JiggleSelection,
+    ToggleTopDown,
+    ToggleSideView,
 }
 
 #[derive(Debug, Default)]
@@ -82,7 +84,7 @@ impl ui::Component for Toolbox {
         }
 
         let content = match self.screen {
-            ToolboxScreen::Launcher => launcher_screen(),
+            ToolboxScreen::Launcher => launcher_screen(&props),
             ToolboxScreen::Inspector(tool) => inspector_screen(tool, &props),
         };
 
@@ -122,12 +124,49 @@ fn launcher_button(label: &'static str, tool: InspectorTool) -> ui::Node<Toolbox
     .h(5.)
 }
 
-fn launcher_screen() -> ui::Node<ToolboxMsg> {
+fn launcher_screen(props: &ToolboxProps) -> ui::Node<ToolboxMsg> {
+    let has_selection = props.selection_count > 0;
+    let selection_btn_style = if has_selection {
+        BtnStyle::style_interactive()
+    } else {
+        BtnStyle::style_unavailable()
+    };
+
+    let top_down_style = match props.active_view {
+        tools::camera::ActiveView::TopDown => BtnStyle::style_active(),
+        _ => selection_btn_style,
+    };
+
+    let side_view_style = match props.active_view {
+        tools::camera::ActiveView::Side => BtnStyle::style_active(),
+        _ => selection_btn_style,
+    };
+
+    let mut ramp_tool_btn = launcher_button("Ramp Tool", InspectorTool::Ramp);
+    if !has_selection {
+         *ramp_tool_btn.bstyle_mut() = BtnStyle::style_unavailable();
+    }
+
+    let mut nudge_selection_btn = launcher_button("Nudge Selection", InspectorTool::Nudge);
+    if !has_selection {
+        *nudge_selection_btn.bstyle_mut() = BtnStyle::style_unavailable();
+    }
+
+    let mut ramp_tool_btn = launcher_button("Ramp Tool", InspectorTool::Ramp);
+    if !has_selection {
+        *ramp_tool_btn.bstyle_mut() = BtnStyle::style_unavailable();
+    }
+
+    let mut nudge_selection_btn = launcher_button("Nudge Selection", InspectorTool::Nudge);
+    if !has_selection {
+        *nudge_selection_btn.bstyle_mut() = BtnStyle::style_unavailable();
+    }
+
     ui::container().flex().flex_col().w(48.).with_children([
         launcher_button("Prefabs", InspectorTool::Prefabs),
         ui::typein(
             "Spline Distribution (m)",
-            BtnStyle::style_interactive(),
+            selection_btn_style,
             32,
             ToolboxMsg::SplineDistribInput,
         )
@@ -135,7 +174,7 @@ fn launcher_screen() -> ui::Node<ToolboxMsg> {
         .h(5.),
         ui::typein(
             "Paint Text",
-            BtnStyle::style_interactive(),
+            selection_btn_style,
             64,
             ToolboxMsg::PaintedTextInput,
         )
@@ -143,20 +182,22 @@ fn launcher_screen() -> ui::Node<ToolboxMsg> {
         .h(5.),
         ui::typein(
             "Rotate Selection (deg)",
-            BtnStyle::style_interactive(),
+            selection_btn_style,
             16,
             ToolboxMsg::RotateInput,
         )
         .block()
         .h(5.),
-        launcher_button("Ramp Tool", InspectorTool::Ramp),
-        launcher_button("Nudge Selection", InspectorTool::Nudge),
+        ramp_tool_btn,
+        nudge_selection_btn,
         ui::clickable(
             "Jiggle Selection",
-            BtnStyle::style_interactive(),
+            selection_btn_style,
             ToolboxMsg::JiggleSelection,
         )
         .h(5.),
+        ui::clickable("Top Down View", top_down_style, ToolboxMsg::ToggleTopDown).h(5.),
+        ui::clickable("Side View", side_view_style, ToolboxMsg::ToggleSideView).h(5.),
         launcher_button("Options", InspectorTool::Options),
     ])
 }
@@ -553,6 +594,62 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
                     action: PmoAction::AddObjects,
                     origin: SpawnOrigin::JiggleSelection,
                 })
+            }
+        },
+        ToolboxMsg::ToggleTopDown => {
+            if state.selection.is_empty() {
+                return None;
+            }
+
+            match state.active_view {
+                tools::camera::ActiveView::TopDown => {
+                    // Toggle off
+                    state.active_view = tools::camera::ActiveView::None;
+                    if let Some(mut original) = state.original_cpp.take() {
+                        original.time = std::time::Duration::from_millis(500);
+                        original.flags = insim::insim::StaFlags::SHIFTU;
+                        Some(Command::CameraMove(original))
+                    } else {
+                        None
+                    }
+                },
+                _ => {
+                    // Toggle on (or switch from Side)
+                    if state.active_view == tools::camera::ActiveView::None {
+                        state.original_cpp = Some(state.last_cpp.clone());
+                    }
+                    state.active_view = tools::camera::ActiveView::TopDown;
+                    tools::camera::get_top_down_view(&state.selection, &state.last_cpp)
+                        .map(Command::CameraMove)
+                },
+            }
+        },
+        ToolboxMsg::ToggleSideView => {
+            if state.selection.is_empty() {
+                return None;
+            }
+
+            match state.active_view {
+                tools::camera::ActiveView::Side => {
+                    // Toggle off
+                    state.active_view = tools::camera::ActiveView::None;
+                    if let Some(mut original) = state.original_cpp.take() {
+                        original.time = std::time::Duration::from_millis(500);
+                        original.flags = insim::insim::StaFlags::SHIFTU;
+                        Some(Command::CameraMove(original))
+                    } else {
+                        None
+                    }
+                },
+                _ => {
+                    // Toggle on (or switch from TopDown)
+                    if state.active_view == tools::camera::ActiveView::None {
+                        state.original_cpp = Some(state.last_cpp.clone());
+                    }
+                    state.active_view = tools::camera::ActiveView::Side;
+                    tools::camera::get_side_view(&state.selection, &state.last_cpp)
+                        .map(Command::CameraMove)
+                },
             }
         },
     }

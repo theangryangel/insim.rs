@@ -1,7 +1,7 @@
 use insim::{
     core::{
         heading::Heading,
-        object::{ObjectCoordinate, painted},
+        object::{painted, ObjectCoordinate},
     },
     insim::ObjectInfo,
 };

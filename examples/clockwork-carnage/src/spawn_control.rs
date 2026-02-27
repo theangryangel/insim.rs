@@ -167,7 +167,7 @@ async fn scan_layout(insim: &InsimTask) -> Result<LayoutScan, SpawnControlError>
 
                 for object in axm.info {
                     match object {
-                        ObjectInfo::StartPosition(start) => {
+                        ObjectInfo::PitStartPoint(start) => {
                             spawn_points.push_back(SpawnPoint {
                                 xyz: start.xyz,
                                 heading: start.heading,

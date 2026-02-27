@@ -1,15 +1,15 @@
 use std::cmp::Ordering;
 
-use anyhow::{Result, ensure};
+use anyhow::{ensure, Result};
 use glam::{DVec2, DVec3};
 use insim::{
     core::{
         heading::Heading,
         object::{
-            ObjectCoordinate,
             concrete::{
                 ConcreteHeight, ConcretePitch, ConcreteRamp, ConcreteSlab, ConcreteWidthLength,
             },
+            ObjectCoordinate,
         },
     },
     insim::ObjectInfo,
@@ -303,6 +303,9 @@ pub fn build(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Object
                     let seam = prev_center + prev_forward;
                     seam + this_forward
                 };
+
+                // Snap to grid to avoid drift
+                let center = ObjectCoordinate::from_dvec3_metres(center).to_dvec3_metres();
                 centres.push(center);
             }
         },

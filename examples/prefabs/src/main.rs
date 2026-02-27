@@ -6,7 +6,7 @@ use insim::{
     Packet, WithRequestId,
     core::heading::Heading,
     identifiers::{ConnectionId, RequestId},
-    insim::{Axm, BfnType, ObjectInfo, PmoAction, PmoFlags, TinyType, TtcType},
+    insim::{Axm, BfnType, Cpp, ObjectInfo, PmoAction, PmoFlags, TinyType, TtcType},
 };
 use kitcar::ui::{Canvas, Component};
 use tokio::time::{MissedTickBehavior, sleep};
@@ -43,6 +43,9 @@ struct State {
     ramp_roll_degrees: f64,
     compass_visible: bool,
     compass_text: Option<String>,
+    last_cpp: Cpp,
+    original_cpp: Option<Cpp>,
+    active_view: tools::camera::ActiveView,
 }
 
 #[derive(Debug)]
@@ -54,6 +57,7 @@ enum Command {
         action: PmoAction,
         origin: SpawnOrigin,
     },
+    CameraMove(Cpp),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -144,6 +148,9 @@ async fn run_command(
             if spawned > 0 {
                 tracing::info!("Spawned {spawned} objects ({origin})");
             }
+        },
+        Command::CameraMove(cpp) => {
+            connection.write(cpp).await?;
         },
     }
 
@@ -247,14 +254,22 @@ pub async fn main() -> anyhow::Result<()> {
         ramp_mode: tools::ramp::RampMode::AlongPath,
         ramp_roll_degrees: 18.0,
         compass_text: None,
+        last_cpp: Cpp::default(),
+        original_cpp: None,
+        active_view: tools::camera::ActiveView::None,
     };
 
     let mut ui_root = ui::Toolbox::default();
+
     let mut canvas = Canvas::<ui::ToolboxMsg>::new(ConnectionId::LOCAL);
     let mut blocked = false;
     let mut dirty = true;
     let mut camera_tick = tokio::time::interval(Duration::from_millis(100));
     camera_tick.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+    connection
+        .write(TinyType::Scp.with_request_id(REQI_CAMERA))
+        .await?;
 
     connection
         .write(TinyType::Sst.with_request_id(REQI_STATE))
@@ -281,6 +296,7 @@ pub async fn main() -> anyhow::Result<()> {
                     ramp_roll_degrees: state.ramp_roll_degrees,
                     compass_visible: state.compass_visible,
                     compass_text: state.compass_text.clone(),
+                    active_view: state.active_view,
                 }),
             ) {
                 for packet in diff.merge() {
@@ -291,7 +307,7 @@ pub async fn main() -> anyhow::Result<()> {
         }
 
         tokio::select! {
-            _ = camera_tick.tick(), if state.compass_visible => {
+            _ = camera_tick.tick() => {
                 connection
                     .write(TinyType::Scp.with_request_id(REQI_CAMERA))
                     .await?;
@@ -311,6 +327,7 @@ pub async fn main() -> anyhow::Result<()> {
 
                 let msg = match packet {
                     Packet::Sta(sta) => {
+                        state.last_cpp.ingamecam = sta.ingamecam;
                         let now_visible = sta.flags.is_shiftu() || sta.flags.is_shiftu_following();
 
                         if now_visible != state.ui_visible {
@@ -335,6 +352,7 @@ pub async fn main() -> anyhow::Result<()> {
                         None
                     },
                     Packet::Cpp(cpp) => {
+                        state.last_cpp = cpp.clone();
                         if state.compass_visible {
                             let next = Some(tools::compass::generate(cpp.h, COMPASS_WIDTH));
 

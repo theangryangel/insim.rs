@@ -1,4 +1,4 @@
-use anyhow::{Result, ensure};
+use anyhow::{ensure, Result};
 use glam::{DMat2, DVec2};
 use insim::{core::heading::Heading, insim::ObjectInfo};
 

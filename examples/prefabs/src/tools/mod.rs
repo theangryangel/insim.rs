@@ -1,3 +1,4 @@
+pub mod camera;
 pub mod compass;
 pub mod jiggle;
 pub mod nudge;

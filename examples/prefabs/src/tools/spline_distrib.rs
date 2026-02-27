@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use glam::{DVec2, DVec3};
 use insim::{
     core::{heading::Heading, object::ObjectCoordinate},
@@ -98,13 +98,7 @@ pub fn build(
 
     // calculate prototype offset (align to first object's placement)
     let prototype = &selection[0];
-    let first_tangent = lut[0].tangent;
     let heading_from_vec2 = |v: DVec2| Heading::from_radians((-v.x).atan2(v.y));
-
-    let heading_offset = prototype
-        .heading()
-        .map(|h| h.to_radians() - heading_from_vec2(first_tangent).to_radians())
-        .unwrap_or(0.0);
 
     // generate spaced-out objects
     let num_objects = (total_len / spacing_meters).floor() as usize + 1;
@@ -140,8 +134,7 @@ pub fn build(
         let seg_idx = entry.t.floor() as usize;
         let local_t = entry.t.fract();
         let pos = interpolate(&points[seg_idx..seg_idx + 4], local_t);
-        let final_heading =
-            Heading::from_radians(heading_from_vec2(entry.tangent).to_radians() + heading_offset);
+        let final_heading = Heading::from_radians(heading_from_vec2(entry.tangent).to_radians());
 
         let mut obj = prototype.clone();
         *obj.position_mut() = ObjectCoordinate::from_dvec3_metres(pos);
