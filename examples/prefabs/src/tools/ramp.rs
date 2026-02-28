@@ -1,15 +1,15 @@
 use std::cmp::Ordering;
 
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use glam::{DVec2, DVec3};
 use insim::{
     core::{
         heading::Heading,
         object::{
+            ObjectCoordinate,
             concrete::{
                 ConcreteHeight, ConcretePitch, ConcreteRamp, ConcreteSlab, ConcreteWidthLength,
             },
-            ObjectCoordinate,
         },
     },
     insim::ObjectInfo,

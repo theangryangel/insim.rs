@@ -1,6 +1,6 @@
 use std::{fs, path::PathBuf};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use insim::{core::object::ObjectCoordinate, insim::ObjectInfo};
 use serde::{Deserialize, Serialize};
 

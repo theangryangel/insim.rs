@@ -1,3 +1,4 @@
+mod challenge;
 mod game;
 mod lobby;
 mod rounds;
@@ -5,6 +6,7 @@ mod setup_track;
 mod victory;
 mod wait_for_admin_start;
 
+pub use challenge::ChallengeLoop;
 pub use game::Clockwork;
 pub use lobby::Lobby;
 pub use rounds::Rounds;

@@ -4,8 +4,8 @@ use insim::{
 };
 use kitcar::ui;
 
-use super::{options, OptionsMsg, PrefabSummary, ToolboxProps};
-use crate::{tools, Command, SpawnOrigin, State};
+use super::{OptionsMsg, PrefabSummary, ToolboxProps, options};
+use crate::{Command, SpawnOrigin, State, tools};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InspectorTool {
@@ -144,7 +144,7 @@ fn launcher_screen(props: &ToolboxProps) -> ui::Node<ToolboxMsg> {
 
     let mut ramp_tool_btn = launcher_button("Ramp Tool", InspectorTool::Ramp);
     if !has_selection {
-         *ramp_tool_btn.bstyle_mut() = BtnStyle::style_unavailable();
+        *ramp_tool_btn.bstyle_mut() = BtnStyle::style_unavailable();
     }
 
     let mut nudge_selection_btn = launcher_button("Nudge Selection", InspectorTool::Nudge);

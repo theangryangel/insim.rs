@@ -8,6 +8,18 @@ repository.workspace = true
 license.workspace = true
 homepage.workspace = true
 
+[lib]
+name = "clockwork_carnage"
+path = "src/lib.rs"
+
+[[bin]]
+name = "event"
+path = "src/bin/event.rs"
+
+[[bin]]
+name = "challenge"
+path = "src/bin/challenge.rs"
+
 [dependencies]
 anyhow = "1.0.86"
 clap = { workspace = true, features = ["derive"] }

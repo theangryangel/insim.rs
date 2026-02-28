@@ -53,7 +53,7 @@ impl Drop for SpawnControlHandle {
     }
 }
 
-pub(crate) async fn spawn(insim: InsimTask) -> Result<SpawnControlHandle, SpawnControlError> {
+pub async fn spawn(insim: InsimTask) -> Result<SpawnControlHandle, SpawnControlError> {
     let layout = scan_layout(&insim).await?;
     tracing::info!(
         "Spawn control initialised with {} start positions (cp1={}, finish={})",

@@ -1,24 +1,30 @@
-//! Clockwork carnage with generic, reusable scene system
-//! Scenes can be shared across different game server projects
+//! Clockwork Carnage — Challenge mode
+//! Always-on weekly challenge: players drop in, do timed runs, compete for fastest time.
 
-use std::time::Duration;
+use std::{net::SocketAddr, time::Duration};
 
 use clap::Parser;
+use clockwork_carnage::{MIN_PLAYERS, chat, scenes};
 use insim::{WithRequestId, core::track::Track, insim::TinyType};
 use kitcar::{
     game, presence,
     scenes::{Scene, SceneExt, wait_for_players::WaitForPlayers},
 };
 
-mod chat;
-mod cli;
-mod components;
-mod leaderboard;
-mod scenes;
-mod spawn_control;
+#[derive(Debug, Parser)]
+struct Args {
+    #[arg(short, long)]
+    addr: SocketAddr,
 
-// host + 1 player
-const MIN_PLAYERS: usize = 2;
+    #[arg(short, long)]
+    password: Option<String>,
+
+    #[arg(short, long)]
+    track: Option<Track>,
+
+    #[arg(short, long)]
+    layout: Option<String>,
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -30,43 +36,35 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
-    let args = cli::Args::parse();
+    let args = Args::parse();
 
     let (insim, insim_handle) = insim::tcp(args.addr)
         .isi_admin_password(args.password.clone())
-        .isi_iname("clockwork".to_owned())
+        .isi_iname("challenge".to_owned())
         .isi_prefix('!')
         .isi_flag_mso_cols(true)
         .spawn(100)
         .await?;
 
-    tracing::info!("Starting clockwork carnage");
+    tracing::info!("Starting weekly challenge");
 
     let (presence, presence_handle) = presence::spawn(insim.clone(), 32);
     let (game, game_handle) = game::spawn(insim.clone(), 32);
-    let (chat, chat_handle) = chat::spawn(insim.clone());
+    let (chat, chat_handle) = chat::spawn_challenge(insim.clone());
 
     insim.send(TinyType::Ncn.with_request_id(1)).await?;
     insim.send(TinyType::Npl.with_request_id(2)).await?;
     insim.send(TinyType::Sst.with_request_id(3)).await?;
 
-    // Take over.
-    // TODO: Probably want to consider if this is right.
     for &cmd in &["/select no", "/vote no", "/autokick no"] {
         insim.send_command(cmd).await?;
     }
 
-    // Composible/reusable scenes snap together, "just like little lego"!
-    let clockwork = WaitForPlayers {
+    let challenge = WaitForPlayers {
         insim: insim.clone(),
         presence: presence.clone(),
         min_players: MIN_PLAYERS,
     }
-    .then(scenes::WaitForAdminStart {
-        insim: insim.clone(),
-        presence: presence.clone(),
-        chat: chat.clone(),
-    })
     .then(
         scenes::SetupTrack {
             insim: insim.clone(),
@@ -78,14 +76,11 @@ async fn main() -> anyhow::Result<()> {
         }
         .with_timeout(Duration::from_secs(60)),
     )
-    .then(scenes::Clockwork {
+    .then(scenes::ChallengeLoop {
+        insim: insim.clone(),
         game: game.clone(),
         presence: presence.clone(),
         chat: chat.clone(),
-        rounds: args.rounds.unwrap_or(5),
-        max_scorers: args.max_scorers.unwrap_or(10),
-        target: Duration::from_secs(20),
-        insim: insim.clone(),
     })
     .loop_until_quit();
 
@@ -118,10 +113,10 @@ async fn main() -> anyhow::Result<()> {
                 Err(e) => tracing::error!("Chat background task join failed: {e}"),
             }
         },
-        res = clockwork.run() => {
+        res = challenge.run() => {
             tracing::info!("{res:?}");
         },
-        _ = chat.wait_for_admin_cmd(presence, |msg| matches!(msg, chat::ChatMsg::Quit)) => {}
+        _ = chat.wait_for_admin_cmd(presence, |msg| matches!(msg, chat::ChallengeChatMsg::Quit)) => {}
     }
 
     Ok(())

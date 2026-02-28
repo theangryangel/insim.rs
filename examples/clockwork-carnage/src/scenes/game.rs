@@ -13,7 +13,7 @@ use crate::chat;
 pub struct Clockwork {
     pub game: game::Game,
     pub presence: presence::Presence,
-    pub chat: chat::Chat,
+    pub chat: chat::EventChat,
     pub insim: InsimTask,
 
     pub rounds: usize,
@@ -66,7 +66,7 @@ impl Scene for Clockwork {
             },
             // TODO: if this all we care about.. do we want to handle this here? it's contextually
             // sensitive.. so maybe this is the right place?
-            _ = self.chat.wait_for_admin_cmd(self.presence.clone(), |msg| matches!(msg, chat::ChatMsg::End)) => {
+            _ = self.chat.wait_for_admin_cmd(self.presence.clone(), |msg| matches!(msg, chat::EventChatMsg::End)) => {
                 tracing::info!("Admin ended event");
                 Ok(SceneResult::bail_with("Admin ended event"))
             },

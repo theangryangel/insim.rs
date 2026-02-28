@@ -1,10 +1,10 @@
-mod help_dialog;
+mod dialog;
 mod marquee;
 mod scoreboard;
 pub mod theme;
 mod topbar;
 
-pub use help_dialog::{HelpDialog, HelpDialogMsg};
+pub use dialog::{Dialog, DialogMsg, DialogProps};
 pub use marquee::Marquee;
-pub use scoreboard::{EnrichedLeaderboard, scoreboard};
+pub use scoreboard::{ChallengeLeaderboard, EnrichedLeaderboard, challenge_scoreboard, scoreboard};
 pub use topbar::topbar;

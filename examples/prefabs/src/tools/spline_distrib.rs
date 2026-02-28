@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use glam::{DVec2, DVec3};
 use insim::{
     core::{heading::Heading, object::ObjectCoordinate},

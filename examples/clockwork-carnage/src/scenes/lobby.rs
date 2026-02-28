@@ -9,16 +9,28 @@ use kitcar::{
 
 use crate::{
     chat,
-    components::{HelpDialog, HelpDialogMsg, topbar},
+    components::{Dialog, DialogMsg, DialogProps, topbar},
 };
+
+const EVENT_HELP_LINES: &[&str] = &[
+    " - Match the target lap time as closely as possible.",
+    " - Crossing the first checkpoint starts your timed attempt.",
+    " - Find one of the finishes as close to the target time as possible.",
+    " - Full contact is permitted.",
+    " - Don't be a dick.",
+    " - Lower delta ranks higher and earns more points.",
+    " - Retry as many times as you want each round.",
+    "",
+    "Good luck.",
+];
 
 #[derive(Clone, Debug)]
 enum ClockworkLobbyMessage {
-    Help(HelpDialogMsg),
+    Help(DialogMsg),
 }
 
 struct ClockworkLobbyView {
-    help_dialog: HelpDialog,
+    help_dialog: Dialog,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -40,7 +52,13 @@ impl ui::Component for ClockworkLobbyView {
 
     fn render(&self, props: Self::Props) -> ui::Node<Self::Message> {
         if self.help_dialog.is_visible() {
-            return self.help_dialog.render(()).map(ClockworkLobbyMessage::Help);
+            return self
+                .help_dialog
+                .render(DialogProps {
+                    title: "Welcome to Clockwork Carnage",
+                    lines: EVENT_HELP_LINES,
+                })
+                .map(ClockworkLobbyMessage::Help);
         }
 
         ui::container()
@@ -66,7 +84,7 @@ impl From<ui::UiState<Duration, ()>> for ClockworkLobbyProps {
 #[derive(Clone)]
 pub struct Lobby {
     pub insim: InsimTask,
-    pub chat: chat::Chat,
+    pub chat: chat::EventChat,
 }
 
 impl Scene for Lobby {
@@ -79,12 +97,12 @@ impl Scene for Lobby {
             self.insim.clone(),
             Duration::ZERO,
             |_ucid, _invalidator| ClockworkLobbyView {
-                help_dialog: HelpDialog::default(),
+                help_dialog: Dialog::default(),
             },
             self.chat.subscribe(),
             |(ucid, msg)| {
-                matches!(msg, chat::ChatMsg::Help)
-                    .then_some((ucid, ClockworkLobbyMessage::Help(HelpDialogMsg::Show)))
+                matches!(msg, chat::EventChatMsg::Help)
+                    .then_some((ucid, ClockworkLobbyMessage::Help(DialogMsg::Show)))
             },
         );
 

@@ -19,18 +19,31 @@ use tokio::time::sleep;
 use crate::{
     chat,
     components::{
-        EnrichedLeaderboard, HelpDialog, HelpDialogMsg, scoreboard,
+        Dialog, DialogMsg, DialogProps, EnrichedLeaderboard, scoreboard,
         theme::{hud_active, hud_muted, hud_text, hud_title},
         topbar,
     },
     leaderboard,
 };
 
+const EVENT_HELP_LINES: &[&str] = &[
+    " - Match the target lap time as closely as possible.",
+    " - Crossing the first checkpoint starts your timed attempt.",
+    " - Find one of the finishes as close to the target time as possible.",
+    " - Full contact is permitted.",
+    " - Don't be a dick.",
+    " - Lower delta ranks higher and earns more points.",
+    " - Retry as many times as you want each round.",
+    "",
+    "Good luck.",
+];
+
 #[derive(Debug, Clone, Default)]
 struct ClockworkRoundGlobalProps {
     remaining: Duration,
     round: usize,
     rounds: usize,
+    target: Duration,
     leaderboard: EnrichedLeaderboard,
 }
 
@@ -43,11 +56,11 @@ struct ClockworkRoundConnectionProps {
 
 #[derive(Clone, Debug)]
 enum ClockworkRoundMessage {
-    Help(HelpDialogMsg),
+    Help(DialogMsg),
 }
 
 struct ClockworkRoundView {
-    help_dialog: HelpDialog,
+    help_dialog: Dialog,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -70,7 +83,13 @@ impl ui::Component for ClockworkRoundView {
 
     fn render(&self, props: Self::Props) -> ui::Node<Self::Message> {
         if self.help_dialog.is_visible() {
-            return self.help_dialog.render(()).map(ClockworkRoundMessage::Help);
+            return self
+                .help_dialog
+                .render(DialogProps {
+                    title: "Welcome to Clockwork Carnage",
+                    lines: EVENT_HELP_LINES,
+                })
+                .map(ClockworkRoundMessage::Help);
         }
 
         let (status, status_style) = if props.connection.in_progress {
@@ -92,6 +111,11 @@ impl ui::Component for ClockworkRoundView {
                     "Round {}/{} - {:?} remaining",
                     props.global.round, props.global.rounds, props.global.remaining,
                 ))
+                .with_child(
+                    ui::text(format!("Target: {:.2?}", props.global.target), hud_text())
+                        .w(20.)
+                        .h(5.),
+                )
                 .with_child(ui::text(status, status_style).w(20.).h(5.)),
             )
             .with_child(
@@ -125,7 +149,7 @@ pub struct Rounds {
     pub insim: InsimTask,
     pub game: game::Game,
     pub presence: presence::Presence,
-    pub chat: chat::Chat,
+    pub chat: chat::EventChat,
     pub rounds: usize,
     pub target: Duration,
     pub max_scorers: usize,
@@ -145,12 +169,12 @@ impl Scene for Rounds {
             self.insim.clone(),
             ClockworkRoundGlobalProps::default(),
             |_ucid, _invalidator| ClockworkRoundView {
-                help_dialog: HelpDialog::default(),
+                help_dialog: Dialog::default(),
             },
             self.chat.subscribe(),
             |(ucid, msg)| {
-                matches!(msg, chat::ChatMsg::Help)
-                    .then_some((ucid, ClockworkRoundMessage::Help(HelpDialogMsg::Show)))
+                matches!(msg, chat::EventChatMsg::Help)
+                    .then_some((ucid, ClockworkRoundMessage::Help(DialogMsg::Show)))
             },
         );
 
@@ -270,6 +294,7 @@ impl RoundsState {
                                 remaining: dur,
                                 round,
                                 rounds: config.rounds,
+                                target: config.target,
                                 leaderboard: leaderboard.clone(),
                             });
                         }

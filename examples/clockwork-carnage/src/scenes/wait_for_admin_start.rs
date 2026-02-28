@@ -38,7 +38,7 @@ impl ui::Component for WaitForAdminStartView {
 pub struct WaitForAdminStart {
     pub insim: InsimTask,
     pub presence: presence::Presence,
-    pub chat: chat::Chat,
+    pub chat: chat::EventChat,
 }
 
 impl scenes::Scene for WaitForAdminStart {
@@ -55,7 +55,7 @@ impl scenes::Scene for WaitForAdminStart {
 
         self.chat
             .wait_for_admin_cmd(self.presence.clone(), |msg| {
-                matches!(msg, chat::ChatMsg::Start)
+                matches!(msg, chat::EventChatMsg::Start)
             })
             .await?;
 
