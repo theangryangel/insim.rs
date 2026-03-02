@@ -87,6 +87,46 @@ pub struct EventRoundResult {
     pub recorded_at: String,
 }
 
+// -- List / get queries -------------------------------------------------------
+
+pub async fn all_events(pool: &Pool) -> Result<Vec<Event>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT id, track, layout, rounds, target_ms, current_round, started_at, ended_at
+         FROM events ORDER BY id DESC",
+    )
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn all_challenges(pool: &Pool) -> Result<Vec<Challenge>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT id, track, layout, started_at, ended_at
+         FROM challenges ORDER BY id DESC",
+    )
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn get_event(pool: &Pool, event_id: i64) -> Result<Option<Event>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT id, track, layout, rounds, target_ms, current_round, started_at, ended_at
+         FROM events WHERE id = ?",
+    )
+    .bind(event_id)
+    .fetch_optional(pool)
+    .await
+}
+
+pub async fn get_challenge(pool: &Pool, challenge_id: i64) -> Result<Option<Challenge>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT id, track, layout, started_at, ended_at
+         FROM challenges WHERE id = ?",
+    )
+    .bind(challenge_id)
+    .fetch_optional(pool)
+    .await
+}
+
 // -- User queries -------------------------------------------------------------
 
 pub async fn upsert_user(pool: &Pool, uname: &str, pname: &str) -> Result<i64, sqlx::Error> {
