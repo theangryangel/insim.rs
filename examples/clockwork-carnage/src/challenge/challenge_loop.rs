@@ -162,9 +162,7 @@ impl Scene for ChallengeLoop {
 
         // Load initial leaderboard from DB
         let leaderboard = self.challenge_leaderboard().await?;
-        if !leaderboard.is_empty() {
-            ui.set_global_state(ChallengeGlobalProps { leaderboard });
-        }
+        ui.set_global_state(ChallengeGlobalProps { leaderboard });
 
         let mut active_runs: HashMap<String, Duration> = HashMap::new();
         let mut packets = self.insim.subscribe();

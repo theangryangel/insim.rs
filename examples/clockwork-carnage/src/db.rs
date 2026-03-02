@@ -2,6 +2,7 @@
 
 use std::str::FromStr;
 
+use insim::core::track::Track;
 use kitcar::presence::{Presence, PresenceEvent};
 use sqlx::{
     FromRow, Row,
@@ -36,7 +37,8 @@ pub struct User {
 #[derive(Debug, Clone, FromRow)]
 pub struct Challenge {
     pub id: i64,
-    pub track: String,
+    #[sqlx(try_from = "String")]
+    pub track: Track,
     pub layout: String,
     pub started_at: String,
     pub ended_at: Option<String>,
@@ -56,7 +58,8 @@ pub struct ChallengeTime {
 #[derive(Debug, Clone, FromRow)]
 pub struct Event {
     pub id: i64,
-    pub track: String,
+    #[sqlx(try_from = "String")]
+    pub track: Track,
     pub layout: String,
     pub rounds: i64,
     pub target_ms: i64,
@@ -138,9 +141,9 @@ pub enum UserSyncError {
 
 // -- Challenge queries --------------------------------------------------------
 
-pub async fn create_challenge(pool: &Pool, track: &str, layout: &str) -> Result<i64, sqlx::Error> {
+pub async fn create_challenge(pool: &Pool, track: &Track, layout: &str) -> Result<i64, sqlx::Error> {
     let row = sqlx::query("INSERT INTO challenges (track, layout) VALUES (?, ?) RETURNING id")
-        .bind(track)
+        .bind(track.to_string())
         .bind(layout)
         .fetch_one(pool)
         .await?;
@@ -155,19 +158,13 @@ pub async fn end_challenge(pool: &Pool, challenge_id: i64) -> Result<(), sqlx::E
     Ok(())
 }
 
-pub async fn active_challenge(
-    pool: &Pool,
-    track: &str,
-    layout: &str,
-) -> Result<Option<Challenge>, sqlx::Error> {
+pub async fn any_active_challenge(pool: &Pool) -> Result<Option<Challenge>, sqlx::Error> {
     sqlx::query_as(
         "SELECT id, track, layout, started_at, ended_at
          FROM challenges
-         WHERE track = ? AND layout = ? AND ended_at IS NULL
+         WHERE ended_at IS NULL
          ORDER BY id DESC LIMIT 1",
     )
-    .bind(track)
-    .bind(layout)
     .fetch_optional(pool)
     .await
 }
@@ -241,7 +238,7 @@ pub async fn challenge_personal_best(
 
 pub async fn create_event(
     pool: &Pool,
-    track: &str,
+    track: &Track,
     layout: &str,
     rounds: i64,
     target_ms: i64,
@@ -249,7 +246,7 @@ pub async fn create_event(
     let row = sqlx::query(
         "INSERT INTO events (track, layout, rounds, target_ms) VALUES (?, ?, ?, ?) RETURNING id",
     )
-    .bind(track)
+    .bind(track.to_string())
     .bind(layout)
     .bind(rounds)
     .bind(target_ms)
@@ -266,19 +263,13 @@ pub async fn end_event(pool: &Pool, event_id: i64) -> Result<(), sqlx::Error> {
     Ok(())
 }
 
-pub async fn active_event(
-    pool: &Pool,
-    track: &str,
-    layout: &str,
-) -> Result<Option<Event>, sqlx::Error> {
+pub async fn any_active_event(pool: &Pool) -> Result<Option<Event>, sqlx::Error> {
     sqlx::query_as(
         "SELECT id, track, layout, rounds, target_ms, current_round, started_at, ended_at
          FROM events
-         WHERE track = ? AND layout = ? AND ended_at IS NULL
+         WHERE ended_at IS NULL
          ORDER BY id DESC LIMIT 1",
     )
-    .bind(track)
-    .bind(layout)
     .fetch_optional(pool)
     .await
 }
