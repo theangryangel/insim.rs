@@ -1,8 +1,4 @@
-use std::{
-    collections::BTreeSet,
-    sync::Arc,
-    time::{Duration, SystemTime},
-};
+use std::{collections::BTreeSet, sync::Arc, time::Duration};
 
 use insim::{core::vehicle::Vehicle, insim::BtnStyle};
 use kitcar::ui;
@@ -10,10 +6,10 @@ use kitcar::ui;
 use super::theme::{hud_active, hud_text};
 
 /// (uname, pname, pts)
-pub type EnrichedLeaderboard = Arc<[(String, String, u32)]>;
+pub type EventLeaderboard = Arc<[(String, String, u32)]>;
 
-/// (uname, pname, vehicle, best_time, set_at)
-pub type ChallengeLeaderboard = Arc<[(String, String, Vehicle, Duration, SystemTime)]>;
+/// (uname, pname, vehicle, best_time)
+pub type ChallengeLeaderboard = Arc<[(String, String, Vehicle, Duration)]>;
 
 fn row_style(uname: &str, current_uname: &str) -> BtnStyle {
     if uname == current_uname {
@@ -23,10 +19,7 @@ fn row_style(uname: &str, current_uname: &str) -> BtnStyle {
     }
 }
 
-pub fn scoreboard<Msg>(
-    leaderboard: &EnrichedLeaderboard,
-    current_uname: &str,
-) -> Vec<ui::Node<Msg>> {
+pub fn scoreboard<Msg>(leaderboard: &EventLeaderboard, current_uname: &str) -> Vec<ui::Node<Msg>> {
     let total = leaderboard.len();
     let player_pos = leaderboard
         .iter()
@@ -108,14 +101,14 @@ pub fn challenge_scoreboard<Msg>(
     let total = leaderboard.len();
     let player_pos = leaderboard
         .iter()
-        .position(|(uname, _, _, _, _)| uname == current_uname);
+        .position(|(uname, _, _, _)| uname == current_uname);
 
     let indices_to_show = visible_indices(total, player_pos);
 
     indices_to_show
         .into_iter()
         .map(|index| {
-            let (uname, pname, vehicle, time, _set_at) = &leaderboard[index];
+            let (uname, pname, vehicle, time) = &leaderboard[index];
             let rank = format!("#{}", index + 1);
             let vehicle_str = format!("{}", vehicle);
             let time_str = format!("{:.2?}", time);

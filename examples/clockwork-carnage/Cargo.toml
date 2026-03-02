@@ -25,6 +25,7 @@ anyhow = "1.0.86"
 clap = { workspace = true, features = ["derive"] }
 insim = { path = "../../insim", features = ["serde", "blocking"] }
 kitcar = { path = "../../kitcar" }
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "migrate"] }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "signal", "time", "sync"]}
 tracing = {workspace = true}

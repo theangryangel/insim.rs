@@ -8,7 +8,7 @@ use insim::{
     insim::{PlayerFlags, PlayerType},
 };
 use tokio::{
-    sync::{mpsc, oneshot, watch},
+    sync::{broadcast, mpsc, oneshot, watch},
     task::JoinHandle,
 };
 
@@ -57,14 +57,37 @@ pub struct ConnectionInfo {
     pub players: HashSet<PlayerId>,
 }
 
+/// Lifecycle events emitted by `Presence` after processing each packet.
+#[derive(Debug, Clone)]
+pub enum PresenceEvent {
+    /// A new connection joined.
+    Connected(ConnectionInfo),
+    /// A connection left.
+    Disconnected(ConnectionInfo),
+    /// A connection changed their display name.
+    Renamed {
+        /// Connection ID
+        ucid: ConnectionId,
+        /// LFS username
+        uname: String,
+        /// New display name
+        new_pname: String,
+    },
+    /// A player joined the track.
+    PlayerJoined(PlayerInfo),
+    /// A player left the track.
+    PlayerLeft(PlayerInfo),
+}
+
 /// Presence state
-#[derive(Debug, Default, Clone)]
+#[derive(Debug)]
 struct PresenceInner {
     connections: HashMap<ConnectionId, ConnectionInfo>,
     players: HashMap<PlayerId, PlayerInfo>,
     last_known_names: HashMap<String, String>,
     player_count: watch::Sender<usize>,
     connection_count: watch::Sender<usize>,
+    event_tx: broadcast::Sender<PresenceEvent>,
 }
 
 impl PresenceInner {
@@ -72,12 +95,14 @@ impl PresenceInner {
     fn new() -> Self {
         let player_count = watch::channel(0);
         let connection_count = watch::channel(0);
+        let (event_tx, _) = broadcast::channel(64);
         Self {
             connections: HashMap::new(),
             players: HashMap::new(),
             last_known_names: HashMap::new(),
             player_count: player_count.0,
             connection_count: connection_count.0,
+            event_tx,
         }
     }
 
@@ -168,24 +193,27 @@ impl PresenceInner {
             .last_known_names
             .insert(ncn.uname.clone(), ncn.pname.clone());
 
-        let _ = self.connections.insert(
-            ncn.ucid,
-            ConnectionInfo {
-                ucid: ncn.ucid,
-                admin: ncn.admin,
-                uname: ncn.uname.clone(),
-                pname: ncn.pname.clone(),
-                players: HashSet::new(),
-            },
-        );
+        let conn = ConnectionInfo {
+            ucid: ncn.ucid,
+            admin: ncn.admin,
+            uname: ncn.uname.clone(),
+            pname: ncn.pname.clone(),
+            players: HashSet::new(),
+        };
+
+        let _ = self.event_tx.send(PresenceEvent::Connected(conn.clone()));
+        let _ = self.connections.insert(ncn.ucid, conn);
     }
 
     fn cnl(&mut self, cnl: &insim::insim::Cnl) {
         if let Some(connection) = self.connections.remove(&cnl.ucid) {
             // Remove all players associated with this connection.
-            for plid in connection.players {
-                let _ = self.players.remove(&plid);
+            for plid in &connection.players {
+                if let Some(player) = self.players.remove(plid) {
+                    let _ = self.event_tx.send(PresenceEvent::PlayerLeft(player));
+                }
             }
+            let _ = self.event_tx.send(PresenceEvent::Disconnected(connection));
         }
     }
 
@@ -196,6 +224,12 @@ impl PresenceInner {
             let _ = self
                 .last_known_names
                 .insert(connection.uname.clone(), cpr.pname.clone());
+
+            let _ = self.event_tx.send(PresenceEvent::Renamed {
+                ucid: cpr.ucid,
+                uname: connection.uname.clone(),
+                new_pname: cpr.pname.clone(),
+            });
         }
     }
 
@@ -207,18 +241,20 @@ impl PresenceInner {
             return;
         }
 
-        let _ = self.players.insert(
-            npl.plid,
-            PlayerInfo {
-                plid: npl.plid,
-                ucid: npl.ucid,
-                vehicle: npl.cname,
-                ptype: npl.ptype,
-                flags: npl.flags,
-                in_pitlane: false,
-                pname: npl.pname.clone(),
-            },
-        );
+        let player = PlayerInfo {
+            plid: npl.plid,
+            ucid: npl.ucid,
+            vehicle: npl.cname,
+            ptype: npl.ptype,
+            flags: npl.flags,
+            in_pitlane: false,
+            pname: npl.pname.clone(),
+        };
+
+        let _ = self
+            .event_tx
+            .send(PresenceEvent::PlayerJoined(player.clone()));
+        let _ = self.players.insert(npl.plid, player);
 
         if let Some(connection) = self.connections.get_mut(&npl.ucid) {
             let _ = connection.players.insert(npl.plid);
@@ -226,10 +262,13 @@ impl PresenceInner {
     }
 
     fn pll(&mut self, pll: &insim::insim::Pll) {
-        if let Some(player) = self.players.remove(&pll.plid)
-            && let Some(connection) = self.connections.get_mut(&player.ucid)
-        {
-            let _ = connection.players.remove(&player.plid);
+        if let Some(player) = self.players.remove(&pll.plid) {
+            let _ = self
+                .event_tx
+                .send(PresenceEvent::PlayerLeft(player.clone()));
+            if let Some(connection) = self.connections.get_mut(&player.ucid) {
+                let _ = connection.players.remove(&player.plid);
+            }
         }
     }
 
@@ -295,6 +334,7 @@ pub fn spawn(
     let mut inner = PresenceInner::new();
     let player_count = inner.player_count.subscribe();
     let connection_count = inner.connection_count.subscribe();
+    let event_tx = inner.event_tx.clone();
 
     let handle = tokio::spawn(async move {
         let result: Result<(), PresenceError> = async {
@@ -359,6 +399,7 @@ pub fn spawn(
             query_tx,
             player_count,
             connection_count,
+            event_tx,
         },
         handle,
     )
@@ -403,9 +444,15 @@ pub struct Presence {
     query_tx: mpsc::Sender<PresenceQuery>,
     player_count: watch::Receiver<usize>,
     connection_count: watch::Receiver<usize>,
+    event_tx: broadcast::Sender<PresenceEvent>,
 }
 
 impl Presence {
+    /// Subscribe to presence lifecycle events.
+    pub fn subscribe_events(&self) -> broadcast::Receiver<PresenceEvent> {
+        self.event_tx.subscribe()
+    }
+
     /// Watch connection count
     pub async fn wait_for_connection_count(
         &mut self,

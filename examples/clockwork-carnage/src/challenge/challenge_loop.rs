@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    time::{Duration, SystemTime},
-};
+use std::{collections::HashMap, time::Duration};
 
 use insim::{
     builder::InsimTask,
@@ -18,13 +15,14 @@ use kitcar::{
     ui::{self, Component},
 };
 
+use super::chat;
 use crate::{
-    chat,
     components::{
         ChallengeLeaderboard, Dialog, DialogMsg, DialogProps, challenge_scoreboard,
         theme::{hud_active, hud_muted, hud_text, hud_title},
         topbar,
     },
+    db,
 };
 
 const CHALLENGE_HELP_LINES: &[&str] = &[
@@ -134,6 +132,8 @@ pub struct ChallengeLoop {
     pub game: game::Game,
     pub presence: presence::Presence,
     pub chat: chat::ChallengeChat,
+    pub db: db::Pool,
+    pub challenge_id: i64,
 }
 
 impl Scene for ChallengeLoop {
@@ -160,7 +160,12 @@ impl Scene for ChallengeLoop {
             },
         );
 
-        let mut best_times: HashMap<String, (Duration, Vehicle, SystemTime)> = HashMap::new();
+        // Load initial leaderboard from DB
+        let leaderboard = self.challenge_leaderboard().await?;
+        if !leaderboard.is_empty() {
+            ui.set_global_state(ChallengeGlobalProps { leaderboard });
+        }
+
         let mut active_runs: HashMap<String, Duration> = HashMap::new();
         let mut packets = self.insim.subscribe();
 
@@ -178,10 +183,11 @@ impl Scene for ChallengeLoop {
                                 scene: "challenge::ncn::connection",
                                 cause: Box::new(cause),
                             })? {
+                                let pb = self.personal_best(&conn.uname).await?;
                                 ui.set_player_state(ncn.ucid, ChallengeConnectionProps {
                                     uname: conn.uname.clone(),
                                     in_progress: false,
-                                    best_time: best_times.get(&conn.uname).map(|(t, _, _)| *t),
+                                    best_time: pb,
                                 }).await;
                             }
                         },
@@ -214,13 +220,25 @@ impl Scene for ChallengeLoop {
                                         if let Some(start) = active_runs.remove(&conn.uname) {
                                             let lap_time = time.saturating_sub(start);
                                             let vehicle = player.vehicle;
-                                            let is_pb = match best_times.get(&conn.uname) {
-                                                Some(&(prev, _, _)) => lap_time < prev,
+
+                                            let prev_pb = self.personal_best(&conn.uname).await?;
+                                            let is_pb = match prev_pb {
+                                                Some(prev) => lap_time < prev,
                                                 None => true,
                                             };
 
-                                            if is_pb {
-                                                let _ = best_times.insert(conn.uname.clone(), (lap_time, vehicle, SystemTime::now()));
+                                            // Persist every run to DB
+                                            let time_ms = lap_time.as_millis() as i64;
+                                            if let Err(e) = db::insert_challenge_time(
+                                                &self.db,
+                                                self.challenge_id,
+                                                &conn.uname,
+                                                &vehicle.to_string(),
+                                                time_ms,
+                                            )
+                                            .await
+                                            {
+                                                tracing::warn!("Failed to persist challenge time: {e}");
                                             }
 
                                             self.insim
@@ -234,8 +252,7 @@ impl Scene for ChallengeLoop {
                                                         conn.ucid,
                                                     )
                                                     .await?;
-                                            } else {
-                                                let (pb, _, _) = best_times[&conn.uname];
+                                            } else if let Some(pb) = prev_pb {
                                                 self.insim
                                                     .send_message(
                                                         format!("Time: {:.2?}, PB: {:.2?}", lap_time, pb).yellow(),
@@ -248,18 +265,19 @@ impl Scene for ChallengeLoop {
                                                 .send_message("Rejoin to retry".yellow(), conn.ucid)
                                                 .await?;
 
-                                            // Update leaderboard
-                                            let leaderboard = self.build_leaderboard(&best_times).await?;
+                                            // Update leaderboard from DB
+                                            let leaderboard = self.challenge_leaderboard().await?;
                                             ui.set_global_state(ChallengeGlobalProps { leaderboard });
                                         }
                                     },
                                     _ => {},
                                 }
 
+                                let pb = self.personal_best(&conn.uname).await?;
                                 ui.set_player_state(conn.ucid, ChallengeConnectionProps {
                                     uname: conn.uname.clone(),
                                     in_progress: active_runs.contains_key(&conn.uname),
-                                    best_time: best_times.get(&conn.uname).map(|(t, _, _)| *t),
+                                    best_time: pb,
                                 }).await;
                             }
                         },
@@ -280,32 +298,33 @@ impl Scene for ChallengeLoop {
 }
 
 impl ChallengeLoop {
-    async fn build_leaderboard(
-        &self,
-        best_times: &HashMap<String, (Duration, Vehicle, SystemTime)>,
-    ) -> Result<ChallengeLeaderboard, SceneError> {
-        let mut entries: Vec<(String, Duration, Vehicle, SystemTime)> = best_times
-            .iter()
-            .map(|(k, &(t, v, ts))| (k.clone(), t, v, ts))
-            .collect();
-        entries.sort_by_key(|(_, t, _, _)| *t);
-
-        let names = self
-            .presence
-            .last_known_names(entries.iter().map(|(uname, _, _, _)| uname))
+    async fn challenge_leaderboard(&self) -> Result<ChallengeLeaderboard, SceneError> {
+        let rows = db::challenge_best_times(&self.db, self.challenge_id, 100)
             .await
             .map_err(|cause| SceneError::Custom {
-                scene: "challenge::build_leaderboard::last_known_names",
+                scene: "challenge::challenge_leaderboard",
                 cause: Box::new(cause),
             })?;
 
-        Ok(entries
+        Ok(rows
             .into_iter()
-            .map(|(uname, time, vehicle, set_at)| {
-                let pname = names.get(&uname).cloned().unwrap_or_else(|| uname.clone());
-                (uname, pname, vehicle, time, set_at)
+            .map(|row| {
+                let vehicle: Vehicle = row.vehicle.parse().unwrap_or(Vehicle::Uf1);
+                let time = Duration::from_millis(row.time_ms as u64);
+                (row.uname, row.pname, vehicle, time)
             })
             .collect::<Vec<_>>()
             .into())
+    }
+
+    async fn personal_best(&self, uname: &str) -> Result<Option<Duration>, SceneError> {
+        let row = db::challenge_personal_best(&self.db, self.challenge_id, uname)
+            .await
+            .map_err(|cause| SceneError::Custom {
+                scene: "challenge::personal_best",
+                cause: Box::new(cause),
+            })?;
+
+        Ok(row.map(|r| Duration::from_millis(r.time_ms as u64)))
     }
 }

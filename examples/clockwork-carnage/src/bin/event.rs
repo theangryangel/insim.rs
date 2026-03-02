@@ -4,7 +4,7 @@
 use std::{net::SocketAddr, time::Duration};
 
 use clap::Parser;
-use clockwork_carnage::{MIN_PLAYERS, chat, scenes};
+use clockwork_carnage::{MIN_PLAYERS, db, event, setup_track};
 use insim::{WithRequestId, core::track::Track, insim::TinyType};
 use kitcar::{
     game, presence,
@@ -30,6 +30,9 @@ struct Args {
 
     #[arg(short, long)]
     layout: Option<String>,
+
+    #[arg(long, default_value = "clockwork-carnage.db")]
+    db: String,
 }
 
 #[tokio::main]
@@ -44,6 +47,36 @@ async fn main() -> anyhow::Result<()> {
 
     let args = Args::parse();
 
+    let pool = db::connect(&args.db).await?;
+
+    let track = args.track.unwrap_or(Track::Fe1x);
+    let layout = args.layout.unwrap_or("CC".to_string());
+    let track_str = track.to_string();
+
+    let (event_id, start_round, rounds, target) = match db::active_event(&pool, &track_str, &layout)
+        .await?
+    {
+        Some(ev) => {
+            tracing::info!(
+                "Resuming event {} (round {}/{})",
+                ev.id,
+                ev.current_round,
+                ev.rounds
+            );
+            let start = ev.current_round as usize + 1;
+            let target = Duration::from_millis(ev.target_ms as u64);
+            (ev.id, start, ev.rounds as usize, target)
+        },
+        None => {
+            let rounds = args.rounds.unwrap_or(5);
+            let target = Duration::from_secs(20);
+            let target_ms = target.as_millis() as i64;
+            let id = db::create_event(&pool, &track_str, &layout, rounds as i64, target_ms).await?;
+            tracing::info!("Created event {id}");
+            (id, 1, rounds, target)
+        },
+    };
+
     let (insim, insim_handle) = insim::tcp(args.addr)
         .isi_admin_password(args.password.clone())
         .isi_iname("clockwork".to_owned())
@@ -56,7 +89,8 @@ async fn main() -> anyhow::Result<()> {
 
     let (presence, presence_handle) = presence::spawn(insim.clone(), 32);
     let (game, game_handle) = game::spawn(insim.clone(), 32);
-    let (chat, chat_handle) = chat::spawn_event(insim.clone());
+    let (chat, chat_handle) = event::chat::spawn(insim.clone());
+    let user_sync_handle = db::spawn_user_sync(&presence, pool.clone());
 
     insim.send(TinyType::Ncn.with_request_id(1)).await?;
     insim.send(TinyType::Npl.with_request_id(2)).await?;
@@ -74,30 +108,33 @@ async fn main() -> anyhow::Result<()> {
         presence: presence.clone(),
         min_players: MIN_PLAYERS,
     }
-    .then(scenes::WaitForAdminStart {
+    .then(event::WaitForAdminStart {
         insim: insim.clone(),
         presence: presence.clone(),
         chat: chat.clone(),
     })
     .then(
-        scenes::SetupTrack {
+        setup_track::SetupTrack {
             insim: insim.clone(),
             presence: presence.clone(),
             min_players: MIN_PLAYERS,
             game: game.clone(),
-            track: args.track.unwrap_or(Track::Fe1x),
-            layout: Some(args.layout.unwrap_or("CC".to_string())),
+            track,
+            layout: Some(layout),
         }
         .with_timeout(Duration::from_secs(60)),
     )
-    .then(scenes::Clockwork {
+    .then(event::Clockwork {
         game: game.clone(),
         presence: presence.clone(),
         chat: chat.clone(),
-        rounds: args.rounds.unwrap_or(5),
+        start_round,
+        rounds,
         max_scorers: args.max_scorers.unwrap_or(10),
-        target: Duration::from_secs(20),
+        target,
         insim: insim.clone(),
+        db: pool.clone(),
+        event_id,
     })
     .loop_until_quit();
 
@@ -130,10 +167,20 @@ async fn main() -> anyhow::Result<()> {
                 Err(e) => tracing::error!("Chat background task join failed: {e}"),
             }
         },
+        res = user_sync_handle => {
+            match res {
+                Ok(Ok(())) => tracing::info!("User sync background task exited"),
+                Ok(Err(e)) => tracing::error!("User sync background task failed: {e}"),
+                Err(e) => tracing::error!("User sync background task join failed: {e}"),
+            }
+        },
         res = clockwork.run() => {
             tracing::info!("{res:?}");
+            if let Err(e) = db::end_event(&pool, event_id).await {
+                tracing::warn!("Failed to end event in DB: {e}");
+            }
         },
-        _ = chat.wait_for_admin_cmd(presence, |msg| matches!(msg, chat::EventChatMsg::Quit)) => {}
+        _ = chat.wait_for_admin_cmd(presence, |msg| matches!(msg, event::chat::EventChatMsg::Quit)) => {}
     }
 
     Ok(())

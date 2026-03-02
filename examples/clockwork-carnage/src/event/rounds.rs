@@ -16,14 +16,14 @@ use kitcar::{
 };
 use tokio::time::sleep;
 
+use super::chat;
 use crate::{
-    chat,
     components::{
-        Dialog, DialogMsg, DialogProps, EnrichedLeaderboard, scoreboard,
+        Dialog, DialogMsg, DialogProps, EventLeaderboard, scoreboard,
         theme::{hud_active, hud_muted, hud_text, hud_title},
         topbar,
     },
-    leaderboard,
+    db,
 };
 
 const EVENT_HELP_LINES: &[&str] = &[
@@ -44,7 +44,7 @@ struct ClockworkRoundGlobalProps {
     round: usize,
     rounds: usize,
     target: Duration,
-    leaderboard: EnrichedLeaderboard,
+    leaderboard: EventLeaderboard,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -150,17 +150,19 @@ pub struct Rounds {
     pub game: game::Game,
     pub presence: presence::Presence,
     pub chat: chat::EventChat,
+    pub start_round: usize,
     pub rounds: usize,
     pub target: Duration,
     pub max_scorers: usize,
+    pub db: db::Pool,
+    pub event_id: i64,
 }
 
 impl Scene for Rounds {
-    type Output = leaderboard::Leaderboard;
+    type Output = ();
 
     async fn run(mut self) -> Result<SceneResult<Self::Output>, SceneError> {
         let mut state = RoundsState {
-            scores: leaderboard::Leaderboard::default(),
             round_best: HashMap::new(),
             active_runs: HashMap::new(),
         };
@@ -178,17 +180,16 @@ impl Scene for Rounds {
             },
         );
 
-        for round in 1..=self.rounds {
+        for round in self.start_round..=self.rounds {
             state.broadcast_rankings(&self, &ui).await?;
             state.run_round(round, &mut self, &ui).await?;
         }
 
-        Ok(SceneResult::Continue(state.scores))
+        Ok(SceneResult::Continue(()))
     }
 }
 
 struct RoundsState {
-    scores: leaderboard::Leaderboard,
     round_best: HashMap<String, Duration>,
     active_runs: HashMap<String, Duration>,
 }
@@ -221,26 +222,17 @@ impl RoundsState {
         Ok(())
     }
 
-    async fn enriched_leaderboard(
-        &self,
-        config: &Rounds,
-    ) -> Result<EnrichedLeaderboard, SceneError> {
-        let ranking = self.scores.ranking();
-        let names = config
-            .presence
-            .last_known_names(ranking.iter().map(|(uname, _)| uname))
+    async fn event_leaderboard(config: &Rounds) -> Result<EventLeaderboard, SceneError> {
+        let standings = db::event_standings(&config.db, config.event_id)
             .await
             .map_err(|cause| SceneError::Custom {
-                scene: "rounds::enriched_leaderboard::last_known_names",
+                scene: "rounds::event_leaderboard",
                 cause: Box::new(cause),
             })?;
 
-        Ok(ranking
-            .iter()
-            .map(|(uname, pts)| {
-                let pname = names.get(uname).cloned().unwrap_or_else(|| uname.clone());
-                (uname.clone(), pname, *pts)
-            })
+        Ok(standings
+            .into_iter()
+            .map(|s| (s.uname, s.pname, s.total_points as u32))
             .collect::<Vec<_>>()
             .into())
     }
@@ -282,7 +274,7 @@ impl RoundsState {
 
         let mut countdown = Countdown::new(Duration::from_secs(1), 60);
         let mut packets = config.insim.subscribe();
-        let leaderboard = self.enriched_leaderboard(config).await?;
+        let leaderboard = Self::event_leaderboard(config).await?;
 
         loop {
             tokio::select! {
@@ -307,7 +299,7 @@ impl RoundsState {
             }
         }
 
-        self.score_round(config);
+        self.score_round(round, config).await;
         Ok(())
     }
 
@@ -426,17 +418,30 @@ impl RoundsState {
         Ok(())
     }
 
-    fn score_round(&mut self, config: &Rounds) {
+    async fn score_round(&mut self, round: usize, config: &Rounds) {
         let mut ordered: Vec<_> = self.round_best.drain().collect();
         ordered.sort_by_key(|(_, v)| *v);
 
-        for (i, (uname, _)) in ordered.into_iter().take(config.max_scorers).enumerate() {
+        for (i, (uname, delta)) in ordered.into_iter().take(config.max_scorers).enumerate() {
             let points = (config.max_scorers - i) as u32;
-            self.scores.add_points(uname, points);
+
+            let delta_ms = delta.as_millis() as i64;
+            if let Err(e) = db::insert_event_round_result(
+                &config.db,
+                config.event_id,
+                round as i64,
+                &uname,
+                delta_ms,
+                points as i64,
+            )
+            .await
+            {
+                tracing::warn!("Failed to persist event round result: {e}");
+            }
         }
 
-        self.scores.rank();
-
-        tracing::info!("{:?}", self.scores);
+        if let Err(e) = db::update_event_round(&config.db, config.event_id, round as i64).await {
+            tracing::warn!("Failed to update event round: {e}");
+        }
     }
 }

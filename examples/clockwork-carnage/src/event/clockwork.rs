@@ -6,7 +6,8 @@ use kitcar::{
     scenes::{Scene, SceneError, SceneExt, SceneResult},
 };
 
-use crate::chat;
+use super::chat;
+use crate::db;
 
 /// Clockwork Carnage game
 #[derive(Clone)]
@@ -16,9 +17,13 @@ pub struct Clockwork {
     pub chat: chat::EventChat,
     pub insim: InsimTask,
 
+    pub start_round: usize,
     pub rounds: usize,
     pub target: Duration,
     pub max_scorers: usize,
+
+    pub db: db::Pool,
+    pub event_id: i64,
 }
 
 impl Scene for Clockwork {
@@ -42,21 +47,17 @@ impl Scene for Clockwork {
             game: self.game.clone(),
             presence: self.presence.clone(),
             chat: self.chat.clone(),
+            start_round: self.start_round,
             rounds: self.rounds,
             target: self.target,
             max_scorers: self.max_scorers,
+            db: self.db.clone(),
+            event_id: self.event_id,
         })
-        .and_then({
-            let insim = self.insim.clone();
-            let presence = self.presence.clone();
-            move |scores| {
-                tracing::info!("scores = {:?}", scores);
-                super::Victory {
-                    insim: insim.clone(),
-                    presence: presence.clone(),
-                    scores,
-                }
-            }
+        .then(super::Victory {
+            insim: self.insim.clone(),
+            db: self.db.clone(),
+            event_id: self.event_id,
         });
 
         tokio::select! {
@@ -64,13 +65,10 @@ impl Scene for Clockwork {
                 let _ = res?;
                 Ok(SceneResult::Continue(()))
             },
-            // TODO: if this all we care about.. do we want to handle this here? it's contextually
-            // sensitive.. so maybe this is the right place?
             _ = self.chat.wait_for_admin_cmd(self.presence.clone(), |msg| matches!(msg, chat::EventChatMsg::End)) => {
                 tracing::info!("Admin ended event");
                 Ok(SceneResult::bail_with("Admin ended event"))
             },
-            // XXX: not required with `/vote no` in main *technically*, however an admin can still /end!
             _ = self.game.wait_for_end() => {
                 tracing::info!("Players voted to end");
                 Ok(SceneResult::Continue(()))

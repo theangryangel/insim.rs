@@ -1,10 +1,8 @@
 use insim::{builder::InsimTask, identifiers::ConnectionId};
 use kitcar::{presence, scenes, ui};
 
-use crate::{
-    chat,
-    components::{Marquee, topbar},
-};
+use super::chat;
+use crate::components::{Marquee, topbar};
 
 struct WaitForAdminStartView {
     marquee: Marquee,

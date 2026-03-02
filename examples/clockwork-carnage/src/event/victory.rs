@@ -2,20 +2,19 @@ use std::time::Duration;
 
 use insim::builder::InsimTask;
 use kitcar::{
-    presence,
     scenes::{Scene, SceneError, SceneResult},
     ui,
 };
 use tokio::time::sleep;
 
 use crate::{
-    components::{EnrichedLeaderboard, scoreboard, theme::hud_title, topbar},
-    leaderboard,
+    components::{EventLeaderboard, scoreboard, theme::hud_title, topbar},
+    db,
 };
 
 #[derive(Debug, Clone, Default)]
 struct ClockworkVictoryGlobalProps {
-    standings: EnrichedLeaderboard,
+    standings: EventLeaderboard,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -73,20 +72,20 @@ impl From<ui::UiState<ClockworkVictoryGlobalProps, ClockworkVictoryConnectionPro
 #[derive(Clone)]
 pub struct Victory {
     pub insim: InsimTask,
-    pub presence: presence::Presence,
-    pub scores: leaderboard::Leaderboard,
+    pub db: db::Pool,
+    pub event_id: i64,
 }
 
 impl Scene for Victory {
     type Output = ();
 
     async fn run(self) -> Result<SceneResult<Self::Output>, SceneError> {
-        let enriched_leaderboard = self.enriched_leaderboard().await?;
-        tracing::info!("leaderboard: {:?}", enriched_leaderboard);
+        let leaderboard = self.event_leaderboard().await?;
+        tracing::info!("leaderboard: {:?}", leaderboard);
         let ui = ui::mount(
             self.insim.clone(),
             ClockworkVictoryGlobalProps {
-                standings: enriched_leaderboard.clone(),
+                standings: leaderboard,
             },
             |_ucid, _invalidator| ClockworkVictoryView {},
         );
@@ -97,23 +96,17 @@ impl Scene for Victory {
 }
 
 impl Victory {
-    async fn enriched_leaderboard(&self) -> Result<EnrichedLeaderboard, SceneError> {
-        let ranking = self.scores.ranking();
-        let names = self
-            .presence
-            .last_known_names(ranking.iter().map(|(uname, _)| uname))
+    async fn event_leaderboard(&self) -> Result<EventLeaderboard, SceneError> {
+        let standings = db::event_standings(&self.db, self.event_id)
             .await
             .map_err(|cause| SceneError::Custom {
-                scene: "victory::enriched_leaderboard::last_known_names",
+                scene: "victory::event_leaderboard",
                 cause: Box::new(cause),
             })?;
 
-        Ok(ranking
-            .iter()
-            .map(|(uname, pts)| {
-                let pname = names.get(uname).cloned().unwrap_or_else(|| uname.clone());
-                (uname.clone(), pname, *pts)
-            })
+        Ok(standings
+            .into_iter()
+            .map(|s| (s.uname, s.pname, s.total_points as u32))
             .collect::<Vec<_>>()
             .into())
     }
