@@ -1,10 +1,10 @@
-//! Clockwork Carnage — Event mode
-//! Manually-started event: admin types `!start`, N rounds play out, victory screen, loop.
+//! Clockwork Carnage — Challenge mode
+//! Always-on weekly challenge: players drop in, do timed runs, compete for fastest time.
 
 use std::{net::SocketAddr, time::Duration};
 
 use clap::{Parser, Subcommand};
-use clockwork_carnage::{MIN_PLAYERS, db, event, setup_track};
+use clockwork_carnage::{MIN_PLAYERS, shortcut, db, setup_track};
 use insim::{WithRequestId, core::track::Track, insim::TinyType};
 use kitcar::{
     game, presence,
@@ -22,34 +22,25 @@ struct Args {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Set/replace the active event configuration
-    Add {
-        #[arg(short, long)]
-        track: Track,
-
-        #[arg(short, long)]
-        layout: String,
-
-        #[arg(short, long, default_value_t = 5)]
-        rounds: usize,
-
-        #[arg(long, default_value_t = 20)]
-        target: u64,
-    },
-
-    /// Show the active event configuration
-    List,
-
-    /// Run the event (reads config from active event in DB)
+    /// Run the challenge (reads track/layout from active challenge in DB)
     Run {
         #[arg(short, long)]
         addr: SocketAddr,
 
         #[arg(short, long)]
         password: Option<String>,
+    },
 
-        #[arg(short, long, default_value_t = 10)]
-        max_scorers: usize,
+    /// Show the current active challenge configuration
+    List,
+
+    /// Set/replace the active challenge configuration
+    Add {
+        #[arg(short, long)]
+        track: Track,
+
+        #[arg(short, long)]
+        layout: String,
     },
 }
 
@@ -67,101 +58,74 @@ async fn main() -> anyhow::Result<()> {
     let pool = db::connect(&args.db).await?;
 
     match args.command {
-        Command::Add {
-            track,
-            layout,
-            rounds,
-            target,
-        } => {
-            if let Some(existing) = db::any_active_event(&pool).await? {
-                db::end_event(&pool, existing.id).await?;
+        Command::Add { track, layout } => {
+            // End any existing active challenge
+            if let Some(existing) = db::any_active_challenge(&pool).await? {
+                db::end_challenge(&pool, existing.id).await?;
                 println!(
-                    "Ended previous event #{} ({}/{})",
+                    "Ended previous challenge #{} ({}/{})",
                     existing.id, existing.track, existing.layout
                 );
             }
 
-            let target_ms = Duration::from_secs(target).as_millis() as i64;
-            let id =
-                db::create_event(&pool, &track, &layout, rounds as i64, target_ms).await?;
-            println!("Created event #{id} ({track}/{layout}, {rounds} rounds, target {target}s)");
+            let id = db::create_challenge(&pool, &track, &layout).await?;
+            println!("Created challenge #{id} ({track}/{layout})");
         },
 
-        Command::List => match db::any_active_event(&pool).await? {
-            Some(ev) => {
-                let target_secs = ev.target_ms as f64 / 1000.0;
-                println!(
-                    "Active event #{}: track={}, layout={}, rounds={}, target={target_secs}s",
-                    ev.id, ev.track, ev.layout, ev.rounds
-                );
+        Command::List => match db::any_active_challenge(&pool).await? {
+            Some(c) => {
+                println!("Active challenge #{}: track={}, layout={}", c.id, c.track, c.layout);
             },
             None => {
-                println!("No active event configured");
+                println!("No active challenge configured");
             },
         },
 
-        Command::Run {
-            addr,
-            password,
-            max_scorers,
-        } => {
-            let ev = match db::any_active_event(&pool).await? {
-                Some(ev) => ev,
+        Command::Run { addr, password } => {
+            let shortcut = match db::any_active_challenge(&pool).await? {
+                Some(c) => c,
                 None => {
-                    eprintln!("No active event configured. Use 'add' first.");
+                    eprintln!("No active challenge configured. Use 'add' first.");
                     std::process::exit(1);
                 },
             };
 
-            let track = ev.track;
-            let layout = ev.layout.clone();
-            let event_id = ev.id;
-            let rounds = ev.rounds as usize;
-            let target = Duration::from_millis(ev.target_ms as u64);
-            let start_round = ev.current_round as usize + 1;
+            let track = shortcut.track;
+            let layout = shortcut.layout.clone();
+            let challenge_id = shortcut.id;
 
             tracing::info!(
-                "Running event #{event_id} on {}/{} (round {start_round}/{rounds})",
-                ev.track,
+                "Running challenge #{challenge_id} on {}/{}",
+                shortcut.track,
                 layout
             );
 
             let (insim, insim_handle) = insim::tcp(addr)
                 .isi_admin_password(password)
-                .isi_iname("clockwork".to_owned())
+                .isi_iname("challenge".to_owned())
                 .isi_prefix('!')
                 .isi_flag_mso_cols(true)
                 .spawn(100)
                 .await?;
 
-            tracing::info!("Starting clockwork carnage");
-
             let (presence, presence_handle) = presence::spawn(insim.clone(), 32);
             let (game, game_handle) = game::spawn(insim.clone(), 32);
-            let (chat, chat_handle) = event::chat::spawn(insim.clone());
+            let (chat, chat_handle) = shortcut::chat::spawn(insim.clone());
             let user_sync_handle = db::spawn_user_sync(&presence, pool.clone());
 
             insim.send(TinyType::Ncn.with_request_id(1)).await?;
             insim.send(TinyType::Npl.with_request_id(2)).await?;
             insim.send(TinyType::Sst.with_request_id(3)).await?;
 
-            // Take over.
-            // TODO: Probably want to consider if this is right.
             for &cmd in &["/select no", "/vote no", "/autokick no"] {
                 insim.send_command(cmd).await?;
             }
 
-            // Composible/reusable scenes snap together, "just like little lego"!
-            let clockwork = WaitForPlayers {
+            let challenge_scene = WaitForPlayers {
                 insim: insim.clone(),
                 presence: presence.clone(),
                 min_players: MIN_PLAYERS,
             }
-            .then(event::WaitForAdminStart {
-                insim: insim.clone(),
-                presence: presence.clone(),
-                chat: chat.clone(),
-            })
             .then(
                 setup_track::SetupTrack {
                     insim: insim.clone(),
@@ -173,17 +137,13 @@ async fn main() -> anyhow::Result<()> {
                 }
                 .with_timeout(Duration::from_secs(60)),
             )
-            .then(event::Clockwork {
+            .then(shortcut::ChallengeLoop {
+                insim: insim.clone(),
                 game: game.clone(),
                 presence: presence.clone(),
                 chat: chat.clone(),
-                start_round,
-                rounds,
-                max_scorers,
-                target,
-                insim: insim.clone(),
                 db: pool.clone(),
-                event_id,
+                challenge_id,
             })
             .loop_until_quit();
 
@@ -223,13 +183,13 @@ async fn main() -> anyhow::Result<()> {
                         Err(e) => tracing::error!("User sync background task join failed: {e}"),
                     }
                 },
-                res = clockwork.run() => {
+                res = challenge_scene.run() => {
                     tracing::info!("{res:?}");
-                    if let Err(e) = db::end_event(&pool, event_id).await {
-                        tracing::warn!("Failed to end event in DB: {e}");
+                    if let Err(e) = db::end_challenge(&pool, challenge_id).await {
+                        tracing::warn!("Failed to end challenge in DB: {e}");
                     }
                 },
-                _ = chat.wait_for_admin_cmd(presence, |msg| matches!(msg, event::chat::EventChatMsg::Quit)) => {}
+                _ = chat.wait_for_admin_cmd(presence, |msg| matches!(msg, shortcut::chat::ChallengeChatMsg::Quit)) => {}
             }
         },
     }

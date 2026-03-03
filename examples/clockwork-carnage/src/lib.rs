@@ -2,10 +2,10 @@
 
 #![allow(missing_docs, missing_debug_implementations)]
 
-pub mod challenge;
+pub mod shortcut;
 pub mod components;
 pub mod db;
-pub mod event;
+pub mod metronome;
 pub mod setup_track;
 pub mod spawn_control;
 

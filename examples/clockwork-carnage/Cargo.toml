@@ -13,12 +13,12 @@ name = "clockwork_carnage"
 path = "src/lib.rs"
 
 [[bin]]
-name = "event"
-path = "src/bin/event.rs"
+name = "metronome"
+path = "src/bin/metronome.rs"
 
 [[bin]]
-name = "challenge"
-path = "src/bin/challenge.rs"
+name = "shortcut"
+path = "src/bin/shortcut.rs"
 
 [[bin]]
 name = "web"

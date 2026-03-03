@@ -9,7 +9,7 @@ Pacing, precision, and punishment. Can you find your rhythm in the middle of the
 
 ## Modes
 
-### Event
+### Metronome
 
 Admin-driven rounds-based competition. An admin starts the game with `!start`, players compete over multiple rounds to match a target lap time as closely as possible, and points are awarded based on accuracy. Full contact is permitted.
 
@@ -56,7 +56,7 @@ Reads track, layout, rounds, and target from the active event in the database. U
 
 Chat commands: `!start`, `!end`, `!echo <msg>`, `!help`, `!quit`
 
-### Challenge
+### Shortcut
 
 Always-on mode. Players drop in and compete for the fastest checkpoint-to-finish time. Personal bests are tracked across attempts. No rounds, no admin start required.
 
