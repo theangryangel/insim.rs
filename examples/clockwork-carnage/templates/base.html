@@ -6,29 +6,25 @@
   <title>{% block title %}Clockwork Carnage{% endblock %}</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-50 text-gray-900 max-w-lg min-h-screen mx-auto flex flex-col space-y-8 px-8 py-8">
+<body class="bg-gray-50 text-gray-900 max-w-lg min-h-screen mx-auto flex flex-col space-y-6 px-6 py-6">
 
     <header class="flex flex-col items-center">
       <a href="/">
-        <img src="/logo.svg" alt="Clockwork Carnage" class="h-20">
+        <img src="/logo.svg" alt="Clockwork Carnage" class="h-16">
       </a>
     </header>
 
-        <nav class="flex justify-center items-center space-x-10 bg-gray-50/50 border-y
-          border-gray-100 py-3 uppercase text-xs">
-          
-          <a href="/" class="relative font-semibold tracking-widest text-gray-400 hover:text-gray-900 transition-colors">
-            Home
-          </a>
-
-          <a href="/about" class="font-semibold tracking-widest text-gray-400 hover:text-gray-900 transition-colors">
-            About
-          </a>
-
-          <a href="/sessions" class="font-semibold tracking-widest text-gray-400 hover:text-gray-900 transition-colors">
-            Sessions
-          </a>
-        </nav>
+    <nav class="flex bg-gray-200/60 rounded-full p-1">
+      <a href="/" class="flex-1 text-center py-1.5 text-xs font-semibold uppercase tracking-wide rounded-full transition-colors hover:bg-white hover:shadow-sm">
+        Home
+      </a>
+      <a href="/sessions" class="flex-1 text-center py-1.5 text-xs font-semibold uppercase tracking-wide rounded-full transition-colors hover:bg-white hover:shadow-sm">
+        Sessions
+      </a>
+      <a href="/about" class="flex-1 text-center py-1.5 text-xs font-semibold uppercase tracking-wide rounded-full transition-colors hover:bg-white hover:shadow-sm">
+        About
+      </a>
+    </nav>
 
     <main>
       {% block content %}{% endblock %}

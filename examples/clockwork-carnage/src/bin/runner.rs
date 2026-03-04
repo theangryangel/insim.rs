@@ -47,6 +47,15 @@ enum Command {
         /// Session ID to activate
         id: i64,
     },
+
+    /// Set the post-event write-up for a session
+    Writeup {
+        /// Session ID
+        id: i64,
+
+        /// Write-up text
+        text: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -67,6 +76,12 @@ enum AddMode {
 
         #[arg(short, long, default_value_t = 10)]
         max_scorers: i64,
+
+        #[arg(long)]
+        name: Option<String>,
+
+        #[arg(long)]
+        description: Option<String>,
     },
 
     /// Create a shortcut (challenge) session
@@ -76,6 +91,12 @@ enum AddMode {
 
         #[arg(short, long, default_value = "")]
         layout: String,
+
+        #[arg(long)]
+        name: Option<String>,
+
+        #[arg(long)]
+        description: Option<String>,
     },
 }
 
@@ -100,16 +121,21 @@ async fn main() -> anyhow::Result<()> {
                 rounds,
                 target,
                 max_scorers,
+                name,
+                description,
             } => {
                 let target_ms = (target * 1000) as i64;
                 let id = db::create_metronome_session(
                     &pool, &track, &layout, rounds, target_ms, max_scorers,
+                    name.as_deref(), description.as_deref(),
                 )
                 .await?;
                 println!("Created metronome session #{id} ({track}/{layout}, {rounds} rounds, target {target}s)");
             },
-            AddMode::Shortcut { track, layout } => {
-                let id = db::create_shortcut_session(&pool, &track, &layout).await?;
+            AddMode::Shortcut { track, layout, name, description } => {
+                let id = db::create_shortcut_session(
+                    &pool, &track, &layout, name.as_deref(), description.as_deref(),
+                ).await?;
                 println!("Created shortcut session #{id} ({track}/{layout})");
             },
         },
@@ -120,9 +146,10 @@ async fn main() -> anyhow::Result<()> {
                 println!("No sessions.");
             } else {
                 for s in sessions {
+                    let label = s.name.as_deref().unwrap_or("");
                     println!(
-                        "#{} {:?} {:?} {}/{} ({})",
-                        s.id, s.mode, s.status, s.track, s.layout, s.created_at
+                        "#{} {:?} {:?} {}/{} {} ({})",
+                        s.id, s.mode, s.status, s.track, s.layout, label, s.created_at
                     );
                 }
             }
@@ -139,6 +166,11 @@ async fn main() -> anyhow::Result<()> {
                     std::process::exit(1);
                 },
             }
+        },
+
+        Command::Writeup { id, text } => {
+            db::update_session_writeup(&pool, id, &text).await?;
+            println!("Updated write-up for session #{id}");
         },
 
         Command::Run { addr, password } => {

@@ -12,7 +12,7 @@ use axum::{
 };
 use clap::Parser;
 use clockwork_carnage::db::{
-    self, Session,
+    self, Session, SessionMode, SessionStatus,
 };
 
 #[derive(Debug, Parser)]
