@@ -13,12 +13,8 @@ name = "clockwork_carnage"
 path = "src/lib.rs"
 
 [[bin]]
-name = "metronome"
-path = "src/bin/metronome.rs"
-
-[[bin]]
-name = "shortcut"
-path = "src/bin/shortcut.rs"
+name = "runner"
+path = "src/bin/runner.rs"
 
 [[bin]]
 name = "web"
@@ -31,6 +27,7 @@ axum = "0.8"
 clap = { workspace = true, features = ["derive"] }
 insim = { path = "../../insim", features = ["serde", "blocking"] }
 kitcar = { path = "../../kitcar" }
+serde = { workspace = true }
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "migrate"] }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "signal", "time", "sync"]}

@@ -23,7 +23,7 @@ pub struct Clockwork {
     pub max_scorers: usize,
 
     pub db: db::Pool,
-    pub event_id: i64,
+    pub session_id: i64,
 }
 
 impl Scene for Clockwork {
@@ -52,12 +52,12 @@ impl Scene for Clockwork {
             target: self.target,
             max_scorers: self.max_scorers,
             db: self.db.clone(),
-            event_id: self.event_id,
+            session_id: self.session_id,
         })
         .then(super::Victory {
             insim: self.insim.clone(),
             db: self.db.clone(),
-            event_id: self.event_id,
+            session_id: self.session_id,
         });
 
         tokio::select! {

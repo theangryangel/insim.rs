@@ -155,7 +155,7 @@ pub struct Rounds {
     pub target: Duration,
     pub max_scorers: usize,
     pub db: db::Pool,
-    pub event_id: i64,
+    pub session_id: i64,
 }
 
 impl Scene for Rounds {
@@ -223,7 +223,7 @@ impl RoundsState {
     }
 
     async fn event_leaderboard(config: &Rounds) -> Result<EventLeaderboard, SceneError> {
-        let standings = db::event_standings(&config.db, config.event_id)
+        let standings = db::metronome_standings(&config.db, config.session_id)
             .await
             .map_err(|cause| SceneError::Custom {
                 scene: "rounds::event_leaderboard",
@@ -426,9 +426,9 @@ impl RoundsState {
             let points = (config.max_scorers - i) as u32;
 
             let delta_ms = delta.as_millis() as i64;
-            if let Err(e) = db::insert_event_round_result(
+            if let Err(e) = db::insert_metronome_result(
                 &config.db,
-                config.event_id,
+                config.session_id,
                 round as i64,
                 &uname,
                 delta_ms,
@@ -440,7 +440,7 @@ impl RoundsState {
             }
         }
 
-        if let Err(e) = db::update_event_round(&config.db, config.event_id, round as i64).await {
+        if let Err(e) = db::update_metronome_round(&config.db, config.session_id, round as i64).await {
             tracing::warn!("Failed to update event round: {e}");
         }
     }

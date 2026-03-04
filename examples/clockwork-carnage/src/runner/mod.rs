@@ -1,0 +1,63 @@
+//! Runner: unified game executor with reconciliation loop.
+
+pub mod metronome;
+pub mod shortcut;
+
+use insim::builder::InsimTask;
+use kitcar::{game, presence, scenes::SceneError};
+
+use crate::db;
+
+/// Shared context for all mini-games (persistent across mode switches).
+pub struct GameCtx {
+    pub pool: db::Pool,
+    pub insim: InsimTask,
+    pub presence: presence::Presence,
+    pub game: game::Game,
+}
+
+/// Lifecycle trait for mini-games. Each mode implements this.
+pub trait MiniGame: Clone + Send + 'static {
+    /// Resources to keep alive during the game (chat handles, etc.).
+    /// Dropped after teardown to clean up background tasks.
+    type Guard: Send + 'static;
+
+    /// Initialize from a session. Creates/resumes DB entries, spawns
+    /// mode-specific background tasks (e.g. chat handler).
+    fn setup(
+        session: &db::Session,
+        ctx: &GameCtx,
+    ) -> impl std::future::Future<Output = Result<(Self, Self::Guard), SceneError>> + Send;
+
+    /// Run one iteration. Composes and executes the scene chain.
+    fn run(
+        self,
+        ctx: &GameCtx,
+    ) -> impl std::future::Future<Output = Result<kitcar::scenes::SceneResult<()>, SceneError>> + Send;
+
+    /// Clean up: mark DB entries as ended.
+    fn teardown(
+        self,
+        session: &db::Session,
+        ctx: &GameCtx,
+    ) -> impl std::future::Future<Output = Result<(), SceneError>> + Send;
+}
+
+/// Generic executor: setup, bail-retry loop, teardown.
+pub async fn execute<G: MiniGame>(
+    session: &db::Session,
+    ctx: &GameCtx,
+) -> Result<(), SceneError> {
+    let (game, _guard) = G::setup(session, ctx).await?;
+    loop {
+        match game.clone().run(ctx).await? {
+            kitcar::scenes::SceneResult::Continue(_) | kitcar::scenes::SceneResult::Quit => break,
+            kitcar::scenes::SceneResult::Bail { msg } => {
+                tracing::info!("Scene bailed ({msg:?}), retrying...");
+                continue;
+            },
+        }
+    }
+    game.teardown(session, ctx).await
+    // _guard dropped here -> chat JoinHandle aborted
+}

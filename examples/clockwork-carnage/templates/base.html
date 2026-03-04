@@ -6,18 +6,32 @@
   <title>{% block title %}Clockwork Carnage{% endblock %}</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="min-h-screen flex flex-col">
-  <nav class="bg-white border-b border-gray-200 shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-6">
-      <a href="/" class="flex items-center gap-2">
-        <img src="/logo.png" alt="Clockwork Carnage" class="h-8">
+<body class="bg-gray-50 text-gray-900 max-w-lg min-h-screen mx-auto flex flex-col space-y-8 px-8 py-8">
+
+    <header class="flex flex-col items-center">
+      <a href="/">
+        <img src="/logo.svg" alt="Clockwork Carnage" class="h-20">
       </a>
-      <a href="/events" class="text-gray-500 hover:text-gray-900 text-sm">Events</a>
-      <a href="/challenges" class="text-gray-500 hover:text-gray-900 text-sm">Challenges</a>
-    </div>
-  </nav>
-  <main class="max-w-7xl mx-auto px-4 py-8 flex-1 w-full">
-    {% block content %}{% endblock %}
-  </main>
+    </header>
+
+        <nav class="flex justify-center items-center space-x-10 bg-gray-50/50 border-y
+          border-gray-100 py-3 uppercase text-xs">
+          
+          <a href="/" class="relative font-semibold tracking-widest text-gray-400 hover:text-gray-900 transition-colors">
+            Home
+          </a>
+
+          <a href="/about" class="font-semibold tracking-widest text-gray-400 hover:text-gray-900 transition-colors">
+            About
+          </a>
+
+          <a href="/sessions" class="font-semibold tracking-widest text-gray-400 hover:text-gray-900 transition-colors">
+            Sessions
+          </a>
+        </nav>
+
+    <main>
+      {% block content %}{% endblock %}
+    </main>
 </body>
 </html>

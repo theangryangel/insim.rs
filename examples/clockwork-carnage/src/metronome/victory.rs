@@ -73,7 +73,7 @@ impl From<ui::UiState<ClockworkVictoryGlobalProps, ClockworkVictoryConnectionPro
 pub struct Victory {
     pub insim: InsimTask,
     pub db: db::Pool,
-    pub event_id: i64,
+    pub session_id: i64,
 }
 
 impl Scene for Victory {
@@ -97,7 +97,7 @@ impl Scene for Victory {
 
 impl Victory {
     async fn event_leaderboard(&self) -> Result<EventLeaderboard, SceneError> {
-        let standings = db::event_standings(&self.db, self.event_id)
+        let standings = db::metronome_standings(&self.db, self.session_id)
             .await
             .map_err(|cause| SceneError::Custom {
                 scene: "victory::event_leaderboard",

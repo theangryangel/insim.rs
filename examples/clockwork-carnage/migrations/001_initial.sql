@@ -6,49 +6,55 @@ CREATE TABLE users (
     last_seen TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
--- A challenge is a track+layout combo that players compete on.
--- One challenge is "active" at a time; the binary creates/reuses it on startup.
-CREATE TABLE challenges (
+-- Base table: shared across all modes
+CREATE TABLE sessions (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    track      TEXT    NOT NULL,
-    layout     TEXT    NOT NULL DEFAULT '',
-    started_at TEXT    NOT NULL DEFAULT (datetime('now')),
+    mode       TEXT NOT NULL,
+    status     TEXT NOT NULL DEFAULT 'PENDING'
+                    CHECK(status IN ('PENDING', 'ACTIVE', 'COMPLETED', 'CANCELLED')),
+    track      TEXT NOT NULL,
+    layout     TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    started_at TEXT,
     ended_at   TEXT
 );
-CREATE INDEX idx_challenges_active ON challenges(ended_at);
+CREATE UNIQUE INDEX idx_sessions_active ON sessions(status) WHERE status = 'ACTIVE';
 
--- Every timed run in a challenge. PBs derived via MIN(time_ms) GROUP BY user_id.
-CREATE TABLE challenge_times (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    challenge_id INTEGER NOT NULL REFERENCES challenges(id),
-    user_id      INTEGER NOT NULL REFERENCES users(id),
-    vehicle      TEXT    NOT NULL,
-    time_ms      INTEGER NOT NULL,
-    set_at       TEXT    NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX idx_challenge_times_challenge ON challenge_times(challenge_id);
-CREATE INDEX idx_challenge_times_user ON challenge_times(challenge_id, user_id);
-
--- A scheduled event session with N rounds at a target time.
-CREATE TABLE events (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    track      TEXT    NOT NULL,
-    layout     TEXT    NOT NULL DEFAULT '',
-    rounds     INTEGER NOT NULL,
-    target_ms  INTEGER NOT NULL,
-    started_at TEXT    NOT NULL DEFAULT (datetime('now')),
-    ended_at   TEXT
+-- Metronome extension
+CREATE TABLE metronome_sessions (
+    session_id    INTEGER PRIMARY KEY REFERENCES sessions(id),
+    rounds        INTEGER NOT NULL,
+    target_ms     INTEGER NOT NULL,
+    max_scorers   INTEGER NOT NULL DEFAULT 10,
+    current_round INTEGER NOT NULL DEFAULT 0
 );
 
--- Per-round results for each player in an event.
-CREATE TABLE event_round_results (
+-- Shortcut extension
+CREATE TABLE shortcut_sessions (
+    session_id INTEGER PRIMARY KEY REFERENCES sessions(id)
+);
+
+-- Metronome results
+CREATE TABLE metronome_results (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    event_id    INTEGER NOT NULL REFERENCES events(id),
+    session_id  INTEGER NOT NULL REFERENCES sessions(id),
     round       INTEGER NOT NULL,
     user_id     INTEGER NOT NULL REFERENCES users(id),
     delta_ms    INTEGER NOT NULL,
     points      INTEGER NOT NULL,
     recorded_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
-CREATE INDEX idx_event_round_event ON event_round_results(event_id);
-CREATE INDEX idx_event_round_combo ON event_round_results(event_id, round);
+CREATE INDEX idx_metronome_results_session ON metronome_results(session_id);
+CREATE INDEX idx_metronome_results_combo ON metronome_results(session_id, round);
+
+-- Shortcut times
+CREATE TABLE shortcut_times (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES sessions(id),
+    user_id    INTEGER NOT NULL REFERENCES users(id),
+    vehicle    TEXT    NOT NULL,
+    time_ms    INTEGER NOT NULL,
+    set_at     TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_shortcut_times_session ON shortcut_times(session_id);
+CREATE INDEX idx_shortcut_times_user ON shortcut_times(session_id, user_id);

@@ -6,6 +6,7 @@ pub mod shortcut;
 pub mod components;
 pub mod db;
 pub mod metronome;
+pub mod runner;
 pub mod setup_track;
 pub mod spawn_control;
 

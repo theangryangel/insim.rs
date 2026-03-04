@@ -1,12 +1,12 @@
 //! SQLite database layer for Clockwork Carnage.
 
-use std::str::FromStr;
+use std::{collections::HashMap, fmt, str::FromStr};
 
 use insim::core::track::Track;
 use kitcar::presence::{Presence, PresenceEvent};
 use sqlx::{
     FromRow, Row,
-    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
+    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions}, types::Json,
 };
 use tokio::task::JoinHandle;
 
@@ -24,6 +24,54 @@ pub async fn connect(path: &str) -> Result<Pool, sqlx::Error> {
     Ok(pool)
 }
 
+// -- Enums --------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum SessionMode {
+    Metronome {
+        rounds: i64,
+        target_ms: i64,
+        max_scorers: i64,
+        #[serde(default)]
+        current_round: i64,
+    },
+    Shortcut,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SessionStatus {
+    Pending,
+    Active,
+    Completed,
+    Cancelled,
+}
+
+impl fmt::Display for SessionStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Pending => f.write_str("PENDING"),
+            Self::Active => f.write_str("ACTIVE"),
+            Self::Completed => f.write_str("COMPLETED"),
+            Self::Cancelled => f.write_str("CANCELLED"),
+        }
+    }
+}
+
+impl TryFrom<String> for SessionStatus {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        match s.as_str() {
+            "PENDING" => Ok(Self::Pending),
+            "ACTIVE" => Ok(Self::Active),
+            "COMPLETED" => Ok(Self::Completed),
+            "CANCELLED" => Ok(Self::Cancelled),
+            other => Err(format!("unknown session status: {other}")),
+        }
+    }
+}
+
 // -- Row types ----------------------------------------------------------------
 
 #[derive(Debug, Clone, FromRow)]
@@ -35,50 +83,30 @@ pub struct User {
 }
 
 #[derive(Debug, Clone, FromRow)]
-pub struct Challenge {
+pub struct Session {
     pub id: i64,
+    pub mode: Json<SessionMode>,
+    #[sqlx(try_from = "String")]
+    pub status: SessionStatus,
     #[sqlx(try_from = "String")]
     pub track: Track,
     pub layout: String,
-    pub started_at: String,
-    pub ended_at: Option<String>,
-}
-
-#[derive(Debug, Clone, FromRow)]
-pub struct ChallengeTime {
-    pub id: i64,
-    pub challenge_id: i64,
-    pub uname: String,
-    pub pname: String,
-    pub vehicle: String,
-    pub time_ms: i64,
-    pub set_at: String,
-}
-
-#[derive(Debug, Clone, FromRow)]
-pub struct Event {
-    pub id: i64,
-    #[sqlx(try_from = "String")]
-    pub track: Track,
-    pub layout: String,
-    pub rounds: i64,
-    pub target_ms: i64,
-    pub current_round: i64,
-    pub started_at: String,
+    pub created_at: String,
+    pub started_at: Option<String>,
     pub ended_at: Option<String>,
 }
 
 #[derive(Debug, Clone)]
-pub struct EventStanding {
+pub struct MetronomeStanding {
     pub uname: String,
     pub pname: String,
     pub total_points: i64,
 }
 
 #[derive(Debug, Clone, FromRow)]
-pub struct EventRoundResult {
+pub struct MetronomeResult {
     pub id: i64,
-    pub event_id: i64,
+    pub session_id: i64,
     pub round: i64,
     pub uname: String,
     pub pname: String,
@@ -87,45 +115,67 @@ pub struct EventRoundResult {
     pub recorded_at: String,
 }
 
+#[derive(Debug, Clone, FromRow)]
+pub struct ShortcutTime {
+    pub id: i64,
+    pub session_id: i64,
+    pub uname: String,
+    pub pname: String,
+    pub vehicle: String,
+    pub time_ms: i64,
+    pub set_at: String,
+}
+
 // -- List / get queries -------------------------------------------------------
 
-pub async fn all_events(pool: &Pool) -> Result<Vec<Event>, sqlx::Error> {
+pub async fn all_sessions(pool: &Pool) -> Result<Vec<Session>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT id, track, layout, rounds, target_ms, current_round, started_at, ended_at
-         FROM events ORDER BY id DESC",
+        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at
+         FROM sessions ORDER BY id DESC",
     )
     .fetch_all(pool)
     .await
 }
 
-pub async fn all_challenges(pool: &Pool) -> Result<Vec<Challenge>, sqlx::Error> {
+pub async fn get_session(pool: &Pool, id: i64) -> Result<Option<Session>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT id, track, layout, started_at, ended_at
-         FROM challenges ORDER BY id DESC",
+        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at
+         FROM sessions WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+}
+
+pub async fn active_session(pool: &Pool) -> Result<Option<Session>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at
+         FROM sessions WHERE status = 'ACTIVE'
+         LIMIT 1",
+    )
+    .fetch_optional(pool)
+    .await
+}
+
+pub async fn pending_session(pool: &Pool, id: i64) -> Result<Option<Session>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at
+         FROM sessions WHERE id = ? AND status = 'PENDING'",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+}
+
+pub async fn upcoming_sessions(pool: &Pool) -> Result<Vec<Session>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at
+         FROM sessions WHERE status = 'PENDING' ORDER BY id DESC LIMIT 10",
     )
     .fetch_all(pool)
     .await
 }
 
-pub async fn get_event(pool: &Pool, event_id: i64) -> Result<Option<Event>, sqlx::Error> {
-    sqlx::query_as(
-        "SELECT id, track, layout, rounds, target_ms, current_round, started_at, ended_at
-         FROM events WHERE id = ?",
-    )
-    .bind(event_id)
-    .fetch_optional(pool)
-    .await
-}
-
-pub async fn get_challenge(pool: &Pool, challenge_id: i64) -> Result<Option<Challenge>, sqlx::Error> {
-    sqlx::query_as(
-        "SELECT id, track, layout, started_at, ended_at
-         FROM challenges WHERE id = ?",
-    )
-    .bind(challenge_id)
-    .fetch_optional(pool)
-    .await
-}
 
 // -- User queries -------------------------------------------------------------
 
@@ -179,164 +229,119 @@ pub enum UserSyncError {
     PresenceClosed,
 }
 
-// -- Challenge queries --------------------------------------------------------
+// -- Session creation ---------------------------------------------------------
 
-pub async fn create_challenge(pool: &Pool, track: &Track, layout: &str) -> Result<i64, sqlx::Error> {
-    let row = sqlx::query("INSERT INTO challenges (track, layout) VALUES (?, ?) RETURNING id")
-        .bind(track.to_string())
-        .bind(layout)
-        .fetch_one(pool)
-        .await?;
-    Ok(row.get("id"))
-}
-
-pub async fn end_challenge(pool: &Pool, challenge_id: i64) -> Result<(), sqlx::Error> {
-    let _ = sqlx::query("UPDATE challenges SET ended_at = datetime('now') WHERE id = ?")
-        .bind(challenge_id)
-        .execute(pool)
-        .await?;
-    Ok(())
-}
-
-pub async fn any_active_challenge(pool: &Pool) -> Result<Option<Challenge>, sqlx::Error> {
-    sqlx::query_as(
-        "SELECT id, track, layout, started_at, ended_at
-         FROM challenges
-         WHERE ended_at IS NULL
-         ORDER BY id DESC LIMIT 1",
-    )
-    .fetch_optional(pool)
-    .await
-}
-
-pub async fn insert_challenge_time(
-    pool: &Pool,
-    challenge_id: i64,
-    uname: &str,
-    vehicle: &str,
-    time_ms: i64,
-) -> Result<i64, sqlx::Error> {
-    let row = sqlx::query(
-        "INSERT INTO challenge_times (challenge_id, user_id, vehicle, time_ms)
-         VALUES (?, (SELECT id FROM users WHERE uname = ?), ?, ?)
-         RETURNING id",
-    )
-    .bind(challenge_id)
-    .bind(uname)
-    .bind(vehicle)
-    .bind(time_ms)
-    .fetch_one(pool)
-    .await?;
-    Ok(row.get("id"))
-}
-
-pub async fn challenge_best_times(
-    pool: &Pool,
-    challenge_id: i64,
-    limit: i64,
-) -> Result<Vec<ChallengeTime>, sqlx::Error> {
-    sqlx::query_as(
-        "SELECT ct.id, ct.challenge_id, u.uname, u.pname, ct.vehicle, ct.time_ms, ct.set_at
-         FROM challenge_times ct
-         JOIN users u ON u.id = ct.user_id
-         INNER JOIN (
-             SELECT user_id, MIN(time_ms) AS best
-             FROM challenge_times
-             WHERE challenge_id = ?
-             GROUP BY user_id
-         ) pb ON ct.user_id = pb.user_id AND ct.time_ms = pb.best AND ct.challenge_id = ?
-         ORDER BY ct.time_ms ASC
-         LIMIT ?",
-    )
-    .bind(challenge_id)
-    .bind(challenge_id)
-    .bind(limit)
-    .fetch_all(pool)
-    .await
-}
-
-pub async fn challenge_personal_best(
-    pool: &Pool,
-    challenge_id: i64,
-    uname: &str,
-) -> Result<Option<ChallengeTime>, sqlx::Error> {
-    sqlx::query_as(
-        "SELECT ct.id, ct.challenge_id, u.uname, u.pname, ct.vehicle, ct.time_ms, ct.set_at
-         FROM challenge_times ct
-         JOIN users u ON u.id = ct.user_id
-         WHERE ct.challenge_id = ? AND u.uname = ?
-         ORDER BY ct.time_ms ASC
-         LIMIT 1",
-    )
-    .bind(challenge_id)
-    .bind(uname)
-    .fetch_optional(pool)
-    .await
-}
-
-// -- Event queries ------------------------------------------------------------
-
-pub async fn create_event(
+pub async fn create_metronome_session(
     pool: &Pool,
     track: &Track,
     layout: &str,
     rounds: i64,
     target_ms: i64,
+    max_scorers: i64,
 ) -> Result<i64, sqlx::Error> {
     let row = sqlx::query(
-        "INSERT INTO events (track, layout, rounds, target_ms) VALUES (?, ?, ?, ?) RETURNING id",
+        "INSERT INTO sessions (mode, track, layout) VALUES (?, ?, ?) RETURNING id",
     )
+    .bind(Json(SessionMode::Metronome { rounds, target_ms, max_scorers, current_round: 0 }))
     .bind(track.to_string())
     .bind(layout)
-    .bind(rounds)
-    .bind(target_ms)
     .fetch_one(pool)
     .await?;
-    Ok(row.get("id"))
+    let id: i64 = row.get("id");
+
+    Ok(id)
 }
 
-pub async fn end_event(pool: &Pool, event_id: i64) -> Result<(), sqlx::Error> {
-    let _ = sqlx::query("UPDATE events SET ended_at = datetime('now') WHERE id = ?")
-        .bind(event_id)
-        .execute(pool)
-        .await?;
-    Ok(())
-}
-
-pub async fn any_active_event(pool: &Pool) -> Result<Option<Event>, sqlx::Error> {
-    sqlx::query_as(
-        "SELECT id, track, layout, rounds, target_ms, current_round, started_at, ended_at
-         FROM events
-         WHERE ended_at IS NULL
-         ORDER BY id DESC LIMIT 1",
-    )
-    .fetch_optional(pool)
-    .await
-}
-
-pub async fn update_event_round(pool: &Pool, event_id: i64, round: i64) -> Result<(), sqlx::Error> {
-    let _ = sqlx::query("UPDATE events SET current_round = ? WHERE id = ?")
-        .bind(round)
-        .bind(event_id)
-        .execute(pool)
-        .await?;
-    Ok(())
-}
-
-pub async fn insert_event_round_result(
+pub async fn create_shortcut_session(
     pool: &Pool,
-    event_id: i64,
+    track: &Track,
+    layout: &str,
+) -> Result<i64, sqlx::Error> {
+    let row = sqlx::query(
+        "INSERT INTO sessions (mode, track, layout) VALUES (?, ?, ?) RETURNING id",
+    )
+    .bind(Json(SessionMode::Shortcut))
+    .bind(track.to_string())
+    .bind(layout)
+    .fetch_one(pool)
+    .await?;
+    let id: i64 = row.get("id");
+
+    let _ = sqlx::query("INSERT INTO shortcut_sessions (session_id) VALUES (?)")
+        .bind(id)
+        .execute(pool)
+        .await?;
+
+    Ok(id)
+}
+
+// -- Session lifecycle --------------------------------------------------------
+
+pub async fn activate_session(pool: &Pool, session_id: i64) -> Result<(), sqlx::Error> {
+    let _ = sqlx::query(
+        "UPDATE sessions SET status = 'ACTIVE', started_at = datetime('now') WHERE id = ? AND status = 'PENDING'",
+    )
+    .bind(session_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn complete_session(pool: &Pool, session_id: i64) -> Result<(), sqlx::Error> {
+    let _ = sqlx::query(
+        "UPDATE sessions SET status = 'COMPLETED', ended_at = datetime('now') WHERE id = ?",
+    )
+    .bind(session_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn cancel_session(pool: &Pool, session_id: i64) -> Result<(), sqlx::Error> {
+    let _ = sqlx::query(
+        "UPDATE sessions SET status = 'CANCELLED', ended_at = datetime('now') WHERE id = ?",
+    )
+    .bind(session_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+// -- Metronome queries --------------------------------------------------------
+
+pub async fn update_metronome_round(
+    pool: &Pool,
+    session_id: i64,
+    round: i64,
+) -> Result<(), sqlx::Error> {
+    let _ = sqlx::query(
+        r#"
+        UPDATE sessions 
+        SET mode = json_set(mode, '$.current_round', ?) 
+        WHERE id = ?
+        "#,
+    )
+    .bind(round)
+    .bind(session_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn insert_metronome_result(
+    pool: &Pool,
+    session_id: i64,
     round: i64,
     uname: &str,
     delta_ms: i64,
     points: i64,
 ) -> Result<i64, sqlx::Error> {
     let row = sqlx::query(
-        "INSERT INTO event_round_results (event_id, round, user_id, delta_ms, points)
+        "INSERT INTO metronome_results (session_id, round, user_id, delta_ms, points)
          VALUES (?, ?, (SELECT id FROM users WHERE uname = ?), ?, ?)
          RETURNING id",
     )
-    .bind(event_id)
+    .bind(session_id)
     .bind(round)
     .bind(uname)
     .bind(delta_ms)
@@ -346,46 +351,114 @@ pub async fn insert_event_round_result(
     Ok(row.get("id"))
 }
 
-pub async fn event_standings(
+pub async fn metronome_standings(
     pool: &Pool,
-    event_id: i64,
-) -> Result<Vec<EventStanding>, sqlx::Error> {
+    session_id: i64,
+) -> Result<Vec<MetronomeStanding>, sqlx::Error> {
     let rows = sqlx::query(
-        "SELECT u.uname, u.pname, SUM(r.points) AS total_points
-         FROM event_round_results r
-         JOIN users u ON u.id = r.user_id
-         WHERE r.event_id = ?
-         GROUP BY r.user_id
-         ORDER BY total_points DESC",
+        r#"
+        SELECT u.uname, u.pname, SUM(r.points) AS total_points
+        FROM metronome_results r
+        JOIN users u ON u.id = r.user_id
+        JOIN sessions s ON s.id = r.session_id
+        WHERE r.session_id = ? 
+          AND s.mode ->> '$.type' = 'METRONOME' -- Guard rail
+        GROUP BY r.user_id
+        ORDER BY total_points DESC
+        "#,
     )
-    .bind(event_id)
+    .bind(session_id)
     .fetch_all(pool)
     .await?;
 
-    Ok(rows
-        .into_iter()
-        .map(|row| EventStanding {
-            uname: row.get("uname"),
-            pname: row.get("pname"),
-            total_points: row.get("total_points"),
-        })
-        .collect())
+    Ok(rows.into_iter().map(|row| MetronomeStanding {
+        uname: row.get("uname"),
+        pname: row.get("pname"),
+        total_points: row.get("total_points"),
+    }).collect())
 }
 
-pub async fn event_round_results(
+pub async fn metronome_round_results(
     pool: &Pool,
-    event_id: i64,
+    session_id: i64,
     round: i64,
-) -> Result<Vec<EventRoundResult>, sqlx::Error> {
+) -> Result<Vec<MetronomeResult>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT r.id, r.event_id, r.round, u.uname, u.pname, r.delta_ms, r.points, r.recorded_at
-         FROM event_round_results r
+        "SELECT r.id, r.session_id, r.round, u.uname, u.pname, r.delta_ms, r.points, r.recorded_at
+         FROM metronome_results r
          JOIN users u ON u.id = r.user_id
-         WHERE r.event_id = ? AND r.round = ?
+         WHERE r.session_id = ? AND r.round = ?
          ORDER BY r.points DESC",
     )
-    .bind(event_id)
+    .bind(session_id)
     .bind(round)
     .fetch_all(pool)
+    .await
+}
+
+// -- Shortcut queries ---------------------------------------------------------
+
+pub async fn insert_shortcut_time(
+    pool: &Pool,
+    session_id: i64,
+    uname: &str,
+    vehicle: &str,
+    time_ms: i64,
+) -> Result<i64, sqlx::Error> {
+    let row = sqlx::query(
+        "INSERT INTO shortcut_times (session_id, user_id, vehicle, time_ms)
+         VALUES (?, (SELECT id FROM users WHERE uname = ?), ?, ?)
+         RETURNING id",
+    )
+    .bind(session_id)
+    .bind(uname)
+    .bind(vehicle)
+    .bind(time_ms)
+    .fetch_one(pool)
+    .await?;
+    Ok(row.get("id"))
+}
+
+pub async fn shortcut_best_times(
+    pool: &Pool,
+    session_id: i64,
+    limit: i64,
+) -> Result<Vec<ShortcutTime>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT ct.id, ct.session_id, u.uname, u.pname, ct.vehicle, ct.time_ms, ct.set_at
+         FROM shortcut_times ct
+         JOIN users u ON u.id = ct.user_id
+         INNER JOIN (
+             SELECT user_id, MIN(time_ms) AS best
+             FROM shortcut_times
+             WHERE session_id = ?
+             GROUP BY user_id
+         ) pb ON ct.user_id = pb.user_id AND ct.time_ms = pb.best AND ct.session_id = ?
+         ORDER BY ct.time_ms ASC
+         LIMIT ?",
+    )
+    .bind(session_id)
+    .bind(session_id)
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn shortcut_personal_best(
+    pool: &Pool,
+    session_id: i64,
+    uname: &str,
+) -> Result<Option<ShortcutTime>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT ct.id, ct.session_id, u.uname, u.pname, ct.vehicle, ct.time_ms, ct.set_at
+         FROM shortcut_times ct
+         JOIN users u ON u.id = ct.user_id
+         WHERE ct.session_id = ? AND u.uname = ?
+         ORDER BY ct.time_ms ASC
+         LIMIT 1",
+    )
+    .bind(session_id)
+    .bind(uname)
+    .fetch_optional(pool)
     .await
 }

@@ -133,7 +133,7 @@ pub struct ChallengeLoop {
     pub presence: presence::Presence,
     pub chat: chat::ChallengeChat,
     pub db: db::Pool,
-    pub challenge_id: i64,
+    pub session_id: i64,
 }
 
 impl Scene for ChallengeLoop {
@@ -227,9 +227,9 @@ impl Scene for ChallengeLoop {
 
                                             // Persist every run to DB
                                             let time_ms = lap_time.as_millis() as i64;
-                                            if let Err(e) = db::insert_challenge_time(
+                                            if let Err(e) = db::insert_shortcut_time(
                                                 &self.db,
-                                                self.challenge_id,
+                                                self.session_id,
                                                 &conn.uname,
                                                 &vehicle.to_string(),
                                                 time_ms,
@@ -297,7 +297,7 @@ impl Scene for ChallengeLoop {
 
 impl ChallengeLoop {
     async fn challenge_leaderboard(&self) -> Result<ChallengeLeaderboard, SceneError> {
-        let rows = db::challenge_best_times(&self.db, self.challenge_id, 100)
+        let rows = db::shortcut_best_times(&self.db, self.session_id, 100)
             .await
             .map_err(|cause| SceneError::Custom {
                 scene: "challenge::challenge_leaderboard",
@@ -316,7 +316,7 @@ impl ChallengeLoop {
     }
 
     async fn personal_best(&self, uname: &str) -> Result<Option<Duration>, SceneError> {
-        let row = db::challenge_personal_best(&self.db, self.challenge_id, uname)
+        let row = db::shortcut_personal_best(&self.db, self.session_id, uname)
             .await
             .map_err(|cause| SceneError::Custom {
                 scene: "challenge::personal_best",
