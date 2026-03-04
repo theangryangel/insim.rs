@@ -82,6 +82,9 @@ enum AddMode {
 
         #[arg(long)]
         description: Option<String>,
+
+        #[arg(long)]
+        scheduled_at: Option<String>,
     },
 
     /// Create a shortcut (challenge) session
@@ -97,6 +100,9 @@ enum AddMode {
 
         #[arg(long)]
         description: Option<String>,
+
+        #[arg(long)]
+        scheduled_at: Option<String>,
     },
 }
 
@@ -123,18 +129,19 @@ async fn main() -> anyhow::Result<()> {
                 max_scorers,
                 name,
                 description,
+                scheduled_at,
             } => {
                 let target_ms = (target * 1000) as i64;
                 let id = db::create_metronome_session(
                     &pool, &track, &layout, rounds, target_ms, max_scorers,
-                    name.as_deref(), description.as_deref(),
+                    name.as_deref(), description.as_deref(), scheduled_at.as_deref(),
                 )
                 .await?;
                 println!("Created metronome session #{id} ({track}/{layout}, {rounds} rounds, target {target}s)");
             },
-            AddMode::Shortcut { track, layout, name, description } => {
+            AddMode::Shortcut { track, layout, name, description, scheduled_at } => {
                 let id = db::create_shortcut_session(
-                    &pool, &track, &layout, name.as_deref(), description.as_deref(),
+                    &pool, &track, &layout, name.as_deref(), description.as_deref(), scheduled_at.as_deref(),
                 ).await?;
                 println!("Created shortcut session #{id} ({track}/{layout})");
             },

@@ -94,6 +94,7 @@ pub struct Session {
     pub created_at: String,
     pub started_at: Option<String>,
     pub ended_at: Option<String>,
+    pub scheduled_at: Option<String>,
     pub name: Option<String>,
     pub description: Option<String>,
     pub writeup: Option<String>,
@@ -133,7 +134,7 @@ pub struct ShortcutTime {
 
 pub async fn all_sessions(pool: &Pool) -> Result<Vec<Session>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, name, description, writeup
+        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, name, description, writeup
          FROM sessions ORDER BY id DESC",
     )
     .fetch_all(pool)
@@ -142,7 +143,7 @@ pub async fn all_sessions(pool: &Pool) -> Result<Vec<Session>, sqlx::Error> {
 
 pub async fn get_session(pool: &Pool, id: i64) -> Result<Option<Session>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, name, description, writeup
+        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, name, description, writeup
          FROM sessions WHERE id = ?",
     )
     .bind(id)
@@ -152,7 +153,7 @@ pub async fn get_session(pool: &Pool, id: i64) -> Result<Option<Session>, sqlx::
 
 pub async fn active_session(pool: &Pool) -> Result<Option<Session>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, name, description, writeup
+        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, name, description, writeup
          FROM sessions WHERE status = 'ACTIVE'
          LIMIT 1",
     )
@@ -162,7 +163,7 @@ pub async fn active_session(pool: &Pool) -> Result<Option<Session>, sqlx::Error>
 
 pub async fn pending_session(pool: &Pool, id: i64) -> Result<Option<Session>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, name, description, writeup
+        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, name, description, writeup
          FROM sessions WHERE id = ? AND status = 'PENDING'",
     )
     .bind(id)
@@ -172,7 +173,7 @@ pub async fn pending_session(pool: &Pool, id: i64) -> Result<Option<Session>, sq
 
 pub async fn upcoming_sessions(pool: &Pool) -> Result<Vec<Session>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, name, description, writeup
+        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, name, description, writeup
          FROM sessions WHERE status = 'PENDING' ORDER BY id DESC LIMIT 10",
     )
     .fetch_all(pool)
@@ -243,15 +244,17 @@ pub async fn create_metronome_session(
     max_scorers: i64,
     name: Option<&str>,
     description: Option<&str>,
+    scheduled_at: Option<&str>,
 ) -> Result<i64, sqlx::Error> {
     let row = sqlx::query(
-        "INSERT INTO sessions (mode, track, layout, name, description) VALUES (?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO sessions (mode, track, layout, name, description, scheduled_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(Json(SessionMode::Metronome { rounds, target_ms, max_scorers, current_round: 0 }))
     .bind(track.to_string())
     .bind(layout)
     .bind(name)
     .bind(description)
+    .bind(scheduled_at)
     .fetch_one(pool)
     .await?;
     let id: i64 = row.get("id");
@@ -265,15 +268,17 @@ pub async fn create_shortcut_session(
     layout: &str,
     name: Option<&str>,
     description: Option<&str>,
+    scheduled_at: Option<&str>,
 ) -> Result<i64, sqlx::Error> {
     let row = sqlx::query(
-        "INSERT INTO sessions (mode, track, layout, name, description) VALUES (?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO sessions (mode, track, layout, name, description, scheduled_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(Json(SessionMode::Shortcut))
     .bind(track.to_string())
     .bind(layout)
     .bind(name)
     .bind(description)
+    .bind(scheduled_at)
     .fetch_one(pool)
     .await?;
     let id: i64 = row.get("id");

@@ -8,7 +8,16 @@
 
     <a href="/sessions/{{ active_session.id }}" class="bg-white border border-gray-200 rounded-lg border-l-4 border-l-orange-600 p-4 mb-6 flex items-center justify-between hover:border-orange-600 transition-colors">
       <div>
-        <p class="text-sm font-bold">{% match active_session.name %}{% when Some with (n) %}{{ n }}{% when None %}{{ active_session.track }} — {{ active_session.layout }}{% endmatch %}</p>
+        <div class="flex items-center gap-2">
+          <p class="font-bold">{% match active_session.name %}{% when Some with (n) %}{{ n }}{% when None %}{{ active_session.track }} — {{ active_session.layout }}{% endmatch %}</p>
+          {% match *active_session.mode %}
+            {% when SessionMode::Metronome { .. } %}
+              <span class="flex items-center gap-1.5 px-2 py-0.5 bg-orange-600/20 rounded-full border border-orange-800/30"><span class="h-2 w-2 bg-orange-600 rounded-full"></span><span class="text-[10px] font-semibold text-orange-600 uppercase">Metronome</span></span>
+            {% when SessionMode::Shortcut %}
+              <span class="flex items-center gap-1.5 px-2 py-0.5 bg-blue-600/20 rounded-full border border-blue-800/30"><span class="h-2 w-2 bg-blue-600 rounded-full"></span><span class="text-[10px] font-semibold text-blue-600 uppercase">Shortcut</span></span>
+          {% endmatch %}
+        </div>
+        {% match active_session.scheduled_at %}{% when Some with (s) %}<p class="text-xs text-gray-400">{{ s }}</p>{% when None %}{% endmatch %}
       </div>
       <span class="flex items-center gap-1.5 px-2 py-1 bg-orange-600/20 rounded-full border border-orange-800/30">
           <span class="h-2 w-2 bg-orange-600 rounded-full animate-pulse"></span>
@@ -22,8 +31,19 @@
 <div class="flex flex-col">
   {% for session in upcoming %}
     <a href="/sessions/{{ session.id }}" class="flex items-center justify-between py-3 border-b border-gray-100 hover:bg-orange-50 transition-colors">
-      <p class="text-sm font-semibold">{% match session.name %}{% when Some with (n) %}{{ n }}{% when None %}{{ session.track }} — {{ session.layout }}{% endmatch %}</p>
-      <span class="font-mono text-xs text-gray-400">#{{ session.id }}</span>
+      <div class="flex items-center gap-2">
+        <p class="font-semibold">{% match session.name %}{% when Some with (n) %}{{ n }}{% when None %}{{ session.track }} — {{ session.layout }}{% endmatch %}</p>
+        {% match *session.mode %}
+          {% when SessionMode::Metronome { .. } %}
+            <span class="flex items-center gap-1.5 px-2 py-0.5 bg-orange-600/20 rounded-full border border-orange-800/30"><span class="h-2 w-2 bg-orange-600 rounded-full"></span><span class="text-[10px] font-semibold text-orange-600 uppercase">Metronome</span></span>
+          {% when SessionMode::Shortcut %}
+            <span class="flex items-center gap-1.5 px-2 py-0.5 bg-blue-600/20 rounded-full border border-blue-800/30"><span class="h-2 w-2 bg-blue-600 rounded-full"></span><span class="text-[10px] font-semibold text-blue-600 uppercase">Shortcut</span></span>
+        {% endmatch %}
+      </div>
+      <span class="text-right">
+        {% match session.scheduled_at %}{% when Some with (s) %}<span class="text-xs text-gray-400 mr-2">{{ s }}</span>{% when None %}{% endmatch %}
+        <span class="font-mono text-xs text-gray-400">#{{ session.id }}</span>
+      </span>
     </a>
   {% endfor %}
 </div>
