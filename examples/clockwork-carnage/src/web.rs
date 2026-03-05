@@ -107,8 +107,6 @@ impl AuthnBackend for Backend {
         let userinfo: serde_json::Value = serde_json::from_slice(&userinfo_body)
             .map_err(|e| BackendError::OAuth(format!("failed to parse userinfo response: {e}")))?;
 
-        tracing::info!("LFS userinfo response: {userinfo}");
-
         let data = &userinfo["data"];
 
         let uname = data["preferred_username"]

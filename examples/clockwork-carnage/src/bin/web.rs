@@ -113,7 +113,6 @@ async fn index(
     auth_session: AuthSession,
     State(state): State<AppState>,
 ) -> Result<Html<String>, StatusCode> {
-    tracing::info!("{:?}", auth_session.user);
     let current_user = auth_session.user.map(|u| u.uname.clone());
     let active = db::active_session(&state.pool)
         .await
