@@ -63,22 +63,27 @@ mod filters {
 struct IndexTemplate {
     active: Option<Session>,
     upcoming: Vec<Session>,
+    current_user: Option<String>,
 }
 
 #[derive(Template)]
 #[template(path = "about.html")]
-struct AboutTemplate {}
+struct AboutTemplate {
+    current_user: Option<String>,
+}
 
 #[derive(Template)]
 #[template(path = "sessions.html")]
 struct SessionsTemplate {
     sessions: Vec<Session>,
+    current_user: Option<String>,
 }
 
 #[derive(Template)]
 #[template(path = "session_detail.html")]
 struct SessionDetailTemplate {
     session: Session,
+    current_user: Option<String>,
 }
 
 // -- Helpers ------------------------------------------------------------------
@@ -108,45 +113,56 @@ async fn logo() -> (StatusCode, [(&'static str, &'static str); 1], &'static [u8]
 
 // -- Page handlers ------------------------------------------------------------
 
-async fn index(State(state): State<AppState>) -> Result<Html<String>, StatusCode> {
+async fn index(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+) -> Result<Html<String>, StatusCode> {
+    let current_user = auth_session.user.map(|u| u.uname.clone());
     let active = db::active_session(&state.pool)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let upcoming = db::upcoming_sessions(&state.pool)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let tmpl = IndexTemplate { active, upcoming };
+    let tmpl = IndexTemplate { active, upcoming, current_user };
     Ok(Html(
         tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     ))
 }
 
-async fn about() -> Result<Html<String>, StatusCode> {
-    let tmpl = AboutTemplate {};
+async fn about(auth_session: AuthSession) -> Result<Html<String>, StatusCode> {
+    let current_user = auth_session.user.map(|u| u.uname.clone());
+    let tmpl = AboutTemplate { current_user };
     Ok(Html(
         tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     ))
 }
 
-async fn sessions(State(state): State<AppState>) -> Result<Html<String>, StatusCode> {
+async fn sessions(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+) -> Result<Html<String>, StatusCode> {
+    let current_user = auth_session.user.map(|u| u.uname.clone());
     let sessions = db::all_sessions(&state.pool)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let tmpl = SessionsTemplate { sessions };
+    let tmpl = SessionsTemplate { sessions, current_user };
     Ok(Html(
         tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     ))
 }
 
 async fn session_detail(
+    auth_session: AuthSession,
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Html<String>, StatusCode> {
+    let current_user = auth_session.user.map(|u| u.uname.clone());
     let session = db::get_session(&state.pool, id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
-    let tmpl = SessionDetailTemplate { session };
+    let tmpl = SessionDetailTemplate { session, current_user };
     Ok(Html(
         tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     ))

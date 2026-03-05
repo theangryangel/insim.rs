@@ -14,6 +14,16 @@
       </a>
     </header>
 
+    <div class="flex justify-end items-center text-xs text-gray-400 -mt-2">
+      {% if let Some(uname) = current_user %}
+        <span class="font-semibold text-gray-600">{{ uname }}</span>
+        <span class="mx-1.5">·</span>
+        <a href="/logout" class="hover:text-gray-700 transition-colors">Logout</a>
+      {% else %}
+        <a href="/login" class="font-semibold hover:text-gray-700 transition-colors">Login with LFS</a>
+      {% endif %}
+    </div>
+
     <nav class="flex bg-gray-200/60 rounded-full p-1">
       <a href="/" class="flex-1 text-center py-1.5 text-xs font-semibold uppercase tracking-wide rounded-full transition-colors hover:bg-white hover:shadow-sm">
         Home
