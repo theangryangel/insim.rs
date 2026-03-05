@@ -5,8 +5,8 @@ use std::sync::Arc;
 use askama::Template;
 use axum::{
     Router,
-    extract::{Path, Query, State},
-    http::StatusCode,
+    extract::{Form, FromRequestParts, Path, Query, State},
+    http::{StatusCode, request::Parts},
     response::{Html, IntoResponse, Redirect},
     routing::{get, post},
 };
@@ -62,27 +62,65 @@ mod filters {
 #[derive(Template)]
 #[template(path = "index.html")]
 struct IndexTemplate {
+    page: PageCtx,
     active: Option<Session>,
     upcoming: Vec<Session>,
-    current_user: Option<String>,
 }
 
 #[derive(Template)]
 #[template(path = "sessions.html")]
 struct SessionsTemplate {
+    page: PageCtx,
     sessions: Vec<Session>,
-    current_user: Option<String>,
-    admin: bool,
 }
 
 #[derive(Template)]
 #[template(path = "session_detail.html")]
 struct SessionDetailTemplate {
+    page: PageCtx,
     session: Session,
-    current_user: Option<String>,
 }
 
 // -- Helpers ------------------------------------------------------------------
+
+struct PageCtx {
+    pub current_user: Option<String>,
+    pub admin: bool,
+    pub csrf_token: String,
+}
+
+impl FromRequestParts<AppState> for PageCtx {
+    type Rejection = StatusCode;
+
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, StatusCode> {
+        let session = TowerSession::from_request_parts(parts, state)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        let auth_session = AuthSession::from_request_parts(parts, state)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        let current_user = auth_session.user.as_ref().map(|u| u.uname.clone());
+        let admin = auth_session.user.map(|u| u.admin).unwrap_or(false);
+        let csrf_token = get_or_create_csrf_token(&session).await?;
+        Ok(PageCtx { current_user, admin, csrf_token })
+    }
+}
+
+async fn get_or_create_csrf_token(session: &TowerSession) -> Result<String, StatusCode> {
+    if let Some(token) = session
+        .get::<String>("csrf_token")
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    {
+        return Ok(token);
+    }
+    let token = CsrfToken::new_random().secret().clone();
+    session
+        .insert("csrf_token", &token)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(token)
+}
 
 fn build_oauth_client(
     client_id: &str,
@@ -110,68 +148,70 @@ async fn logo() -> (StatusCode, [(&'static str, &'static str); 1], &'static [u8]
 // -- Page handlers ------------------------------------------------------------
 
 async fn index(
-    auth_session: AuthSession,
+    page: PageCtx,
     State(state): State<AppState>,
 ) -> Result<Html<String>, StatusCode> {
-    let current_user = auth_session.user.map(|u| u.uname.clone());
     let active = db::active_session(&state.pool)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let upcoming = db::upcoming_sessions(&state.pool)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let tmpl = IndexTemplate { active, upcoming, current_user };
+    let tmpl = IndexTemplate { page, active, upcoming };
     Ok(Html(
         tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     ))
 }
 
 async fn sessions(
-    auth_session: AuthSession,
+    page: PageCtx,
     State(state): State<AppState>,
 ) -> Result<Html<String>, StatusCode> {
-
-    let (current_user, admin) = match auth_session.user {
-        Some(db::User { ref uname, admin, .. }) => (Some(uname.clone()), admin),
-        None => (None, false)
-    };
     let sessions = db::all_sessions(&state.pool)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let tmpl = SessionsTemplate { sessions, current_user, admin };
+    let tmpl = SessionsTemplate { page, sessions };
     Ok(Html(
         tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     ))
 }
 
 async fn session_detail(
-    auth_session: AuthSession,
+    page: PageCtx,
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Html<String>, StatusCode> {
-    let current_user = auth_session.user.map(|u| u.uname.clone());
     let session = db::get_session(&state.pool, id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
-    let tmpl = SessionDetailTemplate { session, current_user };
+    let tmpl = SessionDetailTemplate { page, session };
     Ok(Html(
         tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     ))
 }
 
+#[derive(serde::Deserialize)]
+struct StartSessionForm {
+    csrf_token: String,
+}
+
 async fn session_start(
-    auth_session: AuthSession,
+    page: PageCtx,
     State(state): State<AppState>,
     Path(id): Path<i64>,
+    Form(form): Form<StartSessionForm>,
 ) -> Result<Redirect, StatusCode> {
-    if let Some(true) = auth_session.user.map(|u| u.admin) {
-        db::switch_session(&state.pool, id).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-        Ok(Redirect::to("/"))
-    } else {
-        Err(StatusCode::NOT_FOUND)
+    if !page.admin {
+        return Err(StatusCode::NOT_FOUND);
     }
-
+    if form.csrf_token != page.csrf_token {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    db::switch_session(&state.pool, id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Redirect::to("/"))
 }
 
 // -- Auth handlers ------------------------------------------------------------

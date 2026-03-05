@@ -2,13 +2,10 @@
 
 #![allow(missing_docs, missing_debug_implementations)]
 
-pub mod shortcut;
 pub mod components;
 pub mod db;
-pub mod metronome;
+pub mod game_modes;
 pub mod runner;
-pub mod setup_track;
-pub mod spawn_control;
 pub mod web;
 
 pub type ChatError = kitcar::chat::RuntimeError;

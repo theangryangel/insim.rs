@@ -6,7 +6,8 @@ use kitcar::scenes::{Scene, SceneExt, SceneResult, SceneError, wait_for_players:
 use tokio::task::JoinHandle;
 
 use super::{GameCtx, MiniGame};
-use crate::{ChatError, MIN_PLAYERS, db, setup_track, shortcut};
+use crate::{ChatError, MIN_PLAYERS, db, game_modes::shortcut};
+use super::setup_track;
 
 #[derive(Clone)]
 pub struct ShortcutGame {

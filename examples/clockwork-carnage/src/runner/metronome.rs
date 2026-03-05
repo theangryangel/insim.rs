@@ -7,7 +7,8 @@ use sqlx::types::Json;
 use tokio::task::JoinHandle;
 
 use super::{GameCtx, MiniGame};
-use crate::{ChatError, MIN_PLAYERS, db, metronome, setup_track};
+use crate::{ChatError, MIN_PLAYERS, db, game_modes::metronome};
+use super::setup_track;
 
 #[derive(Clone)]
 pub struct MetronomeGame {

@@ -1,7 +1,9 @@
 //! Runner: unified game executor with reconciliation loop.
 
 pub mod metronome;
+pub mod setup_track;
 pub mod shortcut;
+pub mod spawn_control;
 
 use insim::builder::InsimTask;
 use kitcar::{game, presence, scenes::SceneError};

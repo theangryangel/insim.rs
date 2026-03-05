@@ -30,7 +30,7 @@ impl Scene for Clockwork {
     type Output = ();
 
     async fn run(mut self) -> Result<SceneResult<()>, SceneError> {
-        let _spawn_control = crate::spawn_control::spawn(self.insim.clone())
+        let _spawn_control = crate::runner::spawn_control::spawn(self.insim.clone())
             .await
             .map_err(|cause| SceneError::Custom {
                 scene: "clockwork::spawn_control",
