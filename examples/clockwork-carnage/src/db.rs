@@ -81,6 +81,7 @@ pub struct User {
     pub pname: String,
     pub last_seen: String,
     pub oauth_access_token: Option<String>,
+    pub admin: bool,
 }
 
 impl std::fmt::Debug for User {
@@ -198,7 +199,7 @@ pub async fn upcoming_sessions(pool: &Pool) -> Result<Vec<Session>, sqlx::Error>
 
 pub async fn get_user_by_id(pool: &Pool, id: i64) -> Result<Option<User>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT id, uname, pname, last_seen, oauth_access_token FROM users WHERE id = ?",
+        "SELECT id, uname, pname, last_seen, oauth_access_token, admin FROM users WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -218,7 +219,7 @@ pub async fn upsert_user_with_token(
            pname = excluded.pname,
            oauth_access_token = excluded.oauth_access_token,
            last_seen = datetime('now')
-         RETURNING id, uname, pname, last_seen, oauth_access_token",
+         RETURNING id, uname, pname, last_seen, oauth_access_token, admin",
     )
     .bind(uname)
     .bind(pname)
@@ -336,6 +337,25 @@ pub async fn create_shortcut_session(
 }
 
 // -- Session lifecycle --------------------------------------------------------
+
+pub async fn switch_session(pool: &Pool, session_id: i64) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    let _ = sqlx::query(
+        "UPDATE sessions SET status = 'COMPLETED', ended_at = datetime('now') WHERE status = 'ACTIVE' AND id != ?",
+    )
+    .bind(session_id)
+    .execute(&mut *tx)
+    .await?;
+
+    let _ = sqlx::query(
+        "UPDATE sessions SET status = 'ACTIVE', started_at = datetime('now') WHERE id = ? AND status = 'PENDING'",
+    )
+    .bind(session_id)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(())
+}
 
 pub async fn activate_session(pool: &Pool, session_id: i64) -> Result<(), sqlx::Error> {
     let _ = sqlx::query(

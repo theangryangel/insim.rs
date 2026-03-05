@@ -4,8 +4,6 @@ use axum_login::{AuthUser, AuthnBackend, UserId};
 
 use crate::db;
 
-// --- AuthUser impl ---
-
 impl AuthUser for db::User {
     type Id = i64;
 
@@ -21,15 +19,11 @@ impl AuthUser for db::User {
     }
 }
 
-// --- Credentials (passed from callback to authenticate()) ---
-
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct OAuthCredentials {
     pub code: String,
     pub state: String,
 }
-
-// --- Backend ---
 
 #[derive(Clone)]
 pub struct Backend {
@@ -57,8 +51,6 @@ impl Backend {
     }
 }
 
-// --- Error type ---
-
 #[derive(Debug, thiserror::Error)]
 pub enum BackendError {
     #[error(transparent)]
@@ -70,8 +62,6 @@ pub enum BackendError {
     #[error("missing username in LFS token response")]
     MissingUname,
 }
-
-// --- AuthnBackend impl ---
 
 impl AuthnBackend for Backend {
     type User = db::User;
@@ -138,5 +128,5 @@ impl AuthnBackend for Backend {
     }
 }
 
-// Convenience alias
+// Convenience
 pub type AuthSession = axum_login::AuthSession<Backend>;

@@ -13,6 +13,9 @@
       <th class="px-3 py-2">Track</th>
       <th class="px-3 py-2">Scheduled</th>
       <th class="px-3 py-2">Status</th>
+      {% if admin %}
+      <th class="px-3 py-2">Start</th>
+      {% endif %}
     </tr>
   </thead>
   <tbody>
@@ -33,6 +36,13 @@
         <td class="px-3 py-2 text-gray-600">{{ session.track }} / {{ session.layout }}</td>
         <td class="px-3 py-2 text-gray-600">{% match session.scheduled_at %}{% when Some with (s) %}{{ s }}{% when None %}—{% endmatch %}</td>
         <td class="px-3 py-2 text-gray-600">{{ session.status }}</td>
+        {% if admin %}
+        <td>
+          <form method="post" action="/sessions/{{ session.id }}/start">
+            <button type="submit">Start</button>
+          </form>
+        </td>
+        {% endif %}
       </tr>
     {% endfor %}
   </tbody>

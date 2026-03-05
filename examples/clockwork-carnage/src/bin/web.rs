@@ -8,7 +8,7 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::{Html, IntoResponse, Redirect},
-    routing::get,
+    routing::{get, post},
 };
 use axum_login::AuthManagerLayerBuilder;
 use clap::Parser;
@@ -17,7 +17,8 @@ use clockwork_carnage::{
     web::{AuthSession, Backend, OAuthCredentials},
 };
 use oauth2::{AuthUrl, ClientId, CsrfToken, RedirectUrl, Scope, basic::BasicClient};
-use tower_sessions::{MemoryStore, SessionManagerLayer, cookie::SameSite};
+use tower_sessions::{SessionManagerLayer, cookie::SameSite, cookie::Key};
+use tower_sessions_sqlx_store::SqliteStore;
 use tower_sessions::Session as TowerSession;
 
 #[derive(Debug, Parser)]
@@ -67,16 +68,11 @@ struct IndexTemplate {
 }
 
 #[derive(Template)]
-#[template(path = "about.html")]
-struct AboutTemplate {
-    current_user: Option<String>,
-}
-
-#[derive(Template)]
 #[template(path = "sessions.html")]
 struct SessionsTemplate {
     sessions: Vec<Session>,
     current_user: Option<String>,
+    admin: bool,
 }
 
 #[derive(Template)]
@@ -117,6 +113,7 @@ async fn index(
     auth_session: AuthSession,
     State(state): State<AppState>,
 ) -> Result<Html<String>, StatusCode> {
+    tracing::info!("{:?}", auth_session.user);
     let current_user = auth_session.user.map(|u| u.uname.clone());
     let active = db::active_session(&state.pool)
         .await
@@ -130,23 +127,19 @@ async fn index(
     ))
 }
 
-async fn about(auth_session: AuthSession) -> Result<Html<String>, StatusCode> {
-    let current_user = auth_session.user.map(|u| u.uname.clone());
-    let tmpl = AboutTemplate { current_user };
-    Ok(Html(
-        tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
-    ))
-}
-
 async fn sessions(
     auth_session: AuthSession,
     State(state): State<AppState>,
 ) -> Result<Html<String>, StatusCode> {
-    let current_user = auth_session.user.map(|u| u.uname.clone());
+
+    let (current_user, admin) = match auth_session.user {
+        Some(db::User { ref uname, admin, .. }) => (Some(uname.clone()), admin),
+        None => (None, false)
+    };
     let sessions = db::all_sessions(&state.pool)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let tmpl = SessionsTemplate { sessions, current_user };
+    let tmpl = SessionsTemplate { sessions, current_user, admin };
     Ok(Html(
         tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     ))
@@ -166,6 +159,20 @@ async fn session_detail(
     Ok(Html(
         tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     ))
+}
+
+async fn session_start(
+    auth_session: AuthSession,
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Redirect, StatusCode> {
+    if let Some(true) = auth_session.user.map(|u| u.admin) {
+        db::switch_session(&state.pool, id).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        Ok(Redirect::to("/"))
+    } else {
+        Err(StatusCode::NOT_FOUND)
+    }
+
 }
 
 // -- Auth handlers ------------------------------------------------------------
@@ -249,10 +256,19 @@ async fn main() -> anyhow::Result<()> {
     let oauth_client = build_oauth_client(&client_id, &redirect_uri)?;
     let backend = Backend::new(pool.clone(), client_id, client_secret, redirect_uri);
 
-    let session_store = MemoryStore::default();
+    let session_store = SqliteStore::new(pool.clone());
+    session_store.migrate().await?;
+
+    let key = Key::from(
+        std::env::var("SESSION_KEY")
+            .unwrap_or_else(|_| "a".repeat(64))
+            .as_bytes(),
+    );
+
     let session_layer = SessionManagerLayer::new(session_store)
         .with_secure(false)
-        .with_same_site(SameSite::Lax);
+        .with_same_site(SameSite::Lax)
+        .with_private(key);
 
     let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
 
@@ -264,9 +280,9 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/logo.svg", get(logo))
         .route("/", get(index))
-        .route("/about", get(about))
         .route("/sessions", get(sessions))
         .route("/sessions/{id}", get(session_detail))
+        .route("/sessions/{id}/start", post(session_start))
         .route("/login", get(login))
         .route("/auth/callback", get(callback))
         .route("/logout", get(logout))
