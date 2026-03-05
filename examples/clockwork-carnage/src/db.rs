@@ -74,12 +74,25 @@ impl TryFrom<String> for SessionStatus {
 
 // -- Row types ----------------------------------------------------------------
 
-#[derive(Debug, Clone, FromRow)]
+#[derive(Clone, FromRow)]
 pub struct User {
     pub id: i64,
     pub uname: String,
     pub pname: String,
     pub last_seen: String,
+    pub oauth_access_token: Option<String>,
+}
+
+impl std::fmt::Debug for User {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("User")
+            .field("id", &self.id)
+            .field("uname", &self.uname)
+            .field("pname", &self.pname)
+            .field("last_seen", &self.last_seen)
+            .field("oauth_access_token", &"[redacted]")
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone, FromRow)]
@@ -182,6 +195,37 @@ pub async fn upcoming_sessions(pool: &Pool) -> Result<Vec<Session>, sqlx::Error>
 
 
 // -- User queries -------------------------------------------------------------
+
+pub async fn get_user_by_id(pool: &Pool, id: i64) -> Result<Option<User>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT id, uname, pname, last_seen, oauth_access_token FROM users WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+}
+
+pub async fn upsert_user_with_token(
+    pool: &Pool,
+    uname: &str,
+    pname: &str,
+    token: &str,
+) -> Result<User, sqlx::Error> {
+    sqlx::query_as(
+        "INSERT INTO users (uname, pname, oauth_access_token)
+         VALUES (?, ?, ?)
+         ON CONFLICT(uname) DO UPDATE SET
+           pname = excluded.pname,
+           oauth_access_token = excluded.oauth_access_token,
+           last_seen = datetime('now')
+         RETURNING id, uname, pname, last_seen, oauth_access_token",
+    )
+    .bind(uname)
+    .bind(pname)
+    .bind(token)
+    .fetch_one(pool)
+    .await
+}
 
 pub async fn upsert_user(pool: &Pool, uname: &str, pname: &str) -> Result<i64, sqlx::Error> {
     let row = sqlx::query(

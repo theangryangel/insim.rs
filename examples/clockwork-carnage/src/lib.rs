@@ -9,6 +9,7 @@ pub mod metronome;
 pub mod runner;
 pub mod setup_track;
 pub mod spawn_control;
+pub mod web;
 
 pub type ChatError = kitcar::chat::RuntimeError;
 
