@@ -16,6 +16,7 @@ use clockwork_carnage::{
     db::{self, Session, SessionMode, SessionStatus},
     web::{AuthSession, Backend, OAuthCredentials},
 };
+use insim::core::track::Track;
 use oauth2::{AuthUrl, ClientId, CsrfToken, RedirectUrl, Scope, basic::BasicClient};
 use tower_sessions::{SessionManagerLayer, cookie::SameSite, cookie::Key};
 use tower_sessions_sqlx_store::SqliteStore;
@@ -79,6 +80,15 @@ struct SessionsTemplate {
 struct SessionDetailTemplate {
     page: PageCtx,
     session: Session,
+    metronome_standings: Vec<db::MetronomeStanding>,
+    shortcut_best_times: Vec<db::ShortcutTime>,
+}
+
+#[derive(Template)]
+#[template(path = "session_new.html")]
+struct SessionNewTemplate {
+    page: PageCtx,
+    tracks: &'static [Track],
 }
 
 // -- Helpers ------------------------------------------------------------------
@@ -185,7 +195,23 @@ async fn session_detail(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
-    let tmpl = SessionDetailTemplate { page, session };
+
+    let (metronome_standings, shortcut_best_times) = match &*session.mode {
+        SessionMode::Metronome { .. } => {
+            let s = db::metronome_standings(&state.pool, session.id)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            (s, vec![])
+        }
+        SessionMode::Shortcut => {
+            let t = db::shortcut_best_times(&state.pool, session.id, 20)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            (vec![], t)
+        }
+    };
+
+    let tmpl = SessionDetailTemplate { page, session, metronome_standings, shortcut_best_times };
     Ok(Html(
         tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     ))
@@ -212,6 +238,93 @@ async fn session_start(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Redirect::to("/"))
+}
+
+fn default_rounds() -> i64 { 5 }
+fn default_target() -> u64 { 20 }
+fn default_max_scorers() -> i64 { 10 }
+
+#[derive(serde::Deserialize)]
+struct NewSessionForm {
+    csrf_token: String,
+    mode: String,
+    track: String,
+    #[serde(default)]
+    layout: String,
+    name: Option<String>,
+    description: Option<String>,
+    scheduled_at: Option<String>,
+    #[serde(default = "default_rounds")]
+    rounds: i64,
+    #[serde(default = "default_target")]
+    target: u64,
+    #[serde(default = "default_max_scorers")]
+    max_scorers: i64,
+}
+
+async fn session_new_get(
+    page: PageCtx,
+) -> Result<Html<String>, StatusCode> {
+    if !page.admin {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    let tmpl = SessionNewTemplate { page, tracks: Track::ALL };
+    Ok(Html(tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?))
+}
+
+async fn session_new_post(
+    page: PageCtx,
+    State(state): State<AppState>,
+    Form(form): Form<NewSessionForm>,
+) -> Result<Redirect, StatusCode> {
+    if !page.admin {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    if form.csrf_token != page.csrf_token {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    let track = form.track.parse().map_err(|_| StatusCode::BAD_REQUEST)?;
+    let name = form.name.filter(|s| !s.is_empty());
+    let description = form.description.filter(|s| !s.is_empty());
+    let scheduled_at = form.scheduled_at.filter(|s| !s.is_empty());
+
+    let id = match form.mode.as_str() {
+        "metronome" => {
+            let target_ms = (form.target * 1000) as i64;
+            db::create_metronome_session(
+                &state.pool,
+                &db::CreateMetronomeParams {
+                    track,
+                    layout: form.layout,
+                    rounds: form.rounds,
+                    target_ms,
+                    max_scorers: form.max_scorers,
+                    name,
+                    description,
+                    scheduled_at,
+                },
+            )
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        }
+        "shortcut" => {
+            db::create_shortcut_session(
+                &state.pool,
+                &db::CreateShortcutParams {
+                    track,
+                    layout: form.layout,
+                    name,
+                    description,
+                    scheduled_at,
+                },
+            )
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        }
+        _ => return Err(StatusCode::BAD_REQUEST),
+    };
+
+    Ok(Redirect::to(&format!("/sessions/{id}")))
 }
 
 // -- Auth handlers ------------------------------------------------------------
@@ -320,6 +433,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/logo.svg", get(logo))
         .route("/", get(index))
         .route("/sessions", get(sessions))
+        .route("/sessions/new", get(session_new_get).post(session_new_post))
         .route("/sessions/{id}", get(session_detail))
         .route("/sessions/{id}/start", post(session_start))
         .route("/login", get(login))

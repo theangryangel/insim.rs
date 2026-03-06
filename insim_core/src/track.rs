@@ -74,6 +74,9 @@ macro_rules! define_tracks {
                 let s = self.code();
                 s.ends_with('X') || s.ends_with('Y') || matches!(self, Self::So7)
             }
+
+            /// All track variants in declaration order.
+            pub const ALL: &'static [Self] = &[$(Self::$variant),*];
         }
 
         impl FromStr for Track {

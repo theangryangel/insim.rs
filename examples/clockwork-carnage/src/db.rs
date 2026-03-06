@@ -280,26 +280,38 @@ pub enum UserSyncError {
 
 // -- Session creation ---------------------------------------------------------
 
+pub struct CreateMetronomeParams {
+    pub track: Track,
+    pub layout: String,
+    pub rounds: i64,
+    pub target_ms: i64,
+    pub max_scorers: i64,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub scheduled_at: Option<String>,
+}
+
+pub struct CreateShortcutParams {
+    pub track: Track,
+    pub layout: String,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub scheduled_at: Option<String>,
+}
+
 pub async fn create_metronome_session(
     pool: &Pool,
-    track: &Track,
-    layout: &str,
-    rounds: i64,
-    target_ms: i64,
-    max_scorers: i64,
-    name: Option<&str>,
-    description: Option<&str>,
-    scheduled_at: Option<&str>,
+    p: &CreateMetronomeParams,
 ) -> Result<i64, sqlx::Error> {
     let row = sqlx::query(
         "INSERT INTO sessions (mode, track, layout, name, description, scheduled_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
     )
-    .bind(Json(SessionMode::Metronome { rounds, target_ms, max_scorers, current_round: 0 }))
-    .bind(track.to_string())
-    .bind(layout)
-    .bind(name)
-    .bind(description)
-    .bind(scheduled_at)
+    .bind(Json(SessionMode::Metronome { rounds: p.rounds, target_ms: p.target_ms, max_scorers: p.max_scorers, current_round: 0 }))
+    .bind(p.track.to_string())
+    .bind(&p.layout)
+    .bind(p.name.as_deref())
+    .bind(p.description.as_deref())
+    .bind(p.scheduled_at.as_deref())
     .fetch_one(pool)
     .await?;
     let id: i64 = row.get("id");
@@ -309,21 +321,17 @@ pub async fn create_metronome_session(
 
 pub async fn create_shortcut_session(
     pool: &Pool,
-    track: &Track,
-    layout: &str,
-    name: Option<&str>,
-    description: Option<&str>,
-    scheduled_at: Option<&str>,
+    p: &CreateShortcutParams,
 ) -> Result<i64, sqlx::Error> {
     let row = sqlx::query(
         "INSERT INTO sessions (mode, track, layout, name, description, scheduled_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(Json(SessionMode::Shortcut))
-    .bind(track.to_string())
-    .bind(layout)
-    .bind(name)
-    .bind(description)
-    .bind(scheduled_at)
+    .bind(p.track.to_string())
+    .bind(&p.layout)
+    .bind(p.name.as_deref())
+    .bind(p.description.as_deref())
+    .bind(p.scheduled_at.as_deref())
     .fetch_one(pool)
     .await?;
     let id: i64 = row.get("id");

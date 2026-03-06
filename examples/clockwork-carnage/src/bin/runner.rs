@@ -133,17 +133,33 @@ async fn main() -> anyhow::Result<()> {
             } => {
                 let target_ms = (target * 1000) as i64;
                 let id = db::create_metronome_session(
-                    &pool, &track, &layout, rounds, target_ms, max_scorers,
-                    name.as_deref(), description.as_deref(), scheduled_at.as_deref(),
+                    &pool,
+                    &db::CreateMetronomeParams {
+                        track,
+                        layout,
+                        rounds,
+                        target_ms,
+                        max_scorers,
+                        name,
+                        description,
+                        scheduled_at,
+                    },
                 )
                 .await?;
-                println!("Created metronome session #{id} ({track}/{layout}, {rounds} rounds, target {target}s)");
+                println!("Created metronome session #{id}");
             },
             AddMode::Shortcut { track, layout, name, description, scheduled_at } => {
                 let id = db::create_shortcut_session(
-                    &pool, &track, &layout, name.as_deref(), description.as_deref(), scheduled_at.as_deref(),
+                    &pool,
+                    &db::CreateShortcutParams {
+                        track,
+                        layout,
+                        name,
+                        description,
+                        scheduled_at,
+                    },
                 ).await?;
-                println!("Created shortcut session #{id} ({track}/{layout})");
+                println!("Created shortcut session #{id}");
             },
         },
 

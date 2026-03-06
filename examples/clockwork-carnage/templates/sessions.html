@@ -2,7 +2,12 @@
 {% block title %}Sessions — Clockwork Carnage{% endblock %}
 {% block content %}
 
-<p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">All Sessions</p>
+<div class="flex items-center justify-between mb-3">
+  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">All Sessions</p>
+  {% if page.admin %}
+  <a href="/sessions/new" class="px-3 py-1.5 bg-orange-600 text-white text-xs font-semibold rounded hover:bg-orange-700 transition-colors">New Session</a>
+  {% endif %}
+</div>
 
 <table class="w-full">
   <thead>
