@@ -10,10 +10,6 @@ use crate::ChatError;
 #[chat(prefix = '!')]
 /// Chat Commands
 pub enum EventChatMsg {
-    /// Only valid during Idle scene - start the game
-    Start,
-    /// Only valid during Event scene - stops the game
-    End,
     /// Echo a string back from the server
     Echo { message: String },
     /// Help

@@ -436,6 +436,7 @@ async fn session_new_post(
                     rounds: form.rounds,
                     target_ms,
                     max_scorers: form.max_scorers,
+                    lobby_duration_secs: 300,
                     name,
                     description,
                     scheduled_at,

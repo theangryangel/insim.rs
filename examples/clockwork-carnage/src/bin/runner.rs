@@ -77,6 +77,9 @@ enum AddMode {
         #[arg(short, long, default_value_t = 10)]
         max_scorers: i64,
 
+        #[arg(long, default_value_t = 300)]
+        lobby_duration_secs: u64,
+
         #[arg(long)]
         name: Option<String>,
 
@@ -127,6 +130,7 @@ async fn main() -> anyhow::Result<()> {
                 rounds,
                 target,
                 max_scorers,
+                lobby_duration_secs,
                 name,
                 description,
                 scheduled_at,
@@ -140,6 +144,7 @@ async fn main() -> anyhow::Result<()> {
                         rounds,
                         target_ms,
                         max_scorers,
+                        lobby_duration_secs: lobby_duration_secs as i64,
                         name,
                         description,
                         scheduled_at,
@@ -239,6 +244,12 @@ async fn run_loop(pool: db::Pool, addr: SocketAddr, password: Option<String>) ->
         let mut current_task: Option<tokio::task::JoinHandle<Result<(), kitcar::scenes::SceneError>>> = None;
 
         loop {
+            // Auto-activate any due scheduled session, interrupting the current one if needed
+            if let Ok(Some(session)) = db::next_scheduled_session(&pool).await {
+                tracing::info!("Auto-activating scheduled session #{}", session.id);
+                let _ = db::switch_session(&pool, session.id).await;
+            }
+
             let desired = db::active_session(&pool).await;
 
             match (&current_task, desired) {

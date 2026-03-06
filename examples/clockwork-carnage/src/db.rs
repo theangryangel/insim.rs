@@ -1,6 +1,6 @@
 //! SQLite database layer for Clockwork Carnage.
 
-use std::{collections::HashMap, fmt, str::FromStr};
+use std::{fmt, str::FromStr};
 
 use insim::core::track::Track;
 use kitcar::presence::{Presence, PresenceEvent};
@@ -26,6 +26,10 @@ pub async fn connect(path: &str) -> Result<Pool, sqlx::Error> {
 
 // -- Enums --------------------------------------------------------------------
 
+fn default_lobby_secs() -> i64 {
+    300
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SessionMode {
@@ -35,6 +39,8 @@ pub enum SessionMode {
         max_scorers: i64,
         #[serde(default)]
         current_round: i64,
+        #[serde(default = "default_lobby_secs")]
+        lobby_duration_secs: i64,
     },
     Shortcut,
 }
@@ -194,6 +200,18 @@ pub async fn upcoming_sessions(pool: &Pool) -> Result<Vec<Session>, sqlx::Error>
     .await
 }
 
+pub async fn next_scheduled_session(pool: &Pool) -> Result<Option<Session>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, name, description, writeup
+         FROM sessions
+         WHERE status = 'PENDING' AND scheduled_at IS NOT NULL AND scheduled_at <= datetime('now')
+         ORDER BY scheduled_at ASC
+         LIMIT 1",
+    )
+    .fetch_optional(pool)
+    .await
+}
+
 
 // -- User queries -------------------------------------------------------------
 
@@ -286,6 +304,7 @@ pub struct CreateMetronomeParams {
     pub rounds: i64,
     pub target_ms: i64,
     pub max_scorers: i64,
+    pub lobby_duration_secs: i64,
     pub name: Option<String>,
     pub description: Option<String>,
     pub scheduled_at: Option<String>,
@@ -306,7 +325,7 @@ pub async fn create_metronome_session(
     let row = sqlx::query(
         "INSERT INTO sessions (mode, track, layout, name, description, scheduled_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
     )
-    .bind(Json(SessionMode::Metronome { rounds: p.rounds, target_ms: p.target_ms, max_scorers: p.max_scorers, current_round: 0 }))
+    .bind(Json(SessionMode::Metronome { rounds: p.rounds, target_ms: p.target_ms, max_scorers: p.max_scorers, current_round: 0, lobby_duration_secs: p.lobby_duration_secs }))
     .bind(p.track.to_string())
     .bind(&p.layout)
     .bind(p.name.as_deref())
@@ -464,24 +483,6 @@ pub async fn metronome_standings(
         pname: row.get("pname"),
         total_points: row.get("total_points"),
     }).collect())
-}
-
-pub async fn metronome_round_results(
-    pool: &Pool,
-    session_id: i64,
-    round: i64,
-) -> Result<Vec<MetronomeResult>, sqlx::Error> {
-    sqlx::query_as(
-        "SELECT r.id, r.session_id, r.round, u.uname, u.pname, r.delta_ms, r.points, r.recorded_at
-         FROM metronome_results r
-         JOIN users u ON u.id = r.user_id
-         WHERE r.session_id = ? AND r.round = ?
-         ORDER BY r.points DESC",
-    )
-    .bind(session_id)
-    .bind(round)
-    .fetch_all(pool)
-    .await
 }
 
 pub async fn metronome_all_results(
@@ -643,17 +644,3 @@ pub async fn update_session_writeup(
     Ok(())
 }
 
-pub async fn update_session_details(
-    pool: &Pool,
-    session_id: i64,
-    name: Option<&str>,
-    description: Option<&str>,
-) -> Result<(), sqlx::Error> {
-    let _ = sqlx::query("UPDATE sessions SET name = ?, description = ? WHERE id = ?")
-        .bind(name)
-        .bind(description)
-        .bind(session_id)
-        .execute(pool)
-        .await?;
-    Ok(())
-}

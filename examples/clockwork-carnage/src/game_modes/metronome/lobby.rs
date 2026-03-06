@@ -78,10 +78,11 @@ impl From<ui::UiState<Duration, ()>> for ClockworkLobbyProps {
     }
 }
 
-/// Lobby scene - 20 second warm up period
+/// Lobby scene - configurable warm up period
 #[derive(Clone)]
 pub struct Lobby {
     pub chat: chat::EventChat,
+    pub duration: Duration,
 }
 
 impl<Ctx> Scene<Ctx> for Lobby
@@ -93,8 +94,8 @@ where
 
     async fn run(self, ctx: &Ctx) -> Result<SceneResult<Self::Output>, SceneError> {
         let insim = InsimTask::from_context(ctx);
-        tracing::info!("Lobby: 20 second warm up");
-        let mut countdown = Countdown::new(Duration::from_secs(1), 20);
+        tracing::info!("Lobby: {:?} warm up", self.duration);
+        let mut countdown = Countdown::new(Duration::from_secs(1), self.duration.as_secs() as u32);
         let (ui, _ui_handle) = ui::mount_with(
             insim.clone(),
             Duration::ZERO,

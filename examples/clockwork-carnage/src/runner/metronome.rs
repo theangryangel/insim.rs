@@ -17,6 +17,7 @@ pub struct MetronomeGame {
     pub rounds: usize,
     pub target: Duration,
     pub max_scorers: usize,
+    pub lobby_duration: Duration,
     pub track: insim::core::track::Track,
     pub layout: String,
     pub chat: metronome::chat::EventChat,
@@ -38,7 +39,6 @@ impl MiniGame for MetronomeGame {
     async fn setup(session: &db::Session, ctx: &GameCtx) -> Result<(Self, Self::Guard), SceneError> {
         let (chat, chat_handle) = metronome::chat::spawn(ctx.insim.clone());
 
-        // Check if metronome_sessions row exists (crash recovery)
         let session = db::get_session(&ctx.pool, session.id)
             .await
             .map_err(|cause| SceneError::Custom {
@@ -50,11 +50,11 @@ impl MiniGame for MetronomeGame {
                 cause: "no metronome_sessions row for this session".into(),
             })?;
 
-        let (rounds, target_ms, max_scorers, current_round) = match session.mode {
-            Json(db::SessionMode::Metronome { rounds, target_ms, max_scorers, current_round }) => (rounds, target_ms, max_scorers, current_round),
-            _ => {
-                unimplemented!()
-            }
+        let (rounds, target_ms, max_scorers, current_round, lobby_duration_secs) = match session.mode {
+            Json(db::SessionMode::Metronome { rounds, target_ms, max_scorers, current_round, lobby_duration_secs }) => {
+                (rounds, target_ms, max_scorers, current_round, lobby_duration_secs)
+            },
+            _ => unimplemented!(),
         };
 
         let start_round = (current_round as usize) + 1;
@@ -65,6 +65,7 @@ impl MiniGame for MetronomeGame {
             rounds: rounds as usize,
             target: Duration::from_millis(target_ms as u64),
             max_scorers: max_scorers as usize,
+            lobby_duration: Duration::from_secs(lobby_duration_secs as u64),
             track: session.track,
             layout: session.layout.clone(),
             chat,
@@ -75,35 +76,52 @@ impl MiniGame for MetronomeGame {
     }
 
     async fn run(self, ctx: &GameCtx) -> Result<SceneResult<()>, SceneError> {
-        let clockwork = WaitForPlayers {
-            min_players: MIN_PLAYERS,
-        }
-        .then(metronome::WaitForAdminStart {
-            chat: self.chat.clone(),
-        })
-        .then(
-            setup_track::SetupTrack {
-                min_players: MIN_PLAYERS,
-                track: self.track,
-                layout: Some(self.layout.clone()),
+        // Setup: retry if players leave before the track loads
+        loop {
+            let setup = WaitForPlayers { min_players: MIN_PLAYERS }.then(
+                setup_track::SetupTrack {
+                    min_players: MIN_PLAYERS,
+                    track: self.track,
+                    layout: Some(self.layout.clone()),
+                }
+                .with_timeout(Duration::from_secs(60)),
+            );
+
+            match setup.run(ctx).await? {
+                SceneResult::Continue(_) => break,
+                SceneResult::Bail { .. } => continue,
+                SceneResult::Quit => return Ok(SceneResult::Quit),
             }
-            .with_timeout(Duration::from_secs(60)),
-        )
-        .then(metronome::Clockwork {
+        }
+
+        let _spawn_control = crate::runner::spawn_control::spawn(ctx.insim.clone())
+            .await
+            .map_err(|cause| SceneError::Custom {
+                scene: "metronome::spawn_control",
+                cause: Box::new(cause),
+            })?;
+
+        let event = metronome::Lobby {
+            chat: self.chat.clone(),
+            duration: self.lobby_duration,
+        }
+        .then(metronome::Rounds {
             chat: self.chat.clone(),
             start_round: self.start_round,
             rounds: self.rounds,
-            max_scorers: self.max_scorers,
             target: self.target,
+            max_scorers: self.max_scorers,
             session_id: self.session_id,
         })
-        .loop_until_quit();
+        .then(metronome::Victory {
+            session_id: self.session_id,
+        });
 
         let presence = ctx.presence.clone();
         let chat = self.chat.clone();
 
         tokio::select! {
-            res = clockwork.run(ctx) => {
+            res = event.run(ctx) => {
                 let _ = res?;
                 Ok(SceneResult::Continue(()))
             },
