@@ -38,6 +38,8 @@ struct AppState {
 }
 
 mod filters {
+    use insim::core::string::{colours::Colour, escaping::Escape};
+
     #[askama::filter_fn]
     pub fn format_time_ms(ms: &i64, _env: &dyn askama::Values) -> askama::Result<String> {
         let ms = *ms;
@@ -55,6 +57,50 @@ mod filters {
         let seconds = total / 1000;
         let millis = total % 1000;
         Ok(format!("{sign}{seconds}.{millis:03}s"))
+    }
+
+    /// Convert an LFS player name with colour markers into HTML `<span>` elements.
+    /// Must be used with `|safe` in templates.
+    #[askama::filter_fn]
+    pub fn colour_html(s: &str, _env: &dyn askama::Values) -> askama::Result<String> {
+        fn lfs_colour_class(c: u8) -> &'static str {
+            match c {
+                0 => "text-gray-900",
+                1 => "text-red-500",
+                2 => "text-green-500",
+                3 => "text-amber-500",
+                4 => "text-blue-500",
+                5 => "text-purple-500",
+                6 => "text-cyan-500",
+                _ => "", // 7 (white) and 8 (default): inherit parent colour
+            }
+        }
+
+        fn html_escape(s: &str) -> String {
+            s.chars().fold(String::with_capacity(s.len()), |mut out, c| {
+                match c {
+                    '&'  => out.push_str("&amp;"),
+                    '<'  => out.push_str("&lt;"),
+                    '>'  => out.push_str("&gt;"),
+                    '"'  => out.push_str("&quot;"),
+                    '\'' => out.push_str("&#39;"),
+                    c    => out.push(c),
+                }
+                out
+            })
+        }
+
+        let mut out = String::new();
+        for (colour, chunk) in s.colour_spans() {
+            let text = html_escape(&chunk.unescape());
+            let class = lfs_colour_class(colour);
+            if class.is_empty() {
+                out.push_str(&text);
+            } else {
+                out.push_str(&format!("<span class=\"{class}\">{text}</span>"));
+            }
+        }
+        Ok(out)
     }
 }
 
@@ -75,12 +121,19 @@ struct SessionsTemplate {
     sessions: Vec<Session>,
 }
 
+/// Results for a single metronome round, used in the round breakdown table.
+struct RoundResults {
+    round: i64,
+    results: Vec<db::MetronomeResult>,
+}
+
 #[derive(Template)]
 #[template(path = "session_detail.html")]
 struct SessionDetailTemplate {
     page: PageCtx,
     session: Session,
     metronome_standings: Vec<db::MetronomeStanding>,
+    metronome_rounds: Vec<RoundResults>,
     shortcut_best_times: Vec<db::ShortcutTime>,
 }
 
@@ -89,6 +142,59 @@ struct SessionDetailTemplate {
 struct SessionNewTemplate {
     page: PageCtx,
     tracks: &'static [Track],
+}
+
+#[derive(Template)]
+#[template(path = "session_edit.html")]
+struct SessionEditTemplate {
+    page: PageCtx,
+    session: db::Session,
+    tracks: &'static [Track],
+}
+
+#[derive(Template)]
+#[template(path = "partials/session_actions.html")]
+struct SessionActionsFragment {
+    page: PageCtx,
+    session: Session,
+}
+
+#[derive(Template)]
+#[template(path = "partials/metronome_standings_response.html")]
+struct MetronomeStandingsTab {
+    session: Session,
+    metronome_standings: Vec<db::MetronomeStanding>,
+    metronome_rounds: Vec<RoundResults>,
+}
+
+#[derive(Template)]
+#[template(path = "partials/metronome_round_response.html")]
+struct MetronomeRoundTab {
+    session: Session,
+    round_number: i64,
+    round_results: Vec<db::MetronomeResult>,
+    metronome_rounds: Vec<RoundResults>,
+}
+
+#[derive(Template)]
+#[template(path = "partials/shortcut_standings.html")]
+struct ShortcutStandingsFragment {
+    session: Session,
+    shortcut_best_times: Vec<db::ShortcutTime>,
+}
+
+#[derive(Template)]
+#[template(path = "partials/shortcut_best_times_response.html")]
+struct ShortcutBestTimesFragment {
+    session: Session,
+    shortcut_best_times: Vec<db::ShortcutTime>,
+}
+
+#[derive(Template)]
+#[template(path = "partials/shortcut_all_times_response.html")]
+struct ShortcutAllTimesFragment {
+    session: Session,
+    shortcut_all_times: Vec<db::ShortcutTime>,
 }
 
 // -- Helpers ------------------------------------------------------------------
@@ -145,6 +251,20 @@ fn build_oauth_client(
     .set_redirect_uri(RedirectUrl::new(redirect_uri.to_string())?))
 }
 
+fn group_metronome_rounds(results: Vec<db::MetronomeResult>) -> Vec<RoundResults> {
+    let mut rounds: Vec<RoundResults> = Vec::new();
+    for result in results {
+        if let Some(last) = rounds.last_mut() {
+            if last.round == result.round {
+                last.results.push(result);
+                continue;
+            }
+        }
+        rounds.push(RoundResults { round: result.round, results: vec![result] });
+    }
+    rounds
+}
+
 // -- Static assets ------------------------------------------------------------
 
 async fn logo() -> (StatusCode, [(&'static str, &'static str); 1], &'static [u8]) {
@@ -196,22 +316,27 @@ async fn session_detail(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    let (metronome_standings, shortcut_best_times) = match &*session.mode {
+    let (metronome_standings, metronome_rounds, shortcut_best_times) = match &*session.mode {
         SessionMode::Metronome { .. } => {
-            let s = db::metronome_standings(&state.pool, session.id)
+            let standings = db::metronome_standings(&state.pool, session.id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            (s, vec![])
+            let rounds = group_metronome_rounds(
+                db::metronome_all_results(&state.pool, session.id)
+                    .await
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+            );
+            (standings, rounds, vec![])
         }
         SessionMode::Shortcut => {
-            let t = db::shortcut_best_times(&state.pool, session.id, 20)
+            let t = db::shortcut_best_times(&state.pool, session.id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            (vec![], t)
+            (vec![], vec![], t)
         }
     };
 
-    let tmpl = SessionDetailTemplate { page, session, metronome_standings, shortcut_best_times };
+    let tmpl = SessionDetailTemplate { page, session, metronome_standings, metronome_rounds, shortcut_best_times };
     Ok(Html(
         tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     ))
@@ -224,10 +349,11 @@ struct StartSessionForm {
 
 async fn session_start(
     page: PageCtx,
+    headers: axum::http::HeaderMap,
     State(state): State<AppState>,
     Path(id): Path<i64>,
     Form(form): Form<StartSessionForm>,
-) -> Result<Redirect, StatusCode> {
+) -> Result<axum::response::Response, StatusCode> {
     if !page.admin {
         return Err(StatusCode::NOT_FOUND);
     }
@@ -237,7 +363,18 @@ async fn session_start(
     db::switch_session(&state.pool, id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    Ok(Redirect::to("/"))
+    if headers.contains_key("hx-request") {
+        let session = db::get_session(&state.pool, id)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .ok_or(StatusCode::NOT_FOUND)?;
+        let html = SessionActionsFragment { page, session }
+            .render()
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        Ok(Html(html).into_response())
+    } else {
+        Ok(Redirect::to("/").into_response())
+    }
 }
 
 fn default_rounds() -> i64 { 5 }
@@ -325,6 +462,203 @@ async fn session_new_post(
     };
 
     Ok(Redirect::to(&format!("/sessions/{id}")))
+}
+
+async fn session_edit_get(
+    page: PageCtx,
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Html<String>, StatusCode> {
+    if !page.admin {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    let session = db::get_session(&state.pool, id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+    let tmpl = SessionEditTemplate { page, session, tracks: Track::ALL };
+    Ok(Html(tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?))
+}
+
+#[derive(serde::Deserialize)]
+struct EditSessionForm {
+    csrf_token: String,
+    track: String,
+    #[serde(default)]
+    layout: String,
+    name: Option<String>,
+    description: Option<String>,
+    scheduled_at: Option<String>,
+    writeup: Option<String>,
+    // Metronome-only (absent for shortcut sessions)
+    rounds: Option<i64>,
+    target: Option<u64>,
+    max_scorers: Option<i64>,
+}
+
+async fn session_edit_post(
+    page: PageCtx,
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Form(form): Form<EditSessionForm>,
+) -> Result<Redirect, StatusCode> {
+    if !page.admin {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    if form.csrf_token != page.csrf_token {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    let track = form.track.parse().map_err(|_| StatusCode::BAD_REQUEST)?;
+    let name = form.name.as_deref().filter(|s| !s.is_empty());
+    let description = form.description.as_deref().filter(|s| !s.is_empty());
+    let scheduled_at = form.scheduled_at.as_deref().filter(|s| !s.is_empty());
+    let writeup = form.writeup.as_deref().filter(|s| !s.is_empty());
+
+    db::update_session(
+        &state.pool,
+        id,
+        &db::UpdateSessionParams { track, layout: &form.layout, name, description, scheduled_at, writeup },
+    )
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    if let (Some(rounds), Some(target), Some(max_scorers)) =
+        (form.rounds, form.target, form.max_scorers)
+    {
+        let target_ms = (target * 1000) as i64;
+        db::update_metronome_settings(&state.pool, id, rounds, target_ms, max_scorers)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    }
+
+    Ok(Redirect::to(&format!("/sessions/{id}")))
+}
+
+async fn session_standings(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Html<String>, StatusCode> {
+    let session = db::get_session(&state.pool, id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    let html = match &*session.mode {
+        SessionMode::Metronome { .. } => {
+            let metronome_standings = db::metronome_standings(&state.pool, session.id)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            let metronome_rounds = group_metronome_rounds(
+                db::metronome_all_results(&state.pool, session.id)
+                    .await
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+            );
+            MetronomeStandingsTab { session, metronome_standings, metronome_rounds }
+                .render()
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        }
+        SessionMode::Shortcut => {
+            let shortcut_best_times = db::shortcut_best_times(&state.pool, session.id)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            ShortcutStandingsFragment { session, shortcut_best_times }
+                .render()
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        }
+    };
+
+    Ok(Html(html))
+}
+
+async fn session_round(
+    State(state): State<AppState>,
+    Path((id, round_number)): Path<(i64, i64)>,
+) -> Result<Html<String>, StatusCode> {
+    let session = db::get_session(&state.pool, id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+    let metronome_rounds = group_metronome_rounds(
+        db::metronome_all_results(&state.pool, id)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+    );
+    let round_results = metronome_rounds
+        .iter()
+        .find(|r| r.round == round_number)
+        .map(|r| r.results.clone())
+        .unwrap_or_default();
+    Ok(Html(
+        MetronomeRoundTab { session, round_number, round_results, metronome_rounds }
+            .render()
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+    ))
+}
+
+async fn session_standings_best(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Html<String>, StatusCode> {
+    let session = db::get_session(&state.pool, id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+    let shortcut_best_times = db::shortcut_best_times(&state.pool, id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Html(
+        ShortcutBestTimesFragment { session, shortcut_best_times }
+            .render()
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+    ))
+}
+
+async fn session_standings_all(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Html<String>, StatusCode> {
+    let session = db::get_session(&state.pool, id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+    let shortcut_all_times = db::shortcut_all_times(&state.pool, id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Html(
+        ShortcutAllTimesFragment { session, shortcut_all_times }
+            .render()
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+    ))
+}
+
+async fn session_cancel(
+    page: PageCtx,
+    headers: axum::http::HeaderMap,
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Form(form): Form<StartSessionForm>,
+) -> Result<axum::response::Response, StatusCode> {
+    if !page.admin {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    if form.csrf_token != page.csrf_token {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    db::cancel_session(&state.pool, id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if headers.contains_key("hx-request") {
+        let session = db::get_session(&state.pool, id)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .ok_or(StatusCode::NOT_FOUND)?;
+        let html = SessionActionsFragment { page, session }
+            .render()
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        Ok(Html(html).into_response())
+    } else {
+        Ok(Redirect::to(&format!("/sessions/{id}")).into_response())
+    }
 }
 
 // -- Auth handlers ------------------------------------------------------------
@@ -435,7 +769,13 @@ async fn main() -> anyhow::Result<()> {
         .route("/sessions", get(sessions))
         .route("/sessions/new", get(session_new_get).post(session_new_post))
         .route("/sessions/{id}", get(session_detail))
+        .route("/sessions/{id}/edit", get(session_edit_get).post(session_edit_post))
+        .route("/sessions/{id}/standings", get(session_standings))
+        .route("/sessions/{id}/rounds/{round}", get(session_round))
+        .route("/sessions/{id}/standings/best", get(session_standings_best))
+        .route("/sessions/{id}/standings/all", get(session_standings_all))
         .route("/sessions/{id}/start", post(session_start))
+        .route("/sessions/{id}/cancel", post(session_cancel))
         .route("/login", get(login))
         .route("/auth/callback", get(callback))
         .route("/logout", get(logout))

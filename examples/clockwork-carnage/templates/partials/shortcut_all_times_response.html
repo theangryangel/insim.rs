@@ -1,0 +1,15 @@
+{% include "partials/shortcut_all_times_content.html" %}
+<div id="standings-tabs" hx-swap-oob="true" class="flex bg-gray-100 rounded p-0.5 text-xs font-semibold">
+  <button hx-get="/sessions/{{ session.id }}/standings/best"
+          hx-target="#standings-content"
+          hx-swap="outerHTML"
+          class="px-2.5 py-1 rounded text-gray-400 hover:text-gray-700 transition-colors">
+    Best Times
+  </button>
+  <button hx-get="/sessions/{{ session.id }}/standings/all"
+          hx-target="#standings-content"
+          hx-swap="outerHTML"
+          class="px-2.5 py-1 rounded bg-white shadow-sm text-gray-700 transition-colors">
+    All Times
+  </button>
+</div>

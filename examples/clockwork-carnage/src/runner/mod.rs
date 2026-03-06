@@ -60,6 +60,8 @@ pub async fn execute<G: MiniGame>(
             },
         }
     }
-    game.teardown(session, ctx).await
+    game.teardown(session, ctx).await?;
+    ctx.insim.send_command("/axclear").await?;
+    Ok(())
     // _guard dropped here -> chat JoinHandle aborted
 }

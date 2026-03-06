@@ -1,0 +1,41 @@
+{# ── Standings ── #}
+<section class="mb-6" id="metronome-standings"
+  {% match session.status %}
+    {% when SessionStatus::Active %}
+      hx-get="/sessions/{{ session.id }}/standings"
+      hx-trigger="every 5s"
+      hx-swap="outerHTML"
+    {% when _ %}
+  {% endmatch %}
+>
+  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Standings</p>
+  <table class="w-full">
+    <thead>
+      <tr class="text-left text-xs text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-200">
+        <th class="py-2 pr-2 w-8">#</th>
+        <th class="py-2 px-2">Driver</th>
+        <th class="py-2 pl-2 text-right">Points</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if metronome_standings.is_empty() %}
+      <tr class="border-b border-gray-100">
+        <td class="py-2 pr-2 font-mono text-gray-400" colspan="3">
+          <p class="text-center text-xs text-gray-300 py-4">No results yet</p>
+        </td>
+      </tr>
+      {% else %}
+      {% for standing in metronome_standings %}
+      <tr class="border-b border-gray-100">
+        <td class="py-2 pr-2 font-mono text-gray-400 text-sm">{{ loop.index }}</td>
+        <td class="py-2 px-2">
+          <span class="font-medium">{{ standing.pname|colour_html|safe }}</span>
+          <span class="text-xs text-gray-400 ml-1">{{ standing.uname }}</span>
+        </td>
+        <td class="py-2 pl-2 text-right font-mono font-semibold">{{ standing.total_points }}</td>
+      </tr>
+      {% endfor %}
+      {% endif %}
+    </tbody>
+  </table>
+</section>

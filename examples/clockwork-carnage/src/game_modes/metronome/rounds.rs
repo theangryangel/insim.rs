@@ -371,8 +371,8 @@ impl RoundsState {
                         },
                         InsimCheckpointKind::Finish => {
                             if let Some(start) = self.active_runs.remove(&conn.uname) {
-                                let delta = time.saturating_sub(start);
-                                let diff = config.target.abs_diff(delta);
+                                let elapsed = time.saturating_sub(start);
+                                let diff = config.target.abs_diff(elapsed);
                                 let best = {
                                     let entry = self
                                         .round_best

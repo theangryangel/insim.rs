@@ -1,0 +1,46 @@
+<div id="session-actions">
+{% if page.admin %}
+<div class="flex items-center gap-1.5">
+  <a href="/sessions/{{ session.id }}/edit"
+    class="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-semibold rounded hover:bg-gray-200 transition-colors">
+    Edit
+  </a>
+  {% match session.status %}
+    {% when SessionStatus::Pending %}
+    <form method="post" action="/sessions/{{ session.id }}/start"
+          hx-post="/sessions/{{ session.id }}/start"
+          hx-target="#session-actions"
+          hx-swap="outerHTML">
+      <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}"/>
+      <button type="submit"
+        class="px-2 py-1 bg-orange-600 text-white text-xs font-semibold rounded hover:bg-orange-700 transition-colors">
+        Start
+      </button>
+    </form>
+    <form method="post" action="/sessions/{{ session.id }}/cancel"
+          hx-post="/sessions/{{ session.id }}/cancel"
+          hx-target="#session-actions"
+          hx-swap="outerHTML">
+      <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}"/>
+      <button type="submit"
+        class="px-2 py-1 bg-gray-200 text-gray-600 text-xs font-semibold rounded hover:bg-gray-300 transition-colors">
+        Cancel
+      </button>
+    </form>
+    {% when SessionStatus::Active %}
+    <form method="post" action="/sessions/{{ session.id }}/cancel"
+          hx-post="/sessions/{{ session.id }}/cancel"
+          hx-target="#session-actions"
+          hx-swap="outerHTML">
+      <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}"/>
+      <button type="submit"
+        class="px-2 py-1 bg-gray-200 text-gray-600 text-xs font-semibold rounded hover:bg-gray-300 transition-colors">
+        Cancel
+      </button>
+    </form>
+    {% when SessionStatus::Completed %}
+    {% when SessionStatus::Cancelled %}
+  {% endmatch %}
+</div>
+{% endif %}
+</div>

@@ -4,7 +4,10 @@
 
 {# ── Header ── #}
 <div class="flex items-start justify-between gap-4 mb-6">
-  <h1 class="text-2xl font-bold">{% match session.name %}{% when Some with (n) %}{{ n }}{% when None %}Session #{{ session.id }}{% endmatch %}</h1>
+  <div>
+    <h1 class="text-2xl font-bold mb-2">{% match session.name %}{% when Some with (n) %}{{ n }}{% when None %}Session #{{ session.id }}{% endmatch %}</h1>
+    {% include "partials/session_actions.html" %}
+  </div>
   <span class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full border
     {% match session.status %}
       {% when SessionStatus::Active %}bg-orange-600/20 border-orange-800/30

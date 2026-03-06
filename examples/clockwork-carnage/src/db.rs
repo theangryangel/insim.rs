@@ -450,7 +450,7 @@ pub async fn metronome_standings(
         JOIN users u ON u.id = r.user_id
         JOIN sessions s ON s.id = r.session_id
         WHERE r.session_id = ? 
-          AND s.mode ->> '$.type' = 'METRONOME' -- Guard rail
+          AND s.mode ->> '$.type' = 'metronome' -- Guard rail
         GROUP BY r.user_id
         ORDER BY total_points DESC
         "#,
@@ -484,6 +484,22 @@ pub async fn metronome_round_results(
     .await
 }
 
+pub async fn metronome_all_results(
+    pool: &Pool,
+    session_id: i64,
+) -> Result<Vec<MetronomeResult>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT r.id, r.session_id, r.round, u.uname, u.pname, r.delta_ms, r.points, r.recorded_at
+         FROM metronome_results r
+         JOIN users u ON u.id = r.user_id
+         WHERE r.session_id = ?
+         ORDER BY r.round ASC, r.points DESC",
+    )
+    .bind(session_id)
+    .fetch_all(pool)
+    .await
+}
+
 // -- Shortcut queries ---------------------------------------------------------
 
 pub async fn insert_shortcut_time(
@@ -510,7 +526,6 @@ pub async fn insert_shortcut_time(
 pub async fn shortcut_best_times(
     pool: &Pool,
     session_id: i64,
-    limit: i64,
 ) -> Result<Vec<ShortcutTime>, sqlx::Error> {
     sqlx::query_as(
         "SELECT ct.id, ct.session_id, u.uname, u.pname, ct.vehicle, ct.time_ms, ct.set_at
@@ -522,12 +537,26 @@ pub async fn shortcut_best_times(
              WHERE session_id = ?
              GROUP BY user_id
          ) pb ON ct.user_id = pb.user_id AND ct.time_ms = pb.best AND ct.session_id = ?
-         ORDER BY ct.time_ms ASC
-         LIMIT ?",
+         ORDER BY ct.time_ms ASC",
     )
     .bind(session_id)
     .bind(session_id)
-    .bind(limit)
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn shortcut_all_times(
+    pool: &Pool,
+    session_id: i64,
+) -> Result<Vec<ShortcutTime>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT ct.id, ct.session_id, u.uname, u.pname, ct.vehicle, ct.time_ms, ct.set_at
+         FROM shortcut_times ct
+         JOIN users u ON u.id = ct.user_id
+         WHERE ct.session_id = ?
+         ORDER BY ct.time_ms ASC",
+    )
+    .bind(session_id)
     .fetch_all(pool)
     .await
 }
@@ -552,6 +581,54 @@ pub async fn shortcut_personal_best(
 }
 
 // -- Session metadata updates -------------------------------------------------
+
+pub struct UpdateSessionParams<'a> {
+    pub track: Track,
+    pub layout: &'a str,
+    pub name: Option<&'a str>,
+    pub description: Option<&'a str>,
+    pub scheduled_at: Option<&'a str>,
+    pub writeup: Option<&'a str>,
+}
+
+pub async fn update_session(
+    pool: &Pool,
+    id: i64,
+    p: &UpdateSessionParams<'_>,
+) -> Result<(), sqlx::Error> {
+    let _ = sqlx::query(
+        "UPDATE sessions SET track = ?, layout = ?, name = ?, description = ?, scheduled_at = ?, writeup = ? WHERE id = ?",
+    )
+    .bind(p.track.to_string())
+    .bind(p.layout)
+    .bind(p.name)
+    .bind(p.description)
+    .bind(p.scheduled_at)
+    .bind(p.writeup)
+    .bind(id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn update_metronome_settings(
+    pool: &Pool,
+    session_id: i64,
+    rounds: i64,
+    target_ms: i64,
+    max_scorers: i64,
+) -> Result<(), sqlx::Error> {
+    let _ = sqlx::query(
+        "UPDATE sessions SET mode = json_set(mode, '$.rounds', ?, '$.target_ms', ?, '$.max_scorers', ?) WHERE id = ?",
+    )
+    .bind(rounds)
+    .bind(target_ms)
+    .bind(max_scorers)
+    .bind(session_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
 
 pub async fn update_session_writeup(
     pool: &Pool,

@@ -1,0 +1,47 @@
+<div id="round-breakdown"
+  {% match session.status %}
+    {% when SessionStatus::Active %}
+      hx-get="/sessions/{{ session.id }}/round-breakdown"
+      hx-trigger="every 5s"
+      hx-swap="outerHTML"
+    {% when _ %}
+  {% endmatch %}
+>
+{% if !metronome_rounds.is_empty() %}
+<p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Round Breakdown</p>
+<div class="space-y-4">
+  {% for round in metronome_rounds %}
+  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div class="px-3 py-2 bg-gray-50 border-b border-gray-200">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Round {{ round.round }}</p>
+    </div>
+    <table class="w-full">
+      <thead>
+        <tr class="text-left text-xs text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-100">
+          <th class="py-2 pr-2 pl-3 w-8">#</th>
+          <th class="py-2 px-2">Driver</th>
+          <th class="py-2 px-2 text-right">Delta</th>
+          <th class="py-2 pl-2 pr-3 text-right">Points</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for result in round.results %}
+        <tr class="border-b border-gray-50 last:border-0">
+          <td class="py-1.5 pr-2 pl-3 font-mono text-gray-400 text-sm">{{ loop.index }}</td>
+          <td class="py-1.5 px-2">
+            <span class="font-medium">{{ result.pname|colour_html|safe }}</span>
+            <span class="text-xs text-gray-400 ml-1">{{ result.uname }}</span>
+          </td>
+          <td class="py-1.5 px-2 text-right font-mono text-sm text-gray-600">
+            {{ result.delta_ms|format_delta_ms }}
+          </td>
+          <td class="py-1.5 pl-2 pr-3 text-right font-mono font-semibold">{{ result.points }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+</div>

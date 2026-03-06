@@ -297,7 +297,7 @@ impl Scene for ChallengeLoop {
 
 impl ChallengeLoop {
     async fn challenge_leaderboard(&self) -> Result<ChallengeLeaderboard, SceneError> {
-        let rows = db::shortcut_best_times(&self.db, self.session_id, 100)
+        let rows = db::shortcut_best_times(&self.db, self.session_id)
             .await
             .map_err(|cause| SceneError::Custom {
                 scene: "challenge::challenge_leaderboard",
