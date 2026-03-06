@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use insim::builder::InsimTask;
 use kitcar::{
-    scenes::{Scene, SceneError, SceneResult},
+    scenes::{FromContext, Scene, SceneError, SceneResult},
     ui,
 };
 use tokio::time::sleep;
@@ -71,19 +71,25 @@ impl From<ui::UiState<ClockworkVictoryGlobalProps, ClockworkVictoryConnectionPro
 /// Victory scene - displays final standings
 #[derive(Clone)]
 pub struct Victory {
-    pub insim: InsimTask,
-    pub db: db::Pool,
     pub session_id: i64,
 }
 
-impl Scene for Victory {
+impl<Ctx> Scene<Ctx> for Victory
+where
+    InsimTask: FromContext<Ctx>,
+    db::Pool: FromContext<Ctx>,
+    Ctx: Sync,
+{
     type Output = ();
 
-    async fn run(self) -> Result<SceneResult<Self::Output>, SceneError> {
-        let leaderboard = self.event_leaderboard().await?;
+    async fn run(self, ctx: &Ctx) -> Result<SceneResult<Self::Output>, SceneError> {
+        let insim = InsimTask::from_context(ctx);
+        let db = db::Pool::from_context(ctx);
+
+        let leaderboard = event_leaderboard(&db, self.session_id).await?;
         tracing::info!("leaderboard: {:?}", leaderboard);
         let ui = ui::mount(
-            self.insim.clone(),
+            insim,
             ClockworkVictoryGlobalProps {
                 standings: leaderboard,
             },
@@ -95,19 +101,17 @@ impl Scene for Victory {
     }
 }
 
-impl Victory {
-    async fn event_leaderboard(&self) -> Result<EventLeaderboard, SceneError> {
-        let standings = db::metronome_standings(&self.db, self.session_id)
-            .await
-            .map_err(|cause| SceneError::Custom {
-                scene: "victory::event_leaderboard",
-                cause: Box::new(cause),
-            })?;
+async fn event_leaderboard(db: &db::Pool, session_id: i64) -> Result<EventLeaderboard, SceneError> {
+    let standings = db::metronome_standings(db, session_id)
+        .await
+        .map_err(|cause| SceneError::Custom {
+            scene: "victory::event_leaderboard",
+            cause: Box::new(cause),
+        })?;
 
-        Ok(standings
-            .into_iter()
-            .map(|s| (s.uname, s.pname, s.total_points as u32))
-            .collect::<Vec<_>>()
-            .into())
-    }
+    Ok(standings
+        .into_iter()
+        .map(|s| (s.uname, s.pname, s.total_points as u32))
+        .collect::<Vec<_>>()
+        .into())
 }

@@ -46,27 +46,18 @@ impl MiniGame for ShortcutGame {
 
     async fn run(self, ctx: &GameCtx) -> Result<SceneResult<()>, SceneError> {
         let challenge_scene = WaitForPlayers {
-            insim: ctx.insim.clone(),
-            presence: ctx.presence.clone(),
             min_players: MIN_PLAYERS,
         }
         .then(
             setup_track::SetupTrack {
-                insim: ctx.insim.clone(),
-                presence: ctx.presence.clone(),
                 min_players: MIN_PLAYERS,
-                game: ctx.game.clone(),
                 track: self.track,
                 layout: Some(self.layout.clone()),
             }
             .with_timeout(Duration::from_secs(60)),
         )
         .then(shortcut::ChallengeLoop {
-            insim: ctx.insim.clone(),
-            game: ctx.game.clone(),
-            presence: ctx.presence.clone(),
             chat: self.chat.clone(),
-            db: ctx.pool.clone(),
             session_id: self.session_id,
         })
         .loop_until_quit();
@@ -75,7 +66,7 @@ impl MiniGame for ShortcutGame {
         let chat = self.chat.clone();
 
         tokio::select! {
-            res = challenge_scene.run() => {
+            res = challenge_scene.run(ctx) => {
                 let _ = res?;
                 Ok(SceneResult::Continue(()))
             },

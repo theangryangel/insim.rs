@@ -11,7 +11,7 @@ use insim::{
 };
 use kitcar::{
     game, presence,
-    scenes::{Scene, SceneError, SceneResult},
+    scenes::{FromContext, Scene, SceneError, SceneResult},
     ui::{self, Component},
 };
 
@@ -128,18 +128,45 @@ impl From<ui::UiState<ChallengeGlobalProps, ChallengeConnectionProps>> for Chall
 /// Challenge mode — runs indefinitely, players compete for fastest time.
 #[derive(Clone)]
 pub struct ChallengeLoop {
-    pub insim: InsimTask,
-    pub game: game::Game,
-    pub presence: presence::Presence,
     pub chat: chat::ChallengeChat,
-    pub db: db::Pool,
     pub session_id: i64,
 }
 
-impl Scene for ChallengeLoop {
+impl<Ctx> Scene<Ctx> for ChallengeLoop
+where
+    InsimTask: FromContext<Ctx>,
+    game::Game: FromContext<Ctx>,
+    presence::Presence: FromContext<Ctx>,
+    db::Pool: FromContext<Ctx>,
+    Ctx: Sync,
+{
     type Output = ();
 
-    async fn run(mut self) -> Result<SceneResult<()>, SceneError> {
+    async fn run(self, ctx: &Ctx) -> Result<SceneResult<()>, SceneError> {
+        let inner = ChallengeLoopInner {
+            insim: InsimTask::from_context(ctx),
+            game: game::Game::from_context(ctx),
+            presence: presence::Presence::from_context(ctx),
+            db: db::Pool::from_context(ctx),
+            chat: self.chat,
+            session_id: self.session_id,
+        };
+        inner.run_inner().await
+    }
+}
+
+/// Internal struct combining config and extracted infrastructure.
+struct ChallengeLoopInner {
+    insim: InsimTask,
+    game: game::Game,
+    presence: presence::Presence,
+    db: db::Pool,
+    chat: chat::ChallengeChat,
+    session_id: i64,
+}
+
+impl ChallengeLoopInner {
+    async fn run_inner(mut self) -> Result<SceneResult<()>, SceneError> {
         let _spawn_control = crate::runner::spawn_control::spawn(self.insim.clone())
             .await
             .map_err(|cause| SceneError::Custom {
@@ -293,9 +320,7 @@ impl Scene for ChallengeLoop {
             }
         }
     }
-}
 
-impl ChallengeLoop {
     async fn challenge_leaderboard(&self) -> Result<ChallengeLeaderboard, SceneError> {
         let rows = db::shortcut_best_times(&self.db, self.session_id)
             .await

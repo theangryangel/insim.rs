@@ -6,7 +6,7 @@ pub mod shortcut;
 pub mod spawn_control;
 
 use insim::builder::InsimTask;
-use kitcar::{game, presence, scenes::SceneError};
+use kitcar::{game, presence, scenes::{FromContext, SceneError}};
 
 use crate::db;
 
@@ -16,6 +16,30 @@ pub struct GameCtx {
     pub insim: InsimTask,
     pub presence: presence::Presence,
     pub game: game::Game,
+}
+
+impl FromContext<GameCtx> for InsimTask {
+    fn from_context(ctx: &GameCtx) -> Self {
+        ctx.insim.clone()
+    }
+}
+
+impl FromContext<GameCtx> for presence::Presence {
+    fn from_context(ctx: &GameCtx) -> Self {
+        ctx.presence.clone()
+    }
+}
+
+impl FromContext<GameCtx> for game::Game {
+    fn from_context(ctx: &GameCtx) -> Self {
+        ctx.game.clone()
+    }
+}
+
+impl FromContext<GameCtx> for db::Pool {
+    fn from_context(ctx: &GameCtx) -> Self {
+        ctx.pool.clone()
+    }
 }
 
 /// Lifecycle trait for mini-games. Each mode implements this.

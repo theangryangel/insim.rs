@@ -3,35 +3,39 @@
 
 use insim::builder::InsimTask;
 
-use super::{Scene, SceneError, SceneResult};
+use super::{FromContext, Scene, SceneError, SceneResult};
 use crate::presence;
 
 /// Wait for minimum players to connect
 #[derive(Clone)]
 pub struct WaitForPlayers {
-    /// Insim handle
-    pub insim: InsimTask,
-    /// Presence handle
-    pub presence: presence::Presence,
     /// Minimum number of players required. It should include the dedicated server itself.
     pub min_players: usize,
 }
 
-impl Scene for WaitForPlayers {
+impl<Ctx> Scene<Ctx> for WaitForPlayers
+where
+    InsimTask: FromContext<Ctx>,
+    presence::Presence: FromContext<Ctx>,
+    Ctx: Sync,
+{
     type Output = ();
 
-    async fn run(mut self) -> Result<SceneResult<()>, SceneError> {
+    async fn run(self, ctx: &Ctx) -> Result<SceneResult<()>, SceneError> {
+        let insim = InsimTask::from_context(ctx);
+        let mut presence = presence::Presence::from_context(ctx);
+
         tracing::info!("Waiting for {} players...", self.min_players);
-        let mut packets = self.insim.subscribe();
+        let mut packets = insim.subscribe();
 
         loop {
             tokio::select! {
                 packet = packets.recv() => {
                     if let insim::Packet::Ncn(ncn) = packet.map_err(|_| SceneError::InsimHandleLost)? {
-                        self.insim.send_message("Waiting for players", ncn.ucid).await?;
+                        insim.send_message("Waiting for players", ncn.ucid).await?;
                     }
                 }
-                res = self.presence.wait_for_connection_count(|val| *val >= self.min_players) => {
+                res = presence.wait_for_connection_count(|val| *val >= self.min_players) => {
                     let _ = res.map_err(|cause| SceneError::Custom {
                         scene: "wait_for_players::wait_for_connection_count",
                         cause: Box::new(cause),

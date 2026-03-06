@@ -1,7 +1,7 @@
 use insim::{builder::InsimTask, core::track::Track, insim::RaceLaps};
 use kitcar::{
     game, presence,
-    scenes::{Scene, SceneError, SceneResult},
+    scenes::{FromContext, Scene, SceneError, SceneResult},
     ui,
 };
 
@@ -20,24 +20,31 @@ impl ui::Component for SetupTrackView {
 /// Setup track
 #[derive(Clone)]
 pub struct SetupTrack {
-    pub game: game::Game,
-    pub presence: presence::Presence,
-    pub insim: InsimTask,
     pub min_players: usize,
     pub track: Track,
     pub layout: Option<String>,
 }
 
-impl Scene for SetupTrack {
+impl<Ctx> Scene<Ctx> for SetupTrack
+where
+    InsimTask: FromContext<Ctx>,
+    game::Game: FromContext<Ctx>,
+    presence::Presence: FromContext<Ctx>,
+    Ctx: Sync,
+{
     type Output = ();
 
-    async fn run(mut self) -> Result<SceneResult<()>, SceneError> {
-        let (_ui, _ui_handle) = ui::mount(self.insim.clone(), (), |_ucid, _invalidator| {
+    async fn run(self, ctx: &Ctx) -> Result<SceneResult<()>, SceneError> {
+        let insim = InsimTask::from_context(ctx);
+        let mut game = game::Game::from_context(ctx);
+        let mut presence = presence::Presence::from_context(ctx);
+
+        let (_ui, _ui_handle) = ui::mount(insim.clone(), (), |_ucid, _invalidator| {
             SetupTrackView {}
         });
         tokio::select! {
-            res = self.game.track_rotation(
-                self.insim.clone(),
+            res = game.track_rotation(
+                insim.clone(),
                 self.track,
                 RaceLaps::Practice,
                 0,
@@ -49,7 +56,7 @@ impl Scene for SetupTrack {
                 })?;
                 Ok(SceneResult::Continue(()))
             },
-            res = self.presence.wait_for_connection_count(|val| *val < self.min_players) => {
+            res = presence.wait_for_connection_count(|val| *val < self.min_players) => {
                 let _ = res.map_err(|cause| SceneError::Custom {
                     scene: "setup_track::wait_for_connection_count",
                     cause: Box::new(cause),

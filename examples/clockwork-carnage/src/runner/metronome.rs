@@ -76,36 +76,25 @@ impl MiniGame for MetronomeGame {
 
     async fn run(self, ctx: &GameCtx) -> Result<SceneResult<()>, SceneError> {
         let clockwork = WaitForPlayers {
-            insim: ctx.insim.clone(),
-            presence: ctx.presence.clone(),
             min_players: MIN_PLAYERS,
         }
         .then(metronome::WaitForAdminStart {
-            insim: ctx.insim.clone(),
-            presence: ctx.presence.clone(),
             chat: self.chat.clone(),
         })
         .then(
             setup_track::SetupTrack {
-                insim: ctx.insim.clone(),
-                presence: ctx.presence.clone(),
                 min_players: MIN_PLAYERS,
-                game: ctx.game.clone(),
                 track: self.track,
                 layout: Some(self.layout.clone()),
             }
             .with_timeout(Duration::from_secs(60)),
         )
         .then(metronome::Clockwork {
-            game: ctx.game.clone(),
-            presence: ctx.presence.clone(),
             chat: self.chat.clone(),
             start_round: self.start_round,
             rounds: self.rounds,
             max_scorers: self.max_scorers,
             target: self.target,
-            insim: ctx.insim.clone(),
-            db: ctx.pool.clone(),
             session_id: self.session_id,
         })
         .loop_until_quit();
@@ -114,7 +103,7 @@ impl MiniGame for MetronomeGame {
         let chat = self.chat.clone();
 
         tokio::select! {
-            res = clockwork.run() => {
+            res = clockwork.run(ctx) => {
                 let _ = res?;
                 Ok(SceneResult::Continue(()))
             },

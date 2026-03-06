@@ -10,7 +10,7 @@ use insim::{
 };
 use kitcar::{
     game, presence,
-    scenes::{Scene, SceneError, SceneResult},
+    scenes::{FromContext, Scene, SceneError, SceneResult},
     time::Countdown,
     ui::{self, Component},
 };
@@ -146,22 +146,57 @@ impl From<ui::UiState<ClockworkRoundGlobalProps, ClockworkRoundConnectionProps>>
 /// Rounds scene - runs multiple rounds and tracks scores
 #[derive(Clone)]
 pub struct Rounds {
-    pub insim: InsimTask,
-    pub game: game::Game,
-    pub presence: presence::Presence,
     pub chat: chat::EventChat,
     pub start_round: usize,
     pub rounds: usize,
     pub target: Duration,
     pub max_scorers: usize,
-    pub db: db::Pool,
     pub session_id: i64,
 }
 
-impl Scene for Rounds {
+impl<Ctx> Scene<Ctx> for Rounds
+where
+    InsimTask: FromContext<Ctx>,
+    game::Game: FromContext<Ctx>,
+    presence::Presence: FromContext<Ctx>,
+    db::Pool: FromContext<Ctx>,
+    Ctx: Sync,
+{
     type Output = ();
 
-    async fn run(mut self) -> Result<SceneResult<Self::Output>, SceneError> {
+    async fn run(self, ctx: &Ctx) -> Result<SceneResult<Self::Output>, SceneError> {
+        let inner = RoundsInner {
+            insim: InsimTask::from_context(ctx),
+            game: game::Game::from_context(ctx),
+            presence: presence::Presence::from_context(ctx),
+            db: db::Pool::from_context(ctx),
+            chat: self.chat,
+            start_round: self.start_round,
+            rounds: self.rounds,
+            target: self.target,
+            max_scorers: self.max_scorers,
+            session_id: self.session_id,
+        };
+        inner.run_inner().await
+    }
+}
+
+/// Internal struct combining config and extracted infrastructure for use in helper methods.
+struct RoundsInner {
+    insim: InsimTask,
+    game: game::Game,
+    presence: presence::Presence,
+    db: db::Pool,
+    chat: chat::EventChat,
+    start_round: usize,
+    rounds: usize,
+    target: Duration,
+    max_scorers: usize,
+    session_id: i64,
+}
+
+impl RoundsInner {
+    async fn run_inner(mut self) -> Result<SceneResult<()>, SceneError> {
         let mut state = RoundsState {
             round_best: HashMap::new(),
             active_runs: HashMap::new(),
@@ -197,7 +232,7 @@ struct RoundsState {
 impl RoundsState {
     async fn broadcast_rankings(
         &mut self,
-        config: &Rounds,
+        config: &RoundsInner,
         ui: &ui::Ui<
             ClockworkRoundMessage,
             ClockworkRoundGlobalProps,
@@ -222,7 +257,7 @@ impl RoundsState {
         Ok(())
     }
 
-    async fn event_leaderboard(config: &Rounds) -> Result<EventLeaderboard, SceneError> {
+    async fn event_leaderboard(config: &RoundsInner) -> Result<EventLeaderboard, SceneError> {
         let standings = db::metronome_standings(&config.db, config.session_id)
             .await
             .map_err(|cause| SceneError::Custom {
@@ -248,7 +283,7 @@ impl RoundsState {
     async fn run_round(
         &mut self,
         round: usize,
-        config: &mut Rounds,
+        config: &mut RoundsInner,
         ui: &ui::Ui<
             ClockworkRoundMessage,
             ClockworkRoundGlobalProps,
@@ -306,7 +341,7 @@ impl RoundsState {
     async fn handle_packet(
         &mut self,
         packet: insim::Packet,
-        config: &Rounds,
+        config: &RoundsInner,
         ui: &ui::Ui<
             ClockworkRoundMessage,
             ClockworkRoundGlobalProps,
@@ -418,7 +453,7 @@ impl RoundsState {
         Ok(())
     }
 
-    async fn score_round(&mut self, round: usize, config: &Rounds) {
+    async fn score_round(&mut self, round: usize, config: &RoundsInner) {
         let mut ordered: Vec<_> = self.round_best.drain().collect();
         ordered.sort_by_key(|(_, v)| *v);
 

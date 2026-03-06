@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use insim::builder::InsimTask;
 use kitcar::{
-    scenes::{Scene, SceneError, SceneResult},
+    scenes::{FromContext, Scene, SceneError, SceneResult},
     time::Countdown,
     ui::{self, Component},
 };
@@ -81,18 +81,22 @@ impl From<ui::UiState<Duration, ()>> for ClockworkLobbyProps {
 /// Lobby scene - 20 second warm up period
 #[derive(Clone)]
 pub struct Lobby {
-    pub insim: InsimTask,
     pub chat: chat::EventChat,
 }
 
-impl Scene for Lobby {
+impl<Ctx> Scene<Ctx> for Lobby
+where
+    InsimTask: FromContext<Ctx>,
+    Ctx: Sync,
+{
     type Output = ();
 
-    async fn run(self) -> Result<SceneResult<Self::Output>, SceneError> {
+    async fn run(self, ctx: &Ctx) -> Result<SceneResult<Self::Output>, SceneError> {
+        let insim = InsimTask::from_context(ctx);
         tracing::info!("Lobby: 20 second warm up");
         let mut countdown = Countdown::new(Duration::from_secs(1), 20);
         let (ui, _ui_handle) = ui::mount_with(
-            self.insim.clone(),
+            insim.clone(),
             Duration::ZERO,
             |_ucid, _invalidator| ClockworkLobbyView {
                 help_dialog: Dialog::default(),

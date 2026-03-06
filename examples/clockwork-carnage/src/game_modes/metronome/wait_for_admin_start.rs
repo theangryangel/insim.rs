@@ -1,5 +1,5 @@
 use insim::{builder::InsimTask, identifiers::ConnectionId};
-use kitcar::{presence, scenes, ui};
+use kitcar::{presence, scenes::{self, FromContext}, ui};
 
 use super::chat;
 use crate::components::{Marquee, topbar};
@@ -34,25 +34,31 @@ impl ui::Component for WaitForAdminStartView {
 /// Wait for admin to start
 #[derive(Clone)]
 pub struct WaitForAdminStart {
-    pub insim: InsimTask,
-    pub presence: presence::Presence,
     pub chat: chat::EventChat,
 }
 
-impl scenes::Scene for WaitForAdminStart {
+impl<Ctx> scenes::Scene<Ctx> for WaitForAdminStart
+where
+    InsimTask: FromContext<Ctx>,
+    presence::Presence: FromContext<Ctx>,
+    Ctx: Sync,
+{
     type Output = ();
 
-    async fn run(self) -> Result<scenes::SceneResult<()>, scenes::SceneError> {
-        let (_ui, _ui_handle) = ui::mount(self.insim.clone(), (), |_ucid, invalidator| {
+    async fn run(self, ctx: &Ctx) -> Result<scenes::SceneResult<()>, scenes::SceneError> {
+        let insim = InsimTask::from_context(ctx);
+        let presence = presence::Presence::from_context(ctx);
+
+        let (_ui, _ui_handle) = ui::mount(insim.clone(), (), |_ucid, invalidator| {
             WaitForAdminStartView::new(invalidator)
         });
 
-        self.insim
+        insim
             .send_message("Ready for admin !start command", ConnectionId::ALL)
             .await?;
 
         self.chat
-            .wait_for_admin_cmd(self.presence.clone(), |msg| {
+            .wait_for_admin_cmd(presence, |msg| {
                 matches!(msg, chat::EventChatMsg::Start)
             })
             .await?;
