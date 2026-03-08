@@ -1,5 +1,14 @@
 //! MetronomeGame — MiniGame implementation for the metronome/event mode.
 
+pub mod chat;
+mod lobby;
+mod rounds;
+mod victory;
+
+pub use lobby::Lobby;
+pub use rounds::Rounds;
+pub use victory::Victory;
+
 use std::time::Duration;
 
 use kitcar::scenes::{Scene, SceneExt, SceneResult, SceneError, wait_for_players::WaitForPlayers};
@@ -7,7 +16,7 @@ use sqlx::types::Json;
 use tokio::task::JoinHandle;
 
 use super::{GameCtx, MiniGame};
-use crate::{ChatError, MIN_PLAYERS, db, game_modes::metronome};
+use crate::{ChatError, MIN_PLAYERS, db};
 use super::setup_track;
 
 #[derive(Clone)]
@@ -20,7 +29,7 @@ pub struct MetronomeGame {
     pub lobby_duration: Duration,
     pub track: insim::core::track::Track,
     pub layout: String,
-    pub chat: metronome::chat::EventChat,
+    pub chat: chat::EventChat,
 }
 
 pub struct MetronomeGuard {
@@ -37,7 +46,7 @@ impl MiniGame for MetronomeGame {
     type Guard = MetronomeGuard;
 
     async fn setup(session: &db::Session, ctx: &GameCtx) -> Result<(Self, Self::Guard), SceneError> {
-        let (chat, chat_handle) = metronome::chat::spawn(ctx.insim.clone());
+        let (chat, chat_handle) = chat::spawn(ctx.insim.clone());
 
         let session = db::get_session(&ctx.pool, session.id)
             .await
@@ -94,18 +103,18 @@ impl MiniGame for MetronomeGame {
             }
         }
 
-        let _spawn_control = crate::runner::spawn_control::spawn(ctx.insim.clone())
+        let _spawn_control = crate::games::spawn_control::spawn(ctx.insim.clone())
             .await
             .map_err(|cause| SceneError::Custom {
                 scene: "metronome::spawn_control",
                 cause: Box::new(cause),
             })?;
 
-        let event = metronome::Lobby {
+        let event = Lobby {
             chat: self.chat.clone(),
             duration: self.lobby_duration,
         }
-        .then(metronome::Rounds {
+        .then(Rounds {
             chat: self.chat.clone(),
             start_round: self.start_round,
             rounds: self.rounds,
@@ -113,7 +122,7 @@ impl MiniGame for MetronomeGame {
             max_scorers: self.max_scorers,
             session_id: self.session_id,
         })
-        .then(metronome::Victory {
+        .then(Victory {
             session_id: self.session_id,
         });
 
@@ -125,7 +134,7 @@ impl MiniGame for MetronomeGame {
                 let _ = res?;
                 Ok(SceneResult::Continue(()))
             },
-            _ = chat.wait_for_admin_cmd(presence, |msg| matches!(msg, metronome::chat::EventChatMsg::Quit)) => {
+            _ = chat.wait_for_admin_cmd(presence, |msg| matches!(msg, chat::EventChatMsg::Quit)) => {
                 Ok(SceneResult::Quit)
             }
         }

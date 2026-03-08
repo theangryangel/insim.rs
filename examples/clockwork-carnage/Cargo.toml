@@ -8,18 +8,6 @@ repository.workspace = true
 license.workspace = true
 homepage.workspace = true
 
-[lib]
-name = "clockwork_carnage"
-path = "src/lib.rs"
-
-[[bin]]
-name = "runner"
-path = "src/bin/runner.rs"
-
-[[bin]]
-name = "web"
-path = "src/bin/web.rs"
-
 [dependencies]
 anyhow = "1"
 askama = "0.15"

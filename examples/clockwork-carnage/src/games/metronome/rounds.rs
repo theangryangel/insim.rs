@@ -18,7 +18,7 @@ use tokio::time::sleep;
 
 use super::chat;
 use crate::{
-    components::{
+    hud::{
         Dialog, DialogMsg, DialogProps, EventLeaderboard, scoreboard,
         theme::{hud_active, hud_muted, hud_text, hud_title},
         topbar,

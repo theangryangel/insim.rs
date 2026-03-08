@@ -1,5 +1,16 @@
-//! Clockwork Carnage — web dashboard with LFS OAuth login.
+//! Clockwork Carnage — unified binary (InSim runner + web dashboard).
 
+#![allow(missing_docs, missing_debug_implementations)]
+
+mod db;
+mod games;
+mod hud;
+mod web;
+
+type ChatError = kitcar::chat::RuntimeError;
+const MIN_PLAYERS: usize = 2;
+
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use askama::Template;
@@ -11,31 +22,119 @@ use axum::{
     routing::{get, post},
 };
 use axum_login::AuthManagerLayerBuilder;
-use clap::Parser;
-use clockwork_carnage::{
-    db::{self, Session, SessionMode, SessionStatus},
-    web::{AuthSession, Backend, OAuthCredentials},
-};
-use insim::core::track::Track;
+use clap::{Parser, Subcommand};
+use db::{Session, SessionMode, SessionStatus};
+use games::{GameCtx, execute};
+use web::{AuthSession, Backend, OAuthCredentials};
+use insim::{WithRequestId, core::track::Track, insim::TinyType};
+use kitcar::{game, presence};
 use oauth2::{AuthUrl, ClientId, CsrfToken, RedirectUrl, Scope, basic::BasicClient};
-use tower_sessions::{SessionManagerLayer, cookie::SameSite, cookie::Key};
+use sqlx::types::Json;
+use tower_sessions::{SessionManagerLayer, Session as TowerSession, cookie::Key, cookie::SameSite};
 use tower_sessions_sqlx_store::SqliteStore;
-use tower_sessions::Session as TowerSession;
+
+// -- CLI ----------------------------------------------------------------------
 
 #[derive(Debug, Parser)]
 struct Args {
     #[arg(long, default_value = "clockwork-carnage.db")]
     db: String,
 
-    #[arg(long, default_value = "127.0.0.1:3000")]
-    listen: String,
+    #[command(subcommand)]
+    command: Command,
 }
 
-#[derive(Clone)]
-struct AppState {
-    pool: Arc<db::Pool>,
-    oauth_client: BasicClient,
+#[derive(Debug, Subcommand)]
+enum Command {
+    /// Start the runner (connects to InSim, polls for active sessions, serves web UI)
+    Run {
+        #[arg(short, long)]
+        addr: SocketAddr,
+
+        #[arg(short, long)]
+        password: Option<String>,
+
+        #[arg(long, default_value = "127.0.0.1:3000")]
+        listen: SocketAddr,
+    },
+
+    /// Queue a new session
+    Add {
+        #[command(subcommand)]
+        mode: AddMode,
+    },
+
+    /// List all sessions
+    List,
+
+    /// Activate a pending session (sets status to ACTIVE)
+    Activate {
+        /// Session ID to activate
+        id: i64,
+    },
+
+    /// Set the post-event write-up for a session
+    Writeup {
+        /// Session ID
+        id: i64,
+
+        /// Write-up text
+        text: String,
+    },
 }
+
+#[derive(Debug, Subcommand)]
+enum AddMode {
+    /// Create a metronome (event) session
+    Metronome {
+        #[arg(short, long)]
+        track: Track,
+
+        #[arg(short, long, default_value = "")]
+        layout: String,
+
+        #[arg(short, long, default_value_t = 5)]
+        rounds: i64,
+
+        #[arg(long, default_value_t = 20)]
+        target: u64,
+
+        #[arg(short, long, default_value_t = 10)]
+        max_scorers: i64,
+
+        #[arg(long, default_value_t = 300)]
+        lobby_duration_secs: u64,
+
+        #[arg(long)]
+        name: Option<String>,
+
+        #[arg(long)]
+        description: Option<String>,
+
+        #[arg(long)]
+        scheduled_at: Option<String>,
+    },
+
+    /// Create a shortcut (challenge) session
+    Shortcut {
+        #[arg(short, long)]
+        track: Track,
+
+        #[arg(short, long, default_value = "")]
+        layout: String,
+
+        #[arg(long)]
+        name: Option<String>,
+
+        #[arg(long)]
+        description: Option<String>,
+
+        #[arg(long)]
+        scheduled_at: Option<String>,
+    },
+}
+
+// -- Web: filters -------------------------------------------------------------
 
 mod filters {
     use insim::core::string::{colours::Colour, escaping::Escape};
@@ -104,7 +203,7 @@ mod filters {
     }
 }
 
-// -- Templates ----------------------------------------------------------------
+// -- Web: templates -----------------------------------------------------------
 
 #[derive(Template)]
 #[template(path = "index.html")]
@@ -121,7 +220,6 @@ struct SessionsTemplate {
     sessions: Vec<Session>,
 }
 
-/// Results for a single metronome round, used in the round breakdown table.
 struct RoundResults {
     round: i64,
     results: Vec<db::MetronomeResult>,
@@ -197,7 +295,13 @@ struct ShortcutAllTimesFragment {
     shortcut_all_times: Vec<db::ShortcutTime>,
 }
 
-// -- Helpers ------------------------------------------------------------------
+// -- Web: app state & helpers -------------------------------------------------
+
+#[derive(Clone)]
+struct AppState {
+    pool: Arc<db::Pool>,
+    oauth_client: BasicClient,
+}
 
 struct PageCtx {
     pub current_user: Option<String>,
@@ -238,10 +342,7 @@ async fn get_or_create_csrf_token(session: &TowerSession) -> Result<String, Stat
     Ok(token)
 }
 
-fn build_oauth_client(
-    client_id: &str,
-    redirect_uri: &str,
-) -> anyhow::Result<BasicClient> {
+fn build_oauth_client(client_id: &str, redirect_uri: &str) -> anyhow::Result<BasicClient> {
     Ok(BasicClient::new(
         ClientId::new(client_id.to_string()),
         None,
@@ -265,17 +366,17 @@ fn group_metronome_rounds(results: Vec<db::MetronomeResult>) -> Vec<RoundResults
     rounds
 }
 
-// -- Static assets ------------------------------------------------------------
+// -- Web: static assets -------------------------------------------------------
 
 async fn logo() -> (StatusCode, [(&'static str, &'static str); 1], &'static [u8]) {
     (
         StatusCode::OK,
         [("content-type", "image/svg+xml")],
-        include_bytes!("../../logo.svg"),
+        include_bytes!("../logo.svg"),
     )
 }
 
-// -- Page handlers ------------------------------------------------------------
+// -- Web: page handlers -------------------------------------------------------
 
 async fn index(
     page: PageCtx,
@@ -288,9 +389,7 @@ async fn index(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let tmpl = IndexTemplate { page, active, upcoming };
-    Ok(Html(
-        tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
-    ))
+    Ok(Html(tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?))
 }
 
 async fn sessions(
@@ -301,9 +400,7 @@ async fn sessions(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let tmpl = SessionsTemplate { page, sessions };
-    Ok(Html(
-        tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
-    ))
+    Ok(Html(tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?))
 }
 
 async fn session_detail(
@@ -337,9 +434,7 @@ async fn session_detail(
     };
 
     let tmpl = SessionDetailTemplate { page, session, metronome_standings, metronome_rounds, shortcut_best_times };
-    Ok(Html(
-        tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
-    ))
+    Ok(Html(tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?))
 }
 
 #[derive(serde::Deserialize)]
@@ -399,9 +494,7 @@ struct NewSessionForm {
     max_scorers: i64,
 }
 
-async fn session_new_get(
-    page: PageCtx,
-) -> Result<Html<String>, StatusCode> {
+async fn session_new_get(page: PageCtx) -> Result<Html<String>, StatusCode> {
     if !page.admin {
         return Err(StatusCode::NOT_FOUND);
     }
@@ -491,7 +584,6 @@ struct EditSessionForm {
     description: Option<String>,
     scheduled_at: Option<String>,
     writeup: Option<String>,
-    // Metronome-only (absent for shortcut sessions)
     rounds: Option<i64>,
     target: Option<u64>,
     max_scorers: Option<i64>,
@@ -662,7 +754,7 @@ async fn session_cancel(
     }
 }
 
-// -- Auth handlers ------------------------------------------------------------
+// -- Web: auth handlers -------------------------------------------------------
 
 async fn login(
     auth_session: AuthSession,
@@ -696,17 +788,11 @@ async fn callback(
     session: TowerSession,
     Query(params): Query<AuthzResp>,
 ) -> impl IntoResponse {
-    let expected: Option<String> = session
-        .remove("oauth_csrf_state")
-        .await
-        .unwrap();
+    let expected: Option<String> = session.remove("oauth_csrf_state").await.unwrap();
     if expected.as_deref() != Some(&params.state) {
         return StatusCode::BAD_REQUEST.into_response();
     }
-    let creds = OAuthCredentials {
-        code: params.code,
-        state: params.state,
-    };
+    let creds = OAuthCredentials { code: params.code, state: params.state };
     match auth_session.authenticate(creds).await {
         Ok(Some(user)) => {
             auth_session.login(&user).await.unwrap();
@@ -725,17 +811,130 @@ async fn logout(mut auth_session: AuthSession) -> impl IntoResponse {
     Redirect::to("/")
 }
 
-// -- Main ---------------------------------------------------------------------
+// -- Runner -------------------------------------------------------------------
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .init();
+async fn run_loop(
+    pool: db::Pool,
+    addr: SocketAddr,
+    password: Option<String>,
+    listen: SocketAddr,
+) -> anyhow::Result<()> {
+    let (insim, insim_handle) = insim::tcp(addr)
+        .isi_admin_password(password)
+        .isi_iname("carnage".to_owned())
+        .isi_prefix('!')
+        .isi_flag_mso_cols(true)
+        .spawn(100)
+        .await?;
 
-    let args = Args::parse();
-    let pool = db::connect(&args.db).await?;
+    tracing::info!("Connected to InSim");
 
+    let (presence, presence_handle) = presence::spawn(insim.clone(), 32);
+    let (game, game_handle) = game::spawn(insim.clone(), 32);
+    let user_sync_handle = db::spawn_user_sync(&presence, pool.clone());
+
+    insim.send(TinyType::Ncn.with_request_id(1)).await?;
+    insim.send(TinyType::Npl.with_request_id(2)).await?;
+    insim.send(TinyType::Sst.with_request_id(3)).await?;
+
+    for &cmd in &["/select no", "/vote no", "/autokick no"] {
+        insim.send_command(cmd).await?;
+    }
+
+    let ctx = GameCtx {
+        pool: pool.clone(),
+        insim: insim.clone(),
+        presence,
+        game,
+    };
+
+    let reconcile = async {
+        let mut current_session_id: Option<i64> = None;
+        let mut current_task: Option<tokio::task::JoinHandle<Result<(), kitcar::scenes::SceneError>>> = None;
+
+        loop {
+            if let Ok(Some(session)) = db::next_scheduled_session(&pool).await {
+                tracing::info!("Auto-activating scheduled session #{}", session.id);
+                let _ = db::switch_session(&pool, session.id).await;
+            }
+
+            let desired = db::active_session(&pool).await;
+
+            match (&current_task, desired) {
+                (_, Err(e)) => {
+                    tracing::warn!("Failed to poll active session: {e}");
+                },
+
+                (None, Ok(None)) => {},
+
+                (None, Ok(Some(session))) => {
+                    tracing::info!(
+                        "Starting session #{} ({:?} on {}/{})",
+                        session.id, session.mode, session.track, session.layout
+                    );
+                    current_session_id = Some(session.id);
+                    let ctx_ref = &ctx;
+                    current_task = Some(tokio::spawn({
+                        let session = session.clone();
+                        let pool = ctx_ref.pool.clone();
+                        let insim = ctx_ref.insim.clone();
+                        let presence = ctx_ref.presence.clone();
+                        let game = ctx_ref.game.clone();
+                        async move {
+                            let ctx = GameCtx { pool, insim, presence, game };
+                            match session.mode {
+                                Json(SessionMode::Metronome { .. }) => {
+                                    execute::<games::metronome::MetronomeGame>(&session, &ctx).await
+                                },
+                                Json(SessionMode::Shortcut) => {
+                                    execute::<games::shortcut::ShortcutGame>(&session, &ctx).await
+                                },
+                            }
+                        }
+                    }));
+                },
+
+                (Some(task), Ok(Some(session)))
+                    if current_session_id == Some(session.id) && !task.is_finished() => {},
+
+                (Some(_), Ok(Some(session)))
+                    if current_session_id == Some(session.id) =>
+                {
+                    let task = current_task.take().unwrap();
+                    match task.await {
+                        Ok(Ok(())) => {
+                            tracing::info!("Session #{} completed", session.id);
+                        },
+                        Ok(Err(e)) => {
+                            tracing::error!(
+                                "Session #{} failed: {e:?} (leaving ACTIVE for crash recovery)",
+                                session.id
+                            );
+                        },
+                        Err(e) => {
+                            tracing::error!(
+                                "Session #{} join error: {e} (leaving ACTIVE for crash recovery)",
+                                session.id
+                            );
+                        },
+                    }
+                    current_session_id = None;
+                },
+
+                (Some(_), Ok(_)) => {
+                    tracing::info!("Desired session changed, aborting current task");
+                    if let Some(task) = current_task.take() {
+                        task.abort();
+                    }
+                    current_session_id = None;
+                },
+            }
+
+            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        }
+    };
+
+    // Set up web server
     let client_id = std::env::var("LFS_CLIENT_ID")?;
     let client_secret = std::env::var("LFS_CLIENT_SECRET")?;
     let redirect_uri = std::env::var("LFS_REDIRECT_URI")?;
@@ -759,8 +958,8 @@ async fn main() -> anyhow::Result<()> {
 
     let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
 
-    let state = AppState {
-        pool: Arc::new(pool),
+    let app_state = AppState {
+        pool: Arc::new(pool.clone()),
         oauth_client,
     };
 
@@ -781,11 +980,144 @@ async fn main() -> anyhow::Result<()> {
         .route("/auth/callback", get(callback))
         .route("/logout", get(logout))
         .layer(auth_layer)
-        .with_state(state);
+        .with_state(app_state);
 
-    let listener = tokio::net::TcpListener::bind(&args.listen).await?;
-    tracing::info!("Listening on {}", args.listen);
-    axum::serve(listener, app).await?;
+    let listener = tokio::net::TcpListener::bind(listen).await?;
+    tracing::info!("Web listening on {listen}");
+
+    tokio::select! {
+        _ = reconcile => {},
+        result = axum::serve(listener, app) => {
+            if let Err(e) = result {
+                tracing::error!("Web server error: {e}");
+            }
+        },
+        res = insim_handle => {
+            match res {
+                Ok(Ok(())) => tracing::info!("InSim background task exited"),
+                Ok(Err(e)) => tracing::error!("InSim background task failed: {e:?}"),
+                Err(e) => tracing::error!("InSim background task join failed: {e}"),
+            }
+        },
+        res = presence_handle => {
+            match res {
+                Ok(Ok(())) => tracing::info!("Presence background task exited"),
+                Ok(Err(e)) => tracing::error!("Presence background task failed: {e}"),
+                Err(e) => tracing::error!("Presence background task join failed: {e}"),
+            }
+        },
+        res = game_handle => {
+            match res {
+                Ok(Ok(())) => tracing::info!("Game background task exited"),
+                Ok(Err(e)) => tracing::error!("Game background task failed: {e}"),
+                Err(e) => tracing::error!("Game background task join failed: {e}"),
+            }
+        },
+        res = user_sync_handle => {
+            match res {
+                Ok(Ok(())) => tracing::info!("User sync background task exited"),
+                Ok(Err(e)) => tracing::error!("User sync background task failed: {e}"),
+                Err(e) => tracing::error!("User sync background task join failed: {e}"),
+            }
+        },
+    }
+
+    Ok(())
+}
+
+// -- Entry point --------------------------------------------------------------
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::builder()
+                .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
+        .init();
+
+    let args = Args::parse();
+    let pool = db::connect(&args.db).await?;
+
+    match args.command {
+        Command::Add { mode } => match mode {
+            AddMode::Metronome {
+                track,
+                layout,
+                rounds,
+                target,
+                max_scorers,
+                lobby_duration_secs,
+                name,
+                description,
+                scheduled_at,
+            } => {
+                let target_ms = (target * 1000) as i64;
+                let id = db::create_metronome_session(
+                    &pool,
+                    &db::CreateMetronomeParams {
+                        track,
+                        layout,
+                        rounds,
+                        target_ms,
+                        max_scorers,
+                        lobby_duration_secs: lobby_duration_secs as i64,
+                        name,
+                        description,
+                        scheduled_at,
+                    },
+                )
+                .await?;
+                println!("Created metronome session #{id}");
+            },
+            AddMode::Shortcut { track, layout, name, description, scheduled_at } => {
+                let id = db::create_shortcut_session(
+                    &pool,
+                    &db::CreateShortcutParams { track, layout, name, description, scheduled_at },
+                )
+                .await?;
+                println!("Created shortcut session #{id}");
+            },
+        },
+
+        Command::List => {
+            let sessions = db::all_sessions(&pool).await?;
+            if sessions.is_empty() {
+                println!("No sessions.");
+            } else {
+                for s in sessions {
+                    let label = s.name.as_deref().unwrap_or("");
+                    println!(
+                        "#{} {:?} {:?} {}/{} {} ({})",
+                        s.id, s.mode, s.status, s.track, s.layout, label, s.created_at
+                    );
+                }
+            }
+        },
+
+        Command::Activate { id } => {
+            match db::pending_session(&pool, id).await? {
+                Some(_) => {
+                    db::activate_session(&pool, id).await?;
+                    println!("Activated session #{id}");
+                },
+                None => {
+                    eprintln!("Session #{id} not found or not in PENDING status.");
+                    std::process::exit(1);
+                },
+            }
+        },
+
+        Command::Writeup { id, text } => {
+            db::update_session_writeup(&pool, id, &text).await?;
+            println!("Updated write-up for session #{id}");
+        },
+
+        Command::Run { addr, password, listen } => {
+            run_loop(pool, addr, password, listen).await?;
+        },
+    }
 
     Ok(())
 }

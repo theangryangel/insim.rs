@@ -1,12 +1,17 @@
 //! ShortcutGame — MiniGame implementation for the shortcut/challenge mode.
 
+mod challenge_loop;
+pub mod chat;
+
+pub use challenge_loop::ChallengeLoop;
+
 use std::time::Duration;
 
 use kitcar::scenes::{Scene, SceneExt, SceneResult, SceneError, wait_for_players::WaitForPlayers};
 use tokio::task::JoinHandle;
 
 use super::{GameCtx, MiniGame};
-use crate::{ChatError, MIN_PLAYERS, db, game_modes::shortcut};
+use crate::{ChatError, MIN_PLAYERS, db};
 use super::setup_track;
 
 #[derive(Clone)]
@@ -14,7 +19,7 @@ pub struct ShortcutGame {
     pub session_id: i64,
     pub track: insim::core::track::Track,
     pub layout: String,
-    pub chat: shortcut::chat::ChallengeChat,
+    pub chat: chat::ChallengeChat,
 }
 
 pub struct ShortcutGuard {
@@ -31,7 +36,7 @@ impl MiniGame for ShortcutGame {
     type Guard = ShortcutGuard;
 
     async fn setup(session: &db::Session, ctx: &GameCtx) -> Result<(Self, Self::Guard), SceneError> {
-        let (chat, chat_handle) = shortcut::chat::spawn(ctx.insim.clone());
+        let (chat, chat_handle) = chat::spawn(ctx.insim.clone());
 
         let game = ShortcutGame {
             session_id: session.id,
@@ -56,7 +61,7 @@ impl MiniGame for ShortcutGame {
             }
             .with_timeout(Duration::from_secs(60)),
         )
-        .then(shortcut::ChallengeLoop {
+        .then(ChallengeLoop {
             chat: self.chat.clone(),
             session_id: self.session_id,
         })
@@ -70,7 +75,7 @@ impl MiniGame for ShortcutGame {
                 let _ = res?;
                 Ok(SceneResult::Continue(()))
             },
-            _ = chat.wait_for_admin_cmd(presence, |msg| matches!(msg, shortcut::chat::ChallengeChatMsg::Quit)) => {
+            _ = chat.wait_for_admin_cmd(presence, |msg| matches!(msg, chat::ChallengeChatMsg::Quit)) => {
                 Ok(SceneResult::Quit)
             }
         }

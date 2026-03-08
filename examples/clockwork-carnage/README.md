@@ -13,24 +13,28 @@ Always-on mode. Players drop in and compete for the fastest checkpoint-to-finish
 
 ## Architecture / How to use
 
-There are two binaries:
+A single binary (`clockwork-carnage`) connects to an LFS server via InSim, polls a SQLite database for active sessions, drives gameplay, and serves the web dashboard — all in one process. Migrations run automatically on startup.
 
-- **`runner`** — connects to an LFS server via InSim, polls the database for active sessions, and drives gameplay.
-- **`web`** — read-only web dashboard (default `localhost:3000`) showing upcoming/active sessions, results, and standings.
+### Environment variables (required for `run`)
 
-Both share a SQLite database. Migrations run automatically on startup.
+| Variable | Description |
+|---|---|
+| `LFS_CLIENT_ID` | OAuth2 client ID from id.lfs.net |
+| `LFS_CLIENT_SECRET` | OAuth2 client secret |
+| `LFS_REDIRECT_URI` | OAuth2 redirect URI (e.g. `http://localhost:3000/auth/callback`) |
+| `SESSION_KEY` | 64-byte cookie signing key (defaults to `aaaa...` in dev) |
 
 ### Creating sessions
 
 ```sh
 # Metronome session
-cargo run --bin runner -- add metronome \
+cargo run -- add metronome \
   --track BL1 --layout "" --rounds 5 --target 20 --max-scorers 10 \
   --name "Friday Night Carnage" \
   --scheduled-at "2026-03-15 19:00"
 
 # Shortcut session
-cargo run --bin runner -- add shortcut \
+cargo run -- add shortcut \
   --track AU1 --layout "" \
   --name "AU1 Time Attack" \
   --scheduled-at "2026-03-16 14:00"
@@ -41,22 +45,20 @@ cargo run --bin runner -- add shortcut \
 ### Running
 
 ```sh
-# Start the game runner
-cargo run --bin runner -- run --addr 127.0.0.1:29999
-
-# Start the web dashboard
-cargo run --bin web
+cargo run -- run --addr 127.0.0.1:29999 --listen 127.0.0.1:3000
 ```
+
+`--listen` defaults to `127.0.0.1:3000`.
 
 ### Other commands
 
 ```sh
 # List all sessions
-cargo run --bin runner -- list
+cargo run -- list
 
 # Activate a pending session
-cargo run --bin runner -- activate <id>
+cargo run -- activate <id>
 
 # Set a post-event write-up
-cargo run --bin runner -- writeup <id> "Great event, congrats to the winners!"
+cargo run -- writeup <id> "Great event, congrats to the winners!"
 ```

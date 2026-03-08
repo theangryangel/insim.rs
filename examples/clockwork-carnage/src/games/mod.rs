@@ -1,4 +1,4 @@
-//! Runner: unified game executor with reconciliation loop.
+//! Games: unified game executor with reconciliation loop.
 
 pub mod metronome;
 pub mod setup_track;

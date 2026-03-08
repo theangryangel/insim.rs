@@ -17,7 +17,7 @@ use kitcar::{
 
 use super::chat;
 use crate::{
-    components::{
+    hud::{
         ChallengeLeaderboard, Dialog, DialogMsg, DialogProps, challenge_scoreboard,
         theme::{hud_active, hud_muted, hud_text, hud_title},
         topbar,
@@ -167,7 +167,7 @@ struct ChallengeLoopInner {
 
 impl ChallengeLoopInner {
     async fn run_inner(mut self) -> Result<SceneResult<()>, SceneError> {
-        let _spawn_control = crate::runner::spawn_control::spawn(self.insim.clone())
+        let _spawn_control = crate::games::spawn_control::spawn(self.insim.clone())
             .await
             .map_err(|cause| SceneError::Custom {
                 scene: "challenge::spawn_control",

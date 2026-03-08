@@ -8,7 +8,7 @@ use kitcar::{
 use tokio::time::sleep;
 
 use crate::{
-    components::{EventLeaderboard, scoreboard, theme::hud_title, topbar},
+    hud::{EventLeaderboard, scoreboard, theme::hud_title, topbar},
     db,
 };
 

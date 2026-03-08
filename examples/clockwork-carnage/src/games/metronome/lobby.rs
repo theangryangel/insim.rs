@@ -8,7 +8,7 @@ use kitcar::{
 };
 
 use super::chat;
-use crate::components::{Dialog, DialogMsg, DialogProps, topbar};
+use crate::hud::{Dialog, DialogMsg, DialogProps, topbar};
 
 const EVENT_HELP_LINES: &[&str] = &[
     " - Match the target lap time as closely as possible.",

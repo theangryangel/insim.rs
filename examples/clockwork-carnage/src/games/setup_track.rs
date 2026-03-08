@@ -5,7 +5,7 @@ use kitcar::{
     ui,
 };
 
-use crate::components::topbar;
+use crate::hud::topbar;
 
 struct SetupTrackView {}
 impl ui::Component for SetupTrackView {
