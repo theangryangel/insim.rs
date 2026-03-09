@@ -44,8 +44,6 @@ struct State {
     compass_visible: bool,
     compass_text: Option<String>,
     last_cpp: Cpp,
-    original_cpp: Option<Cpp>,
-    active_view: tools::camera::ActiveView,
 }
 
 #[derive(Debug)]
@@ -255,8 +253,6 @@ pub async fn main() -> anyhow::Result<()> {
         ramp_roll_degrees: 18.0,
         compass_text: None,
         last_cpp: Cpp::default(),
-        original_cpp: None,
-        active_view: tools::camera::ActiveView::None,
     };
 
     let mut ui_root = ui::Toolbox::default();
@@ -296,7 +292,6 @@ pub async fn main() -> anyhow::Result<()> {
                     ramp_roll_degrees: state.ramp_roll_degrees,
                     compass_visible: state.compass_visible,
                     compass_text: state.compass_text.clone(),
-                    active_view: state.active_view,
                 }),
             ) {
                 for packet in diff.merge() {

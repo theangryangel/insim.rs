@@ -6,14 +6,6 @@ use insim::{
     insim::{Cpp, ObjectInfo, StaFlags},
 };
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum ActiveView {
-    #[default]
-    None,
-    TopDown,
-    Side,
-}
-
 pub fn get_top_down_view(selection: &[ObjectInfo], last_cpp: &Cpp) -> Option<Cpp> {
     let target = get_target(selection)?;
     let pos_m = target.position().xyz_metres();

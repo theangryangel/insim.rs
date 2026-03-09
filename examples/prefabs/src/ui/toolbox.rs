@@ -132,16 +132,6 @@ fn launcher_screen(props: &ToolboxProps) -> ui::Node<ToolboxMsg> {
         BtnStyle::style_unavailable()
     };
 
-    let top_down_style = match props.active_view {
-        tools::camera::ActiveView::TopDown => BtnStyle::style_active(),
-        _ => selection_btn_style,
-    };
-
-    let side_view_style = match props.active_view {
-        tools::camera::ActiveView::Side => BtnStyle::style_active(),
-        _ => selection_btn_style,
-    };
-
     let mut ramp_tool_btn = launcher_button("Ramp Tool", InspectorTool::Ramp);
     if !has_selection {
         *ramp_tool_btn.bstyle_mut() = BtnStyle::style_unavailable();
@@ -196,8 +186,8 @@ fn launcher_screen(props: &ToolboxProps) -> ui::Node<ToolboxMsg> {
             ToolboxMsg::JiggleSelection,
         )
         .h(5.),
-        ui::clickable("Top Down View", top_down_style, ToolboxMsg::ToggleTopDown).h(5.),
-        ui::clickable("Side View", side_view_style, ToolboxMsg::ToggleSideView).h(5.),
+        ui::clickable("Top Down View", selection_btn_style, ToolboxMsg::ToggleTopDown).h(5.),
+        ui::clickable("Side View", selection_btn_style, ToolboxMsg::ToggleSideView).h(5.),
         launcher_button("Options", InspectorTool::Options),
     ])
 }
@@ -390,7 +380,7 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
 
             Some(Command::SpawnObjects {
                 objects: prefab.place_at_anchor(anchor),
-                action: PmoAction::Selection,
+                action: PmoAction::AddObjects,
                 origin: SpawnOrigin::Prefab,
             })
         },
@@ -600,57 +590,16 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
             if state.selection.is_empty() {
                 return None;
             }
-
-            match state.active_view {
-                tools::camera::ActiveView::TopDown => {
-                    // Toggle off
-                    state.active_view = tools::camera::ActiveView::None;
-                    if let Some(mut original) = state.original_cpp.take() {
-                        original.time = std::time::Duration::from_millis(500);
-                        original.flags = insim::insim::StaFlags::SHIFTU;
-                        Some(Command::CameraMove(original))
-                    } else {
-                        None
-                    }
-                },
-                _ => {
-                    // Toggle on (or switch from Side)
-                    if state.active_view == tools::camera::ActiveView::None {
-                        state.original_cpp = Some(state.last_cpp.clone());
-                    }
-                    state.active_view = tools::camera::ActiveView::TopDown;
-                    tools::camera::get_top_down_view(&state.selection, &state.last_cpp)
-                        .map(Command::CameraMove)
-                },
-            }
+            tools::camera::get_top_down_view(&state.selection, &state.last_cpp)
+                .map(Command::CameraMove)
         },
         ToolboxMsg::ToggleSideView => {
             if state.selection.is_empty() {
                 return None;
             }
 
-            match state.active_view {
-                tools::camera::ActiveView::Side => {
-                    // Toggle off
-                    state.active_view = tools::camera::ActiveView::None;
-                    if let Some(mut original) = state.original_cpp.take() {
-                        original.time = std::time::Duration::from_millis(500);
-                        original.flags = insim::insim::StaFlags::SHIFTU;
-                        Some(Command::CameraMove(original))
-                    } else {
-                        None
-                    }
-                },
-                _ => {
-                    // Toggle on (or switch from TopDown)
-                    if state.active_view == tools::camera::ActiveView::None {
-                        state.original_cpp = Some(state.last_cpp.clone());
-                    }
-                    state.active_view = tools::camera::ActiveView::Side;
-                    tools::camera::get_side_view(&state.selection, &state.last_cpp)
-                        .map(Command::CameraMove)
-                },
-            }
+            tools::camera::get_side_view(&state.selection, &state.last_cpp)
+                .map(Command::CameraMove)
         },
     }
 }
