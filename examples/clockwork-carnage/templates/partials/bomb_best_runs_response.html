@@ -1,0 +1,15 @@
+{% include "partials/bomb_best_runs_content.html" %}
+<div id="standings-tabs" hx-swap-oob="true" class="flex bg-gray-100 rounded p-0.5 text-xs font-semibold">
+  <button hx-get="/sessions/{{ session.id }}/standings/bomb/best"
+          hx-target="#standings-content"
+          hx-swap="outerHTML"
+          class="px-2.5 py-1 rounded bg-white shadow-sm text-gray-700 transition-colors">
+    Best Runs
+  </button>
+  <button hx-get="/sessions/{{ session.id }}/standings/bomb/all"
+          hx-target="#standings-content"
+          hx-swap="outerHTML"
+          class="px-2.5 py-1 rounded text-gray-400 hover:text-gray-700 transition-colors">
+    All Runs
+  </button>
+</div>

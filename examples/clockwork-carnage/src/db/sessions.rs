@@ -23,6 +23,15 @@ pub struct CreateShortcutParams {
     pub scheduled_at: Option<String>,
 }
 
+pub struct CreateBombParams {
+    pub track: Track,
+    pub layout: String,
+    pub checkpoint_timeout_secs: i64,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub scheduled_at: Option<String>,
+}
+
 pub struct UpdateSessionParams<'a> {
     pub track: Track,
     pub layout: &'a str,
@@ -133,6 +142,24 @@ pub async fn create_shortcut_session(
         .await?;
 
     Ok(id)
+}
+
+pub async fn create_bomb_session(
+    pool: &Pool,
+    p: &CreateBombParams,
+) -> Result<i64, sqlx::Error> {
+    let row = sqlx::query(
+        "INSERT INTO sessions (mode, track, layout, name, description, scheduled_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+    )
+    .bind(Json(SessionMode::Bomb { checkpoint_timeout_secs: p.checkpoint_timeout_secs }))
+    .bind(p.track.to_string())
+    .bind(&p.layout)
+    .bind(p.name.as_deref())
+    .bind(p.description.as_deref())
+    .bind(p.scheduled_at.as_deref())
+    .fetch_one(pool)
+    .await?;
+    Ok(row.get("id"))
 }
 
 pub async fn switch_session(pool: &Pool, session_id: i64) -> Result<(), sqlx::Error> {

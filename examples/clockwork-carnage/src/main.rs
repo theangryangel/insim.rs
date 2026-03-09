@@ -132,6 +132,24 @@ enum AddMode {
         #[arg(long)]
         scheduled_at: Option<String>,
     },
+
+    /// Create a bomb (countdown) session
+    Bomb {
+        #[arg(short, long)]
+        track: Track,
+
+        #[arg(short, long, default_value = "")]
+        layout: String,
+
+        #[arg(long, default_value_t = 30)]
+        checkpoint_timeout: u64,
+
+        #[arg(long)]
+        name: Option<String>,
+
+        #[arg(long)]
+        scheduled_at: Option<String>,
+    },
 }
 
 // -- Web: filters -------------------------------------------------------------
@@ -233,6 +251,7 @@ struct SessionDetailTemplate {
     metronome_standings: Vec<db::MetronomeStanding>,
     metronome_rounds: Vec<RoundResults>,
     shortcut_best_times: Vec<db::ShortcutTime>,
+    bomb_best_runs: Vec<db::BombRun>,
 }
 
 #[derive(Template)]
@@ -293,6 +312,27 @@ struct ShortcutBestTimesFragment {
 struct ShortcutAllTimesFragment {
     session: Session,
     shortcut_all_times: Vec<db::ShortcutTime>,
+}
+
+#[derive(Template)]
+#[template(path = "partials/bomb_standings.html")]
+struct BombStandingsFragment {
+    session: Session,
+    bomb_best_runs: Vec<db::BombRun>,
+}
+
+#[derive(Template)]
+#[template(path = "partials/bomb_best_runs_response.html")]
+struct BombBestRunsFragment {
+    session: Session,
+    bomb_best_runs: Vec<db::BombRun>,
+}
+
+#[derive(Template)]
+#[template(path = "partials/bomb_all_runs_response.html")]
+struct BombAllRunsFragment {
+    session: Session,
+    bomb_all_runs: Vec<db::BombRun>,
 }
 
 // -- Web: app state & helpers -------------------------------------------------
@@ -413,7 +453,7 @@ async fn session_detail(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    let (metronome_standings, metronome_rounds, shortcut_best_times) = match &*session.mode {
+    let (metronome_standings, metronome_rounds, shortcut_best_times, bomb_best_runs) = match &*session.mode {
         SessionMode::Metronome { .. } => {
             let standings = db::metronome_standings(&state.pool, session.id)
                 .await
@@ -423,17 +463,23 @@ async fn session_detail(
                     .await
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
             );
-            (standings, rounds, vec![])
+            (standings, rounds, vec![], vec![])
         }
         SessionMode::Shortcut => {
             let t = db::shortcut_best_times(&state.pool, session.id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            (vec![], vec![], t)
+            (vec![], vec![], t, vec![])
+        }
+        SessionMode::Bomb { .. } => {
+            let b = db::bomb_best_runs(&state.pool, session.id)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            (vec![], vec![], vec![], b)
         }
     };
 
-    let tmpl = SessionDetailTemplate { page, session, metronome_standings, metronome_rounds, shortcut_best_times };
+    let tmpl = SessionDetailTemplate { page, session, metronome_standings, metronome_rounds, shortcut_best_times, bomb_best_runs };
     Ok(Html(tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?))
 }
 
@@ -552,6 +598,21 @@ async fn session_new_post(
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         }
+        "bomb" => {
+            db::create_bomb_session(
+                &state.pool,
+                &db::CreateBombParams {
+                    track,
+                    layout: form.layout,
+                    checkpoint_timeout_secs: 30,
+                    name,
+                    description,
+                    scheduled_at,
+                },
+            )
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        }
         _ => return Err(StatusCode::BAD_REQUEST),
     };
 
@@ -658,6 +719,14 @@ async fn session_standings(
                 .render()
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         }
+        SessionMode::Bomb { .. } => {
+            let bomb_best_runs = db::bomb_best_runs(&state.pool, session.id)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            BombStandingsFragment { session, bomb_best_runs }
+                .render()
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        }
     };
 
     Ok(Html(html))
@@ -719,6 +788,42 @@ async fn session_standings_all(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Html(
         ShortcutAllTimesFragment { session, shortcut_all_times }
+            .render()
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+    ))
+}
+
+async fn session_bomb_best(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Html<String>, StatusCode> {
+    let session = db::get_session(&state.pool, id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+    let bomb_best_runs = db::bomb_best_runs(&state.pool, id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Html(
+        BombBestRunsFragment { session, bomb_best_runs }
+            .render()
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+    ))
+}
+
+async fn session_bomb_all(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Html<String>, StatusCode> {
+    let session = db::get_session(&state.pool, id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+    let bomb_all_runs = db::bomb_all_runs(&state.pool, id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Html(
+        BombAllRunsFragment { session, bomb_all_runs }
             .render()
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     ))
@@ -889,6 +994,9 @@ async fn run_loop(
                                 Json(SessionMode::Shortcut) => {
                                     execute::<games::shortcut::ShortcutGame>(&session, &ctx).await
                                 },
+                                Json(SessionMode::Bomb { .. }) => {
+                                    execute::<games::bomb::BombGame>(&session, &ctx).await
+                                },
                             }
                         }
                     }));
@@ -974,6 +1082,8 @@ async fn run_loop(
         .route("/sessions/{id}/rounds/{round}", get(session_round))
         .route("/sessions/{id}/standings/best", get(session_standings_best))
         .route("/sessions/{id}/standings/all", get(session_standings_all))
+        .route("/sessions/{id}/standings/bomb/best", get(session_bomb_best))
+        .route("/sessions/{id}/standings/bomb/all", get(session_bomb_all))
         .route("/sessions/{id}/start", post(session_start))
         .route("/sessions/{id}/cancel", post(session_cancel))
         .route("/login", get(login))
@@ -1078,6 +1188,21 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .await?;
                 println!("Created shortcut session #{id}");
+            },
+            AddMode::Bomb { track, layout, checkpoint_timeout, name, scheduled_at } => {
+                let id = db::create_bomb_session(
+                    &pool,
+                    &db::CreateBombParams {
+                        track,
+                        layout,
+                        checkpoint_timeout_secs: checkpoint_timeout as i64,
+                        name,
+                        description: None,
+                        scheduled_at,
+                    },
+                )
+                .await?;
+                println!("Created bomb session #{id}");
             },
         },
 

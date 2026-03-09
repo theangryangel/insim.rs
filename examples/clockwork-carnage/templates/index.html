@@ -19,6 +19,8 @@
                   <span class="flex items-center gap-1.5 px-2 py-0.5 bg-orange-600/20 rounded-full border border-orange-800/30"><span class="h-2 w-2 bg-orange-600 rounded-full"></span><span class="text-[10px] font-semibold text-orange-600 uppercase">Metronome</span></span>
                 {% when SessionMode::Shortcut %}
                   <span class="flex items-center gap-1.5 px-2 py-0.5 bg-blue-600/20 rounded-full border border-blue-800/30"><span class="h-2 w-2 bg-blue-600 rounded-full"></span><span class="text-[10px] font-semibold text-blue-600 uppercase">Shortcut</span></span>
+                {% when SessionMode::Bomb { .. } %}
+                  <span class="flex items-center gap-1.5 px-2 py-0.5 bg-red-600/20 rounded-full border border-red-800/30"><span class="h-2 w-2 bg-red-600 rounded-full"></span><span class="text-[10px] font-semibold text-red-600 uppercase">Bomb</span></span>
               {% endmatch %}
             </div>
             {% match active_session.scheduled_at %}{% when Some with (s) %}<p class="text-xs text-gray-400">{{ s }}</p>{% when None %}{% endmatch %}
@@ -42,6 +44,8 @@
                 <span class="flex items-center gap-1.5 px-2 py-0.5 bg-orange-600/20 rounded-full border border-orange-800/30"><span class="h-2 w-2 bg-orange-600 rounded-full"></span><span class="text-[10px] font-semibold text-orange-600 uppercase">Metronome</span></span>
               {% when SessionMode::Shortcut %}
                 <span class="flex items-center gap-1.5 px-2 py-0.5 bg-blue-600/20 rounded-full border border-blue-800/30"><span class="h-2 w-2 bg-blue-600 rounded-full"></span><span class="text-[10px] font-semibold text-blue-600 uppercase">Shortcut</span></span>
+              {% when SessionMode::Bomb { .. } %}
+                <span class="flex items-center gap-1.5 px-2 py-0.5 bg-red-600/20 rounded-full border border-red-800/30"><span class="h-2 w-2 bg-red-600 rounded-full"></span><span class="text-[10px] font-semibold text-red-600 uppercase">Bomb</span></span>
             {% endmatch %}
           </div>
           <span class="text-right">

@@ -11,6 +11,9 @@ pub type EventLeaderboard = Arc<[(String, String, u32)]>;
 /// (uname, pname, vehicle, best_time)
 pub type ChallengeLeaderboard = Arc<[(String, String, Vehicle, Duration)]>;
 
+/// (uname, pname, checkpoint_count, survival_ms) — session best
+pub type BombLeaderboard = Arc<[(String, String, i64, i64)]>;
+
 fn row_style(uname: &str, current_uname: &str) -> BtnStyle {
     if uname == current_uname {
         hud_active()
@@ -92,6 +95,37 @@ fn visible_indices(total: usize, player_pos: Option<usize>) -> Vec<usize> {
         }
         positions.into_iter().collect()
     }
+}
+
+pub fn bomb_scoreboard<Msg>(
+    leaderboard: &BombLeaderboard,
+    current_uname: &str,
+) -> Vec<ui::Node<Msg>> {
+    let total = leaderboard.len();
+    let player_pos = leaderboard
+        .iter()
+        .position(|(uname, _, _, _)| uname == current_uname);
+
+    let indices_to_show = visible_indices(total, player_pos);
+
+    indices_to_show
+        .into_iter()
+        .map(|index| {
+            let (uname, pname, cps, survival_ms) = &leaderboard[index];
+            let rank = format!("#{}", index + 1);
+            let cps_str = format!("{cps} cps");
+            let secs = *survival_ms as f64 / 1000.0;
+            let survival_str = format!("{secs:.1}s");
+            let style = row_style(uname, current_uname);
+
+            ui::container().flex().flex_row().with_children([
+                ui::text(rank, style).w(5.).h(5.),
+                ui::text(pname.as_str(), style.align_left()).w(20.).h(5.),
+                ui::text(cps_str, style.align_right()).w(8.).h(5.),
+                ui::text(survival_str, style.align_right()).w(8.).h(5.),
+            ])
+        })
+        .collect()
 }
 
 pub fn challenge_scoreboard<Msg>(

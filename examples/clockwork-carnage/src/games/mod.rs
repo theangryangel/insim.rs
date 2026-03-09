@@ -1,5 +1,6 @@
 //! Games: unified game executor with reconciliation loop.
 
+pub mod bomb;
 pub mod metronome;
 pub mod setup_track;
 pub mod shortcut;

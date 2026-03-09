@@ -15,6 +15,7 @@
       <p class="text-xs text-gray-400 uppercase font-semibold mt-1">Scorers</p>
     </div>
     {% when SessionMode::Shortcut %}
+    {% when SessionMode::Bomb { .. } %}
   {% endmatch %}
 </div>
 

@@ -96,6 +96,8 @@
         {% include "partials/metronome_detail.html" %}
       {% when SessionMode::Shortcut %}
         {% include "partials/shortcut_detail.html" %}
+      {% when SessionMode::Bomb { .. } %}
+        {% include "partials/bomb_detail.html" %}
     {% endmatch %}
   </div>
 

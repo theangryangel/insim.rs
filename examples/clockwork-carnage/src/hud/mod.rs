@@ -6,5 +6,5 @@ mod topbar;
 
 pub use dialog::{Dialog, DialogMsg, DialogProps};
 pub use marquee::Marquee;
-pub use scoreboard::{ChallengeLeaderboard, EventLeaderboard, challenge_scoreboard, scoreboard};
+pub use scoreboard::{BombLeaderboard, ChallengeLeaderboard, EventLeaderboard, bomb_scoreboard, challenge_scoreboard, scoreboard};
 pub use topbar::topbar;

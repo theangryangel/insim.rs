@@ -41,6 +41,9 @@ pub enum SessionMode {
         lobby_duration_secs: i64,
     },
     Shortcut,
+    Bomb {
+        checkpoint_timeout_secs: i64,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -148,14 +151,29 @@ pub struct ShortcutTime {
     pub set_at: String,
 }
 
+#[derive(Debug, Clone, FromRow)]
+pub struct BombRun {
+    pub id: i64,
+    pub session_id: i64,
+    pub user_id: i64,
+    pub uname: String,
+    pub pname: String,
+    pub vehicle: String,
+    pub checkpoint_count: i64,
+    pub survival_ms: i64,
+    pub recorded_at: String,
+}
+
 // -- Submodules ---------------------------------------------------------------
 
 mod sessions;
 mod users;
 mod metronome;
 mod shortcut;
+mod bomb;
 
 pub use sessions::*;
 pub use users::*;
 pub use metronome::*;
 pub use shortcut::*;
+pub use bomb::*;

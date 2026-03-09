@@ -16,6 +16,7 @@
       {% match *session.mode %}
         {% when SessionMode::Metronome { .. } %}Metronome
         {% when SessionMode::Shortcut %}Shortcut
+        {% when SessionMode::Bomb { .. } %}Bomb
       {% endmatch %}
     </p>
   </div>
@@ -86,6 +87,7 @@
       </div>
     </div>
     {% when SessionMode::Shortcut %}
+    {% when SessionMode::Bomb { .. } %}
   {% endmatch %}
 
   <div class="flex gap-2 pt-2">
