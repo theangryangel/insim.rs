@@ -279,81 +279,93 @@ pub fn build(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Object
         });
     }
     let mut centres = Vec::with_capacity(candidates.len());
-    match config.mode {
-        RampMode::AcrossPath => {
-            centres.extend(candidates.iter().map(|candidate| candidate.target_position));
-        },
-        RampMode::AlongPath => {
-            // Helper to precisely sample the spline at any arc-length distance
-            let get_spline_pos = |d_target: f64| -> DVec3 {
-                let entry = sample_lut(&lut, d_target);
-                let max_seg_idx = points.len() - 4;
-                let mut seg_idx = entry.t.floor() as usize;
-                let mut local_t = entry.t.fract();
-                if seg_idx > max_seg_idx {
-                    seg_idx = max_seg_idx;
-                    local_t = 1.0;
-                }
-                interpolate(&points[seg_idx..seg_idx + 4], local_t)
-            };
+    
+    // Helper to precisely sample the spline at any arc-length distance
+    let get_spline_pos = |d_target: f64| -> DVec3 {
+        let entry = sample_lut(&lut, d_target);
+        let max_seg_idx = points.len() - 4;
+        let mut seg_idx = entry.t.floor() as usize;
+        let mut local_t = entry.t.fract();
+        if seg_idx > max_seg_idx {
+            seg_idx = max_seg_idx;
+            local_t = 1.0;
+        }
+        interpolate(&points[seg_idx..seg_idx + 4], local_t)
+    };
 
-            // 1. Establish the starting seam of the track (half a block behind the first point)
-            let start_center = candidates.first().map(|c| c.target_position).unwrap_or_default();
-            let start_heading = candidates.first().map(|c| c.travel_heading).unwrap_or(fallback_heading);
-            let mut current_seam = start_center - heading_to_forward(start_heading).extend(0.0) * (spacing_metres * 0.5);
+    let start_center = candidates.first().map(|c| c.target_position).unwrap_or_default();
+    let start_heading = candidates.first().map(|c| c.travel_heading).unwrap_or(fallback_heading);
+    let mut current_seam = start_center - heading_to_forward(start_heading).extend(0.0) * (spacing_metres * 0.5);
 
-            // 2. Chain pieces using "Lookahead Chords" instead of instantaneous tangents
-            for (i, candidate) in candidates.iter_mut().enumerate() {
-                // Find where the spline mathematically wants the NEXT seam to be
-                let target_next_distance = (i as f64 * spacing_metres + spacing_metres * 0.5).min(total_len);
-                let target_next_seam = get_spline_pos(target_next_distance);
+    for (i, candidate) in candidates.iter_mut().enumerate() {
+        let target_next_distance = (i as f64 * spacing_metres + spacing_metres * 0.5).min(total_len);
+        let target_next_seam = get_spline_pos(target_next_distance);
 
-                // Calculate the 3D chord from our current actual seam to the target seam
-                let delta = target_next_seam - current_seam;
-                let horizontal = delta.truncate().length();
-                let slope_degrees = if horizontal <= f64::EPSILON {
-                    0.0
+        let delta = target_next_seam - current_seam;
+        let horizontal = delta.truncate().length();
+        let slope_degrees = if horizontal <= f64::EPSILON {
+            0.0
+        } else {
+            delta.z.atan2(horizontal).to_degrees()
+        };
+
+        let chord_heading = heading_from_vec2_or_fallback(delta.truncate(), candidate.travel_heading);
+
+        match config.mode {
+            RampMode::AcrossPath => {
+                // Turn exactly 90 degrees from the forward chord
+                let quarter_turn = std::f64::consts::FRAC_PI_2;
+                let heading = if config.roll_degrees < 0.0 {
+                    Heading::from_radians(chord_heading.to_radians() - quarter_turn)
                 } else {
-                    delta.z.atan2(horizontal).to_degrees()
+                    Heading::from_radians(chord_heading.to_radians() + quarter_turn)
                 };
 
-                // Derive the heading from the chord, NOT the spline's tangent
-                let path_heading = heading_from_vec2_or_fallback(delta.truncate(), candidate.travel_heading);
+                candidate.piece = Piece::Slab {
+                    heading,
+                    pitch_step: quantize_pitch_step(config.roll_degrees.abs()),
+                };
 
-                // Quantize the exact rise needed to bridge this specific chord
+                // For AcrossPath, Z is locked to the spline's exact center height to minimize the staircase effect
+                let actual_travel = DVec3::new(
+                    heading_to_forward(chord_heading).x * spacing_metres,
+                    heading_to_forward(chord_heading).y * spacing_metres,
+                    delta.z
+                );
+
+                let center = current_seam + actual_travel * 0.5;
+                centres.push(center);
+                current_seam += actual_travel;
+            },
+            RampMode::AlongPath => {
                 let rise_metres = slope_degrees.abs().to_radians().tan() * spacing_metres;
                 let height_step = quantize_height_step(rise_metres);
                 let magnitude = height_metres_from_step(height_step);
                 let actual_rise = if slope_degrees < 0.0 { -magnitude } else { magnitude };
 
                 let block_heading = if slope_degrees < 0.0 {
-                    path_heading.opposite()
+                    chord_heading.opposite()
                 } else {
-                    path_heading
+                    chord_heading
                 };
 
-                // Overwrite the candidate's piece with our newly calculated flush geometry
                 candidate.piece = if height_step == 0 {
-                    Piece::Slab { heading: path_heading, pitch_step: 0 }
+                    Piece::Slab { heading: chord_heading, pitch_step: 0 }
                 } else {
                     Piece::Ramp { heading: block_heading, height_step }
                 };
 
-                // Calculate the exact quantized travel vector of this LFS object
                 let actual_travel = DVec3::new(
-                    heading_to_forward(path_heading).x * spacing_metres,
-                    heading_to_forward(path_heading).y * spacing_metres,
+                    heading_to_forward(chord_heading).x * spacing_metres,
+                    heading_to_forward(chord_heading).y * spacing_metres,
                     actual_rise
                 );
 
-                // Place the object center exactly halfway along its travel vector
                 let center = current_seam + actual_travel * 0.5;
                 centres.push(center);
-
-                // Advance our dead-reckoning seam exactly to where this block ends
                 current_seam += actual_travel;
             }
-        },
+        }
     }
 
     let mut output = Vec::with_capacity(candidates.len());
