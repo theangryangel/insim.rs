@@ -18,6 +18,10 @@
         <input type="radio" name="mode" value="shortcut" class="accent-blue-600"/>
         <span class="text-sm font-medium">Shortcut</span>
       </label>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="radio" name="mode" value="bomb" class="accent-red-600"/>
+        <span class="text-sm font-medium">Bomb</span>
+      </label>
     </div>
   </div>
 
@@ -76,7 +80,19 @@
           class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"/>
       </div>
     </div>
-    <p class="text-xs text-gray-400 mt-1">These fields are ignored for shortcut sessions.</p>
+    <p class="text-xs text-gray-400 mt-1">These fields are ignored for shortcut and bomb sessions.</p>
+  </div>
+
+  <div class="border-t border-gray-200 pt-4">
+    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Bomb settings</p>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="checkpoint_timeout">Checkpoint timeout (s)</label>
+        <input id="checkpoint_timeout" type="number" name="checkpoint_timeout" value="30" min="1"
+          class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-red-400"/>
+      </div>
+    </div>
+    <p class="text-xs text-gray-400 mt-1">This field is ignored for metronome and shortcut sessions.</p>
   </div>
 
   <div class="flex gap-2 pt-2">

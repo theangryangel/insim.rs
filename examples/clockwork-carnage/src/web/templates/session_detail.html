@@ -77,6 +77,16 @@
       {% endmatch %}
     </div>
 
+    {# Mode card #}
+    {% match *session.mode %}
+      {% when SessionMode::Metronome { .. } %}
+        {% include "partials/mode_card_metronome.html" %}
+      {% when SessionMode::Shortcut %}
+        {% include "partials/mode_card_shortcut.html" %}
+      {% when SessionMode::Bomb { .. } %}
+        {% include "partials/mode_card_bomb.html" %}
+    {% endmatch %}
+
     {# Write-up #}
     {% match session.writeup %}
       {% when Some with (w) %}

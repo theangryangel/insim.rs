@@ -521,6 +521,7 @@ async fn session_start(
 fn default_rounds() -> i64 { 5 }
 fn default_target() -> u64 { 20 }
 fn default_max_scorers() -> i64 { 10 }
+fn default_checkpoint_timeout() -> u64 { 30 }
 
 #[derive(serde::Deserialize)]
 struct NewSessionForm {
@@ -538,6 +539,8 @@ struct NewSessionForm {
     target: u64,
     #[serde(default = "default_max_scorers")]
     max_scorers: i64,
+    #[serde(default = "default_checkpoint_timeout")]
+    checkpoint_timeout: u64,
 }
 
 async fn session_new_get(page: PageCtx) -> Result<Html<String>, StatusCode> {
@@ -604,7 +607,7 @@ async fn session_new_post(
                 &db::CreateBombParams {
                     track,
                     layout: form.layout,
-                    checkpoint_timeout_secs: 30,
+                    checkpoint_timeout_secs: form.checkpoint_timeout as i64,
                     name,
                     description,
                     scheduled_at,
