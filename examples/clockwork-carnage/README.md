@@ -15,50 +15,32 @@ Always-on mode. Players drop in and compete for the fastest checkpoint-to-finish
 
 A single binary (`clockwork-carnage`) connects to an LFS server via InSim, polls a SQLite database for active sessions, drives gameplay, and serves the web dashboard — all in one process. Migrations run automatically on startup.
 
-### Environment variables (required for `run`)
+The InSim connection and web server are independently optional: include `[insim]` to enable the InSim runner, include `[web]` to enable the web dashboard. At least one must be present.
 
-| Variable | Description |
-|---|---|
-| `LFS_CLIENT_ID` | OAuth2 client ID from id.lfs.net |
-| `LFS_CLIENT_SECRET` | OAuth2 client secret |
-| `LFS_REDIRECT_URI` | OAuth2 redirect URI (e.g. `http://localhost:3000/auth/callback`) |
-| `SESSION_KEY` | 64-byte cookie signing key (defaults to `aaaa...` in dev) |
-
-### Creating sessions
+### Config file quickstart
 
 ```sh
-# Metronome session
-cargo run -- add metronome \
-  --track BL1 --layout "" --rounds 5 --target 20 --max-scorers 10 \
-  --name "Friday Night Carnage" \
-  --scheduled-at "2026-03-15 19:00"
-
-# Shortcut session
-cargo run -- add shortcut \
-  --track AU1 --layout "" \
-  --name "AU1 Time Attack" \
-  --scheduled-at "2026-03-16 14:00"
+cp clockwork-carnage.example.toml clockwork-carnage.toml
+# edit clockwork-carnage.toml to fill in your values
+cargo run
 ```
 
-`--name`, `--description`, and `--scheduled-at` are all optional.
+The default config path is `clockwork-carnage.toml` in the current directory. Override with `--config /path/to/config.toml`.
 
-### Running
+### Minimal config (both components)
 
-```sh
-cargo run -- run --addr 127.0.0.1:29999 --listen 127.0.0.1:3000
+```toml
+[insim]
+addr = "127.0.0.1:29999"
+
+[web]
+lfs_client_id     = "your-client-id"
+lfs_client_secret = "your-client-secret"
+lfs_redirect_uri  = "http://localhost:3000/auth/callback"
 ```
 
-`--listen` defaults to `127.0.0.1:3000`.
+See `clockwork-carnage.example.toml` for all available options.
 
-### Other commands
+### Managing sessions
 
-```sh
-# List all sessions
-cargo run -- list
-
-# Activate a pending session
-cargo run -- activate <id>
-
-# Set a post-event write-up
-cargo run -- writeup <id> "Great event, congrats to the winners!"
-```
+Use the web dashboard (`http://localhost:3000`) to create, list, start, edit, and cancel sessions.

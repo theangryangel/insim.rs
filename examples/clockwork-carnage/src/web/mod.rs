@@ -1,8 +1,26 @@
-//! axum-login auth backend for LFS OAuth2.
+//! Web module: axum-login auth backend + HTTP server.
 
-use axum_login::{AuthUser, AuthnBackend, UserId};
+pub mod handlers;
+pub mod state;
+pub mod templates;
+pub mod filters;
+
+use std::net::SocketAddr;
+use std::sync::Arc;
+
+use axum::Router;
+use axum::routing::{get, post};
+use axum_login::AuthManagerLayerBuilder;
+use tower_sessions::{SessionManagerLayer, cookie::Key, cookie::SameSite};
+use tower_sessions_sqlx_store::SqliteStore;
 
 use crate::db;
+use state::{AppState, build_oauth_client};
+use handlers::*;
+
+// -- axum-login auth backend --------------------------------------------------
+
+use axum_login::{AuthUser, AuthnBackend, UserId};
 
 impl AuthUser for db::User {
     type Id = i64;
@@ -128,3 +146,70 @@ impl AuthnBackend for Backend {
 
 // Convenience
 pub type AuthSession = axum_login::AuthSession<Backend>;
+
+// -- Web configuration --------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct WebConfig {
+    pub lfs_client_id: String,
+    pub lfs_client_secret: String,
+    pub lfs_redirect_uri: String,
+    pub session_key: String,
+}
+
+// -- Server entry point -------------------------------------------------------
+
+pub async fn serve(listen: SocketAddr, pool: db::Pool, cfg: WebConfig) -> anyhow::Result<()> {
+    let oauth_client = build_oauth_client(&cfg.lfs_client_id, &cfg.lfs_redirect_uri)?;
+    let backend = Backend::new(
+        pool.clone(),
+        cfg.lfs_client_id,
+        cfg.lfs_client_secret,
+        cfg.lfs_redirect_uri,
+    );
+
+    let session_store = SqliteStore::new(pool.clone());
+    session_store.migrate().await?;
+
+    let key = Key::from(cfg.session_key.as_bytes());
+
+    let session_layer = SessionManagerLayer::new(session_store)
+        .with_secure(false)
+        .with_same_site(SameSite::Lax)
+        .with_private(key);
+
+    let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
+
+    let app_state = AppState {
+        pool: Arc::new(pool),
+        oauth_client,
+    };
+
+    let app = Router::new()
+        .route("/logo.svg", get(logo))
+        .route("/", get(index))
+        .route("/sessions", get(sessions))
+        .route("/sessions/new", get(session_new_get).post(session_new_post))
+        .route("/sessions/{id}", get(session_detail))
+        .route("/sessions/{id}/edit", get(session_edit_get).post(session_edit_post))
+        .route("/sessions/{id}/standings", get(session_standings))
+        .route("/sessions/{id}/rounds/{round}", get(session_round))
+        .route("/sessions/{id}/standings/best", get(session_standings_best))
+        .route("/sessions/{id}/standings/all", get(session_standings_all))
+        .route("/sessions/{id}/standings/bomb/best", get(session_bomb_best))
+        .route("/sessions/{id}/standings/bomb/all", get(session_bomb_all))
+        .route("/sessions/{id}/start", post(session_start))
+        .route("/sessions/{id}/cancel", post(session_cancel))
+        .route("/login", get(login))
+        .route("/auth/callback", get(callback))
+        .route("/logout", get(logout))
+        .layer(auth_layer)
+        .with_state(app_state);
+
+    let listener = tokio::net::TcpListener::bind(listen).await?;
+    tracing::info!("Web listening on {listen}");
+
+    axum::serve(listener, app).await?;
+
+    Ok(())
+}
