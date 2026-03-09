@@ -58,7 +58,6 @@ struct LutEntry {
 #[derive(Debug, Clone, Copy)]
 struct Candidate {
     target_position: DVec3,
-    travel_heading: Heading,
     travel_rise_metres: f64,
     piece: Piece,
 }
@@ -245,8 +244,8 @@ pub fn build(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Object
             Piece::Ramp { heading, .. } => heading,
         };
 
-        let (travel_heading, travel_rise_metres) = match config.mode {
-            RampMode::AcrossPath => (path_heading, 0.0),
+        let travel_rise_metres = match config.mode {
+            RampMode::AcrossPath => 0.0,
             RampMode::AlongPath => {
                 let horizontal = tangent.truncate().length();
                 let slope_degrees = if horizontal <= f64::EPSILON {
@@ -267,45 +266,38 @@ pub fn build(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Object
                     Piece::Slab { .. } => 0.0,
                 };
 
-                (path_heading, rise)
+                rise
             },
         };
 
         candidates.push(Candidate {
             target_position: pos,
-            travel_heading,
             travel_rise_metres,
             piece,
         });
     }
-
     let mut centres = Vec::with_capacity(candidates.len());
     match config.mode {
         RampMode::AcrossPath => {
             centres.extend(candidates.iter().map(|candidate| candidate.target_position));
         },
         RampMode::AlongPath => {
-            for (idx, candidate) in candidates.iter().enumerate() {
-                let center = if idx == 0 {
-                    candidate.target_position
-                } else {
-                    let prev_center = centres[idx - 1];
-                    let prev_forward = travel_half_offset(
-                        candidates[idx - 1].travel_heading,
-                        candidates[idx - 1].travel_rise_metres,
-                        spacing_metres,
-                    );
-                    let this_forward = travel_half_offset(
-                        candidate.travel_heading,
-                        candidate.travel_rise_metres,
-                        spacing_metres,
-                    );
-                    let seam = prev_center + prev_forward;
-                    seam + this_forward
-                };
+            let mut current_z = candidates.first().map(|c| c.target_position.z).unwrap_or_default();
 
-                // Snap to grid to avoid drift
-                let center = ObjectCoordinate::from_dvec3_metres(center).to_dvec3_metres();
+            for (idx, candidate) in candidates.iter().enumerate() {
+                if idx > 0 {
+                    let prev = &candidates[idx - 1];
+                    let half_prev_rise = prev.travel_rise_metres * 0.5;
+                    let half_this_rise = candidate.travel_rise_metres * 0.5;
+                    
+                    // Floating-point dead-reckoning guarantees wedge tops are perfectly flush
+                    current_z += half_prev_rise + half_this_rise;
+                }
+
+                // Lock XY perfectly to the spline, override Z with our chained wedge height
+                let mut center = candidate.target_position;
+                center.z = current_z;
+                
                 centres.push(center);
             }
         },
@@ -399,12 +391,6 @@ fn normalize_or_fallback(vector: DVec3, fallback: DVec3) -> DVec3 {
     } else {
         DVec3::Y
     }
-}
-
-fn travel_half_offset(heading: Heading, rise_metres: f64, spacing_metres: f64) -> DVec3 {
-    let forward = heading_to_forward(heading);
-    let half = spacing_metres * 0.5;
-    DVec3::new(forward.x * half, forward.y * half, rise_metres * 0.5)
 }
 
 fn prototype_slab(selection: &[ObjectInfo]) -> ConcreteSlab {
