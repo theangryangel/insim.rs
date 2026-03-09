@@ -12,11 +12,11 @@ use crate::db::{self, SessionMode};
 use crate::web::{AuthSession, OAuthCredentials};
 use crate::web::state::{AppState, PageCtx};
 use crate::web::templates::{
-    BombAllRunsFragment, BombBestRunsFragment, BombStandingsFragment,
-    IndexTemplate, MetronomeRoundTab, MetronomeStandingsTab,
+    BombAllRunsContent, BombBestRunsContent, BombStandingsFragment,
+    IndexTemplate, MetronomeRoundContent, MetronomeStandingsContent,
     SessionActionsFragment, SessionDetailTemplate, SessionEditTemplate,
-    SessionNewTemplate, SessionsTemplate, ShortcutAllTimesFragment,
-    ShortcutBestTimesFragment, ShortcutStandingsFragment,
+    SessionNewTemplate, SessionsTemplate, ShortcutAllTimesContent,
+    ShortcutBestTimesContent, ShortcutStandingsFragment,
     group_metronome_rounds,
 };
 
@@ -67,9 +67,17 @@ pub async fn session_detail(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    let (metronome_standings, metronome_rounds, shortcut_best_times, bomb_best_runs) = match &*session.mode {
+    let mut metronome_standings = vec![];
+    let mut metronome_rounds = vec![];
+    let mut round_results: Vec<(i64, Vec<db::MetronomeResult>)> = vec![];
+    let mut shortcut_best_times = vec![];
+    let mut shortcut_all_times = vec![];
+    let mut bomb_best_runs = vec![];
+    let mut bomb_all_runs = vec![];
+
+    match &*session.mode {
         SessionMode::Metronome { .. } => {
-            let standings = db::metronome_standings(&state.pool, session.id)
+            metronome_standings = db::metronome_standings(&state.pool, session.id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
             let rounds = group_metronome_rounds(
@@ -77,23 +85,33 @@ pub async fn session_detail(
                     .await
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
             );
-            (standings, rounds, vec![], vec![])
+            round_results = rounds.iter().map(|r| (r.round, r.results.clone())).collect();
+            metronome_rounds = rounds;
         }
         SessionMode::Shortcut => {
-            let t = db::shortcut_best_times(&state.pool, session.id)
+            shortcut_best_times = db::shortcut_best_times(&state.pool, session.id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            (vec![], vec![], t, vec![])
+            shortcut_all_times = db::shortcut_all_times(&state.pool, session.id)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         }
         SessionMode::Bomb { .. } => {
-            let b = db::bomb_best_runs(&state.pool, session.id)
+            bomb_best_runs = db::bomb_best_runs(&state.pool, session.id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            (vec![], vec![], vec![], b)
+            bomb_all_runs = db::bomb_all_runs(&state.pool, session.id)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         }
     };
 
-    let tmpl = SessionDetailTemplate { page, session, metronome_standings, metronome_rounds, shortcut_best_times, bomb_best_runs };
+    let tmpl = SessionDetailTemplate {
+        page, session,
+        metronome_standings, metronome_rounds, round_results,
+        shortcut_best_times, shortcut_all_times,
+        bomb_best_runs, bomb_all_runs,
+    };
     Ok(Html(tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?))
 }
 
@@ -265,6 +283,7 @@ pub struct EditSessionForm {
     pub rounds: Option<i64>,
     pub target: Option<u64>,
     pub max_scorers: Option<i64>,
+    pub checkpoint_timeout: Option<u64>,
 }
 
 pub async fn session_edit_post(
@@ -302,6 +321,12 @@ pub async fn session_edit_post(
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     }
 
+    if let Some(timeout) = form.checkpoint_timeout {
+        db::update_bomb_settings(&state.pool, id, timeout as i64)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    }
+
     Ok(Redirect::to(&format!("/sessions/{id}")))
 }
 
@@ -319,12 +344,7 @@ pub async fn session_standings(
             let metronome_standings = db::metronome_standings(&state.pool, session.id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            let metronome_rounds = group_metronome_rounds(
-                db::metronome_all_results(&state.pool, session.id)
-                    .await
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
-            );
-            MetronomeStandingsTab { session, metronome_standings, metronome_rounds }
+            MetronomeStandingsContent { metronome_standings }
                 .render()
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         }
@@ -332,7 +352,10 @@ pub async fn session_standings(
             let shortcut_best_times = db::shortcut_best_times(&state.pool, session.id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            ShortcutStandingsFragment { session, shortcut_best_times }
+            let shortcut_all_times = db::shortcut_all_times(&state.pool, session.id)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            ShortcutStandingsFragment { session, shortcut_best_times, shortcut_all_times }
                 .render()
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         }
@@ -340,7 +363,10 @@ pub async fn session_standings(
             let bomb_best_runs = db::bomb_best_runs(&state.pool, session.id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            BombStandingsFragment { session, bomb_best_runs }
+            let bomb_all_runs = db::bomb_all_runs(&state.pool, session.id)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            BombStandingsFragment { session, bomb_best_runs, bomb_all_runs }
                 .render()
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         }
@@ -353,10 +379,6 @@ pub async fn session_round(
     State(state): State<AppState>,
     Path((id, round_number)): Path<(i64, i64)>,
 ) -> Result<Html<String>, StatusCode> {
-    let session = db::get_session(&state.pool, id)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
     let metronome_rounds = group_metronome_rounds(
         db::metronome_all_results(&state.pool, id)
             .await
@@ -368,7 +390,7 @@ pub async fn session_round(
         .map(|r| r.results.clone())
         .unwrap_or_default();
     Ok(Html(
-        MetronomeRoundTab { session, round_number, round_results, metronome_rounds }
+        MetronomeRoundContent { round_results }
             .render()
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     ))
@@ -378,15 +400,11 @@ pub async fn session_standings_best(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Html<String>, StatusCode> {
-    let session = db::get_session(&state.pool, id)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
     let shortcut_best_times = db::shortcut_best_times(&state.pool, id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Html(
-        ShortcutBestTimesFragment { session, shortcut_best_times }
+        ShortcutBestTimesContent { shortcut_best_times }
             .render()
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     ))
@@ -396,15 +414,11 @@ pub async fn session_standings_all(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Html<String>, StatusCode> {
-    let session = db::get_session(&state.pool, id)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
     let shortcut_all_times = db::shortcut_all_times(&state.pool, id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Html(
-        ShortcutAllTimesFragment { session, shortcut_all_times }
+        ShortcutAllTimesContent { shortcut_all_times }
             .render()
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     ))
@@ -414,15 +428,11 @@ pub async fn session_bomb_best(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Html<String>, StatusCode> {
-    let session = db::get_session(&state.pool, id)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
     let bomb_best_runs = db::bomb_best_runs(&state.pool, id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Html(
-        BombBestRunsFragment { session, bomb_best_runs }
+        BombBestRunsContent { bomb_best_runs }
             .render()
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     ))
@@ -432,15 +442,11 @@ pub async fn session_bomb_all(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Html<String>, StatusCode> {
-    let session = db::get_session(&state.pool, id)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
     let bomb_all_runs = db::bomb_all_runs(&state.pool, id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Html(
-        BombAllRunsFragment { session, bomb_all_runs }
+        BombAllRunsContent { bomb_all_runs }
             .render()
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     ))

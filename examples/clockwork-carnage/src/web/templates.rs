@@ -47,8 +47,11 @@ pub struct SessionDetailTemplate {
     pub session: Session,
     pub metronome_standings: Vec<db::MetronomeStanding>,
     pub metronome_rounds: Vec<RoundResults>,
+    pub round_results: Vec<(i64, Vec<db::MetronomeResult>)>,
     pub shortcut_best_times: Vec<db::ShortcutTime>,
+    pub shortcut_all_times: Vec<db::ShortcutTime>,
     pub bomb_best_runs: Vec<db::BombRun>,
+    pub bomb_all_runs: Vec<db::BombRun>,
 }
 
 #[derive(Template)]
@@ -74,20 +77,15 @@ pub struct SessionActionsFragment {
 }
 
 #[derive(Template)]
-#[template(path = "partials/metronome_standings_response.html")]
-pub struct MetronomeStandingsTab {
-    pub session: Session,
+#[template(path = "partials/metronome_standings_content.html")]
+pub struct MetronomeStandingsContent {
     pub metronome_standings: Vec<db::MetronomeStanding>,
-    pub metronome_rounds: Vec<RoundResults>,
 }
 
 #[derive(Template)]
-#[template(path = "partials/metronome_round_response.html")]
-pub struct MetronomeRoundTab {
-    pub session: Session,
-    pub round_number: i64,
+#[template(path = "partials/metronome_round_content.html")]
+pub struct MetronomeRoundContent {
     pub round_results: Vec<db::MetronomeResult>,
-    pub metronome_rounds: Vec<RoundResults>,
 }
 
 #[derive(Template)]
@@ -95,19 +93,18 @@ pub struct MetronomeRoundTab {
 pub struct ShortcutStandingsFragment {
     pub session: Session,
     pub shortcut_best_times: Vec<db::ShortcutTime>,
+    pub shortcut_all_times: Vec<db::ShortcutTime>,
 }
 
 #[derive(Template)]
-#[template(path = "partials/shortcut_best_times_response.html")]
-pub struct ShortcutBestTimesFragment {
-    pub session: Session,
+#[template(path = "partials/shortcut_best_times_content.html")]
+pub struct ShortcutBestTimesContent {
     pub shortcut_best_times: Vec<db::ShortcutTime>,
 }
 
 #[derive(Template)]
-#[template(path = "partials/shortcut_all_times_response.html")]
-pub struct ShortcutAllTimesFragment {
-    pub session: Session,
+#[template(path = "partials/shortcut_all_times_content.html")]
+pub struct ShortcutAllTimesContent {
     pub shortcut_all_times: Vec<db::ShortcutTime>,
 }
 
@@ -116,18 +113,17 @@ pub struct ShortcutAllTimesFragment {
 pub struct BombStandingsFragment {
     pub session: Session,
     pub bomb_best_runs: Vec<db::BombRun>,
+    pub bomb_all_runs: Vec<db::BombRun>,
 }
 
 #[derive(Template)]
-#[template(path = "partials/bomb_best_runs_response.html")]
-pub struct BombBestRunsFragment {
-    pub session: Session,
+#[template(path = "partials/bomb_best_runs_content.html")]
+pub struct BombBestRunsContent {
     pub bomb_best_runs: Vec<db::BombRun>,
 }
 
 #[derive(Template)]
-#[template(path = "partials/bomb_all_runs_response.html")]
-pub struct BombAllRunsFragment {
-    pub session: Session,
+#[template(path = "partials/bomb_all_runs_content.html")]
+pub struct BombAllRunsContent {
     pub bomb_all_runs: Vec<db::BombRun>,
 }

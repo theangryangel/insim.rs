@@ -250,6 +250,21 @@ pub async fn update_metronome_settings(
     Ok(())
 }
 
+pub async fn update_bomb_settings(
+    pool: &Pool,
+    session_id: i64,
+    checkpoint_timeout_secs: i64,
+) -> Result<(), sqlx::Error> {
+    let _ = sqlx::query(
+        "UPDATE sessions SET mode = json_set(mode, '$.checkpoint_timeout_secs', ?) WHERE id = ?",
+    )
+    .bind(checkpoint_timeout_secs)
+    .bind(session_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 pub async fn update_session_writeup(
     pool: &Pool,
     session_id: i64,
