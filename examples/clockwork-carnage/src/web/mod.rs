@@ -2,7 +2,6 @@
 
 pub mod handlers;
 pub mod state;
-pub mod templates;
 pub mod filters;
 
 use std::net::SocketAddr;

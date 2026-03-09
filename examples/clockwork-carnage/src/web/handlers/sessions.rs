@@ -1,50 +1,182 @@
+use askama::Template;
 use axum::{
-    extract::{Form, Path, Query, State},
+    extract::{Form, Path, State},
     http::StatusCode,
     response::{Html, IntoResponse, Redirect},
 };
-use askama::Template;
 use insim::core::track::Track;
-use oauth2::{CsrfToken, Scope};
-use tower_sessions::Session as TowerSession;
 
-use crate::db::{self, SessionMode};
-use crate::web::{AuthSession, OAuthCredentials};
+use crate::db::{self, Session, SessionMode, SessionStatus};
 use crate::web::state::{AppState, PageCtx};
-use crate::web::templates::{
-    BombAllRunsContent, BombBestRunsContent, BombStandingsFragment,
-    IndexTemplate, MetronomeRoundContent, MetronomeStandingsContent,
-    SessionActionsFragment, SessionDetailTemplate, SessionEditTemplate,
-    SessionNewTemplate, SessionsTemplate, ShortcutAllTimesContent,
-    ShortcutBestTimesContent, ShortcutStandingsFragment,
-    group_metronome_rounds,
-};
+use crate::web::filters;
 
-// -- Static assets ------------------------------------------------------------
+// -- Shared types -------------------------------------------------------------
 
-pub async fn logo() -> (StatusCode, [(&'static str, &'static str); 1], &'static [u8]) {
-    (
-        StatusCode::OK,
-        [("content-type", "image/svg+xml")],
-        include_bytes!("../../logo.svg"),
-    )
+pub struct RoundResults {
+    pub round: i64,
+    pub results: Vec<db::MetronomeResult>,
 }
 
-// -- Page handlers ------------------------------------------------------------
-
-pub async fn index(
-    page: PageCtx,
-    State(state): State<AppState>,
-) -> Result<Html<String>, StatusCode> {
-    let active = db::active_session(&state.pool)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let upcoming = db::upcoming_sessions(&state.pool)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let tmpl = IndexTemplate { page, active, upcoming };
-    Ok(Html(tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?))
+pub fn group_metronome_rounds(results: Vec<db::MetronomeResult>) -> Vec<RoundResults> {
+    let mut rounds: Vec<RoundResults> = Vec::new();
+    for result in results {
+        if let Some(last) = rounds.last_mut() {
+            if last.round == result.round {
+                last.results.push(result);
+                continue;
+            }
+        }
+        rounds.push(RoundResults { round: result.round, results: vec![result] });
+    }
+    rounds
 }
+
+// -- Template structs ---------------------------------------------------------
+
+#[derive(Template)]
+#[template(path = "sessions.html")]
+pub struct SessionsTemplate {
+    pub page: PageCtx,
+    pub sessions: Vec<Session>,
+}
+
+#[derive(Template)]
+#[template(path = "session_detail.html")]
+pub struct SessionDetailTemplate {
+    pub page: PageCtx,
+    pub session: Session,
+    pub metronome_standings: Vec<db::MetronomeStanding>,
+    pub metronome_rounds: Vec<RoundResults>,
+    pub round_results: Vec<(i64, Vec<db::MetronomeResult>)>,
+    pub shortcut_best_times: Vec<db::ShortcutTime>,
+    pub shortcut_all_times: Vec<db::ShortcutTime>,
+    pub bomb_best_runs: Vec<db::BombRun>,
+    pub bomb_all_runs: Vec<db::BombRun>,
+}
+
+#[derive(Template)]
+#[template(path = "session_new.html")]
+pub struct SessionNewTemplate {
+    pub page: PageCtx,
+    pub tracks: &'static [Track],
+}
+
+#[derive(Template)]
+#[template(path = "session_edit.html")]
+pub struct SessionEditTemplate {
+    pub page: PageCtx,
+    pub session: db::Session,
+    pub tracks: &'static [Track],
+}
+
+#[derive(Template)]
+#[template(path = "partials/session_actions.html")]
+pub struct SessionActionsFragment {
+    pub page: PageCtx,
+    pub session: Session,
+}
+
+#[derive(Template)]
+#[template(path = "partials/metronome_standings_content.html")]
+pub struct MetronomeStandingsContent {
+    pub metronome_standings: Vec<db::MetronomeStanding>,
+}
+
+#[derive(Template)]
+#[template(path = "partials/metronome_round_content.html")]
+pub struct MetronomeRoundContent {
+    pub round_results: Vec<db::MetronomeResult>,
+}
+
+#[derive(Template)]
+#[template(path = "partials/shortcut_standings.html")]
+pub struct ShortcutStandingsFragment {
+    pub session: Session,
+    pub shortcut_best_times: Vec<db::ShortcutTime>,
+    pub shortcut_all_times: Vec<db::ShortcutTime>,
+}
+
+#[derive(Template)]
+#[template(path = "partials/shortcut_best_times_content.html")]
+pub struct ShortcutBestTimesContent {
+    pub shortcut_best_times: Vec<db::ShortcutTime>,
+}
+
+#[derive(Template)]
+#[template(path = "partials/shortcut_all_times_content.html")]
+pub struct ShortcutAllTimesContent {
+    pub shortcut_all_times: Vec<db::ShortcutTime>,
+}
+
+#[derive(Template)]
+#[template(path = "partials/bomb_standings.html")]
+pub struct BombStandingsFragment {
+    pub session: Session,
+    pub bomb_best_runs: Vec<db::BombRun>,
+    pub bomb_all_runs: Vec<db::BombRun>,
+}
+
+#[derive(Template)]
+#[template(path = "partials/bomb_best_runs_content.html")]
+pub struct BombBestRunsContent {
+    pub bomb_best_runs: Vec<db::BombRun>,
+}
+
+#[derive(Template)]
+#[template(path = "partials/bomb_all_runs_content.html")]
+pub struct BombAllRunsContent {
+    pub bomb_all_runs: Vec<db::BombRun>,
+}
+
+// -- Form structs -------------------------------------------------------------
+
+#[derive(serde::Deserialize)]
+pub struct StartSessionForm {
+    pub csrf_token: String,
+}
+
+fn default_rounds() -> i64 { 5 }
+fn default_target() -> u64 { 20 }
+fn default_max_scorers() -> i64 { 10 }
+fn default_checkpoint_timeout() -> u64 { 30 }
+
+#[derive(serde::Deserialize)]
+pub struct NewSessionForm {
+    pub csrf_token: String,
+    pub mode: String,
+    pub track: String,
+    #[serde(default)]
+    pub layout: String,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub scheduled_at: Option<String>,
+    #[serde(default = "default_rounds")]
+    pub rounds: i64,
+    #[serde(default = "default_target")]
+    pub target: u64,
+    #[serde(default = "default_max_scorers")]
+    pub max_scorers: i64,
+    #[serde(default = "default_checkpoint_timeout")]
+    pub checkpoint_timeout: u64,
+}
+
+#[derive(serde::Deserialize)]
+pub struct EditSessionForm {
+    pub csrf_token: String,
+    pub track: String,
+    #[serde(default)]
+    pub layout: String,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub scheduled_at: Option<String>,
+    pub writeup: Option<String>,
+    pub rounds: Option<i64>,
+    pub target: Option<u64>,
+    pub max_scorers: Option<i64>,
+    pub checkpoint_timeout: Option<u64>,
+}
+
+// -- Handlers -----------------------------------------------------------------
 
 pub async fn sessions(
     page: PageCtx,
@@ -113,66 +245,6 @@ pub async fn session_detail(
         bomb_best_runs, bomb_all_runs,
     };
     Ok(Html(tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?))
-}
-
-#[derive(serde::Deserialize)]
-pub struct StartSessionForm {
-    pub csrf_token: String,
-}
-
-pub async fn session_start(
-    page: PageCtx,
-    headers: axum::http::HeaderMap,
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-    Form(form): Form<StartSessionForm>,
-) -> Result<axum::response::Response, StatusCode> {
-    if !page.admin {
-        return Err(StatusCode::NOT_FOUND);
-    }
-    if form.csrf_token != page.csrf_token {
-        return Err(StatusCode::FORBIDDEN);
-    }
-    db::switch_session(&state.pool, id)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    if headers.contains_key("hx-request") {
-        let session = db::get_session(&state.pool, id)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-            .ok_or(StatusCode::NOT_FOUND)?;
-        let html = SessionActionsFragment { page, session }
-            .render()
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-        Ok(Html(html).into_response())
-    } else {
-        Ok(Redirect::to("/").into_response())
-    }
-}
-
-fn default_rounds() -> i64 { 5 }
-fn default_target() -> u64 { 20 }
-fn default_max_scorers() -> i64 { 10 }
-fn default_checkpoint_timeout() -> u64 { 30 }
-
-#[derive(serde::Deserialize)]
-pub struct NewSessionForm {
-    pub csrf_token: String,
-    pub mode: String,
-    pub track: String,
-    #[serde(default)]
-    pub layout: String,
-    pub name: Option<String>,
-    pub description: Option<String>,
-    pub scheduled_at: Option<String>,
-    #[serde(default = "default_rounds")]
-    pub rounds: i64,
-    #[serde(default = "default_target")]
-    pub target: u64,
-    #[serde(default = "default_max_scorers")]
-    pub max_scorers: i64,
-    #[serde(default = "default_checkpoint_timeout")]
-    pub checkpoint_timeout: u64,
 }
 
 pub async fn session_new_get(page: PageCtx) -> Result<Html<String>, StatusCode> {
@@ -270,22 +342,6 @@ pub async fn session_edit_get(
     Ok(Html(tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?))
 }
 
-#[derive(serde::Deserialize)]
-pub struct EditSessionForm {
-    pub csrf_token: String,
-    pub track: String,
-    #[serde(default)]
-    pub layout: String,
-    pub name: Option<String>,
-    pub description: Option<String>,
-    pub scheduled_at: Option<String>,
-    pub writeup: Option<String>,
-    pub rounds: Option<i64>,
-    pub target: Option<u64>,
-    pub max_scorers: Option<i64>,
-    pub checkpoint_timeout: Option<u64>,
-}
-
 pub async fn session_edit_post(
     page: PageCtx,
     State(state): State<AppState>,
@@ -328,6 +384,66 @@ pub async fn session_edit_post(
     }
 
     Ok(Redirect::to(&format!("/sessions/{id}")))
+}
+
+pub async fn session_start(
+    page: PageCtx,
+    headers: axum::http::HeaderMap,
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Form(form): Form<StartSessionForm>,
+) -> Result<axum::response::Response, StatusCode> {
+    if !page.admin {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    if form.csrf_token != page.csrf_token {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    db::switch_session(&state.pool, id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if headers.contains_key("hx-request") {
+        let session = db::get_session(&state.pool, id)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .ok_or(StatusCode::NOT_FOUND)?;
+        let html = SessionActionsFragment { page, session }
+            .render()
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        Ok(Html(html).into_response())
+    } else {
+        Ok(Redirect::to("/").into_response())
+    }
+}
+
+pub async fn session_cancel(
+    page: PageCtx,
+    headers: axum::http::HeaderMap,
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Form(form): Form<StartSessionForm>,
+) -> Result<axum::response::Response, StatusCode> {
+    if !page.admin {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    if form.csrf_token != page.csrf_token {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    db::cancel_session(&state.pool, id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if headers.contains_key("hx-request") {
+        let session = db::get_session(&state.pool, id)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .ok_or(StatusCode::NOT_FOUND)?;
+        let html = SessionActionsFragment { page, session }
+            .render()
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        Ok(Html(html).into_response())
+    } else {
+        Ok(Redirect::to(&format!("/sessions/{id}")).into_response())
+    }
 }
 
 pub async fn session_standings(
@@ -450,91 +566,4 @@ pub async fn session_bomb_all(
             .render()
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     ))
-}
-
-pub async fn session_cancel(
-    page: PageCtx,
-    headers: axum::http::HeaderMap,
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-    Form(form): Form<StartSessionForm>,
-) -> Result<axum::response::Response, StatusCode> {
-    if !page.admin {
-        return Err(StatusCode::NOT_FOUND);
-    }
-    if form.csrf_token != page.csrf_token {
-        return Err(StatusCode::FORBIDDEN);
-    }
-    db::cancel_session(&state.pool, id)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    if headers.contains_key("hx-request") {
-        let session = db::get_session(&state.pool, id)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-            .ok_or(StatusCode::NOT_FOUND)?;
-        let html = SessionActionsFragment { page, session }
-            .render()
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-        Ok(Html(html).into_response())
-    } else {
-        Ok(Redirect::to(&format!("/sessions/{id}")).into_response())
-    }
-}
-
-// -- Auth handlers ------------------------------------------------------------
-
-pub async fn login(
-    auth_session: AuthSession,
-    session: TowerSession,
-    State(state): State<AppState>,
-) -> impl IntoResponse {
-    if auth_session.user.is_some() {
-        return Redirect::to("/").into_response();
-    }
-    let (auth_url, csrf_token) = state
-        .oauth_client
-        .authorize_url(CsrfToken::new_random)
-        .add_scope(Scope::new("openid".to_string()))
-        .add_scope(Scope::new("profile".to_string()))
-        .url();
-    session
-        .insert("oauth_csrf_state", csrf_token.secret().clone())
-        .await
-        .unwrap();
-    Redirect::to(auth_url.as_str()).into_response()
-}
-
-#[derive(serde::Deserialize)]
-pub struct AuthzResp {
-    pub code: String,
-    pub state: String,
-}
-
-pub async fn callback(
-    mut auth_session: AuthSession,
-    session: TowerSession,
-    Query(params): Query<AuthzResp>,
-) -> impl IntoResponse {
-    let expected: Option<String> = session.remove("oauth_csrf_state").await.unwrap();
-    if expected.as_deref() != Some(&params.state) {
-        return StatusCode::BAD_REQUEST.into_response();
-    }
-    let creds = OAuthCredentials { code: params.code, state: params.state };
-    match auth_session.authenticate(creds).await {
-        Ok(Some(user)) => {
-            auth_session.login(&user).await.unwrap();
-            Redirect::to("/").into_response()
-        }
-        Ok(None) => StatusCode::UNAUTHORIZED.into_response(),
-        Err(e) => {
-            tracing::error!("Auth error: {e}");
-            StatusCode::INTERNAL_SERVER_ERROR.into_response()
-        }
-    }
-}
-
-pub async fn logout(mut auth_session: AuthSession) -> impl IntoResponse {
-    let _ = auth_session.logout().await.unwrap();
-    Redirect::to("/")
 }
