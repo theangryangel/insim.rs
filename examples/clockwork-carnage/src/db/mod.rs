@@ -112,8 +112,11 @@ pub struct Session {
     #[sqlx(try_from = "String")]
     pub track: Track,
     pub layout: String,
+    #[allow(unused)]
     pub created_at: String,
+    #[allow(unused)]
     pub started_at: Option<String>,
+    #[allow(unused)]
     pub ended_at: Option<String>,
     pub scheduled_at: Option<String>,
     pub name: Option<String>,
@@ -130,19 +133,24 @@ pub struct MetronomeStanding {
 
 #[derive(Debug, Clone, FromRow)]
 pub struct MetronomeResult {
+    #[allow(unused)]
     pub id: i64,
+    #[allow(unused)]
     pub session_id: i64,
     pub round: i64,
     pub uname: String,
     pub pname: String,
     pub delta_ms: i64,
     pub points: i64,
+    #[allow(unused)]
     pub recorded_at: String,
 }
 
 #[derive(Debug, Clone, FromRow)]
 pub struct ShortcutTime {
+    #[allow(unused)]
     pub id: i64,
+    #[allow(unused)]
     pub session_id: i64,
     pub uname: String,
     pub pname: String,
@@ -153,8 +161,11 @@ pub struct ShortcutTime {
 
 #[derive(Debug, Clone, FromRow)]
 pub struct BombRun {
+    #[allow(unused)]
     pub id: i64,
+    #[allow(unused)]
     pub session_id: i64,
+    #[allow(unused)]
     pub user_id: i64,
     pub uname: String,
     pub pname: String,

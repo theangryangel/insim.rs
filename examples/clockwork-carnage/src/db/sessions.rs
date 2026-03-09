@@ -70,16 +70,6 @@ pub async fn active_session(pool: &Pool) -> Result<Option<Session>, sqlx::Error>
     .await
 }
 
-pub async fn pending_session(pool: &Pool, id: i64) -> Result<Option<Session>, sqlx::Error> {
-    sqlx::query_as(
-        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, name, description, writeup
-         FROM sessions WHERE id = ? AND status = 'PENDING'",
-    )
-    .bind(id)
-    .fetch_optional(pool)
-    .await
-}
-
 pub async fn upcoming_sessions(pool: &Pool) -> Result<Vec<Session>, sqlx::Error> {
     sqlx::query_as(
         "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, name, description, writeup
@@ -181,16 +171,6 @@ pub async fn switch_session(pool: &Pool, session_id: i64) -> Result<(), sqlx::Er
     Ok(())
 }
 
-pub async fn activate_session(pool: &Pool, session_id: i64) -> Result<(), sqlx::Error> {
-    let _ = sqlx::query(
-        "UPDATE sessions SET status = 'ACTIVE', started_at = datetime('now') WHERE id = ? AND status = 'PENDING'",
-    )
-    .bind(session_id)
-    .execute(pool)
-    .await?;
-    Ok(())
-}
-
 pub async fn complete_session(pool: &Pool, session_id: i64) -> Result<(), sqlx::Error> {
     let _ = sqlx::query(
         "UPDATE sessions SET status = 'COMPLETED', ended_at = datetime('now') WHERE id = ?",
@@ -262,18 +242,5 @@ pub async fn update_bomb_settings(
     .bind(session_id)
     .execute(pool)
     .await?;
-    Ok(())
-}
-
-pub async fn update_session_writeup(
-    pool: &Pool,
-    session_id: i64,
-    writeup: &str,
-) -> Result<(), sqlx::Error> {
-    let _ = sqlx::query("UPDATE sessions SET writeup = ? WHERE id = ?")
-        .bind(writeup)
-        .bind(session_id)
-        .execute(pool)
-        .await?;
     Ok(())
 }

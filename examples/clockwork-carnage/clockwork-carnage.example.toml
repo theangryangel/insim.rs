@@ -21,9 +21,9 @@ addr = "127.0.0.1:29999"
 # listen = "127.0.0.1:3000"
 
 # OAuth2 credentials from id.lfs.net (all required if this section is present)
-lfs_client_id     = "your-client-id"
-lfs_client_secret = "your-client-secret"
-lfs_redirect_uri  = "http://localhost:3000/auth/callback"
+oauth_client_id     = "your-client-id"
+oauth_client_secret = "your-client-secret"
+oauth_redirect_uri  = "http://localhost:3000/auth/callback"
 
 # 64-byte cookie signing key (optional; a weak default is used in dev if omitted)
 # session_key = "change-me-to-a-random-64-byte-string-before-going-to-production!!"

@@ -40,9 +40,9 @@ struct InsimSection {
 struct WebSection {
     #[serde(default = "default_listen")]
     listen: SocketAddr,
-    lfs_client_id: String,
-    lfs_client_secret: String,
-    lfs_redirect_uri: String,
+    oauth_client_id: String,
+    oauth_client_secret: String,
+    oauth_redirect_uri: String,
     session_key: Option<String>,
 }
 
@@ -128,9 +128,9 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
     // Web — only if [web] present
     let web_listen = config.web.as_ref().map(|w| w.listen);
     let web_cfg = config.web.map(|w| web::WebConfig {
-        lfs_client_id: w.lfs_client_id,
-        lfs_client_secret: w.lfs_client_secret,
-        lfs_redirect_uri: w.lfs_redirect_uri,
+        oauth_client_id: w.oauth_client_id,
+        oauth_client_secret: w.oauth_client_secret,
+        oauth_redirect_uri: w.oauth_redirect_uri,
         session_key: w.session_key.unwrap_or_else(|| "a".repeat(64)),
     });
 

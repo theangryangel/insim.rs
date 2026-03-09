@@ -39,6 +39,7 @@ impl AuthUser for db::User {
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct OAuthCredentials {
     pub code: String,
+    #[allow(unused)]
     pub state: String,
 }
 
@@ -150,21 +151,21 @@ pub type AuthSession = axum_login::AuthSession<Backend>;
 
 #[derive(Debug, Clone)]
 pub struct WebConfig {
-    pub lfs_client_id: String,
-    pub lfs_client_secret: String,
-    pub lfs_redirect_uri: String,
+    pub oauth_client_id: String,
+    pub oauth_client_secret: String,
+    pub oauth_redirect_uri: String,
     pub session_key: String,
 }
 
 // -- Server entry point -------------------------------------------------------
 
 pub async fn serve(listen: SocketAddr, pool: db::Pool, cfg: WebConfig) -> anyhow::Result<()> {
-    let oauth_client = build_oauth_client(&cfg.lfs_client_id, &cfg.lfs_redirect_uri)?;
+    let oauth_client = build_oauth_client(&cfg.oauth_client_id, &cfg.oauth_redirect_uri)?;
     let backend = Backend::new(
         pool.clone(),
-        cfg.lfs_client_id,
-        cfg.lfs_client_secret,
-        cfg.lfs_redirect_uri,
+        cfg.oauth_client_id,
+        cfg.oauth_client_secret,
+        cfg.oauth_redirect_uri,
     );
 
     let session_store = SqliteStore::new(pool.clone());
