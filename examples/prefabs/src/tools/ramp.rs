@@ -18,8 +18,8 @@ use insim::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RampMode {
     #[default]
-    AlongPath,
-    AcrossPath,
+    AlongPath,  // Classic track surface: uses wedges and flat slabs
+    AcrossPath, // Banked surface: sideways slabs with dynamic easing and overlapping
 }
 
 impl RampMode {
@@ -55,20 +55,6 @@ struct LutEntry {
     tangent: DVec3,
 }
 
-#[derive(Debug, Clone, Copy)]
-struct Candidate {
-    target_position: DVec3,
-    travel_heading: Heading,
-    travel_rise_metres: f64,
-    piece: Piece,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum Piece {
-    Slab { heading: Heading, pitch_step: u8 },
-    Ramp { heading: Heading, height_step: u8 },
-}
-
 pub fn build(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<ObjectInfo>> {
     ensure!(
         selection.len() >= 2,
@@ -80,12 +66,6 @@ pub fn build(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Object
     );
 
     let prototype = prototype_slab(selection);
-    let spacing_metres = concrete_width_length_metres(prototype.length);
-    ensure!(
-        spacing_metres > 0.0,
-        "prototype slab length must be positive"
-    );
-
     let steps_per_segment = config.steps_per_segment.unwrap_or(100).max(1);
 
     let first = selection
@@ -138,8 +118,7 @@ pub fn build(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Object
     let mut prev_pos = points[1];
 
     let prototype_forward = heading_to_forward(prototype.heading);
-    let mut last_tangent =
-        normalize_or_fallback(points[2] - points[1], prototype_forward.extend(0.0));
+    let mut last_tangent = normalize_or_fallback(points[2] - points[1], prototype_forward.extend(0.0));
     lut.push(LutEntry {
         t: 0.0,
         distance: 0.0,
@@ -163,7 +142,6 @@ pub fn build(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Object
                     tangent: last_tangent,
                 });
             }
-
             prev_pos = pos;
         }
     }
@@ -173,117 +151,9 @@ pub fn build(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Object
         "guide points produce zero horizontal path length"
     );
 
-    let num_objects = (total_len / spacing_metres).ceil() as usize + 1;
-    let mut candidates = Vec::with_capacity(num_objects);
-    let mut fallback_heading = prototype.heading;
-
-    for i in 0..num_objects {
-        let d_target = (i as f64 * spacing_metres).min(total_len);
-        let entry = sample_lut(&lut, d_target);
-
-        let max_seg_idx = points.len() - 4;
-        let mut seg_idx = entry.t.floor() as usize;
-        let mut local_t = entry.t.fract();
-        if seg_idx > max_seg_idx {
-            seg_idx = max_seg_idx;
-            local_t = 1.0;
-        }
-
-        let pos = interpolate(&points[seg_idx..seg_idx + 4], local_t);
-        let tangent = normalize_or_fallback(
-            entry.tangent,
-            heading_to_forward(fallback_heading).extend(0.0),
-        );
-        let path_heading = heading_from_vec2_or_fallback(tangent.truncate(), fallback_heading);
-
-        let piece = match config.mode {
-            RampMode::AlongPath => {
-                let horizontal = tangent.truncate().length();
-                let slope_degrees = if horizontal <= f64::EPSILON {
-                    0.0
-                } else {
-                    tangent.z.atan2(horizontal).to_degrees()
-                };
-
-                let rise_metres = slope_degrees.abs().to_radians().tan() * spacing_metres;
-                let height_step = quantize_height_step(rise_metres);
-
-                if height_step == 0 {
-                    Piece::Slab {
-                        heading: path_heading,
-                        pitch_step: 0,
-                    }
-                } else {
-                    let heading = if slope_degrees < 0.0 {
-                        path_heading.opposite()
-                    } else {
-                        path_heading
-                    };
-                    Piece::Ramp {
-                        heading,
-                        height_step,
-                    }
-                }
-            },
-            RampMode::AcrossPath => {
-                let quarter_turn = std::f64::consts::FRAC_PI_2;
-                let heading = if config.roll_degrees < 0.0 {
-                    Heading::from_radians(path_heading.to_radians() - quarter_turn)
-                } else {
-                    Heading::from_radians(path_heading.to_radians() + quarter_turn)
-                };
-
-                Piece::Slab {
-                    heading,
-                    pitch_step: quantize_pitch_step(config.roll_degrees.abs()),
-                }
-            },
-        };
-
-        fallback_heading = match piece {
-            Piece::Slab { heading, .. } => heading,
-            Piece::Ramp { heading, .. } => heading,
-        };
-
-        let (travel_heading, travel_rise_metres) = match config.mode {
-            RampMode::AcrossPath => (path_heading, 0.0),
-            RampMode::AlongPath => {
-                let horizontal = tangent.truncate().length();
-                let slope_degrees = if horizontal <= f64::EPSILON {
-                    0.0
-                } else {
-                    tangent.z.atan2(horizontal).to_degrees()
-                };
-
-                let rise = match piece {
-                    Piece::Ramp { height_step, .. } => {
-                        let magnitude = height_metres_from_step(height_step);
-                        if slope_degrees < 0.0 {
-                            -magnitude
-                        } else {
-                            magnitude
-                        }
-                    },
-                    Piece::Slab { .. } => 0.0,
-                };
-
-                (path_heading, rise)
-            },
-        };
-
-        candidates.push(Candidate {
-            target_position: pos,
-            travel_heading,
-            travel_rise_metres,
-            piece,
-        });
-    }
-    let mut centres = Vec::with_capacity(candidates.len());
-    
-    // Helper to precisely sample the spline at any arc-length distance
     let get_spline_pos = |d_target: f64| -> DVec3 {
         let entry = sample_lut(&lut, d_target);
-        let max_seg_idx = points.len() - 4;
+        let max_seg_idx = points.len().saturating_sub(4);
         let mut seg_idx = entry.t.floor() as usize;
         let mut local_t = entry.t.fract();
         if seg_idx > max_seg_idx {
@@ -293,107 +163,130 @@ pub fn build(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Object
         interpolate(&points[seg_idx..seg_idx + 4], local_t)
     };
 
-    let start_center = candidates.first().map(|c| c.target_position).unwrap_or_default();
-    let start_heading = candidates.first().map(|c| c.travel_heading).unwrap_or(fallback_heading);
-    let mut current_seam = start_center - heading_to_forward(start_heading).extend(0.0) * (spacing_metres * 0.5);
+    let mut output = Vec::new();
+    let mut current_distance = 0.0;
+    let mut current_seam = get_spline_pos(0.0);
+    
+    let initial_next = get_spline_pos(total_len.min(0.1));
+    let mut prev_heading = heading_from_vec2_or_fallback((initial_next - current_seam).truncate(), prototype.heading);
 
-    for (i, candidate) in candidates.iter_mut().enumerate() {
-        let target_next_distance = (i as f64 * spacing_metres + spacing_metres * 0.5).min(total_len);
-        let target_next_seam = get_spline_pos(target_next_distance);
+    let mut current_bank_angle = 0.0;
+    let max_roll_change_per_block = 6.0;
 
-        let delta = target_next_seam - current_seam;
-        let horizontal = delta.truncate().length();
-        let slope_degrees = if horizontal <= f64::EPSILON {
-            0.0
-        } else {
-            delta.z.atan2(horizontal).to_degrees()
+    while current_distance < total_len {
+        let target_bank = match config.mode {
+            RampMode::AlongPath => 0.0,
+            RampMode::AcrossPath => config.roll_degrees,
         };
 
-        let chord_heading = heading_from_vec2_or_fallback(delta.truncate(), candidate.travel_heading);
+        // --- EASE THE TRANSITION ---
+        let bank_diff = target_bank - current_bank_angle;
+        let is_transitioning = bank_diff.abs() > f64::EPSILON;
 
-        match config.mode {
+        // If the block has ANY roll, it MUST be built sideways
+        let active_orientation = if current_bank_angle.abs() > f64::EPSILON || target_bank.abs() > f64::EPSILON {
+            RampMode::AcrossPath
+        } else {
+            RampMode::AlongPath
+        };
+
+        // --- DYNAMIC SPACING (Micro-stepping for smoothness) ---
+        let base_step = match active_orientation {
+            RampMode::AlongPath => concrete_width_length_metres(prototype.length),
+            RampMode::AcrossPath => concrete_width_length_metres(prototype.width),
+        };
+
+        let step_metres = if is_transitioning {
+            base_step * 0.25 // 75% overlap while twisting
+        } else if current_bank_angle.abs() > f64::EPSILON {
+            base_step * 0.50 // 50% overlap during sustained bank
+        } else {
+            base_step        // 0% overlap on flat straights
+        };
+
+        if step_metres <= f64::EPSILON { break; }
+
+        if is_transitioning {
+            let change = bank_diff.signum() * bank_diff.abs().min(max_roll_change_per_block);
+            current_bank_angle += change;
+        }
+
+        // --- CALCULATE EXACT 3D CHORD ---
+        let target_distance = (current_distance + step_metres).min(total_len);
+        let target_pos = get_spline_pos(target_distance);
+        let delta = target_pos - current_seam;
+        
+        let chord_heading = heading_from_vec2_or_fallback(delta.truncate(), prev_heading);
+        let actual_horizontal = delta.truncate().length();
+        let slope_degrees = if actual_horizontal <= f64::EPSILON {
+            0.0
+        } else {
+            delta.z.atan2(actual_horizontal).to_degrees()
+        };
+
+        // --- BUILD AND PLACE ---
+        match active_orientation {
             RampMode::AcrossPath => {
-                // Turn exactly 90 degrees from the forward chord
                 let quarter_turn = std::f64::consts::FRAC_PI_2;
-                let heading = if config.roll_degrees < 0.0 {
+                let final_heading = if current_bank_angle < 0.0 {
                     Heading::from_radians(chord_heading.to_radians() - quarter_turn)
                 } else {
                     Heading::from_radians(chord_heading.to_radians() + quarter_turn)
                 };
 
-                candidate.piece = Piece::Slab {
-                    heading,
-                    pitch_step: quantize_pitch_step(config.roll_degrees.abs()),
-                };
-
-                // For AcrossPath, Z is locked to the spline's exact center height to minimize the staircase effect
                 let actual_travel = DVec3::new(
-                    heading_to_forward(chord_heading).x * spacing_metres,
-                    heading_to_forward(chord_heading).y * spacing_metres,
-                    delta.z
+                    heading_to_forward(chord_heading).x * step_metres,
+                    heading_to_forward(chord_heading).y * step_metres,
+                    delta.z // Lock Z to spline arc
                 );
 
                 let center = current_seam + actual_travel * 0.5;
-                centres.push(center);
+                
+                let mut slab = prototype.clone();
+                slab.xyz = ObjectCoordinate::from_dvec3_metres(center);
+                slab.heading = final_heading;
+                slab.pitch = pitch_from_step(quantize_pitch_step(current_bank_angle.abs()));
+                output.push(ObjectInfo::ConcreteSlab(slab));
+
                 current_seam += actual_travel;
             },
             RampMode::AlongPath => {
-                let rise_metres = slope_degrees.abs().to_radians().tan() * spacing_metres;
+                let rise_metres = slope_degrees.abs().to_radians().tan() * step_metres;
                 let height_step = quantize_height_step(rise_metres);
                 let magnitude = height_metres_from_step(height_step);
                 let actual_rise = if slope_degrees < 0.0 { -magnitude } else { magnitude };
 
-                let block_heading = if slope_degrees < 0.0 {
-                    chord_heading.opposite()
-                } else {
-                    chord_heading
-                };
-
-                candidate.piece = if height_step == 0 {
-                    Piece::Slab { heading: chord_heading, pitch_step: 0 }
-                } else {
-                    Piece::Ramp { heading: block_heading, height_step }
-                };
-
                 let actual_travel = DVec3::new(
-                    heading_to_forward(chord_heading).x * spacing_metres,
-                    heading_to_forward(chord_heading).y * spacing_metres,
+                    heading_to_forward(chord_heading).x * step_metres,
+                    heading_to_forward(chord_heading).y * step_metres,
                     actual_rise
                 );
 
                 let center = current_seam + actual_travel * 0.5;
-                centres.push(center);
+
+                if height_step == 0 {
+                    let mut slab = prototype.clone();
+                    slab.xyz = ObjectCoordinate::from_dvec3_metres(center);
+                    slab.heading = chord_heading;
+                    slab.pitch = ConcretePitch::Deg0;
+                    output.push(ObjectInfo::ConcreteSlab(slab));
+                } else {
+                    let block_heading = if slope_degrees < 0.0 { chord_heading.opposite() } else { chord_heading };
+                    output.push(ObjectInfo::ConcreteRamp(ConcreteRamp {
+                        xyz: ObjectCoordinate::from_dvec3_metres(center),
+                        width: prototype.width,
+                        length: prototype.length,
+                        height: height_from_step(height_step),
+                        heading: block_heading,
+                    }));
+                }
+
                 current_seam += actual_travel;
             }
         }
-    }
 
-    let mut output = Vec::with_capacity(candidates.len());
-    for (idx, candidate) in candidates.iter().enumerate() {
-        match candidate.piece {
-            Piece::Slab {
-                heading,
-                pitch_step,
-            } => {
-                let mut slab = prototype.clone();
-                slab.xyz = ObjectCoordinate::from_dvec3_metres(centres[idx]);
-                slab.heading = heading;
-                slab.pitch = pitch_from_step(pitch_step);
-                output.push(ObjectInfo::ConcreteSlab(slab));
-            },
-            Piece::Ramp {
-                heading,
-                height_step,
-            } => {
-                output.push(ObjectInfo::ConcreteRamp(ConcreteRamp {
-                    xyz: ObjectCoordinate::from_dvec3_metres(centres[idx]),
-                    width: prototype.width,
-                    length: prototype.length,
-                    height: height_from_step(height_step),
-                    heading,
-                }));
-            },
-        }
+        prev_heading = chord_heading;
+        current_distance += step_metres;
     }
 
     Ok(output)
