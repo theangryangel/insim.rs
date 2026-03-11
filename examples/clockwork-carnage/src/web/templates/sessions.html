@@ -38,10 +38,21 @@
               <span class="flex items-center gap-1.5 px-2 py-0.5 bg-blue-600/20 rounded-full border border-blue-800/30 w-fit"><span class="h-2 w-2 bg-blue-600 rounded-full"></span><span class="text-[10px] font-semibold text-blue-600 uppercase">Shortcut</span></span>
             {% when SessionMode::Bomb { .. } %}
               <span class="flex items-center gap-1.5 px-2 py-0.5 bg-red-600/20 rounded-full border border-red-800/30 w-fit"><span class="h-2 w-2 bg-red-600 rounded-full"></span><span class="text-[10px] font-semibold text-red-600 uppercase">Bomb</span></span>
+            {% when SessionMode::Climb %}
+              <span class="flex items-center gap-1.5 px-2 py-0.5 bg-green-600/20 rounded-full border border-green-800/30 w-fit"><span class="h-2 w-2 bg-green-600 rounded-full"></span><span class="text-[10px] font-semibold text-green-600 uppercase">Climb</span></span>
           {% endmatch %}
         </td>
         <td class="px-3 py-2 text-gray-600">{{ session.track }} / {{ session.layout }}</td>
-        <td class="px-3 py-2 text-gray-600">{% match session.scheduled_at %}{% when Some with (s) %}{{ s }}{% when None %}—{% endmatch %}</td>
+        <td class="px-3 py-2 text-gray-600 text-xs">
+          {% match session.scheduled_at %}
+            {% when Some with (s) %}
+              <span>{{ s }}</span>
+              {% match session.scheduled_end_at %}
+                {% when Some with (e) %}<span class="text-gray-400"> → {{ e }}</span>{% when None %}
+              {% endmatch %}
+            {% when None %}—
+          {% endmatch %}
+        </td>
         <td class="px-3 py-2 text-gray-600">{{ session.status }}</td>
         {% if page.admin %}
         <td class="px-3 py-2">{% include "partials/session_actions.html" %}</td>

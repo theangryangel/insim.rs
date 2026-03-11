@@ -22,6 +22,10 @@
         <input type="radio" name="mode" value="bomb" class="accent-red-600" @change="mode = 'bomb'"/>
         <span class="text-sm font-medium">Bomb</span>
       </label>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="radio" name="mode" value="climb" class="accent-green-600" @change="mode = 'climb'"/>
+        <span class="text-sm font-medium">Climb</span>
+      </label>
     </div>
   </div>
 
@@ -55,10 +59,17 @@
       class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"></textarea>
   </div>
 
-  <div>
-    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="scheduled_at">Scheduled at</label>
-    <input id="scheduled_at" type="datetime-local" name="scheduled_at"
-      class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"/>
+  <div class="grid grid-cols-2 gap-3">
+    <div>
+      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="scheduled_at">Scheduled start</label>
+      <input id="scheduled_at" type="datetime-local" name="scheduled_at"
+        class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"/>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="scheduled_end_at">Scheduled end</label>
+      <input id="scheduled_end_at" type="datetime-local" name="scheduled_end_at"
+        class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"/>
+    </div>
   </div>
 
   <div x-show="mode === 'metronome'" x-cloak class="border-t border-gray-200 pt-4">

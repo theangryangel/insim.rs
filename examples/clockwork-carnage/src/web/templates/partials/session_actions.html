@@ -28,6 +28,16 @@
       </button>
     </form>
     {% when SessionStatus::Active %}
+    <form method="post" action="/sessions/{{ session.id }}/complete"
+          hx-post="/sessions/{{ session.id }}/complete"
+          hx-target="#session-actions"
+          hx-swap="outerHTML">
+      <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}"/>
+      <button type="submit"
+        class="px-2 py-1 bg-green-600 text-white text-xs font-semibold rounded hover:bg-green-700 transition-colors">
+        Complete
+      </button>
+    </form>
     <form method="post" action="/sessions/{{ session.id }}/cancel"
           hx-post="/sessions/{{ session.id }}/cancel"
           hx-target="#session-actions"

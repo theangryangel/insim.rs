@@ -44,6 +44,7 @@ pub enum SessionMode {
     Bomb {
         checkpoint_timeout_secs: i64,
     },
+    Climb,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -119,6 +120,8 @@ pub struct Session {
     #[allow(unused)]
     pub ended_at: Option<String>,
     pub scheduled_at: Option<String>,
+    #[allow(unused)]
+    pub scheduled_end_at: Option<String>,
     pub name: Option<String>,
     pub description: Option<String>,
     pub writeup: Option<String>,
@@ -175,6 +178,19 @@ pub struct BombRun {
     pub recorded_at: String,
 }
 
+#[derive(Debug, Clone, FromRow)]
+pub struct ClimbTime {
+    #[allow(unused)]
+    pub id: i64,
+    #[allow(unused)]
+    pub session_id: i64,
+    pub uname: String,
+    pub pname: String,
+    pub vehicle: String,
+    pub time_ms: i64,
+    pub set_at: String,
+}
+
 // -- Submodules ---------------------------------------------------------------
 
 mod sessions;
@@ -182,9 +198,11 @@ mod users;
 mod metronome;
 mod shortcut;
 mod bomb;
+mod climb;
 
 pub use sessions::*;
 pub use users::*;
 pub use metronome::*;
 pub use shortcut::*;
 pub use bomb::*;
+pub use climb::*;

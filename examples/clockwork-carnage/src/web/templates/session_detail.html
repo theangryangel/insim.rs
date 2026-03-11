@@ -64,8 +64,16 @@
         {% match session.scheduled_at %}
           {% when Some with (s) %}
           <div class="flex justify-between">
-            <span class="text-gray-400">Scheduled</span>
+            <span class="text-gray-400">Scheduled start</span>
             <span class="font-medium">{{ s }}</span>
+          </div>
+          {% when None %}
+        {% endmatch %}
+        {% match session.scheduled_end_at %}
+          {% when Some with (e) %}
+          <div class="flex justify-between">
+            <span class="text-gray-400">Scheduled end</span>
+            <span class="font-medium">{{ e }}</span>
           </div>
           {% when None %}
         {% endmatch %}
@@ -85,6 +93,8 @@
         {% include "partials/mode_card_shortcut.html" %}
       {% when SessionMode::Bomb { .. } %}
         {% include "partials/mode_card_bomb.html" %}
+      {% when SessionMode::Climb %}
+        {% include "partials/mode_card_climb.html" %}
     {% endmatch %}
 
     {# Write-up #}
@@ -108,6 +118,8 @@
         {% include "partials/shortcut_detail.html" %}
       {% when SessionMode::Bomb { .. } %}
         {% include "partials/bomb_detail.html" %}
+      {% when SessionMode::Climb %}
+        {% include "partials/climb_detail.html" %}
     {% endmatch %}
   </div>
 

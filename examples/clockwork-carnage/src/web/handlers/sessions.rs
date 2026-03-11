@@ -52,6 +52,8 @@ pub struct SessionDetailTemplate {
     pub shortcut_all_times: Vec<db::ShortcutTime>,
     pub bomb_best_runs: Vec<db::BombRun>,
     pub bomb_all_runs: Vec<db::BombRun>,
+    pub climb_best_times: Vec<db::ClimbTime>,
+    pub climb_all_times: Vec<db::ClimbTime>,
 }
 
 #[derive(Template)]
@@ -128,6 +130,26 @@ pub struct BombAllRunsContent {
     pub bomb_all_runs: Vec<db::BombRun>,
 }
 
+#[derive(Template)]
+#[template(path = "partials/climb_standings.html")]
+pub struct ClimbStandingsFragment {
+    pub session: Session,
+    pub climb_best_times: Vec<db::ClimbTime>,
+    pub climb_all_times: Vec<db::ClimbTime>,
+}
+
+#[derive(Template)]
+#[template(path = "partials/climb_best_times_content.html")]
+pub struct ClimbBestTimesContent {
+    pub climb_best_times: Vec<db::ClimbTime>,
+}
+
+#[derive(Template)]
+#[template(path = "partials/climb_all_times_content.html")]
+pub struct ClimbAllTimesContent {
+    pub climb_all_times: Vec<db::ClimbTime>,
+}
+
 // -- Form structs -------------------------------------------------------------
 
 #[derive(serde::Deserialize)]
@@ -150,6 +172,7 @@ pub struct NewSessionForm {
     pub name: Option<String>,
     pub description: Option<String>,
     pub scheduled_at: Option<String>,
+    pub scheduled_end_at: Option<String>,
     #[serde(default = "default_rounds")]
     pub rounds: i64,
     #[serde(default = "default_target")]
@@ -169,6 +192,7 @@ pub struct EditSessionForm {
     pub name: Option<String>,
     pub description: Option<String>,
     pub scheduled_at: Option<String>,
+    pub scheduled_end_at: Option<String>,
     pub writeup: Option<String>,
     pub rounds: Option<i64>,
     pub target: Option<u64>,
@@ -206,6 +230,8 @@ pub async fn session_detail(
     let mut shortcut_all_times = vec![];
     let mut bomb_best_runs = vec![];
     let mut bomb_all_runs = vec![];
+    let mut climb_best_times = vec![];
+    let mut climb_all_times = vec![];
 
     match &*session.mode {
         SessionMode::Metronome { .. } => {
@@ -236,6 +262,14 @@ pub async fn session_detail(
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         }
+        SessionMode::Climb => {
+            climb_best_times = db::climb_best_times(&state.pool, session.id)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            climb_all_times = db::climb_all_times(&state.pool, session.id)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        }
     };
 
     let tmpl = SessionDetailTemplate {
@@ -243,6 +277,7 @@ pub async fn session_detail(
         metronome_standings, metronome_rounds, round_results,
         shortcut_best_times, shortcut_all_times,
         bomb_best_runs, bomb_all_runs,
+        climb_best_times, climb_all_times,
     };
     Ok(Html(tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?))
 }
@@ -270,6 +305,16 @@ pub async fn session_new_post(
     let name = form.name.filter(|s| !s.is_empty());
     let description = form.description.filter(|s| !s.is_empty());
     let scheduled_at = form.scheduled_at.filter(|s| !s.is_empty());
+    let scheduled_end_at = form.scheduled_end_at.filter(|s| !s.is_empty());
+
+    if let (Some(start), Some(end)) = (scheduled_at.as_deref(), scheduled_end_at.as_deref()) {
+        let overlap = db::has_scheduling_overlap(&state.pool, start, end, None)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        if overlap {
+            return Err(StatusCode::CONFLICT);
+        }
+    }
 
     let id = match form.mode.as_str() {
         "metronome" => {
@@ -286,6 +331,7 @@ pub async fn session_new_post(
                     name,
                     description,
                     scheduled_at,
+                    scheduled_end_at,
                 },
             )
             .await
@@ -300,6 +346,7 @@ pub async fn session_new_post(
                     name,
                     description,
                     scheduled_at,
+                    scheduled_end_at,
                 },
             )
             .await
@@ -315,6 +362,22 @@ pub async fn session_new_post(
                     name,
                     description,
                     scheduled_at,
+                    scheduled_end_at,
+                },
+            )
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        }
+        "climb" => {
+            db::create_climb_session(
+                &state.pool,
+                &db::CreateClimbParams {
+                    track,
+                    layout: form.layout,
+                    name,
+                    description,
+                    scheduled_at,
+                    scheduled_end_at,
                 },
             )
             .await
@@ -358,12 +421,22 @@ pub async fn session_edit_post(
     let name = form.name.as_deref().filter(|s| !s.is_empty());
     let description = form.description.as_deref().filter(|s| !s.is_empty());
     let scheduled_at = form.scheduled_at.as_deref().filter(|s| !s.is_empty());
+    let scheduled_end_at = form.scheduled_end_at.as_deref().filter(|s| !s.is_empty());
     let writeup = form.writeup.as_deref().filter(|s| !s.is_empty());
+
+    if let (Some(start), Some(end)) = (scheduled_at, scheduled_end_at) {
+        let overlap = db::has_scheduling_overlap(&state.pool, start, end, Some(id))
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        if overlap {
+            return Err(StatusCode::CONFLICT);
+        }
+    }
 
     db::update_session(
         &state.pool,
         id,
-        &db::UpdateSessionParams { track, layout: &form.layout, name, description, scheduled_at, writeup },
+        &db::UpdateSessionParams { track, layout: &form.layout, name, description, scheduled_at, scheduled_end_at, writeup },
     )
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -446,6 +519,36 @@ pub async fn session_cancel(
     }
 }
 
+pub async fn session_complete(
+    page: PageCtx,
+    headers: axum::http::HeaderMap,
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Form(form): Form<StartSessionForm>,
+) -> Result<axum::response::Response, StatusCode> {
+    if !page.admin {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    if form.csrf_token != page.csrf_token {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    db::complete_session(&state.pool, id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if headers.contains_key("hx-request") {
+        let session = db::get_session(&state.pool, id)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .ok_or(StatusCode::NOT_FOUND)?;
+        let html = SessionActionsFragment { page, session }
+            .render()
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        Ok(Html(html).into_response())
+    } else {
+        Ok(Redirect::to(&format!("/sessions/{id}")).into_response())
+    }
+}
+
 pub async fn session_standings(
     State(state): State<AppState>,
     Path(id): Path<i64>,
@@ -483,6 +586,17 @@ pub async fn session_standings(
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
             BombStandingsFragment { session, bomb_best_runs, bomb_all_runs }
+                .render()
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        }
+        SessionMode::Climb => {
+            let climb_best_times = db::climb_best_times(&state.pool, session.id)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            let climb_all_times = db::climb_all_times(&state.pool, session.id)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            ClimbStandingsFragment { session, climb_best_times, climb_all_times }
                 .render()
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         }
@@ -563,6 +677,34 @@ pub async fn session_bomb_all(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Html(
         BombAllRunsContent { bomb_all_runs }
+            .render()
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+    ))
+}
+
+pub async fn session_climb_best(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Html<String>, StatusCode> {
+    let climb_best_times = db::climb_best_times(&state.pool, id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Html(
+        ClimbBestTimesContent { climb_best_times }
+            .render()
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+    ))
+}
+
+pub async fn session_climb_all(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Html<String>, StatusCode> {
+    let climb_all_times = db::climb_all_times(&state.pool, id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Html(
+        ClimbAllTimesContent { climb_all_times }
             .render()
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     ))

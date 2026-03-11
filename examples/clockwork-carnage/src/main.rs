@@ -146,11 +146,6 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
         > = None;
 
         loop {
-            if let Ok(Some(session)) = db::next_scheduled_session(&ctx.pool).await {
-                tracing::info!("Auto-activating scheduled session #{}", session.id);
-                let _ = db::switch_session(&ctx.pool, session.id).await;
-            }
-
             let desired = db::active_session(&ctx.pool).await;
 
             match (&current_task, desired) {
@@ -187,6 +182,9 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
                                 },
                                 Json(SessionMode::Bomb { .. }) => {
                                     execute::<games::bomb::BombGame>(&session, &ctx).await
+                                },
+                                Json(SessionMode::Climb) => {
+                                    execute::<games::climb::ClimbGame>(&session, &ctx).await
                                 },
                             }
                         }

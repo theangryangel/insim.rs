@@ -3,6 +3,28 @@ use sqlx::{Row, types::Json};
 
 use super::{Pool, Session, SessionMode};
 
+pub async fn has_scheduling_overlap(
+    pool: &Pool,
+    start: &str,
+    end: &str,
+    exclude_id: Option<i64>,
+) -> Result<bool, sqlx::Error> {
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM sessions
+         WHERE status IN ('PENDING', 'ACTIVE')
+         AND (? IS NULL OR id != ?)
+         AND scheduled_at < ?
+         AND (scheduled_end_at IS NULL OR scheduled_end_at > ?)",
+    )
+    .bind(exclude_id)
+    .bind(exclude_id)
+    .bind(end)
+    .bind(start)
+    .fetch_one(pool)
+    .await?;
+    Ok(count > 0)
+}
+
 pub struct CreateMetronomeParams {
     pub track: Track,
     pub layout: String,
@@ -13,6 +35,7 @@ pub struct CreateMetronomeParams {
     pub name: Option<String>,
     pub description: Option<String>,
     pub scheduled_at: Option<String>,
+    pub scheduled_end_at: Option<String>,
 }
 
 pub struct CreateShortcutParams {
@@ -21,6 +44,7 @@ pub struct CreateShortcutParams {
     pub name: Option<String>,
     pub description: Option<String>,
     pub scheduled_at: Option<String>,
+    pub scheduled_end_at: Option<String>,
 }
 
 pub struct CreateBombParams {
@@ -30,6 +54,16 @@ pub struct CreateBombParams {
     pub name: Option<String>,
     pub description: Option<String>,
     pub scheduled_at: Option<String>,
+    pub scheduled_end_at: Option<String>,
+}
+
+pub struct CreateClimbParams {
+    pub track: Track,
+    pub layout: String,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub scheduled_at: Option<String>,
+    pub scheduled_end_at: Option<String>,
 }
 
 pub struct UpdateSessionParams<'a> {
@@ -38,12 +72,13 @@ pub struct UpdateSessionParams<'a> {
     pub name: Option<&'a str>,
     pub description: Option<&'a str>,
     pub scheduled_at: Option<&'a str>,
+    pub scheduled_end_at: Option<&'a str>,
     pub writeup: Option<&'a str>,
 }
 
 pub async fn all_sessions(pool: &Pool) -> Result<Vec<Session>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, name, description, writeup
+        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, scheduled_end_at, name, description, writeup
          FROM sessions ORDER BY id DESC",
     )
     .fetch_all(pool)
@@ -52,7 +87,7 @@ pub async fn all_sessions(pool: &Pool) -> Result<Vec<Session>, sqlx::Error> {
 
 pub async fn get_session(pool: &Pool, id: i64) -> Result<Option<Session>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, name, description, writeup
+        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, scheduled_end_at, name, description, writeup
          FROM sessions WHERE id = ?",
     )
     .bind(id)
@@ -62,7 +97,7 @@ pub async fn get_session(pool: &Pool, id: i64) -> Result<Option<Session>, sqlx::
 
 pub async fn active_session(pool: &Pool) -> Result<Option<Session>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, name, description, writeup
+        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, scheduled_end_at, name, description, writeup
          FROM sessions WHERE status = 'ACTIVE'
          LIMIT 1",
     )
@@ -72,31 +107,20 @@ pub async fn active_session(pool: &Pool) -> Result<Option<Session>, sqlx::Error>
 
 pub async fn upcoming_sessions(pool: &Pool) -> Result<Vec<Session>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, name, description, writeup
+        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, scheduled_end_at, name, description, writeup
          FROM sessions WHERE status = 'PENDING' ORDER BY id DESC LIMIT 10",
     )
     .fetch_all(pool)
     .await
 }
 
-pub async fn next_scheduled_session(pool: &Pool) -> Result<Option<Session>, sqlx::Error> {
-    sqlx::query_as(
-        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, name, description, writeup
-         FROM sessions
-         WHERE status = 'PENDING' AND scheduled_at IS NOT NULL AND scheduled_at <= datetime('now')
-         ORDER BY scheduled_at ASC
-         LIMIT 1",
-    )
-    .fetch_optional(pool)
-    .await
-}
 
 pub async fn create_metronome_session(
     pool: &Pool,
     p: &CreateMetronomeParams,
 ) -> Result<i64, sqlx::Error> {
     let row = sqlx::query(
-        "INSERT INTO sessions (mode, track, layout, name, description, scheduled_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO sessions (mode, track, layout, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(Json(SessionMode::Metronome { rounds: p.rounds, target_ms: p.target_ms, max_scorers: p.max_scorers, current_round: 0, lobby_duration_secs: p.lobby_duration_secs }))
     .bind(p.track.to_string())
@@ -104,6 +128,7 @@ pub async fn create_metronome_session(
     .bind(p.name.as_deref())
     .bind(p.description.as_deref())
     .bind(p.scheduled_at.as_deref())
+    .bind(p.scheduled_end_at.as_deref())
     .fetch_one(pool)
     .await?;
     Ok(row.get("id"))
@@ -114,7 +139,7 @@ pub async fn create_shortcut_session(
     p: &CreateShortcutParams,
 ) -> Result<i64, sqlx::Error> {
     let row = sqlx::query(
-        "INSERT INTO sessions (mode, track, layout, name, description, scheduled_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO sessions (mode, track, layout, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(Json(SessionMode::Shortcut))
     .bind(p.track.to_string())
@@ -122,6 +147,7 @@ pub async fn create_shortcut_session(
     .bind(p.name.as_deref())
     .bind(p.description.as_deref())
     .bind(p.scheduled_at.as_deref())
+    .bind(p.scheduled_end_at.as_deref())
     .fetch_one(pool)
     .await?;
     let id: i64 = row.get("id");
@@ -139,7 +165,7 @@ pub async fn create_bomb_session(
     p: &CreateBombParams,
 ) -> Result<i64, sqlx::Error> {
     let row = sqlx::query(
-        "INSERT INTO sessions (mode, track, layout, name, description, scheduled_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO sessions (mode, track, layout, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(Json(SessionMode::Bomb { checkpoint_timeout_secs: p.checkpoint_timeout_secs }))
     .bind(p.track.to_string())
@@ -147,9 +173,36 @@ pub async fn create_bomb_session(
     .bind(p.name.as_deref())
     .bind(p.description.as_deref())
     .bind(p.scheduled_at.as_deref())
+    .bind(p.scheduled_end_at.as_deref())
     .fetch_one(pool)
     .await?;
     Ok(row.get("id"))
+}
+
+pub async fn create_climb_session(
+    pool: &Pool,
+    p: &CreateClimbParams,
+) -> Result<i64, sqlx::Error> {
+    let row = sqlx::query(
+        "INSERT INTO sessions (mode, track, layout, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+    )
+    .bind(Json(SessionMode::Climb))
+    .bind(p.track.to_string())
+    .bind(&p.layout)
+    .bind(p.name.as_deref())
+    .bind(p.description.as_deref())
+    .bind(p.scheduled_at.as_deref())
+    .bind(p.scheduled_end_at.as_deref())
+    .fetch_one(pool)
+    .await?;
+    let id: i64 = row.get("id");
+
+    let _ = sqlx::query("INSERT INTO climb_sessions (session_id) VALUES (?)")
+        .bind(id)
+        .execute(pool)
+        .await?;
+
+    Ok(id)
 }
 
 pub async fn switch_session(pool: &Pool, session_id: i64) -> Result<(), sqlx::Error> {
@@ -197,13 +250,14 @@ pub async fn update_session(
     p: &UpdateSessionParams<'_>,
 ) -> Result<(), sqlx::Error> {
     let _ = sqlx::query(
-        "UPDATE sessions SET track = ?, layout = ?, name = ?, description = ?, scheduled_at = ?, writeup = ? WHERE id = ?",
+        "UPDATE sessions SET track = ?, layout = ?, name = ?, description = ?, scheduled_at = ?, scheduled_end_at = ?, writeup = ? WHERE id = ?",
     )
     .bind(p.track.to_string())
     .bind(p.layout)
     .bind(p.name)
     .bind(p.description)
     .bind(p.scheduled_at)
+    .bind(p.scheduled_end_at)
     .bind(p.writeup)
     .bind(id)
     .execute(pool)

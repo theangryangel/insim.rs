@@ -17,6 +17,7 @@
         {% when SessionMode::Metronome { .. } %}Metronome
         {% when SessionMode::Shortcut %}Shortcut
         {% when SessionMode::Bomb { .. } %}Bomb
+        {% when SessionMode::Climb %}Climb
       {% endmatch %}
     </p>
   </div>
@@ -51,11 +52,19 @@
       class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400">{% match session.description %}{% when Some with (d) %}{{ d }}{% when None %}{% endmatch %}</textarea>
   </div>
 
-  <div>
-    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="scheduled_at">Scheduled at</label>
-    <input id="scheduled_at" type="datetime-local" name="scheduled_at"
-      value="{% match session.scheduled_at %}{% when Some with (s) %}{{ s }}{% when None %}{% endmatch %}"
-      class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"/>
+  <div class="grid grid-cols-2 gap-3">
+    <div>
+      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="scheduled_at">Scheduled start</label>
+      <input id="scheduled_at" type="datetime-local" name="scheduled_at"
+        value="{% match session.scheduled_at %}{% when Some with (s) %}{{ s }}{% when None %}{% endmatch %}"
+        class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"/>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="scheduled_end_at">Scheduled end</label>
+      <input id="scheduled_end_at" type="datetime-local" name="scheduled_end_at"
+        value="{% match session.scheduled_end_at %}{% when Some with (s) %}{{ s }}{% when None %}{% endmatch %}"
+        class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"/>
+    </div>
   </div>
 
   <div>
@@ -87,6 +96,7 @@
       </div>
     </div>
     {% when SessionMode::Shortcut %}
+    {% when SessionMode::Climb %}
     {% when SessionMode::Bomb { checkpoint_timeout_secs, .. } %}
     <div class="border-t border-gray-200 pt-4">
       <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Bomb settings</p>
