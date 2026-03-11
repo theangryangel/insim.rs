@@ -14,7 +14,7 @@ use std::net::SocketAddr;
 
 use anyhow::Context as _;
 use clap::Parser;
-use db::SessionMode;
+use db::EventMode;
 use games::{GameCtx, execute};
 use insim::{WithRequestId, insim::TinyType};
 use kitcar::{game, presence};
@@ -140,90 +140,90 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
             unreachable!()
         };
 
-        let mut current_session_id: Option<i64> = None;
+        let mut current_event_id: Option<i64> = None;
         let mut current_task: Option<
             tokio::task::JoinHandle<Result<(), kitcar::scenes::SceneError>>,
         > = None;
 
         loop {
-            let desired = db::active_session(&ctx.pool).await;
+            let desired = db::active_event(&ctx.pool).await;
 
             match (&current_task, desired) {
                 (_, Err(e)) => {
-                    tracing::warn!("Failed to poll active session: {e}");
+                    tracing::warn!("Failed to poll active event: {e}");
                 },
 
                 (None, Ok(None)) => {},
 
-                (None, Ok(Some(session))) => {
+                (None, Ok(Some(event))) => {
                     tracing::info!(
-                        "Starting session #{} ({:?} on {}/{})",
-                        session.id,
-                        session.mode,
-                        session.track,
-                        session.layout
+                        "Starting event #{} ({:?} on {}/{})",
+                        event.id,
+                        event.mode,
+                        event.track,
+                        event.layout
                     );
-                    current_session_id = Some(session.id);
+                    current_event_id = Some(event.id);
                     let ctx_ref = &ctx;
                     current_task = Some(tokio::spawn({
-                        let session = session.clone();
+                        let event = event.clone();
                         let pool = ctx_ref.pool.clone();
                         let insim = ctx_ref.insim.clone();
                         let presence = ctx_ref.presence.clone();
                         let game = ctx_ref.game.clone();
                         async move {
                             let ctx = GameCtx { pool, insim, presence, game };
-                            match session.mode {
-                                Json(SessionMode::Metronome { .. }) => {
-                                    execute::<games::metronome::MetronomeGame>(&session, &ctx).await
+                            match event.mode {
+                                Json(EventMode::Metronome { .. }) => {
+                                    execute::<games::metronome::MetronomeGame>(&event, &ctx).await
                                 },
-                                Json(SessionMode::Shortcut) => {
-                                    execute::<games::shortcut::ShortcutGame>(&session, &ctx).await
+                                Json(EventMode::Shortcut) => {
+                                    execute::<games::shortcut::ShortcutGame>(&event, &ctx).await
                                 },
-                                Json(SessionMode::Bomb { .. }) => {
-                                    execute::<games::bomb::BombGame>(&session, &ctx).await
+                                Json(EventMode::Bomb { .. }) => {
+                                    execute::<games::bomb::BombGame>(&event, &ctx).await
                                 },
-                                Json(SessionMode::Climb) => {
-                                    execute::<games::climb::ClimbGame>(&session, &ctx).await
+                                Json(EventMode::Climb) => {
+                                    execute::<games::climb::ClimbGame>(&event, &ctx).await
                                 },
                             }
                         }
                     }));
                 },
 
-                (Some(task), Ok(Some(session)))
-                    if current_session_id == Some(session.id) && !task.is_finished() => {},
+                (Some(task), Ok(Some(event)))
+                    if current_event_id == Some(event.id) && !task.is_finished() => {},
 
-                (Some(_), Ok(Some(session)))
-                    if current_session_id == Some(session.id) =>
+                (Some(_), Ok(Some(event)))
+                    if current_event_id == Some(event.id) =>
                 {
                     let task = current_task.take().unwrap();
                     match task.await {
                         Ok(Ok(())) => {
-                            tracing::info!("Session #{} completed", session.id);
+                            tracing::info!("Event #{} completed", event.id);
                         },
                         Ok(Err(e)) => {
                             tracing::error!(
-                                "Session #{} failed: {e:?} (leaving ACTIVE for crash recovery)",
-                                session.id
+                                "Event #{} failed: {e:?} (leaving ACTIVE for crash recovery)",
+                                event.id
                             );
                         },
                         Err(e) => {
                             tracing::error!(
-                                "Session #{} join error: {e} (leaving ACTIVE for crash recovery)",
-                                session.id
+                                "Event #{} join error: {e} (leaving ACTIVE for crash recovery)",
+                                event.id
                             );
                         },
                     }
-                    current_session_id = None;
+                    current_event_id = None;
                 },
 
                 (Some(_), Ok(_)) => {
-                    tracing::info!("Desired session changed, aborting current task");
+                    tracing::info!("Desired event changed, aborting current task");
                     if let Some(task) = current_task.take() {
                         task.abort();
                     }
-                    current_session_id = None;
+                    current_event_id = None;
                 },
             }
 

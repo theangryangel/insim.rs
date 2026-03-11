@@ -50,10 +50,10 @@ pub trait MiniGame: Clone + Send + 'static {
     /// Dropped after teardown to clean up background tasks.
     type Guard: Send + 'static;
 
-    /// Initialize from a session. Creates/resumes DB entries, spawns
+    /// Initialize from an event. Creates/resumes DB entries, spawns
     /// mode-specific background tasks (e.g. chat handler).
     fn setup(
-        session: &db::Session,
+        event: &db::Event,
         ctx: &GameCtx,
     ) -> impl std::future::Future<Output = Result<(Self, Self::Guard), SceneError>> + Send;
 
@@ -66,17 +66,17 @@ pub trait MiniGame: Clone + Send + 'static {
     /// Clean up: mark DB entries as ended.
     fn teardown(
         self,
-        session: &db::Session,
+        event: &db::Event,
         ctx: &GameCtx,
     ) -> impl std::future::Future<Output = Result<(), SceneError>> + Send;
 }
 
 /// Generic executor: setup, bail-retry loop, teardown.
 pub async fn execute<G: MiniGame>(
-    session: &db::Session,
+    event: &db::Event,
     ctx: &GameCtx,
 ) -> Result<(), SceneError> {
-    let (game, _guard) = G::setup(session, ctx).await?;
+    let (game, _guard) = G::setup(event, ctx).await?;
     loop {
         match game.clone().run(ctx).await? {
             kitcar::scenes::SceneResult::Continue(_) | kitcar::scenes::SceneResult::Quit => break,
@@ -86,7 +86,7 @@ pub async fn execute<G: MiniGame>(
             },
         }
     }
-    game.teardown(session, ctx).await?;
+    game.teardown(event, ctx).await?;
     ctx.insim.send_command("/axclear").await?;
     Ok(())
     // _guard dropped here -> chat JoinHandle aborted

@@ -1,15 +1,15 @@
-<div id="session-actions">
+<div id="event-actions">
 {% if page.admin %}
 <div class="flex items-center gap-1.5">
-  <a href="/sessions/{{ session.id }}/edit"
+  <a href="/events/{{ event.id }}/edit"
     class="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-semibold rounded hover:bg-gray-200 transition-colors">
     Edit
   </a>
-  {% match session.status %}
-    {% when SessionStatus::Pending %}
-    <form method="post" action="/sessions/{{ session.id }}/start"
-          hx-post="/sessions/{{ session.id }}/start"
-          hx-target="#session-actions"
+  {% match event.status %}
+    {% when EventStatus::Pending %}
+    <form method="post" action="/events/{{ event.id }}/start"
+          hx-post="/events/{{ event.id }}/start"
+          hx-target="#event-actions"
           hx-swap="outerHTML">
       <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}"/>
       <button type="submit"
@@ -17,9 +17,9 @@
         Start
       </button>
     </form>
-    <form method="post" action="/sessions/{{ session.id }}/cancel"
-          hx-post="/sessions/{{ session.id }}/cancel"
-          hx-target="#session-actions"
+    <form method="post" action="/events/{{ event.id }}/cancel"
+          hx-post="/events/{{ event.id }}/cancel"
+          hx-target="#event-actions"
           hx-swap="outerHTML">
       <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}"/>
       <button type="submit"
@@ -27,10 +27,10 @@
         Cancel
       </button>
     </form>
-    {% when SessionStatus::Active %}
-    <form method="post" action="/sessions/{{ session.id }}/complete"
-          hx-post="/sessions/{{ session.id }}/complete"
-          hx-target="#session-actions"
+    {% when EventStatus::Active %}
+    <form method="post" action="/events/{{ event.id }}/complete"
+          hx-post="/events/{{ event.id }}/complete"
+          hx-target="#event-actions"
           hx-swap="outerHTML">
       <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}"/>
       <button type="submit"
@@ -38,9 +38,9 @@
         Complete
       </button>
     </form>
-    <form method="post" action="/sessions/{{ session.id }}/cancel"
-          hx-post="/sessions/{{ session.id }}/cancel"
-          hx-target="#session-actions"
+    <form method="post" action="/events/{{ event.id }}/cancel"
+          hx-post="/events/{{ event.id }}/cancel"
+          hx-target="#event-actions"
           hx-swap="outerHTML">
       <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}"/>
       <button type="submit"
@@ -48,8 +48,8 @@
         Cancel
       </button>
     </form>
-    {% when SessionStatus::Completed %}
-    {% when SessionStatus::Cancelled %}
+    {% when EventStatus::Completed %}
+    {% when EventStatus::Cancelled %}
   {% endmatch %}
 </div>
 {% endif %}

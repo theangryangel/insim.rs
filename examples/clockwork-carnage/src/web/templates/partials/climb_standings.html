@@ -15,9 +15,9 @@
 
     <div x-show="tab === 'best'">
       <div
-        {% match session.status %}
-          {% when SessionStatus::Active %}
-            hx-get="/sessions/{{ session.id }}/standings/climb/best"
+        {% match event.status %}
+          {% when EventStatus::Active %}
+            hx-get="/events/{{ event.id }}/standings/climb/best"
             hx-trigger="every 5s"
             hx-swap="innerHTML"
           {% when _ %}
@@ -28,9 +28,9 @@
     </div>
     <div x-show="tab === 'all'" x-cloak>
       <div
-        {% match session.status %}
-          {% when SessionStatus::Active %}
-            hx-get="/sessions/{{ session.id }}/standings/climb/all"
+        {% match event.status %}
+          {% when EventStatus::Active %}
+            hx-get="/events/{{ event.id }}/standings/climb/all"
             hx-trigger="every 5s"
             hx-swap="innerHTML"
           {% when _ %}

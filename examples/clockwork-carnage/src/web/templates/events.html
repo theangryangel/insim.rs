@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Sessions — Clockwork Carnage{% endblock %}
+{% block title %}Events — Clockwork Carnage{% endblock %}
 {% block content %}
 
 <div class="flex items-center justify-between mb-3">
-  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">All Sessions</p>
+  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">All Events</p>
   {% if page.admin %}
-  <a href="/sessions/new" class="px-3 py-1.5 bg-orange-600 text-white text-xs font-semibold rounded hover:bg-orange-700 transition-colors">New Session</a>
+  <a href="/events/new" class="px-3 py-1.5 bg-orange-600 text-white text-xs font-semibold rounded hover:bg-orange-700 transition-colors">New Event</a>
   {% endif %}
 </div>
 
@@ -14,7 +14,7 @@
     <tr class="text-left text-xs text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-200">
       <th class="px-3 py-2">#</th>
       <th class="px-3 py-2">Name</th>
-      <th class="px-3 py-2">Mode</th>
+      <th class="px-3 py-2">Type</th>
       <th class="px-3 py-2">Track</th>
       <th class="px-3 py-2">Scheduled</th>
       <th class="px-3 py-2">Status</th>
@@ -24,38 +24,38 @@
     </tr>
   </thead>
   <tbody>
-    {% for session in sessions %}
+    {% for event in events %}
       <tr class="border-b border-gray-100 hover:bg-orange-50 transition-colors">
-        <td class="px-3 py-2 font-mono text-gray-400">{{ session.id }}</td>
+        <td class="px-3 py-2 font-mono text-gray-400">{{ event.id }}</td>
         <td class="px-3 py-2">
-          <a href="/sessions/{{ session.id }}" class="font-semibold hover:text-orange-600">{% match session.name %}{% when Some with (n) %}{{ n }}{% when None %}—{% endmatch %}</a>
+          <a href="/events/{{ event.id }}" class="font-semibold hover:text-orange-600">{% match event.name %}{% when Some with (n) %}{{ n }}{% when None %}—{% endmatch %}</a>
         </td>
         <td class="px-3 py-2">
-          {% match *session.mode %}
-            {% when SessionMode::Metronome { .. } %}
+          {% match *event.mode %}
+            {% when EventMode::Metronome { .. } %}
               <span class="flex items-center gap-1.5 px-2 py-0.5 bg-orange-600/20 rounded-full border border-orange-800/30 w-fit"><span class="h-2 w-2 bg-orange-600 rounded-full"></span><span class="text-[10px] font-semibold text-orange-600 uppercase">Metronome</span></span>
-            {% when SessionMode::Shortcut %}
+            {% when EventMode::Shortcut %}
               <span class="flex items-center gap-1.5 px-2 py-0.5 bg-blue-600/20 rounded-full border border-blue-800/30 w-fit"><span class="h-2 w-2 bg-blue-600 rounded-full"></span><span class="text-[10px] font-semibold text-blue-600 uppercase">Shortcut</span></span>
-            {% when SessionMode::Bomb { .. } %}
+            {% when EventMode::Bomb { .. } %}
               <span class="flex items-center gap-1.5 px-2 py-0.5 bg-red-600/20 rounded-full border border-red-800/30 w-fit"><span class="h-2 w-2 bg-red-600 rounded-full"></span><span class="text-[10px] font-semibold text-red-600 uppercase">Bomb</span></span>
-            {% when SessionMode::Climb %}
+            {% when EventMode::Climb %}
               <span class="flex items-center gap-1.5 px-2 py-0.5 bg-green-600/20 rounded-full border border-green-800/30 w-fit"><span class="h-2 w-2 bg-green-600 rounded-full"></span><span class="text-[10px] font-semibold text-green-600 uppercase">Climb</span></span>
           {% endmatch %}
         </td>
-        <td class="px-3 py-2 text-gray-600">{{ session.track }} / {{ session.layout }}</td>
+        <td class="px-3 py-2 text-gray-600">{{ event.track }} / {{ event.layout }}</td>
         <td class="px-3 py-2 text-gray-600 text-xs">
-          {% match session.scheduled_at %}
+          {% match event.scheduled_at %}
             {% when Some with (s) %}
               <span>{{ s }}</span>
-              {% match session.scheduled_end_at %}
+              {% match event.scheduled_end_at %}
                 {% when Some with (e) %}<span class="text-gray-400"> → {{ e }}</span>{% when None %}
               {% endmatch %}
             {% when None %}—
           {% endmatch %}
         </td>
-        <td class="px-3 py-2 text-gray-600">{{ session.status }}</td>
+        <td class="px-3 py-2 text-gray-600">{{ event.status }}</td>
         {% if page.admin %}
-        <td class="px-3 py-2">{% include "partials/session_actions.html" %}</td>
+        <td class="px-3 py-2">{% include "partials/event_actions.html" %}</td>
         {% endif %}
       </tr>
     {% endfor %}

@@ -1,7 +1,7 @@
 use insim::core::track::Track;
 use sqlx::{Row, types::Json};
 
-use super::{Pool, Session, SessionMode};
+use super::{Pool, Event, EventMode};
 
 pub async fn has_scheduling_overlap(
     pool: &Pool,
@@ -10,7 +10,7 @@ pub async fn has_scheduling_overlap(
     exclude_id: Option<i64>,
 ) -> Result<bool, sqlx::Error> {
     let count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM sessions
+        "SELECT COUNT(*) FROM events
          WHERE status IN ('PENDING', 'ACTIVE')
          AND (? IS NULL OR id != ?)
          AND scheduled_at < ?
@@ -66,7 +66,7 @@ pub struct CreateClimbParams {
     pub scheduled_end_at: Option<String>,
 }
 
-pub struct UpdateSessionParams<'a> {
+pub struct UpdateEventParams<'a> {
     pub track: Track,
     pub layout: &'a str,
     pub name: Option<&'a str>,
@@ -76,53 +76,53 @@ pub struct UpdateSessionParams<'a> {
     pub writeup: Option<&'a str>,
 }
 
-pub async fn all_sessions(pool: &Pool) -> Result<Vec<Session>, sqlx::Error> {
+pub async fn all_events(pool: &Pool) -> Result<Vec<Event>, sqlx::Error> {
     sqlx::query_as(
         "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, scheduled_end_at, name, description, writeup
-         FROM sessions ORDER BY id DESC",
+         FROM events ORDER BY id DESC",
     )
     .fetch_all(pool)
     .await
 }
 
-pub async fn get_session(pool: &Pool, id: i64) -> Result<Option<Session>, sqlx::Error> {
+pub async fn get_event(pool: &Pool, id: i64) -> Result<Option<Event>, sqlx::Error> {
     sqlx::query_as(
         "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, scheduled_end_at, name, description, writeup
-         FROM sessions WHERE id = ?",
+         FROM events WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
     .await
 }
 
-pub async fn active_session(pool: &Pool) -> Result<Option<Session>, sqlx::Error> {
+pub async fn active_event(pool: &Pool) -> Result<Option<Event>, sqlx::Error> {
     sqlx::query_as(
         "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, scheduled_end_at, name, description, writeup
-         FROM sessions WHERE status = 'ACTIVE'
+         FROM events WHERE status = 'ACTIVE'
          LIMIT 1",
     )
     .fetch_optional(pool)
     .await
 }
 
-pub async fn upcoming_sessions(pool: &Pool) -> Result<Vec<Session>, sqlx::Error> {
+pub async fn upcoming_events(pool: &Pool) -> Result<Vec<Event>, sqlx::Error> {
     sqlx::query_as(
         "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, scheduled_end_at, name, description, writeup
-         FROM sessions WHERE status = 'PENDING' ORDER BY id DESC LIMIT 10",
+         FROM events WHERE status = 'PENDING' ORDER BY id DESC LIMIT 10",
     )
     .fetch_all(pool)
     .await
 }
 
 
-pub async fn create_metronome_session(
+pub async fn create_metronome_event(
     pool: &Pool,
     p: &CreateMetronomeParams,
 ) -> Result<i64, sqlx::Error> {
     let row = sqlx::query(
-        "INSERT INTO sessions (mode, track, layout, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO events (mode, track, layout, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
-    .bind(Json(SessionMode::Metronome { rounds: p.rounds, target_ms: p.target_ms, max_scorers: p.max_scorers, current_round: 0, lobby_duration_secs: p.lobby_duration_secs }))
+    .bind(Json(EventMode::Metronome { rounds: p.rounds, target_ms: p.target_ms, max_scorers: p.max_scorers, current_round: 0, lobby_duration_secs: p.lobby_duration_secs }))
     .bind(p.track.to_string())
     .bind(&p.layout)
     .bind(p.name.as_deref())
@@ -134,14 +134,14 @@ pub async fn create_metronome_session(
     Ok(row.get("id"))
 }
 
-pub async fn create_shortcut_session(
+pub async fn create_shortcut_event(
     pool: &Pool,
     p: &CreateShortcutParams,
 ) -> Result<i64, sqlx::Error> {
     let row = sqlx::query(
-        "INSERT INTO sessions (mode, track, layout, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO events (mode, track, layout, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
-    .bind(Json(SessionMode::Shortcut))
+    .bind(Json(EventMode::Shortcut))
     .bind(p.track.to_string())
     .bind(&p.layout)
     .bind(p.name.as_deref())
@@ -152,7 +152,7 @@ pub async fn create_shortcut_session(
     .await?;
     let id: i64 = row.get("id");
 
-    let _ = sqlx::query("INSERT INTO shortcut_sessions (session_id) VALUES (?)")
+    let _ = sqlx::query("INSERT INTO shortcut_events (event_id) VALUES (?)")
         .bind(id)
         .execute(pool)
         .await?;
@@ -160,14 +160,14 @@ pub async fn create_shortcut_session(
     Ok(id)
 }
 
-pub async fn create_bomb_session(
+pub async fn create_bomb_event(
     pool: &Pool,
     p: &CreateBombParams,
 ) -> Result<i64, sqlx::Error> {
     let row = sqlx::query(
-        "INSERT INTO sessions (mode, track, layout, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO events (mode, track, layout, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
-    .bind(Json(SessionMode::Bomb { checkpoint_timeout_secs: p.checkpoint_timeout_secs }))
+    .bind(Json(EventMode::Bomb { checkpoint_timeout_secs: p.checkpoint_timeout_secs }))
     .bind(p.track.to_string())
     .bind(&p.layout)
     .bind(p.name.as_deref())
@@ -179,14 +179,14 @@ pub async fn create_bomb_session(
     Ok(row.get("id"))
 }
 
-pub async fn create_climb_session(
+pub async fn create_climb_event(
     pool: &Pool,
     p: &CreateClimbParams,
 ) -> Result<i64, sqlx::Error> {
     let row = sqlx::query(
-        "INSERT INTO sessions (mode, track, layout, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO events (mode, track, layout, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
-    .bind(Json(SessionMode::Climb))
+    .bind(Json(EventMode::Climb))
     .bind(p.track.to_string())
     .bind(&p.layout)
     .bind(p.name.as_deref())
@@ -197,7 +197,7 @@ pub async fn create_climb_session(
     .await?;
     let id: i64 = row.get("id");
 
-    let _ = sqlx::query("INSERT INTO climb_sessions (session_id) VALUES (?)")
+    let _ = sqlx::query("INSERT INTO climb_events (event_id) VALUES (?)")
         .bind(id)
         .execute(pool)
         .await?;
@@ -205,52 +205,52 @@ pub async fn create_climb_session(
     Ok(id)
 }
 
-pub async fn switch_session(pool: &Pool, session_id: i64) -> Result<(), sqlx::Error> {
+pub async fn switch_event(pool: &Pool, event_id: i64) -> Result<(), sqlx::Error> {
     let mut tx = pool.begin().await?;
     let _ = sqlx::query(
-        "UPDATE sessions SET status = 'COMPLETED', ended_at = datetime('now') WHERE status = 'ACTIVE' AND id != ?",
+        "UPDATE events SET status = 'COMPLETED', ended_at = datetime('now') WHERE status = 'ACTIVE' AND id != ?",
     )
-    .bind(session_id)
+    .bind(event_id)
     .execute(&mut *tx)
     .await?;
 
     let _ = sqlx::query(
-        "UPDATE sessions SET status = 'ACTIVE', started_at = datetime('now') WHERE id = ? AND status = 'PENDING'",
+        "UPDATE events SET status = 'ACTIVE', started_at = datetime('now') WHERE id = ? AND status = 'PENDING'",
     )
-    .bind(session_id)
+    .bind(event_id)
     .execute(&mut *tx)
     .await?;
     tx.commit().await?;
     Ok(())
 }
 
-pub async fn complete_session(pool: &Pool, session_id: i64) -> Result<(), sqlx::Error> {
+pub async fn complete_event(pool: &Pool, event_id: i64) -> Result<(), sqlx::Error> {
     let _ = sqlx::query(
-        "UPDATE sessions SET status = 'COMPLETED', ended_at = datetime('now') WHERE id = ?",
+        "UPDATE events SET status = 'COMPLETED', ended_at = datetime('now') WHERE id = ?",
     )
-    .bind(session_id)
+    .bind(event_id)
     .execute(pool)
     .await?;
     Ok(())
 }
 
-pub async fn cancel_session(pool: &Pool, session_id: i64) -> Result<(), sqlx::Error> {
+pub async fn cancel_event(pool: &Pool, event_id: i64) -> Result<(), sqlx::Error> {
     let _ = sqlx::query(
-        "UPDATE sessions SET status = 'CANCELLED', ended_at = datetime('now') WHERE id = ?",
+        "UPDATE events SET status = 'CANCELLED', ended_at = datetime('now') WHERE id = ?",
     )
-    .bind(session_id)
+    .bind(event_id)
     .execute(pool)
     .await?;
     Ok(())
 }
 
-pub async fn update_session(
+pub async fn update_event(
     pool: &Pool,
     id: i64,
-    p: &UpdateSessionParams<'_>,
+    p: &UpdateEventParams<'_>,
 ) -> Result<(), sqlx::Error> {
     let _ = sqlx::query(
-        "UPDATE sessions SET track = ?, layout = ?, name = ?, description = ?, scheduled_at = ?, scheduled_end_at = ?, writeup = ? WHERE id = ?",
+        "UPDATE events SET track = ?, layout = ?, name = ?, description = ?, scheduled_at = ?, scheduled_end_at = ?, writeup = ? WHERE id = ?",
     )
     .bind(p.track.to_string())
     .bind(p.layout)
@@ -267,18 +267,18 @@ pub async fn update_session(
 
 pub async fn update_metronome_settings(
     pool: &Pool,
-    session_id: i64,
+    event_id: i64,
     rounds: i64,
     target_ms: i64,
     max_scorers: i64,
 ) -> Result<(), sqlx::Error> {
     let _ = sqlx::query(
-        "UPDATE sessions SET mode = json_set(mode, '$.rounds', ?, '$.target_ms', ?, '$.max_scorers', ?) WHERE id = ?",
+        "UPDATE events SET mode = json_set(mode, '$.rounds', ?, '$.target_ms', ?, '$.max_scorers', ?) WHERE id = ?",
     )
     .bind(rounds)
     .bind(target_ms)
     .bind(max_scorers)
-    .bind(session_id)
+    .bind(event_id)
     .execute(pool)
     .await?;
     Ok(())
@@ -286,14 +286,14 @@ pub async fn update_metronome_settings(
 
 pub async fn update_bomb_settings(
     pool: &Pool,
-    session_id: i64,
+    event_id: i64,
     checkpoint_timeout_secs: i64,
 ) -> Result<(), sqlx::Error> {
     let _ = sqlx::query(
-        "UPDATE sessions SET mode = json_set(mode, '$.checkpoint_timeout_secs', ?) WHERE id = ?",
+        "UPDATE events SET mode = json_set(mode, '$.checkpoint_timeout_secs', ?) WHERE id = ?",
     )
     .bind(checkpoint_timeout_secs)
-    .bind(session_id)
+    .bind(event_id)
     .execute(pool)
     .await?;
     Ok(())

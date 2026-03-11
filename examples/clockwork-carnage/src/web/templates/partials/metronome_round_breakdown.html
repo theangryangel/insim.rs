@@ -1,7 +1,7 @@
 <div id="round-breakdown"
-  {% match session.status %}
-    {% when SessionStatus::Active %}
-      hx-get="/sessions/{{ session.id }}/round-breakdown"
+  {% match event.status %}
+    {% when EventStatus::Active %}
+      hx-get="/events/{{ event.id }}/round-breakdown"
       hx-trigger="every 5s"
       hx-swap="outerHTML"
     {% when _ %}

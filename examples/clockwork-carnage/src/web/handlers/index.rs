@@ -5,25 +5,25 @@ use axum::{
     response::Html,
 };
 
-use crate::db::{self, Session, SessionMode};
+use crate::db::{self, Event, EventMode};
 use crate::web::state::{AppState, PageCtx};
 
 #[derive(Template)]
 #[template(path = "index.html")]
 pub struct IndexTemplate {
     pub page: PageCtx,
-    pub active: Option<Session>,
-    pub upcoming: Vec<Session>,
+    pub active: Option<Event>,
+    pub upcoming: Vec<Event>,
 }
 
 pub async fn index(
     page: PageCtx,
     State(state): State<AppState>,
 ) -> Result<Html<String>, StatusCode> {
-    let active = db::active_session(&state.pool)
+    let active = db::active_event(&state.pool)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let upcoming = db::upcoming_sessions(&state.pool)
+    let upcoming = db::upcoming_events(&state.pool)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let tmpl = IndexTemplate { page, active, upcoming };

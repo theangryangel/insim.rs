@@ -45,22 +45,22 @@ impl Drop for MetronomeGuard {
 impl MiniGame for MetronomeGame {
     type Guard = MetronomeGuard;
 
-    async fn setup(session: &db::Session, ctx: &GameCtx) -> Result<(Self, Self::Guard), SceneError> {
+    async fn setup(event: &db::Event, ctx: &GameCtx) -> Result<(Self, Self::Guard), SceneError> {
         let (chat, chat_handle) = chat::spawn(ctx.insim.clone());
 
-        let session = db::get_session(&ctx.pool, session.id)
+        let event = db::get_event(&ctx.pool, event.id)
             .await
             .map_err(|cause| SceneError::Custom {
-                scene: "metronome::setup::get_metronome_session",
+                scene: "metronome::setup::get_metronome_event",
                 cause: Box::new(cause),
             })?
             .ok_or_else(|| SceneError::Custom {
                 scene: "metronome::setup",
-                cause: "no metronome_sessions row for this session".into(),
+                cause: "no metronome_events row for this event".into(),
             })?;
 
-        let (rounds, target_ms, max_scorers, current_round, lobby_duration_secs) = match session.mode {
-            Json(db::SessionMode::Metronome { rounds, target_ms, max_scorers, current_round, lobby_duration_secs }) => {
+        let (rounds, target_ms, max_scorers, current_round, lobby_duration_secs) = match event.mode {
+            Json(db::EventMode::Metronome { rounds, target_ms, max_scorers, current_round, lobby_duration_secs }) => {
                 (rounds, target_ms, max_scorers, current_round, lobby_duration_secs)
             },
             _ => unimplemented!(),
@@ -69,14 +69,14 @@ impl MiniGame for MetronomeGame {
         let start_round = (current_round as usize) + 1;
 
         let game = MetronomeGame {
-            session_id: session.id,
+            session_id: event.id,
             start_round,
             rounds: rounds as usize,
             target: Duration::from_millis(target_ms as u64),
             max_scorers: max_scorers as usize,
             lobby_duration: Duration::from_secs(lobby_duration_secs as u64),
-            track: session.track,
-            layout: session.layout.clone(),
+            track: event.track,
+            layout: event.layout.clone(),
             chat,
         };
 
@@ -140,8 +140,8 @@ impl MiniGame for MetronomeGame {
         }
     }
 
-    async fn teardown(self, session: &db::Session, ctx: &GameCtx) -> Result<(), SceneError> {
-        db::complete_session(&ctx.pool, session.id)
+    async fn teardown(self, event: &db::Event, ctx: &GameCtx) -> Result<(), SceneError> {
+        db::complete_event(&ctx.pool, event.id)
             .await
             .map_err(|cause| SceneError::Custom {
                 scene: "metronome::teardown",

@@ -6,7 +6,7 @@ use axum::{
 };
 use insim::core::track::Track;
 
-use crate::db::{self, Session, SessionMode, SessionStatus};
+use crate::db::{self, Event, EventMode, EventStatus};
 use crate::web::state::{AppState, PageCtx};
 use crate::web::filters;
 
@@ -34,17 +34,17 @@ pub fn group_metronome_rounds(results: Vec<db::MetronomeResult>) -> Vec<RoundRes
 // -- Template structs ---------------------------------------------------------
 
 #[derive(Template)]
-#[template(path = "sessions.html")]
-pub struct SessionsTemplate {
+#[template(path = "events.html")]
+pub struct EventsTemplate {
     pub page: PageCtx,
-    pub sessions: Vec<Session>,
+    pub events: Vec<Event>,
 }
 
 #[derive(Template)]
-#[template(path = "session_detail.html")]
-pub struct SessionDetailTemplate {
+#[template(path = "event_detail.html")]
+pub struct EventDetailTemplate {
     pub page: PageCtx,
-    pub session: Session,
+    pub event: Event,
     pub metronome_standings: Vec<db::MetronomeStanding>,
     pub metronome_rounds: Vec<RoundResults>,
     pub round_results: Vec<(i64, Vec<db::MetronomeResult>)>,
@@ -57,25 +57,25 @@ pub struct SessionDetailTemplate {
 }
 
 #[derive(Template)]
-#[template(path = "session_new.html")]
-pub struct SessionNewTemplate {
+#[template(path = "event_new.html")]
+pub struct EventNewTemplate {
     pub page: PageCtx,
     pub tracks: &'static [Track],
 }
 
 #[derive(Template)]
-#[template(path = "session_edit.html")]
-pub struct SessionEditTemplate {
+#[template(path = "event_edit.html")]
+pub struct EventEditTemplate {
     pub page: PageCtx,
-    pub session: db::Session,
+    pub event: db::Event,
     pub tracks: &'static [Track],
 }
 
 #[derive(Template)]
-#[template(path = "partials/session_actions.html")]
-pub struct SessionActionsFragment {
+#[template(path = "partials/event_actions.html")]
+pub struct EventActionsFragment {
     pub page: PageCtx,
-    pub session: Session,
+    pub event: Event,
 }
 
 #[derive(Template)]
@@ -93,7 +93,7 @@ pub struct MetronomeRoundContent {
 #[derive(Template)]
 #[template(path = "partials/shortcut_standings.html")]
 pub struct ShortcutStandingsFragment {
-    pub session: Session,
+    pub event: Event,
     pub shortcut_best_times: Vec<db::ShortcutTime>,
     pub shortcut_all_times: Vec<db::ShortcutTime>,
 }
@@ -113,7 +113,7 @@ pub struct ShortcutAllTimesContent {
 #[derive(Template)]
 #[template(path = "partials/bomb_standings.html")]
 pub struct BombStandingsFragment {
-    pub session: Session,
+    pub event: Event,
     pub bomb_best_runs: Vec<db::BombRun>,
     pub bomb_all_runs: Vec<db::BombRun>,
 }
@@ -133,7 +133,7 @@ pub struct BombAllRunsContent {
 #[derive(Template)]
 #[template(path = "partials/climb_standings.html")]
 pub struct ClimbStandingsFragment {
-    pub session: Session,
+    pub event: Event,
     pub climb_best_times: Vec<db::ClimbTime>,
     pub climb_all_times: Vec<db::ClimbTime>,
 }
@@ -153,7 +153,7 @@ pub struct ClimbAllTimesContent {
 // -- Form structs -------------------------------------------------------------
 
 #[derive(serde::Deserialize)]
-pub struct StartSessionForm {
+pub struct StartEventForm {
     pub csrf_token: String,
 }
 
@@ -163,7 +163,7 @@ fn default_max_scorers() -> i64 { 10 }
 fn default_checkpoint_timeout() -> u64 { 30 }
 
 #[derive(serde::Deserialize)]
-pub struct NewSessionForm {
+pub struct NewEventForm {
     pub csrf_token: String,
     pub mode: String,
     pub track: String,
@@ -184,7 +184,7 @@ pub struct NewSessionForm {
 }
 
 #[derive(serde::Deserialize)]
-pub struct EditSessionForm {
+pub struct EditEventForm {
     pub csrf_token: String,
     pub track: String,
     #[serde(default)]
@@ -202,23 +202,23 @@ pub struct EditSessionForm {
 
 // -- Handlers -----------------------------------------------------------------
 
-pub async fn sessions(
+pub async fn events(
     page: PageCtx,
     State(state): State<AppState>,
 ) -> Result<Html<String>, StatusCode> {
-    let sessions = db::all_sessions(&state.pool)
+    let events = db::all_events(&state.pool)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let tmpl = SessionsTemplate { page, sessions };
+    let tmpl = EventsTemplate { page, events };
     Ok(Html(tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?))
 }
 
-pub async fn session_detail(
+pub async fn event_detail(
     page: PageCtx,
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Html<String>, StatusCode> {
-    let session = db::get_session(&state.pool, id)
+    let event = db::get_event(&state.pool, id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
@@ -233,47 +233,47 @@ pub async fn session_detail(
     let mut climb_best_times = vec![];
     let mut climb_all_times = vec![];
 
-    match &*session.mode {
-        SessionMode::Metronome { .. } => {
-            metronome_standings = db::metronome_standings(&state.pool, session.id)
+    match &*event.mode {
+        EventMode::Metronome { .. } => {
+            metronome_standings = db::metronome_standings(&state.pool, event.id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
             let rounds = group_metronome_rounds(
-                db::metronome_all_results(&state.pool, session.id)
+                db::metronome_all_results(&state.pool, event.id)
                     .await
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
             );
             round_results = rounds.iter().map(|r| (r.round, r.results.clone())).collect();
             metronome_rounds = rounds;
         }
-        SessionMode::Shortcut => {
-            shortcut_best_times = db::shortcut_best_times(&state.pool, session.id)
+        EventMode::Shortcut => {
+            shortcut_best_times = db::shortcut_best_times(&state.pool, event.id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            shortcut_all_times = db::shortcut_all_times(&state.pool, session.id)
-                .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-        }
-        SessionMode::Bomb { .. } => {
-            bomb_best_runs = db::bomb_best_runs(&state.pool, session.id)
-                .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            bomb_all_runs = db::bomb_all_runs(&state.pool, session.id)
+            shortcut_all_times = db::shortcut_all_times(&state.pool, event.id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         }
-        SessionMode::Climb => {
-            climb_best_times = db::climb_best_times(&state.pool, session.id)
+        EventMode::Bomb { .. } => {
+            bomb_best_runs = db::bomb_best_runs(&state.pool, event.id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            climb_all_times = db::climb_all_times(&state.pool, session.id)
+            bomb_all_runs = db::bomb_all_runs(&state.pool, event.id)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        }
+        EventMode::Climb => {
+            climb_best_times = db::climb_best_times(&state.pool, event.id)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            climb_all_times = db::climb_all_times(&state.pool, event.id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         }
     };
 
-    let tmpl = SessionDetailTemplate {
-        page, session,
+    let tmpl = EventDetailTemplate {
+        page, event,
         metronome_standings, metronome_rounds, round_results,
         shortcut_best_times, shortcut_all_times,
         bomb_best_runs, bomb_all_runs,
@@ -282,18 +282,18 @@ pub async fn session_detail(
     Ok(Html(tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?))
 }
 
-pub async fn session_new_get(page: PageCtx) -> Result<Html<String>, StatusCode> {
+pub async fn event_new_get(page: PageCtx) -> Result<Html<String>, StatusCode> {
     if !page.admin {
         return Err(StatusCode::NOT_FOUND);
     }
-    let tmpl = SessionNewTemplate { page, tracks: Track::ALL };
+    let tmpl = EventNewTemplate { page, tracks: Track::ALL };
     Ok(Html(tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?))
 }
 
-pub async fn session_new_post(
+pub async fn event_new_post(
     page: PageCtx,
     State(state): State<AppState>,
-    Form(form): Form<NewSessionForm>,
+    Form(form): Form<NewEventForm>,
 ) -> Result<Redirect, StatusCode> {
     if !page.admin {
         return Err(StatusCode::NOT_FOUND);
@@ -319,7 +319,7 @@ pub async fn session_new_post(
     let id = match form.mode.as_str() {
         "metronome" => {
             let target_ms = (form.target * 1000) as i64;
-            db::create_metronome_session(
+            db::create_metronome_event(
                 &state.pool,
                 &db::CreateMetronomeParams {
                     track,
@@ -338,7 +338,7 @@ pub async fn session_new_post(
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         }
         "shortcut" => {
-            db::create_shortcut_session(
+            db::create_shortcut_event(
                 &state.pool,
                 &db::CreateShortcutParams {
                     track,
@@ -353,7 +353,7 @@ pub async fn session_new_post(
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         }
         "bomb" => {
-            db::create_bomb_session(
+            db::create_bomb_event(
                 &state.pool,
                 &db::CreateBombParams {
                     track,
@@ -369,7 +369,7 @@ pub async fn session_new_post(
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         }
         "climb" => {
-            db::create_climb_session(
+            db::create_climb_event(
                 &state.pool,
                 &db::CreateClimbParams {
                     track,
@@ -386,10 +386,10 @@ pub async fn session_new_post(
         _ => return Err(StatusCode::BAD_REQUEST),
     };
 
-    Ok(Redirect::to(&format!("/sessions/{id}")))
+    Ok(Redirect::to(&format!("/events/{id}")))
 }
 
-pub async fn session_edit_get(
+pub async fn event_edit_get(
     page: PageCtx,
     State(state): State<AppState>,
     Path(id): Path<i64>,
@@ -397,19 +397,19 @@ pub async fn session_edit_get(
     if !page.admin {
         return Err(StatusCode::NOT_FOUND);
     }
-    let session = db::get_session(&state.pool, id)
+    let event = db::get_event(&state.pool, id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
-    let tmpl = SessionEditTemplate { page, session, tracks: Track::ALL };
+    let tmpl = EventEditTemplate { page, event, tracks: Track::ALL };
     Ok(Html(tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?))
 }
 
-pub async fn session_edit_post(
+pub async fn event_edit_post(
     page: PageCtx,
     State(state): State<AppState>,
     Path(id): Path<i64>,
-    Form(form): Form<EditSessionForm>,
+    Form(form): Form<EditEventForm>,
 ) -> Result<Redirect, StatusCode> {
     if !page.admin {
         return Err(StatusCode::NOT_FOUND);
@@ -433,10 +433,10 @@ pub async fn session_edit_post(
         }
     }
 
-    db::update_session(
+    db::update_event(
         &state.pool,
         id,
-        &db::UpdateSessionParams { track, layout: &form.layout, name, description, scheduled_at, scheduled_end_at, writeup },
+        &db::UpdateEventParams { track, layout: &form.layout, name, description, scheduled_at, scheduled_end_at, writeup },
     )
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -456,15 +456,15 @@ pub async fn session_edit_post(
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     }
 
-    Ok(Redirect::to(&format!("/sessions/{id}")))
+    Ok(Redirect::to(&format!("/events/{id}")))
 }
 
-pub async fn session_start(
+pub async fn event_start(
     page: PageCtx,
     headers: axum::http::HeaderMap,
     State(state): State<AppState>,
     Path(id): Path<i64>,
-    Form(form): Form<StartSessionForm>,
+    Form(form): Form<StartEventForm>,
 ) -> Result<axum::response::Response, StatusCode> {
     if !page.admin {
         return Err(StatusCode::NOT_FOUND);
@@ -472,15 +472,15 @@ pub async fn session_start(
     if form.csrf_token != page.csrf_token {
         return Err(StatusCode::FORBIDDEN);
     }
-    db::switch_session(&state.pool, id)
+    db::switch_event(&state.pool, id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     if headers.contains_key("hx-request") {
-        let session = db::get_session(&state.pool, id)
+        let event = db::get_event(&state.pool, id)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
             .ok_or(StatusCode::NOT_FOUND)?;
-        let html = SessionActionsFragment { page, session }
+        let html = EventActionsFragment { page, event }
             .render()
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         Ok(Html(html).into_response())
@@ -489,12 +489,12 @@ pub async fn session_start(
     }
 }
 
-pub async fn session_cancel(
+pub async fn event_cancel(
     page: PageCtx,
     headers: axum::http::HeaderMap,
     State(state): State<AppState>,
     Path(id): Path<i64>,
-    Form(form): Form<StartSessionForm>,
+    Form(form): Form<StartEventForm>,
 ) -> Result<axum::response::Response, StatusCode> {
     if !page.admin {
         return Err(StatusCode::NOT_FOUND);
@@ -502,29 +502,29 @@ pub async fn session_cancel(
     if form.csrf_token != page.csrf_token {
         return Err(StatusCode::FORBIDDEN);
     }
-    db::cancel_session(&state.pool, id)
+    db::cancel_event(&state.pool, id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     if headers.contains_key("hx-request") {
-        let session = db::get_session(&state.pool, id)
+        let event = db::get_event(&state.pool, id)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
             .ok_or(StatusCode::NOT_FOUND)?;
-        let html = SessionActionsFragment { page, session }
+        let html = EventActionsFragment { page, event }
             .render()
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         Ok(Html(html).into_response())
     } else {
-        Ok(Redirect::to(&format!("/sessions/{id}")).into_response())
+        Ok(Redirect::to(&format!("/events/{id}")).into_response())
     }
 }
 
-pub async fn session_complete(
+pub async fn event_complete(
     page: PageCtx,
     headers: axum::http::HeaderMap,
     State(state): State<AppState>,
     Path(id): Path<i64>,
-    Form(form): Form<StartSessionForm>,
+    Form(form): Form<StartEventForm>,
 ) -> Result<axum::response::Response, StatusCode> {
     if !page.admin {
         return Err(StatusCode::NOT_FOUND);
@@ -532,71 +532,71 @@ pub async fn session_complete(
     if form.csrf_token != page.csrf_token {
         return Err(StatusCode::FORBIDDEN);
     }
-    db::complete_session(&state.pool, id)
+    db::complete_event(&state.pool, id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     if headers.contains_key("hx-request") {
-        let session = db::get_session(&state.pool, id)
+        let event = db::get_event(&state.pool, id)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
             .ok_or(StatusCode::NOT_FOUND)?;
-        let html = SessionActionsFragment { page, session }
+        let html = EventActionsFragment { page, event }
             .render()
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         Ok(Html(html).into_response())
     } else {
-        Ok(Redirect::to(&format!("/sessions/{id}")).into_response())
+        Ok(Redirect::to(&format!("/events/{id}")).into_response())
     }
 }
 
-pub async fn session_standings(
+pub async fn event_standings(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Html<String>, StatusCode> {
-    let session = db::get_session(&state.pool, id)
+    let event = db::get_event(&state.pool, id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    let html = match &*session.mode {
-        SessionMode::Metronome { .. } => {
-            let metronome_standings = db::metronome_standings(&state.pool, session.id)
+    let html = match &*event.mode {
+        EventMode::Metronome { .. } => {
+            let metronome_standings = db::metronome_standings(&state.pool, event.id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
             MetronomeStandingsContent { metronome_standings }
                 .render()
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         }
-        SessionMode::Shortcut => {
-            let shortcut_best_times = db::shortcut_best_times(&state.pool, session.id)
+        EventMode::Shortcut => {
+            let shortcut_best_times = db::shortcut_best_times(&state.pool, event.id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            let shortcut_all_times = db::shortcut_all_times(&state.pool, session.id)
+            let shortcut_all_times = db::shortcut_all_times(&state.pool, event.id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            ShortcutStandingsFragment { session, shortcut_best_times, shortcut_all_times }
+            ShortcutStandingsFragment { event, shortcut_best_times, shortcut_all_times }
                 .render()
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         }
-        SessionMode::Bomb { .. } => {
-            let bomb_best_runs = db::bomb_best_runs(&state.pool, session.id)
+        EventMode::Bomb { .. } => {
+            let bomb_best_runs = db::bomb_best_runs(&state.pool, event.id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            let bomb_all_runs = db::bomb_all_runs(&state.pool, session.id)
+            let bomb_all_runs = db::bomb_all_runs(&state.pool, event.id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            BombStandingsFragment { session, bomb_best_runs, bomb_all_runs }
+            BombStandingsFragment { event, bomb_best_runs, bomb_all_runs }
                 .render()
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         }
-        SessionMode::Climb => {
-            let climb_best_times = db::climb_best_times(&state.pool, session.id)
+        EventMode::Climb => {
+            let climb_best_times = db::climb_best_times(&state.pool, event.id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            let climb_all_times = db::climb_all_times(&state.pool, session.id)
+            let climb_all_times = db::climb_all_times(&state.pool, event.id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            ClimbStandingsFragment { session, climb_best_times, climb_all_times }
+            ClimbStandingsFragment { event, climb_best_times, climb_all_times }
                 .render()
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         }
@@ -605,7 +605,7 @@ pub async fn session_standings(
     Ok(Html(html))
 }
 
-pub async fn session_round(
+pub async fn event_round(
     State(state): State<AppState>,
     Path((id, round_number)): Path<(i64, i64)>,
 ) -> Result<Html<String>, StatusCode> {
@@ -626,7 +626,7 @@ pub async fn session_round(
     ))
 }
 
-pub async fn session_standings_best(
+pub async fn event_standings_best(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Html<String>, StatusCode> {
@@ -640,7 +640,7 @@ pub async fn session_standings_best(
     ))
 }
 
-pub async fn session_standings_all(
+pub async fn event_standings_all(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Html<String>, StatusCode> {
@@ -654,7 +654,7 @@ pub async fn session_standings_all(
     ))
 }
 
-pub async fn session_bomb_best(
+pub async fn event_bomb_best(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Html<String>, StatusCode> {
@@ -668,7 +668,7 @@ pub async fn session_bomb_best(
     ))
 }
 
-pub async fn session_bomb_all(
+pub async fn event_bomb_all(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Html<String>, StatusCode> {
@@ -682,7 +682,7 @@ pub async fn session_bomb_all(
     ))
 }
 
-pub async fn session_climb_best(
+pub async fn event_climb_best(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Html<String>, StatusCode> {
@@ -696,7 +696,7 @@ pub async fn session_climb_best(
     ))
 }
 
-pub async fn session_climb_all(
+pub async fn event_climb_all(
     State(state): State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Html<String>, StatusCode> {

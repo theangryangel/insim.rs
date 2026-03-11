@@ -36,9 +36,9 @@ impl Drop for BombGuard {
 impl MiniGame for BombGame {
     type Guard = BombGuard;
 
-    async fn setup(session: &db::Session, ctx: &GameCtx) -> Result<(Self, Self::Guard), SceneError> {
-        let checkpoint_timeout = match *session.mode {
-            db::SessionMode::Bomb { checkpoint_timeout_secs } => {
+    async fn setup(event: &db::Event, ctx: &GameCtx) -> Result<(Self, Self::Guard), SceneError> {
+        let checkpoint_timeout = match *event.mode {
+            db::EventMode::Bomb { checkpoint_timeout_secs } => {
                 Duration::from_secs(checkpoint_timeout_secs as u64)
             },
             _ => Duration::from_secs(30),
@@ -47,9 +47,9 @@ impl MiniGame for BombGame {
         let (chat, chat_handle) = chat::spawn(ctx.insim.clone());
 
         let game = BombGame {
-            session_id: session.id,
-            track: session.track,
-            layout: session.layout.clone(),
+            session_id: event.id,
+            track: event.track,
+            layout: event.layout.clone(),
             checkpoint_timeout,
             chat,
         };
@@ -91,8 +91,8 @@ impl MiniGame for BombGame {
         }
     }
 
-    async fn teardown(self, session: &db::Session, ctx: &GameCtx) -> Result<(), SceneError> {
-        db::complete_session(&ctx.pool, session.id)
+    async fn teardown(self, event: &db::Event, ctx: &GameCtx) -> Result<(), SceneError> {
+        db::complete_event(&ctx.pool, event.id)
             .await
             .map_err(|cause| SceneError::Custom {
                 scene: "bomb::teardown",

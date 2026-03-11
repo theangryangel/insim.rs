@@ -30,7 +30,7 @@ pub(super) fn default_lobby_secs() -> i64 {
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum SessionMode {
+pub enum EventMode {
     Metronome {
         rounds: i64,
         target_ms: i64,
@@ -48,14 +48,14 @@ pub enum SessionMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SessionStatus {
+pub enum EventStatus {
     Pending,
     Active,
     Completed,
     Cancelled,
 }
 
-impl fmt::Display for SessionStatus {
+impl fmt::Display for EventStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Pending => f.write_str("PENDING"),
@@ -66,7 +66,7 @@ impl fmt::Display for SessionStatus {
     }
 }
 
-impl TryFrom<String> for SessionStatus {
+impl TryFrom<String> for EventStatus {
     type Error = String;
 
     fn try_from(s: String) -> Result<Self, Self::Error> {
@@ -75,7 +75,7 @@ impl TryFrom<String> for SessionStatus {
             "ACTIVE" => Ok(Self::Active),
             "COMPLETED" => Ok(Self::Completed),
             "CANCELLED" => Ok(Self::Cancelled),
-            other => Err(format!("unknown session status: {other}")),
+            other => Err(format!("unknown event status: {other}")),
         }
     }
 }
@@ -105,11 +105,11 @@ impl std::fmt::Debug for User {
 }
 
 #[derive(Debug, Clone, FromRow)]
-pub struct Session {
+pub struct Event {
     pub id: i64,
-    pub mode: Json<SessionMode>,
+    pub mode: Json<EventMode>,
     #[sqlx(try_from = "String")]
-    pub status: SessionStatus,
+    pub status: EventStatus,
     #[sqlx(try_from = "String")]
     pub track: Track,
     pub layout: String,
@@ -139,7 +139,7 @@ pub struct MetronomeResult {
     #[allow(unused)]
     pub id: i64,
     #[allow(unused)]
-    pub session_id: i64,
+    pub event_id: i64,
     pub round: i64,
     pub uname: String,
     pub pname: String,
@@ -154,7 +154,7 @@ pub struct ShortcutTime {
     #[allow(unused)]
     pub id: i64,
     #[allow(unused)]
-    pub session_id: i64,
+    pub event_id: i64,
     pub uname: String,
     pub pname: String,
     pub vehicle: String,
@@ -167,7 +167,7 @@ pub struct BombRun {
     #[allow(unused)]
     pub id: i64,
     #[allow(unused)]
-    pub session_id: i64,
+    pub event_id: i64,
     #[allow(unused)]
     pub user_id: i64,
     pub uname: String,
@@ -183,7 +183,7 @@ pub struct ClimbTime {
     #[allow(unused)]
     pub id: i64,
     #[allow(unused)]
-    pub session_id: i64,
+    pub event_id: i64,
     pub uname: String,
     pub pname: String,
     pub vehicle: String,
@@ -193,14 +193,14 @@ pub struct ClimbTime {
 
 // -- Submodules ---------------------------------------------------------------
 
-mod sessions;
+mod events;
 mod users;
 mod metronome;
 mod shortcut;
 mod bomb;
 mod climb;
 
-pub use sessions::*;
+pub use events::*;
 pub use users::*;
 pub use metronome::*;
 pub use shortcut::*;

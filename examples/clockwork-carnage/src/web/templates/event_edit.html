@@ -1,23 +1,23 @@
 {% extends "base.html" %}
-{% block title %}Edit Session #{{ session.id }} — Clockwork Carnage{% endblock %}
+{% block title %}Edit Event #{{ event.id }} — Clockwork Carnage{% endblock %}
 {% block content %}
 
 <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-  Edit Session — <a href="/sessions/{{ session.id }}" class="text-orange-600 hover:underline">#{{ session.id }}</a>
+  Edit Event — <a href="/events/{{ event.id }}" class="text-orange-600 hover:underline">#{{ event.id }}</a>
 </p>
 
-<form method="post" action="/sessions/{{ session.id }}/edit" class="max-w-lg space-y-4">
+<form method="post" action="/events/{{ event.id }}/edit" class="max-w-lg space-y-4">
   <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}"/>
 
   {# Mode (read-only) #}
   <div>
     <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Mode</p>
     <p class="text-sm font-medium text-gray-700">
-      {% match *session.mode %}
-        {% when SessionMode::Metronome { .. } %}Metronome
-        {% when SessionMode::Shortcut %}Shortcut
-        {% when SessionMode::Bomb { .. } %}Bomb
-        {% when SessionMode::Climb %}Climb
+      {% match *event.mode %}
+        {% when EventMode::Metronome { .. } %}Metronome
+        {% when EventMode::Shortcut %}Shortcut
+        {% when EventMode::Bomb { .. } %}Bomb
+        {% when EventMode::Climb %}Climb
       {% endmatch %}
     </p>
   </div>
@@ -28,20 +28,20 @@
       <select id="track" name="track" required
         class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400">
         {% for track in tracks %}
-        <option value="{{ track }}"{% if *track == session.track %} selected{% endif %}>{{ track }} — {{ track.complete_name() }}</option>
+        <option value="{{ track }}"{% if *track == event.track %} selected{% endif %}>{{ track }} — {{ track.complete_name() }}</option>
         {% endfor %}
       </select>
     </div>
     <div>
       <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="layout">Layout</label>
-      <input id="layout" type="text" name="layout" value="{{ session.layout }}"
+      <input id="layout" type="text" name="layout" value="{{ event.layout }}"
         class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"/>
     </div>
   </div>
 
   <div>
     <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="name">Name</label>
-    <input id="name" type="text" name="name" value="{% match session.name %}{% when Some with (n) %}{{ n }}{% when None %}{% endmatch %}"
+    <input id="name" type="text" name="name" value="{% match event.name %}{% when Some with (n) %}{{ n }}{% when None %}{% endmatch %}"
       placeholder="Optional display name"
       class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"/>
   </div>
@@ -49,32 +49,32 @@
   <div>
     <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="description">Description</label>
     <textarea id="description" name="description" rows="2" placeholder="Optional description"
-      class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400">{% match session.description %}{% when Some with (d) %}{{ d }}{% when None %}{% endmatch %}</textarea>
+      class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400">{% match event.description %}{% when Some with (d) %}{{ d }}{% when None %}{% endmatch %}</textarea>
   </div>
 
   <div class="grid grid-cols-2 gap-3">
     <div>
       <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="scheduled_at">Scheduled start</label>
       <input id="scheduled_at" type="datetime-local" name="scheduled_at"
-        value="{% match session.scheduled_at %}{% when Some with (s) %}{{ s }}{% when None %}{% endmatch %}"
+        value="{% match event.scheduled_at %}{% when Some with (s) %}{{ s }}{% when None %}{% endmatch %}"
         class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"/>
     </div>
     <div>
       <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="scheduled_end_at">Scheduled end</label>
       <input id="scheduled_end_at" type="datetime-local" name="scheduled_end_at"
-        value="{% match session.scheduled_end_at %}{% when Some with (s) %}{{ s }}{% when None %}{% endmatch %}"
+        value="{% match event.scheduled_end_at %}{% when Some with (s) %}{{ s }}{% when None %}{% endmatch %}"
         class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"/>
     </div>
   </div>
 
   <div>
     <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="writeup">Write-up</label>
-    <textarea id="writeup" name="writeup" rows="5" placeholder="Post-session write-up (optional)"
-      class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400">{% match session.writeup %}{% when Some with (w) %}{{ w }}{% when None %}{% endmatch %}</textarea>
+    <textarea id="writeup" name="writeup" rows="5" placeholder="Post-event write-up (optional)"
+      class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400">{% match event.writeup %}{% when Some with (w) %}{{ w }}{% when None %}{% endmatch %}</textarea>
   </div>
 
-  {% match *session.mode %}
-    {% when SessionMode::Metronome { rounds, target_ms, max_scorers, .. } %}
+  {% match *event.mode %}
+    {% when EventMode::Metronome { rounds, target_ms, max_scorers, .. } %}
     <div class="border-t border-gray-200 pt-4">
       <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Metronome settings</p>
       <div class="grid grid-cols-3 gap-3">
@@ -95,9 +95,9 @@
         </div>
       </div>
     </div>
-    {% when SessionMode::Shortcut %}
-    {% when SessionMode::Climb %}
-    {% when SessionMode::Bomb { checkpoint_timeout_secs, .. } %}
+    {% when EventMode::Shortcut %}
+    {% when EventMode::Climb %}
+    {% when EventMode::Bomb { checkpoint_timeout_secs, .. } %}
     <div class="border-t border-gray-200 pt-4">
       <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Bomb settings</p>
       <div class="grid grid-cols-2 gap-3">
@@ -115,7 +115,7 @@
       class="px-4 py-2 bg-orange-600 text-white text-sm font-semibold rounded hover:bg-orange-700 transition-colors">
       Save Changes
     </button>
-    <a href="/sessions/{{ session.id }}"
+    <a href="/events/{{ event.id }}"
       class="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-semibold rounded hover:bg-gray-300 transition-colors">
       Cancel
     </a>

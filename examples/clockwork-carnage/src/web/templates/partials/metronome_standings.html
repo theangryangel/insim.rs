@@ -1,8 +1,8 @@
 {# ── Standings ── #}
 <section class="mb-6" id="metronome-standings"
-  {% match session.status %}
-    {% when SessionStatus::Active %}
-      hx-get="/sessions/{{ session.id }}/standings"
+  {% match event.status %}
+    {% when EventStatus::Active %}
+      hx-get="/events/{{ event.id }}/standings"
       hx-trigger="every 5s"
       hx-swap="outerHTML"
     {% when _ %}
