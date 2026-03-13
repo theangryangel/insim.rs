@@ -41,6 +41,12 @@ struct State {
     nudge_distance_metres: f64,
     ramp_mode: tools::ramp::RampMode,
     ramp_roll_degrees: f64,
+    grid_mode: tools::grid::GridMode,
+    grid_width: usize,
+    grid_rows: usize,
+    grid_col_spacing: f64,
+    grid_row_spacing: f64,
+    grid_lateral_offset: f64,
     compass_visible: bool,
     compass_text: Option<String>,
     last_cpp: Cpp,
@@ -77,6 +83,11 @@ enum SpawnOrigin {
         distance_metres: f64,
     },
     JiggleSelection,
+    Grid {
+        mode: tools::grid::GridMode,
+        width: usize,
+        rows: usize,
+    },
 }
 
 impl fmt::Display for SpawnOrigin {
@@ -114,6 +125,14 @@ impl fmt::Display for SpawnOrigin {
                 write!(f, "nudge {heading} by {distance_metres} metres")
             },
             SpawnOrigin::JiggleSelection => write!(f, "jiggle selection"),
+            SpawnOrigin::Grid { mode, width, rows } => {
+                let mode_str = match mode {
+                    tools::grid::GridMode::StartGrid => "start grid",
+                    tools::grid::GridMode::Pit => "pit",
+                    tools::grid::GridMode::PitBox => "pit box",
+                };
+                write!(f, "{mode_str} grid ({width}x{rows})")
+            },
         }
     }
 }
@@ -251,6 +270,12 @@ pub async fn main() -> anyhow::Result<()> {
         nudge_distance_metres: 1.0,
         ramp_mode: tools::ramp::RampMode::AlongPath,
         ramp_roll_degrees: 18.0,
+        grid_mode: tools::grid::GridMode::StartGrid,
+        grid_width: 2,
+        grid_rows: 24,
+        grid_col_spacing: 4.0,
+        grid_row_spacing: 8.0,
+        grid_lateral_offset: 3.0,
         compass_text: None,
         last_cpp: Cpp::default(),
     };
@@ -290,6 +315,12 @@ pub async fn main() -> anyhow::Result<()> {
                     nudge_distance_metres: state.nudge_distance_metres,
                     ramp_mode: state.ramp_mode,
                     ramp_roll_degrees: state.ramp_roll_degrees,
+                    grid_mode: state.grid_mode,
+                    grid_width: state.grid_width,
+                    grid_rows: state.grid_rows,
+                    grid_col_spacing: state.grid_col_spacing,
+                    grid_row_spacing: state.grid_row_spacing,
+                    grid_lateral_offset: state.grid_lateral_offset,
                     compass_visible: state.compass_visible,
                     compass_text: state.compass_text.clone(),
                 }),

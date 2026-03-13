@@ -1,9 +1,11 @@
 pub mod camera;
 pub mod compass;
+pub mod grid;
 pub mod jiggle;
 pub mod nudge;
 pub mod painted_letters;
 pub mod prefabs;
 pub mod ramp;
 pub mod rotate;
+pub mod spline;
 pub mod spline_distrib;

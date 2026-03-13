@@ -11,6 +11,7 @@ use crate::{Command, SpawnOrigin, State, tools};
 pub enum InspectorTool {
     Prefabs,
     Ramp,
+    Grid,
     Nudge,
     Options,
 }
@@ -20,6 +21,7 @@ impl InspectorTool {
         match self {
             Self::Prefabs => "Prefabs",
             Self::Ramp => "Ramp Tool",
+            Self::Grid => "Grid Tool",
             Self::Nudge => "Nudge Selection",
             Self::Options => "Options",
         }
@@ -47,6 +49,13 @@ pub enum ToolboxMsg {
     ToggleRampMode,
     RampRollInput(String),
     BuildRamp,
+    GridMode(tools::grid::GridMode),
+    GridWidthInput(String),
+    GridRowsInput(String),
+    GridColSpacingInput(String),
+    GridRowSpacingInput(String),
+    GridLateralOffsetInput(String),
+    BuildGrid,
     NudgeDistanceInput(String),
     Nudge(Heading),
     JiggleSelection,
@@ -147,6 +156,11 @@ fn launcher_screen(props: &ToolboxProps) -> ui::Node<ToolboxMsg> {
         *ramp_tool_btn.bstyle_mut() = BtnStyle::style_unavailable();
     }
 
+    let mut grid_tool_btn = launcher_button("Grid Tool", InspectorTool::Grid);
+    if !has_selection {
+        *grid_tool_btn.bstyle_mut() = BtnStyle::style_unavailable();
+    }
+
     let mut nudge_selection_btn = launcher_button("Nudge Selection", InspectorTool::Nudge);
     if !has_selection {
         *nudge_selection_btn.bstyle_mut() = BtnStyle::style_unavailable();
@@ -179,6 +193,7 @@ fn launcher_screen(props: &ToolboxProps) -> ui::Node<ToolboxMsg> {
         .block()
         .h(5.),
         ramp_tool_btn,
+        grid_tool_btn,
         nudge_selection_btn,
         ui::clickable(
             "Jiggle Selection",
@@ -196,6 +211,14 @@ fn inspector_screen(tool: InspectorTool, props: &ToolboxProps) -> ui::Node<Toolb
     let body = match tool {
         InspectorTool::Prefabs => prefabs_panel(&props.prefabs),
         InspectorTool::Ramp => ramp_panel(props.ramp_mode, props.ramp_roll_degrees),
+        InspectorTool::Grid => grid_panel(
+            props.grid_mode,
+            props.grid_width,
+            props.grid_rows,
+            props.grid_col_spacing,
+            props.grid_row_spacing,
+            props.grid_lateral_offset,
+        ),
         InspectorTool::Nudge => nudge_panel(props.nudge_distance_metres),
         InspectorTool::Options => {
             options::panel(props.compass_visible, props.display_selection_info)
@@ -358,6 +381,97 @@ fn ramp_panel(ramp_mode: tools::ramp::RampMode, ramp_roll_degrees: f64) -> ui::N
                 ToolboxMsg::BuildRamp,
             )
             .h(5.),
+        )
+}
+
+fn grid_panel(
+    grid_mode: tools::grid::GridMode,
+    grid_width: usize,
+    grid_rows: usize,
+    grid_col_spacing: f64,
+    grid_row_spacing: f64,
+    grid_lateral_offset: f64,
+) -> ui::Node<ToolboxMsg> {
+    let mode_label = match grid_mode {
+        tools::grid::GridMode::StartGrid => "Mode: Start Grid",
+        tools::grid::GridMode::Pit => "Mode: Pit",
+        tools::grid::GridMode::PitBox => "Mode: Pit Box",
+    };
+
+    ui::container()
+        .flex()
+        .flex_col()
+        .with_child(
+            ui::clickable(
+                mode_label,
+                BtnStyle::style_active(),
+                ToolboxMsg::GridMode(grid_mode.cycled()),
+            )
+            .h(5.),
+        )
+        .with_child(
+            ui::container()
+                .flex()
+                .flex_row()
+                .with_child(
+                    ui::typein(
+                        format!("Width ({grid_width})"),
+                        BtnStyle::style_interactive(),
+                        8,
+                        ToolboxMsg::GridWidthInput,
+                    )
+                    .flex_grow(1.0)
+                    .h(5.),
+                )
+                .with_child(
+                    ui::typein(
+                        format!("Rows ({grid_rows})"),
+                        BtnStyle::style_interactive(),
+                        8,
+                        ToolboxMsg::GridRowsInput,
+                    )
+                    .flex_grow(1.0)
+                    .h(5.),
+                ),
+        )
+        .with_child(
+            ui::container()
+                .flex()
+                .flex_row()
+                .with_child(
+                    ui::typein(
+                        format!("Col Spacing ({grid_col_spacing:.1}m)"),
+                        BtnStyle::style_interactive(),
+                        8,
+                        ToolboxMsg::GridColSpacingInput,
+                    )
+                    .flex_grow(1.0)
+                    .h(5.),
+                )
+                .with_child(
+                    ui::typein(
+                        format!("Row Spacing ({grid_row_spacing:.1}m)"),
+                        BtnStyle::style_interactive(),
+                        8,
+                        ToolboxMsg::GridRowSpacingInput,
+                    )
+                    .flex_grow(1.0)
+                    .h(5.),
+                ),
+        )
+        .with_child(
+            ui::typein(
+                format!("Lateral Offset ({grid_lateral_offset:.1}m)"),
+                BtnStyle::style_interactive(),
+                8,
+                ToolboxMsg::GridLateralOffsetInput,
+            )
+            .block()
+            .h(5.),
+        )
+        .with_child(
+            ui::clickable("Build Grid", BtnStyle::style_interactive(), ToolboxMsg::BuildGrid)
+                .h(5.),
         )
 }
 
@@ -535,6 +649,87 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
                 }),
                 Err(err) => {
                     tracing::warn!("ramp skipped: {err}");
+                    None
+                },
+            }
+        },
+        ToolboxMsg::GridMode(mode) => {
+            state.grid_mode = mode;
+            None
+        },
+        ToolboxMsg::GridWidthInput(input) => {
+            match input.trim().parse::<usize>() {
+                Ok(value) if value > 0 => {
+                    state.grid_width = value;
+                },
+                Ok(_) => tracing::warn!("grid width skipped: must be at least 1"),
+                Err(_) => tracing::warn!("grid width skipped: not a valid integer"),
+            }
+            None
+        },
+        ToolboxMsg::GridRowsInput(input) => {
+            match input.trim().parse::<usize>() {
+                Ok(value) if value > 0 => {
+                    state.grid_rows = value;
+                },
+                Ok(_) => tracing::warn!("grid rows skipped: must be at least 1"),
+                Err(_) => tracing::warn!("grid rows skipped: not a valid integer"),
+            }
+            None
+        },
+        ToolboxMsg::GridColSpacingInput(input) => {
+            match input.trim().parse::<f64>() {
+                Ok(value) if value.is_finite() && value > 0.0 => {
+                    state.grid_col_spacing = value;
+                },
+                Ok(_) => tracing::warn!("grid col spacing skipped: must be a positive finite number"),
+                Err(_) => tracing::warn!("grid col spacing skipped: not a number"),
+            }
+            None
+        },
+        ToolboxMsg::GridRowSpacingInput(input) => {
+            match input.trim().parse::<f64>() {
+                Ok(value) if value.is_finite() && value > 0.0 => {
+                    state.grid_row_spacing = value;
+                },
+                Ok(_) => tracing::warn!("grid row spacing skipped: must be a positive finite number"),
+                Err(_) => tracing::warn!("grid row spacing skipped: not a number"),
+            }
+            None
+        },
+        ToolboxMsg::GridLateralOffsetInput(input) => {
+            match input.trim().parse::<f64>() {
+                Ok(value) if value.is_finite() => {
+                    state.grid_lateral_offset = value;
+                },
+                Ok(_) => tracing::warn!("grid lateral offset skipped: must be finite"),
+                Err(_) => tracing::warn!("grid lateral offset skipped: not a number"),
+            }
+            None
+        },
+        ToolboxMsg::BuildGrid => {
+            match tools::grid::build(
+                &state.selection,
+                tools::grid::BuildConfig {
+                    mode: state.grid_mode,
+                    width: state.grid_width,
+                    rows: state.grid_rows,
+                    col_spacing: state.grid_col_spacing,
+                    row_spacing: state.grid_row_spacing,
+                    lateral_offset: state.grid_lateral_offset,
+                },
+            ) {
+                Ok(objects) => Some(Command::SpawnObjects {
+                    objects,
+                    action: PmoAction::AddObjects,
+                    origin: SpawnOrigin::Grid {
+                        mode: state.grid_mode,
+                        width: state.grid_width,
+                        rows: state.grid_rows,
+                    },
+                }),
+                Err(err) => {
+                    tracing::warn!("grid skipped: {err}");
                     None
                 },
             }
