@@ -1,0 +1,75 @@
+# Three ConcreteWedge ramps of increasing angle serve as kicker launch pads.
+# Each wedge sits on flat ground; the steeper ones flip under-geared cars.
+# Perfect at the crest of a climb to fling the player skyward.
+#
+# Wedge 1 — shallow 22.5° kicker, gentle lift
+- !ConcreteWedge
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  colour: Grey
+  length: Four
+  angle: Deg22_5
+  heading:
+    radians: 0.0
+# Wedge 2 — steeper 45° launch, offset to the right of centre
+- !ConcreteWedge
+  xyz:
+    x: 96
+    y: -32
+    z: 0
+  colour: Red
+  length: Four
+  angle: Deg45
+  heading:
+    radians: 0.0
+# Wedge 3 — extreme 67.5° kicker, offset left; forces a choice of trajectory
+- !ConcreteWedge
+  xyz:
+    x: 192
+    y: 32
+    z: 0
+  colour: Blue
+  length: Four
+  angle: Deg67_5
+  heading:
+    radians: 0.0
+# Approach cones to signal the first wedge
+- !Cone1
+  xyz:
+    x: -32
+    y: -32
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+- !Cone1
+  xyz:
+    x: -32
+    y: 32
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+# Inter-wedge chalk line so the driver can read the run-in
+- !ChalkAhead
+  xyz:
+    x: 80
+    y: 0
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !ChalkAhead
+  xyz:
+    x: 160
+    y: 0
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false

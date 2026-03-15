@@ -1,0 +1,85 @@
+# A razor-thin elevated spine: three width:Two slabs chained at altitude.
+# No side walls — one wrong twitch sends you off into the void.
+# Approach via a M2_00 ramp; exit via a mirrored descending ramp.
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  width: Two
+  length: Four
+  height: M2_00
+  heading:
+    radians: 0.0
+# Spine section 1
+- !ConcreteSlab
+  xyz:
+    x: 64
+    y: 0
+    z: 8
+  width: Two
+  length: Four
+  pitch: Deg0
+  heading:
+    radians: 0.0
+# Spine section 2 — a slight dogleg left keeps the driver honest
+- !ConcreteSlab
+  xyz:
+    x: 128
+    y: -16
+    z: 8
+  width: Two
+  length: Four
+  pitch: Deg0
+  heading:
+    radians: 0.0
+# Spine section 3 — back on centreline
+- !ConcreteSlab
+  xyz:
+    x: 192
+    y: 0
+    z: 8
+  width: Two
+  length: Four
+  pitch: Deg0
+  heading:
+    radians: 0.0
+# Descent ramp — heading=π so it descends forward into the +x direction
+- !ConcreteRamp
+  xyz:
+    x: 320
+    y: 0
+    z: 0
+  width: Two
+  length: Four
+  height: M2_00
+  heading:
+    radians: 3.141592653589793
+# Tiny floating cone sentinels at the spine entry to warn of the width
+- !Cone1
+  xyz:
+    x: 64
+    y: -16
+    z: 8
+  colour: Red
+  heading:
+    radians: 0.0
+  floating: true
+- !Cone1
+  xyz:
+    x: 64
+    y: 16
+    z: 8
+  colour: Red
+  heading:
+    radians: 0.0
+  floating: true
+- !ChalkAhead
+  xyz:
+    x: -32
+    y: 0
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false

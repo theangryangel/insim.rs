@@ -1,0 +1,96 @@
+# A monumental gateway: four M4_00 pillars carry two overhead SlabWalls,
+# forming a pointed arch the driver passes under at speed.
+# Useful as a mid-climb checkpoint or dramatic map entrance.
+#
+# Left-side pillars (y negative)
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: -56
+    z: 0
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: -24
+    z: 0
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+# Right-side pillars (y positive)
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 24
+    z: 0
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 56
+    z: 0
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+# Overhead arch — two SlabWalls leaning inward from each side at steep pitch.
+# They meet roughly above the centreline to form the pointed arch crown.
+- !ConcreteSlabWall
+  xyz:
+    x: 0
+    y: -40
+    z: 16
+  colour: Yellow
+  length: Two
+  pitch: Deg66
+  heading:
+    radians: -1.5707963267948966
+- !ConcreteSlabWall
+  xyz:
+    x: 0
+    y: 40
+    z: 16
+  colour: Yellow
+  length: Two
+  pitch: Deg66
+  heading:
+    radians: 1.5707963267948966
+# Flanking tyre stacks mark the approach
+- !TyreStack4Big
+  xyz:
+    x: -48
+    y: -64
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4Big
+  xyz:
+    x: -48
+    y: 64
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !ChalkAhead
+  xyz:
+    x: -80
+    y: 0
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false

@@ -1,0 +1,131 @@
+# Five concrete slabs suspended at ascending heights with gaps between each step.
+# A launch ramp kicks you to the first slab; carry speed to clear each gap.
+# The slab height rises by 4 z-units (1m) per step — bail angle increases fast.
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  width: Four
+  length: Two
+  height: M1_00
+  heading:
+    radians: 0.0
+# Step 1 — 1 m up. Floating tyre markers frame the landing zone.
+- !ConcreteSlab
+  xyz:
+    x: 32
+    y: 0
+    z: 4
+  width: Four
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 0.0
+- !TyreSingle
+  xyz:
+    x: 32
+    y: -24
+    z: 4
+  colour: Blue
+  heading:
+    radians: 0.0
+  floating: true
+- !TyreSingle
+  xyz:
+    x: 32
+    y: 24
+    z: 4
+  colour: Blue
+  heading:
+    radians: 0.0
+  floating: true
+# Step 2 — 2 m up. 16-unit gap from step 1 top (x=64) to x=80.
+- !ConcreteSlab
+  xyz:
+    x: 80
+    y: 0
+    z: 8
+  width: Four
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 0.0
+- !TyreSingle
+  xyz:
+    x: 80
+    y: -24
+    z: 8
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: true
+- !TyreSingle
+  xyz:
+    x: 80
+    y: 24
+    z: 8
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: true
+# Step 3 — 3 m up.
+- !ConcreteSlab
+  xyz:
+    x: 128
+    y: 0
+    z: 12
+  width: Four
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 0.0
+- !TyreSingle
+  xyz:
+    x: 128
+    y: -24
+    z: 12
+  colour: Red
+  heading:
+    radians: 0.0
+  floating: true
+- !TyreSingle
+  xyz:
+    x: 128
+    y: 24
+    z: 12
+  colour: Red
+  heading:
+    radians: 0.0
+  floating: true
+# Step 4 — 4 m up. No side markers: aim blind.
+- !ConcreteSlab
+  xyz:
+    x: 176
+    y: 0
+    z: 16
+  width: Four
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 0.0
+# Step 5 — 5 m up. Wider landing pad — you made it.
+- !ConcreteSlab
+  xyz:
+    x: 224
+    y: 0
+    z: 20
+  width: Four
+  length: Four
+  pitch: Deg0
+  heading:
+    radians: 0.0
+- !ChalkAhead
+  xyz:
+    x: -32
+    y: 0
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
