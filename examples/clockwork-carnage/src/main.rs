@@ -90,6 +90,8 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
                 .isi_iname("carnage".to_owned())
                 .isi_prefix('!')
                 .isi_flag_mso_cols(true)
+                .isi_flag_mci(true)
+                .isi_interval(std::time::Duration::from_millis(250))
                 .spawn(100)
                 .await?;
 
@@ -182,9 +184,6 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
                                 },
                                 Json(EventMode::Bomb { .. }) => {
                                     execute::<games::bomb::BombGame>(&event, &ctx).await
-                                },
-                                Json(EventMode::Climb) => {
-                                    execute::<games::climb::ClimbGame>(&event, &ctx).await
                                 },
                             }
                         }

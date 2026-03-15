@@ -17,7 +17,6 @@
         {% when EventMode::Metronome { .. } %}Metronome
         {% when EventMode::Shortcut %}Shortcut
         {% when EventMode::Bomb { .. } %}Bomb
-        {% when EventMode::Climb %}Climb
       {% endmatch %}
     </p>
   </div>
@@ -96,7 +95,6 @@
       </div>
     </div>
     {% when EventMode::Shortcut %}
-    {% when EventMode::Climb %}
     {% when EventMode::Bomb { checkpoint_timeout_secs, .. } %}
     <div class="border-t border-gray-200 pt-4">
       <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Bomb settings</p>

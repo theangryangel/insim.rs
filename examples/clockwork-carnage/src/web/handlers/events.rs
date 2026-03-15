@@ -52,8 +52,6 @@ pub struct EventDetailTemplate {
     pub shortcut_all_times: Vec<db::ShortcutTime>,
     pub bomb_best_runs: Vec<db::BombRun>,
     pub bomb_all_runs: Vec<db::BombRun>,
-    pub climb_best_times: Vec<db::ClimbTime>,
-    pub climb_all_times: Vec<db::ClimbTime>,
 }
 
 #[derive(Template)]
@@ -128,26 +126,6 @@ pub struct BombBestRunsContent {
 #[template(path = "partials/bomb_all_runs_content.html")]
 pub struct BombAllRunsContent {
     pub bomb_all_runs: Vec<db::BombRun>,
-}
-
-#[derive(Template)]
-#[template(path = "partials/climb_standings.html")]
-pub struct ClimbStandingsFragment {
-    pub event: Event,
-    pub climb_best_times: Vec<db::ClimbTime>,
-    pub climb_all_times: Vec<db::ClimbTime>,
-}
-
-#[derive(Template)]
-#[template(path = "partials/climb_best_times_content.html")]
-pub struct ClimbBestTimesContent {
-    pub climb_best_times: Vec<db::ClimbTime>,
-}
-
-#[derive(Template)]
-#[template(path = "partials/climb_all_times_content.html")]
-pub struct ClimbAllTimesContent {
-    pub climb_all_times: Vec<db::ClimbTime>,
 }
 
 // -- Form structs -------------------------------------------------------------
@@ -230,8 +208,6 @@ pub async fn event_detail(
     let mut shortcut_all_times = vec![];
     let mut bomb_best_runs = vec![];
     let mut bomb_all_runs = vec![];
-    let mut climb_best_times = vec![];
-    let mut climb_all_times = vec![];
 
     match &*event.mode {
         EventMode::Metronome { .. } => {
@@ -262,14 +238,6 @@ pub async fn event_detail(
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         }
-        EventMode::Climb => {
-            climb_best_times = db::climb_best_times(&state.pool, event.id)
-                .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            climb_all_times = db::climb_all_times(&state.pool, event.id)
-                .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-        }
     };
 
     let tmpl = EventDetailTemplate {
@@ -277,7 +245,6 @@ pub async fn event_detail(
         metronome_standings, metronome_rounds, round_results,
         shortcut_best_times, shortcut_all_times,
         bomb_best_runs, bomb_all_runs,
-        climb_best_times, climb_all_times,
     };
     Ok(Html(tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?))
 }
@@ -359,21 +326,6 @@ pub async fn event_new_post(
                     track,
                     layout: form.layout,
                     checkpoint_timeout_secs: form.checkpoint_timeout as i64,
-                    name,
-                    description,
-                    scheduled_at,
-                    scheduled_end_at,
-                },
-            )
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        }
-        "climb" => {
-            db::create_climb_event(
-                &state.pool,
-                &db::CreateClimbParams {
-                    track,
-                    layout: form.layout,
                     name,
                     description,
                     scheduled_at,
@@ -589,17 +541,6 @@ pub async fn event_standings(
                 .render()
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         }
-        EventMode::Climb => {
-            let climb_best_times = db::climb_best_times(&state.pool, event.id)
-                .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            let climb_all_times = db::climb_all_times(&state.pool, event.id)
-                .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            ClimbStandingsFragment { event, climb_best_times, climb_all_times }
-                .render()
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        }
     };
 
     Ok(Html(html))
@@ -682,30 +623,3 @@ pub async fn event_bomb_all(
     ))
 }
 
-pub async fn event_climb_best(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Result<Html<String>, StatusCode> {
-    let climb_best_times = db::climb_best_times(&state.pool, id)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    Ok(Html(
-        ClimbBestTimesContent { climb_best_times }
-            .render()
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
-    ))
-}
-
-pub async fn event_climb_all(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Result<Html<String>, StatusCode> {
-    let climb_all_times = db::climb_all_times(&state.pool, id)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    Ok(Html(
-        ClimbAllTimesContent { climb_all_times }
-            .render()
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
-    ))
-}

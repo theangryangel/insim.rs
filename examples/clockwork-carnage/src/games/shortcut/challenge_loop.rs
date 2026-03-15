@@ -45,6 +45,7 @@ struct ChallengeConnectionProps {
     uname: String,
     in_progress: bool,
     best_time: Option<Duration>,
+    height: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -95,6 +96,7 @@ impl ui::Component for ChallengeView {
         };
 
         let players = challenge_scoreboard(&props.global.leaderboard, &props.connection.uname);
+        let height_text = format!("Alt: {:.1}m", props.connection.height);
 
         ui::container()
             .flex()
@@ -110,6 +112,7 @@ impl ui::Component for ChallengeView {
                     .mt(90.)
                     .flex_col()
                     .items_end()
+                    .with_child(ui::text(height_text, hud_muted()).w(35.).h(5.))
                     .with_child(ui::text("Best Times", hud_title()).w(35.).h(5.))
                     .with_children(players),
             )
@@ -192,6 +195,7 @@ impl ChallengeLoopInner {
         ui.set_global_state(ChallengeGlobalProps { leaderboard });
 
         let mut active_runs: HashMap<String, Duration> = HashMap::new();
+        let mut player_heights: HashMap<insim::identifiers::ConnectionId, f32> = HashMap::new();
         let mut packets = self.insim.subscribe();
 
         loop {
@@ -213,6 +217,7 @@ impl ChallengeLoopInner {
                                     uname: conn.uname.clone(),
                                     in_progress: false,
                                     best_time: pb,
+                                    height: 0.0,
                                 }).await;
                             }
                         },
@@ -303,7 +308,21 @@ impl ChallengeLoopInner {
                                     uname: conn.uname.clone(),
                                     in_progress: active_runs.contains_key(&conn.uname),
                                     best_time: pb,
+                                    height: player_heights.get(&conn.ucid).copied().unwrap_or(0.0),
                                 }).await;
+                            }
+                        },
+                        insim::Packet::Cnl(cnl) => {
+                            let _ = player_heights.remove(&cnl.ucid);
+                        },
+                        insim::Packet::Mci(mci) => {
+                            for car in &mci.info {
+                                if let Some(conn) = self.presence.connection_by_player(&car.plid).await.map_err(|cause| SceneError::Custom {
+                                    scene: "challenge::mci::connection_by_player",
+                                    cause: Box::new(cause),
+                                })? {
+                                    let _ = player_heights.insert(conn.ucid, car.xyz.z_metres());
+                                }
                             }
                         },
                         _ => {},

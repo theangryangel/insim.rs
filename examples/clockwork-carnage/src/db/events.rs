@@ -57,15 +57,6 @@ pub struct CreateBombParams {
     pub scheduled_end_at: Option<String>,
 }
 
-pub struct CreateClimbParams {
-    pub track: Track,
-    pub layout: String,
-    pub name: Option<String>,
-    pub description: Option<String>,
-    pub scheduled_at: Option<String>,
-    pub scheduled_end_at: Option<String>,
-}
-
 pub struct UpdateEventParams<'a> {
     pub track: Track,
     pub layout: &'a str,
@@ -177,32 +168,6 @@ pub async fn create_bomb_event(
     .fetch_one(pool)
     .await?;
     Ok(row.get("id"))
-}
-
-pub async fn create_climb_event(
-    pool: &Pool,
-    p: &CreateClimbParams,
-) -> Result<i64, sqlx::Error> {
-    let row = sqlx::query(
-        "INSERT INTO events (mode, track, layout, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
-    )
-    .bind(Json(EventMode::Climb))
-    .bind(p.track.to_string())
-    .bind(&p.layout)
-    .bind(p.name.as_deref())
-    .bind(p.description.as_deref())
-    .bind(p.scheduled_at.as_deref())
-    .bind(p.scheduled_end_at.as_deref())
-    .fetch_one(pool)
-    .await?;
-    let id: i64 = row.get("id");
-
-    let _ = sqlx::query("INSERT INTO climb_events (event_id) VALUES (?)")
-        .bind(id)
-        .execute(pool)
-        .await?;
-
-    Ok(id)
 }
 
 pub async fn switch_event(pool: &Pool, event_id: i64) -> Result<(), sqlx::Error> {

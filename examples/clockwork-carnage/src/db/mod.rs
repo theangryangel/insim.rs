@@ -44,7 +44,6 @@ pub enum EventMode {
     Bomb {
         checkpoint_timeout_secs: i64,
     },
-    Climb,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -178,19 +177,6 @@ pub struct BombRun {
     pub recorded_at: String,
 }
 
-#[derive(Debug, Clone, FromRow)]
-pub struct ClimbTime {
-    #[allow(unused)]
-    pub id: i64,
-    #[allow(unused)]
-    pub event_id: i64,
-    pub uname: String,
-    pub pname: String,
-    pub vehicle: String,
-    pub time_ms: i64,
-    pub set_at: String,
-}
-
 // -- Submodules ---------------------------------------------------------------
 
 mod events;
@@ -198,11 +184,9 @@ mod users;
 mod metronome;
 mod shortcut;
 mod bomb;
-mod climb;
 
 pub use events::*;
 pub use users::*;
 pub use metronome::*;
 pub use shortcut::*;
 pub use bomb::*;
-pub use climb::*;

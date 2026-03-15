@@ -93,8 +93,6 @@
         {% include "partials/mode_card_shortcut.html" %}
       {% when EventMode::Bomb { .. } %}
         {% include "partials/mode_card_bomb.html" %}
-      {% when EventMode::Climb %}
-        {% include "partials/mode_card_climb.html" %}
     {% endmatch %}
 
     {# Write-up #}
@@ -118,8 +116,6 @@
         {% include "partials/shortcut_detail.html" %}
       {% when EventMode::Bomb { .. } %}
         {% include "partials/bomb_detail.html" %}
-      {% when EventMode::Climb %}
-        {% include "partials/climb_detail.html" %}
     {% endmatch %}
   </div>
 
