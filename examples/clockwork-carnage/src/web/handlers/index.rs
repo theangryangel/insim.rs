@@ -8,6 +8,8 @@ use axum::{
 use crate::db::{self, Event, EventMode};
 use crate::web::state::{AppState, PageCtx};
 
+use super::internal_error;
+
 #[derive(Template)]
 #[template(path = "index.html")]
 pub struct IndexTemplate {
@@ -22,10 +24,10 @@ pub async fn index(
 ) -> Result<Html<String>, StatusCode> {
     let active = db::active_event(&state.pool)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(internal_error)?;
     let upcoming = db::upcoming_events(&state.pool)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(internal_error)?;
     let tmpl = IndexTemplate { page, active, upcoming };
-    Ok(Html(tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?))
+    Ok(Html(tmpl.render().map_err(internal_error)?))
 }

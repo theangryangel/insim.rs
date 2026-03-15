@@ -10,6 +10,8 @@ use crate::db::{self, Event, EventMode, EventStatus};
 use crate::web::state::{AppState, PageCtx};
 use crate::web::filters;
 
+use super::internal_error;
+
 // -- Shared types -------------------------------------------------------------
 
 pub struct RoundResults {
@@ -186,9 +188,9 @@ pub async fn events(
 ) -> Result<Html<String>, StatusCode> {
     let events = db::all_events(&state.pool)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(internal_error)?;
     let tmpl = EventsTemplate { page, events };
-    Ok(Html(tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?))
+    Ok(Html(tmpl.render().map_err(internal_error)?))
 }
 
 pub async fn event_detail(
@@ -198,7 +200,7 @@ pub async fn event_detail(
 ) -> Result<Html<String>, StatusCode> {
     let event = db::get_event(&state.pool, id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .map_err(internal_error)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
     let mut metronome_standings = vec![];
@@ -213,11 +215,11 @@ pub async fn event_detail(
         EventMode::Metronome { .. } => {
             metronome_standings = db::metronome_standings(&state.pool, event.id)
                 .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                .map_err(internal_error)?;
             let rounds = group_metronome_rounds(
                 db::metronome_all_results(&state.pool, event.id)
                     .await
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+                    .map_err(internal_error)?,
             );
             round_results = rounds.iter().map(|r| (r.round, r.results.clone())).collect();
             metronome_rounds = rounds;
@@ -225,18 +227,18 @@ pub async fn event_detail(
         EventMode::Shortcut => {
             shortcut_best_times = db::shortcut_best_times(&state.pool, event.id)
                 .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                .map_err(internal_error)?;
             shortcut_all_times = db::shortcut_all_times(&state.pool, event.id)
                 .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                .map_err(internal_error)?;
         }
         EventMode::Bomb { .. } => {
             bomb_best_runs = db::bomb_best_runs(&state.pool, event.id)
                 .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                .map_err(internal_error)?;
             bomb_all_runs = db::bomb_all_runs(&state.pool, event.id)
                 .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                .map_err(internal_error)?;
         }
     };
 
@@ -246,7 +248,7 @@ pub async fn event_detail(
         shortcut_best_times, shortcut_all_times,
         bomb_best_runs, bomb_all_runs,
     };
-    Ok(Html(tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?))
+    Ok(Html(tmpl.render().map_err(internal_error)?))
 }
 
 pub async fn event_new_get(page: PageCtx) -> Result<Html<String>, StatusCode> {
@@ -254,7 +256,7 @@ pub async fn event_new_get(page: PageCtx) -> Result<Html<String>, StatusCode> {
         return Err(StatusCode::NOT_FOUND);
     }
     let tmpl = EventNewTemplate { page, tracks: Track::ALL };
-    Ok(Html(tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?))
+    Ok(Html(tmpl.render().map_err(internal_error)?))
 }
 
 pub async fn event_new_post(
@@ -277,7 +279,7 @@ pub async fn event_new_post(
     if let (Some(start), Some(end)) = (scheduled_at.as_deref(), scheduled_end_at.as_deref()) {
         let overlap = db::has_scheduling_overlap(&state.pool, start, end, None)
             .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            .map_err(internal_error)?;
         if overlap {
             return Err(StatusCode::CONFLICT);
         }
@@ -302,7 +304,7 @@ pub async fn event_new_post(
                 },
             )
             .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .map_err(internal_error)?
         }
         "shortcut" => {
             db::create_shortcut_event(
@@ -317,7 +319,7 @@ pub async fn event_new_post(
                 },
             )
             .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .map_err(internal_error)?
         }
         "bomb" => {
             db::create_bomb_event(
@@ -333,7 +335,7 @@ pub async fn event_new_post(
                 },
             )
             .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .map_err(internal_error)?
         }
         _ => return Err(StatusCode::BAD_REQUEST),
     };
@@ -351,10 +353,10 @@ pub async fn event_edit_get(
     }
     let event = db::get_event(&state.pool, id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .map_err(internal_error)?
         .ok_or(StatusCode::NOT_FOUND)?;
     let tmpl = EventEditTemplate { page, event, tracks: Track::ALL };
-    Ok(Html(tmpl.render().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?))
+    Ok(Html(tmpl.render().map_err(internal_error)?))
 }
 
 pub async fn event_edit_post(
@@ -379,7 +381,7 @@ pub async fn event_edit_post(
     if let (Some(start), Some(end)) = (scheduled_at, scheduled_end_at) {
         let overlap = db::has_scheduling_overlap(&state.pool, start, end, Some(id))
             .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            .map_err(internal_error)?;
         if overlap {
             return Err(StatusCode::CONFLICT);
         }
@@ -391,7 +393,7 @@ pub async fn event_edit_post(
         &db::UpdateEventParams { track, layout: &form.layout, name, description, scheduled_at, scheduled_end_at, writeup },
     )
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(internal_error)?;
 
     if let (Some(rounds), Some(target), Some(max_scorers)) =
         (form.rounds, form.target, form.max_scorers)
@@ -399,13 +401,13 @@ pub async fn event_edit_post(
         let target_ms = (target * 1000) as i64;
         db::update_metronome_settings(&state.pool, id, rounds, target_ms, max_scorers)
             .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            .map_err(internal_error)?;
     }
 
     if let Some(timeout) = form.checkpoint_timeout {
         db::update_bomb_settings(&state.pool, id, timeout as i64)
             .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            .map_err(internal_error)?;
     }
 
     Ok(Redirect::to(&format!("/events/{id}")))
@@ -426,15 +428,15 @@ pub async fn event_start(
     }
     db::switch_event(&state.pool, id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(internal_error)?;
     if headers.contains_key("hx-request") {
         let event = db::get_event(&state.pool, id)
             .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .map_err(internal_error)?
             .ok_or(StatusCode::NOT_FOUND)?;
         let html = EventActionsFragment { page, event }
             .render()
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            .map_err(internal_error)?;
         Ok(Html(html).into_response())
     } else {
         Ok(Redirect::to("/").into_response())
@@ -456,15 +458,15 @@ pub async fn event_cancel(
     }
     db::cancel_event(&state.pool, id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(internal_error)?;
     if headers.contains_key("hx-request") {
         let event = db::get_event(&state.pool, id)
             .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .map_err(internal_error)?
             .ok_or(StatusCode::NOT_FOUND)?;
         let html = EventActionsFragment { page, event }
             .render()
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            .map_err(internal_error)?;
         Ok(Html(html).into_response())
     } else {
         Ok(Redirect::to(&format!("/events/{id}")).into_response())
@@ -486,15 +488,15 @@ pub async fn event_complete(
     }
     db::complete_event(&state.pool, id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(internal_error)?;
     if headers.contains_key("hx-request") {
         let event = db::get_event(&state.pool, id)
             .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .map_err(internal_error)?
             .ok_or(StatusCode::NOT_FOUND)?;
         let html = EventActionsFragment { page, event }
             .render()
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            .map_err(internal_error)?;
         Ok(Html(html).into_response())
     } else {
         Ok(Redirect::to(&format!("/events/{id}")).into_response())
@@ -507,39 +509,39 @@ pub async fn event_standings(
 ) -> Result<Html<String>, StatusCode> {
     let event = db::get_event(&state.pool, id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .map_err(internal_error)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
     let html = match &*event.mode {
         EventMode::Metronome { .. } => {
             let metronome_standings = db::metronome_standings(&state.pool, event.id)
                 .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                .map_err(internal_error)?;
             MetronomeStandingsContent { metronome_standings }
                 .render()
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+                .map_err(internal_error)?
         }
         EventMode::Shortcut => {
             let shortcut_best_times = db::shortcut_best_times(&state.pool, event.id)
                 .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                .map_err(internal_error)?;
             let shortcut_all_times = db::shortcut_all_times(&state.pool, event.id)
                 .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                .map_err(internal_error)?;
             ShortcutStandingsFragment { event, shortcut_best_times, shortcut_all_times }
                 .render()
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+                .map_err(internal_error)?
         }
         EventMode::Bomb { .. } => {
             let bomb_best_runs = db::bomb_best_runs(&state.pool, event.id)
                 .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                .map_err(internal_error)?;
             let bomb_all_runs = db::bomb_all_runs(&state.pool, event.id)
                 .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                .map_err(internal_error)?;
             BombStandingsFragment { event, bomb_best_runs, bomb_all_runs }
                 .render()
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+                .map_err(internal_error)?
         }
     };
 
@@ -553,7 +555,7 @@ pub async fn event_round(
     let metronome_rounds = group_metronome_rounds(
         db::metronome_all_results(&state.pool, id)
             .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+            .map_err(internal_error)?,
     );
     let round_results = metronome_rounds
         .iter()
@@ -563,7 +565,7 @@ pub async fn event_round(
     Ok(Html(
         MetronomeRoundContent { round_results }
             .render()
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+            .map_err(internal_error)?,
     ))
 }
 
@@ -573,11 +575,11 @@ pub async fn event_standings_best(
 ) -> Result<Html<String>, StatusCode> {
     let shortcut_best_times = db::shortcut_best_times(&state.pool, id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(internal_error)?;
     Ok(Html(
         ShortcutBestTimesContent { shortcut_best_times }
             .render()
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+            .map_err(internal_error)?,
     ))
 }
 
@@ -587,11 +589,11 @@ pub async fn event_standings_all(
 ) -> Result<Html<String>, StatusCode> {
     let shortcut_all_times = db::shortcut_all_times(&state.pool, id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(internal_error)?;
     Ok(Html(
         ShortcutAllTimesContent { shortcut_all_times }
             .render()
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+            .map_err(internal_error)?,
     ))
 }
 
@@ -601,11 +603,11 @@ pub async fn event_bomb_best(
 ) -> Result<Html<String>, StatusCode> {
     let bomb_best_runs = db::bomb_best_runs(&state.pool, id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(internal_error)?;
     Ok(Html(
         BombBestRunsContent { bomb_best_runs }
             .render()
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+            .map_err(internal_error)?,
     ))
 }
 
@@ -615,11 +617,11 @@ pub async fn event_bomb_all(
 ) -> Result<Html<String>, StatusCode> {
     let bomb_all_runs = db::bomb_all_runs(&state.pool, id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(internal_error)?;
     Ok(Html(
         BombAllRunsContent { bomb_all_runs }
             .render()
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+            .map_err(internal_error)?,
     ))
 }
 
