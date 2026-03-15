@@ -39,6 +39,9 @@ struct State {
     ui_visible: bool,
     display_selection_info: bool,
     nudge_distance_metres: f64,
+    radial_count: usize,
+    radial_radius_metres: f64,
+    radial_arc_degrees: f64,
     ramp_mode: tools::ramp::RampMode,
     ramp_roll_degrees: f64,
     grid_mode: tools::grid::GridMode,
@@ -88,6 +91,14 @@ enum SpawnOrigin {
         width: usize,
         rows: usize,
     },
+    Mirror {
+        axis: tools::mirror::MirrorAxis,
+    },
+    RadialArray {
+        count: usize,
+        radius_metres: f64,
+        arc_degrees: f64,
+    },
 }
 
 impl fmt::Display for SpawnOrigin {
@@ -123,7 +134,19 @@ impl fmt::Display for SpawnOrigin {
                 };
                 write!(f, "nudge {heading} by {distance_metres} metres")
             },
-            SpawnOrigin::JiggleSelection => write!(f, "jiggle selection"),
+                    SpawnOrigin::JiggleSelection => write!(f, "jiggle selection"),
+            SpawnOrigin::Mirror { axis } => match axis {
+                tools::mirror::MirrorAxis::X => write!(f, "mirror across X axis (left/right)"),
+                tools::mirror::MirrorAxis::Y => write!(f, "mirror across Y axis (front/back)"),
+            },
+            SpawnOrigin::RadialArray {
+                count,
+                radius_metres,
+                arc_degrees,
+            } => write!(
+                f,
+                "radial array ({count} copies, {radius_metres}m radius, {arc_degrees}°)"
+            ),
             SpawnOrigin::Grid { mode, width, rows } => {
                 let mode_str = match mode {
                     tools::grid::GridMode::StartGrid => "start grid",
@@ -284,6 +307,9 @@ pub async fn main() -> anyhow::Result<()> {
         display_selection_info: true,
         compass_visible: false,
         nudge_distance_metres: 1.0,
+        radial_count: 6,
+        radial_radius_metres: 10.0,
+        radial_arc_degrees: 360.0,
         ramp_mode: tools::ramp::RampMode::AlongPath,
         ramp_roll_degrees: 18.0,
         grid_mode: tools::grid::GridMode::StartGrid,
@@ -328,6 +354,9 @@ pub async fn main() -> anyhow::Result<()> {
                         })
                         .collect(),
                     nudge_distance_metres: state.nudge_distance_metres,
+                    radial_count: state.radial_count,
+                    radial_radius_metres: state.radial_radius_metres,
+                    radial_arc_degrees: state.radial_arc_degrees,
                     ramp_mode: state.ramp_mode,
                     ramp_roll_degrees: state.ramp_roll_degrees,
                     grid_mode: state.grid_mode,

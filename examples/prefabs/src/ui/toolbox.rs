@@ -13,6 +13,8 @@ pub enum InspectorTool {
     Ramp,
     Grid,
     Nudge,
+    Mirror,
+    RadialArray,
     Options,
 }
 
@@ -23,6 +25,8 @@ impl InspectorTool {
             Self::Ramp => "Ramp Tool",
             Self::Grid => "Grid Tool",
             Self::Nudge => "Nudge Selection",
+            Self::Mirror => "Mirror Selection",
+            Self::RadialArray => "Radial Array",
             Self::Options => "Options",
         }
     }
@@ -61,6 +65,12 @@ pub enum ToolboxMsg {
     JiggleSelection,
     ToggleTopDown,
     ToggleSideView,
+    MirrorX,
+    MirrorY,
+    RadialCountInput(String),
+    RadialRadiusInput(String),
+    RadialArcInput(String),
+    BuildRadialArray,
 }
 
 #[derive(Debug, Default)]
@@ -201,6 +211,20 @@ fn launcher_screen(props: &ToolboxProps) -> ui::Node<ToolboxMsg> {
             ToolboxMsg::JiggleSelection,
         )
         .h(5.),
+        {
+            let mut btn = launcher_button("Mirror Selection", InspectorTool::Mirror);
+            if !has_selection {
+                *btn.bstyle_mut() = BtnStyle::style_unavailable();
+            }
+            btn
+        },
+        {
+            let mut btn = launcher_button("Radial Array", InspectorTool::RadialArray);
+            if !has_selection {
+                *btn.bstyle_mut() = BtnStyle::style_unavailable();
+            }
+            btn
+        },
         ui::clickable("Top Down View", selection_btn_style, ToolboxMsg::ToggleTopDown).h(5.),
         ui::clickable("Side View", selection_btn_style, ToolboxMsg::ToggleSideView).h(5.),
         launcher_button("Options", InspectorTool::Options),
@@ -220,6 +244,10 @@ fn inspector_screen(tool: InspectorTool, props: &ToolboxProps) -> ui::Node<Toolb
             props.grid_lateral_offset,
         ),
         InspectorTool::Nudge => nudge_panel(props.nudge_distance_metres),
+        InspectorTool::Mirror => mirror_panel(),
+        InspectorTool::RadialArray => {
+            radial_array_panel(props.radial_count, props.radial_radius_metres, props.radial_arc_degrees)
+        },
         InspectorTool::Options => {
             options::panel(props.compass_visible, props.display_selection_info)
                 .map(ToolboxMsg::Options)
@@ -785,5 +813,171 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
             tools::camera::get_side_view(&state.selection, &state.last_cpp)
                 .map(Command::CameraMove)
         },
+        ToolboxMsg::MirrorX => {
+            match tools::mirror::build(&state.selection, tools::mirror::MirrorAxis::X) {
+                Ok(objects) => Some(Command::SpawnObjects {
+                    objects,
+                    action: PmoAction::AddObjects,
+                    origin: SpawnOrigin::Mirror {
+                        axis: tools::mirror::MirrorAxis::X,
+                    },
+                }),
+                Err(err) => {
+                    tracing::warn!("mirror skipped: {err}");
+                    None
+                },
+            }
+        },
+        ToolboxMsg::MirrorY => {
+            match tools::mirror::build(&state.selection, tools::mirror::MirrorAxis::Y) {
+                Ok(objects) => Some(Command::SpawnObjects {
+                    objects,
+                    action: PmoAction::AddObjects,
+                    origin: SpawnOrigin::Mirror {
+                        axis: tools::mirror::MirrorAxis::Y,
+                    },
+                }),
+                Err(err) => {
+                    tracing::warn!("mirror skipped: {err}");
+                    None
+                },
+            }
+        },
+        ToolboxMsg::RadialCountInput(input) => {
+            match input.trim().parse::<usize>() {
+                Ok(value) if value >= 2 => {
+                    state.radial_count = value;
+                },
+                Ok(_) => tracing::warn!("radial count skipped: must be at least 2"),
+                Err(_) => tracing::warn!("radial count skipped: not a valid integer"),
+            }
+            None
+        },
+        ToolboxMsg::RadialRadiusInput(input) => {
+            match input.trim().parse::<f64>() {
+                Ok(value) if value.is_finite() && value > 0.0 => {
+                    state.radial_radius_metres = value;
+                },
+                Ok(_) => tracing::warn!("radial radius skipped: must be a positive finite number"),
+                Err(_) => tracing::warn!("radial radius skipped: not a number"),
+            }
+            None
+        },
+        ToolboxMsg::RadialArcInput(input) => {
+            match input.trim().parse::<f64>() {
+                Ok(value) if value.is_finite() && value != 0.0 => {
+                    state.radial_arc_degrees = value;
+                },
+                Ok(_) => tracing::warn!("radial arc skipped: must be a non-zero finite number"),
+                Err(_) => tracing::warn!("radial arc skipped: not a number"),
+            }
+            None
+        },
+        ToolboxMsg::BuildRadialArray => {
+            match tools::radial_array::build(
+                &state.selection,
+                state.radial_count,
+                state.radial_radius_metres,
+                state.radial_arc_degrees,
+            ) {
+                Ok(objects) => Some(Command::SpawnObjects {
+                    objects,
+                    action: PmoAction::AddObjects,
+                    origin: SpawnOrigin::RadialArray {
+                        count: state.radial_count,
+                        radius_metres: state.radial_radius_metres,
+                        arc_degrees: state.radial_arc_degrees,
+                    },
+                }),
+                Err(err) => {
+                    tracing::warn!("radial array skipped: {err}");
+                    None
+                },
+            }
+        },
     }
+}
+
+fn mirror_panel() -> ui::Node<ToolboxMsg> {
+    ui::container()
+        .flex()
+        .flex_col()
+        .with_child(
+            ui::text(
+                "Flip selection across an axis",
+                BtnStyle::style_readonly(),
+            )
+            .h(5.),
+        )
+        .with_child(
+            ui::container()
+                .flex()
+                .flex_row()
+                .with_child(
+                    ui::clickable(
+                        "Mirror X (left/right)",
+                        BtnStyle::style_interactive(),
+                        ToolboxMsg::MirrorX,
+                    )
+                    .flex_grow(1.0)
+                    .h(5.),
+                )
+                .with_child(
+                    ui::clickable(
+                        "Mirror Y (front/back)",
+                        BtnStyle::style_interactive(),
+                        ToolboxMsg::MirrorY,
+                    )
+                    .flex_grow(1.0)
+                    .h(5.),
+                ),
+        )
+}
+
+fn radial_array_panel(
+    radial_count: usize,
+    radial_radius_metres: f64,
+    radial_arc_degrees: f64,
+) -> ui::Node<ToolboxMsg> {
+    ui::container()
+        .flex()
+        .flex_col()
+        .with_child(
+            ui::typein(
+                format!("Count ({radial_count})"),
+                BtnStyle::style_interactive(),
+                8,
+                ToolboxMsg::RadialCountInput,
+            )
+            .block()
+            .h(5.),
+        )
+        .with_child(
+            ui::typein(
+                format!("Radius ({radial_radius_metres:.1}m)"),
+                BtnStyle::style_interactive(),
+                16,
+                ToolboxMsg::RadialRadiusInput,
+            )
+            .block()
+            .h(5.),
+        )
+        .with_child(
+            ui::typein(
+                format!("Arc ({radial_arc_degrees:.0}\u{00b0})"),
+                BtnStyle::style_interactive(),
+                16,
+                ToolboxMsg::RadialArcInput,
+            )
+            .block()
+            .h(5.),
+        )
+        .with_child(
+            ui::clickable(
+                "Build Array",
+                BtnStyle::style_interactive(),
+                ToolboxMsg::BuildRadialArray,
+            )
+            .h(5.),
+        )
 }
