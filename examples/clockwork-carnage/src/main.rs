@@ -79,6 +79,56 @@ struct Args {
     config: std::path::PathBuf,
 }
 
+// -- Announcements ------------------------------------------------------------
+
+fn next_announce_interval(secs: i64) -> std::time::Duration {
+    std::time::Duration::from_secs(if secs > 3600 {
+        1800
+    } else if secs > 900 {
+        600
+    } else if secs > 300 {
+        300
+    } else if secs > 60 {
+        60
+    } else {
+        15
+    })
+}
+
+async fn announce_loop(pool: db::Pool, insim: insim::builder::InsimTask) {
+    loop {
+        let sleep = match db::next_scheduled_event(&pool).await {
+            Ok(Some((event, secs))) => {
+                let mode = match &*event.mode {
+                    EventMode::Metronome { .. } => "Metronome",
+                    EventMode::Shortcut => "Shortcut",
+                    EventMode::Bomb { .. } => "Bomb",
+                };
+                let name = event
+                    .name
+                    .as_deref()
+                    .map(str::to_owned)
+                    .unwrap_or_else(|| format!("{} / {}", event.track, event.layout));
+                let remaining = std::time::Duration::from_secs(secs as u64);
+                let msg = format!(
+                    "Upcoming: {} — {} on {} in {remaining:.0?}",
+                    name, mode, event.track,
+                );
+                if let Err(e) = insim.send_message(msg, None).await {
+                    tracing::warn!("Failed to send event announcement: {e}");
+                }
+                next_announce_interval(secs)
+            }
+            Ok(None) => std::time::Duration::from_secs(60),
+            Err(e) => {
+                tracing::warn!("Failed to fetch next scheduled event: {e}");
+                std::time::Duration::from_secs(60)
+            }
+        };
+        tokio::time::sleep(sleep).await;
+    }
+}
+
 // -- Runner -------------------------------------------------------------------
 
 async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
@@ -135,6 +185,8 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
         oauth_redirect_uri: w.oauth_redirect_uri,
         session_key: w.session_key.unwrap_or_else(|| "a".repeat(64)),
     });
+
+    let announce_data = ctx.as_ref().map(|c| (c.pool.clone(), c.insim.clone()));
 
     let reconcile = async move {
         let Some(ctx) = ctx else {
@@ -263,6 +315,12 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
             None => std::future::pending().await,
         }
     };
+    let announce_fut = async move {
+        match announce_data {
+            Some((pool, insim)) => announce_loop(pool, insim).await,
+            None => std::future::pending().await,
+        }
+    };
 
     tokio::select! {
         _ = reconcile => {},
@@ -299,6 +357,7 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
                 Err(e) => tracing::error!("User sync background task join failed: {e}"),
             }
         },
+        _ = announce_fut => {},
     }
 
     Ok(())

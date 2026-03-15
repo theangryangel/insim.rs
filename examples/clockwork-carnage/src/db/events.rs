@@ -105,6 +105,32 @@ pub async fn upcoming_events(pool: &Pool) -> Result<Vec<Event>, sqlx::Error> {
     .await
 }
 
+pub async fn next_scheduled_event(pool: &Pool) -> Result<Option<(Event, i64)>, sqlx::Error> {
+    let event = sqlx::query_as::<_, Event>(
+        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at,
+                scheduled_at, scheduled_end_at, name, description, writeup
+         FROM events
+         WHERE status = 'PENDING'
+           AND scheduled_at IS NOT NULL
+           AND scheduled_at > datetime('now')
+         ORDER BY scheduled_at ASC
+         LIMIT 1",
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    let Some(event) = event else { return Ok(None) };
+
+    let secs: i64 = sqlx::query_scalar(
+        "SELECT CAST((julianday(?) - julianday('now')) * 86400 AS INTEGER)",
+    )
+    .bind(event.scheduled_at.as_deref())
+    .fetch_one(pool)
+    .await?;
+
+    Ok(Some((event, secs)))
+}
+
 
 pub async fn create_metronome_event(
     pool: &Pool,
