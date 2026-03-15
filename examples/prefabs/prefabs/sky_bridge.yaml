@@ -1,0 +1,85 @@
+- !ChalkLine
+  xyz:
+    x: -32
+    y: 0
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  width: Two
+  length: Four
+  height: M2_00
+  heading:
+    radians: 0.0
+# Entry gate cones
+- !ConeTall1
+  xyz:
+    x: 64
+    y: -20
+    z: 8
+  colour: Green
+  heading:
+    radians: 0.0
+  floating: false
+- !ConeTall1
+  xyz:
+    x: 64
+    y: 20
+    z: 8
+  colour: Green
+  heading:
+    radians: 0.0
+  floating: false
+# Bridge deck
+- !ConcreteSlab
+  xyz:
+    x: 64
+    y: 0
+    z: 8
+  width: Two
+  length: Eight
+  pitch: Deg0
+  heading:
+    radians: 0.0
+# Minimal guard rails — just enough to know the edge
+- !ConcreteWall
+  xyz:
+    x: 64
+    y: -20
+    z: 8
+  colour: Yellow
+  length: Eight
+  height: M0_25
+  heading:
+    radians: 0.0
+- !ConcreteWall
+  xyz:
+    x: 64
+    y: 20
+    z: 8
+  colour: Yellow
+  length: Eight
+  height: M0_25
+  heading:
+    radians: 0.0
+# Exit ramp: anchor at x=256, heading=π → high end at x=192 (z=8), low at x=256
+- !ConcreteRamp
+  xyz:
+    x: 256
+    y: 0
+    z: 0
+  width: Two
+  length: Four
+  height: M2_00
+  heading:
+    radians: 3.141592653589793
+
+# 12. pinball_gauntlet
+# Twelve TyreStack4Big in a staggered 4-row pattern. Some rows block y=0,
+# others have tight ±24 inner pairs. Weave through like a steel ball.

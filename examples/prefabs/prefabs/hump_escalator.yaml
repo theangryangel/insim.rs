@@ -1,0 +1,63 @@
+- !ChalkLine
+  xyz:
+    x: -48
+    y: 0
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !SpeedHump1M
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  heading:
+    radians: 0.0
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump2M
+  xyz:
+    x: 80
+    y: 0
+    z: 0
+  heading:
+    radians: 0.0
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump6M
+  xyz:
+    x: 176
+    y: 0
+    z: 0
+  heading:
+    radians: 0.0
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: 304
+    y: 0
+    z: 0
+  heading:
+    radians: 0.0
+  colour: 0
+  mapping: 0
+  floating: false
+- !ChalkLine
+  xyz:
+    x: 432
+    y: 0
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+
+# 9. mega_ski_jump
+# A monstrous 16m-long, 4m-high concrete ramp. Top speed required.
+# Landing zone marked by a 3×2 grid of TyreStack4Big for visual reference.
+# Side walls are full-height to keep you on course (no chickening out).

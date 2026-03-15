@@ -282,7 +282,7 @@ fn prefabs_panel(prefabs: &[PrefabSummary]) -> ui::Node<ToolboxMsg> {
         )
         .with_children(prefabs.iter().enumerate().map(|(idx, prefab)| {
             ui::clickable(
-                format!("{} [{}]", prefab.name, prefab.count),
+                prefab.name.clone(),
                 BtnStyle::style_interactive().align_left(),
                 ToolboxMsg::SpawnPrefab(idx),
             )
@@ -482,21 +482,10 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
         ToolboxMsg::ReloadYaml => Some(Command::ReloadPrefabs),
         ToolboxMsg::SavePrefab(name) => Some(Command::SavePrefabs(name.trim().to_string())),
         ToolboxMsg::SpawnPrefab(idx) => {
-            let Some(prefab) = state.prefabs.data.get(idx) else {
+            if idx >= state.prefabs.entries.len() {
                 return None;
-            };
-
-            let anchor = state
-                .selection
-                .first()
-                .map(|obj| *obj.position())
-                .unwrap_or_default();
-
-            Some(Command::SpawnObjects {
-                objects: prefab.place_at_anchor(anchor),
-                action: PmoAction::AddObjects,
-                origin: SpawnOrigin::Prefab,
-            })
+            }
+            Some(Command::SpawnPrefab(idx))
         },
         ToolboxMsg::PaintedTextInput(text) => {
             let text = text.trim().to_string();

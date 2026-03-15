@@ -1,0 +1,98 @@
+- !ChalkAhead
+  xyz:
+    x: -64
+    y: 0
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+# Approach cone gates marking the gap
+- !ConeTall1
+  xyz:
+    x: -32
+    y: -32
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !ConeTall1
+  xyz:
+    x: -32
+    y: 32
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+# Left wall of tyres
+- !TyreStack4Big
+  xyz:
+    x: 0
+    y: -48
+    z: 0
+  colour: Red
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4Big
+  xyz:
+    x: 0
+    y: -72
+    z: 0
+  colour: Red
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4Big
+  xyz:
+    x: 0
+    y: -96
+    z: 0
+  colour: Red
+  heading:
+    radians: 0.0
+  floating: false
+# Right wall of tyres
+- !TyreStack4Big
+  xyz:
+    x: 0
+    y: 48
+    z: 0
+  colour: Blue
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4Big
+  xyz:
+    x: 0
+    y: 72
+    z: 0
+  colour: Blue
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4Big
+  xyz:
+    x: 0
+    y: 96
+    z: 0
+  colour: Blue
+  heading:
+    radians: 0.0
+  floating: false
+- !ChalkAhead
+  xyz:
+    x: 32
+    y: 0
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+
+# 6. concrete_arch_tunnel
+# Two ConcreteSlabWall panels pitched at Deg60 lean inward from each side,
+# forming a dramatic arch/tunnel. ConcreteWall bases keep them anchored.
+# The right arch uses heading=π so the pitch mirrors correctly.

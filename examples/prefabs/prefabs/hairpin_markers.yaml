@@ -1,0 +1,81 @@
+- !TyreStack4
+  xyz:
+    x: 0
+    y: -32
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4
+  xyz:
+    x: 0
+    y: -16
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4
+  xyz:
+    x: 0
+    y: 16
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4
+  xyz:
+    x: 0
+    y: 32
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !Cone1
+  xyz:
+    x: -32
+    y: -24
+    z: 0
+  colour: Orange
+  heading:
+    radians: 0.0
+  floating: false
+- !Cone1
+  xyz:
+    x: -32
+    y: 24
+    z: 0
+  colour: Orange
+  heading:
+    radians: 0.0
+  floating: false
+- !ChalkAhead
+  xyz:
+    x: -80
+    y: 0
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+- !ChalkLeft
+  xyz:
+    x: -48
+    y: 0
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false

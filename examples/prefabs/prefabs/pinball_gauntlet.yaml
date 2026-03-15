@@ -1,0 +1,134 @@
+- !ChalkAhead
+  xyz:
+    x: -48
+    y: 0
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+# Row 1: block y=0
+- !TyreStack4Big
+  xyz:
+    x: 0
+    y: -48
+    z: 0
+  colour: Red
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4Big
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  colour: Red
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4Big
+  xyz:
+    x: 0
+    y: 48
+    z: 0
+  colour: Red
+  heading:
+    radians: 0.0
+  floating: false
+# Row 2: tight ±24 inner gates
+- !TyreStack4Big
+  xyz:
+    x: 80
+    y: -72
+    z: 0
+  colour: Blue
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4Big
+  xyz:
+    x: 80
+    y: -24
+    z: 0
+  colour: Blue
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4Big
+  xyz:
+    x: 80
+    y: 24
+    z: 0
+  colour: Blue
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4Big
+  xyz:
+    x: 80
+    y: 72
+    z: 0
+  colour: Blue
+  heading:
+    radians: 0.0
+  floating: false
+# Row 3: block y=0 again
+- !TyreStack4Big
+  xyz:
+    x: 160
+    y: -48
+    z: 0
+  colour: Red
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4Big
+  xyz:
+    x: 160
+    y: 0
+    z: 0
+  colour: Red
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4Big
+  xyz:
+    x: 160
+    y: 48
+    z: 0
+  colour: Red
+  heading:
+    radians: 0.0
+  floating: false
+# Row 4: wide outer guards only — sprint for the gap
+- !TyreStack4Big
+  xyz:
+    x: 240
+    y: -64
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4Big
+  xyz:
+    x: 240
+    y: 64
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !ChalkAhead
+  xyz:
+    x: 288
+    y: 0
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+
+# 13. kerb_corridor
+# Eight kerbs forming a colourful corridor (4 per side), alternating between
+# two colours each side. Visually loud, tests how close you'll drive to kerbs.

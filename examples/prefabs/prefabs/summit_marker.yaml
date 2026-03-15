@@ -1,0 +1,67 @@
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: -48
+    z: 0
+  x: Half
+  y: Half
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 48
+    z: 0
+  x: Half
+  y: Half
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcreteSlabWall
+  xyz:
+    x: 0
+    y: -24
+    z: 16
+  colour: Yellow
+  length: Four
+  pitch: Deg42
+  heading:
+    radians: -1.5707963267948966
+- !ConcreteSlabWall
+  xyz:
+    x: 0
+    y: 24
+    z: 16
+  colour: Red
+  length: Four
+  pitch: Deg42
+  heading:
+    radians: 1.5707963267948966
+- !TyreStack4Big
+  xyz:
+    x: -32
+    y: -48
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4Big
+  xyz:
+    x: -32
+    y: 48
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !ChalkLine
+  xyz:
+    x: -48
+    y: 0
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false

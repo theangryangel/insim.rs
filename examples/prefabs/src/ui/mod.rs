@@ -7,7 +7,6 @@ pub use toolbox::{Toolbox, ToolboxMsg};
 #[derive(Debug, Clone, Default)]
 pub struct PrefabSummary {
     pub name: String,
-    pub count: usize,
 }
 
 #[derive(Debug, Clone, Default)]

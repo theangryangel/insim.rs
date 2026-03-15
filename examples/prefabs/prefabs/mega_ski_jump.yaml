@@ -1,0 +1,107 @@
+- !ChalkAhead
+  xyz:
+    x: -80
+    y: 0
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !ChalkLine
+  xyz:
+    x: -48
+    y: 0
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  width: Four
+  length: Sixteen
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcreteWall
+  xyz:
+    x: 0
+    y: -40
+    z: 0
+  colour: Grey
+  length: Sixteen
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcreteWall
+  xyz:
+    x: 0
+    y: 40
+    z: 0
+  colour: Grey
+  length: Sixteen
+  height: M4_00
+  heading:
+    radians: 0.0
+# Landing zone grid
+- !TyreStack4Big
+  xyz:
+    x: 320
+    y: -48
+    z: 0
+  colour: Green
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4Big
+  xyz:
+    x: 320
+    y: 0
+    z: 0
+  colour: Green
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4Big
+  xyz:
+    x: 320
+    y: 48
+    z: 0
+  colour: Green
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4Big
+  xyz:
+    x: 384
+    y: -48
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4Big
+  xyz:
+    x: 384
+    y: 0
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4Big
+  xyz:
+    x: 384
+    y: 48
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+
+# 10. ambulance_slalom
+# Four ambulances parked at 45° angles, alternating sides, acting as gates.
+# Drive your way past the emergency without causing one.

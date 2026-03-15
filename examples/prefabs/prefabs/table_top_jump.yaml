@@ -1,0 +1,149 @@
+- !ChalkAhead
+  xyz:
+    x: -32
+    y: 0
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+# Approach ramp
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  width: Four
+  length: Four
+  height: M2_00
+  heading:
+    radians: 0.0
+- !ConcreteWall
+  xyz:
+    x: 0
+    y: -40
+    z: 0
+  colour: Grey
+  length: Four
+  height: M2_00
+  heading:
+    radians: 0.0
+- !ConcreteWall
+  xyz:
+    x: 0
+    y: 40
+    z: 0
+  colour: Grey
+  length: Four
+  height: M2_00
+  heading:
+    radians: 0.0
+# Raised platform (8m long, 4m wide, at z=8)
+- !ConcreteSlab
+  xyz:
+    x: 64
+    y: 0
+    z: 8
+  width: Four
+  length: Eight
+  pitch: Deg0
+  heading:
+    radians: 0.0
+# Low side walls on platform edges
+- !ConcreteWall
+  xyz:
+    x: 64
+    y: -40
+    z: 8
+  colour: Grey
+  length: Eight
+  height: M0_50
+  heading:
+    radians: 0.0
+- !ConcreteWall
+  xyz:
+    x: 64
+    y: 40
+    z: 8
+  colour: Grey
+  length: Eight
+  height: M0_50
+  heading:
+    radians: 0.0
+# Corner tyre markers on the platform
+- !TyreStack4
+  xyz:
+    x: 64
+    y: -48
+    z: 8
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4
+  xyz:
+    x: 64
+    y: 48
+    z: 8
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4
+  xyz:
+    x: 192
+    y: -48
+    z: 8
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4
+  xyz:
+    x: 192
+    y: 48
+    z: 8
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+# Exit ramp: anchor at x=256, heading=π → high end at x=192 (z=8), low at x=256
+- !ConcreteRamp
+  xyz:
+    x: 256
+    y: 0
+    z: 0
+  width: Four
+  length: Four
+  height: M2_00
+  heading:
+    radians: 3.141592653589793
+- !ConcreteWall
+  xyz:
+    x: 256
+    y: -40
+    z: 0
+  colour: Grey
+  length: Four
+  height: M2_00
+  heading:
+    radians: 3.141592653589793
+- !ConcreteWall
+  xyz:
+    x: 256
+    y: 40
+    z: 0
+  colour: Grey
+  length: Four
+  height: M2_00
+  heading:
+    radians: 3.141592653589793
+- !ChalkAhead
+  xyz:
+    x: 288
+    y: 0
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false

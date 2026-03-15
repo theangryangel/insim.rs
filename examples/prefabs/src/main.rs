@@ -27,7 +27,7 @@ struct Cli {
     /// host:port of LFS to connect to
     addr: SocketAddr,
 
-    /// Path to prefabs.yaml
+    /// Path to directory containing prefab YAML files (one file per prefab)
     #[arg(long)]
     prefabs: PathBuf,
 }
@@ -56,6 +56,7 @@ struct State {
 enum Command {
     ReloadPrefabs,
     SavePrefabs(String),
+    SpawnPrefab(usize),
     SpawnObjects {
         objects: Vec<ObjectInfo>,
         action: PmoAction,
@@ -66,7 +67,6 @@ enum Command {
 
 #[derive(Debug, Clone, Copy)]
 enum SpawnOrigin {
-    Prefab,
     PaintedText,
     SplineDistrib {
         spacing_metres: f64,
@@ -93,7 +93,6 @@ enum SpawnOrigin {
 impl fmt::Display for SpawnOrigin {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SpawnOrigin::Prefab => write!(f, "prefab"),
             SpawnOrigin::PaintedText => write!(f, "painted text"),
             SpawnOrigin::SplineDistrib { spacing_metres } => {
                 write!(f, "spline distribution ({spacing_metres}m spacing)")
@@ -144,8 +143,25 @@ async fn run_command(
 ) -> anyhow::Result<()> {
     match command {
         Command::ReloadPrefabs => {
-            let path = state.prefabs.path.clone();
-            state.prefabs = tools::prefabs::Prefabs::load(path)?;
+            let dir = state.prefabs.dir.clone();
+            state.prefabs = tools::prefabs::Prefabs::load(dir)?;
+        },
+        Command::SpawnPrefab(idx) => {
+            let anchor = state
+                .selection
+                .first()
+                .map(|obj| *obj.position())
+                .unwrap_or_default();
+            match state.prefabs.load_prefab(idx) {
+                Ok(prefab) => {
+                    let spawned =
+                        spawn_at_selection(connection, state, prefab.place_at_anchor(anchor), PmoAction::AddObjects).await?;
+                    if spawned > 0 {
+                        tracing::info!("Spawned {spawned} objects (prefab)");
+                    }
+                },
+                Err(err) => tracing::warn!("spawn skipped: {err}"),
+            }
         },
         Command::SavePrefabs(name) => {
             match state
@@ -305,11 +321,10 @@ pub async fn main() -> anyhow::Result<()> {
                     selection_count: state.selection.len(),
                     prefabs: state
                         .prefabs
-                        .data
+                        .entries
                         .iter()
-                        .map(|prefab| ui::PrefabSummary {
-                            name: prefab.name.clone(),
-                            count: prefab.objects.len(),
+                        .map(|entry| ui::PrefabSummary {
+                            name: entry.name.clone(),
                         })
                         .collect(),
                     nudge_distance_metres: state.nudge_distance_metres,

@@ -1,0 +1,57 @@
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  width: Four
+  length: Four
+  height: M1_00
+  heading:
+    radians: 0.0
+- !ConcreteWall
+  xyz:
+    x: 0
+    y: -40
+    z: 0
+  colour: Grey
+  length: Four
+  height: M1_50
+  heading:
+    radians: 0.0
+- !ConcreteWall
+  xyz:
+    x: 0
+    y: 40
+    z: 0
+  colour: Grey
+  length: Four
+  height: M1_50
+  heading:
+    radians: 0.0
+- !Cone1
+  xyz:
+    x: -48
+    y: -28
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !Cone1
+  xyz:
+    x: -48
+    y: 28
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !ChalkLine
+  xyz:
+    x: -32
+    y: 0
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false

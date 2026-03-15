@@ -1,0 +1,134 @@
+- !ChalkAhead
+  xyz:
+    x: -48
+    y: 0
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+- !ConeTall1
+  xyz:
+    x: -32
+    y: -40
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !ConeTall1
+  xyz:
+    x: -32
+    y: 40
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+# Row 1: y=0 blocked
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: -48
+    z: 0
+  x: Half
+  y: Half
+  height: M2_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  x: Half
+  y: Half
+  height: M2_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 48
+    z: 0
+  x: Half
+  y: Half
+  height: M2_00
+  heading:
+    radians: 0.0
+# Row 2: tight inner gates at y=±24
+- !ConcretePillar
+  xyz:
+    x: 80
+    y: -72
+    z: 0
+  x: Half
+  y: Half
+  height: M2_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 80
+    y: -24
+    z: 0
+  x: Half
+  y: Half
+  height: M2_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 80
+    y: 24
+    z: 0
+  x: Half
+  y: Half
+  height: M2_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 80
+    y: 72
+    z: 0
+  x: Half
+  y: Half
+  height: M2_00
+  heading:
+    radians: 0.0
+# Row 3: y=0 blocked again
+- !ConcretePillar
+  xyz:
+    x: 160
+    y: -48
+    z: 0
+  x: Half
+  y: Half
+  height: M2_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 160
+    y: 0
+    z: 0
+  x: Half
+  y: Half
+  height: M2_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 160
+    y: 48
+    z: 0
+  x: Half
+  y: Half
+  height: M2_00
+  heading:
+    radians: 0.0
+
+# 3. wedge_gates
+# Alternating ConcreteWedge chicane gates: each wedge blocks one half of the
+# road from a different side, forcing a full S-weave through three gates.

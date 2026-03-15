@@ -1,0 +1,60 @@
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  width: Four
+  length: Two
+  height: M1_00
+  heading:
+    radians: 0.0
+- !ConcreteSlab
+  xyz:
+    x: 32
+    y: 0
+    z: 4
+  width: Four
+  length: Four
+  pitch: Deg0
+  heading:
+    radians: 0.0
+- !ConcreteRamp
+  xyz:
+    x: 96
+    y: 0
+    z: 4
+  width: Four
+  length: Two
+  height: M1_00
+  heading:
+    radians: 0.0
+- !ConcreteSlab
+  xyz:
+    x: 128
+    y: 0
+    z: 8
+  width: Four
+  length: Four
+  pitch: Deg0
+  heading:
+    radians: 0.0
+- !ConcreteRamp
+  xyz:
+    x: 192
+    y: 0
+    z: 8
+  width: Four
+  length: Two
+  height: M1_00
+  heading:
+    radians: 0.0
+- !ConcreteSlab
+  xyz:
+    x: 224
+    y: 0
+    z: 12
+  width: Four
+  length: Four
+  pitch: Deg0
+  heading:
+    radians: 0.0

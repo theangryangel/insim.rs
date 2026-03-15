@@ -1,0 +1,79 @@
+- !ChalkAhead
+  xyz:
+    x: -48
+    y: 0
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !VehicleTruck
+  xyz:
+    x: 0
+    y: -24
+    z: 0
+  heading:
+    radians: 0.7853981633974483
+  colour: Orange
+  mapping: 0
+  floating: false
+- !Cone1
+  xyz:
+    x: 48
+    y: 32
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+- !VehicleTruck
+  xyz:
+    x: 128
+    y: 24
+    z: 0
+  heading:
+    radians: -0.7853981633974483
+  colour: White
+  mapping: 0
+  floating: false
+- !Cone1
+  xyz:
+    x: 176
+    y: -32
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+- !VehicleTruck
+  xyz:
+    x: 256
+    y: -24
+    z: 0
+  heading:
+    radians: 0.7853981633974483
+  colour: Orange
+  mapping: 0
+  floating: false
+- !Cone1
+  xyz:
+    x: 304
+    y: 32
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+- !ChalkAhead
+  xyz:
+    x: 352
+    y: 0
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+
+# 5. tyre_wall_keyhole
+# A near-solid wall of TyreStack4Big spanning 10m across the track with a
+# single 4m gap at centre. Requires commitment and precise line.

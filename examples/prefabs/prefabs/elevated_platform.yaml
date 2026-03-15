@@ -1,0 +1,60 @@
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  width: Four
+  length: Eight
+  height: M2_00
+  heading:
+    radians: 0.0
+- !ConcreteWall
+  xyz:
+    x: 0
+    y: -40
+    z: 0
+  colour: Grey
+  length: Eight
+  height: M2_00
+  heading:
+    radians: 0.0
+- !ConcreteWall
+  xyz:
+    x: 0
+    y: 40
+    z: 0
+  colour: Grey
+  length: Eight
+  height: M2_00
+  heading:
+    radians: 0.0
+- !ConcreteSlab
+  xyz:
+    x: 128
+    y: 0
+    z: 8
+  width: Four
+  length: Eight
+  pitch: Deg0
+  heading:
+    radians: 0.0
+- !ConcreteWall
+  xyz:
+    x: 128
+    y: -40
+    z: 8
+  colour: Grey
+  length: Eight
+  height: M1_00
+  heading:
+    radians: 0.0
+- !ConcreteWall
+  xyz:
+    x: 128
+    y: 40
+    z: 8
+  colour: Grey
+  length: Eight
+  height: M1_00
+  heading:
+    radians: 0.0
