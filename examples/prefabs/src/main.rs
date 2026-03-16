@@ -33,6 +33,13 @@ struct Cli {
 }
 
 #[derive(Debug)]
+struct UndoEntry {
+    deleted: Vec<ObjectInfo>,
+    added: Vec<ObjectInfo>,
+    selection_before: Vec<ObjectInfo>,
+}
+
+#[derive(Debug)]
 struct State {
     prefabs: tools::prefabs::Prefabs,
     selection: Vec<ObjectInfo>,
@@ -53,6 +60,7 @@ struct State {
     compass_visible: bool,
     compass_text: Option<String>,
     last_cpp: Cpp,
+    undo_stack: Vec<UndoEntry>,
 }
 
 #[derive(Debug)]
@@ -66,6 +74,7 @@ enum Command {
         origin: SpawnOrigin,
     },
     CameraMove(Cpp),
+    Undo,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -208,6 +217,44 @@ async fn run_command(
         Command::CameraMove(cpp) => {
             connection.write(cpp).await?;
         },
+        Command::Undo => {
+            if let Some(entry) = state.undo_stack.pop() {
+                if !entry.added.is_empty() {
+                    connection
+                        .write(Axm {
+                            ucid: ConnectionId::LOCAL,
+                            pmoaction: PmoAction::DelObjects,
+                            info: entry.added,
+                            ..Default::default()
+                        })
+                        .await?;
+                }
+                for chunk in entry.deleted.chunks(60) {
+                    connection
+                        .write(Axm {
+                            ucid: ConnectionId::LOCAL,
+                            pmoaction: PmoAction::AddObjects,
+                            info: chunk.to_vec(),
+                            ..Default::default()
+                        })
+                        .await?;
+                }
+                if !entry.selection_before.is_empty() {
+                    sleep(Duration::from_millis(50)).await;
+                    for chunk in entry.selection_before.chunks(60) {
+                        connection
+                            .write(Axm {
+                                ucid: ConnectionId::LOCAL,
+                                pmoaction: PmoAction::Selection,
+                                pmoflags: PmoFlags::SELECTION_REAL,
+                                info: chunk.to_vec(),
+                                ..Default::default()
+                            })
+                            .await?;
+                    }
+                }
+            }
+        },
     }
 
     Ok(())
@@ -235,12 +282,21 @@ fn clamp_u8(value: i32) -> u8 {
 
 async fn spawn_at_selection(
     connection: &mut FramedConnection,
-    state: &State,
+    state: &mut State,
     objects: Vec<ObjectInfo>,
     pmoaction: PmoAction,
 ) -> insim::Result<usize> {
     if objects.is_empty() {
         return Ok(0);
+    }
+
+    state.undo_stack.push(UndoEntry {
+        deleted: state.selection.clone(),
+        added: objects.clone(),
+        selection_before: state.selection.clone(),
+    });
+    if state.undo_stack.len() > 20 {
+        state.undo_stack.remove(0);
     }
 
     if !state.selection.is_empty() {
@@ -320,6 +376,7 @@ pub async fn main() -> anyhow::Result<()> {
         grid_lateral_offset: 3.0,
         compass_text: None,
         last_cpp: Cpp::default(),
+        undo_stack: Vec::new(),
     };
 
     let mut ui_root = ui::Toolbox::default();
@@ -367,6 +424,7 @@ pub async fn main() -> anyhow::Result<()> {
                     grid_lateral_offset: state.grid_lateral_offset,
                     compass_visible: state.compass_visible,
                     compass_text: state.compass_text.clone(),
+                    can_undo: !state.undo_stack.is_empty(),
                 }),
             ) {
                 for packet in diff.merge() {

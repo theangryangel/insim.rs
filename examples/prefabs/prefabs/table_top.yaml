@@ -1,0 +1,219 @@
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  width: Two
+  length: Two
+  height: M0_25
+  heading:
+    radians: 0.0
+- !ConcreteSlab
+  xyz:
+    x: 0
+    y: 703
+    z: 0
+  width: Eight
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 1.5707963267948966
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 33
+    z: 1
+  width: Two
+  length: Two
+  height: M0_50
+  heading:
+    radians: 0.0
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 66
+    z: 3
+  width: Two
+  length: Two
+  height: M0_75
+  heading:
+    radians: 0.0
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 624
+    z: 0
+  width: Two
+  length: Two
+  height: M0_25
+  heading:
+    radians: -3.141592653589793
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 99
+    z: 6
+  width: Two
+  length: Two
+  height: M1_00
+  heading:
+    radians: 0.0
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 591
+    z: 1
+  width: Two
+  length: Two
+  height: M0_50
+  heading:
+    radians: -3.141592653589793
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 132
+    z: 10
+  width: Two
+  length: Two
+  height: M1_25
+  heading:
+    radians: 0.0
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 558
+    z: 3
+  width: Two
+  length: Two
+  height: M0_75
+  heading:
+    radians: -3.141592653589793
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 165
+    z: 15
+  width: Two
+  length: Two
+  height: M1_50
+  heading:
+    radians: 0.0
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 525
+    z: 6
+  width: Two
+  length: Two
+  height: M1_00
+  heading:
+    radians: -3.141592653589793
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 492
+    z: 10
+  width: Two
+  length: Two
+  height: M1_25
+  heading:
+    radians: -3.141592653589793
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 198
+    z: 21
+  width: Two
+  length: Two
+  height: M1_75
+  heading:
+    radians: 0.0
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 459
+    z: 15
+  width: Two
+  length: Two
+  height: M1_50
+  heading:
+    radians: -3.141592653589793
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 426
+    z: 21
+  width: Two
+  length: Two
+  height: M1_75
+  heading:
+    radians: -3.141592653589793
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 247
+    z: 28
+  width: Two
+  length: Four
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 403
+    z: 26
+  width: Two
+  length: Two
+  height: M1_75
+  heading:
+    radians: -3.141592653589793
+- !ChalkAhead2
+  xyz:
+    x: -2
+    y: 442
+    z: 0
+  colour: White
+  heading:
+    radians: 2.6016314162540475
+  floating: false
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 379
+    z: 31
+  width: Two
+  length: Two
+  height: M2_00
+  heading:
+    radians: -3.141592653589793
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 347
+    z: 39
+  width: Two
+  length: Two
+  height: M1_25
+  heading:
+    radians: -3.141592653589793
+- !ConcreteSlab
+  xyz:
+    x: 0
+    y: 316
+    z: 43
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 1.5707963267948966
+- !ConcreteSlab
+  xyz:
+    x: 0
+    y: 296
+    z: 43
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 1.5707963267948966

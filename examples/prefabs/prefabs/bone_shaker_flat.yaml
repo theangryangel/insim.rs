@@ -1,0 +1,190 @@
+- !ChalkLine2
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  colour: Red
+  heading:
+    radians: -3.141592653589793
+  floating: true
+- !ChalkLine2
+  xyz:
+    x: -28
+    y: 0
+    z: 0
+  colour: Red
+  heading:
+    radians: -3.141592653589793
+  floating: true
+- !ChalkLine2
+  xyz:
+    x: -28
+    y: -402
+    z: 0
+  colour: Red
+  heading:
+    radians: -3.141592653589793
+  floating: true
+- !ConcreteSlab
+  xyz:
+    x: -14
+    y: -89
+    z: 0
+  width: Sixteen
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 1.5707963267948966
+- !ChalkLine2
+  xyz:
+    x: 0
+    y: -402
+    z: 0
+  colour: Red
+  heading:
+    radians: -3.141592653589793
+  floating: true
+- !ChalkLine2
+  xyz:
+    x: 0
+    y: -102
+    z: 0
+  colour: Red
+  heading:
+    radians: -3.141592653589793
+  floating: true
+- !ConcreteRamp
+  xyz:
+    x: -14
+    y: -392
+    z: 0
+  width: Two
+  length: Two
+  height: M0_25
+  heading:
+    radians: 0.0
+- !ChalkLine2
+  xyz:
+    x: -28
+    y: -102
+    z: 0
+  colour: Red
+  heading:
+    radians: -3.141592653589793
+  floating: true
+- !ConcreteRamp
+  xyz:
+    x: -14
+    y: -109
+    z: 0
+  width: Two
+  length: Two
+  height: M0_50
+  heading:
+    radians: 0.0
+- !ConcreteRamp
+  xyz:
+    x: -14
+    y: -346
+    z: 0
+  width: Two
+  length: Two
+  height: M0_25
+  heading:
+    radians: 0.0
+- !ConcreteSlab
+  xyz:
+    x: -14
+    y: -344
+    z: 0
+  width: Sixteen
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 1.5707963267948966
+- !ConcreteRamp
+  xyz:
+    x: -14
+    y: -154
+    z: 0
+  width: Two
+  length: Two
+  height: M0_50
+  heading:
+    radians: 0.0
+- !ChalkLine2
+  xyz:
+    x: -28
+    y: -307
+    z: 0
+  colour: Red
+  heading:
+    radians: -3.141592653589793
+  floating: true
+- !ChalkLine2
+  xyz:
+    x: 0
+    y: -194
+    z: 0
+  colour: Red
+  heading:
+    radians: -3.141592653589793
+  floating: true
+- !ChalkLine2
+  xyz:
+    x: -28
+    y: -194
+    z: 0
+  colour: Red
+  heading:
+    radians: -3.141592653589793
+  floating: true
+- !ChalkLine2
+  xyz:
+    x: 0
+    y: -307
+    z: 0
+  colour: Red
+  heading:
+    radians: -3.141592653589793
+  floating: true
+- !ConcreteRamp
+  xyz:
+    x: -14
+    y: -200
+    z: 0
+  width: Two
+  length: Two
+  height: M0_50
+  heading:
+    radians: 0.0
+- !ConcreteRamp
+  xyz:
+    x: -14
+    y: -298
+    z: 0
+  width: Two
+  length: Two
+  height: M0_25
+  heading:
+    radians: 0.0
+- !ConcreteRamp
+  xyz:
+    x: -14
+    y: -252
+    z: 0
+  width: Two
+  length: Two
+  height: M0_25
+  heading:
+    radians: 0.0
+- !ConcreteSlab
+  xyz:
+    x: -14
+    y: -598
+    z: 0
+  width: Sixteen
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 1.5707963267948966

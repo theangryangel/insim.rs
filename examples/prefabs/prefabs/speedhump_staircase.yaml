@@ -1,0 +1,400 @@
+- !SpeedHump10M
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -222
+    y: -227
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -5
+    y: -5
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -215
+    y: -220
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -10
+    y: -10
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -208
+    y: -213
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -15
+    y: -15
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -201
+    y: -206
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -20
+    y: -20
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -194
+    y: -199
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -25
+    y: -25
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -188
+    y: -192
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -30
+    y: -30
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -182
+    y: -185
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -35
+    y: -35
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -176
+    y: -178
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -40
+    y: -40
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -45
+    y: -45
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -170
+    y: -171
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -50
+    y: -50
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -164
+    y: -164
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -55
+    y: -55
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -158
+    y: -158
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -60
+    y: -60
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -152
+    y: -152
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -65
+    y: -65
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -146
+    y: -146
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -70
+    y: -70
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -140
+    y: -140
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -75
+    y: -75
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -134
+    y: -134
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -80
+    y: -80
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -128
+    y: -128
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -86
+    y: -86
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -122
+    y: -122
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -92
+    y: -92
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -116
+    y: -116
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -98
+    y: -98
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -110
+    y: -110
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false
+- !SpeedHump10M
+  xyz:
+    x: -104
+    y: -104
+    z: 0
+  heading:
+    radians: 0.8099418560036186
+  colour: 0
+  mapping: 0
+  floating: false

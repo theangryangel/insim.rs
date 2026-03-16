@@ -73,6 +73,7 @@ pub enum ToolboxMsg {
     RadialArcInput(String),
     BuildRadialArray,
     PrefabScroll(scroll_list::ScrollMsg),
+    Undo,
 }
 
 #[derive(Debug, Default)]
@@ -120,16 +121,6 @@ impl ui::Component for Toolbox {
             .w(170.)
             .pt(7.)
             .items_end()
-            .with_child(if props.display_selection_info {
-                ui::text(
-                    format!("Selection: {} object(s)", props.selection_count),
-                    BtnStyle::style_readonly(),
-                )
-                .w(48.)
-                .h(5.)
-            } else {
-                ui::empty()
-            })
             .with_child(if let Some(compass_text) = props.compass_text.as_ref() {
                 ui::text(compass_text, BtnStyle::style_readonly())
                     .w(48.)
@@ -137,8 +128,53 @@ impl ui::Component for Toolbox {
             } else {
                 ui::empty()
             })
+            .with_child(header_row(&props, self.screen))
             .with_child(content)
     }
+}
+
+fn header_row(props: &ToolboxProps, screen: ToolboxScreen) -> ui::Node<ToolboxMsg> {
+    let sel_text = if props.display_selection_info {
+        format!("Sel: {}", props.selection_count)
+    } else {
+        String::new()
+    };
+
+    let options_style = if screen == ToolboxScreen::Inspector(InspectorTool::Options) {
+        BtnStyle::style_active()
+    } else {
+        BtnStyle::style_interactive()
+    };
+
+    let undo_style = if props.can_undo {
+        BtnStyle::style_interactive()
+    } else {
+        BtnStyle::style_unavailable()
+    };
+
+    ui::container()
+        .flex()
+        .flex_row()
+        .w(48.)
+        .with_child(
+            ui::text(sel_text, BtnStyle::style_readonly())
+                .flex_grow(1.0)
+                .h(5.),
+        )
+        .with_child(
+            ui::clickable("Undo", undo_style, ToolboxMsg::Undo)
+                .w(12.)
+                .h(5.),
+        )
+        .with_child(
+            ui::clickable(
+                "Options",
+                options_style,
+                ToolboxMsg::OpenInspector(InspectorTool::Options),
+            )
+            .w(16.)
+            .h(5.),
+        )
 }
 
 fn launcher_button(label: &'static str, tool: InspectorTool) -> ui::Node<ToolboxMsg> {
@@ -157,16 +193,6 @@ fn launcher_screen(props: &ToolboxProps) -> ui::Node<ToolboxMsg> {
     } else {
         BtnStyle::style_unavailable()
     };
-
-    let mut ramp_tool_btn = launcher_button("Ramp Tool", InspectorTool::Ramp);
-    if !has_selection {
-        *ramp_tool_btn.bstyle_mut() = BtnStyle::style_unavailable();
-    }
-
-    let mut nudge_selection_btn = launcher_button("Nudge Selection", InspectorTool::Nudge);
-    if !has_selection {
-        *nudge_selection_btn.bstyle_mut() = BtnStyle::style_unavailable();
-    }
 
     let mut ramp_tool_btn = launcher_button("Ramp Tool", InspectorTool::Ramp);
     if !has_selection {
@@ -234,7 +260,6 @@ fn launcher_screen(props: &ToolboxProps) -> ui::Node<ToolboxMsg> {
         },
         ui::clickable("Top Down View", selection_btn_style, ToolboxMsg::ToggleTopDown).h(5.),
         ui::clickable("Side View", selection_btn_style, ToolboxMsg::ToggleSideView).h(5.),
-        launcher_button("Options", InspectorTool::Options),
     ])
 }
 
@@ -896,6 +921,7 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
             }
             None
         },
+        ToolboxMsg::Undo => Some(Command::Undo),
         ToolboxMsg::BuildRadialArray => {
             match tools::radial_array::build(
                 &state.selection,

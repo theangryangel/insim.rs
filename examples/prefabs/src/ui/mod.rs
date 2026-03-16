@@ -30,6 +30,7 @@ pub struct ToolboxProps {
     pub grid_lateral_offset: f64,
     pub compass_visible: bool,
     pub compass_text: Option<String>,
+    pub can_undo: bool,
 }
 
 pub(crate) fn reduce_message(state: &mut crate::State, msg: ToolboxMsg) -> Option<crate::Command> {
