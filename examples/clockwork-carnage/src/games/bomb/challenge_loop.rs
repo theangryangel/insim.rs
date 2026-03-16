@@ -3,7 +3,7 @@ use std::{collections::HashMap, time::{Duration, Instant}};
 use insim::{
     builder::InsimTask,
     core::{
-        object::insim::InsimCheckpoint,
+        object::insim::{InsimCheckpoint, InsimCheckpointKind},
         string::colours::Colour,
         vehicle::Vehicle,
     },
@@ -28,8 +28,9 @@ use crate::{
 };
 
 const BOMB_HELP_LINES: &[&str] = &[
-    " - Hit checkpoints before the timer expires or your run ends (BOOM).",
-    " - Each checkpoint resets the timer and adds to your count.",
+    " - Hit ^2checkpoint 1^7 objects before the timer expires or your run ends (BOOM).",
+    " - Time carries over: arrive late and you have less time to reach the next one.",
+    " - Hit a ^3checkpoint 2/3^7 or ^3finish^7 object to refresh your timer to the full window.",
     " - Score = checkpoints hit. Survival time breaks ties.",
     " - Your best run is recorded on the leaderboard.",
     "",
@@ -39,7 +40,7 @@ const BOMB_HELP_LINES: &[&str] = &[
 #[derive(Debug, Clone, Default)]
 struct BombGlobalProps {
     leaderboard: BombLeaderboard,
-    active_runs: Vec<(String, String, i64, f64, f64)>, // (uname, pname, cps, secs_left, fraction)
+    active_runs: Vec<(String, String, i64, Instant, Duration)>, // (uname, pname, cps, deadline, current_timeout)
 }
 
 #[derive(Debug, Clone, Default)]
@@ -55,6 +56,7 @@ enum BombMessage {
 
 struct BombView {
     help_dialog: Dialog,
+    _tick_handle: tokio::task::JoinHandle<()>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -95,9 +97,16 @@ impl ui::Component for BombView {
 
         let leaderboard_rows = bomb_scoreboard(&props.global.leaderboard, &props.connection.uname);
 
+        let now = Instant::now();
         let active_run_rows: Vec<ui::Node<BombMessage>> = props.global.active_runs
             .iter()
-            .map(|(uname, pname, cps, secs_left, fraction)| {
+            .map(|(uname, pname, cps, deadline, current_timeout)| {
+                let secs_left = deadline.saturating_duration_since(now).as_secs_f64();
+                let fraction = if current_timeout.is_zero() {
+                    0.0
+                } else {
+                    (secs_left / current_timeout.as_secs_f64()).clamp(0.0, 1.0)
+                };
                 let cps_str = format!("{cps} cps");
                 let time_str = format!("{secs_left:.1}s");
                 // 8-char progress bar
@@ -154,6 +163,7 @@ impl From<ui::UiState<BombGlobalProps, BombConnectionProps>> for BombProps {
 struct ActiveRun {
     started_at: Instant,
     deadline: Instant,
+    current_timeout: Duration,
     checkpoints: i64,
     vehicle: Vehicle,
     uname: String,
@@ -207,8 +217,18 @@ impl BombLoopInner {
         let (ui, _ui_handle) = ui::mount_with(
             self.insim.clone(),
             BombGlobalProps::default(),
-            |_ucid, _invalidator| BombView {
-                help_dialog: Dialog::default(),
+            |_ucid, invalidator| {
+                let handle = tokio::spawn(async move {
+                    let mut interval = tokio::time::interval(Duration::from_millis(100));
+                    loop {
+                        let _ = interval.tick().await;
+                        invalidator.invalidate();
+                    }
+                });
+                BombView {
+                    help_dialog: Dialog::default(),
+                    _tick_handle: handle,
+                }
             },
             self.chat.subscribe(),
             |(ucid, msg)| {
@@ -303,7 +323,7 @@ impl BombLoopInner {
                             }
                         },
                         insim::Packet::Uco(Uco {
-                            info: ObjectInfo::InsimCheckpoint(InsimCheckpoint { .. }),
+                            info: ObjectInfo::InsimCheckpoint(InsimCheckpoint { kind, .. }),
                             plid,
                             ..
                         }) => {
@@ -327,6 +347,7 @@ impl BombLoopInner {
                                     ActiveRun {
                                         started_at: now,
                                         deadline: now + self.checkpoint_timeout,
+                                        current_timeout: self.checkpoint_timeout,
                                         checkpoints: 0,
                                         vehicle,
                                         uname: uname.clone(),
@@ -335,17 +356,32 @@ impl BombLoopInner {
                                     }
                                 });
 
-                                run.checkpoints += 1;
-                                run.deadline = now + self.checkpoint_timeout;
-                                let n = run.checkpoints;
-                                let timeout_secs = self.checkpoint_timeout.as_secs();
+                                let remaining = run.deadline.saturating_duration_since(now);
 
-                                self.insim
-                                    .send_message(
-                                        format!("checkpoint {n} — {timeout_secs}s").light_green(),
-                                        ucid,
-                                    )
-                                    .await?;
+                                // Checkpoint1: carry over remaining time as the next window.
+                                // Checkpoint2/3/Finish: refresh — top up to the full base window.
+                                // A refresh checkpoint placed after a hard section rewards survival.
+                                let (new_timeout, is_refresh) = match kind {
+                                    InsimCheckpointKind::Checkpoint1 => (remaining, false),
+                                    InsimCheckpointKind::Checkpoint2
+                                    | InsimCheckpointKind::Checkpoint3
+                                    | InsimCheckpointKind::Finish => {
+                                        (self.checkpoint_timeout, true)
+                                    },
+                                };
+
+                                run.deadline = now + new_timeout;
+                                run.current_timeout = new_timeout;
+                                run.checkpoints += 1;
+                                let n = run.checkpoints;
+                                let new_timeout_secs = new_timeout.as_secs_f64();
+
+                                let msg = if is_refresh {
+                                    format!("REFRESH — checkpoint {n} — {new_timeout_secs:.1}s").yellow()
+                                } else {
+                                    format!("checkpoint {n} — {new_timeout_secs:.1}s").light_green()
+                                };
+                                self.insim.send_message(msg, ucid).await?;
 
                                 let active = self.build_active_runs_props(&active_runs);
                                 let leaderboard = self.load_leaderboard().await?;
@@ -430,18 +466,12 @@ impl BombLoopInner {
             .into())
     }
 
-    fn build_active_runs_props(&self, active_runs: &HashMap<String, ActiveRun>) -> Vec<(String, String, i64, f64, f64)> {
-        let now = Instant::now();
-        let timeout_secs = self.checkpoint_timeout.as_secs_f64();
+    fn build_active_runs_props(&self, active_runs: &HashMap<String, ActiveRun>) -> Vec<(String, String, i64, Instant, Duration)> {
         let mut runs: Vec<_> = active_runs
             .values()
-            .map(|run| {
-                let secs_left = run.deadline.saturating_duration_since(now).as_secs_f64();
-                let fraction = (secs_left / timeout_secs).clamp(0.0, 1.0);
-                (run.uname.clone(), run.pname.clone(), run.checkpoints, secs_left, fraction)
-            })
+            .map(|run| (run.uname.clone(), run.pname.clone(), run.checkpoints, run.deadline, run.current_timeout))
             .collect();
-        runs.sort_by(|a, b| b.2.cmp(&a.2).then(b.3.partial_cmp(&a.3).unwrap_or(std::cmp::Ordering::Equal)));
+        runs.sort_by(|a, b| b.2.cmp(&a.2).then(b.3.cmp(&a.3)));
         runs
     }
 }
