@@ -64,7 +64,7 @@ struct ChallengeProps {
 }
 
 impl ui::Component for ChallengeView {
-    type Props = ChallengeProps;
+    type Props<'a> = ChallengeProps;
     type Message = ChallengeMessage;
 
     fn update(&mut self, msg: Self::Message) {
@@ -75,7 +75,7 @@ impl ui::Component for ChallengeView {
         }
     }
 
-    fn render(&self, props: Self::Props) -> ui::Node<Self::Message> {
+    fn render(&self, props: Self::Props<'_>) -> ui::Node<Self::Message> {
         if self.help_dialog.is_visible() {
             return self
                 .help_dialog

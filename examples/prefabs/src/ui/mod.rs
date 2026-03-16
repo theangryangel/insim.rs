@@ -1,4 +1,5 @@
 mod options;
+pub mod scroll_list;
 mod toolbox;
 
 pub use options::OptionsMsg;

@@ -4,7 +4,9 @@ use insim::{
 };
 use kitcar::ui;
 
-use super::{OptionsMsg, PrefabSummary, ToolboxProps, options};
+use kitcar::ui::Component as _;
+
+use super::{OptionsMsg, PrefabSummary, ToolboxProps, options, scroll_list};
 use crate::{Command, SpawnOrigin, State, tools};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -46,7 +48,6 @@ pub enum ToolboxMsg {
     Options(OptionsMsg),
     ReloadYaml,
     SavePrefab(String),
-    SpawnPrefab(usize),
     PaintedTextInput(String),
     RotateInput(String),
     SplineDistribInput(String),
@@ -71,15 +72,17 @@ pub enum ToolboxMsg {
     RadialRadiusInput(String),
     RadialArcInput(String),
     BuildRadialArray,
+    PrefabScroll(scroll_list::ScrollMsg),
 }
 
 #[derive(Debug, Default)]
 pub struct Toolbox {
     screen: ToolboxScreen,
+    prefab_scroll: scroll_list::ScrollList<super::PrefabSummary>,
 }
 
 impl ui::Component for Toolbox {
-    type Props = ToolboxProps;
+    type Props<'a> = ToolboxProps;
     type Message = ToolboxMsg;
 
     fn update(&mut self, msg: Self::Message) {
@@ -93,19 +96,23 @@ impl ui::Component for Toolbox {
             ToolboxMsg::BackToLauncher => {
                 self.screen = ToolboxScreen::Launcher;
             },
+            ToolboxMsg::PrefabScroll(msg) => {
+                self.prefab_scroll.update(msg);
+            },
             _ => {},
         }
     }
 
-    fn render(&self, props: Self::Props) -> ui::Node<Self::Message> {
+    fn render(&self, props: Self::Props<'_>) -> ui::Node<Self::Message> {
         if !props.ui_visible {
             return ui::empty();
         }
 
         let content = match self.screen {
             ToolboxScreen::Launcher => launcher_screen(&props),
-            ToolboxScreen::Inspector(tool) => inspector_screen(tool, &props),
+            ToolboxScreen::Inspector(tool) => inspector_screen(tool, &props, &self.prefab_scroll),
         };
+
 
         ui::container()
             .flex()
@@ -231,9 +238,13 @@ fn launcher_screen(props: &ToolboxProps) -> ui::Node<ToolboxMsg> {
     ])
 }
 
-fn inspector_screen(tool: InspectorTool, props: &ToolboxProps) -> ui::Node<ToolboxMsg> {
+fn inspector_screen(
+    tool: InspectorTool,
+    props: &ToolboxProps,
+    scroll: &scroll_list::ScrollList<PrefabSummary>,
+) -> ui::Node<ToolboxMsg> {
     let body = match tool {
-        InspectorTool::Prefabs => prefabs_panel(&props.prefabs),
+        InspectorTool::Prefabs => prefabs_panel(&props.prefabs, scroll),
         InspectorTool::Ramp => ramp_panel(props.ramp_mode, props.ramp_roll_degrees),
         InspectorTool::Grid => grid_panel(
             props.grid_mode,
@@ -280,7 +291,26 @@ fn inspector_screen(tool: InspectorTool, props: &ToolboxProps) -> ui::Node<Toolb
         .with_child(body)
 }
 
-fn prefabs_panel(prefabs: &[PrefabSummary]) -> ui::Node<ToolboxMsg> {
+fn prefabs_panel(
+    prefabs: &[PrefabSummary],
+    scroll: &scroll_list::ScrollList<PrefabSummary>,
+) -> ui::Node<ToolboxMsg> {
+    let scroll_props = scroll_list::ScrollListProps {
+        items: prefabs,
+        render_item: Box::new(|prefab, idx| {
+            ui::clickable(
+                prefab.name.clone(),
+                BtnStyle::style_interactive().align_left(),
+                scroll_list::ScrollMsg::ItemClicked(idx),
+            )
+            .key(format!("prefab-{idx}"))
+            .h(5.)
+        }),
+        filter_item: Box::new(|prefab, filter| {
+            prefab.name.to_lowercase().contains(&filter.to_lowercase())
+        }),
+    };
+
     ui::container()
         .flex()
         .flex_col()
@@ -308,15 +338,7 @@ fn prefabs_panel(prefabs: &[PrefabSummary]) -> ui::Node<ToolboxMsg> {
                     .h(5.),
                 ),
         )
-        .with_children(prefabs.iter().enumerate().map(|(idx, prefab)| {
-            ui::clickable(
-                prefab.name.clone(),
-                BtnStyle::style_interactive().align_left(),
-                ToolboxMsg::SpawnPrefab(idx),
-            )
-            .key(format!("prefab-{idx}"))
-            .h(5.)
-        }))
+        .with_child(scroll.render(scroll_props).map(ToolboxMsg::PrefabScroll))
 }
 
 fn nudge_panel(nudge_distance_metres: f64) -> ui::Node<ToolboxMsg> {
@@ -506,15 +528,16 @@ fn grid_panel(
 pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
     match msg {
         ToolboxMsg::OpenInspector(_) | ToolboxMsg::BackToLauncher => None,
-        ToolboxMsg::Options(options_msg) => options::reduce(state, options_msg),
-        ToolboxMsg::ReloadYaml => Some(Command::ReloadPrefabs),
-        ToolboxMsg::SavePrefab(name) => Some(Command::SavePrefabs(name.trim().to_string())),
-        ToolboxMsg::SpawnPrefab(idx) => {
+        ToolboxMsg::PrefabScroll(scroll_list::ScrollMsg::ItemClicked(idx)) => {
             if idx >= state.prefabs.entries.len() {
                 return None;
             }
             Some(Command::SpawnPrefab(idx))
         },
+        ToolboxMsg::PrefabScroll(_) => None,
+        ToolboxMsg::Options(options_msg) => options::reduce(state, options_msg),
+        ToolboxMsg::ReloadYaml => Some(Command::ReloadPrefabs),
+        ToolboxMsg::SavePrefab(name) => Some(Command::SavePrefabs(name.trim().to_string())),
         ToolboxMsg::PaintedTextInput(text) => {
             let text = text.trim().to_string();
             if text.is_empty() {

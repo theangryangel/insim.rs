@@ -19,14 +19,14 @@ pub enum DialogMsg {
     Hide,
 }
 
-pub struct DialogProps {
-    pub title: &'static str,
-    pub lines: &'static [&'static str],
+pub struct DialogProps<'a> {
+    pub title: &'a str,
+    pub lines: &'a [&'a str],
 }
 
 impl ui::Component for Dialog {
     type Message = DialogMsg;
-    type Props = DialogProps;
+    type Props<'a> = DialogProps<'a>;
 
     fn update(&mut self, msg: Self::Message) {
         match msg {
@@ -35,7 +35,7 @@ impl ui::Component for Dialog {
         }
     }
 
-    fn render(&self, props: Self::Props) -> ui::Node<Self::Message> {
+    fn render(&self, props: Self::Props<'_>) -> ui::Node<Self::Message> {
         if !self.visible {
             return ui::Node::empty();
         }

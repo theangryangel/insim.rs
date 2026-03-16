@@ -9,10 +9,10 @@ use crate::hud::topbar;
 
 struct SetupTrackView {}
 impl ui::Component for SetupTrackView {
-    type Props = ();
+    type Props<'a> = ();
     type Message = ();
 
-    fn render(&self, _props: Self::Props) -> ui::Node<Self::Message> {
+    fn render(&self, _props: Self::Props<'_>) -> ui::Node<Self::Message> {
         topbar("Waiting for player ready")
     }
 }

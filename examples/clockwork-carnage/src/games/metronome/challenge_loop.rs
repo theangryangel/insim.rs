@@ -78,7 +78,7 @@ struct MetronomeProps {
 }
 
 impl ui::Component for MetronomeView {
-    type Props = MetronomeProps;
+    type Props<'a> = MetronomeProps;
     type Message = MetronomeMessage;
 
     fn update(&mut self, msg: Self::Message) {
@@ -89,7 +89,7 @@ impl ui::Component for MetronomeView {
         }
     }
 
-    fn render(&self, props: Self::Props) -> ui::Node<Self::Message> {
+    fn render(&self, props: Self::Props<'_>) -> ui::Node<Self::Message> {
         if self.help_dialog.is_visible() {
             return self
                 .help_dialog

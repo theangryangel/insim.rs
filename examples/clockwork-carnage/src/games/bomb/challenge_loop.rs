@@ -64,7 +64,7 @@ struct BombProps {
 }
 
 impl ui::Component for BombView {
-    type Props = BombProps;
+    type Props<'a> = BombProps;
     type Message = BombMessage;
 
     fn update(&mut self, msg: Self::Message) {
@@ -75,7 +75,7 @@ impl ui::Component for BombView {
         }
     }
 
-    fn render(&self, props: Self::Props) -> ui::Node<Self::Message> {
+    fn render(&self, props: Self::Props<'_>) -> ui::Node<Self::Message> {
         if self.help_dialog.is_visible() {
             return self
                 .help_dialog
