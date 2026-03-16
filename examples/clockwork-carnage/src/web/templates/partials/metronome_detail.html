@@ -1,63 +1,25 @@
 {# ── Quick stats ── #}
-<div class="grid grid-cols-3 gap-3 mb-6">
+<div class="grid grid-cols-1 gap-3 mb-6">
   {% match *event.mode %}
-    {% when EventMode::Metronome { rounds, target_ms, max_scorers, .. } %}
-    <div class="bg-white rounded-lg p-4 text-center">
-      <p class="text-2xl font-bold">{{ rounds }}</p>
-      <p class="text-xs text-gray-400 uppercase font-semibold mt-1">Rounds</p>
-    </div>
+    {% when EventMode::Metronome { target_ms } %}
     <div class="bg-white rounded-lg p-4 text-center">
       <p class="text-2xl font-bold">{{ target_ms|format_time_ms }}</p>
       <p class="text-xs text-gray-400 uppercase font-semibold mt-1">Target</p>
-    </div>
-    <div class="bg-white rounded-lg p-4 text-center">
-      <p class="text-2xl font-bold">{{ max_scorers }}</p>
-      <p class="text-xs text-gray-400 uppercase font-semibold mt-1">Scorers</p>
     </div>
     {% when EventMode::Shortcut %}
     {% when EventMode::Bomb { .. } %}
   {% endmatch %}
 </div>
 
-{# ── Tabs ── #}
-<div class="mb-4" x-data="{ tab: 'standings' }">
-  <div id="metronome-tabs" class="flex flex-wrap gap-0.5 bg-gray-100 rounded p-0.5 text-xs font-semibold mb-3">
-    <button @click="tab = 'standings'"
-      :class="tab === 'standings' ? 'bg-white shadow-sm text-gray-700' : 'text-gray-400 hover:text-gray-700'"
-      class="px-2.5 py-1 rounded transition-colors">Standings</button>
-    {% for round in metronome_rounds %}
-    <button @click="tab = 'round-{{ round.round }}'"
-      :class="tab === 'round-{{ round.round }}' ? 'bg-white shadow-sm text-gray-700' : 'text-gray-400 hover:text-gray-700'"
-      class="px-2.5 py-1 rounded transition-colors">Round {{ round.round }}</button>
-    {% endfor %}
-  </div>
-
-  <div x-show="tab === 'standings'">
-    <div
-      {% match event.status %}
-        {% when EventStatus::Active %}
-          hx-get="/events/{{ event.id }}/standings"
-          hx-trigger="every 5s"
-          hx-swap="innerHTML"
-        {% when _ %}
-      {% endmatch %}
-    >
-      {% include "partials/metronome_standings_content.html" %}
-    </div>
-  </div>
-  {% for (round_number, round_results) in round_results %}
-  <div x-show="tab === 'round-{{ round_number }}'" x-cloak>
-    <div
-      {% match event.status %}
-        {% when EventStatus::Active %}
-          hx-get="/events/{{ event.id }}/rounds/{{ round_number }}"
-          hx-trigger="every 5s"
-          hx-swap="innerHTML"
-        {% when _ %}
-      {% endmatch %}
-    >
-      {% include "partials/metronome_round_content.html" %}
-    </div>
-  </div>
-  {% endfor %}
+{# ── Standings ── #}
+<div
+  {% match event.status %}
+    {% when EventStatus::Active %}
+      hx-get="/events/{{ event.id }}/standings"
+      hx-trigger="every 5s"
+      hx-swap="innerHTML"
+    {% when _ %}
+  {% endmatch %}
+>
+  {% include "partials/metronome_standings_content.html" %}
 </div>

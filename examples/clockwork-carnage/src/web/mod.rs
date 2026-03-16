@@ -193,7 +193,6 @@ pub async fn serve(listen: SocketAddr, pool: db::Pool, cfg: WebConfig) -> anyhow
         .route("/events/{id}", get(event_detail))
         .route("/events/{id}/edit", get(event_edit_get).post(event_edit_post))
         .route("/events/{id}/standings", get(event_standings))
-        .route("/events/{id}/rounds/{round}", get(event_round))
         .route("/events/{id}/standings/best", get(event_standings_best))
         .route("/events/{id}/standings/all", get(event_standings_all))
         .route("/events/{id}/standings/bomb/best", get(event_bomb_best))

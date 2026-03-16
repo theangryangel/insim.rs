@@ -5,8 +5,8 @@ use kitcar::ui;
 
 use super::theme::{hud_active, hud_text};
 
-/// (uname, pname, pts)
-pub type EventLeaderboard = Arc<[(String, String, u32)]>;
+/// (uname, pname, best_delta)
+pub type MetronomeLeaderboard = Arc<[(String, String, Duration)]>;
 
 /// (uname, pname, vehicle, best_time)
 pub type ChallengeLeaderboard = Arc<[(String, String, Vehicle, Duration)]>;
@@ -22,53 +22,6 @@ fn row_style(uname: &str, current_uname: &str) -> BtnStyle {
     }
 }
 
-pub fn scoreboard<Msg>(leaderboard: &EventLeaderboard, current_uname: &str) -> Vec<ui::Node<Msg>> {
-    let total = leaderboard.len();
-    let player_pos = leaderboard
-        .iter()
-        .position(|(uname, _, _)| uname == current_uname);
-
-    let indices_to_show: Vec<usize> = if total <= 7 {
-        (0..total).collect()
-    } else {
-        let mut positions: BTreeSet<usize> = [0, 1, 2, total - 1].into_iter().collect();
-        if let Some(p) = player_pos {
-            let _ = positions.insert(p);
-            if p > 0 {
-                let _ = positions.insert(p - 1);
-            }
-            if p < total - 1 {
-                let _ = positions.insert(p + 1);
-            }
-        }
-        while positions.len() < 7 {
-            let next = (3..total).find(|i| !positions.contains(i));
-            match next {
-                Some(i) => {
-                    let _ = positions.insert(i);
-                },
-                None => break,
-            }
-        }
-        positions.into_iter().collect()
-    };
-
-    indices_to_show
-        .into_iter()
-        .map(|index| {
-            let (uname, pname, pts) = &leaderboard[index];
-            let rank = format!("#{}", index + 1);
-            let pts_str = format!("{}", pts);
-            let style = row_style(uname, current_uname);
-
-            ui::container().flex().flex_row().with_children([
-                ui::text(rank, style).w(5.).h(5.),
-                ui::text(pname.as_str(), style.align_left()).w(25.).h(5.),
-                ui::text(pts_str, style.align_right()).w(5.).h(5.),
-            ])
-        })
-        .collect()
-}
 
 fn visible_indices(total: usize, player_pos: Option<usize>) -> Vec<usize> {
     if total <= 7 {
@@ -123,6 +76,34 @@ pub fn bomb_scoreboard<Msg>(
                 ui::text(pname.as_str(), style.align_left()).w(20.).h(5.),
                 ui::text(cps_str, style.align_right()).w(8.).h(5.),
                 ui::text(survival_str, style.align_right()).w(8.).h(5.),
+            ])
+        })
+        .collect()
+}
+
+pub fn metronome_scoreboard<Msg>(
+    leaderboard: &MetronomeLeaderboard,
+    current_uname: &str,
+) -> Vec<ui::Node<Msg>> {
+    let total = leaderboard.len();
+    let player_pos = leaderboard
+        .iter()
+        .position(|(uname, _, _)| uname == current_uname);
+
+    let indices_to_show = visible_indices(total, player_pos);
+
+    indices_to_show
+        .into_iter()
+        .map(|index| {
+            let (uname, pname, delta) = &leaderboard[index];
+            let rank = format!("#{}", index + 1);
+            let delta_str = format!("{:.2?}", delta);
+            let style = row_style(uname, current_uname);
+
+            ui::container().flex().flex_row().with_children([
+                ui::text(rank, style).w(5.).h(5.),
+                ui::text(pname.as_str(), style.align_left()).w(20.).h(5.),
+                ui::text(delta_str, style.align_right()).w(10.).h(5.),
             ])
         })
         .collect()

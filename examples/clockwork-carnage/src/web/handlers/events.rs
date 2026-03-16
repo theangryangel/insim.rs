@@ -12,27 +12,6 @@ use crate::web::filters;
 
 use super::internal_error;
 
-// -- Shared types -------------------------------------------------------------
-
-pub struct RoundResults {
-    pub round: i64,
-    pub results: Vec<db::MetronomeResult>,
-}
-
-pub fn group_metronome_rounds(results: Vec<db::MetronomeResult>) -> Vec<RoundResults> {
-    let mut rounds: Vec<RoundResults> = Vec::new();
-    for result in results {
-        if let Some(last) = rounds.last_mut() {
-            if last.round == result.round {
-                last.results.push(result);
-                continue;
-            }
-        }
-        rounds.push(RoundResults { round: result.round, results: vec![result] });
-    }
-    rounds
-}
-
 // -- Template structs ---------------------------------------------------------
 
 #[derive(Template)]
@@ -48,8 +27,6 @@ pub struct EventDetailTemplate {
     pub page: PageCtx,
     pub event: Event,
     pub metronome_standings: Vec<db::MetronomeStanding>,
-    pub metronome_rounds: Vec<RoundResults>,
-    pub round_results: Vec<(i64, Vec<db::MetronomeResult>)>,
     pub shortcut_best_times: Vec<db::ShortcutTime>,
     pub shortcut_all_times: Vec<db::ShortcutTime>,
     pub bomb_best_runs: Vec<db::BombRun>,
@@ -82,12 +59,6 @@ pub struct EventActionsFragment {
 #[template(path = "partials/metronome_standings_content.html")]
 pub struct MetronomeStandingsContent {
     pub metronome_standings: Vec<db::MetronomeStanding>,
-}
-
-#[derive(Template)]
-#[template(path = "partials/metronome_round_content.html")]
-pub struct MetronomeRoundContent {
-    pub round_results: Vec<db::MetronomeResult>,
 }
 
 #[derive(Template)]
@@ -137,9 +108,7 @@ pub struct StartEventForm {
     pub csrf_token: String,
 }
 
-fn default_rounds() -> i64 { 5 }
 fn default_target() -> u64 { 20 }
-fn default_max_scorers() -> i64 { 10 }
 fn default_checkpoint_timeout() -> u64 { 30 }
 
 #[derive(serde::Deserialize)]
@@ -153,12 +122,8 @@ pub struct NewEventForm {
     pub description: Option<String>,
     pub scheduled_at: Option<String>,
     pub scheduled_end_at: Option<String>,
-    #[serde(default = "default_rounds")]
-    pub rounds: i64,
     #[serde(default = "default_target")]
     pub target: u64,
-    #[serde(default = "default_max_scorers")]
-    pub max_scorers: i64,
     #[serde(default = "default_checkpoint_timeout")]
     pub checkpoint_timeout: u64,
 }
@@ -174,9 +139,7 @@ pub struct EditEventForm {
     pub scheduled_at: Option<String>,
     pub scheduled_end_at: Option<String>,
     pub writeup: Option<String>,
-    pub rounds: Option<i64>,
     pub target: Option<u64>,
-    pub max_scorers: Option<i64>,
     pub checkpoint_timeout: Option<u64>,
 }
 
@@ -204,8 +167,6 @@ pub async fn event_detail(
         .ok_or(StatusCode::NOT_FOUND)?;
 
     let mut metronome_standings = vec![];
-    let mut metronome_rounds = vec![];
-    let mut round_results: Vec<(i64, Vec<db::MetronomeResult>)> = vec![];
     let mut shortcut_best_times = vec![];
     let mut shortcut_all_times = vec![];
     let mut bomb_best_runs = vec![];
@@ -216,13 +177,6 @@ pub async fn event_detail(
             metronome_standings = db::metronome_standings(&state.pool, event.id)
                 .await
                 .map_err(internal_error)?;
-            let rounds = group_metronome_rounds(
-                db::metronome_all_results(&state.pool, event.id)
-                    .await
-                    .map_err(internal_error)?,
-            );
-            round_results = rounds.iter().map(|r| (r.round, r.results.clone())).collect();
-            metronome_rounds = rounds;
         }
         EventMode::Shortcut => {
             shortcut_best_times = db::shortcut_best_times(&state.pool, event.id)
@@ -244,7 +198,7 @@ pub async fn event_detail(
 
     let tmpl = EventDetailTemplate {
         page, event,
-        metronome_standings, metronome_rounds, round_results,
+        metronome_standings,
         shortcut_best_times, shortcut_all_times,
         bomb_best_runs, bomb_all_runs,
     };
@@ -293,10 +247,7 @@ pub async fn event_new_post(
                 &db::CreateMetronomeParams {
                     track,
                     layout: form.layout,
-                    rounds: form.rounds,
                     target_ms,
-                    max_scorers: form.max_scorers,
-                    lobby_duration_secs: 300,
                     name,
                     description,
                     scheduled_at,
@@ -395,11 +346,9 @@ pub async fn event_edit_post(
     .await
     .map_err(internal_error)?;
 
-    if let (Some(rounds), Some(target), Some(max_scorers)) =
-        (form.rounds, form.target, form.max_scorers)
-    {
+    if let Some(target) = form.target {
         let target_ms = (target * 1000) as i64;
-        db::update_metronome_settings(&state.pool, id, rounds, target_ms, max_scorers)
+        db::update_metronome_settings(&state.pool, id, target_ms)
             .await
             .map_err(internal_error)?;
     }
@@ -548,27 +497,6 @@ pub async fn event_standings(
     Ok(Html(html))
 }
 
-pub async fn event_round(
-    State(state): State<AppState>,
-    Path((id, round_number)): Path<(i64, i64)>,
-) -> Result<Html<String>, StatusCode> {
-    let metronome_rounds = group_metronome_rounds(
-        db::metronome_all_results(&state.pool, id)
-            .await
-            .map_err(internal_error)?,
-    );
-    let round_results = metronome_rounds
-        .iter()
-        .find(|r| r.round == round_number)
-        .map(|r| r.results.clone())
-        .unwrap_or_default();
-    Ok(Html(
-        MetronomeRoundContent { round_results }
-            .render()
-            .map_err(internal_error)?,
-    ))
-}
-
 pub async fn event_standings_best(
     State(state): State<AppState>,
     Path(id): Path<i64>,
@@ -624,4 +552,3 @@ pub async fn event_bomb_all(
             .map_err(internal_error)?,
     ))
 }
-

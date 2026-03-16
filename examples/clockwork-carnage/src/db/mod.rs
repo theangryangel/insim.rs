@@ -24,21 +24,11 @@ pub async fn connect(path: &str) -> Result<Pool, sqlx::Error> {
 
 // -- Enums --------------------------------------------------------------------
 
-pub(super) fn default_lobby_secs() -> i64 {
-    300
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EventMode {
     Metronome {
-        rounds: i64,
         target_ms: i64,
-        max_scorers: i64,
-        #[serde(default)]
-        current_round: i64,
-        #[serde(default = "default_lobby_secs")]
-        lobby_duration_secs: i64,
     },
     Shortcut,
     Bomb {
@@ -130,22 +120,7 @@ pub struct Event {
 pub struct MetronomeStanding {
     pub uname: String,
     pub pname: String,
-    pub total_points: i64,
-}
-
-#[derive(Debug, Clone, FromRow)]
-pub struct MetronomeResult {
-    #[allow(unused)]
-    pub id: i64,
-    #[allow(unused)]
-    pub event_id: i64,
-    pub round: i64,
-    pub uname: String,
-    pub pname: String,
-    pub delta_ms: i64,
-    pub points: i64,
-    #[allow(unused)]
-    pub recorded_at: String,
+    pub best_delta_ms: i64,
 }
 
 #[derive(Debug, Clone, FromRow)]

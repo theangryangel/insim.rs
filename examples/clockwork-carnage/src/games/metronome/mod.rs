@@ -1,13 +1,9 @@
-//! MetronomeGame — MiniGame implementation for the metronome/event mode.
+//! MetronomeGame — open-format precision challenge.
 
+mod challenge_loop;
 pub mod chat;
-mod lobby;
-mod rounds;
-mod victory;
 
-pub use lobby::Lobby;
-pub use rounds::Rounds;
-pub use victory::Victory;
+pub use challenge_loop::ChallengeLoop;
 
 use std::time::Duration;
 
@@ -22,11 +18,7 @@ use super::setup_track;
 #[derive(Clone)]
 pub struct MetronomeGame {
     pub session_id: i64,
-    pub start_round: usize,
-    pub rounds: usize,
     pub target: Duration,
-    pub max_scorers: usize,
-    pub lobby_duration: Duration,
     pub track: insim::core::track::Track,
     pub layout: String,
     pub chat: chat::EventChat,
@@ -48,33 +40,14 @@ impl MiniGame for MetronomeGame {
     async fn setup(event: &db::Event, ctx: &GameCtx) -> Result<(Self, Self::Guard), SceneError> {
         let (chat, chat_handle) = chat::spawn(ctx.insim.clone());
 
-        let event = db::get_event(&ctx.pool, event.id)
-            .await
-            .map_err(|cause| SceneError::Custom {
-                scene: "metronome::setup::get_metronome_event",
-                cause: Box::new(cause),
-            })?
-            .ok_or_else(|| SceneError::Custom {
-                scene: "metronome::setup",
-                cause: "no metronome_events row for this event".into(),
-            })?;
-
-        let (rounds, target_ms, max_scorers, current_round, lobby_duration_secs) = match event.mode {
-            Json(db::EventMode::Metronome { rounds, target_ms, max_scorers, current_round, lobby_duration_secs }) => {
-                (rounds, target_ms, max_scorers, current_round, lobby_duration_secs)
-            },
+        let target_ms = match event.mode {
+            Json(db::EventMode::Metronome { target_ms }) => target_ms,
             _ => unimplemented!(),
         };
 
-        let start_round = (current_round as usize) + 1;
-
         let game = MetronomeGame {
             session_id: event.id,
-            start_round,
-            rounds: rounds as usize,
             target: Duration::from_millis(target_ms as u64),
-            max_scorers: max_scorers as usize,
-            lobby_duration: Duration::from_secs(lobby_duration_secs as u64),
             track: event.track,
             layout: event.layout.clone(),
             chat,
@@ -85,52 +58,27 @@ impl MiniGame for MetronomeGame {
     }
 
     async fn run(self, ctx: &GameCtx) -> Result<SceneResult<()>, SceneError> {
-        // Setup: retry if players leave before the track loads
-        loop {
-            let setup = WaitForPlayers { min_players: MIN_PLAYERS }.then(
+        let challenge_scene = WaitForPlayers { min_players: MIN_PLAYERS }
+            .then(
                 setup_track::SetupTrack {
                     min_players: MIN_PLAYERS,
                     track: self.track,
                     layout: Some(self.layout.clone()),
                 }
                 .with_timeout(Duration::from_secs(60)),
-            );
-
-            match setup.run(ctx).await? {
-                SceneResult::Continue(_) => break,
-                SceneResult::Bail { .. } => continue,
-                SceneResult::Quit => return Ok(SceneResult::Quit),
-            }
-        }
-
-        let _spawn_control = crate::games::spawn_control::spawn(ctx.insim.clone())
-            .await
-            .map_err(|cause| SceneError::Custom {
-                scene: "metronome::spawn_control",
-                cause: Box::new(cause),
-            })?;
-
-        let event = Lobby {
-            chat: self.chat.clone(),
-            duration: self.lobby_duration,
-        }
-        .then(Rounds {
-            chat: self.chat.clone(),
-            start_round: self.start_round,
-            rounds: self.rounds,
-            target: self.target,
-            max_scorers: self.max_scorers,
-            session_id: self.session_id,
-        })
-        .then(Victory {
-            session_id: self.session_id,
-        });
+            )
+            .then(ChallengeLoop {
+                chat: self.chat.clone(),
+                target: self.target,
+                session_id: self.session_id,
+            })
+            .loop_until_quit();
 
         let presence = ctx.presence.clone();
         let chat = self.chat.clone();
 
         tokio::select! {
-            res = event.run(ctx) => {
+            res = challenge_scene.run(ctx) => {
                 let _ = res?;
                 Ok(SceneResult::Continue(()))
             },

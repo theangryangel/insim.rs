@@ -73,23 +73,13 @@
   </div>
 
   {% match *event.mode %}
-    {% when EventMode::Metronome { rounds, target_ms, max_scorers, .. } %}
+    {% when EventMode::Metronome { target_ms } %}
     <div class="border-t border-gray-200 pt-4">
       <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Metronome settings</p>
-      <div class="grid grid-cols-3 gap-3">
-        <div>
-          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="rounds">Rounds</label>
-          <input id="rounds" type="number" name="rounds" value="{{ rounds }}" min="1"
-            class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"/>
-        </div>
+      <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="target">Target (s)</label>
           <input id="target" type="number" name="target" value="{{ target_ms / 1000 }}" min="1"
-            class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"/>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="max_scorers">Max scorers</label>
-          <input id="max_scorers" type="number" name="max_scorers" value="{{ max_scorers }}" min="1"
             class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"/>
         </div>
       </div>

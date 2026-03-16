@@ -28,10 +28,7 @@ pub async fn has_scheduling_overlap(
 pub struct CreateMetronomeParams {
     pub track: Track,
     pub layout: String,
-    pub rounds: i64,
     pub target_ms: i64,
-    pub max_scorers: i64,
-    pub lobby_duration_secs: i64,
     pub name: Option<String>,
     pub description: Option<String>,
     pub scheduled_at: Option<String>,
@@ -139,7 +136,7 @@ pub async fn create_metronome_event(
     let row = sqlx::query(
         "INSERT INTO events (mode, track, layout, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
-    .bind(Json(EventMode::Metronome { rounds: p.rounds, target_ms: p.target_ms, max_scorers: p.max_scorers, current_round: 0, lobby_duration_secs: p.lobby_duration_secs }))
+    .bind(Json(EventMode::Metronome { target_ms: p.target_ms }))
     .bind(p.track.to_string())
     .bind(&p.layout)
     .bind(p.name.as_deref())
@@ -259,16 +256,12 @@ pub async fn update_event(
 pub async fn update_metronome_settings(
     pool: &Pool,
     event_id: i64,
-    rounds: i64,
     target_ms: i64,
-    max_scorers: i64,
 ) -> Result<(), sqlx::Error> {
     let _ = sqlx::query(
-        "UPDATE events SET mode = json_set(mode, '$.rounds', ?, '$.target_ms', ?, '$.max_scorers', ?) WHERE id = ?",
+        "UPDATE events SET mode = json_set(mode, '$.target_ms', ?) WHERE id = ?",
     )
-    .bind(rounds)
     .bind(target_ms)
-    .bind(max_scorers)
     .bind(event_id)
     .execute(pool)
     .await?;
