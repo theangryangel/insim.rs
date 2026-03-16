@@ -4,7 +4,7 @@ pub mod bomb;
 pub mod metronome;
 pub mod setup_track;
 pub mod shortcut;
-pub mod spawn_control;
+// pub mod spawn_control;
 pub mod vehicle_restrictions;
 
 use insim::builder::InsimTask;

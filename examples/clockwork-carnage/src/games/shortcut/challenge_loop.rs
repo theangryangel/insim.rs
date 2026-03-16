@@ -170,13 +170,6 @@ struct ChallengeLoopInner {
 
 impl ChallengeLoopInner {
     async fn run_inner(mut self) -> Result<SceneResult<()>, SceneError> {
-        let _spawn_control = crate::games::spawn_control::spawn(self.insim.clone())
-            .await
-            .map_err(|cause| SceneError::Custom {
-                scene: "challenge::spawn_control",
-                cause: Box::new(cause),
-            })?;
-
         let (ui, _ui_handle) = ui::mount_with(
             self.insim.clone(),
             ChallengeGlobalProps::default(),
