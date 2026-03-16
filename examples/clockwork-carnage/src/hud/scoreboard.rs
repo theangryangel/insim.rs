@@ -3,7 +3,7 @@ use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use insim::{core::vehicle::Vehicle, insim::BtnStyle};
 use kitcar::ui;
 
-use super::theme::{hud_active, hud_text};
+use super::{format_duration, theme::{hud_active, hud_text}};
 
 /// (uname, pname, best_delta)
 pub type MetronomeLeaderboard = Arc<[(String, String, Duration)]>;
@@ -67,8 +67,7 @@ pub fn bomb_scoreboard<Msg>(
             let (uname, pname, cps, survival_ms) = &leaderboard[index];
             let rank = format!("#{}", index + 1);
             let cps_str = format!("{cps} cps");
-            let secs = *survival_ms as f64 / 1000.0;
-            let survival_str = format!("{secs:.1}s");
+            let survival_str = format_duration(Duration::from_millis(*survival_ms as u64));
             let style = row_style(uname, current_uname);
 
             ui::container().flex().flex_row().with_children([
@@ -97,7 +96,7 @@ pub fn metronome_scoreboard<Msg>(
         .map(|index| {
             let (uname, pname, delta) = &leaderboard[index];
             let rank = format!("#{}", index + 1);
-            let delta_str = format!("{:.2?}", delta);
+            let delta_str = format_duration(*delta);
             let style = row_style(uname, current_uname);
 
             ui::container().flex().flex_row().with_children([
@@ -126,7 +125,7 @@ pub fn challenge_scoreboard<Msg>(
             let (uname, pname, vehicle, time) = &leaderboard[index];
             let rank = format!("#{}", index + 1);
             let vehicle_str = format!("{}", vehicle);
-            let time_str = format!("{:.2?}", time);
+            let time_str = format_duration(*time);
             let style = row_style(uname, current_uname);
 
             ui::container().flex().flex_row().with_children([

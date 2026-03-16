@@ -106,7 +106,7 @@ impl ui::Component for MetronomeView {
             match props.connection.best_delta {
                 Some(d) => {
                     let tier = tier_label(d).unwrap_or("No tier");
-                    (format!("Best: {:.2?} [{}]", d, tier), hud_text())
+                    (format!("Best: {} [{}]", crate::hud::format_duration(d), tier), hud_text())
                 },
                 None => ("Waiting for start".to_string(), hud_muted()),
             }
@@ -224,7 +224,7 @@ impl ChallengeLoopInner {
                     match packet {
                         insim::Packet::Ncn(ncn) => {
                             self.insim
-                                .send_message("Welcome to Clockwork Carnage! Drive CP1→Finish. Match the target time.", ncn.ucid)
+                                .send_message("Metronome. Match the target time as closely as possible.", ncn.ucid)
                                 .await?;
 
                             if let Some(conn) = self.presence.connection(&ncn.ucid).await.map_err(|cause| SceneError::Custom {

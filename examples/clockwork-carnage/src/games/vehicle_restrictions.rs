@@ -1,7 +1,5 @@
 use insim::{
-    builder::InsimTask,
-    core::vehicle::Vehicle,
-    insim::{Mal, Plc, PlcAllowedCarsSet},
+    builder::InsimTask, core::vehicle::Vehicle, identifiers::ConnectionId, insim::{Mal, Plc, PlcAllowedCarsSet}
 };
 use kitcar::scenes::SceneError;
 
@@ -38,7 +36,7 @@ pub async fn apply(insim: &InsimTask, vehicles: &[Vehicle]) -> Result<(), SceneE
     };
 
     insim
-        .send(Plc { cars, ..Plc::default() })
+        .send(Plc { cars, ucid: ConnectionId::ALL, ..Plc::default() })
         .await
         .map_err(|cause| SceneError::Custom {
             scene: "vehicle_restrictions::plc",

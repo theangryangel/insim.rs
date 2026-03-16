@@ -41,16 +41,18 @@
   {# ── Left sidebar ── #}
   <div class="space-y-4">
 
-    {# Track map #}
-    <div class="bg-white rounded-lg border border-gray-200 p-3">
-      <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Track Map</p>
-      <div class="aspect-square flex items-center justify-center bg-gray-50 rounded">
-        <p class="text-gray-300 text-sm">{{ event.track }} — {{ event.layout }}</p>
-      </div>
-    </div>
+    {# Mode card #}
+    {% match *event.mode %}
+      {% when EventMode::Metronome { .. } %}
+        {% include "partials/mode_card_metronome.html" %}
+      {% when EventMode::Shortcut %}
+        {% include "partials/mode_card_shortcut.html" %}
+      {% when EventMode::Bomb { .. } %}
+        {% include "partials/mode_card_bomb.html" %}
+    {% endmatch %}
 
     {# Event metadata #}
-    <div class="bg-white rounded-lg border border-gray-200 p-3 space-y-2">
+    <div class="bg-white rounded-lg p-3 space-y-2">
       <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Details</p>
       <div class="text-sm space-y-1">
         <div class="flex justify-between">
@@ -80,35 +82,27 @@
       </div>
       {% match event.description %}
         {% when Some with (d) %}
-        <p class="text-xs text-gray-500 pt-1 border-t border-gray-100">{{ d }}</p>
+        <p class="text-gray-500 pt-1">{{ d }}</p>
         {% when None %}
       {% endmatch %}
     </div>
 
-    {# Mode card #}
-    {% match *event.mode %}
-      {% when EventMode::Metronome { .. } %}
-        {% include "partials/mode_card_metronome.html" %}
-      {% when EventMode::Shortcut %}
-        {% include "partials/mode_card_shortcut.html" %}
-      {% when EventMode::Bomb { .. } %}
-        {% include "partials/mode_card_bomb.html" %}
-    {% endmatch %}
+  </div>
+
+  {# ── Right main ── #}
+  <div class="lg:col-span-2 space-y-6">
 
     {# Write-up #}
     {% match event.writeup %}
       {% when Some with (w) %}
-      <div class="bg-white rounded-lg border border-gray-200 p-3">
+      <div>
         <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Write-up</p>
         <div class="prose prose-sm text-gray-700 whitespace-pre-line">{{ w }}</div>
       </div>
       {% when None %}
     {% endmatch %}
 
-  </div>
 
-  {# ── Right main ── #}
-  <div class="lg:col-span-2 space-y-6">
     {% match *event.mode %}
       {% when EventMode::Metronome { .. } %}
         {% include "partials/metronome_detail.html" %}

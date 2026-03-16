@@ -80,7 +80,7 @@ impl ui::Component for ChallengeView {
             return self
                 .help_dialog
                 .render(DialogProps {
-                    title: "Weekly Challenge",
+                    title: "Shortcut",
                     lines: CHALLENGE_HELP_LINES,
                 })
                 .map(ChallengeMessage::Help);
@@ -90,7 +90,7 @@ impl ui::Component for ChallengeView {
             ("In progress".to_string(), hud_active())
         } else {
             match props.connection.best_time {
-                Some(d) => (format!("PB: {:.2?}", d), hud_text()),
+                Some(d) => (format!("PB: {}", crate::hud::format_duration(d)), hud_text()),
                 None => ("Waiting for start".to_string(), hud_muted()),
             }
         };
@@ -102,7 +102,7 @@ impl ui::Component for ChallengeView {
             .flex()
             .flex_col()
             .with_child(
-                topbar("Weekly Challenge").with_child(ui::text(status, status_style).w(20.).h(5.)),
+                topbar("Shortcut").with_child(ui::text(status, status_style).w(20.).h(5.)),
             )
             .with_child(
                 ui::container()
@@ -205,7 +205,7 @@ impl ChallengeLoopInner {
                     match packet {
                         insim::Packet::Ncn(ncn) => {
                             self.insim
-                                .send_message("Welcome to the Weekly Challenge! Drive checkpoint1 to finish for fastest time.", ncn.ucid)
+                                .send_message("Welcome to the Shortcut! Compete for the fastest time.", ncn.ucid)
                                 .await?;
 
                             if let Some(conn) = self.presence.connection(&ncn.ucid).await.map_err(|cause| SceneError::Custom {

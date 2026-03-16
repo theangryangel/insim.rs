@@ -7,7 +7,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -222
@@ -17,7 +17,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -5
@@ -27,7 +27,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -215
@@ -37,7 +37,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -10
@@ -47,7 +47,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -208
@@ -57,7 +57,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -15
@@ -67,7 +67,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -201
@@ -77,7 +77,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -20
@@ -87,7 +87,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -194
@@ -97,7 +97,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -25
@@ -107,7 +107,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -188
@@ -117,7 +117,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -30
@@ -127,7 +127,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -182
@@ -137,7 +137,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -35
@@ -147,7 +147,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -176
@@ -157,7 +157,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -40
@@ -167,7 +167,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -45
@@ -177,7 +177,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -170
@@ -187,7 +187,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -50
@@ -197,7 +197,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -164
@@ -207,7 +207,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -55
@@ -217,7 +217,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -158
@@ -227,7 +227,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -60
@@ -237,7 +237,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -152
@@ -247,7 +247,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -65
@@ -257,7 +257,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -146
@@ -267,7 +267,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -70
@@ -277,7 +277,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -140
@@ -287,7 +287,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -75
@@ -297,7 +297,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -134
@@ -307,7 +307,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -80
@@ -317,7 +317,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -128
@@ -327,7 +327,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -86
@@ -337,7 +337,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -122
@@ -347,7 +347,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -92
@@ -357,7 +357,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -116
@@ -367,7 +367,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -98
@@ -377,7 +377,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -110
@@ -387,7 +387,7 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true
 - !SpeedHump10M
   xyz:
     x: -104
@@ -397,4 +397,4 @@
     radians: 0.8099418560036186
   colour: 0
   mapping: 0
-  floating: false
+  floating: true

@@ -72,14 +72,22 @@ pub trait MiniGame: Clone + Send + 'static {
 }
 
 /// Generic executor: setup, bail-retry loop, teardown.
+///
+/// `cancel` is cancelled to signal the run loop to exit and let teardown
+/// proceed normally.
 pub async fn execute<G: MiniGame>(
     event: &db::Event,
     ctx: &GameCtx,
+    cancel: tokio_util::sync::CancellationToken,
 ) -> Result<(), SceneError> {
     vehicle_restrictions::apply(&ctx.insim, &event.allowed_vehicles.0).await?;
     let (game, _guard) = G::setup(event, ctx).await?;
     loop {
-        match game.clone().run(ctx).await? {
+        let result = tokio::select! {
+            result = game.clone().run(ctx) => result?,
+            _ = cancel.cancelled() => break,
+        };
+        match result {
             kitcar::scenes::SceneResult::Continue(_) | kitcar::scenes::SceneResult::Quit => break,
             kitcar::scenes::SceneResult::Bail { msg } => {
                 tracing::info!("Scene bailed ({msg:?}), retrying...");

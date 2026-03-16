@@ -168,15 +168,6 @@
   height: M1_75
   heading:
     radians: -3.141592653589793
-- !ChalkAhead2
-  xyz:
-    x: -2
-    y: 442
-    z: 0
-  colour: White
-  heading:
-    radians: 2.6016314162540475
-  floating: false
 - !ConcreteRamp
   xyz:
     x: 0

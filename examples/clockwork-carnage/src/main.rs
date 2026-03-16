@@ -198,6 +198,7 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
         let mut current_task: Option<
             tokio::task::JoinHandle<Result<(), kitcar::scenes::SceneError>>,
         > = None;
+        let mut current_cancel: Option<tokio_util::sync::CancellationToken> = None;
 
         loop {
             let desired = db::active_event(&ctx.pool).await;
@@ -219,6 +220,8 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
                     );
                     current_event_id = Some(event.id);
                     let ctx_ref = &ctx;
+                    let cancel = tokio_util::sync::CancellationToken::new();
+                    current_cancel = Some(cancel.clone());
                     current_task = Some(tokio::spawn({
                         let event = event.clone();
                         let pool = ctx_ref.pool.clone();
@@ -229,13 +232,13 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
                             let ctx = GameCtx { pool, insim, presence, game };
                             match event.mode {
                                 Json(EventMode::Metronome { .. }) => {
-                                    execute::<games::metronome::MetronomeGame>(&event, &ctx).await
+                                    execute::<games::metronome::MetronomeGame>(&event, &ctx, cancel).await
                                 },
                                 Json(EventMode::Shortcut) => {
-                                    execute::<games::shortcut::ShortcutGame>(&event, &ctx).await
+                                    execute::<games::shortcut::ShortcutGame>(&event, &ctx, cancel).await
                                 },
                                 Json(EventMode::Bomb { .. }) => {
-                                    execute::<games::bomb::BombGame>(&event, &ctx).await
+                                    execute::<games::bomb::BombGame>(&event, &ctx, cancel).await
                                 },
                             }
                         }
@@ -248,6 +251,7 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
                 (Some(_), Ok(Some(event)))
                     if current_event_id == Some(event.id) =>
                 {
+                    current_cancel = None;
                     let task = current_task.take().unwrap();
                     match task.await {
                         Ok(Ok(())) => {
@@ -270,9 +274,16 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
                 },
 
                 (Some(_), Ok(_)) => {
-                    tracing::info!("Desired event changed, aborting current task");
+                    tracing::info!("Desired event changed, cancelling current task");
+                    if let Some(token) = current_cancel.take() {
+                        token.cancel();
+                    }
                     if let Some(task) = current_task.take() {
-                        task.abort();
+                        let _ = tokio::time::timeout(
+                            std::time::Duration::from_secs(10),
+                            task,
+                        )
+                        .await;
                     }
                     current_event_id = None;
                 },

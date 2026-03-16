@@ -80,7 +80,7 @@ impl ui::Component for BombView {
             return self
                 .help_dialog
                 .render(DialogProps {
-                    title: "Bomb Mode",
+                    title: "Bomb",
                     lines: BOMB_HELP_LINES,
                 })
                 .map(BombMessage::Help);

@@ -121,7 +121,20 @@ pub fn build(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Object
         };
 
         let step_metres = match config.mode {
-            RampMode::AlongPath => base_step,
+            RampMode::AlongPath => {
+                // Peek one base-step ahead to measure the upcoming heading change.
+                // Outer corner gap = W·sin(dθ). For the outer corners of adjacent
+                // slabs to just touch, the seam advance must be s = L - W·tan(dθ/2).
+                let slab_width = concrete_width_length_metres(prototype.width);
+                let preview_pos =
+                    get_spline_pos((current_distance + base_step).min(total_len));
+                let preview_heading = spline::heading_from_vec2_or_fallback(
+                    (preview_pos - current_seam).truncate(),
+                    prev_heading,
+                );
+                let dtheta = heading_delta_radians(preview_heading, prev_heading);
+                (base_step - slab_width * (dtheta / 2.0).tan()).max(base_step * 0.1)
+            },
             RampMode::AcrossPath => base_step * 0.50, // 50% overlap for banked surface
         };
 
@@ -277,4 +290,16 @@ fn height_metres_from_step(step: u8) -> f64 {
 fn height_from_step(step: u8) -> ConcreteHeight {
     let wire = step.saturating_sub(1).min(15);
     ConcreteHeight::try_from(wire).unwrap_or(ConcreteHeight::M4_00)
+}
+
+/// Absolute angular difference between two headings, normalised to [0, π].
+fn heading_delta_radians(a: Heading, b: Heading) -> f64 {
+    let mut diff = a.to_radians() - b.to_radians();
+    while diff > std::f64::consts::PI {
+        diff -= 2.0 * std::f64::consts::PI;
+    }
+    while diff < -std::f64::consts::PI {
+        diff += 2.0 * std::f64::consts::PI;
+    }
+    diff.abs()
 }
