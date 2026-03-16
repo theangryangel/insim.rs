@@ -92,7 +92,7 @@ pub enum EncodeErrorKind {
     },
 
     /// Value too large or small for field
-    #[error("Out of valid range")]
+    #[error("Out of valid range: min: {min}, max: {max}, found: {found}")]
     OutOfRange {
         /// Minimum valid size
         min: usize,
