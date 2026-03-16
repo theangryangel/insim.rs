@@ -9,5 +9,6 @@ pub mod prefabs;
 pub mod radial_array;
 pub mod ramp;
 pub mod rotate;
+pub mod rotate_each;
 pub mod spline;
 pub mod spline_distrib;

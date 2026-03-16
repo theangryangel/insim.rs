@@ -4,11 +4,10 @@ use insim::{core::heading::Heading, insim::ObjectInfo};
 
 /// Arrange `count` copies of `selection` evenly around a circle.
 ///
-/// The array centre is placed `radius_metres` in the +Y direction from the
-/// selection's centroid, so the first copy stays in its original position.
-/// Each subsequent copy is rotated around that centre by
-/// `total_arc_degrees / count` per step, with object headings updated to
-/// match.
+/// The selection's centroid is the centre of the circle. Each copy is placed
+/// `radius_metres` away from the centroid, with the first copy offset in the
+/// +Y direction. Copies are spaced `total_arc_degrees / count` apart, with
+/// object headings updated to match.
 pub fn build(
     selection: &[ObjectInfo],
     count: usize,
@@ -32,28 +31,31 @@ pub fn build(
         .sum();
     let centroid = sum / selection.len() as f64;
 
-    // The pivot is offset from the centroid along +Y by the radius so that
-    // copy 0 sits at angle 0 (its original position) and copies fan outward.
-    let pivot = centroid + DVec2::new(0.0, radius_metres);
-
     let angle_step_rad = total_arc_degrees.to_radians() / count as f64;
 
+    // Each object's offset from the centroid, rotated and then placed at
+    // radius distance from the centroid.
     let mut result = Vec::with_capacity(count * selection.len());
 
     for k in 0..count {
         let angle = k as f64 * angle_step_rad;
         let rot = DMat2::from_angle(angle);
 
+        // Radial offset for this copy: start at +Y then rotate.
+        let radial_offset = rot * DVec2::new(0.0, radius_metres);
+
         for obj in selection {
             let mut new_obj = obj.clone();
 
+            // Preserve the object's position relative to the centroid,
+            // then place the whole group at the radial offset.
             let world_pos = obj.position().to_dvec3_metres().truncate();
-            let relative = world_pos - pivot;
-            let rotated = pivot + rot * relative;
+            let local = world_pos - centroid;
+            let placed = centroid + radial_offset + rot * local;
 
             let p = new_obj.position_mut();
-            p.x = crate::clamp_i16((rotated.x * 16.0).round() as i32);
-            p.y = crate::clamp_i16((rotated.y * 16.0).round() as i32);
+            p.x = crate::clamp_i16((placed.x * 16.0).round() as i32);
+            p.y = crate::clamp_i16((placed.y * 16.0).round() as i32);
 
             if let Some(heading) = new_obj.heading_mut() {
                 *heading = Heading::from_radians(heading.to_radians() + angle);

@@ -86,6 +86,9 @@ enum SpawnOrigin {
     Rotate {
         degrees: f64,
     },
+    RotateEach {
+        degrees: f64,
+    },
     Ramp {
         mode: tools::ramp::RampMode,
         roll_degrees: f64,
@@ -118,6 +121,7 @@ impl fmt::Display for SpawnOrigin {
                 write!(f, "spline distribution ({spacing_metres}m spacing)")
             },
             SpawnOrigin::Rotate { degrees } => write!(f, "rotation ({degrees} degrees)"),
+            SpawnOrigin::RotateEach { degrees } => write!(f, "rotate each ({degrees} degrees)"),
             SpawnOrigin::Ramp { mode, roll_degrees } => match mode {
                 tools::ramp::RampMode::AlongPath => {
                     write!(f, "concrete ramp/slab blend (grade along path)")

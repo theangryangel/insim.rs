@@ -50,6 +50,7 @@ pub enum ToolboxMsg {
     SavePrefab(String),
     PaintedTextInput(String),
     RotateInput(String),
+    RotateEachInput(String),
     SplineDistribInput(String),
     ToggleRampMode,
     RampRollInput(String),
@@ -232,6 +233,14 @@ fn launcher_screen(props: &ToolboxProps) -> ui::Node<ToolboxMsg> {
             selection_btn_style,
             16,
             ToolboxMsg::RotateInput,
+        )
+        .block()
+        .h(5.),
+        ui::typein(
+            "Rotate Each (deg)",
+            selection_btn_style,
+            16,
+            ToolboxMsg::RotateEachInput,
         )
         .block()
         .h(5.),
@@ -655,6 +664,38 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
                 },
                 Err(_) => {
                     tracing::warn!("rotation skipped: input is not a number");
+                    None
+                },
+            }
+        },
+        ToolboxMsg::RotateEachInput(input) => {
+            let trimmed = input.trim();
+
+            if trimmed.is_empty() {
+                tracing::warn!("rotate each skipped: input is empty");
+                return None;
+            }
+
+            match trimmed.parse::<f64>() {
+                Ok(value) if value.is_finite() => {
+                    match tools::rotate_each::build(&state.selection, value) {
+                        Ok(objects) => Some(Command::SpawnObjects {
+                            objects,
+                            action: PmoAction::AddObjects,
+                            origin: SpawnOrigin::RotateEach { degrees: value },
+                        }),
+                        Err(err) => {
+                            tracing::warn!("rotate each skipped: {err}");
+                            None
+                        },
+                    }
+                },
+                Ok(_) => {
+                    tracing::warn!("rotate each skipped: value must be finite");
+                    None
+                },
+                Err(_) => {
+                    tracing::warn!("rotate each skipped: input is not a number");
                     None
                 },
             }
