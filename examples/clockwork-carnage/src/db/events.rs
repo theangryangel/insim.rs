@@ -164,14 +164,7 @@ pub async fn create_shortcut_event(
     .bind(p.scheduled_end_at.as_deref())
     .fetch_one(pool)
     .await?;
-    let id: i64 = row.get("id");
-
-    let _ = sqlx::query("INSERT INTO shortcut_events (event_id) VALUES (?)")
-        .bind(id)
-        .execute(pool)
-        .await?;
-
-    Ok(id)
+    Ok(row.get("id"))
 }
 
 pub async fn create_bomb_event(
