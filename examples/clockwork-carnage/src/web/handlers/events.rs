@@ -4,7 +4,7 @@ use axum::{
     http::StatusCode,
     response::{Html, IntoResponse, Redirect},
 };
-use insim::core::track::Track;
+use insim::core::{track::Track, vehicle::Vehicle};
 
 use crate::db::{self, Event, EventMode, EventStatus};
 use crate::web::state::{AppState, PageCtx};
@@ -46,6 +46,7 @@ pub struct EventEditTemplate {
     pub page: PageCtx,
     pub event: db::Event,
     pub tracks: &'static [Track],
+    pub allowed_vehicles_str: String,
 }
 
 #[derive(Template)]
@@ -126,6 +127,8 @@ pub struct NewEventForm {
     pub target: u64,
     #[serde(default = "default_checkpoint_timeout")]
     pub checkpoint_timeout: u64,
+    #[serde(default)]
+    pub allowed_vehicles: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -141,6 +144,27 @@ pub struct EditEventForm {
     pub writeup: Option<String>,
     pub target: Option<u64>,
     pub checkpoint_timeout: Option<u64>,
+    #[serde(default)]
+    pub allowed_vehicles: String,
+}
+
+// -- Helpers ------------------------------------------------------------------
+
+fn parse_vehicles(vehicles_str: &str) -> Vec<Vehicle> {
+    vehicles_str
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .filter_map(|s| s.parse::<Vehicle>().ok())
+        .filter(|v| !matches!(v, Vehicle::Unknown))
+        .collect()
+}
+
+fn event_vehicles_str(event: &db::Event) -> String {
+    event.allowed_vehicles.0.iter()
+        .map(|v| v.to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 // -- Handlers -----------------------------------------------------------------
@@ -291,6 +315,13 @@ pub async fn event_new_post(
         _ => return Err(StatusCode::BAD_REQUEST),
     };
 
+    let vehicles = parse_vehicles(&form.allowed_vehicles);
+    if !vehicles.is_empty() {
+        db::update_vehicle_restrictions(&state.pool, id, &vehicles)
+            .await
+            .map_err(internal_error)?;
+    }
+
     Ok(Redirect::to(&format!("/events/{id}")))
 }
 
@@ -306,7 +337,8 @@ pub async fn event_edit_get(
         .await
         .map_err(internal_error)?
         .ok_or(StatusCode::NOT_FOUND)?;
-    let tmpl = EventEditTemplate { page, event, tracks: Track::ALL };
+    let allowed_vehicles_str = event_vehicles_str(&event);
+    let tmpl = EventEditTemplate { page, event, tracks: Track::ALL, allowed_vehicles_str };
     Ok(Html(tmpl.render().map_err(internal_error)?))
 }
 
@@ -358,6 +390,11 @@ pub async fn event_edit_post(
             .await
             .map_err(internal_error)?;
     }
+
+    let vehicles = parse_vehicles(&form.allowed_vehicles);
+    db::update_vehicle_restrictions(&state.pool, id, &vehicles)
+        .await
+        .map_err(internal_error)?;
 
     Ok(Redirect::to(&format!("/events/{id}")))
 }

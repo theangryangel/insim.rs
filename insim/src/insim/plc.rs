@@ -36,6 +36,33 @@ impl PlcAllowedCarsSet {
     const BWM_SAUBER_F1_06: u32 = (1 << 18);
     const FORMULA_BMW_FB02: u32 = (1 << 19);
 
+    const ALL: u32 = Self::XF_GTI
+        | Self::XR_GT
+        | Self::FORMULA_BMW_FB02
+        | Self::XR_GT_TURBO
+        | Self::RB4
+        | Self::FXO_TURBO
+        | Self::LX4
+        | Self::LX6
+        | Self::MRT5
+        | Self::UF_1000
+        | Self::RACEABOUT
+        | Self::FZ50
+        | Self::FORMULA_XR
+        | Self::XF_GTR
+        | Self::UF_GTR
+        | Self::FORMULA_V8
+        | Self::FXO_GTR
+        | Self::XR_GTR
+        | Self::FZ50_GTR
+        | Self::BWM_SAUBER_F1_06
+        | Self::FORMULA_BMW_FB02;
+
+    /// A set containing all 20 standard vehicles — use this to remove all car restrictions.
+    pub fn all() -> Self {
+        Self::from_bits_truncate(Self::ALL)
+    }
+
     /// Does this set include a vehicle?
     pub fn contains(&self, v: &Vehicle) -> bool {
         self.inner.contains(v)

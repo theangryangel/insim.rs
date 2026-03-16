@@ -5,6 +5,7 @@ pub mod metronome;
 pub mod setup_track;
 pub mod shortcut;
 pub mod spawn_control;
+pub mod vehicle_restrictions;
 
 use insim::builder::InsimTask;
 use kitcar::{game, presence, scenes::{FromContext, SceneError}};
@@ -75,6 +76,7 @@ pub async fn execute<G: MiniGame>(
     event: &db::Event,
     ctx: &GameCtx,
 ) -> Result<(), SceneError> {
+    vehicle_restrictions::apply(&ctx.insim, &event.allowed_vehicles.0).await?;
     let (game, _guard) = G::setup(event, ctx).await?;
     loop {
         match game.clone().run(ctx).await? {
@@ -86,6 +88,7 @@ pub async fn execute<G: MiniGame>(
         }
     }
     game.teardown(event, ctx).await?;
+    vehicle_restrictions::apply(&ctx.insim, &[]).await?;
     ctx.insim.send_command("/axclear").await?;
     Ok(())
     // _guard dropped here -> chat JoinHandle aborted

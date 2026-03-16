@@ -2,7 +2,7 @@
 
 use std::{fmt, str::FromStr};
 
-use insim::core::track::Track;
+use insim::core::{track::Track, vehicle::Vehicle};
 use sqlx::{
     FromRow,
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions}, types::Json,
@@ -114,7 +114,9 @@ pub struct Event {
     pub name: Option<String>,
     pub description: Option<String>,
     pub writeup: Option<String>,
+    pub allowed_vehicles: Json<Vec<Vehicle>>,
 }
+
 
 #[derive(Debug, Clone)]
 pub struct MetronomeStanding {
