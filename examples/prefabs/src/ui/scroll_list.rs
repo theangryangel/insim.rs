@@ -68,16 +68,19 @@ impl<Item: 'static> ui::Component for ScrollList<Item> {
             format!("Filter: {}", self.filter)
         };
 
-        let filter_input =
-            ui::typein(filter_label, BtnStyle::style_interactive(), 64, ScrollMsg::Filter)
-                .block()
-                .h(5.);
+        let filter_input = ui::typein(
+            filter_label,
+            BtnStyle::style_interactive(),
+            64,
+            ScrollMsg::Filter,
+        )
+        .block()
+        .h(5.);
 
-        let item_col = visible
-            .iter()
-            .fold(ui::container().flex().flex_col().flex_grow(1.0), |col, (orig_idx, item)| {
-                col.with_child((props.render_item)(item, *orig_idx))
-            });
+        let item_col = visible.iter().fold(
+            ui::container().flex().flex_col().flex_grow(1.0),
+            |col, (orig_idx, item)| col.with_child((props.render_item)(item, *orig_idx)),
+        );
 
         let items_row = if !needs_scroll {
             item_col

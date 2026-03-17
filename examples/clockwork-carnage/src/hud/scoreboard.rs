@@ -3,7 +3,10 @@ use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use insim::{core::vehicle::Vehicle, insim::BtnStyle};
 use kitcar::ui;
 
-use super::{format_duration, theme::{hud_active, hud_text}};
+use super::{
+    format_duration,
+    theme::{hud_active, hud_text},
+};
 
 /// (uname, pname, best_delta)
 pub type MetronomeLeaderboard = Arc<[(String, String, Duration)]>;
@@ -21,7 +24,6 @@ fn row_style(uname: &str, current_uname: &str) -> BtnStyle {
         hud_text()
     }
 }
-
 
 fn visible_indices(total: usize, player_pos: Option<usize>) -> Vec<usize> {
     if total <= 7 {

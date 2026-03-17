@@ -24,11 +24,7 @@ pub fn spawn(insim: InsimTask) -> (BombChat, JoinHandle<Result<(), ChatError>>) 
     kitcar::chat::spawn_with_handler(insim, 100, handle_bomb_chat)
 }
 
-async fn handle_bomb_chat(
-    insim: InsimTask,
-    mso: Mso,
-    msg: BombChatMsg,
-) -> Result<(), ChatError> {
+async fn handle_bomb_chat(insim: InsimTask, mso: Mso, msg: BombChatMsg) -> Result<(), ChatError> {
     if msg == BombChatMsg::Help {
         insim.send_message("Available commands:", mso.ucid).await?;
         for cmd in BombChatMsg::help() {

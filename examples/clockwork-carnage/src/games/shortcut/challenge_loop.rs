@@ -17,12 +17,12 @@ use kitcar::{
 
 use super::chat;
 use crate::{
+    db,
     hud::{
         ChallengeLeaderboard, Dialog, DialogMsg, DialogProps, challenge_scoreboard,
         theme::{hud_active, hud_muted, hud_text, hud_title},
         topbar,
     },
-    db,
 };
 
 const CHALLENGE_HELP_LINES: &[&str] = &[
@@ -90,7 +90,10 @@ impl ui::Component for ChallengeView {
             ("In progress".to_string(), hud_active())
         } else {
             match props.connection.best_time {
-                Some(d) => (format!("PB: {}", crate::hud::format_duration(d)), hud_text()),
+                Some(d) => (
+                    format!("PB: {}", crate::hud::format_duration(d)),
+                    hud_text(),
+                ),
                 None => ("Waiting for start".to_string(), hud_muted()),
             }
         };
@@ -101,9 +104,7 @@ impl ui::Component for ChallengeView {
         ui::container()
             .flex()
             .flex_col()
-            .with_child(
-                topbar("Shortcut").with_child(ui::text(status, status_style).w(20.).h(5.)),
-            )
+            .with_child(topbar("Shortcut").with_child(ui::text(status, status_style).w(20.).h(5.)))
             .with_child(
                 ui::container()
                     .flex()

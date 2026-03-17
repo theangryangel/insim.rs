@@ -6,11 +6,14 @@ use axum::{
 };
 use insim::core::{track::Track, vehicle::Vehicle};
 
-use crate::db::{self, Event, EventMode, EventStatus};
-use crate::web::state::{AppState, PageCtx};
-use crate::web::filters;
-
 use super::internal_error;
+use crate::{
+    db::{self, Event, EventMode, EventStatus},
+    web::{
+        filters,
+        state::{AppState, PageCtx},
+    },
+};
 
 // -- Template structs ---------------------------------------------------------
 
@@ -109,8 +112,12 @@ pub struct StartEventForm {
     pub csrf_token: String,
 }
 
-fn default_target() -> u64 { 20 }
-fn default_checkpoint_timeout() -> u64 { 30 }
+fn default_target() -> u64 {
+    20
+}
+fn default_checkpoint_timeout() -> u64 {
+    30
+}
 
 #[derive(serde::Deserialize)]
 pub struct NewEventForm {
@@ -161,7 +168,10 @@ fn parse_vehicles(vehicles_str: &str) -> Vec<Vehicle> {
 }
 
 fn event_vehicles_str(event: &db::Event) -> String {
-    event.allowed_vehicles.0.iter()
+    event
+        .allowed_vehicles
+        .0
+        .iter()
         .map(|v| v.to_string())
         .collect::<Vec<_>>()
         .join(", ")
@@ -173,9 +183,7 @@ pub async fn events(
     page: PageCtx,
     State(state): State<AppState>,
 ) -> Result<Html<String>, StatusCode> {
-    let events = db::all_events(&state.pool)
-        .await
-        .map_err(internal_error)?;
+    let events = db::all_events(&state.pool).await.map_err(internal_error)?;
     let tmpl = EventsTemplate { page, events };
     Ok(Html(tmpl.render().map_err(internal_error)?))
 }
@@ -201,7 +209,7 @@ pub async fn event_detail(
             metronome_standings = db::metronome_standings(&state.pool, event.id)
                 .await
                 .map_err(internal_error)?;
-        }
+        },
         EventMode::Shortcut => {
             shortcut_best_times = db::shortcut_best_times(&state.pool, event.id)
                 .await
@@ -209,7 +217,7 @@ pub async fn event_detail(
             shortcut_all_times = db::shortcut_all_times(&state.pool, event.id)
                 .await
                 .map_err(internal_error)?;
-        }
+        },
         EventMode::Bomb { .. } => {
             bomb_best_runs = db::bomb_best_runs(&state.pool, event.id)
                 .await
@@ -217,14 +225,17 @@ pub async fn event_detail(
             bomb_all_runs = db::bomb_all_runs(&state.pool, event.id)
                 .await
                 .map_err(internal_error)?;
-        }
+        },
     };
 
     let tmpl = EventDetailTemplate {
-        page, event,
+        page,
+        event,
         metronome_standings,
-        shortcut_best_times, shortcut_all_times,
-        bomb_best_runs, bomb_all_runs,
+        shortcut_best_times,
+        shortcut_all_times,
+        bomb_best_runs,
+        bomb_all_runs,
     };
     Ok(Html(tmpl.render().map_err(internal_error)?))
 }
@@ -233,7 +244,10 @@ pub async fn event_new_get(page: PageCtx) -> Result<Html<String>, StatusCode> {
     if !page.admin {
         return Err(StatusCode::NOT_FOUND);
     }
-    let tmpl = EventNewTemplate { page, tracks: Track::ALL };
+    let tmpl = EventNewTemplate {
+        page,
+        tracks: Track::ALL,
+    };
     Ok(Html(tmpl.render().map_err(internal_error)?))
 }
 
@@ -280,38 +294,34 @@ pub async fn event_new_post(
             )
             .await
             .map_err(internal_error)?
-        }
-        "shortcut" => {
-            db::create_shortcut_event(
-                &state.pool,
-                &db::CreateShortcutParams {
-                    track,
-                    layout: form.layout,
-                    name,
-                    description,
-                    scheduled_at,
-                    scheduled_end_at,
-                },
-            )
-            .await
-            .map_err(internal_error)?
-        }
-        "bomb" => {
-            db::create_bomb_event(
-                &state.pool,
-                &db::CreateBombParams {
-                    track,
-                    layout: form.layout,
-                    checkpoint_timeout_secs: form.checkpoint_timeout as i64,
-                    name,
-                    description,
-                    scheduled_at,
-                    scheduled_end_at,
-                },
-            )
-            .await
-            .map_err(internal_error)?
-        }
+        },
+        "shortcut" => db::create_shortcut_event(
+            &state.pool,
+            &db::CreateShortcutParams {
+                track,
+                layout: form.layout,
+                name,
+                description,
+                scheduled_at,
+                scheduled_end_at,
+            },
+        )
+        .await
+        .map_err(internal_error)?,
+        "bomb" => db::create_bomb_event(
+            &state.pool,
+            &db::CreateBombParams {
+                track,
+                layout: form.layout,
+                checkpoint_timeout_secs: form.checkpoint_timeout as i64,
+                name,
+                description,
+                scheduled_at,
+                scheduled_end_at,
+            },
+        )
+        .await
+        .map_err(internal_error)?,
         _ => return Err(StatusCode::BAD_REQUEST),
     };
 
@@ -338,7 +348,12 @@ pub async fn event_edit_get(
         .map_err(internal_error)?
         .ok_or(StatusCode::NOT_FOUND)?;
     let allowed_vehicles_str = event_vehicles_str(&event);
-    let tmpl = EventEditTemplate { page, event, tracks: Track::ALL, allowed_vehicles_str };
+    let tmpl = EventEditTemplate {
+        page,
+        event,
+        tracks: Track::ALL,
+        allowed_vehicles_str,
+    };
     Ok(Html(tmpl.render().map_err(internal_error)?))
 }
 
@@ -373,7 +388,15 @@ pub async fn event_edit_post(
     db::update_event(
         &state.pool,
         id,
-        &db::UpdateEventParams { track, layout: &form.layout, name, description, scheduled_at, scheduled_end_at, writeup },
+        &db::UpdateEventParams {
+            track,
+            layout: &form.layout,
+            name,
+            description,
+            scheduled_at,
+            scheduled_end_at,
+            writeup,
+        },
     )
     .await
     .map_err(internal_error)?;
@@ -503,10 +526,12 @@ pub async fn event_standings(
             let metronome_standings = db::metronome_standings(&state.pool, event.id)
                 .await
                 .map_err(internal_error)?;
-            MetronomeStandingsContent { metronome_standings }
-                .render()
-                .map_err(internal_error)?
-        }
+            MetronomeStandingsContent {
+                metronome_standings,
+            }
+            .render()
+            .map_err(internal_error)?
+        },
         EventMode::Shortcut => {
             let shortcut_best_times = db::shortcut_best_times(&state.pool, event.id)
                 .await
@@ -514,10 +539,14 @@ pub async fn event_standings(
             let shortcut_all_times = db::shortcut_all_times(&state.pool, event.id)
                 .await
                 .map_err(internal_error)?;
-            ShortcutStandingsFragment { event, shortcut_best_times, shortcut_all_times }
-                .render()
-                .map_err(internal_error)?
-        }
+            ShortcutStandingsFragment {
+                event,
+                shortcut_best_times,
+                shortcut_all_times,
+            }
+            .render()
+            .map_err(internal_error)?
+        },
         EventMode::Bomb { .. } => {
             let bomb_best_runs = db::bomb_best_runs(&state.pool, event.id)
                 .await
@@ -525,10 +554,14 @@ pub async fn event_standings(
             let bomb_all_runs = db::bomb_all_runs(&state.pool, event.id)
                 .await
                 .map_err(internal_error)?;
-            BombStandingsFragment { event, bomb_best_runs, bomb_all_runs }
-                .render()
-                .map_err(internal_error)?
-        }
+            BombStandingsFragment {
+                event,
+                bomb_best_runs,
+                bomb_all_runs,
+            }
+            .render()
+            .map_err(internal_error)?
+        },
     };
 
     Ok(Html(html))
@@ -542,9 +575,11 @@ pub async fn event_standings_best(
         .await
         .map_err(internal_error)?;
     Ok(Html(
-        ShortcutBestTimesContent { shortcut_best_times }
-            .render()
-            .map_err(internal_error)?,
+        ShortcutBestTimesContent {
+            shortcut_best_times,
+        }
+        .render()
+        .map_err(internal_error)?,
     ))
 }
 

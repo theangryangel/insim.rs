@@ -101,7 +101,6 @@
   heading:
     radians: 0.0
   floating: false
-
 # 10. ambulance_slalom
 # Four ambulances parked at 45° angles, alternating sides, acting as gates.
 # Drive your way past the emergency without causing one.

@@ -6,7 +6,10 @@ mod topbar;
 
 pub use dialog::{Dialog, DialogMsg, DialogProps};
 pub use marquee::{Marquee, MarqueeProps};
-pub use scoreboard::{BombLeaderboard, ChallengeLeaderboard, MetronomeLeaderboard, bomb_scoreboard, challenge_scoreboard, metronome_scoreboard};
+pub use scoreboard::{
+    BombLeaderboard, ChallengeLeaderboard, MetronomeLeaderboard, bomb_scoreboard,
+    challenge_scoreboard, metronome_scoreboard,
+};
 pub use topbar::topbar;
 
 /// Format a `Duration` as `m:ss.xxx`, matching the web UI's `format_time_ms` filter.

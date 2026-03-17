@@ -49,7 +49,8 @@ pub fn build(
         }
 
         let pos = spline::catmull_rom(&points[seg_idx..seg_idx + 4], local_t);
-        let final_heading = spline::heading_from_vec2_or_fallback(entry.tangent.truncate(), proto_heading);
+        let final_heading =
+            spline::heading_from_vec2_or_fallback(entry.tangent.truncate(), proto_heading);
 
         let mut obj = prototype.clone();
         *obj.position_mut() = ObjectCoordinate::from_dvec3_metres(pos);

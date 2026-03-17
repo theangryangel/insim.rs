@@ -128,7 +128,6 @@
   heading:
     radians: 0.0
   floating: false
-
 # 13. kerb_corridor
 # Eight kerbs forming a colourful corridor (4 per side), alternating between
 # two colours each side. Visually loud, tests how close you'll drive to kerbs.

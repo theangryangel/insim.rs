@@ -2,9 +2,7 @@ use insim::{
     core::heading::Heading,
     insim::{BtnStyle, ObjectInfo, PmoAction},
 };
-use kitcar::ui;
-
-use kitcar::ui::Component as _;
+use kitcar::{ui, ui::Component as _};
 
 use super::{OptionsMsg, PrefabSummary, ToolboxProps, options, scroll_list};
 use crate::{Command, SpawnOrigin, State, tools};
@@ -114,7 +112,6 @@ impl ui::Component for Toolbox {
             ToolboxScreen::Launcher => launcher_screen(&props),
             ToolboxScreen::Inspector(tool) => inspector_screen(tool, &props, &self.prefab_scroll),
         };
-
 
         ui::container()
             .flex()
@@ -267,7 +264,12 @@ fn launcher_screen(props: &ToolboxProps) -> ui::Node<ToolboxMsg> {
             }
             btn
         },
-        ui::clickable("Top Down View", selection_btn_style, ToolboxMsg::ToggleTopDown).h(5.),
+        ui::clickable(
+            "Top Down View",
+            selection_btn_style,
+            ToolboxMsg::ToggleTopDown,
+        )
+        .h(5.),
         ui::clickable("Side View", selection_btn_style, ToolboxMsg::ToggleSideView).h(5.),
     ])
 }
@@ -290,9 +292,11 @@ fn inspector_screen(
         ),
         InspectorTool::Nudge => nudge_panel(props.nudge_distance_metres),
         InspectorTool::Mirror => mirror_panel(),
-        InspectorTool::RadialArray => {
-            radial_array_panel(props.radial_count, props.radial_radius_metres, props.radial_arc_degrees)
-        },
+        InspectorTool::RadialArray => radial_array_panel(
+            props.radial_count,
+            props.radial_radius_metres,
+            props.radial_arc_degrees,
+        ),
         InspectorTool::Options => {
             options::panel(props.compass_visible, props.display_selection_info)
                 .map(ToolboxMsg::Options)
@@ -554,8 +558,12 @@ fn grid_panel(
             .h(5.),
         )
         .with_child(
-            ui::clickable("Build Grid", BtnStyle::style_interactive(), ToolboxMsg::BuildGrid)
-                .h(5.),
+            ui::clickable(
+                "Build Grid",
+                BtnStyle::style_interactive(),
+                ToolboxMsg::BuildGrid,
+            )
+            .h(5.),
         )
 }
 
@@ -788,7 +796,9 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
                 Ok(value) if value.is_finite() && value > 0.0 => {
                     state.grid_col_spacing = value;
                 },
-                Ok(_) => tracing::warn!("grid col spacing skipped: must be a positive finite number"),
+                Ok(_) => {
+                    tracing::warn!("grid col spacing skipped: must be a positive finite number")
+                },
                 Err(_) => tracing::warn!("grid col spacing skipped: not a number"),
             }
             None
@@ -798,7 +808,9 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
                 Ok(value) if value.is_finite() && value > 0.0 => {
                     state.grid_row_spacing = value;
                 },
-                Ok(_) => tracing::warn!("grid row spacing skipped: must be a positive finite number"),
+                Ok(_) => {
+                    tracing::warn!("grid row spacing skipped: must be a positive finite number")
+                },
                 Err(_) => tracing::warn!("grid row spacing skipped: not a number"),
             }
             None
@@ -899,8 +911,7 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
                 return None;
             }
 
-            tools::camera::get_side_view(&state.selection, &state.last_cpp)
-                .map(Command::CameraMove)
+            tools::camera::get_side_view(&state.selection, &state.last_cpp).map(Command::CameraMove)
         },
         ToolboxMsg::MirrorX => {
             match tools::mirror::build(&state.selection, tools::mirror::MirrorAxis::X) {
@@ -992,13 +1003,7 @@ fn mirror_panel() -> ui::Node<ToolboxMsg> {
     ui::container()
         .flex()
         .flex_col()
-        .with_child(
-            ui::text(
-                "Flip selection across an axis",
-                BtnStyle::style_readonly(),
-            )
-            .h(5.),
-        )
+        .with_child(ui::text("Flip selection across an axis", BtnStyle::style_readonly()).h(5.))
         .with_child(
             ui::container()
                 .flex()

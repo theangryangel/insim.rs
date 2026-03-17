@@ -16,12 +16,12 @@ use kitcar::{
 
 use super::chat;
 use crate::{
+    db,
     hud::{
-        MetronomeLeaderboard, Dialog, DialogMsg, DialogProps, metronome_scoreboard,
+        Dialog, DialogMsg, DialogProps, MetronomeLeaderboard, metronome_scoreboard,
         theme::{hud_active, hud_muted, hud_text, hud_title},
         topbar,
     },
-    db,
 };
 
 const METRONOME_HELP_LINES: &[&str] = &[
@@ -106,7 +106,10 @@ impl ui::Component for MetronomeView {
             match props.connection.best_delta {
                 Some(d) => {
                     let tier = tier_label(d).unwrap_or("No tier");
-                    (format!("Best: {} [{}]", crate::hud::format_duration(d), tier), hud_text())
+                    (
+                        format!("Best: {} [{}]", crate::hud::format_duration(d), tier),
+                        hud_text(),
+                    )
                 },
                 None => ("Waiting for start".to_string(), hud_muted()),
             }
@@ -205,7 +208,10 @@ impl ChallengeLoopInner {
         );
 
         let leaderboard = self.metronome_leaderboard().await?;
-        ui.set_global_state(MetronomeGlobalProps { target: self.target, leaderboard });
+        ui.set_global_state(MetronomeGlobalProps {
+            target: self.target,
+            leaderboard,
+        });
 
         let mut active_runs: HashMap<String, Duration> = HashMap::new();
         let mut packets = self.insim.subscribe();
@@ -333,7 +339,13 @@ impl ChallengeLoopInner {
 
         Ok(rows
             .into_iter()
-            .map(|row| (row.uname, row.pname, Duration::from_millis(row.best_delta_ms as u64)))
+            .map(|row| {
+                (
+                    row.uname,
+                    row.pname,
+                    Duration::from_millis(row.best_delta_ms as u64),
+                )
+            })
             .collect::<Vec<_>>()
             .into())
     }

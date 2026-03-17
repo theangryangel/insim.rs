@@ -1,25 +1,27 @@
 //! Web module: axum-login auth backend + HTTP server.
 
+pub mod filters;
 pub mod handlers;
 pub mod state;
-pub mod filters;
 
-use std::net::SocketAddr;
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 
-use axum::Router;
-use axum::routing::{get, post};
+use axum::{
+    Router,
+    routing::{get, post},
+};
 use axum_login::AuthManagerLayerBuilder;
-use tower_sessions::{SessionManagerLayer, cookie::Key, cookie::SameSite};
+// -- axum-login auth backend --------------------------------------------------
+use axum_login::{AuthUser, AuthnBackend, UserId};
+use handlers::*;
+use state::{AppState, build_oauth_client};
+use tower_sessions::{
+    SessionManagerLayer,
+    cookie::{Key, SameSite},
+};
 use tower_sessions_sqlx_store::SqliteStore;
 
 use crate::db;
-use state::{AppState, build_oauth_client};
-use handlers::*;
-
-// -- axum-login auth backend --------------------------------------------------
-
-use axum_login::{AuthUser, AuthnBackend, UserId};
 
 impl AuthUser for db::User {
     type Id = i64;
@@ -134,8 +136,7 @@ impl AuthnBackend for Backend {
 
         let pname = data["name"].as_str().unwrap_or(uname);
 
-        let user =
-            db::upsert_user_with_token(&self.pool, uname, pname, access_token).await?;
+        let user = db::upsert_user_with_token(&self.pool, uname, pname, access_token).await?;
         Ok(Some(user))
     }
 
@@ -191,7 +192,10 @@ pub async fn serve(listen: SocketAddr, pool: db::Pool, cfg: WebConfig) -> anyhow
         .route("/events", get(events))
         .route("/events/new", get(event_new_get).post(event_new_post))
         .route("/events/{id}", get(event_detail))
-        .route("/events/{id}/edit", get(event_edit_get).post(event_edit_post))
+        .route(
+            "/events/{id}/edit",
+            get(event_edit_get).post(event_edit_post),
+        )
         .route("/events/{id}/standings", get(event_standings))
         .route("/events/{id}/standings/best", get(event_standings_best))
         .route("/events/{id}/standings/all", get(event_standings_all))

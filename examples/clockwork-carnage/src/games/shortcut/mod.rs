@@ -3,16 +3,14 @@
 mod challenge_loop;
 pub mod chat;
 
-pub use challenge_loop::ChallengeLoop;
-
 use std::time::Duration;
 
-use kitcar::scenes::{Scene, SceneExt, SceneResult, SceneError, wait_for_players::WaitForPlayers};
+pub use challenge_loop::ChallengeLoop;
+use kitcar::scenes::{Scene, SceneError, SceneExt, SceneResult, wait_for_players::WaitForPlayers};
 use tokio::task::JoinHandle;
 
-use super::{GameCtx, MiniGame};
+use super::{GameCtx, MiniGame, setup_track};
 use crate::{ChatError, MIN_PLAYERS, db};
-use super::setup_track;
 
 #[derive(Clone)]
 pub struct ShortcutGame {

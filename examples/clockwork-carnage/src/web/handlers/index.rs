@@ -1,14 +1,11 @@
 use askama::Template;
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::Html,
-};
-
-use crate::db::{self, Event, EventMode};
-use crate::web::state::{AppState, PageCtx};
+use axum::{extract::State, http::StatusCode, response::Html};
 
 use super::internal_error;
+use crate::{
+    db::{self, Event, EventMode},
+    web::state::{AppState, PageCtx},
+};
 
 #[derive(Template)]
 #[template(path = "index.html")]
@@ -28,6 +25,10 @@ pub async fn index(
     let upcoming = db::upcoming_events(&state.pool)
         .await
         .map_err(internal_error)?;
-    let tmpl = IndexTemplate { page, active, upcoming };
+    let tmpl = IndexTemplate {
+        page,
+        active,
+        upcoming,
+    };
     Ok(Html(tmpl.render().map_err(internal_error)?))
 }

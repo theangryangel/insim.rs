@@ -4,9 +4,7 @@ use insim::{
     core::{
         heading::Heading,
         object::{
-            ObjectCoordinate,
-            pit::PitStopBox,
-            pit_start_point::PitStartPoint,
+            ObjectCoordinate, pit::PitStopBox, pit_start_point::PitStartPoint,
             start_position::StartPosition,
         },
     },
@@ -19,8 +17,8 @@ use super::spline;
 pub enum GridMode {
     #[default]
     StartGrid, // → StartPosition
-    Pit,       // → PitStartPoint
-    PitBox,    // → PitStopBox
+    Pit,    // → PitStartPoint
+    PitBox, // → PitStopBox
 }
 
 impl GridMode {
@@ -136,8 +134,7 @@ fn build_flat(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Objec
 
     for row in 0..config.rows {
         for col in 0..config.width {
-            let col_offset =
-                (col as f64 - (config.width as f64 - 1.0) / 2.0) * config.col_spacing;
+            let col_offset = (col as f64 - (config.width as f64 - 1.0) / 2.0) * config.col_spacing;
             let row_offset = row as f64 * config.row_spacing;
 
             let pos = DVec3::new(
@@ -217,7 +214,8 @@ fn build_spline(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Obj
         let entry = spline::sample_lut(&lut, current_distance);
         let pos = get_spline_pos(current_distance);
 
-        let heading = spline::heading_from_vec2_or_fallback(entry.tangent.truncate(), proto_heading);
+        let heading =
+            spline::heading_from_vec2_or_fallback(entry.tangent.truncate(), proto_heading);
 
         let fwd = spline::heading_to_forward(heading);
         let right = DVec2::new(fwd.y, -fwd.x); // 90° clockwise
@@ -228,14 +226,16 @@ fn build_spline(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Obj
             -config.lateral_offset
         };
 
-        let offset_pos = DVec3::new(
-            pos.x + right.x * lateral,
-            pos.y + right.y * lateral,
-            pos.z,
-        );
+        let offset_pos = DVec3::new(pos.x + right.x * lateral, pos.y + right.y * lateral, pos.z);
 
         let clamped = seq.min(max_idx) as u8;
-        output.push(make_object(config.mode, offset_pos, heading, floating, clamped));
+        output.push(make_object(
+            config.mode,
+            offset_pos,
+            heading,
+            floating,
+            clamped,
+        ));
 
         seq += 1;
         current_distance += config.row_spacing;

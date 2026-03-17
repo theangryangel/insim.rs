@@ -14,7 +14,10 @@ pub fn build(
     radius_metres: f64,
     total_arc_degrees: f64,
 ) -> Result<Vec<ObjectInfo>> {
-    ensure!(!selection.is_empty(), "radial array skipped: selection is empty");
+    ensure!(
+        !selection.is_empty(),
+        "radial array skipped: selection is empty"
+    );
     ensure!(count >= 2, "radial array skipped: count must be at least 2");
     ensure!(
         radius_metres.is_finite() && radius_metres > 0.0,

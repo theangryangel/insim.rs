@@ -37,17 +37,18 @@ pub fn colour_html(s: &str, _env: &dyn askama::Values) -> askama::Result<String>
     }
 
     fn html_escape(s: &str) -> String {
-        s.chars().fold(String::with_capacity(s.len()), |mut out, c| {
-            match c {
-                '&'  => out.push_str("&amp;"),
-                '<'  => out.push_str("&lt;"),
-                '>'  => out.push_str("&gt;"),
-                '"'  => out.push_str("&quot;"),
-                '\'' => out.push_str("&#39;"),
-                c    => out.push(c),
-            }
-            out
-        })
+        s.chars()
+            .fold(String::with_capacity(s.len()), |mut out, c| {
+                match c {
+                    '&' => out.push_str("&amp;"),
+                    '<' => out.push_str("&lt;"),
+                    '>' => out.push_str("&gt;"),
+                    '"' => out.push_str("&quot;"),
+                    '\'' => out.push_str("&#39;"),
+                    c => out.push(c),
+                }
+                out
+            })
     }
 
     let mut out = String::new();

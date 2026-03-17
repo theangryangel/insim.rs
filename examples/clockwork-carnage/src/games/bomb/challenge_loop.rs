@@ -1,4 +1,7 @@
-use std::{collections::HashMap, time::{Duration, Instant}};
+use std::{
+    collections::HashMap,
+    time::{Duration, Instant},
+};
 
 use insim::{
     builder::InsimTask,
@@ -8,7 +11,7 @@ use insim::{
         vehicle::Vehicle,
     },
     identifiers::ConnectionId,
-    insim::{ObjectInfo, Pll, Uco, Cnl},
+    insim::{Cnl, ObjectInfo, Pll, Uco},
 };
 use kitcar::{
     game, presence,
@@ -18,19 +21,18 @@ use kitcar::{
 
 use super::chat;
 use crate::{
+    db,
     hud::{
-        BombLeaderboard, Dialog, DialogMsg, DialogProps,
-        bomb_scoreboard,
+        BombLeaderboard, Dialog, DialogMsg, DialogProps, bomb_scoreboard,
         theme::{hud_active, hud_muted, hud_text, hud_title},
         topbar,
     },
-    db,
 };
 
 const BOMB_HELP_LINES: &[&str] = &[
     " - Hit ^2checkpoint 1^7 objects before the timer expires or your run ends (BOOM).",
     " - Time carries over: arrive late and you have less time to reach the next one.",
-    " - Hit a ^3checkpoint 2/3^7 or ^3finish^7 object to refresh your timer to the full window.",
+    " - Hit a ^3checkpoint 2/3^7 or ^3finish^7 object to refresh your timer to the 1/4th window.",
     " - Score = checkpoints hit. Survival time breaks ties.",
     " - Your best run is recorded on the leaderboard.",
     "",
@@ -93,12 +95,18 @@ impl ui::Component for BombView {
         } else {
             "Waiting".to_string()
         };
-        let status_style = if props.connection.in_run { hud_active() } else { hud_muted() };
+        let status_style = if props.connection.in_run {
+            hud_active()
+        } else {
+            hud_muted()
+        };
 
         let leaderboard_rows = bomb_scoreboard(&props.global.leaderboard, &props.connection.uname);
 
         let now = Instant::now();
-        let active_run_rows: Vec<ui::Node<BombMessage>> = props.global.active_runs
+        let active_run_rows: Vec<ui::Node<BombMessage>> = props
+            .global
+            .active_runs
             .iter()
             .map(|(uname, pname, cps, deadline, current_timeout)| {
                 let secs_left = deadline.saturating_duration_since(now).as_secs_f64();
@@ -111,9 +119,7 @@ impl ui::Component for BombView {
                 let time_str = format!("{secs_left:.1}s");
                 // 8-char progress bar
                 let filled = (fraction * 8.0).round() as usize;
-                let bar: String = (0..8)
-                    .map(|i| if i < filled { '█' } else { '░' })
-                    .collect();
+                let bar: String = (0..8).map(|i| if i < filled { '█' } else { '░' }).collect();
                 let style = if uname.as_str() == props.connection.uname.as_str() {
                     hud_active()
                 } else {
@@ -132,9 +138,7 @@ impl ui::Component for BombView {
         ui::container()
             .flex()
             .flex_col()
-            .with_child(
-                topbar("Bomb").with_child(ui::text(status_str, status_style).w(15.).h(5.)),
-            )
+            .with_child(topbar("Bomb").with_child(ui::text(status_str, status_style).w(15.).h(5.)))
             .with_child(
                 ui::container()
                     .flex()
@@ -239,7 +243,10 @@ impl BombLoopInner {
 
         // Load initial leaderboard
         let leaderboard = self.load_leaderboard().await?;
-        ui.set_global_state(BombGlobalProps { leaderboard, active_runs: vec![] });
+        ui.set_global_state(BombGlobalProps {
+            leaderboard,
+            active_runs: vec![],
+        });
 
         // keyed by uname
         let mut active_runs: HashMap<String, ActiveRun> = HashMap::new();
@@ -359,14 +366,14 @@ impl BombLoopInner {
                                 let remaining = run.deadline.saturating_duration_since(now);
 
                                 // Checkpoint1: carry over remaining time as the next window.
-                                // Checkpoint2/3/Finish: refresh — top up to the full base window.
+                                // Checkpoint2/3/Finish: refresh — top up to the 1/4 base window.
                                 // A refresh checkpoint placed after a hard section rewards survival.
                                 let (new_timeout, is_refresh) = match kind {
                                     InsimCheckpointKind::Checkpoint1 => (remaining, false),
                                     InsimCheckpointKind::Checkpoint2
                                     | InsimCheckpointKind::Checkpoint3
                                     | InsimCheckpointKind::Finish => {
-                                        (self.checkpoint_timeout, true)
+                                        (remaining + (self.checkpoint_timeout / 4), true)
                                     },
                                 };
 
@@ -406,6 +413,10 @@ impl BombLoopInner {
 
                     for uname in expired {
                         if let Some(run) = active_runs.remove(&uname) {
+                            self.insim
+                                .send_command(format!("/spec {}", uname))
+                                .await?;
+
                             let survival_ms = (run.deadline - run.started_at).as_millis() as i64;
                             let n = run.checkpoints;
                             let survival_secs = survival_ms as f64 / 1000.0;
@@ -443,6 +454,7 @@ impl BombLoopInner {
                     tracing::info!("Admin ended bomb session");
                     return Ok(SceneResult::Continue(()));
                 },
+
                 _ = self.game.wait_for_end() => {
                     tracing::info!("Game ended");
                     return Ok(SceneResult::Continue(()));
@@ -466,10 +478,21 @@ impl BombLoopInner {
             .into())
     }
 
-    fn build_active_runs_props(&self, active_runs: &HashMap<String, ActiveRun>) -> Vec<(String, String, i64, Instant, Duration)> {
+    fn build_active_runs_props(
+        &self,
+        active_runs: &HashMap<String, ActiveRun>,
+    ) -> Vec<(String, String, i64, Instant, Duration)> {
         let mut runs: Vec<_> = active_runs
             .values()
-            .map(|run| (run.uname.clone(), run.pname.clone(), run.checkpoints, run.deadline, run.current_timeout))
+            .map(|run| {
+                (
+                    run.uname.clone(),
+                    run.pname.clone(),
+                    run.checkpoints,
+                    run.deadline,
+                    run.current_timeout,
+                )
+            })
             .collect();
         runs.sort_by(|a, b| b.2.cmp(&a.2).then(b.3.cmp(&a.3)));
         runs

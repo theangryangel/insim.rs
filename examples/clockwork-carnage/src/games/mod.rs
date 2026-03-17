@@ -8,7 +8,10 @@ pub mod shortcut;
 pub mod vehicle_restrictions;
 
 use insim::builder::InsimTask;
-use kitcar::{game, presence, scenes::{FromContext, SceneError}};
+use kitcar::{
+    game, presence,
+    scenes::{FromContext, SceneError},
+};
 
 use crate::db;
 

@@ -57,8 +57,8 @@ fn default_listen() -> SocketAddr {
 fn load_config(path: &std::path::Path) -> anyhow::Result<Config> {
     let text = std::fs::read_to_string(path)
         .with_context(|| format!("cannot read config file {path:?}"))?;
-    let config: Config = toml::from_str(&text)
-        .with_context(|| format!("cannot parse config file {path:?}"))?;
+    let config: Config =
+        toml::from_str(&text).with_context(|| format!("cannot parse config file {path:?}"))?;
     if config.insim.is_none() && config.web.is_none() {
         anyhow::bail!("at least one of [insim] or [web] must be present in config");
     }
@@ -118,12 +118,12 @@ async fn announce_loop(pool: db::Pool, insim: insim::builder::InsimTask) {
                     tracing::warn!("Failed to send event announcement: {e}");
                 }
                 next_announce_interval(secs)
-            }
+            },
             Ok(None) => std::time::Duration::from_secs(60),
             Err(e) => {
                 tracing::warn!("Failed to fetch next scheduled event: {e}");
                 std::time::Duration::from_secs(60)
-            }
+            },
         };
         tokio::time::sleep(sleep).await;
     }
@@ -229,13 +229,20 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
                         let presence = ctx_ref.presence.clone();
                         let game = ctx_ref.game.clone();
                         async move {
-                            let ctx = GameCtx { pool, insim, presence, game };
+                            let ctx = GameCtx {
+                                pool,
+                                insim,
+                                presence,
+                                game,
+                            };
                             match event.mode {
                                 Json(EventMode::Metronome { .. }) => {
-                                    execute::<games::metronome::MetronomeGame>(&event, &ctx, cancel).await
+                                    execute::<games::metronome::MetronomeGame>(&event, &ctx, cancel)
+                                        .await
                                 },
                                 Json(EventMode::Shortcut) => {
-                                    execute::<games::shortcut::ShortcutGame>(&event, &ctx, cancel).await
+                                    execute::<games::shortcut::ShortcutGame>(&event, &ctx, cancel)
+                                        .await
                                 },
                                 Json(EventMode::Bomb { .. }) => {
                                     execute::<games::bomb::BombGame>(&event, &ctx, cancel).await
@@ -248,9 +255,7 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
                 (Some(task), Ok(Some(event)))
                     if current_event_id == Some(event.id) && !task.is_finished() => {},
 
-                (Some(_), Ok(Some(event)))
-                    if current_event_id == Some(event.id) =>
-                {
+                (Some(_), Ok(Some(event))) if current_event_id == Some(event.id) => {
                     current_cancel = None;
                     let task = current_task.take().unwrap();
                     match task.await {
@@ -279,11 +284,8 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
                         token.cancel();
                     }
                     if let Some(task) = current_task.take() {
-                        let _ = tokio::time::timeout(
-                            std::time::Duration::from_secs(10),
-                            task,
-                        )
-                        .await;
+                        let _ =
+                            tokio::time::timeout(std::time::Duration::from_secs(10), task).await;
                     }
                     current_event_id = None;
                 },

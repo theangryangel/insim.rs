@@ -128,7 +128,6 @@
   height: M2_00
   heading:
     radians: 0.0
-
 # 3. wedge_gates
 # Alternating ConcreteWedge chicane gates: each wedge blocks one half of the
 # road from a different side, forcing a full S-weave through three gates.

@@ -83,7 +83,6 @@
   heading:
     radians: 0.0
   floating: false
-
 # 11. sky_bridge
 # A terrifyingly narrow Two-wide (2m) ConcreteSlab bridge at z=8 (2m height),
 # reached via a 4m ramp and exited by a mirrored ramp the other side.

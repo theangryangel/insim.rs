@@ -3,17 +3,15 @@
 mod challenge_loop;
 pub mod chat;
 
-pub use challenge_loop::ChallengeLoop;
-
 use std::time::Duration;
 
-use kitcar::scenes::{Scene, SceneExt, SceneResult, SceneError, wait_for_players::WaitForPlayers};
+pub use challenge_loop::ChallengeLoop;
+use kitcar::scenes::{Scene, SceneError, SceneExt, SceneResult, wait_for_players::WaitForPlayers};
 use sqlx::types::Json;
 use tokio::task::JoinHandle;
 
-use super::{GameCtx, MiniGame};
+use super::{GameCtx, MiniGame, setup_track};
 use crate::{ChatError, MIN_PLAYERS, db};
-use super::setup_track;
 
 #[derive(Clone)]
 pub struct MetronomeGame {
@@ -58,21 +56,23 @@ impl MiniGame for MetronomeGame {
     }
 
     async fn run(self, ctx: &GameCtx) -> Result<SceneResult<()>, SceneError> {
-        let challenge_scene = WaitForPlayers { min_players: MIN_PLAYERS }
-            .then(
-                setup_track::SetupTrack {
-                    min_players: MIN_PLAYERS,
-                    track: self.track,
-                    layout: Some(self.layout.clone()),
-                }
-                .with_timeout(Duration::from_secs(60)),
-            )
-            .then(ChallengeLoop {
-                chat: self.chat.clone(),
-                target: self.target,
-                session_id: self.session_id,
-            })
-            .loop_until_quit();
+        let challenge_scene = WaitForPlayers {
+            min_players: MIN_PLAYERS,
+        }
+        .then(
+            setup_track::SetupTrack {
+                min_players: MIN_PLAYERS,
+                track: self.track,
+                layout: Some(self.layout.clone()),
+            }
+            .with_timeout(Duration::from_secs(60)),
+        )
+        .then(ChallengeLoop {
+            chat: self.chat.clone(),
+            target: self.target,
+            session_id: self.session_id,
+        })
+        .loop_until_quit();
 
         let presence = ctx.presence.clone();
         let chat = self.chat.clone();

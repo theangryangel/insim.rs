@@ -91,7 +91,6 @@
   heading:
     radians: 0.0
   floating: false
-
 # 6. concrete_arch_tunnel
 # Two ConcreteSlabWall panels pitched at Deg60 lean inward from each side,
 # forming a dramatic arch/tunnel. ConcreteWall bases keep them anchored.

@@ -6,635 +6,635 @@
 
 - name: launch_ramp
   objects:
-  - !ConcreteRamp
-    xyz:
-      x: 0
-      y: 0
-      z: 0
-    width: Four
-    length: Four
-    height: M1_00
-    heading:
-      radians: 0.0
-  - !ConcreteWall
-    xyz:
-      x: 0
-      y: -40
-      z: 0
-    colour: Grey
-    length: Four
-    height: M1_50
-    heading:
-      radians: 0.0
-  - !ConcreteWall
-    xyz:
-      x: 0
-      y: 40
-      z: 0
-    colour: Grey
-    length: Four
-    height: M1_50
-    heading:
-      radians: 0.0
-  - !Cone1
-    xyz:
-      x: -48
-      y: -28
-      z: 0
-    colour: Yellow
-    heading:
-      radians: 0.0
-    floating: false
-  - !Cone1
-    xyz:
-      x: -48
-      y: 28
-      z: 0
-    colour: Yellow
-    heading:
-      radians: 0.0
-    floating: false
-  - !ChalkLine
-    xyz:
-      x: -32
-      y: 0
-      z: 0
-    colour: Yellow
-    heading:
-      radians: 0.0
-    floating: false
+    - !ConcreteRamp
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      width: Four
+      length: Four
+      height: M1_00
+      heading:
+        radians: 0.0
+    - !ConcreteWall
+      xyz:
+        x: 0
+        y: -40
+        z: 0
+      colour: Grey
+      length: Four
+      height: M1_50
+      heading:
+        radians: 0.0
+    - !ConcreteWall
+      xyz:
+        x: 0
+        y: 40
+        z: 0
+      colour: Grey
+      length: Four
+      height: M1_50
+      heading:
+        radians: 0.0
+    - !Cone1
+      xyz:
+        x: -48
+        y: -28
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !Cone1
+      xyz:
+        x: -48
+        y: 28
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkLine
+      xyz:
+        x: -32
+        y: 0
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
 
 - name: gap_jump
   objects:
-  - !ConcreteRamp
-    xyz:
-      x: 0
-      y: 0
-      z: 0
-    width: Four
-    length: Four
-    height: M1_00
-    heading:
-      radians: 0.0
-  - !TyreStack4
-    xyz:
-      x: 64
-      y: -32
-      z: 0
-    colour: Red
-    heading:
-      radians: 0.0
-    floating: false
-  - !TyreStack4
-    xyz:
-      x: 64
-      y: 32
-      z: 0
-    colour: Red
-    heading:
-      radians: 0.0
-    floating: false
-  - !TyreStack4
-    xyz:
-      x: 128
-      y: -32
-      z: 0
-    colour: Blue
-    heading:
-      radians: 0.0
-    floating: false
-  - !TyreStack4
-    xyz:
-      x: 128
-      y: 32
-      z: 0
-    colour: Blue
-    heading:
-      radians: 0.0
-    floating: false
-  - !ConcreteRamp
-    xyz:
-      x: 192
-      y: 0
-      z: 0
-    width: Four
-    length: Four
-    height: M1_00
-    heading:
-      radians: 3.141592653589793
+    - !ConcreteRamp
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      width: Four
+      length: Four
+      height: M1_00
+      heading:
+        radians: 0.0
+    - !TyreStack4
+      xyz:
+        x: 64
+        y: -32
+        z: 0
+      colour: Red
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4
+      xyz:
+        x: 64
+        y: 32
+        z: 0
+      colour: Red
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4
+      xyz:
+        x: 128
+        y: -32
+        z: 0
+      colour: Blue
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4
+      xyz:
+        x: 128
+        y: 32
+        z: 0
+      colour: Blue
+      heading:
+        radians: 0.0
+      floating: false
+    - !ConcreteRamp
+      xyz:
+        x: 192
+        y: 0
+        z: 0
+      width: Four
+      length: Four
+      height: M1_00
+      heading:
+        radians: 3.141592653589793
 
 - name: step_up_sequence
   objects:
-  - !ConcreteRamp
-    xyz:
-      x: 0
-      y: 0
-      z: 0
-    width: Four
-    length: Two
-    height: M1_00
-    heading:
-      radians: 0.0
-  - !ConcreteSlab
-    xyz:
-      x: 32
-      y: 0
-      z: 4
-    width: Four
-    length: Four
-    pitch: Deg0
-    heading:
-      radians: 0.0
-  - !ConcreteRamp
-    xyz:
-      x: 96
-      y: 0
-      z: 4
-    width: Four
-    length: Two
-    height: M1_00
-    heading:
-      radians: 0.0
-  - !ConcreteSlab
-    xyz:
-      x: 128
-      y: 0
-      z: 8
-    width: Four
-    length: Four
-    pitch: Deg0
-    heading:
-      radians: 0.0
-  - !ConcreteRamp
-    xyz:
-      x: 192
-      y: 0
-      z: 8
-    width: Four
-    length: Two
-    height: M1_00
-    heading:
-      radians: 0.0
-  - !ConcreteSlab
-    xyz:
-      x: 224
-      y: 0
-      z: 12
-    width: Four
-    length: Four
-    pitch: Deg0
-    heading:
-      radians: 0.0
+    - !ConcreteRamp
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      width: Four
+      length: Two
+      height: M1_00
+      heading:
+        radians: 0.0
+    - !ConcreteSlab
+      xyz:
+        x: 32
+        y: 0
+        z: 4
+      width: Four
+      length: Four
+      pitch: Deg0
+      heading:
+        radians: 0.0
+    - !ConcreteRamp
+      xyz:
+        x: 96
+        y: 0
+        z: 4
+      width: Four
+      length: Two
+      height: M1_00
+      heading:
+        radians: 0.0
+    - !ConcreteSlab
+      xyz:
+        x: 128
+        y: 0
+        z: 8
+      width: Four
+      length: Four
+      pitch: Deg0
+      heading:
+        radians: 0.0
+    - !ConcreteRamp
+      xyz:
+        x: 192
+        y: 0
+        z: 8
+      width: Four
+      length: Two
+      height: M1_00
+      heading:
+        radians: 0.0
+    - !ConcreteSlab
+      xyz:
+        x: 224
+        y: 0
+        z: 12
+      width: Four
+      length: Four
+      pitch: Deg0
+      heading:
+        radians: 0.0
 
 - name: hairpin_markers
   objects:
-  - !TyreStack4
-    xyz:
-      x: 0
-      y: -32
-      z: 0
-    colour: Yellow
-    heading:
-      radians: 0.0
-    floating: false
-  - !TyreStack4
-    xyz:
-      x: 0
-      y: -16
-      z: 0
-    colour: Yellow
-    heading:
-      radians: 0.0
-    floating: false
-  - !TyreStack4
-    xyz:
-      x: 0
-      y: 0
-      z: 0
-    colour: Yellow
-    heading:
-      radians: 0.0
-    floating: false
-  - !TyreStack4
-    xyz:
-      x: 0
-      y: 16
-      z: 0
-    colour: Yellow
-    heading:
-      radians: 0.0
-    floating: false
-  - !TyreStack4
-    xyz:
-      x: 0
-      y: 32
-      z: 0
-    colour: Yellow
-    heading:
-      radians: 0.0
-    floating: false
-  - !Cone1
-    xyz:
-      x: -32
-      y: -24
-      z: 0
-    colour: Orange
-    heading:
-      radians: 0.0
-    floating: false
-  - !Cone1
-    xyz:
-      x: -32
-      y: 24
-      z: 0
-    colour: Orange
-    heading:
-      radians: 0.0
-    floating: false
-  - !ChalkAhead
-    xyz:
-      x: -80
-      y: 0
-      z: 0
-    colour: White
-    heading:
-      radians: 0.0
-    floating: false
-  - !ChalkLeft
-    xyz:
-      x: -48
-      y: 0
-      z: 0
-    colour: White
-    heading:
-      radians: 0.0
-    floating: false
+    - !TyreStack4
+      xyz:
+        x: 0
+        y: -32
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4
+      xyz:
+        x: 0
+        y: -16
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4
+      xyz:
+        x: 0
+        y: 16
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4
+      xyz:
+        x: 0
+        y: 32
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !Cone1
+      xyz:
+        x: -32
+        y: -24
+        z: 0
+      colour: Orange
+      heading:
+        radians: 0.0
+      floating: false
+    - !Cone1
+      xyz:
+        x: -32
+        y: 24
+        z: 0
+      colour: Orange
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkAhead
+      xyz:
+        x: -80
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkLeft
+      xyz:
+        x: -48
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
 
 - name: hump_gauntlet
   objects:
-  - !ChalkLine
-    xyz:
-      x: -48
-      y: 0
-      z: 0
-    colour: Yellow
-    heading:
-      radians: 0.0
-    floating: false
-  - !SpeedHump10M
-    xyz:
-      x: 0
-      y: 0
-      z: 0
-    heading:
-      radians: 0.0
-    colour: 0
-    mapping: 0
-    floating: false
-  - !SpeedHump10M
-    xyz:
-      x: 192
-      y: 0
-      z: 0
-    heading:
-      radians: 0.0
-    colour: 0
-    mapping: 0
-    floating: false
-  - !SpeedHump10M
-    xyz:
-      x: 384
-      y: 0
-      z: 0
-    heading:
-      radians: 0.0
-    colour: 0
-    mapping: 0
-    floating: false
-  - !ChalkLine
-    xyz:
-      x: 480
-      y: 0
-      z: 0
-    colour: White
-    heading:
-      radians: 0.0
-    floating: false
+    - !ChalkLine
+      xyz:
+        x: -48
+        y: 0
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !SpeedHump10M
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      heading:
+        radians: 0.0
+      colour: 0
+      mapping: 0
+      floating: false
+    - !SpeedHump10M
+      xyz:
+        x: 192
+        y: 0
+        z: 0
+      heading:
+        radians: 0.0
+      colour: 0
+      mapping: 0
+      floating: false
+    - !SpeedHump10M
+      xyz:
+        x: 384
+        y: 0
+        z: 0
+      heading:
+        radians: 0.0
+      colour: 0
+      mapping: 0
+      floating: false
+    - !ChalkLine
+      xyz:
+        x: 480
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
 
 - name: chicane_walls
   objects:
-  - !ConcreteWall
-    xyz:
-      x: 0
-      y: -40
-      z: 0
-    colour: Red
-    length: Four
-    height: M1_00
-    heading:
-      radians: 0.0
-  - !Cone1
-    xyz:
-      x: 0
-      y: 24
-      z: 0
-    colour: Blue
-    heading:
-      radians: 0.0
-    floating: false
-  - !ChalkLine
-    xyz:
-      x: 64
-      y: 0
-      z: 0
-    colour: White
-    heading:
-      radians: 0.0
-    floating: false
-  - !ConcreteWall
-    xyz:
-      x: 128
-      y: 40
-      z: 0
-    colour: Blue
-    length: Four
-    height: M1_00
-    heading:
-      radians: 0.0
-  - !Cone1
-    xyz:
-      x: 128
-      y: -24
-      z: 0
-    colour: Red
-    heading:
-      radians: 0.0
-    floating: false
+    - !ConcreteWall
+      xyz:
+        x: 0
+        y: -40
+        z: 0
+      colour: Red
+      length: Four
+      height: M1_00
+      heading:
+        radians: 0.0
+    - !Cone1
+      xyz:
+        x: 0
+        y: 24
+        z: 0
+      colour: Blue
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkLine
+      xyz:
+        x: 64
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    - !ConcreteWall
+      xyz:
+        x: 128
+        y: 40
+        z: 0
+      colour: Blue
+      length: Four
+      height: M1_00
+      heading:
+        radians: 0.0
+    - !Cone1
+      xyz:
+        x: 128
+        y: -24
+        z: 0
+      colour: Red
+      heading:
+        radians: 0.0
+      floating: false
 
 - name: elevated_platform
   objects:
-  - !ConcreteRamp
-    xyz:
-      x: 0
-      y: 0
-      z: 0
-    width: Four
-    length: Eight
-    height: M2_00
-    heading:
-      radians: 0.0
-  - !ConcreteWall
-    xyz:
-      x: 0
-      y: -40
-      z: 0
-    colour: Grey
-    length: Eight
-    height: M2_00
-    heading:
-      radians: 0.0
-  - !ConcreteWall
-    xyz:
-      x: 0
-      y: 40
-      z: 0
-    colour: Grey
-    length: Eight
-    height: M2_00
-    heading:
-      radians: 0.0
-  - !ConcreteSlab
-    xyz:
-      x: 128
-      y: 0
-      z: 8
-    width: Four
-    length: Eight
-    pitch: Deg0
-    heading:
-      radians: 0.0
-  - !ConcreteWall
-    xyz:
-      x: 128
-      y: -40
-      z: 8
-    colour: Grey
-    length: Eight
-    height: M1_00
-    heading:
-      radians: 0.0
-  - !ConcreteWall
-    xyz:
-      x: 128
-      y: 40
-      z: 8
-    colour: Grey
-    length: Eight
-    height: M1_00
-    heading:
-      radians: 0.0
+    - !ConcreteRamp
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      width: Four
+      length: Eight
+      height: M2_00
+      heading:
+        radians: 0.0
+    - !ConcreteWall
+      xyz:
+        x: 0
+        y: -40
+        z: 0
+      colour: Grey
+      length: Eight
+      height: M2_00
+      heading:
+        radians: 0.0
+    - !ConcreteWall
+      xyz:
+        x: 0
+        y: 40
+        z: 0
+      colour: Grey
+      length: Eight
+      height: M2_00
+      heading:
+        radians: 0.0
+    - !ConcreteSlab
+      xyz:
+        x: 128
+        y: 0
+        z: 8
+      width: Four
+      length: Eight
+      pitch: Deg0
+      heading:
+        radians: 0.0
+    - !ConcreteWall
+      xyz:
+        x: 128
+        y: -40
+        z: 8
+      colour: Grey
+      length: Eight
+      height: M1_00
+      heading:
+        radians: 0.0
+    - !ConcreteWall
+      xyz:
+        x: 128
+        y: 40
+        z: 8
+      colour: Grey
+      length: Eight
+      height: M1_00
+      heading:
+        radians: 0.0
 
 - name: banked_wall_corner
   objects:
-  - !ConcreteSlabWall
-    xyz:
-      x: 0
-      y: 48
-      z: 0
-    colour: Grey
-    length: Sixteen
-    pitch: Deg30
-    heading:
-      radians: 0.0
-  - !ConcreteSlabWall
-    xyz:
-      x: 0
-      y: 96
-      z: 0
-    colour: Grey
-    length: Sixteen
-    pitch: Deg30
-    heading:
-      radians: 0.0
-  - !Cone1
-    xyz:
-      x: 0
-      y: -32
-      z: 0
-    colour: White
-    heading:
-      radians: 0.0
-    floating: false
-  - !Cone1
-    xyz:
-      x: 64
-      y: -32
-      z: 0
-    colour: White
-    heading:
-      radians: 0.0
-    floating: false
-  - !Cone1
-    xyz:
-      x: 128
-      y: -32
-      z: 0
-    colour: White
-    heading:
-      radians: 0.0
-    floating: false
-  - !Cone1
-    xyz:
-      x: 192
-      y: -32
-      z: 0
-    colour: White
-    heading:
-      radians: 0.0
-    floating: false
-  - !ChalkRight
-    xyz:
-      x: -32
-      y: 0
-      z: 0
-    colour: White
-    heading:
-      radians: 0.0
-    floating: false
+    - !ConcreteSlabWall
+      xyz:
+        x: 0
+        y: 48
+        z: 0
+      colour: Grey
+      length: Sixteen
+      pitch: Deg30
+      heading:
+        radians: 0.0
+    - !ConcreteSlabWall
+      xyz:
+        x: 0
+        y: 96
+        z: 0
+      colour: Grey
+      length: Sixteen
+      pitch: Deg30
+      heading:
+        radians: 0.0
+    - !Cone1
+      xyz:
+        x: 0
+        y: -32
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    - !Cone1
+      xyz:
+        x: 64
+        y: -32
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    - !Cone1
+      xyz:
+        x: 128
+        y: -32
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    - !Cone1
+      xyz:
+        x: 192
+        y: -32
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkRight
+      xyz:
+        x: -32
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
 
 - name: kicker_ramp
   objects:
-  - !ConcreteRamp
-    xyz:
-      x: 0
-      y: 0
-      z: 0
-    width: Two
-    length: Two
-    height: M2_00
-    heading:
-      radians: 0.0
-  - !Cone1
-    xyz:
-      x: -32
-      y: -16
-      z: 0
-    colour: Orange
-    heading:
-      radians: 0.0
-    floating: false
-  - !Cone1
-    xyz:
-      x: -32
-      y: 16
-      z: 0
-    colour: Orange
-    heading:
-      radians: 0.0
-    floating: false
-  - !TyreStack4
-    xyz:
-      x: 128
-      y: -24
-      z: 0
-    colour: Yellow
-    heading:
-      radians: 0.0
-    floating: false
-  - !TyreStack4
-    xyz:
-      x: 128
-      y: 0
-      z: 0
-    colour: Yellow
-    heading:
-      radians: 0.0
-    floating: false
-  - !TyreStack4
-    xyz:
-      x: 128
-      y: 24
-      z: 0
-    colour: Yellow
-    heading:
-      radians: 0.0
-    floating: false
-  - !ChalkLine
-    xyz:
-      x: 96
-      y: 0
-      z: 0
-    colour: Yellow
-    heading:
-      radians: 0.0
-    floating: false
+    - !ConcreteRamp
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      width: Two
+      length: Two
+      height: M2_00
+      heading:
+        radians: 0.0
+    - !Cone1
+      xyz:
+        x: -32
+        y: -16
+        z: 0
+      colour: Orange
+      heading:
+        radians: 0.0
+      floating: false
+    - !Cone1
+      xyz:
+        x: -32
+        y: 16
+        z: 0
+      colour: Orange
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4
+      xyz:
+        x: 128
+        y: -24
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4
+      xyz:
+        x: 128
+        y: 0
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4
+      xyz:
+        x: 128
+        y: 24
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkLine
+      xyz:
+        x: 96
+        y: 0
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
 
 - name: summit_marker
   objects:
-  - !ConcretePillar
-    xyz:
-      x: 0
-      y: -48
-      z: 0
-    x: Half
-    y: Half
-    height: M4_00
-    heading:
-      radians: 0.0
-  - !ConcretePillar
-    xyz:
-      x: 0
-      y: 48
-      z: 0
-    x: Half
-    y: Half
-    height: M4_00
-    heading:
-      radians: 0.0
-  - !ConcreteSlabWall
-    xyz:
-      x: 0
-      y: -24
-      z: 16
-    colour: Yellow
-    length: Four
-    pitch: Deg42
-    heading:
-      radians: -1.5707963267948966
-  - !ConcreteSlabWall
-    xyz:
-      x: 0
-      y: 24
-      z: 16
-    colour: Red
-    length: Four
-    pitch: Deg42
-    heading:
-      radians: 1.5707963267948966
-  - !TyreStack4Big
-    xyz:
-      x: -32
-      y: -48
-      z: 0
-    colour: Yellow
-    heading:
-      radians: 0.0
-    floating: false
-  - !TyreStack4Big
-    xyz:
-      x: -32
-      y: 48
-      z: 0
-    colour: Yellow
-    heading:
-      radians: 0.0
-    floating: false
-  - !ChalkLine
-    xyz:
-      x: -48
-      y: 0
-      z: 0
-    colour: Yellow
-    heading:
-      radians: 0.0
-    floating: false
+    - !ConcretePillar
+      xyz:
+        x: 0
+        y: -48
+        z: 0
+      x: Half
+      y: Half
+      height: M4_00
+      heading:
+        radians: 0.0
+    - !ConcretePillar
+      xyz:
+        x: 0
+        y: 48
+        z: 0
+      x: Half
+      y: Half
+      height: M4_00
+      heading:
+        radians: 0.0
+    - !ConcreteSlabWall
+      xyz:
+        x: 0
+        y: -24
+        z: 16
+      colour: Yellow
+      length: Four
+      pitch: Deg42
+      heading:
+        radians: -1.5707963267948966
+    - !ConcreteSlabWall
+      xyz:
+        x: 0
+        y: 24
+        z: 16
+      colour: Red
+      length: Four
+      pitch: Deg42
+      heading:
+        radians: 1.5707963267948966
+    - !TyreStack4Big
+      xyz:
+        x: -32
+        y: -48
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4Big
+      xyz:
+        x: -32
+        y: 48
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkLine
+      xyz:
+        x: -48
+        y: 0
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false

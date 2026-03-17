@@ -1,5 +1,8 @@
 use insim::{
-    builder::InsimTask, core::vehicle::Vehicle, identifiers::ConnectionId, insim::{Mal, Plc, PlcAllowedCarsSet}
+    builder::InsimTask,
+    core::vehicle::Vehicle,
+    identifiers::ConnectionId,
+    insim::{Mal, Plc, PlcAllowedCarsSet},
 };
 use kitcar::scenes::SceneError;
 
@@ -26,30 +29,31 @@ pub async fn apply(insim: &InsimTask, vehicles: &[Vehicle]) -> Result<(), SceneE
             match v {
                 Vehicle::Mod(_) => {
                     let _ = mal.insert(v.clone());
-                }
+                },
                 _ => {
                     let _ = cars.insert(v.clone());
-                }
+                },
             }
         }
         cars
     };
 
     insim
-        .send(Plc { cars, ucid: ConnectionId::ALL, ..Plc::default() })
+        .send(Plc {
+            cars,
+            ucid: ConnectionId::ALL,
+            ..Plc::default()
+        })
         .await
         .map_err(|cause| SceneError::Custom {
             scene: "vehicle_restrictions::plc",
             cause: Box::new(cause),
         })?;
 
-    insim
-        .send(mal)
-        .await
-        .map_err(|cause| SceneError::Custom {
-            scene: "vehicle_restrictions::mal",
-            cause: Box::new(cause),
-        })?;
+    insim.send(mal).await.map_err(|cause| SceneError::Custom {
+        scene: "vehicle_restrictions::mal",
+        cause: Box::new(cause),
+    })?;
 
     Ok(())
 }

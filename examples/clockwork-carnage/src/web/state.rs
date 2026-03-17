@@ -7,7 +7,7 @@ use axum::{
 use oauth2::{AuthUrl, ClientId, CsrfToken, RedirectUrl, basic::BasicClient};
 use tower_sessions::Session as TowerSession;
 
-use crate::web::{AuthSession};
+use crate::web::AuthSession;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -34,7 +34,11 @@ impl FromRequestParts<AppState> for PageCtx {
         let current_user = auth_session.user.as_ref().map(|u| u.uname.clone());
         let admin = auth_session.user.map(|u| u.admin).unwrap_or(false);
         let csrf_token = get_or_create_csrf_token(&session).await?;
-        Ok(PageCtx { current_user, admin, csrf_token })
+        Ok(PageCtx {
+            current_user,
+            admin,
+            csrf_token,
+        })
     }
 }
 

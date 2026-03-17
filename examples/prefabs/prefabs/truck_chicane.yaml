@@ -73,7 +73,6 @@
   heading:
     radians: 0.0
   floating: false
-
 # 5. tyre_wall_keyhole
 # A near-solid wall of TyreStack4Big spanning 10m across the track with a
 # single 4m gap at centre. Requires commitment and precise line.

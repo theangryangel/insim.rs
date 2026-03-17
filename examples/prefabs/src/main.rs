@@ -147,7 +147,7 @@ impl fmt::Display for SpawnOrigin {
                 };
                 write!(f, "nudge {heading} by {distance_metres} metres")
             },
-                    SpawnOrigin::JiggleSelection => write!(f, "jiggle selection"),
+            SpawnOrigin::JiggleSelection => write!(f, "jiggle selection"),
             SpawnOrigin::Mirror { axis } => match axis {
                 tools::mirror::MirrorAxis::X => write!(f, "mirror across X axis (left/right)"),
                 tools::mirror::MirrorAxis::Y => write!(f, "mirror across Y axis (front/back)"),
@@ -190,8 +190,13 @@ async fn run_command(
                 .unwrap_or_default();
             match state.prefabs.load_prefab(idx) {
                 Ok(prefab) => {
-                    let spawned =
-                        spawn_at_selection(connection, state, prefab.place_at_anchor(anchor), PmoAction::AddObjects).await?;
+                    let spawned = spawn_at_selection(
+                        connection,
+                        state,
+                        prefab.place_at_anchor(anchor),
+                        PmoAction::AddObjects,
+                    )
+                    .await?;
                     if spawned > 0 {
                         tracing::info!("Spawned {spawned} objects (prefab)");
                     }

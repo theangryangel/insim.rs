@@ -1,6 +1,6 @@
 use sqlx::Row;
 
-use super::{Pool, MetronomeStanding};
+use super::{MetronomeStanding, Pool};
 
 pub async fn insert_metronome_lap(
     pool: &Pool,
@@ -39,11 +39,14 @@ pub async fn metronome_standings(
     .fetch_all(pool)
     .await?;
 
-    Ok(rows.into_iter().map(|row| MetronomeStanding {
-        uname: row.get("uname"),
-        pname: row.get("pname"),
-        best_delta_ms: row.get("best_delta_ms"),
-    }).collect())
+    Ok(rows
+        .into_iter()
+        .map(|row| MetronomeStanding {
+            uname: row.get("uname"),
+            pname: row.get("pname"),
+            best_delta_ms: row.get("best_delta_ms"),
+        })
+        .collect())
 }
 
 pub async fn metronome_personal_best(

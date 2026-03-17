@@ -39,9 +39,8 @@ where
         let mut game = game::Game::from_context(ctx);
         let mut presence = presence::Presence::from_context(ctx);
 
-        let (_ui, _ui_handle) = ui::mount(insim.clone(), (), |_ucid, _invalidator| {
-            SetupTrackView {}
-        });
+        let (_ui, _ui_handle) =
+            ui::mount(insim.clone(), (), |_ucid, _invalidator| SetupTrackView {});
         tokio::select! {
             res = game.track_rotation(
                 insim.clone(),

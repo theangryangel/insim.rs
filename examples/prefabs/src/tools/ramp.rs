@@ -18,7 +18,7 @@ use super::spline;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RampMode {
     #[default]
-    AlongPath,  // Classic track surface: uses wedges and flat slabs
+    AlongPath, // Classic track surface: uses wedges and flat slabs
     AcrossPath, // Banked surface: sideways slabs with dynamic easing and overlapping
 }
 
@@ -126,8 +126,7 @@ pub fn build(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Object
                 // Outer corner gap = W·sin(dθ). For the outer corners of adjacent
                 // slabs to just touch, the seam advance must be s = L - W·tan(dθ/2).
                 let slab_width = concrete_width_length_metres(prototype.width);
-                let preview_pos =
-                    get_spline_pos((current_distance + base_step).min(total_len));
+                let preview_pos = get_spline_pos((current_distance + base_step).min(total_len));
                 let preview_heading = spline::heading_from_vec2_or_fallback(
                     (preview_pos - current_seam).truncate(),
                     prev_heading,
@@ -138,7 +137,9 @@ pub fn build(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Object
             RampMode::AcrossPath => base_step * 0.50, // 50% overlap for banked surface
         };
 
-        if step_metres <= f64::EPSILON { break; }
+        if step_metres <= f64::EPSILON {
+            break;
+        }
 
         // --- CALCULATE EXACT 3D CHORD ---
         let target_distance = (current_distance + step_metres).min(total_len);
@@ -184,14 +185,15 @@ pub fn build(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Object
                 let rise_metres = slope_degrees.abs().to_radians().tan() * step_metres;
                 let height_step = quantize_height_step(rise_metres);
                 let magnitude = height_metres_from_step(height_step);
-                let actual_rise = if slope_degrees < 0.0 { -magnitude } else { magnitude };
+                let actual_rise = if slope_degrees < 0.0 {
+                    -magnitude
+                } else {
+                    magnitude
+                };
 
                 let fwd = spline::heading_to_forward(chord_heading);
-                let actual_travel = DVec3::new(
-                    fwd.x * step_metres,
-                    fwd.y * step_metres,
-                    actual_rise,
-                );
+                let actual_travel =
+                    DVec3::new(fwd.x * step_metres, fwd.y * step_metres, actual_rise);
 
                 let center = current_seam + actual_travel * 0.5;
 
@@ -202,7 +204,11 @@ pub fn build(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Object
                     slab.pitch = ConcretePitch::Deg0;
                     output.push(ObjectInfo::ConcreteSlab(slab));
                 } else {
-                    let block_heading = if slope_degrees < 0.0 { chord_heading.opposite() } else { chord_heading };
+                    let block_heading = if slope_degrees < 0.0 {
+                        chord_heading.opposite()
+                    } else {
+                        chord_heading
+                    };
                     output.push(ObjectInfo::ConcreteRamp(ConcreteRamp {
                         xyz: ObjectCoordinate::from_dvec3_metres(center),
                         width: prototype.width,
@@ -213,7 +219,7 @@ pub fn build(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Object
                 }
 
                 current_seam += actual_travel;
-            }
+            },
         }
 
         prev_heading = chord_heading;

@@ -6,8 +6,7 @@ use axum::{
 use oauth2::{CsrfToken, Scope};
 use tower_sessions::Session as TowerSession;
 
-use crate::web::{AuthSession, OAuthCredentials};
-use crate::web::state::AppState;
+use crate::web::{AuthSession, OAuthCredentials, state::AppState};
 
 #[derive(serde::Deserialize)]
 pub struct AuthzResp {
@@ -45,17 +44,20 @@ pub async fn callback(
     if expected.as_deref() != Some(&params.state) {
         return StatusCode::BAD_REQUEST.into_response();
     }
-    let creds = OAuthCredentials { code: params.code, state: params.state };
+    let creds = OAuthCredentials {
+        code: params.code,
+        state: params.state,
+    };
     match auth_session.authenticate(creds).await {
         Ok(Some(user)) => {
             auth_session.login(&user).await.unwrap();
             Redirect::to("/").into_response()
-        }
+        },
         Ok(None) => StatusCode::UNAUTHORIZED.into_response(),
         Err(e) => {
             tracing::error!("Auth error: {e}");
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
-        }
+        },
     }
 }
 

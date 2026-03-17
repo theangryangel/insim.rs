@@ -81,8 +81,7 @@ impl Prefabs {
         let relative = to_relative(selection);
         let yaml = serde_norway::to_string(&relative)
             .map_err(|e| anyhow!("failed to serialize prefab yaml: {e}"))?;
-        fs::write(&path, yaml)
-            .map_err(|e| anyhow!("failed to write '{}': {e}", path.display()))?;
+        fs::write(&path, yaml).map_err(|e| anyhow!("failed to write '{}': {e}", path.display()))?;
 
         let display_name = path
             .file_stem()

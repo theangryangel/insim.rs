@@ -1,4 +1,5 @@
 # Clockwork Carnage
+
 PoC / dog fooding for the insim and kitcar crates
 
 ## Modes
@@ -8,6 +9,7 @@ PoC / dog fooding for the insim and kitcar crates
 Always-on time attack. Players cross a **Checkpoint 1** object to start a timed attempt, then reach a **Finish** object to record their time. Personal bests are tracked throughout the session. No rounds, no admin interaction required — players can retry immediately without leaving.
 
 **Mapper notes:**
+
 - Place at least one `Checkpoint 1` (start) and one `Finish` object.
 - Multiple instances of each are fine — any crossing counts.
 - The route between them is entirely up to the layout. Short technical sections, long straights, whatever suits the track.
@@ -20,14 +22,15 @@ Always-on precision challenge. Players cross a **Checkpoint 1** to start and a *
 
 **Tiers:**
 
-| Tier | Delta |
-|------|-------|
+| Tier     | Delta  |
+| -------- | ------ |
 | Platinum | ≤ 0.1s |
-| Gold | ≤ 0.5s |
-| Silver | ≤ 2s |
-| Bronze | ≤ 5s |
+| Gold     | ≤ 0.5s |
+| Silver   | ≤ 2s   |
+| Bronze   | ≤ 5s   |
 
 **Mapper notes:**
+
 - Same object requirements as Shortcut: one or more `Checkpoint 1` (start) and `Finish` objects.
 - The target time is set in the event configuration (`target_ms`), not the layout — design the route first, then measure a representative lap and set the target accordingly.
 - Works best on routes with a predictable feel (consistent braking points, no huge variance lap-to-lap) so players can dial in their timing.
@@ -41,17 +44,20 @@ Survival mode. Players hit **Checkpoint 1** objects to keep themselves alive. Th
 **Refresh checkpoints:** Place **Checkpoint 2**, **Checkpoint 3**, or **Finish** objects at key locations to act as refreshes — hitting one resets the timer to the full base window. Use these sparingly as a reward for surviving a hard section.
 
 **Checkpoint 1 — regular:**
+
 - Timer carries over: `next_window = remaining`
 - Arrive with 20s left → you have 20s to reach the next one
 - Arrive with 3s left → you have 3s
 
 **Checkpoint 2 / 3 / Finish — refresh:**
-- Timer resets to the full base window regardless of remaining time
+
+- Timer resets to the 1/4 base window regardless of remaining time
 - Announced to the player in yellow as `REFRESH`
 
 **Scoring:** checkpoint count, with survival time as a tiebreaker. Best run per session is recorded on the leaderboard.
 
 **Mapper notes:**
+
 - The base window (configured as `checkpoint_timeout_secs`) and the spacing between checkpoints together determine difficulty. A rough guide: `base_window ÷ average_time_between_checkpoints ≈ maximum checkpoints a skilled driver can reach`.
 - Aim for checkpoint gaps of **3–5 seconds** at push pace. Tighter than that and runs end almost immediately; wider and the timer barely matters.
 - Place one or two refresh (`Checkpoint 2/3` or `Finish`) objects after the hardest section of the route. Reaching the refresh should feel like an achievement — a second wind for players who survive.

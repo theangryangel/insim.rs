@@ -118,7 +118,7 @@ pub fn sample_lut(lut: &[LutEntry], target_distance: f64) -> LutEntry {
                     }
                 }
             }
-        }
+        },
     }
 }
 

@@ -1,7 +1,7 @@
 use insim::core::{track::Track, vehicle::Vehicle};
 use sqlx::{Row, types::Json};
 
-use super::{Pool, Event, EventMode};
+use super::{Event, EventMode, Pool};
 
 pub async fn has_scheduling_overlap(
     pool: &Pool,
@@ -118,16 +118,14 @@ pub async fn next_scheduled_event(pool: &Pool) -> Result<Option<(Event, i64)>, s
 
     let Some(event) = event else { return Ok(None) };
 
-    let secs: i64 = sqlx::query_scalar(
-        "SELECT CAST((julianday(?) - julianday('now')) * 86400 AS INTEGER)",
-    )
-    .bind(event.scheduled_at.as_deref())
-    .fetch_one(pool)
-    .await?;
+    let secs: i64 =
+        sqlx::query_scalar("SELECT CAST((julianday(?) - julianday('now')) * 86400 AS INTEGER)")
+            .bind(event.scheduled_at.as_deref())
+            .fetch_one(pool)
+            .await?;
 
     Ok(Some((event, secs)))
 }
-
 
 pub async fn create_metronome_event(
     pool: &Pool,
@@ -167,10 +165,7 @@ pub async fn create_shortcut_event(
     Ok(row.get("id"))
 }
 
-pub async fn create_bomb_event(
-    pool: &Pool,
-    p: &CreateBombParams,
-) -> Result<i64, sqlx::Error> {
+pub async fn create_bomb_event(pool: &Pool, p: &CreateBombParams) -> Result<i64, sqlx::Error> {
     let row = sqlx::query(
         "INSERT INTO events (mode, track, layout, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
@@ -251,13 +246,11 @@ pub async fn update_metronome_settings(
     event_id: i64,
     target_ms: i64,
 ) -> Result<(), sqlx::Error> {
-    let _ = sqlx::query(
-        "UPDATE events SET mode = json_set(mode, '$.target_ms', ?) WHERE id = ?",
-    )
-    .bind(target_ms)
-    .bind(event_id)
-    .execute(pool)
-    .await?;
+    let _ = sqlx::query("UPDATE events SET mode = json_set(mode, '$.target_ms', ?) WHERE id = ?")
+        .bind(target_ms)
+        .bind(event_id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
@@ -281,12 +274,10 @@ pub async fn update_vehicle_restrictions(
     event_id: i64,
     vehicles: &[Vehicle],
 ) -> Result<(), sqlx::Error> {
-    let _ = sqlx::query(
-        "UPDATE events SET allowed_vehicles = ? WHERE id = ?",
-    )
-    .bind(Json(vehicles.to_vec()))
-    .bind(event_id)
-    .execute(pool)
-    .await?;
+    let _ = sqlx::query("UPDATE events SET allowed_vehicles = ? WHERE id = ?")
+        .bind(Json(vehicles.to_vec()))
+        .bind(event_id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
