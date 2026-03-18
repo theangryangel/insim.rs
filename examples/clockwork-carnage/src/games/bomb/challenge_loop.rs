@@ -377,6 +377,9 @@ impl BombLoopInner {
                                     },
                                 };
 
+                                let is_refresh = true;
+                                let new_timeout = self.checkpoint_timeout;
+
                                 run.deadline = now + new_timeout;
                                 run.current_timeout = new_timeout;
                                 run.checkpoints += 1;

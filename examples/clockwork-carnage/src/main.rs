@@ -3,6 +3,8 @@
 #![allow(missing_docs, missing_debug_implementations)]
 
 mod db;
+
+use tracing_subscriber::fmt::format::FmtSpan;
 mod games;
 mod hud;
 mod web;

@@ -2,6 +2,8 @@
 //! This example showcases the shortcut methods
 use std::{net::SocketAddr, time::Duration};
 
+use tracing_subscriber::fmt::format::FmtSpan;
+
 use clap::Parser;
 use insim::{
     Packet, Result, WithRequestId,
@@ -58,6 +60,7 @@ pub async fn main() -> Result<()> {
     // Setup tracing_subcriber with some sane defaults
     tracing_subscriber::fmt::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
         .init();
 
     // Parse our command line arguments, using clap

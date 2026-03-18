@@ -6,6 +6,7 @@ use std::{
 
 use clap::Parser;
 use glam::Vec3;
+use tracing_subscriber::fmt::format::FmtSpan;
 use insim::{
     Packet, Result, WithRequestId,
     identifiers::{ClickId, PlayerId, RequestId},
@@ -137,6 +138,7 @@ pub fn main() -> Result<()> {
     // Setup tracing_subcriber with some sane defaults
     tracing_subscriber::fmt::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
         .init();
 
     // Parse our command line arguments, using clap

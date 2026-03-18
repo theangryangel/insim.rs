@@ -12,3 +12,4 @@ clap = { workspace = true, features = ["derive"] }
 insim = { path = "../../insim" }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
+tracing-tree = "0.4.1"

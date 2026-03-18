@@ -1,5 +1,7 @@
 use bytes::Buf;
 
+use crate::hex::HexDisplay;
+
 /// DecodeContext
 #[derive(Debug)]
 pub struct DecodeContext<'a> {
@@ -38,7 +40,7 @@ impl<'a> DecodeContext<'a> {
         if let Some(start) = start_buf {
             let consumed = start.len() - self.buf.len();
             if consumed > 0 {
-                tracing::trace!(bytes = ?&start.slice(..consumed), "ok");
+                tracing::trace!(bytes = %HexDisplay(&start.slice(..consumed)));
             }
         }
 

@@ -1,5 +1,7 @@
 use bytes::BufMut;
 
+use crate::hex::HexDisplay;
+
 /// EncodeContext
 #[derive(Debug)]
 pub struct EncodeContext<'a> {
@@ -25,7 +27,7 @@ impl<'a> EncodeContext<'a> {
         if tracing::enabled!(tracing::Level::TRACE) {
             let written = &self.buf[start_len..];
             if !written.is_empty() {
-                tracing::trace!(bytes = ?written, "ok");
+                tracing::trace!(bytes = %HexDisplay(written));
             }
         }
         Ok(())

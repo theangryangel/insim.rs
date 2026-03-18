@@ -11,7 +11,8 @@
 use bytes::Bytes;
 use clap::Parser;
 use insim::core::{Decode, DecodeContext};
-use tracing_subscriber::fmt::format::FmtSpan;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_tree::HierarchicalLayer;
 
 #[derive(Parser)]
 #[command(author, version, about)]
@@ -65,15 +66,14 @@ fn parse_escape_sequences(s: &str) -> Result<Vec<u8>, String> {
 fn main() {
     // Force insim_core to TRACE so every field decode is logged.
     // Override specific targets via RUST_LOG if needed.
-    tracing_subscriber::fmt()
-        .with_env_filter(
+    tracing_subscriber::registry()
+        .with(
             tracing_subscriber::EnvFilter::builder()
                 .with_default_directive(tracing::Level::WARN.into())
                 .from_env_lossy()
                 .add_directive("insim_core=trace".parse().expect("valid directive")),
         )
-        .with_span_events(FmtSpan::NONE)
-        .with_target(true)
+        .with(HierarchicalLayer::new(2).with_targets(true))
         .init();
 
     let cli = Cli::parse();

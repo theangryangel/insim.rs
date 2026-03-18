@@ -4,6 +4,7 @@
 #[cfg(test)]
 extern crate criterion as _; // Needed for cargo bench. BARF.
 
+pub(crate) mod hex;
 pub mod angvel;
 pub mod coordinate;
 pub mod dash_lights;

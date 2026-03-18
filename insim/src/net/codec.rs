@@ -1,4 +1,7 @@
-use std::time::{Duration, Instant};
+use std::{
+    fmt,
+    time::{Duration, Instant},
+};
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use insim_core::{Decode, DecodeContext, DecodeErrorKind, Encode, EncodeContext, EncodeErrorKind};
@@ -11,6 +14,20 @@ use crate::{
     packet::Packet,
     result::Result,
 };
+
+struct HexDisplay<'a>(&'a [u8]);
+
+impl fmt::Display for HexDisplay<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (i, b) in self.0.iter().enumerate() {
+            if i > 0 {
+                f.write_str(" ")?;
+            }
+            write!(f, "{b:02x}")?;
+        }
+        Ok(())
+    }
+}
 
 const MAX_PACKET_SIZE: usize = 1020;
 const MIN_PACKET_SIZE: usize = 4;
@@ -110,7 +127,7 @@ impl Codec {
 
         let mut data = self.buffer.split_to(n).freeze();
 
-        tracing::trace!("{:?}", data);
+        tracing::trace!(bytes = %HexDisplay(&data), "raw packet");
 
         self.timeout_at = Instant::now() + Duration::from_secs(DEFAULT_TIMEOUT_SECS);
 

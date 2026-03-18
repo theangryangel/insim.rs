@@ -2,6 +2,8 @@
 //! This example showcases the shortcut methods
 use std::{net::SocketAddr, time::Duration};
 
+use tracing_subscriber::fmt::format::FmtSpan;
+
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -44,6 +46,7 @@ fn setup_tracing_subscriber() {
                 .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
                 .from_env_lossy(),
         )
+        .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
         .init();
 }
 

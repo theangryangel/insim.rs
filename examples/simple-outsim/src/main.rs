@@ -3,6 +3,7 @@ use std::net::UdpSocket;
 
 use bytes::{Bytes, BytesMut};
 use outsim::{core::{Decode, DecodeContext}, OutsimPack};
+use tracing_subscriber::fmt::format::FmtSpan;
 
 /// Setup tracing output
 fn setup_tracing_subscriber() {
@@ -13,6 +14,7 @@ fn setup_tracing_subscriber() {
                 .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
                 .from_env_lossy(),
         )
+        .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
         .init();
 }
 

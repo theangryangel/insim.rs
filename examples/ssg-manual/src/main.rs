@@ -2,6 +2,7 @@
 use std::{net::SocketAddr, time::Duration};
 
 use bytes::{Buf, Bytes, BytesMut};
+use tracing_subscriber::fmt::format::FmtSpan;
 use clap::Parser;
 use insim::{core::{Decode, DecodeContext}, insim::SmallType, Packet};
 use outgauge::Outgauge;
@@ -29,6 +30,7 @@ fn setup_tracing_subscriber() {
                 .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
                 .from_env_lossy(),
         )
+        .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
         .init();
 }
 
