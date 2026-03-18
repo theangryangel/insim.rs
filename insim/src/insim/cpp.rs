@@ -57,7 +57,7 @@ impl Decode for Cpp {
         let ingamecam = ctx.decode::<CameraView>("ingamecam")?;
 
         let fov = ctx.decode::<f32>("fov")?;
-        let time = Duration::from_millis(ctx.decode::<u16>("time")? as u64);
+        let time = ctx.decode_duration::<u16>("time")?;
         let flags = ctx.decode::<StaFlags>("flags")?;
 
         Ok(Self {
@@ -89,7 +89,7 @@ impl Encode for Cpp {
         ctx.encode("viewplid", &self.viewplid)?;
         ctx.encode("ingamecam", &self.ingamecam)?;
         ctx.encode("fov", &self.fov)?;
-        ctx.encode("time", &(self.time.as_millis() as u16))?;
+        ctx.encode_duration::<u16>("time", self.time)?;
         ctx.encode("flags", &self.flags)?;
 
         Ok(())

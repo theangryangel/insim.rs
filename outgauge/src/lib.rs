@@ -138,8 +138,7 @@ pub struct Outgauge {
 
 impl Encode for Outgauge {
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
-        let time = self.time.as_millis();
-        ctx.encode("time", &(time as u32))?;
+        ctx.encode_duration::<u32>("time", self.time)?;
         ctx.encode("car", &self.car)?;
         ctx.encode("flags", &self.flags)?;
         ctx.encode("gear", &self.gear)?;
@@ -167,7 +166,7 @@ impl Encode for Outgauge {
 
 impl Decode for Outgauge {
     fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
-        let time = Duration::from_millis(ctx.decode::<u32>("time")? as u64);
+        let time = ctx.decode_duration::<u32>("time")?;
         let car = ctx.decode::<Vehicle>("car")?;
         let flags = ctx.decode::<OutgaugeFlags>("flags")?;
         let gear = ctx.decode::<Gear>("gear")?;

@@ -151,7 +151,7 @@ impl Decode for Obh {
         let spclose = Speed::from_meters_per_sec(spclose as f32 / 10.0);
         ctx.pad("spw", 2)?;
 
-        let time = Duration::from_millis(ctx.decode::<u32>("time")? as u64);
+        let time = ctx.decode_duration::<u32>("time")?;
         let c = ctx.decode::<CarContact>("c")?;
         // FIXME: become glam Vec
         let x = ctx.decode::<i16>("x")?;
@@ -183,17 +183,7 @@ impl Encode for Obh {
         let spclose = spclose_strip_high_bits((self.spclose.into_inner() * 10.0) as u16);
         ctx.encode("spclose", &spclose)?;
         ctx.pad("spw", 2)?;
-        match u32::try_from(self.time.as_millis()) {
-            Ok(time) => ctx.encode("time", &time)?,
-            Err(_) => {
-                return Err(insim_core::EncodeErrorKind::OutOfRange {
-                    min: 0,
-                    max: u32::MAX as usize,
-                    found: self.time.as_millis() as usize,
-                }
-                .context("Obh time out of range"));
-            },
-        }
+        ctx.encode_duration::<u32>("time", self.time)?;
         ctx.encode("c", &self.c)?;
         ctx.encode("x", &self.x)?;
         ctx.encode("y", &self.y)?;

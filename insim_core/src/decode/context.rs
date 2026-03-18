@@ -62,6 +62,26 @@ impl<'a> DecodeContext<'a> {
         })
     }
 
+    /// Read a primitive integer and convert it to a [std::time::Duration] in milliseconds.
+    pub fn decode_duration<T>(&mut self, name: &'static str) -> Result<std::time::Duration, super::DecodeError>
+    where
+        T: super::Decode + num_traits::ToPrimitive,
+    {
+        self.op(name, |ctx| {
+            let raw = T::decode(ctx)?;
+            raw.to_u64()
+                .map(std::time::Duration::from_millis)
+                .ok_or_else(|| {
+                    super::DecodeErrorKind::OutOfRange {
+                        min: 0,
+                        max: u64::MAX as usize,
+                        found: raw.to_usize().unwrap_or(usize::MAX),
+                    }
+                    .into()
+                })
+        })
+    }
+
     /// Special case: fixed length codepage string
     pub fn decode_codepage(&mut self, name: &'static str, len: usize) -> Result<String, super::DecodeError> {
         self.op(name, |reader| {

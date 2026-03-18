@@ -69,11 +69,7 @@ impl Field {
         } else if let Some(duration_repr) = f.duration.as_ref() {
             tokens = quote! {
                 #tokens
-                let __raw_field_name = ctx.decode::<#duration_repr>(#context)?;
-                let #field_name = match TryInto::<u64>::try_into(__raw_field_name) {
-                    Ok(v) => std::time::Duration::from_millis(v),
-                    Err(_) => return Err(::insim_core::DecodeErrorKind::OutOfRange { min: 0, max: u64::MAX as usize, found: __raw_field_name as usize }.context(#context)),
-                };
+                let #field_name = ctx.decode_duration::<#duration_repr>(#context)?;
             };
         } else {
             // converts a Vec<u8> into Vec::<u8> for usage in the decoding calls
@@ -166,10 +162,7 @@ impl Field {
         } else if let Some(duration_repr) = f.duration.as_ref() {
             tokens = quote! {
                 #tokens
-                match #duration_repr::try_from(self.#field_name.as_millis()) {
-                    Ok(v) => ctx.encode(#context, &v)?,
-                    Err(_) => return Err(::insim_core::EncodeErrorKind::OutOfRange { min: 0, max: #duration_repr::MAX as usize, found: self.#field_name.as_millis() as usize}.context(#context))
-                };
+                ctx.encode_duration::<#duration_repr>(#context, self.#field_name)?;
             };
         } else {
             tokens = quote! {

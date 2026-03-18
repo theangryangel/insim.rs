@@ -40,8 +40,7 @@ pub struct OutsimPack {
 
 impl Encode for OutsimPack {
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
-        let time = self.time.as_millis();
-        ctx.encode("time", &(time as u32))?;
+        ctx.encode_duration::<u32>("time", self.time)?;
         ctx.encode("angvel", &self.angvel)?;
         ctx.encode("heading", &self.heading)?;
         ctx.encode("pitch", &self.pitch)?;
@@ -58,7 +57,7 @@ impl Encode for OutsimPack {
 
 impl Decode for OutsimPack {
     fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
-        let time = Duration::from_millis(ctx.decode::<u32>("time")? as u64);
+        let time = ctx.decode_duration::<u32>("time")?;
         let angvel = ctx.decode::<Vector>("angvel")?;
         let heading = ctx.decode::<f32>("heading")?;
         let pitch = ctx.decode::<f32>("pitch")?;

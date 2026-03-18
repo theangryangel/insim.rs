@@ -40,6 +40,7 @@ encoding_rs = { workspace = true }
 glam = { workspace = true, optional = true }
 insim_macros = { path = "../insim_macros", version = "0.2.0" }
 itertools = { workspace = true }
+num-traits = { workspace = true }
 serde = { workspace = true, features = ["derive"], optional = true }
 smallvec = { workspace = true }
 thiserror = { workspace = true }

@@ -224,8 +224,7 @@ impl Decode for Con {
         let spclose = spclose_strip_high_bits(ctx.decode::<u16>("spclose")?);
         let spclose = Speed::from_meters_per_sec(spclose as f32 / 10.0);
         ctx.pad("spw", 2)?;
-        let time = ctx.decode::<u32>("time")? as u64;
-        let time = Duration::from_millis(time);
+        let time = ctx.decode_duration::<u32>("time")?;
 
         let a = ctx.decode::<ConInfo>("a")?;
         let b = ctx.decode::<ConInfo>("b")?;
@@ -245,17 +244,7 @@ impl Encode for Con {
         ctx.encode("reqi", &self.reqi)?;
         ctx.pad("sp0", 1)?;
         ctx.encode("spclose", &spclose_strip_high_bits((self.spclose.to_meters_per_sec() * 10.0) as u16))?;
-        match TryInto::<u32>::try_into(self.time.as_millis()) {
-            Ok(time) => ctx.encode("time", &time)?,
-            Err(_) => {
-                return Err(insim_core::EncodeErrorKind::OutOfRange {
-                    min: 0,
-                    max: u32::MAX as usize,
-                    found: self.time.as_millis() as usize,
-                }
-                .context("Con::spclose"));
-            },
-        }
+        ctx.encode_duration::<u32>("time", self.time)?;
         ctx.encode("a", &self.a)?;
         ctx.encode("b", &self.b)?;
         Ok(())

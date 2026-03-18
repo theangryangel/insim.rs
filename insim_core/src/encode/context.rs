@@ -44,6 +44,26 @@ impl<'a> EncodeContext<'a> {
         self.op(name, |writer| val.encode(writer))
     }
 
+    /// Convert a [std::time::Duration] to milliseconds and encode it as a primitive integer.
+    pub fn encode_duration<T>(&mut self, name: &'static str, val: std::time::Duration) -> Result<(), super::EncodeError>
+    where
+        T: super::Encode + num_traits::NumCast + num_traits::Bounded,
+    {
+        self.op(name, |ctx| {
+            let millis = val.as_millis();
+            let max = num_traits::cast::<T, usize>(T::max_value()).unwrap_or(usize::MAX);
+            match num_traits::cast::<u128, T>(millis) {
+                Some(v) => v.encode(ctx),
+                None => Err(super::EncodeErrorKind::OutOfRange {
+                    min: 0,
+                    max,
+                    found: millis as usize,
+                }
+                .into()),
+            }
+        })
+    }
+
     /// Write
     pub fn encode_ascii<T: AsRef<str>>(
         &mut self,

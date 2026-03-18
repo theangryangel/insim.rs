@@ -200,8 +200,7 @@ impl OutsimPack2 {
         }
 
         if opts.contains(OutSimOpts::TIME) {
-            let time = Duration::from_millis(ctx.decode::<u32>("time")? as u64);
-            val.time = Some(time);
+            val.time = Some(ctx.decode_duration::<u32>("time")?);
         }
 
         if opts.contains(OutSimOpts::MAIN) {
@@ -256,7 +255,7 @@ impl OutsimPack2 {
         }
 
         if opts.contains(OutSimOpts::TIME) {
-            ctx.encode("time", &(self.time.unwrap_or_default().as_millis() as u32))?;
+            ctx.encode_duration::<u32>("time", self.time.unwrap_or_default())?;
         }
 
         if opts.contains(OutSimOpts::MAIN) {
