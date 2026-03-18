@@ -49,7 +49,7 @@ impl Codec {
     }
 
     /// Encode a [Packet] into [Bytes].
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn encode(&self, msg: &Packet) -> Result<Bytes> {
         let mut buf = BytesMut::with_capacity(msg.size_hint());
 
@@ -71,7 +71,7 @@ impl Codec {
     }
 
     /// Feed the codec with bytes
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all, fields(len = src.len()))]
     pub fn feed(&mut self, src: &[u8]) {
         if src.is_empty() {
             return;
@@ -87,7 +87,6 @@ impl Codec {
     /// This function will automatically to see if there is space in the buffer for a full insim
     /// packet. If there is not it reserves the required space to do so. This is a safety mechanism
     /// to ensure that usage with UdpSocket does not fail.
-    #[tracing::instrument]
     pub fn buf_mut(&mut self) -> &mut BytesMut {
         if self.buffer.remaining_mut() < MAX_SIZE_PACKET {
             self.buffer.reserve(MAX_SIZE_PACKET);
@@ -96,7 +95,7 @@ impl Codec {
     }
 
     /// Decode any complete packet in the buffer into a [Packet]
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all)]
     pub fn decode(&mut self) -> Result<Option<Packet>> {
         if self.buffer.is_empty() {
             return Ok(None);
@@ -110,6 +109,8 @@ impl Codec {
         };
 
         let mut data = self.buffer.split_to(n).freeze();
+
+        tracing::trace!("{:?}", data);
 
         self.timeout_at = Instant::now() + Duration::from_secs(DEFAULT_TIMEOUT_SECS);
 
@@ -181,7 +182,7 @@ impl Codec {
 
     /// Given a single packet in dst, encode it's length, and ensure that it does not
     /// exceed maximum limits
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all, level = "trace")]
     fn encode_length(&self, len: usize) -> Result<u8> {
         if !(MIN_PACKET_SIZE..=MAX_PACKET_SIZE).contains(&len) {
             return Err(EncodeErrorKind::OutOfRange {
@@ -210,7 +211,7 @@ impl Codec {
 
     /// Decode the length of the next packet in the buffer src, ensuring that it does
     /// not exceed limits.
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all, level = "trace")]
     fn decode_length(&self, src: &BytesMut) -> Result<Option<usize>> {
         if src.len() < MIN_PACKET_SIZE {
             // Not enough data for even the header

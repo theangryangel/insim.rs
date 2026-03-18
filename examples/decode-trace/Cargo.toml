@@ -1,0 +1,14 @@
+[package]
+name = "decode-trace"
+version = "0.1.0-unreleased"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+bytes = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+insim = { path = "../../insim" }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
