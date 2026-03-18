@@ -1,8 +1,7 @@
 use std::time::Duration;
 
 use bitflags::bitflags;
-use bytes::{Buf, BufMut};
-use insim_core::{Decode, Encode, heading::Heading, speed::Speed};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext, heading::Heading, speed::Speed};
 
 use crate::identifiers::{PlayerId, RequestId};
 
@@ -64,20 +63,17 @@ pub struct CarContact {
 }
 
 impl Decode for CarContact {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let direction_raw =
-            u8::decode(buf).map_err(|e| e.nested().context("CarContact::direction_raw"))?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let direction_raw = ctx.decode::<u8>("direction_raw")?;
         let direction = Heading::from_degrees((direction_raw as f64) * CARCONTACT_DEGREES_PER_UNIT);
 
-        let heading_raw =
-            u8::decode(buf).map_err(|e| e.nested().context("CarContact::heading_raw"))?;
+        let heading_raw = ctx.decode::<u8>("heading_raw")?;
         let heading = Heading::from_degrees((heading_raw as f64) * CARCONTACT_DEGREES_PER_UNIT);
 
-        let speed = u8::decode(buf).map_err(|e| e.nested().context("CarContact::speed"))?;
-        let speed = Speed::from_meters_per_sec(speed as f32);
-        let z = u8::decode(buf).map_err(|e| e.nested().context("CarContact::z"))?;
-        let x = i16::decode(buf).map_err(|e| e.nested().context("CarContact::x"))?;
-        let y = i16::decode(buf).map_err(|e| e.nested().context("CarContact::y"))?;
+        let speed = Speed::from_meters_per_sec(ctx.decode::<u8>("speed")? as f32);
+        let z = ctx.decode::<u8>("z")?;
+        let x = ctx.decode::<i16>("x")?;
+        let y = ctx.decode::<i16>("y")?;
         Ok(Self {
             direction,
             heading,
@@ -90,33 +86,21 @@ impl Decode for CarContact {
 }
 
 impl Encode for CarContact {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
         let direction_units = (self.direction.to_degrees() / CARCONTACT_DEGREES_PER_UNIT)
             .round()
             .clamp(0.0, 255.0) as u8;
-        direction_units
-            .encode(buf)
-            .map_err(|e| e.nested().context("CarContact::direction"))?;
+        ctx.encode("direction", &direction_units)?;
 
         let heading_units = (self.heading.to_degrees() / CARCONTACT_DEGREES_PER_UNIT)
             .round()
             .clamp(0.0, 255.0) as u8;
-        heading_units
-            .encode(buf)
-            .map_err(|e| e.nested().context("CarContact::heading"))?;
+        ctx.encode("heading", &heading_units)?;
 
-        (self.speed.to_meters_per_sec() as u8)
-            .encode(buf)
-            .map_err(|e| e.nested().context("CarContact::speed"))?;
-        self.z
-            .encode(buf)
-            .map_err(|e| e.nested().context("CarContact::z"))?;
-        self.x
-            .encode(buf)
-            .map_err(|e| e.nested().context("CarContact::x"))?;
-        self.y
-            .encode(buf)
-            .map_err(|e| e.nested().context("CarContact::y"))?;
+        ctx.encode("speed", &(self.speed.to_meters_per_sec() as u8))?;
+        ctx.encode("z", &self.z)?;
+        ctx.encode("x", &self.x)?;
+        ctx.encode("y", &self.y)?;
         Ok(())
     }
 }
@@ -159,27 +143,23 @@ pub struct Obh {
 }
 
 impl Decode for Obh {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf).map_err(|e| e.nested().context("Obh::reqi"))?;
-        let plid = PlayerId::decode(buf).map_err(|e| e.nested().context("Obh::plid"))?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let reqi = ctx.decode::<RequestId>("reqi")?;
+        let plid = ctx.decode::<PlayerId>("plid")?;
         // automatically strip off the first 4 bits as they're reserved
-        let spclose = spclose_strip_high_bits(
-            u16::decode(buf).map_err(|e| e.nested().context("Obh::spclose"))?,
-        );
+        let spclose = spclose_strip_high_bits(ctx.decode::<u16>("spclose")?);
         let spclose = Speed::from_meters_per_sec(spclose as f32 / 10.0);
-        buf.advance(2);
+        ctx.pad("spw", 2)?;
 
-        let time = Duration::from_millis(
-            u32::decode(buf).map_err(|e| e.nested().context("Obh::time"))? as u64,
-        );
-        let c = CarContact::decode(buf).map_err(|e| e.nested().context("Obh::c"))?;
+        let time = Duration::from_millis(ctx.decode::<u32>("time")? as u64);
+        let c = ctx.decode::<CarContact>("c")?;
         // FIXME: become glam Vec
-        let x = i16::decode(buf).map_err(|e| e.nested().context("Obh::x"))?;
-        let y = i16::decode(buf).map_err(|e| e.nested().context("Obh::y"))?;
-        let zbyte = u8::decode(buf).map_err(|e| e.nested().context("Obh::zbyte"))?;
-        buf.advance(1);
-        let index = u8::decode(buf).map_err(|e| e.nested().context("Obh::index"))?;
-        let flags = ObhFlags::decode(buf).map_err(|e| e.nested().context("Obh::flags"))?;
+        let x = ctx.decode::<i16>("x")?;
+        let y = ctx.decode::<i16>("y")?;
+        let zbyte = ctx.decode::<u8>("zbyte")?;
+        ctx.pad("sp1", 1)?;
+        let index = ctx.decode::<u8>("index")?;
+        let flags = ctx.decode::<ObhFlags>("flags")?;
         Ok(Self {
             reqi,
             plid,
@@ -196,23 +176,15 @@ impl Decode for Obh {
 }
 
 impl Encode for Obh {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi
-            .encode(buf)
-            .map_err(|e| e.nested().context("Obh::reqi"))?;
-        self.plid
-            .encode(buf)
-            .map_err(|e| e.nested().context("Obh::plid"))?;
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("reqi", &self.reqi)?;
+        ctx.encode("plid", &self.plid)?;
         // automatically strip off the first 4 bits as they're reserved
         let spclose = spclose_strip_high_bits((self.spclose.into_inner() * 10.0) as u16);
-        spclose
-            .encode(buf)
-            .map_err(|e| e.nested().context("Obh::spclose"))?;
-        buf.put_bytes(0, 2);
+        ctx.encode("spclose", &spclose)?;
+        ctx.pad("spw", 2)?;
         match u32::try_from(self.time.as_millis()) {
-            Ok(time) => time
-                .encode(buf)
-                .map_err(|e| e.nested().context("Obh::time"))?,
+            Ok(time) => ctx.encode("time", &time)?,
             Err(_) => {
                 return Err(insim_core::EncodeErrorKind::OutOfRange {
                     min: 0,
@@ -222,25 +194,13 @@ impl Encode for Obh {
                 .context("Obh time out of range"));
             },
         }
-        self.c
-            .encode(buf)
-            .map_err(|e| e.nested().context("Obh::c"))?;
-        self.x
-            .encode(buf)
-            .map_err(|e| e.nested().context("Obh::x"))?;
-        self.y
-            .encode(buf)
-            .map_err(|e| e.nested().context("Obh::y"))?;
-        self.zbyte
-            .encode(buf)
-            .map_err(|e| e.nested().context("Obh::zbyte"))?;
-        buf.put_bytes(0, 1);
-        self.index
-            .encode(buf)
-            .map_err(|e| e.nested().context("Obh::index"))?;
-        self.flags
-            .encode(buf)
-            .map_err(|e| e.nested().context("Obh::flags"))?;
+        ctx.encode("c", &self.c)?;
+        ctx.encode("x", &self.x)?;
+        ctx.encode("y", &self.y)?;
+        ctx.encode("zbyte", &self.zbyte)?;
+        ctx.pad("sp1", 1)?;
+        ctx.encode("index", &self.index)?;
+        ctx.encode("flags", &self.flags)?;
         Ok(())
     }
 }

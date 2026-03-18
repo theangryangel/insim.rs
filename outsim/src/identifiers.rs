@@ -6,8 +6,7 @@ use std::{
 };
 
 pub use ::insim_core as core;
-use bytes::{Buf, BufMut};
-use insim_core::{Decode, Encode};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 
 /// Unique Player Identifier, commonly referred to as PLID in Insim.txt
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
@@ -41,15 +40,13 @@ impl From<i32> for OutsimId {
 }
 
 impl Decode for OutsimId {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        Ok(OutsimId(buf.get_i32_le()))
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        ctx.decode::<i32>("val").map(OutsimId)
     }
 }
 
 impl Encode for OutsimId {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        buf.put_i32_le(self.0);
-
-        Ok(())
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("val", &self.0)
     }
 }

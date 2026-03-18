@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use insim_core::{Decode, Encode};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 
 use super::{PenaltyInfo, PlayerFlags};
 use crate::identifiers::{PlayerId, RequestId};
@@ -19,8 +19,8 @@ pub enum Fuel200 {
 }
 
 impl Decode for Fuel200 {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let data = u8::decode(buf).map_err(|e| e.nested().context("Fuel200::data"))?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let data = ctx.decode::<u8>("data")?;
 
         if data == 255 {
             Ok(Self::No)
@@ -31,14 +31,13 @@ impl Decode for Fuel200 {
 }
 
 impl Encode for Fuel200 {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
         let data = match self {
             Self::Percentage(data) => *data,
             Self::No => 255_u8,
         };
 
-        data.encode(buf)
-            .map_err(|e| e.nested().context("Fuel200::data"))
+        ctx.encode("data", &data)
     }
 }
 
@@ -56,8 +55,8 @@ pub enum Fuel {
 }
 
 impl Decode for Fuel {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let data = u8::decode(buf).map_err(|e| e.nested().context("Fuel::data"))?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let data = ctx.decode::<u8>("data")?;
         if data == 255 {
             Ok(Self::No)
         } else {
@@ -67,13 +66,12 @@ impl Decode for Fuel {
 }
 
 impl Encode for Fuel {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
         let data = match self {
             Self::Percentage(data) => *data,
             Self::No => 255_u8,
         };
-        data.encode(buf)
-            .map_err(|e| e.nested().context("Fuel::data"))?;
+        ctx.encode("data", &data)?;
         Ok(())
     }
 }

@@ -21,6 +21,6 @@ pub mod track;
 pub mod vector;
 pub mod vehicle;
 pub mod wind;
-pub use decode::{Decode, DecodeError, DecodeErrorKind, DecodeString};
-pub use encode::{Encode, EncodeError, EncodeErrorKind, EncodeString};
+pub use decode::{Decode, DecodeContext, DecodeError, DecodeErrorKind};
+pub use encode::{Encode, EncodeContext, EncodeError, EncodeErrorKind};
 pub use insim_macros::{Decode, Encode};

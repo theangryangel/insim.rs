@@ -7,9 +7,10 @@ macro_rules! assert_from_to_bytes {
         parsed_buf.extend_from_slice(&raw);
 
         let mut parsed_buf = parsed_buf.freeze();
+        let mut decode_ctx = ::insim_core::DecodeContext::new(&mut parsed_buf);
 
-        let parsed = <$thing as ::insim_core::Decode>::decode(&mut parsed_buf).unwrap();
-        let remaining = <::bytes::Bytes as ::bytes::Buf>::remaining(&parsed_buf);
+        let parsed = <$thing as ::insim_core::Decode>::decode(&mut decode_ctx).unwrap();
+        let remaining = <::bytes::Bytes as ::bytes::Buf>::remaining(decode_ctx.buf);
         assert_eq!(
             remaining, 0,
             "expected 0 remaining bytes, found {}",
@@ -17,7 +18,8 @@ macro_rules! assert_from_to_bytes {
         );
 
         let mut written_buf = ::bytes::BytesMut::new();
-        <$thing as ::insim_core::Encode>::encode(&parsed, &mut written_buf).unwrap();
+        let mut encode_ctx = ::insim_core::EncodeContext::new(&mut written_buf);
+        <$thing as ::insim_core::Encode>::encode(&parsed, &mut encode_ctx).unwrap();
 
         assert_eq!(
             written_buf.as_ref(),

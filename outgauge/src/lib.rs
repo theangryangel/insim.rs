@@ -9,9 +9,9 @@ use std::{
 };
 
 pub use ::insim_core as core;
-use bytes::{Buf, BufMut};
+use bytes::Buf;
 use insim_core::{
-    Decode, DecodeString, Encode, EncodeString, dash_lights::DashLights, gear::Gear,
+    Decode, DecodeContext, Encode, EncodeContext, dash_lights::DashLights, gear::Gear,
     identifiers::PlayerId, speed::Speed, vehicle::Vehicle,
 };
 
@@ -35,14 +35,14 @@ bitflags::bitflags! {
 }
 
 impl Encode for OutgaugeFlags {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.bits().encode(buf)
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("bits", &self.bits())
     }
 }
 
 impl Decode for OutgaugeFlags {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        Ok(Self::from_bits_truncate(u16::decode(buf)?))
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        ctx.decode::<u16>("bits").map(Self::from_bits_truncate)
     }
 }
 
@@ -78,16 +78,14 @@ impl From<i32> for OutgaugeId {
 }
 
 impl Decode for OutgaugeId {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        Ok(OutgaugeId(buf.get_i32_le()))
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        ctx.decode::<i32>("val").map(OutgaugeId)
     }
 }
 
 impl Encode for OutgaugeId {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        buf.put_i32_le(self.0);
-
-        Ok(())
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("val", &self.0)
     }
 }
 
@@ -139,61 +137,61 @@ pub struct Outgauge {
 }
 
 impl Encode for Outgauge {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
         let time = self.time.as_millis();
-        (time as u32).encode(buf)?;
-        self.car.encode(buf)?;
-        self.flags.encode(buf)?;
-        self.gear.encode(buf)?;
-        self.plid.encode(buf)?;
-        self.speed.to_meters_per_sec().encode(buf)?;
-        self.rpm.encode(buf)?;
-        self.turbo.encode(buf)?;
-        self.engtemp.encode(buf)?;
-        self.fuel.encode(buf)?;
-        self.oilpressure.encode(buf)?;
-        self.oiltemp.encode(buf)?;
-        self.dashlights.encode(buf)?;
-        self.showlights.encode(buf)?;
-        self.throttle.encode(buf)?;
-        self.clutch.encode(buf)?;
-        self.brake.encode(buf)?;
-        self.display1.encode_ascii(buf, 16, false)?;
-        self.display2.encode_ascii(buf, 16, false)?;
+        ctx.encode("time", &(time as u32))?;
+        ctx.encode("car", &self.car)?;
+        ctx.encode("flags", &self.flags)?;
+        ctx.encode("gear", &self.gear)?;
+        ctx.encode("plid", &self.plid)?;
+        ctx.encode("speed", &self.speed.to_meters_per_sec())?;
+        ctx.encode("rpm", &self.rpm)?;
+        ctx.encode("turbo", &self.turbo)?;
+        ctx.encode("engtemp", &self.engtemp)?;
+        ctx.encode("fuel", &self.fuel)?;
+        ctx.encode("oilpressure", &self.oilpressure)?;
+        ctx.encode("oiltemp", &self.oiltemp)?;
+        ctx.encode("dashlights", &self.dashlights)?;
+        ctx.encode("showlights", &self.showlights)?;
+        ctx.encode("throttle", &self.throttle)?;
+        ctx.encode("clutch", &self.clutch)?;
+        ctx.encode("brake", &self.brake)?;
+        ctx.encode_ascii("display1", &self.display1, 16, false)?;
+        ctx.encode_ascii("display2", &self.display2, 16, false)?;
         if let Some(id) = self.id {
-            id.encode(buf)?;
+            ctx.encode("id", &id)?;
         }
         Ok(())
     }
 }
 
 impl Decode for Outgauge {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let time = Duration::from_millis(u32::decode(buf)? as u64);
-        let car = Vehicle::decode(buf)?;
-        let flags = OutgaugeFlags::decode(buf)?;
-        let gear = Gear::decode(buf)?;
-        let plid = PlayerId::decode(buf)?;
-        let speed = Speed::from_meters_per_sec(f32::decode(buf)?);
-        let rpm = f32::decode(buf)?;
-        let turbo = f32::decode(buf)?;
-        let engtemp = f32::decode(buf)?;
-        let fuel = f32::decode(buf)?;
-        let oilpressure = f32::decode(buf)?;
-        let oiltemp = f32::decode(buf)?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let time = Duration::from_millis(ctx.decode::<u32>("time")? as u64);
+        let car = ctx.decode::<Vehicle>("car")?;
+        let flags = ctx.decode::<OutgaugeFlags>("flags")?;
+        let gear = ctx.decode::<Gear>("gear")?;
+        let plid = ctx.decode::<PlayerId>("plid")?;
+        let speed = Speed::from_meters_per_sec(ctx.decode::<f32>("speed")?);
+        let rpm = ctx.decode::<f32>("rpm")?;
+        let turbo = ctx.decode::<f32>("turbo")?;
+        let engtemp = ctx.decode::<f32>("engtemp")?;
+        let fuel = ctx.decode::<f32>("fuel")?;
+        let oilpressure = ctx.decode::<f32>("oilpressure")?;
+        let oiltemp = ctx.decode::<f32>("oiltemp")?;
 
-        let dashlights = DashLights::decode(buf)?;
-        let showlights = DashLights::decode(buf)?;
+        let dashlights = ctx.decode::<DashLights>("dashlights")?;
+        let showlights = ctx.decode::<DashLights>("showlights")?;
 
-        let throttle = f32::decode(buf)?;
-        let clutch = f32::decode(buf)?;
-        let brake = f32::decode(buf)?;
+        let throttle = ctx.decode::<f32>("throttle")?;
+        let clutch = ctx.decode::<f32>("clutch")?;
+        let brake = ctx.decode::<f32>("brake")?;
 
-        let display1 = String::decode_ascii(buf, 16)?;
-        let display2 = String::decode_ascii(buf, 16)?;
+        let display1 = ctx.decode_ascii("display1", 16)?;
+        let display2 = ctx.decode_ascii("display2", 16)?;
 
-        let id = if buf.has_remaining() {
-            Some(OutgaugeId::decode(buf)?)
+        let id = if ctx.buf.has_remaining() {
+            Some(ctx.decode::<OutgaugeId>("id")?)
         } else {
             None
         };
@@ -225,7 +223,8 @@ impl Decode for Outgauge {
 
 #[cfg(test)]
 mod test {
-    use bytes::{BufMut, BytesMut};
+    use bytes::{BufMut, Buf, BytesMut};
+    use insim_core::{DecodeContext, EncodeContext};
 
     use super::*;
 
@@ -302,11 +301,11 @@ mod test {
 
         let mut buf = input.clone().freeze();
 
-        let outgauge = Outgauge::decode(&mut buf).unwrap();
+        let outgauge = Outgauge::decode(&mut DecodeContext::new(&mut buf)).unwrap();
         assert_eq!(buf.remaining(), 0);
 
         let mut output = BytesMut::new();
-        outgauge.encode(&mut output).unwrap();
+        outgauge.encode(&mut EncodeContext::new(&mut output)).unwrap();
 
         assert_eq!(
             output.as_ref(),
@@ -332,12 +331,12 @@ mod test {
 
         let mut buf = input.clone().freeze();
 
-        let outgauge = Outgauge::decode(&mut buf).unwrap();
+        let outgauge = Outgauge::decode(&mut DecodeContext::new(&mut buf)).unwrap();
         assert_eq!(buf.remaining(), 0);
         assert!(matches!(outgauge.id, Some(OutgaugeId(10))));
 
         let mut output = BytesMut::new();
-        outgauge.encode(&mut output).unwrap();
+        outgauge.encode(&mut EncodeContext::new(&mut output)).unwrap();
 
         assert_eq!(
             output.as_ref(),

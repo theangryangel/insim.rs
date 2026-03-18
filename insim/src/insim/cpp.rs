@@ -1,7 +1,6 @@
 use std::time::Duration;
 
-use bytes::{Buf, BufMut};
-use insim_core::{Decode, Encode, coordinate::Coordinate, heading::Heading};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext, coordinate::Coordinate, heading::Heading};
 
 use super::{CameraView, StaFlags};
 use crate::identifiers::{PlayerId, RequestId};
@@ -43,27 +42,23 @@ pub struct Cpp {
 }
 
 impl Decode for Cpp {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf).map_err(|e| e.nested().context("Cpp::reqi"))?;
-        buf.advance(1);
-        let pos = Coordinate::decode(buf).map_err(|e| e.nested().context("Cpp::pos"))?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let reqi = ctx.decode::<RequestId>("reqi")?;
+        ctx.pad("zero", 1)?;
+        let pos = ctx.decode::<Coordinate>("pos")?;
 
         let h = Heading::from_degrees(
-            (u16::decode(buf).map_err(|e| e.nested().context("Cpp::h"))? as f64)
-                * super::mci::COMPCAR_DEGREES_PER_UNIT,
+            (ctx.decode::<u16>("h")? as f64) * super::mci::COMPCAR_DEGREES_PER_UNIT,
         );
-        let p = u16::decode(buf).map_err(|e| e.nested().context("Cpp::p"))?;
-        let r = u16::decode(buf).map_err(|e| e.nested().context("Cpp::r"))?;
+        let p = ctx.decode::<u16>("p")?;
+        let r = ctx.decode::<u16>("r")?;
 
-        let viewplid = PlayerId::decode(buf).map_err(|e| e.nested().context("Cpp::viewplid"))?;
-        let ingamecam =
-            CameraView::decode(buf).map_err(|e| e.nested().context("Cpp::ingamecam"))?;
+        let viewplid = ctx.decode::<PlayerId>("viewplid")?;
+        let ingamecam = ctx.decode::<CameraView>("ingamecam")?;
 
-        let fov = f32::decode(buf).map_err(|e| e.nested().context("Cpp::fov"))?;
-        let time = Duration::from_millis(
-            u16::decode(buf).map_err(|e| e.nested().context("Cpp::time"))? as u64,
-        );
-        let flags = StaFlags::decode(buf).map_err(|e| e.nested().context("Cpp::flags"))?;
+        let fov = ctx.decode::<f32>("fov")?;
+        let time = Duration::from_millis(ctx.decode::<u16>("time")? as u64);
+        let flags = ctx.decode::<StaFlags>("flags")?;
 
         Ok(Self {
             reqi,
@@ -81,39 +76,21 @@ impl Decode for Cpp {
 }
 
 impl Encode for Cpp {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi
-            .encode(buf)
-            .map_err(|e| e.nested().context("Cpp::reqi"))?;
-        buf.put_bytes(0, 1);
-        self.pos
-            .encode(buf)
-            .map_err(|e| e.nested().context("Cpp::pos"))?;
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("reqi", &self.reqi)?;
+        ctx.pad("zero", 1)?;
+        ctx.encode("pos", &self.pos)?;
         let h = (self.h.to_degrees() / super::mci::COMPCAR_DEGREES_PER_UNIT)
             .round()
             .clamp(0.0, 65535.0) as u16;
-        h.encode(buf).map_err(|e| e.nested().context("Cpp::h"))?;
-        self.p
-            .encode(buf)
-            .map_err(|e| e.nested().context("Cpp::p"))?;
-        self.r
-            .encode(buf)
-            .map_err(|e| e.nested().context("Cpp::r"))?;
-        self.viewplid
-            .encode(buf)
-            .map_err(|e| e.nested().context("Cpp::viewplid"))?;
-        self.ingamecam
-            .encode(buf)
-            .map_err(|e| e.nested().context("Cpp::ingamecam"))?;
-        self.fov
-            .encode(buf)
-            .map_err(|e| e.nested().context("Cpp::fov"))?;
-        (self.time.as_millis() as u16)
-            .encode(buf)
-            .map_err(|e| e.nested().context("Cpp::time"))?;
-        self.flags
-            .encode(buf)
-            .map_err(|e| e.nested().context("Cpp::flags"))?;
+        ctx.encode("h", &h)?;
+        ctx.encode("p", &self.p)?;
+        ctx.encode("r", &self.r)?;
+        ctx.encode("viewplid", &self.viewplid)?;
+        ctx.encode("ingamecam", &self.ingamecam)?;
+        ctx.encode("fov", &self.fov)?;
+        ctx.encode("time", &(self.time.as_millis() as u16))?;
+        ctx.encode("flags", &self.flags)?;
 
         Ok(())
     }

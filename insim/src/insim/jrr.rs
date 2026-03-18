@@ -1,5 +1,4 @@
-use bytes::BufMut;
-use insim_core::{Decode, Encode, heading::Heading, object::ObjectCoordinate};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext, heading::Heading, object::ObjectCoordinate};
 
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
@@ -39,14 +38,14 @@ pub enum JrrStartPosition {
 }
 
 impl Decode for JrrStartPosition {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let x = i16::decode(buf)?;
-        let y = i16::decode(buf)?;
-        let z = u8::decode(buf)?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let x = ctx.decode::<i16>("x")?;
+        let y = ctx.decode::<i16>("y")?;
+        let z = ctx.decode::<u8>("z")?;
 
-        let flags = u8::decode(buf)?;
-        let index = u8::decode(buf)?;
-        let heading = u8::decode(buf)?;
+        let flags = ctx.decode::<u8>("flags")?;
+        let index = ctx.decode::<u8>("index")?;
+        let heading = ctx.decode::<u8>("heading")?;
 
         if x == 0 && y == 0 && z == 8 && flags == 0 && index == 0 && heading == 0 {
             Ok(Self::DefaultStartPosition)
@@ -60,16 +59,16 @@ impl Decode for JrrStartPosition {
 }
 
 impl Encode for JrrStartPosition {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
         match self {
-            JrrStartPosition::DefaultStartPosition => buf.put_bytes(0, 8),
+            JrrStartPosition::DefaultStartPosition => ctx.pad("startpos", 8)?,
             JrrStartPosition::Custom { xyz, heading } => {
-                xyz.x.encode(buf)?;
-                xyz.y.encode(buf)?;
-                xyz.z.encode(buf)?;
-                0x80u8.encode(buf)?; // flags
-                buf.put_u8(0); // index
-                heading.to_objectinfo_wire().encode(buf)?;
+                ctx.encode("x", &xyz.x)?;
+                ctx.encode("y", &xyz.y)?;
+                ctx.encode("z", &xyz.z)?;
+                ctx.encode("flags", &0x80u8)?;
+                ctx.encode("index", &0u8)?;
+                ctx.encode("heading", &heading.to_objectinfo_wire())?;
             },
         };
         Ok(())

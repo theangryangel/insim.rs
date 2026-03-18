@@ -3,7 +3,8 @@ use bytes::Buf;
 /// DecodeContext
 #[derive(Debug)]
 pub struct DecodeContext<'a> {
-    pub(crate) buf: &'a mut bytes::Bytes,
+    /// The underlying buffer being decoded
+    pub buf: &'a mut bytes::Bytes,
 }
 
 impl<'a> DecodeContext<'a> {

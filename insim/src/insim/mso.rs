@@ -1,5 +1,5 @@
-use bytes::{Buf, BufMut};
-use insim_core::{Decode, DecodeString, Encode, EncodeString, string::codepages};
+use bytes::BufMut;
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext, string::codepages};
 
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
@@ -62,28 +62,24 @@ impl Mso {
 }
 
 impl Decode for Mso {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf).map_err(|e| e.nested().context("Mso::reqi"))?;
-        buf.advance(1);
-        let ucid = ConnectionId::decode(buf).map_err(|e| e.nested().context("Mso::ucid"))?;
-        let plid = PlayerId::decode(buf).map_err(|e| e.nested().context("Mso::plid"))?;
-        let usertype = MsoUserType::decode(buf).map_err(|e| e.nested().context("Mso::usertype"))?;
-        let textstart = u8::decode(buf).map_err(|e| e.nested().context("Mso::textstart"))?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let reqi = ctx.decode::<RequestId>("reqi")?;
+        ctx.pad("pad", 1)?;
+        let ucid = ctx.decode::<ConnectionId>("ucid")?;
+        let plid = ctx.decode::<PlayerId>("plid")?;
+        let usertype = ctx.decode::<MsoUserType>("usertype")?;
+        let textstart = ctx.decode::<u8>("textstart")?;
 
         let (textstart, msg) = if textstart > 0 {
-            let mut name = buf.split_to(textstart as usize);
+            let mut name = ctx.buf.split_to(textstart as usize);
             let name_len = name.len();
-            let name = String::decode_codepage(&mut name, name_len)
-                .map_err(|e| e.nested().context("Mso::name"))?;
-            let msg = String::decode_codepage(buf, buf.len())
-                .map_err(|e| e.nested().context("Mso::msg"))?;
+            let name = DecodeContext::new(&mut name).decode_codepage("name", name_len)?;
+            let msg_len = ctx.buf.len();
+            let msg = ctx.decode_codepage("msg", msg_len)?;
             (name.len() as u8, format!("{name}{msg}"))
         } else {
-            (
-                0_u8,
-                String::decode_codepage(buf, buf.len())
-                    .map_err(|e| e.nested().context("Mso::msg"))?,
-            )
+            let msg_len = ctx.buf.len();
+            (0_u8, ctx.decode_codepage("msg", msg_len)?)
         };
 
         Ok(Self {
@@ -98,20 +94,12 @@ impl Decode for Mso {
 }
 
 impl Encode for Mso {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi
-            .encode(buf)
-            .map_err(|e| e.nested().context("Mso::reqi"))?;
-        buf.put_bytes(0, 1);
-        self.ucid
-            .encode(buf)
-            .map_err(|e| e.nested().context("Mso::ucid"))?;
-        self.plid
-            .encode(buf)
-            .map_err(|e| e.nested().context("Mso::plid"))?;
-        self.usertype
-            .encode(buf)
-            .map_err(|e| e.nested().context("Mso::usertype"))?;
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("reqi", &self.reqi)?;
+        ctx.pad("pad", 1)?;
+        ctx.encode("ucid", &self.ucid)?;
+        ctx.encode("plid", &self.plid)?;
+        ctx.encode("usertype", &self.usertype)?;
 
         if self.textstart > 0 {
             let name = &self.msg[..self.textstart as usize];
@@ -131,29 +119,27 @@ impl Encode for Mso {
 
             let textstart = name.len() as u8;
 
-            buf.put_u8(textstart);
+            ctx.buf.put_u8(textstart);
 
             let mut remaining = MSO_MSG_MAX_LEN;
 
             let name_len_to_write = name.len().min(remaining);
-            buf.extend_from_slice(&name[..name_len_to_write]);
+            ctx.buf.extend_from_slice(&name[..name_len_to_write]);
             remaining -= name_len_to_write;
 
             let msg_len_to_write = msg.len().min(remaining);
-            buf.extend_from_slice(&msg[..msg_len_to_write]);
+            ctx.buf.extend_from_slice(&msg[..msg_len_to_write]);
 
             let written = name_len_to_write + msg_len_to_write;
             if remaining > 0 {
                 let align_to = MSO_MSG_ALIGN - 1;
                 let round_to = (written + align_to) & !align_to;
                 let round_to = round_to.min(MSO_MSG_MAX_LEN);
-                buf.put_bytes(0, round_to - written);
+                ctx.buf.put_bytes(0, round_to - written);
             }
         } else {
-            buf.put_u8(0);
-            self.msg
-                .encode_codepage_with_alignment(buf, MSO_MSG_MAX_LEN, MSO_MSG_ALIGN, true)
-                .map_err(|e| e.nested().context("Mso::msg"))?;
+            ctx.buf.put_u8(0);
+            ctx.encode_codepage_with_alignment("msg", &self.msg, MSO_MSG_MAX_LEN, MSO_MSG_ALIGN, true)?;
         }
 
         Ok(())
@@ -163,6 +149,7 @@ impl Encode for Mso {
 #[cfg(test)]
 mod tests {
     use bytes::{BufMut, Bytes, BytesMut};
+    use insim_core::{DecodeContext, EncodeContext};
 
     use super::*;
 
@@ -204,7 +191,8 @@ mod tests {
         //raw.put_bytes(0, 1);
         let raw = raw.freeze();
 
-        let res = Mso::decode(&mut Bytes::from(raw.clone())).unwrap();
+        let mut buf = Bytes::from(raw.clone());
+        let res = Mso::decode(&mut DecodeContext::new(&mut buf)).unwrap();
         assert_eq!(res.textstart, 0);
         assert_eq!(res.msg, "Downloaded Skin : XFG_PRO38");
     }
@@ -224,12 +212,13 @@ mod tests {
         // when reading we want to handle too long entries, but ensure that when we convert to
         // bytes it's appropriately truncated
 
-        let res = Mso::decode(&mut Bytes::from(raw.clone())).unwrap();
+        let mut bytes = Bytes::from(raw.clone());
+        let res = Mso::decode(&mut DecodeContext::new(&mut bytes)).unwrap();
         assert_eq!(res.textstart, 0);
         assert_eq!(res.msg.len(), MSO_MSG_MAX_LEN + 10);
 
         let mut buf = BytesMut::new();
-        let res = res.encode(&mut buf);
+        let res = res.encode(&mut EncodeContext::new(&mut buf));
         assert!(res.is_err());
     }
 

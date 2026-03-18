@@ -14,7 +14,7 @@ use bytes::{Bytes, BytesMut};
 pub mod error;
 
 pub use error::Error;
-use insim_core::{Decode, Encode, object::ObjectInfo};
+use insim_core::{DecodeContext, EncodeContext, object::ObjectInfo};
 
 #[derive(Debug)]
 /// LYT file
@@ -52,15 +52,16 @@ impl Lyt {
                 let mut data = Vec::with_capacity(Self::DEFAULT_CAPACITY);
                 let _ = reader.read_to_end(&mut data)?;
                 let mut buf = Bytes::from(data);
-                let numo = u16::decode(&mut buf)?;
-                let laps = u8::decode(&mut buf)?;
-                let mini_rev = u8::decode(&mut buf)?;
+                let mut ctx = DecodeContext::new(&mut buf);
+                let numo = ctx.decode::<u16>("numo")?;
+                let laps = ctx.decode::<u8>("laps")?;
+                let mini_rev = ctx.decode::<u8>("mini_rev")?;
                 if mini_rev < 9 {
                     return Err(Error::UnsupportedMiniRev { mini_rev });
                 }
                 let mut objects = Vec::with_capacity(numo as usize);
                 for _ in 0..numo {
-                    objects.push(ObjectInfo::decode(&mut buf)?);
+                    objects.push(ctx.decode::<ObjectInfo>("objects")?);
                 }
                 Ok(Self {
                     version,
@@ -82,19 +83,20 @@ impl Lyt {
     pub fn write<W: Write>(&self, mut writer: W) -> Result<usize, Error> {
         let mut written: usize = 0;
         let mut buf = BytesMut::new();
-        self.version.encode(&mut buf)?;
-        self.revision.encode(&mut buf)?;
+        let mut ctx = EncodeContext::new(&mut buf);
+        ctx.encode("version", &self.version)?;
+        ctx.encode("revision", &self.revision)?;
         let numo = self.objects.len();
         match TryInto::<u16>::try_into(numo) {
-            Ok(numo) => numo.encode(&mut buf)?,
+            Ok(numo) => ctx.encode("numo", &numo)?,
             Err(_) => {
                 unimplemented!()
             },
         }
-        self.laps.encode(&mut buf)?;
-        self.mini_rev.encode(&mut buf)?;
+        ctx.encode("laps", &self.laps)?;
+        ctx.encode("mini_rev", &self.mini_rev)?;
         for object in self.objects.iter() {
-            object.encode(&mut buf)?;
+            ctx.encode("objects", object)?;
         }
         written += writer.write(b"LFSLYT")?;
         written += writer.write(&buf[..])?;

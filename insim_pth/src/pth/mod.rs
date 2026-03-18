@@ -10,7 +10,7 @@ use std::{
 };
 
 use bytes::{Bytes, BytesMut};
-use insim_core::{Decode, Encode};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 
 use crate::node;
 
@@ -47,7 +47,7 @@ impl Pth {
                 let _ = reader.read_to_end(&mut data)?;
                 let mut buf = Bytes::from(data);
 
-                Ok(Self::LfsPth0(lfspth::v0::LfsPth::decode(&mut buf)?))
+                Ok(Self::LfsPth0(lfspth::v0::LfsPth::decode(&mut DecodeContext::new(&mut buf))?))
             },
 
             (b"SRPATH", 0, r) if r <= 252 => {
@@ -55,7 +55,7 @@ impl Pth {
                 data.push(revision);
                 let _ = reader.read_to_end(&mut data)?;
                 let mut buf = Bytes::from(data);
-                Ok(Self::SrPath0(srpath::v0::SrPth::decode(&mut buf)?))
+                Ok(Self::SrPath0(srpath::v0::SrPth::decode(&mut DecodeContext::new(&mut buf))?))
             },
             _ => Err(super::Error::UnsupportedVersion {
                 magic: magic.to_vec(),
@@ -71,12 +71,12 @@ impl Pth {
         let mut buf = BytesMut::new();
         match self {
             Pth::LfsPth0(inner) => {
-                inner.encode(&mut buf)?;
+                inner.encode(&mut EncodeContext::new(&mut buf))?;
                 written += writer.write(b"LFSPTH\0")?;
                 written += writer.write(&buf[..])?;
             },
             Pth::SrPath0(sr_pthv0r252) => {
-                sr_pthv0r252.encode(&mut buf)?;
+                sr_pthv0r252.encode(&mut EncodeContext::new(&mut buf))?;
                 written += writer.write(b"SRPATH\0")?;
                 written += writer.write(&buf[..])?;
             },

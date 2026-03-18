@@ -41,7 +41,7 @@ mod tests;
 
 pub use object_coordinate::ObjectCoordinate;
 
-use crate::{Decode, DecodeError, Encode, EncodeError, heading::Heading};
+use crate::{Decode, DecodeContext, DecodeError, Encode, EncodeContext, EncodeError, heading::Heading};
 
 trait ObjectInfoInner {
     fn flags(&self) -> u8;
@@ -131,13 +131,13 @@ macro_rules! define_object_info {
         }
 
         impl Decode for ObjectInfo {
-            fn decode(buf: &mut bytes::Bytes) -> Result<Self, DecodeError> {
-                let x = i16::decode(buf).map_err(|e| e.nested().context("Raw::x"))?;
-                let y = i16::decode(buf).map_err(|e| e.nested().context("Raw::y"))?;
-                let z = u8::decode(buf).map_err(|e| e.nested().context("Raw::z"))?;
-                let flags = u8::decode(buf).map_err(|e| e.nested().context("Raw::flags"))?;
-                let index = u8::decode(buf).map_err(|e| e.nested().context("Raw::index"))?;
-                let heading = u8::decode(buf).map_err(|e| e.nested().context("Raw::heading"))?;
+            fn decode(ctx: &mut DecodeContext) -> Result<Self, DecodeError> {
+                let x = ctx.decode::<i16>("x")?;
+                let y = ctx.decode::<i16>("y")?;
+                let z = ctx.decode::<u8>("z")?;
+                let flags = ctx.decode::<u8>("flags")?;
+                let index = ctx.decode::<u8>("index")?;
+                let heading = ctx.decode::<u8>("heading")?;
 
                 let raw = Raw {
                     index,
@@ -159,7 +159,7 @@ macro_rules! define_object_info {
         }
 
         impl Encode for ObjectInfo {
-            fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), EncodeError> {
+            fn encode(&self, ctx: &mut EncodeContext) -> Result<(), EncodeError> {
                 let index: u8 = match self {
                     $(
                         ObjectInfo::$variant(_) => $index,
@@ -171,12 +171,12 @@ macro_rules! define_object_info {
                 let flags = self.flags();
                 let heading = self.heading_objectinfo_wire();
 
-                xyz.x.encode(buf)?;
-                xyz.y.encode(buf)?;
-                xyz.z.encode(buf)?;
-                flags.encode(buf)?;
-                index.encode(buf)?;
-                heading.encode(buf)?;
+                ctx.encode("x", &xyz.x)?;
+                ctx.encode("y", &xyz.y)?;
+                ctx.encode("z", &xyz.z)?;
+                ctx.encode("flags", &flags)?;
+                ctx.encode("index", &index)?;
+                ctx.encode("heading", &heading)?;
 
                 Ok(())
             }

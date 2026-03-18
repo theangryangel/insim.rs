@@ -1,6 +1,5 @@
-use bytes::{Buf, BufMut};
 use indexmap::{IndexSet, set::Iter as IndexSetIter};
-use insim_core::{Decode, Encode, vehicle::Vehicle};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext, vehicle::Vehicle};
 
 use crate::{
     error::Error,
@@ -223,32 +222,23 @@ pub struct Plc {
 impl_typical_with_request_id!(Plc);
 
 impl Decode for Plc {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf).map_err(|e| e.nested().context("Plc::reqi"))?;
-        buf.advance(1);
-        let ucid = ConnectionId::decode(buf).map_err(|e| e.nested().context("Plc::ucid"))?;
-        buf.advance(3);
-        let cars = PlcAllowedCarsSet::from_bits_truncate(
-            u32::decode(buf).map_err(|e| e.nested().context("Plc::cars"))?,
-        );
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let reqi = ctx.decode::<RequestId>("reqi")?;
+        ctx.pad("zero", 1)?;
+        let ucid = ctx.decode::<ConnectionId>("ucid")?;
+        ctx.pad("sp1", 3)?;
+        let cars = PlcAllowedCarsSet::from_bits_truncate(ctx.decode::<u32>("cars")?);
         Ok(Self { reqi, ucid, cars })
     }
 }
 
 impl Encode for Plc {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi
-            .encode(buf)
-            .map_err(|e| e.nested().context("Plc::reqi"))?;
-        buf.put_bytes(0, 1);
-        self.ucid
-            .encode(buf)
-            .map_err(|e| e.nested().context("Plc::ucid"))?;
-        buf.put_bytes(0, 3);
-        self.cars
-            .bits()
-            .encode(buf)
-            .map_err(|e| e.nested().context("Plc::cars"))?;
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("reqi", &self.reqi)?;
+        ctx.pad("zero", 1)?;
+        ctx.encode("ucid", &self.ucid)?;
+        ctx.pad("sp1", 3)?;
+        ctx.encode("cars", &self.cars.bits())?;
         Ok(())
     }
 }

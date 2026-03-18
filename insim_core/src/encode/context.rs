@@ -3,7 +3,8 @@ use bytes::BufMut;
 /// EncodeContext
 #[derive(Debug)]
 pub struct EncodeContext<'a> {
-    pub(crate) buf: &'a mut bytes::BytesMut,
+    /// The underlying buffer being encoded into
+    pub buf: &'a mut bytes::BytesMut,
 }
 
 impl<'a> EncodeContext<'a> {

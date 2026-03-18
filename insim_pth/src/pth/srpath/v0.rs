@@ -2,8 +2,7 @@
 
 use std::ops::{Deref, DerefMut};
 
-use bytes::{Buf, BufMut, Bytes};
-use insim_core::{Decode, Encode};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 
 use crate::node::{Node, NodeCoordinate};
 
@@ -23,17 +22,14 @@ bitflags::bitflags! {
 }
 
 impl Encode for SrPathFlags {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        let val = self.bits();
-        val.encode(buf)?;
-        Ok(())
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("bits", &self.bits())
     }
 }
 
 impl Decode for SrPathFlags {
-    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
-        let val = u32::decode(buf)?;
-        Ok(Self::from_bits_truncate(val))
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        ctx.decode::<u32>("bits").map(Self::from_bits_truncate)
     }
 }
 
@@ -53,17 +49,14 @@ bitflags::bitflags! {
 }
 
 impl Encode for SrNodeFlags {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        let val = self.bits();
-        val.encode(buf)?;
-        Ok(())
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("bits", &self.bits())
     }
 }
 
 impl Decode for SrNodeFlags {
-    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
-        let val = u8::decode(buf)?;
-        Ok(Self::from_bits_truncate(val))
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        ctx.decode::<u8>("bits").map(Self::from_bits_truncate)
     }
 }
 
@@ -139,8 +132,8 @@ pub struct SrPth {
 }
 
 impl Decode for SrPth {
-    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
-        let revision = u8::decode(buf)?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let revision = ctx.decode::<u8>("revision")?;
         if revision > 252 {
             return Err(insim_core::DecodeErrorKind::OutOfRange {
                 min: 0,
@@ -150,8 +143,8 @@ impl Decode for SrPth {
             .context("SRPATH unsupported revision"));
         }
 
-        let flags = SrPathFlags::decode(buf)?;
-        let mini_rev = u8::decode(buf)?;
+        let flags = ctx.decode::<SrPathFlags>("flags")?;
+        let mini_rev = ctx.decode::<u8>("mini_rev")?;
 
         if mini_rev > 9 {
             return Err(insim_core::DecodeErrorKind::OutOfRange {
@@ -162,31 +155,31 @@ impl Decode for SrPth {
             .context("SRPATH unsupported mini_rev"));
         }
 
-        buf.advance(3);
+        ctx.pad("reserved", 3)?;
 
-        let num_main_nodes = u16::decode(buf)?;
-        let num_pit0_nodes = u16::decode(buf)?;
-        let num_pit1_nodes = u16::decode(buf)?;
+        let num_main_nodes = ctx.decode::<u16>("num_main_nodes")?;
+        let num_pit0_nodes = ctx.decode::<u16>("num_pit0_nodes")?;
+        let num_pit1_nodes = ctx.decode::<u16>("num_pit1_nodes")?;
 
-        buf.advance(2);
+        ctx.pad("reserved2", 2)?;
 
-        let split0_node = u32::decode(buf)? as usize;
-        let split1_node = u32::decode(buf)? as usize;
-        let split2_node = u32::decode(buf)? as usize;
-        let split3_node = u32::decode(buf)? as usize;
+        let split0_node = ctx.decode::<u32>("split0_node")? as usize;
+        let split1_node = ctx.decode::<u32>("split1_node")? as usize;
+        let split2_node = ctx.decode::<u32>("split2_node")? as usize;
+        let split3_node = ctx.decode::<u32>("split3_node")? as usize;
 
-        let pole_position = SrPolePosition::decode(buf)?;
+        let pole_position = ctx.decode::<SrPolePosition>("pole_position")?;
 
         let main_nodes: Vec<_> = (0..num_main_nodes)
-            .map(|_| SrNode::decode(buf))
+            .map(|_| ctx.decode::<SrNode>("main_node"))
             .collect::<Result<Vec<_>, _>>()?;
 
         let pit0_nodes: Vec<_> = (0..num_pit0_nodes)
-            .map(|_| SrNode::decode(buf))
+            .map(|_| ctx.decode::<SrNode>("pit0_node"))
             .collect::<Result<Vec<_>, _>>()?;
 
         let pit1_nodes: Vec<_> = (0..num_pit1_nodes)
-            .map(|_| SrNode::decode(buf))
+            .map(|_| ctx.decode::<SrNode>("pit1_node"))
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(Self {
@@ -206,7 +199,7 @@ impl Decode for SrPth {
 }
 
 impl Encode for SrPth {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
         if self.revision > 252 {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
                 min: 0,
@@ -240,23 +233,22 @@ impl Encode for SrPth {
             .context("SRPATH too many pit1 nodes"));
         }
 
-        self.revision.encode(buf)?;
-        self.flags.encode(buf)?;
+        ctx.encode("revision", &self.revision)?;
+        ctx.encode("flags", &self.flags)?;
+        ctx.encode("mini_rev", &self.mini_rev)?;
+        ctx.pad("reserved", 3)?;
 
-        self.mini_rev.encode(buf)?;
-        buf.put_bytes(0, 3);
+        ctx.encode("num_main_nodes", &(self.main_nodes.len() as u16))?;
+        ctx.encode("num_pit0_nodes", &(self.pit0_nodes.len() as u16))?;
+        ctx.encode("num_pit1_nodes", &(self.pit1_nodes.len() as u16))?;
+        ctx.pad("reserved2", 2)?;
 
-        (self.main_nodes.len() as u16).encode(buf)?;
-        (self.pit0_nodes.len() as u16).encode(buf)?;
-        (self.pit1_nodes.len() as u16).encode(buf)?;
-        buf.put_bytes(0, 2);
+        ctx.encode("split0_node", &(self.split0_node as u32))?;
+        ctx.encode("split1_node", &(self.split1_node as u32))?;
+        ctx.encode("split2_node", &(self.split2_node as u32))?;
+        ctx.encode("split3_node", &(self.split3_node as u32))?;
 
-        (self.split0_node as u32).encode(buf)?;
-        (self.split1_node as u32).encode(buf)?;
-        (self.split2_node as u32).encode(buf)?;
-        (self.split3_node as u32).encode(buf)?;
-
-        self.pole_position.encode(buf)?;
+        ctx.encode("pole_position", &self.pole_position)?;
 
         for i in self
             .main_nodes
@@ -264,7 +256,7 @@ impl Encode for SrPth {
             .chain(self.pit0_nodes.iter())
             .chain(self.pit1_nodes.iter())
         {
-            i.encode(buf)?;
+            ctx.encode("node", i)?;
         }
         Ok(())
     }

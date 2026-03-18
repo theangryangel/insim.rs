@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use insim_core::{Decode, DecodeErrorKind, Encode, EncodeErrorKind};
+use insim_core::{Decode, DecodeContext, DecodeErrorKind, Encode, EncodeContext, EncodeErrorKind};
 
 use super::DEFAULT_TIMEOUT_SECS;
 use crate::{
@@ -57,7 +57,8 @@ impl Codec {
         buf.put_u8(0);
 
         // encode the message
-        msg.encode(&mut buf)?;
+        let mut ctx = EncodeContext::new(&mut buf);
+        msg.encode(&mut ctx)?;
 
         let n = self.encode_length(buf.len())?;
 
@@ -121,11 +122,12 @@ impl Codec {
         // none of the packet definitions include the size
         data.advance(1);
 
-        let packet = Packet::decode(&mut data);
+        let mut ctx = DecodeContext::new(&mut data);
+        let packet = Packet::decode(&mut ctx);
         match packet {
             Ok(packet) => {
                 tracing::debug!("{:?}", &packet);
-                if data.remaining() > 0 {
+                if ctx.buf.remaining() > 0 {
                     return Err(Error::IncompleteDecode {
                         input: original,
                         remaining: data,

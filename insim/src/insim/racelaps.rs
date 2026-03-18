@@ -1,6 +1,6 @@
 use std::convert::From;
 
-use insim_core::{Decode, Encode};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 
 /// Handles the rules around how RaceLaps are described within Insim automatically for you.
 #[derive(Debug, Default, Clone, Copy)]
@@ -48,17 +48,16 @@ impl From<RaceLaps> for u8 {
 }
 
 impl Decode for RaceLaps {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let val = u8::decode(buf).map_err(|e| e.nested().context("RaceLaps::val"))?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let val = ctx.decode::<u8>("val")?;
         Ok(val.into())
     }
 }
 
 impl Encode for RaceLaps {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
         let val = u8::from(*self);
-        val.encode(buf)
-            .map_err(|e| e.nested().context("RaceLaps::val"))?;
+        ctx.encode("val", &val)?;
         Ok(())
     }
 }

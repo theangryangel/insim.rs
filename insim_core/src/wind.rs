@@ -19,8 +19,8 @@ pub enum Wind {
 }
 
 impl Decode for Wind {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
-        match u8::decode(buf)? {
+    fn decode(ctx: &mut crate::DecodeContext) -> Result<Self, crate::DecodeError> {
+        match ctx.decode::<u8>("val")? {
             0 => Ok(Wind::None),
             1 => Ok(Self::Weak),
             2 => Ok(Self::Strong),
@@ -33,7 +33,7 @@ impl Decode for Wind {
 }
 
 impl Encode for Wind {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodeError> {
-        (*self as u8).encode(buf)
+    fn encode(&self, ctx: &mut crate::EncodeContext) -> Result<(), crate::EncodeError> {
+        ctx.encode("val", &(*self as u8))
     }
 }
