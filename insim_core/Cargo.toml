@@ -43,6 +43,7 @@ itertools = { workspace = true }
 serde = { workspace = true, features = ["derive"], optional = true }
 smallvec = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true, features = ["html_reports"] }
