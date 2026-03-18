@@ -1,7 +1,6 @@
 //! OutsimPack
 use std::time::Duration;
 
-use bytes::{Buf, Bytes, BytesMut};
 use insim_core::{
     Decode, DecodeContext, DecodeError, Encode, EncodeContext, EncodeError,
     coordinate::Coordinate, gear::Gear, vector::Vector,
@@ -188,8 +187,7 @@ pub struct OutsimPack2 {
 
 impl OutsimPack2 {
     /// How should we decode this?
-    pub fn decode_with_options(buf: &mut Bytes, opts: &OutSimOpts) -> Result<Self, DecodeError> {
-        let mut ctx = DecodeContext::new(buf);
+    pub fn decode_with_options(ctx: &mut DecodeContext, opts: &OutSimOpts) -> Result<Self, DecodeError> {
         let mut val = Self::default();
         if opts.contains(OutSimOpts::HEADER) {
             val.header = Some(ctx.decode_ascii("header", 4)?);
@@ -238,10 +236,9 @@ impl OutsimPack2 {
     /// How should we encode this?
     pub fn encode_with_options(
         &self,
-        buf: &mut BytesMut,
+        ctx: &mut EncodeContext,
         opts: &OutSimOpts,
     ) -> Result<(), EncodeError> {
-        let mut ctx = EncodeContext::new(buf);
         if opts.contains(OutSimOpts::HEADER) {
             if let Some(header) = &self.header {
                 ctx.encode_ascii("header", header, 4, false)?;
@@ -293,6 +290,8 @@ impl OutsimPack2 {
 
 #[cfg(test)]
 mod test {
+    use bytes::{Buf, BytesMut};
+
     use super::*;
 
     #[test]
@@ -302,16 +301,19 @@ mod test {
 
         let opts = OutSimOpts::HEADER;
 
-        let buf = input.freeze();
+        let orig = input.freeze();
+        let mut buf = orig.clone();
+        let mut ctx = DecodeContext::new(&mut buf);
 
-        let parsed = OutsimPack2::decode_with_options(&mut buf.clone(), &opts).unwrap();
+        let parsed = OutsimPack2::decode_with_options(&mut ctx, &opts).unwrap();
         assert!(parsed.header.is_some());
 
         let mut output = BytesMut::new();
+        let mut output_ctx = EncodeContext::new(&mut output);
 
-        parsed.encode_with_options(&mut output, &opts).unwrap();
+        parsed.encode_with_options(&mut output_ctx, &opts).unwrap();
 
-        assert_eq!(buf.as_ref(), output.as_ref());
+        assert_eq!(orig.as_ref(), output.as_ref());
     }
 
     #[test]
@@ -321,17 +323,20 @@ mod test {
 
         let opts = OutSimOpts::ID;
 
-        let buf = input.freeze();
+        let orig = input.freeze();
+        let mut buf = orig.clone();
+        let mut ctx = DecodeContext::new(&mut buf);
 
-        let parsed = OutsimPack2::decode_with_options(&mut buf.clone(), &opts).unwrap();
+        let parsed = OutsimPack2::decode_with_options(&mut ctx, &opts).unwrap();
         assert!(parsed.header.is_none());
         assert!(matches!(parsed.id, Some(OutsimId(117769280))));
 
         let mut output = BytesMut::new();
+        let mut output_ctx = EncodeContext::new(&mut output);
 
-        parsed.encode_with_options(&mut output, &opts).unwrap();
+        parsed.encode_with_options(&mut output_ctx, &opts).unwrap();
 
-        assert_eq!(buf.as_ref(), output.as_ref());
+        assert_eq!(orig.as_ref(), output.as_ref());
     }
 
     #[test]
@@ -625,8 +630,9 @@ mod test {
         let buf = input.freeze();
 
         let mut buf_to_parse = buf.clone();
+        let mut ctx = DecodeContext::new(&mut buf_to_parse);
 
-        let parsed = OutsimPack2::decode_with_options(&mut buf_to_parse, &opts).unwrap();
+        let parsed = OutsimPack2::decode_with_options(&mut ctx, &opts).unwrap();
 
         assert!(
             !buf_to_parse.has_remaining(),
@@ -638,8 +644,9 @@ mod test {
         assert!(matches!(parsed.id, Some(OutsimId(117769280))));
 
         let mut output = BytesMut::new();
+        let mut output_ctx = EncodeContext::new(&mut output);
 
-        parsed.encode_with_options(&mut output, &opts).unwrap();
+        parsed.encode_with_options(&mut output_ctx, &opts).unwrap();
 
         assert_eq!(buf.as_ref(), output.as_ref());
     }

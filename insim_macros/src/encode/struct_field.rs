@@ -116,7 +116,6 @@ impl Field {
             .ok_or_else(|| darling::Error::custom("missing field name").with_span(&f.ty))?;
         let pad_after = f.pad_after.unwrap_or(0);
         let pad_before = f.pad_before.unwrap_or(0);
-        let field_type = f.ty.clone();
         let context = format!("{}::{}", parent, field_name);
         let mut tokens = quote! {};
 
