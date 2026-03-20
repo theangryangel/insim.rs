@@ -68,7 +68,7 @@ pub struct UpdateEventParams<'a> {
 
 pub async fn all_events(pool: &Pool) -> Result<Vec<Event>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, scheduled_end_at, name, description, writeup, allowed_vehicles
+        "SELECT id, mode, status, track, layout, scheduled_at, scheduled_end_at, name, description, writeup, allowed_vehicles
          FROM events ORDER BY id DESC",
     )
     .fetch_all(pool)
@@ -77,7 +77,7 @@ pub async fn all_events(pool: &Pool) -> Result<Vec<Event>, sqlx::Error> {
 
 pub async fn get_event(pool: &Pool, id: i64) -> Result<Option<Event>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, scheduled_end_at, name, description, writeup, allowed_vehicles
+        "SELECT id, mode, status, track, layout, scheduled_at, scheduled_end_at, name, description, writeup, allowed_vehicles
          FROM events WHERE id = ?",
     )
     .bind(id)
@@ -87,7 +87,7 @@ pub async fn get_event(pool: &Pool, id: i64) -> Result<Option<Event>, sqlx::Erro
 
 pub async fn active_event(pool: &Pool) -> Result<Option<Event>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, scheduled_end_at, name, description, writeup, allowed_vehicles
+        "SELECT id, mode, status, track, layout, scheduled_at, scheduled_end_at, name, description, writeup, allowed_vehicles
          FROM events WHERE status = 'ACTIVE'
          LIMIT 1",
     )
@@ -97,18 +97,35 @@ pub async fn active_event(pool: &Pool) -> Result<Option<Event>, sqlx::Error> {
 
 pub async fn upcoming_events(pool: &Pool) -> Result<Vec<Event>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at, scheduled_at, scheduled_end_at, name, description, writeup, allowed_vehicles
+        "SELECT id, mode, status, track, layout, scheduled_at, scheduled_end_at, name, description, writeup, allowed_vehicles
          FROM events WHERE status = 'PENDING' ORDER BY id DESC LIMIT 10",
     )
     .fetch_all(pool)
     .await
 }
 
+pub async fn next_due_event(pool: &Pool) -> Result<Option<Event>, sqlx::Error> {
+    let now = Timestamp::now();
+    sqlx::query_as(
+        "SELECT id, mode, status, track, layout, scheduled_at, scheduled_end_at,
+                name, description, writeup, allowed_vehicles
+         FROM events
+         WHERE status = 'PENDING'
+           AND scheduled_at IS NOT NULL
+           AND scheduled_at <= ?
+         ORDER BY scheduled_at ASC
+         LIMIT 1",
+    )
+    .bind(now)
+    .fetch_optional(pool)
+    .await
+}
+
 pub async fn next_scheduled_event(pool: &Pool) -> Result<Option<(Event, i64)>, sqlx::Error> {
     let now = Timestamp::now();
     let event = sqlx::query_as::<_, Event>(
-        "SELECT id, mode, status, track, layout, created_at, started_at, ended_at,
-                scheduled_at, scheduled_end_at, name, description, writeup, allowed_vehicles
+        "SELECT id, mode, status, track, layout, scheduled_at, scheduled_end_at,
+                name, description, writeup, allowed_vehicles
          FROM events
          WHERE status = 'PENDING'
            AND scheduled_at IS NOT NULL

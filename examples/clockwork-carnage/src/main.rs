@@ -131,6 +131,53 @@ async fn announce_loop(pool: db::Pool, insim: insim::builder::InsimTask) {
     }
 }
 
+// -- Scheduler ----------------------------------------------------------------
+
+async fn scheduler_loop(pool: db::Pool) {
+    loop {
+        let now = db::Timestamp::now();
+
+        let sleep_secs: u64 = async {
+            // Auto-stop: if the active event's scheduled_end_at has passed, complete it.
+            if let Some(event) = db::active_event(&pool).await? {
+                if let Some(end) = event.scheduled_end_at {
+                    if end <= now {
+                        tracing::info!(
+                            "Auto-completing event #{} (scheduled_end_at reached)",
+                            event.id
+                        );
+                        db::complete_event(&pool, event.id).await?;
+                        return Ok(5);
+                    }
+                    let secs_to_end = (end.as_second() - now.as_second()).max(0) as u64;
+                    return Ok(secs_to_end.min(30));
+                }
+                return Ok(30);
+            }
+
+            // Auto-start: if no event is active, check for a due PENDING event.
+            if let Some(event) = db::next_due_event(&pool).await? {
+                tracing::info!("Auto-starting event #{} (scheduled_at reached)", event.id);
+                db::switch_event(&pool, event.id).await?;
+                return Ok(5);
+            }
+
+            // No active, no due event. Check how soon the next one is.
+            match db::next_scheduled_event(&pool).await? {
+                Some((_, secs)) => Ok((secs as u64).min(30).max(5)),
+                None => Ok(30),
+            }
+        }
+        .await
+        .unwrap_or_else(|e: sqlx::Error| {
+            tracing::warn!("Scheduler error: {e}");
+            30
+        });
+
+        tokio::time::sleep(std::time::Duration::from_secs(sleep_secs)).await;
+    }
+}
+
 // -- Runner -------------------------------------------------------------------
 
 async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
@@ -189,6 +236,7 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
     });
 
     let announce_data = ctx.as_ref().map(|c| (c.pool.clone(), c.insim.clone()));
+    let scheduler_pool = pool.clone();
 
     let reconcile = async move {
         let Some(ctx) = ctx else {
@@ -339,6 +387,7 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
 
     tokio::select! {
         _ = reconcile => {},
+        _ = scheduler_loop(scheduler_pool) => {},
         result = web_fut => {
             if let Err(e) = result {
                 tracing::error!("Web server error: {e}");

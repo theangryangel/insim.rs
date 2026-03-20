@@ -188,14 +188,7 @@ pub struct Event {
     #[sqlx(try_from = "String")]
     pub track: Track,
     pub layout: String,
-    #[allow(unused)]
-    pub created_at: Timestamp,
-    #[allow(unused)]
-    pub started_at: Option<Timestamp>,
-    #[allow(unused)]
-    pub ended_at: Option<Timestamp>,
     pub scheduled_at: Option<Timestamp>,
-    #[allow(unused)]
     pub scheduled_end_at: Option<Timestamp>,
     pub name: Option<String>,
     pub description: Option<String>,
@@ -212,10 +205,6 @@ pub struct MetronomeStanding {
 
 #[derive(Debug, Clone, FromRow)]
 pub struct ShortcutTime {
-    #[allow(unused)]
-    pub id: i64,
-    #[allow(unused)]
-    pub event_id: i64,
     pub uname: String,
     pub pname: String,
     pub vehicle: String,
@@ -225,12 +214,6 @@ pub struct ShortcutTime {
 
 #[derive(Debug, Clone, FromRow)]
 pub struct BombRun {
-    #[allow(unused)]
-    pub id: i64,
-    #[allow(unused)]
-    pub event_id: i64,
-    #[allow(unused)]
-    pub user_id: i64,
     pub uname: String,
     pub pname: String,
     pub vehicle: String,
