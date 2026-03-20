@@ -152,21 +152,22 @@ pub type AuthSession = axum_login::AuthSession<Backend>;
 
 #[derive(Debug, Clone)]
 pub struct WebConfig {
+    pub base_url: String,
     pub oauth_client_id: String,
     pub oauth_client_secret: String,
-    pub oauth_redirect_uri: String,
     pub session_key: String,
 }
 
 // -- Server entry point -------------------------------------------------------
 
 pub async fn serve(listen: SocketAddr, pool: db::Pool, cfg: WebConfig) -> anyhow::Result<()> {
-    let oauth_client = build_oauth_client(&cfg.oauth_client_id, &cfg.oauth_redirect_uri)?;
+    let redirect_uri = format!("{}/auth/callback", cfg.base_url);
+    let oauth_client = build_oauth_client(&cfg.oauth_client_id, &redirect_uri)?;
     let backend = Backend::new(
         pool.clone(),
         cfg.oauth_client_id,
         cfg.oauth_client_secret,
-        cfg.oauth_redirect_uri,
+        redirect_uri,
     );
 
     let session_store = SqliteStore::new(pool.clone());

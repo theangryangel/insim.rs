@@ -20,10 +20,13 @@ addr = "127.0.0.1:29999"
 # Address to listen on (optional, default shown)
 # listen = "127.0.0.1:3000"
 
+# Public base URL of the web dashboard (required if this section is present)
+# Used to build the OAuth2 callback URL and advertise results in-game.
+base_url = "http://localhost:3000"
+
 # OAuth2 credentials from id.lfs.net (all required if this section is present)
 oauth_client_id     = "your-client-id"
 oauth_client_secret = "your-client-secret"
-oauth_redirect_uri  = "http://localhost:3000/auth/callback"
 
 # 64-byte cookie signing key (optional; a weak default is used in dev if omitted)
 # session_key = "change-me-to-a-random-64-byte-string-before-going-to-production!!"

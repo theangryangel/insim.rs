@@ -42,9 +42,9 @@ struct InsimSection {
 struct WebSection {
     #[serde(default = "default_listen")]
     listen: SocketAddr,
+    base_url: String,
     oauth_client_id: String,
     oauth_client_secret: String,
-    oauth_redirect_uri: String,
     session_key: Option<String>,
 }
 
@@ -97,7 +97,7 @@ fn next_announce_interval(secs: i64) -> std::time::Duration {
     })
 }
 
-async fn announce_loop(pool: db::Pool, insim: insim::builder::InsimTask) {
+async fn announce_loop(pool: db::Pool, insim: insim::builder::InsimTask, base_url: Option<String>) {
     loop {
         let sleep = match db::next_scheduled_event(&pool).await {
             Ok(Some((event, secs))) => {
@@ -112,10 +112,13 @@ async fn announce_loop(pool: db::Pool, insim: insim::builder::InsimTask) {
                     .map(str::to_owned)
                     .unwrap_or_else(|| format!("{} / {}", event.track, event.layout));
                 let remaining = std::time::Duration::from_secs(secs as u64);
-                let msg = format!(
+                let mut msg = format!(
                     "Upcoming: {} — {} on {} in {remaining:.0?}",
                     name, mode, event.track,
                 );
+                if let Some(ref url) = base_url {
+                    msg.push_str(&format!(" — {url}/events/{}", event.id));
+                }
                 if let Err(e) = insim.send_message(msg, None).await {
                     tracing::warn!("Failed to send event announcement: {e}");
                 }
@@ -181,6 +184,8 @@ async fn scheduler_loop(pool: db::Pool) {
 // -- Runner -------------------------------------------------------------------
 
 async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
+    let base_url = config.web.as_ref().map(|w| w.base_url.clone());
+
     // InSim setup — only if [insim] present
     let (insim_handle, presence_handle, game_handle, user_sync_handle, ctx) =
         if let Some(insim_cfg) = config.insim {
@@ -213,6 +218,7 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
                 insim: insim.clone(),
                 presence,
                 game,
+                base_url: base_url.clone(),
             };
 
             (
@@ -229,13 +235,13 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
     // Web — only if [web] present
     let web_listen = config.web.as_ref().map(|w| w.listen);
     let web_cfg = config.web.map(|w| web::WebConfig {
+        base_url: w.base_url,
         oauth_client_id: w.oauth_client_id,
         oauth_client_secret: w.oauth_client_secret,
-        oauth_redirect_uri: w.oauth_redirect_uri,
         session_key: w.session_key.unwrap_or_else(|| "a".repeat(64)),
     });
 
-    let announce_data = ctx.as_ref().map(|c| (c.pool.clone(), c.insim.clone()));
+    let announce_data = ctx.as_ref().map(|c| (c.pool.clone(), c.insim.clone(), base_url.clone()));
     let scheduler_pool = pool.clone();
 
     let reconcile = async move {
@@ -278,12 +284,14 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
                         let insim = ctx_ref.insim.clone();
                         let presence = ctx_ref.presence.clone();
                         let game = ctx_ref.game.clone();
+                        let base_url = base_url.clone();
                         async move {
                             let ctx = GameCtx {
                                 pool,
                                 insim,
                                 presence,
                                 game,
+                                base_url,
                             };
                             match event.mode {
                                 Json(EventMode::Metronome { .. }) => {
@@ -380,7 +388,7 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
     };
     let announce_fut = async move {
         match announce_data {
-            Some((pool, insim)) => announce_loop(pool, insim).await,
+            Some((pool, insim, base_url)) => announce_loop(pool, insim, base_url).await,
             None => std::future::pending().await,
         }
     };

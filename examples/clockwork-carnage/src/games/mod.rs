@@ -21,6 +21,7 @@ pub struct GameCtx {
     pub insim: InsimTask,
     pub presence: presence::Presence,
     pub game: game::Game,
+    pub base_url: Option<String>,
 }
 
 impl FromContext<GameCtx> for InsimTask {
@@ -101,6 +102,12 @@ pub async fn execute<G: MiniGame>(
     game.teardown(event, ctx).await?;
     vehicle_restrictions::apply(&ctx.insim, &[]).await?;
     ctx.insim.send_command("/axclear").await?;
+    if let Some(ref url) = ctx.base_url {
+        let _ = ctx
+            .insim
+            .send_message(format!("Results: {url}/events/{}", event.id), None)
+            .await;
+    }
     Ok(())
     // _guard dropped here -> chat JoinHandle aborted
 }
