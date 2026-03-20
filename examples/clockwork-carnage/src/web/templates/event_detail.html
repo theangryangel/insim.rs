@@ -46,13 +46,13 @@ Carnage{% endblock %} {% block content %} {# ── Header ── #}
         {% match event.scheduled_at %} {% when Some with (s) %}
         <div class="flex justify-between">
           <span class="text-gray-400">Scheduled start</span>
-          <span class="font-medium">{{ s|format_timestamp }}</span>
+          <time datetime="{{ s|as_datetime }}" x-data x-localtime class="font-medium">{{ s|format_timestamp }}</time>
         </div>
         {% when None %} {% endmatch %} {% match event.scheduled_end_at %} {%
         when Some with (e) %}
         <div class="flex justify-between">
           <span class="text-gray-400">Scheduled end</span>
-          <span class="font-medium">{{ e|format_timestamp }}</span>
+          <time datetime="{{ e|as_datetime }}" x-data x-localtime class="font-medium">{{ e|format_timestamp }}</time>
         </div>
         {% when None %} {% endmatch %}
       </div>

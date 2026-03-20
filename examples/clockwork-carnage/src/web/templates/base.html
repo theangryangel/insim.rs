@@ -11,6 +11,58 @@
       }
     </style>
     <script src="https://unpkg.com/htmx.org@2" defer></script>
+    <script>
+      // x-localtime: reads a <time datetime="..."> UTC value, renders in the
+      // visitor's local timezone. Within 3 hours of the time, switches to a
+      // live countdown. The raw UTC string is kept as a title tooltip.
+      document.addEventListener('alpine:init', () => {
+        Alpine.directive('localtime', (el, _bindings, { cleanup }) => {
+          const raw = el.getAttribute('datetime');
+          if (!raw) return;
+          const date = new Date(raw);
+          if (isNaN(date.getTime())) return;
+
+          if (!el.hasAttribute('title')) {
+            el.setAttribute('title', raw);
+          }
+
+          const THREE_HOURS = 3 * 60 * 60 * 1000;
+          let timer = null;
+
+          function render() {
+            const diffMs = date - Date.now();
+
+            if (diffMs > 0 && diffMs <= THREE_HOURS) {
+              const totalSecs = Math.ceil(diffMs / 1000);
+              const h = Math.floor(totalSecs / 3600);
+              const m = Math.floor((totalSecs % 3600) / 60);
+              const s = totalSecs % 60;
+              el.textContent =
+                h > 0
+                  ? `in ${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`
+                  : m > 0
+                  ? `in ${m}m ${String(s).padStart(2, '0')}s`
+                  : `in ${s}s`;
+            } else {
+              el.textContent = date.toLocaleString(undefined, {
+                dateStyle: 'short',
+                timeStyle: 'short',
+              });
+              if (diffMs <= 0 && timer) {
+                clearInterval(timer);
+                timer = null;
+              }
+            }
+          }
+
+          render();
+          if (date > new Date()) {
+            timer = setInterval(render, 1000);
+          }
+          cleanup(() => { if (timer) clearInterval(timer); });
+        });
+      });
+    </script>
     <script
       src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"
       defer

@@ -12,6 +12,13 @@ pub fn format_timestamp(ts: &Timestamp, _env: &dyn askama::Values) -> askama::Re
     Ok(ts.to_zoned(jiff::tz::TimeZone::UTC).strftime("%Y-%m-%d %H:%M UTC").to_string())
 }
 
+/// Outputs an ISO 8601 string at second precision for use in <time datetime="...">.
+/// Truncates sub-seconds so all browsers parse it reliably.
+#[askama::filter_fn]
+pub fn as_datetime(ts: &Timestamp, _env: &dyn askama::Values) -> askama::Result<String> {
+    Ok(ts.to_zoned(jiff::tz::TimeZone::UTC).strftime("%Y-%m-%dT%H:%M:%SZ").to_string())
+}
+
 #[askama::filter_fn]
 pub fn format_time_ms(ms: &i64, _env: &dyn askama::Values) -> askama::Result<String> {
     let ms = *ms;

@@ -49,7 +49,7 @@ endblock %} {% block content %}
           {% endmatch %}
         </div>
         {% match active_event.scheduled_at %}{% when Some with (s) %}
-        <p class="text-xs text-gray-400">{{ s|format_timestamp }}</p>
+        <p class="text-xs text-gray-400"><time datetime="{{ s|as_datetime }}" x-data x-localtime>{{ s|format_timestamp }}</time></p>
         {% when None %}{% endmatch %}
       </div>
       <span
@@ -106,9 +106,10 @@ endblock %} {% block content %}
           {% endmatch %}
         </div>
         <span class="text-right">
-          {% match event.scheduled_at %}{% when Some with (s) %}<span
+          {% match event.scheduled_at %}{% when Some with (s) %}<time
+            datetime="{{ s|as_datetime }}" x-data x-localtime
             class="text-xs text-gray-400 mr-2"
-            >{{ s|format_timestamp }}</span
+            >{{ s|format_timestamp }}</time
           >{% when None %}{% endmatch %}
           <span class="font-mono text-xs text-gray-400">#{{ event.id }}</span>
         </span>
