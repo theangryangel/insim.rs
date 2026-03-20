@@ -48,6 +48,8 @@ pub struct CreateBombParams {
     pub track: Track,
     pub layout: String,
     pub checkpoint_timeout_secs: i64,
+    pub checkpoint_penalty_ms: i64,
+    pub collision_max_penalty_ms: i64,
     pub name: Option<String>,
     pub description: Option<String>,
     pub scheduled_at: Option<String>,
@@ -169,7 +171,11 @@ pub async fn create_bomb_event(pool: &Pool, p: &CreateBombParams) -> Result<i64,
     let row = sqlx::query(
         "INSERT INTO events (mode, track, layout, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
-    .bind(Json(EventMode::Bomb { checkpoint_timeout_secs: p.checkpoint_timeout_secs }))
+    .bind(Json(EventMode::Bomb {
+        checkpoint_timeout_secs: p.checkpoint_timeout_secs,
+        checkpoint_penalty_ms: p.checkpoint_penalty_ms,
+        collision_max_penalty_ms: p.collision_max_penalty_ms,
+    }))
     .bind(p.track.to_string())
     .bind(&p.layout)
     .bind(p.name.as_deref())
@@ -263,6 +269,36 @@ pub async fn update_bomb_settings(
         "UPDATE events SET mode = json_set(mode, '$.checkpoint_timeout_secs', ?) WHERE id = ?",
     )
     .bind(checkpoint_timeout_secs)
+    .bind(event_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn update_bomb_penalty(
+    pool: &Pool,
+    event_id: i64,
+    checkpoint_penalty_ms: i64,
+) -> Result<(), sqlx::Error> {
+    let _ = sqlx::query(
+        "UPDATE events SET mode = json_set(mode, '$.checkpoint_penalty_ms', ?) WHERE id = ?",
+    )
+    .bind(checkpoint_penalty_ms)
+    .bind(event_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn update_bomb_collision_penalty(
+    pool: &Pool,
+    event_id: i64,
+    collision_max_penalty_ms: i64,
+) -> Result<(), sqlx::Error> {
+    let _ = sqlx::query(
+        "UPDATE events SET mode = json_set(mode, '$.collision_max_penalty_ms', ?) WHERE id = ?",
+    )
+    .bind(collision_max_penalty_ms)
     .bind(event_id)
     .execute(pool)
     .await?;

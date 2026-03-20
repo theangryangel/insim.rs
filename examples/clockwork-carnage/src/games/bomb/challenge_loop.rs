@@ -11,7 +11,7 @@ use insim::{
         vehicle::Vehicle,
     },
     identifiers::ConnectionId,
-    insim::{Cnl, ObjectInfo, Pll, Uco},
+    insim::{Cnl, Con, Crs, ObjectInfo, Pit, Pll, Uco},
 };
 use kitcar::{
     game, presence,
@@ -30,9 +30,12 @@ use crate::{
 };
 
 const BOMB_HELP_LINES: &[&str] = &[
-    " - Hit ^2checkpoint 1^7 objects before the timer expires or your run ends (BOOM).",
-    " - Time carries over: arrive late and you have less time to reach the next one.",
-    " - Hit a ^3checkpoint 2/3^7 or ^3finish^7 object to refresh your timer to the 1/4th window.",
+    " - Hit ^2checkpoint^7 objects before the timer expires or your run ends (BOOM).",
+    " - Each checkpoint shrinks the window: ^1next window = current window - penalty^7.",
+    " - Hit a ^3finish^7 object to fully reset the window back to the base time.",
+    " - ^1Resetting your car^7 deducts the penalty directly from your remaining time.",
+    " - ^1Pitting^7 ends your run immediately — commit to your fuel before you start.",
+    " - ^1Collisions^7 cost time — harder impacts cost more, up to the collision max penalty.",
     " - Score = checkpoints hit. Survival time breaks ties.",
     " - Your best run is recorded on the leaderboard.",
     "",
@@ -180,6 +183,8 @@ pub struct BombLoop {
     pub chat: chat::BombChat,
     pub session_id: i64,
     pub checkpoint_timeout: Duration,
+    pub checkpoint_penalty: Duration,
+    pub collision_max_penalty: Duration,
 }
 
 impl<Ctx> Scene<Ctx> for BombLoop
@@ -201,6 +206,8 @@ where
             chat: self.chat,
             session_id: self.session_id,
             checkpoint_timeout: self.checkpoint_timeout,
+            checkpoint_penalty: self.checkpoint_penalty,
+            collision_max_penalty: self.collision_max_penalty,
         };
         inner.run_inner().await
     }
@@ -214,6 +221,8 @@ struct BombLoopInner {
     chat: chat::BombChat,
     session_id: i64,
     checkpoint_timeout: Duration,
+    checkpoint_penalty: Duration,
+    collision_max_penalty: Duration,
 }
 
 impl BombLoopInner {
@@ -288,6 +297,12 @@ impl BombLoopInner {
                                 if let Some(run) = active_runs.remove(&conn.uname) {
                                     let now = Instant::now();
                                     let survival_ms = (run.deadline.min(now) - run.started_at).as_millis() as i64;
+                                    self.insim
+                                        .send_message(
+                                            format!("Run ended — left race after {} checkpoints.", run.checkpoints).red(),
+                                            run.ucid,
+                                        )
+                                        .await?;
                                     if let Err(e) = db::insert_bomb_run(
                                         &self.db,
                                         self.session_id,
@@ -296,11 +311,15 @@ impl BombLoopInner {
                                         run.checkpoints,
                                         survival_ms,
                                     ).await {
-                                        tracing::warn!("Failed to persist bomb run on disconnect: {e}");
+                                        tracing::warn!("Failed to persist bomb run on player leave: {e}");
                                     }
                                     let leaderboard = self.load_leaderboard().await?;
                                     let active = self.build_active_runs_props(&active_runs);
                                     ui.set_global_state(BombGlobalProps { leaderboard, active_runs: active });
+                                    ui.set_player_state(run.ucid, BombConnectionProps {
+                                        uname: conn.uname.clone(),
+                                        in_run: false,
+                                    }).await;
                                 }
                             }
                         },
@@ -327,6 +346,98 @@ impl BombLoopInner {
                                     let active = self.build_active_runs_props(&active_runs);
                                     ui.set_global_state(BombGlobalProps { leaderboard, active_runs: active });
                                 }
+                            }
+                        },
+                        insim::Packet::Crs(Crs { plid, .. }) => {
+                            if let Some(conn) = self.presence.connection_by_player(&plid).await.map_err(|cause| SceneError::Custom {
+                                scene: "bomb::crs::connection",
+                                cause: Box::new(cause),
+                            })? {
+                                let now = Instant::now();
+                                if let Some(run) = active_runs.get_mut(&conn.uname) {
+                                    run.deadline -= self.checkpoint_penalty;
+                                    let new_secs = run.deadline.saturating_duration_since(now).as_secs_f64();
+                                    self.insim.send_message(
+                                        format!(
+                                            "RESET penalty — -{:.2}s — {new_secs:.1}s left",
+                                            self.checkpoint_penalty.as_secs_f64()
+                                        )
+                                        .red(),
+                                        conn.ucid,
+                                    ).await?;
+                                    let active = self.build_active_runs_props(&active_runs);
+                                    let leaderboard = self.load_leaderboard().await?;
+                                    ui.set_global_state(BombGlobalProps { leaderboard, active_runs: active });
+                                }
+                            }
+                        },
+                        insim::Packet::Pit(Pit { plid, .. }) => {
+                            if let Some(conn) = self.presence.connection_by_player(&plid).await.map_err(|cause| SceneError::Custom {
+                                scene: "bomb::pit::connection",
+                                cause: Box::new(cause),
+                            })? {
+                                if let Some(run) = active_runs.remove(&conn.uname) {
+                                    let now = Instant::now();
+                                    let survival_ms = (run.deadline.min(now) - run.started_at).as_millis() as i64;
+                                    self.insim
+                                        .send_message(
+                                            format!("PITTED — run ended after {} checkpoints. Commit to your fuel before the run.", run.checkpoints).red(),
+                                            run.ucid,
+                                        )
+                                        .await?;
+                                    self.insim
+                                        .send_command(format!("/spec {}", conn.uname))
+                                        .await?;
+                                    if let Err(e) = db::insert_bomb_run(
+                                        &self.db,
+                                        self.session_id,
+                                        &conn.uname,
+                                        &run.vehicle.to_string(),
+                                        run.checkpoints,
+                                        survival_ms,
+                                    ).await {
+                                        tracing::warn!("Failed to persist bomb run on pit: {e}");
+                                    }
+                                    let leaderboard = self.load_leaderboard().await?;
+                                    let active = self.build_active_runs_props(&active_runs);
+                                    ui.set_global_state(BombGlobalProps { leaderboard, active_runs: active });
+                                    ui.set_player_state(run.ucid, BombConnectionProps {
+                                        uname: conn.uname.clone(),
+                                        in_run: false,
+                                    }).await;
+                                }
+                            }
+                        },
+                        insim::Packet::Con(Con { spclose, a, b, .. }) => {
+                            const THRESHOLD_MPS: f32 = 30.0;
+                            let fraction = (spclose.to_meters_per_sec() / THRESHOLD_MPS).clamp(0.0, 1.0);
+                            let penalty = Duration::from_millis(
+                                (fraction * self.collision_max_penalty.as_millis() as f32) as u64
+                            );
+
+                            if !penalty.is_zero() {
+                                let now = Instant::now();
+                                for plid in [a.plid, b.plid] {
+                                    if let Some(conn) = self.presence.connection_by_player(&plid).await.map_err(|cause| SceneError::Custom {
+                                        scene: "bomb::con::connection",
+                                        cause: Box::new(cause),
+                                    })? {
+                                        if let Some(run) = active_runs.get_mut(&conn.uname) {
+                                            run.deadline -= penalty;
+                                            self.insim.send_message(
+                                                format!(
+                                                    "COLLISION — -{:.2}s — {:.1}s left",
+                                                    penalty.as_secs_f64(),
+                                                    run.deadline.saturating_duration_since(now).as_secs_f64()
+                                                ).red(),
+                                                run.ucid,
+                                            ).await?;
+                                        }
+                                    }
+                                }
+                                let active = self.build_active_runs_props(&active_runs);
+                                let leaderboard = self.load_leaderboard().await?;
+                                ui.set_global_state(BombGlobalProps { leaderboard, active_runs: active });
                             }
                         },
                         insim::Packet::Uco(Uco {
@@ -363,33 +474,25 @@ impl BombLoopInner {
                                     }
                                 });
 
-                                let remaining = run.deadline.saturating_duration_since(now);
-
-                                // Checkpoint1: carry over remaining time as the next window.
-                                // Checkpoint2/3/Finish: refresh — top up to the 1/4 base window.
-                                // A refresh checkpoint placed after a hard section rewards survival.
-                                let (new_timeout, is_refresh) = match kind {
-                                    InsimCheckpointKind::Checkpoint1 => (remaining, false),
-                                    InsimCheckpointKind::Checkpoint2
-                                    | InsimCheckpointKind::Checkpoint3
-                                    | InsimCheckpointKind::Finish => {
-                                        (remaining + (self.checkpoint_timeout / 4), true)
-                                    },
+                                let (new_window, is_refresh) = match kind {
+                                    InsimCheckpointKind::Finish => (self.checkpoint_timeout, true),
+                                    _ => (run.current_timeout.saturating_sub(self.checkpoint_penalty), false),
                                 };
 
-                                let is_refresh = true;
-                                let new_timeout = self.checkpoint_timeout;
-
-                                run.deadline = now + new_timeout;
-                                run.current_timeout = new_timeout;
+                                run.deadline = now + new_window;
+                                run.current_timeout = new_window;
                                 run.checkpoints += 1;
                                 let n = run.checkpoints;
-                                let new_timeout_secs = new_timeout.as_secs_f64();
+                                let new_secs = new_window.as_secs_f64();
 
                                 let msg = if is_refresh {
-                                    format!("REFRESH — checkpoint {n} — {new_timeout_secs:.1}s").yellow()
+                                    format!("FINISH — checkpoint {n} — REFRESHED {new_secs:.1}s").yellow()
                                 } else {
-                                    format!("checkpoint {n} — {new_timeout_secs:.1}s").light_green()
+                                    format!(
+                                        "checkpoint {n} — -{:.2}s — {new_secs:.1}s left",
+                                        self.checkpoint_penalty.as_secs_f64()
+                                    )
+                                    .light_green()
                                 };
                                 self.insim.send_message(msg, ucid).await?;
 

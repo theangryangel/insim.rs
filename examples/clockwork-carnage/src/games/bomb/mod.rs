@@ -20,6 +20,8 @@ pub struct BombGame {
     pub track: insim::core::track::Track,
     pub layout: String,
     pub checkpoint_timeout: Duration,
+    pub checkpoint_penalty: Duration,
+    pub collision_max_penalty: Duration,
     pub chat: chat::BombChat,
 }
 
@@ -37,11 +39,13 @@ impl MiniGame for BombGame {
     type Guard = BombGuard;
 
     async fn setup(event: &db::Event, ctx: &GameCtx) -> Result<(Self, Self::Guard), SceneError> {
-        let checkpoint_timeout = match *event.mode {
-            db::EventMode::Bomb { checkpoint_timeout_secs } => {
-                Duration::from_secs(checkpoint_timeout_secs as u64)
-            },
-            _ => Duration::from_secs(30),
+        let (checkpoint_timeout, checkpoint_penalty, collision_max_penalty) = match *event.mode {
+            db::EventMode::Bomb { checkpoint_timeout_secs, checkpoint_penalty_ms, collision_max_penalty_ms } => (
+                Duration::from_secs(checkpoint_timeout_secs as u64),
+                Duration::from_millis(checkpoint_penalty_ms as u64),
+                Duration::from_millis(collision_max_penalty_ms as u64),
+            ),
+            _ => (Duration::from_secs(30), Duration::from_millis(250), Duration::from_millis(500)),
         };
 
         let (chat, chat_handle) = chat::spawn(ctx.insim.clone());
@@ -51,6 +55,8 @@ impl MiniGame for BombGame {
             track: event.track,
             layout: event.layout.clone(),
             checkpoint_timeout,
+            checkpoint_penalty,
+            collision_max_penalty,
             chat,
         };
 
@@ -74,6 +80,8 @@ impl MiniGame for BombGame {
             chat: self.chat.clone(),
             session_id: self.session_id,
             checkpoint_timeout: self.checkpoint_timeout,
+            checkpoint_penalty: self.checkpoint_penalty,
+            collision_max_penalty: self.collision_max_penalty,
         })
         .loop_until_quit();
 

@@ -23,6 +23,14 @@ pub async fn connect(path: &str) -> Result<Pool, sqlx::Error> {
     Ok(pool)
 }
 
+fn default_checkpoint_penalty_ms() -> i64 {
+    250
+}
+
+fn default_collision_max_penalty_ms() -> i64 {
+    500
+}
+
 // -- Enums --------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -30,7 +38,13 @@ pub async fn connect(path: &str) -> Result<Pool, sqlx::Error> {
 pub enum EventMode {
     Metronome { target_ms: i64 },
     Shortcut,
-    Bomb { checkpoint_timeout_secs: i64 },
+    Bomb {
+        checkpoint_timeout_secs: i64,
+        #[serde(default = "default_checkpoint_penalty_ms")]
+        checkpoint_penalty_ms: i64,
+        #[serde(default = "default_collision_max_penalty_ms")]
+        collision_max_penalty_ms: i64,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

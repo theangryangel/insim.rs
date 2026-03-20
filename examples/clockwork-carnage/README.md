@@ -39,29 +39,46 @@ Always-on precision challenge. Players cross a **Checkpoint 1** to start and a *
 
 ### Bomb
 
-Survival mode. Players hit **Checkpoint 1** objects to keep themselves alive. The timer does not reset — whatever time was left when you hit a checkpoint carries over as your window for the next one. Arrive late and you start the next section already under pressure.
+Survival mode. Players hit checkpoint objects to stay alive. Every run begins with a full timer window. Each checkpoint costs a small time penalty — the window shrinks permanently as checkpoints accumulate. Reach a **Finish** object to fully reset the window back to the base value.
 
-**Refresh checkpoints:** Place **Checkpoint 2**, **Checkpoint 3**, or **Finish** objects at key locations to act as refreshes — hitting one resets the timer to the full base window. Use these sparingly as a reward for surviving a hard section.
+**Checkpoints (any kind except Finish):**
 
-**Checkpoint 1 — regular:**
+- Deduct `checkpoint_penalty_ms` from the current window: `next_window = current_window - penalty`
+- After enough checkpoints the window becomes very tight, even if you arrive early
+- Announced to the player in green as `checkpoint N — -Xs — Ys left`
 
-- Timer carries over: `next_window = remaining`
-- Arrive with 20s left → you have 20s to reach the next one
-- Arrive with 3s left → you have 3s
+**Finish — refresh:**
 
-**Checkpoint 2 / 3 / Finish — refresh:**
+- Resets the window back to the full `checkpoint_timeout_secs` value regardless of current window size
+- Announced to the player in yellow as `FINISH — checkpoint N — REFRESHED Ys`
 
-- Timer resets to the 1/4 base window regardless of remaining time
-- Announced to the player in yellow as `REFRESH`
+**Car reset penalty:**
+
+- Resetting your car (via the in-game reset or object collision reset) deducts `checkpoint_penalty_ms` directly from the time remaining on the clock — the deadline moves backwards without touching the window size
+- Announced to the player in red as `RESET penalty — -Xs — Ys left`
+
+**Pitting ends the run:**
+
+- Driving into the pits during an active run immediately ends the run and specs the player
+- The run is recorded with however many checkpoints were reached before pitting
+- Players must commit to their fuel load before starting — there is no opportunity to refuel mid-run
+
+**Collision penalty:**
+
+- Car-to-car contact deducts time proportional to the closing speed at impact
+- Formula: `penalty = (closing_speed / 30 m/s).clamp(0, 1) × collision_max_penalty_ms`
+- A light brush at low closing speed costs little; a head-on ram at ≥ 30 m/s (≈ 108 km/h) deducts the full `collision_max_penalty_ms` — default 500 ms
+- Both drivers are penalised independently if they have an active run
+- Announced in red as `COLLISION — -Xs — Ys left`
 
 **Scoring:** checkpoint count, with survival time as a tiebreaker. Best run per session is recorded on the leaderboard.
 
 **Mapper notes:**
 
-- The base window (configured as `checkpoint_timeout_secs`) and the spacing between checkpoints together determine difficulty. A rough guide: `base_window ÷ average_time_between_checkpoints ≈ maximum checkpoints a skilled driver can reach`.
+- `checkpoint_timeout_secs` sets the starting window and what a Finish refresh returns you to. `checkpoint_penalty_ms` controls how fast the window erodes — default is 250 ms per checkpoint. `collision_max_penalty_ms` sets the maximum time deducted for a full-speed collision — default is 500 ms.
+- A low penalty with a long timeout rewards checkpoint volume. A high penalty makes early checkpoints cheap but forces a Finish refresh before the window vanishes.
+- Place **Finish** objects on an optional detour rather than the main checkpoint line — players must decide whether to gamble time on the diversion or keep grinding checkpoints on the safe path. The further off-route the Finish, the higher the risk/reward.
 - Aim for checkpoint gaps of **3–5 seconds** at push pace. Tighter than that and runs end almost immediately; wider and the timer barely matters.
-- Place one or two refresh (`Checkpoint 2/3` or `Finish`) objects after the hardest section of the route. Reaching the refresh should feel like an achievement — a second wind for players who survive.
-- A route with no refreshes and generous spacing suits casual play. A route with tight gaps and a single late refresh rewards mastery.
 
 ## Architecture / How to use
 

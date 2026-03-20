@@ -118,6 +118,12 @@ fn default_target() -> u64 {
 fn default_checkpoint_timeout() -> u64 {
     30
 }
+fn default_checkpoint_penalty_ms() -> u64 {
+    250
+}
+fn default_collision_max_penalty_ms() -> u64 {
+    500
+}
 
 #[derive(serde::Deserialize)]
 pub struct NewEventForm {
@@ -134,6 +140,10 @@ pub struct NewEventForm {
     pub target: u64,
     #[serde(default = "default_checkpoint_timeout")]
     pub checkpoint_timeout: u64,
+    #[serde(default = "default_checkpoint_penalty_ms")]
+    pub checkpoint_penalty_ms: u64,
+    #[serde(default = "default_collision_max_penalty_ms")]
+    pub collision_max_penalty_ms: u64,
     #[serde(default)]
     pub allowed_vehicles: String,
 }
@@ -151,6 +161,8 @@ pub struct EditEventForm {
     pub writeup: Option<String>,
     pub target: Option<u64>,
     pub checkpoint_timeout: Option<u64>,
+    pub checkpoint_penalty_ms: Option<u64>,
+    pub collision_max_penalty_ms: Option<u64>,
     #[serde(default)]
     pub allowed_vehicles: String,
 }
@@ -314,6 +326,8 @@ pub async fn event_new_post(
                 track,
                 layout: form.layout,
                 checkpoint_timeout_secs: form.checkpoint_timeout as i64,
+                checkpoint_penalty_ms: form.checkpoint_penalty_ms as i64,
+                collision_max_penalty_ms: form.collision_max_penalty_ms as i64,
                 name,
                 description,
                 scheduled_at,
@@ -410,6 +424,18 @@ pub async fn event_edit_post(
 
     if let Some(timeout) = form.checkpoint_timeout {
         db::update_bomb_settings(&state.pool, id, timeout as i64)
+            .await
+            .map_err(internal_error)?;
+    }
+
+    if let Some(penalty) = form.checkpoint_penalty_ms {
+        db::update_bomb_penalty(&state.pool, id, penalty as i64)
+            .await
+            .map_err(internal_error)?;
+    }
+
+    if let Some(collision_penalty) = form.collision_max_penalty_ms {
+        db::update_bomb_collision_penalty(&state.pool, id, collision_penalty as i64)
             .await
             .map_err(internal_error)?;
     }
