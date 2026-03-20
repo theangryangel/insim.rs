@@ -1,6 +1,6 @@
 use sqlx::Row;
 
-use super::{MetronomeStanding, Pool};
+use super::{MetronomeStanding, Pool, Timestamp};
 
 pub async fn insert_metronome_lap(
     pool: &Pool,
@@ -8,14 +8,16 @@ pub async fn insert_metronome_lap(
     uname: &str,
     delta_ms: i64,
 ) -> Result<i64, sqlx::Error> {
+    let now = Timestamp::now();
     let row = sqlx::query(
-        "INSERT INTO metronome_results (event_id, user_id, delta_ms)
-         VALUES (?, (SELECT id FROM users WHERE uname = ?), ?)
+        "INSERT INTO metronome_results (event_id, user_id, delta_ms, recorded_at)
+         VALUES (?, (SELECT id FROM users WHERE uname = ?), ?, ?)
          RETURNING id",
     )
     .bind(event_id)
     .bind(uname)
     .bind(delta_ms)
+    .bind(now)
     .fetch_one(pool)
     .await?;
     Ok(row.get("id"))

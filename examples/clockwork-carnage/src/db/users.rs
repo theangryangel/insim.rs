@@ -2,7 +2,7 @@ use kitcar::presence::{Presence, PresenceEvent};
 use sqlx::Row;
 use tokio::task::JoinHandle;
 
-use super::{Pool, User};
+use super::{Pool, Timestamp, User};
 
 pub async fn get_user_by_id(pool: &Pool, id: i64) -> Result<Option<User>, sqlx::Error> {
     sqlx::query_as(
@@ -19,30 +19,34 @@ pub async fn upsert_user_with_token(
     pname: &str,
     token: &str,
 ) -> Result<User, sqlx::Error> {
+    let now = Timestamp::now();
     sqlx::query_as(
-        "INSERT INTO users (uname, pname, oauth_access_token)
-         VALUES (?, ?, ?)
+        "INSERT INTO users (uname, pname, last_seen, oauth_access_token)
+         VALUES (?, ?, ?, ?)
          ON CONFLICT(uname) DO UPDATE SET
            pname = excluded.pname,
            oauth_access_token = excluded.oauth_access_token,
-           last_seen = datetime('now')
+           last_seen = excluded.last_seen
          RETURNING id, uname, pname, last_seen, oauth_access_token, admin",
     )
     .bind(uname)
     .bind(pname)
+    .bind(now)
     .bind(token)
     .fetch_one(pool)
     .await
 }
 
 pub async fn upsert_user(pool: &Pool, uname: &str, pname: &str) -> Result<i64, sqlx::Error> {
+    let now = Timestamp::now();
     let row = sqlx::query(
-        "INSERT INTO users (uname, pname) VALUES (?, ?)
-         ON CONFLICT(uname) DO UPDATE SET pname = excluded.pname, last_seen = datetime('now')
+        "INSERT INTO users (uname, pname, last_seen) VALUES (?, ?, ?)
+         ON CONFLICT(uname) DO UPDATE SET pname = excluded.pname, last_seen = excluded.last_seen
          RETURNING id",
     )
     .bind(uname)
     .bind(pname)
+    .bind(now)
     .fetch_one(pool)
     .await?;
     Ok(row.get("id"))

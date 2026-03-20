@@ -4,7 +4,10 @@ use axum::{extract::State, http::StatusCode, response::Html};
 use super::internal_error;
 use crate::{
     db::{self, Event, EventMode},
-    web::state::{AppState, PageCtx},
+    web::{
+        filters,
+        state::{AppState, PageCtx},
+    },
 };
 
 #[derive(Template)]

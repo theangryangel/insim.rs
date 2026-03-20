@@ -31,6 +31,81 @@ fn default_collision_max_penalty_ms() -> i64 {
     500
 }
 
+// -- Timestamp newtype --------------------------------------------------------
+
+/// A UTC timestamp stored as ISO 8601 text in SQLite.
+/// Wraps `jiff::Timestamp` and provides sqlx encode/decode via RFC 3339 strings.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Timestamp(pub jiff::Timestamp);
+
+impl Timestamp {
+    pub fn now() -> Self {
+        Timestamp(jiff::Timestamp::now())
+    }
+}
+
+impl std::fmt::Debug for Timestamp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Timestamp({})", self.0)
+    }
+}
+
+impl std::ops::Deref for Timestamp {
+    type Target = jiff::Timestamp;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<jiff::Timestamp> for Timestamp {
+    fn from(ts: jiff::Timestamp) -> Self {
+        Timestamp(ts)
+    }
+}
+
+impl From<Timestamp> for jiff::Timestamp {
+    fn from(ts: Timestamp) -> Self {
+        ts.0
+    }
+}
+
+// sqlx type info: stored as TEXT in SQLite
+impl sqlx::Type<sqlx::Sqlite> for Timestamp {
+    fn type_info() -> sqlx::sqlite::SqliteTypeInfo {
+        <String as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+    fn compatible(ty: &sqlx::sqlite::SqliteTypeInfo) -> bool {
+        <String as sqlx::Type<sqlx::Sqlite>>::compatible(ty)
+    }
+}
+
+// Decode: read TEXT from SQLite, parse as RFC 3339
+impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for Timestamp {
+    fn decode(
+        value: sqlx::sqlite::SqliteValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        let ts: jiff::Timestamp = s.parse().map_err(|_| {
+            format!("invalid timestamp: {s:?}")
+        })?;
+        Ok(Timestamp(ts))
+    }
+}
+
+// Encode: write RFC 3339 TEXT to SQLite
+impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for Timestamp {
+    fn encode_by_ref(
+        &self,
+        args: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'q>>,
+    ) -> Result<sqlx::encode::IsNull, Box<dyn std::error::Error + Send + Sync>> {
+        let s = self.0.to_string(); // RFC 3339 via jiff's Display impl
+        args.push(sqlx::sqlite::SqliteArgumentValue::Text(
+            std::borrow::Cow::Owned(s),
+        ));
+        Ok(sqlx::encode::IsNull::No)
+    }
+}
+
 // -- Enums --------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -87,7 +162,7 @@ pub struct User {
     pub id: i64,
     pub uname: String,
     pub pname: String,
-    pub last_seen: String,
+    pub last_seen: Timestamp,
     pub oauth_access_token: Option<String>,
     pub admin: bool,
 }
@@ -114,14 +189,14 @@ pub struct Event {
     pub track: Track,
     pub layout: String,
     #[allow(unused)]
-    pub created_at: String,
+    pub created_at: Timestamp,
     #[allow(unused)]
-    pub started_at: Option<String>,
+    pub started_at: Option<Timestamp>,
     #[allow(unused)]
-    pub ended_at: Option<String>,
-    pub scheduled_at: Option<String>,
+    pub ended_at: Option<Timestamp>,
+    pub scheduled_at: Option<Timestamp>,
     #[allow(unused)]
-    pub scheduled_end_at: Option<String>,
+    pub scheduled_end_at: Option<Timestamp>,
     pub name: Option<String>,
     pub description: Option<String>,
     pub writeup: Option<String>,
@@ -145,7 +220,7 @@ pub struct ShortcutTime {
     pub pname: String,
     pub vehicle: String,
     pub time_ms: i64,
-    pub set_at: String,
+    pub set_at: Timestamp,
 }
 
 #[derive(Debug, Clone, FromRow)]
@@ -161,7 +236,7 @@ pub struct BombRun {
     pub vehicle: String,
     pub checkpoint_count: i64,
     pub survival_ms: i64,
-    pub recorded_at: String,
+    pub recorded_at: Timestamp,
 }
 
 // -- Submodules ---------------------------------------------------------------

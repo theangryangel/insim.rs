@@ -37,7 +37,7 @@
         {{ entry.survival_ms|format_time_ms }}
       </td>
       <td class="py-2 pl-2 text-right text-xs text-gray-400">
-        {{ entry.recorded_at }}
+        {{ entry.recorded_at|format_timestamp }}
       </td>
     </tr>
     {% endfor %} {% endif %}

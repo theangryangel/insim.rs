@@ -1,5 +1,17 @@
 use insim::core::string::{colours::Colour, escaping::Escape};
 
+use crate::db::Timestamp;
+
+#[askama::filter_fn]
+pub fn format_datetime_local(ts: &Timestamp, _env: &dyn askama::Values) -> askama::Result<String> {
+    Ok(ts.to_zoned(jiff::tz::TimeZone::UTC).strftime("%Y-%m-%dT%H:%M").to_string())
+}
+
+#[askama::filter_fn]
+pub fn format_timestamp(ts: &Timestamp, _env: &dyn askama::Values) -> askama::Result<String> {
+    Ok(ts.to_zoned(jiff::tz::TimeZone::UTC).strftime("%Y-%m-%d %H:%M UTC").to_string())
+}
+
 #[askama::filter_fn]
 pub fn format_time_ms(ms: &i64, _env: &dyn askama::Values) -> askama::Result<String> {
     let ms = *ms;

@@ -1,12 +1,12 @@
 use insim::core::{track::Track, vehicle::Vehicle};
 use sqlx::{Row, types::Json};
 
-use super::{Event, EventMode, Pool};
+use super::{Event, EventMode, Pool, Timestamp};
 
 pub async fn has_scheduling_overlap(
     pool: &Pool,
-    start: &str,
-    end: &str,
+    start: Timestamp,
+    end: Timestamp,
     exclude_id: Option<i64>,
 ) -> Result<bool, sqlx::Error> {
     let count: i64 = sqlx::query_scalar(
@@ -31,8 +31,8 @@ pub struct CreateMetronomeParams {
     pub target_ms: i64,
     pub name: Option<String>,
     pub description: Option<String>,
-    pub scheduled_at: Option<String>,
-    pub scheduled_end_at: Option<String>,
+    pub scheduled_at: Option<Timestamp>,
+    pub scheduled_end_at: Option<Timestamp>,
 }
 
 pub struct CreateShortcutParams {
@@ -40,8 +40,8 @@ pub struct CreateShortcutParams {
     pub layout: String,
     pub name: Option<String>,
     pub description: Option<String>,
-    pub scheduled_at: Option<String>,
-    pub scheduled_end_at: Option<String>,
+    pub scheduled_at: Option<Timestamp>,
+    pub scheduled_end_at: Option<Timestamp>,
 }
 
 pub struct CreateBombParams {
@@ -52,8 +52,8 @@ pub struct CreateBombParams {
     pub collision_max_penalty_ms: i64,
     pub name: Option<String>,
     pub description: Option<String>,
-    pub scheduled_at: Option<String>,
-    pub scheduled_end_at: Option<String>,
+    pub scheduled_at: Option<Timestamp>,
+    pub scheduled_end_at: Option<Timestamp>,
 }
 
 pub struct UpdateEventParams<'a> {
@@ -61,8 +61,8 @@ pub struct UpdateEventParams<'a> {
     pub layout: &'a str,
     pub name: Option<&'a str>,
     pub description: Option<&'a str>,
-    pub scheduled_at: Option<&'a str>,
-    pub scheduled_end_at: Option<&'a str>,
+    pub scheduled_at: Option<Timestamp>,
+    pub scheduled_end_at: Option<Timestamp>,
     pub writeup: Option<&'a str>,
 }
 
@@ -105,26 +105,24 @@ pub async fn upcoming_events(pool: &Pool) -> Result<Vec<Event>, sqlx::Error> {
 }
 
 pub async fn next_scheduled_event(pool: &Pool) -> Result<Option<(Event, i64)>, sqlx::Error> {
+    let now = Timestamp::now();
     let event = sqlx::query_as::<_, Event>(
         "SELECT id, mode, status, track, layout, created_at, started_at, ended_at,
                 scheduled_at, scheduled_end_at, name, description, writeup, allowed_vehicles
          FROM events
          WHERE status = 'PENDING'
            AND scheduled_at IS NOT NULL
-           AND scheduled_at > datetime('now')
+           AND scheduled_at > ?
          ORDER BY scheduled_at ASC
          LIMIT 1",
     )
+    .bind(now)
     .fetch_optional(pool)
     .await?;
 
     let Some(event) = event else { return Ok(None) };
 
-    let secs: i64 =
-        sqlx::query_scalar("SELECT CAST((julianday(?) - julianday('now')) * 86400 AS INTEGER)")
-            .bind(event.scheduled_at.as_deref())
-            .fetch_one(pool)
-            .await?;
+    let secs = event.scheduled_at.unwrap().as_second() - now.as_second();
 
     Ok(Some((event, secs)))
 }
@@ -134,15 +132,16 @@ pub async fn create_metronome_event(
     p: &CreateMetronomeParams,
 ) -> Result<i64, sqlx::Error> {
     let row = sqlx::query(
-        "INSERT INTO events (mode, track, layout, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO events (mode, track, layout, created_at, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(Json(EventMode::Metronome { target_ms: p.target_ms }))
     .bind(p.track.to_string())
     .bind(&p.layout)
+    .bind(Timestamp::now())
     .bind(p.name.as_deref())
     .bind(p.description.as_deref())
-    .bind(p.scheduled_at.as_deref())
-    .bind(p.scheduled_end_at.as_deref())
+    .bind(p.scheduled_at)
+    .bind(p.scheduled_end_at)
     .fetch_one(pool)
     .await?;
     Ok(row.get("id"))
@@ -153,15 +152,16 @@ pub async fn create_shortcut_event(
     p: &CreateShortcutParams,
 ) -> Result<i64, sqlx::Error> {
     let row = sqlx::query(
-        "INSERT INTO events (mode, track, layout, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO events (mode, track, layout, created_at, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(Json(EventMode::Shortcut))
     .bind(p.track.to_string())
     .bind(&p.layout)
+    .bind(Timestamp::now())
     .bind(p.name.as_deref())
     .bind(p.description.as_deref())
-    .bind(p.scheduled_at.as_deref())
-    .bind(p.scheduled_end_at.as_deref())
+    .bind(p.scheduled_at)
+    .bind(p.scheduled_end_at)
     .fetch_one(pool)
     .await?;
     Ok(row.get("id"))
@@ -169,7 +169,7 @@ pub async fn create_shortcut_event(
 
 pub async fn create_bomb_event(pool: &Pool, p: &CreateBombParams) -> Result<i64, sqlx::Error> {
     let row = sqlx::query(
-        "INSERT INTO events (mode, track, layout, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO events (mode, track, layout, created_at, name, description, scheduled_at, scheduled_end_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(Json(EventMode::Bomb {
         checkpoint_timeout_secs: p.checkpoint_timeout_secs,
@@ -178,27 +178,31 @@ pub async fn create_bomb_event(pool: &Pool, p: &CreateBombParams) -> Result<i64,
     }))
     .bind(p.track.to_string())
     .bind(&p.layout)
+    .bind(Timestamp::now())
     .bind(p.name.as_deref())
     .bind(p.description.as_deref())
-    .bind(p.scheduled_at.as_deref())
-    .bind(p.scheduled_end_at.as_deref())
+    .bind(p.scheduled_at)
+    .bind(p.scheduled_end_at)
     .fetch_one(pool)
     .await?;
     Ok(row.get("id"))
 }
 
 pub async fn switch_event(pool: &Pool, event_id: i64) -> Result<(), sqlx::Error> {
+    let now = Timestamp::now();
     let mut tx = pool.begin().await?;
     let _ = sqlx::query(
-        "UPDATE events SET status = 'COMPLETED', ended_at = datetime('now') WHERE status = 'ACTIVE' AND id != ?",
+        "UPDATE events SET status = 'COMPLETED', ended_at = ? WHERE status = 'ACTIVE' AND id != ?",
     )
+    .bind(now)
     .bind(event_id)
     .execute(&mut *tx)
     .await?;
 
     let _ = sqlx::query(
-        "UPDATE events SET status = 'ACTIVE', started_at = datetime('now') WHERE id = ? AND status = 'PENDING'",
+        "UPDATE events SET status = 'ACTIVE', started_at = ? WHERE id = ? AND status = 'PENDING'",
     )
+    .bind(now)
     .bind(event_id)
     .execute(&mut *tx)
     .await?;
@@ -207,9 +211,11 @@ pub async fn switch_event(pool: &Pool, event_id: i64) -> Result<(), sqlx::Error>
 }
 
 pub async fn complete_event(pool: &Pool, event_id: i64) -> Result<(), sqlx::Error> {
+    let now = Timestamp::now();
     let _ = sqlx::query(
-        "UPDATE events SET status = 'COMPLETED', ended_at = datetime('now') WHERE id = ?",
+        "UPDATE events SET status = 'COMPLETED', ended_at = ? WHERE id = ?",
     )
+    .bind(now)
     .bind(event_id)
     .execute(pool)
     .await?;
@@ -217,9 +223,11 @@ pub async fn complete_event(pool: &Pool, event_id: i64) -> Result<(), sqlx::Erro
 }
 
 pub async fn cancel_event(pool: &Pool, event_id: i64) -> Result<(), sqlx::Error> {
+    let now = Timestamp::now();
     let _ = sqlx::query(
-        "UPDATE events SET status = 'CANCELLED', ended_at = datetime('now') WHERE id = ?",
+        "UPDATE events SET status = 'CANCELLED', ended_at = ? WHERE id = ?",
     )
+    .bind(now)
     .bind(event_id)
     .execute(pool)
     .await?;

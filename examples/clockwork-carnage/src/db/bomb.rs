@@ -1,4 +1,4 @@
-use super::{BombRun, Pool};
+use super::{BombRun, Pool, Timestamp};
 
 pub async fn insert_bomb_run(
     pool: &Pool,
@@ -8,15 +8,17 @@ pub async fn insert_bomb_run(
     checkpoint_count: i64,
     survival_ms: i64,
 ) -> Result<(), sqlx::Error> {
+    let now = Timestamp::now();
     let _ = sqlx::query(
-        "INSERT INTO bomb_runs (event_id, user_id, vehicle, checkpoint_count, survival_ms)
-         VALUES (?, (SELECT id FROM users WHERE uname = ?), ?, ?, ?)",
+        "INSERT INTO bomb_runs (event_id, user_id, vehicle, checkpoint_count, survival_ms, recorded_at)
+         VALUES (?, (SELECT id FROM users WHERE uname = ?), ?, ?, ?, ?)",
     )
     .bind(event_id)
     .bind(uname)
     .bind(vehicle)
     .bind(checkpoint_count)
     .bind(survival_ms)
+    .bind(now)
     .execute(pool)
     .await?;
     Ok(())

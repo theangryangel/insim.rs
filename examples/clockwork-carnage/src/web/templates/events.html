@@ -74,11 +74,11 @@
       </td>
       <td class="px-3 py-2 text-gray-600 text-xs">
         {% match event.scheduled_at %} {% when Some with (s) %}
-        <span>{{ s }}</span>
+        <span>{{ s|format_timestamp }}</span>
         {% match event.scheduled_end_at %} {% when Some with (e) %}<span
           class="text-gray-400"
         >
-          → {{ e }}</span
+          → {{ e|format_timestamp }}</span
         >{% when None %} {% endmatch %} {% when None %}— {% endmatch %}
       </td>
       <td class="px-3 py-2 text-gray-600">{{ event.status }}</td>

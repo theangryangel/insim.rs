@@ -1,6 +1,6 @@
 use sqlx::Row;
 
-use super::{Pool, ShortcutTime};
+use super::{Pool, ShortcutTime, Timestamp};
 
 pub async fn insert_shortcut_time(
     pool: &Pool,
@@ -9,15 +9,17 @@ pub async fn insert_shortcut_time(
     vehicle: &str,
     time_ms: i64,
 ) -> Result<i64, sqlx::Error> {
+    let now = Timestamp::now();
     let row = sqlx::query(
-        "INSERT INTO shortcut_times (event_id, user_id, vehicle, time_ms)
-         VALUES (?, (SELECT id FROM users WHERE uname = ?), ?, ?)
+        "INSERT INTO shortcut_times (event_id, user_id, vehicle, time_ms, set_at)
+         VALUES (?, (SELECT id FROM users WHERE uname = ?), ?, ?, ?)
          RETURNING id",
     )
     .bind(event_id)
     .bind(uname)
     .bind(vehicle)
     .bind(time_ms)
+    .bind(now)
     .fetch_one(pool)
     .await?;
     Ok(row.get("id"))

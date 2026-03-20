@@ -169,6 +169,17 @@ pub struct EditEventForm {
 
 // -- Helpers ------------------------------------------------------------------
 
+fn parse_datetime_local(s: &str) -> Result<db::Timestamp, StatusCode> {
+    let dt = jiff::civil::DateTime::strptime("%Y-%m-%dT%H:%M", s)
+        .or_else(|_| jiff::civil::DateTime::strptime("%Y-%m-%dT%H:%M:%S", s))
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
+    let ts = dt
+        .to_zoned(jiff::tz::TimeZone::UTC)
+        .map_err(|_| StatusCode::BAD_REQUEST)?
+        .timestamp();
+    Ok(db::Timestamp(ts))
+}
+
 fn parse_vehicles(vehicles_str: &str) -> Vec<Vehicle> {
     vehicles_str
         .split(',')
@@ -277,10 +288,18 @@ pub async fn event_new_post(
     let track = form.track.parse().map_err(|_| StatusCode::BAD_REQUEST)?;
     let name = form.name.filter(|s| !s.is_empty());
     let description = form.description.filter(|s| !s.is_empty());
-    let scheduled_at = form.scheduled_at.filter(|s| !s.is_empty());
-    let scheduled_end_at = form.scheduled_end_at.filter(|s| !s.is_empty());
+    let scheduled_at: Option<db::Timestamp> = form
+        .scheduled_at
+        .filter(|s| !s.is_empty())
+        .map(|s| parse_datetime_local(&s))
+        .transpose()?;
+    let scheduled_end_at: Option<db::Timestamp> = form
+        .scheduled_end_at
+        .filter(|s| !s.is_empty())
+        .map(|s| parse_datetime_local(&s))
+        .transpose()?;
 
-    if let (Some(start), Some(end)) = (scheduled_at.as_deref(), scheduled_end_at.as_deref()) {
+    if let (Some(&start), Some(&end)) = (scheduled_at.as_ref(), scheduled_end_at.as_ref()) {
         let overlap = db::has_scheduling_overlap(&state.pool, start, end, None)
             .await
             .map_err(internal_error)?;
@@ -386,11 +405,21 @@ pub async fn event_edit_post(
     let track = form.track.parse().map_err(|_| StatusCode::BAD_REQUEST)?;
     let name = form.name.as_deref().filter(|s| !s.is_empty());
     let description = form.description.as_deref().filter(|s| !s.is_empty());
-    let scheduled_at = form.scheduled_at.as_deref().filter(|s| !s.is_empty());
-    let scheduled_end_at = form.scheduled_end_at.as_deref().filter(|s| !s.is_empty());
+    let scheduled_at: Option<db::Timestamp> = form
+        .scheduled_at
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .map(parse_datetime_local)
+        .transpose()?;
+    let scheduled_end_at: Option<db::Timestamp> = form
+        .scheduled_end_at
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .map(parse_datetime_local)
+        .transpose()?;
     let writeup = form.writeup.as_deref().filter(|s| !s.is_empty());
 
-    if let (Some(start), Some(end)) = (scheduled_at, scheduled_end_at) {
+    if let (Some(&start), Some(&end)) = (scheduled_at.as_ref(), scheduled_end_at.as_ref()) {
         let overlap = db::has_scheduling_overlap(&state.pool, start, end, Some(id))
             .await
             .map_err(internal_error)?;
