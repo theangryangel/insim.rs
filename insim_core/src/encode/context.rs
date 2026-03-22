@@ -15,11 +15,16 @@ impl<'a> EncodeContext<'a> {
         Self { buf }
     }
 
-    fn op<F>(&mut self, name: &'static str, f: F) -> Result<(), super::EncodeError>
+    fn op<F>(&mut self, name: &'static str, is_prim: bool, f: F) -> Result<(), super::EncodeError>
     where
         F: FnOnce(&mut Self) -> Result<(), super::EncodeError>,
     {
-        let _span = tracing::trace_span!("encode", field = name).entered();
+        let span = if is_prim {
+            tracing::Span::none() 
+        } else {
+            tracing::trace_span!("encode", field = name)
+        };
+        let _entered = span.entered();
         let start_len = self.buf.len();
 
         f(self).map_err(|e| e.nested().context(name))?;
@@ -27,7 +32,12 @@ impl<'a> EncodeContext<'a> {
         if tracing::enabled!(tracing::Level::TRACE) {
             let written = &self.buf[start_len..];
             if !written.is_empty() {
-                tracing::trace!(bytes = %HexDisplay(written));
+                let display_bytes = HexDisplay(written);
+                if is_prim {
+                    tracing::trace!(field = name, bytes = %display_bytes, "wrote");
+                } else {
+                    tracing::trace!(bytes = %display_bytes);
+                }
             }
         }
         Ok(())
@@ -35,7 +45,7 @@ impl<'a> EncodeContext<'a> {
 
     /// Paddding
     pub fn pad(&mut self, name: &'static str, len: usize) -> Result<(), super::EncodeError> {
-        self.op(name, |w| {
+        self.op(name, true, |w| {
             w.buf.put_bytes(0, len);
             Ok(())
         })
@@ -43,7 +53,7 @@ impl<'a> EncodeContext<'a> {
 
     /// Encode anything that impls Encode
     pub fn encode<T: super::Encode>(&mut self, name: &'static str, val: &T) -> Result<(), super::EncodeError> {
-        self.op(name, |writer| val.encode(writer))
+        self.op(name, T::PRIMITIVE, |writer| val.encode(writer))
     }
 
     /// Convert a [std::time::Duration] to milliseconds and encode it as a primitive integer.
@@ -51,7 +61,7 @@ impl<'a> EncodeContext<'a> {
     where
         T: super::Encode + num_traits::NumCast + num_traits::Bounded,
     {
-        self.op(name, |ctx| {
+        self.op(name, true, |ctx| {
             let millis = val.as_millis();
             let max = num_traits::cast::<T, usize>(T::max_value()).unwrap_or(usize::MAX);
             match num_traits::cast::<u128, T>(millis) {
@@ -78,7 +88,7 @@ impl<'a> EncodeContext<'a> {
             return Err(super::EncodeErrorKind::NotAsciiString.into());
         }
 
-        self.op(name, |writer| {
+        self.op(name, true, |writer| {
             let new = val.as_ref().as_bytes();
             let max_len = if trailing_nul { len - 1 } else { len };
             if new.len() > max_len {
@@ -104,7 +114,7 @@ impl<'a> EncodeContext<'a> {
         len: usize,
         trailing_nul: bool,
     ) -> Result<(), super::EncodeError> {
-        self.op(name, |writer| {
+        self.op(name, true, |writer| {
             let new = crate::string::codepages::to_lossy_bytes(val.as_ref());
             let max_len = if trailing_nul { len - 1 } else { len };
             if new.len() > max_len {
@@ -131,7 +141,7 @@ impl<'a> EncodeContext<'a> {
         alignment: usize,
         trailing_nul: bool,
     ) -> Result<(), super::EncodeError> {
-        self.op(name, |writer| {
+        self.op(name, true, |writer| {
             let new = crate::string::codepages::to_lossy_bytes(val.as_ref());
             let max_len = if trailing_nul { len - 1 } else { len };
             if new.len() > max_len {

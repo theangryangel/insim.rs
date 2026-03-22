@@ -11,6 +11,9 @@ pub use error::{EncodeError, EncodeErrorKind};
 
 /// Enable to bytes
 pub trait Encode: Sized {
+    /// Indicates if this is a primitive / leaf to EncodeContext
+    const PRIMITIVE: bool = false;
+
     /// Write
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), EncodeError>;
 }
@@ -18,6 +21,8 @@ pub trait Encode: Sized {
 // impls
 
 impl Encode for char {
+    const PRIMITIVE: bool = true;
+
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), EncodeError> {
         if self.is_ascii() {
             ctx.buf.put_u8(*self as u8);
@@ -29,6 +34,8 @@ impl Encode for char {
 }
 
 impl Encode for bool {
+    const PRIMITIVE: bool = true;
+
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), EncodeError> {
         ctx.buf.put_u8(*self as u8);
         Ok(())
@@ -36,6 +43,8 @@ impl Encode for bool {
 }
 
 impl Encode for u8 {
+    const PRIMITIVE: bool = true;
+
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), EncodeError> {
         ctx.buf.put_u8(*self);
 
@@ -44,6 +53,8 @@ impl Encode for u8 {
 }
 
 impl Encode for u16 {
+    const PRIMITIVE: bool = true;
+
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), EncodeError> {
         ctx.buf.put_u16_le(*self);
 
@@ -52,6 +63,8 @@ impl Encode for u16 {
 }
 
 impl Encode for i16 {
+    const PRIMITIVE: bool = true;
+
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), EncodeError> {
         ctx.buf.put_i16_le(*self);
 
@@ -60,6 +73,8 @@ impl Encode for i16 {
 }
 
 impl Encode for u32 {
+    const PRIMITIVE: bool = true;
+
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), EncodeError> {
         ctx.buf.put_u32_le(*self);
 
@@ -68,6 +83,8 @@ impl Encode for u32 {
 }
 
 impl Encode for i32 {
+    const PRIMITIVE: bool = true;
+
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), EncodeError> {
         ctx.buf.put_i32_le(*self);
 
@@ -76,6 +93,8 @@ impl Encode for i32 {
 }
 
 impl Encode for f32 {
+    const PRIMITIVE: bool = true;
+
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), EncodeError> {
         ctx.buf.put_f32_le(*self);
 

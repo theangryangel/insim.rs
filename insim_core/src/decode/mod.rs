@@ -13,6 +13,9 @@ use bytes::Buf;
 
 /// Decode from bytes
 pub trait Decode: Sized {
+    /// Indicates if this is a primitive / leaf to DecodeContext
+    const PRIMITIVE: bool = false;
+
     /// Read
     fn decode(ctx: &mut DecodeContext) -> Result<Self, DecodeError>;
 }
@@ -20,48 +23,64 @@ pub trait Decode: Sized {
 // impls
 
 impl Decode for char {
+    const PRIMITIVE: bool = true;
+
     fn decode(ctx: &mut DecodeContext) -> Result<Self, DecodeError> {
         Ok(ctx.buf.get_u8() as char)
     }
 }
 
 impl Decode for bool {
+    const PRIMITIVE: bool = true;
+
     fn decode(ctx: &mut DecodeContext) -> Result<Self, DecodeError> {
         Ok(ctx.buf.get_u8() > 0)
     }
 }
 
 impl Decode for u8 {
+    const PRIMITIVE: bool = true;
+
     fn decode(ctx: &mut DecodeContext) -> Result<Self, DecodeError> {
         Ok(ctx.buf.get_u8())
     }
 }
 
 impl Decode for u16 {
+    const PRIMITIVE: bool = true;
+
     fn decode(ctx: &mut DecodeContext) -> Result<Self, DecodeError> {
         Ok(ctx.buf.get_u16_le())
     }
 }
 
 impl Decode for i16 {
+    const PRIMITIVE: bool = true;
+
     fn decode(ctx: &mut DecodeContext) -> Result<Self, DecodeError> {
         Ok(ctx.buf.get_i16_le())
     }
 }
 
 impl Decode for u32 {
+    const PRIMITIVE: bool = true;
+
     fn decode(ctx: &mut DecodeContext) -> Result<Self, DecodeError> {
         Ok(ctx.buf.get_u32_le())
     }
 }
 
 impl Decode for i32 {
+    const PRIMITIVE: bool = true;
+
     fn decode(ctx: &mut DecodeContext) -> Result<Self, DecodeError> {
         Ok(ctx.buf.get_i32_le())
     }
 }
 
 impl Decode for f32 {
+    const PRIMITIVE: bool = true;
+
     fn decode(ctx: &mut DecodeContext) -> Result<Self, DecodeError> {
         Ok(ctx.buf.get_f32_le())
     }

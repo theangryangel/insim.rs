@@ -3,6 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use bytes::{Buf, BufMut};
 use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 
 /// Unique Connection Identifier, commonly referred to as UCID in Insim.txt
@@ -55,15 +56,16 @@ impl From<u8> for ConnectionId {
 }
 
 impl Decode for ConnectionId {
+    const PRIMITIVE: bool = true;
     fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
-        Ok(ConnectionId(ctx.decode::<u8>("val")?))
+        Ok(ConnectionId(ctx.buf.get_u8()))
     }
 }
 
 impl Encode for ConnectionId {
+    const PRIMITIVE: bool = true;
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
-        ctx.encode("val", &self.0)?;
-
+        ctx.buf.put_u8(self.0);
         Ok(())
     }
 }

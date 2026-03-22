@@ -78,14 +78,15 @@ impl From<i32> for OutgaugeId {
 }
 
 impl Decode for OutgaugeId {
+    const PRIMITIVE: bool = true;
     fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
-        ctx.decode::<i32>("val").map(OutgaugeId)
+        Ok(OutgaugeId(i32::decode(ctx)?))
     }
 }
 
 impl Encode for OutgaugeId {
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
-        ctx.encode("val", &self.0)
+        self.0.encode(ctx)
     }
 }
 

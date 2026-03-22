@@ -40,13 +40,15 @@ impl From<i32> for OutsimId {
 }
 
 impl Decode for OutsimId {
+    const PRIMITIVE: bool = true;
     fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
-        ctx.decode::<i32>("val").map(OutsimId)
+        Ok(OutsimId(i32::decode(ctx)?))
     }
 }
 
 impl Encode for OutsimId {
+    const PRIMITIVE: bool = true;
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
-        ctx.encode("val", &self.0)
+        self.0.encode(ctx)
     }
 }

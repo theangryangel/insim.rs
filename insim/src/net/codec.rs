@@ -66,7 +66,7 @@ impl Codec {
     }
 
     /// Encode a [Packet] into [Bytes].
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(skip(self), err)]
     pub fn encode(&self, msg: &Packet) -> Result<Bytes> {
         let mut buf = BytesMut::with_capacity(msg.size_hint());
 
@@ -82,7 +82,7 @@ impl Codec {
         // populate the size
         buf[0] = n;
 
-        tracing::debug!("{:?}", &buf);
+        tracing::debug!(bytes = %HexDisplay(&buf), "encoded packet");
 
         Ok(buf.freeze())
     }
@@ -112,7 +112,7 @@ impl Codec {
     }
 
     /// Decode any complete packet in the buffer into a [Packet]
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(skip_all, fields(buf_len = self.buffer.len()), err)]
     pub fn decode(&mut self) -> Result<Option<Packet>> {
         if self.buffer.is_empty() {
             return Ok(None);
@@ -144,7 +144,7 @@ impl Codec {
         let packet = Packet::decode(&mut ctx);
         match packet {
             Ok(packet) => {
-                tracing::debug!("{:?}", &packet);
+                tracing::debug!(?packet, "decoded packet");
                 if ctx.buf.remaining() > 0 {
                     return Err(Error::IncompleteDecode {
                         input: original,
@@ -199,7 +199,7 @@ impl Codec {
 
     /// Given a single packet in dst, encode it's length, and ensure that it does not
     /// exceed maximum limits
-    #[tracing::instrument(skip_all, level = "trace")]
+    #[tracing::instrument(skip(self), level = "trace", ret, err)]
     fn encode_length(&self, len: usize) -> Result<u8> {
         if !(MIN_PACKET_SIZE..=MAX_PACKET_SIZE).contains(&len) {
             return Err(EncodeErrorKind::OutOfRange {
@@ -228,7 +228,7 @@ impl Codec {
 
     /// Decode the length of the next packet in the buffer src, ensuring that it does
     /// not exceed limits.
-    #[tracing::instrument(skip_all, level = "trace")]
+    #[tracing::instrument(skip_all, fields(src_len = src.len()), level = "trace", ret, err)]
     fn decode_length(&self, src: &BytesMut) -> Result<Option<usize>> {
         if src.len() < MIN_PACKET_SIZE {
             // Not enough data for even the header

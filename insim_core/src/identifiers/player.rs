@@ -3,6 +3,8 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use bytes::{Buf, BufMut};
+
 use crate::{DecodeContext, EncodeContext};
 
 /// Unique Player Identifier, commonly referred to as PLID in Insim.txt
@@ -37,13 +39,16 @@ impl From<u8> for PlayerId {
 }
 
 impl crate::Decode for PlayerId {
+    const PRIMITIVE: bool = true;
     fn decode(ctx: &mut DecodeContext) -> Result<Self, crate::DecodeError> {
-        ctx.decode::<u8>("val").map(PlayerId)
+        Ok(Self(ctx.buf.get_u8()))
     }
 }
 
 impl crate::Encode for PlayerId {
+    const PRIMITIVE: bool = true;
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), crate::EncodeError> {
-        ctx.encode("val", &self.0)
+        ctx.buf.put_u8(self.0);
+        Ok(())
     }
 }

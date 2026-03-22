@@ -3,6 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use bytes::{Buf, BufMut};
 use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 
 /// Request Identifier, commonly referred to as reqi in Insim.txt
@@ -37,15 +38,16 @@ impl From<u8> for RequestId {
 }
 
 impl Decode for RequestId {
+    const PRIMITIVE: bool = true;
     fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
-        Ok(RequestId(ctx.decode::<u8>("val")?))
+        Ok(RequestId(ctx.buf.get_u8()))
     }
 }
 
 impl Encode for RequestId {
+    const PRIMITIVE: bool = true;
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
-        ctx.encode("val", &self.0)?;
-
+        ctx.buf.put_u8(self.0);
         Ok(())
     }
 }

@@ -19,12 +19,17 @@ impl<'a> DecodeContext<'a> {
     /// Naming the field in a tracing span.
     /// Capturing bytes for a tracing dump
     /// Mapping errors with breadcrumbs
-    fn op<T, F>(&mut self, name: &'static str, f: F) -> Result<T, super::DecodeError>
+    fn op<T, F>(&mut self, name: &'static str, is_prim: bool, f: F) -> Result<T, super::DecodeError>
     where
         F: FnOnce(&mut Self) -> Result<T, super::DecodeError>,
     {
         // Enter a span. Tracing will handle the "Parent > Child" indentation automatically.
-        let _span = tracing::trace_span!("decode", field = name).entered();
+        let span = if is_prim {
+            tracing::Span::none()
+        } else {
+            tracing::trace_span!("decode", field = name)
+        };
+        let _entered = span.entered();
         
         // Snapshot the buffer state for the HexDump
         let start_buf = if tracing::enabled!(tracing::Level::TRACE) {
@@ -40,7 +45,12 @@ impl<'a> DecodeContext<'a> {
         if let Some(start) = start_buf {
             let consumed = start.len() - self.buf.len();
             if consumed > 0 {
-                tracing::trace!(bytes = %HexDisplay(&start.slice(..consumed)));
+                let display_bytes = HexDisplay(&start.slice(..consumed));
+                if is_prim {
+                    tracing::trace!(field = name, bytes = %display_bytes, "read");
+                } else {
+                    tracing::trace!(bytes = %display_bytes);
+                }
             }
         }
 
@@ -49,12 +59,12 @@ impl<'a> DecodeContext<'a> {
 
     /// Read any type that implements our basic Decode trait
     pub fn decode<T: super::Decode>(&mut self, name: &'static str) -> Result<T, super::DecodeError> {
-        self.op(name, |reader| T::decode(reader))
+        self.op(name, T::PRIMITIVE, |reader| T::decode(reader))
     }
 
     /// Paddding
     pub fn pad(&mut self, name: &'static str, len: usize) -> Result<(), super::DecodeError> {
-        self.op(name, |reader| {
+        self.op(name, true, |reader| {
             if reader.buf.remaining() < len {
                 return Err(super::DecodeErrorKind::UnexpectedEof.into());
 
@@ -69,7 +79,7 @@ impl<'a> DecodeContext<'a> {
     where
         T: super::Decode + num_traits::ToPrimitive,
     {
-        self.op(name, |ctx| {
+        self.op(name, true, |ctx| {
             let raw = T::decode(ctx)?;
             raw.to_u64()
                 .map(std::time::Duration::from_millis)
@@ -86,7 +96,7 @@ impl<'a> DecodeContext<'a> {
 
     /// Special case: fixed length codepage string
     pub fn decode_codepage(&mut self, name: &'static str, len: usize) -> Result<String, super::DecodeError> {
-        self.op(name, |reader| {
+        self.op(name, true, |reader| {
             let new = reader.buf.copy_to_bytes(reader.buf.len().min(len));
             let new =
                 crate::string::codepages::to_lossy_string(crate::string::strip_trailing_nul(&new));
@@ -96,7 +106,7 @@ impl<'a> DecodeContext<'a> {
 
     /// Special case: fixed length ascii string
     pub fn decode_ascii(&mut self, name: &'static str, len: usize) -> Result<String, super::DecodeError> {
-        self.op(name, |reader| {
+        self.op(name, true, |reader| {
             if reader.buf.remaining() < len {
                 return Err(super::DecodeErrorKind::UnexpectedEof.into());
             }

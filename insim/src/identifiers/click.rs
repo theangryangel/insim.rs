@@ -3,6 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use bytes::{Buf, BufMut};
 use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 
 /// Button Click Identifier
@@ -42,8 +43,9 @@ impl From<u8> for ClickId {
 }
 
 impl Decode for ClickId {
+    const PRIMITIVE: bool = true;
     fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
-        let clickid = ctx.decode::<u8>("clickid")?;
+        let clickid = ctx.buf.get_u8();
         if clickid > Self::MAX {
             Err(insim_core::DecodeErrorKind::OutOfRange {
                 min: 1,
@@ -67,7 +69,7 @@ impl Encode for ClickId {
             }
             .into())
         } else {
-            ctx.encode("clickid", &self.0)?;
+            ctx.buf.put_u8(self.0);
             Ok(())
         }
     }
