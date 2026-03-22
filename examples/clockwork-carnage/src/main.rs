@@ -4,7 +4,6 @@
 
 mod db;
 
-use tracing_subscriber::fmt::format::FmtSpan;
 mod games;
 mod hud;
 mod web;
@@ -242,6 +241,7 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
     });
 
     let announce_data = ctx.as_ref().map(|c| (c.pool.clone(), c.insim.clone(), base_url.clone()));
+    let web_presence = ctx.as_ref().map(|c| c.presence.clone());
     let scheduler_pool = pool.clone();
 
     let reconcile = async move {
@@ -358,7 +358,7 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
     // guards, so .unwrap() on None would panic even with an `if false` guard.
     let web_fut = async move {
         match (web_listen, web_cfg) {
-            (Some(listen), Some(cfg)) => web::serve(listen, pool.clone(), cfg).await,
+            (Some(listen), Some(cfg)) => web::serve(listen, pool.clone(), cfg, web_presence).await,
             _ => std::future::pending().await,
         }
     };

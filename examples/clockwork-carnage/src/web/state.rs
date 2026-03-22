@@ -13,6 +13,7 @@ use crate::web::AuthSession;
 pub struct AppState {
     pub pool: Arc<crate::db::Pool>,
     pub oauth_client: BasicClient,
+    pub presence: Option<kitcar::presence::Presence>,
 }
 
 pub struct PageCtx {

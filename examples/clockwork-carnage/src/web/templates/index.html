@@ -69,6 +69,9 @@ endblock %} {% block content %}
       Upcoming
     </p>
     <div class="flex flex-col gap-2">
+      {% if upcoming.is_empty() %}
+      <p class="text-center text-xs text-gray-300 font-mono py-4">Nothing scheduled.</p>
+      {% endif %}
       {% for event in upcoming %}
       <a
         href="/events/{{ event.id }}"
@@ -116,6 +119,8 @@ endblock %} {% block content %}
       </a>
       {% endfor %}
     </div>
+
+    <div class="mt-6" hx-get="/presence" hx-trigger="load" hx-swap="outerHTML"></div>
   </div>
 
   {# ── Right: About (left on desktop) ── #}
@@ -126,10 +131,19 @@ endblock %} {% block content %}
       About
     </p>
 
-    <p class="text-gray-500 mb-6">
+    <p class="text-gray-500 mb-3">
       Clockwork Carnage is a Live for Speed mini-game server. Jump in and race
       across three unique challenge modes — each one tests a different skill and
       keeps every event fresh.
+    </p>
+
+    <p class="text-gray-500 mb-6">
+      Built with
+      <a
+        href="https://github.com/theangryangel/insim.rs"
+        class="underline hover:text-orange-600"
+        >insim.rs</a
+      >
     </p>
 
     <p

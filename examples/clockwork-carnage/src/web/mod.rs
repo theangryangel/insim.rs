@@ -160,7 +160,12 @@ pub struct WebConfig {
 
 // -- Server entry point -------------------------------------------------------
 
-pub async fn serve(listen: SocketAddr, pool: db::Pool, cfg: WebConfig) -> anyhow::Result<()> {
+pub async fn serve(
+    listen: SocketAddr,
+    pool: db::Pool,
+    cfg: WebConfig,
+    presence: Option<kitcar::presence::Presence>,
+) -> anyhow::Result<()> {
     let redirect_uri = format!("{}/auth/callback", cfg.base_url);
     let oauth_client = build_oauth_client(&cfg.oauth_client_id, &redirect_uri)?;
     let backend = Backend::new(
@@ -185,6 +190,7 @@ pub async fn serve(listen: SocketAddr, pool: db::Pool, cfg: WebConfig) -> anyhow
     let app_state = AppState {
         pool: Arc::new(pool),
         oauth_client,
+        presence,
     };
 
     let app = Router::new()
@@ -205,6 +211,7 @@ pub async fn serve(listen: SocketAddr, pool: db::Pool, cfg: WebConfig) -> anyhow
         .route("/events/{id}/start", post(event_start))
         .route("/events/{id}/complete", post(event_complete))
         .route("/events/{id}/cancel", post(event_cancel))
+        .route("/presence", get(presence_partial))
         .route("/login", get(login))
         .route("/auth/callback", get(callback))
         .route("/logout", get(logout))
