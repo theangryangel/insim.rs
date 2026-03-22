@@ -165,6 +165,8 @@ pub struct User {
     pub last_seen: Timestamp,
     pub oauth_access_token: Option<String>,
     pub admin: bool,
+    pub twitch_username: Option<String>,
+    pub youtube_username: Option<String>,
 }
 
 impl std::fmt::Debug for User {
@@ -201,6 +203,8 @@ pub struct MetronomeStanding {
     pub uname: String,
     pub pname: String,
     pub best_delta_ms: i64,
+    pub twitch_username: Option<String>,
+    pub youtube_username: Option<String>,
 }
 
 #[derive(Debug, Clone, FromRow)]
@@ -210,6 +214,8 @@ pub struct ShortcutTime {
     pub vehicle: String,
     pub time_ms: i64,
     pub set_at: Timestamp,
+    pub twitch_username: Option<String>,
+    pub youtube_username: Option<String>,
 }
 
 #[derive(Debug, Clone, FromRow)]
@@ -220,6 +226,8 @@ pub struct BombRun {
     pub checkpoint_count: i64,
     pub survival_ms: i64,
     pub recorded_at: Timestamp,
+    pub twitch_username: Option<String>,
+    pub youtube_username: Option<String>,
 }
 
 // -- Submodules ---------------------------------------------------------------

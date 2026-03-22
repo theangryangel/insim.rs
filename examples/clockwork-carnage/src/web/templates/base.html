@@ -95,7 +95,7 @@
       <div class="w-px bg-gray-300/70 my-1 mx-0.5"></div>
       <div class="flex items-center gap-1.5 px-3">
         {% if let Some(uname) = page.current_user %}
-        <span class="text-xs font-semibold text-gray-600">{{ uname }}</span>
+        <a href="/profile" class="text-xs font-semibold text-gray-600 hover:text-gray-900 transition-colors">{{ uname }}</a>
         <span class="text-gray-300">·</span>
         <a
           href="/logout"

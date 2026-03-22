@@ -29,7 +29,7 @@ pub async fn metronome_standings(
 ) -> Result<Vec<MetronomeStanding>, sqlx::Error> {
     let rows = sqlx::query(
         r#"
-        SELECT u.uname, u.pname, MIN(r.delta_ms) AS best_delta_ms
+        SELECT u.uname, u.pname, u.twitch_username, u.youtube_username, MIN(r.delta_ms) AS best_delta_ms
         FROM metronome_results r
         JOIN users u ON u.id = r.user_id
         WHERE r.event_id = ?
@@ -47,6 +47,8 @@ pub async fn metronome_standings(
             uname: row.get("uname"),
             pname: row.get("pname"),
             best_delta_ms: row.get("best_delta_ms"),
+            twitch_username: row.get("twitch_username"),
+            youtube_username: row.get("youtube_username"),
         })
         .collect())
 }

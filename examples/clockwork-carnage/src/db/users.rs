@@ -6,7 +6,7 @@ use super::{Pool, Timestamp, User};
 
 pub async fn get_user_by_id(pool: &Pool, id: i64) -> Result<Option<User>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT id, uname, pname, last_seen, oauth_access_token, admin FROM users WHERE id = ?",
+        "SELECT id, uname, pname, last_seen, oauth_access_token, admin, twitch_username, youtube_username FROM users WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -27,7 +27,7 @@ pub async fn upsert_user_with_token(
            pname = excluded.pname,
            oauth_access_token = excluded.oauth_access_token,
            last_seen = excluded.last_seen
-         RETURNING id, uname, pname, last_seen, oauth_access_token, admin",
+         RETURNING id, uname, pname, last_seen, oauth_access_token, admin, twitch_username, youtube_username",
     )
     .bind(uname)
     .bind(pname)
@@ -50,6 +50,38 @@ pub async fn upsert_user(pool: &Pool, uname: &str, pname: &str) -> Result<i64, s
     .fetch_one(pool)
     .await?;
     Ok(row.get("id"))
+}
+
+pub async fn update_user_profile(
+    pool: &Pool,
+    uname: &str,
+    twitch_username: Option<&str>,
+    youtube_username: Option<&str>,
+) -> Result<(), sqlx::Error> {
+    let _ = sqlx::query(
+        "UPDATE users SET twitch_username = ?, youtube_username = ? WHERE uname = ?",
+    )
+    .bind(twitch_username)
+    .bind(youtube_username)
+    .bind(uname)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn users_for_unames(pool: &Pool, unames: &[String]) -> Result<Vec<User>, sqlx::Error> {
+    if unames.is_empty() {
+        return Ok(vec![]);
+    }
+    let placeholders = unames.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+    let sql = format!(
+        "SELECT id, uname, pname, last_seen, oauth_access_token, admin, twitch_username, youtube_username FROM users WHERE uname IN ({placeholders})"
+    );
+    let mut query = sqlx::query_as(&sql);
+    for uname in unames {
+        query = query.bind(uname);
+    }
+    query.fetch_all(pool).await
 }
 
 #[derive(Debug, thiserror::Error)]

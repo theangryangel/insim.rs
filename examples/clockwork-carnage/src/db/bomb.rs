@@ -26,7 +26,7 @@ pub async fn insert_bomb_run(
 
 pub async fn bomb_best_runs(pool: &Pool, event_id: i64) -> Result<Vec<BombRun>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT u.uname, u.pname, br.vehicle,
+        "SELECT u.uname, u.pname, u.twitch_username, u.youtube_username, br.vehicle,
                 br.checkpoint_count, br.survival_ms, br.recorded_at
          FROM bomb_runs br
          JOIN users u ON u.id = br.user_id
@@ -54,7 +54,7 @@ pub async fn bomb_best_runs(pool: &Pool, event_id: i64) -> Result<Vec<BombRun>, 
 
 pub async fn bomb_all_runs(pool: &Pool, event_id: i64) -> Result<Vec<BombRun>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT u.uname, u.pname, br.vehicle,
+        "SELECT u.uname, u.pname, u.twitch_username, u.youtube_username, br.vehicle,
                 br.checkpoint_count, br.survival_ms, br.recorded_at
          FROM bomb_runs br
          JOIN users u ON u.id = br.user_id

@@ -195,6 +195,9 @@ pub async fn serve(
 
     let app = Router::new()
         .route("/logo.svg", get(logo))
+        .route("/twitch-icon.svg", get(twitch_icon))
+        .route("/youtube-icon.svg", get(youtube_icon))
+        .route("/profile", get(profile_get).post(profile_post))
         .route("/", get(index))
         .route("/events", get(events))
         .route("/events/new", get(event_new_get).post(event_new_post))

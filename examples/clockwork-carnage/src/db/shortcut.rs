@@ -30,7 +30,7 @@ pub async fn shortcut_best_times(
     event_id: i64,
 ) -> Result<Vec<ShortcutTime>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT u.uname, u.pname, ct.vehicle, ct.time_ms, ct.set_at
+        "SELECT u.uname, u.pname, u.twitch_username, u.youtube_username, ct.vehicle, ct.time_ms, ct.set_at
          FROM shortcut_times ct
          JOIN users u ON u.id = ct.user_id
          INNER JOIN (
@@ -52,7 +52,7 @@ pub async fn shortcut_all_times(
     event_id: i64,
 ) -> Result<Vec<ShortcutTime>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT u.uname, u.pname, ct.vehicle, ct.time_ms, ct.set_at
+        "SELECT u.uname, u.pname, u.twitch_username, u.youtube_username, ct.vehicle, ct.time_ms, ct.set_at
          FROM shortcut_times ct
          JOIN users u ON u.id = ct.user_id
          WHERE ct.event_id = ?
@@ -69,7 +69,7 @@ pub async fn shortcut_personal_best(
     uname: &str,
 ) -> Result<Option<ShortcutTime>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT u.uname, u.pname, ct.vehicle, ct.time_ms, ct.set_at
+        "SELECT u.uname, u.pname, u.twitch_username, u.youtube_username, ct.vehicle, ct.time_ms, ct.set_at
          FROM shortcut_times ct
          JOIN users u ON u.id = ct.user_id
          WHERE ct.event_id = ? AND u.uname = ?

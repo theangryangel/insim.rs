@@ -20,7 +20,19 @@
     >
       <span class="h-2 w-2 bg-green-500 rounded-full flex-shrink-0"></span>
       <span class="text-sm font-medium">{{ conn.pname }}</span>
-      <span class="text-xs text-gray-400 ml-auto font-mono">{{ conn.uname }}</span>
+      <span class="text-xs text-gray-400 font-mono">{{ conn.uname }}</span>
+      <span class="flex items-center gap-1 ml-auto">
+        {% if let Some(tw) = conn.twitch_username %}
+        <a href="https://twitch.tv/{{ tw }}" target="_blank" class="text-purple-500 hover:text-purple-700">
+          <img src="/twitch-icon.svg" class="h-3 w-3 inline" alt="Twitch" />
+        </a>
+        {% endif %}
+        {% if let Some(yt) = conn.youtube_username %}
+        <a href="https://youtube.com/@{{ yt }}" target="_blank" class="text-red-500 hover:text-red-700">
+          <img src="/youtube-icon.svg" class="h-3 w-3 inline" alt="YouTube" />
+        </a>
+        {% endif %}
+      </span>
     </div>
     {% endfor %}
   </div>
