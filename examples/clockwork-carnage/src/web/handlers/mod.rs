@@ -11,6 +11,6 @@ pub use index::*;
 pub use profile::*;
 
 pub(crate) fn internal_error(e: impl std::fmt::Display) -> axum::http::StatusCode {
-    tracing::error!("{e:#}");
+    tracing::error!(%e, "internal error");
     axum::http::StatusCode::INTERNAL_SERVER_ERROR
 }

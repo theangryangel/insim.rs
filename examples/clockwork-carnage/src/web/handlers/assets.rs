@@ -1,25 +1,16 @@
-use axum::http::StatusCode;
+use axum::{extract::Path, http::StatusCode, response::IntoResponse, http::header::CONTENT_TYPE};
 
-pub async fn logo() -> (StatusCode, [(&'static str, &'static str); 1], &'static [u8]) {
-    (
-        StatusCode::OK,
-        [("content-type", "image/svg+xml")],
-        include_bytes!("../../../logo.svg"),
-    )
-}
+#[derive(rust_embed::Embed)]
+#[folder = "assets/"]
+struct Assets;
 
-pub async fn twitch_icon() -> (StatusCode, [(&'static str, &'static str); 1], &'static [u8]) {
-    (
-        StatusCode::OK,
-        [("content-type", "image/svg+xml")],
-        include_bytes!("../../../twitch-icon.svg"),
-    )
-}
-
-pub async fn youtube_icon() -> (StatusCode, [(&'static str, &'static str); 1], &'static [u8]) {
-    (
-        StatusCode::OK,
-        [("content-type", "image/svg+xml")],
-        include_bytes!("../../../youtube-icon.svg"),
-    )
+/// Serve static files from `/assets/*` path
+pub async fn assets(Path(path): Path<String>) -> impl IntoResponse {
+    match Assets::get(path.as_str()) {
+        Some(content) => {
+            let mime = mime_guess::from_path(path).first_or_octet_stream();
+            ([(CONTENT_TYPE, mime.as_ref())], content.data).into_response()
+        }
+        None => (StatusCode::NOT_FOUND, "404 Not Found").into_response(),
+    }
 }

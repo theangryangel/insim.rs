@@ -30,6 +30,8 @@ tower-sessions = { version = "0.14", features = ["private"] }
 tower-sessions-sqlx-store = { version = "0.15", features = ["sqlite"] }
 tracing = {workspace = true}
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
+rust-embed = "8.11.0"
+mime_guess = "2.0.5"
 
 [lints]
 workspace = true

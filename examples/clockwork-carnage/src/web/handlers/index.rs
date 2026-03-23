@@ -1,10 +1,10 @@
 use askama::Template;
 use axum::{extract::State, http::StatusCode, response::Html};
-use std::collections::HashMap;
+use insim::identifiers::ConnectionId;
 
 use super::internal_error;
 use crate::{
-    db::{self, Event, EventMode},
+    db::{self, Event, EventMode, User},
     web::{
         filters,
         state::{AppState, PageCtx},
@@ -26,6 +26,17 @@ pub struct PresenceRow {
     pub youtube_username: Option<String>,
 }
 
+impl From<User> for PresenceRow {
+    fn from(value: User) -> Self {
+        Self {
+            uname: value.uname,
+            pname: value.pname,
+            twitch_username: value.twitch_username,
+            youtube_username: value.youtube_username
+        }
+    }
+}
+
 #[derive(Template)]
 #[template(path = "partials/presence.html")]
 pub struct PresenceTemplate {
@@ -40,30 +51,20 @@ pub async fn presence_partial(
         None => vec![],
     };
 
-    let unames: Vec<String> = raw_connections.iter().map(|c| c.uname.clone()).collect();
+    let unames: Vec<&str> = raw_connections.iter().filter_map(|c| {
+        if c.ucid == ConnectionId::LOCAL {
+            None
+        } else {
+            Some(c.uname.as_ref()) 
+        }
+    }).collect();
     let users = db::users_for_unames(&state.pool, &unames)
         .await
         .map_err(internal_error)?;
-    let user_map: HashMap<String, (Option<String>, Option<String>)> = users
-        .into_iter()
-        .map(|u| (u.uname, (u.twitch_username, u.youtube_username)))
-        .collect();
 
-    let connections = raw_connections
+    let connections: Vec<PresenceRow> = users
         .into_iter()
-        .map(|c| {
-            let (twitch_username, youtube_username) = user_map
-                .get(&c.uname)
-                .map(|(t, y)| (t.clone(), y.clone()))
-                .unwrap_or((None, None));
-            PresenceRow {
-                uname: c.uname,
-                pname: c.pname,
-                twitch_username,
-                youtube_username,
-            }
-        })
-        .collect();
+        .map(|u| u.into()).collect();
 
     let tmpl = PresenceTemplate { connections };
     Ok(Html(tmpl.render().map_err(internal_error)?))

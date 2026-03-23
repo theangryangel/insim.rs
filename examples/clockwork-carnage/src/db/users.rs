@@ -69,7 +69,7 @@ pub async fn update_user_profile(
     Ok(())
 }
 
-pub async fn users_for_unames(pool: &Pool, unames: &[String]) -> Result<Vec<User>, sqlx::Error> {
+pub async fn users_for_unames(pool: &Pool, unames: &[&str]) -> Result<Vec<User>, sqlx::Error> {
     if unames.is_empty() {
         return Ok(vec![]);
     }
