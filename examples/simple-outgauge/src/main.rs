@@ -2,7 +2,10 @@
 use std::net::UdpSocket;
 
 use bytes::{Bytes, BytesMut};
-use outgauge::{core::{Decode, DecodeContext}, Outgauge};
+use outgauge::{
+    Outgauge,
+    core::{Decode, DecodeContext},
+};
 use tracing_subscriber::fmt::format::FmtSpan;
 
 /// Setup tracing output

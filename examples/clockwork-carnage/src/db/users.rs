@@ -58,14 +58,13 @@ pub async fn update_user_profile(
     twitch_username: Option<&str>,
     youtube_username: Option<&str>,
 ) -> Result<(), sqlx::Error> {
-    let _ = sqlx::query(
-        "UPDATE users SET twitch_username = ?, youtube_username = ? WHERE uname = ?",
-    )
-    .bind(twitch_username)
-    .bind(youtube_username)
-    .bind(uname)
-    .execute(pool)
-    .await?;
+    let _ =
+        sqlx::query("UPDATE users SET twitch_username = ?, youtube_username = ? WHERE uname = ?")
+            .bind(twitch_username)
+            .bind(youtube_username)
+            .bind(uname)
+            .execute(pool)
+            .await?;
     Ok(())
 }
 

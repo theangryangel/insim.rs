@@ -152,9 +152,8 @@ impl ui::Component for BombView {
             .with_children(leaderboard_rows);
 
         if let Some(url) = &props.global.event_url {
-            scoreboard = scoreboard.with_child(
-                ui::text(url, hud_muted().align_left()).w(43.).h(5.),
-            );
+            scoreboard =
+                scoreboard.with_child(ui::text(url, hud_muted().align_left()).w(43.).h(5.));
         }
 
         ui::container()

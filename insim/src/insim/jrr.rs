@@ -1,4 +1,6 @@
-use insim_core::{Decode, DecodeContext, Encode, EncodeContext, heading::Heading, object::ObjectCoordinate};
+use insim_core::{
+    Decode, DecodeContext, Encode, EncodeContext, heading::Heading, object::ObjectCoordinate,
+};
 
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 

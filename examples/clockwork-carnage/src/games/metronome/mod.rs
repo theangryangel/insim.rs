@@ -67,8 +67,12 @@ impl MiniGame for MetronomeGame {
                 track: self.track,
                 layout: Some(self.layout.clone()),
                 mode_name: match &self.event_name {
-                    Some(name) => format!("{name} — Metronome: match the target lap time as closely as possible!"),
-                    None => "Metronome: match the target lap time as closely as possible!".to_string(),
+                    Some(name) => format!(
+                        "{name} — Metronome: match the target lap time as closely as possible!"
+                    ),
+                    None => {
+                        "Metronome: match the target lap time as closely as possible!".to_string()
+                    },
                 },
             }
             .with_timeout(Duration::from_secs(60)),

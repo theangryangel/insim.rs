@@ -1,8 +1,6 @@
 //! Prefab toolbox for LFS layout editing.
 use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
-use tracing_subscriber::fmt::format::FmtSpan;
-
 use clap::Parser;
 use insim::{
     Packet, WithRequestId,
@@ -12,6 +10,7 @@ use insim::{
 };
 use kitcar::ui::{Canvas, Component};
 use tokio::time::{MissedTickBehavior, sleep};
+use tracing_subscriber::fmt::format::FmtSpan;
 
 mod tools;
 mod ui;

@@ -42,7 +42,9 @@ impl Pin {
                 let _ = reader.read_to_end(&mut data)?;
                 let mut buf = Bytes::from(data);
 
-                Ok(Self::LfsPin0(v0::LfsPin::decode(&mut DecodeContext::new(&mut buf))?))
+                Ok(Self::LfsPin0(v0::LfsPin::decode(&mut DecodeContext::new(
+                    &mut buf,
+                ))?))
             },
             _ => Err(super::Error::UnsupportedVersion {
                 magic: magic.to_vec(),

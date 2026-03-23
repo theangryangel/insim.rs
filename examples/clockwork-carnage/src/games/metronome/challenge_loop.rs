@@ -129,9 +129,8 @@ impl ui::Component for MetronomeView {
             .with_children(players);
 
         if let Some(url) = &props.global.event_url {
-            scoreboard = scoreboard.with_child(
-                ui::text(url, hud_muted().align_left()).w(35.).h(5.),
-            );
+            scoreboard =
+                scoreboard.with_child(ui::text(url, hud_muted().align_left()).w(35.).h(5.));
         }
 
         ui::container()

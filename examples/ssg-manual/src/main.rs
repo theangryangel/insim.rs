@@ -2,12 +2,16 @@
 use std::{net::SocketAddr, time::Duration};
 
 use bytes::{Buf, Bytes, BytesMut};
-use tracing_subscriber::fmt::format::FmtSpan;
 use clap::Parser;
-use insim::{core::{Decode, DecodeContext}, insim::SmallType, Packet};
+use insim::{
+    Packet,
+    core::{Decode, DecodeContext},
+    insim::SmallType,
+};
 use outgauge::Outgauge;
 use outsim::OutsimPack;
 use tokio::net::UdpSocket;
+use tracing_subscriber::fmt::format::FmtSpan;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]

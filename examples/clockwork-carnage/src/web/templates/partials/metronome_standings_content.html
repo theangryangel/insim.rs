@@ -1,7 +1,9 @@
 {% if metronome_standings.is_empty() %}
 <tr class="border-b border-gray-100">
   <td class="py-2 pr-2 font-mono text-gray-400" colspan="4">
-    <p class="text-center text-xs text-gray-300 font-mono py-4">No results yet</p>
+    <p class="text-center text-xs text-gray-300 font-mono py-4">
+      No results yet
+    </p>
   </td>
 </tr>
 {% else %} {% for standing in metronome_standings %}
@@ -11,13 +13,24 @@
     <span class="font-medium">{{ standing.pname|colour_html|safe }}</span>
     <span class="text-xs text-gray-400 ml-1">{{ standing.uname }}</span>
     {% if let Some(tw) = standing.twitch_username %}
-    <a href="https://twitch.tv/{{ tw }}" target="_blank" class="text-purple-500 hover:text-purple-700 ml-1">
+    <a
+      href="https://twitch.tv/{{ tw }}"
+      target="_blank"
+      class="text-purple-500 hover:text-purple-700 ml-1"
+    >
       <img src="/assets/twitch-icon.svg" class="h-3 w-3 inline" alt="Twitch" />
     </a>
-    {% endif %}
-    {% if let Some(yt) = standing.youtube_username %}
-    <a href="https://youtube.com/@{{ yt }}" target="_blank" class="text-red-500 hover:text-red-700 ml-1">
-      <img src="/assets/youtube-icon.svg" class="h-3 w-3 inline" alt="YouTube" />
+    {% endif %} {% if let Some(yt) = standing.youtube_username %}
+    <a
+      href="https://youtube.com/@{{ yt }}"
+      target="_blank"
+      class="text-red-500 hover:text-red-700 ml-1"
+    >
+      <img
+        src="/assets/youtube-icon.svg"
+        class="h-3 w-3 inline"
+        alt="YouTube"
+      />
     </a>
     {% endif %}
   </td>

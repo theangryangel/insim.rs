@@ -1,6 +1,8 @@
 use std::time::Duration;
 
-use insim_core::{Decode, DecodeContext, Encode, EncodeContext, coordinate::Coordinate, heading::Heading};
+use insim_core::{
+    Decode, DecodeContext, Encode, EncodeContext, coordinate::Coordinate, heading::Heading,
+};
 
 use super::{CameraView, StaFlags};
 use crate::identifiers::{PlayerId, RequestId};

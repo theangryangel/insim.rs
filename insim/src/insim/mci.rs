@@ -1,6 +1,7 @@
 use bitflags::bitflags;
 use insim_core::{
-    Decode, DecodeContext, Encode, EncodeContext, angvel::AngVel, coordinate::Coordinate, heading::Heading, speed::Speed,
+    Decode, DecodeContext, Encode, EncodeContext, angvel::AngVel, coordinate::Coordinate,
+    heading::Heading, speed::Speed,
 };
 
 use crate::identifiers::{PlayerId, RequestId};

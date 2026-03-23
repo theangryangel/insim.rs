@@ -15,15 +15,15 @@
       // x-localtime: reads a <time datetime="..."> UTC value, renders in the
       // visitor's local timezone. Within 3 hours of the time, switches to a
       // live countdown. The raw UTC string is kept as a title tooltip.
-      document.addEventListener('alpine:init', () => {
-        Alpine.directive('localtime', (el, _bindings, { cleanup }) => {
-          const raw = el.getAttribute('datetime');
+      document.addEventListener("alpine:init", () => {
+        Alpine.directive("localtime", (el, _bindings, { cleanup }) => {
+          const raw = el.getAttribute("datetime");
           if (!raw) return;
           const date = new Date(raw);
           if (isNaN(date.getTime())) return;
 
-          if (!el.hasAttribute('title')) {
-            el.setAttribute('title', raw);
+          if (!el.hasAttribute("title")) {
+            el.setAttribute("title", raw);
           }
 
           const THREE_HOURS = 3 * 60 * 60 * 1000;
@@ -39,14 +39,14 @@
               const s = totalSecs % 60;
               el.textContent =
                 h > 0
-                  ? `in ${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`
+                  ? `in ${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`
                   : m > 0
-                  ? `in ${m}m ${String(s).padStart(2, '0')}s`
-                  : `in ${s}s`;
+                    ? `in ${m}m ${String(s).padStart(2, "0")}s`
+                    : `in ${s}s`;
             } else {
               el.textContent = date.toLocaleString(undefined, {
-                dateStyle: 'short',
-                timeStyle: 'short',
+                dateStyle: "short",
+                timeStyle: "short",
               });
               if (diffMs <= 0 && timer) {
                 clearInterval(timer);
@@ -59,7 +59,9 @@
           if (date > new Date()) {
             timer = setInterval(render, 1000);
           }
-          cleanup(() => { if (timer) clearInterval(timer); });
+          cleanup(() => {
+            if (timer) clearInterval(timer);
+          });
         });
       });
     </script>
@@ -95,7 +97,11 @@
       <div class="w-px bg-gray-300/70 my-1 mx-0.5"></div>
       <div class="flex items-center gap-1.5 px-3">
         {% if let Some(uname) = page.current_user %}
-        <a href="/profile" class="text-xs font-semibold text-gray-600 hover:text-gray-900 transition-colors">{{ uname }}</a>
+        <a
+          href="/profile"
+          class="text-xs font-semibold text-gray-600 hover:text-gray-900 transition-colors"
+          >{{ uname }}</a
+        >
         <span class="text-gray-300">·</span>
         <a
           href="/logout"

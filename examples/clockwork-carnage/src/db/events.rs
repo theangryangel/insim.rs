@@ -229,25 +229,21 @@ pub async fn switch_event(pool: &Pool, event_id: i64) -> Result<(), sqlx::Error>
 
 pub async fn complete_event(pool: &Pool, event_id: i64) -> Result<(), sqlx::Error> {
     let now = Timestamp::now();
-    let _ = sqlx::query(
-        "UPDATE events SET status = 'COMPLETED', ended_at = ? WHERE id = ?",
-    )
-    .bind(now)
-    .bind(event_id)
-    .execute(pool)
-    .await?;
+    let _ = sqlx::query("UPDATE events SET status = 'COMPLETED', ended_at = ? WHERE id = ?")
+        .bind(now)
+        .bind(event_id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
 pub async fn cancel_event(pool: &Pool, event_id: i64) -> Result<(), sqlx::Error> {
     let now = Timestamp::now();
-    let _ = sqlx::query(
-        "UPDATE events SET status = 'CANCELLED', ended_at = ? WHERE id = ?",
-    )
-    .bind(now)
-    .bind(event_id)
-    .execute(pool)
-    .await?;
+    let _ = sqlx::query("UPDATE events SET status = 'CANCELLED', ended_at = ? WHERE id = ?")
+        .bind(now)
+        .bind(event_id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 

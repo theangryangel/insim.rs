@@ -116,5 +116,3 @@ impl EncodeErrorKind {
         }
     }
 }
-
-

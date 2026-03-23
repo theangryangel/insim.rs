@@ -49,7 +49,11 @@ endblock %} {% block content %}
           {% endmatch %}
         </div>
         {% match active_event.scheduled_at %}{% when Some with (s) %}
-        <p class="text-xs text-gray-400"><time datetime="{{ s|as_datetime }}" x-data x-localtime>{{ s|format_timestamp }}</time></p>
+        <p class="text-xs text-gray-400">
+          <time datetime="{{ s|as_datetime }}" x-data x-localtime
+            >{{ s|format_timestamp }}</time
+          >
+        </p>
         {% when None %}{% endmatch %}
       </div>
       <span
@@ -70,9 +74,10 @@ endblock %} {% block content %}
     </p>
     <div class="flex flex-col gap-2">
       {% if upcoming.is_empty() %}
-      <p class="text-center text-xs text-gray-300 font-mono py-4">Nothing scheduled.</p>
-      {% endif %}
-      {% for event in upcoming %}
+      <p class="text-center text-xs text-gray-300 font-mono py-4">
+        Nothing scheduled.
+      </p>
+      {% endif %} {% for event in upcoming %}
       <a
         href="/events/{{ event.id }}"
         class="bg-white border border-gray-200 rounded-lg p-4 flex items-center justify-between hover:border-gray-300 hover:shadow-sm transition-all"
@@ -110,7 +115,9 @@ endblock %} {% block content %}
         </div>
         <span class="text-right">
           {% match event.scheduled_at %}{% when Some with (s) %}<time
-            datetime="{{ s|as_datetime }}" x-data x-localtime
+            datetime="{{ s|as_datetime }}"
+            x-data
+            x-localtime
             class="text-xs text-gray-400 mr-2"
             >{{ s|format_timestamp }}</time
           >{% when None %}{% endmatch %}
@@ -120,7 +127,12 @@ endblock %} {% block content %}
       {% endfor %}
     </div>
 
-    <div class="mt-6" hx-get="/presence" hx-trigger="load" hx-swap="outerHTML"></div>
+    <div
+      class="mt-6"
+      hx-get="/presence"
+      hx-trigger="load"
+      hx-swap="outerHTML"
+    ></div>
   </div>
 
   {# ── Right: About (left on desktop) ── #}
@@ -147,12 +159,16 @@ endblock %} {% block content %}
     </p>
 
     <p class="text-gray-500 mb-6">
-      <a href="/auth/login" class="underline hover:text-orange-600">Log in with your LFS account</a>
+      <a href="/auth/login" class="underline hover:text-orange-600"
+        >Log in with your LFS account</a
+      >
       to link your
       <span class="text-purple-600 font-medium">Twitch</span> and
-      <span class="text-red-500 font-medium">YouTube</span> channels —
-      your links will appear alongside your results so spectators can find your stream.
-      Set them on your <a href="/profile" class="underline hover:text-orange-600">profile page</a>.
+      <span class="text-red-500 font-medium">YouTube</span> channels — your
+      links will appear alongside your results so spectators can find your
+      stream. Set them on your
+      <a href="/profile" class="underline hover:text-orange-600">profile page</a
+      >.
     </p>
 
     <p

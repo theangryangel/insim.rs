@@ -243,7 +243,9 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
         session_key: w.session_key.unwrap_or_else(|| "a".repeat(64)),
     });
 
-    let announce_data = ctx.as_ref().map(|c| (c.pool.clone(), c.insim.clone(), base_url.clone()));
+    let announce_data = ctx
+        .as_ref()
+        .map(|c| (c.pool.clone(), c.insim.clone(), base_url.clone()));
     let web_presence = ctx.as_ref().map(|c| c.presence.clone());
     let scheduler_pool = pool.clone();
 

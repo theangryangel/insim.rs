@@ -1,14 +1,14 @@
-{% extends "base.html" %}
-
-{% block title %}Profile – Clockwork Carnage{% endblock %}
-
-{% block content %}
+{% extends "base.html" %} {% block title %}Profile – Clockwork Carnage{%
+endblock %} {% block content %}
 <div class="max-w-md mx-auto">
   <h1 class="text-lg font-semibold mb-6">Profile</h1>
   <form method="post" action="/profile" class="space-y-4">
     <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}" />
     <div>
-      <label for="twitch_username" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+      <label
+        for="twitch_username"
+        class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
+      >
         Twitch Username
       </label>
       <input
@@ -19,10 +19,15 @@
         placeholder="your_twitch_handle"
         class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
       />
-      <p class="mt-1 text-xs text-gray-400">Enter without the @ sign. Leave blank to remove.</p>
+      <p class="mt-1 text-xs text-gray-400">
+        Enter without the @ sign. Leave blank to remove.
+      </p>
     </div>
     <div>
-      <label for="youtube_username" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+      <label
+        for="youtube_username"
+        class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
+      >
         YouTube Username
       </label>
       <input
@@ -33,7 +38,9 @@
         placeholder="your_youtube_handle"
         class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400"
       />
-      <p class="mt-1 text-xs text-gray-400">Enter without the @ sign. Leave blank to remove.</p>
+      <p class="mt-1 text-xs text-gray-400">
+        Enter without the @ sign. Leave blank to remove.
+      </p>
     </div>
     <button
       type="submit"

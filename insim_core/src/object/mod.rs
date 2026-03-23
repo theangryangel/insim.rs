@@ -41,7 +41,9 @@ mod tests;
 
 pub use object_coordinate::ObjectCoordinate;
 
-use crate::{Decode, DecodeContext, DecodeError, Encode, EncodeContext, EncodeError, heading::Heading};
+use crate::{
+    Decode, DecodeContext, DecodeError, Encode, EncodeContext, EncodeError, heading::Heading,
+};
 
 trait ObjectInfoInner {
     fn flags(&self) -> u8;

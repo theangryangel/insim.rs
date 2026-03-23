@@ -5,7 +5,6 @@ mod error;
 use std::net::Ipv4Addr;
 
 use bytes::BufMut;
-
 pub use context::EncodeContext;
 pub use error::{EncodeError, EncodeErrorKind};
 
@@ -124,15 +123,17 @@ impl Encode for Ipv4Addr {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use bytes::BytesMut;
+
+    use super::*;
 
     #[test]
     fn test_string_codepage_bytes_aligned_abc() {
         let input = String::from("abc");
         let mut buf = BytesMut::new();
         let mut ctx = EncodeContext::new(&mut buf);
-        ctx.encode_codepage_with_alignment("test", input, 128, 4, false).unwrap();
+        ctx.encode_codepage_with_alignment("test", input, 128, 4, false)
+            .unwrap();
         let inner = buf.freeze();
         assert_eq!(inner.as_ref(), [b'a', b'b', b'c', 0]);
     }
@@ -142,8 +143,7 @@ mod test {
         let input = String::from("abcd");
         let mut buf = BytesMut::new();
         let mut ctx = EncodeContext::new(&mut buf);
-        ctx
-            .encode_codepage_with_alignment("test", input, 128, 4, false)
+        ctx.encode_codepage_with_alignment("test", input, 128, 4, false)
             .unwrap();
         let inner = buf.freeze();
         assert_eq!(inner.as_ref(), [b'a', b'b', b'c', b'd']);
@@ -154,8 +154,7 @@ mod test {
         let input = String::from("a");
         let mut buf = BytesMut::new();
         let mut ctx = EncodeContext::new(&mut buf);
-        ctx
-            .encode_codepage_with_alignment("test", input, 2, 2, true)
+        ctx.encode_codepage_with_alignment("test", input, 2, 2, true)
             .unwrap();
         let inner = buf.freeze();
         assert_eq!(inner.as_ref(), [b'a', 0]);

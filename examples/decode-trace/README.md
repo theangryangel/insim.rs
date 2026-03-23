@@ -19,12 +19,12 @@ cargo run -p decode-trace -- 01030203
 
 The bytes are the full on-wire packet including the leading size byte:
 
-| Offset | Content |
-|--------|---------|
-| 0      | Size (total bytes / 4) |
+| Offset | Content                  |
+| ------ | ------------------------ |
+| 0      | Size (total bytes / 4)   |
 | 1      | Packet type discriminant |
-| 2      | ReqI |
-| 3+     | Payload |
+| 2      | ReqI                     |
+| 3+     | Payload                  |
 
 ## Example output
 

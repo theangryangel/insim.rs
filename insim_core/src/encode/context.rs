@@ -20,7 +20,7 @@ impl<'a> EncodeContext<'a> {
         F: FnOnce(&mut Self) -> Result<(), super::EncodeError>,
     {
         let span = if is_prim {
-            tracing::Span::none() 
+            tracing::Span::none()
         } else {
             tracing::trace_span!("encode", field = name)
         };
@@ -52,12 +52,20 @@ impl<'a> EncodeContext<'a> {
     }
 
     /// Encode anything that impls Encode
-    pub fn encode<T: super::Encode>(&mut self, name: &'static str, val: &T) -> Result<(), super::EncodeError> {
+    pub fn encode<T: super::Encode>(
+        &mut self,
+        name: &'static str,
+        val: &T,
+    ) -> Result<(), super::EncodeError> {
         self.op(name, T::PRIMITIVE, |writer| val.encode(writer))
     }
 
     /// Convert a [std::time::Duration] to milliseconds and encode it as a primitive integer.
-    pub fn encode_duration<T>(&mut self, name: &'static str, val: std::time::Duration) -> Result<(), super::EncodeError>
+    pub fn encode_duration<T>(
+        &mut self,
+        name: &'static str,
+        val: std::time::Duration,
+    ) -> Result<(), super::EncodeError>
     where
         T: super::Encode + num_traits::NumCast + num_traits::Bounded,
     {
@@ -171,6 +179,4 @@ impl<'a> EncodeContext<'a> {
             Ok(())
         })
     }
-
 }
-

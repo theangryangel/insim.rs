@@ -30,7 +30,7 @@ impl<'a> DecodeContext<'a> {
             tracing::trace_span!("decode", field = name)
         };
         let _entered = span.entered();
-        
+
         // Snapshot the buffer state for the HexDump
         let start_buf = if tracing::enabled!(tracing::Level::TRACE) {
             Some(self.buf.clone())
@@ -58,7 +58,10 @@ impl<'a> DecodeContext<'a> {
     }
 
     /// Read any type that implements our basic Decode trait
-    pub fn decode<T: super::Decode>(&mut self, name: &'static str) -> Result<T, super::DecodeError> {
+    pub fn decode<T: super::Decode>(
+        &mut self,
+        name: &'static str,
+    ) -> Result<T, super::DecodeError> {
         self.op(name, T::PRIMITIVE, |reader| T::decode(reader))
     }
 
@@ -67,7 +70,6 @@ impl<'a> DecodeContext<'a> {
         self.op(name, true, |reader| {
             if reader.buf.remaining() < len {
                 return Err(super::DecodeErrorKind::UnexpectedEof.into());
-
             }
             reader.buf.advance(len);
             Ok(())
@@ -75,7 +77,10 @@ impl<'a> DecodeContext<'a> {
     }
 
     /// Read a primitive integer and convert it to a [std::time::Duration] in milliseconds.
-    pub fn decode_duration<T>(&mut self, name: &'static str) -> Result<std::time::Duration, super::DecodeError>
+    pub fn decode_duration<T>(
+        &mut self,
+        name: &'static str,
+    ) -> Result<std::time::Duration, super::DecodeError>
     where
         T: super::Decode + num_traits::ToPrimitive,
     {
@@ -95,7 +100,11 @@ impl<'a> DecodeContext<'a> {
     }
 
     /// Special case: fixed length codepage string
-    pub fn decode_codepage(&mut self, name: &'static str, len: usize) -> Result<String, super::DecodeError> {
+    pub fn decode_codepage(
+        &mut self,
+        name: &'static str,
+        len: usize,
+    ) -> Result<String, super::DecodeError> {
         self.op(name, true, |reader| {
             let new = reader.buf.copy_to_bytes(reader.buf.len().min(len));
             let new =
@@ -105,7 +114,11 @@ impl<'a> DecodeContext<'a> {
     }
 
     /// Special case: fixed length ascii string
-    pub fn decode_ascii(&mut self, name: &'static str, len: usize) -> Result<String, super::DecodeError> {
+    pub fn decode_ascii(
+        &mut self,
+        name: &'static str,
+        len: usize,
+    ) -> Result<String, super::DecodeError> {
         self.op(name, true, |reader| {
             if reader.buf.remaining() < len {
                 return Err(super::DecodeErrorKind::UnexpectedEof.into());

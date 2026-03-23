@@ -99,10 +99,13 @@ mod test {
         };
 
         let mut buf = bytes::BytesMut::new();
-        original.encode(&mut EncodeContext::new(&mut buf)).expect("Expected to encode");
+        original
+            .encode(&mut EncodeContext::new(&mut buf))
+            .expect("Expected to encode");
 
         let mut bytes = bytes::Bytes::from(buf);
-        let decoded = LfsPin::decode(&mut DecodeContext::new(&mut bytes)).expect("Expected to decode");
+        let decoded =
+            LfsPin::decode(&mut DecodeContext::new(&mut bytes)).expect("Expected to decode");
 
         assert_eq!(original, decoded);
     }

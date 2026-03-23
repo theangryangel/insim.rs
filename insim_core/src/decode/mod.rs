@@ -3,13 +3,12 @@
 mod context;
 mod error;
 
-pub use context::DecodeContext;
-pub use error::{DecodeError, DecodeErrorKind};
-
 use std::net::Ipv4Addr;
 
 use arrayvec::ArrayVec;
 use bytes::Buf;
+pub use context::DecodeContext;
+pub use error::{DecodeError, DecodeErrorKind};
 
 /// Decode from bytes
 pub trait Decode: Sized {

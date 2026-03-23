@@ -1,9 +1,9 @@
 use askama::Template;
 use axum::{
+    Form,
     extract::State,
     http::StatusCode,
     response::{Html, IntoResponse, Redirect},
-    Form,
 };
 
 use super::internal_error;
@@ -70,9 +70,17 @@ pub async fn profile_post(
         return Err(StatusCode::FORBIDDEN);
     }
     let twitch = form.twitch_username.trim().trim_start_matches('@');
-    let twitch_username = if twitch.is_empty() { None } else { Some(twitch) };
+    let twitch_username = if twitch.is_empty() {
+        None
+    } else {
+        Some(twitch)
+    };
     let youtube = form.youtube_username.trim().trim_start_matches('@');
-    let youtube_username = if youtube.is_empty() { None } else { Some(youtube) };
+    let youtube_username = if youtube.is_empty() {
+        None
+    } else {
+        Some(youtube)
+    };
     db::update_user_profile(&state.pool, &uname, twitch_username, youtube_username)
         .await
         .map_err(internal_error)?;

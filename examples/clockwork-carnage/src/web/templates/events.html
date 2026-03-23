@@ -74,11 +74,16 @@
       </td>
       <td class="px-3 py-2 text-gray-600 text-xs">
         {% match event.scheduled_at %} {% when Some with (s) %}
-        <time datetime="{{ s|as_datetime }}" x-data x-localtime>{{ s|format_timestamp }}</time>
+        <time datetime="{{ s|as_datetime }}" x-data x-localtime
+          >{{ s|format_timestamp }}</time
+        >
         {% match event.scheduled_end_at %} {% when Some with (e) %}<span
           class="text-gray-400"
         >
-          → <time datetime="{{ e|as_datetime }}" x-data x-localtime>{{ e|format_timestamp }}</time></span
+          →
+          <time datetime="{{ e|as_datetime }}" x-data x-localtime
+            >{{ e|format_timestamp }}</time
+          ></span
         >{% when None %} {% endmatch %} {% when None %}— {% endmatch %}
       </td>
       <td class="px-3 py-2 text-gray-600">{{ event.status }}</td>

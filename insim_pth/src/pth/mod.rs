@@ -47,7 +47,9 @@ impl Pth {
                 let _ = reader.read_to_end(&mut data)?;
                 let mut buf = Bytes::from(data);
 
-                Ok(Self::LfsPth0(lfspth::v0::LfsPth::decode(&mut DecodeContext::new(&mut buf))?))
+                Ok(Self::LfsPth0(lfspth::v0::LfsPth::decode(
+                    &mut DecodeContext::new(&mut buf),
+                )?))
             },
 
             (b"SRPATH", 0, r) if r <= 252 => {
@@ -55,7 +57,9 @@ impl Pth {
                 data.push(revision);
                 let _ = reader.read_to_end(&mut data)?;
                 let mut buf = Bytes::from(data);
-                Ok(Self::SrPath0(srpath::v0::SrPth::decode(&mut DecodeContext::new(&mut buf))?))
+                Ok(Self::SrPath0(srpath::v0::SrPth::decode(
+                    &mut DecodeContext::new(&mut buf),
+                )?))
             },
             _ => Err(super::Error::UnsupportedVersion {
                 magic: magic.to_vec(),

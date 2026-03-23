@@ -2,8 +2,8 @@
 use std::time::Duration;
 
 use insim_core::{
-    Decode, DecodeContext, DecodeError, Encode, EncodeContext, EncodeError,
-    coordinate::Coordinate, gear::Gear, vector::Vector,
+    Decode, DecodeContext, DecodeError, Encode, EncodeContext, EncodeError, coordinate::Coordinate,
+    gear::Gear, vector::Vector,
 };
 
 use crate::OutsimId;
@@ -187,7 +187,10 @@ pub struct OutsimPack2 {
 
 impl OutsimPack2 {
     /// How should we decode this?
-    pub fn decode_with_options(ctx: &mut DecodeContext, opts: &OutSimOpts) -> Result<Self, DecodeError> {
+    pub fn decode_with_options(
+        ctx: &mut DecodeContext,
+        opts: &OutSimOpts,
+    ) -> Result<Self, DecodeError> {
         let mut val = Self::default();
         if opts.contains(OutSimOpts::HEADER) {
             val.header = Some(ctx.decode_ascii("header", 4)?);

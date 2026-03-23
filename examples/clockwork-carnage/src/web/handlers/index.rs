@@ -32,7 +32,7 @@ impl From<User> for PresenceRow {
             uname: value.uname,
             pname: value.pname,
             twitch_username: value.twitch_username,
-            youtube_username: value.youtube_username
+            youtube_username: value.youtube_username,
         }
     }
 }
@@ -43,28 +43,27 @@ pub struct PresenceTemplate {
     pub connections: Vec<PresenceRow>,
 }
 
-pub async fn presence_partial(
-    State(state): State<AppState>,
-) -> Result<Html<String>, StatusCode> {
+pub async fn presence_partial(State(state): State<AppState>) -> Result<Html<String>, StatusCode> {
     let raw_connections = match &state.presence {
         Some(presence) => presence.connections().await.unwrap_or_default(),
         None => vec![],
     };
 
-    let unames: Vec<&str> = raw_connections.iter().filter_map(|c| {
-        if c.ucid == ConnectionId::LOCAL {
-            None
-        } else {
-            Some(c.uname.as_ref()) 
-        }
-    }).collect();
+    let unames: Vec<&str> = raw_connections
+        .iter()
+        .filter_map(|c| {
+            if c.ucid == ConnectionId::LOCAL {
+                None
+            } else {
+                Some(c.uname.as_ref())
+            }
+        })
+        .collect();
     let users = db::users_for_unames(&state.pool, &unames)
         .await
         .map_err(internal_error)?;
 
-    let connections: Vec<PresenceRow> = users
-        .into_iter()
-        .map(|u| u.into()).collect();
+    let connections: Vec<PresenceRow> = users.into_iter().map(|u| u.into()).collect();
 
     let tmpl = PresenceTemplate { connections };
     Ok(Html(tmpl.render().map_err(internal_error)?))

@@ -243,7 +243,10 @@ impl Encode for Con {
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
         ctx.encode("reqi", &self.reqi)?;
         ctx.pad("sp0", 1)?;
-        ctx.encode("spclose", &spclose_strip_high_bits((self.spclose.to_meters_per_sec() * 10.0) as u16))?;
+        ctx.encode(
+            "spclose",
+            &spclose_strip_high_bits((self.spclose.to_meters_per_sec() * 10.0) as u16),
+        )?;
         ctx.encode_duration::<u32>("time", self.time)?;
         ctx.encode("a", &self.a)?;
         ctx.encode("b", &self.b)?;

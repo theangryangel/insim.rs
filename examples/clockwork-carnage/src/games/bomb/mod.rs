@@ -3,16 +3,14 @@
 mod challenge_loop;
 pub mod chat;
 
-pub use challenge_loop::BombLoop;
-
 use std::time::Duration;
 
-use kitcar::scenes::{Scene, SceneExt, SceneResult, SceneError, wait_for_players::WaitForPlayers};
+pub use challenge_loop::BombLoop;
+use kitcar::scenes::{Scene, SceneError, SceneExt, SceneResult, wait_for_players::WaitForPlayers};
 use tokio::task::JoinHandle;
 
-use super::{GameCtx, MiniGame};
+use super::{GameCtx, MiniGame, setup_track};
 use crate::{ChatError, MIN_PLAYERS, db};
-use super::setup_track;
 
 #[derive(Clone)]
 pub struct BombGame {
@@ -41,12 +39,20 @@ impl MiniGame for BombGame {
 
     async fn setup(event: &db::Event, ctx: &GameCtx) -> Result<(Self, Self::Guard), SceneError> {
         let (checkpoint_timeout, checkpoint_penalty, collision_max_penalty) = match *event.mode {
-            db::EventMode::Bomb { checkpoint_timeout_secs, checkpoint_penalty_ms, collision_max_penalty_ms } => (
+            db::EventMode::Bomb {
+                checkpoint_timeout_secs,
+                checkpoint_penalty_ms,
+                collision_max_penalty_ms,
+            } => (
                 Duration::from_secs(checkpoint_timeout_secs as u64),
                 Duration::from_millis(checkpoint_penalty_ms as u64),
                 Duration::from_millis(collision_max_penalty_ms as u64),
             ),
-            _ => (Duration::from_secs(30), Duration::from_millis(250), Duration::from_millis(500)),
+            _ => (
+                Duration::from_secs(30),
+                Duration::from_millis(250),
+                Duration::from_millis(500),
+            ),
         };
 
         let (chat, chat_handle) = chat::spawn(ctx.insim.clone());
@@ -76,7 +82,9 @@ impl MiniGame for BombGame {
                 track: self.track,
                 layout: Some(self.layout.clone()),
                 mode_name: match &self.event_name {
-                    Some(name) => format!("{name} — Bomb: hit every checkpoint before the clock runs out!"),
+                    Some(name) => {
+                        format!("{name} — Bomb: hit every checkpoint before the clock runs out!")
+                    },
                     None => "Bomb: hit every checkpoint before the clock runs out!".to_string(),
                 },
             }

@@ -223,7 +223,7 @@ impl Decode for Outgauge {
 
 #[cfg(test)]
 mod test {
-    use bytes::{BufMut, Buf, BytesMut};
+    use bytes::{Buf, BufMut, BytesMut};
     use insim_core::{DecodeContext, EncodeContext};
 
     use super::*;
@@ -305,7 +305,9 @@ mod test {
         assert_eq!(buf.remaining(), 0);
 
         let mut output = BytesMut::new();
-        outgauge.encode(&mut EncodeContext::new(&mut output)).unwrap();
+        outgauge
+            .encode(&mut EncodeContext::new(&mut output))
+            .unwrap();
 
         assert_eq!(
             output.as_ref(),
@@ -336,7 +338,9 @@ mod test {
         assert!(matches!(outgauge.id, Some(OutgaugeId(10))));
 
         let mut output = BytesMut::new();
-        outgauge.encode(&mut EncodeContext::new(&mut output)).unwrap();
+        outgauge
+            .encode(&mut EncodeContext::new(&mut output))
+            .unwrap();
 
         assert_eq!(
             output.as_ref(),

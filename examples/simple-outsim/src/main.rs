@@ -2,7 +2,10 @@
 use std::net::UdpSocket;
 
 use bytes::{Bytes, BytesMut};
-use outsim::{core::{Decode, DecodeContext}, OutsimPack};
+use outsim::{
+    OutsimPack,
+    core::{Decode, DecodeContext},
+};
 use tracing_subscriber::fmt::format::FmtSpan;
 
 /// Setup tracing output

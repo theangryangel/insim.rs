@@ -2,8 +2,6 @@
 //! This example showcases the shortcut methods
 use std::{net::SocketAddr, time::Duration};
 
-use tracing_subscriber::fmt::format::FmtSpan;
-
 use clap::Parser;
 use insim::{
     Packet, Result, WithRequestId,
@@ -11,6 +9,7 @@ use insim::{
     insim::{LclFlags, TinyType},
 };
 use tokio::time::interval;
+use tracing_subscriber::fmt::format::FmtSpan;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]

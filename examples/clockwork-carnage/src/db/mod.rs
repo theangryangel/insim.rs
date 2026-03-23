@@ -81,13 +81,9 @@ impl sqlx::Type<sqlx::Sqlite> for Timestamp {
 
 // Decode: read TEXT from SQLite, parse as RFC 3339
 impl<'r> sqlx::Decode<'r, sqlx::Sqlite> for Timestamp {
-    fn decode(
-        value: sqlx::sqlite::SqliteValueRef<'r>,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
+    fn decode(value: sqlx::sqlite::SqliteValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
-        let ts: jiff::Timestamp = s.parse().map_err(|_| {
-            format!("invalid timestamp: {s:?}")
-        })?;
+        let ts: jiff::Timestamp = s.parse().map_err(|_| format!("invalid timestamp: {s:?}"))?;
         Ok(Timestamp(ts))
     }
 }
@@ -111,7 +107,9 @@ impl<'q> sqlx::Encode<'q, sqlx::Sqlite> for Timestamp {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EventMode {
-    Metronome { target_ms: i64 },
+    Metronome {
+        target_ms: i64,
+    },
     Shortcut,
     Bomb {
         checkpoint_timeout_secs: i64,

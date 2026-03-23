@@ -21,7 +21,10 @@ use crate::{
     db,
     hud::{
         ChallengeLeaderboard, Dialog, DialogMsg, DialogProps, challenge_scoreboard,
-        theme::{hud_active, hud_muted, hud_overlay_action, hud_overlay_text, hud_panel_bg, hud_text, hud_title},
+        theme::{
+            hud_active, hud_muted, hud_overlay_action, hud_overlay_text, hud_panel_bg, hud_text,
+            hud_title,
+        },
         topbar,
     },
 };
@@ -94,9 +97,14 @@ fn render_altitude_overlay(altitudes: &[(String, f32)]) -> ui::Node<ChallengeMes
         .collect();
 
     let content = if rows.is_empty() {
-        vec![ui::text("No players on track.", hud_overlay_text().align_left().white())
+        vec![
+            ui::text(
+                "No players on track.",
+                hud_overlay_text().align_left().white(),
+            )
             .w_auto()
-            .h(6.)]
+            .h(6.),
+        ]
     } else {
         rows
     };
@@ -192,11 +200,8 @@ impl ui::Component for ChallengeView {
             .with_children(players);
 
         if let Some(url) = &props.global.event_url {
-            scoreboard = scoreboard.with_child(
-                ui::text(url, hud_muted().align_left())
-                    .w(40.)
-                    .h(5.),
-            );
+            scoreboard =
+                scoreboard.with_child(ui::text(url, hud_muted().align_left()).w(40.).h(5.));
         }
 
         ui::container()

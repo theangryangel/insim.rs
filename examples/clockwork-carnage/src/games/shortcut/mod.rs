@@ -59,7 +59,9 @@ impl MiniGame for ShortcutGame {
                 track: self.track,
                 layout: Some(self.layout.clone()),
                 mode_name: match &self.event_name {
-                    Some(name) => format!("{name} — Shortcut: find a faster path than your opponents!"),
+                    Some(name) => {
+                        format!("{name} — Shortcut: find a faster path than your opponents!")
+                    },
                     None => "Shortcut: find a faster path than your opponents!".to_string(),
                 },
             }

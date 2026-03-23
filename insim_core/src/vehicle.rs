@@ -201,7 +201,8 @@ mod tests {
 
         let raw = b"XRT\0";
         let mut decode_buf = Bytes::copy_from_slice(raw);
-        let decoded = Vehicle::decode(&mut DecodeContext::new(&mut decode_buf)).expect("Expected to decode XRT");
+        let decoded = Vehicle::decode(&mut DecodeContext::new(&mut decode_buf))
+            .expect("Expected to decode XRT");
         assert_eq!(decoded, Vehicle::Xrt);
 
         let mut encode_buf = BytesMut::new();
@@ -239,8 +240,8 @@ mod tests {
 
         let raw = 4_301_472_u32.to_le_bytes();
         let mut decode_buf = Bytes::copy_from_slice(&raw);
-        let decoded =
-            Vehicle::decode(&mut DecodeContext::new(&mut decode_buf)).expect("Expected to decode Piran Firefly 200");
+        let decoded = Vehicle::decode(&mut DecodeContext::new(&mut decode_buf))
+            .expect("Expected to decode Piran Firefly 200");
         assert_eq!(decoded, Vehicle::Mod(mod_id));
 
         let mut encode_buf = BytesMut::new();
@@ -257,7 +258,8 @@ mod tests {
 
         let raw = b"\0\0\0\0";
         let mut decode_buf = Bytes::copy_from_slice(raw);
-        let decoded = Vehicle::decode(&mut DecodeContext::new(&mut decode_buf)).expect("Expected to decode Unknown");
+        let decoded = Vehicle::decode(&mut DecodeContext::new(&mut decode_buf))
+            .expect("Expected to decode Unknown");
         assert_eq!(decoded, Vehicle::Unknown);
 
         let mut encode_buf = BytesMut::new();

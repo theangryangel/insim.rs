@@ -5,7 +5,7 @@ use kitcar::{
     ui,
 };
 
-use crate::hud::{topbar, Marquee, MarqueeProps};
+use crate::hud::{Marquee, MarqueeProps, topbar};
 
 struct SetupTrackView {
     marquee: Marquee,
@@ -16,18 +16,12 @@ impl ui::Component for SetupTrackView {
     type Message = ();
 
     fn render(&self, _props: Self::Props<'_>) -> ui::Node<Self::Message> {
-        ui::container()
-            .flex()
-            .flex_col()
-            .w(200.)
-            .with_child(
-                topbar("Waiting for player ready").with_child(
-                    self.marquee.render(MarqueeProps {
-                        text: &self.mode_name,
-                        width: 15,
-                    })
-                )
-            )
+        ui::container().flex().flex_col().w(200.).with_child(
+            topbar("Waiting for player ready").with_child(self.marquee.render(MarqueeProps {
+                text: &self.mode_name,
+                width: 15,
+            })),
+        )
     }
 }
 
