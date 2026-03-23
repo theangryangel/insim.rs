@@ -6,7 +6,7 @@ use insim::{
         object::insim::{InsimCheckpoint, InsimCheckpointKind},
         string::colours::Colour,
     },
-    insim::{ObjectInfo, Uco},
+    insim::{ObjectInfo, Pll, Plp, Uco},
 };
 use kitcar::{
     game, presence,
@@ -125,12 +125,12 @@ impl ui::Component for MetronomeView {
             .mt(10.)
             .flex_col()
             .items_start()
-            .with_child(ui::text("Best Deltas", hud_title()).w(40.).h(5.))
+            .with_child(ui::text("Best Deltas", hud_title()).w(35.).h(5.))
             .with_children(players);
 
         if let Some(url) = &props.global.event_url {
             scoreboard = scoreboard.with_child(
-                ui::text(url, hud_muted().align_left()).w(40.).h(5.),
+                ui::text(url, hud_muted().align_left()).w(35.).h(5.),
             );
         }
 
@@ -231,6 +231,7 @@ impl ChallengeLoopInner {
         });
 
         let mut active_runs: HashMap<String, Duration> = HashMap::new();
+        let mut plid_to_uname: HashMap<insim::identifiers::PlayerId, String> = HashMap::new();
         let mut packets = self.insim.subscribe();
 
         loop {
@@ -279,8 +280,10 @@ impl ChallengeLoopInner {
                                 match kind {
                                     InsimCheckpointKind::Checkpoint1 => {
                                         let _ = active_runs.insert(conn.uname.clone(), time);
+                                        let _ = plid_to_uname.insert(plid, conn.uname.clone());
                                     },
                                     InsimCheckpointKind::Finish => {
+                                        let _ = plid_to_uname.remove(&plid);
                                         if let Some(start) = active_runs.remove(&conn.uname) {
                                             let elapsed = time.saturating_sub(start);
                                             let delta = self.target.abs_diff(elapsed);
@@ -333,6 +336,11 @@ impl ChallengeLoopInner {
                                     in_progress: active_runs.contains_key(&conn.uname),
                                     best_delta: pb,
                                 }).await;
+                            }
+                        },
+                        insim::Packet::Pll(Pll { plid, .. }) | insim::Packet::Plp(Plp { plid, .. }) => {
+                            if let Some(uname) = plid_to_uname.remove(&plid) {
+                                let _ = active_runs.remove(&uname);
                             }
                         },
                         _ => {},

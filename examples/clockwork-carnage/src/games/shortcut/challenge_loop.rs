@@ -8,7 +8,7 @@ use insim::{
         vehicle::Vehicle,
     },
     identifiers::ConnectionId,
-    insim::{ObjectInfo, Uco},
+    insim::{ObjectInfo, Pll, Plp, Uco},
 };
 use kitcar::{
     game, presence,
@@ -304,6 +304,7 @@ impl ChallengeLoopInner {
         });
 
         let mut active_runs: HashMap<String, Duration> = HashMap::new();
+        let mut plid_to_uname: HashMap<insim::identifiers::PlayerId, String> = HashMap::new();
         let mut player_heights: HashMap<ConnectionId, f32> = HashMap::new();
         let mut player_names: HashMap<ConnectionId, String> = HashMap::new();
         let mut packets = self.insim.subscribe();
@@ -355,8 +356,10 @@ impl ChallengeLoopInner {
                                 match kind {
                                     InsimCheckpointKind::Checkpoint1 => {
                                         let _ = active_runs.insert(conn.uname.clone(), time);
+                                        let _ = plid_to_uname.insert(plid, conn.uname.clone());
                                     },
                                     InsimCheckpointKind::Finish => {
+                                        let _ = plid_to_uname.remove(&plid);
                                         if let Some(start) = active_runs.remove(&conn.uname) {
                                             let lap_time = time.saturating_sub(start);
                                             let vehicle = player.vehicle;
@@ -425,9 +428,16 @@ impl ChallengeLoopInner {
                                 }).await;
                             }
                         },
+                        insim::Packet::Pll(Pll { plid, .. }) | insim::Packet::Plp(Plp { plid, .. }) => {
+                            if let Some(uname) = plid_to_uname.remove(&plid) {
+                                let _ = active_runs.remove(&uname);
+                            }
+                        },
                         insim::Packet::Cnl(cnl) => {
                             let _ = player_heights.remove(&cnl.ucid);
-                            let _ = player_names.remove(&cnl.ucid);
+                            if let Some(uname) = player_names.remove(&cnl.ucid) {
+                                let _ = active_runs.remove(&uname);
+                            }
                             ui.set_global_state(ChallengeGlobalProps {
                                 leaderboard: current_leaderboard.clone(),
                                 altitudes: build_altitudes(&player_heights, &player_names),
