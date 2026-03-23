@@ -6,12 +6,12 @@ use std::{
 
 use clap::Parser;
 use glam::Vec3;
-use tracing_subscriber::fmt::format::FmtSpan;
 use insim::{
     Packet, Result, WithRequestId,
     identifiers::{ClickId, PlayerId, RequestId},
     insim::{Btn, BtnStyle, LapTimingInfo, TinyType},
 };
+use tracing_subscriber::fmt::format::FmtSpan;
 
 #[derive(Clone, Debug)]
 pub struct RefPoint {
