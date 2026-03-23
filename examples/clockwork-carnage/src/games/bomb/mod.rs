@@ -88,6 +88,7 @@ impl MiniGame for BombGame {
             checkpoint_timeout: self.checkpoint_timeout,
             checkpoint_penalty: self.checkpoint_penalty,
             collision_max_penalty: self.collision_max_penalty,
+            base_url: ctx.base_url.clone(),
         })
         .loop_until_quit();
 

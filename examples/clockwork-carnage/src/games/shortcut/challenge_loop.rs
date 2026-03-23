@@ -7,6 +7,7 @@ use insim::{
         string::colours::Colour,
         vehicle::Vehicle,
     },
+    identifiers::ConnectionId,
     insim::{ObjectInfo, Uco},
 };
 use kitcar::{
@@ -20,7 +21,7 @@ use crate::{
     db,
     hud::{
         ChallengeLeaderboard, Dialog, DialogMsg, DialogProps, challenge_scoreboard,
-        theme::{hud_active, hud_muted, hud_text, hud_title},
+        theme::{hud_active, hud_muted, hud_overlay_action, hud_overlay_text, hud_panel_bg, hud_text, hud_title},
         topbar,
     },
 };
@@ -35,9 +36,16 @@ const CHALLENGE_HELP_LINES: &[&str] = &[
     "Good luck.",
 ];
 
+const ALT_MAX: f32 = u8::MAX as f32;
+const ALT_BAR_LEN: usize = 18;
+
 #[derive(Debug, Clone, Default)]
 struct ChallengeGlobalProps {
     leaderboard: ChallengeLeaderboard,
+    /// (pname, altitude) for all players currently on track.
+    altitudes: Vec<(String, f32)>,
+    /// Full URL to this event's results page, if a base URL is configured.
+    event_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -45,16 +53,17 @@ struct ChallengeConnectionProps {
     uname: String,
     in_progress: bool,
     best_time: Option<Duration>,
-    height: f32,
 }
 
 #[derive(Clone, Debug)]
 enum ChallengeMessage {
     Help(DialogMsg),
+    Altitude(DialogMsg),
 }
 
 struct ChallengeView {
     help_dialog: Dialog,
+    altitude_dialog: Dialog,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -63,15 +72,83 @@ struct ChallengeProps {
     connection: ChallengeConnectionProps,
 }
 
+fn render_altitude_overlay(altitudes: &[(String, f32)]) -> ui::Node<ChallengeMessage> {
+    let mut sorted = altitudes.to_vec();
+    sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    let rows: Vec<ui::Node<ChallengeMessage>> = sorted
+        .iter()
+        .map(|(pname, height)| {
+            let h = height.clamp(0.0, ALT_MAX);
+            let filled = (h / ALT_MAX * ALT_BAR_LEN as f32).round() as usize;
+            let bar = format!(
+                "[{}{}]",
+                "#".repeat(filled),
+                " ".repeat(ALT_BAR_LEN - filled)
+            );
+            let text = format!("{}  {}  {:3.0}m", pname, bar, h);
+            ui::text(text, hud_overlay_text().align_left().white())
+                .w_auto()
+                .h(6.)
+        })
+        .collect();
+
+    let content = if rows.is_empty() {
+        vec![ui::text("No players on track.", hud_overlay_text().align_left().white())
+            .w_auto()
+            .h(6.)]
+    } else {
+        rows
+    };
+
+    ui::container()
+        .flex()
+        .flex_col()
+        .justify_center()
+        .items_center()
+        .w(200.)
+        .h(200.)
+        .with_child(
+            ui::container()
+                .flex()
+                .flex_col()
+                .with_child(
+                    ui::background(hud_panel_bg())
+                        .w(100.)
+                        .flex()
+                        .flex_col()
+                        .p(1.)
+                        .with_child(
+                            ui::text("Altitude Tracker", hud_overlay_text().align_left().yellow())
+                                .h(8.)
+                                .mb(2.)
+                                .w_auto(),
+                        )
+                        .with_children(content),
+                )
+                .with_child(
+                    ui::clickable(
+                        "Close",
+                        hud_overlay_action().green().dark(),
+                        ChallengeMessage::Altitude(DialogMsg::Hide),
+                    )
+                    .self_end()
+                    .w(12.)
+                    .h(8.)
+                    .mt(2.)
+                    .key("alt-close"),
+                ),
+        )
+}
+
 impl ui::Component for ChallengeView {
     type Props<'a> = ChallengeProps;
     type Message = ChallengeMessage;
 
     fn update(&mut self, msg: Self::Message) {
         match msg {
-            ChallengeMessage::Help(help_msg) => {
-                Component::update(&mut self.help_dialog, help_msg);
-            },
+            ChallengeMessage::Help(m) => Component::update(&mut self.help_dialog, m),
+            ChallengeMessage::Altitude(m) => Component::update(&mut self.altitude_dialog, m),
         }
     }
 
@@ -84,6 +161,10 @@ impl ui::Component for ChallengeView {
                     lines: CHALLENGE_HELP_LINES,
                 })
                 .map(ChallengeMessage::Help);
+        }
+
+        if self.altitude_dialog.is_visible() {
+            return render_altitude_overlay(&props.global.altitudes);
         }
 
         let (status, status_style) = if props.connection.in_progress {
@@ -99,24 +180,31 @@ impl ui::Component for ChallengeView {
         };
 
         let players = challenge_scoreboard(&props.global.leaderboard, &props.connection.uname);
-        let height_text = format!("Alt: {:.1}m", props.connection.height);
+
+        let mut scoreboard = ui::container()
+            .flex()
+            .pl(5.)
+            .w(200.)
+            .mt(10.)
+            .flex_col()
+            .items_start()
+            .with_child(ui::text("Best Times", hud_title()).w(40.).h(5.))
+            .with_children(players);
+
+        if let Some(url) = &props.global.event_url {
+            scoreboard = scoreboard.with_child(
+                ui::text(url, hud_muted().align_left())
+                    .w(40.)
+                    .h(5.),
+            );
+        }
 
         ui::container()
             .flex()
             .flex_col()
+            .w(200.)
             .with_child(topbar("Shortcut").with_child(ui::text(status, status_style).w(20.).h(5.)))
-            .with_child(
-                ui::container()
-                    .flex()
-                    .pr(5.)
-                    .w(200.)
-                    .mt(90.)
-                    .flex_col()
-                    .items_end()
-                    .with_child(ui::text(height_text, hud_muted()).w(35.).h(5.))
-                    .with_child(ui::text("Best Times", hud_title()).w(35.).h(5.))
-                    .with_children(players),
-            )
+            .with_child(scoreboard)
     }
 }
 
@@ -129,11 +217,22 @@ impl From<ui::UiState<ChallengeGlobalProps, ChallengeConnectionProps>> for Chall
     }
 }
 
+fn build_altitudes(
+    heights: &HashMap<ConnectionId, f32>,
+    names: &HashMap<ConnectionId, String>,
+) -> Vec<(String, f32)> {
+    heights
+        .iter()
+        .filter_map(|(ucid, &h)| names.get(ucid).map(|n| (n.clone(), h)))
+        .collect()
+}
+
 /// Challenge mode — runs indefinitely, players compete for fastest time.
 #[derive(Clone)]
 pub struct ChallengeLoop {
     pub chat: chat::ChallengeChat,
     pub session_id: i64,
+    pub base_url: Option<String>,
 }
 
 impl<Ctx> Scene<Ctx> for ChallengeLoop
@@ -154,6 +253,7 @@ where
             db: db::Pool::from_context(ctx),
             chat: self.chat,
             session_id: self.session_id,
+            base_url: self.base_url,
         };
         inner.run_inner().await
     }
@@ -167,6 +267,7 @@ struct ChallengeLoopInner {
     db: db::Pool,
     chat: chat::ChallengeChat,
     session_id: i64,
+    base_url: Option<String>,
 }
 
 impl ChallengeLoopInner {
@@ -176,20 +277,35 @@ impl ChallengeLoopInner {
             ChallengeGlobalProps::default(),
             |_ucid, _invalidator| ChallengeView {
                 help_dialog: Dialog::default(),
+                altitude_dialog: Dialog::default(),
             },
             self.chat.subscribe(),
-            |(ucid, msg)| {
-                matches!(msg, chat::ChallengeChatMsg::Help)
-                    .then_some((ucid, ChallengeMessage::Help(DialogMsg::Show)))
+            |(ucid, msg)| match msg {
+                chat::ChallengeChatMsg::Help => {
+                    Some((ucid, ChallengeMessage::Help(DialogMsg::Show)))
+                },
+                chat::ChallengeChatMsg::Alt => {
+                    Some((ucid, ChallengeMessage::Altitude(DialogMsg::Show)))
+                },
+                _ => None,
             },
         );
 
         // Load initial leaderboard from DB
-        let leaderboard = self.challenge_leaderboard().await?;
-        ui.set_global_state(ChallengeGlobalProps { leaderboard });
+        let event_url = self
+            .base_url
+            .as_deref()
+            .map(|base| format!("{}/event/{}", base.trim_end_matches('/'), self.session_id));
+        let mut current_leaderboard = self.challenge_leaderboard().await?;
+        ui.set_global_state(ChallengeGlobalProps {
+            leaderboard: current_leaderboard.clone(),
+            altitudes: vec![],
+            event_url: event_url.clone(),
+        });
 
         let mut active_runs: HashMap<String, Duration> = HashMap::new();
-        let mut player_heights: HashMap<insim::identifiers::ConnectionId, f32> = HashMap::new();
+        let mut player_heights: HashMap<ConnectionId, f32> = HashMap::new();
+        let mut player_names: HashMap<ConnectionId, String> = HashMap::new();
         let mut packets = self.insim.subscribe();
 
         loop {
@@ -206,12 +322,12 @@ impl ChallengeLoopInner {
                                 scene: "challenge::ncn::connection",
                                 cause: Box::new(cause),
                             })? {
+                                let _ = player_names.insert(ncn.ucid, conn.pname.clone());
                                 let pb = self.personal_best(&conn.uname).await?;
                                 ui.set_player_state(ncn.ucid, ChallengeConnectionProps {
                                     uname: conn.uname.clone(),
                                     in_progress: false,
                                     best_time: pb,
-                                    height: 0.0,
                                 }).await;
                             }
                         },
@@ -290,8 +406,12 @@ impl ChallengeLoopInner {
                                                 .await?;
 
                                             // Update leaderboard from DB
-                                            let leaderboard = self.challenge_leaderboard().await?;
-                                            ui.set_global_state(ChallengeGlobalProps { leaderboard });
+                                            current_leaderboard = self.challenge_leaderboard().await?;
+                                            ui.set_global_state(ChallengeGlobalProps {
+                                                leaderboard: current_leaderboard.clone(),
+                                                altitudes: build_altitudes(&player_heights, &player_names),
+                                                event_url: event_url.clone(),
+                                            });
                                         }
                                     },
                                     _ => {},
@@ -302,12 +422,17 @@ impl ChallengeLoopInner {
                                     uname: conn.uname.clone(),
                                     in_progress: active_runs.contains_key(&conn.uname),
                                     best_time: pb,
-                                    height: player_heights.get(&conn.ucid).copied().unwrap_or(0.0),
                                 }).await;
                             }
                         },
                         insim::Packet::Cnl(cnl) => {
                             let _ = player_heights.remove(&cnl.ucid);
+                            let _ = player_names.remove(&cnl.ucid);
+                            ui.set_global_state(ChallengeGlobalProps {
+                                leaderboard: current_leaderboard.clone(),
+                                altitudes: build_altitudes(&player_heights, &player_names),
+                                event_url: event_url.clone(),
+                            });
                         },
                         insim::Packet::Mci(mci) => {
                             for car in &mci.info {
@@ -318,6 +443,11 @@ impl ChallengeLoopInner {
                                     let _ = player_heights.insert(conn.ucid, car.xyz.z_metres());
                                 }
                             }
+                            ui.set_global_state(ChallengeGlobalProps {
+                                leaderboard: current_leaderboard.clone(),
+                                altitudes: build_altitudes(&player_heights, &player_names),
+                                event_url: event_url.clone(),
+                            });
                         },
                         _ => {},
                     }

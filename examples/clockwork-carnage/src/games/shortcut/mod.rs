@@ -68,6 +68,7 @@ impl MiniGame for ShortcutGame {
         .then(ChallengeLoop {
             chat: self.chat.clone(),
             session_id: self.session_id,
+            base_url: ctx.base_url.clone(),
         })
         .loop_until_quit();
 

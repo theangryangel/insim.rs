@@ -77,6 +77,7 @@ impl MiniGame for MetronomeGame {
             chat: self.chat.clone(),
             target: self.target,
             session_id: self.session_id,
+            base_url: ctx.base_url.clone(),
         })
         .loop_until_quit();
 

@@ -53,6 +53,7 @@ fn tier_label(delta: Duration) -> Option<&'static str> {
 struct MetronomeGlobalProps {
     target: Duration,
     leaderboard: MetronomeLeaderboard,
+    event_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -117,6 +118,22 @@ impl ui::Component for MetronomeView {
 
         let players = metronome_scoreboard(&props.global.leaderboard, &props.connection.uname);
 
+        let mut scoreboard = ui::container()
+            .flex()
+            .pl(5.)
+            .w(200.)
+            .mt(10.)
+            .flex_col()
+            .items_start()
+            .with_child(ui::text("Best Deltas", hud_title()).w(40.).h(5.))
+            .with_children(players);
+
+        if let Some(url) = &props.global.event_url {
+            scoreboard = scoreboard.with_child(
+                ui::text(url, hud_muted().align_left()).w(40.).h(5.),
+            );
+        }
+
         ui::container()
             .flex()
             .flex_col()
@@ -124,17 +141,7 @@ impl ui::Component for MetronomeView {
                 topbar(&format!("Target: {:.2?}", props.global.target))
                     .with_child(ui::text(status, status_style).w(20.).h(5.)),
             )
-            .with_child(
-                ui::container()
-                    .flex()
-                    .pr(5.)
-                    .w(200.)
-                    .mt(90.)
-                    .flex_col()
-                    .items_end()
-                    .with_child(ui::text("Best Deltas", hud_title()).w(35.).h(5.))
-                    .with_children(players),
-            )
+            .with_child(scoreboard)
     }
 }
 
@@ -153,6 +160,7 @@ pub struct ChallengeLoop {
     pub chat: chat::EventChat,
     pub target: Duration,
     pub session_id: i64,
+    pub base_url: Option<String>,
 }
 
 impl<Ctx> Scene<Ctx> for ChallengeLoop
@@ -174,6 +182,7 @@ where
             chat: self.chat,
             target: self.target,
             session_id: self.session_id,
+            base_url: self.base_url,
         };
         inner.run_inner().await
     }
@@ -187,6 +196,7 @@ struct ChallengeLoopInner {
     chat: chat::EventChat,
     target: Duration,
     session_id: i64,
+    base_url: Option<String>,
 }
 
 impl ChallengeLoopInner {
@@ -196,6 +206,7 @@ impl ChallengeLoopInner {
             MetronomeGlobalProps {
                 target: self.target,
                 leaderboard: MetronomeLeaderboard::default(),
+                event_url: None,
             },
             |_ucid, _invalidator| MetronomeView {
                 help_dialog: Dialog::default(),
@@ -207,10 +218,16 @@ impl ChallengeLoopInner {
             },
         );
 
+        let event_url = self
+            .base_url
+            .as_deref()
+            .map(|base| format!("{}/event/{}", base.trim_end_matches('/'), self.session_id));
+
         let leaderboard = self.metronome_leaderboard().await?;
         ui.set_global_state(MetronomeGlobalProps {
             target: self.target,
             leaderboard,
+            event_url: event_url.clone(),
         });
 
         let mut active_runs: HashMap<String, Duration> = HashMap::new();
@@ -304,7 +321,7 @@ impl ChallengeLoopInner {
                                             }
 
                                             let leaderboard = self.metronome_leaderboard().await?;
-                                            ui.set_global_state(MetronomeGlobalProps { target: self.target, leaderboard });
+                                            ui.set_global_state(MetronomeGlobalProps { target: self.target, leaderboard, event_url: event_url.clone() });
                                         }
                                     },
                                     _ => {},

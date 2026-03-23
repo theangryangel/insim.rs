@@ -46,6 +46,7 @@ const BOMB_HELP_LINES: &[&str] = &[
 struct BombGlobalProps {
     leaderboard: BombLeaderboard,
     active_runs: Vec<(String, String, i64, Instant, Duration)>, // (uname, pname, cps, deadline, current_timeout)
+    event_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -138,23 +139,29 @@ impl ui::Component for BombView {
             })
             .collect();
 
+        let mut scoreboard = ui::container()
+            .flex()
+            .pl(5.)
+            .w(200.)
+            .mt(10.)
+            .flex_col()
+            .items_start()
+            .with_child(ui::text("Active Runs", hud_title()).w(40.).h(5.))
+            .with_children(active_run_rows)
+            .with_child(ui::text("Session Best", hud_title()).w(40.).h(5.))
+            .with_children(leaderboard_rows);
+
+        if let Some(url) = &props.global.event_url {
+            scoreboard = scoreboard.with_child(
+                ui::text(url, hud_muted().align_left()).w(40.).h(5.),
+            );
+        }
+
         ui::container()
             .flex()
             .flex_col()
             .with_child(topbar("Bomb").with_child(ui::text(status_str, status_style).w(15.).h(5.)))
-            .with_child(
-                ui::container()
-                    .flex()
-                    .pr(5.)
-                    .w(200.)
-                    .mt(90.)
-                    .flex_col()
-                    .items_end()
-                    .with_child(ui::text("Active Runs", hud_title()).w(35.).h(5.))
-                    .with_children(active_run_rows)
-                    .with_child(ui::text("Session Best", hud_title()).w(35.).h(5.))
-                    .with_children(leaderboard_rows),
-            )
+            .with_child(scoreboard)
     }
 }
 
@@ -185,6 +192,7 @@ pub struct BombLoop {
     pub checkpoint_timeout: Duration,
     pub checkpoint_penalty: Duration,
     pub collision_max_penalty: Duration,
+    pub base_url: Option<String>,
 }
 
 impl<Ctx> Scene<Ctx> for BombLoop
@@ -208,6 +216,7 @@ where
             checkpoint_timeout: self.checkpoint_timeout,
             checkpoint_penalty: self.checkpoint_penalty,
             collision_max_penalty: self.collision_max_penalty,
+            base_url: self.base_url,
         };
         inner.run_inner().await
     }
@@ -223,6 +232,7 @@ struct BombLoopInner {
     checkpoint_timeout: Duration,
     checkpoint_penalty: Duration,
     collision_max_penalty: Duration,
+    base_url: Option<String>,
 }
 
 impl BombLoopInner {
@@ -250,11 +260,17 @@ impl BombLoopInner {
             },
         );
 
+        let event_url = self
+            .base_url
+            .as_deref()
+            .map(|base| format!("{}/event/{}", base.trim_end_matches('/'), self.session_id));
+
         // Load initial leaderboard
         let leaderboard = self.load_leaderboard().await?;
         ui.set_global_state(BombGlobalProps {
             leaderboard,
             active_runs: vec![],
+            event_url: event_url.clone(),
         });
 
         // keyed by uname
@@ -315,7 +331,7 @@ impl BombLoopInner {
                                     }
                                     let leaderboard = self.load_leaderboard().await?;
                                     let active = self.build_active_runs_props(&active_runs);
-                                    ui.set_global_state(BombGlobalProps { leaderboard, active_runs: active });
+                                    ui.set_global_state(BombGlobalProps { leaderboard, active_runs: active, event_url: event_url.clone() });
                                     ui.set_player_state(run.ucid, BombConnectionProps {
                                         uname: conn.uname.clone(),
                                         in_run: false,
@@ -344,7 +360,7 @@ impl BombLoopInner {
                                     }
                                     let leaderboard = self.load_leaderboard().await?;
                                     let active = self.build_active_runs_props(&active_runs);
-                                    ui.set_global_state(BombGlobalProps { leaderboard, active_runs: active });
+                                    ui.set_global_state(BombGlobalProps { leaderboard, active_runs: active, event_url: event_url.clone() });
                                 }
                             }
                         },
@@ -367,7 +383,7 @@ impl BombLoopInner {
                                     ).await?;
                                     let active = self.build_active_runs_props(&active_runs);
                                     let leaderboard = self.load_leaderboard().await?;
-                                    ui.set_global_state(BombGlobalProps { leaderboard, active_runs: active });
+                                    ui.set_global_state(BombGlobalProps { leaderboard, active_runs: active, event_url: event_url.clone() });
                                 }
                             }
                         },
@@ -400,7 +416,7 @@ impl BombLoopInner {
                                     }
                                     let leaderboard = self.load_leaderboard().await?;
                                     let active = self.build_active_runs_props(&active_runs);
-                                    ui.set_global_state(BombGlobalProps { leaderboard, active_runs: active });
+                                    ui.set_global_state(BombGlobalProps { leaderboard, active_runs: active, event_url: event_url.clone() });
                                     ui.set_player_state(run.ucid, BombConnectionProps {
                                         uname: conn.uname.clone(),
                                         in_run: false,
@@ -437,7 +453,7 @@ impl BombLoopInner {
                                 }
                                 let active = self.build_active_runs_props(&active_runs);
                                 let leaderboard = self.load_leaderboard().await?;
-                                ui.set_global_state(BombGlobalProps { leaderboard, active_runs: active });
+                                ui.set_global_state(BombGlobalProps { leaderboard, active_runs: active, event_url: event_url.clone() });
                             }
                         },
                         insim::Packet::Uco(Uco {
@@ -498,7 +514,7 @@ impl BombLoopInner {
 
                                 let active = self.build_active_runs_props(&active_runs);
                                 let leaderboard = self.load_leaderboard().await?;
-                                ui.set_global_state(BombGlobalProps { leaderboard, active_runs: active });
+                                ui.set_global_state(BombGlobalProps { leaderboard, active_runs: active, event_url: event_url.clone() });
                                 ui.set_player_state(ucid, BombConnectionProps {
                                     uname: uname.clone(),
                                     in_run: true,
@@ -551,7 +567,7 @@ impl BombLoopInner {
 
                             let leaderboard = self.load_leaderboard().await?;
                             let active = self.build_active_runs_props(&active_runs);
-                            ui.set_global_state(BombGlobalProps { leaderboard, active_runs: active });
+                            ui.set_global_state(BombGlobalProps { leaderboard, active_runs: active, event_url: event_url.clone() });
                         }
                     }
                 },

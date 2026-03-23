@@ -134,7 +134,7 @@ pub fn challenge_scoreboard<Msg>(
                 ui::text(rank, style).w(5.).h(5.),
                 ui::text(pname.as_str(), style.align_left()).w(20.).h(5.),
                 ui::text(vehicle_str, style).w(5.).h(5.),
-                ui::text(time_str, style.align_right()).w(5.).h(5.),
+                ui::text(time_str, style.align_right()).w(10.).h(5.),
             ])
         })
         .collect()

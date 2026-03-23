@@ -12,6 +12,8 @@ use crate::ChatError;
 pub enum ChallengeChatMsg {
     /// Help
     Help,
+    /// Show altitude tracker
+    Alt,
     /// End the challenge
     End,
     /// Quit
