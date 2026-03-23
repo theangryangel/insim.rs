@@ -76,7 +76,7 @@ pub fn bomb_scoreboard<Msg>(
                 ui::text(rank, style).w(5.).h(5.),
                 ui::text(pname.as_str(), style.align_left()).w(20.).h(5.),
                 ui::text(cps_str, style.align_right()).w(8.).h(5.),
-                ui::text(survival_str, style.align_right()).w(8.).h(5.),
+                ui::text(survival_str, style.align_right()).w(10.).h(5.),
             ])
         })
         .collect()

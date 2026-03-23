@@ -11,7 +11,7 @@ use insim::{
         vehicle::Vehicle,
     },
     identifiers::ConnectionId,
-    insim::{Cnl, Con, Crs, ObjectInfo, Pit, Pll, Uco},
+    insim::{Cnl, Con, Crs, ObjectInfo, Pit, Pll, Plp, Uco},
 };
 use kitcar::{
     game, presence,
@@ -133,7 +133,7 @@ impl ui::Component for BombView {
                 ui::container().flex().flex_row().with_children([
                     ui::text(pname.as_str(), style.align_left()).w(15.).h(5.),
                     ui::text(cps_str, style.align_right()).w(8.).h(5.),
-                    ui::text(time_str, style.align_right()).w(8.).h(5.),
+                    ui::text(time_str, style.align_right()).w(10.).h(5.),
                     ui::text(bar, style).w(10.).h(5.),
                 ])
             })
@@ -146,14 +146,14 @@ impl ui::Component for BombView {
             .mt(10.)
             .flex_col()
             .items_start()
-            .with_child(ui::text("Active Runs", hud_title()).w(40.).h(5.))
+            .with_child(ui::text("Active Runs", hud_title()).w(43.).h(5.))
             .with_children(active_run_rows)
-            .with_child(ui::text("Session Best", hud_title()).w(40.).h(5.))
+            .with_child(ui::text("Session Best", hud_title()).w(43.).h(5.))
             .with_children(leaderboard_rows);
 
         if let Some(url) = &props.global.event_url {
             scoreboard = scoreboard.with_child(
-                ui::text(url, hud_muted().align_left()).w(40.).h(5.),
+                ui::text(url, hud_muted().align_left()).w(43.).h(5.),
             );
         }
 
@@ -183,6 +183,7 @@ struct ActiveRun {
     uname: String,
     pname: String,
     ucid: ConnectionId,
+    plid: insim::identifiers::PlayerId,
 }
 
 #[derive(Clone)]
@@ -304,13 +305,15 @@ impl BombLoopInner {
                                 }).await;
                             }
                         },
-                        insim::Packet::Pll(Pll { plid, .. }) => {
-                            // Player left race — look up connection via player
-                            if let Some(conn) = self.presence.connection_by_player(&plid).await.map_err(|cause| SceneError::Custom {
-                                scene: "bomb::pll::connection",
-                                cause: Box::new(cause),
-                            })? {
-                                if let Some(run) = active_runs.remove(&conn.uname) {
+                        insim::Packet::Pll(Pll { plid, .. }) | insim::Packet::Plp(Plp { plid, .. }) => {
+                            // Player left race or telepitted — find run by plid directly
+                            // (avoid presence lookup which may have already removed the player)
+                            let uname = active_runs
+                                .values()
+                                .find(|r| r.plid == plid)
+                                .map(|r| r.uname.clone());
+                            if let Some(uname) = uname {
+                                if let Some(run) = active_runs.remove(&uname) {
                                     let now = Instant::now();
                                     let survival_ms = (run.deadline.min(now) - run.started_at).as_millis() as i64;
                                     self.insim
@@ -322,7 +325,7 @@ impl BombLoopInner {
                                     if let Err(e) = db::insert_bomb_run(
                                         &self.db,
                                         self.session_id,
-                                        &conn.uname,
+                                        &uname,
                                         &run.vehicle.to_string(),
                                         run.checkpoints,
                                         survival_ms,
@@ -333,7 +336,7 @@ impl BombLoopInner {
                                     let active = self.build_active_runs_props(&active_runs);
                                     ui.set_global_state(BombGlobalProps { leaderboard, active_runs: active, event_url: event_url.clone() });
                                     ui.set_player_state(run.ucid, BombConnectionProps {
-                                        uname: conn.uname.clone(),
+                                        uname: uname.clone(),
                                         in_run: false,
                                     }).await;
                                 }
@@ -487,6 +490,7 @@ impl BombLoopInner {
                                         uname: uname.clone(),
                                         pname: pname.clone(),
                                         ucid,
+                                        plid,
                                     }
                                 });
 

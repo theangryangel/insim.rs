@@ -111,15 +111,18 @@ async fn announce_loop(pool: db::Pool, insim: insim::builder::InsimTask, base_ur
                     .map(str::to_owned)
                     .unwrap_or_else(|| format!("{} / {}", event.track, event.layout));
                 let remaining = std::time::Duration::from_secs(secs as u64);
-                let mut msg = format!(
+                let msg = format!(
                     "Upcoming: {} — {} on {} in {remaining:.0?}",
                     name, mode, event.track,
                 );
-                if let Some(ref url) = base_url {
-                    msg.push_str(&format!(" — {url}/events/{}", event.id));
-                }
                 if let Err(e) = insim.send_message(msg, None).await {
                     tracing::warn!("Failed to send event announcement: {e}");
+                }
+                if let Some(ref url) = base_url {
+                    let url_msg = format!("{url}/event/{}", event.id);
+                    if let Err(e) = insim.send_message(url_msg, None).await {
+                        tracing::warn!("Failed to send event URL announcement: {e}");
+                    }
                 }
                 next_announce_interval(secs)
             },
