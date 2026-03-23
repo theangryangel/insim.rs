@@ -5,15 +5,29 @@ use kitcar::{
     ui,
 };
 
-use crate::hud::topbar;
+use crate::hud::{topbar, Marquee, MarqueeProps};
 
-struct SetupTrackView {}
+struct SetupTrackView {
+    marquee: Marquee,
+    mode_name: String,
+}
 impl ui::Component for SetupTrackView {
     type Props<'a> = ();
     type Message = ();
 
     fn render(&self, _props: Self::Props<'_>) -> ui::Node<Self::Message> {
-        topbar("Waiting for player ready")
+        ui::container()
+            .flex()
+            .flex_col()
+            .w(200.)
+            .with_child(
+                topbar("Waiting for player ready").with_child(
+                    self.marquee.render(MarqueeProps {
+                        text: &self.mode_name,
+                        width: 15,
+                    })
+                )
+            )
     }
 }
 
@@ -23,6 +37,7 @@ pub struct SetupTrack {
     pub min_players: usize,
     pub track: Track,
     pub layout: Option<String>,
+    pub mode_name: String,
 }
 
 impl<Ctx> Scene<Ctx> for SetupTrack
@@ -39,8 +54,14 @@ where
         let mut game = game::Game::from_context(ctx);
         let mut presence = presence::Presence::from_context(ctx);
 
-        let (_ui, _ui_handle) =
-            ui::mount(insim.clone(), (), |_ucid, _invalidator| SetupTrackView {});
+        let mode_name = self.mode_name.clone();
+        let (_ui, _ui_handle) = ui::mount(insim.clone(), (), move |_ucid, invalidator| {
+            let name = mode_name.clone();
+            SetupTrackView {
+                marquee: Marquee::new(invalidator),
+                mode_name: name,
+            }
+        });
         tokio::select! {
             res = game.track_rotation(
                 insim.clone(),

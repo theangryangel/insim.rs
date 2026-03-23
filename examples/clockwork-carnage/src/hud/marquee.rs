@@ -65,10 +65,12 @@ impl ui::Component for Marquee {
         canvas.extend(std::iter::repeat_n(' ', props.width));
         let scroll_limit = canvas.len().saturating_sub(props.width);
 
+        let w = props.width as f32;
+
         if scroll_limit == 0 {
             let end = props.width.min(canvas.len());
             let visible: String = canvas[..end].iter().collect();
-            return ui::text(visible, hud_text().align_left()).key("marquee");
+            return ui::text(visible, hud_text().align_left()).w(w).h(5.).key("marquee");
         }
 
         let cycle_ticks = scroll_limit as u64 + self.wait_ticks;
@@ -78,10 +80,10 @@ impl ui::Component for Marquee {
             let offset = phase as usize;
             let end = (offset + props.width).min(canvas.len());
             let visible: String = canvas[offset..end].iter().collect();
-            return ui::text(visible, hud_text()).key("marquee");
+            return ui::text(visible, hud_text()).w(w).h(5.).key("marquee");
         }
 
         // waiting phase at the end of each loop
-        ui::text("", hud_text())
+        ui::text("", hud_text()).w(w).h(5.)
     }
 }

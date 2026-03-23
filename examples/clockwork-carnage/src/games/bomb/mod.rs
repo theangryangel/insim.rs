@@ -23,6 +23,7 @@ pub struct BombGame {
     pub checkpoint_penalty: Duration,
     pub collision_max_penalty: Duration,
     pub chat: chat::BombChat,
+    pub event_name: Option<String>,
 }
 
 pub struct BombGuard {
@@ -58,6 +59,7 @@ impl MiniGame for BombGame {
             checkpoint_penalty,
             collision_max_penalty,
             chat,
+            event_name: event.name.clone(),
         };
 
         let guard = BombGuard { chat_handle };
@@ -73,6 +75,10 @@ impl MiniGame for BombGame {
                 min_players: MIN_PLAYERS,
                 track: self.track,
                 layout: Some(self.layout.clone()),
+                mode_name: match &self.event_name {
+                    Some(name) => format!("{name} — Bomb: hit every checkpoint before the clock runs out!"),
+                    None => "Bomb: hit every checkpoint before the clock runs out!".to_string(),
+                },
             }
             .with_timeout(Duration::from_secs(60)),
         )

@@ -20,6 +20,7 @@ pub struct MetronomeGame {
     pub track: insim::core::track::Track,
     pub layout: String,
     pub chat: chat::EventChat,
+    pub event_name: Option<String>,
 }
 
 pub struct MetronomeGuard {
@@ -49,6 +50,7 @@ impl MiniGame for MetronomeGame {
             track: event.track,
             layout: event.layout.clone(),
             chat,
+            event_name: event.name.clone(),
         };
 
         let guard = MetronomeGuard { chat_handle };
@@ -64,6 +66,10 @@ impl MiniGame for MetronomeGame {
                 min_players: MIN_PLAYERS,
                 track: self.track,
                 layout: Some(self.layout.clone()),
+                mode_name: match &self.event_name {
+                    Some(name) => format!("{name} — Metronome: match the target lap time as closely as possible!"),
+                    None => "Metronome: match the target lap time as closely as possible!".to_string(),
+                },
             }
             .with_timeout(Duration::from_secs(60)),
         )

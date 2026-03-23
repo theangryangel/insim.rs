@@ -18,6 +18,7 @@ pub struct ShortcutGame {
     pub track: insim::core::track::Track,
     pub layout: String,
     pub chat: chat::ChallengeChat,
+    pub event_name: Option<String>,
 }
 
 pub struct ShortcutGuard {
@@ -41,6 +42,7 @@ impl MiniGame for ShortcutGame {
             track: event.track,
             layout: event.layout.clone(),
             chat,
+            event_name: event.name.clone(),
         };
 
         let guard = ShortcutGuard { chat_handle };
@@ -56,6 +58,10 @@ impl MiniGame for ShortcutGame {
                 min_players: MIN_PLAYERS,
                 track: self.track,
                 layout: Some(self.layout.clone()),
+                mode_name: match &self.event_name {
+                    Some(name) => format!("{name} — Shortcut: find a faster path than your opponents!"),
+                    None => "Shortcut: find a faster path than your opponents!".to_string(),
+                },
             }
             .with_timeout(Duration::from_secs(60)),
         )
