@@ -9,7 +9,7 @@ pub use challenge_loop::ChallengeLoop;
 use kitcar::scenes::{Scene, SceneError, SceneExt, SceneResult, wait_for_players::WaitForPlayers};
 use tokio::task::JoinHandle;
 
-use super::{GameCtx, MiniGame, setup_track};
+use super::{MiniGame, MiniGameCtx, setup_track};
 use crate::{ChatError, MIN_PLAYERS, db};
 
 #[derive(Clone)]
@@ -34,7 +34,10 @@ impl Drop for ShortcutGuard {
 impl MiniGame for ShortcutGame {
     type Guard = ShortcutGuard;
 
-    async fn setup(event: &db::Event, ctx: &GameCtx) -> Result<(Self, Self::Guard), SceneError> {
+    async fn setup(
+        event: &db::Event,
+        ctx: &MiniGameCtx,
+    ) -> Result<(Self, Self::Guard), SceneError> {
         let (chat, chat_handle) = chat::spawn(ctx.insim.clone());
 
         let game = ShortcutGame {
@@ -49,7 +52,7 @@ impl MiniGame for ShortcutGame {
         Ok((game, guard))
     }
 
-    async fn run(self, ctx: &GameCtx) -> Result<SceneResult<()>, SceneError> {
+    async fn run(self, ctx: &MiniGameCtx) -> Result<SceneResult<()>, SceneError> {
         let challenge_scene = WaitForPlayers {
             min_players: MIN_PLAYERS,
         }
@@ -88,7 +91,7 @@ impl MiniGame for ShortcutGame {
         }
     }
 
-    async fn teardown(self, event: &db::Event, ctx: &GameCtx) -> Result<(), SceneError> {
+    async fn teardown(self, event: &db::Event, ctx: &MiniGameCtx) -> Result<(), SceneError> {
         db::complete_event(&ctx.pool, event.id)
             .await
             .map_err(|cause| SceneError::Custom {

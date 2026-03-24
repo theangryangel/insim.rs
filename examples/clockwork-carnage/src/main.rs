@@ -15,11 +15,9 @@ use std::net::SocketAddr;
 
 use anyhow::Context as _;
 use clap::Parser;
-use db::EventMode;
-use games::{GameCtx, execute};
+use games::MiniGameCtx;
 use insim::{WithRequestId, insim::TinyType};
 use kitcar::{game, presence};
-use sqlx::types::Json;
 
 // -- Config -------------------------------------------------------------------
 
@@ -80,361 +78,109 @@ struct Args {
     config: std::path::PathBuf,
 }
 
-// -- Announcements ------------------------------------------------------------
-
-fn next_announce_interval(secs: i64) -> std::time::Duration {
-    std::time::Duration::from_secs(if secs > 3600 {
-        1800
-    } else if secs > 900 {
-        600
-    } else if secs > 300 {
-        300
-    } else if secs > 60 {
-        60
-    } else {
-        15
-    })
-}
-
-async fn announce_loop(pool: db::Pool, insim: insim::builder::InsimTask, base_url: Option<String>) {
-    loop {
-        let sleep = match db::next_scheduled_event(&pool).await {
-            Ok(Some((event, secs))) => {
-                let mode = match &*event.mode {
-                    EventMode::Metronome { .. } => "Metronome",
-                    EventMode::Shortcut => "Shortcut",
-                    EventMode::Bomb { .. } => "Bomb",
-                };
-                let name = event
-                    .name
-                    .as_deref()
-                    .map(str::to_owned)
-                    .unwrap_or_else(|| format!("{} / {}", event.track, event.layout));
-                let remaining = std::time::Duration::from_secs(secs as u64);
-                let msg = format!(
-                    "Upcoming: {} — {} on {} in {remaining:.0?}",
-                    name, mode, event.track,
-                );
-                if let Err(e) = insim.send_message(msg, None).await {
-                    tracing::warn!("Failed to send event announcement: {e}");
-                }
-                if let Some(ref url) = base_url {
-                    let url_msg = format!("{url}/event/{}", event.id);
-                    if let Err(e) = insim.send_message(url_msg, None).await {
-                        tracing::warn!("Failed to send event URL announcement: {e}");
-                    }
-                }
-                next_announce_interval(secs)
-            },
-            Ok(None) => std::time::Duration::from_secs(60),
-            Err(e) => {
-                tracing::warn!("Failed to fetch next scheduled event: {e}");
-                std::time::Duration::from_secs(60)
-            },
-        };
-        tokio::time::sleep(sleep).await;
-    }
-}
-
-// -- Scheduler ----------------------------------------------------------------
-
-async fn scheduler_loop(pool: db::Pool) {
-    loop {
-        let now = db::Timestamp::now();
-
-        let sleep_secs: u64 = async {
-            // Auto-stop: if the active event's scheduled_end_at has passed, complete it.
-            if let Some(event) = db::active_event(&pool).await? {
-                if let Some(end) = event.scheduled_end_at {
-                    if end <= now {
-                        tracing::info!(
-                            "Auto-completing event #{} (scheduled_end_at reached)",
-                            event.id
-                        );
-                        db::complete_event(&pool, event.id).await?;
-                        return Ok(5);
-                    }
-                    let secs_to_end = (end.as_second() - now.as_second()).max(0) as u64;
-                    return Ok(secs_to_end.min(30));
-                }
-                return Ok(30);
-            }
-
-            // Auto-start: if no event is active, check for a due PENDING event.
-            if let Some(event) = db::next_due_event(&pool).await? {
-                tracing::info!("Auto-starting event #{} (scheduled_at reached)", event.id);
-                db::switch_event(&pool, event.id).await?;
-                return Ok(5);
-            }
-
-            // No active, no due event. Check how soon the next one is.
-            match db::next_scheduled_event(&pool).await? {
-                Some((_, secs)) => Ok((secs as u64).min(30).max(5)),
-                None => Ok(30),
-            }
-        }
-        .await
-        .unwrap_or_else(|e: sqlx::Error| {
-            tracing::warn!("Scheduler error: {e}");
-            30
-        });
-
-        tokio::time::sleep(std::time::Duration::from_secs(sleep_secs)).await;
-    }
-}
+use tokio::task::JoinSet;
 
 // -- Runner -------------------------------------------------------------------
 
 async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
+    let mut set = JoinSet::new();
     let base_url = config.web.as_ref().map(|w| w.base_url.clone());
 
     // InSim setup — only if [insim] present
-    let (insim_handle, presence_handle, game_handle, user_sync_handle, ctx) =
-        if let Some(insim_cfg) = config.insim {
-            let (insim, insim_handle) = insim::tcp(insim_cfg.addr)
-                .isi_admin_password(insim_cfg.password)
-                .isi_iname("carnage".to_owned())
-                .isi_prefix('!')
-                .isi_flag_mso_cols(true)
-                .isi_flag_mci(true)
-                .isi_interval(std::time::Duration::from_millis(250))
-                .spawn(100)
-                .await?;
+    let (ctx, web_presence) = if let Some(insim_cfg) = config.insim {
+        let (insim, insim_handle) = insim::tcp(insim_cfg.addr)
+            .isi_admin_password(insim_cfg.password)
+            .isi_iname("carnage".to_owned())
+            .isi_prefix('!')
+            .isi_flag_mso_cols(true)
+            .isi_flag_mci(true)
+            .isi_interval(std::time::Duration::from_millis(250))
+            .spawn(100)
+            .await?;
 
-            tracing::info!("Connected to InSim");
+        tracing::info!("Connected to InSim");
 
-            let (presence, presence_handle) = presence::spawn(insim.clone(), 32);
-            let (game, game_handle) = game::spawn(insim.clone(), 32);
-            let user_sync_handle = db::spawn_user_sync(&presence, pool.clone());
+        let (presence, presence_handle) = presence::spawn(insim.clone(), 32);
+        let (game, game_handle) = game::spawn(insim.clone(), 32);
+        let user_sync_handle = db::spawn_user_sync(&presence, pool.clone());
 
-            insim.send(TinyType::Ncn.with_request_id(1)).await?;
-            insim.send(TinyType::Npl.with_request_id(2)).await?;
-            insim.send(TinyType::Sst.with_request_id(3)).await?;
+        insim.send(TinyType::Ncn.with_request_id(1)).await?;
+        insim.send(TinyType::Npl.with_request_id(2)).await?;
+        insim.send(TinyType::Sst.with_request_id(3)).await?;
 
-            for &cmd in &["/select no", "/vote no", "/autokick no"] {
-                insim.send_command(cmd).await?;
-            }
+        for &cmd in &["/select no", "/vote no", "/autokick no"] {
+            insim.send_command(cmd).await?;
+        }
 
-            let ctx = GameCtx {
-                pool: pool.clone(),
-                insim: insim.clone(),
-                presence,
-                game,
-                base_url: base_url.clone(),
-            };
+        let _ = set.spawn(async move {
+            insim_handle
+                .await
+                .context("InSim background task panicked")?
+                .context("InSim background task failed")
+        });
 
-            (
-                Some(insim_handle),
-                Some(presence_handle),
-                Some(game_handle),
-                Some(user_sync_handle),
-                Some(ctx),
-            )
-        } else {
-            (None, None, None, None, None)
+        let _ = set.spawn(async move {
+            presence_handle
+                .await
+                .context("Presence background task panicked")?
+                .map_err(|e| anyhow::anyhow!("Presence background task failed: {e}"))
+        });
+
+        let _ = set.spawn(async move {
+            game_handle
+                .await
+                .context("Game background task panicked")?
+                .map_err(|e| anyhow::anyhow!("Game background task failed: {e}"))
+        });
+
+        let _ = set.spawn(async move {
+            user_sync_handle
+                .await
+                .context("User sync background task panicked")?
+                .map_err(|e| anyhow::anyhow!("User sync background task failed: {e}"))
+        });
+
+        let ctx = MiniGameCtx {
+            pool: pool.clone(),
+            insim: insim.clone(),
+            presence: presence.clone(),
+            game: game.clone(),
+            base_url: base_url.clone(),
         };
 
-    // Web — only if [web] present
-    let web_listen = config.web.as_ref().map(|w| w.listen);
-    let web_cfg = config.web.map(|w| web::WebConfig {
-        base_url: w.base_url,
-        oauth_client_id: w.oauth_client_id,
-        oauth_client_secret: w.oauth_client_secret,
-        session_key: w.session_key.unwrap_or_else(|| "a".repeat(64)),
+        (Some(ctx), Some(presence))
+    } else {
+        (None, None)
+    };
+
+    // Orchestrator (Scheduler + Game Manager + Announcer)
+    let _ = set.spawn({
+        let pool = pool.clone();
+        async move { games::MiniGameManager::new(pool, ctx).run().await }
     });
 
-    let announce_data = ctx
-        .as_ref()
-        .map(|c| (c.pool.clone(), c.insim.clone(), base_url.clone()));
-    let web_presence = ctx.as_ref().map(|c| c.presence.clone());
-    let scheduler_pool = pool.clone();
-
-    let reconcile = async move {
-        let Some(ctx) = ctx else {
-            std::future::pending::<()>().await;
-            unreachable!()
+    // Web — only if [web] present
+    if let Some(w) = config.web {
+        let web_cfg = web::WebConfig {
+            base_url: w.base_url,
+            oauth_client_id: w.oauth_client_id,
+            oauth_client_secret: w.oauth_client_secret,
+            session_key: w.session_key.unwrap_or_else(|| "a".repeat(64)),
         };
 
-        let mut current_event_id: Option<i64> = None;
-        let mut current_task: Option<
-            tokio::task::JoinHandle<Result<(), kitcar::scenes::SceneError>>,
-        > = None;
-        let mut current_cancel: Option<tokio_util::sync::CancellationToken> = None;
+        let _ = set.spawn({
+            let pool = pool.clone();
+            let web_presence = web_presence.clone();
+            async move { web::serve(w.listen, pool, web_cfg, web_presence).await }
+        });
+    }
 
-        loop {
-            let desired = db::active_event(&ctx.pool).await;
-
-            match (&current_task, desired) {
-                (_, Err(e)) => {
-                    tracing::warn!("Failed to poll active event: {e}");
-                },
-
-                (None, Ok(None)) => {},
-
-                (None, Ok(Some(event))) => {
-                    tracing::info!(
-                        "Starting event #{} ({:?} on {}/{})",
-                        event.id,
-                        event.mode,
-                        event.track,
-                        event.layout
-                    );
-                    current_event_id = Some(event.id);
-                    let ctx_ref = &ctx;
-                    let cancel = tokio_util::sync::CancellationToken::new();
-                    current_cancel = Some(cancel.clone());
-                    current_task = Some(tokio::spawn({
-                        let event = event.clone();
-                        let pool = ctx_ref.pool.clone();
-                        let insim = ctx_ref.insim.clone();
-                        let presence = ctx_ref.presence.clone();
-                        let game = ctx_ref.game.clone();
-                        let base_url = base_url.clone();
-                        async move {
-                            let ctx = GameCtx {
-                                pool,
-                                insim,
-                                presence,
-                                game,
-                                base_url,
-                            };
-                            match event.mode {
-                                Json(EventMode::Metronome { .. }) => {
-                                    execute::<games::metronome::MetronomeGame>(&event, &ctx, cancel)
-                                        .await
-                                },
-                                Json(EventMode::Shortcut) => {
-                                    execute::<games::shortcut::ShortcutGame>(&event, &ctx, cancel)
-                                        .await
-                                },
-                                Json(EventMode::Bomb { .. }) => {
-                                    execute::<games::bomb::BombGame>(&event, &ctx, cancel).await
-                                },
-                            }
-                        }
-                    }));
-                },
-
-                (Some(task), Ok(Some(event)))
-                    if current_event_id == Some(event.id) && !task.is_finished() => {},
-
-                (Some(_), Ok(Some(event))) if current_event_id == Some(event.id) => {
-                    current_cancel = None;
-                    let task = current_task.take().unwrap();
-                    match task.await {
-                        Ok(Ok(())) => {
-                            tracing::info!("Event #{} completed", event.id);
-                        },
-                        Ok(Err(e)) => {
-                            tracing::error!(
-                                "Event #{} failed: {e:?} (leaving ACTIVE for crash recovery)",
-                                event.id
-                            );
-                        },
-                        Err(e) => {
-                            tracing::error!(
-                                "Event #{} join error: {e} (leaving ACTIVE for crash recovery)",
-                                event.id
-                            );
-                        },
-                    }
-                    current_event_id = None;
-                },
-
-                (Some(_), Ok(_)) => {
-                    tracing::info!("Desired event changed, cancelling current task");
-                    if let Some(token) = current_cancel.take() {
-                        token.cancel();
-                    }
-                    if let Some(task) = current_task.take() {
-                        let _ =
-                            tokio::time::timeout(std::time::Duration::from_secs(10), task).await;
-                    }
-                    current_event_id = None;
-                },
-            }
-
-            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    if let Some(res) = set.join_next().await {
+        match res {
+            Ok(Ok(())) => tracing::info!("A background task exited naturally"),
+            Ok(Err(e)) => tracing::error!("A background task failed: {e:?}"),
+            Err(e) => tracing::error!("A background task panicked: {e}"),
         }
-    };
-
-    // Wrap each optional future so disabled branches park forever instead of
-    // panicking — tokio::select! evaluates future expressions before checking
-    // guards, so .unwrap() on None would panic even with an `if false` guard.
-    let web_fut = async move {
-        match (web_listen, web_cfg) {
-            (Some(listen), Some(cfg)) => web::serve(listen, pool.clone(), cfg, web_presence).await,
-            _ => std::future::pending().await,
-        }
-    };
-    let insim_fut = async move {
-        match insim_handle {
-            Some(h) => h.await,
-            None => std::future::pending().await,
-        }
-    };
-    let presence_fut = async move {
-        match presence_handle {
-            Some(h) => h.await,
-            None => std::future::pending().await,
-        }
-    };
-    let game_fut = async move {
-        match game_handle {
-            Some(h) => h.await,
-            None => std::future::pending().await,
-        }
-    };
-    let user_sync_fut = async move {
-        match user_sync_handle {
-            Some(h) => h.await,
-            None => std::future::pending().await,
-        }
-    };
-    let announce_fut = async move {
-        match announce_data {
-            Some((pool, insim, base_url)) => announce_loop(pool, insim, base_url).await,
-            None => std::future::pending().await,
-        }
-    };
-
-    tokio::select! {
-        _ = reconcile => {},
-        _ = scheduler_loop(scheduler_pool) => {},
-        result = web_fut => {
-            if let Err(e) = result {
-                tracing::error!("Web server error: {e}");
-            }
-        },
-        res = insim_fut => {
-            match res {
-                Ok(Ok(())) => tracing::info!("InSim background task exited"),
-                Ok(Err(e)) => tracing::error!("InSim background task failed: {e:?}"),
-                Err(e) => tracing::error!("InSim background task join failed: {e}"),
-            }
-        },
-        res = presence_fut => {
-            match res {
-                Ok(Ok(())) => tracing::info!("Presence background task exited"),
-                Ok(Err(e)) => tracing::error!("Presence background task failed: {e}"),
-                Err(e) => tracing::error!("Presence background task join failed: {e}"),
-            }
-        },
-        res = game_fut => {
-            match res {
-                Ok(Ok(())) => tracing::info!("Game background task exited"),
-                Ok(Err(e)) => tracing::error!("Game background task failed: {e}"),
-                Err(e) => tracing::error!("Game background task join failed: {e}"),
-            }
-        },
-        res = user_sync_fut => {
-            match res {
-                Ok(Ok(())) => tracing::info!("User sync background task exited"),
-                Ok(Err(e)) => tracing::error!("User sync background task failed: {e}"),
-                Err(e) => tracing::error!("User sync background task join failed: {e}"),
-            }
-        },
-        _ = announce_fut => {},
     }
 
     Ok(())

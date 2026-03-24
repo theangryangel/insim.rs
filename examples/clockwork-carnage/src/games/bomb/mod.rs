@@ -2,6 +2,7 @@
 
 mod challenge_loop;
 pub mod chat;
+pub mod state;
 
 use std::time::Duration;
 
@@ -9,7 +10,7 @@ pub use challenge_loop::BombLoop;
 use kitcar::scenes::{Scene, SceneError, SceneExt, SceneResult, wait_for_players::WaitForPlayers};
 use tokio::task::JoinHandle;
 
-use super::{GameCtx, MiniGame, setup_track};
+use super::{MiniGame, MiniGameCtx, setup_track};
 use crate::{ChatError, MIN_PLAYERS, db};
 
 #[derive(Clone)]
@@ -37,7 +38,10 @@ impl Drop for BombGuard {
 impl MiniGame for BombGame {
     type Guard = BombGuard;
 
-    async fn setup(event: &db::Event, ctx: &GameCtx) -> Result<(Self, Self::Guard), SceneError> {
+    async fn setup(
+        event: &db::Event,
+        ctx: &MiniGameCtx,
+    ) -> Result<(Self, Self::Guard), SceneError> {
         let (checkpoint_timeout, checkpoint_penalty, collision_max_penalty) = match *event.mode {
             db::EventMode::Bomb {
                 checkpoint_timeout_secs,
@@ -72,7 +76,7 @@ impl MiniGame for BombGame {
         Ok((game, guard))
     }
 
-    async fn run(self, ctx: &GameCtx) -> Result<SceneResult<()>, SceneError> {
+    async fn run(self, ctx: &MiniGameCtx) -> Result<SceneResult<()>, SceneError> {
         let bomb_scene = WaitForPlayers {
             min_players: MIN_PLAYERS,
         }
@@ -114,7 +118,7 @@ impl MiniGame for BombGame {
         }
     }
 
-    async fn teardown(self, event: &db::Event, ctx: &GameCtx) -> Result<(), SceneError> {
+    async fn teardown(self, event: &db::Event, ctx: &MiniGameCtx) -> Result<(), SceneError> {
         db::complete_event(&ctx.pool, event.id)
             .await
             .map_err(|cause| SceneError::Custom {
