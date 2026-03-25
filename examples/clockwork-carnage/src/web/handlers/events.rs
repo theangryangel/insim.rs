@@ -66,6 +66,13 @@ pub struct MetronomeStandingsContent {
 }
 
 #[derive(Template)]
+#[template(path = "partials/metronome_standings.html")]
+pub struct MetronomeStandingsFragment {
+    pub event: Event,
+    pub metronome_standings: Vec<db::MetronomeStanding>,
+}
+
+#[derive(Template)]
 #[template(path = "partials/shortcut_standings.html")]
 pub struct ShortcutStandingsFragment {
     pub event: Event,
@@ -581,7 +588,8 @@ pub async fn event_standings(
             let metronome_standings = db::metronome_standings(&state.pool, event.id)
                 .await
                 .map_err(internal_error)?;
-            MetronomeStandingsContent {
+            MetronomeStandingsFragment {
+                event,
                 metronome_standings,
             }
             .render()

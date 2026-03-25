@@ -95,6 +95,7 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
             .isi_flag_mso_cols(true)
             .isi_flag_mci(true)
             .isi_interval(std::time::Duration::from_millis(250))
+            .isi_flag_axm_load(true)
             .spawn(100)
             .await?;
 

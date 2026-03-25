@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use insim_core::vehicle::Vehicle;
+use insim_core::{vehicle::Vehicle, Decode, Encode};
 
 use super::Fuel;
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
@@ -159,6 +159,57 @@ bitflags! {
 
 impl_bitflags_from_to_bytes!(Passengers, u8);
 
+bitflags! {
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    /// Racer Info flags
+    pub struct RiFlags: u8 {
+        /// Late start.
+        const LATE_START    = 1 << 0;
+        /// Server AI non-solid
+        const SAI_NON_SOLID = 1 << 3;
+        /// Server AI mask 1
+        const SAI_0 = 1 << 4;
+        /// Server AI mask 2
+        const SAI_1 = 1 << 5;
+        /// Server AI combined mask
+        const SAI_MASK = Self::SAI_0.bits() | Self::SAI_1.bits();
+    }
+}
+
+impl_bitflags_from_to_bytes!(RiFlags, u8);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Encode, Decode)]
+#[repr(u8)]
+/// Server AI Type
+pub enum SaiType {
+    /// Movable
+    Move = 0,   
+    /// Immovable / floating
+    Float = 1,  
+    /// Immovable / ground level
+    Ground = 2, 
+    /// Immovable / ground level / ground angle
+    Angle = 3,  
+}
+
+impl RiFlags {
+    const SAI_SHIFTS: u8 = 4;
+
+    /// Views the relevant bits as an SaiType
+    pub fn as_sai_type(self) -> SaiType {
+        let val = (self.bits() & Self::SAI_MASK.bits()) >> Self::SAI_SHIFTS;
+        match val {
+            0 => SaiType::Move,
+            1 => SaiType::Float,
+            2 => SaiType::Ground,
+            3 => SaiType::Angle,
+            _ => unreachable!("Masking guarantees a value between 0 and 3"),
+        }
+    }
+}
+
+
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Player joined race notification.
@@ -214,8 +265,11 @@ pub struct Npl {
     pub rwadj: u8,
 
     /// Front tyre width adjustment.
-    #[insim(pad_after = 2)]
     pub fwadj: u8,
+
+    #[insim(pad_after = 1)]
+    /// Racer info flags.
+    pub riflags: RiFlags,
 
     /// Setup flags.
     pub setf: SetFlags,
@@ -267,7 +321,7 @@ mod test {
             2,  // pass
             4,  // rwadj
             5,  // fwadj
-            0,  // sp2
+            0,  // riflags
             0,  // sp3
             4,  // setf
             20, // nump

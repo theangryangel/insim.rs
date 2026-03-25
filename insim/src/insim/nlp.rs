@@ -2,6 +2,8 @@ use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 
 use crate::identifiers::{PlayerId, RequestId};
 
+const NLP_MAX_CARS: usize = 48;
+
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Node/lap snapshot for a player.
@@ -50,10 +52,10 @@ impl Encode for Nlp {
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
         ctx.encode("reqi", &self.reqi)?;
         let nump = self.info.len();
-        if nump > 255 {
+        if nump > NLP_MAX_CARS {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
                 min: 0,
-                max: 255,
+                max: NLP_MAX_CARS,
                 found: nump,
             }
             .context("Nlp::nump"));

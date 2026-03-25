@@ -6,10 +6,12 @@ use insim::{
         object::insim::{InsimCheckpoint, InsimCheckpointKind},
         string::colours::Colour,
     },
-    insim::{ObjectInfo, Pll, Plp, Uco},
+    identifiers::{ConnectionId, PlayerId},
+    insim::{ObjectInfo, Uco},
 };
 use kitcar::{
     game, presence,
+    presence::PresenceEvent,
     scenes::{FromContext, Scene, SceneError, SceneResult},
     ui::{self, Component},
 };
@@ -229,32 +231,82 @@ impl ChallengeLoopInner {
             event_url: event_url.clone(),
         });
 
+        // Subscribe before seeding to avoid missing events during the queries.
+        let mut events = self.presence.subscribe_events();
+        let mut connections: HashMap<ConnectionId, presence::ConnectionInfo> = self
+            .presence
+            .connections()
+            .await
+            .map_err(|cause| SceneError::Custom {
+                scene: "metronome::init::connections",
+                cause: Box::new(cause),
+            })?
+            .into_iter()
+            .map(|c| (c.ucid, c))
+            .collect();
+        let mut players: HashMap<PlayerId, presence::PlayerInfo> = self
+            .presence
+            .players()
+            .await
+            .map_err(|cause| SceneError::Custom {
+                scene: "metronome::init::players",
+                cause: Box::new(cause),
+            })?
+            .into_iter()
+            .map(|p| (p.plid, p))
+            .collect();
+
         let mut active_runs: HashMap<String, Duration> = HashMap::new();
-        let mut plid_to_uname: HashMap<insim::identifiers::PlayerId, String> = HashMap::new();
+        let mut plid_to_uname: HashMap<PlayerId, String> = HashMap::new();
         let mut packets = self.insim.subscribe();
 
         loop {
             tokio::select! {
+                event = events.recv() => {
+                    match event {
+                        Ok(PresenceEvent::Connected(info)) => {
+                            self.insim
+                                .send_message(
+                                    "Metronome. Match the target time as closely as possible.",
+                                    info.ucid,
+                                )
+                                .await?;
+                            let pb = self.personal_best(&info.uname).await?;
+                            ui.set_player_state(info.ucid, MetronomeConnectionProps {
+                                uname: info.uname.clone(),
+                                in_progress: active_runs.contains_key(&info.uname),
+                                best_delta: pb,
+                            }).await;
+                            let _ = connections.insert(info.ucid, info);
+                        },
+                        Ok(PresenceEvent::Disconnected(info)) => {
+                            let _ = connections.remove(&info.ucid);
+                            // active_runs already cleaned up by preceding PlayerLeft events.
+                        },
+                        Ok(PresenceEvent::PlayerJoined(info)) => {
+                            let _ = players.insert(info.plid, info);
+                        },
+                        Ok(PresenceEvent::PlayerLeft(info))
+                        | Ok(PresenceEvent::PlayerTeleportedToPits(info)) => {
+                            let _ = players.remove(&info.plid);
+                            if let Some(uname) = plid_to_uname.remove(&info.plid) {
+                                let _ = active_runs.remove(&uname);
+                            }
+                        },
+                        Ok(PresenceEvent::TakingOver { before, after }) => {
+                            let _ = players.remove(&before.plid);
+                            let _ = players.insert(after.plid, after);
+                        },
+                        Ok(PresenceEvent::Renamed { .. })
+                        | Ok(PresenceEvent::ConnectionDetails(_))
+                        | Ok(PresenceEvent::VehicleSelected { .. })
+                        | Err(_) => {},
+                    }
+                },
+
                 packet = packets.recv() => {
                     let packet = packet.map_err(|_| SceneError::InsimHandleLost)?;
                     match packet {
-                        insim::Packet::Ncn(ncn) => {
-                            self.insim
-                                .send_message("Metronome. Match the target time as closely as possible.", ncn.ucid)
-                                .await?;
-
-                            if let Some(conn) = self.presence.connection(&ncn.ucid).await.map_err(|cause| SceneError::Custom {
-                                scene: "metronome::ncn::connection",
-                                cause: Box::new(cause),
-                            })? {
-                                let pb = self.personal_best(&conn.uname).await?;
-                                ui.set_player_state(ncn.ucid, MetronomeConnectionProps {
-                                    uname: conn.uname.clone(),
-                                    in_progress: active_runs.contains_key(&conn.uname),
-                                    best_delta: pb,
-                                }).await;
-                            }
-                        },
                         insim::Packet::Uco(Uco {
                             info:
                                 ObjectInfo::InsimCheckpoint(InsimCheckpoint {
@@ -266,15 +318,9 @@ impl ChallengeLoopInner {
                             time,
                             ..
                         }) => {
-                            if let Some(player) = self.presence.player(&plid).await.map_err(|cause| SceneError::Custom {
-                                scene: "metronome::uco::player",
-                                cause: Box::new(cause),
-                            })?
+                            if let Some(player) = players.get(&plid).cloned()
                                 && !player.ptype.is_ai()
-                                && let Some(conn) = self.presence.connection_by_player(&plid).await.map_err(|cause| SceneError::Custom {
-                                    scene: "metronome::uco::connection_by_player",
-                                    cause: Box::new(cause),
-                                })?
+                                && let Some(conn) = connections.get(&player.ucid).cloned()
                             {
                                 match kind {
                                     InsimCheckpointKind::Checkpoint1 => {
@@ -295,6 +341,11 @@ impl ChallengeLoopInner {
                                             ).await {
                                                 tracing::warn!("Failed to persist metronome lap: {e}");
                                             }
+
+                                            self.presence.spec(conn.ucid).await.map_err(|cause| SceneError::Custom {
+                                                scene: "metronome::spec",
+                                                cause: Box::new(cause),
+                                            })?;
 
                                             let prev_best = self.personal_best(&conn.uname).await?;
                                             let is_pb = match prev_best {
@@ -323,7 +374,11 @@ impl ChallengeLoopInner {
                                             }
 
                                             let leaderboard = self.metronome_leaderboard().await?;
-                                            ui.set_global_state(MetronomeGlobalProps { target: self.target, leaderboard, event_url: event_url.clone() });
+                                            ui.set_global_state(MetronomeGlobalProps {
+                                                target: self.target,
+                                                leaderboard,
+                                                event_url: event_url.clone(),
+                                            });
                                         }
                                     },
                                     _ => {},
@@ -337,14 +392,10 @@ impl ChallengeLoopInner {
                                 }).await;
                             }
                         },
-                        insim::Packet::Pll(Pll { plid, .. }) | insim::Packet::Plp(Plp { plid, .. }) => {
-                            if let Some(uname) = plid_to_uname.remove(&plid) {
-                                let _ = active_runs.remove(&uname);
-                            }
-                        },
                         _ => {},
                     }
                 },
+
                 _ = self.game.wait_for_end() => {
                     tracing::info!("Metronome game ended");
                     return Ok(SceneResult::Continue(()));

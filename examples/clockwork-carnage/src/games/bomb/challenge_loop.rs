@@ -344,7 +344,10 @@ where
                                 let survival_ms = res.run.survival_ms(now);
                                 let msg = format!("PITTED — run ended after {} checkpoints. Commit to your fuel before the run.", res.run.checkpoints).red();
                                 insim.send_message(msg, res.run.ucid).await?;
-                                insim.send_command(format!("/spec {}", res.run.uname)).await?;
+                                presence.spec(res.run.ucid).await.map_err(|cause| SceneError::Custom {
+                                    scene: "bomb::pit::spec",
+                                    cause: Box::new(cause),
+                                })?;
                                 persist_run(&pool, self.session_id, &mut state, &res.run, survival_ms).await?;
                                 let active = state.active_runs_props();
                                 ui.set_global_state(BombGlobalProps { leaderboard: state.leaderboard.clone(), active_runs: active, event_url: event_url.clone() });
@@ -434,7 +437,10 @@ where
                         let survival_secs = survival_ms as f64 / 1000.0;
                         let msg = format!("BOOM — {n} checkpoints, {survival_secs:.1}s").red();
                         insim.send_message(msg, res.run.ucid).await?;
-                        insim.send_command(format!("/spec {}", res.run.uname)).await?;
+                        presence.spec(res.run.ucid).await.map_err(|cause| SceneError::Custom {
+                                scene: "bomb::tick::spec",
+                                cause: Box::new(cause),
+                            })?;
                         persist_run(&pool, self.session_id, &mut state, &res.run, survival_ms).await?;
                         let active = state.active_runs_props();
                         ui.set_global_state(BombGlobalProps { leaderboard: state.leaderboard.clone(), active_runs: active, event_url: event_url.clone() });

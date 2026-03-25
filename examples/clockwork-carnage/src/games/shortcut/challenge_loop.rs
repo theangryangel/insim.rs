@@ -7,11 +7,12 @@ use insim::{
         string::colours::Colour,
         vehicle::Vehicle,
     },
-    identifiers::ConnectionId,
-    insim::{ObjectInfo, Pll, Plp, Uco},
+    identifiers::{ConnectionId, PlayerId},
+    insim::{ObjectInfo, Uco},
 };
 use kitcar::{
     game, presence,
+    presence::PresenceEvent,
     scenes::{FromContext, Scene, SceneError, SceneResult},
     ui::{self, Component},
 };
@@ -296,7 +297,6 @@ impl ChallengeLoopInner {
             },
         );
 
-        // Load initial leaderboard from DB
         let event_url = self
             .base_url
             .as_deref()
@@ -308,35 +308,100 @@ impl ChallengeLoopInner {
             event_url: event_url.clone(),
         });
 
+        // Subscribe before seeding to avoid missing events during the queries.
+        let mut events = self.presence.subscribe_events();
+        let mut connections: HashMap<ConnectionId, presence::ConnectionInfo> = self
+            .presence
+            .connections()
+            .await
+            .map_err(|cause| SceneError::Custom {
+                scene: "shortcut::init::connections",
+                cause: Box::new(cause),
+            })?
+            .into_iter()
+            .map(|c| (c.ucid, c))
+            .collect();
+        let mut players: HashMap<PlayerId, presence::PlayerInfo> = self
+            .presence
+            .players()
+            .await
+            .map_err(|cause| SceneError::Custom {
+                scene: "shortcut::init::players",
+                cause: Box::new(cause),
+            })?
+            .into_iter()
+            .map(|p| (p.plid, p))
+            .collect();
+
         let mut active_runs: HashMap<String, Duration> = HashMap::new();
-        let mut plid_to_uname: HashMap<insim::identifiers::PlayerId, String> = HashMap::new();
+        let mut plid_to_uname: HashMap<PlayerId, String> = HashMap::new();
         let mut player_heights: HashMap<ConnectionId, f32> = HashMap::new();
-        let mut player_names: HashMap<ConnectionId, String> = HashMap::new();
+        // ucid → pname for altitude display
+        let mut player_names: HashMap<ConnectionId, String> =
+            connections.values().map(|c| (c.ucid, c.pname.clone())).collect();
+
         let mut packets = self.insim.subscribe();
 
         loop {
             tokio::select! {
+                event = events.recv() => {
+                    match event {
+                        Ok(PresenceEvent::Connected(info)) => {
+                            self.insim
+                                .send_message(
+                                    "Welcome to the Shortcut! Compete for the fastest time.",
+                                    info.ucid,
+                                )
+                                .await?;
+                            let _ = player_names.insert(info.ucid, info.pname.clone());
+                            let pb = self.personal_best(&info.uname).await?;
+                            ui.set_player_state(info.ucid, ChallengeConnectionProps {
+                                uname: info.uname.clone(),
+                                in_progress: false,
+                                best_time: pb,
+                            }).await;
+                            let _ = connections.insert(info.ucid, info);
+                        },
+                        Ok(PresenceEvent::Disconnected(info)) => {
+                            let _ = connections.remove(&info.ucid);
+                            let _ = player_heights.remove(&info.ucid);
+                            let _ = player_names.remove(&info.ucid);
+                            // active_runs already cleaned up by preceding PlayerLeft events.
+                            ui.set_global_state(ChallengeGlobalProps {
+                                leaderboard: current_leaderboard.clone(),
+                                altitudes: build_altitudes(&player_heights, &player_names),
+                                event_url: event_url.clone(),
+                            });
+                        },
+                        Ok(PresenceEvent::PlayerJoined(info)) => {
+                            let _ = players.insert(info.plid, info);
+                        },
+                        Ok(PresenceEvent::PlayerLeft(info))
+                        | Ok(PresenceEvent::PlayerTeleportedToPits(info)) => {
+                            let _ = players.remove(&info.plid);
+                            if let Some(uname) = plid_to_uname.remove(&info.plid) {
+                                let _ = active_runs.remove(&uname);
+                            }
+                        },
+                        Ok(PresenceEvent::Renamed { ucid, new_pname, .. }) => {
+                            if let Some(conn) = connections.get_mut(&ucid) {
+                                conn.pname = new_pname.clone();
+                            }
+                            let _ = player_names.insert(ucid, new_pname);
+                        },
+                        Ok(PresenceEvent::TakingOver { before, after }) => {
+                            let _ = players.remove(&before.plid);
+                            let _ = players.insert(after.plid, after);
+                        },
+                        Ok(PresenceEvent::ConnectionDetails(_))
+                        | Ok(PresenceEvent::VehicleSelected { .. })
+                        | Err(_) => {},
+                    }
+                },
+
                 packet = packets.recv() => {
                     let packet = packet.map_err(|_| SceneError::InsimHandleLost)?;
                     match packet {
-                        insim::Packet::Ncn(ncn) => {
-                            self.insim
-                                .send_message("Welcome to the Shortcut! Compete for the fastest time.", ncn.ucid)
-                                .await?;
-
-                            if let Some(conn) = self.presence.connection(&ncn.ucid).await.map_err(|cause| SceneError::Custom {
-                                scene: "challenge::ncn::connection",
-                                cause: Box::new(cause),
-                            })? {
-                                let _ = player_names.insert(ncn.ucid, conn.pname.clone());
-                                let pb = self.personal_best(&conn.uname).await?;
-                                ui.set_player_state(ncn.ucid, ChallengeConnectionProps {
-                                    uname: conn.uname.clone(),
-                                    in_progress: false,
-                                    best_time: pb,
-                                }).await;
-                            }
-                        },
                         insim::Packet::Uco(Uco {
                             info:
                                 ObjectInfo::InsimCheckpoint(InsimCheckpoint {
@@ -348,15 +413,9 @@ impl ChallengeLoopInner {
                             time,
                             ..
                         }) => {
-                            if let Some(player) = self.presence.player(&plid).await.map_err(|cause| SceneError::Custom {
-                                scene: "challenge::uco::player",
-                                cause: Box::new(cause),
-                            })?
+                            if let Some(player) = players.get(&plid).cloned()
                                 && !player.ptype.is_ai()
-                                && let Some(conn) = self.presence.connection_by_player(&plid).await.map_err(|cause| SceneError::Custom {
-                                    scene: "challenge::uco::connection_by_player",
-                                    cause: Box::new(cause),
-                                })?
+                                && let Some(conn) = connections.get(&player.ucid).cloned()
                             {
                                 match kind {
                                     InsimCheckpointKind::Checkpoint1 => {
@@ -375,7 +434,6 @@ impl ChallengeLoopInner {
                                                 None => true,
                                             };
 
-                                            // Persist every run to DB
                                             let time_ms = lap_time.as_millis() as i64;
                                             if let Err(e) = db::insert_shortcut_time(
                                                 &self.db,
@@ -389,9 +447,10 @@ impl ChallengeLoopInner {
                                                 tracing::warn!("Failed to persist challenge time: {e}");
                                             }
 
-                                            self.insim
-                                                .send_command(format!("/spec {}", conn.uname))
-                                                .await?;
+                                            self.presence.spec(conn.ucid).await.map_err(|cause| SceneError::Custom {
+                                                scene: "shortcut::spec",
+                                                cause: Box::new(cause),
+                                            })?;
 
                                             if is_pb {
                                                 self.insim
@@ -413,7 +472,6 @@ impl ChallengeLoopInner {
                                                 .send_message("Rejoin to retry".yellow(), conn.ucid)
                                                 .await?;
 
-                                            // Update leaderboard from DB
                                             current_leaderboard = self.challenge_leaderboard().await?;
                                             ui.set_global_state(ChallengeGlobalProps {
                                                 leaderboard: current_leaderboard.clone(),
@@ -433,29 +491,10 @@ impl ChallengeLoopInner {
                                 }).await;
                             }
                         },
-                        insim::Packet::Pll(Pll { plid, .. }) | insim::Packet::Plp(Plp { plid, .. }) => {
-                            if let Some(uname) = plid_to_uname.remove(&plid) {
-                                let _ = active_runs.remove(&uname);
-                            }
-                        },
-                        insim::Packet::Cnl(cnl) => {
-                            let _ = player_heights.remove(&cnl.ucid);
-                            if let Some(uname) = player_names.remove(&cnl.ucid) {
-                                let _ = active_runs.remove(&uname);
-                            }
-                            ui.set_global_state(ChallengeGlobalProps {
-                                leaderboard: current_leaderboard.clone(),
-                                altitudes: build_altitudes(&player_heights, &player_names),
-                                event_url: event_url.clone(),
-                            });
-                        },
                         insim::Packet::Mci(mci) => {
                             for car in &mci.info {
-                                if let Some(conn) = self.presence.connection_by_player(&car.plid).await.map_err(|cause| SceneError::Custom {
-                                    scene: "challenge::mci::connection_by_player",
-                                    cause: Box::new(cause),
-                                })? {
-                                    let _ = player_heights.insert(conn.ucid, car.xyz.z_metres());
+                                if let Some(player) = players.get(&car.plid) {
+                                    let _ = player_heights.insert(player.ucid, car.xyz.z_metres());
                                 }
                             }
                             ui.set_global_state(ChallengeGlobalProps {
@@ -467,6 +506,7 @@ impl ChallengeLoopInner {
                         _ => {},
                     }
                 },
+
                 _ = self.chat.wait_for_admin_cmd(self.presence.clone(), |msg| matches!(msg, chat::ChallengeChatMsg::End)) => {
                     tracing::info!("Admin ended challenge");
                     return Ok(SceneResult::Continue(()));

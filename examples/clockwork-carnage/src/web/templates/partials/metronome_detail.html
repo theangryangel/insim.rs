@@ -10,25 +10,4 @@
 </div>
 
 {# ── Standings ── #}
-<div
-  {%
-  match
-  event.status
-  %}
-  {%
-  when
-  EventStatus::Active
-  %}
-  hx-get="/events/{{ event.id }}/standings"
-  hx-trigger="every 5s"
-  hx-swap="innerHTML"
-  {%
-  when
-  _
-  %}
-  {%
-  endmatch
-  %}
->
-  {% include "partials/metronome_standings_content.html" %}
-</div>
+{% include "partials/metronome_standings.html" %}

@@ -58,9 +58,8 @@ where
         });
         tokio::select! {
             res = game.track_rotation(
-                insim.clone(),
                 self.track,
-                RaceLaps::Practice,
+                RaceLaps::Untimed,
                 0,
                 self.layout.clone(),
             ) => {
