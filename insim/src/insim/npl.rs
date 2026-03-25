@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use insim_core::{vehicle::Vehicle, Decode, Encode};
+use insim_core::{Decode, Encode, vehicle::Vehicle};
 
 use super::Fuel;
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
@@ -184,13 +184,13 @@ impl_bitflags_from_to_bytes!(RiFlags, u8);
 /// Server AI Type
 pub enum SaiType {
     /// Movable
-    Move = 0,   
+    Move = 0,
     /// Immovable / floating
-    Float = 1,  
+    Float = 1,
     /// Immovable / ground level
-    Ground = 2, 
+    Ground = 2,
     /// Immovable / ground level / ground angle
-    Angle = 3,  
+    Angle = 3,
 }
 
 impl RiFlags {
@@ -208,7 +208,6 @@ impl RiFlags {
         }
     }
 }
-
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

@@ -337,8 +337,10 @@ impl ChallengeLoopInner {
         let mut plid_to_uname: HashMap<PlayerId, String> = HashMap::new();
         let mut player_heights: HashMap<ConnectionId, f32> = HashMap::new();
         // ucid → pname for altitude display
-        let mut player_names: HashMap<ConnectionId, String> =
-            connections.values().map(|c| (c.ucid, c.pname.clone())).collect();
+        let mut player_names: HashMap<ConnectionId, String> = connections
+            .values()
+            .map(|c| (c.ucid, c.pname.clone()))
+            .collect();
 
         let mut packets = self.insim.subscribe();
 

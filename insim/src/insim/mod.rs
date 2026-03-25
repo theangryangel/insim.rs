@@ -105,7 +105,7 @@ pub use mtc::Mtc;
 pub use nci::{Language, Nci};
 pub use ncn::{Ncn, NcnFlags};
 pub use nlp::{Nlp, NodeLapInfo};
-pub use npl::{Npl, Passengers, PlayerFlags, PlayerType, SetFlags, TyreCompound, RiFlags, SaiType};
+pub use npl::{Npl, Passengers, PlayerFlags, PlayerType, RiFlags, SaiType, SetFlags, TyreCompound};
 pub use obh::{CarContact, Obh, ObhFlags};
 pub use oco::{Oco, OcoAction, OcoIndex, OcoLights};
 pub use pen::{Pen, PenaltyInfo, PenaltyReason};

@@ -79,9 +79,8 @@ impl GameInfo {
 
     /// Handle packet updates
     pub fn handle_packet(&mut self, packet: &insim::Packet) {
-        match packet {
-            insim::Packet::Sta(sta) => self.sta(sta),
-            _ => {},
+        if let insim::Packet::Sta(sta) = packet {
+            self.sta(sta)
         }
     }
 }
@@ -104,7 +103,6 @@ pub enum GameError {
     /// Lost game response channel
     #[error("Lost game response channel")]
     ResponseChannelClosed,
-
 }
 
 #[derive(Debug)]
@@ -312,7 +310,8 @@ impl Game {
     /// Send the `/end` command.
     pub async fn end(&self) -> Result<(), GameError> {
         let (response_tx, rx) = oneshot::channel();
-        self.send_command(GameMessage::End { response_tx }, rx).await
+        self.send_command(GameMessage::End { response_tx }, rx)
+            .await
     }
 
     /// Send a track change command.
@@ -346,33 +345,48 @@ impl Game {
     /// Start a race.
     pub async fn restart(&self) -> Result<(), GameError> {
         let (response_tx, rx) = oneshot::channel();
-        self.send_command(GameMessage::Restart { response_tx }, rx).await
+        self.send_command(GameMessage::Restart { response_tx }, rx)
+            .await
     }
 
     /// Start qualifying.
     pub async fn qualify(&self) -> Result<(), GameError> {
         let (response_tx, rx) = oneshot::channel();
-        self.send_command(GameMessage::Qualify { response_tx }, rx).await
+        self.send_command(GameMessage::Qualify { response_tx }, rx)
+            .await
     }
 
     /// Total restart — removes all connections.
     pub async fn reinit(&self) -> Result<(), GameError> {
         let (response_tx, rx) = oneshot::channel();
-        self.send_command(GameMessage::Reinit { response_tx }, rx).await
+        self.send_command(GameMessage::Reinit { response_tx }, rx)
+            .await
     }
 
     /// Set weather/lighting.
     pub async fn change_weather(&self, weather: u8) -> Result<(), GameError> {
         let (response_tx, rx) = oneshot::channel();
-        self.send_command(GameMessage::ChangeWeather { weather, response_tx }, rx)
-            .await
+        self.send_command(
+            GameMessage::ChangeWeather {
+                weather,
+                response_tx,
+            },
+            rx,
+        )
+        .await
     }
 
     /// Set qualifying duration in minutes. 0 = no qualifying.
     pub async fn change_qual(&self, minutes: u8) -> Result<(), GameError> {
         let (response_tx, rx) = oneshot::channel();
-        self.send_command(GameMessage::ChangeQual { minutes, response_tx }, rx)
-            .await
+        self.send_command(
+            GameMessage::ChangeQual {
+                minutes,
+                response_tx,
+            },
+            rx,
+        )
+        .await
     }
 
     /// Pit all
@@ -396,10 +410,7 @@ impl Game {
     }
 
     /// Poll until the predicate returns `true`.
-    pub async fn wait_for<F: Fn(&GameInfo) -> bool>(
-        &self,
-        predicate: F,
-    ) -> Result<(), GameError> {
+    pub async fn wait_for<F: Fn(&GameInfo) -> bool>(&self, predicate: F) -> Result<(), GameError> {
         let mut interval = time::interval(std::time::Duration::from_millis(500));
         loop {
             let _ = interval.tick().await;

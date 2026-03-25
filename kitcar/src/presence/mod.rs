@@ -233,7 +233,9 @@ impl PresenceInner {
         if let Some(connection) = self.connections.get_mut(&nci.ucid) {
             connection.userid = Some(nci.userid);
             connection.ipaddress = Some(nci.ipaddress);
-            let _ = self.event_tx.send(PresenceEvent::ConnectionDetails(connection.clone()));
+            let _ = self
+                .event_tx
+                .send(PresenceEvent::ConnectionDetails(connection.clone()));
         }
     }
 
@@ -249,7 +251,9 @@ impl PresenceInner {
 
     fn plp(&mut self, plp: &insim::insim::Plp) {
         if let Some(player) = self.players.get(&plp.plid) {
-            let _ = self.event_tx.send(PresenceEvent::PlayerTeleportedToPits(player.clone()));
+            let _ = self
+                .event_tx
+                .send(PresenceEvent::PlayerTeleportedToPits(player.clone()));
         }
     }
 
@@ -325,7 +329,9 @@ impl PresenceInner {
             let before = player.clone();
             player.ucid = toc.newucid;
             let after = player.clone();
-            let _ = self.event_tx.send(PresenceEvent::TakingOver { before, after });
+            let _ = self
+                .event_tx
+                .send(PresenceEvent::TakingOver { before, after });
         }
 
         if let Some(old) = self.connections.get_mut(&toc.olducid) {
@@ -493,13 +499,7 @@ pub fn spawn(
         result
     });
 
-    (
-        Presence {
-            tx,
-            event_tx,
-        },
-        handle,
-    )
+    (Presence { tx, event_tx }, handle)
 }
 
 #[derive(Debug)]
@@ -741,15 +741,25 @@ impl Presence {
     /// Ban a connection. `ban_days` of 0 = 12 hours.
     pub async fn ban(&self, ucid: ConnectionId, ban_days: u32) -> Result<(), PresenceError> {
         let (response_tx, rx) = oneshot::channel();
-        self.send_command(PresenceMessage::Ban { ucid, ban_days, response_tx }, rx)
-            .await
+        self.send_command(
+            PresenceMessage::Ban {
+                ucid,
+                ban_days,
+                response_tx,
+            },
+            rx,
+        )
+        .await
     }
 
     /// Unban a player by LFS username.
     pub async fn unban(&self, uname: impl Into<String>) -> Result<(), PresenceError> {
         let (response_tx, rx) = oneshot::channel();
         self.send_command(
-            PresenceMessage::Unban { uname: uname.into(), response_tx },
+            PresenceMessage::Unban {
+                uname: uname.into(),
+                response_tx,
+            },
             rx,
         )
         .await
