@@ -7,6 +7,7 @@ use insim::{
     core::vehicle::Vehicle,
     identifiers::{ConnectionId, PlayerId},
 };
+
 use crate::hud::BombLeaderboard;
 
 /// Configuration for the bomb game.
@@ -144,7 +145,9 @@ impl BombState {
                 }
             } else {
                 run.deadline = now + run.current_timeout;
-                run.current_timeout = run.current_timeout.saturating_sub(self.config.checkpoint_penalty);
+                run.current_timeout = run
+                    .current_timeout
+                    .saturating_sub(self.config.checkpoint_penalty);
                 run.checkpoints += 1;
                 CheckpointResult::Extended {
                     ucid,
@@ -156,7 +159,10 @@ impl BombState {
             return Some(result);
         }
 
-        let _ = self.active_runs.insert(plid, ActiveRun::new(uname, pname, vehicle, ucid, &self.config, now));
+        let _ = self.active_runs.insert(
+            plid,
+            ActiveRun::new(uname, pname, vehicle, ucid, &self.config, now),
+        );
         Some(CheckpointResult::Started { ucid })
     }
 
@@ -173,12 +179,6 @@ impl BombState {
         if let Some(run) = self.active_runs.get_mut(&plid) {
             run.ucid = new_ucid;
         }
-    }
-
-    /// Handles a connection leaving (Cnl packet, which gives ucid not plid).
-    pub fn on_leave_by_ucid(&mut self, ucid: ConnectionId) -> Option<RunResult> {
-        let plid = self.active_runs.iter().find(|(_, r)| r.ucid == ucid).map(|(k, _)| *k);
-        plid.and_then(|plid| self.on_leave(plid))
     }
 
     pub fn on_pit(&mut self, plid: PlayerId) -> Option<RunResult> {
@@ -235,7 +235,15 @@ impl BombState {
         let mut runs: Vec<_> = self
             .active_runs
             .values()
-            .map(|r| (r.uname.clone(), r.pname.clone(), r.checkpoints, r.deadline, r.current_timeout))
+            .map(|r| {
+                (
+                    r.uname.clone(),
+                    r.pname.clone(),
+                    r.checkpoints,
+                    r.deadline,
+                    r.current_timeout,
+                )
+            })
             .collect();
         runs.sort_by(|a, b| b.2.cmp(&a.2).then(b.3.cmp(&a.3)));
         runs
@@ -243,7 +251,8 @@ impl BombState {
 
     /// Checks for expired runs.
     pub fn tick(&mut self, now: Instant) -> Vec<RunResult> {
-        let keys: Vec<PlayerId> = self.active_runs
+        let keys: Vec<PlayerId> = self
+            .active_runs
             .iter()
             .filter(|(_, run)| run.deadline < now)
             .map(|(k, _)| *k)
@@ -259,4 +268,3 @@ impl BombState {
             .collect()
     }
 }
-

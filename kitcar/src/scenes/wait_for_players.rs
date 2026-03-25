@@ -23,7 +23,7 @@ where
 
     async fn run(self, ctx: &Ctx) -> Result<SceneResult<()>, SceneError> {
         let insim = InsimTask::from_context(ctx);
-        let mut presence = presence::Presence::from_context(ctx);
+        let presence = presence::Presence::from_context(ctx);
 
         tracing::info!("Waiting for {} players...", self.min_players);
         let mut packets = insim.subscribe();
@@ -35,7 +35,7 @@ where
                         insim.send_message("Waiting for players", ncn.ucid).await?;
                     }
                 }
-                res = presence.wait_for_connection_count(|val| *val >= self.min_players) => {
+                res = presence.wait_for_connection_count(|val| val >= self.min_players) => {
                     let _ = res.map_err(|cause| SceneError::Custom {
                         scene: "wait_for_players::wait_for_connection_count",
                         cause: Box::new(cause),

@@ -1,6 +1,9 @@
 //! Connection and player presence/tracking
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    net::Ipv4Addr,
+};
 
 use insim::{
     core::vehicle::Vehicle,
@@ -8,8 +11,9 @@ use insim::{
     insim::{PlayerFlags, PlayerType},
 };
 use tokio::{
-    sync::{broadcast, mpsc, oneshot, watch},
+    sync::{broadcast, mpsc, oneshot},
     task::JoinHandle,
+    time,
 };
 
 #[derive(Debug, Clone)]
@@ -55,6 +59,16 @@ pub struct ConnectionInfo {
     /// List of players relating to this connection
     /// Some may be AI players.
     pub players: HashSet<PlayerId>,
+
+    /// LFS.net user ID. Only populated when the host has an admin password set
+    /// and an IS_NCI packet has been received for this connection.
+    pub userid: Option<u32>,
+
+    /// Originating IP address. Only populated on hosts with an admin password.
+    pub ipaddress: Option<Ipv4Addr>,
+
+    /// Most recently selected vehicle in the garage (from IS_SLC).
+    pub selected_vehicle: Option<Vehicle>,
 }
 
 /// Lifecycle events emitted by `Presence` after processing each packet.
@@ -77,6 +91,25 @@ pub enum PresenceEvent {
     PlayerJoined(PlayerInfo),
     /// A player left the track.
     PlayerLeft(PlayerInfo),
+    /// A player's controlling connection changed (driver swap).
+    TakingOver {
+        /// The player before the swap (with old ucid).
+        before: PlayerInfo,
+        /// The player after the swap (with new ucid).
+        after: PlayerInfo,
+    },
+    /// Extra connection details received (IS_NCI — host-only, requires admin password).
+    /// Enriches the connection with LFS.net user ID and IP address.
+    ConnectionDetails(ConnectionInfo),
+    /// A connection selected a vehicle in the garage (IS_SLC).
+    VehicleSelected {
+        /// Connection that selected the vehicle.
+        ucid: ConnectionId,
+        /// The selected vehicle.
+        vehicle: Vehicle,
+    },
+    /// A player tele-pitted (Shift+P). The player is still in the race but repositioned.
+    PlayerTeleportedToPits(PlayerInfo),
 }
 
 /// Presence state
@@ -85,23 +118,17 @@ struct PresenceInner {
     connections: HashMap<ConnectionId, ConnectionInfo>,
     players: HashMap<PlayerId, PlayerInfo>,
     last_known_names: HashMap<String, String>,
-    player_count: watch::Sender<usize>,
-    connection_count: watch::Sender<usize>,
     event_tx: broadcast::Sender<PresenceEvent>,
 }
 
 impl PresenceInner {
     /// New presence handler
     fn new() -> Self {
-        let player_count = watch::channel(0);
-        let connection_count = watch::channel(0);
         let (event_tx, _) = broadcast::channel(64);
         Self {
             connections: HashMap::new(),
             players: HashMap::new(),
             last_known_names: HashMap::new(),
-            player_count: player_count.0,
-            connection_count: connection_count.0,
             event_tx,
         }
     }
@@ -148,35 +175,29 @@ impl PresenceInner {
 
     /// Handle a game packet
     fn handle_packet(&mut self, packet: &insim::Packet) {
-        let old_player_count = self.players.len();
-        let old_connection_count = self.connections.len();
-
         match packet {
             // Game
             insim::Packet::Tiny(tiny) => self.tiny(tiny),
             // Connection
             insim::Packet::Ncn(ncn) => self.ncn(ncn),
+            insim::Packet::Nci(nci) => self.nci(nci),
             insim::Packet::Cnl(cnl) => self.cnl(cnl),
             insim::Packet::Cpr(cpr) => self.cpr(cpr),
+            insim::Packet::Slc(slc) => self.slc(slc),
             // Player
             insim::Packet::Npl(npl) => self.npl(npl),
             insim::Packet::Pll(pll) => self.pll(pll),
+            insim::Packet::Plp(plp) => self.plp(plp),
             insim::Packet::Toc(toc) => self.toc(toc),
             insim::Packet::Pfl(pfl) => self.pfl(pfl),
             insim::Packet::Pla(pla) => self.pla(pla),
 
             _ => {},
         }
+    }
 
-        let new_player_count = self.players.len();
-        if new_player_count != old_player_count {
-            let _ = self.player_count.send(new_player_count);
-        }
-
-        let new_connection_count = self.connections.len();
-        if new_connection_count != old_connection_count {
-            let _ = self.connection_count.send(new_connection_count);
-        }
+    fn connection_count(&self) -> usize {
+        self.connections.len()
     }
 
     fn tiny(&mut self, tiny: &insim::insim::Tiny) {
@@ -199,10 +220,37 @@ impl PresenceInner {
             uname: ncn.uname.clone(),
             pname: ncn.pname.clone(),
             players: HashSet::new(),
+            userid: None,
+            ipaddress: None,
+            selected_vehicle: None,
         };
 
         let _ = self.event_tx.send(PresenceEvent::Connected(conn.clone()));
         let _ = self.connections.insert(ncn.ucid, conn);
+    }
+
+    fn nci(&mut self, nci: &insim::insim::Nci) {
+        if let Some(connection) = self.connections.get_mut(&nci.ucid) {
+            connection.userid = Some(nci.userid);
+            connection.ipaddress = Some(nci.ipaddress);
+            let _ = self.event_tx.send(PresenceEvent::ConnectionDetails(connection.clone()));
+        }
+    }
+
+    fn slc(&mut self, slc: &insim::insim::Slc) {
+        if let Some(connection) = self.connections.get_mut(&slc.ucid) {
+            connection.selected_vehicle = Some(slc.cname);
+            let _ = self.event_tx.send(PresenceEvent::VehicleSelected {
+                ucid: slc.ucid,
+                vehicle: slc.cname,
+            });
+        }
+    }
+
+    fn plp(&mut self, plp: &insim::insim::Plp) {
+        if let Some(player) = self.players.get(&plp.plid) {
+            let _ = self.event_tx.send(PresenceEvent::PlayerTeleportedToPits(player.clone()));
+        }
     }
 
     fn cnl(&mut self, cnl: &insim::insim::Cnl) {
@@ -274,7 +322,10 @@ impl PresenceInner {
 
     fn toc(&mut self, toc: &insim::insim::Toc) {
         if let Some(player) = self.players.get_mut(&toc.plid) {
+            let before = player.clone();
             player.ucid = toc.newucid;
+            let after = player.clone();
+            let _ = self.event_tx.send(PresenceEvent::TakingOver { before, after });
         }
 
         if let Some(old) = self.connections.get_mut(&toc.olducid) {
@@ -312,10 +363,6 @@ pub enum PresenceError {
     #[error("Lost Insim packet stream")]
     InsimHandleLost,
 
-    /// Lost presence watch channel
-    #[error("Lost presence watch channel")]
-    WatchChannelClosed,
-
     /// Lost presence query channel
     #[error("Lost presence query channel")]
     QueryChannelClosed,
@@ -332,8 +379,6 @@ pub fn spawn(
 ) -> (Presence, JoinHandle<Result<(), PresenceError>>) {
     let (query_tx, mut query_rx) = mpsc::channel(capacity);
     let mut inner = PresenceInner::new();
-    let player_count = inner.player_count.subscribe();
-    let connection_count = inner.connection_count.subscribe();
     let event_tx = inner.event_tx.clone();
 
     let handle = tokio::spawn(async move {
@@ -367,7 +412,10 @@ pub fn spawn(
                             },
                             Some(PresenceQuery::PlayerCount { response_tx }) => {
                                 let _ = response_tx.send(inner.player_count());
-                            }
+                            },
+                            Some(PresenceQuery::ConnectionCount { response_tx }) => {
+                                let _ = response_tx.send(inner.connection_count());
+                            },
                             Some(PresenceQuery::LastKnownName { uname, response_tx }) => {
                                 let _ = response_tx.send(inner.last_known_name(&uname).cloned());
                             }
@@ -397,8 +445,6 @@ pub fn spawn(
     (
         Presence {
             query_tx,
-            player_count,
-            connection_count,
             event_tx,
         },
         handle,
@@ -428,6 +474,9 @@ enum PresenceQuery {
     PlayerCount {
         response_tx: oneshot::Sender<usize>,
     },
+    ConnectionCount {
+        response_tx: oneshot::Sender<usize>,
+    },
     LastKnownName {
         uname: String,
         response_tx: oneshot::Sender<Option<String>>,
@@ -442,8 +491,6 @@ enum PresenceQuery {
 /// Handler for Presence
 pub struct Presence {
     query_tx: mpsc::Sender<PresenceQuery>,
-    player_count: watch::Receiver<usize>,
-    connection_count: watch::Receiver<usize>,
     event_tx: broadcast::Sender<PresenceEvent>,
 }
 
@@ -453,28 +500,44 @@ impl Presence {
         self.event_tx.subscribe()
     }
 
-    /// Watch connection count
+    /// Poll until the connection count satisfies the predicate.
     pub async fn wait_for_connection_count(
-        &mut self,
-        f: impl FnMut(&usize) -> bool,
+        &self,
+        f: impl Fn(usize) -> bool,
     ) -> Result<usize, PresenceError> {
-        self.connection_count
-            .wait_for(f)
-            .await
-            .map(|val| *val)
-            .map_err(|_| PresenceError::WatchChannelClosed)
+        let mut interval = time::interval(std::time::Duration::from_millis(500));
+        loop {
+            let _ = interval.tick().await;
+            let count = self.connection_count().await?;
+            if f(count) {
+                return Ok(count);
+            }
+        }
     }
 
-    /// Watch player count
+    /// Poll until the player count satisfies the predicate.
     pub async fn wait_for_player_count(
-        &mut self,
-        f: impl FnMut(&usize) -> bool,
+        &self,
+        f: impl Fn(usize) -> bool,
     ) -> Result<usize, PresenceError> {
-        self.player_count
-            .wait_for(f)
+        let mut interval = time::interval(std::time::Duration::from_millis(500));
+        loop {
+            let _ = interval.tick().await;
+            let count = self.player_count().await?;
+            if f(count) {
+                return Ok(count);
+            }
+        }
+    }
+
+    /// Connection count
+    pub async fn connection_count(&self) -> Result<usize, PresenceError> {
+        let (tx, rx) = oneshot::channel();
+        self.query_tx
+            .send(PresenceQuery::ConnectionCount { response_tx: tx })
             .await
-            .map(|val| *val)
-            .map_err(|_| PresenceError::WatchChannelClosed)
+            .map_err(|_| PresenceError::QueryChannelClosed)?;
+        rx.await.map_err(|_| PresenceError::ResponseChannelClosed)
     }
 
     /// Player count

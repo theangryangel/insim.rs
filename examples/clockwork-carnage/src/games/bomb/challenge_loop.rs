@@ -1,13 +1,18 @@
-use std::time::{Duration, Instant};
+use std::{
+    collections::HashMap,
+    time::{Duration, Instant},
+};
 
 use insim::{
     Colour,
     builder::InsimTask,
     core::object::insim::{InsimCheckpoint, InsimCheckpointKind},
-    insim::{Cnl, Con, Crs, ObjectInfo, Pit, Pll, Plp, Toc, Uco},
+    identifiers::{ConnectionId, PlayerId},
+    insim::{Con, Crs, ObjectInfo, Pit, Uco},
 };
 use kitcar::{
     game, presence,
+    presence::PresenceEvent,
     scenes::{FromContext, Scene, SceneError, SceneResult},
     ui::{self, Component},
 };
@@ -228,6 +233,29 @@ where
         let mut state = state::BombState::new(config, BombLeaderboard::default());
         reload_leaderboard(&pool, self.session_id, &mut state).await?;
 
+        // Subscribe before seeding so we don't miss events that arrive during the queries.
+        let mut events = presence.subscribe_events();
+        let mut connections: HashMap<ConnectionId, presence::ConnectionInfo> = presence
+            .connections()
+            .await
+            .map_err(|cause| SceneError::Custom {
+                scene: "bomb::init::connections",
+                cause: Box::new(cause),
+            })?
+            .into_iter()
+            .map(|c| (c.ucid, c))
+            .collect();
+        let mut players: HashMap<PlayerId, presence::PlayerInfo> = presence
+            .players()
+            .await
+            .map_err(|cause| SceneError::Custom {
+                scene: "bomb::init::players",
+                cause: Box::new(cause),
+            })?
+            .into_iter()
+            .map(|p| (p.plid, p))
+            .collect();
+
         ui.set_global_state(BombGlobalProps {
             leaderboard: state.leaderboard.clone(),
             active_runs: vec![],
@@ -239,32 +267,32 @@ where
 
         loop {
             tokio::select! {
-                packet = packets.recv() => {
-                    let packet = packet.map_err(|_| SceneError::InsimHandleLost)?;
-                    match packet {
-                        insim::Packet::Ncn(ncn) => {
-                            insim
-                                .send_message(
-                                    format!(
-                                        "Welcome to Bomb Mode! Hit checkpoints before {}s timer expires.",
-                                        self.checkpoint_timeout.as_secs()
-                                    ),
-                                    ncn.ucid,
-                                )
-                                .await?;
-
-                            if let Some(conn) = presence.connection(&ncn.ucid).await.map_err(|cause| SceneError::Custom {
-                                scene: "bomb::ncn::connection",
-                                cause: Box::new(cause),
-                            })? {
-                                ui.set_player_state(ncn.ucid, BombConnectionProps {
-                                    uname: conn.uname.clone(),
-                                    in_run: false,
-                                }).await;
-                            }
+                event = events.recv() => {
+                    match event {
+                        Ok(PresenceEvent::Connected(info)) => {
+                            insim.send_message(
+                                format!(
+                                    "Welcome to Bomb Mode! Hit checkpoints before {}s timer expires.",
+                                    self.checkpoint_timeout.as_secs()
+                                ),
+                                info.ucid,
+                            ).await?;
+                            ui.set_player_state(info.ucid, BombConnectionProps {
+                                uname: info.uname.clone(),
+                                in_run: false,
+                            }).await;
+                            let _ = connections.insert(info.ucid, info);
                         },
-                        insim::Packet::Pll(Pll { plid, .. }) | insim::Packet::Plp(Plp { plid, .. }) => {
-                            if let Some(res) = state.on_leave(plid) {
+                        Ok(PresenceEvent::Disconnected(info)) => {
+                            let _ = connections.remove(&info.ucid);
+                            // Runs are cleaned up by the PlayerLeft events emitted before Disconnected.
+                        },
+                        Ok(PresenceEvent::PlayerJoined(info)) => {
+                            let _ = players.insert(info.plid, info);
+                        },
+                        Ok(PresenceEvent::PlayerLeft(info)) | Ok(PresenceEvent::PlayerTeleportedToPits(info)) => {
+                            let _ = players.remove(&info.plid);
+                            if let Some(res) = state.on_leave(info.plid) {
                                 let now = Instant::now();
                                 let survival_ms = res.run.survival_ms(now);
                                 let msg = format!("Run ended — left race after {} checkpoints.", res.run.checkpoints).red();
@@ -278,17 +306,24 @@ where
                                 }).await;
                             }
                         },
-                        insim::Packet::Toc(Toc { plid, newucid, .. }) => {
-                            state.on_toc(plid, newucid);
-                        },
-                        insim::Packet::Cnl(Cnl { ucid, .. }) => {
-                            if let Some(res) = state.on_leave_by_ucid(ucid) {
-                                let survival_ms = res.run.survival_ms(Instant::now());
-                                persist_run(&pool, self.session_id, &mut state, &res.run, survival_ms).await?;
-                                let active = state.active_runs_props();
-                                ui.set_global_state(BombGlobalProps { leaderboard: state.leaderboard.clone(), active_runs: active, event_url: event_url.clone() });
+                        Ok(PresenceEvent::Renamed { ucid, new_pname, .. }) => {
+                            if let Some(conn) = connections.get_mut(&ucid) {
+                                conn.pname = new_pname;
                             }
                         },
+                        Ok(PresenceEvent::TakingOver { after, .. }) => {
+                            state.on_toc(after.plid, after.ucid);
+                            let _ = players.insert(after.plid, after);
+                        },
+                        Ok(PresenceEvent::ConnectionDetails(_))
+                        | Ok(PresenceEvent::VehicleSelected { .. })
+                        | Err(_) => {},
+                    }
+                },
+
+                packet = packets.recv() => {
+                    let packet = packet.map_err(|_| SceneError::InsimHandleLost)?;
+                    match packet {
                         insim::Packet::Crs(Crs { plid, .. }) => {
                             if let Some(res) = state.on_reset(plid, Instant::now()) {
                                 insim.send_message(
@@ -341,15 +376,9 @@ where
                             plid,
                             ..
                         }) => {
-                             if let Some(player) = presence.player(&plid).await.map_err(|cause| SceneError::Custom {
-                                scene: "bomb::uco::player",
-                                cause: Box::new(cause),
-                            })?
+                            if let Some(player) = players.get(&plid)
                                 && !player.ptype.is_ai()
-                                && let Some(conn) = presence.connection_by_player(&plid).await.map_err(|cause| SceneError::Custom {
-                                    scene: "bomb::uco::connection",
-                                    cause: Box::new(cause),
-                                })?
+                                && let Some(conn) = connections.get(&player.ucid)
                             {
                                 if let Some(res) = state.on_checkpoint(
                                     conn.uname.clone(),

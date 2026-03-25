@@ -46,7 +46,7 @@ where
     async fn run(self, ctx: &Ctx) -> Result<SceneResult<()>, SceneError> {
         let insim = InsimTask::from_context(ctx);
         let mut game = game::Game::from_context(ctx);
-        let mut presence = presence::Presence::from_context(ctx);
+        let presence = presence::Presence::from_context(ctx);
 
         let mode_name = self.mode_name.clone();
         let (_ui, _ui_handle) = ui::mount(insim.clone(), (), move |_ucid, invalidator| {
@@ -70,7 +70,7 @@ where
                 })?;
                 Ok(SceneResult::Continue(()))
             },
-            res = presence.wait_for_connection_count(|val| *val < self.min_players) => {
+            res = presence.wait_for_connection_count(|val| val < self.min_players) => {
                 let _ = res.map_err(|cause| SceneError::Custom {
                     scene: "setup_track::wait_for_connection_count",
                     cause: Box::new(cause),
