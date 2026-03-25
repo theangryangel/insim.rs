@@ -193,7 +193,7 @@ where
 
     async fn run(self, ctx: &Ctx) -> Result<SceneResult<()>, SceneError> {
         let insim = InsimTask::from_context(ctx);
-        let mut game = game::Game::from_context(ctx);
+        let game = game::Game::from_context(ctx);
         let presence = presence::Presence::from_context(ctx);
         let pool = db::Pool::from_context(ctx);
 

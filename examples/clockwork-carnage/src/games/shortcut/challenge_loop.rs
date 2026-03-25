@@ -276,7 +276,7 @@ struct ChallengeLoopInner {
 }
 
 impl ChallengeLoopInner {
-    async fn run_inner(mut self) -> Result<SceneResult<()>, SceneError> {
+    async fn run_inner(self) -> Result<SceneResult<()>, SceneError> {
         let (ui, _ui_handle) = ui::mount_with(
             self.insim.clone(),
             ChallengeGlobalProps::default(),

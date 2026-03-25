@@ -8,14 +8,16 @@ use insim::{
     insim::{RaceInProgress, RaceLaps, StaFlags, TinyType},
 };
 use tokio::{
-    sync::{mpsc, oneshot, watch},
+    sync::{mpsc, oneshot},
     task::JoinHandle,
+    time,
 };
 
 #[derive(Debug, Default, Clone)]
 /// GameInfo
 pub struct GameInfo {
     track: Option<Track>,
+    layout: Option<String>,
     weather: Option<u8>,
     wind: Option<Wind>,
     racing: RaceInProgress,
@@ -33,6 +35,11 @@ impl GameInfo {
     /// Current track
     pub fn current_track(&self) -> Option<&Track> {
         self.track.as_ref()
+    }
+
+    /// Currently loaded layout name, or `None` if no layout is loaded.
+    pub fn current_layout(&self) -> Option<&str> {
+        self.layout.as_deref()
     }
 
     /// Fetch the weather
@@ -66,6 +73,11 @@ impl GameInfo {
     }
 
     fn sta(&mut self, sta: &insim::insim::Sta) {
+        // Track change clears the layout — clear defensively before Axi arrives.
+        if self.track != Some(sta.track) {
+            self.layout = None;
+        }
+
         self.racing = sta.raceinprog.clone();
         self.qualifying_duration = Duration::from_secs(sta.qualmins as u64 * 60);
         self.race_duration = sta.racelaps;
@@ -77,12 +89,19 @@ impl GameInfo {
         self.flags = sta.flags;
     }
 
+    fn axi(&mut self, axi: &insim::insim::Axi) {
+        self.layout = if axi.lname.is_empty() {
+            None
+        } else {
+            Some(axi.lname.clone())
+        };
+    }
+
     /// Handle packet updates
     pub fn handle_packet(&mut self, packet: &insim::Packet) {
-        #[allow(clippy::single_match)] // we'll come back through to add more support for other
-        // stuff later
         match packet {
             insim::Packet::Sta(sta) => self.sta(sta),
+            insim::Packet::Axi(axi) => self.axi(axi),
             _ => {},
         }
     }
@@ -107,9 +126,6 @@ pub enum GameError {
     #[error("Lost game response channel")]
     ResponseChannelClosed,
 
-    /// Lost game watch channel
-    #[error("Lost game watch channel")]
-    WatchChannelClosed,
 }
 
 /// Spawn a background instance of GameInfo and return a handle so that we can query it
@@ -118,31 +134,30 @@ pub fn spawn(
     capacity: usize,
 ) -> (Game, JoinHandle<Result<(), GameError>>) {
     let (query_tx, mut query_rx) = mpsc::channel(capacity);
-    let (tx, rx) = watch::channel(GameInfo::new());
 
     let handle = tokio::spawn(async move {
         let result: Result<(), GameError> = async {
             let mut packet_rx = insim.subscribe();
+            let mut inner = GameInfo::new();
             let mut query_rx_closed = false;
 
             // Make the relevant background requests that we *must* have. If the user doesnt use
             // spawn it's upto them to handle this.
             insim.send(TinyType::Sst.with_request_id(1)).await?;
+            insim.send(TinyType::Axi.with_request_id(1)).await?;
 
             loop {
                 tokio::select! {
                     packet = packet_rx.recv() => {
                         match packet {
-                            Ok(packet) => {
-                                tx.send_modify(|inner| inner.handle_packet(&packet));
-                            }
+                            Ok(packet) => inner.handle_packet(&packet),
                             Err(_) => return Err(GameError::InsimHandleLost),
                         }
                     }
                     query = query_rx.recv(), if !query_rx_closed => {
                         match query {
                             Some(GameQuery::Get { response_tx }) => {
-                                let _ = response_tx.send(tx.borrow().clone());
+                                let _ = response_tx.send(inner.clone());
                             }
                             None => {
                                 query_rx_closed = true;
@@ -156,13 +171,7 @@ pub fn spawn(
         result
     });
 
-    (
-        Game {
-            query_tx,
-            watch: rx,
-        },
-        handle,
-    )
+    (Game { query_tx }, handle)
 }
 
 #[derive(Debug)]
@@ -173,14 +182,13 @@ enum GameQuery {
 }
 
 #[derive(Debug, Clone)]
-/// Handler for Presence
+/// Handler for game state
 pub struct Game {
     query_tx: mpsc::Sender<GameQuery>,
-    watch: watch::Receiver<GameInfo>,
 }
 
 impl Game {
-    /// Request the game state
+    /// Request the current game state.
     pub async fn get(&self) -> Result<GameInfo, GameError> {
         let (response_tx, rx) = oneshot::channel();
         self.query_tx
@@ -190,44 +198,45 @@ impl Game {
         rx.await.map_err(|_| GameError::ResponseChannelClosed)
     }
 
-    /// Wait for a given state
+    /// Poll until the predicate returns `true`.
     pub async fn wait_for<F: Fn(&GameInfo) -> bool>(
-        &mut self,
+        &self,
         predicate: F,
     ) -> Result<(), GameError> {
-        let _ = self
-            .watch
-            .wait_for(predicate)
-            .await
-            .map_err(|_| GameError::WatchChannelClosed)?;
-        Ok(())
+        let mut interval = time::interval(std::time::Duration::from_millis(500));
+        loop {
+            let _ = interval.tick().await;
+            if predicate(&self.get().await?) {
+                return Ok(());
+            }
+        }
     }
 
-    /// Wait for the end
-    pub async fn wait_for_end(&mut self) -> Result<(), GameError> {
+    /// Wait until the game is no longer in progress.
+    pub async fn wait_for_end(&self) -> Result<(), GameError> {
         self.wait_for(|info| !info.flags.is_in_game() && matches!(info.racing, RaceInProgress::No))
             .await
     }
 
-    /// Wait for track to load
-    pub async fn wait_for_track(&mut self, track: Track) -> Result<(), GameError> {
+    /// Wait until the named layout is confirmed loaded.
+    pub async fn wait_for_layout(&self, layout: &str) -> Result<(), GameError> {
+        self.wait_for(|info| info.layout.as_deref() == Some(layout))
+            .await
+    }
+
+    /// Wait until the given track is loaded and the server is at the selection screen.
+    pub async fn wait_for_track(&self, track: Track) -> Result<(), GameError> {
         self.wait_for(|info| {
             tracing::debug!("waiting for track {:?}", info);
-            if let Some(state_track) = info.track.as_ref()
-                && state_track == &track
+            info.track.as_ref() == Some(&track)
                 && !info.flags.is_in_game()
                 && matches!(info.racing, RaceInProgress::No)
-            {
-                true
-            } else {
-                false
-            }
         })
         .await
     }
 
-    /// Wait for track to load
-    pub async fn wait_for_racing(&mut self) -> Result<(), GameError> {
+    /// Wait until racing is in progress.
+    pub async fn wait_for_racing(&self) -> Result<(), GameError> {
         self.wait_for(|info| {
             tracing::debug!("waiting for racing {:?}", info);
             info.flags.is_in_game() && matches!(info.racing, RaceInProgress::Racing)
@@ -237,7 +246,7 @@ impl Game {
 
     /// Request track rotation
     pub async fn track_rotation(
-        &mut self,
+        &self,
         insim: InsimTask,
         track: Track,
         laps: RaceLaps,
@@ -269,6 +278,8 @@ impl Game {
         if let Some(layout) = layout {
             tracing::info!("Requesting layout load: {}", layout);
             insim.send_command(format!("/axload {layout}")).await?;
+            tracing::info!("Waiting for layout to load: {}", layout);
+            self.wait_for_layout(&layout).await?;
         }
 
         tracing::info!("Waiting for all players to hit ready");
