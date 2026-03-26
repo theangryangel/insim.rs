@@ -45,7 +45,8 @@ impl<'a> DecodeContext<'a> {
         if let Some(start) = start_buf {
             let consumed = start.len() - self.buf.len();
             if consumed > 0 {
-                let display_bytes = HexDisplay(&start.slice(..consumed));
+                let slice = start.slice(..consumed);
+                let display_bytes = HexDisplay(&slice);
                 if is_prim {
                     tracing::trace!(field = name, bytes = %display_bytes, "read");
                 } else {
