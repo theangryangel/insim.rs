@@ -1,8 +1,7 @@
 use std::{default::Default, net::Ipv4Addr};
 
-use bytes::{Buf, BufMut};
 use indexmap::{IndexSet, set::Iter as IndexSetIter};
-use insim_core::{Decode, Encode};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 
 use crate::identifiers::RequestId;
 
@@ -58,13 +57,13 @@ impl Ipb {
 }
 
 impl Decode for Ipb {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf).map_err(|e| e.nested().context("Ipb::reqi"))?;
-        let mut numb = u8::decode(buf).map_err(|e| e.nested().context("Ipb::numb"))?;
-        buf.advance(4);
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let reqi = ctx.decode::<RequestId>("reqi")?;
+        let mut numb = ctx.decode::<u8>("numb")?;
+        ctx.pad("sp0", 4)?;
         let mut banips = IndexSet::with_capacity(numb as usize);
         while numb > 0 {
-            let ip = Ipv4Addr::from(u32::decode(buf).map_err(|e| e.nested().context("Ipb::ip"))?);
+            let ip = Ipv4Addr::from(ctx.decode::<u32>("ip")?);
             let _ = banips.insert(ip);
             numb -= 1;
         }
@@ -74,10 +73,8 @@ impl Decode for Ipb {
 }
 
 impl Encode for Ipb {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi
-            .encode(buf)
-            .map_err(|e| e.nested().context("Ipb::reqi"))?;
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("reqi", &self.reqi)?;
         let numb = self.banips.len();
         if numb > IPB_MAX_BANS {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
@@ -87,14 +84,10 @@ impl Encode for Ipb {
             }
             .context("Ipb::numb"));
         }
-        (numb as u8)
-            .encode(buf)
-            .map_err(|e| e.nested().context("Ipb::numb"))?;
-        buf.put_bytes(0, 4);
+        ctx.encode("numb", &(numb as u8))?;
+        ctx.pad("sp0", 4)?;
         for i in self.banips.iter() {
-            u32::from(*i)
-                .encode(buf)
-                .map_err(|e| e.nested().context("Ipb::ip"))?;
+            ctx.encode("ip", &u32::from(*i))?;
         }
 
         Ok(())

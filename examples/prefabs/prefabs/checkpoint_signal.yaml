@@ -1,0 +1,109 @@
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  x: ThreeQuarter
+  y: ThreeQuarter
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 0
+    z: 16
+  x: ThreeQuarter
+  y: ThreeQuarter
+  height: M2_25
+  heading:
+    radians: 0.0
+- !ConcreteSlabWall
+  xyz:
+    x: 27
+    y: 0
+    z: 16
+  colour: Yellow
+  length: Four
+  pitch: Deg42
+  heading:
+    radians: -1.5707963267948966
+- !ConcreteSlabWall
+  xyz:
+    x: 27
+    y: 0
+    z: 20
+  colour: Red
+  length: Four
+  pitch: Deg42
+  heading:
+    radians: -1.5707963267948966
+- !ConcreteSlabWall
+  xyz:
+    x: 27
+    y: 0
+    z: 24
+  colour: Blue
+  length: Four
+  pitch: Deg42
+  heading:
+    radians: -1.5707963267948966
+- !ChalkLine
+  xyz:
+    x: 72
+    y: 0
+    z: 1
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false
+- !ConcretePillar
+  xyz:
+    x: 144
+    y: 0
+    z: 0
+  x: ThreeQuarter
+  y: ThreeQuarter
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 144
+    y: 0
+    z: 16
+  x: ThreeQuarter
+  y: ThreeQuarter
+  height: M2_25
+  heading:
+    radians: 0.0
+- !ConcreteSlabWall
+  xyz:
+    x: 117
+    y: 0
+    z: 16
+  colour: Yellow
+  length: Four
+  pitch: Deg42
+  heading:
+    radians: 1.5707963267948966
+- !ConcreteSlabWall
+  xyz:
+    x: 117
+    y: 0
+    z: 20
+  colour: Red
+  length: Four
+  pitch: Deg42
+  heading:
+    radians: 1.5707963267948966
+- !ConcreteSlabWall
+  xyz:
+    x: 117
+    y: 0
+    z: 24
+  colour: Blue
+  length: Four
+  pitch: Deg42
+  heading:
+    radians: 1.5707963267948966

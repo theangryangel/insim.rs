@@ -134,7 +134,7 @@ pub fn mount<Cmp, G, C, Make>(
 ) -> (Ui<Cmp::Message, G, C>, JoinHandle<Result<(), UiError>>)
 where
     Cmp: Component + 'static,
-    UiState<G, C>: Into<Cmp::Props>,
+    for<'a> UiState<G, C>: Into<Cmp::Props<'a>>,
     G: Clone + Send + Sync + 'static,
     C: Clone + Send + Sync + Default + 'static,
     Make: FnMut(ConnectionId, InvalidateHandle) -> Cmp + Send + 'static,
@@ -157,7 +157,7 @@ pub fn mount_with<Cmp, G, C, Make, E, F>(
 ) -> (Ui<Cmp::Message, G, C>, JoinHandle<Result<(), UiError>>)
 where
     Cmp: Component + 'static,
-    UiState<G, C>: Into<Cmp::Props>,
+    for<'a> UiState<G, C>: Into<Cmp::Props<'a>>,
     G: Clone + Send + Sync + 'static,
     C: Clone + Send + Sync + Default + 'static,
     Make: FnMut(ConnectionId, InvalidateHandle) -> Cmp + Send + 'static,
@@ -356,7 +356,7 @@ fn spawn_for<Cmp, G, C>(
     invalidation_notify: Arc<Notify>,
 ) where
     Cmp: Component + 'static,
-    UiState<G, C>: Into<Cmp::Props>,
+    for<'a> UiState<G, C>: Into<Cmp::Props<'a>>,
     G: Clone + Send + Sync + 'static,
     C: Clone + Send + Sync + Default + 'static,
 {

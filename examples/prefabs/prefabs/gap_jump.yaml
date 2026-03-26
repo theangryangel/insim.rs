@@ -1,0 +1,56 @@
+- !ConcreteRamp
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  width: Four
+  length: Four
+  height: M1_00
+  heading:
+    radians: 0.0
+- !TyreStack4
+  xyz:
+    x: 64
+    y: -32
+    z: 0
+  colour: Red
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4
+  xyz:
+    x: 64
+    y: 32
+    z: 0
+  colour: Red
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4
+  xyz:
+    x: 128
+    y: -32
+    z: 0
+  colour: Blue
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4
+  xyz:
+    x: 128
+    y: 32
+    z: 0
+  colour: Blue
+  heading:
+    radians: 0.0
+  floating: false
+- !ConcreteRamp
+  xyz:
+    x: 192
+    y: 0
+    z: 0
+  width: Four
+  length: Four
+  height: M1_00
+  heading:
+    radians: 3.141592653589793

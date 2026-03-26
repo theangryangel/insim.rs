@@ -1,0 +1,160 @@
+- !PaintLetters
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  colour: Yellow
+  character: E
+  heading:
+    radians: -2.6998061866787286
+  floating: false
+- !PaintLetters
+  xyz:
+    x: 231
+    y: 110
+    z: 0
+  colour: Yellow
+  character: C
+  heading:
+    radians: -2.6998061866787286
+  floating: false
+- !PaintLetters
+  xyz:
+    x: 14
+    y: 7
+    z: 0
+  colour: Yellow
+  character: G
+  heading:
+    radians: -2.6998061866787286
+  floating: false
+- !PaintLetters
+  xyz:
+    x: 217
+    y: 103
+    z: 0
+  colour: Yellow
+  character: L
+  heading:
+    radians: -2.6998061866787286
+  floating: false
+- !PaintLetters
+  xyz:
+    x: 29
+    y: 13
+    z: 0
+  colour: Yellow
+  character: A
+  heading:
+    radians: -2.6998061866787286
+  floating: false
+- !PaintLetters
+  xyz:
+    x: 202
+    y: 96
+    z: 0
+  colour: Yellow
+  character: O
+  heading:
+    radians: -2.6998061866787286
+  floating: false
+- !PaintLetters
+  xyz:
+    x: 43
+    y: 21
+    z: 0
+  colour: Yellow
+  character: N
+  heading:
+    radians: -2.6998061866787286
+  floating: false
+- !PaintLetters
+  xyz:
+    x: 188
+    y: 89
+    z: 0
+  colour: Yellow
+  character: C
+  heading:
+    radians: -2.6998061866787286
+  floating: false
+- !PaintLetters
+  xyz:
+    x: 58
+    y: 27
+    z: 0
+  colour: Yellow
+  character: R
+  heading:
+    radians: -2.6998061866787286
+  floating: false
+- !PaintLetters
+  xyz:
+    x: 174
+    y: 82
+    z: 0
+  colour: Yellow
+  character: K
+  heading:
+    radians: -2.6998061866787286
+  floating: false
+- !PaintLetters
+  xyz:
+    x: 72
+    y: 34
+    z: 0
+  colour: Yellow
+  character: A
+  heading:
+    radians: -2.6998061866787286
+  floating: false
+- !PaintLetters
+  xyz:
+    x: 159
+    y: 76
+    z: 0
+  colour: Yellow
+  character: W
+  heading:
+    radians: -2.6998061866787286
+  floating: false
+- !PaintLetters
+  xyz:
+    x: 87
+    y: 41
+    z: 0
+  colour: Yellow
+  character: C
+  heading:
+    radians: -2.6998061866787286
+  floating: false
+- !PaintLetters
+  xyz:
+    x: 145
+    y: 68
+    z: 0
+  colour: Yellow
+  character: O
+  heading:
+    radians: -2.6998061866787286
+  floating: false
+- !PaintLetters
+  xyz:
+    x: 130
+    y: 62
+    z: 0
+  colour: Yellow
+  character: R
+  heading:
+    radians: -2.6998061866787286
+  floating: false
+- !PaintLetters
+  xyz:
+    x: 116
+    y: 55
+    z: 0
+  colour: Yellow
+  character: K
+  heading:
+    radians: -2.6998061866787286
+  floating: false

@@ -9,14 +9,29 @@ license.workspace = true
 homepage.workspace = true
 
 [dependencies]
-anyhow = "1.0.86"
+anyhow = "1"
+askama = "0.15"
+axum = "0.8"
+axum-login = "0.18"
 clap = { workspace = true, features = ["derive"] }
 insim = { path = "../../insim", features = ["serde", "blocking"] }
 kitcar = { path = "../../kitcar" }
+oauth2 = { version = "4", features = ["reqwest"] }
+reqwest = { version = "0.12", features = ["json"] }
+serde = { workspace = true, features = ["derive"] }
+toml = "0.8"
+serde_json = "1"
+jiff = "0.2"
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "migrate"] }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "signal", "time", "sync"]}
+tokio-util = { workspace = true }
+tower-sessions = { version = "0.14", features = ["private"] }
+tower-sessions-sqlx-store = { version = "0.15", features = ["sqlite"] }
 tracing = {workspace = true}
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
+rust-embed = "8.11.0"
+mime_guess = "2.0.5"
 
 [lints]
 workspace = true

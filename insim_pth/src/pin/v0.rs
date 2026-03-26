@@ -1,7 +1,6 @@
 //! LFSPIN file, version 0, revision 0
 
-use bytes::Bytes;
-use insim_core::{Decode, Encode};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 
 #[derive(Debug, Default, PartialEq)]
 /// PIN file - Path info file for Live for Speed 0.8A
@@ -26,8 +25,8 @@ pub struct LfsPin {
 }
 
 impl Decode for LfsPin {
-    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
-        let revision = u8::decode(buf)?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let revision = ctx.decode::<u8>("revision")?;
         if revision > 0 {
             return Err(insim_core::DecodeErrorKind::BadMagic {
                 found: Box::new(revision),
@@ -35,16 +34,16 @@ impl Decode for LfsPin {
             .context("LFSPIN unsupported revision"));
         }
 
-        let _reserved = i32::decode(buf)?;
-        let num_configs = u8::decode(buf)?;
-        let _reserved1 = u8::decode(buf)?;
-        let _reserved2 = u8::decode(buf)?;
-        let _reserved3 = u8::decode(buf)?;
+        ctx.pad("reserved", 4)?;
+        let num_configs = ctx.decode::<u8>("num_configs")?;
+        ctx.pad("reserved1", 1)?;
+        ctx.pad("reserved2", 1)?;
+        ctx.pad("reserved3", 1)?;
 
-        let ms_min_x = i32::decode(buf)?;
-        let ms_max_x = i32::decode(buf)?;
-        let ms_min_y = i32::decode(buf)?;
-        let ms_max_y = i32::decode(buf)?;
+        let ms_min_x = ctx.decode::<i32>("ms_min_x")?;
+        let ms_max_x = ctx.decode::<i32>("ms_max_x")?;
+        let ms_min_y = ctx.decode::<i32>("ms_min_y")?;
+        let ms_max_y = ctx.decode::<i32>("ms_max_y")?;
 
         Ok(Self {
             revision,
@@ -58,7 +57,7 @@ impl Decode for LfsPin {
 }
 
 impl Encode for LfsPin {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
         if self.revision > 0 {
             return Err(insim_core::EncodeErrorKind::NoVariantMatch {
                 found: self.revision as u64,
@@ -66,16 +65,16 @@ impl Encode for LfsPin {
             .context("LFSPIN unsupported revision"));
         }
 
-        self.revision.encode(buf)?;
-        0i32.encode(buf)?; // reserved
-        self.num_configs.encode(buf)?;
-        0u8.encode(buf)?; // reserved
-        0u8.encode(buf)?; // reserved
-        0u8.encode(buf)?; // reserved
-        self.ms_min_x.encode(buf)?;
-        self.ms_max_x.encode(buf)?;
-        self.ms_min_y.encode(buf)?;
-        self.ms_max_y.encode(buf)?;
+        ctx.encode("revision", &self.revision)?;
+        ctx.pad("reserved", 4)?;
+        ctx.encode("num_configs", &self.num_configs)?;
+        ctx.pad("reserved1", 1)?;
+        ctx.pad("reserved2", 1)?;
+        ctx.pad("reserved3", 1)?;
+        ctx.encode("ms_min_x", &self.ms_min_x)?;
+        ctx.encode("ms_max_x", &self.ms_max_x)?;
+        ctx.encode("ms_min_y", &self.ms_min_y)?;
+        ctx.encode("ms_max_y", &self.ms_max_y)?;
 
         Ok(())
     }
@@ -100,10 +99,13 @@ mod test {
         };
 
         let mut buf = bytes::BytesMut::new();
-        original.encode(&mut buf).expect("Expected to encode");
+        original
+            .encode(&mut EncodeContext::new(&mut buf))
+            .expect("Expected to encode");
 
-        let mut bytes = Bytes::from(buf);
-        let decoded = LfsPin::decode(&mut bytes).expect("Expected to decode");
+        let mut bytes = bytes::Bytes::from(buf);
+        let decoded =
+            LfsPin::decode(&mut DecodeContext::new(&mut bytes)).expect("Expected to decode");
 
         assert_eq!(original, decoded);
     }

@@ -2,16 +2,19 @@ use insim::{
     core::heading::Heading,
     insim::{BtnStyle, ObjectInfo, PmoAction},
 };
-use kitcar::ui;
+use kitcar::{ui, ui::Component as _};
 
-use super::{OptionsMsg, PrefabSummary, ToolboxProps, options};
+use super::{OptionsMsg, PrefabSummary, ToolboxProps, options, scroll_list};
 use crate::{Command, SpawnOrigin, State, tools};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InspectorTool {
     Prefabs,
     Ramp,
+    Grid,
     Nudge,
+    Mirror,
+    RadialArray,
     Options,
 }
 
@@ -20,7 +23,10 @@ impl InspectorTool {
         match self {
             Self::Prefabs => "Prefabs",
             Self::Ramp => "Ramp Tool",
+            Self::Grid => "Grid Tool",
             Self::Nudge => "Nudge Selection",
+            Self::Mirror => "Mirror Selection",
+            Self::RadialArray => "Radial Array",
             Self::Options => "Options",
         }
     }
@@ -40,25 +46,43 @@ pub enum ToolboxMsg {
     Options(OptionsMsg),
     ReloadYaml,
     SavePrefab(String),
-    SpawnPrefab(usize),
     PaintedTextInput(String),
     RotateInput(String),
+    RotateEachInput(String),
     SplineDistribInput(String),
     ToggleRampMode,
     RampRollInput(String),
     BuildRamp,
+    GridMode(tools::grid::GridMode),
+    GridWidthInput(String),
+    GridRowsInput(String),
+    GridColSpacingInput(String),
+    GridRowSpacingInput(String),
+    GridLateralOffsetInput(String),
+    BuildGrid,
     NudgeDistanceInput(String),
     Nudge(Heading),
     JiggleSelection,
+    ToggleTopDown,
+    ToggleSideView,
+    MirrorX,
+    MirrorY,
+    RadialCountInput(String),
+    RadialRadiusInput(String),
+    RadialArcInput(String),
+    BuildRadialArray,
+    PrefabScroll(scroll_list::ScrollMsg),
+    Undo,
 }
 
 #[derive(Debug, Default)]
 pub struct Toolbox {
     screen: ToolboxScreen,
+    prefab_scroll: scroll_list::ScrollList<super::PrefabSummary>,
 }
 
 impl ui::Component for Toolbox {
-    type Props = ToolboxProps;
+    type Props<'a> = ToolboxProps;
     type Message = ToolboxMsg;
 
     fn update(&mut self, msg: Self::Message) {
@@ -72,18 +96,21 @@ impl ui::Component for Toolbox {
             ToolboxMsg::BackToLauncher => {
                 self.screen = ToolboxScreen::Launcher;
             },
+            ToolboxMsg::PrefabScroll(msg) => {
+                self.prefab_scroll.update(msg);
+            },
             _ => {},
         }
     }
 
-    fn render(&self, props: Self::Props) -> ui::Node<Self::Message> {
+    fn render(&self, props: Self::Props<'_>) -> ui::Node<Self::Message> {
         if !props.ui_visible {
             return ui::empty();
         }
 
         let content = match self.screen {
-            ToolboxScreen::Launcher => launcher_screen(),
-            ToolboxScreen::Inspector(tool) => inspector_screen(tool, &props),
+            ToolboxScreen::Launcher => launcher_screen(&props),
+            ToolboxScreen::Inspector(tool) => inspector_screen(tool, &props, &self.prefab_scroll),
         };
 
         ui::container()
@@ -92,16 +119,6 @@ impl ui::Component for Toolbox {
             .w(170.)
             .pt(7.)
             .items_end()
-            .with_child(if props.display_selection_info {
-                ui::text(
-                    format!("Selection: {} object(s)", props.selection_count),
-                    BtnStyle::style_readonly(),
-                )
-                .w(48.)
-                .h(5.)
-            } else {
-                ui::empty()
-            })
             .with_child(if let Some(compass_text) = props.compass_text.as_ref() {
                 ui::text(compass_text, BtnStyle::style_readonly())
                     .w(48.)
@@ -109,8 +126,53 @@ impl ui::Component for Toolbox {
             } else {
                 ui::empty()
             })
+            .with_child(header_row(&props, self.screen))
             .with_child(content)
     }
+}
+
+fn header_row(props: &ToolboxProps, screen: ToolboxScreen) -> ui::Node<ToolboxMsg> {
+    let sel_text = if props.display_selection_info {
+        format!("Sel: {}", props.selection_count)
+    } else {
+        String::new()
+    };
+
+    let options_style = if screen == ToolboxScreen::Inspector(InspectorTool::Options) {
+        BtnStyle::style_active()
+    } else {
+        BtnStyle::style_interactive()
+    };
+
+    let undo_style = if props.can_undo {
+        BtnStyle::style_interactive()
+    } else {
+        BtnStyle::style_unavailable()
+    };
+
+    ui::container()
+        .flex()
+        .flex_row()
+        .w(48.)
+        .with_child(
+            ui::text(sel_text, BtnStyle::style_readonly())
+                .flex_grow(1.0)
+                .h(5.),
+        )
+        .with_child(
+            ui::clickable("Undo", undo_style, ToolboxMsg::Undo)
+                .w(12.)
+                .h(5.),
+        )
+        .with_child(
+            ui::clickable(
+                "Options",
+                options_style,
+                ToolboxMsg::OpenInspector(InspectorTool::Options),
+            )
+            .w(16.)
+            .h(5.),
+        )
 }
 
 fn launcher_button(label: &'static str, tool: InspectorTool) -> ui::Node<ToolboxMsg> {
@@ -122,12 +184,34 @@ fn launcher_button(label: &'static str, tool: InspectorTool) -> ui::Node<Toolbox
     .h(5.)
 }
 
-fn launcher_screen() -> ui::Node<ToolboxMsg> {
+fn launcher_screen(props: &ToolboxProps) -> ui::Node<ToolboxMsg> {
+    let has_selection = props.selection_count > 0;
+    let selection_btn_style = if has_selection {
+        BtnStyle::style_interactive()
+    } else {
+        BtnStyle::style_unavailable()
+    };
+
+    let mut ramp_tool_btn = launcher_button("Ramp Tool", InspectorTool::Ramp);
+    if !has_selection {
+        *ramp_tool_btn.bstyle_mut() = BtnStyle::style_unavailable();
+    }
+
+    let mut grid_tool_btn = launcher_button("Grid Tool", InspectorTool::Grid);
+    if !has_selection {
+        *grid_tool_btn.bstyle_mut() = BtnStyle::style_unavailable();
+    }
+
+    let mut nudge_selection_btn = launcher_button("Nudge Selection", InspectorTool::Nudge);
+    if !has_selection {
+        *nudge_selection_btn.bstyle_mut() = BtnStyle::style_unavailable();
+    }
+
     ui::container().flex().flex_col().w(48.).with_children([
         launcher_button("Prefabs", InspectorTool::Prefabs),
         ui::typein(
             "Spline Distribution (m)",
-            BtnStyle::style_interactive(),
+            selection_btn_style,
             32,
             ToolboxMsg::SplineDistribInput,
         )
@@ -135,7 +219,7 @@ fn launcher_screen() -> ui::Node<ToolboxMsg> {
         .h(5.),
         ui::typein(
             "Paint Text",
-            BtnStyle::style_interactive(),
+            selection_btn_style,
             64,
             ToolboxMsg::PaintedTextInput,
         )
@@ -143,29 +227,76 @@ fn launcher_screen() -> ui::Node<ToolboxMsg> {
         .h(5.),
         ui::typein(
             "Rotate Selection (deg)",
-            BtnStyle::style_interactive(),
+            selection_btn_style,
             16,
             ToolboxMsg::RotateInput,
         )
         .block()
         .h(5.),
-        launcher_button("Ramp Tool", InspectorTool::Ramp),
-        launcher_button("Nudge Selection", InspectorTool::Nudge),
+        ui::typein(
+            "Rotate Each (deg)",
+            selection_btn_style,
+            16,
+            ToolboxMsg::RotateEachInput,
+        )
+        .block()
+        .h(5.),
+        ramp_tool_btn,
+        grid_tool_btn,
+        nudge_selection_btn,
         ui::clickable(
             "Jiggle Selection",
-            BtnStyle::style_interactive(),
+            selection_btn_style,
             ToolboxMsg::JiggleSelection,
         )
         .h(5.),
-        launcher_button("Options", InspectorTool::Options),
+        {
+            let mut btn = launcher_button("Mirror Selection", InspectorTool::Mirror);
+            if !has_selection {
+                *btn.bstyle_mut() = BtnStyle::style_unavailable();
+            }
+            btn
+        },
+        {
+            let mut btn = launcher_button("Radial Array", InspectorTool::RadialArray);
+            if !has_selection {
+                *btn.bstyle_mut() = BtnStyle::style_unavailable();
+            }
+            btn
+        },
+        ui::clickable(
+            "Top Down View",
+            selection_btn_style,
+            ToolboxMsg::ToggleTopDown,
+        )
+        .h(5.),
+        ui::clickable("Side View", selection_btn_style, ToolboxMsg::ToggleSideView).h(5.),
     ])
 }
 
-fn inspector_screen(tool: InspectorTool, props: &ToolboxProps) -> ui::Node<ToolboxMsg> {
+fn inspector_screen(
+    tool: InspectorTool,
+    props: &ToolboxProps,
+    scroll: &scroll_list::ScrollList<PrefabSummary>,
+) -> ui::Node<ToolboxMsg> {
     let body = match tool {
-        InspectorTool::Prefabs => prefabs_panel(&props.prefabs),
+        InspectorTool::Prefabs => prefabs_panel(&props.prefabs, scroll),
         InspectorTool::Ramp => ramp_panel(props.ramp_mode, props.ramp_roll_degrees),
+        InspectorTool::Grid => grid_panel(
+            props.grid_mode,
+            props.grid_width,
+            props.grid_rows,
+            props.grid_col_spacing,
+            props.grid_row_spacing,
+            props.grid_lateral_offset,
+        ),
         InspectorTool::Nudge => nudge_panel(props.nudge_distance_metres),
+        InspectorTool::Mirror => mirror_panel(),
+        InspectorTool::RadialArray => radial_array_panel(
+            props.radial_count,
+            props.radial_radius_metres,
+            props.radial_arc_degrees,
+        ),
         InspectorTool::Options => {
             options::panel(props.compass_visible, props.display_selection_info)
                 .map(ToolboxMsg::Options)
@@ -198,7 +329,26 @@ fn inspector_screen(tool: InspectorTool, props: &ToolboxProps) -> ui::Node<Toolb
         .with_child(body)
 }
 
-fn prefabs_panel(prefabs: &[PrefabSummary]) -> ui::Node<ToolboxMsg> {
+fn prefabs_panel(
+    prefabs: &[PrefabSummary],
+    scroll: &scroll_list::ScrollList<PrefabSummary>,
+) -> ui::Node<ToolboxMsg> {
+    let scroll_props = scroll_list::ScrollListProps {
+        items: prefabs,
+        render_item: Box::new(|prefab, idx| {
+            ui::clickable(
+                prefab.name.clone(),
+                BtnStyle::style_interactive().align_left(),
+                scroll_list::ScrollMsg::ItemClicked(idx),
+            )
+            .key(format!("prefab-{idx}"))
+            .h(5.)
+        }),
+        filter_item: Box::new(|prefab, filter| {
+            prefab.name.to_lowercase().contains(&filter.to_lowercase())
+        }),
+    };
+
     ui::container()
         .flex()
         .flex_col()
@@ -226,15 +376,7 @@ fn prefabs_panel(prefabs: &[PrefabSummary]) -> ui::Node<ToolboxMsg> {
                     .h(5.),
                 ),
         )
-        .with_children(prefabs.iter().enumerate().map(|(idx, prefab)| {
-            ui::clickable(
-                format!("{} [{}]", prefab.name, prefab.count),
-                BtnStyle::style_interactive().align_left(),
-                ToolboxMsg::SpawnPrefab(idx),
-            )
-            .key(format!("prefab-{idx}"))
-            .h(5.)
-        }))
+        .with_child(scroll.render(scroll_props).map(ToolboxMsg::PrefabScroll))
 }
 
 fn nudge_panel(nudge_distance_metres: f64) -> ui::Node<ToolboxMsg> {
@@ -330,29 +472,114 @@ fn ramp_panel(ramp_mode: tools::ramp::RampMode, ramp_roll_degrees: f64) -> ui::N
         )
 }
 
+fn grid_panel(
+    grid_mode: tools::grid::GridMode,
+    grid_width: usize,
+    grid_rows: usize,
+    grid_col_spacing: f64,
+    grid_row_spacing: f64,
+    grid_lateral_offset: f64,
+) -> ui::Node<ToolboxMsg> {
+    let mode_label = match grid_mode {
+        tools::grid::GridMode::StartGrid => "Mode: Start Grid",
+        tools::grid::GridMode::Pit => "Mode: Pit",
+        tools::grid::GridMode::PitBox => "Mode: Pit Box",
+    };
+
+    ui::container()
+        .flex()
+        .flex_col()
+        .with_child(
+            ui::clickable(
+                mode_label,
+                BtnStyle::style_active(),
+                ToolboxMsg::GridMode(grid_mode.cycled()),
+            )
+            .h(5.),
+        )
+        .with_child(
+            ui::container()
+                .flex()
+                .flex_row()
+                .with_child(
+                    ui::typein(
+                        format!("Width ({grid_width})"),
+                        BtnStyle::style_interactive(),
+                        8,
+                        ToolboxMsg::GridWidthInput,
+                    )
+                    .flex_grow(1.0)
+                    .h(5.),
+                )
+                .with_child(
+                    ui::typein(
+                        format!("Rows ({grid_rows})"),
+                        BtnStyle::style_interactive(),
+                        8,
+                        ToolboxMsg::GridRowsInput,
+                    )
+                    .flex_grow(1.0)
+                    .h(5.),
+                ),
+        )
+        .with_child(
+            ui::container()
+                .flex()
+                .flex_row()
+                .with_child(
+                    ui::typein(
+                        format!("Col Spacing ({grid_col_spacing:.1}m)"),
+                        BtnStyle::style_interactive(),
+                        8,
+                        ToolboxMsg::GridColSpacingInput,
+                    )
+                    .flex_grow(1.0)
+                    .h(5.),
+                )
+                .with_child(
+                    ui::typein(
+                        format!("Row Spacing ({grid_row_spacing:.1}m)"),
+                        BtnStyle::style_interactive(),
+                        8,
+                        ToolboxMsg::GridRowSpacingInput,
+                    )
+                    .flex_grow(1.0)
+                    .h(5.),
+                ),
+        )
+        .with_child(
+            ui::typein(
+                format!("Lateral Offset ({grid_lateral_offset:.1}m)"),
+                BtnStyle::style_interactive(),
+                8,
+                ToolboxMsg::GridLateralOffsetInput,
+            )
+            .block()
+            .h(5.),
+        )
+        .with_child(
+            ui::clickable(
+                "Build Grid",
+                BtnStyle::style_interactive(),
+                ToolboxMsg::BuildGrid,
+            )
+            .h(5.),
+        )
+}
+
 pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
     match msg {
         ToolboxMsg::OpenInspector(_) | ToolboxMsg::BackToLauncher => None,
+        ToolboxMsg::PrefabScroll(scroll_list::ScrollMsg::ItemClicked(idx)) => {
+            if idx >= state.prefabs.entries.len() {
+                return None;
+            }
+            Some(Command::SpawnPrefab(idx))
+        },
+        ToolboxMsg::PrefabScroll(_) => None,
         ToolboxMsg::Options(options_msg) => options::reduce(state, options_msg),
         ToolboxMsg::ReloadYaml => Some(Command::ReloadPrefabs),
         ToolboxMsg::SavePrefab(name) => Some(Command::SavePrefabs(name.trim().to_string())),
-        ToolboxMsg::SpawnPrefab(idx) => {
-            let Some(prefab) = state.prefabs.data.get(idx) else {
-                return None;
-            };
-
-            let anchor = state
-                .selection
-                .first()
-                .map(|obj| *obj.position())
-                .unwrap_or_default();
-
-            Some(Command::SpawnObjects {
-                objects: prefab.place_at_anchor(anchor),
-                action: PmoAction::Selection,
-                origin: SpawnOrigin::Prefab,
-            })
-        },
         ToolboxMsg::PaintedTextInput(text) => {
             let text = text.trim().to_string();
             if text.is_empty() {
@@ -449,6 +676,38 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
                 },
             }
         },
+        ToolboxMsg::RotateEachInput(input) => {
+            let trimmed = input.trim();
+
+            if trimmed.is_empty() {
+                tracing::warn!("rotate each skipped: input is empty");
+                return None;
+            }
+
+            match trimmed.parse::<f64>() {
+                Ok(value) if value.is_finite() => {
+                    match tools::rotate_each::build(&state.selection, value) {
+                        Ok(objects) => Some(Command::SpawnObjects {
+                            objects,
+                            action: PmoAction::AddObjects,
+                            origin: SpawnOrigin::RotateEach { degrees: value },
+                        }),
+                        Err(err) => {
+                            tracing::warn!("rotate each skipped: {err}");
+                            None
+                        },
+                    }
+                },
+                Ok(_) => {
+                    tracing::warn!("rotate each skipped: value must be finite");
+                    None
+                },
+                Err(_) => {
+                    tracing::warn!("rotate each skipped: input is not a number");
+                    None
+                },
+            }
+        },
         ToolboxMsg::ToggleRampMode => {
             state.ramp_mode = state.ramp_mode.toggled();
             tracing::info!(
@@ -508,6 +767,91 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
                 },
             }
         },
+        ToolboxMsg::GridMode(mode) => {
+            state.grid_mode = mode;
+            None
+        },
+        ToolboxMsg::GridWidthInput(input) => {
+            match input.trim().parse::<usize>() {
+                Ok(value) if value > 0 => {
+                    state.grid_width = value;
+                },
+                Ok(_) => tracing::warn!("grid width skipped: must be at least 1"),
+                Err(_) => tracing::warn!("grid width skipped: not a valid integer"),
+            }
+            None
+        },
+        ToolboxMsg::GridRowsInput(input) => {
+            match input.trim().parse::<usize>() {
+                Ok(value) if value > 0 => {
+                    state.grid_rows = value;
+                },
+                Ok(_) => tracing::warn!("grid rows skipped: must be at least 1"),
+                Err(_) => tracing::warn!("grid rows skipped: not a valid integer"),
+            }
+            None
+        },
+        ToolboxMsg::GridColSpacingInput(input) => {
+            match input.trim().parse::<f64>() {
+                Ok(value) if value.is_finite() && value > 0.0 => {
+                    state.grid_col_spacing = value;
+                },
+                Ok(_) => {
+                    tracing::warn!("grid col spacing skipped: must be a positive finite number")
+                },
+                Err(_) => tracing::warn!("grid col spacing skipped: not a number"),
+            }
+            None
+        },
+        ToolboxMsg::GridRowSpacingInput(input) => {
+            match input.trim().parse::<f64>() {
+                Ok(value) if value.is_finite() && value > 0.0 => {
+                    state.grid_row_spacing = value;
+                },
+                Ok(_) => {
+                    tracing::warn!("grid row spacing skipped: must be a positive finite number")
+                },
+                Err(_) => tracing::warn!("grid row spacing skipped: not a number"),
+            }
+            None
+        },
+        ToolboxMsg::GridLateralOffsetInput(input) => {
+            match input.trim().parse::<f64>() {
+                Ok(value) if value.is_finite() => {
+                    state.grid_lateral_offset = value;
+                },
+                Ok(_) => tracing::warn!("grid lateral offset skipped: must be finite"),
+                Err(_) => tracing::warn!("grid lateral offset skipped: not a number"),
+            }
+            None
+        },
+        ToolboxMsg::BuildGrid => {
+            match tools::grid::build(
+                &state.selection,
+                tools::grid::BuildConfig {
+                    mode: state.grid_mode,
+                    width: state.grid_width,
+                    rows: state.grid_rows,
+                    col_spacing: state.grid_col_spacing,
+                    row_spacing: state.grid_row_spacing,
+                    lateral_offset: state.grid_lateral_offset,
+                },
+            ) {
+                Ok(objects) => Some(Command::SpawnObjects {
+                    objects,
+                    action: PmoAction::AddObjects,
+                    origin: SpawnOrigin::Grid {
+                        mode: state.grid_mode,
+                        width: state.grid_width,
+                        rows: state.grid_rows,
+                    },
+                }),
+                Err(err) => {
+                    tracing::warn!("grid skipped: {err}");
+                    None
+                },
+            }
+        },
         ToolboxMsg::NudgeDistanceInput(input) => {
             let trimmed = input.trim();
 
@@ -555,5 +899,180 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
                 })
             }
         },
+        ToolboxMsg::ToggleTopDown => {
+            if state.selection.is_empty() {
+                return None;
+            }
+            tools::camera::get_top_down_view(&state.selection, &state.last_cpp)
+                .map(Command::CameraMove)
+        },
+        ToolboxMsg::ToggleSideView => {
+            if state.selection.is_empty() {
+                return None;
+            }
+
+            tools::camera::get_side_view(&state.selection, &state.last_cpp).map(Command::CameraMove)
+        },
+        ToolboxMsg::MirrorX => {
+            match tools::mirror::build(&state.selection, tools::mirror::MirrorAxis::X) {
+                Ok(objects) => Some(Command::SpawnObjects {
+                    objects,
+                    action: PmoAction::AddObjects,
+                    origin: SpawnOrigin::Mirror {
+                        axis: tools::mirror::MirrorAxis::X,
+                    },
+                }),
+                Err(err) => {
+                    tracing::warn!("mirror skipped: {err}");
+                    None
+                },
+            }
+        },
+        ToolboxMsg::MirrorY => {
+            match tools::mirror::build(&state.selection, tools::mirror::MirrorAxis::Y) {
+                Ok(objects) => Some(Command::SpawnObjects {
+                    objects,
+                    action: PmoAction::AddObjects,
+                    origin: SpawnOrigin::Mirror {
+                        axis: tools::mirror::MirrorAxis::Y,
+                    },
+                }),
+                Err(err) => {
+                    tracing::warn!("mirror skipped: {err}");
+                    None
+                },
+            }
+        },
+        ToolboxMsg::RadialCountInput(input) => {
+            match input.trim().parse::<usize>() {
+                Ok(value) if value >= 2 => {
+                    state.radial_count = value;
+                },
+                Ok(_) => tracing::warn!("radial count skipped: must be at least 2"),
+                Err(_) => tracing::warn!("radial count skipped: not a valid integer"),
+            }
+            None
+        },
+        ToolboxMsg::RadialRadiusInput(input) => {
+            match input.trim().parse::<f64>() {
+                Ok(value) if value.is_finite() && value > 0.0 => {
+                    state.radial_radius_metres = value;
+                },
+                Ok(_) => tracing::warn!("radial radius skipped: must be a positive finite number"),
+                Err(_) => tracing::warn!("radial radius skipped: not a number"),
+            }
+            None
+        },
+        ToolboxMsg::RadialArcInput(input) => {
+            match input.trim().parse::<f64>() {
+                Ok(value) if value.is_finite() && value != 0.0 => {
+                    state.radial_arc_degrees = value;
+                },
+                Ok(_) => tracing::warn!("radial arc skipped: must be a non-zero finite number"),
+                Err(_) => tracing::warn!("radial arc skipped: not a number"),
+            }
+            None
+        },
+        ToolboxMsg::Undo => Some(Command::Undo),
+        ToolboxMsg::BuildRadialArray => {
+            match tools::radial_array::build(
+                &state.selection,
+                state.radial_count,
+                state.radial_radius_metres,
+                state.radial_arc_degrees,
+            ) {
+                Ok(objects) => Some(Command::SpawnObjects {
+                    objects,
+                    action: PmoAction::AddObjects,
+                    origin: SpawnOrigin::RadialArray {
+                        count: state.radial_count,
+                        radius_metres: state.radial_radius_metres,
+                        arc_degrees: state.radial_arc_degrees,
+                    },
+                }),
+                Err(err) => {
+                    tracing::warn!("radial array skipped: {err}");
+                    None
+                },
+            }
+        },
     }
+}
+
+fn mirror_panel() -> ui::Node<ToolboxMsg> {
+    ui::container()
+        .flex()
+        .flex_col()
+        .with_child(ui::text("Flip selection across an axis", BtnStyle::style_readonly()).h(5.))
+        .with_child(
+            ui::container()
+                .flex()
+                .flex_row()
+                .with_child(
+                    ui::clickable(
+                        "Mirror X (left/right)",
+                        BtnStyle::style_interactive(),
+                        ToolboxMsg::MirrorX,
+                    )
+                    .flex_grow(1.0)
+                    .h(5.),
+                )
+                .with_child(
+                    ui::clickable(
+                        "Mirror Y (front/back)",
+                        BtnStyle::style_interactive(),
+                        ToolboxMsg::MirrorY,
+                    )
+                    .flex_grow(1.0)
+                    .h(5.),
+                ),
+        )
+}
+
+fn radial_array_panel(
+    radial_count: usize,
+    radial_radius_metres: f64,
+    radial_arc_degrees: f64,
+) -> ui::Node<ToolboxMsg> {
+    ui::container()
+        .flex()
+        .flex_col()
+        .with_child(
+            ui::typein(
+                format!("Count ({radial_count})"),
+                BtnStyle::style_interactive(),
+                8,
+                ToolboxMsg::RadialCountInput,
+            )
+            .block()
+            .h(5.),
+        )
+        .with_child(
+            ui::typein(
+                format!("Radius ({radial_radius_metres:.1}m)"),
+                BtnStyle::style_interactive(),
+                16,
+                ToolboxMsg::RadialRadiusInput,
+            )
+            .block()
+            .h(5.),
+        )
+        .with_child(
+            ui::typein(
+                format!("Arc ({radial_arc_degrees:.0}\u{00b0})"),
+                BtnStyle::style_interactive(),
+                16,
+                ToolboxMsg::RadialArcInput,
+            )
+            .block()
+            .h(5.),
+        )
+        .with_child(
+            ui::clickable(
+                "Build Array",
+                BtnStyle::style_interactive(),
+                ToolboxMsg::BuildRadialArray,
+            )
+            .h(5.),
+        )
 }

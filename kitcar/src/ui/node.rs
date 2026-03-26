@@ -209,6 +209,22 @@ impl<Msg> Node<Msg> {
         self
     }
 
+    pub fn bstyle(&self) -> Option<&BtnStyle> {
+        match self.kind {
+            NodeKind::Container { ref bstyle, .. } => Some(bstyle),
+            NodeKind::Button { ref bstyle, .. } => Some(bstyle),
+            NodeKind::Empty => None,
+        }
+    }
+
+    pub fn bstyle_mut(&mut self) -> &mut BtnStyle {
+        match self.kind {
+            NodeKind::Container { ref mut bstyle, .. } => bstyle,
+            NodeKind::Button { ref mut bstyle, .. } => bstyle,
+            NodeKind::Empty => unimplemented!("You cannot mutate a bstyle on an Empty node"),
+        }
+    }
+
     pub fn style(&self) -> Option<&taffy::Style> {
         self.style.as_ref()
     }

@@ -1,7 +1,7 @@
 use std::{ops::Deref, time::Duration};
 
 use bitflags::bitflags;
-use insim_core::{Decode, Encode};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 
 use super::{PlcAllowedCarsSet, VtnAction};
 use crate::{
@@ -256,9 +256,9 @@ impl WithRequestId for SmallType {
 }
 
 impl Decode for SmallType {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let discrim = u8::decode(buf)?;
-        let uval = u32::decode(buf)?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let discrim = ctx.decode::<u8>("discrim")?;
+        let uval = ctx.decode::<u32>("uval")?;
         let res = match discrim {
             0 => Self::None,
             1 => Self::Ssp(Duration::from_millis(uval as u64 * 10)),
@@ -284,7 +284,7 @@ impl Decode for SmallType {
 }
 
 impl Encode for SmallType {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
         let (discrim, uval) = match self {
             SmallType::None => (0u8, 0u32),
             SmallType::Ssp(uval) => (1u8, uval.as_millis() as u32 / 10),
@@ -300,8 +300,8 @@ impl Encode for SmallType {
             SmallType::Aii(plid) => (11u8, (*plid.deref() as u32)),
         };
 
-        discrim.encode(buf)?;
-        uval.encode(buf)?;
+        ctx.encode("discrim", &discrim)?;
+        ctx.encode("uval", &uval)?;
         Ok(())
     }
 }

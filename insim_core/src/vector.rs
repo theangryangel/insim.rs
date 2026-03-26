@@ -26,20 +26,19 @@ impl From<Vector> for glam::Vec3 {
 }
 
 impl Decode for Vector {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
+    fn decode(ctx: &mut crate::DecodeContext) -> Result<Self, crate::DecodeError> {
         Ok(Self(
-            f32::decode(buf)?,
-            f32::decode(buf)?,
-            f32::decode(buf)?,
+            ctx.decode::<f32>("0")?,
+            ctx.decode::<f32>("1")?,
+            ctx.decode::<f32>("2")?,
         ))
     }
 }
 
 impl Encode for Vector {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodeError> {
-        self.0.encode(buf)?;
-        self.1.encode(buf)?;
-        self.2.encode(buf)?;
-        Ok(())
+    fn encode(&self, ctx: &mut crate::EncodeContext) -> Result<(), crate::EncodeError> {
+        ctx.encode("0", &self.0)?;
+        ctx.encode("1", &self.1)?;
+        ctx.encode("2", &self.2)
     }
 }

@@ -76,11 +76,11 @@ macro_rules! define_packet {
         }
 
         impl Decode for Packet {
-            fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-                let discriminator = u8::decode(buf)?;
+            fn decode(ctx: &mut insim_core::DecodeContext) -> Result<Self, insim_core::DecodeError> {
+                let discriminator = ctx.decode::<u8>("discriminator")?;
                 match discriminator {
                     $(
-                        $disc => Ok(Self::$variant(<$variant>::decode(buf)?)),
+                        $disc => Ok(Self::$variant(<$variant>::decode(ctx)?)),
                     )*
                     i => {
                         #[cfg(feature = "allow-unknown-packet")]
@@ -88,7 +88,7 @@ macro_rules! define_packet {
                             Ok(Self::Unknown(
                                 Raw {
                                     discriminator: i,
-                                    data: buf.clone(),
+                                    data: ctx.buf.clone(),
                                 }
                             ))
                         }
@@ -105,18 +105,18 @@ macro_rules! define_packet {
         }
 
         impl Encode for Packet {
-            fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+            fn encode(&self, ctx: &mut insim_core::EncodeContext) -> Result<(), insim_core::EncodeError> {
                 match self {
                     $(
                         Self::$variant(inner) => {
-                            ($disc as u8).encode(buf)?;
-                            inner.encode(buf)?;
+                            ctx.encode("discriminator", &($disc as u8))?;
+                            inner.encode(ctx)?;
                         },
                     )*
                     #[cfg(feature = "allow-unknown-packet")]
                     Self::Unknown(Raw { discriminator, data }) => {
-                        discriminator.encode(buf)?;
-                        buf.extend_from_slice(&data);
+                        ctx.encode("discriminator", discriminator)?;
+                        ctx.buf.extend_from_slice(&data);
                     },
                 }
                 Ok(())
@@ -356,7 +356,7 @@ impl Packet {
 #[cfg(test)]
 mod test {
     use bytes::Bytes;
-    use insim_core::Decode;
+    use insim_core::{Decode, DecodeContext};
 
     use super::Packet;
 
@@ -373,7 +373,8 @@ mod test {
         use super::Raw;
 
         let mut buf = Bytes::from_static(&[255, 1]);
-        let res = Packet::decode(&mut buf)
+        let mut ctx = DecodeContext::new(&mut buf);
+        let res = Packet::decode(&mut ctx)
             .expect("Expected to handle unknown packet with allow-unknown-packet feature enabled`");
         assert!(matches!(
             res,
@@ -388,7 +389,8 @@ mod test {
     #[test]
     fn test_unknown_packet() {
         let mut buf = Bytes::from_static(&[255, 1]);
-        let res = Packet::decode(&mut buf);
+        let mut ctx = DecodeContext::new(&mut buf);
+        let res = Packet::decode(&mut ctx);
         assert!(res.is_err());
     }
 }

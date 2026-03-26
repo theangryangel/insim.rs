@@ -3,13 +3,13 @@ use std::time::Duration;
 
 use insim::{
     WithRequestId,
-    builder::InsimTask,
     core::{track::Track, wind::Wind},
     insim::{RaceInProgress, RaceLaps, StaFlags, TinyType},
 };
 use tokio::{
-    sync::{mpsc, oneshot, watch},
+    sync::{mpsc, oneshot},
     task::JoinHandle,
+    time,
 };
 
 #[derive(Debug, Default, Clone)]
@@ -79,11 +79,8 @@ impl GameInfo {
 
     /// Handle packet updates
     pub fn handle_packet(&mut self, packet: &insim::Packet) {
-        #[allow(clippy::single_match)] // we'll come back through to add more support for other
-        // stuff later
-        match packet {
-            insim::Packet::Sta(sta) => self.sta(sta),
-            _ => {},
+        if let insim::Packet::Sta(sta) = packet {
+            self.sta(sta)
         }
     }
 }
@@ -106,10 +103,55 @@ pub enum GameError {
     /// Lost game response channel
     #[error("Lost game response channel")]
     ResponseChannelClosed,
+}
 
-    /// Lost game watch channel
-    #[error("Lost game watch channel")]
-    WatchChannelClosed,
+#[derive(Debug)]
+enum GameMessage {
+    Get {
+        response_tx: oneshot::Sender<GameInfo>,
+    },
+    End {
+        response_tx: oneshot::Sender<Result<(), GameError>>,
+    },
+    ChangeTrack {
+        track: Track,
+        response_tx: oneshot::Sender<Result<(), GameError>>,
+    },
+    ChangeLaps {
+        laps: RaceLaps,
+        response_tx: oneshot::Sender<Result<(), GameError>>,
+    },
+    ChangeWind {
+        wind: u8,
+        response_tx: oneshot::Sender<Result<(), GameError>>,
+    },
+    AxClear {
+        response_tx: oneshot::Sender<Result<(), GameError>>,
+    },
+    AxLoad {
+        layout: String,
+        response_tx: oneshot::Sender<Result<(), GameError>>,
+    },
+    Restart {
+        response_tx: oneshot::Sender<Result<(), GameError>>,
+    },
+    Qualify {
+        response_tx: oneshot::Sender<Result<(), GameError>>,
+    },
+    Reinit {
+        response_tx: oneshot::Sender<Result<(), GameError>>,
+    },
+    ChangeWeather {
+        weather: u8,
+        response_tx: oneshot::Sender<Result<(), GameError>>,
+    },
+    ChangeQual {
+        minutes: u8,
+        response_tx: oneshot::Sender<Result<(), GameError>>,
+    },
+    PitAll {
+        response_tx: oneshot::Sender<Result<(), GameError>>,
+    },
 }
 
 /// Spawn a background instance of GameInfo and return a handle so that we can query it
@@ -117,13 +159,13 @@ pub fn spawn(
     insim: insim::builder::InsimTask,
     capacity: usize,
 ) -> (Game, JoinHandle<Result<(), GameError>>) {
-    let (query_tx, mut query_rx) = mpsc::channel(capacity);
-    let (tx, rx) = watch::channel(GameInfo::new());
+    let (tx, mut rx) = mpsc::channel(capacity);
 
     let handle = tokio::spawn(async move {
         let result: Result<(), GameError> = async {
             let mut packet_rx = insim.subscribe();
-            let mut query_rx_closed = false;
+            let mut inner = GameInfo::new();
+            let mut rx_closed = false;
 
             // Make the relevant background requests that we *must* have. If the user doesnt use
             // spawn it's upto them to handle this.
@@ -133,19 +175,96 @@ pub fn spawn(
                 tokio::select! {
                     packet = packet_rx.recv() => {
                         match packet {
-                            Ok(packet) => {
-                                tx.send_modify(|inner| inner.handle_packet(&packet));
-                            }
+                            Ok(packet) => inner.handle_packet(&packet),
                             Err(_) => return Err(GameError::InsimHandleLost),
                         }
                     }
-                    query = query_rx.recv(), if !query_rx_closed => {
-                        match query {
-                            Some(GameQuery::Get { response_tx }) => {
-                                let _ = response_tx.send(tx.borrow().clone());
+                    msg = rx.recv(), if !rx_closed => {
+                        match msg {
+                            Some(GameMessage::Get { response_tx }) => {
+                                let _ = response_tx.send(inner.clone());
+                            }
+                            Some(GameMessage::End { response_tx }) => {
+                                let res = insim.send_command("/end").await.map_err(GameError::from);
+                                let _ = response_tx.send(res);
+                            }
+                            Some(GameMessage::ChangeTrack { track, response_tx }) => {
+                                let res = insim
+                                    .send_command(format!("/track {track}"))
+                                    .await
+                                    .map_err(GameError::from);
+                                let _ = response_tx.send(res);
+                            }
+                            Some(GameMessage::ChangeLaps { laps, response_tx }) => {
+
+                                let cmd = match laps {
+                                    RaceLaps::Untimed => "/laps no".to_string(),
+                                    RaceLaps::Hours(h) => format!("/hours {h}"),
+                                    o => format!("/laps {}", Into::<u8>::into(o)),
+                                };
+
+                                let res = insim
+                                    .send_command(cmd)
+                                    .await
+                                    .map_err(GameError::from);
+                                let _ = response_tx.send(res);
+                            }
+                            Some(GameMessage::ChangeWind { wind, response_tx }) => {
+                                let res = insim
+                                    .send_command(format!("/wind {wind}"))
+                                    .await
+                                    .map_err(GameError::from);
+                                let _ = response_tx.send(res);
+                            }
+                            Some(GameMessage::AxClear { response_tx }) => {
+                                let res = insim
+                                    .send_command("/axclear")
+                                    .await
+                                    .map_err(GameError::from);
+                                let _ = response_tx.send(res);
+                            }
+                            Some(GameMessage::AxLoad { layout, response_tx }) => {
+                                let res = insim
+                                    .send_command(format!("/axload {layout}"))
+                                    .await
+                                    .map_err(GameError::from);
+                                let _ = response_tx.send(res);
+                            }
+                            Some(GameMessage::Restart { response_tx }) => {
+                                let res = insim.send_command("/restart").await.map_err(GameError::from);
+                                let _ = response_tx.send(res);
+                            }
+                            Some(GameMessage::Qualify { response_tx }) => {
+                                let res = insim.send_command("/qualify").await.map_err(GameError::from);
+                                let _ = response_tx.send(res);
+                            }
+                            Some(GameMessage::Reinit { response_tx }) => {
+                                let res = insim.send_command("/reinit").await.map_err(GameError::from);
+                                let _ = response_tx.send(res);
+                            }
+                            Some(GameMessage::ChangeWeather { weather, response_tx }) => {
+                                let res = insim
+                                    .send_command(format!("/weather {weather}"))
+                                    .await
+                                    .map_err(GameError::from);
+                                let _ = response_tx.send(res);
+                            }
+                            Some(GameMessage::ChangeQual { minutes, response_tx }) => {
+                                let res = insim
+                                    .send_command(format!("/qual {minutes}"))
+                                    .await
+                                    .map_err(GameError::from);
+                                let _ = response_tx.send(res);
+                            }
+                            Some(GameMessage::PitAll { response_tx }) => {
+                                let res = insim
+                                    .send_command("/pit_all")
+                                    .await
+                                    .map_err(GameError::from);
+                                let _ = response_tx.send(res);
                             }
                             None => {
-                                query_rx_closed = true;
+                                rx_closed = true;
                             }
                         }
                     }
@@ -156,78 +275,170 @@ pub fn spawn(
         result
     });
 
-    (
-        Game {
-            query_tx,
-            watch: rx,
-        },
-        handle,
-    )
-}
-
-#[derive(Debug)]
-enum GameQuery {
-    Get {
-        response_tx: oneshot::Sender<GameInfo>,
-    },
+    (Game { tx }, handle)
 }
 
 #[derive(Debug, Clone)]
-/// Handler for Presence
+/// Handler for game state
 pub struct Game {
-    query_tx: mpsc::Sender<GameQuery>,
-    watch: watch::Receiver<GameInfo>,
+    tx: mpsc::Sender<GameMessage>,
 }
 
 impl Game {
-    /// Request the game state
+    async fn send_command(
+        &self,
+        msg: GameMessage,
+        rx: oneshot::Receiver<Result<(), GameError>>,
+    ) -> Result<(), GameError> {
+        self.tx
+            .send(msg)
+            .await
+            .map_err(|_| GameError::QueryChannelClosed)?;
+        rx.await.map_err(|_| GameError::ResponseChannelClosed)?
+    }
+
+    /// Request the current game state.
     pub async fn get(&self) -> Result<GameInfo, GameError> {
         let (response_tx, rx) = oneshot::channel();
-        self.query_tx
-            .send(GameQuery::Get { response_tx })
+        self.tx
+            .send(GameMessage::Get { response_tx })
             .await
             .map_err(|_| GameError::QueryChannelClosed)?;
         rx.await.map_err(|_| GameError::ResponseChannelClosed)
     }
 
-    /// Wait for a given state
-    pub async fn wait_for<F: Fn(&GameInfo) -> bool>(
-        &mut self,
-        predicate: F,
-    ) -> Result<(), GameError> {
-        let _ = self
-            .watch
-            .wait_for(predicate)
+    /// Send the `/end` command.
+    pub async fn end(&self) -> Result<(), GameError> {
+        let (response_tx, rx) = oneshot::channel();
+        self.send_command(GameMessage::End { response_tx }, rx)
             .await
-            .map_err(|_| GameError::WatchChannelClosed)?;
-        Ok(())
     }
 
-    /// Wait for the end
-    pub async fn wait_for_end(&mut self) -> Result<(), GameError> {
+    /// Send a track change command.
+    pub async fn change_track(&self, track: Track) -> Result<(), GameError> {
+        let (response_tx, rx) = oneshot::channel();
+        self.send_command(GameMessage::ChangeTrack { track, response_tx }, rx)
+            .await
+    }
+
+    /// Send a laps change command.
+    pub async fn change_laps(&self, laps: RaceLaps) -> Result<(), GameError> {
+        let (response_tx, rx) = oneshot::channel();
+        self.send_command(GameMessage::ChangeLaps { laps, response_tx }, rx)
+            .await
+    }
+
+    /// Send a wind change command.
+    pub async fn change_wind(&self, wind: u8) -> Result<(), GameError> {
+        let (response_tx, rx) = oneshot::channel();
+        self.send_command(GameMessage::ChangeWind { wind, response_tx }, rx)
+            .await
+    }
+
+    /// Clear the autocross layout.
+    pub async fn ax_clear(&self) -> Result<(), GameError> {
+        let (response_tx, rx) = oneshot::channel();
+        self.send_command(GameMessage::AxClear { response_tx }, rx)
+            .await
+    }
+
+    /// Start a race.
+    pub async fn restart(&self) -> Result<(), GameError> {
+        let (response_tx, rx) = oneshot::channel();
+        self.send_command(GameMessage::Restart { response_tx }, rx)
+            .await
+    }
+
+    /// Start qualifying.
+    pub async fn qualify(&self) -> Result<(), GameError> {
+        let (response_tx, rx) = oneshot::channel();
+        self.send_command(GameMessage::Qualify { response_tx }, rx)
+            .await
+    }
+
+    /// Total restart — removes all connections.
+    pub async fn reinit(&self) -> Result<(), GameError> {
+        let (response_tx, rx) = oneshot::channel();
+        self.send_command(GameMessage::Reinit { response_tx }, rx)
+            .await
+    }
+
+    /// Set weather/lighting.
+    pub async fn change_weather(&self, weather: u8) -> Result<(), GameError> {
+        let (response_tx, rx) = oneshot::channel();
+        self.send_command(
+            GameMessage::ChangeWeather {
+                weather,
+                response_tx,
+            },
+            rx,
+        )
+        .await
+    }
+
+    /// Set qualifying duration in minutes. 0 = no qualifying.
+    pub async fn change_qual(&self, minutes: u8) -> Result<(), GameError> {
+        let (response_tx, rx) = oneshot::channel();
+        self.send_command(
+            GameMessage::ChangeQual {
+                minutes,
+                response_tx,
+            },
+            rx,
+        )
+        .await
+    }
+
+    /// Pit all
+    pub async fn pit_all(&self) -> Result<(), GameError> {
+        let (response_tx, rx) = oneshot::channel();
+        self.send_command(GameMessage::PitAll { response_tx }, rx)
+            .await
+    }
+
+    /// Load an autocross layout.
+    pub async fn ax_load(&self, layout: impl Into<String>) -> Result<(), GameError> {
+        let (response_tx, rx) = oneshot::channel();
+        self.send_command(
+            GameMessage::AxLoad {
+                layout: layout.into(),
+                response_tx,
+            },
+            rx,
+        )
+        .await
+    }
+
+    /// Poll until the predicate returns `true`.
+    pub async fn wait_for<F: Fn(&GameInfo) -> bool>(&self, predicate: F) -> Result<(), GameError> {
+        let mut interval = time::interval(std::time::Duration::from_millis(500));
+        loop {
+            let _ = interval.tick().await;
+            if predicate(&self.get().await?) {
+                return Ok(());
+            }
+        }
+    }
+
+    /// Wait until the game is no longer in progress.
+    pub async fn wait_for_end(&self) -> Result<(), GameError> {
         self.wait_for(|info| !info.flags.is_in_game() && matches!(info.racing, RaceInProgress::No))
             .await
     }
 
-    /// Wait for track to load
-    pub async fn wait_for_track(&mut self, track: Track) -> Result<(), GameError> {
+    /// Wait until the given track is loaded and the server is at the selection screen.
+    pub async fn wait_for_track(&self, track: Track) -> Result<(), GameError> {
         self.wait_for(|info| {
             tracing::debug!("waiting for track {:?}", info);
-            if let Some(state_track) = info.track.as_ref()
-                && state_track == &track
+            info.track.as_ref() == Some(&track)
                 && !info.flags.is_in_game()
                 && matches!(info.racing, RaceInProgress::No)
-            {
-                true
-            } else {
-                false
-            }
         })
         .await
     }
 
-    /// Wait for track to load
-    pub async fn wait_for_racing(&mut self) -> Result<(), GameError> {
+    /// Wait until racing is in progress.
+    pub async fn wait_for_racing(&self) -> Result<(), GameError> {
         self.wait_for(|info| {
             tracing::debug!("waiting for racing {:?}", info);
             info.flags.is_in_game() && matches!(info.racing, RaceInProgress::Racing)
@@ -237,8 +448,7 @@ impl Game {
 
     /// Request track rotation
     pub async fn track_rotation(
-        &mut self,
-        insim: InsimTask,
+        &self,
         track: Track,
         laps: RaceLaps,
         wind: u8,
@@ -248,27 +458,25 @@ impl Game {
 
         if current.track != Some(track) {
             tracing::info!("/end");
-            insim.send_command("/end").await?;
+            self.end().await?;
             tracing::info!("waiting for track selection screen");
             self.wait_for_end().await?;
 
             tracing::info!("Requesting track change");
-            insim.send_command(format!("/track {track}")).await?;
+            self.change_track(track).await?;
         }
 
-        let laps: u8 = laps.into();
-
         tracing::info!("Requesting laps change");
-        insim.send_command(format!("/laps {laps}")).await?;
+        self.change_laps(laps).await?;
 
         tracing::info!("Requesting wind change");
-        insim.send_command(format!("/wind {wind}")).await?;
+        self.change_wind(wind).await?;
 
-        insim.send_command("/axclear").await?;
+        self.ax_clear().await?;
 
         if let Some(layout) = layout {
             tracing::info!("Requesting layout load: {}", layout);
-            insim.send_command(format!("/axload {layout}")).await?;
+            self.ax_load(&layout).await?;
         }
 
         tracing::info!("Waiting for all players to hit ready");

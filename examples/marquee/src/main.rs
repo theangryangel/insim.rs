@@ -5,6 +5,7 @@ use std::{
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use tracing_subscriber::fmt::format::FmtSpan;
 
 #[derive(Debug, Subcommand)]
 enum Mode {
@@ -390,6 +391,7 @@ fn setup_tracing_subscriber() {
                 .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
                 .from_env_lossy(),
         )
+        .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
         .init();
 }
 

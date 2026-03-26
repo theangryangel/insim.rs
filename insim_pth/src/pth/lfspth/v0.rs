@@ -1,7 +1,6 @@
 //! LFSPATH file, version 0, revision <= 0
 
-use bytes::Bytes;
-use insim_core::{Decode, Encode};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 
 use crate::node::Node;
 
@@ -19,8 +18,8 @@ pub struct LfsPth {
 }
 
 impl Decode for LfsPth {
-    fn decode(buf: &mut Bytes) -> Result<Self, insim_core::DecodeError> {
-        let revision = u8::decode(buf)?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let revision = ctx.decode::<u8>("revision")?;
         if revision > 0 {
             return Err(insim_core::DecodeErrorKind::OutOfRange {
                 min: 0,
@@ -29,10 +28,10 @@ impl Decode for LfsPth {
             }
             .context("LFSPTH unsupported revision"));
         }
-        let num_nodes = i32::decode(buf)?;
-        let finish_line_node = i32::decode(buf)?;
+        let num_nodes = ctx.decode::<i32>("num_nodes")?;
+        let finish_line_node = ctx.decode::<i32>("finish_line_node")?;
         let nodes: Vec<_> = (0..num_nodes)
-            .map(|_| Node::decode(buf))
+            .map(|_| ctx.decode::<Node>("node"))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(Self {
             revision,
@@ -43,7 +42,7 @@ impl Decode for LfsPth {
 }
 
 impl Encode for LfsPth {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
         if self.revision > 0 {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
                 min: 0,
@@ -52,7 +51,7 @@ impl Encode for LfsPth {
             }
             .context("LFSPTH unsupported revision"));
         }
-        self.revision.encode(buf)?;
+        ctx.encode("revision", &self.revision)?;
         if self.nodes.len() > (i32::MAX as usize) {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
                 min: 0,
@@ -61,10 +60,10 @@ impl Encode for LfsPth {
             }
             .context("LFSPTH too many nodes"));
         }
-        (self.nodes.len() as i32).encode(buf)?;
-        self.finish_line_node.encode(buf)?;
+        ctx.encode("num_nodes", &(self.nodes.len() as i32))?;
+        ctx.encode("finish_line_node", &self.finish_line_node)?;
         for i in self.nodes.iter() {
-            i.encode(buf)?;
+            ctx.encode("node", i)?;
         }
         Ok(())
     }

@@ -50,13 +50,13 @@ bitflags::bitflags! {
 }
 
 impl crate::Encode for DashLights {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodeError> {
-        self.bits().encode(buf)
+    fn encode(&self, ctx: &mut crate::EncodeContext) -> Result<(), crate::EncodeError> {
+        ctx.encode("bits", &self.bits())
     }
 }
 
 impl crate::Decode for DashLights {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
-        Ok(Self::from_bits_truncate(u32::decode(buf)?))
+    fn decode(ctx: &mut crate::DecodeContext) -> Result<Self, crate::DecodeError> {
+        ctx.decode::<u32>("bits").map(Self::from_bits_truncate)
     }
 }

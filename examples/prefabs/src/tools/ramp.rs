@@ -1,7 +1,5 @@
-use std::cmp::Ordering;
-
 use anyhow::{Result, ensure};
-use glam::{DVec2, DVec3};
+use glam::DVec3;
 use insim::{
     core::{
         heading::Heading,
@@ -15,11 +13,13 @@ use insim::{
     insim::ObjectInfo,
 };
 
+use super::spline;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RampMode {
     #[default]
-    AlongPath,
-    AcrossPath,
+    AlongPath, // Classic track surface: uses wedges and flat slabs
+    AcrossPath, // Banked surface: sideways slabs with dynamic easing and overlapping
 }
 
 impl RampMode {
@@ -48,27 +48,6 @@ impl Default for BuildConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-struct LutEntry {
-    t: f64,
-    distance: f64,
-    tangent: DVec3,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct Candidate {
-    target_position: DVec3,
-    travel_heading: Heading,
-    travel_rise_metres: f64,
-    piece: Piece,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum Piece {
-    Slab { heading: Heading, pitch_step: u8 },
-    Ramp { heading: Heading, height_step: u8 },
-}
-
 pub fn build(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<ObjectInfo>> {
     ensure!(
         selection.len() >= 2,
@@ -80,12 +59,6 @@ pub fn build(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Object
     );
 
     let prototype = prototype_slab(selection);
-    let spacing_metres = concrete_width_length_metres(prototype.length);
-    ensure!(
-        spacing_metres > 0.0,
-        "prototype slab length must be positive"
-    );
-
     let steps_per_segment = config.steps_per_segment.unwrap_or(100).max(1);
 
     let first = selection
@@ -102,306 +75,158 @@ pub fn build(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Object
     points.extend(selection.iter().map(|obj| obj.position().to_dvec3_metres()));
     points.push(last);
 
-    let interpolate = |pts: &[DVec3], t_norm: f64| -> DVec3 {
-        let alpha = 0.5;
-        let dt0 = pts[0].distance(pts[1]).powf(alpha);
-        let dt1 = pts[1].distance(pts[2]).powf(alpha);
-        let dt2 = pts[2].distance(pts[3]).powf(alpha);
-
-        let t1 = dt0;
-        let t2 = t1 + dt1;
-        let t3 = t2 + dt2;
-
-        if dt1 < f64::EPSILON {
-            return pts[1];
-        }
-
-        let target_t = t1 + t_norm * (t2 - t1);
-        let lerp = |a: DVec3, b: DVec3, ta: f64, tb: f64| {
-            if (tb - ta).abs() < f64::EPSILON {
-                a
-            } else {
-                (tb - target_t) / (tb - ta) * a + (target_t - ta) / (tb - ta) * b
-            }
-        };
-
-        let a1 = lerp(pts[0], pts[1], 0.0, t1);
-        let a2 = lerp(pts[1], pts[2], t1, t2);
-        let a3 = lerp(pts[2], pts[3], t2, t3);
-        let b1 = lerp(a1, a2, 0.0, t2);
-        let b2 = lerp(a2, a3, t1, t3);
-        lerp(b1, b2, t1, t2)
-    };
-
-    let mut lut = Vec::with_capacity((points.len() - 3) * steps_per_segment + 1);
-    let mut total_len = 0.0;
-    let mut prev_pos = points[1];
-
-    let prototype_forward = heading_to_forward(prototype.heading);
-    let mut last_tangent =
-        normalize_or_fallback(points[2] - points[1], prototype_forward.extend(0.0));
-    lut.push(LutEntry {
-        t: 0.0,
-        distance: 0.0,
-        tangent: last_tangent,
-    });
-
-    for i in 0..points.len() - 3 {
-        let seg = &points[i..i + 4];
-        for s in 1..=steps_per_segment {
-            let t_local = s as f64 / steps_per_segment as f64;
-            let pos = interpolate(seg, t_local);
-            let delta = pos - prev_pos;
-            let dist_xy = delta.truncate().length();
-
-            if dist_xy > f64::EPSILON {
-                total_len += dist_xy;
-                last_tangent = normalize_or_fallback(delta, last_tangent);
-                lut.push(LutEntry {
-                    t: i as f64 + t_local,
-                    distance: total_len,
-                    tangent: last_tangent,
-                });
-            }
-
-            prev_pos = pos;
-        }
-    }
+    let initial_tangent = spline::normalize_or_fallback(
+        points[2] - points[1],
+        spline::heading_to_forward(prototype.heading).extend(0.0),
+    );
+    let (lut, total_len) = spline::build_lut(&points, steps_per_segment, initial_tangent);
 
     ensure!(
         total_len > f64::EPSILON,
         "guide points produce zero horizontal path length"
     );
 
-    let num_objects = (total_len / spacing_metres).ceil() as usize + 1;
-    let mut candidates = Vec::with_capacity(num_objects);
-    let mut fallback_heading = prototype.heading;
-
-    for i in 0..num_objects {
-        let d_target = (i as f64 * spacing_metres).min(total_len);
-        let entry = sample_lut(&lut, d_target);
-
-        let max_seg_idx = points.len() - 4;
+    let get_spline_pos = |d_target: f64| -> DVec3 {
+        let entry = spline::sample_lut(&lut, d_target);
+        let max_seg_idx = points.len().saturating_sub(4);
         let mut seg_idx = entry.t.floor() as usize;
         let mut local_t = entry.t.fract();
         if seg_idx > max_seg_idx {
             seg_idx = max_seg_idx;
             local_t = 1.0;
         }
+        spline::catmull_rom(&points[seg_idx..seg_idx + 4], local_t)
+    };
 
-        let pos = interpolate(&points[seg_idx..seg_idx + 4], local_t);
-        let tangent = normalize_or_fallback(
-            entry.tangent,
-            heading_to_forward(fallback_heading).extend(0.0),
-        );
-        let path_heading = heading_from_vec2_or_fallback(tangent.truncate(), fallback_heading);
+    let mut output = Vec::new();
+    let mut current_distance = 0.0;
+    let mut current_seam = get_spline_pos(0.0);
 
-        let piece = match config.mode {
+    let initial_next = get_spline_pos(total_len.min(0.1));
+    let mut prev_heading = spline::heading_from_vec2_or_fallback(
+        (initial_next - current_seam).truncate(),
+        prototype.heading,
+    );
+
+    let current_bank_angle = match config.mode {
+        RampMode::AlongPath => 0.0,
+        RampMode::AcrossPath => config.roll_degrees,
+    };
+
+    while current_distance < total_len {
+        // --- SPACING ---
+        let base_step = match config.mode {
+            RampMode::AlongPath => concrete_width_length_metres(prototype.length),
+            RampMode::AcrossPath => concrete_width_length_metres(prototype.width),
+        };
+
+        let step_metres = match config.mode {
             RampMode::AlongPath => {
-                let horizontal = tangent.truncate().length();
-                let slope_degrees = if horizontal <= f64::EPSILON {
-                    0.0
-                } else {
-                    tangent.z.atan2(horizontal).to_degrees()
-                };
-
-                let rise_metres = slope_degrees.abs().to_radians().tan() * spacing_metres;
-                let height_step = quantize_height_step(rise_metres);
-
-                if height_step == 0 {
-                    Piece::Slab {
-                        heading: path_heading,
-                        pitch_step: 0,
-                    }
-                } else {
-                    let heading = if slope_degrees < 0.0 {
-                        path_heading.opposite()
-                    } else {
-                        path_heading
-                    };
-                    Piece::Ramp {
-                        heading,
-                        height_step,
-                    }
-                }
+                // Peek one base-step ahead to measure the upcoming heading change.
+                // Outer corner gap = W·sin(dθ). For the outer corners of adjacent
+                // slabs to just touch, the seam advance must be s = L - W·tan(dθ/2).
+                let slab_width = concrete_width_length_metres(prototype.width);
+                let preview_pos = get_spline_pos((current_distance + base_step).min(total_len));
+                let preview_heading = spline::heading_from_vec2_or_fallback(
+                    (preview_pos - current_seam).truncate(),
+                    prev_heading,
+                );
+                let dtheta = heading_delta_radians(preview_heading, prev_heading);
+                (base_step - slab_width * (dtheta / 2.0).tan()).max(base_step * 0.1)
             },
+            RampMode::AcrossPath => base_step * 0.50, // 50% overlap for banked surface
+        };
+
+        if step_metres <= f64::EPSILON {
+            break;
+        }
+
+        // --- CALCULATE EXACT 3D CHORD ---
+        let target_distance = (current_distance + step_metres).min(total_len);
+        let target_pos = get_spline_pos(target_distance);
+        let delta = target_pos - current_seam;
+
+        let chord_heading = spline::heading_from_vec2_or_fallback(delta.truncate(), prev_heading);
+        let actual_horizontal = delta.truncate().length();
+        let slope_degrees = if actual_horizontal <= f64::EPSILON {
+            0.0
+        } else {
+            delta.z.atan2(actual_horizontal).to_degrees()
+        };
+
+        // --- BUILD AND PLACE ---
+        match config.mode {
             RampMode::AcrossPath => {
                 let quarter_turn = std::f64::consts::FRAC_PI_2;
-                let heading = if config.roll_degrees < 0.0 {
-                    Heading::from_radians(path_heading.to_radians() - quarter_turn)
+                let final_heading = if current_bank_angle < 0.0 {
+                    Heading::from_radians(chord_heading.to_radians() - quarter_turn)
                 } else {
-                    Heading::from_radians(path_heading.to_radians() + quarter_turn)
+                    Heading::from_radians(chord_heading.to_radians() + quarter_turn)
                 };
 
-                Piece::Slab {
-                    heading,
-                    pitch_step: quantize_pitch_step(config.roll_degrees.abs()),
-                }
-            },
-        };
+                let fwd = spline::heading_to_forward(chord_heading);
+                let actual_travel = DVec3::new(
+                    fwd.x * step_metres,
+                    fwd.y * step_metres,
+                    delta.z, // Lock Z to spline arc
+                );
 
-        fallback_heading = match piece {
-            Piece::Slab { heading, .. } => heading,
-            Piece::Ramp { heading, .. } => heading,
-        };
+                let center = current_seam + actual_travel * 0.5;
 
-        let (travel_heading, travel_rise_metres) = match config.mode {
-            RampMode::AcrossPath => (path_heading, 0.0),
-            RampMode::AlongPath => {
-                let horizontal = tangent.truncate().length();
-                let slope_degrees = if horizontal <= f64::EPSILON {
-                    0.0
-                } else {
-                    tangent.z.atan2(horizontal).to_degrees()
-                };
-
-                let rise = match piece {
-                    Piece::Ramp { height_step, .. } => {
-                        let magnitude = height_metres_from_step(height_step);
-                        if slope_degrees < 0.0 {
-                            -magnitude
-                        } else {
-                            magnitude
-                        }
-                    },
-                    Piece::Slab { .. } => 0.0,
-                };
-
-                (path_heading, rise)
-            },
-        };
-
-        candidates.push(Candidate {
-            target_position: pos,
-            travel_heading,
-            travel_rise_metres,
-            piece,
-        });
-    }
-
-    let mut centres = Vec::with_capacity(candidates.len());
-    match config.mode {
-        RampMode::AcrossPath => {
-            centres.extend(candidates.iter().map(|candidate| candidate.target_position));
-        },
-        RampMode::AlongPath => {
-            for (idx, candidate) in candidates.iter().enumerate() {
-                let center = if idx == 0 {
-                    candidate.target_position
-                } else {
-                    let prev_center = centres[idx - 1];
-                    let prev_forward = travel_half_offset(
-                        candidates[idx - 1].travel_heading,
-                        candidates[idx - 1].travel_rise_metres,
-                        spacing_metres,
-                    );
-                    let this_forward = travel_half_offset(
-                        candidate.travel_heading,
-                        candidate.travel_rise_metres,
-                        spacing_metres,
-                    );
-                    let seam = prev_center + prev_forward;
-                    seam + this_forward
-                };
-                centres.push(center);
-            }
-        },
-    }
-
-    let mut output = Vec::with_capacity(candidates.len());
-    for (idx, candidate) in candidates.iter().enumerate() {
-        match candidate.piece {
-            Piece::Slab {
-                heading,
-                pitch_step,
-            } => {
                 let mut slab = prototype.clone();
-                slab.xyz = ObjectCoordinate::from_dvec3_metres(centres[idx]);
-                slab.heading = heading;
-                slab.pitch = pitch_from_step(pitch_step);
+                slab.xyz = ObjectCoordinate::from_dvec3_metres(center);
+                slab.heading = final_heading;
+                slab.pitch = pitch_from_step(quantize_pitch_step(current_bank_angle.abs()));
                 output.push(ObjectInfo::ConcreteSlab(slab));
+
+                current_seam += actual_travel;
             },
-            Piece::Ramp {
-                heading,
-                height_step,
-            } => {
-                output.push(ObjectInfo::ConcreteRamp(ConcreteRamp {
-                    xyz: ObjectCoordinate::from_dvec3_metres(centres[idx]),
-                    width: prototype.width,
-                    length: prototype.length,
-                    height: height_from_step(height_step),
-                    heading,
-                }));
+            RampMode::AlongPath => {
+                let rise_metres = slope_degrees.abs().to_radians().tan() * step_metres;
+                let height_step = quantize_height_step(rise_metres);
+                let magnitude = height_metres_from_step(height_step);
+                let actual_rise = if slope_degrees < 0.0 {
+                    -magnitude
+                } else {
+                    magnitude
+                };
+
+                let fwd = spline::heading_to_forward(chord_heading);
+                let actual_travel =
+                    DVec3::new(fwd.x * step_metres, fwd.y * step_metres, actual_rise);
+
+                let center = current_seam + actual_travel * 0.5;
+
+                if height_step == 0 {
+                    let mut slab = prototype.clone();
+                    slab.xyz = ObjectCoordinate::from_dvec3_metres(center);
+                    slab.heading = chord_heading;
+                    slab.pitch = ConcretePitch::Deg0;
+                    output.push(ObjectInfo::ConcreteSlab(slab));
+                } else {
+                    let block_heading = if slope_degrees < 0.0 {
+                        chord_heading.opposite()
+                    } else {
+                        chord_heading
+                    };
+                    output.push(ObjectInfo::ConcreteRamp(ConcreteRamp {
+                        xyz: ObjectCoordinate::from_dvec3_metres(center),
+                        width: prototype.width,
+                        length: prototype.length,
+                        height: height_from_step(height_step),
+                        heading: block_heading,
+                    }));
+                }
+
+                current_seam += actual_travel;
             },
         }
+
+        prev_heading = chord_heading;
+        current_distance += step_metres;
     }
 
     Ok(output)
-}
-
-fn sample_lut(lut: &[LutEntry], target_distance: f64) -> LutEntry {
-    match lut.binary_search_by(|entry| {
-        entry
-            .distance
-            .partial_cmp(&target_distance)
-            .unwrap_or(Ordering::Less)
-    }) {
-        Ok(idx) => lut[idx],
-        Err(idx) => {
-            if idx == 0 {
-                lut[0]
-            } else if idx >= lut.len() {
-                *lut.last().unwrap()
-            } else {
-                let e0 = lut[idx - 1];
-                let e1 = lut[idx];
-                let span = e1.distance - e0.distance;
-                if span <= f64::EPSILON {
-                    e0
-                } else {
-                    let factor = (target_distance - e0.distance) / span;
-                    LutEntry {
-                        t: e0.t + (e1.t - e0.t) * factor,
-                        distance: target_distance,
-                        tangent: normalize_or_fallback(
-                            e0.tangent.lerp(e1.tangent, factor),
-                            e0.tangent,
-                        ),
-                    }
-                }
-            }
-        },
-    }
-}
-
-fn heading_from_vec2_or_fallback(vector: DVec2, fallback: Heading) -> Heading {
-    if vector.length_squared() <= f64::EPSILON {
-        return fallback;
-    }
-
-    let tangent = vector.normalize();
-    Heading::from_radians((-tangent.x).atan2(tangent.y))
-}
-
-fn heading_to_forward(heading: Heading) -> DVec2 {
-    let radians = heading.to_radians();
-    DVec2::new(-radians.sin(), radians.cos())
-}
-
-fn normalize_or_fallback(vector: DVec3, fallback: DVec3) -> DVec3 {
-    if vector.length_squared() > f64::EPSILON {
-        vector.normalize()
-    } else if fallback.length_squared() > f64::EPSILON {
-        fallback.normalize()
-    } else {
-        DVec3::Y
-    }
-}
-
-fn travel_half_offset(heading: Heading, rise_metres: f64, spacing_metres: f64) -> DVec3 {
-    let forward = heading_to_forward(heading);
-    let half = spacing_metres * 0.5;
-    DVec3::new(forward.x * half, forward.y * half, rise_metres * 0.5)
 }
 
 fn prototype_slab(selection: &[ObjectInfo]) -> ConcreteSlab {
@@ -471,4 +296,16 @@ fn height_metres_from_step(step: u8) -> f64 {
 fn height_from_step(step: u8) -> ConcreteHeight {
     let wire = step.saturating_sub(1).min(15);
     ConcreteHeight::try_from(wire).unwrap_or(ConcreteHeight::M4_00)
+}
+
+/// Absolute angular difference between two headings, normalised to [0, π].
+fn heading_delta_radians(a: Heading, b: Heading) -> f64 {
+    let mut diff = a.to_radians() - b.to_radians();
+    while diff > std::f64::consts::PI {
+        diff -= 2.0 * std::f64::consts::PI;
+    }
+    while diff < -std::f64::consts::PI {
+        diff += 2.0 * std::f64::consts::PI;
+    }
+    diff.abs()
 }

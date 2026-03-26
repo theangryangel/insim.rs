@@ -1,7 +1,7 @@
 use bitflags::bitflags;
-use bytes::{Buf, BufMut};
 use insim_core::{
-    Decode, Encode, angvel::AngVel, coordinate::Coordinate, heading::Heading, speed::Speed,
+    Decode, DecodeContext, Encode, EncodeContext, angvel::AngVel, coordinate::Coordinate,
+    heading::Heading, speed::Speed,
 };
 
 use crate::identifiers::{PlayerId, RequestId};
@@ -95,30 +95,26 @@ impl CompCar {
 }
 
 impl Decode for CompCar {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let node = u16::decode(buf).map_err(|e| e.nested().context("CompCar::node"))?;
-        let lap = u16::decode(buf).map_err(|e| e.nested().context("CompCar::lap"))?;
-        let plid = PlayerId::decode(buf).map_err(|e| e.nested().context("CompCar::plid"))?;
-        let position = u8::decode(buf).map_err(|e| e.nested().context("CompCar::position"))?;
-        let info = CompCarInfo::decode(buf).map_err(|e| e.nested().context("CompCar::info"))?;
-        buf.advance(1);
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let node = ctx.decode::<u16>("node")?;
+        let lap = ctx.decode::<u16>("lap")?;
+        let plid = ctx.decode::<PlayerId>("plid")?;
+        let position = ctx.decode::<u8>("position")?;
+        let info = ctx.decode::<CompCarInfo>("info")?;
+        ctx.pad("sp3", 1)?;
 
-        let xyz = Coordinate::decode(buf).map_err(|e| e.nested().context("CompCar::xyz"))?;
+        let xyz = ctx.decode::<Coordinate>("xyz")?;
 
-        let speed =
-            (u16::decode(buf).map_err(|e| e.nested().context("CompCar::speed"))? as f32) / 327.68;
+        let speed = (ctx.decode::<u16>("speed")? as f32) / 327.68;
         let speed = Speed::from_meters_per_sec(speed);
 
-        let direction_raw =
-            u16::decode(buf).map_err(|e| e.nested().context("CompCar::direction"))?;
+        let direction_raw = ctx.decode::<u16>("direction")?;
         let direction = Heading::from_degrees((direction_raw as f64) * COMPCAR_DEGREES_PER_UNIT);
 
-        let heading_raw = u16::decode(buf).map_err(|e| e.nested().context("CompCar::heading"))?;
+        let heading_raw = ctx.decode::<u16>("heading")?;
         let heading = Heading::from_degrees((heading_raw as f64) * COMPCAR_DEGREES_PER_UNIT);
 
-        let angvel = AngVel::from_wire_i16(
-            i16::decode(buf).map_err(|e| e.nested().context("CompCar::angvel"))?,
-        );
+        let angvel = AngVel::from_wire_i16(ctx.decode::<i16>("angvel")?);
         Ok(Self {
             node,
             lap,
@@ -135,49 +131,28 @@ impl Decode for CompCar {
 }
 
 impl Encode for CompCar {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.node
-            .encode(buf)
-            .map_err(|e| e.nested().context("CompCar::node"))?;
-        self.lap
-            .encode(buf)
-            .map_err(|e| e.nested().context("CompCar::lap"))?;
-        self.plid
-            .encode(buf)
-            .map_err(|e| e.nested().context("CompCar::plid"))?;
-        self.position
-            .encode(buf)
-            .map_err(|e| e.nested().context("CompCar::position"))?;
-        self.info
-            .encode(buf)
-            .map_err(|e| e.nested().context("CompCar::info"))?;
-        buf.put_bytes(0, 1);
-        self.xyz
-            .encode(buf)
-            .map_err(|e| e.nested().context("CompCar::xyz"))?;
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("node", &self.node)?;
+        ctx.encode("lap", &self.lap)?;
+        ctx.encode("plid", &self.plid)?;
+        ctx.encode("position", &self.position)?;
+        ctx.encode("info", &self.info)?;
+        ctx.pad("sp3", 1)?;
+        ctx.encode("xyz", &self.xyz)?;
         let speed = (self.speed.to_meters_per_sec() * 327.68) as u16;
-        speed
-            .encode(buf)
-            .map_err(|e| e.nested().context("CompCar::speed"))?;
+        ctx.encode("speed", &speed)?;
 
         let direction_units = (self.direction.to_degrees() / COMPCAR_DEGREES_PER_UNIT)
             .round()
             .clamp(0.0, 65535.0) as u16;
-        direction_units
-            .encode(buf)
-            .map_err(|e| e.nested().context("CompCar::direction"))?;
+        ctx.encode("direction", &direction_units)?;
 
         let heading_units = (self.heading.to_degrees() / COMPCAR_DEGREES_PER_UNIT)
             .round()
             .clamp(0.0, 65535.0) as u16;
-        heading_units
-            .encode(buf)
-            .map_err(|e| e.nested().context("CompCar::heading"))?;
+        ctx.encode("heading", &heading_units)?;
 
-        self.angvel
-            .to_wire_i16()
-            .encode(buf)
-            .map_err(|e| e.nested().context("CompCar::angvel"))?;
+        ctx.encode("angvel", &self.angvel.to_wire_i16())?;
         Ok(())
     }
 }
@@ -209,12 +184,12 @@ impl Mci {
 }
 
 impl Decode for Mci {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf).map_err(|e| e.nested().context("Mci::reqi"))?;
-        let mut numc = u8::decode(buf).map_err(|e| e.nested().context("Mci::numc"))?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let reqi = ctx.decode::<RequestId>("reqi")?;
+        let mut numc = ctx.decode::<u8>("numc")?;
         let mut info = Vec::with_capacity(numc as usize);
         while numc > 0 {
-            info.push(CompCar::decode(buf).map_err(|e| e.nested().context("Mci::info"))?);
+            info.push(ctx.decode::<CompCar>("info")?);
             numc -= 1;
         }
         Ok(Self { reqi, info })
@@ -222,10 +197,8 @@ impl Decode for Mci {
 }
 
 impl Encode for Mci {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi
-            .encode(buf)
-            .map_err(|e| e.nested().context("Mci::reqi"))?;
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("reqi", &self.reqi)?;
         let numc = self.info.len();
         if numc > 255 {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
@@ -235,11 +208,9 @@ impl Encode for Mci {
             }
             .context("Mci::numc too many infos"));
         }
-        (numc as u8)
-            .encode(buf)
-            .map_err(|e| e.nested().context("Mci::numc"))?;
+        ctx.encode("numc", &(numc as u8))?;
         for i in self.info.iter() {
-            i.encode(buf).map_err(|e| e.nested().context("Mci::info"))?;
+            ctx.encode("info", i)?;
         }
         Ok(())
     }

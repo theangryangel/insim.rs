@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use insim_core::{Decode, Encode, track::Track, wind::Wind};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext, track::Track, wind::Wind};
 
 use super::RaceLaps;
 use crate::identifiers::RequestId;
@@ -91,18 +91,14 @@ impl LapTimingInfo {
 }
 
 impl Decode for LapTimingInfo {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        Ok(LapTimingInfo::from_u8(
-            u8::decode(buf).map_err(|e| e.nested().context("LapTimingInfo::value"))?,
-        ))
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        Ok(LapTimingInfo::from_u8(ctx.decode::<u8>("value")?))
     }
 }
 
 impl Encode for LapTimingInfo {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.to_u8()
-            .encode(buf)
-            .map_err(|e| e.nested().context("LapTimingInfo::value"))
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("value", &self.to_u8())
     }
 }
 

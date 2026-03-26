@@ -1,5 +1,7 @@
 exclude: |
-  LICENSE
+  (?x)
+  LICENSE|
+  ^examples/clockwork-carnage/src/web/templates/
 repos:
   - repo: local
     hooks:

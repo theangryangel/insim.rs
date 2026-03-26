@@ -1,0 +1,1629 @@
+# prefabs.climb2.yaml
+# Extended climb map building blocks — wacky / creative edition.
+# Coordinate scale: x/y 1 unit = 6.25 cm (1/16 m), z 1 unit = 25 cm (1/4 m)
+# Two=32, Four=64, Eight=128, Sixteen=256 units. z: M1_00=4, M2_00=8, M4_00=16
+# All positions relative to anchor. Headings in radians.
+
+# 1. switchback_climb
+# Drive up Ramp 1 (going +x), steer right across a wide platform, up Ramp 2
+# (offset +y=64), then summit. Two climbs in one lateral-switchback structure.
+- name: switchback_climb
+  objects:
+    - !ConcreteRamp
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      width: Four
+      length: Four
+      height: M2_00
+      heading:
+        radians: 0.0
+    - !ConcreteWall
+      xyz:
+        x: 0
+        y: -40
+        z: 0
+      colour: Grey
+      length: Four
+      height: M2_00
+      heading:
+        radians: 0.0
+    - !ConcreteWall
+      xyz:
+        x: 0
+        y: 40
+        z: 0
+      colour: Grey
+      length: Four
+      height: M2_00
+      heading:
+        radians: 0.0
+    # Wide steering platform at top of ramp 1 (z=8), Eight wide to let player
+    # steer laterally from y=0 lane to y=64 lane for ramp 2.
+    - !ConcreteSlab
+      xyz:
+        x: 64
+        y: 32
+        z: 8
+      width: Eight
+      length: Four
+      pitch: Deg0
+      heading:
+        radians: 0.0
+    - !ChalkRight
+      xyz:
+        x: 80
+        y: 0
+        z: 8
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    # Outer guard wall on the wide platform edge
+    - !ConcreteWall
+      xyz:
+        x: 64
+        y: 104
+        z: 8
+      colour: Yellow
+      length: Four
+      height: M1_00
+      heading:
+        radians: 0.0
+    - !ConcreteRamp
+      xyz:
+        x: 128
+        y: 64
+        z: 8
+      width: Four
+      length: Four
+      height: M2_00
+      heading:
+        radians: 0.0
+    - !ConcreteWall
+      xyz:
+        x: 128
+        y: 24
+        z: 8
+      colour: Grey
+      length: Four
+      height: M2_00
+      heading:
+        radians: 0.0
+    - !ConcreteWall
+      xyz:
+        x: 128
+        y: 104
+        z: 8
+      colour: Grey
+      length: Four
+      height: M2_00
+      heading:
+        radians: 0.0
+    # Summit slab at z=16 (4m up)
+    - !ConcreteSlab
+      xyz:
+        x: 192
+        y: 64
+        z: 16
+      width: Four
+      length: Two
+      pitch: Deg0
+      heading:
+        radians: 0.0
+    - !ChalkAhead
+      xyz:
+        x: -32
+        y: 0
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+
+# 2. pillar_forest
+# Staggered grid of Half×Half concrete pillars to weave through at speed.
+# Row 1 blocks y=0; row 2 has tight ±24 inner guards; row 3 repeats.
+# Gap between adjacent pillars ~40 units (2.5m) — tight but drivable.
+- name: pillar_forest
+  objects:
+    - !ChalkAhead
+      xyz:
+        x: -48
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    - !ConeTall1
+      xyz:
+        x: -32
+        y: -40
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !ConeTall1
+      xyz:
+        x: -32
+        y: 40
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    # Row 1: y=0 blocked
+    - !ConcretePillar
+      xyz:
+        x: 0
+        y: -48
+        z: 0
+      x: Half
+      y: Half
+      height: M2_00
+      heading:
+        radians: 0.0
+    - !ConcretePillar
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      x: Half
+      y: Half
+      height: M2_00
+      heading:
+        radians: 0.0
+    - !ConcretePillar
+      xyz:
+        x: 0
+        y: 48
+        z: 0
+      x: Half
+      y: Half
+      height: M2_00
+      heading:
+        radians: 0.0
+    # Row 2: tight inner gates at y=±24
+    - !ConcretePillar
+      xyz:
+        x: 80
+        y: -72
+        z: 0
+      x: Half
+      y: Half
+      height: M2_00
+      heading:
+        radians: 0.0
+    - !ConcretePillar
+      xyz:
+        x: 80
+        y: -24
+        z: 0
+      x: Half
+      y: Half
+      height: M2_00
+      heading:
+        radians: 0.0
+    - !ConcretePillar
+      xyz:
+        x: 80
+        y: 24
+        z: 0
+      x: Half
+      y: Half
+      height: M2_00
+      heading:
+        radians: 0.0
+    - !ConcretePillar
+      xyz:
+        x: 80
+        y: 72
+        z: 0
+      x: Half
+      y: Half
+      height: M2_00
+      heading:
+        radians: 0.0
+    # Row 3: y=0 blocked again
+    - !ConcretePillar
+      xyz:
+        x: 160
+        y: -48
+        z: 0
+      x: Half
+      y: Half
+      height: M2_00
+      heading:
+        radians: 0.0
+    - !ConcretePillar
+      xyz:
+        x: 160
+        y: 0
+        z: 0
+      x: Half
+      y: Half
+      height: M2_00
+      heading:
+        radians: 0.0
+    - !ConcretePillar
+      xyz:
+        x: 160
+        y: 48
+        z: 0
+      x: Half
+      y: Half
+      height: M2_00
+      heading:
+        radians: 0.0
+
+# 3. wedge_gates
+# Alternating ConcreteWedge chicane gates: each wedge blocks one half of the
+# road from a different side, forcing a full S-weave through three gates.
+- name: wedge_gates
+  objects:
+    - !ChalkAhead
+      xyz:
+        x: -48
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    # Gate 1: Red wedge blocks center-left — go right
+    - !ConcreteWedge
+      xyz:
+        x: 0
+        y: -24
+        z: 0
+      colour: Red
+      length: Four
+      angle: Deg45
+      heading:
+        radians: 0.0
+    - !Cone1
+      xyz:
+        x: 0
+        y: 48
+        z: 0
+      colour: Blue
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkRight
+      xyz:
+        x: 32
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    # Gate 2: Blue wedge blocks center-right — go left
+    - !ConcreteWedge
+      xyz:
+        x: 128
+        y: 24
+        z: 0
+      colour: Blue
+      length: Four
+      angle: Deg45
+      heading:
+        radians: 3.141592653589793
+    - !Cone1
+      xyz:
+        x: 128
+        y: -48
+        z: 0
+      colour: Red
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkLeft
+      xyz:
+        x: 160
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    # Gate 3: Red wedge blocks center-left again — go right
+    - !ConcreteWedge
+      xyz:
+        x: 256
+        y: -24
+        z: 0
+      colour: Red
+      length: Four
+      angle: Deg45
+      heading:
+        radians: 0.0
+    - !Cone1
+      xyz:
+        x: 256
+        y: 48
+        z: 0
+      colour: Blue
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkAhead
+      xyz:
+        x: 320
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+
+# 4. truck_chicane
+# Three trucks parked at 45° angles across the road, alternating sides.
+# Forces three consecutive direction changes. Pray for wide lanes.
+- name: truck_chicane
+  objects:
+    - !ChalkAhead
+      xyz:
+        x: -48
+        y: 0
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !VehicleTruck
+      xyz:
+        x: 0
+        y: -24
+        z: 0
+      heading:
+        radians: 0.7853981633974483
+      colour: Orange
+      mapping: 0
+      floating: false
+    - !Cone1
+      xyz:
+        x: 48
+        y: 32
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    - !VehicleTruck
+      xyz:
+        x: 128
+        y: 24
+        z: 0
+      heading:
+        radians: -0.7853981633974483
+      colour: White
+      mapping: 0
+      floating: false
+    - !Cone1
+      xyz:
+        x: 176
+        y: -32
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    - !VehicleTruck
+      xyz:
+        x: 256
+        y: -24
+        z: 0
+      heading:
+        radians: 0.7853981633974483
+      colour: Orange
+      mapping: 0
+      floating: false
+    - !Cone1
+      xyz:
+        x: 304
+        y: 32
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkAhead
+      xyz:
+        x: 352
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+
+# 5. tyre_wall_keyhole
+# A near-solid wall of TyreStack4Big spanning 10m across the track with a
+# single 4m gap at centre. Requires commitment and precise line.
+- name: tyre_wall_keyhole
+  objects:
+    - !ChalkAhead
+      xyz:
+        x: -64
+        y: 0
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    # Approach cone gates marking the gap
+    - !ConeTall1
+      xyz:
+        x: -32
+        y: -32
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !ConeTall1
+      xyz:
+        x: -32
+        y: 32
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    # Left wall of tyres
+    - !TyreStack4Big
+      xyz:
+        x: 0
+        y: -48
+        z: 0
+      colour: Red
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4Big
+      xyz:
+        x: 0
+        y: -72
+        z: 0
+      colour: Red
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4Big
+      xyz:
+        x: 0
+        y: -96
+        z: 0
+      colour: Red
+      heading:
+        radians: 0.0
+      floating: false
+    # Right wall of tyres
+    - !TyreStack4Big
+      xyz:
+        x: 0
+        y: 48
+        z: 0
+      colour: Blue
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4Big
+      xyz:
+        x: 0
+        y: 72
+        z: 0
+      colour: Blue
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4Big
+      xyz:
+        x: 0
+        y: 96
+        z: 0
+      colour: Blue
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkAhead
+      xyz:
+        x: 32
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+
+# 6. concrete_arch_tunnel
+# Two ConcreteSlabWall panels pitched at Deg60 lean inward from each side,
+# forming a dramatic arch/tunnel. ConcreteWall bases keep them anchored.
+# The right arch uses heading=π so the pitch mirrors correctly.
+- name: concrete_arch_tunnel
+  objects:
+    - !ChalkAhead
+      xyz:
+        x: -48
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    # Base walls
+    - !ConcreteWall
+      xyz:
+        x: 0
+        y: -40
+        z: 0
+      colour: Grey
+      length: Eight
+      height: M1_00
+      heading:
+        radians: 0.0
+    - !ConcreteWall
+      xyz:
+        x: 0
+        y: 40
+        z: 0
+      colour: Grey
+      length: Eight
+      height: M1_00
+      heading:
+        radians: 0.0
+    # Arching slab walls leaning inward
+    - !ConcreteSlabWall
+      xyz:
+        x: 0
+        y: -56
+        z: 0
+      colour: Grey
+      length: Eight
+      pitch: Deg60
+      heading:
+        radians: 0.0
+    - !ConcreteSlabWall
+      xyz:
+        x: 128
+        y: 56
+        z: 0
+      colour: Grey
+      length: Eight
+      pitch: Deg60
+      heading:
+        radians: 3.141592653589793
+    # Red accent strips at apex for visual drama
+    - !ConcreteSlabWall
+      xyz:
+        x: 0
+        y: -64
+        z: 4
+      colour: Red
+      length: Eight
+      pitch: Deg42
+      heading:
+        radians: 0.0
+    - !ConcreteSlabWall
+      xyz:
+        x: 128
+        y: 64
+        z: 4
+      colour: Red
+      length: Eight
+      pitch: Deg42
+      heading:
+        radians: 3.141592653589793
+
+# 7. bale_chicane
+# Six hay bales forming a tight double-chicane S-bend. Classic WRC-style
+# obstacle. Drive around left side, then right, then left again.
+- name: bale_chicane
+  objects:
+    - !ChalkLeft
+      xyz:
+        x: -48
+        y: 0
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    # Chicane 1: bales on right, go left
+    - !Bale
+      xyz:
+        x: 0
+        y: 32
+        z: 0
+      heading:
+        radians: 0.0
+      colour: 0
+      mapping: 0
+      floating: false
+    - !Bale
+      xyz:
+        x: 0
+        y: 52
+        z: 0
+      heading:
+        radians: 1.5707963267948966
+      colour: 0
+      mapping: 0
+      floating: false
+    - !ConeTall1
+      xyz:
+        x: 0
+        y: -40
+        z: 0
+      colour: Orange
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkRight
+      xyz:
+        x: 48
+        y: 0
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    # Chicane 2: bales on left, go right
+    - !Bale
+      xyz:
+        x: 96
+        y: -32
+        z: 0
+      heading:
+        radians: 0.0
+      colour: 0
+      mapping: 0
+      floating: false
+    - !Bale
+      xyz:
+        x: 96
+        y: -52
+        z: 0
+      heading:
+        radians: 1.5707963267948966
+      colour: 0
+      mapping: 0
+      floating: false
+    - !ConeTall1
+      xyz:
+        x: 96
+        y: 40
+        z: 0
+      colour: Orange
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkLeft
+      xyz:
+        x: 144
+        y: 0
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    # Chicane 3: bales on right again
+    - !Bale
+      xyz:
+        x: 192
+        y: 32
+        z: 0
+      heading:
+        radians: 0.0
+      colour: 0
+      mapping: 0
+      floating: false
+    - !Bale
+      xyz:
+        x: 192
+        y: 52
+        z: 0
+      heading:
+        radians: 1.5707963267948966
+      colour: 0
+      mapping: 0
+      floating: false
+    - !ConeTall1
+      xyz:
+        x: 192
+        y: -40
+        z: 0
+      colour: Orange
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkAhead
+      xyz:
+        x: 256
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+
+# 8. hump_escalator
+# Speed humps in ascending size order: 1M → 2M → 6M → 10M.
+# Each one is bigger and slower to cross. By the end you'll feel everything.
+- name: hump_escalator
+  objects:
+    - !ChalkLine
+      xyz:
+        x: -48
+        y: 0
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !SpeedHump1M
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      heading:
+        radians: 0.0
+      colour: 0
+      mapping: 0
+      floating: false
+    - !SpeedHump2M
+      xyz:
+        x: 80
+        y: 0
+        z: 0
+      heading:
+        radians: 0.0
+      colour: 0
+      mapping: 0
+      floating: false
+    - !SpeedHump6M
+      xyz:
+        x: 176
+        y: 0
+        z: 0
+      heading:
+        radians: 0.0
+      colour: 0
+      mapping: 0
+      floating: false
+    - !SpeedHump10M
+      xyz:
+        x: 304
+        y: 0
+        z: 0
+      heading:
+        radians: 0.0
+      colour: 0
+      mapping: 0
+      floating: false
+    - !ChalkLine
+      xyz:
+        x: 432
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+
+# 9. mega_ski_jump
+# A monstrous 16m-long, 4m-high concrete ramp. Top speed required.
+# Landing zone marked by a 3×2 grid of TyreStack4Big for visual reference.
+# Side walls are full-height to keep you on course (no chickening out).
+- name: mega_ski_jump
+  objects:
+    - !ChalkAhead
+      xyz:
+        x: -80
+        y: 0
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkLine
+      xyz:
+        x: -48
+        y: 0
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !ConcreteRamp
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      width: Four
+      length: Sixteen
+      height: M4_00
+      heading:
+        radians: 0.0
+    - !ConcreteWall
+      xyz:
+        x: 0
+        y: -40
+        z: 0
+      colour: Grey
+      length: Sixteen
+      height: M4_00
+      heading:
+        radians: 0.0
+    - !ConcreteWall
+      xyz:
+        x: 0
+        y: 40
+        z: 0
+      colour: Grey
+      length: Sixteen
+      height: M4_00
+      heading:
+        radians: 0.0
+    # Landing zone grid
+    - !TyreStack4Big
+      xyz:
+        x: 320
+        y: -48
+        z: 0
+      colour: Green
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4Big
+      xyz:
+        x: 320
+        y: 0
+        z: 0
+      colour: Green
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4Big
+      xyz:
+        x: 320
+        y: 48
+        z: 0
+      colour: Green
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4Big
+      xyz:
+        x: 384
+        y: -48
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4Big
+      xyz:
+        x: 384
+        y: 0
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4Big
+      xyz:
+        x: 384
+        y: 48
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+
+# 10. ambulance_slalom
+# Four ambulances parked at 45° angles, alternating sides, acting as gates.
+# Drive your way past the emergency without causing one.
+- name: ambulance_slalom
+  objects:
+    - !ChalkAhead
+      xyz:
+        x: -48
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    - !VehicleAmbulance
+      xyz:
+        x: 0
+        y: -40
+        z: 0
+      heading:
+        radians: 0.7853981633974483
+      colour: 0
+      mapping: 0
+      floating: false
+    - !Cone1
+      xyz:
+        x: 48
+        y: 32
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    - !VehicleAmbulance
+      xyz:
+        x: 96
+        y: 40
+        z: 0
+      heading:
+        radians: -0.7853981633974483
+      colour: 0
+      mapping: 0
+      floating: false
+    - !Cone1
+      xyz:
+        x: 144
+        y: -32
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    - !VehicleAmbulance
+      xyz:
+        x: 192
+        y: -40
+        z: 0
+      heading:
+        radians: 0.7853981633974483
+      colour: 0
+      mapping: 0
+      floating: false
+    - !Cone1
+      xyz:
+        x: 240
+        y: 32
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    - !VehicleAmbulance
+      xyz:
+        x: 288
+        y: 40
+        z: 0
+      heading:
+        radians: -0.7853981633974483
+      colour: 0
+      mapping: 0
+      floating: false
+    - !ChalkAhead
+      xyz:
+        x: 352
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+
+# 11. sky_bridge
+# A terrifyingly narrow Two-wide (2m) ConcreteSlab bridge at z=8 (2m height),
+# reached via a 4m ramp and exited by a mirrored ramp the other side.
+# Low M0_25 guard rails because we want to feel the danger.
+- name: sky_bridge
+  objects:
+    - !ChalkLine
+      xyz:
+        x: -32
+        y: 0
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !ConcreteRamp
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      width: Two
+      length: Four
+      height: M2_00
+      heading:
+        radians: 0.0
+    # Entry gate cones
+    - !ConeTall1
+      xyz:
+        x: 64
+        y: -20
+        z: 8
+      colour: Green
+      heading:
+        radians: 0.0
+      floating: false
+    - !ConeTall1
+      xyz:
+        x: 64
+        y: 20
+        z: 8
+      colour: Green
+      heading:
+        radians: 0.0
+      floating: false
+    # Bridge deck
+    - !ConcreteSlab
+      xyz:
+        x: 64
+        y: 0
+        z: 8
+      width: Two
+      length: Eight
+      pitch: Deg0
+      heading:
+        radians: 0.0
+    # Minimal guard rails — just enough to know the edge
+    - !ConcreteWall
+      xyz:
+        x: 64
+        y: -20
+        z: 8
+      colour: Yellow
+      length: Eight
+      height: M0_25
+      heading:
+        radians: 0.0
+    - !ConcreteWall
+      xyz:
+        x: 64
+        y: 20
+        z: 8
+      colour: Yellow
+      length: Eight
+      height: M0_25
+      heading:
+        radians: 0.0
+    # Exit ramp: anchor at x=256, heading=π → high end at x=192 (z=8), low at x=256
+    - !ConcreteRamp
+      xyz:
+        x: 256
+        y: 0
+        z: 0
+      width: Two
+      length: Four
+      height: M2_00
+      heading:
+        radians: 3.141592653589793
+
+# 12. pinball_gauntlet
+# Twelve TyreStack4Big in a staggered 4-row pattern. Some rows block y=0,
+# others have tight ±24 inner pairs. Weave through like a steel ball.
+- name: pinball_gauntlet
+  objects:
+    - !ChalkAhead
+      xyz:
+        x: -48
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    # Row 1: block y=0
+    - !TyreStack4Big
+      xyz:
+        x: 0
+        y: -48
+        z: 0
+      colour: Red
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4Big
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      colour: Red
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4Big
+      xyz:
+        x: 0
+        y: 48
+        z: 0
+      colour: Red
+      heading:
+        radians: 0.0
+      floating: false
+    # Row 2: tight ±24 inner gates
+    - !TyreStack4Big
+      xyz:
+        x: 80
+        y: -72
+        z: 0
+      colour: Blue
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4Big
+      xyz:
+        x: 80
+        y: -24
+        z: 0
+      colour: Blue
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4Big
+      xyz:
+        x: 80
+        y: 24
+        z: 0
+      colour: Blue
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4Big
+      xyz:
+        x: 80
+        y: 72
+        z: 0
+      colour: Blue
+      heading:
+        radians: 0.0
+      floating: false
+    # Row 3: block y=0 again
+    - !TyreStack4Big
+      xyz:
+        x: 160
+        y: -48
+        z: 0
+      colour: Red
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4Big
+      xyz:
+        x: 160
+        y: 0
+        z: 0
+      colour: Red
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4Big
+      xyz:
+        x: 160
+        y: 48
+        z: 0
+      colour: Red
+      heading:
+        radians: 0.0
+      floating: false
+    # Row 4: wide outer guards only — sprint for the gap
+    - !TyreStack4Big
+      xyz:
+        x: 240
+        y: -64
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4Big
+      xyz:
+        x: 240
+        y: 64
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkAhead
+      xyz:
+        x: 288
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+
+# 13. kerb_corridor
+# Eight kerbs forming a colourful corridor (4 per side), alternating between
+# two colours each side. Visually loud, tests how close you'll drive to kerbs.
+- name: kerb_corridor
+  objects:
+    - !Post
+      xyz:
+        x: -16
+        y: -40
+        z: 0
+      heading:
+        radians: 0.0
+      colour: Yellow
+      mapping: 0
+      floating: false
+    - !Post
+      xyz:
+        x: -16
+        y: 40
+        z: 0
+      heading:
+        radians: 0.0
+      colour: Yellow
+      mapping: 0
+      floating: false
+    # Left kerbs: alternating Red / Yellow
+    - !Kerb
+      xyz:
+        x: 0
+        y: -48
+        z: 0
+      heading:
+        radians: 0.0
+      colour: 0
+      mapping: Red
+      floating: false
+    - !Kerb
+      xyz:
+        x: 64
+        y: -48
+        z: 0
+      heading:
+        radians: 0.0
+      colour: 0
+      mapping: Yellow
+      floating: false
+    - !Kerb
+      xyz:
+        x: 128
+        y: -48
+        z: 0
+      heading:
+        radians: 0.0
+      colour: 0
+      mapping: Red
+      floating: false
+    - !Kerb
+      xyz:
+        x: 192
+        y: -48
+        z: 0
+      heading:
+        radians: 0.0
+      colour: 0
+      mapping: Yellow
+      floating: false
+    # Right kerbs: alternating Blue / Cyan
+    - !Kerb
+      xyz:
+        x: 0
+        y: 48
+        z: 0
+      heading:
+        radians: 0.0
+      colour: 0
+      mapping: Blue
+      floating: false
+    - !Kerb
+      xyz:
+        x: 64
+        y: 48
+        z: 0
+      heading:
+        radians: 0.0
+      colour: 0
+      mapping: Cyan
+      floating: false
+    - !Kerb
+      xyz:
+        x: 128
+        y: 48
+        z: 0
+      heading:
+        radians: 0.0
+      colour: 0
+      mapping: Blue
+      floating: false
+    - !Kerb
+      xyz:
+        x: 192
+        y: 48
+        z: 0
+      heading:
+        radians: 0.0
+      colour: 0
+      mapping: Cyan
+      floating: false
+    - !Post
+      xyz:
+        x: 224
+        y: -40
+        z: 0
+      heading:
+        radians: 0.0
+      colour: Yellow
+      mapping: 0
+      floating: false
+    - !Post
+      xyz:
+        x: 224
+        y: 40
+        z: 0
+      heading:
+        radians: 0.0
+      colour: Yellow
+      mapping: 0
+      floating: false
+
+# 14. zigzag_walls
+# Three ConcreteWall panels placed perpendicular to the road (heading=π/2),
+# each blocking roughly half of it from alternating sides. Chalk arrows show
+# the correct path. Go wrong and meet a wall face-on.
+- name: zigzag_walls
+  objects:
+    - !ChalkRight
+      xyz:
+        x: -48
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    # Wall 1: blocks y=-40 to y=0 (left half). Open path on right (y > 0).
+    - !ConcreteWall
+      xyz:
+        x: 64
+        y: -40
+        z: 0
+      colour: Red
+      length: Two
+      height: M2_00
+      heading:
+        radians: 1.5707963267948966
+    - !Cone1
+      xyz:
+        x: 64
+        y: 48
+        z: 0
+      colour: Blue
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkLeft
+      xyz:
+        x: 96
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    # Wall 2: blocks y=0 to y=+40 (right half). Open path on left (y < 0).
+    - !ConcreteWall
+      xyz:
+        x: 160
+        y: 8
+        z: 0
+      colour: Blue
+      length: Two
+      height: M2_00
+      heading:
+        radians: 1.5707963267948966
+    - !Cone1
+      xyz:
+        x: 160
+        y: -48
+        z: 0
+      colour: Red
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkRight
+      xyz:
+        x: 192
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+    # Wall 3: blocks left half again
+    - !ConcreteWall
+      xyz:
+        x: 256
+        y: -40
+        z: 0
+      colour: Red
+      length: Two
+      height: M2_00
+      heading:
+        radians: 1.5707963267948966
+    - !Cone1
+      xyz:
+        x: 256
+        y: 48
+        z: 0
+      colour: Blue
+      heading:
+        radians: 0.0
+      floating: false
+    - !ChalkAhead
+      xyz:
+        x: 320
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false
+
+# 15. table_top_jump
+# Classic tabletop: approach ramp rises 2m onto a flat elevated Eight-long
+# platform, then a mirrored exit ramp drops back to ground. Platform has
+# low side walls and tyre corner markers. Very controllable but very satisfying.
+- name: table_top_jump
+  objects:
+    - !ChalkAhead
+      xyz:
+        x: -32
+        y: 0
+        z: 0
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    # Approach ramp
+    - !ConcreteRamp
+      xyz:
+        x: 0
+        y: 0
+        z: 0
+      width: Four
+      length: Four
+      height: M2_00
+      heading:
+        radians: 0.0
+    - !ConcreteWall
+      xyz:
+        x: 0
+        y: -40
+        z: 0
+      colour: Grey
+      length: Four
+      height: M2_00
+      heading:
+        radians: 0.0
+    - !ConcreteWall
+      xyz:
+        x: 0
+        y: 40
+        z: 0
+      colour: Grey
+      length: Four
+      height: M2_00
+      heading:
+        radians: 0.0
+    # Raised platform (8m long, 4m wide, at z=8)
+    - !ConcreteSlab
+      xyz:
+        x: 64
+        y: 0
+        z: 8
+      width: Four
+      length: Eight
+      pitch: Deg0
+      heading:
+        radians: 0.0
+    # Low side walls on platform edges
+    - !ConcreteWall
+      xyz:
+        x: 64
+        y: -40
+        z: 8
+      colour: Grey
+      length: Eight
+      height: M0_50
+      heading:
+        radians: 0.0
+    - !ConcreteWall
+      xyz:
+        x: 64
+        y: 40
+        z: 8
+      colour: Grey
+      length: Eight
+      height: M0_50
+      heading:
+        radians: 0.0
+    # Corner tyre markers on the platform
+    - !TyreStack4
+      xyz:
+        x: 64
+        y: -48
+        z: 8
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4
+      xyz:
+        x: 64
+        y: 48
+        z: 8
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4
+      xyz:
+        x: 192
+        y: -48
+        z: 8
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    - !TyreStack4
+      xyz:
+        x: 192
+        y: 48
+        z: 8
+      colour: Yellow
+      heading:
+        radians: 0.0
+      floating: false
+    # Exit ramp: anchor at x=256, heading=π → high end at x=192 (z=8), low at x=256
+    - !ConcreteRamp
+      xyz:
+        x: 256
+        y: 0
+        z: 0
+      width: Four
+      length: Four
+      height: M2_00
+      heading:
+        radians: 3.141592653589793
+    - !ConcreteWall
+      xyz:
+        x: 256
+        y: -40
+        z: 0
+      colour: Grey
+      length: Four
+      height: M2_00
+      heading:
+        radians: 3.141592653589793
+    - !ConcreteWall
+      xyz:
+        x: 256
+        y: 40
+        z: 0
+      colour: Grey
+      length: Four
+      height: M2_00
+      heading:
+        radians: 3.141592653589793
+    - !ChalkAhead
+      xyz:
+        x: 288
+        y: 0
+        z: 0
+      colour: White
+      heading:
+        radians: 0.0
+      floating: false

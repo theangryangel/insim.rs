@@ -116,20 +116,19 @@ impl Coordinate {
 }
 
 impl Decode for Coordinate {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
+    fn decode(ctx: &mut crate::DecodeContext) -> Result<Self, crate::DecodeError> {
         Ok(Self {
-            x: i32::decode(buf)?,
-            y: i32::decode(buf)?,
-            z: i32::decode(buf)?,
+            x: ctx.decode::<i32>("x")?,
+            y: ctx.decode::<i32>("y")?,
+            z: ctx.decode::<i32>("z")?,
         })
     }
 }
 
 impl Encode for Coordinate {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodeError> {
-        self.x.encode(buf)?;
-        self.y.encode(buf)?;
-        self.z.encode(buf)?;
-        Ok(())
+    fn encode(&self, ctx: &mut crate::EncodeContext) -> Result<(), crate::EncodeError> {
+        ctx.encode("x", &self.x)?;
+        ctx.encode("y", &self.y)?;
+        ctx.encode("z", &self.z)
     }
 }

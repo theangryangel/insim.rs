@@ -2,7 +2,9 @@
 use std::time::Duration;
 
 use bytes::Buf;
-use insim_core::{Decode, Encode, coordinate::Coordinate, vector::Vector};
+use insim_core::{
+    Decode, DecodeContext, Encode, EncodeContext, coordinate::Coordinate, vector::Vector,
+};
 
 use crate::OutsimId;
 
@@ -39,35 +41,34 @@ pub struct OutsimPack {
 }
 
 impl Encode for OutsimPack {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        let time = self.time.as_millis();
-        (time as u32).encode(buf)?;
-        self.angvel.encode(buf)?;
-        self.heading.encode(buf)?;
-        self.pitch.encode(buf)?;
-        self.roll.encode(buf)?;
-        self.accel.encode(buf)?;
-        self.vel.encode(buf)?;
-        self.pos.encode(buf)?;
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode_duration::<u32>("time", self.time)?;
+        ctx.encode("angvel", &self.angvel)?;
+        ctx.encode("heading", &self.heading)?;
+        ctx.encode("pitch", &self.pitch)?;
+        ctx.encode("roll", &self.roll)?;
+        ctx.encode("accel", &self.accel)?;
+        ctx.encode("vel", &self.vel)?;
+        ctx.encode("pos", &self.pos)?;
         if let Some(id) = self.id {
-            id.encode(buf)?;
+            ctx.encode("id", &id)?;
         }
         Ok(())
     }
 }
 
 impl Decode for OutsimPack {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let time = Duration::from_millis(u32::decode(buf)? as u64);
-        let angvel = Vector::decode(buf)?;
-        let heading = f32::decode(buf)?;
-        let pitch = f32::decode(buf)?;
-        let roll = f32::decode(buf)?;
-        let accel = Vector::decode(buf)?;
-        let vel = Vector::decode(buf)?;
-        let pos = Coordinate::decode(buf)?;
-        let id = if buf.has_remaining() {
-            Some(OutsimId::decode(buf)?)
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let time = ctx.decode_duration::<u32>("time")?;
+        let angvel = ctx.decode::<Vector>("angvel")?;
+        let heading = ctx.decode::<f32>("heading")?;
+        let pitch = ctx.decode::<f32>("pitch")?;
+        let roll = ctx.decode::<f32>("roll")?;
+        let accel = ctx.decode::<Vector>("accel")?;
+        let vel = ctx.decode::<Vector>("vel")?;
+        let pos = ctx.decode::<Coordinate>("pos")?;
+        let id = if ctx.buf.has_remaining() {
+            Some(ctx.decode::<OutsimId>("id")?)
         } else {
             None
         };
@@ -88,7 +89,8 @@ impl Decode for OutsimPack {
 
 #[cfg(test)]
 mod test {
-    use bytes::{BufMut, BytesMut};
+    use bytes::{Buf, BufMut, BytesMut};
+    use insim_core::{DecodeContext, EncodeContext};
 
     use super::*;
 
@@ -166,11 +168,11 @@ mod test {
 
         let mut buf = input.clone().freeze();
 
-        let outsim = OutsimPack::decode(&mut buf).unwrap();
+        let outsim = OutsimPack::decode(&mut DecodeContext::new(&mut buf)).unwrap();
         assert_eq!(buf.remaining(), 0);
 
         let mut output = BytesMut::new();
-        outsim.encode(&mut output).unwrap();
+        outsim.encode(&mut EncodeContext::new(&mut output)).unwrap();
 
         assert_eq!(
             output.as_ref(),
@@ -187,12 +189,12 @@ mod test {
 
         let mut buf = input.clone().freeze();
 
-        let outsim = OutsimPack::decode(&mut buf).unwrap();
+        let outsim = OutsimPack::decode(&mut DecodeContext::new(&mut buf)).unwrap();
         assert_eq!(buf.remaining(), 0);
         assert!(matches!(outsim.id, Some(OutsimId(10))));
 
         let mut output = BytesMut::new();
-        outsim.encode(&mut output).unwrap();
+        outsim.encode(&mut EncodeContext::new(&mut output)).unwrap();
 
         assert_eq!(
             output.as_ref(),

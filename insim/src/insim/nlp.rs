@@ -1,6 +1,8 @@
-use insim_core::{Decode, Encode};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 
 use crate::identifiers::{PlayerId, RequestId};
+
+const NLP_MAX_CARS: usize = 48;
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -34,12 +36,12 @@ pub struct Nlp {
 }
 
 impl Decode for Nlp {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf).map_err(|e| e.nested().context("Nlp::reqi"))?;
-        let mut nump = u8::decode(buf).map_err(|e| e.nested().context("Nlp::nump"))?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let reqi = ctx.decode::<RequestId>("reqi")?;
+        let mut nump = ctx.decode::<u8>("nump")?;
         let mut info = Vec::with_capacity(nump as usize);
         while nump > 0 {
-            info.push(NodeLapInfo::decode(buf).map_err(|e| e.nested().context("Nlp::info"))?);
+            info.push(ctx.decode::<NodeLapInfo>("info")?);
             nump -= 1;
         }
         Ok(Self { reqi, info })
@@ -47,24 +49,20 @@ impl Decode for Nlp {
 }
 
 impl Encode for Nlp {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi
-            .encode(buf)
-            .map_err(|e| e.nested().context("Nlp::reqi"))?;
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("reqi", &self.reqi)?;
         let nump = self.info.len();
-        if nump > 255 {
+        if nump > NLP_MAX_CARS {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
                 min: 0,
-                max: 255,
+                max: NLP_MAX_CARS,
                 found: nump,
             }
             .context("Nlp::nump"));
         }
-        (nump as u8)
-            .encode(buf)
-            .map_err(|e| e.nested().context("Nlp::nump"))?;
+        ctx.encode("nump", &(nump as u8))?;
         for i in self.info.iter() {
-            i.encode(buf).map_err(|e| e.nested().context("Nlp::info"))?;
+            ctx.encode("info", i)?;
         }
 
         Ok(())

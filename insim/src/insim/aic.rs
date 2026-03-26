@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use bitflags::bitflags;
 use bytes::Buf;
-use insim_core::{Decode, Encode};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 
 use crate::identifiers::{PlayerId, RequestId};
 
@@ -402,10 +402,10 @@ impl AiInput {
 }
 
 impl Decode for AiInput {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let input = u8::decode(buf)?;
-        let time = u8::decode(buf)?;
-        let val = u16::decode(buf)?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let input = ctx.decode::<u8>("input")?;
+        let time = ctx.decode::<u8>("time")?;
+        let val = ctx.decode::<u16>("val")?;
 
         let input = match input {
             0 => AiInputType::Msx(val),
@@ -455,7 +455,7 @@ impl Decode for AiInput {
 }
 
 impl Encode for AiInput {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
         let (discrim, val): (u8, u16) = match self.input {
             AiInputType::Msx(val) => (0, val),
             AiInputType::Throttle(val) => (1, val),
@@ -484,11 +484,11 @@ impl Encode for AiInput {
             AiInputType::StopControl => (255, 0),
         };
 
-        discrim.encode(buf)?;
+        ctx.encode("input", &discrim)?;
 
         if let Some(time) = self.time {
             match u8::try_from(time.as_millis() / 10) {
-                Ok(time) => time.encode(buf)?,
+                Ok(time) => ctx.encode("time", &time)?,
                 Err(_) => {
                     return Err(insim_core::EncodeErrorKind::OutOfRange {
                         min: 0,
@@ -499,10 +499,10 @@ impl Encode for AiInput {
                 },
             }
         } else {
-            0_u8.encode(buf)?;
+            ctx.encode("time", &0_u8)?;
         }
 
-        val.encode(buf)?;
+        ctx.encode("val", &val)?;
         Ok(())
     }
 }
@@ -526,12 +526,12 @@ pub struct Aic {
 impl_typical_with_request_id!(Aic);
 
 impl Decode for Aic {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf)?;
-        let plid = PlayerId::decode(buf)?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let reqi = ctx.decode::<RequestId>("reqi")?;
+        let plid = ctx.decode::<PlayerId>("plid")?;
         let mut inputs = Vec::new();
-        while buf.has_remaining() {
-            inputs.push(AiInput::decode(buf)?);
+        while ctx.buf.has_remaining() {
+            inputs.push(ctx.decode::<AiInput>("inputs")?);
         }
 
         Ok(Self { reqi, plid, inputs })
@@ -539,9 +539,9 @@ impl Decode for Aic {
 }
 
 impl Encode for Aic {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi.encode(buf)?;
-        self.plid.encode(buf)?;
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("reqi", &self.reqi)?;
+        ctx.encode("plid", &self.plid)?;
         if self.inputs.len() > AIC_MAX_INPUTS {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
                 min: 0,
@@ -551,7 +551,7 @@ impl Encode for Aic {
             .context("AIC::inputs"));
         }
         for i in self.inputs.iter() {
-            i.encode(buf)?;
+            ctx.encode("inputs", i)?;
         }
         Ok(())
     }

@@ -1,0 +1,95 @@
+# Three progressively narrower gates built from Full×Full M4_00 pillars.
+# Gate 1: 80-unit gap (5 m). Gate 2: 48-unit gap (3 m). Gate 3: 24-unit gap (1.5 m).
+# Place on a straight before a climb section to punish wide entry lines.
+#
+# Gate 1 — 80-unit gap between pillars centred on y=0
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: -56
+    z: 0
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 56
+    z: 0
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+# Gate 2 — 48-unit gap
+- !ConcretePillar
+  xyz:
+    x: 96
+    y: -40
+    z: 0
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 96
+    y: 40
+    z: 0
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+# Gate 3 — 24-unit gap; only the bravest (or narrowest) get through clean
+- !ConcretePillar
+  xyz:
+    x: 192
+    y: -28
+    z: 0
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 192
+    y: 28
+    z: 0
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+# Chalk guidance on approach
+- !ChalkAhead
+  xyz:
+    x: -48
+    y: 0
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+- !ChalkAhead
+  xyz:
+    x: 48
+    y: 0
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+- !ChalkAhead
+  xyz:
+    x: 144
+    y: 0
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false

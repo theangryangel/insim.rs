@@ -74,6 +74,9 @@ macro_rules! define_tracks {
                 let s = self.code();
                 s.ends_with('X') || s.ends_with('Y') || matches!(self, Self::So7)
             }
+
+            /// All track variants in declaration order.
+            pub const ALL: &'static [Self] = &[$(Self::$variant),*];
         }
 
         impl FromStr for Track {
@@ -293,8 +296,8 @@ define_tracks!(
 );
 
 impl Decode for Track {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
-        let raw = buf.split_to(6);
+    fn decode(ctx: &mut crate::DecodeContext) -> Result<Self, crate::DecodeError> {
+        let raw = ctx.buf.split_to(6);
         let s = std::str::from_utf8(&raw).unwrap_or("").trim_matches('\0');
         s.parse().map_err(|_| {
             crate::DecodeErrorKind::BadMagic {
@@ -306,7 +309,7 @@ impl Decode for Track {
 }
 
 impl Encode for Track {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodeError> {
+    fn encode(&self, ctx: &mut crate::EncodeContext) -> Result<(), crate::EncodeError> {
         let s = self.code();
         let bytes = s.as_bytes();
 
@@ -318,8 +321,8 @@ impl Encode for Track {
             }
             .into());
         }
-        buf.extend_from_slice(bytes);
-        buf.resize(buf.len() + (6 - bytes.len()), 0);
+        ctx.buf.extend_from_slice(bytes);
+        ctx.buf.resize(ctx.buf.len() + (6 - bytes.len()), 0);
         Ok(())
     }
 }

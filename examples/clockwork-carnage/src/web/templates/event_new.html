@@ -1,0 +1,243 @@
+{% extends "base.html" %} {% block title %}New Event — Clockwork Carnage{%
+endblock %} {% block content %}
+
+<p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+  New Event
+</p>
+
+<form
+  method="post"
+  action="/events/new"
+  class="max-w-lg space-y-4"
+  x-data="{ mode: 'metronome' }"
+>
+  <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}" />
+
+  <div>
+    <p
+      class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
+    >
+      Mode
+    </p>
+    <div class="flex gap-4">
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input
+          type="radio"
+          name="mode"
+          value="metronome"
+          checked
+          class="accent-orange-600"
+          @change="mode = 'metronome'"
+        />
+        <span class="text-sm font-medium">Metronome</span>
+      </label>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input
+          type="radio"
+          name="mode"
+          value="shortcut"
+          class="accent-blue-600"
+          @change="mode = 'shortcut'"
+        />
+        <span class="text-sm font-medium">Shortcut</span>
+      </label>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input
+          type="radio"
+          name="mode"
+          value="bomb"
+          class="accent-red-600"
+          @change="mode = 'bomb'"
+        />
+        <span class="text-sm font-medium">Bomb</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 gap-3">
+    <div>
+      <label
+        class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
+        for="track"
+        >Track <span class="text-red-500">*</span></label
+      >
+      <select
+        id="track"
+        name="track"
+        required
+        class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+      >
+        <option value="" disabled selected>Select a track…</option>
+        {% for track in tracks %}
+        <option value="{{ track }}">
+          {{ track }} — {{ track.complete_name() }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label
+        class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
+        for="layout"
+        >Layout</label
+      >
+      <input
+        id="layout"
+        type="text"
+        name="layout"
+        placeholder="(blank for default)"
+        class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+      />
+    </div>
+  </div>
+
+  <div>
+    <label
+      class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
+      for="name"
+      >Name</label
+    >
+    <input
+      id="name"
+      type="text"
+      name="name"
+      placeholder="Optional display name"
+      class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+    />
+  </div>
+
+  <div>
+    <label
+      class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
+      for="description"
+      >Description</label
+    >
+    <textarea
+      id="description"
+      name="description"
+      rows="3"
+      placeholder="Optional description"
+      class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+    ></textarea>
+  </div>
+
+  <div class="grid grid-cols-2 gap-3">
+    <div>
+      <label
+        class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
+        for="scheduled_at"
+        >Scheduled start</label
+      >
+      <input
+        id="scheduled_at"
+        type="datetime-local"
+        name="scheduled_at"
+        class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+      />
+    </div>
+    <div>
+      <label
+        class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
+        for="scheduled_end_at"
+        >Scheduled end</label
+      >
+      <input
+        id="scheduled_end_at"
+        type="datetime-local"
+        name="scheduled_end_at"
+        class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+      />
+    </div>
+  </div>
+
+  <div
+    x-show="mode === 'metronome'"
+    x-cloak
+    class="border-t border-gray-200 pt-4"
+  >
+    <p
+      class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3"
+    >
+      Metronome settings
+    </p>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label
+          class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
+          for="target"
+          >Target (s)</label
+        >
+        <input
+          id="target"
+          type="number"
+          name="target"
+          value="20"
+          min="1"
+          class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
+        />
+      </div>
+    </div>
+  </div>
+
+  <div x-show="mode === 'bomb'" x-cloak class="border-t border-gray-200 pt-4">
+    <p
+      class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3"
+    >
+      Bomb settings
+    </p>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label
+          class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
+          for="checkpoint_timeout"
+          >Checkpoint timeout (s)</label
+        >
+        <input
+          id="checkpoint_timeout"
+          type="number"
+          name="checkpoint_timeout"
+          value="30"
+          min="1"
+          class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-red-400"
+        />
+      </div>
+    </div>
+  </div>
+
+  <div class="border-t border-gray-200 pt-4">
+    <p
+      class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1"
+    >
+      Vehicle Restrictions
+    </p>
+    <label class="block text-xs text-gray-500 mb-1" for="allowed_vehicles"
+      >Allowed vehicles (comma-separated codes, e.g.
+      <span class="font-mono">XFG, XRG, 728419</span>). Leave blank to allow
+      all.</label
+    >
+    <input
+      id="allowed_vehicles"
+      type="text"
+      name="allowed_vehicles"
+      placeholder="blank = all allowed"
+      class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-orange-400"
+    />
+  </div>
+
+  <div class="flex gap-2 pt-2">
+    <button
+      type="submit"
+      class="px-4 py-2 bg-orange-600 text-white text-sm font-semibold rounded hover:bg-orange-700 transition-colors"
+    >
+      Create Event
+    </button>
+    <a
+      href="/events"
+      class="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-semibold rounded hover:bg-gray-300 transition-colors"
+    >
+      Cancel
+    </a>
+  </div>
+</form>
+
+{% endblock %}

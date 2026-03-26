@@ -1,0 +1,76 @@
+<div id="event-actions">
+  {% if page.admin %}
+  <div class="flex items-center gap-1.5">
+    <a
+      href="/events/{{ event.id }}/edit"
+      class="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-semibold rounded hover:bg-gray-200 transition-colors"
+    >
+      Edit
+    </a>
+    {% match event.status %} {% when EventStatus::Pending %}
+    <form
+      method="post"
+      action="/events/{{ event.id }}/start"
+      hx-post="/events/{{ event.id }}/start"
+      hx-target="#event-actions"
+      hx-swap="outerHTML"
+    >
+      <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}" />
+      <button
+        type="submit"
+        class="px-2 py-1 bg-orange-600 text-white text-xs font-semibold rounded hover:bg-orange-700 transition-colors"
+      >
+        Start
+      </button>
+    </form>
+    <form
+      method="post"
+      action="/events/{{ event.id }}/cancel"
+      hx-post="/events/{{ event.id }}/cancel"
+      hx-target="#event-actions"
+      hx-swap="outerHTML"
+    >
+      <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}" />
+      <button
+        type="submit"
+        class="px-2 py-1 bg-gray-200 text-gray-600 text-xs font-semibold rounded hover:bg-gray-300 transition-colors"
+      >
+        Cancel
+      </button>
+    </form>
+    {% when EventStatus::Active %}
+    <form
+      method="post"
+      action="/events/{{ event.id }}/complete"
+      hx-post="/events/{{ event.id }}/complete"
+      hx-target="#event-actions"
+      hx-swap="outerHTML"
+    >
+      <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}" />
+      <button
+        type="submit"
+        class="px-2 py-1 bg-green-600 text-white text-xs font-semibold rounded hover:bg-green-700 transition-colors"
+      >
+        Complete
+      </button>
+    </form>
+    <form
+      method="post"
+      action="/events/{{ event.id }}/cancel"
+      hx-post="/events/{{ event.id }}/cancel"
+      hx-target="#event-actions"
+      hx-swap="outerHTML"
+    >
+      <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}" />
+      <button
+        type="submit"
+        class="px-2 py-1 bg-gray-200 text-gray-600 text-xs font-semibold rounded hover:bg-gray-300 transition-colors"
+      >
+        Cancel
+      </button>
+    </form>
+    {% when EventStatus::Completed %} {% when EventStatus::Cancelled %} {%
+    endmatch %}
+  </div>
+  {% endif %}
+</div>

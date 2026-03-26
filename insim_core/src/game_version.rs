@@ -6,7 +6,7 @@ use std::{cmp::Ordering, fmt::Display, str::FromStr};
 use bytes::Bytes;
 use itertools::Itertools;
 
-use crate::{Decode, Encode, EncodeString};
+use crate::{Decode, Encode};
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 /// Possible errors when parsing a game version
@@ -161,8 +161,8 @@ impl FromStr for GameVersion {
 }
 
 impl Decode for GameVersion {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
-        let new = buf.split_to(8);
+    fn decode(ctx: &mut crate::DecodeContext) -> Result<Self, crate::DecodeError> {
+        let new = ctx.buf.split_to(8);
 
         match std::str::from_utf8(&new) {
             Ok(s) => GameVersion::from_str(s.trim_end_matches('\0'))
@@ -176,10 +176,8 @@ impl Decode for GameVersion {
 }
 
 impl Encode for GameVersion {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodeError> {
-        let ver = self.to_string();
-        ver.encode_ascii(buf, 8, false)?;
-        Ok(())
+    fn encode(&self, ctx: &mut crate::EncodeContext) -> Result<(), crate::EncodeError> {
+        ctx.encode_ascii("ver", self.to_string(), 8, false)
     }
 }
 
@@ -298,13 +296,15 @@ mod tests {
 
     #[test]
     fn test_from_to_bytes() {
+        use crate::{DecodeContext, EncodeContext};
+
         let ver = GameVersion::from_str("0.7F").unwrap();
         let mut buf = BytesMut::new();
-        assert!(ver.encode(&mut buf).is_ok());
+        assert!(ver.encode(&mut EncodeContext::new(&mut buf)).is_ok());
 
         assert_eq!(buf.len(), 8);
 
-        let from = GameVersion::decode(&mut buf.freeze()).unwrap();
+        let from = GameVersion::decode(&mut DecodeContext::new(&mut buf.freeze())).unwrap();
 
         assert_eq!(ver, from);
     }

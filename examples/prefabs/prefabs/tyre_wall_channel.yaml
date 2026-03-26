@@ -1,0 +1,88 @@
+# A corridor of TyreStack4 walls on both sides forming a tight channel.
+# The stacks are staggered left-right so a perfectly straight line isn't enough —
+# slight weaving is required, like a slalom through rubber walls.
+#
+# Left-side stacks (y negative)
+- !TyreStack4
+  xyz:
+    x: 0
+    y: -40
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4
+  xyz:
+    x: 64
+    y: -32
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4
+  xyz:
+    x: 128
+    y: -40
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4
+  xyz:
+    x: 192
+    y: -32
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+# Right-side stacks (y positive) — offset by half a period for the weave
+- !TyreStack4
+  xyz:
+    x: 32
+    y: 40
+    z: 0
+  colour: Red
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4
+  xyz:
+    x: 96
+    y: 32
+    z: 0
+  colour: Red
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4
+  xyz:
+    x: 160
+    y: 40
+    z: 0
+  colour: Red
+  heading:
+    radians: 0.0
+  floating: false
+- !TyreStack4
+  xyz:
+    x: 224
+    y: 32
+    z: 0
+  colour: Red
+  heading:
+    radians: 0.0
+  floating: false
+# Entry chalk to show the channel mouth
+- !ChalkAhead
+  xyz:
+    x: -32
+    y: 0
+    z: 0
+  colour: Yellow
+  heading:
+    radians: 0.0
+  floating: false

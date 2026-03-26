@@ -1,0 +1,13 @@
+{# ── Quick stats ── #}
+<div class="grid grid-cols-1 gap-3 mb-6">
+  {% match *event.mode %} {% when EventMode::Metronome { target_ms } %}
+  <div class="bg-white rounded-lg p-4 text-center">
+    <p class="text-2xl font-bold">{{ target_ms|format_time_ms }}</p>
+    <p class="text-xs text-gray-400 uppercase font-semibold mt-1">Target</p>
+  </div>
+  {% when EventMode::Shortcut %} {% when EventMode::Bomb { .. } %} {% endmatch
+  %}
+</div>
+
+{# ── Standings ── #}
+{% include "partials/metronome_standings.html" %}

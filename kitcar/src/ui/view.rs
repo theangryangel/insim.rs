@@ -23,11 +23,11 @@ use super::canvas::Canvas;
 // ```
 pub trait Component {
     type Message: Send + Clone + 'static;
-    type Props;
+    type Props<'a>;
 
     #[allow(unused)]
     fn update(&mut self, msg: Self::Message) {}
-    fn render(&self, props: Self::Props) -> super::Node<Self::Message>;
+    fn render(&self, props: Self::Props<'_>) -> super::Node<Self::Message>;
 }
 
 /// Pair of global and per-connection state values used to derive root component props.
@@ -87,7 +87,7 @@ where
 pub(super) fn run_view<Cmp, G, C>(args: RunViewArgs<Cmp, G, C>)
 where
     Cmp: Component + 'static,
-    UiState<G, C>: Into<Cmp::Props>,
+    for<'a> UiState<G, C>: Into<Cmp::Props<'a>>,
     G: Clone + Send + Sync + 'static,
     C: Clone + Send + Sync + 'static,
 {
@@ -114,7 +114,7 @@ where
 
         loop {
             if should_render && !blocked {
-                let props: Cmp::Props = UiState {
+                let props: Cmp::Props<'_> = UiState {
                     global: global_props.borrow_and_update().clone(),
                     connection: connection_props.borrow_and_update().clone(),
                 }

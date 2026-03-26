@@ -1,6 +1,5 @@
-use bytes::{Buf, BufMut};
 use indexmap::{IndexSet, set::Iter as IndexSetIter};
-use insim_core::{Decode, Encode, vehicle::Vehicle};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext, vehicle::Vehicle};
 
 use crate::{
     error::Error,
@@ -35,6 +34,33 @@ impl PlcAllowedCarsSet {
     const FZ50_GTR: u32 = (1 << 17);
     const BWM_SAUBER_F1_06: u32 = (1 << 18);
     const FORMULA_BMW_FB02: u32 = (1 << 19);
+
+    const ALL: u32 = Self::XF_GTI
+        | Self::XR_GT
+        | Self::FORMULA_BMW_FB02
+        | Self::XR_GT_TURBO
+        | Self::RB4
+        | Self::FXO_TURBO
+        | Self::LX4
+        | Self::LX6
+        | Self::MRT5
+        | Self::UF_1000
+        | Self::RACEABOUT
+        | Self::FZ50
+        | Self::FORMULA_XR
+        | Self::XF_GTR
+        | Self::UF_GTR
+        | Self::FORMULA_V8
+        | Self::FXO_GTR
+        | Self::XR_GTR
+        | Self::FZ50_GTR
+        | Self::BWM_SAUBER_F1_06
+        | Self::FORMULA_BMW_FB02;
+
+    /// A set containing all 20 standard vehicles — use this to remove all car restrictions.
+    pub fn all() -> Self {
+        Self::from_bits_truncate(Self::ALL)
+    }
 
     /// Does this set include a vehicle?
     pub fn contains(&self, v: &Vehicle) -> bool {
@@ -196,32 +222,23 @@ pub struct Plc {
 impl_typical_with_request_id!(Plc);
 
 impl Decode for Plc {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf).map_err(|e| e.nested().context("Plc::reqi"))?;
-        buf.advance(1);
-        let ucid = ConnectionId::decode(buf).map_err(|e| e.nested().context("Plc::ucid"))?;
-        buf.advance(3);
-        let cars = PlcAllowedCarsSet::from_bits_truncate(
-            u32::decode(buf).map_err(|e| e.nested().context("Plc::cars"))?,
-        );
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let reqi = ctx.decode::<RequestId>("reqi")?;
+        ctx.pad("zero", 1)?;
+        let ucid = ctx.decode::<ConnectionId>("ucid")?;
+        ctx.pad("sp1", 3)?;
+        let cars = PlcAllowedCarsSet::from_bits_truncate(ctx.decode::<u32>("cars")?);
         Ok(Self { reqi, ucid, cars })
     }
 }
 
 impl Encode for Plc {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi
-            .encode(buf)
-            .map_err(|e| e.nested().context("Plc::reqi"))?;
-        buf.put_bytes(0, 1);
-        self.ucid
-            .encode(buf)
-            .map_err(|e| e.nested().context("Plc::ucid"))?;
-        buf.put_bytes(0, 3);
-        self.cars
-            .bits()
-            .encode(buf)
-            .map_err(|e| e.nested().context("Plc::cars"))?;
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("reqi", &self.reqi)?;
+        ctx.pad("zero", 1)?;
+        ctx.encode("ucid", &self.ucid)?;
+        ctx.pad("sp1", 3)?;
+        ctx.encode("cars", &self.cars.bits())?;
         Ok(())
     }
 }

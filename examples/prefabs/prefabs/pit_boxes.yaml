@@ -1,0 +1,432 @@
+- !PitStartPoint
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 12
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -42
+    y: -19
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 14
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -83
+    y: -37
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 17
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -122
+    y: -55
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 21
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -165
+    y: -77
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 23
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -207
+    y: -97
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 25
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -250
+    y: -116
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 24
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -13
+    y: 137
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 22
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -57
+    y: 120
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 27
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -99
+    y: 102
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 31
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -140
+    y: 83
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 38
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -179
+    y: 65
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 42
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -277
+    y: 558
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 6
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -222
+    y: 44
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 43
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -319
+    y: 540
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 5
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -263
+    y: 23
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 41
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -361
+    y: 522
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 4
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -306
+    y: 4
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 37
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -400
+    y: 503
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 3
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -527
+    y: 442
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 0
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -443
+    y: 482
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 2
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -484
+    y: 461
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 1
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -71
+    y: 248
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 30
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -115
+    y: 231
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 39
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -157
+    y: 213
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 44
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -123
+    y: 347
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 29
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -223
+    y: 445
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 19
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -198
+    y: 194
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 46
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -265
+    y: 426
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 16
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -167
+    y: 329
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 34
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -237
+    y: 176
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 47
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -306
+    y: 408
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 15
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -280
+    y: 155
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 45
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -321
+    y: 134
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 40
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -209
+    y: 311
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 36
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -345
+    y: 390
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 13
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -364
+    y: 115
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 32
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -388
+    y: 368
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 11
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -472
+    y: 329
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 8
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -429
+    y: 348
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 10
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -250
+    y: 293
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 35
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -289
+    y: 274
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 33
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -332
+    y: 253
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 28
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -374
+    y: 232
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 26
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -417
+    y: 213
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 20
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -179
+    y: 462
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 18
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: -234
+    y: 576
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 7
+  floating: false
+- !PitStartPoint
+  xyz:
+    x: 43
+    y: 17
+    z: 0
+  heading:
+    radians: -2.675262494072558
+  index: 9
+  floating: false
