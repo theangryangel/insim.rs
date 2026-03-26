@@ -19,6 +19,9 @@ pub trait Scene<Ctx = ()> {
     type Output;
 
     /// Run/execute the scene
+    // async_fn_in_trait is stable since Rust 1.75. The lint is suppressed because
+    // the returned future is not required to be Send, which is intentional here —
+    // scene combinators propagate Send bounds at the impl level.
     #[allow(async_fn_in_trait)]
     async fn run(self, ctx: &Ctx) -> Result<SceneResult<Self::Output>, SceneError>
     where
@@ -156,7 +159,7 @@ where
     async fn run(self, ctx: &Ctx) -> Result<SceneResult<Self::Output>, SceneError> {
         match tokio::time::timeout(self.timeout, self.inner.run(ctx)).await {
             Ok(result) => result,
-            Err(_) => Ok(SceneResult::bail_with("WithTimeout")),
+            Err(_) => Ok(SceneResult::bail_with("scene timed out")),
         }
     }
 }

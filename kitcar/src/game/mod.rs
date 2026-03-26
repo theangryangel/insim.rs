@@ -410,8 +410,14 @@ impl Game {
     }
 
     /// Poll until the predicate returns `true`.
-    pub async fn wait_for<F: Fn(&GameInfo) -> bool>(&self, predicate: F) -> Result<(), GameError> {
-        let mut interval = time::interval(std::time::Duration::from_millis(500));
+    ///
+    /// `poll_interval` controls how frequently the predicate is evaluated.
+    pub async fn wait_for<F: Fn(&GameInfo) -> bool>(
+        &self,
+        predicate: F,
+        poll_interval: std::time::Duration,
+    ) -> Result<(), GameError> {
+        let mut interval = time::interval(poll_interval);
         loop {
             let _ = interval.tick().await;
             if predicate(&self.get().await?) {
@@ -422,27 +428,36 @@ impl Game {
 
     /// Wait until the game is no longer in progress.
     pub async fn wait_for_end(&self) -> Result<(), GameError> {
-        self.wait_for(|info| !info.flags.is_in_game() && matches!(info.racing, RaceInProgress::No))
-            .await
+        self.wait_for(
+            |info| !info.flags.is_in_game() && matches!(info.racing, RaceInProgress::No),
+            std::time::Duration::from_millis(500),
+        )
+        .await
     }
 
     /// Wait until the given track is loaded and the server is at the selection screen.
     pub async fn wait_for_track(&self, track: Track) -> Result<(), GameError> {
-        self.wait_for(|info| {
-            tracing::debug!("waiting for track {:?}", info);
-            info.track.as_ref() == Some(&track)
-                && !info.flags.is_in_game()
-                && matches!(info.racing, RaceInProgress::No)
-        })
+        self.wait_for(
+            |info| {
+                tracing::debug!("waiting for track {:?}", info);
+                info.track.as_ref() == Some(&track)
+                    && !info.flags.is_in_game()
+                    && matches!(info.racing, RaceInProgress::No)
+            },
+            std::time::Duration::from_millis(500),
+        )
         .await
     }
 
     /// Wait until racing is in progress.
     pub async fn wait_for_racing(&self) -> Result<(), GameError> {
-        self.wait_for(|info| {
-            tracing::debug!("waiting for racing {:?}", info);
-            info.flags.is_in_game() && matches!(info.racing, RaceInProgress::Racing)
-        })
+        self.wait_for(
+            |info| {
+                tracing::debug!("waiting for racing {:?}", info);
+                info.flags.is_in_game() && matches!(info.racing, RaceInProgress::Racing)
+            },
+            std::time::Duration::from_millis(500),
+        )
         .await
     }
 

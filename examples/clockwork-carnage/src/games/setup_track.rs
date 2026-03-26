@@ -69,7 +69,7 @@ where
                 })?;
                 Ok(SceneResult::Continue(()))
             },
-            res = presence.wait_for_connection_count(|val| val < self.min_players) => {
+            res = presence.wait_for_connection_count(|val| val < self.min_players, std::time::Duration::from_millis(500)) => {
                 let _ = res.map_err(|cause| SceneError::Custom {
                     scene: "setup_track::wait_for_connection_count",
                     cause: Box::new(cause),

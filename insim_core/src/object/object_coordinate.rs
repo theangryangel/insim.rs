@@ -8,7 +8,7 @@ pub struct ObjectCoordinate {
     pub x: i16,
     /// Y coordinate (1:16 scale)
     pub y: i16,
-    /// X coordinate (1:4 scale)
+    /// Z coordinate (1:4 scale)
     pub z: u8,
 }
 
