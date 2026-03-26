@@ -6,13 +6,13 @@ pub mod chat;
 use std::time::Duration;
 
 pub use challenge_loop::ChallengeLoop;
-use kitcar::scenes::{Scene, SceneError, SceneExt, SceneResult, wait_for_players::WaitForPlayers};
+use kitcar::scenes::{Scene, SceneError, SceneExt, wait_for_players::WaitForPlayers};
 use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 
 use super::{MiniGame, MiniGameCtx, setup_track};
 use crate::{ChatError, MIN_PLAYERS, db};
 
-#[derive(Clone)]
 pub struct ShortcutGame {
     pub session_id: i64,
     pub track: insim::core::track::Track,
@@ -34,25 +34,7 @@ impl Drop for ShortcutGuard {
 impl MiniGame for ShortcutGame {
     type Guard = ShortcutGuard;
 
-    async fn setup(
-        event: &db::Event,
-        ctx: &MiniGameCtx,
-    ) -> Result<(Self, Self::Guard), SceneError> {
-        let (chat, chat_handle) = chat::spawn(ctx.insim.clone());
-
-        let game = ShortcutGame {
-            session_id: event.id,
-            track: event.track,
-            layout: event.layout.clone(),
-            chat,
-            event_name: event.name.clone(),
-        };
-
-        let guard = ShortcutGuard { chat_handle };
-        Ok((game, guard))
-    }
-
-    async fn run(self, ctx: &MiniGameCtx) -> Result<SceneResult<()>, SceneError> {
+    async fn run(&self, ctx: &MiniGameCtx, cancel: CancellationToken) -> Result<(), SceneError> {
         let challenge_scene = WaitForPlayers {
             min_players: MIN_PLAYERS,
         }
@@ -75,23 +57,39 @@ impl MiniGame for ShortcutGame {
             session_id: self.session_id,
             base_url: ctx.base_url.clone(),
         })
-        .loop_until_quit();
+        .loop_until_quit()
+        .with_cancellation(cancel);
 
         let presence = ctx.presence.clone();
         let chat = self.chat.clone();
 
         tokio::select! {
-            res = challenge_scene.run(ctx) => {
-                let _ = res?;
-                Ok(SceneResult::Continue(()))
-            },
+            res = challenge_scene.run(ctx) => { let _ = res?; Ok(()) },
             _ = chat.wait_for_admin_cmd(presence, |msg| matches!(msg, chat::ChallengeChatMsg::Quit)) => {
-                Ok(SceneResult::Quit)
-            }
+                Ok(())
+            },
         }
     }
 
-    async fn teardown(self, event: &db::Event, ctx: &MiniGameCtx) -> Result<(), SceneError> {
+    async fn setup(
+        event: &db::Event,
+        ctx: &MiniGameCtx,
+    ) -> Result<(Self, Self::Guard), SceneError> {
+        let (chat, chat_handle) = chat::spawn(ctx.insim.clone());
+
+        let game = ShortcutGame {
+            session_id: event.id,
+            track: event.track,
+            layout: event.layout.clone(),
+            chat,
+            event_name: event.name.clone(),
+        };
+
+        let guard = ShortcutGuard { chat_handle };
+        Ok((game, guard))
+    }
+
+    async fn teardown(&self, event: &db::Event, ctx: &MiniGameCtx) -> Result<(), SceneError> {
         db::complete_event(&ctx.pool, event.id)
             .await
             .map_err(|cause| SceneError::Custom {

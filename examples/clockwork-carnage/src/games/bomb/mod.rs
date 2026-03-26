@@ -7,13 +7,13 @@ pub mod state;
 use std::time::Duration;
 
 pub use challenge_loop::BombLoop;
-use kitcar::scenes::{Scene, SceneError, SceneExt, SceneResult, wait_for_players::WaitForPlayers};
+use kitcar::scenes::{Scene, SceneError, SceneExt, wait_for_players::WaitForPlayers};
 use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 
 use super::{MiniGame, MiniGameCtx, setup_track};
 use crate::{ChatError, MIN_PLAYERS, db};
 
-#[derive(Clone)]
 pub struct BombGame {
     pub session_id: i64,
     pub track: insim::core::track::Track,
@@ -37,6 +37,46 @@ impl Drop for BombGuard {
 
 impl MiniGame for BombGame {
     type Guard = BombGuard;
+
+    async fn run(&self, ctx: &MiniGameCtx, cancel: CancellationToken) -> Result<(), SceneError> {
+        let bomb_scene = WaitForPlayers {
+            min_players: MIN_PLAYERS,
+        }
+        .then(
+            setup_track::SetupTrack {
+                min_players: MIN_PLAYERS,
+                track: self.track,
+                layout: Some(self.layout.clone()),
+                mode_name: match &self.event_name {
+                    Some(name) => {
+                        format!("{name} — Bomb: hit every checkpoint before the clock runs out!")
+                    },
+                    None => "Bomb: hit every checkpoint before the clock runs out!".to_string(),
+                },
+            }
+            .with_timeout(Duration::from_secs(60)),
+        )
+        .then(BombLoop {
+            chat: self.chat.clone(),
+            session_id: self.session_id,
+            checkpoint_timeout: self.checkpoint_timeout,
+            checkpoint_penalty: self.checkpoint_penalty,
+            collision_max_penalty: self.collision_max_penalty,
+            base_url: ctx.base_url.clone(),
+        })
+        .loop_until_quit()
+        .with_cancellation(cancel);
+
+        let presence = ctx.presence.clone();
+        let chat = self.chat.clone();
+
+        tokio::select! {
+            res = bomb_scene.run(ctx) => { let _ = res?; Ok(()) },
+            _ = chat.wait_for_admin_cmd(presence, |msg| matches!(msg, chat::BombChatMsg::Quit)) => {
+                Ok(())
+            },
+        }
+    }
 
     async fn setup(
         event: &db::Event,
@@ -76,49 +116,7 @@ impl MiniGame for BombGame {
         Ok((game, guard))
     }
 
-    async fn run(self, ctx: &MiniGameCtx) -> Result<SceneResult<()>, SceneError> {
-        let bomb_scene = WaitForPlayers {
-            min_players: MIN_PLAYERS,
-        }
-        .then(
-            setup_track::SetupTrack {
-                min_players: MIN_PLAYERS,
-                track: self.track,
-                layout: Some(self.layout.clone()),
-                mode_name: match &self.event_name {
-                    Some(name) => {
-                        format!("{name} — Bomb: hit every checkpoint before the clock runs out!")
-                    },
-                    None => "Bomb: hit every checkpoint before the clock runs out!".to_string(),
-                },
-            }
-            .with_timeout(Duration::from_secs(60)),
-        )
-        .then(BombLoop {
-            chat: self.chat.clone(),
-            session_id: self.session_id,
-            checkpoint_timeout: self.checkpoint_timeout,
-            checkpoint_penalty: self.checkpoint_penalty,
-            collision_max_penalty: self.collision_max_penalty,
-            base_url: ctx.base_url.clone(),
-        })
-        .loop_until_quit();
-
-        let presence = ctx.presence.clone();
-        let chat = self.chat.clone();
-
-        tokio::select! {
-            res = bomb_scene.run(ctx) => {
-                let _ = res?;
-                Ok(SceneResult::Continue(()))
-            },
-            _ = chat.wait_for_admin_cmd(presence, |msg| matches!(msg, chat::BombChatMsg::Quit)) => {
-                Ok(SceneResult::Quit)
-            }
-        }
-    }
-
-    async fn teardown(self, event: &db::Event, ctx: &MiniGameCtx) -> Result<(), SceneError> {
+    async fn teardown(&self, event: &db::Event, ctx: &MiniGameCtx) -> Result<(), SceneError> {
         db::complete_event(&ctx.pool, event.id)
             .await
             .map_err(|cause| SceneError::Custom {

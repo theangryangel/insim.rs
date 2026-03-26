@@ -278,9 +278,18 @@ struct ChallengeLoopInner {
 
 impl ChallengeLoopInner {
     async fn run_inner(self) -> Result<SceneResult<()>, SceneError> {
+        let event_url = self
+            .base_url
+            .as_deref()
+            .map(|base| format!("{}/event/{}", base.trim_end_matches('/'), self.session_id));
+        let mut current_leaderboard = self.challenge_leaderboard().await?;
         let (ui, _ui_handle) = ui::mount_with(
             self.insim.clone(),
-            ChallengeGlobalProps::default(),
+            ChallengeGlobalProps {
+                leaderboard: current_leaderboard.clone(),
+                altitudes: vec![],
+                event_url: event_url.clone(),
+            },
             |_ucid, _invalidator| ChallengeView {
                 help_dialog: Dialog::default(),
                 altitude_dialog: Dialog::default(),
@@ -296,17 +305,6 @@ impl ChallengeLoopInner {
                 _ => None,
             },
         );
-
-        let event_url = self
-            .base_url
-            .as_deref()
-            .map(|base| format!("{}/event/{}", base.trim_end_matches('/'), self.session_id));
-        let mut current_leaderboard = self.challenge_leaderboard().await?;
-        ui.set_global_state(ChallengeGlobalProps {
-            leaderboard: current_leaderboard.clone(),
-            altitudes: vec![],
-            event_url: event_url.clone(),
-        });
 
         // Subscribe before seeding to avoid missing events during the queries.
         let mut events = self.presence.subscribe_events();

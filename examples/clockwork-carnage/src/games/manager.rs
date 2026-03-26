@@ -25,7 +25,7 @@ impl MiniGameManager {
         Self { pool, ctx }
     }
 
-    /// Generic executor: setup, bail-retry loop, teardown.
+    /// Generic executor: setup, run until quit or cancellation, teardown.
     async fn execute<G: MiniGame>(
         event: &db::Event,
         ctx: &MiniGameCtx,
@@ -33,21 +33,7 @@ impl MiniGameManager {
     ) -> Result<(), SceneError> {
         vehicle_restrictions::apply(&ctx.insim, &event.allowed_vehicles.0).await?;
         let (game, _guard) = G::setup(event, ctx).await?;
-        loop {
-            let result = tokio::select! {
-                result = game.clone().run(ctx) => result?,
-                _ = cancel.cancelled() => break,
-            };
-            match result {
-                kitcar::scenes::SceneResult::Continue(_) | kitcar::scenes::SceneResult::Quit => {
-                    break;
-                },
-                kitcar::scenes::SceneResult::Bail { msg } => {
-                    tracing::info!("Scene bailed ({msg:?}), retrying...");
-                    continue;
-                },
-            }
-        }
+        game.run(ctx, cancel).await?;
         game.teardown(event, ctx).await?;
         vehicle_restrictions::apply(&ctx.insim, &[]).await?;
         ctx.insim.send_command("/axclear").await?;
@@ -255,7 +241,7 @@ async fn tick_scheduler(pool: &db::Pool) -> Result<u64, sqlx::Error> {
 
     // No active, no due event. Check how soon the next one is.
     match db::next_scheduled_event(pool).await? {
-        Some((_, secs)) => Ok((secs as u64).min(30).max(1)),
+        Some((_, secs)) => Ok((secs as u64).clamp(1, 30)),
         None => Ok(30),
     }
 }

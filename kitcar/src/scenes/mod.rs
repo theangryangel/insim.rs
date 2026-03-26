@@ -2,6 +2,8 @@
 //! manner and can optionally automatically recover.
 use std::{marker::PhantomData, time::Duration};
 
+pub use tokio_util::sync::CancellationToken;
+
 pub mod wait_for_players;
 
 /// Extract a value from a shared context. Implement this for each infrastructure type you want
@@ -38,7 +40,6 @@ pub enum SceneResult<T> {
         /// Optional reason for bailing
         msg: Option<String>,
     },
-    #[allow(unused)]
     /// Quit stops the chain and does not allow a repeat
     Quit,
 }
@@ -71,7 +72,6 @@ pub enum SceneError {
 
     /// Custom error
     #[error("{scene}: {cause}")]
-    #[allow(unused)]
     Custom {
         /// Origin
         scene: &'static str,
@@ -164,7 +164,43 @@ where
     }
 }
 
+/// Wrap a scene so that it exits with [`SceneResult::Quit`] when a [`CancellationToken`] is
+/// triggered.
+///
+/// Place this as the *outermost* combinator so that inner retry loops (e.g. [`LoopUntilQuit`])
+/// are themselves cancelled rather than restarted. When the token fires, the inner future is
+/// dropped at the next `await` point — no teardown is implicit here.
+///
+/// ```text
+/// game_scene
+///     .loop_until_quit()
+///     .with_cancellation(token)  // ← outermost: kills the loop when signalled
+/// ```
+#[derive(Debug, Clone)]
+pub struct WithCancellation<S> {
+    inner: S,
+    token: CancellationToken,
+}
+
+impl<S, Ctx> Scene<Ctx> for WithCancellation<S>
+where
+    S: Scene<Ctx> + Send + 'static,
+    S::Output: Send + 'static,
+    Ctx: Sync,
+{
+    type Output = S::Output;
+
+    async fn run(self, ctx: &Ctx) -> Result<SceneResult<Self::Output>, SceneError> {
+        tokio::select! {
+            biased;
+            _ = self.token.cancelled() => Ok(SceneResult::Quit),
+            result = self.inner.run(ctx) => result,
+        }
+    }
+}
+
 /// Scene Combinators - repeat the chain on bail
+#[derive(Debug, Clone)]
 pub struct LoopUntilQuit<S> {
     scene: S,
 }
@@ -192,8 +228,22 @@ where
 }
 
 /// Helper trait for constructing scene combinator chains.
-pub trait SceneExt: Sized {
-    /// Shortcut to use the Then combinators
+///
+/// Implemented for every `T: Scene<Ctx>`. The `Ctx` type parameter is almost always inferred
+/// from the eventual `.run(ctx)` call, so call sites read naturally:
+///
+/// ```text
+/// scene_a
+///     .and_then(|output| SceneB::from(output))
+///     .then(SceneC)
+///     .loop_until_quit()
+///     .with_cancellation(token)
+/// ```
+pub trait SceneExt<Ctx>: Scene<Ctx> + Sized {
+    /// Run this scene, then `next` if it returned [`SceneResult::Continue`].
+    ///
+    /// The output of this scene is discarded. Use [`SceneExt::and_then`] if the next scene
+    /// needs to be constructed from this scene's output.
     fn then<S>(self, next: S) -> Then<Self, S> {
         Then {
             first: self,
@@ -201,7 +251,23 @@ pub trait SceneExt: Sized {
         }
     }
 
-    /// When a scene bails, automatically start back at the beginning
+    /// Run this scene, then use its output to construct and run the next scene.
+    ///
+    /// Unlike [`SceneExt::then`], the closure receives `Self::Output` and can build the next
+    /// scene dynamically — the only way to pass runtime data between scenes.
+    fn and_then<B, F>(self, f: F) -> AndThen<Self, B, F>
+    where
+        F: Fn(Self::Output) -> B,
+    {
+        AndThen {
+            first: self,
+            next_fn: f,
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Restart the scene from the beginning on [`SceneResult::Bail`] or [`SceneResult::Continue`];
+    /// stop only on [`SceneResult::Quit`].
     fn loop_until_quit(self) -> LoopUntilQuit<Self>
     where
         Self: Clone,
@@ -209,17 +275,19 @@ pub trait SceneExt: Sized {
         LoopUntilQuit { scene: self }
     }
 
-    /// Shortcut to use the Timeout combinator
-    fn with_timeout(self, timeout: Duration) -> WithTimeout<Self>
-    where
-        Self: Clone,
-    {
+    /// Bail if the scene does not complete within `timeout`.
+    fn with_timeout(self, timeout: Duration) -> WithTimeout<Self> {
         WithTimeout {
             inner: self,
             timeout,
         }
     }
+
+    /// Quit the scene immediately if `token` is cancelled, dropping the inner future at the next
+    /// `await` point.
+    fn with_cancellation(self, token: CancellationToken) -> WithCancellation<Self> {
+        WithCancellation { inner: self, token }
+    }
 }
 
-// Blanket impl for all types
-impl<T> SceneExt for T {}
+impl<T: Scene<Ctx>, Ctx> SceneExt<Ctx> for T {}

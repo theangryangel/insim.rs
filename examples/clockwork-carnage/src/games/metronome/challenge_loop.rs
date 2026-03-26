@@ -202,12 +202,17 @@ struct ChallengeLoopInner {
 
 impl ChallengeLoopInner {
     async fn run_inner(self) -> Result<SceneResult<()>, SceneError> {
+        let event_url = self
+            .base_url
+            .as_deref()
+            .map(|base| format!("{}/event/{}", base.trim_end_matches('/'), self.session_id));
+
         let (ui, _ui_handle) = ui::mount_with(
             self.insim.clone(),
             MetronomeGlobalProps {
                 target: self.target,
-                leaderboard: MetronomeLeaderboard::default(),
-                event_url: None,
+                leaderboard: self.metronome_leaderboard().await?,
+                event_url: event_url.clone(),
             },
             |_ucid, _invalidator| MetronomeView {
                 help_dialog: Dialog::default(),
@@ -218,18 +223,6 @@ impl ChallengeLoopInner {
                     .then_some((ucid, MetronomeMessage::Help(DialogMsg::Show)))
             },
         );
-
-        let event_url = self
-            .base_url
-            .as_deref()
-            .map(|base| format!("{}/event/{}", base.trim_end_matches('/'), self.session_id));
-
-        let leaderboard = self.metronome_leaderboard().await?;
-        ui.set_global_state(MetronomeGlobalProps {
-            target: self.target,
-            leaderboard,
-            event_url: event_url.clone(),
-        });
 
         // Subscribe before seeding to avoid missing events during the queries.
         let mut events = self.presence.subscribe_events();
@@ -306,22 +299,21 @@ impl ChallengeLoopInner {
 
                 packet = packets.recv() => {
                     let packet = packet.map_err(|_| SceneError::InsimHandleLost)?;
-                    match packet {
-                        insim::Packet::Uco(Uco {
-                            info:
-                                ObjectInfo::InsimCheckpoint(InsimCheckpoint {
-                                    kind:
-                                        kind @ (InsimCheckpointKind::Checkpoint1 | InsimCheckpointKind::Finish),
-                                    ..
-                                }),
-                            plid,
-                            time,
-                            ..
-                        }) => {
-                            if let Some(player) = players.get(&plid).cloned()
-                                && !player.ptype.is_ai()
-                                && let Some(conn) = connections.get(&player.ucid).cloned()
-                            {
+                    if let insim::Packet::Uco(Uco {
+                        info:
+                            ObjectInfo::InsimCheckpoint(InsimCheckpoint {
+                                kind:
+                                    kind @ (InsimCheckpointKind::Checkpoint1 | InsimCheckpointKind::Finish),
+                                ..
+                            }),
+                        plid,
+                        time,
+                        ..
+                    }) = packet
+                        && let Some(player) = players.get(&plid).cloned()
+                        && !player.ptype.is_ai()
+                        && let Some(conn) = connections.get(&player.ucid).cloned()
+                    {
                                 match kind {
                                     InsimCheckpointKind::Checkpoint1 => {
                                         let _ = active_runs.insert(conn.uname.clone(), time);
@@ -390,9 +382,6 @@ impl ChallengeLoopInner {
                                     in_progress: active_runs.contains_key(&conn.uname),
                                     best_delta: pb,
                                 }).await;
-                            }
-                        },
-                        _ => {},
                     }
                 },
 

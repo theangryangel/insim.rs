@@ -197,9 +197,27 @@ where
         let presence = presence::Presence::from_context(ctx);
         let pool = db::Pool::from_context(ctx);
 
+        let event_url = self
+            .base_url
+            .as_deref()
+            .map(|base| format!("{}/event/{}", base.trim_end_matches('/'), self.session_id));
+
+        let config = state::BombConfig {
+            checkpoint_timeout: self.checkpoint_timeout,
+            checkpoint_penalty: self.checkpoint_penalty,
+            collision_max_penalty: self.collision_max_penalty,
+        };
+
+        let mut state = state::BombState::new(config, BombLeaderboard::default());
+        reload_leaderboard(&pool, self.session_id, &mut state).await?;
+
         let (ui, _ui_handle) = ui::mount_with(
             insim.clone(),
-            BombGlobalProps::default(),
+            BombGlobalProps {
+                leaderboard: state.leaderboard.clone(),
+                active_runs: vec![],
+                event_url: event_url.clone(),
+            },
             |_ucid, invalidator| {
                 let handle = tokio::spawn(async move {
                     let mut interval = tokio::time::interval(Duration::from_millis(100));
@@ -219,19 +237,6 @@ where
                     .then_some((ucid, BombMessage::Help(DialogMsg::Show)))
             },
         );
-
-        let event_url = self
-            .base_url
-            .as_deref()
-            .map(|base| format!("{}/event/{}", base.trim_end_matches('/'), self.session_id));
-
-        let config = state::BombConfig {
-            checkpoint_timeout: self.checkpoint_timeout,
-            checkpoint_penalty: self.checkpoint_penalty,
-            collision_max_penalty: self.collision_max_penalty,
-        };
-        let mut state = state::BombState::new(config, BombLeaderboard::default());
-        reload_leaderboard(&pool, self.session_id, &mut state).await?;
 
         // Subscribe before seeding so we don't miss events that arrive during the queries.
         let mut events = presence.subscribe_events();
@@ -255,12 +260,6 @@ where
             .into_iter()
             .map(|p| (p.plid, p))
             .collect();
-
-        ui.set_global_state(BombGlobalProps {
-            leaderboard: state.leaderboard.clone(),
-            active_runs: vec![],
-            event_url: event_url.clone(),
-        });
 
         let mut packets = insim.subscribe();
         let mut tick = tokio::time::interval(Duration::from_millis(500));
@@ -382,8 +381,7 @@ where
                             if let Some(player) = players.get(&plid)
                                 && !player.ptype.is_ai()
                                 && let Some(conn) = connections.get(&player.ucid)
-                            {
-                                if let Some(res) = state.on_checkpoint(
+                                && let Some(res) = state.on_checkpoint(
                                     conn.uname.clone(),
                                     conn.pname.clone(),
                                     conn.ucid,
@@ -391,7 +389,8 @@ where
                                     player.vehicle,
                                     matches!(kind, InsimCheckpointKind::Finish),
                                     Instant::now(),
-                                ) {
+                                )
+                            {
                                     match res {
                                         state::CheckpointResult::Refreshed { ucid, checkpoints, new_window } => {
                                             let new_secs = new_window.as_secs_f64();
@@ -422,7 +421,6 @@ where
                                     reload_leaderboard(&pool, self.session_id, &mut state).await?;
                                     let active = state.active_runs_props();
                                     ui.set_global_state(BombGlobalProps { leaderboard: state.leaderboard.clone(), active_runs: active, event_url: event_url.clone() });
-                                }
                             }
                         },
                         _ => {},
