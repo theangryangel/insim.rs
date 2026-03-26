@@ -18,6 +18,14 @@
       "matchPackageNames": ["syn", "quote", "proc-macro2"],
       "matchUpdateTypes": ["minor", "patch"],
       "enabled": false
+    },
+    {
+      "description": "Only minor updates for specific crates",
+      "matchManagers": ["cargo"],
+      "matchDepTypes": ["workspace.dependencies"],
+      "matchPackageNames": ["num-traits"],
+      "matchUpdateTypes": ["patch"],
+      "enabled": false
     }
   ]
 }
