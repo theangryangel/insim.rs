@@ -1,0 +1,400 @@
+- !ConcreteSlab
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 1.5707963267948966
+- !ConcreteSlab
+  xyz:
+    x: 32
+    y: 352
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 1.5707963267948966
+- !ConcreteSlab
+  xyz:
+    x: -32
+    y: 32
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 1.5707963267948966
+- !ConcreteSlab
+  xyz:
+    x: 64
+    y: 0
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: -3.141592653589793
+- !ConcreteSlab
+  xyz:
+    x: -64
+    y: 64
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: -3.141592653589793
+- !ConcreteSlab
+  xyz:
+    x: 32
+    y: 32
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 1.5707963267948966
+- !ConcreteSlab
+  xyz:
+    x: 64
+    y: 320
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 0.0
+- !ConcreteSlab
+  xyz:
+    x: 96
+    y: 32
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: -3.141592653589793
+- !ConcreteSlab
+  xyz:
+    x: 0
+    y: 64
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 1.5707963267948966
+- !ConcreteSlab
+  xyz:
+    x: -32
+    y: 96
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 1.5707963267948966
+- !ConcreteSlab
+  xyz:
+    x: 64
+    y: 64
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: -3.141592653589793
+- !ConcreteSlab
+  xyz:
+    x: 96
+    y: 288
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 0.0
+- !ConcreteSlab
+  xyz:
+    x: 32
+    y: 96
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 1.5707963267948966
+- !ConcreteSlab
+  xyz:
+    x: 32
+    y: 288
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 1.5707963267948966
+- !ConcreteSlab
+  xyz:
+    x: 96
+    y: 96
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 0.0
+- !ConcreteSlab
+  xyz:
+    x: 0
+    y: 128
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 1.5707963267948966
+- !ConcreteSlab
+  xyz:
+    x: -32
+    y: 160
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 1.5707963267948966
+- !ConcreteSlab
+  xyz:
+    x: 64
+    y: 256
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: -3.141592653589793
+- !ConcreteSlab
+  xyz:
+    x: 0
+    y: 256
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 1.5707963267948966
+- !ConcreteSlab
+  xyz:
+    x: 64
+    y: 128
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 0.0
+- !ConcreteSlab
+  xyz:
+    x: 96
+    y: 224
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: -3.141592653589793
+- !ConcreteSlab
+  xyz:
+    x: 0
+    y: 192
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 1.5707963267948966
+- !ConcreteSlab
+  xyz:
+    x: 32
+    y: 160
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 1.5707963267948966
+- !ConcreteSlab
+  xyz:
+    x: 96
+    y: 160
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 0.0
+- !ConcreteSlab
+  xyz:
+    x: 32
+    y: 224
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 1.5707963267948966
+- !ConcreteSlab
+  xyz:
+    x: 64
+    y: 192
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: -3.141592653589793
+- !ConcreteSlab
+  xyz:
+    x: 96
+    y: 352
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 0.0
+- !ConcreteSlab
+  xyz:
+    x: -64
+    y: 0
+    z: 0
+  width: Two
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: -3.141592653589793
+- !ConcreteRamp
+  xyz:
+    x: -17
+    y: -2773
+    z: 7
+  width: Four
+  length: Sixteen
+  height: M1_00
+  heading:
+    radians: -3.141592653589793
+- !ConcreteRamp
+  xyz:
+    x: -17
+    y: -2517
+    z: 3
+  width: Four
+  length: Sixteen
+  height: M1_00
+  heading:
+    radians: -3.141592653589793
+- !ConcreteRamp
+  xyz:
+    x: -17
+    y: -2261
+    z: 0
+  width: Four
+  length: Sixteen
+  height: M1_00
+  heading:
+    radians: -3.141592653589793
+- !ConcreteRamp
+  xyz:
+    x: -17
+    y: -2070
+    z: 0
+  width: Four
+  length: Eight
+  height: M0_25
+  heading:
+    radians: -3.141592653589793
+- !ConcreteRamp
+  xyz:
+    x: -17
+    y: -1991
+    z: 0
+  width: Four
+  length: Eight
+  height: M0_25
+  heading:
+    radians: 0.0
+- !ConcreteRamp
+  xyz:
+    x: -17
+    y: -1904
+    z: 0
+  width: Four
+  length: Four
+  height: M0_25
+  heading:
+    radians: 0.0
+- !ConcreteRamp
+  xyz:
+    x: -17
+    y: -1857
+    z: 0
+  width: Four
+  length: Two
+  height: M0_25
+  heading:
+    radians: 0.0
+- !ConcreteRamp
+  xyz:
+    x: -17
+    y: -1809
+    z: 1
+  width: Four
+  length: Four
+  height: M0_75
+  heading:
+    radians: 0.0
+- !ConcreteSlab
+  xyz:
+    x: -17
+    y: -1337
+    z: 0
+  width: Four
+  length: Two
+  pitch: Deg0
+  heading:
+    radians: 0.0
+- !ConcreteSlab
+  xyz:
+    x: -17
+    y: -1199
+    z: 0
+  width: Four
+  length: Sixteen
+  pitch: Deg0
+  heading:
+    radians: 0.0
+- !ConcreteSlab
+  xyz:
+    x: -17
+    y: -943
+    z: 0
+  width: Four
+  length: Sixteen
+  pitch: Deg0
+  heading:
+    radians: 0.0
+- !ConcreteSlab
+  xyz:
+    x: -17
+    y: -812
+    z: 0
+  width: Four
+  length: Sixteen
+  pitch: Deg0
+  heading:
+    radians: 0.0

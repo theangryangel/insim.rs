@@ -1,0 +1,235 @@
+{% extends "base.html" %} {% block title %}Dashboard — Clockwork Carnage{%
+endblock %} {% block content %}
+
+<div class="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-8 items-start">
+  {# ── Left: Events (right on desktop) ── #}
+  <div class="md:order-last">
+    {% match active %} {% when Some with (active_event) %}
+    <p
+      class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2"
+    >
+      Active Challenge
+    </p>
+
+    <a
+      href="/events/{{ active_event.id }}"
+      class="bg-white border border-gray-200 rounded-lg border-l-4 border-l-orange-600 p-4 mb-6 flex items-center justify-between hover:border-orange-600 transition-colors"
+    >
+      <div>
+        <div class="flex items-center gap-2">
+          <p class="font-bold">
+            {% match active_event.name %}{% when Some with (n) %}{{ n }}{% when
+            None %}{{ active_event.track }} — {{ active_event.layout }}{%
+            endmatch %}
+          </p>
+          {% match *active_event.mode %} {% when EventMode::Metronome { .. } %}
+          <span
+            class="flex items-center gap-1.5 px-2 py-0.5 bg-orange-600/20 rounded-full border border-orange-800/30"
+            ><span class="h-2 w-2 bg-orange-600 rounded-full"></span
+            ><span class="text-[10px] font-semibold text-orange-600 uppercase"
+              >Metronome</span
+            ></span
+          >
+          {% when EventMode::Shortcut %}
+          <span
+            class="flex items-center gap-1.5 px-2 py-0.5 bg-blue-600/20 rounded-full border border-blue-800/30"
+            ><span class="h-2 w-2 bg-blue-600 rounded-full"></span
+            ><span class="text-[10px] font-semibold text-blue-600 uppercase"
+              >Shortcut</span
+            ></span
+          >
+          {% when EventMode::Bomb { .. } %}
+          <span
+            class="flex items-center gap-1.5 px-2 py-0.5 bg-red-600/20 rounded-full border border-red-800/30"
+            ><span class="h-2 w-2 bg-red-600 rounded-full"></span
+            ><span class="text-[10px] font-semibold text-red-600 uppercase"
+              >Bomb</span
+            ></span
+          >
+          {% endmatch %}
+        </div>
+        {% match active_event.scheduled_at %}{% when Some with (s) %}
+        <p class="text-xs text-gray-400">
+          <time datetime="{{ s|as_datetime }}" x-data x-localtime
+            >{{ s|format_timestamp }}</time
+          >
+        </p>
+        {% when None %}{% endmatch %}
+      </div>
+      <span
+        class="flex items-center gap-1.5 px-2 py-1 bg-orange-600/20 rounded-full border border-orange-800/30"
+      >
+        <span class="h-2 w-2 bg-orange-600 rounded-full animate-pulse"></span>
+        <span class="text-[10px] font-semibold text-orange-600 uppercase"
+          >Live</span
+        >
+      </span>
+    </a>
+    {% when None %} {% endmatch %}
+
+    <p
+      class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2"
+    >
+      Upcoming
+    </p>
+    <div class="flex flex-col gap-2">
+      {% if upcoming.is_empty() %}
+      <p class="text-center text-xs text-gray-300 font-mono py-4">
+        Nothing scheduled.
+      </p>
+      {% endif %} {% for event in upcoming %}
+      <a
+        href="/events/{{ event.id }}"
+        class="bg-white border border-gray-200 rounded-lg p-4 flex items-center justify-between hover:border-gray-300 hover:shadow-sm transition-all"
+      >
+        <div class="flex items-center gap-2">
+          <p class="font-bold">
+            {% match event.name %}{% when Some with (n) %}{{ n }}{% when None
+            %}{{ event.track }} — {{ event.layout }}{% endmatch %}
+          </p>
+          {% match *event.mode %} {% when EventMode::Metronome { .. } %}
+          <span
+            class="flex items-center gap-1.5 px-2 py-0.5 bg-orange-600/20 rounded-full border border-orange-800/30"
+            ><span class="h-2 w-2 bg-orange-600 rounded-full"></span
+            ><span class="text-[10px] font-semibold text-orange-600 uppercase"
+              >Metronome</span
+            ></span
+          >
+          {% when EventMode::Shortcut %}
+          <span
+            class="flex items-center gap-1.5 px-2 py-0.5 bg-blue-600/20 rounded-full border border-blue-800/30"
+            ><span class="h-2 w-2 bg-blue-600 rounded-full"></span
+            ><span class="text-[10px] font-semibold text-blue-600 uppercase"
+              >Shortcut</span
+            ></span
+          >
+          {% when EventMode::Bomb { .. } %}
+          <span
+            class="flex items-center gap-1.5 px-2 py-0.5 bg-red-600/20 rounded-full border border-red-800/30"
+            ><span class="h-2 w-2 bg-red-600 rounded-full"></span
+            ><span class="text-[10px] font-semibold text-red-600 uppercase"
+              >Bomb</span
+            ></span
+          >
+          {% endmatch %}
+        </div>
+        <span class="text-right">
+          {% match event.scheduled_at %}{% when Some with (s) %}<time
+            datetime="{{ s|as_datetime }}"
+            x-data
+            x-localtime
+            class="text-xs text-gray-400 mr-2"
+            >{{ s|format_timestamp }}</time
+          >{% when None %}{% endmatch %}
+          <span class="font-mono text-xs text-gray-400">#{{ event.id }}</span>
+        </span>
+      </a>
+      {% endfor %}
+    </div>
+
+    <div
+      class="mt-6"
+      hx-get="/presence"
+      hx-trigger="load"
+      hx-swap="outerHTML"
+    ></div>
+  </div>
+
+  {# ── Right: About (left on desktop) ── #}
+  <div class="md:order-first">
+    <p
+      class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3"
+    >
+      About
+    </p>
+
+    <p class="text-gray-500 mb-3">
+      Clockwork Carnage is a Live for Speed mini-game server. Jump in and race
+      across three unique challenge modes — each one tests a different skill and
+      keeps every event fresh.
+    </p>
+
+    <p class="text-gray-500 mb-3">
+      Built with
+      <a
+        href="https://github.com/theangryangel/insim.rs"
+        class="underline hover:text-orange-600"
+        >insim.rs</a
+      >
+    </p>
+
+    <p class="text-gray-500 mb-6">
+      <a href="/auth/login" class="underline hover:text-orange-600"
+        >Log in with your LFS account</a
+      >
+      to link your
+      <span class="text-purple-600 font-medium">Twitch</span> and
+      <span class="text-red-500 font-medium">YouTube</span> channels — your
+      links will appear alongside your results so spectators can find your
+      stream. Set them on your
+      <a href="/profile" class="underline hover:text-orange-600">profile page</a
+      >.
+    </p>
+
+    <p
+      class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3"
+    >
+      Event Types
+    </p>
+
+    <div class="flex flex-col gap-3 mb-6">
+      {% include "partials/mode_card_metronome.html" %} {% include
+      "partials/mode_card_shortcut.html" %} {% include
+      "partials/mode_card_bomb.html" %}
+    </div>
+
+    <p
+      class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3"
+    >
+      How It Works
+    </p>
+
+    <div class="flex flex-col mb-6">
+      <div class="flex gap-3 py-3 border-b border-gray-100">
+        <span
+          class="flex-shrink-0 h-6 w-6 rounded-full bg-gray-200 text-xs font-bold flex items-center justify-center text-gray-500"
+          >1</span
+        >
+        <div>
+          <p class="font-semibold">Join an event</p>
+          <p class="text-xs text-gray-500">
+            Pick an active or upcoming event from the dashboard and hop into the
+            server.
+          </p>
+        </div>
+      </div>
+      <div class="flex gap-3 py-3 border-b border-gray-100">
+        <span
+          class="flex-shrink-0 h-6 w-6 rounded-full bg-gray-200 text-xs font-bold flex items-center justify-center text-gray-500"
+          >2</span
+        >
+        <div>
+          <p class="font-semibold">Race your way</p>
+          <p class="text-xs text-gray-500">
+            Each mode has its own rules: match the target time, run the fastest
+            shortcut, or survive the bomb countdown.
+          </p>
+        </div>
+      </div>
+      <div class="flex gap-3 py-3">
+        <span
+          class="flex-shrink-0 h-6 w-6 rounded-full bg-gray-200 text-xs font-bold flex items-center justify-center text-gray-500"
+          >3</span
+        >
+        <div>
+          <p class="font-semibold">Check the standings</p>
+          <p class="text-xs text-gray-500">
+            Live standings and round breakdowns update automatically as results
+            come in.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

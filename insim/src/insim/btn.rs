@@ -1,5 +1,5 @@
 use bytes::{Buf, BufMut};
-use insim_core::{Decode, DecodeErrorKind, DecodeString, Encode, EncodeString};
+use insim_core::{Decode, DecodeContext, DecodeErrorKind, Encode, EncodeContext};
 
 use crate::identifiers::{ClickId, ConnectionId, RequestId};
 
@@ -183,7 +183,7 @@ impl BtnStyle {
 }
 
 impl Encode for BtnStyle {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
         let colour = match self.colour {
             BtnStyleColour::NotEditable => 0,
             BtnStyleColour::Title => 1,
@@ -196,15 +196,13 @@ impl Encode for BtnStyle {
         };
         let flags = self.flags.bits();
 
-        (colour | flags)
-            .encode(buf)
-            .map_err(|e| e.nested().context("BtnStyle::value"))
+        ctx.encode("value", &(colour | flags))
     }
 }
 
 impl Decode for BtnStyle {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let val = u8::decode(buf).map_err(|e| e.nested().context("BtnStyle::value"))?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let val = ctx.decode::<u8>("value")?;
 
         let colour = match val & !248 {
             1 => BtnStyleColour::Title,
@@ -335,50 +333,51 @@ pub struct Btn {
 }
 
 impl Decode for Btn {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf)?;
-        let ucid = ConnectionId::decode(buf)?;
-        let clickid = ClickId::decode(buf)?;
-        let inst = BtnInst::decode(buf)?;
-        let bstyle = BtnStyle::decode(buf)?;
-        let typein = u8::decode(buf)?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let reqi = ctx.decode::<RequestId>("reqi")?;
+        let ucid = ctx.decode::<ConnectionId>("ucid")?;
+        let clickid = ctx.decode::<ClickId>("clickid")?;
+        let inst = ctx.decode::<BtnInst>("inst")?;
+        let bstyle = ctx.decode::<BtnStyle>("bstyle")?;
+        let typein = ctx.decode::<u8>("typein")?;
         let typein = if typein > 0 { Some(typein) } else { None };
-        let l = u8::decode(buf)?;
-        let t = u8::decode(buf)?;
-        let w = u8::decode(buf)?;
-        let h = u8::decode(buf)?;
+        let l = ctx.decode::<u8>("l")?;
+        let t = ctx.decode::<u8>("t")?;
+        let w = ctx.decode::<u8>("w")?;
+        let h = ctx.decode::<u8>("h")?;
 
-        let (caption, text) = if let Some(&0_u8) = buf.first() {
+        let (caption, text) = if let Some(&0_u8) = ctx.buf.first() {
             // text with caption has a leading \0
-            buf.advance(1);
+            ctx.buf.advance(1);
 
             // find the caption ending
-            let split = if let Some(split) = buf.iter().position(|c| c == &0_u8) {
+            let split = if let Some(split) = ctx.buf.iter().position(|c| c == &0_u8) {
                 split
             } else {
                 return Err(DecodeErrorKind::ExpectedNull
                     .context("Btn: Expected caption but found no \0 in text field"));
             };
 
-            let caption = buf.split_to(split);
+            let caption = ctx.buf.split_to(split);
             let caption = insim_core::string::codepages::to_lossy_string(&caption);
 
-            buf.advance(1);
+            ctx.buf.advance(1);
 
             let text = insim_core::string::codepages::to_lossy_string(
-                insim_core::string::strip_trailing_nul(buf.as_ref()),
+                insim_core::string::strip_trailing_nul(ctx.buf.as_ref()),
             )
             .to_string();
 
             // ensure that we don't leave anything unconsumed, so that the codec doesnt raise an
             // incomplete parse error
-            let remaining = buf.remaining();
-            buf.advance(remaining);
+            let remaining = ctx.buf.remaining();
+            ctx.buf.advance(remaining);
 
             (Some(caption.to_string()), text.to_string())
         } else {
             // just text
-            (None, String::decode_codepage(buf, buf.remaining())?)
+            let remaining = ctx.buf.remaining();
+            (None, ctx.decode_codepage("text", remaining)?)
         };
 
         Ok(Self {
@@ -399,7 +398,7 @@ impl Decode for Btn {
 }
 
 impl Encode for Btn {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
         if self.l > 200 {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
                 min: 0,
@@ -436,20 +435,20 @@ impl Encode for Btn {
             .context("Btn::h"));
         }
 
-        self.reqi.encode(buf)?;
-        self.ucid.encode(buf)?;
-        self.clickid.encode(buf)?;
-        self.inst.encode(buf)?;
-        self.bstyle.encode(buf)?;
+        ctx.encode("reqi", &self.reqi)?;
+        ctx.encode("ucid", &self.ucid)?;
+        ctx.encode("clickid", &self.clickid)?;
+        ctx.encode("inst", &self.inst)?;
+        ctx.encode("bstyle", &self.bstyle)?;
         if let Some(typein) = self.typein {
-            typein.encode(buf)?;
+            ctx.encode("typein", &typein)?;
         } else {
-            0_u8.encode(buf)?;
+            ctx.encode("typein", &0_u8)?;
         }
-        self.l.encode(buf)?;
-        self.t.encode(buf)?;
-        self.w.encode(buf)?;
-        self.h.encode(buf)?;
+        ctx.encode("l", &self.l)?;
+        ctx.encode("t", &self.t)?;
+        ctx.encode("w", &self.w)?;
+        ctx.encode("h", &self.h)?;
 
         if let Some(caption) = &self.caption {
             let caption = insim_core::string::codepages::to_lossy_bytes(caption);
@@ -464,21 +463,20 @@ impl Encode for Btn {
                 .context("Btn: Caption + text too large"));
             }
 
-            buf.put_u8(0);
-            buf.extend_from_slice(&caption);
-            buf.put_u8(0);
-            buf.extend_from_slice(&text);
+            ctx.buf.put_u8(0);
+            ctx.buf.extend_from_slice(&caption);
+            ctx.buf.put_u8(0);
+            ctx.buf.extend_from_slice(&text);
 
             let written = caption.len() + text.len() + 2;
             if written < BTN_TEXT_MAX_LEN {
                 let align_to = BTN_TEXT_ALIGN - 1;
                 let round_to = (written + align_to) & !align_to;
                 let round_to = round_to.min(BTN_TEXT_MAX_LEN);
-                buf.put_bytes(0, round_to - written);
+                ctx.buf.put_bytes(0, round_to - written);
             }
         } else {
-            self.text
-                .encode_codepage_with_alignment(buf, 240, 4, false)?;
+            ctx.encode_codepage_with_alignment("text", &self.text, 240, 4, false)?;
         }
 
         Ok(())
@@ -533,12 +531,12 @@ pub struct Btt {
 }
 
 impl Decode for Btt {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf)?;
-        let ucid = ConnectionId::decode(buf)?;
-        let clickid = ClickId::decode(buf)?;
-        let inst = BtnInst::decode(buf)?;
-        let typein = u8::decode(buf)?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let reqi = ctx.decode::<RequestId>("reqi")?;
+        let ucid = ctx.decode::<ConnectionId>("ucid")?;
+        let clickid = ctx.decode::<ClickId>("clickid")?;
+        let inst = ctx.decode::<BtnInst>("inst")?;
+        let typein = ctx.decode::<u8>("typein")?;
         if typein > 96 {
             return Err(insim_core::DecodeErrorKind::OutOfRange {
                 min: 0,
@@ -548,8 +546,8 @@ impl Decode for Btt {
             .context("Btn::typein"));
         }
         let typein = if typein > 0 { Some(typein) } else { None };
-        buf.advance(1);
-        let text = String::decode_codepage(buf, 96)?;
+        ctx.pad("pad", 1)?;
+        let text = ctx.decode_codepage("text", 96)?;
         Ok(Self {
             reqi,
             ucid,
@@ -562,11 +560,11 @@ impl Decode for Btt {
 }
 
 impl Encode for Btt {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi.encode(buf)?;
-        self.ucid.encode(buf)?;
-        self.clickid.encode(buf)?;
-        self.inst.encode(buf)?;
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("reqi", &self.reqi)?;
+        ctx.encode("ucid", &self.ucid)?;
+        ctx.encode("clickid", &self.clickid)?;
+        ctx.encode("inst", &self.inst)?;
         let typein = self.typein.unwrap_or(0_u8);
         if typein > 96 {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
@@ -576,9 +574,9 @@ impl Encode for Btt {
             }
             .context("Btn::typein"));
         }
-        typein.encode(buf)?;
-        buf.put_bytes(0, 1);
-        self.text.encode_codepage(buf, 96, false)?;
+        ctx.encode("typein", &typein)?;
+        ctx.pad("pad", 1)?;
+        ctx.encode_codepage("text", &self.text, 96, false)?;
         Ok(())
     }
 }
@@ -588,6 +586,7 @@ mod tests {
     use std::borrow::Cow;
 
     use bytes::{BufMut, BytesMut};
+    use insim_core::EncodeContext;
 
     use super::*;
 
@@ -598,7 +597,7 @@ mod tests {
         bstyle.colour = BtnStyleColour::Title;
 
         let mut buf = BytesMut::new();
-        bstyle.encode(&mut buf).unwrap();
+        bstyle.encode(&mut EncodeContext::new(&mut buf)).unwrap();
 
         assert_eq!(buf.as_ref(), [9]);
     }
@@ -764,7 +763,7 @@ mod tests {
         };
 
         let mut buf = BytesMut::new();
-        let res = btn.encode(&mut buf);
+        let res = btn.encode(&mut EncodeContext::new(&mut buf));
 
         assert!(res.is_err());
         assert!(matches!(

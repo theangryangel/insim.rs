@@ -1,5 +1,8 @@
 use bitflags::bitflags;
-use insim_core::{Decode, Encode, coordinate::Coordinate, dash_lights::DashLights, vector::Vector};
+use insim_core::{
+    Decode, DecodeContext, Encode, EncodeContext, coordinate::Coordinate, dash_lights::DashLights,
+    vector::Vector,
+};
 
 use crate::identifiers::{PlayerId, RequestId};
 
@@ -30,14 +33,14 @@ pub struct OsMain {
 }
 
 impl Decode for OsMain {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let angvel = Vector::decode(buf).map_err(|e| e.nested().context("OsMain::angvel"))?;
-        let heading = f32::decode(buf).map_err(|e| e.nested().context("OsMain::heading"))?;
-        let pitch = f32::decode(buf).map_err(|e| e.nested().context("OsMain::pitch"))?;
-        let roll = f32::decode(buf).map_err(|e| e.nested().context("OsMain::roll"))?;
-        let accel = Vector::decode(buf).map_err(|e| e.nested().context("OsMain::accel"))?;
-        let vel = Vector::decode(buf).map_err(|e| e.nested().context("OsMain::vel"))?;
-        let pos = Coordinate::decode(buf).map_err(|e| e.nested().context("OsMain::pos"))?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let angvel = ctx.decode::<Vector>("angvel")?;
+        let heading = ctx.decode::<f32>("heading")?;
+        let pitch = ctx.decode::<f32>("pitch")?;
+        let roll = ctx.decode::<f32>("roll")?;
+        let accel = ctx.decode::<Vector>("accel")?;
+        let vel = ctx.decode::<Vector>("vel")?;
+        let pos = ctx.decode::<Coordinate>("pos")?;
         Ok(Self {
             angvel,
             heading,
@@ -51,28 +54,14 @@ impl Decode for OsMain {
 }
 
 impl Encode for OsMain {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.angvel
-            .encode(buf)
-            .map_err(|e| e.nested().context("OsMain::angvel"))?;
-        self.heading
-            .encode(buf)
-            .map_err(|e| e.nested().context("OsMain::heading"))?;
-        self.pitch
-            .encode(buf)
-            .map_err(|e| e.nested().context("OsMain::pitch"))?;
-        self.roll
-            .encode(buf)
-            .map_err(|e| e.nested().context("OsMain::roll"))?;
-        self.accel
-            .encode(buf)
-            .map_err(|e| e.nested().context("OsMain::accel"))?;
-        self.vel
-            .encode(buf)
-            .map_err(|e| e.nested().context("OsMain::vel"))?;
-        self.pos
-            .encode(buf)
-            .map_err(|e| e.nested().context("OsMain::pos"))?;
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("angvel", &self.angvel)?;
+        ctx.encode("heading", &self.heading)?;
+        ctx.encode("pitch", &self.pitch)?;
+        ctx.encode("roll", &self.roll)?;
+        ctx.encode("accel", &self.accel)?;
+        ctx.encode("vel", &self.vel)?;
+        ctx.encode("pos", &self.pos)?;
         Ok(())
     }
 }

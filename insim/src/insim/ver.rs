@@ -1,5 +1,4 @@
-use bytes::{Buf, BufMut};
-use insim_core::{Decode, DecodeString, Encode, EncodeString, game_version::GameVersion};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext, game_version::GameVersion};
 
 use crate::identifiers::RequestId;
 
@@ -24,16 +23,15 @@ pub struct Ver {
 }
 
 impl Decode for Ver {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf).map_err(|e| e.nested().context("Ver::reqi"))?;
-        buf.advance(1);
-        let version = GameVersion::decode(buf).map_err(|e| e.nested().context("Ver::version"))?;
-        let product =
-            String::decode_ascii(buf, 6).map_err(|e| e.nested().context("Ver::product"))?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let reqi = ctx.decode::<RequestId>("reqi")?;
+        ctx.pad("zero", 1)?;
+        let version = ctx.decode::<GameVersion>("version")?;
+        let product = ctx.decode_ascii("product", 6)?;
 
-        let insimver = buf.get_u8();
+        let insimver = ctx.decode::<u8>("insimver")?;
 
-        buf.advance(1);
+        ctx.pad("sp0", 1)?;
 
         Ok(Self {
             reqi,
@@ -45,22 +43,14 @@ impl Decode for Ver {
 }
 
 impl Encode for Ver {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi
-            .encode(buf)
-            .map_err(|e| e.nested().context("Ver::reqi"))?;
-        buf.put_u8(0);
-        self.version
-            .encode(buf)
-            .map_err(|e| e.nested().context("Ver::version"))?;
-        self.product
-            .encode_codepage(buf, 6, false)
-            .map_err(|e| e.nested().context("Ver::product"))?;
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("reqi", &self.reqi)?;
+        ctx.pad("zero", 1)?;
+        ctx.encode("version", &self.version)?;
+        ctx.encode_ascii("product", &self.product, 6, false)?;
 
-        self.insimver
-            .encode(buf)
-            .map_err(|e| e.nested().context("Ver::insimver"))?;
-        buf.put_u8(0);
+        ctx.encode("insimver", &self.insimver)?;
+        ctx.pad("sp0", 1)?;
 
         Ok(())
     }

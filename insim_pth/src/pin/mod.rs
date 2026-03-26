@@ -9,7 +9,7 @@ use std::{
 };
 
 use bytes::{Bytes, BytesMut};
-use insim_core::{Decode, Encode};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 
 #[derive(Debug, PartialEq)]
 /// PIN file
@@ -42,7 +42,9 @@ impl Pin {
                 let _ = reader.read_to_end(&mut data)?;
                 let mut buf = Bytes::from(data);
 
-                Ok(Self::LfsPin0(v0::LfsPin::decode(&mut buf)?))
+                Ok(Self::LfsPin0(v0::LfsPin::decode(&mut DecodeContext::new(
+                    &mut buf,
+                ))?))
             },
             _ => Err(super::Error::UnsupportedVersion {
                 magic: magic.to_vec(),
@@ -58,7 +60,7 @@ impl Pin {
         let mut buf = BytesMut::new();
         match self {
             Pin::LfsPin0(inner) => {
-                inner.encode(&mut buf)?;
+                inner.encode(&mut EncodeContext::new(&mut buf))?;
                 written += writer.write(b"LFSPIN\0")?;
                 written += writer.write(&buf[..])?;
             },

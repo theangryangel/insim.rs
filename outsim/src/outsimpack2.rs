@@ -1,9 +1,8 @@
 //! OutsimPack
 use std::time::Duration;
 
-use bytes::{Buf, BufMut, Bytes, BytesMut};
 use insim_core::{
-    Decode, DecodeError, DecodeString, Encode, EncodeError, EncodeString, coordinate::Coordinate,
+    Decode, DecodeContext, DecodeError, Encode, EncodeContext, EncodeError, coordinate::Coordinate,
     gear::Gear, vector::Vector,
 };
 
@@ -63,27 +62,27 @@ pub struct OutsimMain {
 }
 
 impl Encode for OutsimMain {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.angvel.encode(buf)?;
-        self.heading.encode(buf)?;
-        self.pitch.encode(buf)?;
-        self.roll.encode(buf)?;
-        self.accel.encode(buf)?;
-        self.vel.encode(buf)?;
-        self.pos.encode(buf)?;
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("angvel", &self.angvel)?;
+        ctx.encode("heading", &self.heading)?;
+        ctx.encode("pitch", &self.pitch)?;
+        ctx.encode("roll", &self.roll)?;
+        ctx.encode("accel", &self.accel)?;
+        ctx.encode("vel", &self.vel)?;
+        ctx.encode("pos", &self.pos)?;
         Ok(())
     }
 }
 
 impl Decode for OutsimMain {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let angvel = Vector::decode(buf)?;
-        let heading = f32::decode(buf)?;
-        let pitch = f32::decode(buf)?;
-        let roll = f32::decode(buf)?;
-        let accel = Vector::decode(buf)?;
-        let vel = Vector::decode(buf)?;
-        let pos = Coordinate::decode(buf)?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let angvel = ctx.decode::<Vector>("angvel")?;
+        let heading = ctx.decode::<f32>("heading")?;
+        let pitch = ctx.decode::<f32>("pitch")?;
+        let roll = ctx.decode::<f32>("roll")?;
+        let accel = ctx.decode::<Vector>("accel")?;
+        let vel = ctx.decode::<Vector>("vel")?;
+        let pos = ctx.decode::<Coordinate>("pos")?;
 
         Ok(Self {
             angvel,
@@ -188,48 +187,50 @@ pub struct OutsimPack2 {
 
 impl OutsimPack2 {
     /// How should we decode this?
-    pub fn decode_with_options(buf: &mut Bytes, opts: &OutSimOpts) -> Result<Self, DecodeError> {
+    pub fn decode_with_options(
+        ctx: &mut DecodeContext,
+        opts: &OutSimOpts,
+    ) -> Result<Self, DecodeError> {
         let mut val = Self::default();
         if opts.contains(OutSimOpts::HEADER) {
-            val.header = Some(String::decode_ascii(buf, 4)?);
+            val.header = Some(ctx.decode_ascii("header", 4)?);
         }
 
         if opts.contains(OutSimOpts::ID) {
-            val.id = Some(OutsimId::decode(buf)?);
+            val.id = Some(ctx.decode::<OutsimId>("id")?);
         }
 
         if opts.contains(OutSimOpts::TIME) {
-            let time = Duration::from_millis(u32::decode(buf)? as u64);
-            val.time = Some(time);
+            val.time = Some(ctx.decode_duration::<u32>("time")?);
         }
 
         if opts.contains(OutSimOpts::MAIN) {
-            val.osmain = Some(OutsimMain::decode(buf)?);
+            val.osmain = Some(ctx.decode::<OutsimMain>("osmain")?);
         }
 
         if opts.contains(OutSimOpts::INPUTS) {
-            val.osinputs = Some(OutsimInputs::decode(buf)?);
+            val.osinputs = Some(ctx.decode::<OutsimInputs>("osinputs")?);
         }
 
         if opts.contains(OutSimOpts::DRIVE) {
-            val.gear = Some(Gear::decode(buf)?);
-            buf.advance(3);
-            val.engineangvel = Some(f32::decode(buf)?);
-            val.maxtorqueatvel = Some(f32::decode(buf)?);
+            val.gear = Some(ctx.decode::<Gear>("gear")?);
+            ctx.pad("pad", 3)?;
+            val.engineangvel = Some(ctx.decode::<f32>("engineangvel")?);
+            val.maxtorqueatvel = Some(ctx.decode::<f32>("maxtorqueatvel")?);
         }
 
         if opts.contains(OutSimOpts::DISTANCE) {
-            val.currentlapdist = Some(f32::decode(buf)?);
-            val.indexeddistance = Some(f32::decode(buf)?);
+            val.currentlapdist = Some(ctx.decode::<f32>("currentlapdist")?);
+            val.indexeddistance = Some(ctx.decode::<f32>("indexeddistance")?);
         }
 
         if opts.contains(OutSimOpts::WHEELS) {
-            val.oswheels = Some(<[OutsimWheel; 4]>::decode(buf)?);
+            val.oswheels = Some(ctx.decode::<[OutsimWheel; 4]>("oswheels")?);
         }
 
         if opts.contains(OutSimOpts::EXTRA) {
-            val.steertorque = Some(f32::decode(buf)?);
-            buf.advance(4);
+            val.steertorque = Some(ctx.decode::<f32>("steertorque")?);
+            ctx.pad("pad", 4)?;
         }
 
         Ok(val)
@@ -238,52 +239,52 @@ impl OutsimPack2 {
     /// How should we encode this?
     pub fn encode_with_options(
         &self,
-        buf: &mut BytesMut,
+        ctx: &mut EncodeContext,
         opts: &OutSimOpts,
     ) -> Result<(), EncodeError> {
         if opts.contains(OutSimOpts::HEADER) {
             if let Some(header) = &self.header {
-                header.encode_ascii(buf, 4, false)?;
+                ctx.encode_ascii("header", header, 4, false)?;
             } else {
-                buf.put_bytes(0, 4);
+                ctx.pad("pad", 4)?;
             }
         }
 
         if opts.contains(OutSimOpts::ID) {
-            self.id.unwrap_or_default().encode(buf)?;
+            ctx.encode("id", &self.id.unwrap_or_default())?;
         }
 
         if opts.contains(OutSimOpts::TIME) {
-            (self.time.unwrap_or_default().as_millis() as u32).encode(buf)?;
+            ctx.encode_duration::<u32>("time", self.time.unwrap_or_default())?;
         }
 
         if opts.contains(OutSimOpts::MAIN) {
-            self.osmain.unwrap_or_default().encode(buf)?;
+            ctx.encode("osmain", &self.osmain.unwrap_or_default())?;
         }
 
         if opts.contains(OutSimOpts::INPUTS) {
-            self.osinputs.unwrap_or_default().encode(buf)?;
+            ctx.encode("osinputs", &self.osinputs.unwrap_or_default())?;
         }
 
         if opts.contains(OutSimOpts::DRIVE) {
-            self.gear.unwrap_or_default().encode(buf)?;
-            buf.put_bytes(0, 3);
-            self.engineangvel.unwrap_or_default().encode(buf)?;
-            self.maxtorqueatvel.unwrap_or_default().encode(buf)?;
+            ctx.encode("gear", &self.gear.unwrap_or_default())?;
+            ctx.pad("pad", 3)?;
+            ctx.encode("engineangvel", &self.engineangvel.unwrap_or_default())?;
+            ctx.encode("maxtorqueatvel", &self.maxtorqueatvel.unwrap_or_default())?;
         }
 
         if opts.contains(OutSimOpts::DISTANCE) {
-            self.currentlapdist.unwrap_or_default().encode(buf)?;
-            self.indexeddistance.unwrap_or_default().encode(buf)?;
+            ctx.encode("currentlapdist", &self.currentlapdist.unwrap_or_default())?;
+            ctx.encode("indexeddistance", &self.indexeddistance.unwrap_or_default())?;
         }
 
         if opts.contains(OutSimOpts::WHEELS) {
-            self.oswheels.unwrap_or_default().encode(buf)?;
+            ctx.encode("oswheels", &self.oswheels.unwrap_or_default())?;
         }
 
         if opts.contains(OutSimOpts::EXTRA) {
-            self.steertorque.unwrap_or_default().encode(buf)?;
-            buf.put_bytes(0, 4);
+            ctx.encode("steertorque", &self.steertorque.unwrap_or_default())?;
+            ctx.pad("pad", 4)?;
         }
 
         Ok(())
@@ -292,6 +293,8 @@ impl OutsimPack2 {
 
 #[cfg(test)]
 mod test {
+    use bytes::{Buf, BytesMut};
+
     use super::*;
 
     #[test]
@@ -301,16 +304,19 @@ mod test {
 
         let opts = OutSimOpts::HEADER;
 
-        let buf = input.freeze();
+        let orig = input.freeze();
+        let mut buf = orig.clone();
+        let mut ctx = DecodeContext::new(&mut buf);
 
-        let parsed = OutsimPack2::decode_with_options(&mut buf.clone(), &opts).unwrap();
+        let parsed = OutsimPack2::decode_with_options(&mut ctx, &opts).unwrap();
         assert!(parsed.header.is_some());
 
         let mut output = BytesMut::new();
+        let mut output_ctx = EncodeContext::new(&mut output);
 
-        parsed.encode_with_options(&mut output, &opts).unwrap();
+        parsed.encode_with_options(&mut output_ctx, &opts).unwrap();
 
-        assert_eq!(buf.as_ref(), output.as_ref());
+        assert_eq!(orig.as_ref(), output.as_ref());
     }
 
     #[test]
@@ -320,17 +326,20 @@ mod test {
 
         let opts = OutSimOpts::ID;
 
-        let buf = input.freeze();
+        let orig = input.freeze();
+        let mut buf = orig.clone();
+        let mut ctx = DecodeContext::new(&mut buf);
 
-        let parsed = OutsimPack2::decode_with_options(&mut buf.clone(), &opts).unwrap();
+        let parsed = OutsimPack2::decode_with_options(&mut ctx, &opts).unwrap();
         assert!(parsed.header.is_none());
         assert!(matches!(parsed.id, Some(OutsimId(117769280))));
 
         let mut output = BytesMut::new();
+        let mut output_ctx = EncodeContext::new(&mut output);
 
-        parsed.encode_with_options(&mut output, &opts).unwrap();
+        parsed.encode_with_options(&mut output_ctx, &opts).unwrap();
 
-        assert_eq!(buf.as_ref(), output.as_ref());
+        assert_eq!(orig.as_ref(), output.as_ref());
     }
 
     #[test]
@@ -624,8 +633,9 @@ mod test {
         let buf = input.freeze();
 
         let mut buf_to_parse = buf.clone();
+        let mut ctx = DecodeContext::new(&mut buf_to_parse);
 
-        let parsed = OutsimPack2::decode_with_options(&mut buf_to_parse, &opts).unwrap();
+        let parsed = OutsimPack2::decode_with_options(&mut ctx, &opts).unwrap();
 
         assert!(
             !buf_to_parse.has_remaining(),
@@ -637,8 +647,9 @@ mod test {
         assert!(matches!(parsed.id, Some(OutsimId(117769280))));
 
         let mut output = BytesMut::new();
+        let mut output_ctx = EncodeContext::new(&mut output);
 
-        parsed.encode_with_options(&mut output, &opts).unwrap();
+        parsed.encode_with_options(&mut output_ctx, &opts).unwrap();
 
         assert_eq!(buf.as_ref(), output.as_ref());
     }

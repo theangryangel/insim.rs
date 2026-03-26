@@ -9,6 +9,7 @@ use insim::{
     insim::{LclFlags, TinyType},
 };
 use tokio::time::interval;
+use tracing_subscriber::fmt::format::FmtSpan;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -58,6 +59,7 @@ pub async fn main() -> Result<()> {
     // Setup tracing_subcriber with some sane defaults
     tracing_subscriber::fmt::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
         .init();
 
     // Parse our command line arguments, using clap

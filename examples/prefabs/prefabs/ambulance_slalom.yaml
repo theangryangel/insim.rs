@@ -1,0 +1,89 @@
+- !ChalkAhead
+  xyz:
+    x: -48
+    y: 0
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+- !VehicleAmbulance
+  xyz:
+    x: 0
+    y: -40
+    z: 0
+  heading:
+    radians: 0.7853981633974483
+  colour: 0
+  mapping: 0
+  floating: false
+- !Cone1
+  xyz:
+    x: 48
+    y: 32
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+- !VehicleAmbulance
+  xyz:
+    x: 96
+    y: 40
+    z: 0
+  heading:
+    radians: -0.7853981633974483
+  colour: 0
+  mapping: 0
+  floating: false
+- !Cone1
+  xyz:
+    x: 144
+    y: -32
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+- !VehicleAmbulance
+  xyz:
+    x: 192
+    y: -40
+    z: 0
+  heading:
+    radians: 0.7853981633974483
+  colour: 0
+  mapping: 0
+  floating: false
+- !Cone1
+  xyz:
+    x: 240
+    y: 32
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+- !VehicleAmbulance
+  xyz:
+    x: 288
+    y: 40
+    z: 0
+  heading:
+    radians: -0.7853981633974483
+  colour: 0
+  mapping: 0
+  floating: false
+- !ChalkAhead
+  xyz:
+    x: 352
+    y: 0
+    z: 0
+  colour: White
+  heading:
+    radians: 0.0
+  floating: false
+# 11. sky_bridge
+# A terrifyingly narrow Two-wide (2m) ConcreteSlab bridge at z=8 (2m height),
+# reached via a 4m ramp and exited by a mirrored ramp the other side.
+# Low M0_25 guard rails because we want to feel the danger.

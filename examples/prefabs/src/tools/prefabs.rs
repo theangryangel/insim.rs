@@ -2,43 +2,62 @@ use std::{fs, path::PathBuf};
 
 use anyhow::{Result, anyhow};
 use insim::{core::object::ObjectCoordinate, insim::ObjectInfo};
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
 pub struct Prefabs {
+    pub dir: PathBuf,
+    pub entries: Vec<PrefabEntry>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PrefabEntry {
+    pub name: String,
     pub path: PathBuf,
-    pub data: Vec<Prefab>,
 }
 
 impl Prefabs {
-    pub fn load(path: PathBuf) -> Result<Self> {
-        if !path.exists() {
+    pub fn load(dir: PathBuf) -> Result<Self> {
+        if !dir.exists() {
+            fs::create_dir_all(&dir)
+                .map_err(|e| anyhow!("failed to create directory '{}': {e}", dir.display()))?;
             return Ok(Self {
-                path,
-                data: Vec::new(),
+                dir,
+                entries: Vec::new(),
             });
         }
 
-        let raw = fs::read_to_string(&path)
-            .map_err(|e| anyhow!("failed to read '{}': {e}", path.display()))?;
-        if raw.trim().is_empty() {
-            return Ok(Self {
-                path,
-                data: Vec::new(),
-            });
-        }
+        let mut entries: Vec<PrefabEntry> = fs::read_dir(&dir)
+            .map_err(|e| anyhow!("failed to read directory '{}': {e}", dir.display()))?
+            .filter_map(|entry| {
+                let entry = entry.ok()?;
+                let path = entry.path();
+                if path.extension()?.to_str()? != "yaml" {
+                    return None;
+                }
+                let stem = path.file_stem()?.to_str()?.to_string();
+                let name = stem.replace('_', " ");
+                Some(PrefabEntry { name, path })
+            })
+            .collect();
 
-        let data: Vec<Prefab> = serde_norway::from_str(&raw)
-            .map_err(|e| anyhow!("failed to parse '{}': {e}", path.display()))?;
+        entries.sort_by(|a, b| a.name.cmp(&b.name));
 
-        Ok(Self { path: path, data })
+        Ok(Self { dir, entries })
     }
 
-    pub fn save(&self) -> Result<()> {
-        let yaml = serde_norway::to_string(&self.data)
-            .map_err(|e| anyhow!("failed to serialize prefab yaml: {e}"))?;
-        fs::write(&self.path, yaml)
-            .map_err(|e| anyhow!("failed to write '{}': {e}", self.path.display()))
+    pub fn load_prefab(&self, idx: usize) -> Result<Prefab> {
+        let entry = self
+            .entries
+            .get(idx)
+            .ok_or_else(|| anyhow!("prefab index {idx} out of range"))?;
+
+        let raw = fs::read_to_string(&entry.path)
+            .map_err(|e| anyhow!("failed to read '{}': {e}", entry.path.display()))?;
+
+        let objects: Vec<ObjectInfo> = serde_norway::from_str(&raw)
+            .map_err(|e| anyhow!("failed to parse '{}': {e}", entry.path.display()))?;
+
+        Ok(Prefab { objects })
     }
 
     pub fn add_and_save_selection(
@@ -50,21 +69,38 @@ impl Prefabs {
             return Err(anyhow!("cannot save prefab: selection is empty"));
         }
 
-        let name = unique_prefab_name(&self.data, name);
-        let relative = to_relative(selection);
-        self.data.push(Prefab {
-            name: name.clone(),
-            objects: relative,
-        });
-        self.save()?;
+        let name = if name.trim().is_empty() {
+            "prefab"
+        } else {
+            name.trim()
+        };
 
-        Ok(name)
+        let safe = to_safe_filename(name);
+        let path = unique_path(&self.dir, &safe);
+
+        let relative = to_relative(selection);
+        let yaml = serde_norway::to_string(&relative)
+            .map_err(|e| anyhow!("failed to serialize prefab yaml: {e}"))?;
+        fs::write(&path, yaml).map_err(|e| anyhow!("failed to write '{}': {e}", path.display()))?;
+
+        let display_name = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or(name)
+            .replace('_', " ");
+
+        self.entries.push(PrefabEntry {
+            name: display_name.clone(),
+            path,
+        });
+        self.entries.sort_by(|a, b| a.name.cmp(&b.name));
+
+        Ok(display_name)
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Prefab {
-    pub name: String,
     pub objects: Vec<ObjectInfo>,
 }
 
@@ -84,23 +120,30 @@ impl Prefab {
     }
 }
 
-fn unique_prefab_name(existing: &[Prefab], requested: &str) -> String {
-    let trimmed = requested.trim();
-    let base = if trimmed.is_empty() {
-        "prefab".to_string()
-    } else {
-        trimmed.to_string()
-    };
+fn to_safe_filename(name: &str) -> String {
+    let s: String = name
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' {
+                c.to_ascii_lowercase()
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    s.trim_matches('_').to_string()
+}
 
-    if !existing.iter().any(|p| p.name == base) {
-        return base;
+fn unique_path(dir: &PathBuf, stem: &str) -> PathBuf {
+    let path = dir.join(format!("{stem}.yaml"));
+    if !path.exists() {
+        return path;
     }
-
     let mut n = 2_u32;
     loop {
-        let candidate = format!("{}-{n}", base);
-        if !existing.iter().any(|p| p.name == candidate) {
-            return candidate;
+        let path = dir.join(format!("{stem}-{n}.yaml"));
+        if !path.exists() {
+            return path;
         }
         n = n.saturating_add(1);
     }

@@ -3,10 +3,15 @@ use std::{net::SocketAddr, time::Duration};
 
 use bytes::{Buf, Bytes, BytesMut};
 use clap::Parser;
-use insim::{Packet, core::Decode, insim::SmallType};
+use insim::{
+    Packet,
+    core::{Decode, DecodeContext},
+    insim::SmallType,
+};
 use outgauge::Outgauge;
 use outsim::OutsimPack;
 use tokio::net::UdpSocket;
+use tracing_subscriber::fmt::format::FmtSpan;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -29,6 +34,7 @@ fn setup_tracing_subscriber() {
                 .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
                 .from_env_lossy(),
         )
+        .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
         .init();
 }
 
@@ -82,11 +88,13 @@ pub async fn main() -> anyhow::Result<()> {
 
                 if amt == 92 {
                     // Conventionally it's outgauge
-                    let packet = Outgauge::decode(&mut buf)?;
+                    let mut ctx = DecodeContext::new(&mut buf);
+                    let packet = Outgauge::decode(&mut ctx)?;
                     tracing::info!("outgauge: from={:?}, data={:?}", src, packet);
                 } else if amt == 64 {
                     // Conventionally it's outsim
-                    let packet = OutsimPack::decode(&mut buf)?;
+                    let mut ctx = DecodeContext::new(&mut buf);
+                    let packet = OutsimPack::decode(&mut ctx)?;
                     tracing::info!("outsim: from={:?}, data={:?}", src, packet);
                 } else if amt > 1 {
                     // Otherwise it's probably a Mci or Nlp packet
@@ -95,7 +103,8 @@ pub async fn main() -> anyhow::Result<()> {
                     // That's normally handled internally
                     // by the insim crate.
                     buf.advance(1);
-                    let packet = Packet::decode(&mut buf)?;
+                    let mut ctx = DecodeContext::new(&mut buf);
+                    let packet = Packet::decode(&mut ctx)?;
                     tracing::info!("insim: from={:?}, data={:?}", src, packet);
                 }
             }

@@ -2,8 +2,7 @@
 // Do not name this file `con.rs`.
 use std::time::Duration;
 
-use bytes::{Buf, BufMut};
-use insim_core::{Decode, Encode, heading::Heading, speed::Speed};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext, heading::Heading, speed::Speed};
 
 use super::{CompCarInfo, obh::spclose_strip_high_bits};
 use crate::identifiers::{PlayerId, RequestId};
@@ -62,41 +61,37 @@ pub struct ConInfo {
 }
 
 impl Decode for ConInfo {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let plid = PlayerId::decode(buf).map_err(|e| e.nested().context("ConInfo::plid"))?;
-        let info = CompCarInfo::decode(buf).map_err(|e| e.nested().context("ConInfo::info"))?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let plid = ctx.decode::<PlayerId>("plid")?;
+        let info = ctx.decode::<CompCarInfo>("info")?;
         // pad 1 bytes
-        buf.advance(1);
-        let steer = u8::decode(buf).map_err(|e| e.nested().context("ConInfo::steer"))?;
+        ctx.pad("sp0", 1)?;
+        let steer = ctx.decode::<u8>("steer")?;
 
-        let thrbrk = u8::decode(buf).map_err(|e| e.nested().context("ConInfo::thrbrk"))?;
+        let thrbrk = ctx.decode::<u8>("thrbrk")?;
         let thr: u8 = (thrbrk >> 4) & 0x0F; // upper 4 bits
         let brk: u8 = thrbrk & 0x0F; // lower 4 bits
 
-        let cluhan = u8::decode(buf).map_err(|e| e.nested().context("ConInfo::cluhan"))?;
+        let cluhan = ctx.decode::<u8>("cluhan")?;
         let clu: u8 = (cluhan >> 4) & 0x0F; // upper 4 bits
         let han: u8 = cluhan & 0x0F; // lower 4 bits
 
-        let gearsp = u8::decode(buf).map_err(|e| e.nested().context("ConInfo::gearsp"))?;
+        let gearsp = ctx.decode::<u8>("gearsp")?;
         let gearsp = (gearsp >> 4) & 0x0F; // gearsp is only first 4 bits
 
-        let speed = Speed::from_meters_per_sec(
-            u8::decode(buf).map_err(|e| e.nested().context("ConInfo::speed"))? as f32,
-        );
+        let speed = Speed::from_meters_per_sec(ctx.decode::<u8>("speed")? as f32);
 
-        let direction_raw =
-            u8::decode(buf).map_err(|e| e.nested().context("ConInfo::direction_raw"))?;
+        let direction_raw = ctx.decode::<u8>("direction_raw")?;
         let direction = Heading::from_degrees((direction_raw as f64) * CONINFO_DEGREES_PER_UNIT);
 
-        let heading_raw =
-            u8::decode(buf).map_err(|e| e.nested().context("ConInfo::heading_raw"))?;
+        let heading_raw = ctx.decode::<u8>("heading_raw")?;
         let heading = Heading::from_degrees((heading_raw as f64) * CONINFO_DEGREES_PER_UNIT);
 
-        let accelf = u8::decode(buf).map_err(|e| e.nested().context("ConInfo::accelf"))?;
-        let accelr = u8::decode(buf).map_err(|e| e.nested().context("ConInfo::accelr"))?;
+        let accelf = ctx.decode::<u8>("accelf")?;
+        let accelr = ctx.decode::<u8>("accelr")?;
 
-        let x = i16::decode(buf).map_err(|e| e.nested().context("ConInfo::x"))?;
-        let y = i16::decode(buf).map_err(|e| e.nested().context("ConInfo::y"))?;
+        let x = ctx.decode::<i16>("x")?;
+        let y = ctx.decode::<i16>("y")?;
 
         Ok(Self {
             plid,
@@ -119,18 +114,11 @@ impl Decode for ConInfo {
 }
 
 impl Encode for ConInfo {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.plid
-            .encode(buf)
-            .map_err(|e| e.nested().context("ConInfo::plid"))?;
-        self.info
-            .encode(buf)
-            .map_err(|e| e.nested().context("ConInfo::info"))?;
-        0_u8.encode(buf)
-            .map_err(|e| e.nested().context("ConInfo::pad"))?; // pad 1 bytes
-        self.steer
-            .encode(buf)
-            .map_err(|e| e.nested().context("ConInfo::steer"))?;
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("plid", &self.plid)?;
+        ctx.encode("info", &self.info)?;
+        ctx.pad("sp0", 1)?; // pad 1 bytes
+        ctx.encode("steer", &self.steer)?;
 
         if self.thr > 15 {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
@@ -151,9 +139,7 @@ impl Encode for ConInfo {
         }
 
         let thrbrk = (self.thr << 4) | self.brk;
-        thrbrk
-            .encode(buf)
-            .map_err(|e| e.nested().context("ConInfo::thrbrk"))?;
+        ctx.encode("thrbrk", &thrbrk)?;
 
         if self.clu > 15 {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
@@ -174,9 +160,7 @@ impl Encode for ConInfo {
         }
 
         let cluhan = (self.clu << 4) | self.han;
-        cluhan
-            .encode(buf)
-            .map_err(|e| e.nested().context("ConInfo::cluhan"))?;
+        ctx.encode("cluhan", &cluhan)?;
 
         if self.gearsp > 15 {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
@@ -188,40 +172,24 @@ impl Encode for ConInfo {
         }
 
         let gearsp = self.gearsp << 4;
-        gearsp
-            .encode(buf)
-            .map_err(|e| e.nested().context("ConInfo::gearsp"))?;
+        ctx.encode("gearsp", &gearsp)?;
 
-        (self.speed.to_meters_per_sec() as u8)
-            .encode(buf)
-            .map_err(|e| e.nested().context("ConInfo::speed"))?;
+        ctx.encode("speed", &(self.speed.to_meters_per_sec() as u8))?;
 
         let direction_units = (self.direction.to_degrees() / CONINFO_DEGREES_PER_UNIT)
             .round()
             .clamp(0.0, 255.0) as u8;
-        direction_units
-            .encode(buf)
-            .map_err(|e| e.nested().context("ConInfo::direction"))?;
+        ctx.encode("direction", &direction_units)?;
 
         let heading_units = (self.heading.to_degrees() / CONINFO_DEGREES_PER_UNIT)
             .round()
             .clamp(0.0, 255.0) as u8;
-        heading_units
-            .encode(buf)
-            .map_err(|e| e.nested().context("ConInfo::heading"))?;
+        ctx.encode("heading", &heading_units)?;
 
-        self.accelf
-            .encode(buf)
-            .map_err(|e| e.nested().context("ConInfo::accelf"))?;
-        self.accelr
-            .encode(buf)
-            .map_err(|e| e.nested().context("ConInfo::accelr"))?;
-        self.x
-            .encode(buf)
-            .map_err(|e| e.nested().context("ConInfo::x"))?;
-        self.y
-            .encode(buf)
-            .map_err(|e| e.nested().context("ConInfo::y"))?;
+        ctx.encode("accelf", &self.accelf)?;
+        ctx.encode("accelr", &self.accelr)?;
+        ctx.encode("x", &self.x)?;
+        ctx.encode("y", &self.y)?;
 
         Ok(())
     }
@@ -250,19 +218,16 @@ pub struct Con {
 }
 
 impl Decode for Con {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf).map_err(|e| e.nested().context("Con::reqi"))?;
-        buf.advance(1);
-        let spclose = spclose_strip_high_bits(
-            u16::decode(buf).map_err(|e| e.nested().context("Con::spclose"))?,
-        );
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let reqi = ctx.decode::<RequestId>("reqi")?;
+        ctx.pad("sp0", 1)?;
+        let spclose = spclose_strip_high_bits(ctx.decode::<u16>("spclose")?);
         let spclose = Speed::from_meters_per_sec(spclose as f32 / 10.0);
-        buf.advance(2);
-        let time = u32::decode(buf).map_err(|e| e.nested().context("Con::time"))? as u64;
-        let time = Duration::from_millis(time);
+        ctx.pad("spw", 2)?;
+        let time = ctx.decode_duration::<u32>("time")?;
 
-        let a = ConInfo::decode(buf).map_err(|e| e.nested().context("Con::a"))?;
-        let b = ConInfo::decode(buf).map_err(|e| e.nested().context("Con::b"))?;
+        let a = ctx.decode::<ConInfo>("a")?;
+        let b = ctx.decode::<ConInfo>("b")?;
 
         Ok(Self {
             reqi,
@@ -275,33 +240,16 @@ impl Decode for Con {
 }
 
 impl Encode for Con {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi
-            .encode(buf)
-            .map_err(|e| e.nested().context("Con::reqi"))?;
-        buf.put_bytes(0, 1);
-        spclose_strip_high_bits((self.spclose.to_meters_per_sec() * 10.0) as u16)
-            .encode(buf)
-            .map_err(|e| e.nested().context("Con::spclose"))?;
-        match TryInto::<u32>::try_into(self.time.as_millis()) {
-            Ok(time) => time
-                .encode(buf)
-                .map_err(|e| e.nested().context("Con::time"))?,
-            Err(_) => {
-                return Err(insim_core::EncodeErrorKind::OutOfRange {
-                    min: 0,
-                    max: u32::MAX as usize,
-                    found: self.time.as_millis() as usize,
-                }
-                .context("Con::spclose"));
-            },
-        }
-        self.a
-            .encode(buf)
-            .map_err(|e| e.nested().context("Con::a"))?;
-        self.b
-            .encode(buf)
-            .map_err(|e| e.nested().context("Con::b"))?;
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("reqi", &self.reqi)?;
+        ctx.pad("sp0", 1)?;
+        ctx.encode(
+            "spclose",
+            &spclose_strip_high_bits((self.spclose.to_meters_per_sec() * 10.0) as u16),
+        )?;
+        ctx.encode_duration::<u32>("time", self.time)?;
+        ctx.encode("a", &self.a)?;
+        ctx.encode("b", &self.b)?;
         Ok(())
     }
 }

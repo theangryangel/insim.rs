@@ -64,8 +64,8 @@ macro_rules! define_vehicles {
         }
 
         impl Decode for Vehicle {
-            fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
-                let mut bytes = buf.split_to(4);
+            fn decode(ctx: &mut crate::DecodeContext) -> Result<Self, crate::DecodeError> {
+                let mut bytes = ctx.buf.split_to(4);
                 // conventionally builtins are 3 ascii characters with a \0.
                 // so we can take our string input and use this.
                 let is_builtin = bytes[0..=2].iter().all(|c| c.is_ascii_alphanumeric()) && bytes[3] == 0;
@@ -77,20 +77,20 @@ macro_rules! define_vehicles {
                         found: Box::new(bytes),
                     }
                     .into()),
-                    (_, false) => Ok(Vehicle::Mod(u32::decode(&mut bytes)?)),
+                    (_, false) => Ok(Vehicle::Mod(u32::decode(&mut crate::DecodeContext::new(&mut bytes))?)),
                 }
             }
         }
 
         impl Encode for Vehicle {
-            fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodeError> {
+            fn encode(&self, ctx: &mut crate::EncodeContext) -> Result<(), crate::EncodeError> {
                 match self {
                     $(Vehicle::$variant => {
-                        buf.extend_from_slice($code.as_bytes());
-                        ::bytes::BufMut::put_u8(buf, 0);
+                        ctx.buf.extend_from_slice($code.as_bytes());
+                        ::bytes::BufMut::put_u8(ctx.buf, 0);
                     },)*
-                    Vehicle::Mod(vehmod) => vehmod.encode(buf)?,
-                    Vehicle::Unknown => ::bytes::BufMut::put_bytes(buf, 0, 4),
+                    Vehicle::Mod(vehmod) => ctx.encode("vehmod", vehmod)?,
+                    Vehicle::Unknown => ::bytes::BufMut::put_bytes(ctx.buf, 0, 4),
                 };
 
                 Ok(())
@@ -191,7 +191,7 @@ mod tests {
     use bytes::{Bytes, BytesMut};
 
     use super::*;
-    use crate::{Decode, Encode};
+    use crate::{Decode, DecodeContext, Encode, EncodeContext};
 
     #[test]
     fn test_xrt() {
@@ -201,12 +201,13 @@ mod tests {
 
         let raw = b"XRT\0";
         let mut decode_buf = Bytes::copy_from_slice(raw);
-        let decoded = Vehicle::decode(&mut decode_buf).expect("Expected to decode XRT");
+        let decoded = Vehicle::decode(&mut DecodeContext::new(&mut decode_buf))
+            .expect("Expected to decode XRT");
         assert_eq!(decoded, Vehicle::Xrt);
 
         let mut encode_buf = BytesMut::new();
         decoded
-            .encode(&mut encode_buf)
+            .encode(&mut EncodeContext::new(&mut encode_buf))
             .expect("Expected to encode XRT");
         assert_eq!(encode_buf.as_ref(), raw);
     }
@@ -220,13 +221,13 @@ mod tests {
 
         let raw = 7_504_921_u32.to_le_bytes();
         let mut decode_buf = Bytes::copy_from_slice(&raw);
-        let decoded = Vehicle::decode(&mut decode_buf)
+        let decoded = Vehicle::decode(&mut DecodeContext::new(&mut decode_buf))
             .expect("Expected to decode Fraud Wheeler E2 RX Manual");
         assert_eq!(decoded, Vehicle::Mod(mod_id));
 
         let mut encode_buf = bytes::BytesMut::new();
         decoded
-            .encode(&mut encode_buf)
+            .encode(&mut EncodeContext::new(&mut encode_buf))
             .expect("Expected to encode Fraud Wheeler E2 RX Manual");
         assert_eq!(encode_buf.as_ref(), raw.as_slice());
     }
@@ -239,13 +240,13 @@ mod tests {
 
         let raw = 4_301_472_u32.to_le_bytes();
         let mut decode_buf = Bytes::copy_from_slice(&raw);
-        let decoded =
-            Vehicle::decode(&mut decode_buf).expect("Expected to decode Piran Firefly 200");
+        let decoded = Vehicle::decode(&mut DecodeContext::new(&mut decode_buf))
+            .expect("Expected to decode Piran Firefly 200");
         assert_eq!(decoded, Vehicle::Mod(mod_id));
 
         let mut encode_buf = BytesMut::new();
         decoded
-            .encode(&mut encode_buf)
+            .encode(&mut EncodeContext::new(&mut encode_buf))
             .expect("Expected to encode Piran Firefly 200");
         assert_eq!(encode_buf.as_ref(), raw.as_slice());
     }
@@ -257,12 +258,13 @@ mod tests {
 
         let raw = b"\0\0\0\0";
         let mut decode_buf = Bytes::copy_from_slice(raw);
-        let decoded = Vehicle::decode(&mut decode_buf).expect("Expected to decode Unknown");
+        let decoded = Vehicle::decode(&mut DecodeContext::new(&mut decode_buf))
+            .expect("Expected to decode Unknown");
         assert_eq!(decoded, Vehicle::Unknown);
 
         let mut encode_buf = BytesMut::new();
         decoded
-            .encode(&mut encode_buf)
+            .encode(&mut EncodeContext::new(&mut encode_buf))
             .expect("Expected to encode Unknown");
         assert_eq!(encode_buf.as_ref(), raw);
     }

@@ -11,6 +11,7 @@ use insim::{
     identifiers::{ClickId, PlayerId, RequestId},
     insim::{Btn, BtnStyle, LapTimingInfo, TinyType},
 };
+use tracing_subscriber::fmt::format::FmtSpan;
 
 #[derive(Clone, Debug)]
 pub struct RefPoint {
@@ -137,6 +138,7 @@ pub fn main() -> Result<()> {
     // Setup tracing_subcriber with some sane defaults
     tracing_subscriber::fmt::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
         .init();
 
     // Parse our command line arguments, using clap

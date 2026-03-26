@@ -1,12 +1,15 @@
 use std::convert::From;
 
-use insim_core::{Decode, Encode};
+use bytes::{Buf, BufMut};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 
 /// Handles the rules around how RaceLaps are described within Insim automatically for you.
 #[derive(Debug, Default, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum RaceLaps {
+    /// This is an untimed session
+    Untimed,
     /// This is a practise session
     #[default]
     Practice,
@@ -20,6 +23,7 @@ impl From<u8> for RaceLaps {
     fn from(value: u8) -> Self {
         let value = value as usize;
         match value {
+            255 => RaceLaps::Untimed,
             0 => RaceLaps::Practice,
             1..=99 => RaceLaps::Laps(value),
             100..=190 => RaceLaps::Laps((value - 100) * 10 + 100),
@@ -32,6 +36,7 @@ impl From<u8> for RaceLaps {
 impl From<RaceLaps> for u8 {
     fn from(item: RaceLaps) -> u8 {
         let data = match item {
+            RaceLaps::Untimed => 255,
             RaceLaps::Practice => 0,
             RaceLaps::Laps(data) => {
                 match data {
@@ -48,17 +53,18 @@ impl From<RaceLaps> for u8 {
 }
 
 impl Decode for RaceLaps {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let val = u8::decode(buf).map_err(|e| e.nested().context("RaceLaps::val"))?;
+    const PRIMITIVE: bool = true;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let val = ctx.buf.get_u8();
         Ok(val.into())
     }
 }
 
 impl Encode for RaceLaps {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+    const PRIMITIVE: bool = true;
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
         let val = u8::from(*self);
-        val.encode(buf)
-            .map_err(|e| e.nested().context("RaceLaps::val"))?;
+        ctx.buf.put_u8(val);
         Ok(())
     }
 }
@@ -66,6 +72,12 @@ impl Encode for RaceLaps {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn untimed() {
+        let data = RaceLaps::Untimed;
+        assert_eq!(Into::<u8>::into(data), 255);
+    }
 
     #[test]
     fn as_practise() {

@@ -1,0 +1,520 @@
+- !BarrierLong
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !BarrierLong
+  xyz:
+    x: 48
+    y: -9
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !BarrierLong
+  xyz:
+    x: 209
+    y: 908
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !BarrierLong
+  xyz:
+    x: 158
+    y: 917
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 198
+    y: 876
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 193
+    y: 877
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 188
+    y: 878
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 183
+    y: 879
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 178
+    y: 880
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 173
+    y: 881
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 168
+    y: 882
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 163
+    y: 883
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 158
+    y: 884
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 23
+    y: 98
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 28
+    y: 97
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 33
+    y: 96
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 38
+    y: 95
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 43
+    y: 94
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 48
+    y: 93
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 53
+    y: 92
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 58
+    y: 91
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 63
+    y: 90
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !BarrierLong
+  xyz:
+    x: 186
+    y: 777
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !BarrierLong
+  xyz:
+    x: 22
+    y: 131
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !BarrierLong
+  xyz:
+    x: 135
+    y: 786
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !BarrierLong
+  xyz:
+    x: 71
+    y: 122
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !BarrierLong
+  xyz:
+    x: 163
+    y: 646
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !BarrierLong
+  xyz:
+    x: 112
+    y: 655
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 153
+    y: 614
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !BarrierLong
+  xyz:
+    x: 45
+    y: 262
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 148
+    y: 615
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 143
+    y: 616
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 138
+    y: 617
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 133
+    y: 618
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 128
+    y: 619
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 123
+    y: 620
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 118
+    y: 621
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 113
+    y: 622
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !BarrierLong
+  xyz:
+    x: 94
+    y: 253
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !BarrierLong
+  xyz:
+    x: 140
+    y: 515
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !BarrierLong
+  xyz:
+    x: 89
+    y: 524
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 68
+    y: 360
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 73
+    y: 359
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 78
+    y: 358
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 83
+    y: 357
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 88
+    y: 356
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 93
+    y: 355
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 98
+    y: 354
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 103
+    y: 353
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !Armco5
+  xyz:
+    x: 108
+    y: 352
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !BarrierLong
+  xyz:
+    x: 66
+    y: 393
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false
+- !BarrierLong
+  xyz:
+    x: 117
+    y: 384
+    z: 0
+  heading:
+    radians: 2.9697868053466014
+  colour: 0
+  mapping: 0
+  floating: false

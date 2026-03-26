@@ -1,0 +1,41 @@
+//! Challenge mode chat commands
+
+use insim::{builder::InsimTask, insim::Mso};
+use kitcar::chat::Parse;
+use tokio::task::JoinHandle;
+
+use crate::ChatError;
+
+#[derive(Debug, Clone, PartialEq, kitcar::chat::Parse)]
+#[chat(prefix = '!')]
+/// Chat Commands
+pub enum ChallengeChatMsg {
+    /// Help
+    Help,
+    /// Show altitude tracker
+    Alt,
+    /// End the challenge
+    End,
+    /// Quit
+    Quit,
+}
+
+pub type ChallengeChat = kitcar::chat::Chat<ChallengeChatMsg>;
+
+pub fn spawn(insim: InsimTask) -> (ChallengeChat, JoinHandle<Result<(), ChatError>>) {
+    kitcar::chat::spawn_with_handler(insim, 100, handle_challenge_chat)
+}
+
+async fn handle_challenge_chat(
+    insim: InsimTask,
+    mso: Mso,
+    msg: ChallengeChatMsg,
+) -> Result<(), ChatError> {
+    if msg == ChallengeChatMsg::Help {
+        insim.send_message("Available commands:", mso.ucid).await?;
+        for cmd in ChallengeChatMsg::help() {
+            insim.send_message(cmd, mso.ucid).await?;
+        }
+    }
+    Ok(())
+}

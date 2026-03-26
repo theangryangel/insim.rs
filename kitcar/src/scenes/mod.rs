@@ -4,16 +4,23 @@ use std::{marker::PhantomData, time::Duration};
 
 pub mod wait_for_players;
 
+/// Extract a value from a shared context. Implement this for each infrastructure type you want
+/// scenes to receive automatically (axum-style extractor pattern).
+pub trait FromContext<Ctx>: Sized + Clone {
+    /// Extract `Self` from the given context.
+    fn from_context(ctx: &Ctx) -> Self;
+}
+
 /// A stage/layer/scene that orchestrates game flow. long live, delegates to other scene in a
 /// waterfall manner
 /// Scene can succeed, bail (stop chain without error), or error
-pub trait Scene {
+pub trait Scene<Ctx = ()> {
     /// Output from the scene, may be passed to subsequence scenes through the AndThen combinator
     type Output;
 
     /// Run/execute the scene
     #[allow(async_fn_in_trait)]
-    async fn run(self) -> Result<SceneResult<Self::Output>, SceneError>
+    async fn run(self, ctx: &Ctx) -> Result<SceneResult<Self::Output>, SceneError>
     where
         Self: Sized;
 }
@@ -72,25 +79,26 @@ pub enum SceneError {
 }
 
 /// Scene Combinators - do this then...
-/// No data is passed between Scenes. If you need this with AndThen
+/// No data is passed between Scenes. If you need data passed use AndThen
 #[derive(Debug, Clone)]
 pub struct Then<A, B> {
     first: A,
     second: B,
 }
 
-impl<A, B> Scene for Then<A, B>
+impl<A, B, Ctx> Scene<Ctx> for Then<A, B>
 where
-    A: Scene + Send + 'static,
-    B: Scene + Send + 'static,
+    A: Scene<Ctx> + Send + 'static,
+    B: Scene<Ctx> + Send + 'static,
     A::Output: Send + 'static,
     B::Output: Send + 'static,
+    Ctx: Sync,
 {
     type Output = B::Output;
 
-    async fn run(self) -> Result<SceneResult<Self::Output>, SceneError> {
-        match self.first.run().await? {
-            SceneResult::Continue(_) => self.second.run().await,
+    async fn run(self, ctx: &Ctx) -> Result<SceneResult<Self::Output>, SceneError> {
+        match self.first.run(ctx).await? {
+            SceneResult::Continue(_) => self.second.run(ctx).await,
             SceneResult::Bail { msg } => Ok(SceneResult::Bail { msg }),
             SceneResult::Quit => Ok(SceneResult::Quit),
         }
@@ -106,22 +114,23 @@ pub struct AndThen<A, B, F> {
     _phantom: PhantomData<B>,
 }
 
-impl<A, B, F> Scene for AndThen<A, B, F>
+impl<A, B, F, Ctx> Scene<Ctx> for AndThen<A, B, F>
 where
-    A: Scene + Send + 'static,
-    B: Scene + Send + 'static,
+    A: Scene<Ctx> + Send + 'static,
+    B: Scene<Ctx> + Send + 'static,
     F: Fn(A::Output) -> B + Clone,
+    Ctx: Sync,
 {
     type Output = B::Output;
 
-    async fn run(self) -> Result<SceneResult<Self::Output>, SceneError>
+    async fn run(self, ctx: &Ctx) -> Result<SceneResult<Self::Output>, SceneError>
     where
         Self: Sized,
     {
-        match self.first.run().await? {
+        match self.first.run(ctx).await? {
             SceneResult::Continue(res) => {
                 let second = (self.next_fn)(res);
-                second.run().await
+                second.run(ctx).await
             },
             SceneResult::Bail { msg } => Ok(SceneResult::Bail { msg }),
             SceneResult::Quit => Ok(SceneResult::Quit),
@@ -136,15 +145,16 @@ pub struct WithTimeout<S> {
     timeout: Duration,
 }
 
-impl<S> Scene for WithTimeout<S>
+impl<S, Ctx> Scene<Ctx> for WithTimeout<S>
 where
-    S: Scene + Send + 'static,
+    S: Scene<Ctx> + Send + 'static,
     S::Output: Send + 'static,
+    Ctx: Sync,
 {
     type Output = S::Output;
 
-    async fn run(self) -> Result<SceneResult<Self::Output>, SceneError> {
-        match tokio::time::timeout(self.timeout, self.inner.run()).await {
+    async fn run(self, ctx: &Ctx) -> Result<SceneResult<Self::Output>, SceneError> {
+        match tokio::time::timeout(self.timeout, self.inner.run(ctx)).await {
             Ok(result) => result,
             Err(_) => Ok(SceneResult::bail_with("WithTimeout")),
         }
@@ -156,16 +166,17 @@ pub struct LoopUntilQuit<S> {
     scene: S,
 }
 
-impl<S> Scene for LoopUntilQuit<S>
+impl<S, Ctx> Scene<Ctx> for LoopUntilQuit<S>
 where
-    S: Scene + Clone + Send + 'static,
+    S: Scene<Ctx> + Clone + Send + 'static,
     S::Output: Send + 'static,
+    Ctx: Sync,
 {
     type Output = ();
 
-    async fn run(self) -> Result<SceneResult<()>, SceneError> {
+    async fn run(self, ctx: &Ctx) -> Result<SceneResult<()>, SceneError> {
         loop {
-            match self.scene.clone().run().await? {
+            match self.scene.clone().run(ctx).await? {
                 SceneResult::Continue(_) => continue,
                 SceneResult::Bail { msg } => {
                     tracing::info!("Bailed, restarting: {msg:?}");
@@ -177,29 +188,13 @@ where
     }
 }
 
-/// Helper trait
-pub trait SceneExt: Scene + Sized {
+/// Helper trait for constructing scene combinator chains.
+pub trait SceneExt: Sized {
     /// Shortcut to use the Then combinators
-    fn then<S>(self, next: S) -> Then<Self, S>
-    where
-        S: Scene,
-    {
+    fn then<S>(self, next: S) -> Then<Self, S> {
         Then {
             first: self,
             second: next,
-        }
-    }
-
-    /// Shortcut to use the AndThen combinators
-    fn and_then<S, F>(self, f: F) -> AndThen<Self, S, F>
-    where
-        S: Scene,
-        F: Fn(Self::Output) -> S + Clone,
-    {
-        AndThen {
-            first: self,
-            next_fn: f,
-            _phantom: PhantomData,
         }
     }
 
@@ -223,5 +218,5 @@ pub trait SceneExt: Scene + Sized {
     }
 }
 
-// Blanket impl
-impl<T: Scene> SceneExt for T {}
+// Blanket impl for all types
+impl<T> SceneExt for T {}

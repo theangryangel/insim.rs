@@ -1,4 +1,4 @@
-use insim_core::{Decode, Encode};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 
 use crate::identifiers::{PlayerId, RequestId};
 
@@ -35,12 +35,11 @@ pub struct PlayerHandicap {
 }
 
 impl Decode for PlayerHandicap {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let plid = PlayerId::decode(buf).map_err(|e| e.nested().context("PlayerHandicap::plid"))?;
-        let flags = PlayerHandicapFlags::decode(buf)
-            .map_err(|e| e.nested().context("PlayerHandicap::flags"))?;
-        let h_mass = u8::decode(buf).map_err(|e| e.nested().context("PlayerHandicap::h_mass"))?;
-        let h_tres = u8::decode(buf).map_err(|e| e.nested().context("PlayerHandicap::h_tres"))?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let plid = ctx.decode::<PlayerId>("plid")?;
+        let flags = ctx.decode::<PlayerHandicapFlags>("flags")?;
+        let h_mass = ctx.decode::<u8>("h_mass")?;
+        let h_tres = ctx.decode::<u8>("h_tres")?;
 
         Ok(Self {
             plid,
@@ -52,7 +51,7 @@ impl Decode for PlayerHandicap {
 }
 
 impl Encode for PlayerHandicap {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
         if self.h_mass > 200 {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
                 min: 0,
@@ -70,18 +69,10 @@ impl Encode for PlayerHandicap {
             .context("PlayerHandicap::h_tres"));
         }
 
-        self.plid
-            .encode(buf)
-            .map_err(|e| e.nested().context("PlayerHandicap::plid"))?;
-        self.flags
-            .encode(buf)
-            .map_err(|e| e.nested().context("PlayerHandicap::flags"))?;
-        self.h_mass
-            .encode(buf)
-            .map_err(|e| e.nested().context("PlayerHandicap::h_mass"))?;
-        self.h_tres
-            .encode(buf)
-            .map_err(|e| e.nested().context("PlayerHandicap::h_tres"))?;
+        ctx.encode("plid", &self.plid)?;
+        ctx.encode("flags", &self.flags)?;
+        ctx.encode("h_mass", &self.h_mass)?;
+        ctx.encode("h_tres", &self.h_tres)?;
         Ok(())
     }
 }
@@ -102,12 +93,12 @@ pub struct Plh {
 impl_typical_with_request_id!(Plh);
 
 impl Decode for Plh {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf).map_err(|e| e.nested().context("Plh::reqi"))?;
-        let mut nump = u8::decode(buf).map_err(|e| e.nested().context("Plh::nump"))?;
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let reqi = ctx.decode::<RequestId>("reqi")?;
+        let mut nump = ctx.decode::<u8>("nump")?;
         let mut hcaps = Vec::with_capacity(nump as usize);
         while nump > 0 {
-            hcaps.push(PlayerHandicap::decode(buf).map_err(|e| e.nested().context("Plh::hcaps"))?);
+            hcaps.push(ctx.decode::<PlayerHandicap>("hcaps")?);
             nump -= 1;
         }
 
@@ -116,10 +107,8 @@ impl Decode for Plh {
 }
 
 impl Encode for Plh {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi
-            .encode(buf)
-            .map_err(|e| e.nested().context("Plh::reqi"))?;
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("reqi", &self.reqi)?;
         let nump = self.hcaps.len();
         if nump > PLH_MAX_PLAYERS {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
@@ -129,12 +118,9 @@ impl Encode for Plh {
             }
             .context("Plh handicaps out of range"));
         }
-        (nump as u8)
-            .encode(buf)
-            .map_err(|e| e.nested().context("Plh::nump"))?;
+        ctx.encode("nump", &(nump as u8))?;
         for i in self.hcaps.iter() {
-            i.encode(buf)
-                .map_err(|e| e.nested().context("Plh::hcaps"))?;
+            ctx.encode("hcaps", i)?;
         }
         Ok(())
     }

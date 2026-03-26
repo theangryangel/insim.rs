@@ -14,8 +14,8 @@ pub enum Gear {
 }
 
 impl crate::Decode for Gear {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, crate::DecodeError> {
-        let discrim = u8::decode(buf)?;
+    fn decode(ctx: &mut crate::DecodeContext) -> Result<Self, crate::DecodeError> {
+        let discrim = ctx.decode::<u8>("discrim")?;
         match discrim {
             0 => Ok(Self::Reverse),
             1 => Ok(Self::Neutral),
@@ -25,13 +25,13 @@ impl crate::Decode for Gear {
 }
 
 impl crate::Encode for Gear {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::EncodeError> {
+    fn encode(&self, ctx: &mut crate::EncodeContext) -> Result<(), crate::EncodeError> {
         let val: u8 = match self {
             Self::Reverse => 0,
             Self::Neutral => 1,
             Self::Gear(g) => g.saturating_add(1),
         };
 
-        val.encode(buf)
+        ctx.encode("val", &val)
     }
 }

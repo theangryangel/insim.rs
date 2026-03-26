@@ -1,0 +1,32 @@
+# clockwork-carnage.toml — example configuration
+#
+# Copy this file to clockwork-carnage.toml and fill in the values.
+# Section presence determines what runs:
+#   [insim] present  → connects to LFS via InSim
+#   [web]   present  → starts the web dashboard
+#   Both absent      → startup error
+
+# Path to the SQLite database file (optional, default shown)
+# db = "clockwork-carnage.db"
+
+[insim]
+# LFS server address (required if this section is present)
+addr = "127.0.0.1:29999"
+
+# InSim admin password (optional)
+# password = "secret"
+
+[web]
+# Address to listen on (optional, default shown)
+# listen = "127.0.0.1:3000"
+
+# Public base URL of the web dashboard (required if this section is present)
+# Used to build the OAuth2 callback URL and advertise results in-game.
+base_url = "http://localhost:3000"
+
+# OAuth2 credentials from id.lfs.net (all required if this section is present)
+oauth_client_id     = "your-client-id"
+oauth_client_secret = "your-client-secret"
+
+# 64-byte cookie signing key (optional; a weak default is used in dev if omitted)
+# session_key = "change-me-to-a-random-64-byte-string-before-going-to-production!!"

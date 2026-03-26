@@ -52,38 +52,24 @@ impl Field {
         if pad_before > 0 {
             tokens = quote! {
                 #tokens
-                <::bytes::Bytes as ::bytes::buf::Buf>::advance(buf, #pad_before);
+                ctx.pad("pad_before", #pad_before)?;
             }
         }
 
         if let Some(CodepageArgs { length, .. }) = f.codepage.as_ref() {
             tokens = quote! {
                 #tokens
-                let #field_name = <#field_type as ::insim_core::DecodeString>::decode_codepage(
-                    buf, #length
-                ).map_err(|e|
-                    e.nested().context(#context)
-                )?;
+                let #field_name = ctx.decode_codepage(#context, #length)?;
             }
         } else if let Some(AsciiArgs { length, .. }) = f.ascii.as_ref() {
             tokens = quote! {
                 #tokens
-                let #field_name = <#field_type as ::insim_core::DecodeString>::decode_ascii(
-                    buf, #length
-                ).map_err(|e|
-                    e.nested().context(#context)
-                )?;
+                let #field_name = ctx.decode_ascii(#context, #length)?;
             }
         } else if let Some(duration_repr) = f.duration.as_ref() {
             tokens = quote! {
                 #tokens
-                let __raw_field_name = #duration_repr::decode(buf).map_err(|e|
-                    e.nested().context(#context)
-                )?;
-                let #field_name = match TryInto::<u64>::try_into(__raw_field_name) {
-                    Ok(v) => std::time::Duration::from_millis(v),
-                    Err(_) => return Err(::insim_core::DecodeErrorKind::OutOfRange { min: 0, max: u64::MAX as usize, found: __raw_field_name as usize }.context(#context)),
-                };
+                let #field_name = ctx.decode_duration::<#duration_repr>(#context)?;
             };
         } else {
             // converts a Vec<u8> into Vec::<u8> for usage in the decoding calls
@@ -106,16 +92,14 @@ impl Field {
 
             tokens = quote! {
                 #tokens
-                let #field_name = <#typ>::decode(buf).map_err(|e|
-                    e.nested().context(#context)
-                )?;
+                let #field_name = ctx.decode::<#typ>(#context)?;
             };
         }
 
         if pad_after > 0 {
             tokens = quote! {
                 #tokens
-                <::bytes::Bytes as ::bytes::buf::Buf>::advance(buf, #pad_after);
+                ctx.pad("pad_after", #pad_after)?;
             }
         }
         Ok(tokens)
@@ -132,14 +116,13 @@ impl Field {
             .ok_or_else(|| darling::Error::custom("missing field name").with_span(&f.ty))?;
         let pad_after = f.pad_after.unwrap_or(0);
         let pad_before = f.pad_before.unwrap_or(0);
-        let field_type = f.ty.clone();
         let context = format!("{}::{}", parent, field_name);
         let mut tokens = quote! {};
 
         if pad_before > 0 {
             tokens = quote! {
                 #tokens
-                <::bytes::BytesMut as ::bytes::buf::BufMut>::put_bytes(buf, 0, #pad_before);
+                ctx.pad("pad_before", #pad_before)?;
             }
         }
 
@@ -152,11 +135,7 @@ impl Field {
                 } => {
                     tokens = quote! {
                         #tokens
-                        <#field_type as ::insim_core::EncodeString>::encode_codepage(
-                            &self.#field_name, buf, #length, #trailing_nul
-                        ).map_err(|e|
-                            e.nested().context(#context)
-                        )?;
+                        ctx.encode_codepage(#context, &self.#field_name, #length, #trailing_nul)?;
                     }
                 },
                 CodepageArgs {
@@ -166,11 +145,7 @@ impl Field {
                 } => {
                     tokens = quote! {
                         #tokens
-                        <#field_type as ::insim_core::EncodeString>::encode_codepage_with_alignment(
-                            &self.#field_name, buf, #length, #align_to, #trailing_nul
-                        ).map_err(|e|
-                            e.nested().context(#context)
-                        )?;
+                        ctx.encode_codepage_with_alignment(#context, &self.#field_name, #length, #align_to, #trailing_nul)?;
                     }
                 },
             }
@@ -181,33 +156,24 @@ impl Field {
         {
             tokens = quote! {
                 #tokens
-                <#field_type as ::insim_core::EncodeString>::encode_ascii(
-                    &self.#field_name, buf, #length, #trailing_nul
-                ).map_err(|e|
-                    e.nested().context(#context)
-                )?;
+                ctx.encode_ascii(#context, &self.#field_name, #length, #trailing_nul)?;
             };
         } else if let Some(duration_repr) = f.duration.as_ref() {
             tokens = quote! {
                 #tokens
-                match #duration_repr::try_from(self.#field_name.as_millis()) {
-                    Ok(v) => v.encode(buf).map_err(|e|
-                        e.nested().context(#context)
-                    )?,
-                    Err(_) => return Err(::insim_core::EncodeErrorKind::OutOfRange { min: 0, max: #duration_repr::MAX as usize, found: self.#field_name.as_millis() as usize}.context(#context))
-                };
+                ctx.encode_duration::<#duration_repr>(#context, self.#field_name)?;
             };
         } else {
             tokens = quote! {
                 #tokens
-                self.#field_name.encode(buf).map_err(|e| e.nested().context(#context))?;
+                ctx.encode(#context, &self.#field_name)?;
             };
         }
 
         if pad_after > 0 {
             tokens = quote! {
                 #tokens
-                <::bytes::BytesMut as ::bytes::buf::BufMut>::put_bytes(buf, 0, #pad_after);
+                ctx.pad("pad_after", #pad_after)?;
             }
         }
 

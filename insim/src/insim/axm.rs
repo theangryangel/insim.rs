@@ -1,5 +1,4 @@
-use bytes::{Buf, BufMut};
-use insim_core::{Decode, Encode};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 
 use crate::identifiers::{ConnectionId, RequestId};
 
@@ -99,16 +98,16 @@ pub struct Axm {
 impl_typical_with_request_id!(Axm);
 
 impl Decode for Axm {
-    fn decode(buf: &mut bytes::Bytes) -> Result<Self, insim_core::DecodeError> {
-        let reqi = RequestId::decode(buf).map_err(|e| e.nested().context("Axm::reqi"))?;
-        let mut numo = u8::decode(buf).map_err(|e| e.nested().context("Axm::numo"))?;
-        let ucid = ConnectionId::decode(buf).map_err(|e| e.nested().context("Axm::ucid"))?;
-        let pmoaction = PmoAction::decode(buf).map_err(|e| e.nested().context("Axm::pmoaction"))?;
-        let pmoflags = PmoFlags::decode(buf).map_err(|e| e.nested().context("Axm::pmoflags"))?;
-        buf.advance(1);
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
+        let reqi = ctx.decode::<RequestId>("reqi")?;
+        let mut numo = ctx.decode::<u8>("numo")?;
+        let ucid = ctx.decode::<ConnectionId>("ucid")?;
+        let pmoaction = ctx.decode::<PmoAction>("pmoaction")?;
+        let pmoflags = ctx.decode::<PmoFlags>("pmoflags")?;
+        ctx.pad("sp3", 1)?;
         let mut info = Vec::with_capacity(numo as usize);
         while numo > 0 {
-            info.push(ObjectInfo::decode(buf).map_err(|e| e.nested().context("Axm::info"))?);
+            info.push(ctx.decode::<ObjectInfo>("info")?);
             numo -= 1;
         }
 
@@ -123,10 +122,8 @@ impl Decode for Axm {
 }
 
 impl Encode for Axm {
-    fn encode(&self, buf: &mut bytes::BytesMut) -> Result<(), insim_core::EncodeError> {
-        self.reqi
-            .encode(buf)
-            .map_err(|e| e.nested().context("Axm::reqi"))?;
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
+        ctx.encode("reqi", &self.reqi)?;
         let len = self.info.len();
         if len > AXM_MAX_OBJECTS {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
@@ -136,21 +133,13 @@ impl Encode for Axm {
             }
             .context("Axm: Too many AXM objects"));
         }
-        (len as u8)
-            .encode(buf)
-            .map_err(|e| e.nested().context("Axm::len"))?;
-        self.ucid
-            .encode(buf)
-            .map_err(|e| e.nested().context("Axm::ucid"))?;
-        self.pmoaction
-            .encode(buf)
-            .map_err(|e| e.nested().context("Axm::pmoaction"))?;
-        self.pmoflags
-            .encode(buf)
-            .map_err(|e| e.nested().context("Axm::pmoflags"))?;
-        buf.put_bytes(0, 1);
+        ctx.encode("numo", &(len as u8))?;
+        ctx.encode("ucid", &self.ucid)?;
+        ctx.encode("pmoaction", &self.pmoaction)?;
+        ctx.encode("pmoflags", &self.pmoflags)?;
+        ctx.pad("sp3", 1)?;
         for i in self.info.iter() {
-            i.encode(buf).map_err(|e| e.nested().context("Axm::info"))?;
+            ctx.encode("info", i)?;
         }
 
         Ok(())

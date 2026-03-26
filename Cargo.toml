@@ -1,19 +1,20 @@
 [workspace]
 members = [
+  "examples/*",
   "insim",
   "insim_core",
+  "insim_lyt",
   "insim_macros",
   "insim_pth",
-  "outgauge",
-  "outsim",
-  "examples/*",
-  "xtask",
   "kitcar",
   "kitcar_macros",
+  "outgauge",
+  "outsim",
+  "xtask",
 ]
 exclude = ['examples/*']
 # Only check / build main crates by default (check all with `--workspace`)
-default-members = ["insim", "insim_*", "outgauge", "outsim", "kitcar"]
+default-members = ["insim", "insim_core", "insim_macros", "insim_pth", "insim_lyt", "outgauge", "outsim", "kitcar"]
 resolver = "2"
 
 [workspace.package]
@@ -51,6 +52,7 @@ futures = "0.3.32"
 glam = "0.32.0"
 indexmap = "2.13.0"
 itertools = "0.14.0"
+num-traits = "0.2"
 proc-macro2 = "1"
 quote = "1"
 serde = "1.0.228"

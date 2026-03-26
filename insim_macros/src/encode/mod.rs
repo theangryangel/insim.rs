@@ -71,11 +71,11 @@ impl Receiver {
         Ok(quote! {
             impl ::insim_core::Encode for #name {
                 /// Write
-                fn encode(&self, buf: &mut ::bytes::BytesMut) -> Result<(), ::insim_core::EncodeError> {
+                fn encode(&self, ctx: &mut ::insim_core::EncodeContext) -> Result<(), ::insim_core::EncodeError> {
                     let val: #repr_ty = match self {
                         #(#to_variants)*
                     };
-                    val.encode(buf)?;
+                    ctx.encode("discriminant", &val)?;
                     Ok(())
                 }
             }
@@ -99,7 +99,7 @@ impl Receiver {
         Ok(quote! {
             impl ::insim_core::Encode for #name {
                 /// Write
-                fn encode(&self, buf: &mut ::bytes::BytesMut) -> Result<(), ::insim_core::EncodeError> {
+                fn encode(&self, ctx: &mut ::insim_core::EncodeContext) -> Result<(), ::insim_core::EncodeError> {
                     #(#to_bytes_fields)*
                     Ok(())
                 }
@@ -141,8 +141,8 @@ impl Receiver {
         Ok(quote! {
             impl ::insim_core::Decode for #name {
                 /// Read
-                fn decode(buf: &mut ::bytes::Bytes) -> Result<Self, ::insim_core::DecodeError> {
-                    let val: Self = match #repr_ty::decode(buf)? {
+                fn decode(ctx: &mut ::insim_core::DecodeContext) -> Result<Self, ::insim_core::DecodeError> {
+                    let val: Self = match ctx.decode::<#repr_ty>("discriminant")? {
                         #(#from_variants)*
                         found => return Err(::insim_core::DecodeErrorKind::NoVariantMatch { found: found as u64 }.into())
                     };
@@ -184,7 +184,7 @@ impl Receiver {
         Ok(quote! {
             impl ::insim_core::Decode for #name {
                 /// Read
-                fn decode(buf: &mut ::bytes::Bytes) -> Result<Self, ::insim_core::DecodeError> {
+                fn decode(ctx: &mut ::insim_core::DecodeContext) -> Result<Self, ::insim_core::DecodeError> {
                     #(#from_bytes_fields)*
                     Ok(Self {
                         #(#from_bytes_fields_init),*

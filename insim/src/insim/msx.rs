@@ -20,7 +20,7 @@ mod tests {
     use std::borrow::Cow;
 
     use bytes::{BufMut, BytesMut};
-    use insim_core::Encode;
+    use insim_core::{Encode, EncodeContext};
 
     use super::*;
 
@@ -50,7 +50,7 @@ mod tests {
         };
 
         let mut buf = BytesMut::new();
-        let res = msx.encode(&mut buf);
+        let res = msx.encode(&mut EncodeContext::new(&mut buf));
 
         assert!(res.is_err());
         assert!(matches!(

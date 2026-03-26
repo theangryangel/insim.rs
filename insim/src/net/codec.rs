@@ -1,7 +1,10 @@
-use std::time::{Duration, Instant};
+use std::{
+    fmt,
+    time::{Duration, Instant},
+};
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use insim_core::{Decode, DecodeErrorKind, Encode, EncodeErrorKind};
+use insim_core::{Decode, DecodeContext, DecodeErrorKind, Encode, EncodeContext, EncodeErrorKind};
 
 use super::DEFAULT_TIMEOUT_SECS;
 use crate::{
@@ -11,6 +14,20 @@ use crate::{
     packet::Packet,
     result::Result,
 };
+
+struct HexDisplay<'a>(&'a [u8]);
+
+impl fmt::Display for HexDisplay<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (i, b) in self.0.iter().enumerate() {
+            if i > 0 {
+                f.write_str(" ")?;
+            }
+            write!(f, "{b:02x}")?;
+        }
+        Ok(())
+    }
+}
 
 const MAX_PACKET_SIZE: usize = 1020;
 const MIN_PACKET_SIZE: usize = 4;
@@ -49,7 +66,7 @@ impl Codec {
     }
 
     /// Encode a [Packet] into [Bytes].
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self), err)]
     pub fn encode(&self, msg: &Packet) -> Result<Bytes> {
         let mut buf = BytesMut::with_capacity(msg.size_hint());
 
@@ -57,20 +74,21 @@ impl Codec {
         buf.put_u8(0);
 
         // encode the message
-        msg.encode(&mut buf)?;
+        let mut ctx = EncodeContext::new(&mut buf);
+        msg.encode(&mut ctx)?;
 
         let n = self.encode_length(buf.len())?;
 
         // populate the size
         buf[0] = n;
 
-        tracing::debug!("{:?}", &buf);
+        tracing::debug!(bytes = %HexDisplay(&buf), "encoded packet");
 
         Ok(buf.freeze())
     }
 
     /// Feed the codec with bytes
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all, fields(len = src.len()))]
     pub fn feed(&mut self, src: &[u8]) {
         if src.is_empty() {
             return;
@@ -86,7 +104,6 @@ impl Codec {
     /// This function will automatically to see if there is space in the buffer for a full insim
     /// packet. If there is not it reserves the required space to do so. This is a safety mechanism
     /// to ensure that usage with UdpSocket does not fail.
-    #[tracing::instrument]
     pub fn buf_mut(&mut self) -> &mut BytesMut {
         if self.buffer.remaining_mut() < MAX_SIZE_PACKET {
             self.buffer.reserve(MAX_SIZE_PACKET);
@@ -95,7 +112,7 @@ impl Codec {
     }
 
     /// Decode any complete packet in the buffer into a [Packet]
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all, fields(buf_len = self.buffer.len()), err)]
     pub fn decode(&mut self) -> Result<Option<Packet>> {
         if self.buffer.is_empty() {
             return Ok(None);
@@ -110,6 +127,8 @@ impl Codec {
 
         let mut data = self.buffer.split_to(n).freeze();
 
+        tracing::trace!(bytes = %HexDisplay(&data), "raw packet");
+
         self.timeout_at = Instant::now() + Duration::from_secs(DEFAULT_TIMEOUT_SECS);
 
         // cloning Bytes is cheap:
@@ -121,11 +140,12 @@ impl Codec {
         // none of the packet definitions include the size
         data.advance(1);
 
-        let packet = Packet::decode(&mut data);
+        let mut ctx = DecodeContext::new(&mut data);
+        let packet = Packet::decode(&mut ctx);
         match packet {
             Ok(packet) => {
-                tracing::debug!("{:?}", &packet);
-                if data.remaining() > 0 {
+                tracing::debug!(?packet, "decoded packet");
+                if ctx.buf.remaining() > 0 {
                     return Err(Error::IncompleteDecode {
                         input: original,
                         remaining: data,
@@ -179,7 +199,7 @@ impl Codec {
 
     /// Given a single packet in dst, encode it's length, and ensure that it does not
     /// exceed maximum limits
-    #[tracing::instrument]
+    #[tracing::instrument(skip(self), level = "trace", ret, err)]
     fn encode_length(&self, len: usize) -> Result<u8> {
         if !(MIN_PACKET_SIZE..=MAX_PACKET_SIZE).contains(&len) {
             return Err(EncodeErrorKind::OutOfRange {
@@ -208,7 +228,7 @@ impl Codec {
 
     /// Decode the length of the next packet in the buffer src, ensuring that it does
     /// not exceed limits.
-    #[tracing::instrument]
+    #[tracing::instrument(skip_all, fields(src_len = src.len()), level = "trace", ret, err)]
     fn decode_length(&self, src: &BytesMut) -> Result<Option<usize>> {
         if src.len() < MIN_PACKET_SIZE {
             // Not enough data for even the header

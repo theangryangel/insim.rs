@@ -145,7 +145,7 @@ impl_typical_with_request_id!(Tiny);
 #[cfg(test)]
 mod tests {
     use bytes::{BufMut, BytesMut};
-    use insim_core::Decode;
+    use insim_core::{Decode, DecodeContext};
 
     use super::*;
 
@@ -154,7 +154,8 @@ mod tests {
         let mut buf = BytesMut::new();
         buf.put_u8(27);
 
-        let ty = TinyType::decode(&mut buf.freeze()).unwrap();
+        let mut frozen = buf.freeze();
+        let ty = TinyType::decode(&mut DecodeContext::new(&mut frozen)).unwrap();
         assert!(matches!(ty, TinyType::Mal));
     }
 

@@ -2,7 +2,11 @@
 use std::net::UdpSocket;
 
 use bytes::{Bytes, BytesMut};
-use outgauge::{Outgauge, core::Decode};
+use outgauge::{
+    Outgauge,
+    core::{Decode, DecodeContext},
+};
+use tracing_subscriber::fmt::format::FmtSpan;
 
 /// Setup tracing output
 fn setup_tracing_subscriber() {
@@ -13,6 +17,7 @@ fn setup_tracing_subscriber() {
                 .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
                 .from_env_lossy(),
         )
+        .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
         .init();
 }
 
@@ -28,8 +33,9 @@ pub fn main() {
         let (amt, src) = socket.recv_from(&mut raw).unwrap();
 
         let mut buf: Bytes = BytesMut::from(&raw[..amt]).freeze();
+        let mut ctx = DecodeContext::new(&mut buf);
 
-        let packet = Outgauge::decode(&mut buf).unwrap();
+        let packet = Outgauge::decode(&mut ctx).unwrap();
         tracing::info!("from={:?}, data={:?}", src, packet);
     }
 }

@@ -85,4 +85,4 @@ jobs:
         uses: obi1kenobi/cargo-semver-checks-action@v2
         with:
           feature-group: all-features
-          exclude: kitcar
+          exclude: kitcar,insim_lyt
