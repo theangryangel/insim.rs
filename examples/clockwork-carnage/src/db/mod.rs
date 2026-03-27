@@ -235,9 +235,11 @@ mod events;
 mod metronome;
 mod shortcut;
 mod users;
+mod xp;
 
 pub use bomb::*;
 pub use events::*;
 pub use metronome::*;
 pub use shortcut::*;
 pub use users::*;
+pub use xp::*;

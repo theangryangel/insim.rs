@@ -51,6 +51,9 @@ impl MiniGameManager {
         let mut current_task: Option<JoinHandle<Result<(), SceneError>>> = None;
         let mut current_cancel: Option<CancellationToken> = None;
 
+        let mut idle_task: Option<JoinHandle<Result<(), SceneError>>> = None;
+        let mut idle_cancel: Option<CancellationToken> = None;
+
         let mut last_announced_at: Option<Instant> = None;
         let mut last_announced_event_id: Option<i64> = None;
 
@@ -74,9 +77,34 @@ impl MiniGameManager {
                         tracing::warn!("Failed to poll active event: {e}");
                     },
 
-                    (None, Ok(None)) => {},
+                    (None, Ok(None)) => {
+                        // No event running — start idle if not already running.
+                        if idle_task.as_ref().map_or(true, |t| t.is_finished()) {
+                            tracing::info!("No active event — starting idle mode");
+                            let cancel = CancellationToken::new();
+                            idle_cancel = Some(cancel.clone());
+                            let ctx_clone = MiniGameCtx {
+                                pool: ctx.pool.clone(),
+                                insim: ctx.insim.clone(),
+                                presence: ctx.presence.clone(),
+                                game: ctx.game.clone(),
+                                base_url: ctx.base_url.clone(),
+                            };
+                            idle_task = Some(tokio::spawn(async move {
+                                super::idle::run(&ctx_clone, cancel).await
+                            }));
+                        }
+                    },
 
                     (None, Ok(Some(event))) => {
+                        // Cancel idle if it's running before starting the real event.
+                        if let Some(token) = idle_cancel.take() {
+                            token.cancel();
+                        }
+                        if let Some(task) = idle_task.take() {
+                            let _ = tokio::time::timeout(Duration::from_secs(5), task).await;
+                        }
+
                         tracing::info!(
                             "Starting event #{} ({:?} on {}/{})",
                             event.id,

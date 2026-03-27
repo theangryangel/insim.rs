@@ -1,3 +1,4 @@
+{% import "partials/player_name.html" as macros %}
 <table class="w-full">
   <thead>
     <tr
@@ -26,33 +27,7 @@
         {{ loop.index }}
       </td>
       <td class="py-2 px-2">
-        <span class="font-medium">{{ entry.pname|colour_html|safe }}</span>
-        <span class="text-xs text-gray-400 ml-1">{{ entry.uname }}</span>
-        {% if let Some(tw) = entry.twitch_username %}
-        <a
-          href="https://twitch.tv/{{ tw }}"
-          target="_blank"
-          class="text-purple-500 hover:text-purple-700 ml-1"
-        >
-          <img
-            src="/assets/twitch-icon.svg"
-            class="h-3 w-3 inline"
-            alt="Twitch"
-          />
-        </a>
-        {% endif %} {% if let Some(yt) = entry.youtube_username %}
-        <a
-          href="https://youtube.com/@{{ yt }}"
-          target="_blank"
-          class="text-red-500 hover:text-red-700 ml-1"
-        >
-          <img
-            src="/assets/youtube-icon.svg"
-            class="h-3 w-3 inline"
-            alt="YouTube"
-          />
-        </a>
-        {% endif %}
+        {% call macros::player_name(entry.pname, entry.uname, entry.twitch_username, entry.youtube_username) %}{% endcall %}
       </td>
       <td class="py-2 px-2 text-sm text-gray-500">{{ entry.vehicle }}</td>
       <td class="py-2 px-2 text-right font-mono font-semibold">

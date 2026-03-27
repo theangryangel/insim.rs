@@ -1,3 +1,4 @@
+{% import "partials/player_name.html" as macros %}
 <section
   id="presence"
   class="mt-6"
@@ -19,35 +20,7 @@
       class="flex items-center gap-2 py-1.5 px-3 bg-white rounded-lg border border-gray-200"
     >
       <span class="h-2 w-2 bg-green-500 rounded-full flex-shrink-0"></span>
-      <span class="text-sm font-medium">{{ conn.pname|colour_html|safe }}</span>
-      <span class="text-xs text-gray-400 font-mono">{{ conn.uname }}</span>
-      <span class="flex items-center gap-1 ml-auto">
-        {% if let Some(tw) = conn.twitch_username %}
-        <a
-          href="https://twitch.tv/{{ tw }}"
-          target="_blank"
-          class="text-purple-500 hover:text-purple-700"
-        >
-          <img
-            src="/assets/twitch-icon.svg"
-            class="h-3 w-3 inline"
-            alt="Twitch"
-          />
-        </a>
-        {% endif %} {% if let Some(yt) = conn.youtube_username %}
-        <a
-          href="https://youtube.com/@{{ yt }}"
-          target="_blank"
-          class="text-red-500 hover:text-red-700"
-        >
-          <img
-            src="/assets/youtube-icon.svg"
-            class="h-3 w-3 inline"
-            alt="YouTube"
-          />
-        </a>
-        {% endif %}
-      </span>
+      {% call macros::player_name(conn.pname, conn.uname, conn.twitch_username, conn.youtube_username) %}{% endcall %}
     </div>
     {% endfor %}
   </div>

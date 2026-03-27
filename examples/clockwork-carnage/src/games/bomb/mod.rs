@@ -118,6 +118,59 @@ impl MiniGame for BombGame {
             .map_err(|cause| SceneError::Custom {
                 scene: "bomb::teardown",
                 cause: Box::new(cause),
-            })
+            })?;
+
+        let standings = db::bomb_best_runs(&ctx.pool, event.id)
+            .await
+            .map_err(|cause| SceneError::Custom {
+                scene: "bomb::teardown::standings",
+                cause: Box::new(cause),
+            })?;
+
+        if !standings.is_empty() {
+            let parts: Vec<String> = standings
+                .iter()
+                .enumerate()
+                .map(|(i, s)| {
+                    let xp = position_xp(i);
+                    format!("{} {} (+{xp} XP)", ordinal(i + 1), s.pname)
+                })
+                .collect();
+            let _ = ctx
+                .insim
+                .send_message(format!("Bomb: {}", parts.join(", ")), None)
+                .await;
+
+            for (i, s) in standings.iter().enumerate() {
+                let xp = position_xp(i);
+                if let Err(e) =
+                    db::award_xp(&ctx.pool, &s.uname, xp, "bomb", Some(event.id)).await
+                {
+                    tracing::warn!("Failed to award XP to {}: {e}", s.uname);
+                }
+            }
+        }
+
+        Ok(())
     }
+}
+
+fn position_xp(rank: usize) -> i64 {
+    match rank {
+        0 => 100,
+        1 => 75,
+        2 => 50,
+        3..=9 => 25,
+        _ => 10,
+    }
+}
+
+fn ordinal(n: usize) -> String {
+    let suffix = match n % 10 {
+        1 if n % 100 != 11 => "st",
+        2 if n % 100 != 12 => "nd",
+        3 if n % 100 != 13 => "rd",
+        _ => "th",
+    };
+    format!("{n}{suffix}")
 }
