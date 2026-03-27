@@ -108,9 +108,19 @@ impl ui::Component for BombView {
                 };
                 let cps_str = format!("{cps} cps");
                 let time_str = format!("{secs_left:.1}s");
-                // 8-char progress bar
-                let filled = (fraction * 8.0).round() as usize;
-                let bar: String = (0..8).map(|i| if i < filled { '█' } else { '░' }).collect();
+                // 8-char progress bar using interpuncts, color-coded by remaining fraction
+                const BAR_LEN: usize = 8;
+                let available = (fraction * BAR_LEN as f64).round() as usize;
+                let consumed = BAR_LEN - available;
+                let consumed_part = "·".repeat(consumed).black();
+                let available_part = if fraction > 0.25 {
+                    "·".repeat(available).light_green()
+                } else if fraction > 0.05 {
+                    "·".repeat(available).yellow()
+                } else {
+                    "·".repeat(available).red()
+                };
+                let bar = format!("{available_part}{consumed_part}");
                 let style = if uname.as_str() == player.uname.as_str() {
                     hud_active()
                 } else {
