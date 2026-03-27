@@ -40,7 +40,7 @@ struct ActiveViewChannels<M: Clone + Send + 'static, C: Clone + Send + Sync + 's
 /// Intended for multi-player/multi-connection UIs
 #[derive(Debug)]
 pub struct Ui<M: Clone + Send + 'static, G, C> {
-    global: watch::Sender<G>,
+    global: watch::Sender<Arc<G>>,
     connection_props: mpsc::Sender<(ConnectionId, C)>,
     view_messages: mpsc::Sender<(ConnectionId, M)>,
     outbound: broadcast::Sender<(ConnectionId, M)>,
@@ -49,18 +49,18 @@ pub struct Ui<M: Clone + Send + 'static, G, C> {
 impl<M, G, C> Ui<M, G, C>
 where
     M: Clone + Send + 'static,
-    G: Clone + Send + Sync + 'static,
+    G: Send + Sync + 'static,
     C: Clone + Send + Sync + 'static,
 {
-    /// Update the global state for all connections, triggering a re-render.
+    /// Broadcast new global state to all connections, triggering a re-render for each.
     /// Global state is shared state visible to all connected players.
-    pub fn set_global_state(&self, value: G) {
-        let _ = self.global.send(value);
+    pub fn assign(&self, value: G) {
+        let _ = self.global.send(Arc::new(value));
     }
 
     /// Update the state for a specific connection, triggering a re-render for that player.
     /// Player state is per-player state, useful for player-specific UI elements.
-    pub async fn set_player_state(&self, ucid: ConnectionId, value: C) {
+    pub async fn assign_to(&self, ucid: ConnectionId, value: C) {
         let _ = self.connection_props.send((ucid, value)).await;
     }
 
@@ -105,12 +105,14 @@ where
 /// #[derive(Clone)]
 /// struct Props { global: GameState, player: PlayerState }
 ///
-/// impl From<UiState<GameState, PlayerState>> for Props {
-///     fn from(state: UiState<GameState, PlayerState>) -> Self {
-///         Self {
-///             global: state.global,
-///             player: state.connection,
-///         }
+/// // Props<'a> can be a tuple — no combined struct or From impl needed:
+/// impl Component for MyView {
+///     type Props<'a> = (&'a GameState, &'a PlayerState);
+///     type Message = MyMsg;
+///
+///     fn render(&self, (global, player): Self::Props<'_>) -> Node<Self::Message> {
+///         container()
+///             .with_child(text(format!("Score: {}", global.score), BtnStyle::default()))
 ///     }
 /// }
 ///
@@ -120,11 +122,11 @@ where
 ///     |_ucid, _invalidator| MyView,
 /// );
 ///
-/// // Update global state (re-renders for all players)
-/// ui.set_global_state(GameState { score: 100 });
+/// // Broadcast new global state (re-renders for all players)
+/// ui.assign(GameState { score: 100 });
 ///
 /// // Update per-player state
-/// ui.set_player_state(player_ucid, PlayerState { ready: true }).await;
+/// ui.assign_to(player_ucid, PlayerState { ready: true }).await;
 /// ```
 #[allow(clippy::type_complexity)]
 pub fn mount<Cmp, G, C, Make>(
@@ -134,8 +136,8 @@ pub fn mount<Cmp, G, C, Make>(
 ) -> (Ui<Cmp::Message, G, C>, JoinHandle<Result<(), UiError>>)
 where
     Cmp: Component + 'static,
-    for<'a> UiState<G, C>: Into<Cmp::Props<'a>>,
-    G: Clone + Send + Sync + 'static,
+    for<'a> Cmp::Props<'a>: From<(&'a G, &'a C)>,
+    G: Send + Sync + 'static,
     C: Clone + Send + Sync + Default + 'static,
     Make: FnMut(ConnectionId, InvalidateHandle) -> Cmp + Send + 'static,
 {
@@ -157,14 +159,14 @@ pub fn mount_with<Cmp, G, C, Make, E, F>(
 ) -> (Ui<Cmp::Message, G, C>, JoinHandle<Result<(), UiError>>)
 where
     Cmp: Component + 'static,
-    for<'a> UiState<G, C>: Into<Cmp::Props<'a>>,
-    G: Clone + Send + Sync + 'static,
+    for<'a> Cmp::Props<'a>: From<(&'a G, &'a C)>,
+    G: Send + Sync + 'static,
     C: Clone + Send + Sync + Default + 'static,
     Make: FnMut(ConnectionId, InvalidateHandle) -> Cmp + Send + 'static,
     E: Clone + Send + 'static,
     F: FnMut(E) -> Option<(ConnectionId, Cmp::Message)> + Send + 'static,
 {
-    let (global_tx, _global_rx) = watch::channel(props);
+    let (global_tx, _global_rx) = watch::channel(Arc::new(props));
     // Outside-in connection props updates (`Ui::set_player_state`).
     let (connection_props_tx, mut connection_props_rx) = mpsc::channel(100);
     // Outside-in per-player messages (`Ui::update`).
@@ -348,7 +350,7 @@ where
 #[allow(clippy::type_complexity)]
 fn spawn_for<Cmp, G, C>(
     ucid: ConnectionId,
-    global_rx: watch::Receiver<G>,
+    global_rx: watch::Receiver<Arc<G>>,
     insim: &insim::builder::InsimTask,
     active: &mut HashMap<ConnectionId, ActiveViewChannels<Cmp::Message, C>>,
     outbound: broadcast::Sender<(ConnectionId, Cmp::Message)>,
@@ -356,8 +358,8 @@ fn spawn_for<Cmp, G, C>(
     invalidation_notify: Arc<Notify>,
 ) where
     Cmp: Component + 'static,
-    for<'a> UiState<G, C>: Into<Cmp::Props<'a>>,
-    G: Clone + Send + Sync + 'static,
+    for<'a> Cmp::Props<'a>: From<(&'a G, &'a C)>,
+    G: Send + Sync + 'static,
     C: Clone + Send + Sync + Default + 'static,
 {
     // per-view connection props stream (targeted by ucid).

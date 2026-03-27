@@ -52,23 +52,19 @@ impl MiniGame for ShortcutGame {
             }
             .with_timeout(Duration::from_secs(60)),
         )
-        .then(ChallengeLoop {
-            chat: self.chat.clone(),
-            session_id: self.session_id,
-            base_url: ctx.base_url.clone(),
-        })
+        .then(
+            ChallengeLoop {
+                chat: self.chat.clone(),
+                session_id: self.session_id,
+                base_url: ctx.base_url.clone(),
+            }
+            .until_game_ends(),
+        )
         .loop_until_quit()
         .with_cancellation(cancel);
 
-        let presence = ctx.presence.clone();
-        let chat = self.chat.clone();
-
-        tokio::select! {
-            res = challenge_scene.run(ctx) => { let _ = res?; Ok(()) },
-            _ = chat.wait_for_admin_cmd(presence, |msg| matches!(msg, chat::ChallengeChatMsg::Quit)) => {
-                Ok(())
-            },
-        }
+        let _ = challenge_scene.run(ctx).await?;
+        Ok(())
     }
 
     async fn setup(

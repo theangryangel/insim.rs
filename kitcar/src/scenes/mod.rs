@@ -4,6 +4,8 @@ use std::{marker::PhantomData, time::Duration};
 
 pub use tokio_util::sync::CancellationToken;
 
+use crate::game;
+
 pub mod wait_for_players;
 
 /// Extract a value from a shared context. Implement this for each infrastructure type you want
@@ -227,6 +229,52 @@ where
     }
 }
 
+/// Wrap a scene so that it exits with [`SceneResult::Continue`]`(())` when the game ends.
+///
+/// Races the inner scene against [`game::Game::wait_for_end`]. Whichever fires first:
+/// - Game ends first → `Continue(())`, allowing an outer [`LoopUntilQuit`] to restart.
+/// - Inner scene returns `Continue(_)` → `Continue(())`.
+/// - Inner scene returns `Bail` or `Quit` → propagated as-is.
+///
+/// Place this around the long-running game loop scene, inside `loop_until_quit`:
+///
+/// ```text
+/// WaitForPlayers
+///     .then(SetupTrack)
+///     .then(ChallengeLoop.until_game_ends())  // ← game lifecycle handled here
+///     .loop_until_quit()
+///     .with_cancellation(token)
+/// ```
+#[derive(Debug, Clone)]
+pub struct UntilGameEnds<S> {
+    inner: S,
+}
+
+impl<S, Ctx> Scene<Ctx> for UntilGameEnds<S>
+where
+    S: Scene<Ctx> + Send + 'static,
+    S::Output: Send + 'static,
+    game::Game: FromContext<Ctx>,
+    Ctx: Sync,
+{
+    type Output = ();
+
+    async fn run(self, ctx: &Ctx) -> Result<SceneResult<()>, SceneError> {
+        let game = game::Game::from_context(ctx);
+        tokio::select! {
+            biased;
+            result = self.inner.run(ctx) => match result? {
+                SceneResult::Continue(_) => Ok(SceneResult::Continue(())),
+                SceneResult::Bail { msg } => Ok(SceneResult::Bail { msg }),
+                SceneResult::Quit => Ok(SceneResult::Quit),
+            },
+            _ = async { let _ = game.wait_for_end().await; } => {
+                Ok(SceneResult::Continue(()))
+            },
+        }
+    }
+}
+
 /// Helper trait for constructing scene combinator chains.
 ///
 /// Implemented for every `T: Scene<Ctx>`. The `Ctx` type parameter is almost always inferred
@@ -287,6 +335,12 @@ pub trait SceneExt<Ctx>: Scene<Ctx> + Sized {
     /// `await` point.
     fn with_cancellation(self, token: CancellationToken) -> WithCancellation<Self> {
         WithCancellation { inner: self, token }
+    }
+
+    /// Exit with `Continue(())` when the game ends, dropping the inner future at the next
+    /// `await` point. See [`UntilGameEnds`] for placement guidance.
+    fn until_game_ends(self) -> UntilGameEnds<Self> {
+        UntilGameEnds { inner: self }
     }
 }
 

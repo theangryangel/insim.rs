@@ -12,10 +12,10 @@ struct SetupTrackView {
     mode_name: String,
 }
 impl ui::Component for SetupTrackView {
-    type Props<'a> = ();
+    type Props<'a> = (&'a (), &'a ());
     type Message = ();
 
-    fn render(&self, _props: Self::Props<'_>) -> ui::Node<Self::Message> {
+    fn render(&self, _: Self::Props<'_>) -> ui::Node<Self::Message> {
         ui::container().flex().flex_col().w(200.).with_child(
             topbar("Waiting for player ready").with_child(self.marquee.render(MarqueeProps {
                 text: &self.mode_name,

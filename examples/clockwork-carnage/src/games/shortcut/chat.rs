@@ -14,10 +14,6 @@ pub enum ChallengeChatMsg {
     Help,
     /// Show altitude tracker
     Alt,
-    /// End the challenge
-    End,
-    /// Quit
-    Quit,
 }
 
 pub type ChallengeChat = kitcar::chat::Chat<ChallengeChatMsg>;

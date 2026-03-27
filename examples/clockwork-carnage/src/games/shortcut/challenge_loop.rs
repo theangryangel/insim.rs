@@ -11,7 +11,7 @@ use insim::{
     insim::{ObjectInfo, Uco},
 };
 use kitcar::{
-    game, presence,
+    presence,
     presence::PresenceEvent,
     scenes::{FromContext, Scene, SceneError, SceneResult},
     ui::{self, Component},
@@ -68,12 +68,6 @@ enum ChallengeMessage {
 struct ChallengeView {
     help_dialog: Dialog,
     altitude_dialog: Dialog,
-}
-
-#[derive(Debug, Clone, Default)]
-struct ChallengeProps {
-    global: ChallengeGlobalProps,
-    connection: ChallengeConnectionProps,
 }
 
 fn render_altitude_overlay(altitudes: &[(String, f32)]) -> ui::Node<ChallengeMessage> {
@@ -151,7 +145,7 @@ fn render_altitude_overlay(altitudes: &[(String, f32)]) -> ui::Node<ChallengeMes
 }
 
 impl ui::Component for ChallengeView {
-    type Props<'a> = ChallengeProps;
+    type Props<'a> = (&'a ChallengeGlobalProps, &'a ChallengeConnectionProps);
     type Message = ChallengeMessage;
 
     fn update(&mut self, msg: Self::Message) {
@@ -161,7 +155,7 @@ impl ui::Component for ChallengeView {
         }
     }
 
-    fn render(&self, props: Self::Props<'_>) -> ui::Node<Self::Message> {
+    fn render(&self, (global, player): Self::Props<'_>) -> ui::Node<Self::Message> {
         if self.help_dialog.is_visible() {
             return self
                 .help_dialog
@@ -173,13 +167,13 @@ impl ui::Component for ChallengeView {
         }
 
         if self.altitude_dialog.is_visible() {
-            return render_altitude_overlay(&props.global.altitudes);
+            return render_altitude_overlay(&global.altitudes);
         }
 
-        let (status, status_style) = if props.connection.in_progress {
+        let (status, status_style) = if player.in_progress {
             ("In progress".to_string(), hud_active())
         } else {
-            match props.connection.best_time {
+            match player.best_time {
                 Some(d) => (
                     format!("PB: {}", crate::hud::format_duration(d)),
                     hud_text(),
@@ -188,7 +182,7 @@ impl ui::Component for ChallengeView {
             }
         };
 
-        let players = challenge_scoreboard(&props.global.leaderboard, &props.connection.uname);
+        let players = challenge_scoreboard(&global.leaderboard, &player.uname);
 
         let mut scoreboard = ui::container()
             .flex()
@@ -200,7 +194,7 @@ impl ui::Component for ChallengeView {
             .with_child(ui::text("Best Times", hud_title()).w(40.).h(5.))
             .with_children(players);
 
-        if let Some(url) = &props.global.event_url {
+        if let Some(url) = &global.event_url {
             scoreboard =
                 scoreboard.with_child(ui::text(url, hud_muted().align_left()).w(40.).h(5.));
         }
@@ -211,15 +205,6 @@ impl ui::Component for ChallengeView {
             .w(200.)
             .with_child(topbar("Shortcut").with_child(ui::text(status, status_style).w(20.).h(5.)))
             .with_child(scoreboard)
-    }
-}
-
-impl From<ui::UiState<ChallengeGlobalProps, ChallengeConnectionProps>> for ChallengeProps {
-    fn from(state: ui::UiState<ChallengeGlobalProps, ChallengeConnectionProps>) -> Self {
-        Self {
-            global: state.global,
-            connection: state.connection,
-        }
     }
 }
 
@@ -244,7 +229,6 @@ pub struct ChallengeLoop {
 impl<Ctx> Scene<Ctx> for ChallengeLoop
 where
     InsimTask: FromContext<Ctx>,
-    game::Game: FromContext<Ctx>,
     presence::Presence: FromContext<Ctx>,
     db::Pool: FromContext<Ctx>,
     Ctx: Sync,
@@ -254,7 +238,6 @@ where
     async fn run(self, ctx: &Ctx) -> Result<SceneResult<()>, SceneError> {
         let inner = ChallengeLoopInner {
             insim: InsimTask::from_context(ctx),
-            game: game::Game::from_context(ctx),
             presence: presence::Presence::from_context(ctx),
             db: db::Pool::from_context(ctx),
             chat: self.chat,
@@ -268,7 +251,6 @@ where
 /// Internal struct combining config and extracted infrastructure.
 struct ChallengeLoopInner {
     insim: InsimTask,
-    game: game::Game,
     presence: presence::Presence,
     db: db::Pool,
     chat: chat::ChallengeChat,
@@ -302,7 +284,6 @@ impl ChallengeLoopInner {
                 chat::ChallengeChatMsg::Alt => {
                     Some((ucid, ChallengeMessage::Altitude(DialogMsg::Show)))
                 },
-                _ => None,
             },
         );
 
@@ -355,7 +336,7 @@ impl ChallengeLoopInner {
                                 .await?;
                             let _ = player_names.insert(info.ucid, info.pname.clone());
                             let pb = self.personal_best(&info.uname).await?;
-                            ui.set_player_state(info.ucid, ChallengeConnectionProps {
+                            ui.assign_to(info.ucid, ChallengeConnectionProps {
                                 uname: info.uname.clone(),
                                 in_progress: false,
                                 best_time: pb,
@@ -367,7 +348,7 @@ impl ChallengeLoopInner {
                             let _ = player_heights.remove(&info.ucid);
                             let _ = player_names.remove(&info.ucid);
                             // active_runs already cleaned up by preceding PlayerLeft events.
-                            ui.set_global_state(ChallengeGlobalProps {
+                            ui.assign(ChallengeGlobalProps {
                                 leaderboard: current_leaderboard.clone(),
                                 altitudes: build_altitudes(&player_heights, &player_names),
                                 event_url: event_url.clone(),
@@ -473,7 +454,7 @@ impl ChallengeLoopInner {
                                                 .await?;
 
                                             current_leaderboard = self.challenge_leaderboard().await?;
-                                            ui.set_global_state(ChallengeGlobalProps {
+                                            ui.assign(ChallengeGlobalProps {
                                                 leaderboard: current_leaderboard.clone(),
                                                 altitudes: build_altitudes(&player_heights, &player_names),
                                                 event_url: event_url.clone(),
@@ -484,7 +465,7 @@ impl ChallengeLoopInner {
                                 }
 
                                 let pb = self.personal_best(&conn.uname).await?;
-                                ui.set_player_state(conn.ucid, ChallengeConnectionProps {
+                                ui.assign_to(conn.ucid, ChallengeConnectionProps {
                                     uname: conn.uname.clone(),
                                     in_progress: active_runs.contains_key(&conn.uname),
                                     best_time: pb,
@@ -497,7 +478,7 @@ impl ChallengeLoopInner {
                                     let _ = player_heights.insert(player.ucid, car.xyz.z_metres());
                                 }
                             }
-                            ui.set_global_state(ChallengeGlobalProps {
+                            ui.assign(ChallengeGlobalProps {
                                 leaderboard: current_leaderboard.clone(),
                                 altitudes: build_altitudes(&player_heights, &player_names),
                                 event_url: event_url.clone(),
@@ -507,14 +488,6 @@ impl ChallengeLoopInner {
                     }
                 },
 
-                _ = self.chat.wait_for_admin_cmd(self.presence.clone(), |msg| matches!(msg, chat::ChallengeChatMsg::End)) => {
-                    tracing::info!("Admin ended challenge");
-                    return Ok(SceneResult::Continue(()));
-                },
-                _ = self.game.wait_for_end() => {
-                    tracing::info!("Game ended");
-                    return Ok(SceneResult::Continue(()));
-                },
             }
         }
     }

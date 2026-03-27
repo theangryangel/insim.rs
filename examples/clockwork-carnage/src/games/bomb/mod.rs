@@ -56,26 +56,22 @@ impl MiniGame for BombGame {
             }
             .with_timeout(Duration::from_secs(60)),
         )
-        .then(BombLoop {
-            chat: self.chat.clone(),
-            session_id: self.session_id,
-            checkpoint_timeout: self.checkpoint_timeout,
-            checkpoint_penalty: self.checkpoint_penalty,
-            collision_max_penalty: self.collision_max_penalty,
-            base_url: ctx.base_url.clone(),
-        })
+        .then(
+            BombLoop {
+                chat: self.chat.clone(),
+                session_id: self.session_id,
+                checkpoint_timeout: self.checkpoint_timeout,
+                checkpoint_penalty: self.checkpoint_penalty,
+                collision_max_penalty: self.collision_max_penalty,
+                base_url: ctx.base_url.clone(),
+            }
+            .until_game_ends(),
+        )
         .loop_until_quit()
         .with_cancellation(cancel);
 
-        let presence = ctx.presence.clone();
-        let chat = self.chat.clone();
-
-        tokio::select! {
-            res = bomb_scene.run(ctx) => { let _ = res?; Ok(()) },
-            _ = chat.wait_for_admin_cmd(presence, |msg| matches!(msg, chat::BombChatMsg::Quit)) => {
-                Ok(())
-            },
-        }
+        let _ = bomb_scene.run(ctx).await?;
+        Ok(())
     }
 
     async fn setup(

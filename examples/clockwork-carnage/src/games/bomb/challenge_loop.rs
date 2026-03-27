@@ -11,7 +11,7 @@ use insim::{
     insim::{Con, Crs, ObjectInfo, Pit, Uco},
 };
 use kitcar::{
-    game, presence,
+    presence,
     presence::PresenceEvent,
     scenes::{FromContext, Scene, SceneError, SceneResult},
     ui::{self, Component},
@@ -63,14 +63,8 @@ struct BombView {
     _tick_handle: tokio::task::JoinHandle<()>,
 }
 
-#[derive(Debug, Clone, Default)]
-struct BombProps {
-    global: BombGlobalProps,
-    connection: BombConnectionProps,
-}
-
 impl ui::Component for BombView {
-    type Props<'a> = BombProps;
+    type Props<'a> = (&'a BombGlobalProps, &'a BombConnectionProps);
     type Message = BombMessage;
 
     fn update(&mut self, msg: Self::Message) {
@@ -81,7 +75,7 @@ impl ui::Component for BombView {
         }
     }
 
-    fn render(&self, props: Self::Props<'_>) -> ui::Node<Self::Message> {
+    fn render(&self, (global, player): Self::Props<'_>) -> ui::Node<Self::Message> {
         if self.help_dialog.is_visible() {
             return self
                 .help_dialog
@@ -92,22 +86,17 @@ impl ui::Component for BombView {
                 .map(BombMessage::Help);
         }
 
-        let status_str = if props.connection.in_run {
+        let status_str = if player.in_run {
             "In run".to_string()
         } else {
             "Waiting".to_string()
         };
-        let status_style = if props.connection.in_run {
-            hud_active()
-        } else {
-            hud_muted()
-        };
+        let status_style = if player.in_run { hud_active() } else { hud_muted() };
 
-        let leaderboard_rows = bomb_scoreboard(&props.global.leaderboard, &props.connection.uname);
+        let leaderboard_rows = bomb_scoreboard(&global.leaderboard, &player.uname);
 
         let now = Instant::now();
-        let active_run_rows: Vec<ui::Node<BombMessage>> = props
-            .global
+        let active_run_rows: Vec<ui::Node<BombMessage>> = global
             .active_runs
             .iter()
             .map(|(uname, pname, cps, deadline, current_timeout)| {
@@ -122,7 +111,7 @@ impl ui::Component for BombView {
                 // 8-char progress bar
                 let filled = (fraction * 8.0).round() as usize;
                 let bar: String = (0..8).map(|i| if i < filled { '█' } else { '░' }).collect();
-                let style = if uname.as_str() == props.connection.uname.as_str() {
+                let style = if uname.as_str() == player.uname.as_str() {
                     hud_active()
                 } else {
                     hud_text()
@@ -149,7 +138,7 @@ impl ui::Component for BombView {
             .with_child(ui::text("Session Best", hud_title()).w(43.).h(5.))
             .with_children(leaderboard_rows);
 
-        if let Some(url) = &props.global.event_url {
+        if let Some(url) = &global.event_url {
             scoreboard =
                 scoreboard.with_child(ui::text(url, hud_muted().align_left()).w(43.).h(5.));
         }
@@ -159,15 +148,6 @@ impl ui::Component for BombView {
             .flex_col()
             .with_child(topbar("Bomb").with_child(ui::text(status_str, status_style).w(15.).h(5.)))
             .with_child(scoreboard)
-    }
-}
-
-impl From<ui::UiState<BombGlobalProps, BombConnectionProps>> for BombProps {
-    fn from(state: ui::UiState<BombGlobalProps, BombConnectionProps>) -> Self {
-        Self {
-            global: state.global,
-            connection: state.connection,
-        }
     }
 }
 
@@ -184,7 +164,6 @@ pub struct BombLoop {
 impl<Ctx> Scene<Ctx> for BombLoop
 where
     InsimTask: FromContext<Ctx>,
-    game::Game: FromContext<Ctx>,
     presence::Presence: FromContext<Ctx>,
     db::Pool: FromContext<Ctx>,
     Ctx: Sync,
@@ -193,7 +172,6 @@ where
 
     async fn run(self, ctx: &Ctx) -> Result<SceneResult<()>, SceneError> {
         let insim = InsimTask::from_context(ctx);
-        let game = game::Game::from_context(ctx);
         let presence = presence::Presence::from_context(ctx);
         let pool = db::Pool::from_context(ctx);
 
@@ -276,7 +254,7 @@ where
                                 ),
                                 info.ucid,
                             ).await?;
-                            ui.set_player_state(info.ucid, BombConnectionProps {
+                            ui.assign_to(info.ucid, BombConnectionProps {
                                 uname: info.uname.clone(),
                                 in_run: false,
                             }).await;
@@ -298,8 +276,8 @@ where
                                 insim.send_message(msg, res.run.ucid).await?;
                                 persist_run(&pool, self.session_id, &mut state, &res.run, survival_ms).await?;
                                 let active = state.active_runs_props();
-                                ui.set_global_state(BombGlobalProps { leaderboard: state.leaderboard.clone(), active_runs: active, event_url: event_url.clone() });
-                                ui.set_player_state(res.run.ucid, BombConnectionProps {
+                                ui.assign(BombGlobalProps { leaderboard: state.leaderboard.clone(), active_runs: active, event_url: event_url.clone() });
+                                ui.assign_to(res.run.ucid, BombConnectionProps {
                                     uname: res.run.uname.clone(),
                                     in_run: false,
                                 }).await;
@@ -334,7 +312,7 @@ where
                                     res.ucid,
                                 ).await?;
                                 let active = state.active_runs_props();
-                                ui.set_global_state(BombGlobalProps { leaderboard: state.leaderboard.clone(), active_runs: active, event_url: event_url.clone() });
+                                ui.assign(BombGlobalProps { leaderboard: state.leaderboard.clone(), active_runs: active, event_url: event_url.clone() });
                             }
                         },
                         insim::Packet::Pit(Pit { plid, .. }) => {
@@ -349,8 +327,8 @@ where
                                 })?;
                                 persist_run(&pool, self.session_id, &mut state, &res.run, survival_ms).await?;
                                 let active = state.active_runs_props();
-                                ui.set_global_state(BombGlobalProps { leaderboard: state.leaderboard.clone(), active_runs: active, event_url: event_url.clone() });
-                                ui.set_player_state(res.run.ucid, BombConnectionProps {
+                                ui.assign(BombGlobalProps { leaderboard: state.leaderboard.clone(), active_runs: active, event_url: event_url.clone() });
+                                ui.assign_to(res.run.ucid, BombConnectionProps {
                                     uname: res.run.uname.clone(),
                                     in_run: false,
                                 }).await;
@@ -369,7 +347,7 @@ where
                                         res.ucid,
                                     ).await?;
                                     let active = state.active_runs_props();
-                                    ui.set_global_state(BombGlobalProps { leaderboard: state.leaderboard.clone(), active_runs: active, event_url: event_url.clone() });
+                                    ui.assign(BombGlobalProps { leaderboard: state.leaderboard.clone(), active_runs: active, event_url: event_url.clone() });
                                 }
                             }
                         },
@@ -411,7 +389,7 @@ where
                                             ).await?;
                                         },
                                         state::CheckpointResult::Started { ucid } => {
-                                            ui.set_player_state(ucid, BombConnectionProps {
+                                            ui.assign_to(ucid, BombConnectionProps {
                                                 uname: conn.uname.clone(),
                                                 in_run: true,
                                             }).await;
@@ -420,7 +398,7 @@ where
 
                                     reload_leaderboard(&pool, self.session_id, &mut state).await?;
                                     let active = state.active_runs_props();
-                                    ui.set_global_state(BombGlobalProps { leaderboard: state.leaderboard.clone(), active_runs: active, event_url: event_url.clone() });
+                                    ui.assign(BombGlobalProps { leaderboard: state.leaderboard.clone(), active_runs: active, event_url: event_url.clone() });
                             }
                         },
                         _ => {},
@@ -441,23 +419,14 @@ where
                             })?;
                         persist_run(&pool, self.session_id, &mut state, &res.run, survival_ms).await?;
                         let active = state.active_runs_props();
-                        ui.set_global_state(BombGlobalProps { leaderboard: state.leaderboard.clone(), active_runs: active, event_url: event_url.clone() });
-                        ui.set_player_state(res.run.ucid, BombConnectionProps {
+                        ui.assign(BombGlobalProps { leaderboard: state.leaderboard.clone(), active_runs: active, event_url: event_url.clone() });
+                        ui.assign_to(res.run.ucid, BombConnectionProps {
                             uname: res.run.uname.clone(),
                             in_run: false,
                         }).await;
                     }
                 },
 
-                _ = self.chat.wait_for_admin_cmd(presence.clone(), |msg| matches!(msg, chat::BombChatMsg::End)) => {
-                    tracing::info!("Admin ended bomb session");
-                    return Ok(SceneResult::Continue(()));
-                },
-
-                _ = game.wait_for_end() => {
-                    tracing::info!("Game ended");
-                    return Ok(SceneResult::Continue(()));
-                },
             }
         }
     }
