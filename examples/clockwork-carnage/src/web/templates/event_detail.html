@@ -1,98 +1,140 @@
-{% extends "base.html" %} {% block title %}Event #{{ event.id }} — Clockwork
-Carnage{% endblock %} {% block content %} {# ── Header ── #}
-<div class="flex items-start justify-between gap-4 mb-6">
-  <div>
-    <h1 class="text-2xl font-bold mb-2">
-      {% match event.name %}{% when Some with (n) %}{{ n }}{% when None %}Event
-      #{{ event.id }}{% endmatch %}
-    </h1>
-    {% include "partials/event_actions.html" %}
-  </div>
-  <span
-    class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full border {% match event.status %} {% when EventStatus::Active %}bg-orange-600/20 border-orange-800/30 {% when EventStatus::Completed %}bg-green-600/20 border-green-800/30 {% when EventStatus::Cancelled %}bg-gray-600/20 border-gray-800/30 {% when EventStatus::Pending %}bg-blue-600/20 border-blue-800/30 {% endmatch %}"
-  >
-    <span
-      class="h-2 w-2 rounded-full {% match event.status %} {% when EventStatus::Active %}bg-orange-600 animate-pulse {% when EventStatus::Completed %}bg-green-600 {% when EventStatus::Cancelled %}bg-gray-400 {% when EventStatus::Pending %}bg-blue-600 {% endmatch %}"
-    ></span>
-    <span
-      class="text-xs font-semibold uppercase {% match event.status %} {% when EventStatus::Active %}text-orange-600 {% when EventStatus::Completed %}text-green-600 {% when EventStatus::Cancelled %}text-gray-500 {% when EventStatus::Pending %}text-blue-600 {% endmatch %}"
-      >{{ event.status }}</span
-    >
-  </span>
-</div>
+{% extends "base.html" %}
+{% block title %}
+{% match event.name %}{% when Some with (n) %}{{ n }}{% when None %}Event #{{ event.id }}{% endmatch %}
+ — Clockwork Carnage
+{% endblock %}
+{% block content %}
 
-{# ── Two-column body ── #}
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-  {# ── Left sidebar ── #}
-  <div class="space-y-4">
-    {# Mode card #} {% match *event.mode %} {% when EventMode::Metronome { .. }
-    %} {% include "partials/mode_card_metronome.html" %} {% when
-    EventMode::Shortcut %} {% include "partials/mode_card_shortcut.html" %} {%
-    when EventMode::Bomb { .. } %} {% include "partials/mode_card_bomb.html" %}
-    {% endmatch %} {# Event metadata #}
-    <div class="bg-white rounded-lg p-3 space-y-2">
-      <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-        Details
-      </p>
-      <div class="text-sm space-y-1">
-        <div class="flex justify-between">
-          <span class="text-gray-400">Track</span>
-          <span class="font-medium">{{ event.track }}</span>
-        </div>
-        <div class="flex justify-between">
-          <span class="text-gray-400">Layout</span>
-          <span class="font-medium">{{ event.layout }}</span>
-        </div>
-        {% match event.scheduled_at %} {% when Some with (s) %}
-        <div class="flex justify-between">
-          <span class="text-gray-400">Scheduled start</span>
-          <time
-            datetime="{{ s|as_datetime }}"
-            x-data
-            x-localtime
-            class="font-medium"
-            >{{ s|format_timestamp }}</time
-          >
-        </div>
-        {% when None %} {% endmatch %} {% match event.scheduled_end_at %} {%
-        when Some with (e) %}
-        <div class="flex justify-between">
-          <span class="text-gray-400">Scheduled end</span>
-          <time
-            datetime="{{ e|as_datetime }}"
-            x-data
-            x-localtime
-            class="font-medium"
-            >{{ e|format_timestamp }}</time
-          >
-        </div>
-        {% when None %} {% endmatch %}
+{# ── Hero ── #}
+<section class="relative w-full flex items-end overflow-hidden border-b border-outline-variant/20 bg-surface-container-lowest">
+  <div class="relative z-20 w-full max-w-7xl mx-auto px-6 lg:px-16 pb-10 pt-10">
+    <div class="flex flex-col gap-2">
+      <div class="flex items-center gap-3 flex-wrap">
+        {# Status badge #}
+        {% match event.status %}
+        {% when EventStatus::Active %}
+        <span class="bg-primary-container text-white font-headline font-black px-3 py-0.5 uppercase tracking-widest text-xs flex items-center gap-2">
+          <span class="relative flex h-2 w-2">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+          </span>
+          Live
+        </span>
+        {% when EventStatus::Pending %}
+        <span class="bg-surface-container-high text-tertiary font-headline font-bold px-3 py-0.5 uppercase text-xs tracking-widest border border-tertiary/20">Upcoming</span>
+        {% when EventStatus::Completed %}
+        <span class="bg-surface-container-high text-outline font-headline font-bold px-3 py-0.5 uppercase text-xs tracking-widest">Completed</span>
+        {% when EventStatus::Cancelled %}
+        <span class="bg-surface-container-high text-outline font-headline font-bold px-3 py-0.5 uppercase text-xs tracking-widest opacity-50">Cancelled</span>
+        {% endmatch %}
+        {# Mode tag #}
+        {% match *event.mode %}
+        {% when EventMode::Metronome { .. } %}
+        <span class="bg-surface-container-high text-primary font-headline font-bold px-3 py-0.5 uppercase text-xs tracking-widest border border-primary/20">Metronome</span>
+        {% when EventMode::Shortcut %}
+        <span class="bg-tertiary-container/10 text-tertiary font-headline font-bold px-3 py-0.5 uppercase text-xs tracking-widest border border-tertiary/20">Shortcut</span>
+        {% when EventMode::Bomb { .. } %}
+        <span class="bg-surface-container-high text-on-surface-variant font-headline font-bold px-3 py-0.5 uppercase text-xs tracking-widest border border-outline/20">Bomb</span>
+        {% endmatch %}
+        {# Track tag #}
+        <span class="bg-surface-container-high text-outline font-headline font-bold px-3 py-0.5 uppercase text-xs tracking-widest">{{ event.track }}</span>
       </div>
-      {% match event.description %} {% when Some with (d) %}
-      <p class="text-gray-500 pt-1">{{ d }}</p>
-      {% when None %} {% endmatch %}
+      <h1 class="text-5xl md:text-7xl font-headline font-black uppercase tracking-tighter leading-none text-on-surface py-2">
+        {% match event.name %}
+        {% when Some with (n) %}{{ n }}
+        {% when None %}<span class="text-primary-container">Event #{{ event.id }}</span>
+        {% endmatch %}
+      </h1>
+      {# Admin actions in hero #}
+      {% include "partials/event_actions.html" %}
     </div>
   </div>
+</section>
 
-  {# ── Right main ── #}
-  <div class="lg:col-span-2 space-y-6">
-    {# Write-up #} {% match event.writeup %} {% when Some with (w) %}
+{# ── Main content grid ── #}
+<section class="max-w-7xl mx-auto px-6 py-12 grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+  {# ── Standings (8/12) ── #}
+  <div class="lg:col-span-8 flex flex-col gap-8">
+
+    {# Write-up #}
+    {% match event.writeup %}
+    {% when Some with (w) %}
     <div>
-      <p
-        class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2"
-      >
-        Write-up
-      </p>
-      <div class="prose prose-sm text-gray-700 whitespace-pre-line">
-        {{ w }}
+      <div class="flex justify-between items-end border-l-4 border-primary-container pl-4 mb-4">
+        <h2 class="font-headline text-2xl font-black uppercase tracking-tight">Race Recap</h2>
+      </div>
+      <div class="bg-surface-container-low p-6 relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-primary-container/5 skew-x-[-20deg] translate-x-16 -translate-y-16"></div>
+        <p class="font-body text-base leading-relaxed text-on-surface-variant whitespace-pre-line">{{ w }}</p>
       </div>
     </div>
-    {% when None %} {% endmatch %} {% match *event.mode %} {% when
-    EventMode::Metronome { .. } %} {% include "partials/metronome_detail.html"
-    %} {% when EventMode::Shortcut %} {% include "partials/shortcut_detail.html"
-    %} {% when EventMode::Bomb { .. } %} {% include "partials/bomb_detail.html"
-    %} {% endmatch %}
+    {% when None %}
+    {% endmatch %}
+
+    {# Mode-specific content (target stats + standings) #}
+    {% match *event.mode %}
+    {% when EventMode::Metronome { .. } %}
+    {% include "partials/metronome_detail.html" %}
+    {% when EventMode::Shortcut %}
+    {% include "partials/shortcut_detail.html" %}
+    {% when EventMode::Bomb { .. } %}
+    {% include "partials/bomb_detail.html" %}
+    {% endmatch %}
+
   </div>
-</div>
+
+  {# ── Sidebar (4/12) ── #}
+  <div class="lg:col-span-4 flex flex-col gap-6">
+
+    {# Mode card #}
+    {% match *event.mode %}
+    {% when EventMode::Metronome { .. } %}
+    {% include "partials/mode_card_metronome.html" %}
+    {% when EventMode::Shortcut %}
+    {% include "partials/mode_card_shortcut.html" %}
+    {% when EventMode::Bomb { .. } %}
+    {% include "partials/mode_card_bomb.html" %}
+    {% endmatch %}
+
+    {# Event details card #}
+    <div class="bg-surface-container-highest p-6 flex flex-col gap-3">
+      <div class="flex justify-between items-center py-1">
+        <span class="font-label text-xs uppercase tracking-widest text-outline">Track</span>
+        <span class="font-headline font-black text-on-surface">{{ event.track }}</span>
+      </div>
+      <div class="flex justify-between items-center py-1">
+        <span class="font-label text-xs uppercase tracking-widest text-outline">Layout</span>
+        <span class="font-headline font-black text-on-surface">{{ event.layout }}</span>
+      </div>
+      {% match event.scheduled_at %}
+      {% when Some with (s) %}
+      <div class="flex justify-between items-center py-1">
+        <span class="font-label text-xs uppercase tracking-widest text-outline">Starts</span>
+        <span class="font-headline font-black text-on-surface">
+          <time datetime="{{ s|as_datetime }}" x-data x-localtime>{{ s|format_timestamp }}</time>
+        </span>
+      </div>
+      {% when None %}
+      {% endmatch %}
+      {% match event.scheduled_end_at %}
+      {% when Some with (e) %}
+      <div class="flex justify-between items-center py-1">
+        <span class="font-label text-xs uppercase tracking-widest text-outline">Ends</span>
+        <span class="font-headline font-black text-on-surface">
+          <time datetime="{{ e|as_datetime }}" x-data x-localtime>{{ e|format_timestamp }}</time>
+        </span>
+      </div>
+      {% when None %}
+      {% endmatch %}
+      {% match event.description %}
+      {% when Some with (d) %}
+      <p class="font-body text-sm text-on-surface-variant leading-relaxed pt-1">{{ d }}</p>
+      {% when None %}
+      {% endmatch %}
+    </div>
+
+  </div>
+</section>
 
 {% endblock %}

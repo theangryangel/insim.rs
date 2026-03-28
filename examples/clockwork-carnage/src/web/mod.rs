@@ -197,6 +197,7 @@ pub async fn serve(
         .route("/assets/{*file}", get(assets))
         .route("/profile", get(profile_get).post(profile_post))
         .route("/", get(index))
+        .route("/leaderboard", get(leaderboard))
         .route("/events", get(events))
         .route("/events/new", get(event_new_get).post(event_new_post))
         .route("/events/{id}", get(event_detail))

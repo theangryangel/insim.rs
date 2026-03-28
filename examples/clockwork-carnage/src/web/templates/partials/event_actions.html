@@ -1,13 +1,12 @@
 <div id="event-actions">
   {% if page.admin %}
-  <div class="flex items-center gap-1.5">
+  <div class="flex items-center gap-2 flex-wrap mt-3">
     <a
       href="/events/{{ event.id }}/edit"
-      class="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-semibold rounded hover:bg-gray-200 transition-colors"
-    >
-      Edit
-    </a>
-    {% match event.status %} {% when EventStatus::Pending %}
+      class="font-headline text-xs uppercase tracking-widest text-outline border border-outline/30 px-4 py-2 hover:text-on-background hover:border-outline/60 transition-colors"
+    >Edit</a>
+    {% match event.status %}
+    {% when EventStatus::Pending %}
     <form
       method="post"
       action="/events/{{ event.id }}/start"
@@ -18,10 +17,8 @@
       <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}" />
       <button
         type="submit"
-        class="px-2 py-1 bg-orange-600 text-white text-xs font-semibold rounded hover:bg-orange-700 transition-colors"
-      >
-        Start
-      </button>
+        class="font-headline font-bold text-xs uppercase tracking-widest bg-primary-container text-white px-4 py-2 hover:bg-white hover:text-primary-container transition-all"
+      >Start</button>
     </form>
     <form
       method="post"
@@ -33,10 +30,8 @@
       <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}" />
       <button
         type="submit"
-        class="px-2 py-1 bg-gray-200 text-gray-600 text-xs font-semibold rounded hover:bg-gray-300 transition-colors"
-      >
-        Cancel
-      </button>
+        class="font-headline text-xs uppercase tracking-widest text-outline border border-outline/30 px-4 py-2 hover:text-on-background transition-colors"
+      >Cancel</button>
     </form>
     {% when EventStatus::Active %}
     <form
@@ -49,10 +44,8 @@
       <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}" />
       <button
         type="submit"
-        class="px-2 py-1 bg-green-600 text-white text-xs font-semibold rounded hover:bg-green-700 transition-colors"
-      >
-        Complete
-      </button>
+        class="font-headline font-bold text-xs uppercase tracking-widest bg-tertiary-container text-white px-4 py-2 hover:bg-white hover:text-tertiary-container transition-all"
+      >Complete</button>
     </form>
     <form
       method="post"
@@ -64,13 +57,12 @@
       <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}" />
       <button
         type="submit"
-        class="px-2 py-1 bg-gray-200 text-gray-600 text-xs font-semibold rounded hover:bg-gray-300 transition-colors"
-      >
-        Cancel
-      </button>
+        class="font-headline text-xs uppercase tracking-widest text-outline border border-outline/30 px-4 py-2 hover:text-on-background transition-colors"
+      >Cancel</button>
     </form>
-    {% when EventStatus::Completed %} {% when EventStatus::Cancelled %} {%
-    endmatch %}
+    {% when EventStatus::Completed %}
+    {% when EventStatus::Cancelled %}
+    {% endmatch %}
   </div>
   {% endif %}
 </div>

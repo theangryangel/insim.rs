@@ -2,6 +2,10 @@
 //! manner and can optionally automatically recover.
 use std::{marker::PhantomData, time::Duration};
 
+pub use tokio_util::sync::CancellationToken;
+
+use crate::game;
+
 pub mod wait_for_players;
 
 /// Extract a value from a shared context. Implement this for each infrastructure type you want
@@ -19,6 +23,9 @@ pub trait Scene<Ctx = ()> {
     type Output;
 
     /// Run/execute the scene
+    // async_fn_in_trait is stable since Rust 1.75. The lint is suppressed because
+    // the returned future is not required to be Send, which is intentional here —
+    // scene combinators propagate Send bounds at the impl level.
     #[allow(async_fn_in_trait)]
     async fn run(self, ctx: &Ctx) -> Result<SceneResult<Self::Output>, SceneError>
     where
@@ -35,7 +42,6 @@ pub enum SceneResult<T> {
         /// Optional reason for bailing
         msg: Option<String>,
     },
-    #[allow(unused)]
     /// Quit stops the chain and does not allow a repeat
     Quit,
 }
@@ -68,7 +74,6 @@ pub enum SceneError {
 
     /// Custom error
     #[error("{scene}: {cause}")]
-    #[allow(unused)]
     Custom {
         /// Origin
         scene: &'static str,
@@ -156,12 +161,48 @@ where
     async fn run(self, ctx: &Ctx) -> Result<SceneResult<Self::Output>, SceneError> {
         match tokio::time::timeout(self.timeout, self.inner.run(ctx)).await {
             Ok(result) => result,
-            Err(_) => Ok(SceneResult::bail_with("WithTimeout")),
+            Err(_) => Ok(SceneResult::bail_with("scene timed out")),
+        }
+    }
+}
+
+/// Wrap a scene so that it exits with [`SceneResult::Quit`] when a [`CancellationToken`] is
+/// triggered.
+///
+/// Place this as the *outermost* combinator so that inner retry loops (e.g. [`LoopUntilQuit`])
+/// are themselves cancelled rather than restarted. When the token fires, the inner future is
+/// dropped at the next `await` point — no teardown is implicit here.
+///
+/// ```text
+/// game_scene
+///     .loop_until_quit()
+///     .with_cancellation(token)  // ← outermost: kills the loop when signalled
+/// ```
+#[derive(Debug, Clone)]
+pub struct WithCancellation<S> {
+    inner: S,
+    token: CancellationToken,
+}
+
+impl<S, Ctx> Scene<Ctx> for WithCancellation<S>
+where
+    S: Scene<Ctx> + Send + 'static,
+    S::Output: Send + 'static,
+    Ctx: Sync,
+{
+    type Output = S::Output;
+
+    async fn run(self, ctx: &Ctx) -> Result<SceneResult<Self::Output>, SceneError> {
+        tokio::select! {
+            biased;
+            _ = self.token.cancelled() => Ok(SceneResult::Quit),
+            result = self.inner.run(ctx) => result,
         }
     }
 }
 
 /// Scene Combinators - repeat the chain on bail
+#[derive(Debug, Clone)]
 pub struct LoopUntilQuit<S> {
     scene: S,
 }
@@ -188,9 +229,69 @@ where
     }
 }
 
+/// Wrap a scene so that it exits with [`SceneResult::Continue`]`(())` when the game ends.
+///
+/// Races the inner scene against [`game::Game::wait_for_end`]. Whichever fires first:
+/// - Game ends first → `Continue(())`, allowing an outer [`LoopUntilQuit`] to restart.
+/// - Inner scene returns `Continue(_)` → `Continue(())`.
+/// - Inner scene returns `Bail` or `Quit` → propagated as-is.
+///
+/// Place this around the long-running game loop scene, inside `loop_until_quit`:
+///
+/// ```text
+/// WaitForPlayers
+///     .then(SetupTrack)
+///     .then(ChallengeLoop.until_game_ends())  // ← game lifecycle handled here
+///     .loop_until_quit()
+///     .with_cancellation(token)
+/// ```
+#[derive(Debug, Clone)]
+pub struct UntilGameEnds<S> {
+    inner: S,
+}
+
+impl<S, Ctx> Scene<Ctx> for UntilGameEnds<S>
+where
+    S: Scene<Ctx> + Send + 'static,
+    S::Output: Send + 'static,
+    game::Game: FromContext<Ctx>,
+    Ctx: Sync,
+{
+    type Output = ();
+
+    async fn run(self, ctx: &Ctx) -> Result<SceneResult<()>, SceneError> {
+        let game = game::Game::from_context(ctx);
+        tokio::select! {
+            biased;
+            result = self.inner.run(ctx) => match result? {
+                SceneResult::Continue(_) => Ok(SceneResult::Continue(())),
+                SceneResult::Bail { msg } => Ok(SceneResult::Bail { msg }),
+                SceneResult::Quit => Ok(SceneResult::Quit),
+            },
+            _ = async { let _ = game.wait_for_end().await; } => {
+                Ok(SceneResult::Continue(()))
+            },
+        }
+    }
+}
+
 /// Helper trait for constructing scene combinator chains.
-pub trait SceneExt: Sized {
-    /// Shortcut to use the Then combinators
+///
+/// Implemented for every `T: Scene<Ctx>`. The `Ctx` type parameter is almost always inferred
+/// from the eventual `.run(ctx)` call, so call sites read naturally:
+///
+/// ```text
+/// scene_a
+///     .and_then(|output| SceneB::from(output))
+///     .then(SceneC)
+///     .loop_until_quit()
+///     .with_cancellation(token)
+/// ```
+pub trait SceneExt<Ctx>: Scene<Ctx> + Sized {
+    /// Run this scene, then `next` if it returned [`SceneResult::Continue`].
+    ///
+    /// The output of this scene is discarded. Use [`SceneExt::and_then`] if the next scene
+    /// needs to be constructed from this scene's output.
     fn then<S>(self, next: S) -> Then<Self, S> {
         Then {
             first: self,
@@ -198,7 +299,23 @@ pub trait SceneExt: Sized {
         }
     }
 
-    /// When a scene bails, automatically start back at the beginning
+    /// Run this scene, then use its output to construct and run the next scene.
+    ///
+    /// Unlike [`SceneExt::then`], the closure receives `Self::Output` and can build the next
+    /// scene dynamically — the only way to pass runtime data between scenes.
+    fn and_then<B, F>(self, f: F) -> AndThen<Self, B, F>
+    where
+        F: Fn(Self::Output) -> B,
+    {
+        AndThen {
+            first: self,
+            next_fn: f,
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Restart the scene from the beginning on [`SceneResult::Bail`] or [`SceneResult::Continue`];
+    /// stop only on [`SceneResult::Quit`].
     fn loop_until_quit(self) -> LoopUntilQuit<Self>
     where
         Self: Clone,
@@ -206,17 +323,25 @@ pub trait SceneExt: Sized {
         LoopUntilQuit { scene: self }
     }
 
-    /// Shortcut to use the Timeout combinator
-    fn with_timeout(self, timeout: Duration) -> WithTimeout<Self>
-    where
-        Self: Clone,
-    {
+    /// Bail if the scene does not complete within `timeout`.
+    fn with_timeout(self, timeout: Duration) -> WithTimeout<Self> {
         WithTimeout {
             inner: self,
             timeout,
         }
     }
+
+    /// Quit the scene immediately if `token` is cancelled, dropping the inner future at the next
+    /// `await` point.
+    fn with_cancellation(self, token: CancellationToken) -> WithCancellation<Self> {
+        WithCancellation { inner: self, token }
+    }
+
+    /// Exit with `Continue(())` when the game ends, dropping the inner future at the next
+    /// `await` point. See [`UntilGameEnds`] for placement guidance.
+    fn until_game_ends(self) -> UntilGameEnds<Self> {
+        UntilGameEnds { inner: self }
+    }
 }
 
-// Blanket impl for all types
-impl<T> SceneExt for T {}
+impl<T: Scene<Ctx>, Ctx> SceneExt<Ctx> for T {}

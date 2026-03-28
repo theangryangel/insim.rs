@@ -1,7 +1,4 @@
-use std::{
-    fmt,
-    ops::{Deref, DerefMut},
-};
+use std::{fmt, ops::Deref};
 
 use bytes::{Buf, BufMut};
 use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
@@ -27,12 +24,6 @@ impl Deref for ClickId {
 
     fn deref(&self) -> &Self::Target {
         &self.0
-    }
-}
-
-impl DerefMut for ClickId {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }
 

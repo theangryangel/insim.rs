@@ -573,11 +573,14 @@ impl Presence {
     }
 
     /// Poll until the connection count satisfies the predicate.
+    ///
+    /// `poll_interval` controls how frequently the predicate is evaluated.
     pub async fn wait_for_connection_count(
         &self,
         f: impl Fn(usize) -> bool,
+        poll_interval: std::time::Duration,
     ) -> Result<usize, PresenceError> {
-        let mut interval = time::interval(std::time::Duration::from_millis(500));
+        let mut interval = time::interval(poll_interval);
         loop {
             let _ = interval.tick().await;
             let count = self.connection_count().await?;
@@ -588,11 +591,14 @@ impl Presence {
     }
 
     /// Poll until the player count satisfies the predicate.
+    ///
+    /// `poll_interval` controls how frequently the predicate is evaluated.
     pub async fn wait_for_player_count(
         &self,
         f: impl Fn(usize) -> bool,
+        poll_interval: std::time::Duration,
     ) -> Result<usize, PresenceError> {
-        let mut interval = time::interval(std::time::Duration::from_millis(500));
+        let mut interval = time::interval(poll_interval);
         loop {
             let _ = interval.tick().await;
             let count = self.player_count().await?;

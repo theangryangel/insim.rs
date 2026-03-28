@@ -123,6 +123,7 @@ impl BombState {
 
     /// Handles a player hitting a checkpoint.
     /// Returns `Some(CheckpointResult)` if it affected a run or started a new one.
+    #[allow(clippy::too_many_arguments)]
     pub fn on_checkpoint(
         &mut self,
         uname: String,

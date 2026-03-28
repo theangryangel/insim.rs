@@ -12,10 +12,6 @@ use crate::ChatError;
 pub enum BombChatMsg {
     /// Help
     Help,
-    /// End the bomb session
-    End,
-    /// Quit
-    Quit,
 }
 
 pub type BombChat = kitcar::chat::Chat<BombChatMsg>;

@@ -1,6 +1,7 @@
 //! Games: unified game executor with reconciliation loop.
 
 pub mod bomb;
+pub mod idle;
 pub mod manager;
 pub mod metronome;
 pub mod setup_track;
@@ -14,6 +15,7 @@ use kitcar::{
     scenes::{FromContext, SceneError},
 };
 pub use manager::MiniGameManager;
+use tokio_util::sync::CancellationToken;
 
 use crate::db;
 
@@ -51,7 +53,11 @@ impl FromContext<MiniGameCtx> for db::Pool {
 }
 
 /// Lifecycle trait for mini-games. Each mode implements this.
-pub trait MiniGame: Clone + Send + 'static {
+///
+/// `run` owns the cancellation token and applies it internally so that `execute` stays clean.
+/// `async_fn_in_trait`: Send is verified at concrete impl sites — `execute<G>` is a Send async fn.
+#[allow(async_fn_in_trait)]
+pub trait MiniGame: Send + Sized + 'static {
     /// Resources to keep alive during the game (chat handles, etc.).
     /// Dropped after teardown to clean up background tasks.
     type Guard: Send + 'static;
@@ -63,16 +69,9 @@ pub trait MiniGame: Clone + Send + 'static {
         ctx: &MiniGameCtx,
     ) -> impl std::future::Future<Output = Result<(Self, Self::Guard), SceneError>> + Send;
 
-    /// Run one iteration. Composes and executes the scene chain.
-    fn run(
-        self,
-        ctx: &MiniGameCtx,
-    ) -> impl std::future::Future<Output = Result<kitcar::scenes::SceneResult<()>, SceneError>> + Send;
+    /// Run the game scene chain to completion or until `cancel` fires.
+    async fn run(&self, ctx: &MiniGameCtx, cancel: CancellationToken) -> Result<(), SceneError>;
 
     /// Clean up: mark DB entries as ended.
-    fn teardown(
-        self,
-        event: &db::Event,
-        ctx: &MiniGameCtx,
-    ) -> impl std::future::Future<Output = Result<(), SceneError>> + Send;
+    async fn teardown(&self, event: &db::Event, ctx: &MiniGameCtx) -> Result<(), SceneError>;
 }
