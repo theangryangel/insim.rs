@@ -1,56 +1,59 @@
 {% extends "base.html" %}
 {% import "partials/player_name.html" as macros %}
-{% block title %}Leaderboard — Clockwork Carnage{% endblock %} {% block content %}
+{% block title %}Leaderboard — Clockwork Carnage{% endblock %}
+{% block content %}
 
-<p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-  XP Leaderboard — Top 10
-</p>
+{# ── Header ── #}
+<section class="border-b border-primary-container/20 bg-surface-container-lowest px-6 lg:px-16 py-12">
+  <div class="max-w-7xl mx-auto">
+    <h1 class="font-headline text-5xl md:text-7xl font-black uppercase tracking-tighter leading-none text-on-surface">
+      Leader<span class="text-primary-container">board</span>
+    </h1>
+  </div>
+</section>
 
-{% if rows.is_empty() %}
-<p class="text-center text-xs text-gray-300 font-mono py-8">
-  No XP earned yet. Complete an event to get on the board.
-</p>
-{% else %}
-<table class="w-full">
-  <thead>
-    <tr
-      class="text-left text-xs text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-200"
-    >
-      <th class="px-3 py-2 w-10">#</th>
-      <th class="px-3 py-2">Player</th>
-      <th class="px-3 py-2 text-right">Events</th>
-      <th class="px-3 py-2 text-right">XP</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for row in rows %}
-    <tr
-      class="border-b border-gray-100 {% if loop.index == 1 %}bg-yellow-50{% elif loop.index == 2 %}bg-gray-50{% elif loop.index == 3 %}bg-orange-50/50{% else %}hover:bg-gray-50{% endif %} transition-colors"
-    >
-      <td class="px-3 py-3 font-mono text-gray-400 text-xs">
-        {% if loop.index == 1 %}
-        <span class="text-yellow-500 font-bold">1st</span>
-        {% elif loop.index == 2 %}
-        <span class="text-gray-500 font-bold">2nd</span>
-        {% elif loop.index == 3 %}
-        <span class="text-orange-600 font-bold">3rd</span>
-        {% else %}
-        {{ loop.index }}
-        {% endif %}
-      </td>
-      <td class="px-3 py-3">
-        {% call macros::player_name(row.pname, row.uname, row.twitch_username, row.youtube_username) %}{% endcall %}
-      </td>
-      <td class="px-3 py-3 text-right text-gray-500 tabular-nums">
-        {{ row.events_played }}
-      </td>
-      <td class="px-3 py-3 text-right font-bold tabular-nums">
-        {{ row.total_xp }}
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% endif %}
+{# ── Table ── #}
+<div class="max-w-7xl mx-auto px-6 lg:px-16 py-12">
+  {% if rows.is_empty() %}
+  <p class="font-headline text-xs uppercase tracking-widest text-outline text-center py-16">
+    No XP earned yet. Complete an event to get on the board.
+  </p>
+  {% else %}
+  <div class="bg-surface-container-low">
+    <table class="w-full text-left border-collapse">
+      <thead>
+        <tr class="bg-surface-container-high border-b border-outline-variant/20">
+          <th class="p-4 font-headline uppercase text-xs tracking-widest text-primary w-14">Rank</th>
+          <th class="p-4 font-headline uppercase text-xs tracking-widest text-primary">Player</th>
+          <th class="p-4 font-headline uppercase text-xs tracking-widest text-primary text-right">Events</th>
+          <th class="p-4 font-headline uppercase text-xs tracking-widest text-primary text-right">XP</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-outline-variant/10">
+        {% for row in rows %}
+        <tr class="hover:bg-surface-container-high transition-colors group">
+          <td class="p-4">
+            {% if loop.index == 1 %}
+            <span class="font-headline font-black text-xl text-primary-container">01</span>
+            {% elif loop.index == 2 %}
+            <span class="font-headline font-black text-xl text-on-surface-variant">02</span>
+            {% elif loop.index == 3 %}
+            <span class="font-headline font-black text-xl text-on-surface-variant">03</span>
+            {% else %}
+            <span class="font-headline font-black text-xl text-on-surface-variant">{{ loop.index }}</span>
+            {% endif %}
+          </td>
+          <td class="p-4">
+            {% call macros::player_name(row.pname, row.uname, row.twitch_username, row.youtube_username) %}{% endcall %}
+          </td>
+          <td class="p-4 text-right font-headline text-sm text-outline">{{ row.events_played }}</td>
+          <td class="p-4 text-right font-headline font-black tracking-tighter text-xl">{{ row.total_xp }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
 
 {% endblock %}

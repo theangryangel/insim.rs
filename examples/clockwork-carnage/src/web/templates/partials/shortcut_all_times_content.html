@@ -1,43 +1,41 @@
 {% import "partials/player_name.html" as macros %}
-<table class="w-full">
+<table class="w-full text-left border-collapse">
   <thead>
-    <tr
-      class="text-left text-xs text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-200"
-    >
-      <th class="py-2 pr-2 w-8">#</th>
-      <th class="py-2 px-2">Driver</th>
-      <th class="py-2 px-2">Vehicle</th>
-      <th class="py-2 px-2 text-right">Time</th>
-      <th class="py-2 pl-2 text-right">Set At</th>
+    <tr class="bg-surface-container-high border-b border-outline-variant/20">
+      <th class="p-4 font-headline uppercase text-xs tracking-widest text-primary w-14">Rank</th>
+      <th class="p-4 font-headline uppercase text-xs tracking-widest text-primary">Driver</th>
+      <th class="p-4 font-headline uppercase text-xs tracking-widest text-primary">Vehicle</th>
+      <th class="p-4 font-headline uppercase text-xs tracking-widest text-primary text-right">Time</th>
+      <th class="p-4 font-headline uppercase text-xs tracking-widest text-primary text-right">Set At</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody class="divide-y divide-outline-variant/10">
     {% if shortcut_all_times.is_empty() %}
-    <tr class="border-b border-gray-100">
-      <td class="py-2 pr-2 font-mono text-gray-400" colspan="5">
-        <p class="text-center text-xs text-gray-300 font-mono py-4">
-          No times recorded yet
-        </p>
+    <tr>
+      <td colspan="5" class="p-5">
+        <p class="font-headline text-xs uppercase tracking-widest text-outline text-center py-4">No times recorded yet</p>
       </td>
     </tr>
-    {% else %} {% for entry in shortcut_all_times %}
-    <tr class="border-b border-gray-100">
-      <td class="py-2 pr-2 font-mono text-gray-400 text-sm">
-        {{ loop.index }}
+    {% else %}
+    {% for entry in shortcut_all_times %}
+    <tr class="{% if loop.first %}bg-primary-container/5 hover:bg-primary-container/10{% else %}hover:bg-surface-container-high{% endif %} transition-colors">
+      <td class="p-4">
+        <span class="font-headline font-black text-xl {% if loop.first %}text-primary-container{% else %}text-on-surface-variant{% endif %}">
+          {{ loop.index }}
+        </span>
       </td>
-      <td class="py-2 px-2">
+      <td class="p-4">
         {% call macros::player_name(entry.pname, entry.uname, entry.twitch_username, entry.youtube_username) %}{% endcall %}
       </td>
-      <td class="py-2 px-2 text-sm text-gray-500">{{ entry.vehicle }}</td>
-      <td class="py-2 px-2 text-right font-mono font-semibold">
+      <td class="p-4 font-headline text-xs uppercase tracking-widest text-outline">{{ entry.vehicle }}</td>
+      <td class="p-4 text-right font-headline font-black tracking-tighter text-xl">
         {{ entry.time_ms|format_time_ms }}
       </td>
-      <td class="py-2 pl-2 text-right text-xs text-gray-400">
-        <time datetime="{{ entry.set_at|as_datetime }}" x-data x-localtime
-          >{{ entry.set_at|format_timestamp }}</time
-        >
+      <td class="p-4 text-right font-headline text-xs uppercase tracking-widest text-outline">
+        <time datetime="{{ entry.set_at|as_datetime }}" x-data x-localtime>{{ entry.set_at|format_timestamp }}</time>
       </td>
     </tr>
-    {% endfor %} {% endif %}
+    {% endfor %}
+    {% endif %}
   </tbody>
 </table>

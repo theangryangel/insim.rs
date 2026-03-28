@@ -1,43 +1,35 @@
 {% import "partials/player_name.html" as macros %}
 {% if metronome_standings.is_empty() %}
-<tr class="border-b border-gray-100">
-  <td class="py-2 pr-2 font-mono text-gray-400" colspan="4">
-    <p class="text-center text-xs text-gray-300 font-mono py-4">
-      No results yet
-    </p>
+<tr>
+  <td colspan="4" class="p-5">
+    <p class="font-headline text-xs uppercase tracking-widest text-outline text-center py-4">No results yet</p>
   </td>
 </tr>
-{% else %} {% for standing in metronome_standings %}
-<tr class="border-b border-gray-100">
-  <td class="py-2 pr-2 font-mono text-gray-400 text-sm">{{ loop.index }}</td>
-  <td class="py-2 px-2">
+{% else %}
+{% for standing in metronome_standings %}
+<tr class="{% if loop.first %}bg-primary-container/5 hover:bg-primary-container/10{% else %}hover:bg-surface-container-high{% endif %} transition-colors">
+  <td class="p-4">
+    <span class="font-headline font-black text-xl {% if loop.first %}text-primary-container{% else %}text-on-surface-variant{% endif %}">
+      {{ loop.index }}
+    </span>
+  </td>
+  <td class="p-4">
     {% call macros::player_name(standing.pname, standing.uname, standing.twitch_username, standing.youtube_username) %}{% endcall %}
   </td>
-  <td class="py-2 px-2 text-right font-mono text-sm text-gray-600">
+  <td class="p-4 text-right font-headline font-black tracking-tighter text-xl">
     {{ standing.best_delta_ms|format_delta_ms }}
   </td>
-  <td class="py-2 pl-2 text-right">
+  <td class="p-4 text-right">
     {% if standing.best_delta_ms <= 100 %}
-    <span
-      class="px-1.5 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-700"
-      >Platinum</span
-    >
+    <span class="font-headline text-[10px] uppercase tracking-widest bg-primary/10 text-primary px-3 py-1 border border-primary/20">Platinum</span>
     {% elif standing.best_delta_ms <= 500 %}
-    <span
-      class="px-1.5 py-0.5 rounded text-xs font-semibold bg-yellow-100 text-yellow-700"
-      >Gold</span
-    >
+    <span class="font-headline text-[10px] uppercase tracking-widest bg-[#fbbf24]/10 text-[#fbbf24] px-3 py-1 border border-[#fbbf24]/20">Gold</span>
     {% elif standing.best_delta_ms <= 2000 %}
-    <span
-      class="px-1.5 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-500"
-      >Silver</span
-    >
+    <span class="font-headline text-[10px] uppercase tracking-widest bg-surface-variant/40 text-outline px-3 py-1">Silver</span>
     {% elif standing.best_delta_ms <= 5000 %}
-    <span
-      class="px-1.5 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-700"
-      >Bronze</span
-    >
+    <span class="font-headline text-[10px] uppercase tracking-widest bg-[#b45309]/10 text-[#b45309] px-3 py-1 border border-[#b45309]/20">Bronze</span>
     {% endif %}
   </td>
 </tr>
-{% endfor %} {% endif %}
+{% endfor %}
+{% endif %}

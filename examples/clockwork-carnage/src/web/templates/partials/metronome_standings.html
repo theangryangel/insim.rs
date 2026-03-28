@@ -1,42 +1,34 @@
-{# ── Standings ── #}
 <section
-  class="mb-6"
   id="metronome-standings"
-  {%
-  match
-  event.status
-  %}
-  {%
-  when
-  EventStatus::Active
-  %}
+  {% match event.status %}
+  {% when EventStatus::Active %}
   hx-get="/events/{{ event.id }}/standings"
   hx-trigger="every 5s"
   hx-swap="outerHTML"
-  {%
-  when
-  _
-  %}
-  {%
-  endmatch
-  %}
+  {% when _ %}
+  {% endmatch %}
 >
-  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-    Best Deltas
-  </p>
-  <table class="w-full">
-    <thead>
-      <tr
-        class="text-left text-xs text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-200"
-      >
-        <th class="py-2 pr-2 w-8">#</th>
-        <th class="py-2 px-2">Driver</th>
-        <th class="py-2 px-2 text-right">Best Delta</th>
-        <th class="py-2 pl-2 text-right">Tier</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% include "partials/metronome_standings_content.html" %}
-    </tbody>
-  </table>
+  <div class="flex justify-between items-end border-l-4 border-primary-container pl-4 mb-4">
+    <h2 class="font-headline text-2xl font-black uppercase tracking-tight">Current Standings</h2>
+    {% match event.status %}
+    {% when EventStatus::Active %}
+    <span class="font-headline text-xs text-outline uppercase tracking-widest pb-1">Live</span>
+    {% when _ %}
+    {% endmatch %}
+  </div>
+  <div class="bg-surface-container-low overflow-hidden">
+    <table class="w-full text-left border-collapse">
+      <thead>
+        <tr class="bg-surface-container-high border-b border-outline-variant/20">
+          <th class="p-4 font-headline uppercase text-xs tracking-widest text-primary w-14">Rank</th>
+          <th class="p-4 font-headline uppercase text-xs tracking-widest text-primary">Driver</th>
+          <th class="p-4 font-headline uppercase text-xs tracking-widest text-primary text-right">Best Delta</th>
+          <th class="p-4 font-headline uppercase text-xs tracking-widest text-primary text-right">Tier</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-outline-variant/10">
+        {% include "partials/metronome_standings_content.html" %}
+      </tbody>
+    </table>
+  </div>
 </section>

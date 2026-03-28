@@ -1,243 +1,141 @@
-{% extends "base.html" %} {% block title %}New Event — Clockwork Carnage{%
-endblock %} {% block content %}
+{% extends "base.html" %}
+{% block title %}New Event — Clockwork Carnage{% endblock %}
+{% block content %}
 
-<p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-  New Event
-</p>
-
-<form
-  method="post"
-  action="/events/new"
-  class="max-w-lg space-y-4"
-  x-data="{ mode: 'metronome' }"
->
-  <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}" />
-
-  <div>
-    <p
-      class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
-    >
-      Mode
-    </p>
-    <div class="flex gap-4">
-      <label class="flex items-center gap-2 cursor-pointer">
-        <input
-          type="radio"
-          name="mode"
-          value="metronome"
-          checked
-          class="accent-orange-600"
-          @change="mode = 'metronome'"
-        />
-        <span class="text-sm font-medium">Metronome</span>
-      </label>
-      <label class="flex items-center gap-2 cursor-pointer">
-        <input
-          type="radio"
-          name="mode"
-          value="shortcut"
-          class="accent-blue-600"
-          @change="mode = 'shortcut'"
-        />
-        <span class="text-sm font-medium">Shortcut</span>
-      </label>
-      <label class="flex items-center gap-2 cursor-pointer">
-        <input
-          type="radio"
-          name="mode"
-          value="bomb"
-          class="accent-red-600"
-          @change="mode = 'bomb'"
-        />
-        <span class="text-sm font-medium">Bomb</span>
-      </label>
-    </div>
-  </div>
-
-  <div class="grid grid-cols-2 gap-3">
+{# ── Header ── #}
+<section class="border-b border-primary-container/20 bg-surface-container-lowest px-6 lg:px-16 py-12">
+  <div class="max-w-7xl mx-auto flex items-end justify-between gap-4">
     <div>
-      <label
-        class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
-        for="track"
-        >Track <span class="text-red-500">*</span></label
-      >
-      <select
-        id="track"
-        name="track"
-        required
-        class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
-      >
-        <option value="" disabled selected>Select a track…</option>
-        {% for track in tracks %}
-        <option value="{{ track }}">
-          {{ track }} — {{ track.complete_name() }}
-        </option>
-        {% endfor %}
-      </select>
+      <a href="/events" class="font-headline text-xs uppercase tracking-widest text-outline hover:text-primary-container transition-colors mb-2 block">← Events</a>
+      <h1 class="font-headline text-5xl md:text-7xl font-black uppercase tracking-tighter leading-none text-on-surface">
+        New <span class="text-primary-container">Event</span>
+      </h1>
     </div>
+  </div>
+</section>
+
+{# ── Form ── #}
+<div class="max-w-7xl mx-auto px-6 lg:px-16 py-12">
+  <form method="post" action="/events/new" class="max-w-2xl space-y-8" x-data="{ mode: 'metronome' }">
+    <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}" />
+
+    {# Mode selector #}
     <div>
-      <label
-        class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
-        for="layout"
-        >Layout</label
-      >
-      <input
-        id="layout"
-        type="text"
-        name="layout"
-        placeholder="(blank for default)"
-        class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
-      />
-    </div>
-  </div>
-
-  <div>
-    <label
-      class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
-      for="name"
-      >Name</label
-    >
-    <input
-      id="name"
-      type="text"
-      name="name"
-      placeholder="Optional display name"
-      class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
-    />
-  </div>
-
-  <div>
-    <label
-      class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
-      for="description"
-      >Description</label
-    >
-    <textarea
-      id="description"
-      name="description"
-      rows="3"
-      placeholder="Optional description"
-      class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
-    ></textarea>
-  </div>
-
-  <div class="grid grid-cols-2 gap-3">
-    <div>
-      <label
-        class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
-        for="scheduled_at"
-        >Scheduled start</label
-      >
-      <input
-        id="scheduled_at"
-        type="datetime-local"
-        name="scheduled_at"
-        class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
-      />
-    </div>
-    <div>
-      <label
-        class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
-        for="scheduled_end_at"
-        >Scheduled end</label
-      >
-      <input
-        id="scheduled_end_at"
-        type="datetime-local"
-        name="scheduled_end_at"
-        class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
-      />
-    </div>
-  </div>
-
-  <div
-    x-show="mode === 'metronome'"
-    x-cloak
-    class="border-t border-gray-200 pt-4"
-  >
-    <p
-      class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3"
-    >
-      Metronome settings
-    </p>
-    <div class="grid grid-cols-2 gap-3">
-      <div>
-        <label
-          class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
-          for="target"
-          >Target (s)</label
-        >
-        <input
-          id="target"
-          type="number"
-          name="target"
-          value="20"
-          min="1"
-          class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"
-        />
+      <p class="font-headline text-xs uppercase tracking-widest text-outline mb-3">Mode <span class="text-primary-container">*</span></p>
+      <div class="flex">
+        <label class="flex-1 cursor-pointer">
+          <input type="radio" name="mode" value="metronome" class="sr-only peer" checked @change="mode = 'metronome'" />
+          <div class="peer-checked:bg-primary-container peer-checked:text-white bg-surface-container-low text-outline hover:text-on-background border-r border-outline/10 transition-all p-5 text-center">
+            <p class="font-headline font-black uppercase tracking-widest text-lg">MET</p>
+            <p class="font-headline text-[10px] uppercase tracking-widest mt-1">Metronome</p>
+          </div>
+        </label>
+        <label class="flex-1 cursor-pointer">
+          <input type="radio" name="mode" value="shortcut" class="sr-only peer" @change="mode = 'shortcut'" />
+          <div class="peer-checked:bg-primary-container peer-checked:text-white bg-surface-container-low text-outline hover:text-on-background border-r border-outline/10 transition-all p-5 text-center">
+            <p class="font-headline font-black uppercase tracking-widest text-lg">SCT</p>
+            <p class="font-headline text-[10px] uppercase tracking-widest mt-1">Shortcut</p>
+          </div>
+        </label>
+        <label class="flex-1 cursor-pointer">
+          <input type="radio" name="mode" value="bomb" class="sr-only peer" @change="mode = 'bomb'" />
+          <div class="peer-checked:bg-primary-container peer-checked:text-white bg-surface-container-low text-outline hover:text-on-background transition-all p-5 text-center">
+            <p class="font-headline font-black uppercase tracking-widest text-lg">BMB</p>
+            <p class="font-headline text-[10px] uppercase tracking-widest mt-1">Bomb</p>
+          </div>
+        </label>
       </div>
     </div>
-  </div>
 
-  <div x-show="mode === 'bomb'" x-cloak class="border-t border-gray-200 pt-4">
-    <p
-      class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3"
-    >
-      Bomb settings
-    </p>
-    <div class="grid grid-cols-2 gap-3">
+    {# Track + Layout #}
+    <div class="grid grid-cols-2 gap-6">
       <div>
-        <label
-          class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1"
-          for="checkpoint_timeout"
-          >Checkpoint timeout (s)</label
-        >
-        <input
-          id="checkpoint_timeout"
-          type="number"
-          name="checkpoint_timeout"
-          value="30"
-          min="1"
-          class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-red-400"
-        />
+        <label class="font-headline text-xs uppercase tracking-widest text-outline block mb-2" for="track">Track <span class="text-primary-container">*</span></label>
+        <select id="track" name="track" required
+          class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors">
+          <option value="" disabled selected>Select a track…</option>
+          {% for track in tracks %}
+          <option value="{{ track }}">{{ track }} — {{ track.complete_name() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="font-headline text-xs uppercase tracking-widest text-outline block mb-2" for="layout">Layout</label>
+        <input id="layout" type="text" name="layout" placeholder="blank for default"
+          class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors placeholder:text-outline/40" />
       </div>
     </div>
-  </div>
 
-  <div class="border-t border-gray-200 pt-4">
-    <p
-      class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1"
-    >
-      Vehicle Restrictions
-    </p>
-    <label class="block text-xs text-gray-500 mb-1" for="allowed_vehicles"
-      >Allowed vehicles (comma-separated codes, e.g.
-      <span class="font-mono">XFG, XRG, 728419</span>). Leave blank to allow
-      all.</label
-    >
-    <input
-      id="allowed_vehicles"
-      type="text"
-      name="allowed_vehicles"
-      placeholder="blank = all allowed"
-      class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-orange-400"
-    />
-  </div>
+    {# Name #}
+    <div>
+      <label class="font-headline text-xs uppercase tracking-widest text-outline block mb-2" for="name">Name</label>
+      <input id="name" type="text" name="name" placeholder="Optional display name"
+        class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors placeholder:text-outline/40" />
+    </div>
 
-  <div class="flex gap-2 pt-2">
-    <button
-      type="submit"
-      class="px-4 py-2 bg-orange-600 text-white text-sm font-semibold rounded hover:bg-orange-700 transition-colors"
-    >
-      Create Event
-    </button>
-    <a
-      href="/events"
-      class="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-semibold rounded hover:bg-gray-300 transition-colors"
-    >
-      Cancel
-    </a>
-  </div>
-</form>
+    {# Description #}
+    <div>
+      <label class="font-headline text-xs uppercase tracking-widest text-outline block mb-2" for="description">Description</label>
+      <textarea id="description" name="description" rows="3" placeholder="Optional description"
+        class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors placeholder:text-outline/40 resize-none"></textarea>
+    </div>
+
+    {# Schedule #}
+    <div class="grid grid-cols-2 gap-6">
+      <div>
+        <label class="font-headline text-xs uppercase tracking-widest text-outline block mb-2" for="scheduled_at">Scheduled Start</label>
+        <input id="scheduled_at" type="datetime-local" name="scheduled_at"
+          class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors" />
+      </div>
+      <div>
+        <label class="font-headline text-xs uppercase tracking-widest text-outline block mb-2" for="scheduled_end_at">Scheduled End</label>
+        <input id="scheduled_end_at" type="datetime-local" name="scheduled_end_at"
+          class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors" />
+      </div>
+    </div>
+
+    {# Metronome settings #}
+    <div x-show="mode === 'metronome'" x-cloak class="border-t border-outline-variant/20 pt-6">
+      <p class="font-headline text-xs uppercase tracking-widest text-primary-container mb-4">Metronome Settings</p>
+      <div class="grid grid-cols-2 gap-6">
+        <div>
+          <label class="font-headline text-xs uppercase tracking-widest text-outline block mb-2" for="target">Target (s)</label>
+          <input id="target" type="number" name="target" value="20" min="1"
+            class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors" />
+        </div>
+      </div>
+    </div>
+
+    {# Bomb settings #}
+    <div x-show="mode === 'bomb'" x-cloak class="border-t border-outline-variant/20 pt-6">
+      <p class="font-headline text-xs uppercase tracking-widest text-primary-container mb-4">Bomb Settings</p>
+      <div class="grid grid-cols-2 gap-6">
+        <div>
+          <label class="font-headline text-xs uppercase tracking-widest text-outline block mb-2" for="checkpoint_timeout">Checkpoint Timeout (s)</label>
+          <input id="checkpoint_timeout" type="number" name="checkpoint_timeout" value="30" min="1"
+            class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors" />
+        </div>
+      </div>
+    </div>
+
+    {# Vehicle restrictions #}
+    <div class="border-t border-outline-variant/20 pt-6">
+      <p class="font-headline text-xs uppercase tracking-widest text-outline mb-2">Vehicle Restrictions</p>
+      <p class="font-body text-xs text-outline/60 mb-3">Comma-separated codes (e.g. <span class="font-mono text-on-surface-variant">XFG, XRG</span>). Leave blank to allow all vehicles.</p>
+      <input id="allowed_vehicles" type="text" name="allowed_vehicles" placeholder="blank = all allowed"
+        class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-mono border-b-2 border-outline focus:border-primary focus:outline-none transition-colors placeholder:text-outline/40" />
+    </div>
+
+    {# Actions #}
+    <div class="flex gap-3 pt-2">
+      <button type="submit" class="font-headline font-bold text-xs uppercase tracking-widest bg-primary-container text-white px-8 py-3 hover:bg-white hover:text-primary-container transition-all">
+        Create Event
+      </button>
+      <a href="/events" class="font-headline text-xs uppercase tracking-widest text-outline border border-outline/30 px-8 py-3 hover:text-on-background hover:border-outline/60 transition-colors">
+        Cancel
+      </a>
+    </div>
+  </form>
+</div>
 
 {% endblock %}
