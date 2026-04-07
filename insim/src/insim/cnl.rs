@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::identifiers::{ConnectionId, RequestId};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
@@ -36,6 +38,24 @@ pub enum CnlReason {
 
     /// Invalid packet
     Hack = 9,
+}
+
+impl fmt::Display for CnlReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::Disco => "disconnected",
+            Self::Timeout => "timed out",
+            Self::LostConn => "lost connection",
+            Self::Kicked => "kicked",
+            Self::Banned => "banned",
+            Self::Security => "security",
+            Self::Cpw => "cheat protection",
+            Self::Oos => "out of sync",
+            Self::Joos => "join out of sync",
+            Self::Hack => "invalid packet",
+        };
+        f.write_str(s)
+    }
 }
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]

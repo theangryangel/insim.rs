@@ -15,7 +15,9 @@ pub enum RaceLaps {
     Practice,
     /// This is a fixed number of laps
     Laps(usize),
-    /// This is a time-based event
+    /// This is a time-based event.
+    ///
+    /// Valid values are `1..=48`. Values outside that range are clamped when encoding.
     Hours(usize),
 }
 
@@ -45,7 +47,7 @@ impl From<RaceLaps> for u8 {
                     _ => 0, // if it's an invalid structure we're going to push it into practice
                 }
             },
-            RaceLaps::Hours(data) => data + 190,
+            RaceLaps::Hours(data) => data.clamp(1, 48) + 190,
         };
 
         data as u8

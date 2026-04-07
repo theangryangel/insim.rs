@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(
@@ -41,6 +43,21 @@ pub enum PenaltyInfo {
     Seconds45 = 6,
 }
 
+impl fmt::Display for PenaltyInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::None => "none",
+            Self::Dt => "drive-through",
+            Self::DtValid => "drive-through (served)",
+            Self::Sg => "stop-go",
+            Self::SgValid => "stop-go (served)",
+            Self::Seconds30 => "+30s",
+            Self::Seconds45 => "+45s",
+        };
+        f.write_str(s)
+    }
+}
+
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
@@ -67,6 +84,21 @@ pub enum PenaltyReason {
 
     /// Compulsory stop is too late
     StopLate = 6,
+}
+
+impl fmt::Display for PenaltyReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::Unknown => "unknown",
+            Self::Admin => "admin",
+            Self::WrongWay => "wrong way",
+            Self::FalseStart => "false start",
+            Self::Speeding => "pit lane speeding",
+            Self::StopShort => "stop-go too short",
+            Self::StopLate => "compulsory stop too late",
+        };
+        f.write_str(s)
+    }
 }
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
