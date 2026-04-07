@@ -1,6 +1,6 @@
 use insim::{
     core::heading::Heading,
-    insim::{BtnStyle, ObjectInfo, PmoAction},
+    insim::{BtnStyle, ObjectInfo},
 };
 use kitcar::{ui, ui::Component as _};
 
@@ -605,7 +605,7 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
             } else {
                 Some(Command::SpawnObjects {
                     objects,
-                    action: PmoAction::Selection,
+                    action: crate::SpawnAction::Selection,
                     origin: SpawnOrigin::PaintedText,
                 })
             }
@@ -623,7 +623,7 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
                     match tools::spline_distrib::build(&state.selection, value, None) {
                         Ok(objects) => Some(Command::SpawnObjects {
                             objects,
-                            action: PmoAction::AddObjects,
+                            action: crate::SpawnAction::AddObjects,
                             origin: SpawnOrigin::SplineDistrib {
                                 spacing_metres: value,
                             },
@@ -657,7 +657,7 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
                     match tools::rotate::build(&state.selection, value) {
                         Ok(objects) => Some(Command::SpawnObjects {
                             objects,
-                            action: PmoAction::AddObjects,
+                            action: crate::SpawnAction::AddObjects,
                             origin: SpawnOrigin::Rotate { degrees: value },
                         }),
                         Err(err) => {
@@ -689,7 +689,7 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
                     match tools::rotate_each::build(&state.selection, value) {
                         Ok(objects) => Some(Command::SpawnObjects {
                             objects,
-                            action: PmoAction::AddObjects,
+                            action: crate::SpawnAction::AddObjects,
                             origin: SpawnOrigin::RotateEach { degrees: value },
                         }),
                         Err(err) => {
@@ -755,7 +755,7 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
             ) {
                 Ok(objects) => Some(Command::SpawnObjects {
                     objects,
-                    action: PmoAction::AddObjects,
+                    action: crate::SpawnAction::AddObjects,
                     origin: SpawnOrigin::Ramp {
                         mode: state.ramp_mode,
                         roll_degrees: state.ramp_roll_degrees,
@@ -839,7 +839,7 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
             ) {
                 Ok(objects) => Some(Command::SpawnObjects {
                     objects,
-                    action: PmoAction::AddObjects,
+                    action: crate::SpawnAction::AddObjects,
                     origin: SpawnOrigin::Grid {
                         mode: state.grid_mode,
                         width: state.grid_width,
@@ -881,7 +881,7 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
                 heading.clone(),
                 state.nudge_distance_metres,
             ),
-            action: PmoAction::AddObjects,
+            action: crate::SpawnAction::AddObjects,
             origin: SpawnOrigin::Nudge {
                 heading,
                 distance_metres: state.nudge_distance_metres,
@@ -894,7 +894,7 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
             } else {
                 Some(Command::SpawnObjects {
                     objects: tools::jiggle::jiggle(&state.selection, 5.0, 3.5),
-                    action: PmoAction::AddObjects,
+                    action: crate::SpawnAction::AddObjects,
                     origin: SpawnOrigin::JiggleSelection,
                 })
             }
@@ -917,7 +917,7 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
             match tools::mirror::build(&state.selection, tools::mirror::MirrorAxis::X) {
                 Ok(objects) => Some(Command::SpawnObjects {
                     objects,
-                    action: PmoAction::AddObjects,
+                    action: crate::SpawnAction::AddObjects,
                     origin: SpawnOrigin::Mirror {
                         axis: tools::mirror::MirrorAxis::X,
                     },
@@ -932,7 +932,7 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
             match tools::mirror::build(&state.selection, tools::mirror::MirrorAxis::Y) {
                 Ok(objects) => Some(Command::SpawnObjects {
                     objects,
-                    action: PmoAction::AddObjects,
+                    action: crate::SpawnAction::AddObjects,
                     origin: SpawnOrigin::Mirror {
                         axis: tools::mirror::MirrorAxis::Y,
                     },
@@ -983,7 +983,7 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
             ) {
                 Ok(objects) => Some(Command::SpawnObjects {
                     objects,
-                    action: PmoAction::AddObjects,
+                    action: crate::SpawnAction::AddObjects,
                     origin: SpawnOrigin::RadialArray {
                         count: state.radial_count,
                         radius_metres: state.radial_radius_metres,

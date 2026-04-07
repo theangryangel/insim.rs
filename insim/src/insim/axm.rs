@@ -1,4 +1,4 @@
-use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
+use insim_core::{Decode, DecodeContext, Encode, EncodeContext, object::ObjectCoordinate};
 
 use crate::identifiers::{ConnectionId, RequestId};
 
@@ -6,76 +6,117 @@ const AXM_MAX_OBJECTS: usize = 60;
 
 pub use insim_core::object::ObjectInfo;
 
-/// Actions that can be taken as part of [Axm].
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
-#[non_exhaustive]
-pub enum PmoAction {
+enum PmoActionWire {
     #[default]
-    /// Sent by the layout loading system only.
     LoadingFile = 0,
-
-    /// Add objects.
     AddObjects = 1,
-
-    /// Delete objects.
     DelObjects = 2,
-
-    /// Remove/clear all objects.
     ClearAll = 3,
-
-    /// Reply to [`TinyType::Axm`](crate::insim::TinyType::Axm).
     TinyAxm = 4,
-
-    /// Reply to [`TtcType::Sel`](crate::insim::TtcType::Sel).
     TtcSel = 5,
-
-    /// Set a connection's layout editor selection.
     Selection = 6,
-
-    /// User pressed 'O' without anything selected.
     Position = 7,
-
-    /// Request or reply with Z values.
     GetZ = 8,
 }
 
 bitflags::bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-    /// AutoX object flags.
+    /// Flags for an [`Axm`] packet.
     pub struct PmoFlags: u8 {
-        /// LFS has reached the end of a layout file which it is loading. The added objects will then be optimised.
+        /// LFS has reached the end of a layout file, or (on [`PmoAction::AddObjects`])
+        /// requests client-side optimisation of all objects.
         const FILE_END = (1 << 0);
 
-        /// When objects are moved or modified in the layout editor, two IS_AXM packets are
-        /// sent.  A PMO_DEL_OBJECTS followed by a PMO_ADD_OBJECTS.  In this case the flag
-        /// PMO_MOVE_MODIFY is set in the PMOFlags byte of both packets.
+        /// This packet is one of a paired [`PmoAction::DelObjects`] /
+        /// [`PmoAction::AddObjects`] emitted when objects are moved or modified.
         const MOVE_MODIFY = (1 << 1);
 
-        /// If you send an IS_AXM with PMOAction of PMO_SELECTION it is possible for it to be
-        /// either a selection of real objects (as if the user selected several objects while
-        /// holding the CTRL key) or a clipboard selection (as if the user pressed CTRL+C after
-        /// selecting objects).  Clipboard is the default selection mode.  A real selection can
-        /// be set by using the PMO_SELECTION_REAL bit in the PMOFlags byte.
+        /// On [`PmoAction::Selection`]: real object selection (CTRL+click) rather
+        /// than clipboard selection (CTRL+C).
         const SELECTION_REAL = (1 << 2);
 
-        /// If you send an IS_AXM with PMOAction of PMO_ADD_OBJECTS you may wish to set the
-        /// UCID to one of the guest connections (for example if that user's action caused the
-        /// objects to be added).  In this case some validity checks are done on the guest's
-        /// computer which may report "invalid position" or "intersecting object" and delete
-        /// the objects.  This can be avoided by setting the PMO_AVOID_CHECK bit.
+        /// On [`PmoAction::AddObjects`]: skip intersection / position validity checks
+        /// on guest computers.
         const AVOID_CHECK = (1 << 3);
     }
 }
 
 impl_bitflags_from_to_bytes!(PmoFlags, u8);
 
+/// An entry in an [`PmoAction::GetZ`] request or response.
+///
+/// Send entries with Zbyte set to 240 to get the highest point at X, Y,
+/// or use the approximate altitude. In the reply, Zbyte is adjusted and
+/// `adjusted` indicates whether the adjustment succeeded.
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct GetZEntry {
+    /// Position (X, Y, input or output Z).
+    pub xyz: ObjectCoordinate,
+    /// True if Zbyte was successfully adjusted (reply only).
+    pub adjusted: bool,
+}
+
+/// The action carried by an [`Axm`] packet.
+///
+/// Action-specific flags (e.g. [`PmoFlags::SELECTION_REAL`] for [`Selection`](PmoAction::Selection))
+/// live on [`Axm::flags`] rather than inside the variant.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
+pub enum PmoAction {
+    /// Sent by the layout loading system while loading a file.
+    LoadingFile(Vec<ObjectInfo>),
+
+    /// Add objects to the layout.
+    AddObjects(Vec<ObjectInfo>),
+
+    /// Delete objects from the layout.
+    DelObjects(Vec<ObjectInfo>),
+
+    /// Remove all objects from the layout.
+    ClearAll,
+
+    /// Reply to [`TinyType::Axm`](crate::insim::TinyType::Axm).
+    TinyAxm(Vec<ObjectInfo>),
+
+    /// Reply to [`TtcType::Sel`](crate::insim::TtcType::Sel).
+    TtcSel(Vec<ObjectInfo>),
+
+    /// Set or report a connection's layout editor selection.
+    Selection(Vec<ObjectInfo>),
+
+    /// User pressed 'O' without anything selected; reports current editor position.
+    ///
+    /// Information only — no object is added. Only `xyz` and `heading` are meaningful.
+    Position {
+        /// Position of the editor cursor.
+        xyz: ObjectCoordinate,
+        /// Raw heading byte.
+        heading: u8,
+    },
+
+    /// Request or reply with Z values for given X, Y positions.
+    ///
+    /// Send entries with suggested Zbyte values; receive them back with adjusted
+    /// Zbyte values and [`GetZEntry::adjusted`] set to indicate success.
+    GetZ(Vec<GetZEntry>),
+}
+
+impl Default for PmoAction {
+    fn default() -> Self {
+        Self::LoadingFile(Vec::new())
+    }
+}
+
 /// AutoX multiple objects update.
 ///
-/// - Adds, removes, or reports layout objects.
-/// - Carries a list of [ObjectInfo] entries.
+/// Adds, removes, or reports layout objects. Action-specific flags are on
+/// [`flags`](Axm::flags); the action and its data are on [`action`](Axm::action).
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Axm {
@@ -85,14 +126,11 @@ pub struct Axm {
     /// Connection that sent or requested the update.
     pub ucid: ConnectionId,
 
-    /// Action taken or requested.
-    pub pmoaction: PmoAction,
+    /// Flags qualifying the action.
+    pub flags: PmoFlags,
 
-    /// Additional flags for the action.
-    pub pmoflags: PmoFlags,
-
-    /// Object list for the action.
-    pub info: Vec<ObjectInfo>,
+    /// The action and its associated objects or data.
+    pub action: PmoAction,
 }
 
 impl_typical_with_request_id!(Axm);
@@ -100,46 +138,125 @@ impl_typical_with_request_id!(Axm);
 impl Decode for Axm {
     fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
         let reqi = ctx.decode::<RequestId>("reqi")?;
-        let mut numo = ctx.decode::<u8>("numo")?;
+        let numo = ctx.decode::<u8>("numo")?;
         let ucid = ctx.decode::<ConnectionId>("ucid")?;
-        let pmoaction = ctx.decode::<PmoAction>("pmoaction")?;
-        let pmoflags = ctx.decode::<PmoFlags>("pmoflags")?;
+        let pmoaction = ctx.decode::<PmoActionWire>("pmoaction")?;
+        let flags = ctx.decode::<PmoFlags>("pmoflags")?;
         ctx.pad("sp3", 1)?;
-        let mut info = Vec::with_capacity(numo as usize);
-        while numo > 0 {
-            info.push(ctx.decode::<ObjectInfo>("info")?);
-            numo -= 1;
-        }
+
+        let decode_objects =
+            |ctx: &mut DecodeContext, n: u8| -> Result<Vec<ObjectInfo>, insim_core::DecodeError> {
+                (0..n).map(|_| ctx.decode::<ObjectInfo>("info")).collect()
+            };
+
+        let action = match pmoaction {
+            PmoActionWire::LoadingFile => PmoAction::LoadingFile(decode_objects(ctx, numo)?),
+            PmoActionWire::AddObjects => PmoAction::AddObjects(decode_objects(ctx, numo)?),
+            PmoActionWire::DelObjects => PmoAction::DelObjects(decode_objects(ctx, numo)?),
+            PmoActionWire::ClearAll => PmoAction::ClearAll,
+            PmoActionWire::TinyAxm => PmoAction::TinyAxm(decode_objects(ctx, numo)?),
+            PmoActionWire::TtcSel => PmoAction::TtcSel(decode_objects(ctx, numo)?),
+            PmoActionWire::Selection => PmoAction::Selection(decode_objects(ctx, numo)?),
+            PmoActionWire::Position => {
+                let x = ctx.decode::<i16>("x")?;
+                let y = ctx.decode::<i16>("y")?;
+                let z = ctx.decode::<u8>("z")?;
+                ctx.pad("flags", 1)?;
+                ctx.pad("index", 1)?;
+                let heading = ctx.decode::<u8>("heading")?;
+                PmoAction::Position {
+                    xyz: ObjectCoordinate::new(x, y, z),
+                    heading,
+                }
+            },
+            PmoActionWire::GetZ => {
+                let entries = (0..numo)
+                    .map(|_| {
+                        let x = ctx.decode::<i16>("x")?;
+                        let y = ctx.decode::<i16>("y")?;
+                        let z = ctx.decode::<u8>("z")?;
+                        let flags = ctx.decode::<u8>("flags")?;
+                        ctx.pad("index", 1)?;
+                        ctx.pad("heading", 1)?;
+                        Ok(GetZEntry {
+                            xyz: ObjectCoordinate::new(x, y, z),
+                            adjusted: flags & 0x80 != 0,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, insim_core::DecodeError>>()?;
+                PmoAction::GetZ(entries)
+            },
+        };
 
         Ok(Self {
             reqi,
             ucid,
-            pmoaction,
-            pmoflags,
-            info,
+            flags,
+            action,
         })
     }
 }
 
 impl Encode for Axm {
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
-        ctx.encode("reqi", &self.reqi)?;
-        let len = self.info.len();
-        if len > AXM_MAX_OBJECTS {
+        let (pmoaction, numo): (PmoActionWire, usize) = match &self.action {
+            PmoAction::LoadingFile(info) => (PmoActionWire::LoadingFile, info.len()),
+            PmoAction::AddObjects(info) => (PmoActionWire::AddObjects, info.len()),
+            PmoAction::DelObjects(info) => (PmoActionWire::DelObjects, info.len()),
+            PmoAction::ClearAll => (PmoActionWire::ClearAll, 0),
+            PmoAction::TinyAxm(info) => (PmoActionWire::TinyAxm, info.len()),
+            PmoAction::TtcSel(info) => (PmoActionWire::TtcSel, info.len()),
+            PmoAction::Selection(info) => (PmoActionWire::Selection, info.len()),
+            PmoAction::Position { .. } => (PmoActionWire::Position, 1),
+            PmoAction::GetZ(entries) => (PmoActionWire::GetZ, entries.len()),
+        };
+
+        if numo > AXM_MAX_OBJECTS {
             return Err(insim_core::EncodeErrorKind::OutOfRange {
                 min: 0,
                 max: AXM_MAX_OBJECTS,
-                found: len,
+                found: numo,
             }
             .context("Axm: Too many AXM objects"));
         }
-        ctx.encode("numo", &(len as u8))?;
+
+        ctx.encode("reqi", &self.reqi)?;
+        ctx.encode("numo", &(numo as u8))?;
         ctx.encode("ucid", &self.ucid)?;
-        ctx.encode("pmoaction", &self.pmoaction)?;
-        ctx.encode("pmoflags", &self.pmoflags)?;
+        ctx.encode("pmoaction", &pmoaction)?;
+        ctx.encode("pmoflags", &self.flags)?;
         ctx.pad("sp3", 1)?;
-        for i in self.info.iter() {
-            ctx.encode("info", i)?;
+
+        match &self.action {
+            PmoAction::LoadingFile(info)
+            | PmoAction::AddObjects(info)
+            | PmoAction::DelObjects(info)
+            | PmoAction::TinyAxm(info)
+            | PmoAction::TtcSel(info)
+            | PmoAction::Selection(info) => {
+                for obj in info {
+                    ctx.encode("info", obj)?;
+                }
+            },
+            PmoAction::GetZ(entries) => {
+                for entry in entries {
+                    ctx.encode("x", &entry.xyz.x)?;
+                    ctx.encode("y", &entry.xyz.y)?;
+                    ctx.encode("z", &entry.xyz.z)?;
+                    ctx.encode("flags", &(if entry.adjusted { 0x80u8 } else { 0u8 }))?;
+                    ctx.pad("index", 1)?;
+                    ctx.pad("heading", 1)?;
+                }
+            },
+            PmoAction::Position { xyz, heading } => {
+                ctx.encode("x", &xyz.x)?;
+                ctx.encode("y", &xyz.y)?;
+                ctx.encode("z", &xyz.z)?;
+                ctx.pad("flags", 1)?;
+                ctx.pad("index", 1)?;
+                ctx.encode("heading", heading)?;
+            },
+            PmoAction::ClearAll => {},
         }
 
         Ok(())
@@ -160,9 +277,9 @@ mod test {
                 0,   // reqi
                 2,   // numo
                 3,   // ucid
-                1,   // pmoaction
-                4,   // pmoflags
-                0,   // objects
+                1,   // pmoaction (AddObjects)
+                8,   // pmoflags (AVOID_CHECK = 1 << 3)
+                0,   // sp3
                 172, // info[1] - x (1)
                 218, // info[1] - x (2)
                 25,  // info[1] - y (1)
@@ -181,24 +298,19 @@ mod test {
                 128, // info[2] - heading
             ],
             |axm: Axm| {
-                // xyz: Coordinate {
-                //     x:
-                //     y: -1918.4375, // -30695.0 / 16.0
-                //     z: 2.0 // 8.0 / 4
-                // },
+                assert!(axm.flags.contains(PmoFlags::AVOID_CHECK));
+                assert!(!axm.flags.contains(PmoFlags::MOVE_MODIFY));
 
-                assert_eq!(axm.info.len(), 2);
-                assert_eq!(
-                    axm.info[0].position().x_metres(),
-                    -597.25 /* -9556.0 / 16.0 */
-                );
-                assert_eq!(
-                    axm.info[0].position().y_metres(),
-                    -1918.4375 /* -30695.0 / 16.0 */
-                );
-                assert_eq!(axm.info[0].position().z_metres(), 2.0 /* 8.0 / 4 */);
+                let PmoAction::AddObjects(info) = axm.action else {
+                    panic!("expected AddObjects action");
+                };
+
+                assert_eq!(info.len(), 2);
+                assert_eq!(info[0].position().x_metres(), -597.25);
+                assert_eq!(info[0].position().y_metres(), -1918.4375);
+                assert_eq!(info[0].position().z_metres(), 2.0);
                 assert!(matches!(
-                    axm.info[0],
+                    info[0],
                     ObjectInfo::Control(Control {
                         kind: ControlKind::Start,
                         floating: false,
