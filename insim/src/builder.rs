@@ -281,7 +281,7 @@ impl Builder {
                 .as_deref()
                 .unwrap_or(Isi::DEFAULT_INAME)
                 .to_owned(),
-            prefix: self.isi_prefix.unwrap_or(0 as char),
+            prefix: self.isi_prefix.unwrap_or('\0'),
             interval: self.isi_interval.unwrap_or(Duration::ZERO),
             ..Default::default()
         }

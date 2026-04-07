@@ -2,130 +2,148 @@
 {% block title %}Edit Event #{{ event.id }} — Clockwork Carnage{% endblock %}
 {% block content %}
 
-<p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-  Edit Event — <a href="/events/{{ event.id }}" class="text-orange-600 hover:underline">#{{ event.id }}</a>
-</p>
-
-<form method="post" action="/events/{{ event.id }}/edit" class="max-w-lg space-y-4">
-  <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}"/>
-
-  {# Mode (read-only) #}
-  <div>
-    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Mode</p>
-    <p class="text-sm font-medium text-gray-700">
-      {% match *event.mode %}
-        {% when EventMode::Metronome { .. } %}Metronome
-        {% when EventMode::Shortcut %}Shortcut
-        {% when EventMode::Bomb { .. } %}Bomb
-      {% endmatch %}
-    </p>
+{# ── Header ── #}
+<section class="border-b border-primary-container/20 bg-surface-container-lowest px-6 lg:px-16 py-12">
+  <div class="max-w-7xl mx-auto">
+    <a href="/events/{{ event.id }}" class="font-headline text-xs uppercase tracking-widest text-outline hover:text-primary-container transition-colors mb-2 block">← Event #{{ event.id }}</a>
+    <h1 class="font-headline text-5xl md:text-7xl font-black uppercase tracking-tighter leading-none text-on-surface">
+      Edit <span class="text-primary-container">Event</span>
+    </h1>
   </div>
+</section>
 
-  <div class="grid grid-cols-2 gap-3">
+{# ── Form ── #}
+<div class="max-w-7xl mx-auto px-6 lg:px-16 py-12">
+  <form method="post" action="/events/{{ event.id }}/edit" class="max-w-2xl space-y-8">
+    <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}" />
+
+    {# Mode (read-only) #}
     <div>
-      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="track">Track <span class="text-red-500">*</span></label>
-      <select id="track" name="track" required
-        class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400">
-        {% for track in tracks %}
-        <option value="{{ track }}"{% if *track == event.track %} selected{% endif %}>{{ track }} — {{ track.complete_name() }}</option>
-        {% endfor %}
-      </select>
+      <p class="font-headline text-xs uppercase tracking-widest text-outline mb-2">Mode</p>
+      <div class="bg-surface-container-low px-4 py-3 border-b-2 border-outline/30 w-fit">
+        <span class="font-headline font-black uppercase tracking-widest text-on-surface-variant">
+          {% match *event.mode %}
+          {% when EventMode::Metronome { .. } %}Metronome
+          {% when EventMode::Shortcut %}Shortcut
+          {% when EventMode::Bomb { .. } %}Bomb
+          {% endmatch %}
+        </span>
+      </div>
     </div>
+
+    {# Track + Layout #}
+    <div class="grid grid-cols-2 gap-6">
+      <div>
+        <label class="font-headline text-xs uppercase tracking-widest text-outline block mb-2" for="track">Track <span class="text-primary-container">*</span></label>
+        <select id="track" name="track" required
+          class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors">
+          {% for track in tracks %}
+          <option value="{{ track }}"{% if *track == event.track %} selected{% endif %}>{{ track }} — {{ track.complete_name() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="font-headline text-xs uppercase tracking-widest text-outline block mb-2" for="layout">Layout</label>
+        <input id="layout" type="text" name="layout" value="{{ event.layout }}"
+          class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors" />
+      </div>
+    </div>
+
+    {# Name #}
     <div>
-      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="layout">Layout</label>
-      <input id="layout" type="text" name="layout" value="{{ event.layout }}"
-        class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"/>
+      <label class="font-headline text-xs uppercase tracking-widest text-outline block mb-2" for="name">Name</label>
+      <input id="name" type="text" name="name"
+        value="{% match event.name %}{% when Some with (n) %}{{ n }}{% when None %}{% endmatch %}"
+        placeholder="Optional display name"
+        class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors placeholder:text-outline/40" />
     </div>
-  </div>
 
-  <div>
-    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="name">Name</label>
-    <input id="name" type="text" name="name" value="{% match event.name %}{% when Some with (n) %}{{ n }}{% when None %}{% endmatch %}"
-      placeholder="Optional display name"
-      class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"/>
-  </div>
-
-  <div>
-    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="description">Description</label>
-    <textarea id="description" name="description" rows="2" placeholder="Optional description"
-      class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400">{% match event.description %}{% when Some with (d) %}{{ d }}{% when None %}{% endmatch %}</textarea>
-  </div>
-
-  <div class="grid grid-cols-2 gap-3">
+    {# Description #}
     <div>
-      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="scheduled_at">Scheduled start</label>
-      <input id="scheduled_at" type="datetime-local" name="scheduled_at"
-        value="{% match event.scheduled_at %}{% when Some with (s) %}{{ s|format_datetime_local }}{% when None %}{% endmatch %}"
-        class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"/>
+      <label class="font-headline text-xs uppercase tracking-widest text-outline block mb-2" for="description">Description</label>
+      <textarea id="description" name="description" rows="2" placeholder="Optional description"
+        class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors placeholder:text-outline/40 resize-none">{% match event.description %}{% when Some with (d) %}{{ d }}{% when None %}{% endmatch %}</textarea>
     </div>
+
+    {# Schedule #}
+    <div class="grid grid-cols-2 gap-6">
+      <div>
+        <label class="font-headline text-xs uppercase tracking-widest text-outline block mb-2" for="scheduled_at">Scheduled Start</label>
+        <input id="scheduled_at" type="datetime-local" name="scheduled_at"
+          value="{% match event.scheduled_at %}{% when Some with (s) %}{{ s|format_datetime_local }}{% when None %}{% endmatch %}"
+          class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors" />
+      </div>
+      <div>
+        <label class="font-headline text-xs uppercase tracking-widest text-outline block mb-2" for="scheduled_end_at">Scheduled End</label>
+        <input id="scheduled_end_at" type="datetime-local" name="scheduled_end_at"
+          value="{% match event.scheduled_end_at %}{% when Some with (s) %}{{ s|format_datetime_local }}{% when None %}{% endmatch %}"
+          class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors" />
+      </div>
+    </div>
+
+    {# Write-up #}
     <div>
-      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="scheduled_end_at">Scheduled end</label>
-      <input id="scheduled_end_at" type="datetime-local" name="scheduled_end_at"
-        value="{% match event.scheduled_end_at %}{% when Some with (s) %}{{ s|format_datetime_local }}{% when None %}{% endmatch %}"
-        class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"/>
+      <label class="font-headline text-xs uppercase tracking-widest text-outline block mb-2" for="writeup">Write-up</label>
+      <textarea id="writeup" name="writeup" rows="6" placeholder="Post-event write-up (optional)"
+        class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors placeholder:text-outline/40 resize-none">{% match event.writeup %}{% when Some with (w) %}{{ w }}{% when None %}{% endmatch %}</textarea>
     </div>
-  </div>
 
-  <div>
-    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="writeup">Write-up</label>
-    <textarea id="writeup" name="writeup" rows="5" placeholder="Post-event write-up (optional)"
-      class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400">{% match event.writeup %}{% when Some with (w) %}{{ w }}{% when None %}{% endmatch %}</textarea>
-  </div>
-
-  {% match *event.mode %}
+    {# Mode-specific settings #}
+    {% match *event.mode %}
     {% when EventMode::Metronome { target_ms } %}
-    <div class="border-t border-gray-200 pt-4">
-      <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Metronome settings</p>
-      <div class="grid grid-cols-2 gap-3">
+    <div class="border-t border-outline-variant/20 pt-6">
+      <p class="font-headline text-xs uppercase tracking-widest text-primary-container mb-4">Metronome Settings</p>
+      <div class="grid grid-cols-2 gap-6">
         <div>
-          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="target">Target (s)</label>
+          <label class="font-headline text-xs uppercase tracking-widest text-outline block mb-2" for="target">Target (s)</label>
           <input id="target" type="number" name="target" value="{{ target_ms / 1000 }}" min="1"
-            class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-400"/>
+            class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors" />
         </div>
       </div>
     </div>
     {% when EventMode::Shortcut %}
     {% when EventMode::Bomb { checkpoint_timeout_secs, checkpoint_penalty_ms, collision_max_penalty_ms } %}
-    <div class="border-t border-gray-200 pt-4">
-      <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Bomb settings</p>
-      <div class="grid grid-cols-2 gap-3">
+    <div class="border-t border-outline-variant/20 pt-6">
+      <p class="font-headline text-xs uppercase tracking-widest text-primary-container mb-4">Bomb Settings</p>
+      <div class="grid grid-cols-2 gap-6">
         <div>
-          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="checkpoint_timeout">Checkpoint timeout (s)</label>
+          <label class="font-headline text-xs uppercase tracking-widest text-outline block mb-2" for="checkpoint_timeout">Checkpoint Timeout (s)</label>
           <input id="checkpoint_timeout" type="number" name="checkpoint_timeout" value="{{ checkpoint_timeout_secs }}" min="1"
-            class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-red-400"/>
+            class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors" />
         </div>
         <div>
-          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="checkpoint_penalty_ms">Checkpoint penalty (ms)</label>
+          <label class="font-headline text-xs uppercase tracking-widest text-outline block mb-2" for="checkpoint_penalty_ms">Checkpoint Penalty (ms)</label>
           <input id="checkpoint_penalty_ms" type="number" name="checkpoint_penalty_ms" value="{{ checkpoint_penalty_ms }}" min="0"
-            class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-red-400"/>
+            class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors" />
         </div>
         <div>
-          <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1" for="collision_max_penalty_ms">Collision max penalty (ms)</label>
+          <label class="font-headline text-xs uppercase tracking-widest text-outline block mb-2" for="collision_max_penalty_ms">Collision Max Penalty (ms)</label>
           <input id="collision_max_penalty_ms" type="number" name="collision_max_penalty_ms" value="{{ collision_max_penalty_ms }}" min="0"
-            class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-red-400"/>
+            class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors" />
         </div>
       </div>
     </div>
-  {% endmatch %}
+    {% endmatch %}
 
-  <div class="border-t border-gray-200 pt-4">
-    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Vehicle Restrictions</p>
-    <label class="block text-xs text-gray-500 mb-1" for="allowed_vehicles">Allowed vehicles (comma-separated codes, e.g. <span class="font-mono">XFG, XRG, 728419</span>). Leave blank to allow all.</label>
-    <input id="allowed_vehicles" type="text" name="allowed_vehicles" value="{{ allowed_vehicles_str }}"
-      placeholder="blank = all allowed"
-      class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-orange-400"/>
-  </div>
+    {# Vehicle restrictions #}
+    <div class="border-t border-outline-variant/20 pt-6">
+      <p class="font-headline text-xs uppercase tracking-widest text-outline mb-2">Vehicle Restrictions</p>
+      <p class="font-body text-xs text-outline/60 mb-3">Comma-separated codes (e.g. <span class="font-mono text-on-surface-variant">XFG, XRG</span>). Leave blank to allow all vehicles.</p>
+      <input id="allowed_vehicles" type="text" name="allowed_vehicles" value="{{ allowed_vehicles_str }}"
+        placeholder="blank = all allowed"
+        class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-mono border-b-2 border-outline focus:border-primary focus:outline-none transition-colors placeholder:text-outline/40" />
+    </div>
 
-  <div class="flex gap-2 pt-2">
-    <button type="submit"
-      class="px-4 py-2 bg-orange-600 text-white text-sm font-semibold rounded hover:bg-orange-700 transition-colors">
-      Save Changes
-    </button>
-    <a href="/events/{{ event.id }}"
-      class="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-semibold rounded hover:bg-gray-300 transition-colors">
-      Cancel
-    </a>
-  </div>
-</form>
+    {# Actions #}
+    <div class="flex gap-3 pt-2">
+      <button type="submit" class="font-headline font-bold text-xs uppercase tracking-widest bg-primary-container text-white px-8 py-3 hover:bg-white hover:text-primary-container transition-all">
+        Save Changes
+      </button>
+      <a href="/events/{{ event.id }}" class="font-headline text-xs uppercase tracking-widest text-outline border border-outline/30 px-8 py-3 hover:text-on-background hover:border-outline/60 transition-colors">
+        Cancel
+      </a>
+    </div>
+  </form>
+</div>
 
 {% endblock %}

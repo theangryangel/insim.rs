@@ -10,7 +10,7 @@ use insim::{
     insim::{ObjectInfo, Uco},
 };
 use kitcar::{
-    game, presence,
+    presence,
     presence::PresenceEvent,
     scenes::{FromContext, Scene, SceneError, SceneResult},
     ui::{self, Component},
@@ -74,14 +74,8 @@ struct MetronomeView {
     help_dialog: Dialog,
 }
 
-#[derive(Debug, Clone, Default)]
-struct MetronomeProps {
-    global: MetronomeGlobalProps,
-    connection: MetronomeConnectionProps,
-}
-
 impl ui::Component for MetronomeView {
-    type Props<'a> = MetronomeProps;
+    type Props<'a> = (&'a MetronomeGlobalProps, &'a MetronomeConnectionProps);
     type Message = MetronomeMessage;
 
     fn update(&mut self, msg: Self::Message) {
@@ -92,7 +86,7 @@ impl ui::Component for MetronomeView {
         }
     }
 
-    fn render(&self, props: Self::Props<'_>) -> ui::Node<Self::Message> {
+    fn render(&self, (global, player): Self::Props<'_>) -> ui::Node<Self::Message> {
         if self.help_dialog.is_visible() {
             return self
                 .help_dialog
@@ -103,10 +97,10 @@ impl ui::Component for MetronomeView {
                 .map(MetronomeMessage::Help);
         }
 
-        let (status, status_style) = if props.connection.in_progress {
+        let (status, status_style) = if player.in_progress {
             ("In progress".to_string(), hud_active())
         } else {
-            match props.connection.best_delta {
+            match player.best_delta {
                 Some(d) => {
                     let tier = tier_label(d).unwrap_or("No tier");
                     (
@@ -118,7 +112,7 @@ impl ui::Component for MetronomeView {
             }
         };
 
-        let players = metronome_scoreboard(&props.global.leaderboard, &props.connection.uname);
+        let players = metronome_scoreboard(&global.leaderboard, &player.uname);
 
         let mut scoreboard = ui::container()
             .flex()
@@ -130,7 +124,7 @@ impl ui::Component for MetronomeView {
             .with_child(ui::text("Best Deltas", hud_title()).w(35.).h(5.))
             .with_children(players);
 
-        if let Some(url) = &props.global.event_url {
+        if let Some(url) = &global.event_url {
             scoreboard =
                 scoreboard.with_child(ui::text(url, hud_muted().align_left()).w(35.).h(5.));
         }
@@ -139,19 +133,10 @@ impl ui::Component for MetronomeView {
             .flex()
             .flex_col()
             .with_child(
-                topbar(&format!("Target: {:.2?}", props.global.target))
+                topbar(&format!("Target: {:.2?}", global.target))
                     .with_child(ui::text(status, status_style).w(20.).h(5.)),
             )
             .with_child(scoreboard)
-    }
-}
-
-impl From<ui::UiState<MetronomeGlobalProps, MetronomeConnectionProps>> for MetronomeProps {
-    fn from(state: ui::UiState<MetronomeGlobalProps, MetronomeConnectionProps>) -> Self {
-        Self {
-            global: state.global,
-            connection: state.connection,
-        }
     }
 }
 
@@ -167,7 +152,6 @@ pub struct ChallengeLoop {
 impl<Ctx> Scene<Ctx> for ChallengeLoop
 where
     InsimTask: FromContext<Ctx>,
-    game::Game: FromContext<Ctx>,
     presence::Presence: FromContext<Ctx>,
     db::Pool: FromContext<Ctx>,
     Ctx: Sync,
@@ -177,7 +161,6 @@ where
     async fn run(self, ctx: &Ctx) -> Result<SceneResult<Self::Output>, SceneError> {
         let inner = ChallengeLoopInner {
             insim: InsimTask::from_context(ctx),
-            game: game::Game::from_context(ctx),
             presence: presence::Presence::from_context(ctx),
             db: db::Pool::from_context(ctx),
             chat: self.chat,
@@ -191,7 +174,6 @@ where
 
 struct ChallengeLoopInner {
     insim: InsimTask,
-    game: game::Game,
     presence: presence::Presence,
     db: db::Pool,
     chat: chat::EventChat,
@@ -202,12 +184,17 @@ struct ChallengeLoopInner {
 
 impl ChallengeLoopInner {
     async fn run_inner(self) -> Result<SceneResult<()>, SceneError> {
+        let event_url = self
+            .base_url
+            .as_deref()
+            .map(|base| format!("{}/event/{}", base.trim_end_matches('/'), self.session_id));
+
         let (ui, _ui_handle) = ui::mount_with(
             self.insim.clone(),
             MetronomeGlobalProps {
                 target: self.target,
-                leaderboard: MetronomeLeaderboard::default(),
-                event_url: None,
+                leaderboard: self.metronome_leaderboard().await?,
+                event_url: event_url.clone(),
             },
             |_ucid, _invalidator| MetronomeView {
                 help_dialog: Dialog::default(),
@@ -218,18 +205,6 @@ impl ChallengeLoopInner {
                     .then_some((ucid, MetronomeMessage::Help(DialogMsg::Show)))
             },
         );
-
-        let event_url = self
-            .base_url
-            .as_deref()
-            .map(|base| format!("{}/event/{}", base.trim_end_matches('/'), self.session_id));
-
-        let leaderboard = self.metronome_leaderboard().await?;
-        ui.set_global_state(MetronomeGlobalProps {
-            target: self.target,
-            leaderboard,
-            event_url: event_url.clone(),
-        });
 
         // Subscribe before seeding to avoid missing events during the queries.
         let mut events = self.presence.subscribe_events();
@@ -272,7 +247,7 @@ impl ChallengeLoopInner {
                                 )
                                 .await?;
                             let pb = self.personal_best(&info.uname).await?;
-                            ui.set_player_state(info.ucid, MetronomeConnectionProps {
+                            ui.assign_to(info.ucid, MetronomeConnectionProps {
                                 uname: info.uname.clone(),
                                 in_progress: active_runs.contains_key(&info.uname),
                                 best_delta: pb,
@@ -306,22 +281,21 @@ impl ChallengeLoopInner {
 
                 packet = packets.recv() => {
                     let packet = packet.map_err(|_| SceneError::InsimHandleLost)?;
-                    match packet {
-                        insim::Packet::Uco(Uco {
-                            info:
-                                ObjectInfo::InsimCheckpoint(InsimCheckpoint {
-                                    kind:
-                                        kind @ (InsimCheckpointKind::Checkpoint1 | InsimCheckpointKind::Finish),
-                                    ..
-                                }),
-                            plid,
-                            time,
-                            ..
-                        }) => {
-                            if let Some(player) = players.get(&plid).cloned()
-                                && !player.ptype.is_ai()
-                                && let Some(conn) = connections.get(&player.ucid).cloned()
-                            {
+                    if let insim::Packet::Uco(Uco {
+                        info:
+                            ObjectInfo::InsimCheckpoint(InsimCheckpoint {
+                                kind:
+                                    kind @ (InsimCheckpointKind::Checkpoint1 | InsimCheckpointKind::Finish),
+                                ..
+                            }),
+                        plid,
+                        time,
+                        ..
+                    }) = packet
+                        && let Some(player) = players.get(&plid).cloned()
+                        && !player.ptype.is_ai()
+                        && let Some(conn) = connections.get(&player.ucid).cloned()
+                    {
                                 match kind {
                                     InsimCheckpointKind::Checkpoint1 => {
                                         let _ = active_runs.insert(conn.uname.clone(), time);
@@ -374,7 +348,7 @@ impl ChallengeLoopInner {
                                             }
 
                                             let leaderboard = self.metronome_leaderboard().await?;
-                                            ui.set_global_state(MetronomeGlobalProps {
+                                            ui.assign(MetronomeGlobalProps {
                                                 target: self.target,
                                                 leaderboard,
                                                 event_url: event_url.clone(),
@@ -385,21 +359,14 @@ impl ChallengeLoopInner {
                                 }
 
                                 let pb = self.personal_best(&conn.uname).await?;
-                                ui.set_player_state(conn.ucid, MetronomeConnectionProps {
+                                ui.assign_to(conn.ucid, MetronomeConnectionProps {
                                     uname: conn.uname.clone(),
                                     in_progress: active_runs.contains_key(&conn.uname),
                                     best_delta: pb,
                                 }).await;
-                            }
-                        },
-                        _ => {},
                     }
                 },
 
-                _ = self.game.wait_for_end() => {
-                    tracing::info!("Metronome game ended");
-                    return Ok(SceneResult::Continue(()));
-                },
             }
         }
     }

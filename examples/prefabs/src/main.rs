@@ -64,6 +64,12 @@ struct State {
     undo_stack: Vec<UndoEntry>,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum SpawnAction {
+    AddObjects,
+    Selection,
+}
+
 #[derive(Debug)]
 enum Command {
     ReloadPrefabs,
@@ -71,7 +77,7 @@ enum Command {
     SpawnPrefab(usize),
     SpawnObjects {
         objects: Vec<ObjectInfo>,
-        action: PmoAction,
+        action: SpawnAction,
         origin: SpawnOrigin,
     },
     CameraMove(Cpp),
@@ -195,7 +201,7 @@ async fn run_command(
                         connection,
                         state,
                         prefab.place_at_anchor(anchor),
-                        PmoAction::AddObjects,
+                        SpawnAction::AddObjects,
                     )
                     .await?;
                     if spawned > 0 {
@@ -233,8 +239,7 @@ async fn run_command(
                     connection
                         .write(Axm {
                             ucid: ConnectionId::LOCAL,
-                            pmoaction: PmoAction::DelObjects,
-                            info: entry.added,
+                            action: PmoAction::DelObjects(entry.added),
                             ..Default::default()
                         })
                         .await?;
@@ -243,8 +248,7 @@ async fn run_command(
                     connection
                         .write(Axm {
                             ucid: ConnectionId::LOCAL,
-                            pmoaction: PmoAction::AddObjects,
-                            info: chunk.to_vec(),
+                            action: PmoAction::AddObjects(chunk.to_vec()),
                             ..Default::default()
                         })
                         .await?;
@@ -255,9 +259,8 @@ async fn run_command(
                         connection
                             .write(Axm {
                                 ucid: ConnectionId::LOCAL,
-                                pmoaction: PmoAction::Selection,
-                                pmoflags: PmoFlags::SELECTION_REAL,
-                                info: chunk.to_vec(),
+                                flags: PmoFlags::SELECTION_REAL,
+                                action: PmoAction::Selection(chunk.to_vec()),
                                 ..Default::default()
                             })
                             .await?;
@@ -294,7 +297,7 @@ async fn spawn_at_selection(
     connection: &mut FramedConnection,
     state: &mut State,
     objects: Vec<ObjectInfo>,
-    pmoaction: PmoAction,
+    action: SpawnAction,
 ) -> insim::Result<usize> {
     if objects.is_empty() {
         return Ok(0);
@@ -313,33 +316,34 @@ async fn spawn_at_selection(
         connection
             .write(Axm {
                 ucid: ConnectionId::LOCAL,
-                pmoaction: PmoAction::DelObjects,
-                info: state.selection.clone(),
+                action: PmoAction::DelObjects(state.selection.clone()),
                 ..Default::default()
             })
             .await?;
     }
 
     for chunk in objects.chunks(60) {
+        let axm_action = match action {
+            SpawnAction::AddObjects => PmoAction::AddObjects(chunk.to_vec()),
+            SpawnAction::Selection => PmoAction::Selection(chunk.to_vec()),
+        };
         connection
             .write(Axm {
                 ucid: ConnectionId::LOCAL,
-                pmoaction: pmoaction.clone(),
-                info: chunk.to_vec(),
+                action: axm_action,
                 ..Default::default()
             })
             .await?;
     }
 
-    if matches!(pmoaction, PmoAction::AddObjects) {
+    if matches!(action, SpawnAction::AddObjects) {
         sleep(Duration::from_millis(50)).await;
         for chunk in objects.chunks(60) {
             connection
                 .write(Axm {
                     ucid: ConnectionId::LOCAL,
-                    pmoaction: PmoAction::Selection,
-                    pmoflags: PmoFlags::SELECTION_REAL,
-                    info: chunk.to_vec(),
+                    flags: PmoFlags::SELECTION_REAL,
+                    action: PmoAction::Selection(chunk.to_vec()),
                     ..Default::default()
                 })
                 .await?;
@@ -502,9 +506,11 @@ pub async fn main() -> anyhow::Result<()> {
                         None
                     },
                     Packet::Axm(axm) => {
-                        if matches!(axm.pmoaction, PmoAction::TtcSel) && axm.reqi == REQI_SELECTION {
-                            state.selection = axm.info;
-                            dirty = true;
+                        if axm.reqi == REQI_SELECTION {
+                            if let PmoAction::TtcSel(info) = axm.action {
+                                state.selection = info;
+                                dirty = true;
+                            }
                         }
 
                         None

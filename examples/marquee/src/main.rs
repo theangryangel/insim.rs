@@ -450,8 +450,7 @@ pub async fn main() -> Result<()> {
 
             connection
                 .write(Axm {
-                    pmoaction: PmoAction::AddObjects,
-                    info: last_objects.clone(),
+                    action: PmoAction::AddObjects(last_objects.clone()),
                     ..Default::default()
                 })
                 .await?;
@@ -482,8 +481,7 @@ pub async fn main() -> Result<()> {
                     _ = interval.tick() => {
                         if !last_objects.is_empty() {
                             connection.write(Axm {
-                                pmoaction: PmoAction::DelObjects,
-                                info: last_objects,
+                                action: PmoAction::DelObjects(last_objects),
                                 ..Default::default()
                             }).await?;
                         }
@@ -518,8 +516,7 @@ pub async fn main() -> Result<()> {
                         }
 
                         connection.write(Axm {
-                            pmoaction: PmoAction::AddObjects,
-                            info: last_objects.clone(),
+                            action: PmoAction::AddObjects(last_objects.clone()),
                             ..Default::default()
                         }).await?;
                     }
@@ -531,8 +528,7 @@ pub async fn main() -> Result<()> {
     if !last_objects.is_empty() {
         let _ = connection
             .write(Axm {
-                pmoaction: PmoAction::DelObjects,
-                info: last_objects,
+                action: PmoAction::DelObjects(last_objects),
                 ..Default::default()
             })
             .await?;

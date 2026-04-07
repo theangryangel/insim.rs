@@ -6,14 +6,14 @@ pub mod chat;
 use std::time::Duration;
 
 pub use challenge_loop::ChallengeLoop;
-use kitcar::scenes::{Scene, SceneError, SceneExt, SceneResult, wait_for_players::WaitForPlayers};
+use kitcar::scenes::{Scene, SceneError, SceneExt, wait_for_players::WaitForPlayers};
 use sqlx::types::Json;
 use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 
 use super::{MiniGame, MiniGameCtx, setup_track};
 use crate::{ChatError, MIN_PLAYERS, db};
 
-#[derive(Clone)]
 pub struct MetronomeGame {
     pub session_id: i64,
     pub target: Duration,
@@ -35,6 +35,42 @@ impl Drop for MetronomeGuard {
 
 impl MiniGame for MetronomeGame {
     type Guard = MetronomeGuard;
+
+    async fn run(&self, ctx: &MiniGameCtx, cancel: CancellationToken) -> Result<(), SceneError> {
+        let challenge_scene = WaitForPlayers {
+            min_players: MIN_PLAYERS,
+        }
+        .then(
+            setup_track::SetupTrack {
+                min_players: MIN_PLAYERS,
+                track: self.track,
+                layout: Some(self.layout.clone()),
+                mode_name: match &self.event_name {
+                    Some(name) => format!(
+                        "{name} — Metronome: match the target lap time as closely as possible!"
+                    ),
+                    None => {
+                        "Metronome: match the target lap time as closely as possible!".to_string()
+                    },
+                },
+            }
+            .with_timeout(Duration::from_secs(60)),
+        )
+        .then(
+            ChallengeLoop {
+                chat: self.chat.clone(),
+                target: self.target,
+                session_id: self.session_id,
+                base_url: ctx.base_url.clone(),
+            }
+            .until_game_ends(),
+        )
+        .loop_until_quit()
+        .with_cancellation(cancel);
+
+        let _ = challenge_scene.run(ctx).await?;
+        Ok(())
+    }
 
     async fn setup(
         event: &db::Event,
@@ -60,54 +96,65 @@ impl MiniGame for MetronomeGame {
         Ok((game, guard))
     }
 
-    async fn run(self, ctx: &MiniGameCtx) -> Result<SceneResult<()>, SceneError> {
-        let challenge_scene = WaitForPlayers {
-            min_players: MIN_PLAYERS,
-        }
-        .then(
-            setup_track::SetupTrack {
-                min_players: MIN_PLAYERS,
-                track: self.track,
-                layout: Some(self.layout.clone()),
-                mode_name: match &self.event_name {
-                    Some(name) => format!(
-                        "{name} — Metronome: match the target lap time as closely as possible!"
-                    ),
-                    None => {
-                        "Metronome: match the target lap time as closely as possible!".to_string()
-                    },
-                },
-            }
-            .with_timeout(Duration::from_secs(60)),
-        )
-        .then(ChallengeLoop {
-            chat: self.chat.clone(),
-            target: self.target,
-            session_id: self.session_id,
-            base_url: ctx.base_url.clone(),
-        })
-        .loop_until_quit();
-
-        let presence = ctx.presence.clone();
-        let chat = self.chat.clone();
-
-        tokio::select! {
-            res = challenge_scene.run(ctx) => {
-                let _ = res?;
-                Ok(SceneResult::Continue(()))
-            },
-            _ = chat.wait_for_admin_cmd(presence, |msg| matches!(msg, chat::EventChatMsg::Quit)) => {
-                Ok(SceneResult::Quit)
-            }
-        }
-    }
-
-    async fn teardown(self, event: &db::Event, ctx: &MiniGameCtx) -> Result<(), SceneError> {
+    async fn teardown(&self, event: &db::Event, ctx: &MiniGameCtx) -> Result<(), SceneError> {
         db::complete_event(&ctx.pool, event.id)
             .await
             .map_err(|cause| SceneError::Custom {
                 scene: "metronome::teardown",
                 cause: Box::new(cause),
-            })
+            })?;
+
+        let standings = db::metronome_standings(&ctx.pool, event.id)
+            .await
+            .map_err(|cause| SceneError::Custom {
+                scene: "metronome::teardown::standings",
+                cause: Box::new(cause),
+            })?;
+
+        if !standings.is_empty() {
+            let parts: Vec<String> = standings
+                .iter()
+                .enumerate()
+                .map(|(i, s)| {
+                    let xp = position_xp(i);
+                    format!("{} {} (+{xp} XP)", ordinal(i + 1), s.pname)
+                })
+                .collect();
+            let _ = ctx
+                .insim
+                .send_message(format!("Metronome: {}", parts.join(", ")), None)
+                .await;
+
+            for (i, s) in standings.iter().enumerate() {
+                let xp = position_xp(i);
+                if let Err(e) =
+                    db::award_xp(&ctx.pool, &s.uname, xp, "metronome", Some(event.id)).await
+                {
+                    tracing::warn!("Failed to award XP to {}: {e}", s.uname);
+                }
+            }
+        }
+
+        Ok(())
     }
+}
+
+fn position_xp(rank: usize) -> i64 {
+    match rank {
+        0 => 100,
+        1 => 75,
+        2 => 50,
+        3..=9 => 25,
+        _ => 10,
+    }
+}
+
+fn ordinal(n: usize) -> String {
+    let suffix = match n % 10 {
+        1 if n % 100 != 11 => "st",
+        2 if n % 100 != 12 => "nd",
+        3 if n % 100 != 13 => "rd",
+        _ => "th",
+    };
+    format!("{n}{suffix}")
 }

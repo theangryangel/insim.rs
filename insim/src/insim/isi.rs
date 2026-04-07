@@ -115,7 +115,7 @@ impl Default for Isi {
             udpport: 0,
             flags: IsiFlags::default(),
             version: VERSION,
-            prefix: 0 as char,
+            prefix: '\0',
             interval: Duration::default(),
             admin: "".into(),
             iname: Self::DEFAULT_INAME.to_owned(),

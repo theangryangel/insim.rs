@@ -332,7 +332,21 @@ impl Packet {
             Packet::Obh(_) => 28,
             Packet::Hlv(_) => 20,
             Packet::Plc(_) => 8,
-            Packet::Axm(a) => 8 + (a.info.len() * 8),
+            Packet::Axm(a) => {
+                use crate::insim::PmoAction;
+                let numo = match &a.action {
+                    PmoAction::LoadingFile(info)
+                    | PmoAction::AddObjects(info)
+                    | PmoAction::DelObjects(info)
+                    | PmoAction::TinyAxm(info)
+                    | PmoAction::TtcSel(info)
+                    | PmoAction::Selection(info) => info.len(),
+                    PmoAction::GetZ(entries) => entries.len(),
+                    PmoAction::Position { .. } => 1,
+                    PmoAction::ClearAll => 0,
+                };
+                8 + (numo * 8)
+            },
             Packet::Acr(_) => 12,
             Packet::Hcp(_) => 68,
             Packet::Nci(_) => 16,
