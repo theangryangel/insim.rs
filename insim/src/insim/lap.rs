@@ -18,6 +18,18 @@ pub enum Fuel200 {
     No,
 }
 
+impl Fuel200 {
+    /// Returns fuel as a fraction in `0.0..=1.0`, or `None` when `/showfuel` is disabled.
+    ///
+    /// The wire value is double the fuel percentage, so `Percentage(200)` → `Some(1.0)`.
+    pub fn as_percentage(&self) -> Option<f32> {
+        match self {
+            Self::Percentage(v) => Some(*v as f32 / 200.0),
+            Self::No => None,
+        }
+    }
+}
+
 impl Decode for Fuel200 {
     fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
         let data = ctx.decode::<u8>("data")?;
@@ -52,6 +64,16 @@ pub enum Fuel {
     /// Fuel cannot be reported, /showfuel=no
     #[default]
     No,
+}
+
+impl Fuel {
+    /// Returns fuel added as a fraction in `0.0..=1.0`, or `None` when `/showfuel` is disabled.
+    pub fn as_percentage(&self) -> Option<f32> {
+        match self {
+            Self::Percentage(v) => Some(*v as f32 / 100.0),
+            Self::No => None,
+        }
+    }
 }
 
 impl Decode for Fuel {

@@ -501,12 +501,6 @@ impl InsimTask {
                 ..Default::default()
             }
             .into()
-        } else if msg.len() > 63 {
-            crate::insim::Mst {
-                msg,
-                ..Default::default()
-            }
-            .into()
         } else {
             crate::insim::Msx {
                 msg,

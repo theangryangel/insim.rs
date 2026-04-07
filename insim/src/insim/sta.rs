@@ -1,3 +1,5 @@
+use std::fmt;
+
 use bitflags::bitflags;
 use insim_core::{track::Track, wind::Wind};
 
@@ -19,6 +21,17 @@ pub enum RaceInProgress {
 
     /// Qualifying
     Qualifying = 2,
+}
+
+impl fmt::Display for RaceInProgress {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::No => "no race",
+            Self::Racing => "racing",
+            Self::Qualifying => "qualifying",
+        };
+        f.write_str(s)
+    }
 }
 
 bitflags! {

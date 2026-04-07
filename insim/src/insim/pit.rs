@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{fmt, time::Duration};
 
 use bitflags::bitflags;
 
@@ -123,6 +123,19 @@ pub enum PitLaneFact {
 
     /// Entered for a stop-go penalty.
     Sg = 4,
+}
+
+impl fmt::Display for PitLaneFact {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::Exit => "exited pit lane",
+            Self::Enter => "entered pit lane",
+            Self::NoPurpose => "entered pit lane (no purpose)",
+            Self::Dt => "entered pit lane (drive-through)",
+            Self::Sg => "entered pit lane (stop-go)",
+        };
+        f.write_str(s)
+    }
 }
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
