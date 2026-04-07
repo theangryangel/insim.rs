@@ -8,7 +8,7 @@ use itertools::Itertools;
 
 use crate::{Decode, Encode};
 
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, thiserror::Error)]
 /// Possible errors when parsing a game version
 pub enum GameVersionParseError {
     /// Could not parse a float
@@ -58,6 +58,15 @@ impl PartialEq for GameVersion {
 }
 
 impl Eq for GameVersion {}
+
+impl std::hash::Hash for GameVersion {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // Use to_bits() to match the PartialEq impl, which also compares via to_bits().
+        self.major.to_bits().hash(state);
+        self.minor.hash(state);
+        self.patch.unwrap_or(0).hash(state);
+    }
+}
 
 impl PartialOrd for GameVersion {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {

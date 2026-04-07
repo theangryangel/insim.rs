@@ -25,7 +25,7 @@ impl MiniGameManager {
         Self { pool, ctx }
     }
 
-    /// Generic executor: setup, bail-retry loop, teardown.
+    /// Generic executor: setup, run until quit or cancellation, teardown.
     async fn execute<G: MiniGame>(
         event: &db::Event,
         ctx: &MiniGameCtx,
@@ -33,21 +33,7 @@ impl MiniGameManager {
     ) -> Result<(), SceneError> {
         vehicle_restrictions::apply(&ctx.insim, &event.allowed_vehicles.0).await?;
         let (game, _guard) = G::setup(event, ctx).await?;
-        loop {
-            let result = tokio::select! {
-                result = game.clone().run(ctx) => result?,
-                _ = cancel.cancelled() => break,
-            };
-            match result {
-                kitcar::scenes::SceneResult::Continue(_) | kitcar::scenes::SceneResult::Quit => {
-                    break;
-                },
-                kitcar::scenes::SceneResult::Bail { msg } => {
-                    tracing::info!("Scene bailed ({msg:?}), retrying...");
-                    continue;
-                },
-            }
-        }
+        game.run(ctx, cancel).await?;
         game.teardown(event, ctx).await?;
         vehicle_restrictions::apply(&ctx.insim, &[]).await?;
         ctx.insim.send_command("/axclear").await?;
@@ -64,6 +50,9 @@ impl MiniGameManager {
         let mut current_event_id: Option<i64> = None;
         let mut current_task: Option<JoinHandle<Result<(), SceneError>>> = None;
         let mut current_cancel: Option<CancellationToken> = None;
+
+        let mut idle_task: Option<JoinHandle<Result<(), SceneError>>> = None;
+        let mut idle_cancel: Option<CancellationToken> = None;
 
         let mut last_announced_at: Option<Instant> = None;
         let mut last_announced_event_id: Option<i64> = None;
@@ -88,9 +77,34 @@ impl MiniGameManager {
                         tracing::warn!("Failed to poll active event: {e}");
                     },
 
-                    (None, Ok(None)) => {},
+                    (None, Ok(None)) => {
+                        // No event running — start idle if not already running.
+                        if idle_task.as_ref().map_or(true, |t| t.is_finished()) {
+                            tracing::info!("No active event — starting idle mode");
+                            let cancel = CancellationToken::new();
+                            idle_cancel = Some(cancel.clone());
+                            let ctx_clone = MiniGameCtx {
+                                pool: ctx.pool.clone(),
+                                insim: ctx.insim.clone(),
+                                presence: ctx.presence.clone(),
+                                game: ctx.game.clone(),
+                                base_url: ctx.base_url.clone(),
+                            };
+                            idle_task = Some(tokio::spawn(async move {
+                                super::idle::run(&ctx_clone, cancel).await
+                            }));
+                        }
+                    },
 
                     (None, Ok(Some(event))) => {
+                        // Cancel idle if it's running before starting the real event.
+                        if let Some(token) = idle_cancel.take() {
+                            token.cancel();
+                        }
+                        if let Some(task) = idle_task.take() {
+                            let _ = tokio::time::timeout(Duration::from_secs(5), task).await;
+                        }
+
                         tracing::info!(
                             "Starting event #{} ({:?} on {}/{})",
                             event.id,
@@ -255,7 +269,7 @@ async fn tick_scheduler(pool: &db::Pool) -> Result<u64, sqlx::Error> {
 
     // No active, no due event. Check how soon the next one is.
     match db::next_scheduled_event(pool).await? {
-        Some((_, secs)) => Ok((secs as u64).min(30).max(1)),
+        Some((_, secs)) => Ok((secs as u64).clamp(1, 30)),
         None => Ok(30),
     }
 }

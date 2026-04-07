@@ -30,17 +30,6 @@ pub trait Component {
     fn render(&self, props: Self::Props<'_>) -> super::Node<Self::Message>;
 }
 
-/// Pair of global and per-connection state values used to derive root component props.
-#[derive(Debug, Clone)]
-pub struct UiState<G, C> {
-    pub global: G,
-    pub connection: C,
-}
-
-impl From<UiState<(), ()>> for () {
-    fn from(_val: UiState<(), ()>) {}
-}
-
 /// Handle to request a redraw of the current view instance.
 #[derive(Clone, Debug)]
 pub struct InvalidateHandle {
@@ -73,8 +62,8 @@ where
     pub ucid: ConnectionId,
     pub root: Cmp,
     pub invalidation_notify: Arc<Notify>,
-    // global props stream shared by all connected players.
-    pub global_props: watch::Receiver<G>,
+    // global props stream shared by all connected players (Arc so clone is O(1)).
+    pub global_props: watch::Receiver<Arc<G>>,
     // per-connection props stream for this specific `ucid`.
     pub connection_props: watch::Receiver<C>,
     // per-view event stream (external messages + demuxed UI input).
@@ -87,8 +76,8 @@ where
 pub(super) fn run_view<Cmp, G, C>(args: RunViewArgs<Cmp, G, C>)
 where
     Cmp: Component + 'static,
-    for<'a> UiState<G, C>: Into<Cmp::Props<'a>>,
-    G: Clone + Send + Sync + 'static,
+    for<'a> Cmp::Props<'a>: From<(&'a G, &'a C)>,
+    G: Send + Sync + 'static,
     C: Clone + Send + Sync + 'static,
 {
     let RunViewArgs {
@@ -114,12 +103,9 @@ where
 
         loop {
             if should_render && !blocked {
-                let props: Cmp::Props<'_> = UiState {
-                    global: global_props.borrow_and_update().clone(),
-                    connection: connection_props.borrow_and_update().clone(),
-                }
-                .into();
-
+                let global = Arc::clone(&*global_props.borrow_and_update());
+                let player = connection_props.borrow_and_update();
+                let props: Cmp::Props<'_> = (&*global, &*player).into();
                 let vdom = root.render(props);
                 if let Some(diff) = canvas.reconcile(vdom)
                     && let Err(e) = insim.send_all(diff.merge()).await

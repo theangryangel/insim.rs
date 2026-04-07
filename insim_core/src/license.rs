@@ -6,7 +6,7 @@ use crate::{Decode, Encode};
 /// - Determines which tracks and vehicles are available.
 /// - See <https://www.lfs.net/contents> for details.
 #[non_exhaustive]
-#[derive(Default, PartialEq, PartialOrd, Eq, Debug, Copy, Clone)]
+#[derive(Default, PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 pub enum License {

@@ -14,8 +14,6 @@ pub enum EventChatMsg {
     Echo { message: String },
     /// Help
     Help,
-    /// Quit
-    Quit,
 }
 
 pub type EventChat = kitcar::chat::Chat<EventChatMsg>;
@@ -37,7 +35,6 @@ async fn handle_event_chat(insim: InsimTask, mso: Mso, msg: EventChatMsg) -> Res
                 insim.send_message(cmd, mso.ucid).await?;
             }
         },
-        _ => {},
     }
     Ok(())
 }

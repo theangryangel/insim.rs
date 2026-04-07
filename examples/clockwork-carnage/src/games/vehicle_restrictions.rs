@@ -28,10 +28,10 @@ pub async fn apply(insim: &InsimTask, vehicles: &[Vehicle]) -> Result<(), SceneE
         for v in vehicles {
             match v {
                 Vehicle::Mod(_) => {
-                    let _ = mal.insert(v.clone());
+                    let _ = mal.insert(*v);
                 },
                 _ => {
-                    let _ = cars.insert(v.clone());
+                    let _ = cars.insert(*v);
                 },
             }
         }

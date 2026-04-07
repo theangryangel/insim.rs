@@ -71,7 +71,7 @@ pub use acr::{Acr, AcrResult};
 pub use aic::{AiInput, AiInputToggle, AiInputType, Aic};
 pub use aii::{AiFlags, Aii};
 pub use axi::Axi;
-pub use axm::{Axm, ObjectInfo, PmoAction, PmoFlags};
+pub use axm::{Axm, GetZEntry, ObjectInfo, PmoAction, PmoFlags};
 pub use axo::Axo;
 pub use btn::{
     Bfn, BfnType, Btc, Btn, BtnClickFlags, BtnInst, BtnStyle, BtnStyleColour, BtnStyleFlags, Btt,

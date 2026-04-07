@@ -1,0 +1,14 @@
+{% macro player_name(pname, uname, twitch_username, youtube_username) %}
+<span class="font-bold text-primary-container">{{ pname|colour_html|safe }}</span>
+<span class="text-[11px] text-outline font-headline ml-1.5">{{ uname }}</span>
+{% if let Some(tw) = twitch_username %}
+<a href="https://twitch.tv/{{ tw }}" target="_blank" class="ml-1.5">
+  <img src="/assets/twitch-icon.svg" class="h-5 w-5 inline" alt="Twitch" />
+</a>
+{% endif %}
+{% if let Some(yt) = youtube_username %}
+<a href="https://youtube.com/@{{ yt }}" target="_blank" class="ml-1">
+  <img src="/assets/youtube-icon.svg" class="h-5 w-5 inline" alt="YouTube" />
+</a>
+{% endif %}
+{% endmacro %}

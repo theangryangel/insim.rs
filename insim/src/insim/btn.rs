@@ -204,7 +204,8 @@ impl Decode for BtnStyle {
     fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
         let val = ctx.decode::<u8>("value")?;
 
-        let colour = match val & !248 {
+        // Lower 3 bits (0x07) select the colour; upper bits are flags.
+        let colour = match val & 0x07 {
             1 => BtnStyleColour::Title,
             2 => BtnStyleColour::UnselectedText,
             3 => BtnStyleColour::SelectedText,
