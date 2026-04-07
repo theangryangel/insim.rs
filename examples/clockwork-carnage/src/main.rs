@@ -8,7 +8,7 @@ mod games;
 mod hud;
 mod web;
 
-type ChatError = kitcar::chat::RuntimeError;
+type ChatError = insim_extras::chat::RuntimeError;
 const MIN_PLAYERS: usize = 2;
 
 use std::net::SocketAddr;
@@ -17,7 +17,7 @@ use anyhow::Context as _;
 use clap::Parser;
 use games::MiniGameCtx;
 use insim::{WithRequestId, insim::TinyType};
-use kitcar::{game, presence};
+use insim_extras::{game, presence};
 
 // -- Config -------------------------------------------------------------------
 

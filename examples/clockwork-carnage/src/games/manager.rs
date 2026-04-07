@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use kitcar::scenes::SceneError;
+use insim_extras::scenes::SceneError;
 use sqlx::types::Json;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;

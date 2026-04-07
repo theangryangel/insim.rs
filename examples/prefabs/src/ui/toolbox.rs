@@ -2,7 +2,7 @@ use insim::{
     core::heading::Heading,
     insim::{BtnStyle, ObjectInfo},
 };
-use kitcar::{ui, ui::Component as _};
+use insim_extras::{ui, ui::Component as _};
 
 use super::{OptionsMsg, PrefabSummary, ToolboxProps, options, scroll_list};
 use crate::{Command, SpawnOrigin, State, tools};

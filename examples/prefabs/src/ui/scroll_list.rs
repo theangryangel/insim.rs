@@ -1,7 +1,7 @@
 use std::{cell::Cell, marker::PhantomData};
 
 use insim::insim::BtnStyle;
-use kitcar::ui;
+use insim_extras::ui;
 
 pub const PAGE_SIZE: usize = 20;
 

@@ -1,4 +1,4 @@
-use kitcar::ui;
+use insim_extras::ui;
 
 use super::theme::hud_title;
 

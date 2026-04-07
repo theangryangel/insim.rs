@@ -1,11 +1,11 @@
 //! Idle mode chat commands
 
 use insim::{builder::InsimTask, insim::Mso};
-use kitcar::chat::Parse;
+use insim_extras::chat::Parse;
 
 use crate::{ChatError, db};
 
-#[derive(Debug, Clone, PartialEq, kitcar::chat::Parse)]
+#[derive(Debug, Clone, PartialEq, insim_extras::chat::Parse)]
 #[chat(prefix = '!')]
 /// Chat Commands
 pub enum IdleChatMsg {
@@ -17,13 +17,13 @@ pub enum IdleChatMsg {
     Upcoming,
 }
 
-pub type IdleChat = kitcar::chat::Chat<IdleChatMsg>;
+pub type IdleChat = insim_extras::chat::Chat<IdleChatMsg>;
 
 pub fn spawn(
     insim: InsimTask,
     pool: db::Pool,
 ) -> (IdleChat, tokio::task::JoinHandle<Result<(), ChatError>>) {
-    kitcar::chat::spawn_with_handler(insim, 100, move |insim, mso, msg| {
+    insim_extras::chat::spawn_with_handler(insim, 100, move |insim, mso, msg| {
         let pool = pool.clone();
         handle_idle_chat(insim, mso, msg, pool)
     })

@@ -7,7 +7,7 @@ pub mod state;
 use std::time::Duration;
 
 pub use challenge_loop::BombLoop;
-use kitcar::scenes::{Scene, SceneError, SceneExt, wait_for_players::WaitForPlayers};
+use insim_extras::scenes::{Scene, SceneError, SceneExt, wait_for_players::WaitForPlayers};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 

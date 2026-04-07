@@ -88,7 +88,7 @@ You might also find these related crates useful:
 - `insim_pth` – for reading and writing LFS PTH and PIN files.
 - `outgauge` - "sans-io" implementation of the LFS outgauge protocol.
 - `outsim` - "sans-io" implementation of the LFS outsim protocol.
-- `kitcar` - a Work in Progress, unstable suite of micro libraries to help build
+- `insim_extras` - an unreleased, unstable suite of micro libraries to help build
   multi-player mini-games quickly using insim.
 
 They follow the same design focus and can be found in the same GitHub repository, or on

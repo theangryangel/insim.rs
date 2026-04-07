@@ -1,12 +1,12 @@
 //! Bomb mode chat commands
 
 use insim::{builder::InsimTask, insim::Mso};
-use kitcar::chat::Parse;
+use insim_extras::chat::Parse;
 use tokio::task::JoinHandle;
 
 use crate::ChatError;
 
-#[derive(Debug, Clone, PartialEq, kitcar::chat::Parse)]
+#[derive(Debug, Clone, PartialEq, insim_extras::chat::Parse)]
 #[chat(prefix = '!')]
 /// Chat Commands
 pub enum BombChatMsg {
@@ -14,10 +14,10 @@ pub enum BombChatMsg {
     Help,
 }
 
-pub type BombChat = kitcar::chat::Chat<BombChatMsg>;
+pub type BombChat = insim_extras::chat::Chat<BombChatMsg>;
 
 pub fn spawn(insim: InsimTask) -> (BombChat, JoinHandle<Result<(), ChatError>>) {
-    kitcar::chat::spawn_with_handler(insim, 100, handle_bomb_chat)
+    insim_extras::chat::spawn_with_handler(insim, 100, handle_bomb_chat)
 }
 
 async fn handle_bomb_chat(insim: InsimTask, mso: Mso, msg: BombChatMsg) -> Result<(), ChatError> {

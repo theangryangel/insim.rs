@@ -1,4 +1,4 @@
-use kitcar::ui;
+use insim_extras::ui;
 
 use super::theme::{hud_overlay_action, hud_overlay_text, hud_panel_bg};
 
