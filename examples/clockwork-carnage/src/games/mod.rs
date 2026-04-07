@@ -55,7 +55,7 @@ impl FromContext<MiniGameCtx> for db::Pool {
 /// Lifecycle trait for mini-games. Each mode implements this.
 ///
 /// `run` owns the cancellation token and applies it internally so that `execute` stays clean.
-/// `async_fn_in_trait`: Send is verified at concrete impl sites — `execute<G>` is a Send async fn.
+/// `async_fn_in_trait`: Send is verified at concrete impl sites - `execute<G>` is a Send async fn.
 #[allow(async_fn_in_trait)]
 pub trait MiniGame: Send + Sized + 'static {
     /// Resources to keep alive during the game (chat handles, etc.).

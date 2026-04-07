@@ -1,4 +1,4 @@
-//! Clockwork Carnage — unified binary (InSim runner + web dashboard).
+//! Clockwork Carnage - unified binary (InSim runner + web dashboard).
 
 #![allow(missing_docs, missing_debug_implementations)]
 
@@ -86,7 +86,7 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
     let mut set = JoinSet::new();
     let base_url = config.web.as_ref().map(|w| w.base_url.clone());
 
-    // InSim setup — only if [insim] present
+    // InSim setup - only if [insim] present
     let (ctx, web_presence) = if let Some(insim_cfg) = config.insim {
         let (insim, insim_handle) = insim::tcp(insim_cfg.addr)
             .isi_admin_password(insim_cfg.password)
@@ -160,7 +160,7 @@ async fn run_loop(pool: db::Pool, config: Config) -> anyhow::Result<()> {
         async move { games::MiniGameManager::new(pool, ctx).run().await }
     });
 
-    // Web — only if [web] present
+    // Web - only if [web] present
     if let Some(w) = config.web {
         let web_cfg = web::WebConfig {
             base_url: w.base_url,

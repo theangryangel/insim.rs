@@ -1,4 +1,24 @@
-//! Contains [crate::Packet] enum
+//! The [`Packet`] enum and related types.
+//!
+//! ## Packet roles
+//!
+//! InSim packets fall into three broad roles. The doc comment on each [`Packet`] variant
+//! indicates which role(s) it plays:
+//!
+//! - **Instruction** - you send this to LFS to make something happen (e.g. show a button,
+//!   send a message, control lights).
+//! - **Information** - LFS sends this to you unsolicited when something happens (e.g. a
+//!   player joins, a lap is completed, a collision occurs). Most require the relevant
+//!   [`crate::insim::IsiFlags`] to be set during the handshake before LFS will send them.
+//! - **Both** - the same packet type is used in both directions, or can be sent by either
+//!   side depending on context (e.g. [`Packet::Axm`], [`Packet::Rip`]).
+//!
+//! ## Requesting state on demand
+//!
+//! Several [`crate::insim::TinyType`] and [`crate::insim::SmallType`] values can be sent
+//! to request an immediate snapshot from LFS - for example, [`crate::insim::TinyType::Ncn`]
+//! requests the current connection list. Set a non-zero [`crate::identifiers::RequestId`]
+//! on the outbound packet so you can correlate the replies.
 
 use std::fmt::Debug;
 

@@ -98,7 +98,7 @@ pub enum PresenceEvent {
         /// The player after the swap (with new ucid).
         after: PlayerInfo,
     },
-    /// Extra connection details received (IS_NCI — host-only, requires admin password).
+    /// Extra connection details received (IS_NCI - host-only, requires admin password).
     /// Enriches the connection with LFS.net user ID and IP address.
     ConnectionDetails(ConnectionInfo),
     /// A connection selected a vehicle in the garage (IS_SLC).

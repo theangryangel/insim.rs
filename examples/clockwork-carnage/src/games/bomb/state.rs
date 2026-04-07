@@ -108,7 +108,7 @@ pub struct PenaltyResult {
 pub struct BombState {
     pub config: BombConfig,
     pub leaderboard: BombLeaderboard,
-    /// Active runs keyed by PlayerId — the canonical in-race identity.
+    /// Active runs keyed by PlayerId - the canonical in-race identity.
     pub active_runs: HashMap<PlayerId, ActiveRun>,
 }
 
@@ -175,7 +175,7 @@ impl BombState {
         })
     }
 
-    /// Handles a driver swap (Toc packet) — updates the stored ucid for the run.
+    /// Handles a driver swap (Toc packet) - updates the stored ucid for the run.
     pub fn on_toc(&mut self, plid: PlayerId, new_ucid: ConnectionId) {
         if let Some(run) = self.active_runs.get_mut(&plid) {
             run.ucid = new_ucid;
@@ -231,7 +231,7 @@ impl BombState {
         None
     }
 
-    /// Returns active runs sorted by checkpoints desc, then deadline desc — for HUD display.
+    /// Returns active runs sorted by checkpoints desc, then deadline desc - for HUD display.
     pub fn active_runs_props(&self) -> Vec<(String, String, i64, Instant, Duration)> {
         let mut runs: Vec<_> = self
             .active_runs

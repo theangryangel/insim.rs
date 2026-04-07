@@ -24,7 +24,7 @@ pub trait Scene<Ctx = ()> {
 
     /// Run/execute the scene
     // async_fn_in_trait is stable since Rust 1.75. The lint is suppressed because
-    // the returned future is not required to be Send, which is intentional here —
+    // the returned future is not required to be Send, which is intentional here -
     // scene combinators propagate Send bounds at the impl level.
     #[allow(async_fn_in_trait)]
     async fn run(self, ctx: &Ctx) -> Result<SceneResult<Self::Output>, SceneError>
@@ -171,7 +171,7 @@ where
 ///
 /// Place this as the *outermost* combinator so that inner retry loops (e.g. [`LoopUntilQuit`])
 /// are themselves cancelled rather than restarted. When the token fires, the inner future is
-/// dropped at the next `await` point — no teardown is implicit here.
+/// dropped at the next `await` point - no teardown is implicit here.
 ///
 /// ```text
 /// game_scene
@@ -302,7 +302,7 @@ pub trait SceneExt<Ctx>: Scene<Ctx> + Sized {
     /// Run this scene, then use its output to construct and run the next scene.
     ///
     /// Unlike [`SceneExt::then`], the closure receives `Self::Output` and can build the next
-    /// scene dynamically — the only way to pass runtime data between scenes.
+    /// scene dynamically - the only way to pass runtime data between scenes.
     fn and_then<B, F>(self, f: F) -> AndThen<Self, B, F>
     where
         F: Fn(Self::Output) -> B,

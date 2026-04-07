@@ -9,10 +9,12 @@ use std::net::SocketAddr;
 mod macros;
 
 #[cfg(any(feature = "blocking", feature = "tokio"))]
+/// Address types for connecting to LFS.
 pub mod address;
 #[cfg(any(feature = "blocking", feature = "tokio"))]
+/// Builder for establishing an InSim connection.
 pub mod builder;
-#[doc(hidden)]
+/// Error type for InSim connection failures.
 pub mod error;
 pub mod identifiers;
 pub mod insim;

@@ -78,9 +78,9 @@ impl MiniGameManager {
                     },
 
                     (None, Ok(None)) => {
-                        // No event running — start idle if not already running.
+                        // No event running - start idle if not already running.
                         if idle_task.as_ref().map_or(true, |t| t.is_finished()) {
-                            tracing::info!("No active event — starting idle mode");
+                            tracing::info!("No active event - starting idle mode");
                             let cancel = CancellationToken::new();
                             idle_cancel = Some(cancel.clone());
                             let ctx_clone = MiniGameCtx {
@@ -217,7 +217,7 @@ impl MiniGameManager {
                             .unwrap_or_else(|| format!("{} / {}", event.track, event.layout));
                         let remaining = Duration::from_secs(secs as u64);
                         let msg = format!(
-                            "Upcoming: {} — {} on {} in {remaining:.0?}",
+                            "Upcoming: {} - {} on {} in {remaining:.0?}",
                             name, mode, event.track,
                         );
                         if let Err(e) = ctx.insim.send_message(msg, None).await {

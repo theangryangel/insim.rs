@@ -1,4 +1,4 @@
-//! ShortcutGame — MiniGame implementation for the shortcut/challenge mode.
+//! ShortcutGame - MiniGame implementation for the shortcut/challenge mode.
 
 mod challenge_loop;
 pub mod chat;
@@ -45,7 +45,7 @@ impl MiniGame for ShortcutGame {
                 layout: Some(self.layout.clone()),
                 mode_name: match &self.event_name {
                     Some(name) => {
-                        format!("{name} — Shortcut: find a faster path than your opponents!")
+                        format!("{name} - Shortcut: find a faster path than your opponents!")
                     },
                     None => "Shortcut: find a faster path than your opponents!".to_string(),
                 },

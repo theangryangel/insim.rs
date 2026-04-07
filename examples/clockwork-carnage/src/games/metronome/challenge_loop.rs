@@ -30,7 +30,7 @@ const METRONOME_HELP_LINES: &[&str] = &[
     " - Cross checkpoint 1 to start your timed attempt.",
     " - Reach the finish to record your delta from the target.",
     " - The smallest delta wins.",
-    " - Retry as many times as you like — no spec, no limit.",
+    " - Retry as many times as you like - no spec, no limit.",
     " - Platinum: ≤0.1s | Gold: ≤0.5s | Silver: ≤2s | Bronze: ≤5s",
     "",
     "Good luck.",
@@ -140,7 +140,7 @@ impl ui::Component for MetronomeView {
     }
 }
 
-/// Open-format metronome — runs indefinitely, players compete for closest delta to target.
+/// Open-format metronome - runs indefinitely, players compete for closest delta to target.
 #[derive(Clone)]
 pub struct ChallengeLoop {
     pub chat: chat::EventChat,

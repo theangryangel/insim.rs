@@ -218,7 +218,7 @@ fn build_altitudes(
         .collect()
 }
 
-/// Challenge mode — runs indefinitely, players compete for fastest time.
+/// Challenge mode - runs indefinitely, players compete for fastest time.
 #[derive(Clone)]
 pub struct ChallengeLoop {
     pub chat: chat::ChallengeChat,
