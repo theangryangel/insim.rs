@@ -91,7 +91,11 @@ impl ui::Component for BombView {
         } else {
             "Waiting".to_string()
         };
-        let status_style = if player.in_run { hud_active() } else { hud_muted() };
+        let status_style = if player.in_run {
+            hud_active()
+        } else {
+            hud_muted()
+        };
 
         let leaderboard_rows = bomb_scoreboard(&global.leaderboard, &player.uname);
 

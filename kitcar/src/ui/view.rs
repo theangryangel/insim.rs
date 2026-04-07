@@ -30,7 +30,6 @@ pub trait Component {
     fn render(&self, props: Self::Props<'_>) -> super::Node<Self::Message>;
 }
 
-
 /// Handle to request a redraw of the current view instance.
 #[derive(Clone, Debug)]
 pub struct InvalidateHandle {

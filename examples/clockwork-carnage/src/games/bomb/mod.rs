@@ -143,8 +143,7 @@ impl MiniGame for BombGame {
 
             for (i, s) in standings.iter().enumerate() {
                 let xp = position_xp(i);
-                if let Err(e) =
-                    db::award_xp(&ctx.pool, &s.uname, xp, "bomb", Some(event.id)).await
+                if let Err(e) = db::award_xp(&ctx.pool, &s.uname, xp, "bomb", Some(event.id)).await
                 {
                     tracing::warn!("Failed to award XP to {}: {e}", s.uname);
                 }

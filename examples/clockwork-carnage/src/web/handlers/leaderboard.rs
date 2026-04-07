@@ -2,10 +2,12 @@ use askama::Template;
 use axum::{extract::State, http::StatusCode, response::Html};
 
 use super::internal_error;
-use crate::web::filters;
 use crate::{
     db::{self, XpLeaderboardRow},
-    web::state::{AppState, PageCtx},
+    web::{
+        filters,
+        state::{AppState, PageCtx},
+    },
 };
 
 #[derive(Template)]

@@ -2,7 +2,7 @@
 
 pub mod chat;
 
-use kitcar::{ui, scenes::SceneError};
+use kitcar::{scenes::SceneError, ui};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 

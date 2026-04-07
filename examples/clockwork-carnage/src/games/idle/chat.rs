@@ -19,7 +19,10 @@ pub enum IdleChatMsg {
 
 pub type IdleChat = kitcar::chat::Chat<IdleChatMsg>;
 
-pub fn spawn(insim: InsimTask, pool: db::Pool) -> (IdleChat, tokio::task::JoinHandle<Result<(), ChatError>>) {
+pub fn spawn(
+    insim: InsimTask,
+    pool: db::Pool,
+) -> (IdleChat, tokio::task::JoinHandle<Result<(), ChatError>>) {
     kitcar::chat::spawn_with_handler(insim, 100, move |insim, mso, msg| {
         let pool = pool.clone();
         handle_idle_chat(insim, mso, msg, pool)
@@ -45,33 +48,31 @@ async fn handle_idle_chat(
                 insim.send_message(cmd, mso.ucid).await?;
             }
         },
-        IdleChatMsg::Next | IdleChatMsg::Upcoming => {
-            match db::next_scheduled_event(&pool).await {
-                Ok(Some((event, secs))) => {
-                    let mode = match &*event.mode {
-                        db::EventMode::Metronome { .. } => "Metronome",
-                        db::EventMode::Shortcut => "Shortcut",
-                        db::EventMode::Bomb { .. } => "Bomb",
-                    };
-                    let name = event
-                        .name
-                        .as_deref()
-                        .map(str::to_owned)
-                        .unwrap_or_else(|| format!("{} / {}", event.track, event.layout));
-                    insim
-                        .send_message(
-                            format!("Next event: {name} ({mode}) in {}", format_secs(secs)),
-                            mso.ucid,
-                        )
-                        .await?;
-                },
-                Ok(None) => {
-                    insim.send_message("No events scheduled.", mso.ucid).await?;
-                },
-                Err(e) => {
-                    tracing::warn!("Failed to query next scheduled event: {e}");
-                },
-            }
+        IdleChatMsg::Next | IdleChatMsg::Upcoming => match db::next_scheduled_event(&pool).await {
+            Ok(Some((event, secs))) => {
+                let mode = match &*event.mode {
+                    db::EventMode::Metronome { .. } => "Metronome",
+                    db::EventMode::Shortcut => "Shortcut",
+                    db::EventMode::Bomb { .. } => "Bomb",
+                };
+                let name = event
+                    .name
+                    .as_deref()
+                    .map(str::to_owned)
+                    .unwrap_or_else(|| format!("{} / {}", event.track, event.layout));
+                insim
+                    .send_message(
+                        format!("Next event: {name} ({mode}) in {}", format_secs(secs)),
+                        mso.ucid,
+                    )
+                    .await?;
+            },
+            Ok(None) => {
+                insim.send_message("No events scheduled.", mso.ucid).await?;
+            },
+            Err(e) => {
+                tracing::warn!("Failed to query next scheduled event: {e}");
+            },
         },
     }
     Ok(())
