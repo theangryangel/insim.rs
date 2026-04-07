@@ -164,7 +164,7 @@ pub async fn serve(
     listen: SocketAddr,
     pool: db::Pool,
     cfg: WebConfig,
-    presence: Option<kitcar::presence::Presence>,
+    presence: Option<insim_extras::presence::Presence>,
 ) -> anyhow::Result<()> {
     let redirect_uri = format!("{}/auth/callback", cfg.base_url);
     let oauth_client = build_oauth_client(&cfg.oauth_client_id, &redirect_uri)?;

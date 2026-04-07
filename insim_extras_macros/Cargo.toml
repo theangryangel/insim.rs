@@ -1,6 +1,6 @@
 [package]
-name = "kitcar_macros"
-version = "0.1.0"
+name = "insim_extras_macros"
+version = "0.1.0-unreleased"
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true

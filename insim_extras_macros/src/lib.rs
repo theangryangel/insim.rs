@@ -1,4 +1,4 @@
-//! Macros for the kitcar crate
+//! Macros for the insim_extras crate
 use darling::{FromDeriveInput, FromField, FromVariant, ast};
 use proc_macro::TokenStream;
 use quote::quote;
@@ -128,9 +128,9 @@ pub fn derive_command_parser(input: TokenStream) -> TokenStream {
                         let ty = &f.ty;
                         quote! {
                             let #name = args.get(#i)
-                                .ok_or_else(|| kitcar::chat::ParseError::MissingRequiredArg(#name_str.to_string()))?;
-                            let #name = <#ty as kitcar::chat::FromArg>::from_arg(#name)
-                                .map_err(|e| kitcar::chat::ParseError::InvalidArg(#name_str.to_string(), e))?;
+                                .ok_or_else(|| insim_extras::chat::ParseError::MissingRequiredArg(#name_str.to_string()))?;
+                            let #name = <#ty as insim_extras::chat::FromArg>::from_arg(#name)
+                                .map_err(|e| insim_extras::chat::ParseError::InvalidArg(#name_str.to_string(), e))?;
                         }
                     })
                     .collect();
@@ -142,9 +142,9 @@ pub fn derive_command_parser(input: TokenStream) -> TokenStream {
                         let inner_ty = f.option_inner();
                         quote! {
                             let #name = args.get(#i)
-                                .map(|s| <#inner_ty as kitcar::chat::FromArg>::from_arg(s))
+                                .map(|s| <#inner_ty as insim_extras::chat::FromArg>::from_arg(s))
                                 .transpose()
-                                .map_err(|e| kitcar::chat::ParseError::InvalidArg(stringify!(#name).to_string(), e))?;
+                                .map_err(|e| insim_extras::chat::ParseError::InvalidArg(stringify!(#name).to_string(), e))?;
                         }
                     })
                     .collect();
@@ -211,7 +211,7 @@ pub fn derive_command_parser(input: TokenStream) -> TokenStream {
             if let Some(stripped) = input.strip_prefix(#prefix_char) {
                 stripped
             } else {
-                return Err(kitcar::chat::ParseError::MissingPrefix(#prefix_char));
+                return Err(insim_extras::chat::ParseError::MissingPrefix(#prefix_char));
             }
         }
     } else {
@@ -225,12 +225,12 @@ pub fn derive_command_parser(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         #[allow(missing_docs)]
-        impl kitcar::chat::Parse for #enum_name {
-            fn parse(input: &str) -> Result<Self, kitcar::chat::ParseError> {
+        impl insim_extras::chat::Parse for #enum_name {
+            fn parse(input: &str) -> Result<Self, insim_extras::chat::ParseError> {
                 let input = input.trim();
 
                 if input.is_empty() {
-                    return Err(kitcar::chat::ParseError::EmptyInput);
+                    return Err(insim_extras::chat::ParseError::EmptyInput);
                 }
 
                 let input = #strip;
@@ -238,7 +238,7 @@ pub fn derive_command_parser(input: TokenStream) -> TokenStream {
                 let parts: Vec<&str> = input.split_whitespace().collect();
 
                 if parts.is_empty() {
-                    return Err(kitcar::chat::ParseError::EmptyInput);
+                    return Err(insim_extras::chat::ParseError::EmptyInput);
                 }
 
                 let cmd_name = parts[0];
@@ -246,7 +246,7 @@ pub fn derive_command_parser(input: TokenStream) -> TokenStream {
 
                 match cmd_name {
                     #(#match_arms,)*
-                    _ => Err(kitcar::chat::ParseError::UnknownCommand(cmd_name.to_string()))
+                    _ => Err(insim_extras::chat::ParseError::UnknownCommand(cmd_name.to_string()))
                 }
             }
 
@@ -262,7 +262,7 @@ pub fn derive_command_parser(input: TokenStream) -> TokenStream {
         }
 
         impl TryFrom<&insim::insim::Mso> for #enum_name {
-            type Error = kitcar::chat::ParseError;
+            type Error = insim_extras::chat::ParseError;
 
             fn try_from(value: &insim::insim::Mso) -> Result<Self, Self::Error> {
                 Self::parse(value.msg_from_textstart())

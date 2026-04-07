@@ -1,7 +1,7 @@
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 
 use insim::{core::vehicle::Vehicle, insim::BtnStyle};
-use kitcar::ui;
+use insim_extras::ui;
 
 use super::{
     format_duration,

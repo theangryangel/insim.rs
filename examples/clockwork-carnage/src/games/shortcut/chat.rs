@@ -1,12 +1,12 @@
 //! Challenge mode chat commands
 
 use insim::{builder::InsimTask, insim::Mso};
-use kitcar::chat::Parse;
+use insim_extras::chat::Parse;
 use tokio::task::JoinHandle;
 
 use crate::ChatError;
 
-#[derive(Debug, Clone, PartialEq, kitcar::chat::Parse)]
+#[derive(Debug, Clone, PartialEq, insim_extras::chat::Parse)]
 #[chat(prefix = '!')]
 /// Chat Commands
 pub enum ChallengeChatMsg {
@@ -16,10 +16,10 @@ pub enum ChallengeChatMsg {
     Alt,
 }
 
-pub type ChallengeChat = kitcar::chat::Chat<ChallengeChatMsg>;
+pub type ChallengeChat = insim_extras::chat::Chat<ChallengeChatMsg>;
 
 pub fn spawn(insim: InsimTask) -> (ChallengeChat, JoinHandle<Result<(), ChatError>>) {
-    kitcar::chat::spawn_with_handler(insim, 100, handle_challenge_chat)
+    insim_extras::chat::spawn_with_handler(insim, 100, handle_challenge_chat)
 }
 
 async fn handle_challenge_chat(

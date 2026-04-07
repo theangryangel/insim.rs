@@ -4,7 +4,7 @@ use insim::{
     identifiers::ConnectionId,
     insim::{Mal, Plc, PlcAllowedCarsSet},
 };
-use kitcar::scenes::SceneError;
+use insim_extras::scenes::SceneError;
 
 /// Apply vehicle restrictions to all connections (ucid=0 = global default).
 ///

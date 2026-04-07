@@ -10,7 +10,7 @@ use insim::{
     identifiers::{ConnectionId, PlayerId},
     insim::{ObjectInfo, Uco},
 };
-use kitcar::{
+use insim_extras::{
     presence,
     presence::PresenceEvent,
     scenes::{FromContext, Scene, SceneError, SceneResult},

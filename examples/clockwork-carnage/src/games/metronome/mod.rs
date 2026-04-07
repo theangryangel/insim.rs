@@ -6,7 +6,7 @@ pub mod chat;
 use std::time::Duration;
 
 pub use challenge_loop::ChallengeLoop;
-use kitcar::scenes::{Scene, SceneError, SceneExt, wait_for_players::WaitForPlayers};
+use insim_extras::scenes::{Scene, SceneError, SceneExt, wait_for_players::WaitForPlayers};
 use sqlx::types::Json;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;

@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use kitcar::ui;
+use insim_extras::ui;
 use tokio::{task::JoinHandle, time::Instant as TokioInstant};
 
 use super::theme::hud_text;

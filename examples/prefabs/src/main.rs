@@ -8,7 +8,7 @@ use insim::{
     identifiers::{ConnectionId, RequestId},
     insim::{Axm, BfnType, Cpp, ObjectInfo, PmoAction, PmoFlags, TinyType, TtcType},
 };
-use kitcar::ui::{Canvas, Component};
+use insim_extras::ui::{Canvas, Component};
 use tokio::time::{MissedTickBehavior, sleep};
 use tracing_subscriber::fmt::format::FmtSpan;
 

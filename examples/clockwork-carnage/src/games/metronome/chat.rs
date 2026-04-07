@@ -1,12 +1,12 @@
 //! Event mode chat commands
 
 use insim::{builder::InsimTask, insim::Mso};
-use kitcar::chat::Parse;
+use insim_extras::chat::Parse;
 use tokio::task::JoinHandle;
 
 use crate::ChatError;
 
-#[derive(Debug, Clone, PartialEq, kitcar::chat::Parse)]
+#[derive(Debug, Clone, PartialEq, insim_extras::chat::Parse)]
 #[chat(prefix = '!')]
 /// Chat Commands
 pub enum EventChatMsg {
@@ -16,10 +16,10 @@ pub enum EventChatMsg {
     Help,
 }
 
-pub type EventChat = kitcar::chat::Chat<EventChatMsg>;
+pub type EventChat = insim_extras::chat::Chat<EventChatMsg>;
 
 pub fn spawn(insim: InsimTask) -> (EventChat, JoinHandle<Result<(), ChatError>>) {
-    kitcar::chat::spawn_with_handler(insim, 100, handle_event_chat)
+    insim_extras::chat::spawn_with_handler(insim, 100, handle_event_chat)
 }
 
 async fn handle_event_chat(insim: InsimTask, mso: Mso, msg: EventChatMsg) -> Result<(), ChatError> {

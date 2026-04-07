@@ -6,10 +6,10 @@
 //!
 //! ```rust,ignore
 //! use insim::{builder::InsimTask, insim::Mso};
-//! use kitcar::chat::{self, Parse};
+//! use insim_extras::chat::{self, Parse};
 //! use tokio::task::JoinHandle;
 //!
-//! #[derive(Debug, Clone, PartialEq, kitcar::chat::Parse)]
+//! #[derive(Debug, Clone, PartialEq, insim_extras::chat::Parse)]
 //! #[chat(prefix = '!')]
 //! enum ChatMsg {
 //!     Start,
@@ -47,7 +47,7 @@
 use std::future::Future;
 
 use insim::{builder::InsimTask, identifiers::ConnectionId};
-pub use kitcar_macros::ParseChat as Parse;
+pub use insim_extras_macros::ParseChat as Parse;
 use tokio::{sync::broadcast, task::JoinHandle};
 
 use crate::{presence, scenes::SceneError};

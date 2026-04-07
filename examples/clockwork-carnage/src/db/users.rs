@@ -1,4 +1,4 @@
-use kitcar::presence::{Presence, PresenceEvent};
+use insim_extras::presence::{Presence, PresenceEvent};
 use sqlx::Row;
 use tokio::task::JoinHandle;
 
