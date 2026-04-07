@@ -3,7 +3,15 @@ use std::{fmt, ops::Deref};
 use bytes::{Buf, BufMut};
 use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 
-/// Unique Connection Identifier, commonly referred to as UCID in Insim.txt
+/// Unique Connection Identifier (UCID).
+///
+/// Assigned by LFS when a client connects and remains stable for the lifetime of that
+/// connection. Use [`ConnectionId::LOCAL`] (`0`) to refer to the host/local connection
+/// and [`ConnectionId::ALL`] (`255`) when targeting all connections.
+///
+/// Note: a connection is not the same as a player - a connection can spectate, join,
+/// pit, and rejoin. Each time it joins it gets a new [`super::PlayerId`], but the
+/// [`ConnectionId`] never changes.
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ConnectionId(pub u8);

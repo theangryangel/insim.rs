@@ -14,7 +14,7 @@ pub type MetronomeLeaderboard = Arc<[(String, String, Duration)]>;
 /// (uname, pname, vehicle, best_time)
 pub type ChallengeLeaderboard = Arc<[(String, String, Vehicle, Duration)]>;
 
-/// (uname, pname, checkpoint_count, survival_ms) — session best
+/// (uname, pname, checkpoint_count, survival_ms) - session best
 pub type BombLeaderboard = Arc<[(String, String, i64, i64)]>;
 
 fn row_style(uname: &str, current_uname: &str) -> BtnStyle {

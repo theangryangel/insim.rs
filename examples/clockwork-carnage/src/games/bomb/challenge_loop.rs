@@ -32,8 +32,8 @@ const BOMB_HELP_LINES: &[&str] = &[
     " - Each checkpoint shrinks the window: ^1next window = current window - penalty^7.",
     " - Hit a ^3finish^7 object to fully reset the window back to the base time.",
     " - ^1Resetting your car^7 deducts the penalty directly from your remaining time.",
-    " - ^1Pitting^7 ends your run immediately — commit to your fuel before you start.",
-    " - ^1Collisions^7 cost time — harder impacts cost more, up to the collision max penalty.",
+    " - ^1Pitting^7 ends your run immediately - commit to your fuel before you start.",
+    " - ^1Collisions^7 cost time - harder impacts cost more, up to the collision max penalty.",
     " - Score = checkpoints hit. Survival time breaks ties.",
     " - Your best run is recorded on the leaderboard.",
     "",
@@ -286,7 +286,7 @@ where
                             if let Some(res) = state.on_leave(info.plid) {
                                 let now = Instant::now();
                                 let survival_ms = res.run.survival_ms(now);
-                                let msg = format!("Run ended — left race after {} checkpoints.", res.run.checkpoints).red();
+                                let msg = format!("Run ended - left race after {} checkpoints.", res.run.checkpoints).red();
                                 insim.send_message(msg, res.run.ucid).await?;
                                 persist_run(&pool, self.session_id, &mut state, &res.run, survival_ms).await?;
                                 let active = state.active_runs_props();
@@ -319,7 +319,7 @@ where
                             if let Some(res) = state.on_reset(plid, Instant::now()) {
                                 insim.send_message(
                                     format!(
-                                        "PENALTY — -{:.2}s — {:.1}s left",
+                                        "PENALTY - -{:.2}s - {:.1}s left",
                                         res.penalty.as_secs_f64(),
                                         res.time_left.as_secs_f64()
                                     ).red(),
@@ -333,7 +333,7 @@ where
                             if let Some(res) = state.on_pit(plid) {
                                 let now = Instant::now();
                                 let survival_ms = res.run.survival_ms(now);
-                                let msg = format!("PITTED — run ended after {} checkpoints. Commit to your fuel before the run.", res.run.checkpoints).red();
+                                let msg = format!("PITTED - run ended after {} checkpoints. Commit to your fuel before the run.", res.run.checkpoints).red();
                                 insim.send_message(msg, res.run.ucid).await?;
                                 presence.spec(res.run.ucid).await.map_err(|cause| SceneError::Custom {
                                     scene: "bomb::pit::spec",
@@ -354,7 +354,7 @@ where
                                 if let Some(res) = state.on_collision(plid, spclose.to_meters_per_sec(), now) {
                                     insim.send_message(
                                         format!(
-                                            "PENALTY — -{:.2}s — {:.1}s left",
+                                            "PENALTY - -{:.2}s - {:.1}s left",
                                             res.penalty.as_secs_f64(),
                                             res.time_left.as_secs_f64()
                                         ).red(),
@@ -387,7 +387,7 @@ where
                                         state::CheckpointResult::Refreshed { ucid, checkpoints, new_window } => {
                                             let new_secs = new_window.as_secs_f64();
                                             insim.send_message(
-                                                format!("FINISH — checkpoint {checkpoints} — REFRESHED {new_secs:.1}s").yellow(),
+                                                format!("FINISH - checkpoint {checkpoints} - REFRESHED {new_secs:.1}s").yellow(),
                                                 ucid
                                             ).await?;
                                         },
@@ -395,7 +395,7 @@ where
                                             let new_secs = time_left.as_secs_f64();
                                             insim.send_message(
                                                 format!(
-                                                    "checkpoint {checkpoints} — -{:.2}s — {new_secs:.1}s left",
+                                                    "checkpoint {checkpoints} - -{:.2}s - {new_secs:.1}s left",
                                                     penalty.as_secs_f64()
                                                 )
                                                 .light_green(),
@@ -425,7 +425,7 @@ where
                         let survival_ms = res.run.survival_ms(now);
                         let n = res.run.checkpoints;
                         let survival_secs = survival_ms as f64 / 1000.0;
-                        let msg = format!("BOOM — {n} checkpoints, {survival_secs:.1}s").red();
+                        let msg = format!("BOOM - {n} checkpoints, {survival_secs:.1}s").red();
                         insim.send_message(msg, res.run.ucid).await?;
                         presence.spec(res.run.ucid).await.map_err(|cause| SceneError::Custom {
                                 scene: "bomb::tick::spec",

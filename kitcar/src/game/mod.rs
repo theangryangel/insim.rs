@@ -356,7 +356,7 @@ impl Game {
             .await
     }
 
-    /// Total restart — removes all connections.
+    /// Total restart - removes all connections.
     pub async fn reinit(&self) -> Result<(), GameError> {
         let (response_tx, rx) = oneshot::channel();
         self.send_command(GameMessage::Reinit { response_tx }, rx)

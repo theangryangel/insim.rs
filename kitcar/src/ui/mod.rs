@@ -105,7 +105,7 @@ where
 /// #[derive(Clone)]
 /// struct Props { global: GameState, player: PlayerState }
 ///
-/// // Props<'a> can be a tuple — no combined struct or From impl needed:
+/// // Props<'a> can be a tuple - no combined struct or From impl needed:
 /// impl Component for MyView {
 ///     type Props<'a> = (&'a GameState, &'a PlayerState);
 ///     type Message = MyMsg;
@@ -292,7 +292,7 @@ where
                         },
                         None => {
                             // All message senders dropped, but we don't
-                            // shut down here—lifecycle is tied to connection_props_rx.
+                            // shut down here-lifecycle is tied to connection_props_rx.
                             view_msg_rx_closed = true;
                         }
                     },

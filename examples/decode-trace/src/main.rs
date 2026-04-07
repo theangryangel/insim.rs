@@ -34,7 +34,7 @@ fn parse_escape_sequences(s: &str) -> Result<Vec<u8>, String> {
     let mut chars = s.chars().peekable();
     while let Some(c) = chars.next() {
         if c != '\\' {
-            // literal byte — only accept printable ASCII here
+            // literal byte - only accept printable ASCII here
             if c.is_ascii() {
                 out.push(c as u8);
             } else {
@@ -116,7 +116,7 @@ fn main() {
     eprintln!("--- input ({} bytes): {:02x?}", raw.len(), raw);
     eprintln!("--- decode trace:");
 
-    // Skip the framing size byte (byte 0) — it isn't part of the Packet encoding.
+    // Skip the framing size byte (byte 0) - it isn't part of the Packet encoding.
     // Packet::decode expects: [type_byte, reqi, ...payload...]
     let mut buf = Bytes::copy_from_slice(&raw[1..]);
     let mut ctx = DecodeContext::new(&mut buf);

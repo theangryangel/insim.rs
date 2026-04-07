@@ -57,7 +57,7 @@ impl PlcAllowedCarsSet {
         | Self::BWM_SAUBER_F1_06
         | Self::FORMULA_BMW_FB02;
 
-    /// A set containing all 20 standard vehicles — use this to remove all car restrictions.
+    /// A set containing all 20 standard vehicles - use this to remove all car restrictions.
     pub fn all() -> Self {
         Self::from_bits_truncate(Self::ALL)
     }

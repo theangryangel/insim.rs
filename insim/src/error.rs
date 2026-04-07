@@ -2,7 +2,12 @@ use bytes::Bytes;
 
 #[non_exhaustive]
 #[derive(thiserror::Error, Debug)]
-/// The Errors that may occur during an Insim connection.
+/// Errors that may occur during an InSim connection.
+///
+/// Most variants are fatal - once returned, the connection is no longer usable and you
+/// should reconnect via [`crate::builder::Builder`]. The exceptions are [`Error::Encode`],
+/// [`Error::VehicleNotAMod`], and [`Error::VehicleNotStandard`], which indicate a problem
+/// with a packet you tried to send and leave the connection intact.
 pub enum Error {
     /// Connection is disconnected
     #[error("Disconnected")]
@@ -41,9 +46,12 @@ pub enum Error {
     /// Decode Error
     #[error("Decode error {error} at offset {offset}: {:?}", input.as_ref())]
     Decode {
+        /// Byte offset within the packet where decoding failed.
         offset: usize,
+        /// The raw bytes of the packet that could not be decoded.
         input: Bytes,
         #[source]
+        /// The underlying decode error.
         error: insim_core::DecodeError,
     },
 
@@ -57,6 +65,7 @@ pub enum Error {
         remaining: Bytes,
     },
 
+    /// The background task spawned via [`crate::builder::Builder::spawn`] has exited.
     #[cfg(feature = "tokio")]
     #[error("Unable to send to the spawned insim connection. Task died?")]
     SpawnedDead,

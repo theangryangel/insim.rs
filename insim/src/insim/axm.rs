@@ -92,7 +92,7 @@ pub enum PmoAction {
 
     /// User pressed 'O' without anything selected; reports current editor position.
     ///
-    /// Information only — no object is added. Only `xyz` and `heading` are meaningful.
+    /// Information only - no object is added. Only `xyz` and `heading` are meaningful.
     Position {
         /// Position of the editor cursor.
         xyz: ObjectCoordinate,

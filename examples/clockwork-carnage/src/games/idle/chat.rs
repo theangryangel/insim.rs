@@ -9,11 +9,11 @@ use crate::{ChatError, db};
 #[chat(prefix = '!')]
 /// Chat Commands
 pub enum IdleChatMsg {
-    /// Help — about Clockwork Carnage and available commands
+    /// Help - about Clockwork Carnage and available commands
     Help,
-    /// Next — show the next scheduled event
+    /// Next - show the next scheduled event
     Next,
-    /// Upcoming — show the next scheduled event
+    /// Upcoming - show the next scheduled event
     Upcoming,
 }
 

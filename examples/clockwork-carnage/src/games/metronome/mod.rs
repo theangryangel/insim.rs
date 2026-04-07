@@ -1,4 +1,4 @@
-//! MetronomeGame — open-format precision challenge.
+//! MetronomeGame - open-format precision challenge.
 
 mod challenge_loop;
 pub mod chat;
@@ -47,7 +47,7 @@ impl MiniGame for MetronomeGame {
                 layout: Some(self.layout.clone()),
                 mode_name: match &self.event_name {
                     Some(name) => format!(
-                        "{name} — Metronome: match the target lap time as closely as possible!"
+                        "{name} - Metronome: match the target lap time as closely as possible!"
                     ),
                     None => {
                         "Metronome: match the target lap time as closely as possible!".to_string()

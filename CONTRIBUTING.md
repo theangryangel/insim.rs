@@ -30,8 +30,8 @@ around it. Some contributors may have differing opinions about the issue,
 including whether the behavior being seen is a bug or a feature. This discussion
 is part of the process and should be kept focused, helpful, and professional.
 
-Short, clipped responses—that provide neither additional context nor supporting
-detail—are not helpful or professional. To many, such responses are simply
+Short, clipped responses-that provide neither additional context nor supporting
+detail-are not helpful or professional. To many, such responses are simply
 annoying and unfriendly.
 
 ## Resolving a Bug Report
@@ -52,6 +52,17 @@ workflow that ensures that the proposed changes meet the minimal quality.
   pip install pre-commit
   pre-commit run --all
   ```
+
+## AI / LLM usage
+
+Contributions made with the assistance of AI tools are welcome, but contributors must use them
+responsibly and disclose that use clearly.
+
+We welcome new contributors, but cannot sustain the effort of supporting contributors who
+primarily defer to AI rather than engaging substantively with the review process.
+
+AI has been used predominately within the codebase to improve documentation and
+examples, and we would prefer that it remains limited to this scope.
 
 ## Behaviour and Code of Conduct
 

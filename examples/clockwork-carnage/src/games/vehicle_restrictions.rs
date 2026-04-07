@@ -15,15 +15,15 @@ use kitcar::scenes::SceneError;
 /// - Empty slice → no restrictions at all: `Plc` with all cars enabled, empty `Mal`.
 /// - Non-empty slice → whitelist: only the listed vehicles are allowed.
 ///   Standard cars not in the list are blocked via `Plc`; mods not in the list are blocked via `Mal`.
-///   If the slice contains only mods (no standard cars), `Plc` sends `bits=0` — no standard cars allowed.
+///   If the slice contains only mods (no standard cars), `Plc` sends `bits=0` - no standard cars allowed.
 pub async fn apply(insim: &InsimTask, vehicles: &[Vehicle]) -> Result<(), SceneError> {
     let mut mal = Mal::default();
 
     let cars = if vehicles.is_empty() {
-        // No restriction — allow all standard cars.
+        // No restriction - allow all standard cars.
         PlcAllowedCarsSet::all()
     } else {
-        // Whitelist — only the specified standard cars.
+        // Whitelist - only the specified standard cars.
         let mut cars = PlcAllowedCarsSet::default();
         for v in vehicles {
             match v {

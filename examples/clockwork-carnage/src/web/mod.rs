@@ -92,7 +92,7 @@ impl AuthnBackend for Backend {
         &self,
         creds: Self::Credentials,
     ) -> Result<Option<Self::User>, Self::Error> {
-        // Exchange code for token via raw POST — LFS returns text/html Content-Type
+        // Exchange code for token via raw POST - LFS returns text/html Content-Type
         // even for JSON responses, so we bypass the oauth2 crate's content-type check.
         let resp = self
             .http_client

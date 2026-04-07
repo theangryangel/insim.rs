@@ -1,4 +1,4 @@
-//! IdleGame — runs between scheduled events.
+//! IdleGame - runs between scheduled events.
 
 pub mod chat;
 

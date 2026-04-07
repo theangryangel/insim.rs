@@ -1,4 +1,4 @@
-//! BombGame — MiniGame implementation for bomb/countdown mode.
+//! BombGame - MiniGame implementation for bomb/countdown mode.
 
 mod challenge_loop;
 pub mod chat;
@@ -49,7 +49,7 @@ impl MiniGame for BombGame {
                 layout: Some(self.layout.clone()),
                 mode_name: match &self.event_name {
                     Some(name) => {
-                        format!("{name} — Bomb: hit every checkpoint before the clock runs out!")
+                        format!("{name} - Bomb: hit every checkpoint before the clock runs out!")
                     },
                     None => "Bomb: hit every checkpoint before the clock runs out!".to_string(),
                 },
