@@ -12,7 +12,7 @@ use insim::{
 use insim_extras::{
     presence,
     presence::PresenceEvent,
-    scenes::{FromContext, Scene, SceneError, SceneResult},
+    scenes::{FromContext, Scene, IntoSceneError as _, SceneError, SceneResult},
     ui::{self, Component},
 };
 
@@ -212,10 +212,7 @@ impl ChallengeLoopInner {
             .presence
             .connections()
             .await
-            .map_err(|cause| SceneError::Custom {
-                scene: "metronome::init::connections",
-                cause: Box::new(cause),
-            })?
+            .scene_err("metronome::init::connections")?
             .into_iter()
             .map(|c| (c.ucid, c))
             .collect();
@@ -223,10 +220,7 @@ impl ChallengeLoopInner {
             .presence
             .players()
             .await
-            .map_err(|cause| SceneError::Custom {
-                scene: "metronome::init::players",
-                cause: Box::new(cause),
-            })?
+            .scene_err("metronome::init::players")?
             .into_iter()
             .map(|p| (p.plid, p))
             .collect();
@@ -316,10 +310,7 @@ impl ChallengeLoopInner {
                                                 tracing::warn!("Failed to persist metronome lap: {e}");
                                             }
 
-                                            self.presence.spec(conn.ucid).await.map_err(|cause| SceneError::Custom {
-                                                scene: "metronome::spec",
-                                                cause: Box::new(cause),
-                                            })?;
+                                            self.presence.spec(conn.ucid).await.scene_err("metronome::spec")?;
 
                                             let prev_best = self.personal_best(&conn.uname).await?;
                                             let is_pb = match prev_best {
@@ -374,10 +365,7 @@ impl ChallengeLoopInner {
     async fn metronome_leaderboard(&self) -> Result<MetronomeLeaderboard, SceneError> {
         let rows = db::metronome_standings(&self.db, self.session_id)
             .await
-            .map_err(|cause| SceneError::Custom {
-                scene: "metronome::metronome_leaderboard",
-                cause: Box::new(cause),
-            })?;
+            .scene_err("metronome::metronome_leaderboard")?;
 
         Ok(rows
             .into_iter()
@@ -395,10 +383,7 @@ impl ChallengeLoopInner {
     async fn personal_best(&self, uname: &str) -> Result<Option<Duration>, SceneError> {
         let ms = db::metronome_personal_best(&self.db, self.session_id, uname)
             .await
-            .map_err(|cause| SceneError::Custom {
-                scene: "metronome::personal_best",
-                cause: Box::new(cause),
-            })?;
+            .scene_err("metronome::personal_best")?;
 
         Ok(ms.map(|v| Duration::from_millis(v as u64)))
     }

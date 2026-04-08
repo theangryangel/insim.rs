@@ -11,8 +11,9 @@ use sqlx::types::Json;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-use super::{MiniGame, MiniGameCtx, setup_track};
+use super::{MiniGame, MiniGameCtx, ordinal, position_xp, setup_track};
 use crate::{ChatError, MIN_PLAYERS, db};
+use insim_extras::scenes::IntoSceneError as _;
 
 pub struct MetronomeGame {
     pub session_id: i64,
@@ -99,17 +100,11 @@ impl MiniGame for MetronomeGame {
     async fn teardown(&self, event: &db::Event, ctx: &MiniGameCtx) -> Result<(), SceneError> {
         db::complete_event(&ctx.pool, event.id)
             .await
-            .map_err(|cause| SceneError::Custom {
-                scene: "metronome::teardown",
-                cause: Box::new(cause),
-            })?;
+            .scene_err("metronome::teardown")?;
 
         let standings = db::metronome_standings(&ctx.pool, event.id)
             .await
-            .map_err(|cause| SceneError::Custom {
-                scene: "metronome::teardown::standings",
-                cause: Box::new(cause),
-            })?;
+            .scene_err("metronome::teardown::standings")?;
 
         if !standings.is_empty() {
             let parts: Vec<String> = standings
@@ -139,22 +134,3 @@ impl MiniGame for MetronomeGame {
     }
 }
 
-fn position_xp(rank: usize) -> i64 {
-    match rank {
-        0 => 100,
-        1 => 75,
-        2 => 50,
-        3..=9 => 25,
-        _ => 10,
-    }
-}
-
-fn ordinal(n: usize) -> String {
-    let suffix = match n % 10 {
-        1 if n % 100 != 11 => "st",
-        2 if n % 100 != 12 => "nd",
-        3 if n % 100 != 13 => "rd",
-        _ => "th",
-    };
-    format!("{n}{suffix}")
-}

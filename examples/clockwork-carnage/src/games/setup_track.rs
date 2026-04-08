@@ -1,7 +1,7 @@
 use insim::{builder::InsimTask, core::track::Track, insim::RaceLaps};
 use insim_extras::{
     game, presence,
-    scenes::{FromContext, Scene, SceneError, SceneResult},
+    scenes::{FromContext, Scene, IntoSceneError as _, SceneError, SceneResult},
     ui,
 };
 
@@ -63,17 +63,11 @@ where
                 0,
                 self.layout.clone(),
             ) => {
-                res.map_err(|cause| SceneError::Custom {
-                    scene: "setup_track::track_rotation",
-                    cause: Box::new(cause),
-                })?;
+                res.scene_err("setup_track::track_rotation")?;
                 Ok(SceneResult::Continue(()))
             },
             res = presence.wait_for_connection_count(|val| val < self.min_players, std::time::Duration::from_millis(500)) => {
-                let _ = res.map_err(|cause| SceneError::Custom {
-                    scene: "setup_track::wait_for_connection_count",
-                    cause: Box::new(cause),
-                })?;
+                let _ = res.scene_err("setup_track::wait_for_connection_count")?;
                 tracing::info!("Lost players during track setup");
                 Ok(SceneResult::bail_with("Lost players during SetupTrack"))
             }

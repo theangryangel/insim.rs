@@ -345,3 +345,28 @@ pub trait SceneExt<Ctx>: Scene<Ctx> + Sized {
 }
 
 impl<T: Scene<Ctx>, Ctx> SceneExt<Ctx> for T {}
+
+/// Extension trait that adds `.scene_err(scene_name)` to any `Result`.
+///
+/// Converts a generic error into [`SceneError::Custom`] with a static scene label, eliminating
+/// the multi-line `map_err(|cause| SceneError::Custom { scene, cause: Box::new(cause) })` pattern.
+///
+/// # Example
+/// ```ignore
+/// use insim_extras::scenes::IntoSceneError as _;
+///
+/// presence.spec(ucid).await.scene_err("my_game::tick::spec")?;
+/// ```
+pub trait IntoSceneError<T> {
+    /// Wrap the error as [`SceneError::Custom`] labelled with `scene`.
+    fn scene_err(self, scene: &'static str) -> Result<T, SceneError>;
+}
+
+impl<T, E: std::error::Error + Send + Sync + 'static> IntoSceneError<T> for Result<T, E> {
+    fn scene_err(self, scene: &'static str) -> Result<T, SceneError> {
+        self.map_err(|cause| SceneError::Custom {
+            scene,
+            cause: Box::new(cause),
+        })
+    }
+}
