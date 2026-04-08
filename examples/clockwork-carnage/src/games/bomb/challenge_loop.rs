@@ -13,7 +13,7 @@ use insim::{
 use insim_extras::{
     presence,
     presence::PresenceEvent,
-    scenes::{FromContext, Scene, SceneError, SceneResult},
+    scenes::{FromContext, Scene, IntoSceneError as _, SceneError, SceneResult},
     ui::{self, Component},
 };
 
@@ -235,20 +235,14 @@ where
         let mut connections: HashMap<ConnectionId, presence::ConnectionInfo> = presence
             .connections()
             .await
-            .map_err(|cause| SceneError::Custom {
-                scene: "bomb::init::connections",
-                cause: Box::new(cause),
-            })?
+            .scene_err("bomb::init::connections")?
             .into_iter()
             .map(|c| (c.ucid, c))
             .collect();
         let mut players: HashMap<PlayerId, presence::PlayerInfo> = presence
             .players()
             .await
-            .map_err(|cause| SceneError::Custom {
-                scene: "bomb::init::players",
-                cause: Box::new(cause),
-            })?
+            .scene_err("bomb::init::players")?
             .into_iter()
             .map(|p| (p.plid, p))
             .collect();
@@ -335,10 +329,7 @@ where
                                 let survival_ms = res.run.survival_ms(now);
                                 let msg = format!("PITTED - run ended after {} checkpoints. Commit to your fuel before the run.", res.run.checkpoints).red();
                                 insim.send_message(msg, res.run.ucid).await?;
-                                presence.spec(res.run.ucid).await.map_err(|cause| SceneError::Custom {
-                                    scene: "bomb::pit::spec",
-                                    cause: Box::new(cause),
-                                })?;
+                                presence.spec(res.run.ucid).await.scene_err("bomb::pit::spec")?;
                                 persist_run(&pool, self.session_id, &mut state, &res.run, survival_ms).await?;
                                 let active = state.active_runs_props();
                                 ui.assign(BombGlobalProps { leaderboard: state.leaderboard.clone(), active_runs: active, event_url: event_url.clone() });
@@ -427,10 +418,7 @@ where
                         let survival_secs = survival_ms as f64 / 1000.0;
                         let msg = format!("BOOM - {n} checkpoints, {survival_secs:.1}s").red();
                         insim.send_message(msg, res.run.ucid).await?;
-                        presence.spec(res.run.ucid).await.map_err(|cause| SceneError::Custom {
-                                scene: "bomb::tick::spec",
-                                cause: Box::new(cause),
-                            })?;
+                        presence.spec(res.run.ucid).await.scene_err("bomb::tick::spec")?;
                         persist_run(&pool, self.session_id, &mut state, &res.run, survival_ms).await?;
                         let active = state.active_runs_props();
                         ui.assign(BombGlobalProps { leaderboard: state.leaderboard.clone(), active_runs: active, event_url: event_url.clone() });
@@ -453,10 +441,7 @@ async fn reload_leaderboard(
 ) -> Result<(), SceneError> {
     let rows = db::bomb_best_runs(pool, session_id)
         .await
-        .map_err(|cause| SceneError::Custom {
-            scene: "bomb::reload_leaderboard",
-            cause: Box::new(cause),
-        })?;
+        .scene_err("bomb::reload_leaderboard")?;
     state.leaderboard = rows
         .into_iter()
         .map(|r| (r.uname, r.pname, r.checkpoint_count, r.survival_ms))

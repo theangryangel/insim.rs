@@ -14,6 +14,26 @@ use insim_extras::{
     game, presence,
     scenes::{FromContext, SceneError},
 };
+
+pub(super) fn position_xp(rank: usize) -> i64 {
+    match rank {
+        0 => 100,
+        1 => 75,
+        2 => 50,
+        3..=9 => 25,
+        _ => 10,
+    }
+}
+
+pub(super) fn ordinal(n: usize) -> String {
+    let suffix = match n % 10 {
+        1 if n % 100 != 11 => "st",
+        2 if n % 100 != 12 => "nd",
+        3 if n % 100 != 13 => "rd",
+        _ => "th",
+    };
+    format!("{n}{suffix}")
+}
 pub use manager::MiniGameManager;
 use tokio_util::sync::CancellationToken;
 

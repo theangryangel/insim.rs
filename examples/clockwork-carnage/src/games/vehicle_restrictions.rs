@@ -4,7 +4,7 @@ use insim::{
     identifiers::ConnectionId,
     insim::{Mal, Plc, PlcAllowedCarsSet},
 };
-use insim_extras::scenes::SceneError;
+use insim_extras::scenes::{IntoSceneError as _, SceneError};
 
 /// Apply vehicle restrictions to all connections (ucid=0 = global default).
 ///
@@ -45,15 +45,9 @@ pub async fn apply(insim: &InsimTask, vehicles: &[Vehicle]) -> Result<(), SceneE
             ..Plc::default()
         })
         .await
-        .map_err(|cause| SceneError::Custom {
-            scene: "vehicle_restrictions::plc",
-            cause: Box::new(cause),
-        })?;
+        .scene_err("vehicle_restrictions::plc")?;
 
-    insim.send(mal).await.map_err(|cause| SceneError::Custom {
-        scene: "vehicle_restrictions::mal",
-        cause: Box::new(cause),
-    })?;
+    insim.send(mal).await.scene_err("vehicle_restrictions::mal")?;
 
     Ok(())
 }

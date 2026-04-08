@@ -13,7 +13,7 @@ use insim::{
 use insim_extras::{
     presence,
     presence::PresenceEvent,
-    scenes::{FromContext, Scene, SceneError, SceneResult},
+    scenes::{FromContext, Scene, IntoSceneError as _, SceneError, SceneResult},
     ui::{self, Component},
 };
 
@@ -293,10 +293,7 @@ impl ChallengeLoopInner {
             .presence
             .connections()
             .await
-            .map_err(|cause| SceneError::Custom {
-                scene: "shortcut::init::connections",
-                cause: Box::new(cause),
-            })?
+            .scene_err("shortcut::init::connections")?
             .into_iter()
             .map(|c| (c.ucid, c))
             .collect();
@@ -304,10 +301,7 @@ impl ChallengeLoopInner {
             .presence
             .players()
             .await
-            .map_err(|cause| SceneError::Custom {
-                scene: "shortcut::init::players",
-                cause: Box::new(cause),
-            })?
+            .scene_err("shortcut::init::players")?
             .into_iter()
             .map(|p| (p.plid, p))
             .collect();
@@ -428,10 +422,7 @@ impl ChallengeLoopInner {
                                                 tracing::warn!("Failed to persist challenge time: {e}");
                                             }
 
-                                            self.presence.spec(conn.ucid).await.map_err(|cause| SceneError::Custom {
-                                                scene: "shortcut::spec",
-                                                cause: Box::new(cause),
-                                            })?;
+                                            self.presence.spec(conn.ucid).await.scene_err("shortcut::spec")?;
 
                                             if is_pb {
                                                 self.insim
@@ -495,10 +486,7 @@ impl ChallengeLoopInner {
     async fn challenge_leaderboard(&self) -> Result<ChallengeLeaderboard, SceneError> {
         let rows = db::shortcut_best_times(&self.db, self.session_id)
             .await
-            .map_err(|cause| SceneError::Custom {
-                scene: "challenge::challenge_leaderboard",
-                cause: Box::new(cause),
-            })?;
+            .scene_err("challenge::challenge_leaderboard")?;
 
         Ok(rows
             .into_iter()
@@ -514,10 +502,7 @@ impl ChallengeLoopInner {
     async fn personal_best(&self, uname: &str) -> Result<Option<Duration>, SceneError> {
         let row = db::shortcut_personal_best(&self.db, self.session_id, uname)
             .await
-            .map_err(|cause| SceneError::Custom {
-                scene: "challenge::personal_best",
-                cause: Box::new(cause),
-            })?;
+            .scene_err("challenge::personal_best")?;
 
         Ok(row.map(|r| Duration::from_millis(r.time_ms as u64)))
     }
