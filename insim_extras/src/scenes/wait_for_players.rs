@@ -3,7 +3,7 @@
 
 use insim::builder::InsimTask;
 
-use super::{FromContext, Scene, SceneError, SceneResult};
+use super::{FromContext, IntoSceneError as _, Scene, SceneError, SceneResult};
 use crate::presence;
 
 /// Wait for minimum players to connect
@@ -36,10 +36,7 @@ where
                     }
                 }
                 res = presence.wait_for_connection_count(|val| val >= self.min_players, std::time::Duration::from_millis(500)) => {
-                    let _ = res.map_err(|cause| SceneError::Custom {
-                        scene: "wait_for_players::wait_for_connection_count",
-                        cause: Box::new(cause),
-                    })?;
+                    let _ = res.scene_err("wait_for_players::wait_for_connection_count")?;
                     tracing::info!("Got minimum player count!");
                     return Ok(SceneResult::Continue(()));
                 }
