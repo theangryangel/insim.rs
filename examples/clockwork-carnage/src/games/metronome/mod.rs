@@ -6,7 +6,7 @@ pub mod chat;
 use std::time::Duration;
 
 pub use challenge_loop::ChallengeLoop;
-use insim_extras::scenes::{Scene, SceneError, SceneExt, wait_for_players::WaitForPlayers};
+use insim_extras::scenes::{Scene, SceneError, SceneExt, SceneResult, wait_for_players::WaitForPlayers};
 use sqlx::types::Json;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -41,6 +41,13 @@ impl MiniGame for MetronomeGame {
         let challenge_scene = WaitForPlayers {
             min_players: MIN_PLAYERS,
         }
+        .then(|ctx: &MiniGameCtx| {
+            let insim = ctx.insim.clone();
+            async move {
+                let _ = insim.send_message("Get ready!", None).await;
+                Ok(SceneResult::Continue(()))
+            }
+        })
         .then(
             setup_track::SetupTrack {
                 min_players: MIN_PLAYERS,

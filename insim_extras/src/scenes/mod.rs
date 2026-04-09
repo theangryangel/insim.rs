@@ -1,6 +1,6 @@
 //! Orchestrate layers/scenes of a game. Each scene is long lived and delegates in a waterfall
 //! manner and can optionally automatically recover.
-use std::{marker::PhantomData, time::Duration};
+use std::{marker::PhantomData, time::Duration, future::Future};
 
 pub use tokio_util::sync::CancellationToken;
 
@@ -30,6 +30,20 @@ pub trait Scene<Ctx = ()> {
     async fn run(self, ctx: &Ctx) -> Result<SceneResult<Self::Output>, SceneError>
     where
         Self: Sized;
+}
+
+/// Blanket implementation for any function that can be automatically turned into a Scene.
+impl<F, Fut, Ctx, Output> Scene<Ctx> for F
+where
+    F: Fn(&Ctx) -> Fut + Clone + Send + 'static,
+    Fut: Future<Output = Result<SceneResult<Output>, SceneError>> + Send,
+    Ctx: Sync,
+    Output: Send + 'static,
+{
+    type Output = Output;
+    async fn run(self, ctx: &Ctx) -> Result<SceneResult<Self::Output>, SceneError> {
+        self(ctx).await
+    }
 }
 
 #[derive(Debug)]
