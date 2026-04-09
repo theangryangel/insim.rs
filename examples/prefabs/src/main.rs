@@ -10,7 +10,6 @@ use insim::{
 };
 use insim_extras::ui::{Canvas, Component};
 use tokio::time::{MissedTickBehavior, sleep};
-use tracing_subscriber::fmt::format::FmtSpan;
 
 mod tools;
 mod ui;
