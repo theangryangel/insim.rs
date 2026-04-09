@@ -1,6 +1,5 @@
-//! High level example
-//! This example showcases the shortcut methods
-use std::{net::SocketAddr, time::Duration};
+#![doc = include_str!("../README.md")]
+use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
 use clap::Parser;
 use insim::{
@@ -8,8 +7,7 @@ use insim::{
     identifiers::PlayerId,
     insim::{LclFlags, TinyType},
 };
-use tokio::time::interval;
-use tracing_subscriber::fmt::format::FmtSpan;
+use serde::Deserialize;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -18,54 +16,66 @@ struct Cli {
     /// host:port of LFS to connect to
     addr: SocketAddr,
 
-    /// interval
-    interval: Option<u64>,
+    /// path to YAML sequence file
+    file: PathBuf,
 }
 
-struct ReversibleSequence<T> {
-    sequence: Vec<T>,
-    index: usize,
-    reverse: bool,
+/// One step in the light sequence.
+///
+/// `flags` is a `|`-separated list of [`LclFlags`] names, e.g.
+/// `SIGNAL_LEFT | LIGHT_OFF | FOG_FRONT_OFF | FOG_REAR_OFF`.
+#[derive(Deserialize)]
+struct StepConfig {
+    duration_ms: u64,
+    flags: LclFlags,
 }
 
-impl<T: Copy> ReversibleSequence<T> {
-    fn new(sequence: Vec<T>) -> Self {
-        ReversibleSequence {
-            sequence,
-            index: 0,
-            reverse: false,
+/// The top-level structure of the YAML file.
+#[derive(Deserialize)]
+struct Config {
+    steps: Vec<StepConfig>,
+}
+
+/// Extension trait to extract the `plid` from packets that carry one,
+/// letting us handle [`Packet::Pll`] and [`Packet::Plp`] in a single arm.
+trait PacketExt {
+    fn plid(&self) -> Option<PlayerId>;
+}
+
+impl PacketExt for Packet {
+    fn plid(&self) -> Option<PlayerId> {
+        match self {
+            Self::Plp(p) => Some(p.plid),
+            Self::Pll(p) => Some(p.plid),
+            _ => None,
         }
-    }
-
-    fn next(&mut self) -> &T {
-        if self.index >= self.sequence.len() {
-            self.reverse = !self.reverse;
-            self.index = 0;
-        }
-
-        let result = if self.reverse {
-            self.sequence.get(self.sequence.len() - 1 - self.index)
-        } else {
-            self.sequence.get(self.index)
-        };
-
-        self.index += 1;
-        result.unwrap()
     }
 }
 
 #[tokio::main]
 pub async fn main() -> Result<()> {
-    // Setup tracing_subcriber with some sane defaults
     tracing_subscriber::fmt::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
         .init();
 
-    // Parse our command line arguments, using clap
     let cli = Cli::parse();
 
-    // Establish a connection
+    // Read and parse the YAML sequence file. LclFlags deserialises from a
+    // `|`-separated string of flag names via the bitflags serde integration.
+    let content = std::fs::read_to_string(&cli.file)?;
+    let config: Config = serde_norway::from_str(&content)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+
+    let step_vec: Vec<(Duration, LclFlags)> = config
+        .steps
+        .iter()
+        .map(|s| (Duration::from_millis(s.duration_ms), s.flags))
+        .collect();
+
+    let mut steps = step_vec.iter().cycle();
+
+    // Connect to LFS. `isi_flag_local` tells LFS that we are local insim application.
+    // `isi_iname` is the application name.
     let mut connection = insim::tcp(cli.addr)
         .isi_flag_local(true)
         .isi_iname(Some("insim.rs/strobe".to_string()))
@@ -74,60 +84,62 @@ pub async fn main() -> Result<()> {
 
     tracing::info!("Connected!");
 
+    // Request the current player list so we receive an Npl packet for any
+    // player already on track when we connect, not just future joiners.
     connection.write(TinyType::Npl.with_request_id(1)).await?;
 
+    // We only send light commands when a local (human, non-AI) player is on
+    // track. `plid` holds their player ID once we see their Npl packet.
     let mut plid: Option<PlayerId> = None;
 
-    let mut interval = interval(Duration::from_millis(cli.interval.unwrap_or(250)));
+    // Pre-fetch the first step so we always have a valid (duration, flags)
+    // pair to refer to, even before the first tick fires.
+    let (mut current_duration, mut current_flags) = *steps.next().unwrap();
 
-    let mut sequence = ReversibleSequence::new(vec![
-        LclFlags::SIGNAL_LEFT
-            | LclFlags::LIGHT_OFF
-            | LclFlags::FOG_REAR_OFF
-            | LclFlags::FOG_FRONT_OFF,
-        LclFlags::SIGNAL_OFF | LclFlags::LIGHT_HIGH | LclFlags::FOG_REAR | LclFlags::FOG_FRONT,
-        LclFlags::SIGNAL_RIGHT
-            | LclFlags::LIGHT_OFF
-            | LclFlags::FOG_REAR_OFF
-            | LclFlags::FOG_FRONT_OFF,
-    ]);
+    // `next_tick` tracks when the current step expires. Initialising to
+    // `Instant::now()` means the first tick fires immediately on join.
+    let mut next_tick = tokio::time::Instant::now();
 
     loop {
         tokio::select! {
-
-            // We should probably find a way to pause the ticker, but whatever.
-            _ = interval.tick() => {
-                if plid.is_none() {
-                    continue;
-                }
-
-                // insim implements From<LclFlags> for Packet, so we can shortcut, we dont need to
-                // create a Small or a Packet::Small by hand if we're happy to use the default
-                // values
-                connection.write(*sequence.next()).await?;
+            // The `if plid.is_some()` guard disables this branch entirely
+            // while no local player is on track, effectively pausing the timer.
+            _ = tokio::time::sleep_until(next_tick), if plid.is_some() => {
+                connection.write(current_flags).await?;
+                // Advance the deadline by this step's duration before moving
+                // on, so any processing delay doesn't cause drift over time.
+                next_tick = next_tick + current_duration;
+                (current_duration, current_flags) = *steps.next().unwrap();
             },
 
             packet = connection.read() => {
-
                 match packet? {
+                    // Npl fires when a player joins the track (including when
+                    // returning from the pits). We only care about the local
+                    // human player — remote and AI players are ignored.
                     Packet::Npl(npl) => {
-
                         if !npl.ptype.is_remote() && !npl.ptype.is_ai() {
                             plid = Some(npl.plid);
-                            tracing::info!("Woot! local player joined! {:?}", plid);
+                            // Reset the deadline so the sequence starts
+                            // immediately rather than mid-sleep.
+                            next_tick = tokio::time::Instant::now();
+                            tracing::info!("Local player joined! {:?}", plid);
                         }
                     },
 
-                    Packet::Pll(pll) => {
-                        if plid.map_or(false, |p| p == pll.plid) {
+                    // Pll fires when a player leaves the session entirely;
+                    // Plp fires when they drive into the pits. Both should
+                    // pause the strobe and reset the sequence to the start.
+                    p @ (Packet::Pll(_) | Packet::Plp(_)) => {
+                        if p.plid() == plid {
+                            tracing::info!("Local player left! {:?}", plid);
                             plid = None;
-
-                            tracing::info!("Local player left!");
+                            steps = step_vec.iter().cycle();
+                            (current_duration, current_flags) = *steps.next().unwrap();
                         }
                     },
 
                     _ => {}
-
                 }
             },
         }

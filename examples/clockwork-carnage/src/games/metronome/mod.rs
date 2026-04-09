@@ -6,14 +6,15 @@ pub mod chat;
 use std::time::Duration;
 
 pub use challenge_loop::ChallengeLoop;
-use insim_extras::scenes::{Scene, SceneError, SceneExt, SceneResult, wait_for_players::WaitForPlayers};
+use insim_extras::scenes::{
+    IntoSceneError as _, Scene, SceneError, SceneExt, SceneResult, wait_for_players::WaitForPlayers,
+};
 use sqlx::types::Json;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use super::{MiniGame, MiniGameCtx, ordinal, position_xp, setup_track};
 use crate::{ChatError, MIN_PLAYERS, db};
-use insim_extras::scenes::IntoSceneError as _;
 
 pub struct MetronomeGame {
     pub session_id: i64,
@@ -140,4 +141,3 @@ impl MiniGame for MetronomeGame {
         Ok(())
     }
 }
-

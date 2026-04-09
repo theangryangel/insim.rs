@@ -1,7 +1,7 @@
 use insim::{builder::InsimTask, core::track::Track, insim::RaceLaps};
 use insim_extras::{
     game, presence,
-    scenes::{FromContext, Scene, IntoSceneError as _, SceneError, SceneResult},
+    scenes::{FromContext, IntoSceneError as _, Scene, SceneError, SceneResult},
     ui,
 };
 

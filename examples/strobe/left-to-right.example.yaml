@@ -1,0 +1,9 @@
+steps:
+  - duration_ms: 250
+    flags: SIGNAL_LEFT | LIGHT_OFF | FOG_FRONT_OFF | FOG_REAR_OFF
+  - duration_ms: 250
+    flags: SIGNAL_OFF | LIGHT_HIGH | FOG_FRONT | FOG_REAR
+  - duration_ms: 250
+    flags: SIGNAL_RIGHT | LIGHT_OFF | FOG_FRONT_OFF | FOG_REAR_OFF
+  - duration_ms: 250
+    flags: SIGNAL_OFF | LIGHT_HIGH | FOG_FRONT | FOG_REAR

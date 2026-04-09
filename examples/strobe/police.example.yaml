@@ -1,0 +1,18 @@
+# Police-style double-flash: two rapid left bursts, pause, two rapid right bursts, pause.
+steps:
+  - duration_ms: 120
+    flags: SIGNAL_LEFT | LIGHT_HIGH | FOG_FRONT | FOG_REAR
+  - duration_ms: 60
+    flags: SIGNAL_OFF | LIGHT_OFF | FOG_FRONT_OFF | FOG_REAR_OFF
+  - duration_ms: 120
+    flags: SIGNAL_LEFT | LIGHT_HIGH | FOG_FRONT | FOG_REAR
+  - duration_ms: 200
+    flags: SIGNAL_OFF | LIGHT_OFF | FOG_FRONT_OFF | FOG_REAR_OFF
+  - duration_ms: 120
+    flags: SIGNAL_RIGHT | LIGHT_HIGH | FOG_FRONT | FOG_REAR
+  - duration_ms: 60
+    flags: SIGNAL_OFF | LIGHT_OFF | FOG_FRONT_OFF | FOG_REAR_OFF
+  - duration_ms: 120
+    flags: SIGNAL_RIGHT | LIGHT_HIGH | FOG_FRONT | FOG_REAR
+  - duration_ms: 200
+    flags: SIGNAL_OFF | LIGHT_OFF | FOG_FRONT_OFF | FOG_REAR_OFF

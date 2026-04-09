@@ -1,6 +1,6 @@
 //! Orchestrate layers/scenes of a game. Each scene is long lived and delegates in a waterfall
 //! manner and can optionally automatically recover.
-use std::{marker::PhantomData, time::Duration, future::Future};
+use std::{future::Future, marker::PhantomData, time::Duration};
 
 pub use tokio_util::sync::CancellationToken;
 

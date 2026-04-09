@@ -1,0 +1,11 @@
+# Knight Rider-style woosh: sweeps left→centre→right→centre and loops,
+# giving a smooth back-and-forth bounce rather than a hard jump-cut reset.
+steps:
+  - duration_ms: 80
+    flags: SIGNAL_LEFT | LIGHT_OFF | FOG_FRONT_OFF | FOG_REAR_OFF
+  - duration_ms: 80
+    flags: SIGNAL_OFF | LIGHT_HIGH | FOG_FRONT | FOG_REAR
+  - duration_ms: 80
+    flags: SIGNAL_RIGHT | LIGHT_OFF | FOG_FRONT_OFF | FOG_REAR_OFF
+  - duration_ms: 80
+    flags: SIGNAL_OFF | LIGHT_HIGH | FOG_FRONT | FOG_REAR

@@ -1,0 +1,27 @@
+steps:
+  - duration_ms: 0
+    flags: SIGNAL_OFF | LIGHT_OFF | FOG_FRONT_OFF | FOG_REAR_OFF
+  - duration_ms: 83
+    flags: SIGNAL_RIGHT | FOG_FRONT | FOG_REAR
+  - duration_ms: 83
+    flags: SIGNAL_OFF | FOG_FRONT_OFF | FOG_REAR_OFF
+  - duration_ms: 83
+    flags: SIGNAL_RIGHT | FOG_FRONT | FOG_REAR
+  - duration_ms: 83
+    flags: SIGNAL_OFF | FOG_FRONT_OFF | FOG_REAR_OFF
+  - duration_ms: 83
+    flags: SIGNAL_RIGHT | FOG_FRONT | FOG_REAR
+  - duration_ms: 83
+    flags: SIGNAL_OFF | FOG_FRONT_OFF | FOG_REAR_OFF
+  - duration_ms: 83
+    flags: SIGNAL_LEFT | FOG_FRONT | FOG_REAR
+  - duration_ms: 83
+    flags: SIGNAL_OFF | FOG_FRONT_OFF | FOG_REAR_OFF
+  - duration_ms: 83
+    flags: SIGNAL_LEFT | FOG_FRONT | FOG_REAR
+  - duration_ms: 83
+    flags: SIGNAL_OFF | FOG_FRONT_OFF | FOG_REAR_OFF
+  - duration_ms: 83
+    flags: SIGNAL_LEFT | FOG_FRONT | FOG_REAR
+  - duration_ms: 83
+    flags: SIGNAL_OFF | FOG_FRONT_OFF | FOG_REAR_OFF
