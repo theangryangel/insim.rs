@@ -12,7 +12,7 @@ use insim::{
 use insim_extras::{
     presence,
     presence::PresenceEvent,
-    scenes::{FromContext, Scene, IntoSceneError as _, SceneError, SceneResult},
+    scenes::{FromContext, IntoSceneError as _, Scene, SceneError, SceneResult},
     ui::{self, Component},
 };
 

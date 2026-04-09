@@ -7,13 +7,14 @@ pub mod state;
 use std::time::Duration;
 
 pub use challenge_loop::BombLoop;
-use insim_extras::scenes::{Scene, SceneError, SceneExt, wait_for_players::WaitForPlayers};
+use insim_extras::scenes::{
+    IntoSceneError as _, Scene, SceneError, SceneExt, wait_for_players::WaitForPlayers,
+};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use super::{MiniGame, MiniGameCtx, ordinal, position_xp, setup_track};
 use crate::{ChatError, MIN_PLAYERS, db};
-use insim_extras::scenes::IntoSceneError as _;
 
 pub struct BombGame {
     pub session_id: i64,
@@ -148,4 +149,3 @@ impl MiniGame for BombGame {
         Ok(())
     }
 }
-

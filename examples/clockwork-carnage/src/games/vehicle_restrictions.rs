@@ -47,7 +47,10 @@ pub async fn apply(insim: &InsimTask, vehicles: &[Vehicle]) -> Result<(), SceneE
         .await
         .scene_err("vehicle_restrictions::plc")?;
 
-    insim.send(mal).await.scene_err("vehicle_restrictions::mal")?;
+    insim
+        .send(mal)
+        .await
+        .scene_err("vehicle_restrictions::mal")?;
 
     Ok(())
 }
