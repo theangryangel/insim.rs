@@ -21,22 +21,34 @@ impl SimpleArgs {
         let p = Pth::from_path(&self.pth).context(format!("Failed to read {:?}", &self.pth))?;
 
         let first = p.iter_nodes().next().unwrap().get_center(SCALE.into());
+        let limit = p.iter_nodes().next().unwrap().get_outer_limit(SCALE.into());
 
-        let mut data = svg::node::element::path::Data::new().move_to((first.x, first.y));
+        let mut data_limit_left =
+            svg::node::element::path::Data::new().move_to((limit.0.x, -limit.0.y));
+        let mut data_limit_right =
+            svg::node::element::path::Data::new().move_to((limit.1.x, -limit.1.y));
+        let mut data = svg::node::element::path::Data::new().move_to((first.x, -first.y));
 
         for node in p.iter_nodes() {
             let point = node.get_center(SCALE.into());
+            let limit = node.get_outer_limit(SCALE.into());
 
-            viewbox_x.0 = viewbox_x.0.min(point.x);
-            viewbox_x.1 = viewbox_x.1.max(point.x);
+            for p in [limit.0, limit.1] {
+                viewbox_x.0 = viewbox_x.0.min(p.x);
+                viewbox_x.1 = viewbox_x.1.max(p.x);
+                viewbox_y.0 = viewbox_y.0.min(-p.y);
+                viewbox_y.1 = viewbox_y.1.max(-p.y);
+            }
 
-            viewbox_y.0 = viewbox_y.0.min(point.y);
-            viewbox_y.1 = viewbox_y.1.max(point.y);
+            data = data.line_to((point.x, -point.y));
 
-            data = data.line_to((point.x, point.y));
+            data_limit_left = data_limit_left.line_to((limit.0.x, -limit.0.y));
+            data_limit_right = data_limit_right.line_to((limit.1.x, -limit.1.y));
         }
 
         data = data.close();
+        data_limit_right = data_limit_right.close();
+        data_limit_left = data_limit_left.close();
 
         let background = svg::node::element::Path::new()
             .set("fill", "none")
@@ -44,6 +56,20 @@ impl SimpleArgs {
             .set("stroke-width", 20)
             .set("stroke-linejoin", "round")
             .set("d", data.clone());
+
+        let line_limit_left = svg::node::element::Path::new()
+            .set("fill", "none")
+            .set("stroke", "red")
+            .set("stroke-width", 5)
+            .set("stroke-linejoin", "round")
+            .set("d", data_limit_left.clone());
+
+        let line_limit_right = svg::node::element::Path::new()
+            .set("fill", "none")
+            .set("stroke", "green")
+            .set("stroke-width", 5)
+            .set("stroke-linejoin", "round")
+            .set("d", data_limit_right.clone());
 
         let line = svg::node::element::Path::new()
             .set("fill", "none")
@@ -53,6 +79,8 @@ impl SimpleArgs {
             .set("d", data.clone());
 
         document = document.add(background);
+        document = document.add(line_limit_left);
+        document = document.add(line_limit_right);
         document = document.add(line);
 
         document = document.set(
