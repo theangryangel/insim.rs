@@ -52,20 +52,15 @@ impl ComplexArgs {
             for node in nodes.iter() {
                 let limits = node.get_outer_limit(SCALE.into());
 
-                viewbox_x.0 = viewbox_x.0.min(limits.0.x);
-                viewbox_x.0 = viewbox_x.0.min(limits.1.x);
+                for p in [limits.0, limits.1] {
+                    viewbox_x.0 = viewbox_x.0.min(p.x);
+                    viewbox_x.1 = viewbox_x.1.max(p.x);
+                    viewbox_y.0 = viewbox_y.0.min(-p.y);
+                    viewbox_y.1 = viewbox_y.1.max(-p.y);
+                }
 
-                viewbox_x.1 = viewbox_x.1.max(limits.0.x);
-                viewbox_x.1 = viewbox_x.1.max(limits.1.x);
-
-                viewbox_y.0 = viewbox_y.0.min(limits.0.y);
-                viewbox_y.0 = viewbox_y.0.min(limits.1.y);
-
-                viewbox_y.1 = viewbox_y.1.max(limits.0.y);
-                viewbox_y.1 = viewbox_y.1.max(limits.1.y);
-
-                fwd.push((limits.0.x, limits.0.y));
-                bck.push((limits.1.x, limits.1.y));
+                fwd.push((limits.0.x, -limits.0.y));
+                bck.push((limits.1.x, -limits.1.y));
             }
 
             fwd.extend(bck.iter().rev());
@@ -91,8 +86,8 @@ impl ComplexArgs {
             for node in nodes.iter() {
                 let limits = node.get_road_limit(SCALE.into());
 
-                fwd.push((limits.0.x, limits.0.y));
-                bck.push((limits.1.x, limits.1.y));
+                fwd.push((limits.0.x, -limits.0.y));
+                bck.push((limits.1.x, -limits.1.y));
             }
 
             fwd.extend(bck.iter().rev());
@@ -113,20 +108,21 @@ impl ComplexArgs {
         if let Some(i) = self.racing_line {
             let p = Pth::from_path(&i).context(format!("Failed to read {:?}", &i))?;
 
-            let mut data = svg::node::element::path::Data::new().move_to((
-                p.iter_nodes().next().unwrap().center.x as f32,
-                p.iter_nodes().next().unwrap().center.y as f32,
-            ));
+            let point = p.iter_nodes().next().unwrap().get_center(SCALE.into());
+
+            let mut data = svg::node::element::path::Data::new().move_to((point.x, -point.y));
 
             for node in p.iter_nodes() {
-                data = data.line_to((node.center.x as f32, node.center.y as f32));
+                let point = node.get_center(SCALE.into());
+                data = data.line_to((point.x, -point.y));
             }
 
             data = data.close();
 
             let path = svg::node::element::Path::new()
+                .set("id", "racing-line")
                 .set("fill", "none")
-                .set("stroke", self.racing_line_colour)
+                .set("stroke", "red")
                 .set("stroke-width", 2)
                 .set("d", data);
 

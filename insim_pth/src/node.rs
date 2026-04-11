@@ -60,32 +60,30 @@ impl Node {
         // Calculate the length of the direction vector
         let dx = self.direction.1;
         let dy = self.direction.0;
-        let length = (dx*dx + dy*dy).sqrt();
+        let length = dx.hypot(dy);
 
-        let mut left: Vec3 = Vec3::ZERO;
-        let mut right: Vec3 = Vec3::ZERO;
-
-        // length of the direction vector should not be zero
-        // but we check to avoid division by zero
-        if length > 0.0 {
-
-            // Normalize the direction vector
-            let cos_theta = dx / length;
-            let sin_theta = dy / length;
-
-            // Calculate the left and right limit positions
-            left = Vec3 {
-                x: center.x + limit.left * cos_theta,
-                y: center.y + limit.left * -sin_theta,
-                z: center.z,
-            };
-
-            right = Vec3 {
-                x: center.x + limit.right * cos_theta,
-                y: center.y + limit.right * -sin_theta,
-                z: center.z,
-            };
+        // If it's effectively zero, just return zero.
+        // It shouldn't be. But.
+        if length.abs() < f32::EPSILON {
+            return (Vec3::ZERO, Vec3::ZERO);
         }
+
+        // Normalize the direction vector
+        let cos_theta = dx / length;
+        let sin_theta = dy / length;
+
+        // Calculate the left and right limit positions
+        let left = Vec3 {
+            x: center.x + limit.left * cos_theta,
+            y: center.y + limit.left * -sin_theta,
+            z: center.z,
+        };
+
+        let right = Vec3 {
+            x: center.x + limit.right * cos_theta,
+            y: center.y + limit.right * -sin_theta,
+            z: center.z,
+        };
 
         (left, right)
     }
