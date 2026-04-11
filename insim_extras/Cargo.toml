@@ -12,7 +12,7 @@ homepage.workspace = true
 fixedbitset = { workspace = true }
 insim = { path = "../insim", version = "5.0.0", features = ["tokio", "serde"] }
 insim_extras_macros = { path = "../insim_extras_macros", version = "0.1.0-unreleased" }
-taffy = "0.9.2"
+taffy = "0.10.0"
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt", "sync"] }
 tokio-util = { workspace = true }
