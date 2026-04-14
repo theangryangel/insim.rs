@@ -40,7 +40,7 @@ broken_intra_doc_links = "deny"
 
 [workspace.dependencies]
 arrayvec = "0.7.6"
-bitflags = "2.11.0"
+bitflags = "2.11.1"
 bytes = "1.11.1"
 clap = "4.6.1"
 criterion = "0.8.2"
