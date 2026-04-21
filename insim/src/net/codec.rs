@@ -159,10 +159,8 @@ impl Codec {
                     }) => {
                         self.keepalive = true;
                     },
-                    Packet::Ver(Ver { insimver, .. }) => {
-                        if insimver != VERSION {
-                            return Err(Error::IncompatibleVersion(insimver));
-                        }
+                    Packet::Ver(Ver { insimver, .. }) if insimver != VERSION => {
+                        return Err(Error::IncompatibleVersion(insimver));
                     },
                     _ => {},
                 }
