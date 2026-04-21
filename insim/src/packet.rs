@@ -283,7 +283,9 @@ define_packet! (
     /// Instruction - Set AI control value
     Aic = 68,
     /// Information - AI information
-    Aii = 69
+    Aii = 69,
+    /// Information - Player sent setup to host
+    Set = 70
 );
 
 impl Default for Packet {
