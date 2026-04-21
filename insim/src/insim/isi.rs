@@ -39,6 +39,9 @@ bitflags! {
 
         /// Process join requests
         const REQ_JOIN = (1 << 11);
+
+        /// Receive SET packets from guests who sent their setup to the host
+        const SET = (1 << 12);
     }
 }
 

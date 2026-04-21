@@ -226,6 +226,12 @@ impl Builder {
         self
     }
 
+    /// Set the [IsiFlags::SET] flag
+    pub fn isi_flag_set(mut self, enabled: bool) -> Self {
+        self.isi_flags.set(IsiFlags::SET, enabled);
+        self
+    }
+
     /// Set the prefix to be used in the [crate::Packet::Isi] packet during connection
     /// handshake.
     pub fn isi_prefix<C: Into<Option<char>>>(mut self, c: C) -> Self {
