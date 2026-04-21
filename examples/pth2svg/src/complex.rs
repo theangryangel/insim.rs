@@ -52,20 +52,15 @@ impl ComplexArgs {
             for node in nodes.iter() {
                 let limits = node.get_outer_limit(SCALE.into());
 
-                viewbox_x.0 = viewbox_x.0.min(limits.0.x);
-                viewbox_x.0 = viewbox_x.0.min(limits.1.x);
+                for p in [limits.0, limits.1] {
+                    viewbox_x.0 = viewbox_x.0.min(p.x);
+                    viewbox_x.1 = viewbox_x.1.max(p.x);
+                    viewbox_y.0 = viewbox_y.0.min(-p.y);
+                    viewbox_y.1 = viewbox_y.1.max(-p.y);
+                }
 
-                viewbox_x.1 = viewbox_x.1.max(limits.0.x);
-                viewbox_x.1 = viewbox_x.1.max(limits.1.x);
-
-                viewbox_y.0 = viewbox_y.0.min(limits.0.y);
-                viewbox_y.0 = viewbox_y.0.min(limits.1.y);
-
-                viewbox_y.1 = viewbox_y.1.max(limits.0.y);
-                viewbox_y.1 = viewbox_y.1.max(limits.1.y);
-
-                fwd.push((limits.0.x, limits.0.y));
-                bck.push((limits.1.x, limits.1.y));
+                fwd.push((limits.0.x, -limits.0.y));
+                bck.push((limits.1.x, -limits.1.y));
             }
 
             fwd.extend(bck.iter().rev());
@@ -91,8 +86,8 @@ impl ComplexArgs {
             for node in nodes.iter() {
                 let limits = node.get_road_limit(SCALE.into());
 
-                fwd.push((limits.0.x, limits.0.y));
-                bck.push((limits.1.x, limits.1.y));
+                fwd.push((limits.0.x, -limits.0.y));
+                bck.push((limits.1.x, -limits.1.y));
             }
 
             fwd.extend(bck.iter().rev());
@@ -119,7 +114,7 @@ impl ComplexArgs {
             ));
 
             for node in p.nodes.iter() {
-                data = data.line_to((node.center.x as f32, node.center.y as f32));
+                data = data.line_to((node.center.x as f32, -node.center.y as f32));
             }
 
             data = data.close();

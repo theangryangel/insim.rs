@@ -101,27 +101,32 @@ impl Node {
     }
 
     fn calculate_limit_position(&self, limit: &Limit, scale: Option<f32>) -> (Vec3, Vec3) {
-        let left_cos = f32::cos(90.0 * std::f32::consts::PI / 180.0);
-        let left_sin = f32::sin(90.0 * std::f32::consts::PI / 180.0);
-        let right_cos = f32::cos(-90.0 * std::f32::consts::PI / 180.0);
-        let right_sin = f32::sin(-90.0 * std::f32::consts::PI / 180.0);
-
         let center = self.get_center(scale);
+        let dx = self.direction.y;
+        let dy = self.direction.x;
+        let length = dx.hypot(dy);
 
+        // If it's effectively zero, just return zero.
+        // It shouldn't be. But.
+        if length.abs() < f32::EPSILON {
+            return (Vec3::ZERO, Vec3::ZERO);
+        }
+
+        // Normalize the direction vector
+        let cos_theta = dx / length;
+        let sin_theta = dy / length;
+
+        // Calculate the left and right limit positions
         let left = Vec3 {
-            x: ((self.direction.x * left_cos) - (self.direction.y * left_sin)) * limit.left
-                + (center.x),
-            y: ((self.direction.y * left_cos) + (self.direction.x * left_sin)) * limit.left
-                + (center.y),
-            z: (center.z),
+            x: center.x + limit.left * cos_theta,
+            y: center.y + limit.left * -sin_theta,
+            z: center.z,
         };
 
         let right = Vec3 {
-            x: ((self.direction.x * right_cos) - (self.direction.y * right_sin)) * -limit.right
-                + (center.x),
-            y: ((self.direction.y * right_cos) + (self.direction.x * right_sin)) * -limit.right
-                + (center.y),
-            z: (center.z),
+            x: center.x + limit.right * cos_theta,
+            y: center.y + limit.right * -sin_theta,
+            z: center.z,
         };
 
         (left, right)
