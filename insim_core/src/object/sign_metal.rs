@@ -106,6 +106,10 @@ impl ObjectInfoInner for SignMetal {
         Some(self.floating)
     }
 
+    fn floating_mut(&mut self) -> Option<&mut bool> {
+        Some(&mut self.floating)
+    }
+
     fn heading_objectinfo_wire(&self) -> u8 {
         self.heading.to_objectinfo_wire()
     }

@@ -60,6 +60,10 @@ trait ObjectInfoInner {
         None
     }
 
+    fn floating_mut(&mut self) -> Option<&mut bool> {
+        None
+    }
+
     fn heading_objectinfo_wire(&self) -> u8 {
         self.heading()
             .map(|h| h.to_objectinfo_wire())
@@ -241,6 +245,16 @@ macro_rules! define_object_info {
                         ObjectInfo::$variant(i) => i.floating(),
                     )+
                     ObjectInfo::Unknown(i) => i.floating(),
+                }
+            }
+
+            /// Get mutable floating flag if this object supports it
+            pub fn floating_mut(&mut self) -> Option<&mut bool> {
+                match self {
+                    $(
+                        ObjectInfo::$variant(i) => i.floating_mut(),
+                    )+
+                    ObjectInfo::Unknown(i) => i.floating_mut(),
                 }
             }
 

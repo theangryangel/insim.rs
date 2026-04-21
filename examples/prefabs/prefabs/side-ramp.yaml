@@ -1,0 +1,170 @@
+- !ConcreteSlab
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  width: Eight
+  length: Eight
+  pitch: Deg24
+  heading:
+    radians: -2.0616701789183014
+- !ConcreteSlab
+  xyz:
+    x: 29
+    y: 57
+    z: 0
+  width: Eight
+  length: Eight
+  pitch: Deg24
+  heading:
+    radians: -2.0616701789183014
+- !ConcreteSlab
+  xyz:
+    x: 59
+    y: 114
+    z: 0
+  width: Eight
+  length: Eight
+  pitch: Deg24
+  heading:
+    radians: -2.0616701789183014
+- !ConcreteSlab
+  xyz:
+    x: 472
+    y: 909
+    z: 0
+  width: Eight
+  length: Eight
+  pitch: Deg24
+  heading:
+    radians: -2.0616701789183014
+- !ConcreteSlab
+  xyz:
+    x: 88
+    y: 170
+    z: 0
+  width: Eight
+  length: Eight
+  pitch: Deg24
+  heading:
+    radians: -2.0616701789183014
+- !ConcreteSlab
+  xyz:
+    x: 442
+    y: 852
+    z: 0
+  width: Eight
+  length: Eight
+  pitch: Deg24
+  heading:
+    radians: -2.0616701789183014
+- !ConcreteSlab
+  xyz:
+    x: 118
+    y: 227
+    z: 0
+  width: Eight
+  length: Eight
+  pitch: Deg24
+  heading:
+    radians: -2.0616701789183014
+- !ConcreteSlab
+  xyz:
+    x: 147
+    y: 284
+    z: 0
+  width: Eight
+  length: Eight
+  pitch: Deg24
+  heading:
+    radians: -2.0616701789183014
+- !ConcreteSlab
+  xyz:
+    x: 413
+    y: 795
+    z: 0
+  width: Eight
+  length: Eight
+  pitch: Deg24
+  heading:
+    radians: -2.0616701789183014
+- !ConcreteSlab
+  xyz:
+    x: 177
+    y: 341
+    z: 0
+  width: Eight
+  length: Eight
+  pitch: Deg24
+  heading:
+    radians: -2.0616701789183014
+- !ConcreteSlab
+  xyz:
+    x: 383
+    y: 738
+    z: 0
+  width: Eight
+  length: Eight
+  pitch: Deg24
+  heading:
+    radians: -2.0616701789183014
+- !ConcreteSlab
+  xyz:
+    x: 206
+    y: 398
+    z: 0
+  width: Eight
+  length: Eight
+  pitch: Deg24
+  heading:
+    radians: -2.0616701789183014
+- !ConcreteSlab
+  xyz:
+    x: 236
+    y: 454
+    z: 0
+  width: Eight
+  length: Eight
+  pitch: Deg24
+  heading:
+    radians: -2.0616701789183014
+- !ConcreteSlab
+  xyz:
+    x: 354
+    y: 681
+    z: 0
+  width: Eight
+  length: Eight
+  pitch: Deg24
+  heading:
+    radians: -2.0616701789183014
+- !ConcreteSlab
+  xyz:
+    x: 265
+    y: 511
+    z: 0
+  width: Eight
+  length: Eight
+  pitch: Deg24
+  heading:
+    radians: -2.0616701789183014
+- !ConcreteSlab
+  xyz:
+    x: 324
+    y: 625
+    z: 0
+  width: Eight
+  length: Eight
+  pitch: Deg24
+  heading:
+    radians: -2.0616701789183014
+- !ConcreteSlab
+  xyz:
+    x: 295
+    y: 568
+    z: 0
+  width: Eight
+  length: Eight
+  pitch: Deg24
+  heading:
+    radians: -2.0616701789183014

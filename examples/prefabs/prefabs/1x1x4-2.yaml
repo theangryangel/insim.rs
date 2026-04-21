@@ -1,0 +1,140 @@
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 0
+    z: 208
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 0
+    z: 192
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 0
+    z: 176
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 0
+    z: 0
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 0
+    z: 160
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 0
+    z: 16
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 0
+    z: 32
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 0
+    z: 144
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 0
+    z: 48
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 0
+    z: 64
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 0
+    z: 128
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 0
+    z: 80
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 0
+    z: 112
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0
+- !ConcretePillar
+  xyz:
+    x: 0
+    y: 0
+    z: 96
+  x: Full
+  y: Full
+  height: M4_00
+  heading:
+    radians: 0.0

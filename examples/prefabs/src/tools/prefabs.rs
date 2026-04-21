@@ -110,10 +110,17 @@ impl Prefab {
             .iter()
             .cloned()
             .map(|mut obj| {
-                let pos = obj.position_mut();
-                pos.x = crate::clamp_i16(i32::from(anchor.x) + i32::from(pos.x));
-                pos.y = crate::clamp_i16(i32::from(anchor.y) + i32::from(pos.y));
-                pos.z = crate::clamp_u8(i32::from(anchor.z) + i32::from(pos.z));
+                let new_z = {
+                    let pos = obj.position_mut();
+                    pos.x = crate::clamp_i16(i32::from(anchor.x) + i32::from(pos.x));
+                    pos.y = crate::clamp_i16(i32::from(anchor.y) + i32::from(pos.y));
+                    let z = crate::clamp_u8(i32::from(anchor.z) + i32::from(pos.z));
+                    pos.z = z;
+                    z
+                };
+                if let Some(f) = obj.floating_mut() {
+                    *f = new_z > 0;
+                }
                 obj
             })
             .collect()
@@ -155,6 +162,12 @@ pub fn to_relative(selection: &[ObjectInfo]) -> Vec<ObjectInfo> {
     }
 
     let anchor = *selection[0].position();
+    let min_z = selection
+        .iter()
+        .map(|obj| obj.position().z)
+        .min()
+        .unwrap_or(0);
+
     selection
         .iter()
         .cloned()
@@ -162,7 +175,7 @@ pub fn to_relative(selection: &[ObjectInfo]) -> Vec<ObjectInfo> {
             let pos = obj.position_mut();
             pos.x = crate::clamp_i16(i32::from(pos.x) - i32::from(anchor.x));
             pos.y = crate::clamp_i16(i32::from(pos.y) - i32::from(anchor.y));
-            pos.z = crate::clamp_u8(i32::from(pos.z) - i32::from(anchor.z));
+            pos.z = (i32::from(pos.z) - i32::from(min_z)) as u8;
             obj
         })
         .collect()
