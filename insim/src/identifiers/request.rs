@@ -25,6 +25,7 @@ use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 /// (Referred to as `ReqI` in InSim.txt)
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct RequestId(pub u8);
 
 impl fmt::Display for RequestId {

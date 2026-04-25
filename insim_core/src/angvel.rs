@@ -16,6 +16,7 @@ use std::fmt;
 ///   and [`Speed`](crate::speed::Speed).
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AngVel {
     radians_per_sec: f32,
 }

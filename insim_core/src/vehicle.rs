@@ -21,6 +21,7 @@ macro_rules! define_vehicles {
         #[derive(PartialEq, Eq, Clone, Copy, Hash)]
         #[non_exhaustive]
         #[allow(missing_docs)]
+        #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
         pub enum Vehicle {
             $($variant,)*
 

@@ -12,6 +12,7 @@ const MAX_MAL_SIZE: usize = 120;
 
 #[derive(Debug, Clone, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Restrict which mods can be used.
 ///
 /// - Contains a list of allowed mod ids.
@@ -22,6 +23,10 @@ pub struct Mal {
     /// Connection that updated the list.
     pub ucid: ConnectionId,
 
+    #[cfg_attr(
+        feature = "schemars",
+        schemars(with = "Vec<insim_core::vehicle::Vehicle>")
+    )]
     allowed_mods: IndexSet<Vehicle>,
 }
 

@@ -48,6 +48,7 @@ use std::fmt;
 /// ```
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Heading {
     radians: f64,
 }

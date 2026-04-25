@@ -6,6 +6,7 @@ use crate::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Insim Checkpoint Kind
 pub enum InsimCheckpointKind {
     #[default]
@@ -36,6 +37,7 @@ impl TryFrom<u8> for InsimCheckpointKind {
 /// InsimCheckpoint
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct InsimCheckpoint {
     /// Position
     pub xyz: ObjectCoordinate,
@@ -95,6 +97,7 @@ impl ObjectInfoInner for InsimCheckpoint {
 /// Insim Circle
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct InsimCircle {
     /// Position
     pub xyz: ObjectCoordinate,

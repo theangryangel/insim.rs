@@ -3,12 +3,12 @@ use crate::identifiers::{ConnectionId, RequestId};
 bitflags::bitflags! {
     /// Additional facts about this connection. Used within [Ncn].
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct NcnFlags: u8 {
         /// User is remote
         const REMOTE = (1 << 2);
     }
 }
+impl_bitflags_json_schema!(NcnFlags);
 
 generate_bitflag_helpers! {
     NcnFlags,
@@ -19,6 +19,7 @@ impl_bitflags_from_to_bytes!(NcnFlags, u8);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Connection joined notification.
 ///
 /// - Sent when a connection joins the host.

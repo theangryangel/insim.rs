@@ -6,6 +6,7 @@ use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 /// Button Click Identifier
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct ClickId(pub u8);
 
 impl ClickId {

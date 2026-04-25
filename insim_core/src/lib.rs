@@ -5,6 +5,8 @@
 extern crate criterion as _; // Needed for cargo bench. BARF.
 
 pub mod angvel;
+#[cfg(feature = "serde")]
+pub mod bitflags_serde;
 pub mod coordinate;
 pub mod dash_lights;
 pub mod decode;
