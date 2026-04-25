@@ -41,6 +41,7 @@ where
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg(feature = "allow-unknown-packet")]
 /// Raw binary capture of an unknown packet.
 ///
@@ -51,6 +52,7 @@ pub struct Raw {
     /// Packet id / discriminator / identifier
     pub discriminator: u8,
     /// Raw bytes, without the discriminator and without the length prefix
+    #[cfg_attr(feature = "schemars", schemars(with = "Vec<u8>"))]
     pub data: bytes::Bytes,
 }
 
@@ -66,6 +68,7 @@ macro_rules! define_packet {
         /// told something about LFS), or both.
         #[derive(Debug, Clone, from_variants::FromVariants)]
         #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+        #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
         #[cfg_attr(feature = "serde", serde(tag = "type"))]
         #[non_exhaustive]
         pub enum Packet {

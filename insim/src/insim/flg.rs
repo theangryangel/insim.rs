@@ -3,6 +3,7 @@ use crate::identifiers::{PlayerId, RequestId};
 /// Flag type reported by [Flg].
 #[derive(Default, Debug, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum FlgType {
@@ -16,6 +17,7 @@ pub enum FlgType {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Flag state change for a player.
 ///
 /// - Reports when blue or yellow flags are applied or cleared.

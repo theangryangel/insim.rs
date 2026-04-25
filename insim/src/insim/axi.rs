@@ -6,6 +6,7 @@ use crate::identifiers::RequestId;
 /// - Can be requested via [`TinyType::Axi`](crate::insim::TinyType::Axi).
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Axi {
     /// Request identifier echoed by replies.
     #[insim(pad_after = 1)]

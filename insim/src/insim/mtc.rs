@@ -3,6 +3,7 @@ use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Send a message to a specific connection (host only).
 ///
 /// - Can target a connection or a player.

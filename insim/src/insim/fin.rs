@@ -5,7 +5,6 @@ use crate::identifiers::{PlayerId, RequestId};
 
 bitflags::bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Result confirmation flags for finishes and results.
     pub struct RaceConfirmFlags: u8 {
         /// Mentioned
@@ -24,6 +23,7 @@ bitflags::bitflags! {
         const DID_NOT_PIT = (1 << 6);
     }
 }
+impl_bitflags_json_schema!(RaceConfirmFlags);
 
 impl_bitflags_from_to_bytes!(RaceConfirmFlags, u8);
 
@@ -67,6 +67,7 @@ impl RaceConfirmFlags {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Provisional finish notification.
 ///
 /// - Not a final result; use [Res](super::Res) for confirmed results.

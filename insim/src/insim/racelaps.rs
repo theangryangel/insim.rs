@@ -6,6 +6,7 @@ use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 /// Handles the rules around how RaceLaps are described within Insim automatically for you.
 #[derive(Debug, Default, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub enum RaceLaps {
     /// This is an untimed session

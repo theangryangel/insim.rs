@@ -2,6 +2,7 @@ use crate::identifiers::RequestId;
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Extended message (like [Mst](super::Mst), but longer).
 ///
 /// - For chat text only (not for commands).

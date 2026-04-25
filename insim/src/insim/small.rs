@@ -11,7 +11,6 @@ use crate::{
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Local car switches flags.
     ///
     /// - Kept for backwards compatibility; prefer [LclFlags].
@@ -74,10 +73,10 @@ bitflags! {
         const SIREN_SLOW = Self::SET_SIREN.bits() | (2 << 20);
     }
 }
+impl_bitflags_json_schema!(LcsFlags);
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Local car lights flags.
     ///
     /// - Used with [`SmallType::Lcl`].
@@ -127,9 +126,11 @@ bitflags! {
         const EXTRA = Self::SET_EXTRA.bits() | (1 << 2);
     }
 }
+impl_bitflags_json_schema!(LclFlags);
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 /// Subtype for the [Small] packet.
 pub enum SmallType {
@@ -308,6 +309,7 @@ impl Encode for SmallType {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// General purpose packet carrying a subtype and an integer value.
 ///
 /// - Used for requests, replies, and small control messages.

@@ -4,6 +4,7 @@ use crate::identifiers::{ConnectionId, RequestId};
 #[repr(u8)]
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub enum AcrResult {
     /// Command was processed
@@ -22,6 +23,7 @@ pub enum AcrResult {
 /// - Contains the raw command text and result.
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Acr {
     /// Request identifier echoed by replies.
     #[insim(pad_after = 1)]

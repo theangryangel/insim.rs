@@ -9,6 +9,7 @@ use crate::{Decode, Encode};
 /// - Optional `glam` conversions are provided.
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Coordinate {
     /// X coordinate in internal units.
     pub x: i32,

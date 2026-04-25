@@ -2,6 +2,7 @@ use crate::{WithRequestId, identifiers::RequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Result of a screenshot request.
@@ -22,6 +23,7 @@ pub enum SshError {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Screenshot request and response.
 ///
 /// - Send to request a screenshot, receive to learn the saved filename.

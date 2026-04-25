@@ -5,6 +5,7 @@ use crate::{
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Subtype for the [Ttc] packet.
@@ -22,6 +23,7 @@ pub enum TtcType {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Target-to-connection packet for selection-related requests.
 ///
 /// - Routes a request to a specific connection.

@@ -73,6 +73,7 @@ trait ObjectInfoInner {
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Raw layout object wire fields.
 pub struct Raw {
     /// Index
@@ -125,6 +126,7 @@ macro_rules! define_object_info {
     ) => {
         #[derive(Debug, Clone)]
         #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+        #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
         #[non_exhaustive]
         /// Layout Object
         pub enum ObjectInfo {

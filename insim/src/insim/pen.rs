@@ -16,6 +16,7 @@ use crate::identifiers::{PlayerId, RequestId};
     insim_core::Encode,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Penalty state.
@@ -60,6 +61,7 @@ impl fmt::Display for PenaltyInfo {
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 /// Reason for a penalty change.
 pub enum PenaltyReason {
@@ -103,6 +105,7 @@ impl fmt::Display for PenaltyReason {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Penalty state change for a player.
 ///
 /// - Reports a penalty being applied, updated, or cleared.

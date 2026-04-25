@@ -12,6 +12,7 @@ const CONINFO_DEGREES_PER_UNIT: f64 = 180.0 / 128.0;
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Per-car contact details used in [Con].
 pub struct ConInfo {
     /// Player identifier.
@@ -197,6 +198,7 @@ impl Encode for ConInfo {
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Vehicle-to-vehicle contact report.
 ///
 /// - Sent when collision reporting is enabled in [IsiFlags](crate::insim::IsiFlags).

@@ -8,6 +8,7 @@ use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Physical state snapshot used by [Aii].
 pub struct OsMain {
     /// Angular velocity vector.
@@ -69,7 +70,6 @@ impl Encode for OsMain {
 bitflags! {
     /// AI state flags.
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct AiFlags: u8 {
         /// Detect if engine running
         const IGNITION = (1 << 0);
@@ -79,11 +79,13 @@ bitflags! {
         const CHDN = (1 << 3);
     }
 }
+impl_bitflags_json_schema!(AiFlags);
 
 impl_bitflags_from_to_bytes!(AiFlags, u8);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// AI telemetry snapshot.
 ///
 /// - Returned in response to AI info requests.

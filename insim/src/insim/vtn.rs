@@ -3,6 +3,7 @@ use crate::identifiers::{ConnectionId, RequestId};
 /// Enum for the action field of [Vtn].
 #[derive(Default, Debug, Clone, Eq, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum VtnAction {
@@ -68,6 +69,7 @@ impl From<&VtnAction> for u32 {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Vote Notification
 pub struct Vtn {
     /// Non-zero if the packet is a packet request or a reply to a request

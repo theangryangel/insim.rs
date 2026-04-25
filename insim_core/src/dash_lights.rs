@@ -6,7 +6,6 @@ bitflags::bitflags! {
     /// - Bitflags can be combined and queried with `.contains`.
     /// - Typically reported in telemetry packets.
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct DashLights: u32 {
         /// Shift light
         const SHIFT = 1;
@@ -46,6 +45,39 @@ bitflags::bitflags! {
         const NEUTRAL = (1 << 17);
         /// Severe engine damage
         const ENGINE_SEVERE = (1 << 28);
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for DashLights {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        crate::bitflags_serde::serialize(self, serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for DashLights {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        crate::bitflags_serde::deserialize(deserializer)
+    }
+}
+
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for DashLights {
+    fn schema_name() -> ::std::borrow::Cow<'static, str> {
+        "DashLights".into()
+    }
+
+    fn json_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        let names: Vec<String> = <DashLights as ::bitflags::Flags>::FLAGS
+            .iter()
+            .map(|f: &::bitflags::Flag<DashLights>| f.name().to_owned())
+            .collect();
+        schemars::json_schema!({
+            "type": "array",
+            "items": { "type": "string", "enum": names },
+            "uniqueItems": true
+        })
     }
 }
 
