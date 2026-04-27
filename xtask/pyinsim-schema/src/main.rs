@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .to_owned();
 
     let schema_path = workspace_root.join("pyinsim/insim_schema.json");
-    let types_path = workspace_root.join("pyinsim/python/pyinsim/_types.py");
+    let types_path = workspace_root.join("pyinsim/python/insim_rs/_types.py");
 
     generate_schema(&schema_path, cli.check)?;
     generate_types(&schema_path, &types_path, cli.check)?;

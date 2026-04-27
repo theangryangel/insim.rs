@@ -1,7 +1,8 @@
 exclude: |
   (?x)
   LICENSE|
-  ^examples/clockwork-carnage/src/web/templates/
+  ^examples/clockwork-carnage/src/web/templates/|
+  ^pyinsim/insim_schema.json
 repos:
   - repo: local
     hooks:
