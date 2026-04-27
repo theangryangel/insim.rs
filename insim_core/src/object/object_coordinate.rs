@@ -2,6 +2,7 @@
 
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Layout Object Position
 pub struct ObjectCoordinate {
     /// X coordinate (1:16 scale)

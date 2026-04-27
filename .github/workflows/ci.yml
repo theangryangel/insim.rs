@@ -19,6 +19,18 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: pre-commit/action@v3.0.1
 
+  check_pyinsim_schema:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --dev
+        working-directory: pyinsim
+      - name: Check insim_schema.json and _types.py are up to date
+        run: cargo run -p xtask-pyinsim-schema -- --check
+
   check_codepage_lut:
     runs-on: ubuntu-latest
     steps:
@@ -26,7 +38,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Check generated codepage LUT (lookup table) is up to date
-        run: cargo run -p xtask -- codepage-lut --check
+        run: cargo run -p xtask-codepage-lut -- --check
 
   test:
     runs-on: ubuntu-latest
@@ -85,4 +97,4 @@ jobs:
         uses: obi1kenobi/cargo-semver-checks-action@v2
         with:
           feature-group: all-features
-          exclude: insim_extras,insim_lyt
+          exclude: insim_extras,insim_lyt,pyinsim

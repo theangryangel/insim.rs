@@ -23,6 +23,7 @@ macro_rules! define_tracks {
         #[non_exhaustive]
         #[allow(missing_docs)]
         #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+        #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
         #[cfg_attr(feature = "serde", serde(try_from = "String", into = "String"))]
         pub enum Track {
             #[default]

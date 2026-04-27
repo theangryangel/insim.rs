@@ -35,6 +35,7 @@ pub enum GameVersionParseError {
 /// - Display and encoding use the canonical string form.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct GameVersion {
     /// Numeric prefix (e.g., `0.7`).
     // XXX: Why a float? Because as far as I can tell Scawen treats LFS versions like a number, not

@@ -6,6 +6,7 @@ use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Tyre compounds/types
@@ -41,7 +42,6 @@ pub enum TyreCompound {
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Describes the setup of a player and the various helpers that may be enabled, such as
     /// auto-clutch, etc.
     pub struct PlayerFlags: u16 {
@@ -73,6 +73,7 @@ bitflags! {
         const CUSTOM_VIEW = (1 << 13);
     }
 }
+impl_bitflags_json_schema!(PlayerFlags, "PlayerFlag");
 
 generate_bitflag_helpers!(PlayerFlags,
     pub is_left_side => LEFTSIDE,
@@ -90,7 +91,6 @@ impl_bitflags_from_to_bytes!(PlayerFlags, u16);
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Setup Flags
     pub struct SetFlags: u8 {
         /// Symmetric wheels
@@ -101,6 +101,7 @@ bitflags! {
         const ABS_ENABLE = (1 << 2);
     }
 }
+impl_bitflags_json_schema!(SetFlags, "SetFlag");
 
 impl_bitflags_from_to_bytes!(SetFlags, u8);
 
@@ -112,7 +113,6 @@ generate_bitflag_helpers!(SetFlags,
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Player model and type information
     pub struct PlayerType: u8 {
         /// Female, if not set assume male
@@ -123,6 +123,7 @@ bitflags! {
         const REMOTE = (1 << 2);
     }
 }
+impl_bitflags_json_schema!(PlayerType, "PlayerTypeFlag");
 
 impl_bitflags_from_to_bytes!(PlayerType, u8);
 
@@ -135,7 +136,6 @@ generate_bitflag_helpers!(
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Passenger flags
     pub struct Passengers: u8 {
         /// Front male, opposite side from driver
@@ -156,12 +156,12 @@ bitflags! {
         const REAR_RIGHT_FEMALE = (1 << 7);
     }
 }
+impl_bitflags_json_schema!(Passengers, "PassengersFlag");
 
 impl_bitflags_from_to_bytes!(Passengers, u8);
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Racer Info flags
     pub struct RiFlags: u8 {
         /// Late start.
@@ -176,6 +176,7 @@ bitflags! {
         const SAI_MASK = Self::SAI_0.bits() | Self::SAI_1.bits();
     }
 }
+impl_bitflags_json_schema!(RiFlags, "RiFlag");
 
 impl_bitflags_from_to_bytes!(RiFlags, u8);
 
@@ -211,6 +212,7 @@ impl RiFlags {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Player joined race notification.
 ///
 /// - Sent when a player joins the race (or returns from pits).

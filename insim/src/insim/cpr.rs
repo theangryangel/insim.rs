@@ -2,6 +2,7 @@ use crate::identifiers::{ConnectionId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Connection rename or plate change notification.
 ///
 /// - Sent when a player changes their name or number plate.

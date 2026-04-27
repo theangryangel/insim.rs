@@ -7,6 +7,7 @@ use crate::{
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -246,6 +247,7 @@ impl TryFrom<u8> for Character {
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -270,6 +272,7 @@ impl From<u8> for LetterboardRBColour {
 /// Letterboard RB (Red/Blue)
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct LetterboardRB {
     /// Position
     pub xyz: ObjectCoordinate,

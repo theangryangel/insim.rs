@@ -7,6 +7,7 @@ use crate::{
 
 #[derive(Debug, Clone, Default, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Control object
 pub struct Control {
     /// Position
@@ -88,6 +89,7 @@ impl ObjectInfoInner for Control {
 /// Control Kind
 #[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Kind of Control Object
 pub enum ControlKind {
     #[default]

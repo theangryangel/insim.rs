@@ -8,6 +8,7 @@ use crate::{
 /// Barrier long
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Barrier {
     /// Position
     pub xyz: ObjectCoordinate,

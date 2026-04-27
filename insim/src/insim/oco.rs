@@ -4,6 +4,7 @@ use crate::identifiers::RequestId;
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Action type for [Oco].
@@ -21,6 +22,7 @@ pub enum OcoAction {
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Which start lights to manipulate.
@@ -39,7 +41,6 @@ pub enum OcoIndex {
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Which bulbs to manipulate.
     pub struct OcoLights: u8 {
         /// Red1
@@ -52,11 +53,13 @@ bitflags! {
         const GREEN = (1 << 3);
     }
 }
+impl_bitflags_json_schema!(OcoLights, "OcoLight");
 
 impl_bitflags_from_to_bytes!(OcoLights, u8);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Start light control packet.
 ///
 /// - Controls main or layout start lights.

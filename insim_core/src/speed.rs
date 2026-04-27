@@ -7,6 +7,7 @@ use std::fmt;
 /// - Helper methods convert to and from kph and mph.
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Speed {
     inner: f32,
 }

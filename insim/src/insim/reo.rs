@@ -40,6 +40,7 @@ const REO_MAX_PLAYERS: usize = 48;
 
 #[derive(Debug, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Starting order information or instruction.
 ///
 /// - Sent at the start of a race or qualifying session.
@@ -58,6 +59,10 @@ pub struct Reo {
             serialize_with = "serialize_playerids",
             deserialize_with = "deserialize_playerids"
         )
+    )]
+    #[cfg_attr(
+        feature = "schemars",
+        schemars(with = "Vec<crate::identifiers::PlayerId>")
     )]
     pub plid: [PlayerId; REO_MAX_PLAYERS],
 }

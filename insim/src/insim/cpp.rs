@@ -9,6 +9,7 @@ use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Camera Position Pack reports the current camera position and state. This packet may also be
 /// sent to control the camera.
 pub struct Cpp {

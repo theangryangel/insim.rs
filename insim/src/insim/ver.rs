@@ -4,6 +4,7 @@ use crate::identifiers::RequestId;
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Version information about the connected LFS instance.
 ///
 /// - Sent in response to [`TinyType::Ver`](crate::insim::TinyType::Ver).

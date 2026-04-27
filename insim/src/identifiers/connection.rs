@@ -14,6 +14,7 @@ use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 /// [`ConnectionId`] never changes.
 #[derive(Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Clone, Copy, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct ConnectionId(pub u8);
 
 impl ConnectionId {

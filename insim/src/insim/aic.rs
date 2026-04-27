@@ -10,7 +10,6 @@ const AIC_MAX_INPUTS: usize = 20;
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// AI help and assist flags.
     pub struct AiHelpFlags: u16 {
         /// Autogears
@@ -21,11 +20,13 @@ bitflags! {
         const AUTOCLUTCH = (1 << 9);
     }
 }
+impl_bitflags_json_schema!(AiHelpFlags, "AiHelpFlag");
 
 impl_bitflags_from_to_bytes!(AiHelpFlags, u16);
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 /// Toggle mode for AI controls.
 pub enum AiInputToggle {
@@ -60,6 +61,7 @@ impl From<AiInputToggle> for u16 {
 
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 /// AI input command.
 pub enum AiInputType {
@@ -142,6 +144,7 @@ pub enum AiInputType {
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// AI input control value with optional duration.
 pub struct AiInput {
     /// Input command.
@@ -509,6 +512,7 @@ impl Encode for AiInput {
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// AI input control packet.
 ///
 /// - Sends a sequence of AI input commands.
