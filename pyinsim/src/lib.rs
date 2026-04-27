@@ -112,22 +112,25 @@ impl _Insim {
     /// Lagged messages (channel overflow) are silently skipped.
     /// Raises `RuntimeError` when the connection is closed.
     fn recv(&mut self, py: Python<'_>) -> PyResult<String> {
-        let receiver = &mut self.receiver;
-        let rt = &self.runtime;
-
         // Loop outside py.detach() so we can call py.check_signals() on each
         // timeout tick. Without this, SIGINT (Ctrl+C) is never delivered because
         // Python can't act on it until the GIL is reacquired.
         loop {
-            let result = py.detach(|| {
-                rt.block_on(async {
-                    tokio::time::timeout(
-                        std::time::Duration::from_millis(100),
-                        receiver.recv(),
-                    )
-                    .await
+            // Scope the borrows of receiver/runtime so they're released before
+            // we inspect _handle below.
+            let result = {
+                let receiver = &mut self.receiver;
+                let rt = &self.runtime;
+                py.detach(|| {
+                    rt.block_on(async {
+                        tokio::time::timeout(
+                            std::time::Duration::from_millis(100),
+                            receiver.recv(),
+                        )
+                        .await
+                    })
                 })
-            });
+            };
 
             match result {
                 Ok(Ok(packet)) => {
@@ -136,8 +139,19 @@ impl _Insim {
                 },
                 Ok(Err(RecvError::Lagged(_))) => continue,
                 Ok(Err(e)) => return Err(PyRuntimeError::new_err(e.to_string())),
-                // Timeout: GIL reacquired — check for pending Python signals.
-                Err(_) => py.check_signals()?,
+                // Timeout: GIL reacquired — check signals and whether the
+                // background network task has exited (connection lost).
+                Err(_) => {
+                    py.check_signals()?;
+                    if self._handle.is_finished() {
+                        let msg = match self.runtime.block_on(&mut self._handle) {
+                            Ok(Ok(())) => "connection closed".to_owned(),
+                            Ok(Err(e)) => e.to_string(),
+                            Err(e) => format!("task panicked: {e}"),
+                        };
+                        return Err(PyRuntimeError::new_err(msg));
+                    }
+                },
             }
         }
     }

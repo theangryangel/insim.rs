@@ -92,12 +92,18 @@ class Insim:
             h.handle(packet)
 
     def run(self) -> None:
-        """Receive and dispatch packets, blocking the calling thread."""
+        """Receive and dispatch packets, blocking the calling thread.
+
+        Returns normally on Ctrl+C.  Re-raises any other exception (dropped
+        connection, unhandled handler error) after shutting down cleanly.
+        """
         try:
             while True:
                 raw = self._inner.recv()
                 self._dispatch(raw)
         except KeyboardInterrupt:
+            pass
+        finally:
             self.shutdown()
 
     def shutdown(self) -> None:

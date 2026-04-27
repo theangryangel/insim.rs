@@ -26,7 +26,7 @@ client = Insim(
 
 @client.middleware
 def log(packet_type: str, packet: object) -> None:
-    print(f" - {packet_type}: {packet}")
+    print(f"← {packet_type}: {packet}")
 
 
 @client.on(Mso)
@@ -34,9 +34,7 @@ def on_mso(packet: Mso) -> None:
     if packet.usertype != MsoUserType.Prefix:
         return
     command = unescape(strip_colours(packet.msg[packet.textstart :]))
-    print(f"'{command}, {packet.ucid}'")
     if command != "!help":
-        print(packet)
         return
     client.send(
         Mtc(
