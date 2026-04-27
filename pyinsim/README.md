@@ -4,15 +4,21 @@ Python bindings for [insim.rs](https://github.com/theangryangel/insim.rs), built
 
 ## Development setup
 
+Install dependencies and build the native extension in-place:
+
 ```bash
 cd pyinsim
 uv sync --dev
-maturin develop
+uv run maturin develop
 ```
+
+`maturin develop` compiles the Rust extension and installs it into the virtual
+environment created by `uv sync`. Re-run it any time you change Rust source
+files under `src/`.
 
 ## Packet type codegen
 
-`pyinsim/insim_schema.json` and `python/pyinsim/_types.py` are auto-generated
+`pyinsim/insim_schema.json` and `python/insim_rs/_types.py` are auto-generated
 from the Rust packet types and **checked into git**. Regenerate both after any
 change to packet structs in the `insim` crate:
 
@@ -30,63 +36,71 @@ cargo run -p xtask-pyinsim-schema -- --check
 
 ### Connecting and handling packets
 
-Use `InsimClient` as an async context manager — it disconnects automatically on exit.
-Register typed handlers with `@client.on`:
+Create an `Insim`, register typed handlers with `@client.on`, then call
+`client.run()` to block and process packets:
 
 ```python
-import asyncio
-from insim_rs import InsimClient
+from insim_rs import Insim
 from insim_rs._types import Ncn, Mso
 
-async def main() -> None:
-    async with InsimClient("127.0.0.1:29999") as client:
+client = Insim("127.0.0.1:29999")
 
-        @client.on(Ncn)
-        async def on_join(packet: Ncn) -> None:
-            print(f"[join] {packet.pname} ({packet.uname})")
+@client.on(Ncn)
+def on_join(packet: Ncn) -> None:
+    print(f"[join] {packet.pname} ({packet.uname})")
 
-        @client.on(Mso)
-        async def on_chat(packet: Mso) -> None:
-            print(f"[chat] {packet.msg}")
+@client.on(Mso)
+def on_chat(packet: Mso) -> None:
+    print(f"[chat] {packet.msg}")
 
-        await client.run()
+client.run()
+```
 
-asyncio.run(main())
+Press Ctrl+C to disconnect cleanly.
+
+### Connection options
+
+```python
+from insim_rs import Insim
+from insim_rs._types import IsiFlag
+
+client = Insim(
+    "127.0.0.1:29999",
+    flags=[IsiFlag.MCI, IsiFlag.MSO_COLS],
+    iname="my_app",
+    admin_password="secret",
+    interval_ms=500,
+    prefix="!",      # route !-prefixed chat as Mso with usertype=Prefix
+    capacity=256,    # broadcast channel buffer size
+)
+```
+
+### Sending packets
+
+```python
+from insim_rs._types import Mtc, SoundType
+
+client.send(Mtc(ucid=packet.ucid, plid=packet.plid, sound=SoundType.SysMessage, text="hello"))
 ```
 
 ### Reusable handlers
 
-Group related handlers into a `Handler` and attach it to one or more clients:
+Group related handlers into a `Handler` and attach it to a client:
 
 ```python
-from insim_rs import InsimClient
+from insim_rs import Insim
 from insim_rs.handler import Handler
 from insim_rs._types import Ncn
 
 joins = Handler()
 
 @joins.on(Ncn)
-async def on_join(packet: Ncn) -> None:
+def on_join(packet: Ncn) -> None:
     print(f"[join] {packet.pname}")
 
-async def main() -> None:
-    async with InsimClient("127.0.0.1:29999") as client:
-        client.include_handler(joins)
-        await client.run()
-```
-
-### Streaming a packet type
-
-`client.stream(PacketType)` is an async generator that yields every matching
-packet. The subscription is cleaned up automatically when the loop exits:
-
-```python
-async def main() -> None:
-    async with InsimClient("127.0.0.1:29999") as client:
-        async for packet in client.stream(Mso):
-            print(f"[chat] {packet.msg}")
-            if packet.msg == "!quit":
-                break
+client = Insim("127.0.0.1:29999")
+client.include_handler(joins)
+client.run()
 ```
 
 ### Middleware
@@ -95,20 +109,27 @@ Middleware runs before handlers and receives every packet regardless of type —
 useful for logging or metrics:
 
 ```python
-from insim_rs import InsimClient, AnyPacket
+from insim_rs import Insim
+from insim_rs.dispatcher import AnyPacket
 
-async def main() -> None:
-    async with InsimClient("127.0.0.1:29999") as client:
+client = Insim("127.0.0.1:29999")
 
-        @client.middleware
-        async def log_all(packet_type: str, packet: AnyPacket) -> None:
-            print(f"← {packet_type}")
+@client.middleware
+def log_all(packet_type: str, packet: AnyPacket) -> None:
+    print(f"← {packet_type}")
 
-        await client.run()
+client.run()
 ```
 
 ## Running tests
 
+Build the extension first, then run pytest:
+
 ```bash
-pytest pyinsim/tests/
+cd pyinsim
+uv run maturin develop
+uv run pytest
 ```
+
+Tests use `TestClient` to inject synthetic packets without a real LFS
+connection, so no running LFS instance is needed.

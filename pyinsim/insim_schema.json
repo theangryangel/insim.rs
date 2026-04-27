@@ -21,6 +21,7 @@
         },
         "type": {
           "const": "Acr",
+          "default": "Acr",
           "type": "string"
         },
         "ucid": {
@@ -492,6 +493,7 @@
         },
         "type": {
           "const": "Aic",
+          "default": "Aic",
           "type": "string"
         }
       },
@@ -540,6 +542,7 @@
         },
         "type": {
           "const": "Aii",
+          "default": "Aii",
           "type": "string"
         }
       },
@@ -687,6 +690,7 @@
         },
         "type": {
           "const": "Axi",
+          "default": "Axi",
           "type": "string"
         }
       },
@@ -717,6 +721,7 @@
         },
         "type": {
           "const": "Axm",
+          "default": "Axm",
           "type": "string"
         },
         "ucid": {
@@ -746,6 +751,7 @@
         },
         "type": {
           "const": "Axo",
+          "default": "Axo",
           "type": "string"
         }
       },
@@ -910,6 +916,7 @@
         },
         "type": {
           "const": "Bfn",
+          "default": "Bfn",
           "type": "string"
         },
         "ucid": {
@@ -1070,6 +1077,7 @@
         },
         "type": {
           "const": "Btc",
+          "default": "Btc",
           "type": "string"
         },
         "ucid": {
@@ -1140,6 +1148,7 @@
         },
         "type": {
           "const": "Btn",
+          "default": "Btn",
           "type": "string"
         },
         "typein": {
@@ -1309,6 +1318,7 @@
         },
         "type": {
           "const": "Btt",
+          "default": "Btt",
           "type": "string"
         },
         "typein": {
@@ -1435,6 +1445,7 @@
         },
         "type": {
           "const": "Cch",
+          "default": "Cch",
           "type": "string"
         }
       },
@@ -1649,6 +1660,7 @@
         },
         "type": {
           "const": "Cim",
+          "default": "Cim",
           "type": "string"
         },
         "ucid": {
@@ -1877,6 +1889,7 @@
         },
         "type": {
           "const": "Cnl",
+          "default": "Cnl",
           "type": "string"
         },
         "ucid": {
@@ -2058,6 +2071,7 @@
         },
         "type": {
           "const": "Con",
+          "default": "Con",
           "type": "string"
         }
       },
@@ -2821,6 +2835,7 @@
         },
         "type": {
           "const": "Cpp",
+          "default": "Cpp",
           "type": "string"
         },
         "viewplid": {
@@ -2860,6 +2875,7 @@
         },
         "type": {
           "const": "Cpr",
+          "default": "Cpr",
           "type": "string"
         },
         "ucid": {
@@ -2889,6 +2905,7 @@
         },
         "type": {
           "const": "Crs",
+          "default": "Crs",
           "type": "string"
         }
       },
@@ -2924,6 +2941,7 @@
         },
         "type": {
           "const": "Csc",
+          "default": "Csc",
           "type": "string"
         }
       },
@@ -3042,6 +3060,7 @@
         },
         "type": {
           "const": "Fin",
+          "default": "Fin",
           "type": "string"
         }
       },
@@ -3083,6 +3102,7 @@
         },
         "type": {
           "const": "Flg",
+          "default": "Flg",
           "type": "string"
         }
       },
@@ -3229,6 +3249,7 @@
         },
         "type": {
           "const": "Hcp",
+          "default": "Hcp",
           "type": "string"
         }
       },
@@ -3301,6 +3322,7 @@
         },
         "type": {
           "const": "Hlv",
+          "default": "Hlv",
           "type": "string"
         }
       },
@@ -3356,6 +3378,7 @@
         },
         "type": {
           "const": "Iii",
+          "default": "Iii",
           "type": "string"
         },
         "ucid": {
@@ -3467,6 +3490,7 @@
         },
         "type": {
           "const": "Ipb",
+          "default": "Ipb",
           "type": "string"
         }
       },
@@ -3508,6 +3532,7 @@
         },
         "type": {
           "const": "Isi",
+          "default": "Isi",
           "type": "string"
         },
         "udpport": {
@@ -3578,6 +3603,7 @@
         },
         "type": {
           "const": "Ism",
+          "default": "Ism",
           "type": "string"
         }
       },
@@ -3610,6 +3636,7 @@
         },
         "type": {
           "const": "Jrr",
+          "default": "Jrr",
           "type": "string"
         },
         "ucid": {
@@ -3900,6 +3927,7 @@
         },
         "type": {
           "const": "Lap",
+          "default": "Lap",
           "type": "string"
         }
       },
@@ -4193,6 +4221,7 @@
         },
         "type": {
           "const": "Mal",
+          "default": "Mal",
           "type": "string"
         },
         "ucid": {
@@ -4391,6 +4420,7 @@
         },
         "type": {
           "const": "Mci",
+          "default": "Mci",
           "type": "string"
         }
       },
@@ -4470,6 +4500,7 @@
         },
         "type": {
           "const": "Mod",
+          "default": "Mod",
           "type": "string"
         },
         "width": {
@@ -4505,6 +4536,7 @@
         },
         "type": {
           "const": "Msl",
+          "default": "Msl",
           "type": "string"
         }
       },
@@ -4540,6 +4572,7 @@
         },
         "type": {
           "const": "Mso",
+          "default": "Mso",
           "type": "string"
         },
         "ucid": {
@@ -4600,6 +4633,7 @@
         },
         "type": {
           "const": "Mst",
+          "default": "Mst",
           "type": "string"
         }
       },
@@ -4623,6 +4657,7 @@
         },
         "type": {
           "const": "Msx",
+          "default": "Msx",
           "type": "string"
         }
       },
@@ -4654,6 +4689,7 @@
         },
         "type": {
           "const": "Mtc",
+          "default": "Mtc",
           "type": "string"
         },
         "ucid": {
@@ -4693,6 +4729,7 @@
         },
         "type": {
           "const": "Nci",
+          "default": "Nci",
           "type": "string"
         },
         "ucid": {
@@ -4745,6 +4782,7 @@
         },
         "type": {
           "const": "Ncn",
+          "default": "Ncn",
           "type": "string"
         },
         "ucid": {
@@ -4797,6 +4835,7 @@
         },
         "type": {
           "const": "Nlp",
+          "default": "Nlp",
           "type": "string"
         }
       },
@@ -4946,6 +4985,7 @@
         },
         "type": {
           "const": "Npl",
+          "default": "Npl",
           "type": "string"
         },
         "tyres": {
@@ -5024,6 +5064,7 @@
         },
         "type": {
           "const": "Obh",
+          "default": "Obh",
           "type": "string"
         },
         "x": {
@@ -6171,6 +6212,7 @@
         },
         "type": {
           "const": "Oco",
+          "default": "Oco",
           "type": "string"
         }
       },
@@ -6344,6 +6386,7 @@
         },
         "type": {
           "const": "Pen",
+          "default": "Pen",
           "type": "string"
         }
       },
@@ -6454,6 +6497,7 @@
         },
         "type": {
           "const": "Pfl",
+          "default": "Pfl",
           "type": "string"
         }
       },
@@ -6504,6 +6548,7 @@
         },
         "type": {
           "const": "Pit",
+          "default": "Pit",
           "type": "string"
         },
         "tyres": {
@@ -6681,6 +6726,7 @@
         },
         "type": {
           "const": "Pla",
+          "default": "Pla",
           "type": "string"
         }
       },
@@ -6800,6 +6846,7 @@
         },
         "type": {
           "const": "Plc",
+          "default": "Plc",
           "type": "string"
         },
         "ucid": {
@@ -6846,6 +6893,7 @@
         },
         "type": {
           "const": "Plh",
+          "default": "Plh",
           "type": "string"
         }
       },
@@ -6869,6 +6917,7 @@
         },
         "type": {
           "const": "Pll",
+          "default": "Pll",
           "type": "string"
         }
       },
@@ -6892,6 +6941,7 @@
         },
         "type": {
           "const": "Plp",
+          "default": "Plp",
           "type": "string"
         }
       },
@@ -7136,6 +7186,7 @@
         },
         "type": {
           "const": "Psf",
+          "default": "Psf",
           "type": "string"
         }
       },
@@ -7394,6 +7445,7 @@
         },
         "type": {
           "const": "Reo",
+          "default": "Reo",
           "type": "string"
         }
       },
@@ -7488,6 +7540,7 @@
         },
         "type": {
           "const": "Res",
+          "default": "Res",
           "type": "string"
         },
         "uname": {
@@ -7595,6 +7648,7 @@
         },
         "type": {
           "const": "Rip",
+          "default": "Rip",
           "type": "string"
         }
       },
@@ -7799,6 +7853,7 @@
         },
         "type": {
           "const": "Rst",
+          "default": "Rst",
           "type": "string"
         },
         "weather": {
@@ -7845,6 +7900,7 @@
         },
         "type": {
           "const": "Scc",
+          "default": "Scc",
           "type": "string"
         },
         "viewplid": {
@@ -7879,6 +7935,7 @@
         },
         "type": {
           "const": "Sch",
+          "default": "Sch",
           "type": "string"
         }
       },
@@ -7938,6 +7995,7 @@
         },
         "type": {
           "const": "Set",
+          "default": "Set",
           "type": "string"
         }
       },
@@ -7983,6 +8041,7 @@
         },
         "type": {
           "const": "Sfp",
+          "default": "Sfp",
           "type": "string"
         }
       },
@@ -8089,6 +8148,7 @@
         },
         "type": {
           "const": "Slc",
+          "default": "Slc",
           "type": "string"
         },
         "ucid": {
@@ -8117,6 +8177,7 @@
         },
         "type": {
           "const": "Small",
+          "default": "Small",
           "type": "string"
         }
       },
@@ -8430,6 +8491,7 @@
         },
         "type": {
           "const": "Spx",
+          "default": "Spx",
           "type": "string"
         }
       },
@@ -8463,6 +8525,7 @@
         },
         "type": {
           "const": "Ssh",
+          "default": "Ssh",
           "type": "string"
         }
       },
@@ -8568,6 +8631,7 @@
         },
         "type": {
           "const": "Sta",
+          "default": "Sta",
           "type": "string"
         },
         "viewplid": {
@@ -8709,6 +8773,7 @@
         },
         "type": {
           "const": "Tiny",
+          "default": "Tiny",
           "type": "string"
         }
       },
@@ -8900,6 +8965,7 @@
         },
         "type": {
           "const": "Toc",
+          "default": "Toc",
           "type": "string"
         }
       },
@@ -8950,6 +9016,7 @@
         },
         "type": {
           "const": "Ttc",
+          "default": "Ttc",
           "type": "string"
         },
         "ucid": {
@@ -9126,6 +9193,7 @@
         },
         "type": {
           "const": "Uco",
+          "default": "Uco",
           "type": "string"
         },
         "ucoaction": {
@@ -9461,6 +9529,7 @@
         },
         "type": {
           "const": "Ver",
+          "default": "Ver",
           "type": "string"
         },
         "version": {
@@ -9490,6 +9559,7 @@
         },
         "type": {
           "const": "Vtn",
+          "default": "Vtn",
           "type": "string"
         },
         "ucid": {

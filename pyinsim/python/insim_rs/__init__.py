@@ -8,12 +8,13 @@ Regenerate after Rust changes with::
 
 Quick start::
 
-    from insim_rs import InsimClient, Handler
+    from insim_rs import Insim, Handler
     from insim_rs._types import Ncn, Mso
 """
 
-from insim_rs.client import InsimClient
+from insim_rs._insim import colour_spans, escape, strip_colours, unescape
+from insim_rs.client import Insim
 from insim_rs.dispatcher import AnyPacket
 from insim_rs.handler import Handler
 
-__all__ = ["AnyPacket", "InsimClient", "Handler"]
+__all__ = ["AnyPacket", "Insim", "Handler", "strip_colours", "unescape", "escape", "colour_spans"]

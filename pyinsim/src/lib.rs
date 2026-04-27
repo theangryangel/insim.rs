@@ -20,7 +20,7 @@ use tokio::{runtime::Builder as RuntimeBuilder, sync::broadcast::error::RecvErro
 
 /// Raw FFI handle wrapping a spawned insim connection.
 ///
-/// Do not use this directly from Python — the `InsimClient` facade in
+/// Do not use this directly from Python — the `Insim` facade in
 /// `pyinsim.client` is the public API.
 #[pyclass]
 struct _Insim {
@@ -115,26 +115,31 @@ impl _Insim {
         let receiver = &mut self.receiver;
         let rt = &self.runtime;
 
-        // `detach` is PyO3 0.22+'s replacement for `allow_threads`.
-        // It releases the GIL for the duration of the closure so the Python
-        // event loop keeps ticking while we block on the broadcast channel.
-        py.detach(|| {
-            rt.block_on(async {
-                loop {
-                    match receiver.recv().await {
-                        Ok(packet) => {
-                            return serde_json::to_string(&packet)
-                                .map_err(|e| PyRuntimeError::new_err(e.to_string()));
-                        },
-                        // Channel overflowed — skip the gap and keep reading.
-                        Err(RecvError::Lagged(_)) => continue,
-                        Err(e) => {
-                            return Err(PyRuntimeError::new_err(e.to_string()));
-                        },
-                    }
-                }
-            })
-        })
+        // Loop outside py.detach() so we can call py.check_signals() on each
+        // timeout tick. Without this, SIGINT (Ctrl+C) is never delivered because
+        // Python can't act on it until the GIL is reacquired.
+        loop {
+            let result = py.detach(|| {
+                rt.block_on(async {
+                    tokio::time::timeout(
+                        std::time::Duration::from_millis(100),
+                        receiver.recv(),
+                    )
+                    .await
+                })
+            });
+
+            match result {
+                Ok(Ok(packet)) => {
+                    return serde_json::to_string(&packet)
+                        .map_err(|e| PyRuntimeError::new_err(e.to_string()));
+                },
+                Ok(Err(RecvError::Lagged(_))) => continue,
+                Ok(Err(e)) => return Err(PyRuntimeError::new_err(e.to_string())),
+                // Timeout: GIL reacquired — check for pending Python signals.
+                Err(_) => py.check_signals()?,
+            }
+        }
     }
 
     /// Send a packet to LFS. `data` must be a JSON string with a `"type"` field
@@ -164,6 +169,46 @@ impl _Insim {
     }
 }
 
+// ── String utilities ───────────────────────────────────────────────────────
+
+/// Strip LFS colour markers (`^0`–`^8`) from a string.
+///
+/// Escaped control markers (`^^`) are preserved so they survive a subsequent
+/// call to :func:`unescape`.  Call this before :func:`unescape` when you need
+/// both operations.
+#[pyfunction]
+fn strip_colours(input: &str) -> String {
+    insim::core::string::colours::strip(input).into_owned()
+}
+
+/// Unescape LFS escape sequences (e.g. ``^v`` → ``|``, ``^t`` → ``"``).
+///
+/// If you also need to strip colours, call :func:`strip_colours` first while
+/// the marker intent is still preserved.
+#[pyfunction]
+fn unescape(input: &str) -> String {
+    insim::core::string::escaping::unescape(input).into_owned()
+}
+
+/// Escape a string for sending to LFS (e.g. ``|`` → ``^v``, ``"`` → ``^t``).
+#[pyfunction]
+fn escape(input: &str) -> String {
+    insim::core::string::escaping::escape(input).into_owned()
+}
+
+/// Split an LFS string into ``(colour_index, text)`` spans.
+///
+/// Colour index is ``0``–``8`` (matching LFS ``^0``–``^8``).  Spans with no
+/// text are skipped.  The text slices may still contain escaped sequences
+/// (``^^``); call :func:`unescape` on each span if you need the final display
+/// string.
+#[pyfunction]
+fn colour_spans(input: &str) -> Vec<(u8, String)> {
+    insim::core::string::colours::spans(input)
+        .map(|(c, s)| (c, s.to_owned()))
+        .collect()
+}
+
 // ── Module entry point ─────────────────────────────────────────────────────
 
 /// Register the `_Insim` class into the `pyinsim._insim` extension module.
@@ -171,6 +216,10 @@ impl _Insim {
 fn _insim(m: &Bound<'_, PyModule>) -> PyResult<()> {
     let _ = pyo3_log::init();
     m.add_class::<_Insim>()?;
+    m.add_function(wrap_pyfunction!(strip_colours, m)?)?;
+    m.add_function(wrap_pyfunction!(unescape, m)?)?;
+    m.add_function(wrap_pyfunction!(escape, m)?)?;
+    m.add_function(wrap_pyfunction!(colour_spans, m)?)?;
     Ok(())
 }
 

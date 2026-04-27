@@ -4,6 +4,7 @@ use std::{
 };
 
 use clap::Parser;
+use serde::Deserialize;
 
 #[derive(Debug, Parser)]
 #[command(about = "Generate insim_schema.json and pyinsim/_types.py from Rust packet types")]
@@ -11,6 +12,17 @@ struct Cli {
     /// Verify outputs are up to date without writing
     #[arg(long, default_value_t = false)]
     check: bool,
+}
+
+#[derive(Deserialize)]
+struct PyProject {
+    project: PyProjectProject,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct PyProjectProject {
+    requires_python: String,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -25,11 +37,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let schema_path = workspace_root.join("pyinsim/insim_schema.json");
     let types_path = workspace_root.join("pyinsim/python/insim_rs/_types.py");
+    let pyproject_path = workspace_root.join("pyinsim/pyproject.toml");
+
+    let pyproject: PyProject = toml::from_str(&std::fs::read_to_string(&pyproject_path)?)?;
+    let python_version = requires_python_to_target(&pyproject.project.requires_python)?;
 
     generate_schema(&schema_path, cli.check)?;
-    generate_types(&schema_path, &types_path, cli.check)?;
+    generate_types(&schema_path, &types_path, &python_version, cli.check)?;
 
     Ok(())
+}
+
+/// Extract `major.minor` from a PEP 440 `requires-python` specifier.
+///
+/// Takes the version from the first clause and strips any patch component,
+/// e.g. `>=3.12,<4` → `"3.12"`.
+fn requires_python_to_target(spec: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let clause = spec.split(',').next().unwrap_or(spec);
+    let start = clause
+        .find(|c: char| c.is_ascii_digit())
+        .ok_or_else(|| format!("no version number in requires-python = \"{spec}\""))?;
+    let version = &clause[start..];
+    let mut parts = version.split('.');
+    let major = parts.next().ok_or("missing major version")?;
+    let minor = parts.next().ok_or("missing minor version")?;
+    Ok(format!("{major}.{minor}"))
 }
 
 /// Restructure `Packet.oneOf` so datamodel-codegen generates named classes.
@@ -78,7 +110,7 @@ fn postprocess_packet_discriminators(schema: &mut serde_json::Value) {
                 .unwrap()
                 .insert(
                     "type".to_owned(),
-                    serde_json::json!({"type": "string", "const": type_const}),
+                    serde_json::json!({"type": "string", "const": type_const, "default": type_const}),
                 );
 
             let required = def
@@ -138,6 +170,7 @@ fn generate_schema(output: &Path, check: bool) -> Result<(), Box<dyn std::error:
 fn generate_types(
     schema: &Path,
     output: &Path,
+    python_version: &str,
     check: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let effective_output = if check {
@@ -151,7 +184,7 @@ fn generate_types(
             "tool",
             "run",
             "--from",
-            "datamodel-code-generator",
+            "datamodel-code-generator[ruff]",
             "datamodel-codegen",
             "--input",
             schema.to_str().unwrap(),
@@ -165,8 +198,20 @@ fn generate_types(
             "--use-annotated",
             "--disable-timestamp",
             "--field-constraints",
+            "--use-default",
+            "--collapse-root-models",
             "--target-python-version",
-            "3.12",
+            python_version,
+            "--formatters",
+            "ruff-format",
+            "ruff-check",
+            "--type-mappings",
+            "integer+uint8=int32",
+            "integer+uint16=int32",
+            "integer+int16=int32",
+            "integer+uint32=int64",
+            "integer+uint64=int64",
+            "integer+uint=int64",
         ])
         .current_dir(schema.parent().unwrap())
         .status()?;

@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "insim-rs"
 version = "0.1.0"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 description = "Python bindings for the insim.rs InSim library"
 dependencies = [
     "pydantic>=2",
@@ -14,9 +14,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     # Required for codegen — see README.md for the full workflow.
-    "datamodel-code-generator>=0.25",
+    "datamodel-code-generator[ruff]>=0.25",
     "pytest>=8",
-    "pytest-asyncio>=0.24",
     "mypy>=1.10",
 ]
 
@@ -26,7 +25,6 @@ python-source = "python"
 features = ["pyo3/extension-module"]
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
 testpaths = ["tests"]
 
 [tool.mypy]
