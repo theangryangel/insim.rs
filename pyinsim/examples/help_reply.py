@@ -36,15 +36,18 @@ def on_mso(packet: Mso) -> None:
     command = unescape(strip_colours(packet.msg[packet.textstart :]))
     if command != "!help":
         return
-    client.send(
-        Mtc(
-            reqi=0,
-            ucid=packet.ucid,
-            plid=packet.plid,
-            sound=SoundType.SysMessage,
-            text="Commands: !help" * 128,
+    try:
+        client.send(
+            Mtc(
+                reqi=0,
+                ucid=packet.ucid,
+                plid=packet.plid,
+                sound=SoundType.SysMessage,
+                text="Commands: !help" * 128,
+            )
         )
-    )
+    except RuntimeError as e:
+        print(f"send error (non-fatal): {e}")
 
 
 client.run()
