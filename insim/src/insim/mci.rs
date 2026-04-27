@@ -32,7 +32,7 @@ bitflags! {
         const LAST = (1 << 7);
     }
 }
-impl_bitflags_json_schema!(CompCarInfo);
+impl_bitflags_json_schema!(CompCarInfo, "CompCarInfoFlag");
 
 generate_bitflag_helpers! {
     CompCarInfo,

@@ -73,7 +73,7 @@ bitflags! {
         const SIREN_SLOW = Self::SET_SIREN.bits() | (2 << 20);
     }
 }
-impl_bitflags_json_schema!(LcsFlags);
+impl_bitflags_json_schema!(LcsFlags, "LcsFlag");
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
@@ -126,7 +126,7 @@ bitflags! {
         const EXTRA = Self::SET_EXTRA.bits() | (1 << 2);
     }
 }
-impl_bitflags_json_schema!(LclFlags);
+impl_bitflags_json_schema!(LclFlags, "LclFlag");
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

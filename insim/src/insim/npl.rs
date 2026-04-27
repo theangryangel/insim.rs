@@ -73,7 +73,7 @@ bitflags! {
         const CUSTOM_VIEW = (1 << 13);
     }
 }
-impl_bitflags_json_schema!(PlayerFlags);
+impl_bitflags_json_schema!(PlayerFlags, "PlayerFlag");
 
 generate_bitflag_helpers!(PlayerFlags,
     pub is_left_side => LEFTSIDE,
@@ -101,7 +101,7 @@ bitflags! {
         const ABS_ENABLE = (1 << 2);
     }
 }
-impl_bitflags_json_schema!(SetFlags);
+impl_bitflags_json_schema!(SetFlags, "SetFlag");
 
 impl_bitflags_from_to_bytes!(SetFlags, u8);
 
@@ -123,7 +123,7 @@ bitflags! {
         const REMOTE = (1 << 2);
     }
 }
-impl_bitflags_json_schema!(PlayerType);
+impl_bitflags_json_schema!(PlayerType, "PlayerTypeFlag");
 
 impl_bitflags_from_to_bytes!(PlayerType, u8);
 
@@ -156,7 +156,7 @@ bitflags! {
         const REAR_RIGHT_FEMALE = (1 << 7);
     }
 }
-impl_bitflags_json_schema!(Passengers);
+impl_bitflags_json_schema!(Passengers, "PassengersFlag");
 
 impl_bitflags_from_to_bytes!(Passengers, u8);
 
@@ -176,7 +176,7 @@ bitflags! {
         const SAI_MASK = Self::SAI_0.bits() | Self::SAI_1.bits();
     }
 }
-impl_bitflags_json_schema!(RiFlags);
+impl_bitflags_json_schema!(RiFlags, "RiFlag");
 
 impl_bitflags_from_to_bytes!(RiFlags, u8);
 

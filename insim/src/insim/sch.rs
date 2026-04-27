@@ -13,7 +13,7 @@ bitflags! {
         const CTRL = (1 << 1);
     }
 }
-impl_bitflags_json_schema!(SchFlags);
+impl_bitflags_json_schema!(SchFlags, "SchFlag");
 
 generate_bitflag_helpers! {
     SchFlags,

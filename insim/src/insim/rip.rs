@@ -61,7 +61,7 @@ bitflags::bitflags! {
         const FULL_PHYS = (1 << 2);
     }
 }
-impl_bitflags_json_schema!(RipOptions);
+impl_bitflags_json_schema!(RipOptions, "RipOption");
 
 generate_bitflag_helpers! {
     RipOptions,

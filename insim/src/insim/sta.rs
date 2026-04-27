@@ -88,7 +88,7 @@ bitflags! {
         const TEXT_ENTRY = (1 << 15);
     }
 }
-impl_bitflags_json_schema!(StaFlags);
+impl_bitflags_json_schema!(StaFlags, "StaFlag");
 
 generate_bitflag_helpers! {
     StaFlags,

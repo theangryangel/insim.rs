@@ -44,7 +44,7 @@ bitflags::bitflags! {
         const AVOID_CHECK = (1 << 3);
     }
 }
-impl_bitflags_json_schema!(PmoFlags);
+impl_bitflags_json_schema!(PmoFlags, "PmoFlag");
 
 impl_bitflags_from_to_bytes!(PmoFlags, u8);
 

@@ -53,7 +53,7 @@ bitflags! {
         const GREEN = (1 << 3);
     }
 }
-impl_bitflags_json_schema!(OcoLights);
+impl_bitflags_json_schema!(OcoLights, "OcoLight");
 
 impl_bitflags_from_to_bytes!(OcoLights, u8);
 

@@ -26,7 +26,7 @@ bitflags! {
         const ON_SPOT = (1 << 3);
     }
 }
-impl_bitflags_json_schema!(ObhFlags);
+impl_bitflags_json_schema!(ObhFlags, "ObhFlag");
 
 generate_bitflag_helpers! {
     ObhFlags,

@@ -13,7 +13,7 @@ bitflags::bitflags! {
          const SILENT = (1 << 7);
     }
 }
-impl_bitflags_json_schema!(PlayerHandicapFlags);
+impl_bitflags_json_schema!(PlayerHandicapFlags, "PlayerHandicapFlag");
 
 impl_bitflags_from_to_bytes!(PlayerHandicapFlags, u8);
 

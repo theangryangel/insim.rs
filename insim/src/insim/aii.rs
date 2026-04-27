@@ -79,7 +79,7 @@ bitflags! {
         const CHDN = (1 << 3);
     }
 }
-impl_bitflags_json_schema!(AiFlags);
+impl_bitflags_json_schema!(AiFlags, "AiFlag");
 
 impl_bitflags_from_to_bytes!(AiFlags, u8);
 

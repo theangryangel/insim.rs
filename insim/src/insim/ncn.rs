@@ -8,7 +8,7 @@ bitflags::bitflags! {
         const REMOTE = (1 << 2);
     }
 }
-impl_bitflags_json_schema!(NcnFlags);
+impl_bitflags_json_schema!(NcnFlags, "NcnFlag");
 
 generate_bitflag_helpers! {
     NcnFlags,

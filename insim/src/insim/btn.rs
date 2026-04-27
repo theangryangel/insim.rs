@@ -16,7 +16,7 @@ bitflags::bitflags! {
         const ALWAYSON = (1 << 7);
     }
 }
-impl_bitflags_json_schema!(BtnInst);
+impl_bitflags_json_schema!(BtnInst, "BtnInstFlag");
 
 impl_bitflags_from_to_bytes!(BtnInst, u8);
 
@@ -64,7 +64,7 @@ bitflags::bitflags! {
         const RIGHT = (1 << 7);
     }
 }
-impl_bitflags_json_schema!(BtnStyleFlags);
+impl_bitflags_json_schema!(BtnStyleFlags, "BtnStyleFlag");
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -240,7 +240,7 @@ bitflags::bitflags! {
         const SHIFT = (1 << 3);
     }
 }
-impl_bitflags_json_schema!(BtnClickFlags);
+impl_bitflags_json_schema!(BtnClickFlags, "BtnClickFlag");
 
 impl_bitflags_from_to_bytes!(BtnClickFlags, u8);
 

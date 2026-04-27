@@ -47,7 +47,7 @@ bitflags! {
         const PSE_REFUEL = (1 << 16);
     }
 }
-impl_bitflags_json_schema!(PitStopWorkFlags);
+impl_bitflags_json_schema!(PitStopWorkFlags, "PitStopWorkFlag");
 
 impl_bitflags_from_to_bytes!(PitStopWorkFlags, u32);
 

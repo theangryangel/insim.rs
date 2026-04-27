@@ -43,7 +43,7 @@ bitflags! {
         const SET = (1 << 12);
     }
 }
-impl_bitflags_json_schema!(IsiFlags);
+impl_bitflags_json_schema!(IsiFlags, "IsiFlag");
 
 impl IsiFlags {
     /// Clear all flags

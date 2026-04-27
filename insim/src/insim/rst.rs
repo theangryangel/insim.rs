@@ -36,7 +36,7 @@ bitflags! {
         const NO_FLOOD = (1 << 15);
     }
 }
-impl_bitflags_json_schema!(RaceFlags);
+impl_bitflags_json_schema!(RaceFlags, "RaceFlag");
 
 generate_bitflag_helpers!(
     RaceFlags,

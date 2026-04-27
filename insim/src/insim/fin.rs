@@ -23,7 +23,7 @@ bitflags::bitflags! {
         const DID_NOT_PIT = (1 << 6);
     }
 }
-impl_bitflags_json_schema!(RaceConfirmFlags);
+impl_bitflags_json_schema!(RaceConfirmFlags, "RaceConfirmFlag");
 
 impl_bitflags_from_to_bytes!(RaceConfirmFlags, u8);
 

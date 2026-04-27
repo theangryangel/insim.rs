@@ -20,7 +20,7 @@ bitflags! {
         const AUTOCLUTCH = (1 << 9);
     }
 }
-impl_bitflags_json_schema!(AiHelpFlags);
+impl_bitflags_json_schema!(AiHelpFlags, "AiHelpFlag");
 
 impl_bitflags_from_to_bytes!(AiHelpFlags, u16);
 
