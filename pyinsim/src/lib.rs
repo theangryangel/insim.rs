@@ -123,11 +123,8 @@ impl _Insim {
                 let rt = &self.runtime;
                 py.detach(|| {
                     rt.block_on(async {
-                        tokio::time::timeout(
-                            std::time::Duration::from_millis(100),
-                            receiver.recv(),
-                        )
-                        .await
+                        tokio::time::timeout(std::time::Duration::from_millis(100), receiver.recv())
+                            .await
                     })
                 })
             };
