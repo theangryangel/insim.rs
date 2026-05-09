@@ -11,15 +11,14 @@ Each example is setup as its own crate so its dependencies are clear.
 
 ## Catalog
 
-- `simple-async` - Async TCP connection and basic packet loop.
-- `simple-blocking` - Blocking TCP connection and basic packet loop.
-- `strobe` - Toggle local vehicle lights in a sequence.
-- `marquee` - Layout objects and AXM packet tooling experiments.
-- `live-delta` - Live delta timing displayed with in-game buttons.
 - `btn-clickid-mangled-mvp` - Minimal repro: update same ClickID from clickable to non-clickable.
 - `clockwork-carnage` - insim_extras proof-of-concept/dogfooding (WIP).
-- `simple-outsim` - Basic outsim usage.
-- `simple-outgauge` - Basic outgauge usage.
+- `live-delta` - Live delta timing displayed with in-game buttons.
+- `marquee` - Layout objects and AXM packet tooling experiments.
 - `pth2svg` - Convert a LFS PTH file to an SVG.
-- `ssg-manual` - Handle split TCP and UDP connection to LFS, manually, allowing you to receive
-  Mci, Nlp, Outsim and Outgauge packets via UDP, and everything else via TCP.
+- `simple-async` - Async TCP connection and basic packet loop.
+- `simple-blocking` - Blocking TCP connection and basic packet loop.
+- `simple-outgauge` - Basic outgauge usage.
+- `simple-outsim` - Basic outsim usage.
+- `ssg-manual` - Handle split TCP and UDP connection to LFS, manually, allowing you to receive Mci, Nlp, Outsim and Outgauge packets via UDP, and everything else via TCP.
+- `strobe` - Toggle local vehicle lights in a sequence.

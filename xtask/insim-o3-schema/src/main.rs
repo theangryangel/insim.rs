@@ -3,16 +3,7 @@ use std::{
     process::Command,
 };
 
-use clap::Parser;
 use serde::Deserialize;
-
-#[derive(Debug, Parser)]
-#[command(about = "Generate insim_schema.json and pyinsim/_types.py from Rust packet types")]
-struct Cli {
-    /// Verify outputs are up to date without writing
-    #[arg(long, default_value_t = false)]
-    check: bool,
-}
 
 #[derive(Deserialize)]
 struct PyProject {
@@ -26,8 +17,6 @@ struct PyProjectProject {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let cli = Cli::parse();
-
     let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
@@ -35,15 +24,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap()
         .to_owned();
 
-    let schema_path = workspace_root.join("pyinsim/insim_schema.json");
-    let types_path = workspace_root.join("pyinsim/python/insim_rs/_types.py");
-    let pyproject_path = workspace_root.join("pyinsim/pyproject.toml");
+    let schema_path = workspace_root.join("insim_o3/insim_schema.json");
+    let types_path = workspace_root.join("insim_o3/python/insim_o3/packets.py");
+    let pyproject_path = workspace_root.join("insim_o3/pyproject.toml");
 
     let pyproject: PyProject = toml::from_str(&std::fs::read_to_string(&pyproject_path)?)?;
     let python_version = requires_python_to_target(&pyproject.project.requires_python)?;
 
-    generate_schema(&schema_path, cli.check)?;
-    generate_types(&schema_path, &types_path, &python_version, cli.check)?;
+    let variants = generate_schema(&schema_path)?;
+    generatepackets(&schema_path, &types_path, &python_version, &variants)?;
 
     Ok(())
 }
@@ -64,19 +53,24 @@ fn requires_python_to_target(spec: &str) -> Result<String, Box<dyn std::error::E
     Ok(format!("{major}.{minor}"))
 }
 
-/// Restructure `Packet.oneOf` so datamodel-codegen generates named classes.
+/// Reshape the schemars-emitted schema for datamodel-codegen, returning the
+/// ordered list of variant class names.
 ///
-/// schemars emits each variant as `{$ref, properties: {type: {const: …}}, required: [type]}`.
-/// datamodel-codegen can't match that compound form back to the named `$defs` entry, so it
-/// mints numbered duplicates (`Packet1`, `Packet2`, …).
+/// Why we mutate:
+/// - schemars emits each variant in `oneOf` as `{$ref, properties: {type:
+///   {const: …}}, required: [type]}`. datamodel-codegen can't match that
+///   compound form back to the named `$defs` entry, so it mints numbered
+///   duplicates (`Packet1`, `Packet2`, …). We fix this by injecting the
+///   `type` discriminator field into each named `$defs` struct and replacing
+///   each oneOf entry with a plain `{"$ref": …}`.
+/// - We then strip `oneOf` (and the `title`/`description` that go with it)
+///   from the top level entirely. Without those, datamodel-codegen does not
+///   emit a wrapper `Packet` class, so the Python side does not have to
+///   truncate one out. The Python `AnyPacket` alias is built directly from
+///   the returned variant list.
 ///
-/// We fix this by:
-/// 1. Injecting the `type` discriminator field into each named `$defs` struct.
-/// 2. Replacing each compound oneOf entry with a plain `{"$ref": "…"}`.
-///
-/// After this transform datamodel-codegen generates `class Ncn(BaseModel): type: Literal["Ncn"]`
-/// and `Packet = RootModel[Ncn | Mso | …]` using the named classes throughout.
-fn postprocess_packet_discriminators(schema: &mut serde_json::Value) {
+/// The returned variant names are in the same order schemars emitted them.
+fn prepare_schema_for_codegen(schema: &mut serde_json::Value) -> Vec<String> {
     // Collect ($ref, type const) pairs from oneOf entries before any mutation.
     let pairs: Vec<(String, String)> = schema
         .get("oneOf")
@@ -124,61 +118,51 @@ fn postprocess_packet_discriminators(schema: &mut serde_json::Value) {
         }
     }
 
-    // Replace each compound oneOf entry with a plain $ref.
-    if let Some(one_of) = schema.get_mut("oneOf").and_then(|v| v.as_array_mut()) {
-        for entry in one_of.iter_mut() {
-            if let Some(ref_val) = entry
-                .get("$ref")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_owned())
-            {
-                *entry = serde_json::json!({"$ref": ref_val});
-            }
-        }
+    // Capture variant names in oneOf order for the Python `AnyPacket` alias.
+    let variants: Vec<String> = pairs
+        .iter()
+        .map(|(ref_val, _)| {
+            ref_val
+                .strip_prefix("#/$defs/")
+                .unwrap_or(ref_val.as_str())
+                .to_owned()
+        })
+        .collect();
+
+    // Drop top-level fields that would make datamodel-codegen emit a wrapper
+    // class.  Without `oneOf` it has no union to model; without `title` it
+    // has no name to assign.
+    if let Some(obj) = schema.as_object_mut() {
+        obj.remove("oneOf");
+        obj.remove("title");
+        obj.remove("description");
     }
+
+    variants
 }
 
-fn generate_schema(output: &Path, check: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn generate_schema(output: &Path) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let schema = schemars::schema_for!(insim::Packet);
     let mut schema_value: serde_json::Value =
         serde_json::to_value(&schema).expect("schemars produced non-serialisable schema");
 
-    postprocess_packet_discriminators(&mut schema_value);
+    let variants = prepare_schema_for_codegen(&mut schema_value);
 
     let generated = serde_json::to_string_pretty(&schema_value)
         .expect("post-processed schema is non-serialisable");
 
-    if check {
-        let existing = std::fs::read_to_string(output)
-            .map_err(|_| format!("{} not found — run without --check first", output.display()))?;
-        if existing != generated {
-            return Err(format!(
-                "{} is out of date. Run `cargo run -p xtask-pyinsim-schema` to regenerate.",
-                output.display()
-            )
-            .into());
-        }
-        println!("ok: {}", output.display());
-    } else {
-        std::fs::write(output, generated)?;
-        println!("wrote {}", output.display());
-    }
+    std::fs::write(output, generated)?;
+    println!("wrote {}", output.display());
 
-    Ok(())
+    Ok(variants)
 }
 
-fn generate_types(
+fn generatepackets(
     schema: &Path,
     output: &Path,
     python_version: &str,
-    check: bool,
+    variants: &[String],
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let effective_output = if check {
-        std::env::temp_dir().join("pyinsim_types_check.py")
-    } else {
-        output.to_owned()
-    };
-
     let status = Command::new("uv")
         .args([
             "tool",
@@ -191,7 +175,7 @@ fn generate_types(
             "--input-file-type",
             "jsonschema",
             "--output",
-            effective_output.to_str().unwrap(),
+            output.to_str().unwrap(),
             "--output-model-type",
             "pydantic_v2.BaseModel",
             "--use-union-operator",
@@ -220,21 +204,78 @@ fn generate_types(
         return Err(format!("uv run datamodel-codegen exited with {status}").into());
     }
 
-    if check {
-        let existing = std::fs::read_to_string(output)
-            .map_err(|_| format!("{} not found — run without --check first", output.display()))?;
-        let generated = std::fs::read_to_string(&effective_output)?;
-        if existing != generated {
-            return Err(format!(
-                "{} is out of date. Run `cargo run -p xtask-pyinsim-schema` to regenerate.",
-                output.display()
-            )
-            .into());
-        }
-        println!("ok: {}", output.display());
-    } else {
-        println!("wrote {}", output.display());
-    }
+    postprocess_generated_packets(output, variants)?;
+    println!("wrote {}", output.display());
 
     Ok(())
+}
+
+/// Append the `AnyPacket` Python type alias and clean up dead code that
+/// datamodel-codegen leaves at the top of the file.
+///
+/// The schema-side prepare step strips `oneOf` so there is no real top-level
+/// schema, but datamodel-codegen still emits a placeholder
+/// `class Model(RootModel[Any]): root: Any` plus an `Any` typing import.
+/// We delete that pair and then append the `AnyPacket` alias built from the
+/// variant list captured during schema preparation.
+fn postprocess_generated_packets(
+    path: &Path,
+    variants: &[String],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut contents = std::fs::read_to_string(path)?;
+
+    // Appease ruff.
+    contents = replace_once(
+        &contents,
+        "from typing import Annotated, Any, Literal\n",
+        "from typing import Annotated, Literal\n",
+        path,
+    )?;
+
+    // Strip the placeholder root model.  Two leading newlines are part of the
+    // ruff-formatted block separator above, two trailing newlines are the
+    // separator below.
+    contents = replace_once(
+        &contents,
+        "\nclass Model(RootModel[Any]):\n    root: Any\n\n",
+        "",
+        path,
+    )?;
+
+    if !contents.ends_with('\n') {
+        contents.push('\n');
+    }
+    contents.push_str("\n\ntype AnyPacket = (\n");
+    for (i, name) in variants.iter().enumerate() {
+        if i == 0 {
+            contents.push_str(&format!("    {name}\n"));
+        } else {
+            contents.push_str(&format!("    | {name}\n"));
+        }
+    }
+    contents.push_str(")\n");
+
+    std::fs::write(path, contents)?;
+    Ok(())
+}
+
+/// Replace exactly one occurrence of `needle` with `replacement` in
+/// `contents`, returning a clear error if the count is not 1.
+fn replace_once(
+    contents: &str,
+    needle: &str,
+    replacement: &str,
+    path: &Path,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let count = contents.matches(needle).count();
+    if count != 1 {
+        return Err(format!(
+            "expected exactly one occurrence of {:?} in {}, found {}",
+            needle.lines().next().unwrap_or(needle),
+            path.display(),
+            count
+        )
+        .into());
+    }
+    Ok(contents.replacen(needle, replacement, 1))
 }

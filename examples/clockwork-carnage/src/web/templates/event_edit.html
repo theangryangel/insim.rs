@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Edit Event #{{ event.id }} — Clockwork Carnage{% endblock %}
+{% block title %}Edit Event #{{ event.id }} - Clockwork Carnage{% endblock %}
 {% block content %}
 
 {# ── Header ── #}
@@ -38,7 +38,7 @@
         <select id="track" name="track" required
           class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors">
           {% for track in tracks %}
-          <option value="{{ track }}"{% if *track == event.track %} selected{% endif %}>{{ track }} — {{ track.complete_name() }}</option>
+          <option value="{{ track }}"{% if *track == event.track %} selected{% endif %}>{{ track }} - {{ track.complete_name() }}</option>
           {% endfor %}
         </select>
       </div>

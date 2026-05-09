@@ -2,7 +2,7 @@
 # Gate 1: 80-unit gap (5 m). Gate 2: 48-unit gap (3 m). Gate 3: 24-unit gap (1.5 m).
 # Place on a straight before a climb section to punish wide entry lines.
 #
-# Gate 1 — 80-unit gap between pillars centred on y=0
+# Gate 1 - 80-unit gap between pillars centred on y=0
 - !ConcretePillar
   xyz:
     x: 0
@@ -23,7 +23,7 @@
   height: M4_00
   heading:
     radians: 0.0
-# Gate 2 — 48-unit gap
+# Gate 2 - 48-unit gap
 - !ConcretePillar
   xyz:
     x: 96
@@ -44,7 +44,7 @@
   height: M4_00
   heading:
     radians: 0.0
-# Gate 3 — 24-unit gap; only the bravest (or narrowest) get through clean
+# Gate 3 - 24-unit gap; only the bravest (or narrowest) get through clean
 - !ConcretePillar
   xyz:
     x: 192

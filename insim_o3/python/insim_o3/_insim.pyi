@@ -1,20 +1,25 @@
 """
-Type stubs for the compiled PyO3 extension module `insim_rs._insim`.
+Type stubs for the compiled PyO3 extension module `insim_o3._insim`.
 
 The extension is built by maturin from `src/lib.rs`. These stubs give IDEs
 and type-checkers full knowledge of the FFI boundary without requiring the
 compiled `.so`/`.pyd` to be present at analysis time.
 """
 
+from collections.abc import Awaitable
+
+from insim_o3.packets import IsiFlag
+
 class _Insim:
     """
     Raw FFI handle wrapping a spawned insim TCP connection.
 
-    **Not part of the public API.** Use `insim_rs.client.Insim` instead.
+    **Not part of the public API: use `insim_o3.client.Insim` instead.**
 
     The FFI boundary is deliberately narrow: every method accepts or returns
     plain JSON strings so that no PyO3 lifetime or newtype complexity leaks
-    into the Python layer.
+    into the Python layer.  Every method is async - the awaitable resolves
+    through ``pyo3-async-runtimes`` against the running asyncio loop.
     """
 
     @staticmethod
@@ -22,57 +27,55 @@ class _Insim:
         addr: str,
         /,
         *,
-        flags: list[str] | None = None,  # pass IsiFlag enum values
+        flags: list[IsiFlag] | None = None,
         iname: str | None = None,
         admin_password: str | None = None,
         interval_ms: int | None = None,
         prefix: str | None = None,
-        capacity: int = 128,
-    ) -> "_Insim":
+        capacity: int = 512,
+    ) -> Awaitable[_Insim]:
         """
         Establish a TCP connection to LFS and return a ready handle.
 
-        Blocks the calling thread while the handshake completes.
-        Raises `RuntimeError` on connection failure.
-
         ``flags`` accepts a list of ``IsiFlag`` string-enum values from
-        ``insim_rs._types`` (e.g. ``[IsiFlag.MCI, IsiFlag.NLP]``).  Because
-        ``IsiFlag`` is a ``str`` subclass the values pass through the FFI
-        boundary as plain strings.
+        ``insim_o3.packets`` (e.g. ``[IsiFlag.MCI, IsiFlag.NLP]``).
 
         ``prefix`` must be a single character or ``None``.
+
         Raises ``ValueError`` for unrecognised flag names or a multi-character
-        prefix.
+        prefix (raised synchronously, before the awaitable is awaited).
+        Raises ``RuntimeError`` on connection failure (raised when the
+        awaitable is awaited).
         """
         ...
 
-    def recv(self) -> str:
+    def recv(self) -> Awaitable[str]:
         """
-        Block (releasing the GIL) until a packet arrives from LFS.
+        Wait for the next packet from LFS.
 
         Returns a JSON string such as::
 
             '{"type": "Ncn", "reqi": 0, "ucid": 1, ...}'
 
-        Raises `RuntimeError` when the connection is closed.
+        Raises ``RuntimeError`` when the connection is closed.
         """
         ...
 
-    def send(self, data: str, /) -> None:
+    def send(self, data: str, /) -> Awaitable[None]:
         """
         Send a packet to LFS.
 
-        `data` must be a JSON string with a ``"type"`` field matching a Rust
+        ``data`` must be a JSON string with a ``"type"`` field matching a Rust
         ``Packet`` variant name, e.g.::
 
             '{"type": "Tiny", "reqi": 1, "subt": "Ping"}'
 
-        Raises `ValueError` for malformed JSON.
-        Raises `RuntimeError` if the connection is dead.
+        Raises ``ValueError`` for malformed JSON (synchronously).
+        Raises ``RuntimeError`` if the connection is dead (when awaited).
         """
         ...
 
-    def shutdown(self) -> None:
+    def shutdown(self) -> Awaitable[None]:
         """Signal the background network actor to stop gracefully."""
         ...
 

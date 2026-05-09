@@ -1,6 +1,5 @@
 use std::{collections::BTreeSet, fmt::Write as _, fs, path::PathBuf};
 
-use clap::Parser;
 use encoding_rs::Encoding;
 
 const MAX_UNICODE: u32 = 0x10FFFF;
@@ -25,17 +24,7 @@ struct RangeMask {
     mask: u16,
 }
 
-#[derive(Debug, Parser)]
-#[command(about = "Generate the insim_core codepage LUT source file")]
-struct Cli {
-    /// Verify the target file matches generated output without writing
-    #[arg(long, default_value_t = false)]
-    check: bool,
-}
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let cli = Cli::parse();
-
     let ranges = build_disjoint_ranges();
     let generated = emit_rust(&ranges);
     let output_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -44,14 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("could not resolve workspace root")?
         .join("insim_core/src/string/codepages_lut.rs");
 
-    if cli.check {
-        let existing = fs::read_to_string(&output_path)?;
-        if existing != generated {
-            return Err(format!("generated LUT differs from {}", output_path.display()).into());
-        }
-    } else {
-        fs::write(&output_path, generated)?;
-    }
+    fs::write(&output_path, generated)?;
 
     Ok(())
 }

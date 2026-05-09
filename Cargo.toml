@@ -11,8 +11,8 @@ members = [
   "outgauge",
   "outsim",
   "xtask/codepage-lut",
-  "xtask/pyinsim-schema",
-  "pyinsim",
+  "xtask/insim-o3-schema",
+  "insim_o3",
 ]
 exclude = ['examples/*']
 # Only check / build main crates by default (check all with `--workspace`)

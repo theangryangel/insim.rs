@@ -2,9 +2,10 @@
 #   filename:  insim_schema.json
 
 from enum import StrEnum
-from pydantic import BaseModel, ConfigDict, Field, RootModel
-from typing import Annotated, Literal
 from ipaddress import IPv4Address
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 
 class AcrResult(StrEnum):
@@ -4385,153 +4386,75 @@ class Axm(BaseModel):
     ]
 
 
-class Packet(
-    RootModel[
-        Isi
-        | Ver
-        | Tiny
-        | Small
-        | Sta
-        | Sch
-        | Sfp
-        | Scc
-        | Cpp
-        | Ism
-        | Mso
-        | Iii
-        | Mst
-        | Mtc
-        | Mod
-        | Vtn
-        | Rst
-        | Ncn
-        | Cnl
-        | Cpr
-        | Npl
-        | Plp
-        | Pll
-        | Lap
-        | Spx
-        | Pit
-        | Psf
-        | Pla
-        | Cch
-        | Pen
-        | Toc
-        | Flg
-        | Pfl
-        | Fin
-        | Res
-        | Reo
-        | Nlp
-        | Mci
-        | Msx
-        | Msl
-        | Crs
-        | Bfn
-        | Axi
-        | Axo
-        | Btn
-        | Btc
-        | Btt
-        | Rip
-        | Ssh
-        | Con
-        | Obh
-        | Hlv
-        | Plc
-        | Axm
-        | Acr
-        | Hcp
-        | Nci
-        | Jrr
-        | Uco
-        | Oco
-        | Ttc
-        | Slc
-        | Csc
-        | Cim
-        | Mal
-        | Plh
-        | Ipb
-        | Aic
-        | Aii
-        | Set
-    ]
-):
-    root: Annotated[
-        Isi
-        | Ver
-        | Tiny
-        | Small
-        | Sta
-        | Sch
-        | Sfp
-        | Scc
-        | Cpp
-        | Ism
-        | Mso
-        | Iii
-        | Mst
-        | Mtc
-        | Mod
-        | Vtn
-        | Rst
-        | Ncn
-        | Cnl
-        | Cpr
-        | Npl
-        | Plp
-        | Pll
-        | Lap
-        | Spx
-        | Pit
-        | Psf
-        | Pla
-        | Cch
-        | Pen
-        | Toc
-        | Flg
-        | Pfl
-        | Fin
-        | Res
-        | Reo
-        | Nlp
-        | Mci
-        | Msx
-        | Msl
-        | Crs
-        | Bfn
-        | Axi
-        | Axo
-        | Btn
-        | Btc
-        | Btt
-        | Rip
-        | Ssh
-        | Con
-        | Obh
-        | Hlv
-        | Plc
-        | Axm
-        | Acr
-        | Hcp
-        | Nci
-        | Jrr
-        | Uco
-        | Oco
-        | Ttc
-        | Slc
-        | Csc
-        | Cim
-        | Mal
-        | Plh
-        | Ipb
-        | Aic
-        | Aii
-        | Set,
-        Field(
-            description="Enum representing all possible packets receivable via an Insim connection.\nEach variant may either be instructional (tell LFS to do something), informational (you are\ntold something about LFS), or both.",
-            title="Packet",
-        ),
-    ]
+type AnyPacket = (
+    Isi
+    | Ver
+    | Tiny
+    | Small
+    | Sta
+    | Sch
+    | Sfp
+    | Scc
+    | Cpp
+    | Ism
+    | Mso
+    | Iii
+    | Mst
+    | Mtc
+    | Mod
+    | Vtn
+    | Rst
+    | Ncn
+    | Cnl
+    | Cpr
+    | Npl
+    | Plp
+    | Pll
+    | Lap
+    | Spx
+    | Pit
+    | Psf
+    | Pla
+    | Cch
+    | Pen
+    | Toc
+    | Flg
+    | Pfl
+    | Fin
+    | Res
+    | Reo
+    | Nlp
+    | Mci
+    | Msx
+    | Msl
+    | Crs
+    | Bfn
+    | Axi
+    | Axo
+    | Btn
+    | Btc
+    | Btt
+    | Rip
+    | Ssh
+    | Con
+    | Obh
+    | Hlv
+    | Plc
+    | Axm
+    | Acr
+    | Hcp
+    | Nci
+    | Jrr
+    | Uco
+    | Oco
+    | Ttc
+    | Slc
+    | Csc
+    | Cim
+    | Mal
+    | Plh
+    | Ipb
+    | Aic
+    | Aii
+    | Set
+)

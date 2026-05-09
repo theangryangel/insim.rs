@@ -361,7 +361,7 @@ dependencies = [
 
 [[package]]
 name = "btn-clickid-mangled-mvp"
-version = "0.1.0-unreleased"
+version = "0.1.0+unreleased"
 dependencies = [
  "insim",
  "tokio",
@@ -785,7 +785,7 @@ dependencies = [
 
 [[package]]
 name = "decode-trace"
-version = "0.1.0-unreleased"
+version = "0.1.0+unreleased"
 dependencies = [
  "bytes",
  "clap",
@@ -1643,7 +1643,7 @@ dependencies = [
 
 [[package]]
 name = "insim_extras"
-version = "0.1.0-unreleased"
+version = "0.1.0+unreleased"
 dependencies = [
  "fixedbitset",
  "insim",
@@ -1657,7 +1657,7 @@ dependencies = [
 
 [[package]]
 name = "insim_extras_macros"
-version = "0.1.0-unreleased"
+version = "0.1.0+unreleased"
 dependencies = [
  "darling 0.23.0",
  "quote",
@@ -1666,7 +1666,7 @@ dependencies = [
 
 [[package]]
 name = "insim_lyt"
-version = "0.1.0-unreleased"
+version = "0.1.0+unreleased"
 dependencies = [
  "bytes",
  "insim_core",
@@ -1681,6 +1681,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "insim_o3"
+version = "0.1.0+unreleased"
+dependencies = [
+ "insim",
+ "pyo3",
+ "pyo3-async-runtimes",
+ "pyo3-log",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -1848,7 +1860,7 @@ checksum = "6373607a59f0be73a39b6fe456b8192fcc3585f602af20751600e974dd455e77"
 
 [[package]]
 name = "live-delta"
-version = "0.1.0-unreleased"
+version = "0.1.0+unreleased"
 dependencies = [
  "clap",
  "glam",
@@ -1875,7 +1887,7 @@ checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
 name = "marquee"
-version = "0.1.0-unreleased"
+version = "0.1.0+unreleased"
 dependencies = [
  "anyhow",
  "clap",
@@ -2315,7 +2327,7 @@ dependencies = [
 
 [[package]]
 name = "prefabs"
-version = "0.1.0-unreleased"
+version = "0.1.0+unreleased"
 dependencies = [
  "anyhow",
  "clap",
@@ -2343,23 +2355,12 @@ dependencies = [
 
 [[package]]
 name = "pth2svg"
-version = "0.2.0-unreleased"
+version = "0.2.0+unreleased"
 dependencies = [
  "anyhow",
  "clap",
  "insim_pth",
  "svg",
-]
-
-[[package]]
-name = "pyinsim"
-version = "0.1.0"
-dependencies = [
- "insim",
- "pyo3",
- "pyo3-log",
- "serde_json",
- "tokio",
 ]
 
 [[package]]
@@ -2374,6 +2375,20 @@ dependencies = [
  "pyo3-build-config",
  "pyo3-ffi",
  "pyo3-macros",
+]
+
+[[package]]
+name = "pyo3-async-runtimes"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e7364a95bf00e8377bbf9b0f09d7ff9715a29d8fcf93b47d1a967363b973178"
+dependencies = [
+ "futures-channel",
+ "futures-util",
+ "once_cell",
+ "pin-project-lite",
+ "pyo3",
+ "tokio",
 ]
 
 [[package]]
@@ -3122,7 +3137,7 @@ dependencies = [
 
 [[package]]
 name = "simple-async"
-version = "0.1.0-unreleased"
+version = "0.1.0+unreleased"
 dependencies = [
  "clap",
  "insim",
@@ -3133,7 +3148,7 @@ dependencies = [
 
 [[package]]
 name = "simple-blocking"
-version = "0.1.0-unreleased"
+version = "0.1.0+unreleased"
 dependencies = [
  "clap",
  "insim",
@@ -3143,7 +3158,7 @@ dependencies = [
 
 [[package]]
 name = "simple-outgauge"
-version = "0.1.0-unreleased"
+version = "0.1.0+unreleased"
 dependencies = [
  "bytes",
  "outgauge",
@@ -3153,7 +3168,7 @@ dependencies = [
 
 [[package]]
 name = "simple-outsim"
-version = "0.1.0-unreleased"
+version = "0.1.0+unreleased"
 dependencies = [
  "bytes",
  "outsim",
@@ -3418,7 +3433,7 @@ dependencies = [
 
 [[package]]
 name = "ssg-manual"
-version = "0.1.0-unreleased"
+version = "0.1.0+unreleased"
 dependencies = [
  "anyhow",
  "bytes",
@@ -3450,7 +3465,7 @@ dependencies = [
 
 [[package]]
 name = "strobe"
-version = "0.1.0-unreleased"
+version = "0.1.0+unreleased"
 dependencies = [
  "clap",
  "insim",
@@ -4705,17 +4720,15 @@ checksum = "9edde0db4769d2dc68579893f2306b26c6ecfbe0ef499b013d731b7b9247e0b9"
 
 [[package]]
 name = "xtask-codepage-lut"
-version = "0.1.0-unreleased"
+version = "0.1.0+unreleased"
 dependencies = [
- "clap",
  "encoding_rs",
 ]
 
 [[package]]
-name = "xtask-pyinsim-schema"
-version = "0.1.0-unreleased"
+name = "xtask-insim-o3-schema"
+version = "0.1.0+unreleased"
 dependencies = [
- "clap",
  "insim",
  "schemars",
  "serde",

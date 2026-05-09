@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Profile — Clockwork Carnage{% endblock %}
+{% block title %}Profile - Clockwork Carnage{% endblock %}
 {% block content %}
 
 {# ── Header ── #}
@@ -15,7 +15,7 @@
 <div class="max-w-7xl mx-auto px-6 lg:px-16 py-12">
   <div class="max-w-lg">
     <p class="font-body text-sm text-on-surface-variant mb-8 leading-relaxed">
-      Link your streaming channels — your handles will appear alongside your results so spectators can find your stream.
+      Link your streaming channels - your handles will appear alongside your results so spectators can find your stream.
     </p>
     <form method="post" action="/profile" class="space-y-8">
       <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}" />

@@ -100,7 +100,7 @@
   heading:
     radians: 0.0
   floating: false
-# Row 4: wide outer guards only — sprint for the gap
+# Row 4: wide outer guards only - sprint for the gap
 - !TyreStack4Big
   xyz:
     x: 240

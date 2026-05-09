@@ -116,7 +116,7 @@ pub async fn main() -> Result<()> {
                 match packet? {
                     // Npl fires when a player joins the track (including when
                     // returning from the pits). We only care about the local
-                    // human player — remote and AI players are ignored.
+                    // human player - remote and AI players are ignored.
                     Packet::Npl(npl) => {
                         if !npl.ptype.is_remote() && !npl.ptype.is_ai() {
                             plid = Some(npl.plid);

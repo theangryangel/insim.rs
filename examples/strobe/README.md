@@ -15,8 +15,8 @@ the session, resuming from step one when they return.
 strobe <addr> <file>
 ```
 
-- `addr` — `host:port` of the LFS InSim interface (e.g. `127.0.0.1:29999`)
-- `file` — path to a YAML sequence file (see below)
+- `addr` - `host:port` of the LFS InSim interface (e.g. `127.0.0.1:29999`)
+- `file` - path to a YAML sequence file (see below)
 
 ## Sequence file format
 

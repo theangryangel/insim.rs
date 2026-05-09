@@ -420,7 +420,7 @@ impl Builder {
                     // commands
                     Some((packet, response)) = command_receiver.recv() => {
                         // Send the write result back to the caller.
-                        // Write errors are not fatal to the task — if the connection
+                        // Write errors are not fatal to the task - if the connection
                         // is truly broken, the next net.read() will fail and kill it.
                         let _ = response.send(net.write(packet).await);
                     }
