@@ -4,6 +4,7 @@ use crate::identifiers::{ConnectionId, RequestId};
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 /// Interface mode reported by [Cim].
 pub enum CimMode {
@@ -96,6 +97,7 @@ impl Encode for CimMode {
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 /// Submode for `CimMode::Normal`.
 pub enum CimSubModeNormal {
@@ -137,6 +139,7 @@ impl From<u8> for CimSubModeNormal {
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 /// Submode for `CimMode::Garage`.
 pub enum CimSubModeGarage {
@@ -198,6 +201,7 @@ impl From<u8> for CimSubModeGarage {
 #[repr(u8)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 /// Submode for `CimMode::ShiftU`.
 pub enum CimSubModeShiftU {
@@ -224,6 +228,7 @@ impl From<u8> for CimSubModeShiftU {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Connection interface mode report.
 ///
 /// - Indicates which UI screen/mode a connection is in.

@@ -1,5 +1,5 @@
 # prefabs.climb2.yaml
-# Extended climb map building blocks — wacky / creative edition.
+# Extended climb map building blocks - wacky / creative edition.
 # Coordinate scale: x/y 1 unit = 6.25 cm (1/16 m), z 1 unit = 25 cm (1/4 m)
 # Two=32, Four=64, Eight=128, Sixteen=256 units. z: M1_00=4, M2_00=8, M4_00=16
 # All positions relative to anchor. Headings in radians.
@@ -125,7 +125,7 @@
 # 2. pillar_forest
 # Staggered grid of Half×Half concrete pillars to weave through at speed.
 # Row 1 blocks y=0; row 2 has tight ±24 inner guards; row 3 repeats.
-# Gap between adjacent pillars ~40 units (2.5m) — tight but drivable.
+# Gap between adjacent pillars ~40 units (2.5m) - tight but drivable.
 - name: pillar_forest
   objects:
     - !ChalkAhead
@@ -273,7 +273,7 @@
       heading:
         radians: 0.0
       floating: false
-    # Gate 1: Red wedge blocks center-left — go right
+    # Gate 1: Red wedge blocks center-left - go right
     - !ConcreteWedge
       xyz:
         x: 0
@@ -302,7 +302,7 @@
       heading:
         radians: 0.0
       floating: false
-    # Gate 2: Blue wedge blocks center-right — go left
+    # Gate 2: Blue wedge blocks center-right - go left
     - !ConcreteWedge
       xyz:
         x: 128
@@ -331,7 +331,7 @@
       heading:
         radians: 0.0
       floating: false
-    # Gate 3: Red wedge blocks center-left again — go right
+    # Gate 3: Red wedge blocks center-left again - go right
     - !ConcreteWedge
       xyz:
         x: 256
@@ -1072,7 +1072,7 @@
       pitch: Deg0
       heading:
         radians: 0.0
-    # Minimal guard rails — just enough to know the edge
+    # Minimal guard rails - just enough to know the edge
     - !ConcreteWall
       xyz:
         x: 64
@@ -1212,7 +1212,7 @@
       heading:
         radians: 0.0
       floating: false
-    # Row 4: wide outer guards only — sprint for the gap
+    # Row 4: wide outer guards only - sprint for the gap
     - !TyreStack4Big
       xyz:
         x: 240

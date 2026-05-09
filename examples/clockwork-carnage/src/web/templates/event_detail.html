@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}
 {% match event.name %}{% when Some with (n) %}{{ n }}{% when None %}Event #{{ event.id }}{% endmatch %}
- — Clockwork Carnage
+ - Clockwork Carnage
 {% endblock %}
 {% block content %}
 

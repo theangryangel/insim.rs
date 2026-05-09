@@ -2,6 +2,7 @@ use crate::identifiers::RequestId;
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Screen mode configuration.
 ///
 /// - Set resolution and refresh rate, or switch to windowed mode.

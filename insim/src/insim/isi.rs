@@ -7,7 +7,6 @@ use crate::{VERSION, WithRequestId, identifiers::RequestId};
 bitflags! {
     /// Flags for the [Isi] options field.
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Flags for [Isi], used to indicate which updates and behaviours to enable.
     pub struct IsiFlags: u16 {
         /// Guest or single player
@@ -44,6 +43,7 @@ bitflags! {
         const SET = (1 << 12);
     }
 }
+impl_bitflags_json_schema!(IsiFlags, "IsiFlag");
 
 impl IsiFlags {
     /// Clear all flags
@@ -65,6 +65,7 @@ impl_bitflags_from_to_bytes!(IsiFlags, u16);
 
 #[derive(Debug, Clone, Eq, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// InSim init/handshake packet sent to start communication.
 ///
 /// - Sends initial connection options (which updates you want and how often).

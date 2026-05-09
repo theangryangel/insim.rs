@@ -5,7 +5,6 @@ use crate::identifiers::RequestId;
 bitflags! {
     /// Modifier flags used with [Sch].
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct SchFlags: u8 {
         /// Shift
         const SHIFT = (1 << 0);
@@ -14,6 +13,7 @@ bitflags! {
         const CTRL = (1 << 1);
     }
 }
+impl_bitflags_json_schema!(SchFlags, "SchFlag");
 
 generate_bitflag_helpers! {
     SchFlags,
@@ -25,6 +25,7 @@ impl_bitflags_from_to_bytes!(SchFlags, u8);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Send a single key press.
 ///
 /// - Best for simple keys; some special keys may not work.

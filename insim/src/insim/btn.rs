@@ -8,7 +8,6 @@ const BTN_TEXT_ALIGN: usize = 4;
 
 bitflags::bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     /// Bitwise flags used within [Btn], [Btc], and [Btt].
     ///
     /// - Mostly internal, but includes user-visible behavior.
@@ -17,12 +16,14 @@ bitflags::bitflags! {
         const ALWAYSON = (1 << 7);
     }
 }
+impl_bitflags_json_schema!(BtnInst, "BtnInstFlag");
 
 impl_bitflags_from_to_bytes!(BtnInst, u8);
 
 /// Colour
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum BtnStyleColour {
     /// NotEditable, defaults to light grey
     #[default]
@@ -46,7 +47,6 @@ pub enum BtnStyleColour {
 bitflags::bitflags! {
     /// Button style flags for [Btn].
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BtnStyleFlags: u8 {
         /// Clickable button (sends [Btc]).
         const CLICK = (1 << 3);
@@ -64,9 +64,11 @@ bitflags::bitflags! {
         const RIGHT = (1 << 7);
     }
 }
+impl_bitflags_json_schema!(BtnStyleFlags, "BtnStyleFlag");
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Button style configuration (colour + flags).
 pub struct BtnStyle {
     /// Colour selection.
@@ -224,7 +226,6 @@ impl Decode for BtnStyle {
 bitflags::bitflags! {
     /// Bitwise flags reported for a button click.
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
-    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BtnClickFlags: u8 {
         /// Left click
         const LMB = (1 << 0);
@@ -239,11 +240,13 @@ bitflags::bitflags! {
         const SHIFT = (1 << 3);
     }
 }
+impl_bitflags_json_schema!(BtnClickFlags, "BtnClickFlag");
 
 impl_bitflags_from_to_bytes!(BtnClickFlags, u8);
 
 #[derive(Debug, Default, Clone, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Action type for [Bfn].
@@ -264,6 +267,7 @@ pub enum BfnType {
 
 #[derive(Debug, Clone, Default, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Button management command or notification.
 ///
 /// - Deletes or clears buttons, or reports user button actions.
@@ -291,6 +295,7 @@ impl_typical_with_request_id!(Bfn);
 
 #[derive(Debug, Clone, PartialEq, Default, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Create or update a button.
 ///
 /// - Buttons can include optional captions and input fields.
@@ -488,6 +493,7 @@ impl_typical_with_request_id!(Btn);
 
 #[derive(Debug, Clone, Default, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Sent when a user clicks a button.
 ///
 /// - Reports the button id and click modifiers.
@@ -509,6 +515,7 @@ pub struct Btc {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Sent when a user types into a text entry button.
 ///
 /// - Includes the input text and the original `typein` limit.

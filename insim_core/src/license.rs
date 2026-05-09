@@ -8,6 +8,7 @@ use crate::{Decode, Encode};
 #[non_exhaustive]
 #[derive(Default, PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 pub enum License {
     #[default]

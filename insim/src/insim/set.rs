@@ -2,6 +2,7 @@ use insim_core::vehicle::Vehicle;
 
 use crate::identifiers::{PlayerId, RequestId};
 
+#[cfg(feature = "serde")]
 mod setup {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -23,14 +24,11 @@ mod setup {
             serde::de::Error::custom("failed to deserialize list: expected exactly 120 bytes")
         })
     }
-
-    pub(super) fn default() -> [u8; 120] {
-        [0; 120]
-    }
 }
 
 #[derive(Debug, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Player sent setup to host
 ///
 /// - Sent when SET is enabled in [IsiFlags](crate::insim::IsiFlags).
@@ -54,7 +52,11 @@ pub struct Set {
     /// - gear order is the first 7 gears then final drive ratio
     // TODO:: Do we want to strongly type this? I think we should..
     // https://en.lfsmanual.net/wiki/File_Formats#SET
-    #[serde(serialize_with = "setup::ser", deserialize_with = "setup::deser")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(serialize_with = "setup::ser", deserialize_with = "setup::deser")
+    )]
+    #[cfg_attr(feature = "schemars", schemars(with = "Vec<u8>"))]
     pub setup: [u8; 120],
 }
 
@@ -65,7 +67,7 @@ impl Default for Set {
             plid: Default::default(),
             cname: Default::default(),
             fuelload: Default::default(),
-            setup: setup::default(),
+            setup: [0; 120],
         }
     }
 }

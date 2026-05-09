@@ -1,5 +1,5 @@
 # A corridor of TyreStack4 walls on both sides forming a tight channel.
-# The stacks are staggered left-right so a perfectly straight line isn't enough —
+# The stacks are staggered left-right so a perfectly straight line isn't enough -
 # slight weaving is required, like a slalom through rubber walls.
 #
 # Left-side stacks (y negative)
@@ -39,7 +39,7 @@
   heading:
     radians: 0.0
   floating: false
-# Right-side stacks (y positive) — offset by half a period for the weave
+# Right-side stacks (y positive) - offset by half a period for the weave
 - !TyreStack4
   xyz:
     x: 32

@@ -6,6 +6,7 @@ const NLP_MAX_CARS: usize = 48;
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Node/lap snapshot for a player.
 pub struct NodeLapInfo {
     /// Current path node.
@@ -23,6 +24,7 @@ pub struct NodeLapInfo {
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Node/lap updates without positional coordinates.
 ///
 /// - Similar to [Mci](super::Mci) but without coordinates.

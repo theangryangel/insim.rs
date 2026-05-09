@@ -6,6 +6,7 @@ use super::{PenaltyInfo, PlayerFlags};
 use crate::identifiers::{PlayerId, RequestId};
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
 /// Fuel percentage with the `/showfuel` multiplier applied.
@@ -54,6 +55,7 @@ impl Encode for Fuel200 {
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
 /// Fuel percentage for pit stops.
@@ -100,6 +102,7 @@ impl Encode for Fuel {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Lap timing information for a player.
 ///
 /// - Sent when a lap is completed.

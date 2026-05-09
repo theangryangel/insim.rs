@@ -8,6 +8,7 @@ use crate::{Decode, Encode};
 /// - Use the optional `glam` conversions when enabled.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Vector(pub f32, pub f32, pub f32);
 
 impl Vector {

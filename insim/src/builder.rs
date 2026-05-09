@@ -391,7 +391,7 @@ impl Builder {
 
         let (event_sender, _) = tokio::sync::broadcast::channel::<crate::Packet>(cap);
         let (command_sender, mut command_receiver) =
-            tokio::sync::mpsc::channel::<crate::Packet>(cap);
+            tokio::sync::mpsc::channel::<InsimCommand>(cap);
 
         let token = tokio_util::sync::CancellationToken::new();
 
@@ -418,8 +418,11 @@ impl Builder {
                     },
 
                     // commands
-                    Some(packet) = command_receiver.recv() => {
-                        net.write(packet).await?;
+                    Some((packet, response)) = command_receiver.recv() => {
+                        // Send the write result back to the caller.
+                        // Write errors are not fatal to the task - if the connection
+                        // is truly broken, the next net.read() will fail and kill it.
+                        let _ = response.send(net.write(packet).await);
                     }
                 }
             }
@@ -438,6 +441,12 @@ impl Builder {
 }
 
 #[cfg(feature = "tokio")]
+type InsimCommand = (
+    crate::Packet,
+    tokio::sync::oneshot::Sender<crate::Result<()>>,
+);
+
+#[cfg(feature = "tokio")]
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 #[derive(Debug, Clone)]
 /// Handle for a spawned insim connection
@@ -445,7 +454,7 @@ pub struct InsimTask {
     /// Receiver for packets
     events: tokio::sync::broadcast::Sender<Packet>,
     // Sender for packets
-    commands: tokio::sync::mpsc::Sender<Packet>,
+    commands: tokio::sync::mpsc::Sender<InsimCommand>,
     // Cancellation token for shutdown handling
     cancellation_token: tokio_util::sync::CancellationToken,
 }
@@ -459,10 +468,12 @@ impl InsimTask {
 
     /// Send an insim packet
     pub async fn send<P: Into<crate::Packet> + Send + Sync>(&self, packet: P) -> crate::Result<()> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
         self.commands
-            .send(packet.into())
+            .send((packet.into(), tx))
             .await
-            .map_err(|_| crate::Error::SpawnedDead)
+            .map_err(|_| crate::Error::SpawnedDead)?;
+        rx.await.map_err(|_| crate::Error::SpawnedDead)?
     }
 
     /// Sends an iterator of packets concurrently and stops on the first error
@@ -485,7 +496,6 @@ impl InsimTask {
             ..Default::default()
         })
         .await
-        .map_err(|_| crate::Error::SpawnedDead)
     }
 
     /// Shortcut to send a message. This will automatically detect what type of packet to send for
@@ -515,9 +525,7 @@ impl InsimTask {
             .into()
         };
 
-        self.send(packet)
-            .await
-            .map_err(|_| crate::Error::SpawnedDead)
+        self.send(packet).await
     }
 
     /// Request cancellation / shutdown

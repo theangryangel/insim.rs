@@ -64,7 +64,7 @@
               <h3 class="font-headline text-xl font-bold uppercase tracking-tight group-hover:text-primary-container transition-colors">
                 {% match active_event.name %}
                 {% when Some with (n) %}{{ n }}
-                {% when None %}{{ active_event.track }} — {{ active_event.layout }}
+                {% when None %}{{ active_event.track }} - {{ active_event.layout }}
                 {% endmatch %}
               </h3>
               {% match active_event.scheduled_at %}
@@ -109,7 +109,7 @@
               <h3 class="font-headline text-xl font-bold uppercase tracking-tight group-hover:text-primary-container transition-colors">
                 {% match event.name %}
                 {% when Some with (n) %}{{ n }}
-                {% when None %}{{ event.track }} — {{ event.layout }}
+                {% when None %}{{ event.track }} - {{ event.layout }}
                 {% endmatch %}
               </h3>
               <p class="text-[11px] text-secondary/60 mt-1 uppercase font-headline font-medium tracking-wider">{{ event.track }} | {{ event.layout }}</p>

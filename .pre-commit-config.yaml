@@ -1,7 +1,8 @@
 exclude: |
   (?x)
   LICENSE|
-  ^examples/clockwork-carnage/src/web/templates/
+  ^examples/clockwork-carnage/src/web/templates/|
+  ^insim_o3/insim_schema.json
 repos:
   - repo: local
     hooks:
@@ -43,3 +44,9 @@ repos:
           ]
       - id: cargo-check
       - id: clippy
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: "v0.15.12"
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format

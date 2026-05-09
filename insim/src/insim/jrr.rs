@@ -6,6 +6,7 @@ use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Used within the [Jrr] packet.
@@ -26,6 +27,7 @@ pub enum JrrAction {
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Start position selection used by [`Jrr`].
 pub enum JrrStartPosition {
     /// Use the default spawn location selected by LFS.
@@ -79,6 +81,7 @@ impl Encode for JrrStartPosition {
 
 #[derive(Debug, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Join Request Reply
 /// Set the ISF_REQ_JOIN flag in the IS_ISI to receive join requests
 ///

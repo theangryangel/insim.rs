@@ -7,6 +7,7 @@ use crate::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 #[allow(missing_docs)]
 /// Bin Colour
@@ -37,6 +38,7 @@ impl From<u8> for Bin1Colour {
 /// Bin1
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Bin1 {
     /// Position
     pub xyz: ObjectCoordinate,

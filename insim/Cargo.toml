@@ -30,9 +30,14 @@ tokio = [
 serde = [
   "dep:serde",
   "insim_core/serde",
-  "bitflags/serde",
   "indexmap/serde",
   "bytes/serde",
+]
+schemars = [
+  "dep:schemars",
+  "dep:serde_json",
+  "serde",
+  "insim_core/schemars",
 ]
 glam = [
   "insim_core/glam"
@@ -44,7 +49,9 @@ bytes = { workspace = true }
 from_variants = { workspace = true }
 indexmap = { workspace = true }
 insim_core = { path = "../insim_core", version = "4.0.0" }
+schemars = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"], optional = true }
+serde_json = { workspace = true, optional = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt", "time", "net", "macros", "sync", "tracing", "io-util"], optional = true }
 tokio-util = { workspace = true, optional = true }

@@ -1,0 +1,55 @@
+[build-system]
+requires = ["maturin>=1,<2"]
+build-backend = "maturin"
+
+[project]
+name = "insim_o3"
+version = "0.1.0+unreleased"
+requires-python = ">=3.14"
+description = "Python bindings for the insim.rs InSim library"
+dependencies = [
+    "pydantic>=2.6,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "datamodel-code-generator[ruff]>=0.25",
+    "maturin>=1,<2",
+    "mypy>=1.10",
+    "pytest-asyncio>=0.23",
+    "pytest>=8",
+]
+
+[tool.maturin]
+module-name = "insim_o3._insim"
+python-source = "python"
+features = ["pyo3/extension-module"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.mypy]
+strict = true
+python_version = "3.14"
+
+[tool.ruff]
+fix = true
+line-length = 88
+target-version = "py314"
+extend-exclude = ["python/insim_o3/packets.py"]
+
+[tool.ruff.lint]
+extend-select = [
+    "B",
+    "C90",
+    "E501", # line too long (default 88)
+    "I",    # isort
+    "UP",   # pyupgrade
+]
+
+[tool.ruff.lint.isort]
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 16
