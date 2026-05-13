@@ -17,11 +17,15 @@ pub struct Spx {
     pub plid: PlayerId,
 
     #[insim(duration = u32)]
-    /// Split time.
+    /// Split time in milliseconds.
+    #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
+    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub stime: Duration,
 
     #[insim(duration = u32)]
-    /// Total elapsed time since session start.
+    /// Total elapsed time since session start, in milliseconds.
+    #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
+    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub etime: Duration,
 
     /// Split index (1-3).

@@ -79,11 +79,15 @@ pub struct Fin {
     pub plid: PlayerId,
 
     #[insim(duration = u32)]
-    /// Total race time.
+    /// Total race time in milliseconds.
+    #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
+    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub ttime: Duration,
 
     #[insim(duration = u32, pad_after = 1)]
-    /// Best lap time.
+    /// Best lap time in milliseconds.
+    #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
+    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub btime: Duration,
 
     /// Number of pit stops.

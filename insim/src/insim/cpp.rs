@@ -37,7 +37,9 @@ pub struct Cpp {
     /// Field of View, in degrees
     pub fov: f32,
 
-    /// Time in ms to get there (0 means instant)
+    /// Time in milliseconds to get there (0 means instant).
+    #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
+    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub time: Duration,
 
     /// State flags to set

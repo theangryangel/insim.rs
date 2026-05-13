@@ -1,5 +1,5 @@
 """
-Integration tests for the Handler + TestClient layer.
+Integration tests for the Handler + TestApp layer.
 
 These tests run without a real LFS connection by injecting synthetic JSON
 strings directly through the dispatcher.  They verify that:
@@ -18,7 +18,7 @@ import json
 
 from insim_o3 import handler
 from insim_o3.packets import Mso, Ncn
-from insim_o3.test_client import TestClient
+from insim_o3.test_app import MockConnection, TestApp
 
 NCN_JSON = json.dumps(
     {
@@ -57,13 +57,12 @@ async def test_ncn_handler_receives_typed_model() -> None:
             self.received: list[Ncn] = []
 
         @handler.on
-        async def collect(self, packet: Ncn) -> None:
+        async def collect(self, packet: Ncn, conn: MockConnection) -> None:
             self.received.append(packet)
 
     cap = _Capture()
-    tc = TestClient()
-    tc.handlers.add(cap)
-    await tc.inject(NCN_JSON)
+    app = TestApp(handlers=[cap])
+    await app.inject(NCN_JSON)
 
     assert len(cap.received) == 1
     pkt = cap.received[0]
@@ -84,13 +83,12 @@ async def test_mso_handler_receives_typed_model() -> None:
             self.received: list[Mso] = []
 
         @handler.on
-        async def collect(self, packet: Mso) -> None:
+        async def collect(self, packet: Mso, conn: MockConnection) -> None:
             self.received.append(packet)
 
     cap = _Capture()
-    tc = TestClient()
-    tc.handlers.add(cap)
-    await tc.inject(MSO_JSON)
+    app = TestApp(handlers=[cap])
+    await app.inject(MSO_JSON)
 
     assert len(cap.received) == 1
     assert cap.received[0].msg == "Hello, world!"
@@ -99,9 +97,8 @@ async def test_mso_handler_receives_typed_model() -> None:
 
 async def test_unregistered_type_is_ignored() -> None:
     """Injecting a packet type with no handler does not raise."""
-    tc = TestClient()
-    tc.handlers.add(handler.Handler())
-    await tc.inject(TINY_JSON)
+    app = TestApp(handlers=[handler.Handler()])
+    await app.inject(TINY_JSON)
 
 
 async def test_on_decorator_supports_union_types() -> None:
@@ -110,13 +107,12 @@ async def test_on_decorator_supports_union_types() -> None:
 
     class Multi(handler.Handler):
         @handler.on
-        async def both(self, packet: Ncn | Mso) -> None:
+        async def both(self, packet: Ncn | Mso, conn: MockConnection) -> None:
             seen.append(type(packet).__name__)
 
-    tc = TestClient()
-    tc.handlers.add(Multi())
-    await tc.inject(NCN_JSON)
-    await tc.inject(MSO_JSON)
+    app = TestApp(handlers=[Multi()])
+    await app.inject(NCN_JSON)
+    await app.inject(MSO_JSON)
 
     assert seen == ["Ncn", "Mso"]
 
@@ -127,18 +123,17 @@ async def test_class_registrations_are_inheritable() -> None:
 
     class Base(handler.Handler):
         @handler.on
-        async def handle_ncn(self, packet: Ncn) -> None:
+        async def handle_ncn(self, packet: Ncn, conn: MockConnection) -> None:
             seen.append("base-ncn")
 
     class Child(Base):
         @handler.on
-        async def handle_mso(self, packet: Mso) -> None:
+        async def handle_mso(self, packet: Mso, conn: MockConnection) -> None:
             seen.append("child-mso")
 
-    tc = TestClient()
-    tc.handlers.add(Child())
-    await tc.inject(NCN_JSON)
-    await tc.inject(MSO_JSON)
+    app = TestApp(handlers=[Child()])
+    await app.inject(NCN_JSON)
+    await app.inject(MSO_JSON)
 
     assert seen == ["base-ncn", "child-mso"]
 
@@ -149,16 +144,15 @@ async def test_subclass_override_replaces_parent_method() -> None:
 
     class Base(handler.Handler):
         @handler.on
-        async def handle_ncn(self, packet: Ncn) -> None:
+        async def handle_ncn(self, packet: Ncn, conn: MockConnection) -> None:
             seen.append("base")
 
     class Child(Base):
-        async def handle_ncn(self, packet: Ncn) -> None:
+        async def handle_ncn(self, packet: Ncn, conn: MockConnection) -> None:
             seen.append("child")
 
-    tc = TestClient()
-    tc.handlers.add(Child())
-    await tc.inject(NCN_JSON)
+    app = TestApp(handlers=[Child()])
+    await app.inject(NCN_JSON)
 
     assert seen == ["child"]
 
@@ -173,16 +167,15 @@ async def test_failing_handler_does_not_block_others() -> None:
 
     class _H(handler.Handler):
         @handler.on
-        async def boom(self, packet: Ncn) -> None:
+        async def boom(self, packet: Ncn, conn: MockConnection) -> None:
             raise ValueError("kaboom")
 
         @handler.on
-        async def ok(self, packet: Ncn) -> None:
+        async def ok(self, packet: Ncn, conn: MockConnection) -> None:
             seen.append(1)
 
-    tc = TestClient()
-    tc.handlers.add(_H(on_error=on_error))
-    await tc.inject(NCN_JSON)
+    app = TestApp(handlers=[_H(on_error=on_error)])
+    await app.inject(NCN_JSON)
 
     assert seen == [1]
     assert errors == [(ValueError, "Ncn")]
@@ -194,16 +187,15 @@ async def test_multiple_handlers_fire_in_order() -> None:
 
     class _H(handler.Handler):
         @handler.on
-        async def first(self, packet: Ncn) -> None:
+        async def first(self, packet: Ncn, conn: MockConnection) -> None:
             order.append(1)
 
         @handler.on
-        async def second(self, packet: Ncn) -> None:
+        async def second(self, packet: Ncn, conn: MockConnection) -> None:
             order.append(2)
 
-    tc = TestClient()
-    tc.handlers.add(_H())
-    await tc.inject(NCN_JSON)
+    app = TestApp(handlers=[_H()])
+    await app.inject(NCN_JSON)
 
     assert order == [1, 2]
 
@@ -214,17 +206,15 @@ async def test_multiple_handler_instances_all_receive_packet() -> None:
 
     class _H1(handler.Handler):
         @handler.on
-        async def handle(self, packet: Ncn) -> None:
+        async def on_ncn(self, packet: Ncn, conn: MockConnection) -> None:
             hits.append("h1")
 
     class _H2(handler.Handler):
         @handler.on
-        async def handle(self, packet: Ncn) -> None:
+        async def on_ncn(self, packet: Ncn, conn: MockConnection) -> None:
             hits.append("h2")
 
-    tc = TestClient()
-    tc.handlers.add(_H1())
-    tc.handlers.add(_H2())
-    await tc.inject(NCN_JSON)
+    app = TestApp(handlers=[_H1(), _H2()])
+    await app.inject(NCN_JSON)
 
     assert hits == ["h1", "h2"]

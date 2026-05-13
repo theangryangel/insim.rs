@@ -114,11 +114,15 @@ pub struct Lap {
     pub plid: PlayerId,
 
     #[insim(duration = u32)]
-    /// Lap time.
-    pub ltime: Duration, // lap time (ms)
+    /// Lap time in milliseconds.
+    #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
+    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
+    pub ltime: Duration,
 
     #[insim(duration = u32)]
-    /// Total elapsed time since session start.
+    /// Total elapsed time since session start, in milliseconds.
+    #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
+    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub etime: Duration,
 
     /// Number of laps completed.

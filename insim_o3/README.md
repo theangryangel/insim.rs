@@ -26,11 +26,20 @@ change to packet structs in the `insim` crate:
 cargo run -p xtask-insim-o3-schema
 ```
 
-Then commit both changed files. CI verifies they are current with:
+This runs a two-step pipeline:
 
-```bash
-cargo run -p xtask-insim-o3-schema -- --check
-```
+1. The xtask invokes `schemars::schema_for!(insim::Packet)` and writes
+   `insim_o3/insim_schema.json` - the faithful schemars output, no
+   post-processing.
+2. The xtask then shells out to `insim_o3/scripts/generate_packets.py`, which
+   reads the JSON Schema and emits `python/insim_o3/packets.py` with Pydantic
+   v2 models. Variant classes for sum types are named `<Parent><Variant>`
+   (e.g. `AiInputTypeMsx`, `FuelPercentage`, `PmoActionLoadingFile`). The
+   output is formatted with `ruff format`.
+
+`uv` and a recent Python must be on `PATH`; the script itself only uses the
+standard library. CI verifies the two files are up to date with `git diff
+--exit-code` after running the xtask.
 
 ## Usage
 
@@ -40,19 +49,19 @@ middleware) and `Connection` (thin send-only wrapper passed to every handler).
 ### Standalone bot
 
 ```python
-from insim_o3 import App, Connection
+from insim_o3 import App, Connection, Handler, on
 from insim_o3.packets import IsiFlag, Mso, Ncn
 
-app = App(flags=[IsiFlag.MSO_COLS])
+class Bot(Handler):
+    @on
+    async def on_join(self, packet: Ncn, conn: Connection) -> None:
+        print(f"[join] {packet.pname} ({packet.uname})")
 
-@app.on
-async def on_join(packet: Ncn, conn: Connection) -> None:
-    print(f"[join] {packet.pname} ({packet.uname})")
+    @on
+    async def on_chat(self, packet: Mso, conn: Connection) -> None:
+        print(f"[chat] {packet.msg}")
 
-@app.on
-async def on_chat(packet: Mso, conn: Connection) -> None:
-    print(f"[chat] {packet.msg}")
-
+app = App(flags=[IsiFlag.MSO_COLS], handlers=[Bot()])
 app.run("127.0.0.1:29999")
 ```
 
@@ -66,13 +75,14 @@ client, etc.), use `app.connect()` as an async context manager:
 
 ```python
 import asyncio
-from insim_o3 import App, Connection
+from insim_o3 import App, Connection, Handler, on
 from insim_o3.packets import Ncn
 
-app = App()
+class Bot(Handler):
+    @on
+    async def on_join(self, packet: Ncn, conn: Connection) -> None: ...
 
-@app.on
-async def on_join(packet: Ncn, conn: Connection) -> None: ...
+app = App(handlers=[Bot()])
 
 async def main() -> None:
     async with app.connect("127.0.0.1:29999"):
@@ -145,13 +155,12 @@ class SessionTracker(Handler):
     async def leave(self, packet: Cnl, conn: Connection) -> None:
         print(f"[-] ucid={packet.ucid}")
 
-app = App()
-app.handlers.add(SessionTracker())
+app = App(handlers=[SessionTracker()])
 app.run("127.0.0.1:29999")
 ```
 
-`app.handlers` is a small snapshotting registry: `add(h)` and `remove(h)`
-work directly and are safe to call while packets are being dispatched.
+Handlers and middleware are passed at construction time and are fixed for the
+lifetime of the `App`.
 
 ### Middleware
 
@@ -262,8 +271,7 @@ from insim_o3.test_app import TestApp, MockConnection
 
 async def test_something() -> None:
     conn = MockConnection()
-    app = TestApp(conn=conn)
-    app.handlers.add(MyBot())
+    app = TestApp(conn=conn, handlers=[MyBot()])
     await app.inject(raw_json)
     assert conn.sent[0].text == "expected reply"
 ```

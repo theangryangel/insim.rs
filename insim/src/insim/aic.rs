@@ -150,7 +150,9 @@ pub struct AiInput {
     /// Input command.
     pub input: AiInputType,
 
-    /// Duration for the input (if supported).
+    /// Duration for the input (if supported), in milliseconds.
+    #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde::option"))]
+    #[cfg_attr(feature = "schemars", schemars(with = "Option<u64>"))]
     pub time: Option<Duration>,
 }
 

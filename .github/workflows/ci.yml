@@ -56,10 +56,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: astral-sh/setup-uv@v5
-      - name: Check insim_schema.json and packets.py are up to date
-        run: |
-          cargo run -p xtask-insim-o3-schema
-          git diff --exit-code -- insim_o3/insim_schema.json insim_o3/python/insim_o3/packets.py
+      - name: Regenerate insim_schema.json and packets.py
+        # xtask writes the schema, then shells out to
+        # insim_o3/scripts/generate_packets.py (uv run --no-project) to
+        # emit packets.py.
+        run: cargo run -p xtask-insim-o3-schema
+      - name: Verify generated schema and packets.py are committed up-to-date
+        run: git diff --exit-code -- insim_o3/insim_schema.json insim_o3/python/insim_o3/packets.py
       - run: uv sync --dev
         working-directory: insim_o3
       - run: uv run --extra dev maturin develop

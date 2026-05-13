@@ -13,8 +13,7 @@ passed when you actually connect::
         async def join(self, packet: Ncn, conn: Connection) -> None:
             print(f"[join] {packet.pname}")
 
-    app = App(flags=[IsiFlag.MSO_COLS], prefix="!")
-    app.handlers.add(Bot())
+    app = App(flags=[IsiFlag.MSO_COLS], prefix="!", handlers=[Bot()])
     app.run("127.0.0.1:29999")
 
 Use ``async with app.connect(addr)`` to embed inside an existing asyncio
@@ -34,10 +33,9 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from insim_o3._insim import _Insim
-from insim_o3._registry import Registry
 from insim_o3.connection import Connection
 from insim_o3.dispatcher import dispatch
-from insim_o3.handler import ErrorFn, Handler, HandlerFn, default_on_error
+from insim_o3.handler import ErrorFn, Handler, default_on_error
 from insim_o3.middleware import Middleware
 from insim_o3.packets import IsiFlag
 
@@ -47,7 +45,7 @@ _log = logging.getLogger(__name__)
 class App:
     """High-level async InSim application.
 
-    Stores configuration and handler/middleware registries.  No network
+    All handlers and middleware are passed at construction time.  No network
     connection is opened until :meth:`connect` or :meth:`run` is called.
     """
 
@@ -71,26 +69,10 @@ class App:
         self._prefix = prefix
         self._capacity = capacity
         self._on_error: ErrorFn = on_error or default_on_error
-        self._default_handler: Handler = Handler()
         self._inner: _Insim | None = None
         self._conn: Connection | None = None
-        #: Attach ``Handler`` instances via ``app.handlers.add(h)``.
-        self.handlers: Registry[Handler] = Registry(
-            [self._default_handler, *(handlers or [])]
-        )
-        #: Attach ``Middleware`` instances via ``app.middleware.add(m)``.
-        self.middleware: Registry[Middleware] = Registry(middleware or [])
-
-    def on(self, fn: HandlerFn) -> HandlerFn:
-        """Register *fn* as a packet callback, inferring the type from its annotation.
-
-        Use as a decorator::
-
-            @app.on
-            async def join(packet: Ncn, conn: Connection) -> None:
-                print(f"join: {packet.pname}")
-        """
-        return self._default_handler.register(fn)
+        self._handlers: tuple[Handler, ...] = tuple(handlers or ())
+        self._middleware: tuple[Middleware, ...] = tuple(middleware or ())
 
     @contextlib.asynccontextmanager
     async def connect(self, addr: str) -> AsyncIterator[Connection]:
@@ -111,12 +93,12 @@ class App:
             capacity=self._capacity,
         )
         self._conn = Connection(self._inner)
-        for mw in self.middleware:
+        for mw in self._middleware:
             await mw.on_connect(self._conn)
         try:
             yield self._conn
         finally:
-            for mw in self.middleware:
+            for mw in self._middleware:
                 await mw.on_shutdown()
             await self._inner.shutdown()
             self._conn = None
@@ -158,11 +140,11 @@ class App:
         conn = self._conn
         packet = dispatch(raw)
         events: list[Any] = [packet]
-        for mw in self.middleware:
+        for mw in self._middleware:
             try:
                 events.extend(await mw.on_packet(packet))
             except Exception as exc:
                 self._on_error(exc, packet, mw.on_packet)
         for event in events:
-            for h in self.handlers:
+            for h in self._handlers:
                 await h.handle(event, conn)

@@ -94,8 +94,10 @@ pub struct Isi {
     /// Messages typed with this prefix are forwarded to InSim and not shown in chat.
     pub prefix: char,
 
-    /// Interval between [Nlp](super::Nlp) or [Mci](super::Mci) updates (0 = disabled).
+    /// Interval between [Nlp](super::Nlp) or [Mci](super::Mci) updates, in milliseconds (0 = disabled).
     #[insim(duration = u16)]
+    #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
+    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub interval: Duration,
 
     /// Admin password (empty if none).

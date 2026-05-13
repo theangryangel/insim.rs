@@ -19,8 +19,7 @@ Use :class:`MockConnection` to inspect packets sent during a test::
             async def on_ncn(self, packet: Ncn, conn: MockConnection) -> None:
                 await conn.send_message(f"Welcome {packet.pname}", ucid=packet.ucid)
 
-        app = TestApp(conn=conn)
-        app.handlers.add(Bot())
+        app = TestApp(conn=conn, handlers=[Bot()])
 
         await app.inject(json.dumps({
             "type": "Ncn", "reqi": 0, "ucid": 1,
@@ -38,7 +37,6 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from insim_o3._registry import Registry
 from insim_o3.dispatcher import dispatch
 from insim_o3.handler import ErrorFn, Handler, default_on_error
 from insim_o3.middleware import Middleware
@@ -83,40 +81,46 @@ class TestApp:
     """
     Minimal test double for :class:`~insim_o3.app.App`.
 
-    Mirrors ``App``'s public ``handlers`` and ``middleware`` registries.
+    Takes handlers and middleware at construction time, matching ``App``.
     No network connection - driven by :meth:`inject`.
     """
+
+    # Tell pytest not to try to collect this as a test class despite the
+    # `Test` prefix.
+    __test__ = False
 
     def __init__(
         self,
         *,
         conn: MockConnection | None = None,
         on_error: ErrorFn | None = None,
+        handlers: list[Handler] | None = None,
+        middleware: list[Middleware] | None = None,
     ) -> None:
-        self.handlers: Registry[Handler] = Registry()
-        self.middleware: Registry[Middleware] = Registry()
+        self._handlers: tuple[Handler, ...] = tuple(handlers or ())
+        self._middleware: tuple[Middleware, ...] = tuple(middleware or ())
         self._on_error: ErrorFn = on_error or default_on_error
         self.conn: MockConnection = conn or MockConnection()
 
     async def connect(self) -> None:
         """Call ``on_connect`` on all middleware, as the real app would."""
-        for mw in self.middleware:
+        for mw in self._middleware:
             await mw.on_connect(self.conn)  # type: ignore[arg-type]
 
     async def shutdown(self) -> None:
         """Call ``on_shutdown`` on all middleware, as the real app would."""
-        for mw in self.middleware:
+        for mw in self._middleware:
             await mw.on_shutdown()
 
     async def inject(self, raw_json: str) -> None:
         """Parse *raw_json* and run it through the full middleware + handler chain."""
         packet = dispatch(raw_json)
         events: list[Any] = [packet]
-        for mw in self.middleware:
+        for mw in self._middleware:
             try:
                 events.extend(await mw.on_packet(packet))
             except Exception as exc:
                 self._on_error(exc, packet, mw.on_packet)
         for event in events:
-            for h in self.handlers:
+            for h in self._handlers:
                 await h.handle(event, self.conn)

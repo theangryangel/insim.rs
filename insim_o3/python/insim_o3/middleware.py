@@ -19,8 +19,7 @@ dispatch pipeline::
         async def on_shutdown(self) -> None:
             pass  # cleanup
 
-Attach to a client via ``client.middleware.add(m)`` or the ``middleware=``
-constructor argument.
+Attach to a client via the ``middleware=`` constructor argument on ``App``.
 """
 
 from __future__ import annotations

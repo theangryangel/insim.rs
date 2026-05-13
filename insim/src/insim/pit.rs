@@ -100,7 +100,9 @@ pub struct Psf {
     pub plid: PlayerId,
 
     #[insim(duration= u32, pad_after = 4)]
-    /// Total stop time.
+    /// Total stop time in milliseconds.
+    #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
+    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub stime: Duration,
 }
 

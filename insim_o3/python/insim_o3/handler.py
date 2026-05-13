@@ -5,7 +5,7 @@ Subclass ``handler.Handler`` and decorate methods with ``@on`` to register
 callbacks.  Packet types are inferred from the ``packet`` parameter annotation
 and ``|`` unions are supported::
 
-    from insim_o3 import handler
+    from insim_o3 import App, handler
     from insim_o3.packets import Ncn, Mso, Cnl
 
     class Bot(handler.Handler):
@@ -17,9 +17,9 @@ and ``|`` unions are supported::
         async def chat_or_leave(self, packet: Mso | Cnl) -> None:
             print(packet)
 
-Attach the instance to a client::
+Pass the instance to ``App`` at construction time::
 
-    client.handlers.add(Bot())
+    app = App(handlers=[Bot()])
 """
 
 from __future__ import annotations
@@ -32,11 +32,9 @@ from typing import Any, ClassVar, Union, get_args, get_origin, get_type_hints
 
 from pydantic import BaseModel
 
-from insim_o3._registry import Registry
 from insim_o3.dispatcher import AnyPacket
 
 HandlerFn = Callable[..., None | Awaitable[None]]
-_HandlerFn = HandlerFn
 ErrorFn = Callable[[BaseException, AnyPacket, Callable[..., Any]], None]
 
 _log = logging.getLogger(__name__)
@@ -74,7 +72,7 @@ def _infer_packet_types(fn: Callable[..., Any]) -> tuple[type[BaseModel], ...]:
     for pt in packet_types:
         if not isinstance(pt, type):
             raise TypeError(f"Cannot route to non-type annotation: {pt}")
-    return packet_types  # type: ignore[return-value]
+    return packet_types
 
 
 def on[F: Callable[..., Any]](fn: F) -> F:
@@ -151,31 +149,15 @@ class Handler:
         cls._registrations = tuple(merged)
 
     def __init__(self, *, on_error: ErrorFn | None = None) -> None:
-        self._handlers: dict[type[BaseModel], Registry[_HandlerFn]] = {}
-        self._on_error: ErrorFn = on_error or default_on_error
+        buckets: dict[type[BaseModel], list[HandlerFn]] = {}
         for packet_class, attr_name in type(self)._registrations:
-            self._bucket(packet_class).add(getattr(self, attr_name))
+            buckets.setdefault(packet_class, []).append(getattr(self, attr_name))
+        self._handlers: dict[type[BaseModel], tuple[HandlerFn, ...]] = {
+            pt: tuple(fns) for pt, fns in buckets.items()
+        }
+        self._on_error: ErrorFn = on_error or default_on_error
 
-    def register(self, fn: _HandlerFn) -> _HandlerFn:
-        """Register *fn* as a callback, inferring packet type(s) from its annotation.
-
-        Returns *fn* unchanged so this can be used as a decorator::
-
-            @handler_instance.register
-            async def join(packet: Ncn, conn: Connection) -> None: ...
-        """
-        for pt in _infer_packet_types(fn):
-            self._bucket(pt).add(fn)
-        return fn
-
-    def _bucket(self, packet_class: type[BaseModel]) -> Registry[_HandlerFn]:
-        bucket = self._handlers.get(packet_class)
-        if bucket is None:
-            bucket = Registry()
-            self._handlers[packet_class] = bucket
-        return bucket
-
-    async def handle(self, packet: object, conn: object) -> None:
+    async def handle(self, packet: AnyPacket, conn: object) -> None:
         """Dispatch *packet* to all registered callbacks.
 
         Sync and ``async def`` callbacks are both supported.  Exceptions are

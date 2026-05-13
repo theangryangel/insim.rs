@@ -97,12 +97,16 @@ pub struct Rip {
     #[insim(pad_after = 1)]
     pub options: RipOptions,
 
-    /// Requested destination time (request) or current position (reply).
+    /// Requested destination time (request) or current position (reply), in milliseconds.
     #[insim(duration = u32)]
+    #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
+    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub ctime: Duration,
 
-    /// Replay length (reply) or zero when requesting.
+    /// Replay length (reply) or zero when requesting, in milliseconds.
     #[insim(duration = u32)]
+    #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
+    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub ttime: Duration,
 
     /// Replay name (empty when querying current replay).

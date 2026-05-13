@@ -1,10 +1,11 @@
 """
-Smoke tests that exercise the `_Insim` async FFI bridge.
+Smoke tests for the ``App`` -> ``_Insim`` async FFI bridge.
 
-These tests catch regressions the offline `TestClient` cannot:
-- `connect()` raising `ValueError` synchronously (before the awaitable),
-- `connect()` raising `RuntimeError` from the awaitable on a refused connection,
-- the contract that `Insim` must be entered as an async context manager.
+These tests catch regressions the offline ``TestApp`` cannot:
+- ``App.connect()`` raising ``ValueError`` for malformed config,
+- ``App.connect()`` raising ``RuntimeError`` from the awaitable on a
+  refused connection,
+- ``App.serve()`` rejecting use before a connection has been established.
 
 End-to-end packet round-trip tests require a real LFS instance and live
 elsewhere.
@@ -13,29 +14,27 @@ elsewhere.
 from __future__ import annotations
 
 import pytest
-from insim_o3 import Insim
-from insim_o3.packets import Tiny
+from insim_o3 import App
 
 
-async def test_connect_invalid_flag_raises_value_error_synchronously() -> None:
-    """Bad flag values surface as ValueError from connect, not as a future."""
+async def test_connect_invalid_flag_raises_value_error() -> None:
+    """Bad flag values surface as ValueError when entering the context."""
+    app = App(flags=["NOT_A_REAL_FLAG"])  # type: ignore[list-item]
     with pytest.raises(ValueError):
-        async with Insim(
-            "127.0.0.1:0",
-            flags=["NOT_A_REAL_FLAG"],  # type: ignore[list-item]
-        ):
+        async with app.connect("127.0.0.1:0"):
             pass
 
 
-async def test_send_before_connect_raises() -> None:
-    """send() before __aenter__ tells the user to use the context manager."""
-    client = Insim("127.0.0.1:0")
-    with pytest.raises(RuntimeError, match="async with"):
-        await client.send(Tiny(reqi=0, subt="Ping"))
+async def test_serve_before_connect_raises() -> None:
+    """serve() before connect() tells the user how to drive the App."""
+    app = App()
+    with pytest.raises(RuntimeError, match="connect"):
+        await app.serve()
 
 
 async def test_connect_to_nothing_raises_runtime_error() -> None:
     """Loopback port 1 is virtually never listening - connect awaitable fails."""
+    app = App()
     with pytest.raises(RuntimeError):
-        async with Insim("127.0.0.1:1"):
+        async with app.connect("127.0.0.1:1"):
             pass

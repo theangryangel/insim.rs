@@ -12,15 +12,14 @@ Quick start::
         async def join(self, packet: Ncn, conn: Connection) -> None:
             print(packet.pname)
 
-    app = App(flags=[IsiFlag.MSO_COLS])
-    app.handlers.add(Bot())
+    app = App(flags=[IsiFlag.MSO_COLS], handlers=[Bot()])
     app.run("127.0.0.1:29999")
 """
 
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 
-from insim_o3 import handler
+from insim_o3 import commands, handler
 from insim_o3._insim import colour_spans, escape, strip_colours, unescape
 from insim_o3.app import App
 from insim_o3.connection import Connection
@@ -43,6 +42,7 @@ __all__ = [
     "Handler",
     "Middleware",
     "colour_spans",
+    "commands",
     "escape",
     "handler",
     "on",
