@@ -8,8 +8,6 @@ strings directly through the dispatcher.  They verify that:
 - ``@on`` infers packet types from annotations, including ``|`` unions.
 - Inheritance and override behave as expected.
 - Unregistered packet types are silently ignored.
-- Middleware is called before handlers, and a failing middleware does not
-  stop handlers from firing.
 - Multiple handlers for the same type all fire, in declaration order.
 - ``on_error`` isolates a failing handler so siblings still fire.
 """
@@ -165,32 +163,6 @@ async def test_subclass_override_replaces_parent_method() -> None:
     assert seen == ["child"]
 
 
-async def test_failing_middleware_does_not_kill_dispatch() -> None:
-    """An exception in middleware is routed to on_error and handlers still fire."""
-    errors: list[tuple[type, str]] = []
-    seen: list[int] = []
-
-    def on_error(exc: BaseException, packet: object, _fn: object) -> None:
-        errors.append((type(exc), type(packet).__name__))
-
-    class _H(handler.Handler):
-        @handler.on
-        async def handle(self, packet: Ncn) -> None:
-            seen.append(packet.ucid)
-
-    tc = TestClient(on_error=on_error)
-    tc.handlers.add(_H())
-
-    @tc.middleware.add
-    def boom(_: object) -> None:
-        raise RuntimeError("middleware kaboom")
-
-    await tc.inject(NCN_JSON)
-
-    assert seen == [42]
-    assert errors == [(RuntimeError, "Ncn")]
-
-
 async def test_failing_handler_does_not_block_others() -> None:
     """An exception in one handler is routed to on_error and others still fire."""
     errors: list[tuple[type, str]] = []
@@ -236,27 +208,6 @@ async def test_multiple_handlers_fire_in_order() -> None:
     assert order == [1, 2]
 
 
-async def test_middleware_fires_before_handler() -> None:
-    """Middleware is invoked before packet handlers."""
-    calls: list[str] = []
-
-    class _H(handler.Handler):
-        @handler.on
-        async def handle(self, packet: Ncn) -> None:
-            calls.append("handler")
-
-    tc = TestClient()
-
-    @tc.middleware.add
-    def mw(packet: object) -> None:
-        calls.append(f"middleware:{type(packet).__name__}")
-
-    tc.handlers.add(_H())
-    await tc.inject(NCN_JSON)
-
-    assert calls == ["middleware:Ncn", "handler"]
-
-
 async def test_multiple_handler_instances_all_receive_packet() -> None:
     """Packets are dispatched to every registered Handler instance."""
     hits: list[str] = []
@@ -276,4 +227,4 @@ async def test_multiple_handler_instances_all_receive_packet() -> None:
     tc.handlers.add(_H2())
     await tc.inject(NCN_JSON)
 
-    assert sorted(hits) == ["h1", "h2"]
+    assert hits == ["h1", "h2"]

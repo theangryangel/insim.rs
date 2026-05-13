@@ -1461,36 +1461,6 @@ class UcoAction(StrEnum):
     CpRev = "CpRev"
 
 
-class Vehicle1(StrEnum):
-    Xfg = "Xfg"
-    Xrg = "Xrg"
-    Fbm = "Fbm"
-    Xrt = "Xrt"
-    Rb4 = "Rb4"
-    Fxo = "Fxo"
-    Lx4 = "Lx4"
-    Lx6 = "Lx6"
-    Mrt = "Mrt"
-    Uf1 = "Uf1"
-    Rac = "Rac"
-    Fz5 = "Fz5"
-    Fox = "Fox"
-    Xfr = "Xfr"
-    Ufr = "Ufr"
-    Fo8 = "Fo8"
-    Fxr = "Fxr"
-    Xrr = "Xrr"
-    Fzr = "Fzr"
-    Bf1 = "Bf1"
-
-
-class Vehicle2(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    Mod: Annotated[int, Field(ge=0)]
-
-
 class VehicleAmbulance(BaseModel):
     colour: Annotated[int, Field(description="Colour (3 bits, 0-7)", ge=0, le=255)]
     floating: Annotated[bool, Field(description="Floating")]
@@ -2220,7 +2190,7 @@ class Letters(BaseModel):
 
 
 class Mal(BaseModel):
-    allowed_mods: list[Vehicle1 | Vehicle2 | Literal["Unknown"]]
+    allowed_mods: list[str]
     reqi: Annotated[
         int, Field(description="Request identifier echoed by replies.", ge=0, le=255)
     ]
@@ -3045,7 +3015,7 @@ class PlayerHandicap(BaseModel):
 
 
 class PlcAllowedCarsSet(BaseModel):
-    inner: list[Vehicle1 | Vehicle2 | Literal["Unknown"]]
+    inner: list[str]
 
 
 class Plh(BaseModel):
@@ -3116,10 +3086,7 @@ class Reo(BaseModel):
 
 class Res(BaseModel):
     btime: Annotated[Duration, Field(description="Best lap time.")]
-    cname: Annotated[
-        Vehicle1 | Vehicle2 | Literal["Unknown"],
-        Field(description="Vehicle used for the result."),
-    ]
+    cname: Annotated[str, Field(description="Vehicle used for the result.")]
     confirm: Annotated[
         list[RaceConfirmFlag], Field(description="Confirmation flags and penalties.")
     ]
@@ -3225,9 +3192,7 @@ class Sch(BaseModel):
 
 
 class Set(BaseModel):
-    cname: Annotated[
-        Vehicle1 | Vehicle2 | Literal["Unknown"], Field(description="vehicle")
-    ]
+    cname: Annotated[str, Field(description="vehicle")]
     fuelload: Annotated[int, Field(description="Fuel Load at start", ge=0, le=255)]
     plid: Annotated[int, Field(description="Player that left the race.", ge=0, le=255)]
     reqi: Annotated[
@@ -3262,9 +3227,7 @@ class SignSpeed(BaseModel):
 
 
 class Slc(BaseModel):
-    cname: Annotated[
-        Vehicle1 | Vehicle2 | Literal["Unknown"], Field(description="Selected vehicle.")
-    ]
+    cname: Annotated[str, Field(description="Selected vehicle.")]
     reqi: Annotated[
         int, Field(description="Request identifier echoed by replies.", ge=0, le=255)
     ]
@@ -3615,9 +3578,7 @@ class Nlp(BaseModel):
 
 
 class Npl(BaseModel):
-    cname: Annotated[
-        Vehicle1 | Vehicle2 | Literal["Unknown"], Field(description="Vehicle used.")
-    ]
+    cname: Annotated[str, Field(description="Vehicle used.")]
     config: Annotated[
         int,
         Field(

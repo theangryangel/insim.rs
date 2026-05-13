@@ -7,8 +7,7 @@ instances so users write::
     client.handlers.add(my_handler)
     client.handlers.remove(my_handler)
 
-    @client.middleware.add
-    async def log(packet): ...
+    client.middleware.add(my_middleware)
 
 Iteration snapshots the underlying list, so a callback that mutates the
 registry mid-dispatch (e.g. one-shot removal) does not skip siblings.
@@ -16,7 +15,7 @@ registry mid-dispatch (e.g. one-shot removal) does not skip siblings.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 
 
 class Registry[R]:
@@ -24,8 +23,8 @@ class Registry[R]:
 
     __slots__ = ("_items",)
 
-    def __init__(self) -> None:
-        self._items: list[R] = []
+    def __init__(self, initial: Iterable[R] = ()) -> None:
+        self._items: list[R] = list(initial)
 
     def add(self, item: R) -> R:
         """Append *item* and return it unchanged so this works as a decorator."""

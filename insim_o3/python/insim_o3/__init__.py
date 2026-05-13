@@ -1,15 +1,20 @@
 """
-insim_o3 - Python bindings for the insim.rs Insim library.
+insim_o3 - Python bindings for the insim.rs InSim library.
 
 Quick start::
 
-    from insim_o3 import Insim, handler
-    from insim_o3.packets import Ncn, Mso
+    from insim_o3 import App
+    from insim_o3.handler import Handler, on
+    from insim_o3.packets import IsiFlag, Ncn
 
-    class Bot(handler.Handler):
-        @handler.on(Ncn)
-        async def join(self, packet: Ncn) -> None:
+    class Bot(Handler):
+        @on
+        async def join(self, packet: Ncn, conn: Connection) -> None:
             print(packet.pname)
+
+    app = App(flags=[IsiFlag.MSO_COLS])
+    app.handlers.add(Bot())
+    app.run("127.0.0.1:29999")
 """
 
 from importlib.metadata import PackageNotFoundError
@@ -17,9 +22,11 @@ from importlib.metadata import version as _pkg_version
 
 from insim_o3 import handler
 from insim_o3._insim import colour_spans, escape, strip_colours, unescape
-from insim_o3.client import Insim
+from insim_o3.app import App
+from insim_o3.connection import Connection
 from insim_o3.dispatcher import AnyPacket
-from insim_o3.test_client import TestClient
+from insim_o3.handler import Handler, on
+from insim_o3.middleware import Middleware
 
 try:
     __version__ = _pkg_version("insim_o3")
@@ -31,11 +38,14 @@ except (
 __all__ = [
     "__version__",
     "AnyPacket",
-    "Insim",
-    "TestClient",
+    "App",
+    "Connection",
+    "Handler",
+    "Middleware",
     "colour_spans",
     "escape",
     "handler",
+    "on",
     "strip_colours",
     "unescape",
 ]

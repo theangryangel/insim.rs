@@ -9258,53 +9258,7 @@
       "type": "array"
     },
     "Vehicle": {
-      "description": "Vehicle identifier for standard cars and mods.\n\n- Standard vehicles use 3-character codes (e.g., `XFG`).\n- Mods are encoded as 6-character hex ids.\n- `license()` reports the required content tier.\n\nSee <https://www.lfs.net/forum/thread/95662-New-InSim-packet-size-byte-and-mod-info>",
-      "oneOf": [
-        {
-          "enum": [
-            "Xfg",
-            "Xrg",
-            "Fbm",
-            "Xrt",
-            "Rb4",
-            "Fxo",
-            "Lx4",
-            "Lx6",
-            "Mrt",
-            "Uf1",
-            "Rac",
-            "Fz5",
-            "Fox",
-            "Xfr",
-            "Ufr",
-            "Fo8",
-            "Fxr",
-            "Xrr",
-            "Fzr",
-            "Bf1"
-          ],
-          "type": "string"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "Mod": {
-              "format": "uint32",
-              "minimum": 0,
-              "type": "integer"
-            }
-          },
-          "required": [
-            "Mod"
-          ],
-          "type": "object"
-        },
-        {
-          "const": "Unknown",
-          "description": "Unknown vehicle. *Probably* a private mod?",
-          "type": "string"
-        }
-      ]
+      "type": "string"
     },
     "VehicleAmbulance": {
       "description": "Vehicle Ambulance",
