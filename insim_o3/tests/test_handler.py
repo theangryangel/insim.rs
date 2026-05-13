@@ -5,7 +5,7 @@ These tests run without a real LFS connection by injecting synthetic JSON
 strings directly through the dispatcher.  They verify that:
 
 - Subclass-declared handlers receive a correctly typed Pydantic model.
-- ``@on(...)`` registers methods, including for multiple packet types.
+- ``@on`` infers packet types from annotations, including ``|`` unions.
 - Inheritance and override behave as expected.
 - Unregistered packet types are silently ignored.
 - Middleware is called before handlers, and a failing middleware does not
@@ -58,7 +58,7 @@ async def test_ncn_handler_receives_typed_model() -> None:
             super().__init__()
             self.received: list[Ncn] = []
 
-        @handler.on(Ncn)
+        @handler.on
         async def collect(self, packet: Ncn) -> None:
             self.received.append(packet)
 
@@ -85,7 +85,7 @@ async def test_mso_handler_receives_typed_model() -> None:
             super().__init__()
             self.received: list[Mso] = []
 
-        @handler.on(Mso)
+        @handler.on
         async def collect(self, packet: Mso) -> None:
             self.received.append(packet)
 
@@ -106,13 +106,13 @@ async def test_unregistered_type_is_ignored() -> None:
     await tc.inject(TINY_JSON)
 
 
-async def test_on_decorator_supports_multiple_types() -> None:
-    """@on(A, B) registers the same method for both types."""
+async def test_on_decorator_supports_union_types() -> None:
+    """@on with a ``|`` union annotation registers the method for both types."""
     seen: list[str] = []
 
     class Multi(handler.Handler):
-        @handler.on(Ncn, Mso)
-        async def both(self, packet: object) -> None:
+        @handler.on
+        async def both(self, packet: Ncn | Mso) -> None:
             seen.append(type(packet).__name__)
 
     tc = TestClient()
@@ -128,12 +128,12 @@ async def test_class_registrations_are_inheritable() -> None:
     seen: list[str] = []
 
     class Base(handler.Handler):
-        @handler.on(Ncn)
+        @handler.on
         async def handle_ncn(self, packet: Ncn) -> None:
             seen.append("base-ncn")
 
     class Child(Base):
-        @handler.on(Mso)
+        @handler.on
         async def handle_mso(self, packet: Mso) -> None:
             seen.append("child-mso")
 
@@ -150,7 +150,7 @@ async def test_subclass_override_replaces_parent_method() -> None:
     seen: list[str] = []
 
     class Base(handler.Handler):
-        @handler.on(Ncn)
+        @handler.on
         async def handle_ncn(self, packet: Ncn) -> None:
             seen.append("base")
 
@@ -174,7 +174,7 @@ async def test_failing_middleware_does_not_kill_dispatch() -> None:
         errors.append((type(exc), type(packet).__name__))
 
     class _H(handler.Handler):
-        @handler.on(Ncn)
+        @handler.on
         async def handle(self, packet: Ncn) -> None:
             seen.append(packet.ucid)
 
@@ -200,11 +200,11 @@ async def test_failing_handler_does_not_block_others() -> None:
         errors.append((type(exc), type(packet).__name__))
 
     class _H(handler.Handler):
-        @handler.on(Ncn)
+        @handler.on
         async def boom(self, packet: Ncn) -> None:
             raise ValueError("kaboom")
 
-        @handler.on(Ncn)
+        @handler.on
         async def ok(self, packet: Ncn) -> None:
             seen.append(1)
 
@@ -221,11 +221,11 @@ async def test_multiple_handlers_fire_in_order() -> None:
     order: list[int] = []
 
     class _H(handler.Handler):
-        @handler.on(Ncn)
+        @handler.on
         async def first(self, packet: Ncn) -> None:
             order.append(1)
 
-        @handler.on(Ncn)
+        @handler.on
         async def second(self, packet: Ncn) -> None:
             order.append(2)
 
@@ -241,7 +241,7 @@ async def test_middleware_fires_before_handler() -> None:
     calls: list[str] = []
 
     class _H(handler.Handler):
-        @handler.on(Ncn)
+        @handler.on
         async def handle(self, packet: Ncn) -> None:
             calls.append("handler")
 
@@ -262,12 +262,12 @@ async def test_multiple_handler_instances_all_receive_packet() -> None:
     hits: list[str] = []
 
     class _H1(handler.Handler):
-        @handler.on(Ncn)
+        @handler.on
         async def handle(self, packet: Ncn) -> None:
             hits.append("h1")
 
     class _H2(handler.Handler):
-        @handler.on(Ncn)
+        @handler.on
         async def handle(self, packet: Ncn) -> None:
             hits.append("h2")
 

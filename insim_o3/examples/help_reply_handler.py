@@ -1,10 +1,8 @@
 """
 Example: reply to !help via Mtc, using the ``Handler`` subclass pattern.
 
-Same behaviour as ``help_reply.py``, but groups the callbacks into a
-reusable ``Handler`` class.  Methods are bound to packet types via the
-``@on(PacketType)`` decorator; the same verb is used at the client level
-(``@client.on(...)``) so the registration model is consistent.
+Same behaviour as ``help_reply.py``.  Packet types are inferred from method
+annotations; ``|`` unions let one method handle multiple packet types.
 
 Run against a local or remote LFS host::
 
@@ -14,22 +12,23 @@ Run against a local or remote LFS host::
 import argparse
 import asyncio
 
-from insim_o3 import Insim, handler, strip_colours, unescape
+from insim_o3 import Insim, strip_colours, unescape
+from insim_o3 import Handler, on
 from insim_o3.packets import IsiFlag, Mso, MsoUserType, Mtc, Ncn, SoundType
 
 
-class HelpHandler(handler.Handler):
+class HelpHandler(Handler):
     """Replies to ``!help`` with a system message and announces joins."""
 
     def __init__(self, client: Insim) -> None:
         super().__init__()
         self._client = client
 
-    @handler.on(Ncn)
+    @on
     async def announce_join(self, packet: Ncn) -> None:
         print(f"[join] {packet.uname} ({packet.pname})")
 
-    @handler.on(Mso)
+    @on
     async def reply_to_help(self, packet: Mso) -> None:
         if packet.usertype != MsoUserType.Prefix:
             return

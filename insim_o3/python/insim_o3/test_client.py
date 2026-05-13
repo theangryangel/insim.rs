@@ -6,21 +6,25 @@ Usage::
 
     import pytest
     from insim_o3.test_client import TestClient
-    from insim_o3.handler import Handler
+    from insim_o3.handler import Handler, on
     from insim_o3.packets import Ncn
     import json
 
     @pytest.mark.asyncio
     async def test_ncn_handler() -> None:
-        handler = Handler()
-        seen: list[Ncn] = []
+        class Bot(Handler):
+            def __init__(self) -> None:
+                super().__init__()
+                self.seen: list[Ncn] = []
 
-        @handler.on(Ncn)
-        def on_ncn(p: Ncn) -> None:
-            seen.append(p)
+            @on
+            def on_ncn(self, p: Ncn) -> None:
+                self.seen.append(p)
+
+        bot = Bot()
 
         tc = TestClient()
-        tc.handlers.add(handler)
+        tc.handlers.add(bot)
 
         await tc.inject(json.dumps({
             "type": "Ncn",
@@ -33,8 +37,8 @@ Usage::
             "flags": [],
         }))
 
-        assert len(seen) == 1
-        assert seen[0].ucid == 1
+        assert len(bot.seen) == 1
+        assert bot.seen[0].ucid == 1
 """
 
 from __future__ import annotations
@@ -79,5 +83,4 @@ class TestClient:
             except Exception as exc:
                 self._on_error(exc, packet, mw)
 
-        for h in self.handlers:
-            await h.handle(packet)
+        await asyncio.gather(*(h.handle(packet) for h in self.handlers))

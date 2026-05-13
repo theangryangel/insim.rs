@@ -1,17 +1,19 @@
 """
 Insim - the main public facade for the insim_o3 library.
 
-For standalone bots, register handlers and call :meth:`Insim.run_forever`::
+For standalone bots, attach a ``Handler`` subclass and call
+:meth:`Insim.run_forever`::
 
-    from insim_o3 import Insim
+    from insim_o3 import Insim, handler
     from insim_o3.packets import Ncn
 
+    class Bot(handler.Handler):
+        @handler.on
+        async def join(self, packet: Ncn) -> None:
+            print(f"[join] {packet.pname}")
+
     client = Insim("127.0.0.1:29999")
-
-    @client.on(Ncn)
-    async def on_ncn(packet: Ncn) -> None:
-        print(f"[join] {packet.pname}")
-
+    client.handlers.add(Bot())
     client.run_forever()
 
 To embed inside another asyncio program, use ``Insim`` as an async context
@@ -19,9 +21,7 @@ manager directly::
 
     async def main() -> None:
         async with Insim("127.0.0.1:29999") as client:
-            @client.on(Ncn)
-            async def on_ncn(packet: Ncn) -> None: ...
-
+            client.handlers.add(Bot())
             await client.run()
 """
 
@@ -31,17 +31,14 @@ import asyncio
 import inspect
 from collections.abc import Awaitable, Callable
 from types import TracebackType
-from typing import TypeVar
 
 from pydantic import BaseModel
 
 from insim_o3._insim import _Insim
 from insim_o3._registry import Registry
 from insim_o3.dispatcher import AnyPacket, dispatch
-from insim_o3.handler import ErrorFn, Handler, HandlerFn, default_on_error
+from insim_o3.handler import ErrorFn, Handler, default_on_error
 from insim_o3.packets import IsiFlag, Mst, Msx, Mtc, SoundType
-
-_T = TypeVar("_T", bound=BaseModel)
 
 MiddlewareFn = Callable[[AnyPacket], None | Awaitable[None]]
 
@@ -75,46 +72,10 @@ class Insim:
         self._capacity = capacity
         self._inner: _Insim | None = None
         self._on_error: ErrorFn = on_error or default_on_error
-        # Propagate on_error so @client.on() callbacks share the same policy.
-        self._default_handler = Handler(on_error=self._on_error)
-        #: Public ``Registry[Handler]``.  Use ``client.handlers.add(h)`` /
-        #: ``.remove(h)`` to attach extra ``Handler`` instances.  The default
-        #: handler used by :meth:`on` is always present at index 0.
+        #: Attach ``Handler`` instances via ``client.handlers.add(h)``.
         self.handlers: Registry[Handler] = Registry()
-        self.handlers.add(self._default_handler)
-        #: Public ``Registry[MiddlewareFn]``.  Use as a decorator
-        #: (``@client.middleware.add``) or call ``.add(fn)`` / ``.remove(fn)``
-        #: directly.
+        #: Attach middleware via ``client.middleware.add(fn)``.
         self.middleware: Registry[MiddlewareFn] = Registry()
-
-    def on(
-        self,
-        packet_class: type[_T],
-    ) -> Callable[[HandlerFn[_T]], HandlerFn[_T]]:
-        """
-        Decorator that registers a handler directly on the client.
-        The wrapped function may be sync or ``async def``.
-        """
-
-        def decorator(fn: HandlerFn[_T]) -> HandlerFn[_T]:
-            self._default_handler._bucket(packet_class).add(fn)
-            return fn
-
-        return decorator
-
-    def off(self, packet_class: type[_T], fn: HandlerFn[_T]) -> bool:
-        """
-        Remove a handler previously registered via :meth:`on`.
-
-        Returns ``True`` if found and removed, ``False`` otherwise.  Only
-        affects handlers on the default handler - whole ``Handler`` instances
-        attached via :attr:`handlers` should be removed via
-        ``client.handlers.remove(handler)``.
-        """
-        bucket = self._default_handler._handlers.get(packet_class)
-        if bucket is None:
-            return False
-        return bucket.remove(fn)
 
     async def send(self, packet: BaseModel) -> None:
         """
@@ -159,8 +120,7 @@ class Insim:
                     await result
             except Exception as exc:
                 self._on_error(exc, packet, mw)
-        for h in self.handlers:
-            await h.handle(packet)
+        await asyncio.gather(*(h.handle(packet) for h in self.handlers))
 
     async def run(self) -> None:
         """
