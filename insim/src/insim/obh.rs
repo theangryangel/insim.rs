@@ -122,7 +122,9 @@ pub struct Obh {
     /// Closing speed at impact.
     pub spclose: Speed,
 
-    /// Time since session start (wraps periodically).
+    /// Time since session start, in milliseconds (wraps periodically).
+    #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
+    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub time: Duration,
 
     /// Contact details.

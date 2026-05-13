@@ -42,8 +42,10 @@ pub struct Uco {
     #[insim(pad_after = 2)]
     pub ucoaction: UcoAction,
 
-    /// Time since session start (wraps periodically).
+    /// Time since session start, in milliseconds (wraps periodically).
     #[insim(duration = u32)]
+    #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
+    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub time: Duration,
 
     /// Contact details, if relevant.

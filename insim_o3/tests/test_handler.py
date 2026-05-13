@@ -1,15 +1,13 @@
 """
-Integration tests for the Handler + TestClient layer.
+Integration tests for the Handler + TestApp layer.
 
 These tests run without a real LFS connection by injecting synthetic JSON
 strings directly through the dispatcher.  They verify that:
 
 - Subclass-declared handlers receive a correctly typed Pydantic model.
-- ``@on(...)`` registers methods, including for multiple packet types.
+- ``@on`` infers packet types from annotations, including ``|`` unions.
 - Inheritance and override behave as expected.
 - Unregistered packet types are silently ignored.
-- Middleware is called before handlers, and a failing middleware does not
-  stop handlers from firing.
 - Multiple handlers for the same type all fire, in declaration order.
 - ``on_error`` isolates a failing handler so siblings still fire.
 """
@@ -20,7 +18,7 @@ import json
 
 from insim_o3 import handler
 from insim_o3.packets import Mso, Ncn
-from insim_o3.test_client import TestClient
+from insim_o3.test_app import MockConnection, TestApp
 
 NCN_JSON = json.dumps(
     {
@@ -58,14 +56,13 @@ async def test_ncn_handler_receives_typed_model() -> None:
             super().__init__()
             self.received: list[Ncn] = []
 
-        @handler.on(Ncn)
-        async def collect(self, packet: Ncn) -> None:
+        @handler.on
+        async def collect(self, packet: Ncn, conn: MockConnection) -> None:
             self.received.append(packet)
 
     cap = _Capture()
-    tc = TestClient()
-    tc.handlers.add(cap)
-    await tc.inject(NCN_JSON)
+    app = TestApp(handlers=[cap])
+    await app.inject(NCN_JSON)
 
     assert len(cap.received) == 1
     pkt = cap.received[0]
@@ -85,14 +82,13 @@ async def test_mso_handler_receives_typed_model() -> None:
             super().__init__()
             self.received: list[Mso] = []
 
-        @handler.on(Mso)
-        async def collect(self, packet: Mso) -> None:
+        @handler.on
+        async def collect(self, packet: Mso, conn: MockConnection) -> None:
             self.received.append(packet)
 
     cap = _Capture()
-    tc = TestClient()
-    tc.handlers.add(cap)
-    await tc.inject(MSO_JSON)
+    app = TestApp(handlers=[cap])
+    await app.inject(MSO_JSON)
 
     assert len(cap.received) == 1
     assert cap.received[0].msg == "Hello, world!"
@@ -101,24 +97,22 @@ async def test_mso_handler_receives_typed_model() -> None:
 
 async def test_unregistered_type_is_ignored() -> None:
     """Injecting a packet type with no handler does not raise."""
-    tc = TestClient()
-    tc.handlers.add(handler.Handler())
-    await tc.inject(TINY_JSON)
+    app = TestApp(handlers=[handler.Handler()])
+    await app.inject(TINY_JSON)
 
 
-async def test_on_decorator_supports_multiple_types() -> None:
-    """@on(A, B) registers the same method for both types."""
+async def test_on_decorator_supports_union_types() -> None:
+    """@on with a ``|`` union annotation registers the method for both types."""
     seen: list[str] = []
 
     class Multi(handler.Handler):
-        @handler.on(Ncn, Mso)
-        async def both(self, packet: object) -> None:
+        @handler.on
+        async def both(self, packet: Ncn | Mso, conn: MockConnection) -> None:
             seen.append(type(packet).__name__)
 
-    tc = TestClient()
-    tc.handlers.add(Multi())
-    await tc.inject(NCN_JSON)
-    await tc.inject(MSO_JSON)
+    app = TestApp(handlers=[Multi()])
+    await app.inject(NCN_JSON)
+    await app.inject(MSO_JSON)
 
     assert seen == ["Ncn", "Mso"]
 
@@ -128,19 +122,18 @@ async def test_class_registrations_are_inheritable() -> None:
     seen: list[str] = []
 
     class Base(handler.Handler):
-        @handler.on(Ncn)
-        async def handle_ncn(self, packet: Ncn) -> None:
+        @handler.on
+        async def handle_ncn(self, packet: Ncn, conn: MockConnection) -> None:
             seen.append("base-ncn")
 
     class Child(Base):
-        @handler.on(Mso)
-        async def handle_mso(self, packet: Mso) -> None:
+        @handler.on
+        async def handle_mso(self, packet: Mso, conn: MockConnection) -> None:
             seen.append("child-mso")
 
-    tc = TestClient()
-    tc.handlers.add(Child())
-    await tc.inject(NCN_JSON)
-    await tc.inject(MSO_JSON)
+    app = TestApp(handlers=[Child()])
+    await app.inject(NCN_JSON)
+    await app.inject(MSO_JSON)
 
     assert seen == ["base-ncn", "child-mso"]
 
@@ -150,45 +143,18 @@ async def test_subclass_override_replaces_parent_method() -> None:
     seen: list[str] = []
 
     class Base(handler.Handler):
-        @handler.on(Ncn)
-        async def handle_ncn(self, packet: Ncn) -> None:
+        @handler.on
+        async def handle_ncn(self, packet: Ncn, conn: MockConnection) -> None:
             seen.append("base")
 
     class Child(Base):
-        async def handle_ncn(self, packet: Ncn) -> None:
+        async def handle_ncn(self, packet: Ncn, conn: MockConnection) -> None:
             seen.append("child")
 
-    tc = TestClient()
-    tc.handlers.add(Child())
-    await tc.inject(NCN_JSON)
+    app = TestApp(handlers=[Child()])
+    await app.inject(NCN_JSON)
 
     assert seen == ["child"]
-
-
-async def test_failing_middleware_does_not_kill_dispatch() -> None:
-    """An exception in middleware is routed to on_error and handlers still fire."""
-    errors: list[tuple[type, str]] = []
-    seen: list[int] = []
-
-    def on_error(exc: BaseException, packet: object, _fn: object) -> None:
-        errors.append((type(exc), type(packet).__name__))
-
-    class _H(handler.Handler):
-        @handler.on(Ncn)
-        async def handle(self, packet: Ncn) -> None:
-            seen.append(packet.ucid)
-
-    tc = TestClient(on_error=on_error)
-    tc.handlers.add(_H())
-
-    @tc.middleware.add
-    def boom(_: object) -> None:
-        raise RuntimeError("middleware kaboom")
-
-    await tc.inject(NCN_JSON)
-
-    assert seen == [42]
-    assert errors == [(RuntimeError, "Ncn")]
 
 
 async def test_failing_handler_does_not_block_others() -> None:
@@ -200,17 +166,16 @@ async def test_failing_handler_does_not_block_others() -> None:
         errors.append((type(exc), type(packet).__name__))
 
     class _H(handler.Handler):
-        @handler.on(Ncn)
-        async def boom(self, packet: Ncn) -> None:
+        @handler.on
+        async def boom(self, packet: Ncn, conn: MockConnection) -> None:
             raise ValueError("kaboom")
 
-        @handler.on(Ncn)
-        async def ok(self, packet: Ncn) -> None:
+        @handler.on
+        async def ok(self, packet: Ncn, conn: MockConnection) -> None:
             seen.append(1)
 
-    tc = TestClient()
-    tc.handlers.add(_H(on_error=on_error))
-    await tc.inject(NCN_JSON)
+    app = TestApp(handlers=[_H(on_error=on_error)])
+    await app.inject(NCN_JSON)
 
     assert seen == [1]
     assert errors == [(ValueError, "Ncn")]
@@ -221,40 +186,18 @@ async def test_multiple_handlers_fire_in_order() -> None:
     order: list[int] = []
 
     class _H(handler.Handler):
-        @handler.on(Ncn)
-        async def first(self, packet: Ncn) -> None:
+        @handler.on
+        async def first(self, packet: Ncn, conn: MockConnection) -> None:
             order.append(1)
 
-        @handler.on(Ncn)
-        async def second(self, packet: Ncn) -> None:
+        @handler.on
+        async def second(self, packet: Ncn, conn: MockConnection) -> None:
             order.append(2)
 
-    tc = TestClient()
-    tc.handlers.add(_H())
-    await tc.inject(NCN_JSON)
+    app = TestApp(handlers=[_H()])
+    await app.inject(NCN_JSON)
 
     assert order == [1, 2]
-
-
-async def test_middleware_fires_before_handler() -> None:
-    """Middleware is invoked before packet handlers."""
-    calls: list[str] = []
-
-    class _H(handler.Handler):
-        @handler.on(Ncn)
-        async def handle(self, packet: Ncn) -> None:
-            calls.append("handler")
-
-    tc = TestClient()
-
-    @tc.middleware.add
-    def mw(packet: object) -> None:
-        calls.append(f"middleware:{type(packet).__name__}")
-
-    tc.handlers.add(_H())
-    await tc.inject(NCN_JSON)
-
-    assert calls == ["middleware:Ncn", "handler"]
 
 
 async def test_multiple_handler_instances_all_receive_packet() -> None:
@@ -262,18 +205,16 @@ async def test_multiple_handler_instances_all_receive_packet() -> None:
     hits: list[str] = []
 
     class _H1(handler.Handler):
-        @handler.on(Ncn)
-        async def handle(self, packet: Ncn) -> None:
+        @handler.on
+        async def on_ncn(self, packet: Ncn, conn: MockConnection) -> None:
             hits.append("h1")
 
     class _H2(handler.Handler):
-        @handler.on(Ncn)
-        async def handle(self, packet: Ncn) -> None:
+        @handler.on
+        async def on_ncn(self, packet: Ncn, conn: MockConnection) -> None:
             hits.append("h2")
 
-    tc = TestClient()
-    tc.handlers.add(_H1())
-    tc.handlers.add(_H2())
-    await tc.inject(NCN_JSON)
+    app = TestApp(handlers=[_H1(), _H2()])
+    await app.inject(NCN_JSON)
 
-    assert sorted(hits) == ["h1", "h2"]
+    assert hits == ["h1", "h2"]

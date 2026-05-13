@@ -34,11 +34,15 @@ pub struct Res {
     pub cname: Vehicle,
 
     #[insim(duration = u32)]
-    /// Total time.
+    /// Total time in milliseconds.
+    #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
+    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub ttime: Duration,
 
     #[insim(duration = u32, pad_after = 1)]
-    /// Best lap time.
+    /// Best lap time in milliseconds.
+    #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
+    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub btime: Duration,
 
     /// Number of pit stops.

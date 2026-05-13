@@ -42,7 +42,9 @@ pub struct Hlv {
     pub hlvc: Hlvc,
 
     #[insim(duration = u32)]
-    /// Time since session start (wraps periodically).
+    /// Time since session start, in milliseconds (wraps periodically).
+    #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
+    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub time: Duration,
 
     /// Contact details, if relevant.

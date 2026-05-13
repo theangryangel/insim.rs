@@ -8,6 +8,9 @@ use std::net::SocketAddr;
 #[macro_use]
 mod macros;
 
+#[cfg(feature = "serde")]
+pub mod duration_serde;
+
 #[cfg(any(feature = "blocking", feature = "tokio"))]
 /// Address types for connecting to LFS.
 pub mod address;

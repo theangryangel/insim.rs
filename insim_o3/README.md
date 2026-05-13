@@ -26,67 +26,81 @@ change to packet structs in the `insim` crate:
 cargo run -p xtask-insim-o3-schema
 ```
 
-Then commit both changed files. CI verifies they are current with:
+This runs a two-step pipeline:
 
-```bash
-cargo run -p xtask-insim-o3-schema -- --check
-```
+1. The xtask invokes `schemars::schema_for!(insim::Packet)` and writes
+   `insim_o3/insim_schema.json` - the faithful schemars output, no
+   post-processing.
+2. The xtask then shells out to `insim_o3/scripts/generate_packets.py`, which
+   reads the JSON Schema and emits `python/insim_o3/packets.py` with Pydantic
+   v2 models. Variant classes for sum types are named `<Parent><Variant>`
+   (e.g. `AiInputTypeMsx`, `FuelPercentage`, `PmoActionLoadingFile`). The
+   output is formatted with `ruff format`.
+
+`uv` and a recent Python must be on `PATH`; the script itself only uses the
+standard library. CI verifies the two files are up to date with `git diff
+--exit-code` after running the xtask.
 
 ## Usage
 
-The library is async at the core. For standalone bots there's a sync entry
-point (`run_forever`); for embedding in another asyncio program, use `Insim`
-as an async context manager.
+The two main classes are `App` (composition root - holds config, handlers, and
+middleware) and `Connection` (thin send-only wrapper passed to every handler).
 
 ### Standalone bot
 
 ```python
-from insim_o3 import Insim
-from insim_o3.packets import Ncn, Mso
+from insim_o3 import App, Connection, Handler, on
+from insim_o3.packets import IsiFlag, Mso, Ncn
 
-client = Insim("127.0.0.1:29999")
+class Bot(Handler):
+    @on
+    async def on_join(self, packet: Ncn, conn: Connection) -> None:
+        print(f"[join] {packet.pname} ({packet.uname})")
 
-@client.on(Ncn)
-async def on_join(packet: Ncn) -> None:
-    print(f"[join] {packet.pname} ({packet.uname})")
+    @on
+    async def on_chat(self, packet: Mso, conn: Connection) -> None:
+        print(f"[chat] {packet.msg}")
 
-@client.on(Mso)
-async def on_chat(packet: Mso) -> None:
-    print(f"[chat] {packet.msg}")
-
-client.run_forever()
+app = App(flags=[IsiFlag.MSO_COLS], handlers=[Bot()])
+app.run("127.0.0.1:29999")
 ```
 
-`run_forever()` connects, dispatches until the connection drops or Ctrl+C,
-and tears down cleanly. Handler functions may be sync or `async def`.
+`run()` connects, dispatches until the connection drops or Ctrl+C, and tears
+down cleanly.
 
 ### Embedding in another asyncio program
 
 When you need to run alongside other async tasks (a web server, another
-client, etc.), use `Insim` as a context manager directly:
+client, etc.), use `app.connect()` as an async context manager:
 
 ```python
 import asyncio
-from insim_o3 import Insim
+from insim_o3 import App, Connection, Handler, on
+from insim_o3.packets import Ncn
+
+class Bot(Handler):
+    @on
+    async def on_join(self, packet: Ncn, conn: Connection) -> None: ...
+
+app = App(handlers=[Bot()])
 
 async def main() -> None:
-    async with Insim("127.0.0.1:29999") as client:
-        @client.on(Ncn)
-        async def on_join(packet: Ncn) -> None: ...
-
-        await client.run()
+    async with app.connect("127.0.0.1:29999"):
+        await app.serve()
 
 asyncio.run(main())
 ```
 
 ### Connection options
 
+All connection parameters are passed to `App`; only the address goes to
+`run()` / `connect()`:
+
 ```python
-from insim_o3 import Insim
+from insim_o3 import App
 from insim_o3.packets import IsiFlag
 
-client = Insim(
-    "127.0.0.1:29999",
+app = App(
     flags=[IsiFlag.MCI, IsiFlag.MSO_COLS],
     iname="my_app",
     admin_password="secret",
@@ -94,84 +108,129 @@ client = Insim(
     prefix="!",      # route !-prefixed chat as Mso with usertype=Prefix
     capacity=256,    # broadcast channel buffer size
 )
+app.run("127.0.0.1:29999")
 ```
 
 ### Sending packets
 
-```python
-from insim_o3.packets import Mtc, SoundType
+Every handler receives a `Connection` as its second argument. Use it to send:
 
-await client.send(Mtc(ucid=packet.ucid, plid=packet.plid, sound=SoundType.SysMessage, text="hello"))
+```python
+from insim_o3 import Connection
+from insim_o3.packets import Mso, Mtc, SoundType
+from insim_o3.handler import on
+
+@on
+async def reply(self, packet: Mso, conn: Connection) -> None:
+    await conn.send(Mtc(
+        reqi=0, ucid=packet.ucid, plid=packet.plid,
+        sound=SoundType.SysMessage, text="hello",
+    ))
+```
+
+`Connection` also has convenience methods:
+
+```python
+await conn.send_command("/track BL1")          # Mst
+await conn.send_message("hello")               # Msx (broadcast)
+await conn.send_message("hi", ucid=packet.ucid)  # Mtc (targeted)
 ```
 
 ### Reusable handlers
 
-Group related handlers into a `handler.Handler` subclass and decorate
-methods with `@handler.on(PacketType)`. Method names are arbitrary, and one
-method may register for multiple packet types (`@handler.on(Ncn, Cnl)`):
+Group related handlers into a `Handler` subclass. Packet types are inferred
+from the first parameter annotation; `|` unions route one method to multiple
+types:
 
 ```python
-from insim_o3 import Insim, handler
-from insim_o3.packets import Ncn, Mso
+from insim_o3 import App, Connection, Handler, on
+from insim_o3.packets import Cnl, Ncn
 
-class Bot(handler.Handler):
-    @handler.on(Ncn)
-    async def announce(self, packet: Ncn) -> None:
-        print(f"[join] {packet.pname}")
+class SessionTracker(Handler):
+    @on
+    async def join(self, packet: Ncn, conn: Connection) -> None:
+        print(f"[+] {packet.pname}")
 
-    @handler.on(Mso)
-    async def chat(self, packet: Mso) -> None:
-        print(f"[chat] {packet.msg}")
+    @on
+    async def leave(self, packet: Cnl, conn: Connection) -> None:
+        print(f"[-] ucid={packet.ucid}")
 
-async with Insim("127.0.0.1:29999") as client:
-    client.handlers.add(Bot())
-    await client.run()
+app = App(handlers=[SessionTracker()])
+app.run("127.0.0.1:29999")
 ```
 
-`client.handlers` is a small registry: `add(handler)` and `remove(handler)`
-work directly, and the registry is iterable.
-
-The same `on` verb is used as a method on the client itself
-(`@client.on(PacketType)` shown earlier in the standalone-bot example) - at
-the client level it registers a callback at runtime against the default
-handler; on a `Handler` subclass it registers a method at class-definition
-time.
+Handlers and middleware are passed at construction time and are fixed for the
+lifetime of the `App`.
 
 ### Middleware
 
-Middleware runs before handlers and receives every packet regardless of type -
-useful for logging or metrics. Sync and `async def` middleware are both
-supported:
+Middleware intercepts every packet before handlers run and can emit additional
+synthetic events into the dispatch pipeline. Implement the `Middleware`
+protocol - three async methods, all required:
 
 ```python
-from insim_o3 import Insim
+from insim_o3 import Connection, Middleware
 from insim_o3.dispatcher import AnyPacket
 
-async with Insim("127.0.0.1:29999") as client:
+class Logger:
+    async def on_connect(self, conn: Connection) -> None:
+        print("connected")
 
-    @client.middleware.add
-    async def log_all(packet: AnyPacket) -> None:
+    async def on_packet(self, packet: AnyPacket) -> list:
         print(f"<- {type(packet).__name__}")
+        return []   # no synthetic events
 
-    await client.run()
+    async def on_shutdown(self) -> None:
+        print("disconnected")
+
+app = App(middleware=[Logger()])
+app.run("127.0.0.1:29999")
 ```
 
-`client.middleware` is a registry just like `client.handlers`:
-`@client.middleware.add` is the decorator form; `client.middleware.remove(fn)`
-deregisters.
+`on_packet` returns a list of additional events to inject. Those events are
+dispatched after the real packet and can be any object your handlers are
+registered for (including custom dataclasses).
+
+#### PresenceMiddleware
+
+The built-in `PresenceMiddleware` tracks connections and players, and emits
+typed synthetic events (`Connected`, `Disconnected`, `PlayerJoined`,
+`PlayerLeft`, `Renamed`, `TakingOver`):
+
+```python
+from insim_o3 import App, Connection, Handler, on
+from insim_o3.presence import Connected, PlayerJoined, PresenceMiddleware
+
+presence = PresenceMiddleware()
+
+class Bot(Handler):
+    @on
+    async def greet(self, event: Connected, conn: Connection) -> None:
+        total = len(presence.connections)
+        print(f"[+] {event.conn.uname} - {total} online")
+
+    @on
+    async def track(self, event: PlayerJoined, conn: Connection) -> None:
+        print(f"[track+] {event.player.pname} in {event.player.vehicle}")
+
+app = App(middleware=[presence], handlers=[Bot()])
+app.run("127.0.0.1:29999")
+```
+
+Query live state at any time via `presence.connections` (dict keyed by ucid)
+and `presence.players` (dict keyed by plid).
 
 ### Error handling
 
-Exceptions raised by individual handlers or middleware are caught, logged,
-and skipped so one bad callback does not kill the dispatch loop. Override
-the policy with the `on_error` kwarg on `Insim` (and `Handler`):
+Exceptions raised by individual handlers or middleware are caught, logged, and
+skipped so one bad callback does not kill the dispatch loop. Override the
+policy with the `on_error` kwarg on `App` (and `Handler`):
 
 ```python
 def reraise(exc: BaseException, packet: object, fn: object) -> None:
     raise exc
 
-async with Insim("127.0.0.1:29999", on_error=reraise) as client:
-    ...
+app = App(on_error=reraise)
 ```
 
 The default writes via the standard `logging` module under the
@@ -179,9 +238,8 @@ The default writes via the standard `logging` module under the
 
 ### Logging
 
-The Rust core emits `tracing` events that are forwarded into Python's
-`logging` module via `pyo3-log`. Configure them like any other Python
-logger:
+The Rust core emits `tracing` events forwarded into Python's `logging` module
+via `pyo3-log`. Configure them like any other Python logger:
 
 ```python
 import logging
@@ -193,7 +251,7 @@ logging.getLogger("insim.net.codec").setLevel(logging.WARNING)
 ```
 
 Logger names mirror the Rust module path (e.g. `insim.net.codec`). The
-Python-side dispatcher logs under `insim_o3.handler` and `insim_o3.client`.
+Python-side dispatcher logs under `insim_o3.handler`.
 
 ## Running tests
 
@@ -205,5 +263,15 @@ uv run maturin develop
 uv run pytest
 ```
 
-Tests use `TestClient` to inject synthetic packets without a real LFS
-connection, so no running LFS instance is needed.
+Tests use `TestApp` and `MockConnection` to inject synthetic packets without a
+real LFS connection, so no running LFS instance is needed:
+
+```python
+from insim_o3.test_app import TestApp, MockConnection
+
+async def test_something() -> None:
+    conn = MockConnection()
+    app = TestApp(conn=conn, handlers=[MyBot()])
+    await app.inject(raw_json)
+    assert conn.sent[0].text == "expected reply"
+```

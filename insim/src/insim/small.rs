@@ -138,11 +138,19 @@ pub enum SmallType {
     #[default]
     None,
 
-    /// Request node and lap updates at the specified interval.
-    Ssp(Duration),
+    /// Request node and lap updates at the specified interval, in milliseconds.
+    Ssp(
+        #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
+        #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
+        Duration,
+    ),
 
-    /// Request outgauge-style updates at the specified interval.
-    Ssg(Duration),
+    /// Request outgauge-style updates at the specified interval, in milliseconds.
+    Ssg(
+        #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
+        #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
+        Duration,
+    ),
 
     /// Vote action notification or request.
     Vta(VtnAction),
@@ -150,14 +158,26 @@ pub enum SmallType {
     /// Time stop (true = stop, false = resume).
     Tms(bool),
 
-    /// Time step duration.
-    Stp(Duration),
+    /// Time step duration in milliseconds.
+    Stp(
+        #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
+        #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
+        Duration,
+    ),
 
-    /// Race time reply to [`TinyType::Gtm`](crate::insim::TinyType::Gtm).
-    Rtp(Duration),
+    /// Race time reply, in milliseconds. Sent in response to [`TinyType::Gtm`](crate::insim::TinyType::Gtm).
+    Rtp(
+        #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
+        #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
+        Duration,
+    ),
 
-    /// Set the node/lap interval used for [Nlp](super::Nlp).
-    Nli(Duration),
+    /// Set the node/lap interval used for [Nlp](super::Nlp), in milliseconds.
+    Nli(
+        #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
+        #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
+        Duration,
+    ),
 
     /// Set or reply with allowed cars.
     Alc(PlcAllowedCarsSet),

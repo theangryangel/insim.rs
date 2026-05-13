@@ -21,7 +21,6 @@ macro_rules! define_vehicles {
         #[derive(PartialEq, Eq, Clone, Copy, Hash)]
         #[non_exhaustive]
         #[allow(missing_docs)]
-        #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
         pub enum Vehicle {
             $($variant,)*
 
@@ -29,6 +28,17 @@ macro_rules! define_vehicles {
 
             /// Unknown vehicle. *Probably* a private mod?
             Unknown,
+        }
+
+        #[cfg(feature = "schemars")]
+        impl schemars::JsonSchema for Vehicle {
+            fn schema_name() -> ::std::borrow::Cow<'static, str> {
+                "Vehicle".into()
+            }
+
+            fn json_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
+                schemars::json_schema!({ "type": "string" })
+            }
         }
 
         impl Vehicle {
