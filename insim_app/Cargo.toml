@@ -1,0 +1,27 @@
+[package]
+name = "insim_app"
+description = "Axum-style handler runtime over an InSim connection (proof of concept)"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+
+[lib]
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+insim = { path = "../insim", features = ["tokio"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "net"] }
+futures = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "net", "test-util"] }
+tracing-subscriber = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
