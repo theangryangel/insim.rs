@@ -26,22 +26,16 @@ use crate::{
 /// The trait method is declared with `-> impl Future + Send` (rather than
 /// `async fn`) because the runtime hands handlers to a wrapper that requires
 /// the future to be `Send`. Implementors can still write `async fn call(...)`
-/// in their `impl`s — Rust accepts that as long as the body produces a Send
+/// in their `impl`s - Rust accepts that as long as the body produces a Send
 /// future.
 pub trait Handler<S, T>: Clone + Send + Sized + 'static {
     /// Call the handler against the current dispatch context.
-    fn call(
-        self,
-        cx: &ExtractCx<'_, S>,
-    ) -> impl Future<Output = Result<(), AppError>> + Send;
+    fn call(self, cx: &ExtractCx<'_, S>) -> impl Future<Output = Result<(), AppError>> + Send;
 }
 
 /// Object-safe shim so handlers with different `T` tuples can live together in a `Vec`.
 pub(crate) trait ErasedHandler<S>: Send {
-    fn call<'a>(
-        &'a self,
-        cx: &'a ExtractCx<'_, S>,
-    ) -> BoxFuture<'a, Result<(), AppError>>;
+    fn call<'a>(&'a self, cx: &'a ExtractCx<'_, S>) -> BoxFuture<'a, Result<(), AppError>>;
 }
 
 pub(crate) struct HandlerService<S, T, H> {
@@ -64,10 +58,7 @@ where
     S: Send + Sync + 'static,
     T: Send + 'static,
 {
-    fn call<'a>(
-        &'a self,
-        cx: &'a ExtractCx<'_, S>,
-    ) -> BoxFuture<'a, Result<(), AppError>> {
+    fn call<'a>(&'a self, cx: &'a ExtractCx<'_, S>) -> BoxFuture<'a, Result<(), AppError>> {
         let h = self.handler.clone();
         Box::pin(async move { h.call(cx).await })
     }
@@ -91,7 +82,7 @@ macro_rules! impl_handler {
                         return Ok(());
                     };
                 )*
-                
+
                 // Call the function with the extracted variables
                 (self)($($ty),*).await
             }
@@ -99,7 +90,7 @@ macro_rules! impl_handler {
     };
 }
 
-impl_handler!(); 
+impl_handler!();
 impl_handler!(T0);
 impl_handler!(T0, T1);
 impl_handler!(T0, T1, T2);

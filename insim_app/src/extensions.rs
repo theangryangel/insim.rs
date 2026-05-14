@@ -4,7 +4,7 @@
 //! `TypeId`-keyed map. Handlers/middleware reach them through their context
 //! by calling `cx.extension::<T>()`, which downcasts and clones.
 //!
-//! Used by middleware that wants to expose itself as an extractor — see
+//! Used by middleware that wants to expose itself as an extractor - see
 //! [`crate::PresenceMiddleware`] for the canonical example.
 
 use std::{

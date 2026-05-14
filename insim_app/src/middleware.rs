@@ -21,9 +21,10 @@ use insim::{
     identifiers::ConnectionId,
     insim::{MsoUserType, Ncn},
 };
+use tokio_util::sync::CancellationToken;
 
 use crate::{
-    event::{Dispatch, Emitter},
+    event::Dispatch,
     extensions::Extensions,
     extract::{ExtractCx, FromContext, Sender},
 };
@@ -35,25 +36,39 @@ pub struct EventCx<'a, S> {
     pub dispatch: &'a Dispatch,
     /// Shared app state (read-only in the PoC).
     pub state: &'a S,
-    /// Push synthetic events into this cycle.
-    pub emit: Emitter<'a>,
-    /// Back-channel handle if the extension wants to send packets directly.
+    /// Back-channel - same surface handlers see. Use `cx.sender.packet(...)` to
+    /// send a wire packet, `cx.sender.event(...)` to inject a synthetic event
+    /// into a subsequent dispatch cycle.
     pub sender: &'a Sender,
     /// Extension registry; same instance handlers see.
     pub extensions: &'a Extensions,
+    /// Cooperative-shutdown token.
+    pub cancel: &'a CancellationToken,
+}
+
+impl<'a, S> EventCx<'a, S> {
+    /// Request graceful shutdown of the runtime.
+    pub fn shutdown(&self) {
+        self.cancel.cancel();
+    }
+
+    /// Whether shutdown has been requested.
+    pub fn is_shutdown(&self) -> bool {
+        self.cancel.is_cancelled()
+    }
 }
 
 /// A value registered with the [`App`](crate::App). Combines two roles:
 ///
-/// 1. **Extractor source** — every registered extension lives in the
+/// 1. **Extractor source** - every registered extension lives in the
 ///    [`Extensions`] registry by its `TypeId`, so handlers can pull it out via
 ///    [`FromContext`] (the extension author implements [`FromContext`] on the
 ///    type itself).
-/// 2. **Optional event observer** — the default no-op `on_event` is overridden
+/// 2. **Optional event observer** - the default no-op `on_event` is overridden
 ///    by extensions that need to react to wire packets or synthetic events.
 ///
 /// The trait takes `&self` (not `&mut self`) so the runtime can hold a single
-/// `Arc<E>` shared between the registry and the dispatch chain — no `Clone`
+/// `Arc<E>` shared between the registry and the dispatch chain - no `Clone`
 /// bound on `E`, no per-registration clone. Stateful extensions manage their
 /// own mutability internally (`Arc<RwLock<…>>` is the usual pattern).
 ///
@@ -64,10 +79,7 @@ pub trait Extension<S>: Send + Sync + 'static {
     /// Called for every dispatch (wire packets and synthetic events). Runs
     /// sequentially, in registration order, *before* handlers. Default is a
     /// no-op so pure data extensions don't have to write anything.
-    fn on_event<'a>(
-        &'a self,
-        _cx: &'a mut EventCx<'_, S>,
-    ) -> impl Future<Output = ()> + Send + 'a {
+    fn on_event<'a>(&'a self, _cx: &'a mut EventCx<'_, S>) -> impl Future<Output = ()> + Send + 'a {
         async {}
     }
 }
@@ -87,7 +99,7 @@ where
 }
 
 // ---------------------------------------------------------------------------
-// Presence — tracks connections, emits Connected/Disconnected, and acts as
+// Presence - tracks connections, emits Connected/Disconnected, and acts as
 // its own extractor.
 // ---------------------------------------------------------------------------
 
@@ -208,8 +220,8 @@ impl<S: Send + Sync + 'static> Extension<S> for Presence {
                     .expect("poison")
                     .connections
                     .insert(info.ucid, info.clone());
-                cx.emit.emit(Connected(info));
-            }
+                let _ = cx.sender.event(Connected(info));
+            },
             Dispatch::Packet(insim::Packet::Cnl(cnl)) => {
                 let info = self
                     .inner
@@ -217,12 +229,12 @@ impl<S: Send + Sync + 'static> Extension<S> for Presence {
                     .expect("poison")
                     .connections
                     .remove(&cnl.ucid);
-                cx.emit.emit(Disconnected {
+                let _ = cx.sender.event(Disconnected {
                     ucid: cnl.ucid,
                     info,
                 });
-            }
-            _ => {}
+            },
+            _ => {},
         }
     }
 }
@@ -236,7 +248,7 @@ impl<S: Send + Sync + 'static> FromContext<S> for Presence {
 }
 
 // ---------------------------------------------------------------------------
-// ChatParser<C> — typed Mso → C parser. Parses once, dispatches via Event<C>.
+// ChatParser<C> - typed Mso → C parser. Parses once, dispatches via Event<C>.
 // ---------------------------------------------------------------------------
 
 /// Extension that parses every `Mso` body into a typed value `C` via
@@ -244,10 +256,10 @@ impl<S: Send + Sync + 'static> FromContext<S> for Presence {
 ///
 /// **The point of using this over a per-handler parse extractor is that the
 /// parse runs once per `Mso` packet** regardless of how many `Event<C>`
-/// handlers are registered — they all see the same `Arc`-wrapped value.
+/// handlers are registered - they all see the same `Arc`-wrapped value.
 ///
 /// Pair with `Event<C>` handlers and the existing
-/// `insim_extras::chat::Parse` derive (via a small `FromStr` bridge — see
+/// `insim_extras::chat::Parse` derive (via a small `FromStr` bridge - see
 /// docs on the example crate). On parse failure (wrong prefix, unknown
 /// command, malformed args) no event is emitted.
 pub struct ChatParser<C> {
@@ -288,7 +300,7 @@ where
             return;
         }
         if let Ok(c) = mso.msg_from_textstart().trim().parse::<C>() {
-            cx.emit.emit(c);
+            let _ = cx.sender.event(c);
         }
     }
 }

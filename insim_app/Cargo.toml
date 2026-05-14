@@ -17,9 +17,12 @@ workspace = true
 [dependencies]
 insim = { path = "../insim", features = ["tokio"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "net"] }
+tokio-util = { workspace = true }
 futures = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+fixedbitset = { workspace = true }
+taffy = "0.9.2"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "net", "test-util"] }

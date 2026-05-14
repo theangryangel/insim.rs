@@ -1628,10 +1628,13 @@ name = "insim_app"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "fixedbitset",
  "futures",
  "insim",
+ "taffy",
  "thiserror 2.0.18",
  "tokio",
+ "tokio-util",
  "tracing",
  "tracing-subscriber",
 ]

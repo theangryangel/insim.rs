@@ -8,6 +8,7 @@
 use std::{any::Any, marker::PhantomData};
 
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     error::AppError,
@@ -24,15 +25,30 @@ pub struct ExtractCx<'a, S> {
     pub state: &'a S,
     /// Back-channel handle for sending packets / emitting events. Extracted by [`Sender`].
     pub sender: &'a Sender,
-    /// Extension registry — populated via [`crate::App::extension`]. Middleware
+    /// Extension registry - populated via [`crate::App::extension`]. Middleware
     /// that wants to be queryable from handlers (e.g. presence) stashes itself
     /// here and looks up its instance from inside its own `FromContext` impl.
     pub extensions: &'a Extensions,
+    /// Cooperative-shutdown token. Call [`ExtractCx::shutdown`] to request the
+    /// runtime exit at its next select iteration.
+    pub cancel: &'a CancellationToken,
+}
+
+impl<'a, S> ExtractCx<'a, S> {
+    /// Request graceful shutdown of the runtime.
+    pub fn shutdown(&self) {
+        self.cancel.cancel();
+    }
+
+    /// Whether shutdown has been requested.
+    pub fn is_shutdown(&self) -> bool {
+        self.cancel.is_cancelled()
+    }
 }
 
 /// Trait implemented by every magic-extractor type.
 ///
-/// Returning `None` short-circuits the handler — that's how `Packet<T>` and
+/// Returning `None` short-circuits the handler - that's how `Packet<T>` and
 /// `Event<T>` act as routing extractors.
 pub trait FromContext<S>: Sized + Send {
     /// Try to build `Self` from the current dispatch + state. Return `None` to
@@ -55,7 +71,7 @@ impl<S: Clone + Send + Sync + 'static> FromContext<S> for State<S> {
 
 /// Trait that lets `Packet<T>` extract a typed wire-packet variant from
 /// [`insim::Packet`]. Implementations should match the corresponding variant
-/// and clone (cheap — InSim packet structs are small).
+/// and clone (cheap - InSim packet structs are small).
 ///
 /// PoC: hand-implemented for the variants the smoke test uses. A macro covering
 /// every variant is a follow-up.
@@ -115,13 +131,22 @@ where
     }
 }
 
-/// Back-channel handle for sending packets to LFS or emitting synthetic events.
+/// Back-channel handle to the runtime.
 ///
-/// Cloneable and cheap; the dispatcher consumes commands from its single shared
-/// receiver. Extracted automatically via [`FromContext`].
+/// Cloneable, cheap, and unbounded - sends never block (we trade backpressure
+/// for freedom from a deadlock window where the dispatch task is itself the
+/// only thing that can drain the channel). Two operations:
+///
+/// - [`Sender::packet`] - push a wire packet out to LFS.
+/// - [`Sender::event`]  - inject a synthetic event into a new dispatch cycle.
+///
+/// Both routes end up at the same receiver in the dispatcher's main loop.
+/// **Emission semantics: regardless of caller (extension, handler, spawned
+/// task), events posted here are processed in a *subsequent* dispatch cycle
+/// - not the current one.** This is the only emission API in the crate.
 #[derive(Clone)]
 pub struct Sender {
-    tx: mpsc::Sender<Command>,
+    tx: mpsc::UnboundedSender<Command>,
 }
 
 impl std::fmt::Debug for Sender {
@@ -131,23 +156,23 @@ impl std::fmt::Debug for Sender {
 }
 
 impl Sender {
-    pub(crate) fn new(tx: mpsc::Sender<Command>) -> Self {
+    pub(crate) fn new(tx: mpsc::UnboundedSender<Command>) -> Self {
         Self { tx }
     }
 
-    /// Send a packet back to LFS.
-    pub async fn send<P: Into<insim::Packet>>(&self, packet: P) -> Result<(), AppError> {
+    /// Send a packet back to LFS. Non-blocking; only errors if the runtime
+    /// has shut down (back-channel closed).
+    pub fn packet<P: Into<insim::Packet>>(&self, packet: P) -> Result<(), AppError> {
         self.tx
-            .send(Command::Send(packet.into()))
-            .await
+            .send(Command::Packet(packet.into()))
             .map_err(|_| AppError::Closed)
     }
 
-    /// Inject a synthetic event into the dispatch pipeline.
-    pub async fn emit<E: Any + Send + Sync + 'static>(&self, event: E) -> Result<(), AppError> {
+    /// Inject a synthetic event into a new dispatch cycle. Non-blocking; only
+    /// errors if the runtime has shut down.
+    pub fn event<E: Any + Send + Sync + 'static>(&self, event: E) -> Result<(), AppError> {
         self.tx
-            .send(Command::Emit(std::sync::Arc::new(event)))
-            .await
+            .send(Command::Event(std::sync::Arc::new(event)))
             .map_err(|_| AppError::Closed)
     }
 }
