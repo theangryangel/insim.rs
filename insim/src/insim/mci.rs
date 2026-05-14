@@ -22,6 +22,9 @@ bitflags! {
         /// This car is outside the path
         const OOB = (1 << 2);
 
+        /// This car has been retired
+        const RETIRED = (1 << 3);
+
         /// This car is lagging (missing or delayed position packets)
         const LAG = (1 << 5);
 
@@ -42,7 +45,8 @@ generate_bitflag_helpers! {
     pub is_lagging => LAG,
     pub is_first => FIRST,
     pub is_last => LAST,
-    pub out_of_bounds => OOB
+    pub out_of_bounds => OOB,
+    pub has_retired => RETIRED
 }
 
 impl_bitflags_from_to_bytes!(CompCarInfo, u8);

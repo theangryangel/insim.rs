@@ -699,6 +699,7 @@ class CompCarInfoFlag(StrEnum):
     BLUE = "BLUE"
     YELLOW = "YELLOW"
     OOB = "OOB"
+    RETIRED = "RETIRED"
     LAG = "LAG"
     FIRST = "FIRST"
     LAST = "LAST"
