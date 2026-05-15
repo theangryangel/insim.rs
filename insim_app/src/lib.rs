@@ -45,9 +45,11 @@ mod error;
 mod event;
 mod extensions;
 mod extract;
+mod game;
 mod handler;
 mod middleware;
 mod spawned;
+pub mod time;
 #[allow(missing_docs)]
 pub mod ui;
 pub mod util;
@@ -60,8 +62,11 @@ pub use error::AppError;
 pub use event::{Dispatch, Startup};
 pub use extensions::Extensions;
 pub use extract::{Event, ExtractCx, FromContext, Packet, PacketVariant, Sender, State};
+pub use game::{Game, GameInfo};
 pub use handler::Handler;
 pub use middleware::{
-    ChatParser, Connected, ConnectionInfo, Disconnected, EventCx, Extension, Presence,
+    ChatParser, Connected, ConnectionDetails, ConnectionInfo, Disconnected, EventCx, Extension,
+    PlayerInfo, PlayerJoined, PlayerLeft, PlayerTeleportedToPits, Presence, Renamed, TakingOver,
+    VehicleSelected,
 };
 pub use spawned::{Spawned, spawned};

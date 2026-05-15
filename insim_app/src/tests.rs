@@ -106,9 +106,13 @@ fn make_mso(ucid: u8, msg: &str) -> insim::Packet {
 }
 
 fn app_with(state: TestState) -> App<TestState> {
+    // Presence needs a Sender for its admin commands; tests don't exercise
+    // those, so feed it a sender whose receiver is dropped immediately.
+    let (cmd_tx, _) = mpsc::unbounded_channel::<Command>();
+    let dummy_sender = Sender::new(cmd_tx);
     App::new()
         .with_state(state)
-        .extension(Presence::new())
+        .extension(Presence::new(dummy_sender))
         .extension(ChatParser::<TestCmd>::new())
         .handler(count_ncn)
         .handler(count_mso)
@@ -238,14 +242,14 @@ async fn presence_is_queryable_via_extractor() {
     }
 
     let state = PState::default();
-    let presence = Presence::new();
+    let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
+    let sender = Sender::new(cmd_tx);
+    let presence = Presence::new(sender.clone());
     let app: App<PState> = App::new()
         .with_state(state.clone())
         .extension(presence.clone())
         .handler(observe_count);
 
-    let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
-    let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let chain = app.extension_chain;
     let handlers = app.handlers;
@@ -432,7 +436,7 @@ async fn spawned_handler_channel_closes_on_cancel() {
         "task should still be running before cancel"
     );
 
-    // Trigger cancel — forwarder drops user_tx, user rx returns None.
+    // Trigger cancel - forwarder drops user_tx, user rx returns None.
     cancel.cancel();
     tokio::time::sleep(std::time::Duration::from_millis(20)).await;
     assert_eq!(

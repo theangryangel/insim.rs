@@ -356,12 +356,13 @@ async fn main() -> Result<(), AppError> {
         UiGlobal::default(),
         |ucid, _invalidator: InvalidateHandle| SmokeView { ucid, clicks: 0 },
     );
+    let presence = Presence::new(app.sender().clone());
 
     let app = app
         .with_state(AppState {
             joins: Arc::new(AtomicUsize::new(0)),
         })
-        .extension(Presence::new())
+        .extension(presence)
         .extension(ChatParser::<Cmd>::new())
         .extension(ui)
         .handler(install_ticker)

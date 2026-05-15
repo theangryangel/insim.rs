@@ -638,7 +638,7 @@ async fn main() -> Result<(), AppError> {
         },
     );
 
-    let presence = Presence::new();
+    let presence = Presence::new(app.sender().clone());
     let cancel = app.cancel_token().clone();
     let config = BombConfig::default();
 

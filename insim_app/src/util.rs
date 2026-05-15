@@ -2,7 +2,7 @@
 
 use insim::{
     identifiers::ConnectionId,
-    insim::{Msl, Mtc, SoundType},
+    insim::{Msl, Mst, Mtc, SoundType},
 };
 
 /// Build a message-to-connection packet.
@@ -25,4 +25,20 @@ pub fn mtc(text: impl Into<String>, ucid: Option<ConnectionId>) -> insim::Packet
             ..Default::default()
         }),
     }
+}
+
+/// Build a host-command packet (`Mst`) for `/command`-style server commands
+/// such as `/kick <name>`, `/track <track>`, `/restart`, etc.
+///
+/// Equivalent to `insim::builder::InsimTask::send_command` from the
+/// non-`insim_app` actor model. Use with [`crate::Sender::packet`]:
+///
+/// ```ignore
+/// sender.packet(host_command(format!("/kick {}", uname)))?;
+/// ```
+pub fn host_command(text: impl Into<String>) -> insim::Packet {
+    insim::Packet::from(Mst {
+        msg: text.into(),
+        ..Default::default()
+    })
 }
