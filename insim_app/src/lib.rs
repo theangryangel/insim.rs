@@ -1,4 +1,4 @@
-//! Axum-style handler runtime over an InSim connection.
+//! System-style handlers over an InSim packet/event stream.
 //!
 //! `insim_app` lets you write handlers as plain async functions with typed
 //! "magic-extractor" parameters ([`Packet`], [`Event`], [`State`], [`Sender`]),
@@ -6,6 +6,14 @@
 //! `on_event` hooks. The dispatcher owns the connection directly - there is
 //! no actor wrapper around the read half - and uses a single unbounded mpsc
 //! back-channel for outbound packets and synthetic-event injection.
+//!
+//! The function-with-extractor surface is borrowed from axum, but the
+//! runtime semantics are closer to Bevy: handlers are *systems* invoked on a
+//! continuous stream of dispatches, [`Extension`]s are long-lived *resources*
+//! shaped like Bevy's `Res<T>`, and synthetic events are a first-class
+//! primitive. There is no ECS and no plugin abstraction - extensions are
+//! flat. Handlers are gated implicitly by extractor type and explicitly via
+//! [`HandlerExt::run_if`].
 //!
 //! ## Concurrency model
 //!
@@ -48,6 +56,7 @@ mod extract;
 mod game;
 mod handler;
 mod middleware;
+pub mod run_if;
 mod spawned;
 pub mod time;
 #[allow(missing_docs)]
@@ -62,11 +71,12 @@ pub use error::AppError;
 pub use event::{Dispatch, Startup};
 pub use extensions::Extensions;
 pub use extract::{Event, ExtractCx, FromContext, Packet, PacketVariant, Sender, State};
-pub use game::{Game, GameInfo};
+pub use game::{Game, GameInfo, RaceEnded, RaceStarted, TrackChanged};
 pub use handler::Handler;
 pub use middleware::{
     ChatParser, Connected, ConnectionDetails, ConnectionInfo, Disconnected, EventCx, Extension,
     PlayerInfo, PlayerJoined, PlayerLeft, PlayerTeleportedToPits, Presence, Renamed, TakingOver,
     VehicleSelected,
 };
+pub use run_if::{HandlerExt, Predicate, RunIf, always, and, in_state, never, not, or};
 pub use spawned::{Spawned, spawned};

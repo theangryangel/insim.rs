@@ -16,6 +16,10 @@
 //! On construction the extension sends a `Sst` request so the server pushes
 //! initial `Sta` state; subsequent `Sta` packets keep the mirror current.
 //!
+//! Each `Sta` is also diffed against the previous mirror, and transition
+//! events ([`RaceStarted`], [`RaceEnded`], [`TrackChanged`]) are emitted via
+//! the back-channel so handlers can react to changes without polling.
+//!
 //! Commands are fire-and-forget (matching `Sender::packet` semantics).
 //! Polling helpers (`wait_for_*`) take a [`CancellationToken`] and return
 //! `Option<()>` - `None` means "cancelled before the predicate held".
@@ -284,19 +288,63 @@ impl Game {
     }
 }
 
+/// Synthetic event emitted by [`Game`] when an incoming `Sta` packet
+/// transitions race-in-progress from non-racing → `Racing`.
+#[derive(Debug, Clone)]
+pub struct RaceStarted;
+
+/// Synthetic event emitted by [`Game`] when an incoming `Sta` packet
+/// transitions race-in-progress from `Racing` → non-racing.
+#[derive(Debug, Clone)]
+pub struct RaceEnded;
+
+/// Synthetic event emitted by [`Game`] when an incoming `Sta` packet reports
+/// a different track from the one previously mirrored. The first `Sta` after
+/// `Game::new` (`from: None`) also produces a `TrackChanged`.
+#[derive(Debug, Clone)]
+pub struct TrackChanged {
+    /// The previously known track, if any.
+    pub from: Option<Track>,
+    /// The track now reported by LFS.
+    pub to: Track,
+}
+
 impl<S: Send + Sync + 'static> Extension<S> for Game {
     async fn on_event(&self, cx: &mut EventCx<'_, S>) {
         let Dispatch::Packet(insim::Packet::Sta(sta)) = cx.dispatch else {
             return;
         };
-        let mut g = self.inner.write().expect("poison");
-        g.racing = sta.raceinprog.clone();
-        g.qualifying_duration = Duration::from_secs(sta.qualmins as u64 * 60);
-        g.race_duration = sta.racelaps;
-        g.track = Some(sta.track);
-        g.weather = Some(sta.weather);
-        g.wind = Some(sta.wind);
-        g.flags = sta.flags;
+
+        // Mutate under the write lock; capture the values we need for the
+        // transition diff. Drop the guard before emitting so any handler that
+        // reacts to the synthetic events can freely re-enter `Game`.
+        let (was_racing, now_racing, prev_track, new_track) = {
+            let mut g = self.inner.write().expect("poison");
+            let was_racing = matches!(g.racing, RaceInProgress::Racing);
+            let prev_track = g.track;
+            g.racing = sta.raceinprog.clone();
+            g.qualifying_duration = Duration::from_secs(sta.qualmins as u64 * 60);
+            g.race_duration = sta.racelaps;
+            g.track = Some(sta.track);
+            g.weather = Some(sta.weather);
+            g.wind = Some(sta.wind);
+            g.flags = sta.flags;
+            let now_racing = matches!(g.racing, RaceInProgress::Racing);
+            (was_racing, now_racing, prev_track, sta.track)
+        };
+
+        if !was_racing && now_racing {
+            let _ = cx.sender.event(RaceStarted);
+        }
+        if was_racing && !now_racing {
+            let _ = cx.sender.event(RaceEnded);
+        }
+        if prev_track != Some(new_track) {
+            let _ = cx.sender.event(TrackChanged {
+                from: prev_track,
+                to: new_track,
+            });
+        }
     }
 }
 

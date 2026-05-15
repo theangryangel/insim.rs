@@ -23,8 +23,9 @@ use tokio::sync::mpsc;
 use tracing_subscriber as _;
 
 use crate::{
-    App, AppError, ChatParser, Connected, Dispatch, Event, Packet, Presence, Sender, Spawned,
-    State, app::dispatch_cycle, event::Command,
+    App, AppError, ChatParser, Connected, Dispatch, Event, Game, HandlerExt, Packet, Presence,
+    RaceStarted, Sender, Spawned, State, TrackChanged, always, app::dispatch_cycle, event::Command,
+    in_state, never,
 };
 
 /// A toy typed chat enum for the parser test. In production this would be
@@ -466,4 +467,326 @@ async fn sender_event_pushes_into_back_channel() {
         },
         _ => panic!("expected Command::Event"),
     }
+}
+
+// ---------------------------------------------------------------------------
+// run_if + transition-event tests
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn run_if_skips_handler_when_predicate_false() {
+    let state = TestState::default();
+    let app: App<TestState> = App::new()
+        .with_state(state.clone())
+        .handler(count_ncn.run_if(never()));
+
+    let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
+    let sender = Sender::new(cmd_tx);
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let chain = app.extension_chain;
+    let handlers = app.handlers;
+    let extensions = app.extensions;
+
+    dispatch_cycle(
+        Dispatch::Packet(make_ncn(1, "alice")),
+        &state,
+        &sender,
+        &chain,
+        &handlers,
+        &extensions,
+        &cancel,
+    )
+    .await;
+
+    assert_eq!(
+        state.ncn_hits.load(Ordering::Relaxed),
+        0,
+        "handler should be gated off by never()"
+    );
+}
+
+#[tokio::test]
+async fn run_if_runs_handler_when_predicate_true() {
+    let state = TestState::default();
+    let app: App<TestState> = App::new()
+        .with_state(state.clone())
+        .handler(count_ncn.run_if(always()));
+
+    let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
+    let sender = Sender::new(cmd_tx);
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let chain = app.extension_chain;
+    let handlers = app.handlers;
+    let extensions = app.extensions;
+
+    dispatch_cycle(
+        Dispatch::Packet(make_ncn(1, "alice")),
+        &state,
+        &sender,
+        &chain,
+        &handlers,
+        &extensions,
+        &cancel,
+    )
+    .await;
+
+    assert_eq!(
+        state.ncn_hits.load(Ordering::Relaxed),
+        1,
+        "handler should fire under always()"
+    );
+}
+
+#[tokio::test]
+async fn in_state_reads_extension_and_gates_handler() {
+    // An extension that just holds a boolean. The handler is gated on it
+    // through `in_state`. Flipping the boolean between dispatches changes
+    // whether the handler fires.
+    use std::sync::RwLock;
+
+    use crate::{Extension, ExtractCx, FromContext};
+
+    #[derive(Clone)]
+    struct Flag(Arc<RwLock<bool>>);
+
+    impl<S: Send + Sync + 'static> Extension<S> for Flag {}
+
+    impl<S: Send + Sync + 'static> FromContext<S> for Flag {
+        fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+            cx.extensions.get::<Flag>()
+        }
+    }
+
+    let state = TestState::default();
+    let flag = Flag(Arc::new(RwLock::new(false)));
+    let app: App<TestState> = App::new()
+        .with_state(state.clone())
+        .extension(flag.clone())
+        .handler(count_ncn.run_if(in_state(|f: &Flag| *f.0.read().expect("poison"))));
+
+    let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
+    let sender = Sender::new(cmd_tx);
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let chain = app.extension_chain;
+    let handlers = app.handlers;
+    let extensions = app.extensions;
+
+    // flag = false: handler skipped.
+    dispatch_cycle(
+        Dispatch::Packet(make_ncn(1, "alice")),
+        &state,
+        &sender,
+        &chain,
+        &handlers,
+        &extensions,
+        &cancel,
+    )
+    .await;
+    assert_eq!(
+        state.ncn_hits.load(Ordering::Relaxed),
+        0,
+        "should be gated off while flag=false"
+    );
+
+    // Flip the flag - the same handler now passes the predicate.
+    *flag.0.write().expect("poison") = true;
+
+    dispatch_cycle(
+        Dispatch::Packet(make_ncn(2, "bob")),
+        &state,
+        &sender,
+        &chain,
+        &handlers,
+        &extensions,
+        &cancel,
+    )
+    .await;
+    assert_eq!(
+        state.ncn_hits.load(Ordering::Relaxed),
+        1,
+        "handler should fire once flag flipped"
+    );
+}
+
+#[tokio::test]
+async fn game_emits_race_started_on_sta_transition() {
+    use insim::insim::{RaceInProgress, Sta};
+
+    let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<Command>();
+    let sender = Sender::new(cmd_tx);
+
+    // Game::new() fires an Sst request - drop any commands it queued.
+    let game = Game::new(sender.clone());
+    while cmd_rx.try_recv().is_ok() {}
+
+    let app: App<()> = App::new().with_state(()).extension(game.clone());
+
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let chain = app.extension_chain;
+    let handlers = app.handlers;
+    let extensions = app.extensions;
+    let state = ();
+
+    // First Sta with racing=No: matches initial state, no RaceStarted.
+    dispatch_cycle(
+        Dispatch::Packet(insim::Packet::Sta(Sta {
+            raceinprog: RaceInProgress::No,
+            ..Default::default()
+        })),
+        &state,
+        &sender,
+        &chain,
+        &handlers,
+        &extensions,
+        &cancel,
+    )
+    .await;
+
+    let mut events = Vec::new();
+    while let Ok(cmd) = cmd_rx.try_recv() {
+        if let Command::Event(payload) = cmd {
+            events.push(payload);
+        }
+    }
+    assert!(
+        !events.iter().any(|p| p.is::<RaceStarted>()),
+        "no RaceStarted expected on No → No"
+    );
+
+    // Second Sta with racing=Racing: transition fires RaceStarted.
+    dispatch_cycle(
+        Dispatch::Packet(insim::Packet::Sta(Sta {
+            raceinprog: RaceInProgress::Racing,
+            ..Default::default()
+        })),
+        &state,
+        &sender,
+        &chain,
+        &handlers,
+        &extensions,
+        &cancel,
+    )
+    .await;
+
+    let mut events = Vec::new();
+    while let Ok(cmd) = cmd_rx.try_recv() {
+        if let Command::Event(payload) = cmd {
+            events.push(payload);
+        }
+    }
+    let started = events.iter().filter(|p| p.is::<RaceStarted>()).count();
+    assert_eq!(
+        started, 1,
+        "RaceStarted should fire exactly once on transition to Racing"
+    );
+}
+
+#[tokio::test]
+async fn game_emits_track_changed_on_track_field_change() {
+    use insim::core::track::Track;
+    use insim::insim::Sta;
+
+    let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<Command>();
+    let sender = Sender::new(cmd_tx);
+
+    let game = Game::new(sender.clone());
+    while cmd_rx.try_recv().is_ok() {}
+
+    let app: App<()> = App::new().with_state(()).extension(game.clone());
+
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let chain = app.extension_chain;
+    let handlers = app.handlers;
+    let extensions = app.extensions;
+    let state = ();
+
+    let track_a = Track::ALL[0];
+    let track_b = *Track::ALL
+        .iter()
+        .find(|t| **t != track_a)
+        .expect("at least two tracks");
+
+    // First Sta with track_a: prev was None, fires TrackChanged { from: None, to: track_a }.
+    dispatch_cycle(
+        Dispatch::Packet(insim::Packet::Sta(Sta {
+            track: track_a,
+            ..Default::default()
+        })),
+        &state,
+        &sender,
+        &chain,
+        &handlers,
+        &extensions,
+        &cancel,
+    )
+    .await;
+
+    let mut events = Vec::new();
+    while let Ok(cmd) = cmd_rx.try_recv() {
+        if let Command::Event(payload) = cmd {
+            events.push(payload);
+        }
+    }
+    let changes: Vec<_> = events
+        .iter()
+        .filter_map(|p| p.downcast_ref::<TrackChanged>())
+        .collect();
+    assert_eq!(changes.len(), 1, "first Sta should emit TrackChanged");
+    assert_eq!(changes[0].from, None);
+    assert_eq!(changes[0].to, track_a);
+
+    // Same track again - no event.
+    dispatch_cycle(
+        Dispatch::Packet(insim::Packet::Sta(Sta {
+            track: track_a,
+            ..Default::default()
+        })),
+        &state,
+        &sender,
+        &chain,
+        &handlers,
+        &extensions,
+        &cancel,
+    )
+    .await;
+
+    let mut events = Vec::new();
+    while let Ok(cmd) = cmd_rx.try_recv() {
+        if let Command::Event(payload) = cmd {
+            events.push(payload);
+        }
+    }
+    assert!(
+        !events.iter().any(|p| p.is::<TrackChanged>()),
+        "same track should not emit TrackChanged"
+    );
+
+    // Different track - emits with from = Some(track_a), to = track_b.
+    dispatch_cycle(
+        Dispatch::Packet(insim::Packet::Sta(Sta {
+            track: track_b,
+            ..Default::default()
+        })),
+        &state,
+        &sender,
+        &chain,
+        &handlers,
+        &extensions,
+        &cancel,
+    )
+    .await;
+
+    let mut events = Vec::new();
+    while let Ok(cmd) = cmd_rx.try_recv() {
+        if let Command::Event(payload) = cmd {
+            events.push(payload);
+        }
+    }
+    let changes: Vec<_> = events
+        .iter()
+        .filter_map(|p| p.downcast_ref::<TrackChanged>())
+        .collect();
+    assert_eq!(changes.len(), 1, "track change should emit TrackChanged");
+    assert_eq!(changes[0].from, Some(track_a));
+    assert_eq!(changes[0].to, track_b);
 }

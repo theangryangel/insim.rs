@@ -95,7 +95,7 @@ macro_rules! impl_packet_variant {
     };
 }
 
-impl_packet_variant!(Ncn, Mso, Cnl, Mtc, Tiny);
+impl_packet_variant!(Ncn, Mso, Cnl, Mtc, Tiny, Npl, Pll, Toc, Pit, Crs, Con, Uco, Sta);
 
 /// Routing extractor for wire packets. Returns `Some` only when the current
 /// dispatch is a matching [`insim::Packet`] variant.

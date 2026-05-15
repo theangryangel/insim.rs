@@ -1,27 +1,40 @@
-//! Bomb mini-game implemented as a single long-lived async function.
+//! Bomb mini-game as a handler-driven state machine, with track setup
+//! delegated to `Game::track_rotation` via a single fire-and-forget spawn.
 //!
-//! Demonstrates the "spawned async loop" pattern: no Scene trait, no
-//! combinators. Just plain async-Rust over the `insim_app` primitives, with
-//! the `Spawned<F>` handler doing all the wiring - it spawns the game task on
-//! first dispatch and forwards every subsequent dispatch into the task's mpsc.
-//!
-//! The waterfall - wait → run → restart - is literally a `loop { ... }` in
-//! `run_bomb`, with each phase as its own async helper. Cancellation, timeouts,
-//! and round transitions fall out of standard `tokio::select!` patterns.
+//! Three phases:
 //!
 //! ```text
-//!     run_bomb               (outer loop)
-//!       ├─ wait_for_players  (returns when >= 2 connections)
-//!       └─ run_bomb_round    (returns when players drop or cancel fires)
+//!     Waiting  ─[ Connected, count >= MIN ]──▶  SettingUp
+//!     SettingUp ─[ SetupComplete   ]────────▶  Racing
+//!     SettingUp ─[ SetupAborted    ]────────▶  Waiting (retry if count >= MIN)
+//!     Racing   ─[ Disconnected, count < MIN ]▶ Waiting
+//!     Racing   ─[ RaceEnded (server-side) ]──▶ Waiting (retry if count >= MIN)
 //! ```
+//!
+//! Each transition lives in one handler. On entering `SettingUp`,
+//! `start_setup` spawns a tokio task that runs `Game::track_rotation` to load
+//! the configured track + layout and wait for the race to start. When that
+//! task completes successfully it emits a `SetupComplete` synthetic event;
+//! on timeout / cancellation / failure it emits `SetupAborted`. The handler
+//! returns immediately - the spawn doesn't block the dispatch loop.
+//!
+//! What's NOT here:
+//! - `WaitForPlayers` scene combinator: replaced by the default `Waiting` phase.
+//! - `SetupTrack` scene: replaced by the `SettingUp` phase + spawned setup task.
+//! - `until_game_ends`: replaced by `on_race_ended` flipping back to `Waiting`.
+//! - `loop_until_quit`: replaced by `start_setup` being called again from
+//!   `on_race_ended` / `on_setup_aborted` / `on_disconnected` when conditions
+//!   permit. The loop is implicit in the state machine.
 //!
 //! Run with:
 //!     cargo run -p insim_app --example bomb -- 127.0.0.1:29999
+//!     cargo run -p insim_app --example bomb -- 127.0.0.1:29999 --track BL1
 //!     cargo run -p insim_app --example bomb -- 127.0.0.1:29999 --admin-password hunter2
 
-// Pulled in transitively by `insim_app`; silence unused-crate lint.
 use std::{
     collections::HashMap,
+    str::FromStr,
+    sync::{Arc, Mutex, RwLock},
     time::{Duration, Instant},
 };
 
@@ -30,15 +43,19 @@ use fixedbitset as _;
 use futures as _;
 use insim::{
     Colour,
-    core::object::{
-        ObjectInfo,
-        insim::{InsimCheckpoint, InsimCheckpointKind},
+    core::{
+        object::{
+            ObjectInfo,
+            insim::{InsimCheckpoint, InsimCheckpointKind},
+        },
+        track::Track,
     },
     identifiers::{ConnectionId, PlayerId},
-    insim::{BtnStyle, Con, Crs, Npl, Pit, PlayerType, Pll, Tiny, TinyType, Toc, Uco},
+    insim::{BtnStyle, Con, Crs, Npl, Pit, PlayerType, Pll, RaceLaps, Tiny, TinyType, Toc, Uco},
 };
 use insim_app::{
-    App, AppError, Dispatch, Presence, Sender, serve, spawned,
+    App, AppError, Connected, Disconnected, Dispatch, Event, ExtractCx, Extension, FromContext,
+    Game, HandlerExt, Packet, Presence, RaceEnded, Sender, serve, spawned,
     ui::{self, Component, InvalidateHandle, Ui},
     util::mtc,
 };
@@ -56,11 +73,14 @@ const MIN_PLAYERS: usize = 2;
 const TICK_PERIOD: Duration = Duration::from_millis(500);
 const COLLISION_THRESHOLD_MPS: f32 = 30.0;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct BombConfig {
     checkpoint_timeout: Duration,
     checkpoint_penalty: Duration,
     collision_max_penalty: Duration,
+    track: Track,
+    layout: Option<String>,
+    setup_timeout: Duration,
 }
 
 impl Default for BombConfig {
@@ -69,13 +89,15 @@ impl Default for BombConfig {
             checkpoint_timeout: Duration::from_secs(30),
             checkpoint_penalty: Duration::from_millis(250),
             collision_max_penalty: Duration::from_millis(500),
+            track: Track::default(),
+            layout: None,
+            setup_timeout: Duration::from_secs(60),
         }
     }
 }
 
 // ---------------------------------------------------------------------------
-// Game state (ported from examples/clockwork-carnage/.../bomb/state.rs,
-// minus DB and per-player UI hooks)
+// Game state (verbatim from the prior version)
 // ---------------------------------------------------------------------------
 
 #[derive(Clone, Debug)]
@@ -268,7 +290,7 @@ impl BombState {
 }
 
 // ---------------------------------------------------------------------------
-// UI - single fixed view defined at the top level, wired exactly like smoke.rs
+// UI (verbatim)
 // ---------------------------------------------------------------------------
 
 #[derive(Clone, Default, Debug)]
@@ -334,275 +356,635 @@ impl Component for BombView {
     }
 }
 
+type BombUi = Ui<BombView, BombGlobal, ()>;
+
 // ---------------------------------------------------------------------------
-// Game loop
+// Phase extension - the state-machine cursor + in-flight setup cancel handle.
 // ---------------------------------------------------------------------------
 
-struct BombCtx {
-    rx: mpsc::UnboundedReceiver<Dispatch>,
-    sender: Sender,
-    presence: Presence,
-    ui: Ui<BombView, BombGlobal, ()>,
-    cancel: CancellationToken,
-    config: BombConfig,
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+enum BombPhase {
+    #[default]
+    Waiting,
+    SettingUp,
+    Racing,
 }
 
-/// Phase 1: wait until at least `min` connections are present.
-/// Returns early on cancellation.
-async fn wait_for_players(ctx: &mut BombCtx, min: usize) {
-    ctx.ui.assign(BombGlobal {
-        phase: format!("waiting for {min} players"),
-        ..Default::default()
-    });
-    let _ = ctx.sender.packet(mtc(
-        format!("Bomb - waiting for {min} players..."),
-        Some(ConnectionId::ALL),
-    ));
-    loop {
-        if ctx.presence.count() >= min {
-            return;
-        }
-        tokio::select! {
-            _ = ctx.cancel.cancelled() => return,
-            // Any forwarded packet wakes us up. Presence's `on_event` runs
-            // before the forwarder, so by the time we re-check count here,
-            // an Ncn/Cnl has already updated the connection map.
-            res = ctx.rx.recv() => {
-                if res.is_none() { return; }
-            }
+impl BombPhase {
+    fn label(self) -> &'static str {
+        match self {
+            BombPhase::Waiting => "waiting for players",
+            BombPhase::SettingUp => "setting up track",
+            BombPhase::Racing => "racing",
         }
     }
 }
 
-/// Phase 2: run rounds until players drop or cancel fires.
-async fn run_bomb_round(ctx: &mut BombCtx) {
-    let mut state = BombState::new(ctx.config);
-    let mut players: HashMap<PlayerId, PlayerInfo> = HashMap::new();
+struct PhaseInner {
+    state: BombPhase,
+    /// Set while `state == SettingUp` so any handler can cancel the in-flight
+    /// `track_rotation` spawn (e.g. when players drop below threshold).
+    setup_cancel: Option<CancellationToken>,
+    /// Runtime-wide cancel token; child tokens for setup tasks derive from this
+    /// so they die when the runtime dies.
+    runtime_cancel: CancellationToken,
+}
+
+#[derive(Clone)]
+struct Phase(Arc<RwLock<PhaseInner>>);
+
+impl Phase {
+    fn new(runtime_cancel: CancellationToken) -> Self {
+        Self(Arc::new(RwLock::new(PhaseInner {
+            state: BombPhase::default(),
+            setup_cancel: None,
+            runtime_cancel,
+        })))
+    }
+
+    fn get(&self) -> BombPhase {
+        self.0.read().expect("poison").state
+    }
+
+    fn set(&self, p: BombPhase) {
+        self.0.write().expect("poison").state = p;
+    }
+
+    fn is_racing(&self) -> bool {
+        self.get() == BombPhase::Racing
+    }
+
+    /// Install a fresh child cancel token for an in-flight setup task. The
+    /// returned token shares cancellation with the one stored on `self`, so
+    /// `cancel_setup` can interrupt the task from another handler.
+    fn make_setup_cancel(&self) -> CancellationToken {
+        let mut guard = self.0.write().expect("poison");
+        let token = guard.runtime_cancel.child_token();
+        guard.setup_cancel = Some(token.clone());
+        token
+    }
+
+    /// Cancel and clear the stored setup token. No-op if none is set.
+    fn cancel_setup(&self) {
+        let mut guard = self.0.write().expect("poison");
+        if let Some(c) = guard.setup_cancel.take() {
+            c.cancel();
+        }
+    }
+
+    /// Forget the stored setup token without cancelling it. Used by
+    /// `on_setup_complete` when the setup task succeeded.
+    fn clear_setup_cancel(&self) {
+        self.0.write().expect("poison").setup_cancel = None;
+    }
+}
+
+impl<S: Send + Sync + 'static> Extension<S> for Phase {}
+
+impl<S: Send + Sync + 'static> FromContext<S> for Phase {
+    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+        cx.extensions.get::<Phase>()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Bomb extension - the round's mutable game data.
+// ---------------------------------------------------------------------------
+
+struct BombInner {
+    state: BombState,
+    players: HashMap<PlayerId, PlayerInfo>,
+}
+
+#[derive(Clone)]
+struct Bomb {
+    inner: Arc<Mutex<BombInner>>,
+}
+
+impl Bomb {
+    fn new(config: BombConfig) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(BombInner {
+                state: BombState::new(config),
+                players: HashMap::new(),
+            })),
+        }
+    }
+
+    fn config_snapshot(&self) -> BombConfig {
+        self.inner.lock().expect("poison").state.config.clone()
+    }
+}
+
+impl<S: Send + Sync + 'static> Extension<S> for Bomb {}
+
+impl<S: Send + Sync + 'static> FromContext<S> for Bomb {
+    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+        cx.extensions.get::<Bomb>()
+    }
+}
+
+fn refresh_ui(bomb: &Bomb, phase: BombPhase, ui: &BombUi) {
+    let snapshot = bomb
+        .inner
+        .lock()
+        .expect("poison")
+        .state
+        .snapshot(phase.label());
+    ui.assign(snapshot);
+}
+
+// ---------------------------------------------------------------------------
+// Synthetic events local to bomb
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Debug)]
+struct BombTick;
+
+/// Emitted by the spawned setup task when `Game::track_rotation` completes
+/// successfully and the race is in progress.
+#[derive(Clone, Debug)]
+struct SetupComplete;
+
+/// Emitted by the spawned setup task when `track_rotation` was cancelled,
+/// timed out, or returned `None` for any other reason.
+#[derive(Clone, Debug)]
+struct SetupAborted;
+
+// ---------------------------------------------------------------------------
+// Ticker - residual Spawned; emits `BombTick` every TICK_PERIOD.
+// ---------------------------------------------------------------------------
+
+async fn bomb_ticker(mut rx: mpsc::UnboundedReceiver<Dispatch>, sender: Sender) {
     let mut tick = tokio::time::interval(TICK_PERIOD);
     tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-
-    let _ = ctx.sender.packet(mtc(
-        format!(
-            "Bomb - hit checkpoints before the {:.0}s timer expires!",
-            ctx.config.checkpoint_timeout.as_secs_f64()
-        ),
-        Some(ConnectionId::ALL),
-    ));
-
-    // Ask LFS to send us a fresh `Npl` for every player currently in the
-    // race; they'll arrive as Packet::Npl on the forwarder channel.
-    let _ = ctx.sender.packet(insim::Packet::Tiny(Tiny {
-        subt: TinyType::Npl,
-        ..Default::default()
-    }));
-
-    ctx.ui.assign(state.snapshot("running"));
-
     loop {
-        if ctx.presence.count() < MIN_PLAYERS {
-            let _ = ctx.sender.packet(mtc(
-                "Bomb - not enough players, restarting.",
-                Some(ConnectionId::ALL),
-            ));
-            return;
-        }
-
         tokio::select! {
-            _ = ctx.cancel.cancelled() => return,
-
-            // Periodic deadline check - runs that overshot their bomb timer get popped here.
-            _ = tick.tick() => {
-                let now = Instant::now();
-                let expired = state.tick_expired(now);
-                let had_expired = !expired.is_empty();
-                for run in expired {
-                    let survival_ms = run.survival_ms(now);
-                    let msg = format!(
-                        "BOOM - {} cps, {:.1}s",
-                        run.checkpoints,
-                        survival_ms as f64 / 1000.0
-                    )
-                    .red();
-                    let _ = ctx.sender.packet(mtc(msg, Some(run.ucid)));
-                    state.finalize(&run, survival_ms);
-                }
-                // Refresh UI either when a run expired (state changed) or
-                // periodically so the time-left numbers tick down visibly.
-                if had_expired || !state.active_runs.is_empty() {
-                    ctx.ui.assign(state.snapshot("running"));
-                }
+            r = rx.recv() => {
+                if r.is_none() { return; }
             }
-
-            res = ctx.rx.recv() => {
-                let Some(d) = res else { return; };
-                handle_packet(d, &mut state, &mut players, ctx);
+            _ = tick.tick() => {
+                if sender.event(BombTick).is_err() { return; }
             }
         }
     }
 }
 
-fn handle_packet(
-    d: Dispatch,
-    state: &mut BombState,
-    players: &mut HashMap<PlayerId, PlayerInfo>,
-    ctx: &BombCtx,
-) {
-    let now = Instant::now();
-    let Dispatch::Packet(p) = d else {
-        return;
-    };
-    match p {
-        insim::Packet::Npl(Npl {
-            plid,
-            ucid,
-            ptype,
-            pname,
-            ..
-        }) => {
-            let uname = ctx.presence.get(ucid).map(|c| c.uname).unwrap_or_default();
-            let _ = players.insert(
-                plid,
-                PlayerInfo {
-                    ucid,
-                    pname,
-                    uname,
-                    ptype,
-                },
-            );
+// ---------------------------------------------------------------------------
+// Setup: spawn `Game::track_rotation` and signal completion via synthetic events.
+// ---------------------------------------------------------------------------
+
+fn start_setup(phase: &Phase, game: &Game, sender: &Sender, bomb: &Bomb, ui: &BombUi) {
+    let cfg = bomb.config_snapshot();
+    let setup_cancel = phase.make_setup_cancel();
+    phase.set(BombPhase::SettingUp);
+    let _ = sender.packet(mtc(
+        "Bomb - setting up track, hit /ready when prompted.",
+        Some(ConnectionId::ALL),
+    ));
+    refresh_ui(bomb, BombPhase::SettingUp, ui);
+
+    let game = game.clone();
+    let sender = sender.clone();
+    // Fire-and-forget: the spawn's only side effect is a synthetic event when
+    // it completes; the JoinHandle is intentionally dropped.
+    drop(tokio::spawn(async move {
+        let result = tokio::select! {
+            r = game.track_rotation(cfg.track, RaceLaps::Untimed, 0, cfg.layout, setup_cancel.clone()) => r,
+            _ = tokio::time::sleep(cfg.setup_timeout) => None,
+        };
+        match result {
+            Some(()) => { let _ = sender.event(SetupComplete); },
+            None => { let _ = sender.event(SetupAborted); },
+        }
+    }));
+}
+
+// ---------------------------------------------------------------------------
+// Phase-transition handlers
+// ---------------------------------------------------------------------------
+
+async fn on_connected(
+    _: Event<Connected>,
+    presence: Presence,
+    phase: Phase,
+    bomb: Bomb,
+    ui: BombUi,
+    game: Game,
+    sender: Sender,
+) -> Result<(), AppError> {
+    if phase.get() != BombPhase::Waiting || presence.count() < MIN_PLAYERS {
+        refresh_ui(&bomb, phase.get(), &ui);
+        return Ok(());
+    }
+    start_setup(&phase, &game, &sender, &bomb, &ui);
+    Ok(())
+}
+
+async fn on_disconnected(
+    _: Event<Disconnected>,
+    presence: Presence,
+    phase: Phase,
+    bomb: Bomb,
+    sender: Sender,
+    ui: BombUi,
+) -> Result<(), AppError> {
+    if presence.count() >= MIN_PLAYERS {
+        refresh_ui(&bomb, phase.get(), &ui);
+        return Ok(());
+    }
+    match phase.get() {
+        BombPhase::Waiting => {
+            refresh_ui(&bomb, BombPhase::Waiting, &ui);
         },
-        insim::Packet::Pll(Pll { plid, .. }) => {
-            let _ = players.remove(&plid);
-            if let Some(run) = state.active_runs.remove(&plid) {
-                let survival_ms = run.survival_ms(now);
-                let _ = ctx.sender.packet(mtc(
+        BombPhase::SettingUp => {
+            // Cancel the in-flight setup; the spawn will emit SetupAborted
+            // which `on_setup_aborted` translates into Waiting + retry.
+            phase.cancel_setup();
+            refresh_ui(&bomb, BombPhase::SettingUp, &ui);
+        },
+        BombPhase::Racing => {
+            // End the round: finalize every active run and reset.
+            let now = Instant::now();
+            let runs: Vec<ActiveRun> = {
+                let mut guard = bomb.inner.lock().expect("poison");
+                guard.players.clear();
+                guard.state.active_runs.drain().map(|(_, r)| r).collect()
+            };
+            for run in &runs {
+                let _ = sender.packet(mtc(
                     format!("Run ended - left race after {} cps", run.checkpoints).red(),
                     Some(run.ucid),
                 ));
-                state.finalize(&run, survival_ms);
-                ctx.ui.assign(state.snapshot("running"));
             }
-        },
-        insim::Packet::Toc(Toc { plid, newucid, .. }) => {
-            if let Some(p) = players.get_mut(&plid) {
-                p.ucid = newucid;
-            }
-            if let Some(r) = state.active_runs.get_mut(&plid) {
-                r.ucid = newucid;
-            }
-        },
-        insim::Packet::Pit(Pit { plid, .. }) => {
-            if let Some(run) = state.active_runs.remove(&plid) {
-                let survival_ms = run.survival_ms(now);
-                let _ = ctx.sender.packet(mtc(
-                    format!(
-                        "PITTED - run ended after {} cps. Commit to your fuel.",
-                        run.checkpoints
-                    )
-                    .red(),
-                    Some(run.ucid),
-                ));
-                state.finalize(&run, survival_ms);
-                ctx.ui.assign(state.snapshot("running"));
-            }
-        },
-        insim::Packet::Crs(Crs { plid, .. }) => {
-            if let Some((ucid, penalty, time_left)) = state.on_reset(plid, now) {
-                let _ = ctx.sender.packet(mtc(
-                    format!(
-                        "PENALTY -{:.2}s - {:.1}s left",
-                        penalty.as_secs_f64(),
-                        time_left.as_secs_f64()
-                    )
-                    .red(),
-                    Some(ucid),
-                ));
-                ctx.ui.assign(state.snapshot("running"));
-            }
-        },
-        insim::Packet::Con(Con { spclose, a, b, .. }) => {
-            let mps = spclose.to_meters_per_sec();
-            for plid in [a.plid, b.plid] {
-                if let Some((ucid, penalty, time_left)) = state.on_collision(plid, mps, now) {
-                    let _ = ctx.sender.packet(mtc(
-                        format!(
-                            "PENALTY -{:.2}s - {:.1}s left",
-                            penalty.as_secs_f64(),
-                            time_left.as_secs_f64()
-                        )
-                        .red(),
-                        Some(ucid),
-                    ));
-                    ctx.ui.assign(state.snapshot("running"));
+            {
+                let mut guard = bomb.inner.lock().expect("poison");
+                for run in &runs {
+                    let survival_ms = run.survival_ms(now);
+                    guard.state.finalize(run, survival_ms);
                 }
             }
+            phase.set(BombPhase::Waiting);
+            sender.packet(mtc(
+                "Bomb - not enough players, restarting.",
+                Some(ConnectionId::ALL),
+            ))?;
+            refresh_ui(&bomb, BombPhase::Waiting, &ui);
         },
-        insim::Packet::Uco(Uco {
-            info: ObjectInfo::InsimCheckpoint(InsimCheckpoint { kind, .. }),
-            plid,
-            ..
-        }) => {
-            let Some(player) = players.get(&plid).cloned() else {
-                return;
-            };
-            let is_finish = matches!(kind, InsimCheckpointKind::Finish);
-            if let Some(outcome) = state.on_checkpoint(&player, plid, is_finish, now) {
-                match outcome {
-                    CheckpointOutcome::Started { ucid } => {
-                        let _ = ctx.sender.packet(mtc(
-                            "Run started - hit every checkpoint!".light_green(),
-                            Some(ucid),
-                        ));
-                    },
-                    CheckpointOutcome::Refreshed {
-                        ucid,
-                        checkpoints,
-                        new_window,
-                    } => {
-                        let _ = ctx.sender.packet(mtc(
-                            format!(
-                                "FINISH - cp {checkpoints} - REFRESHED {:.1}s",
-                                new_window.as_secs_f64()
-                            )
-                            .yellow(),
-                            Some(ucid),
-                        ));
-                    },
-                    CheckpointOutcome::Extended {
-                        ucid,
-                        checkpoints,
-                        time_left,
-                    } => {
-                        let _ = ctx.sender.packet(mtc(
-                            format!("cp {checkpoints} - {:.1}s left", time_left.as_secs_f64())
-                                .light_green(),
-                            Some(ucid),
-                        ));
-                    },
-                }
-                ctx.ui.assign(state.snapshot("running"));
-            }
-        },
-        _ => {},
     }
+    Ok(())
 }
 
-/// The whole game.
-///
-/// Notice what isn't here: no scene combinators, no state-machine enum, no
-/// modal-takeover semantics. The flow reads top-to-bottom and uses ordinary
-/// async-Rust idioms for cancellation (`tokio::select!` on `cancel.cancelled()`)
-/// and round restart (`continue` in the outer loop).
-async fn run_bomb(mut ctx: BombCtx) {
-    loop {
-        if ctx.cancel.is_cancelled() {
-            return;
-        }
-        wait_for_players(&mut ctx, MIN_PLAYERS).await;
-        if ctx.cancel.is_cancelled() {
-            return;
-        }
-        run_bomb_round(&mut ctx).await;
+async fn on_setup_complete(
+    _: Event<SetupComplete>,
+    phase: Phase,
+    bomb: Bomb,
+    sender: Sender,
+    ui: BombUi,
+) -> Result<(), AppError> {
+    if phase.get() != BombPhase::SettingUp {
+        return Ok(());
     }
+    phase.set(BombPhase::Racing);
+    phase.clear_setup_cancel();
+
+    let cfg_secs = bomb.config_snapshot().checkpoint_timeout.as_secs_f64();
+    sender.packet(mtc(
+        format!("Bomb - hit checkpoints before the {cfg_secs:.0}s timer expires!"),
+        Some(ConnectionId::ALL),
+    ))?;
+    // Ask LFS to resend Npl for every player currently in the race so the
+    // bomb players map repopulates without waiting for the next join.
+    sender.packet(insim::Packet::Tiny(Tiny {
+        subt: TinyType::Npl,
+        ..Default::default()
+    }))?;
+    refresh_ui(&bomb, BombPhase::Racing, &ui);
+    Ok(())
+}
+
+async fn on_setup_aborted(
+    _: Event<SetupAborted>,
+    phase: Phase,
+    presence: Presence,
+    bomb: Bomb,
+    ui: BombUi,
+    game: Game,
+    sender: Sender,
+) -> Result<(), AppError> {
+    if phase.get() != BombPhase::SettingUp {
+        return Ok(());
+    }
+    phase.set(BombPhase::Waiting);
+    phase.clear_setup_cancel();
+    sender.packet(mtc(
+        "Bomb - setup failed, restarting.",
+        Some(ConnectionId::ALL),
+    ))?;
+    refresh_ui(&bomb, BombPhase::Waiting, &ui);
+    // Auto-retry if we still have the players.
+    if presence.count() >= MIN_PLAYERS {
+        start_setup(&phase, &game, &sender, &bomb, &ui);
+    }
+    Ok(())
+}
+
+async fn on_race_ended(
+    _: Event<RaceEnded>,
+    phase: Phase,
+    presence: Presence,
+    bomb: Bomb,
+    ui: BombUi,
+    game: Game,
+    sender: Sender,
+) -> Result<(), AppError> {
+    if phase.get() != BombPhase::Racing {
+        return Ok(());
+    }
+    // Finalize any still-active runs as "race ended" instead of timed out.
+    let now = Instant::now();
+    let runs: Vec<ActiveRun> = {
+        let mut guard = bomb.inner.lock().expect("poison");
+        guard.players.clear();
+        guard.state.active_runs.drain().map(|(_, r)| r).collect()
+    };
+    for run in &runs {
+        let _ = sender.packet(mtc(
+            format!("Run ended - race finished after {} cps", run.checkpoints).yellow(),
+            Some(run.ucid),
+        ));
+    }
+    {
+        let mut guard = bomb.inner.lock().expect("poison");
+        for run in &runs {
+            let survival_ms = run.survival_ms(now);
+            guard.state.finalize(run, survival_ms);
+        }
+    }
+    phase.set(BombPhase::Waiting);
+    refresh_ui(&bomb, BombPhase::Waiting, &ui);
+    if presence.count() >= MIN_PLAYERS {
+        start_setup(&phase, &game, &sender, &bomb, &ui);
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// In-round handlers (run_if(in_state(while_racing)))
+// ---------------------------------------------------------------------------
+
+async fn on_npl(Packet(npl): Packet<Npl>, presence: Presence, bomb: Bomb) -> Result<(), AppError> {
+    let uname = presence
+        .get(npl.ucid)
+        .map(|c| c.uname)
+        .unwrap_or_default();
+    let _ = bomb.inner.lock().expect("poison").players.insert(
+        npl.plid,
+        PlayerInfo {
+            ucid: npl.ucid,
+            pname: npl.pname.clone(),
+            uname,
+            ptype: npl.ptype,
+        },
+    );
+    Ok(())
+}
+
+async fn on_pll(
+    Packet(pll): Packet<Pll>,
+    phase: Phase,
+    bomb: Bomb,
+    sender: Sender,
+    ui: BombUi,
+) -> Result<(), AppError> {
+    let now = Instant::now();
+    let run = {
+        let mut guard = bomb.inner.lock().expect("poison");
+        let _ = guard.players.remove(&pll.plid);
+        guard.state.active_runs.remove(&pll.plid)
+    };
+    if let Some(run) = run {
+        let survival_ms = run.survival_ms(now);
+        sender.packet(mtc(
+            format!("Run ended - left race after {} cps", run.checkpoints).red(),
+            Some(run.ucid),
+        ))?;
+        bomb.inner
+            .lock()
+            .expect("poison")
+            .state
+            .finalize(&run, survival_ms);
+        refresh_ui(&bomb, phase.get(), &ui);
+    }
+    Ok(())
+}
+
+async fn on_toc(Packet(toc): Packet<Toc>, bomb: Bomb) -> Result<(), AppError> {
+    let mut guard = bomb.inner.lock().expect("poison");
+    if let Some(p) = guard.players.get_mut(&toc.plid) {
+        p.ucid = toc.newucid;
+    }
+    if let Some(r) = guard.state.active_runs.get_mut(&toc.plid) {
+        r.ucid = toc.newucid;
+    }
+    Ok(())
+}
+
+async fn on_pit(
+    Packet(pit): Packet<Pit>,
+    phase: Phase,
+    bomb: Bomb,
+    sender: Sender,
+    ui: BombUi,
+) -> Result<(), AppError> {
+    let now = Instant::now();
+    let run = {
+        let mut guard = bomb.inner.lock().expect("poison");
+        guard.state.active_runs.remove(&pit.plid)
+    };
+    if let Some(run) = run {
+        let survival_ms = run.survival_ms(now);
+        sender.packet(mtc(
+            format!(
+                "PITTED - run ended after {} cps. Commit to your fuel.",
+                run.checkpoints
+            )
+            .red(),
+            Some(run.ucid),
+        ))?;
+        bomb.inner
+            .lock()
+            .expect("poison")
+            .state
+            .finalize(&run, survival_ms);
+        refresh_ui(&bomb, phase.get(), &ui);
+    }
+    Ok(())
+}
+
+async fn on_crs(
+    Packet(crs): Packet<Crs>,
+    phase: Phase,
+    bomb: Bomb,
+    sender: Sender,
+    ui: BombUi,
+) -> Result<(), AppError> {
+    let now = Instant::now();
+    let result = bomb.inner.lock().expect("poison").state.on_reset(crs.plid, now);
+    if let Some((ucid, penalty, time_left)) = result {
+        sender.packet(mtc(
+            format!(
+                "PENALTY -{:.2}s - {:.1}s left",
+                penalty.as_secs_f64(),
+                time_left.as_secs_f64()
+            )
+            .red(),
+            Some(ucid),
+        ))?;
+        refresh_ui(&bomb, phase.get(), &ui);
+    }
+    Ok(())
+}
+
+async fn on_con(
+    Packet(con): Packet<Con>,
+    phase: Phase,
+    bomb: Bomb,
+    sender: Sender,
+    ui: BombUi,
+) -> Result<(), AppError> {
+    let now = Instant::now();
+    let mps = con.spclose.to_meters_per_sec();
+    let mut any_hit = false;
+    for plid in [con.a.plid, con.b.plid] {
+        let result = bomb
+            .inner
+            .lock()
+            .expect("poison")
+            .state
+            .on_collision(plid, mps, now);
+        if let Some((ucid, penalty, time_left)) = result {
+            sender.packet(mtc(
+                format!(
+                    "PENALTY -{:.2}s - {:.1}s left",
+                    penalty.as_secs_f64(),
+                    time_left.as_secs_f64()
+                )
+                .red(),
+                Some(ucid),
+            ))?;
+            any_hit = true;
+        }
+    }
+    if any_hit {
+        refresh_ui(&bomb, phase.get(), &ui);
+    }
+    Ok(())
+}
+
+async fn on_uco(
+    Packet(uco): Packet<Uco>,
+    phase: Phase,
+    bomb: Bomb,
+    sender: Sender,
+    ui: BombUi,
+) -> Result<(), AppError> {
+    let ObjectInfo::InsimCheckpoint(InsimCheckpoint { kind, .. }) = uco.info else {
+        return Ok(());
+    };
+    let is_finish = matches!(kind, InsimCheckpointKind::Finish);
+    let now = Instant::now();
+
+    let outcome = {
+        let mut guard = bomb.inner.lock().expect("poison");
+        let player = match guard.players.get(&uco.plid).cloned() {
+            Some(p) => p,
+            None => return Ok(()),
+        };
+        guard.state.on_checkpoint(&player, uco.plid, is_finish, now)
+    };
+    let Some(outcome) = outcome else {
+        return Ok(());
+    };
+
+    match outcome {
+        CheckpointOutcome::Started { ucid } => {
+            sender.packet(mtc(
+                "Run started - hit every checkpoint!".light_green(),
+                Some(ucid),
+            ))?;
+        },
+        CheckpointOutcome::Refreshed {
+            ucid,
+            checkpoints,
+            new_window,
+        } => {
+            sender.packet(mtc(
+                format!(
+                    "FINISH - cp {checkpoints} - REFRESHED {:.1}s",
+                    new_window.as_secs_f64()
+                )
+                .yellow(),
+                Some(ucid),
+            ))?;
+        },
+        CheckpointOutcome::Extended {
+            ucid,
+            checkpoints,
+            time_left,
+        } => {
+            sender.packet(mtc(
+                format!("cp {checkpoints} - {:.1}s left", time_left.as_secs_f64())
+                    .light_green(),
+                Some(ucid),
+            ))?;
+        },
+    }
+    refresh_ui(&bomb, phase.get(), &ui);
+    Ok(())
+}
+
+async fn on_tick(
+    _: Event<BombTick>,
+    phase: Phase,
+    bomb: Bomb,
+    sender: Sender,
+    ui: BombUi,
+) -> Result<(), AppError> {
+    let now = Instant::now();
+    let expired = bomb.inner.lock().expect("poison").state.tick_expired(now);
+    let had_expired = !expired.is_empty();
+    let mut has_active = false;
+    for run in &expired {
+        let survival_ms = run.survival_ms(now);
+        let _ = sender.packet(mtc(
+            format!(
+                "BOOM - {} cps, {:.1}s",
+                run.checkpoints,
+                survival_ms as f64 / 1000.0
+            )
+            .red(),
+            Some(run.ucid),
+        ));
+        bomb.inner
+            .lock()
+            .expect("poison")
+            .state
+            .finalize(run, survival_ms);
+    }
+    if !had_expired {
+        has_active = !bomb
+            .inner
+            .lock()
+            .expect("poison")
+            .state
+            .active_runs
+            .is_empty();
+    }
+    if had_expired || has_active {
+        refresh_ui(&bomb, phase.get(), &ui);
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -610,7 +992,7 @@ async fn run_bomb(mut ctx: BombCtx) {
 // ---------------------------------------------------------------------------
 
 #[derive(Parser, Debug)]
-#[command(about = "insim_app - bomb game example (no scenes)")]
+#[command(about = "insim_app - bomb game example (handler-driven)")]
 struct Args {
     /// LFS InSim address (host:port).
     #[arg(long, default_value = "127.0.0.1:29999")]
@@ -619,6 +1001,14 @@ struct Args {
     /// InSim admin password, if the host requires one.
     #[arg(long)]
     admin_password: Option<String>,
+
+    /// LFS track code (e.g. BL1, AS1, SO1).
+    #[arg(long, default_value = "BL1")]
+    track: String,
+
+    /// Optional autocross layout name (loaded via /axload).
+    #[arg(long)]
+    layout: Option<String>,
 }
 
 #[tokio::main]
@@ -626,45 +1016,64 @@ async fn main() -> Result<(), AppError> {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
 
-    let app = App::<()>::new();
+    let track = Track::from_str(&args.track).expect("unknown track code");
+    let config = BombConfig {
+        track,
+        layout: args.layout.clone(),
+        ..BombConfig::default()
+    };
 
-    // UI lives at the top level, exactly like smoke.rs. Types are known at
-    // compile time because the game type is known at compile time.
+    let app = App::<()>::new();
+    let sender = app.sender().clone();
+    let runtime_cancel = app.cancel_token().clone();
+
     let ui = Ui::<BombView, BombGlobal, ()>::new(
-        app.sender().clone(),
-        BombGlobal::default(),
+        sender.clone(),
+        BombGlobal {
+            phase: BombPhase::Waiting.label().to_string(),
+            ..Default::default()
+        },
         |_ucid, invalidator| BombView {
             _invalidator: invalidator,
         },
     );
 
-    let presence = Presence::new(app.sender().clone());
-    let cancel = app.cancel_token().clone();
-    let config = BombConfig::default();
+    let presence = Presence::new(sender.clone());
+    let game = Game::new(sender.clone());
+    let phase = Phase::new(runtime_cancel);
+    let bomb = Bomb::new(config);
 
-    // `spawned(...)` handles both halves of the pumped-task pattern: it
-    // spawns `run_bomb` on its first dispatch and forwards every dispatch
-    // into the mpsc the game task drains. Extensions are wired in via
-    // ordinary closure capture - they're all `Clone`.
+    // Predicate that gates in-round handlers. Annotating the closure's `cx`
+    // parameter pins `S = ()` so the framework's generic `in_state` can infer
+    // the rest from the closure's typed argument.
+    let while_racing = |cx: &ExtractCx<'_, ()>| {
+        Phase::from_context(cx).is_some_and(|p| p.is_racing())
+    };
+
     let app = app
         .with_state(())
         .extension(presence.clone())
+        .extension(game.clone())
         .extension(ui.clone())
-        .handler(spawned({
-            let presence = presence.clone();
-            let ui = ui.clone();
-            let cancel = cancel.clone();
-            move |rx, sender| {
-                run_bomb(BombCtx {
-                    rx,
-                    sender,
-                    presence,
-                    ui,
-                    cancel,
-                    config,
-                })
-            }
-        }));
+        .extension(phase.clone())
+        .extension(bomb.clone())
+        // Phase transitions.
+        .handler(on_connected)
+        .handler(on_disconnected)
+        .handler(on_setup_complete)
+        .handler(on_setup_aborted)
+        .handler(on_race_ended)
+        // In-round handlers - only run while we're racing.
+        .handler(on_npl.run_if(while_racing))
+        .handler(on_pll.run_if(while_racing))
+        .handler(on_toc.run_if(while_racing))
+        .handler(on_pit.run_if(while_racing))
+        .handler(on_crs.run_if(while_racing))
+        .handler(on_con.run_if(while_racing))
+        .handler(on_uco.run_if(while_racing))
+        .handler(on_tick.run_if(while_racing))
+        // Background ticker - the residual `Spawned`.
+        .handler(spawned(bomb_ticker));
 
     let builder = insim::tcp(args.addr)
         .isi_iname("bomb".to_string())
