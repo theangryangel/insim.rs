@@ -159,6 +159,24 @@ where
         let _ = self.inner.global.send_replace(Arc::new(value));
     }
 
+    /// Apply a closure to the current global props in place. Equivalent to
+    /// reading the current value, mutating it, then [`Ui::assign`]'ing the
+    /// result - but the closure-form avoids the read step and, more
+    /// importantly, lets two handlers update *different fields* of `G`
+    /// without clobbering each other (each `assign(full_g)` would have the
+    /// last writer win on every field; `modify` lets each writer touch only
+    /// its own field).
+    ///
+    /// Internally uses [`tokio::sync::watch::Sender::send_modify`] plus
+    /// [`std::sync::Arc::make_mut`] for cheap clone-on-write under the
+    /// shared `Arc<G>`.
+    pub fn modify<F: FnOnce(&mut G)>(&self, f: F)
+    where
+        G: Clone,
+    {
+        self.inner.global.send_modify(|arc| f(Arc::make_mut(arc)));
+    }
+
     /// Push per-connection props to a specific player's view.
     pub async fn set_player_state(
         &self,

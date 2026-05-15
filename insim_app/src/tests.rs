@@ -349,6 +349,100 @@ async fn spawned_handler_spawns_once_and_forwards_dispatches() {
 }
 
 #[tokio::test]
+async fn cancellation_token_extractor_triggers_shutdown() {
+    // A handler that pulls `CancellationToken` via FromContext and calls
+    // `.cancel()` brings the runtime's token down. This is the round-trip
+    // equivalent of a `!quit` chat command.
+    async fn quit_on_ncn(
+        _: Packet<Ncn>,
+        cancel: tokio_util::sync::CancellationToken,
+    ) -> Result<(), AppError> {
+        cancel.cancel();
+        Ok(())
+    }
+
+    let app: App<()> = App::new().with_state(()).handler(quit_on_ncn);
+    let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
+    let sender = Sender::new(cmd_tx);
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let state = ();
+    let chain = app.extension_chain;
+    let handlers = app.handlers;
+    let extensions = app.extensions;
+
+    assert!(!cancel.is_cancelled());
+    dispatch_cycle(
+        Dispatch::Packet(make_ncn(1, "alice")),
+        &state,
+        &sender,
+        &chain,
+        &handlers,
+        &extensions,
+        &cancel,
+    )
+    .await;
+    assert!(
+        cancel.is_cancelled(),
+        "handler should have cancelled the runtime token"
+    );
+}
+
+#[tokio::test]
+async fn spawned_handler_channel_closes_on_cancel() {
+    // When the runtime's cancel token fires, Spawned's internal forwarder
+    // drops the user-facing tx, so a task whose body is just
+    // `while let Some(_) = rx.recv().await {}` exits without needing an
+    // explicit cancel check of its own.
+    let task_exited = Arc::new(AtomicUsize::new(0));
+
+    let spawned = Spawned::new({
+        let task_exited = task_exited.clone();
+        move |mut rx: mpsc::UnboundedReceiver<Dispatch>, _sender: Sender| async move {
+            while rx.recv().await.is_some() {}
+            let _ = task_exited.fetch_add(1, Ordering::Relaxed);
+        }
+    });
+
+    let app: App<()> = App::new().with_state(()).handler(spawned);
+    let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
+    let sender = Sender::new(cmd_tx);
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let state = ();
+    let chain = app.extension_chain;
+    let handlers = app.handlers;
+    let extensions = app.extensions;
+
+    // First dispatch spawns the user task + forwarder.
+    dispatch_cycle(
+        Dispatch::Packet(make_ncn(1, "alice")),
+        &state,
+        &sender,
+        &chain,
+        &handlers,
+        &extensions,
+        &cancel,
+    )
+    .await;
+
+    // Sanity: task is alive, blocked on rx.recv().
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    assert_eq!(
+        task_exited.load(Ordering::Relaxed),
+        0,
+        "task should still be running before cancel"
+    );
+
+    // Trigger cancel — forwarder drops user_tx, user rx returns None.
+    cancel.cancel();
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    assert_eq!(
+        task_exited.load(Ordering::Relaxed),
+        1,
+        "task should have exited after cancel closed the channel"
+    );
+}
+
+#[tokio::test]
 async fn sender_event_pushes_into_back_channel() {
     // Confirms that Sender::event reaches the dispatcher's back-channel - the
     // serve loop drains this channel on its own; here we just verify the

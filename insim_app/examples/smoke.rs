@@ -32,7 +32,7 @@ use insim_app::{
 };
 use taffy as _;
 use thiserror as _;
-use tokio_util as _;
+use tokio_util::sync::CancellationToken;
 
 #[derive(Clone)]
 struct AppState {
@@ -91,6 +91,7 @@ enum Cmd {
     Hello,
     Ping,
     Echo { message: String },
+    Quit,
 }
 
 impl std::str::FromStr for Cmd {
@@ -104,12 +105,17 @@ impl std::str::FromStr for Cmd {
             "echo" if !rest.trim().is_empty() => Ok(Cmd::Echo {
                 message: rest.trim().to_string(),
             }),
+            "quit" => Ok(Cmd::Quit),
             _ => Err(()),
         }
     }
 }
 
-async fn handle_typed_chat(Event(cmd): Event<Cmd>, sender: Sender) -> Result<(), AppError> {
+async fn handle_typed_chat(
+    Event(cmd): Event<Cmd>,
+    sender: Sender,
+    cancel: CancellationToken,
+) -> Result<(), AppError> {
     match cmd {
         Cmd::Hello => {
             sender.packet(mtc("hi from typed handler!", Some(ConnectionId::ALL)))?;
@@ -122,6 +128,10 @@ async fn handle_typed_chat(Event(cmd): Event<Cmd>, sender: Sender) -> Result<(),
                 format!("typed-echo: {message}"),
                 Some(ConnectionId::ALL),
             ))?;
+        },
+        Cmd::Quit => {
+            sender.packet(mtc("shutting down...", Some(ConnectionId::ALL)))?;
+            cancel.cancel();
         },
     }
     Ok(())
@@ -183,6 +193,11 @@ impl<S: Send + Sync + 'static> Handler<S, (Packet<Mso>,)> for MsoCounter {
 #[derive(Clone, Default, Debug)]
 struct UiGlobal {
     online: u64,
+    /// Heartbeat count - updated by the ticker every 30s. Drives the right-
+    /// hand "[STATUS]" line in the smoke view, demonstrating partial-update
+    /// composition: the ticker pushes `beats` via `ui.modify`, the connect
+    /// handlers push `online` via `ui.modify`, neither clobbers the other.
+    beats: u32,
 }
 
 #[derive(Clone, Debug)]
@@ -200,7 +215,8 @@ impl Component for SmokeView {
     type Props<'a> = (&'a UiGlobal, &'a ());
 
     fn render(&self, (global, _): Self::Props<'_>) -> ui::Node<Self::Message> {
-        ui::container()
+        // Left column: the original three rows.
+        let left_column = ui::container()
             .flex()
             .flex_col()
             .with_child(
@@ -217,6 +233,25 @@ impl Component for SmokeView {
                 ui::clickable("Click me", BtnStyle::default(), SmokeUiMsg::ButtonClicked)
                     .w(40.0)
                     .h(5.0),
+            );
+
+        // Outer flex_row, justify_end pushes the status text to the right
+        // edge of the layout space; the left column stays anchored on the
+        // left because justify_end only affects flex item placement and the
+        // first child fills the space before the gap.
+        ui::container()
+            .flex()
+            .flex_row()
+            .justify_between()
+            .w(200.0)
+            .with_child(left_column)
+            .with_child(
+                ui::text(
+                    format!("[STATUS] beats: {}", global.beats),
+                    BtnStyle::default(),
+                )
+                .w(40.0)
+                .h(5.0),
             )
     }
 
@@ -234,9 +269,9 @@ async fn refresh_ui_count(
     presence: Presence,
     ui: Ui<SmokeView, UiGlobal, ()>,
 ) -> Result<(), AppError> {
-    ui.assign(UiGlobal {
-        online: presence.count() as u64,
-    });
+    // Partial update: only touch `online`. `beats` is owned by the ticker
+    // and would be clobbered by an `assign(UiGlobal { online, ..default })`.
+    ui.modify(|g| g.online = presence.count() as u64);
     Ok(())
 }
 
@@ -268,7 +303,11 @@ async fn on_ui_click(Event(msg): Event<SmokeUiMsg>, sender: Sender) -> Result<()
     Ok(())
 }
 
-async fn install_ticker(_: Event<Startup>, sender: Sender) -> Result<(), AppError> {
+async fn install_ticker(
+    _: Event<Startup>,
+    sender: Sender,
+    ui: Ui<SmokeView, UiGlobal, ()>,
+) -> Result<(), AppError> {
     let _ticker = tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(30));
         let _ = interval.tick().await; // skip immediate fire
@@ -277,6 +316,9 @@ async fn install_ticker(_: Event<Startup>, sender: Sender) -> Result<(), AppErro
             let _ = interval.tick().await;
             beat += 1;
             println!("[ticker] beat {beat}");
+            // Partial update: only touch `beats`. The connect/disconnect
+            // handlers own `online` and update it through `ui.modify`.
+            ui.modify(|g| g.beats = beat);
             if sender
                 .packet(mtc(
                     format!("[ticker] beat {beat}"),

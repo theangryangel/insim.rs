@@ -183,6 +183,17 @@ impl<S: Send + Sync> FromContext<S> for Sender {
     }
 }
 
+/// Extractor that hands out a clone of the runtime's [`CancellationToken`].
+///
+/// Lets handlers trigger graceful shutdown (`token.cancel()`) or check whether
+/// shutdown is already in progress (`token.is_cancelled()`) without needing a
+/// custom `Handler` impl just to read [`ExtractCx::cancel`].
+impl<S: Send + Sync> FromContext<S> for CancellationToken {
+    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+        Some(cx.cancel.clone())
+    }
+}
+
 // Phantom keeps the lint-friendly footprint when an extractor is unused.
 #[allow(dead_code)]
 struct _PhantomExtractor<S>(PhantomData<S>);
