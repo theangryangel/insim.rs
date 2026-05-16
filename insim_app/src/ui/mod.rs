@@ -50,9 +50,9 @@ pub use view::{Component, InvalidateHandle};
 use view::{RunViewArgs, ViewInput, run_view};
 
 use crate::{
+    App, Installable,
     event::Dispatch,
     extract::{ExtractCx, FromContext, Sender},
-    middleware::{EventCx, Extension},
 };
 
 /// Errors from the UI subsystem.
@@ -83,7 +83,7 @@ where
 }
 
 /// UI handle. Construct with [`Ui::new`] and register via
-/// [`crate::App::extension`]. Pulled into handlers via [`FromContext`].
+/// [`crate::App::install`]. Pulled into handlers via [`FromContext`].
 pub struct Ui<Cmp, G, C>
 where
     Cmp: Component + 'static,
@@ -195,44 +195,65 @@ where
     ) -> Result<(), mpsc::error::SendError<(ConnectionId, Cmp::Message)>> {
         self.inner.view_messages.send((ucid, msg)).await
     }
-}
 
-impl<S, Cmp, G, C> Extension<S> for Ui<Cmp, G, C>
-where
-    S: Send + Sync + 'static,
-    Cmp: Component + 'static,
-    for<'a> Cmp::Props<'a>: From<(&'a G, &'a C)>,
-    G: Send + Sync + 'static,
-    C: Clone + Send + Sync + Default + 'static,
-{
-    async fn on_event(&self, cx: &mut EventCx<'_, S>) {
-        // Forward packets the UI cares about into the LocalSet thread.
-        if let Dispatch::Packet(p) = cx.dispatch {
-            match p {
-                Packet::Ncn(_)
-                | Packet::Cnl(_)
-                | Packet::Btc(_)
-                | Packet::Btt(_)
-                | Packet::Bfn(_) => {
-                    let _ = self.inner.packet_tx.send(p.clone());
-                },
-                _ => {},
-            }
+    /// Forward a wire packet into the UI thread if it's one the UI cares
+    /// about (Ncn/Cnl/Btc/Btt/Bfn). Other packets are ignored. This is the
+    /// hook the installed `ui_forward` handler uses; users registering UI
+    /// manually can call it from their own handler.
+    pub fn forward_packet(&self, p: &Packet) {
+        match p {
+            Packet::Ncn(_)
+            | Packet::Cnl(_)
+            | Packet::Btc(_)
+            | Packet::Btt(_)
+            | Packet::Bfn(_) => {
+                let _ = self.inner.packet_tx.send(p.clone());
+            },
+            _ => {},
         }
     }
 }
 
-impl<S, Cmp, G, C> FromContext<S> for Ui<Cmp, G, C>
+impl<Cmp, G, C> FromContext for Ui<Cmp, G, C>
 where
-    S: Send + Sync + 'static,
     Cmp: Component + 'static,
     for<'a> Cmp::Props<'a>: From<(&'a G, &'a C)>,
     G: Send + Sync + 'static,
     C: Clone + Send + Sync + Default + 'static,
 {
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+    fn from_context(cx: &ExtractCx<'_>) -> Option<Self> {
         cx.extensions.get::<Ui<Cmp, G, C>>()
     }
+}
+
+impl<Cmp, G, C> Installable for Ui<Cmp, G, C>
+where
+    Cmp: Component + 'static,
+    for<'a> Cmp::Props<'a>: From<(&'a G, &'a C)>,
+    G: Send + Sync + 'static,
+    C: Clone + Send + Sync + Default + 'static,
+{
+    fn install(self, app: App) -> App {
+        app.resource(self).handler(ui_forward::<Cmp, G, C>)
+    }
+}
+
+/// Generic handler that forwards every dispatch's packet into the [`Ui`]
+/// resource's LocalSet thread. Registered automatically by [`Ui::install`].
+async fn ui_forward<Cmp, G, C>(
+    d: Dispatch,
+    ui: Ui<Cmp, G, C>,
+) -> Result<(), crate::AppError>
+where
+    Cmp: Component + 'static,
+    for<'a> Cmp::Props<'a>: From<(&'a G, &'a C)>,
+    G: Send + Sync + 'static,
+    C: Clone + Send + Sync + Default + 'static,
+{
+    if let Dispatch::Packet(p) = d {
+        ui.forward_packet(&p);
+    }
+    Ok(())
 }
 
 fn spawn_ui_thread<Cmp, G, C, F>(

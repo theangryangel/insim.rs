@@ -1,11 +1,11 @@
 //! Game-state mirror plus host commands and a `track_rotation` combinator.
 //!
-//! Equivalent of `insim_extras::game`, adapted to `insim_app`'s
-//! [`Extension`] / [`FromContext`] / captured-`Sender` pattern. Register with
-//! `App::extension(Game::new(app.sender().clone()))` and pull into handlers
-//! by value:
+//! [`Game`] is a resource + a handler. Register via [`App::install`] and
+//! pull into handlers by value:
 //!
 //! ```ignore
+//! let app = App::new().install(Game::new(app.sender().clone()));
+//!
 //! async fn handler(game: Game) -> Result<(), AppError> {
 //!     tracing::info!(?game.get().current_track(), "current track");
 //!     game.end()?;
@@ -13,7 +13,7 @@
 //! }
 //! ```
 //!
-//! On construction the extension sends a `Sst` request so the server pushes
+//! On construction the resource sends a `Sst` request so the server pushes
 //! initial `Sta` state; subsequent `Sta` packets keep the mirror current.
 //!
 //! Each `Sta` is also diffed against the previous mirror, and transition
@@ -32,15 +32,13 @@ use std::{
 use insim::{
     WithRequestId,
     core::{track::Track, wind::Wind},
-    insim::{RaceInProgress, RaceLaps, StaFlags, TinyType},
+    insim::{RaceInProgress, RaceLaps, Sta, StaFlags, TinyType},
 };
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    AppError,
-    event::Dispatch,
-    extract::{ExtractCx, FromContext, Sender},
-    middleware::{EventCx, Extension},
+    App, AppError, Installable,
+    extract::{ExtractCx, FromContext, Packet, Sender},
     util::host_command,
 };
 
@@ -309,49 +307,60 @@ pub struct TrackChanged {
     pub to: Track,
 }
 
-impl<S: Send + Sync + 'static> Extension<S> for Game {
-    async fn on_event(&self, cx: &mut EventCx<'_, S>) {
-        let Dispatch::Packet(insim::Packet::Sta(sta)) = cx.dispatch else {
-            return;
-        };
+/// Handler that mirrors every `Sta` packet into the [`Game`] resource and
+/// emits transition events ([`RaceStarted`] / [`RaceEnded`] / [`TrackChanged`]).
+///
+/// Registered automatically by [`Game::install`]; pulled out as a free
+/// function for users who want to wire it up manually.
+pub async fn game_on_sta(
+    Packet(sta): Packet<Sta>,
+    game: Game,
+    sender: Sender,
+) -> Result<(), AppError> {
+    // Mutate under the write lock; capture the values we need for the
+    // transition diff. Drop the guard before emitting so any handler that
+    // reacts to the synthetic events can freely re-enter `Game`.
+    let (was_racing, now_racing, prev_track, new_track) = {
+        let mut g = game.inner.write().expect("poison");
+        let was_racing = matches!(g.racing, RaceInProgress::Racing);
+        let prev_track = g.track;
+        g.racing = sta.raceinprog.clone();
+        g.qualifying_duration = Duration::from_secs(sta.qualmins as u64 * 60);
+        g.race_duration = sta.racelaps;
+        g.track = Some(sta.track);
+        g.weather = Some(sta.weather);
+        g.wind = Some(sta.wind);
+        g.flags = sta.flags;
+        let now_racing = matches!(g.racing, RaceInProgress::Racing);
+        (was_racing, now_racing, prev_track, sta.track)
+    };
 
-        // Mutate under the write lock; capture the values we need for the
-        // transition diff. Drop the guard before emitting so any handler that
-        // reacts to the synthetic events can freely re-enter `Game`.
-        let (was_racing, now_racing, prev_track, new_track) = {
-            let mut g = self.inner.write().expect("poison");
-            let was_racing = matches!(g.racing, RaceInProgress::Racing);
-            let prev_track = g.track;
-            g.racing = sta.raceinprog.clone();
-            g.qualifying_duration = Duration::from_secs(sta.qualmins as u64 * 60);
-            g.race_duration = sta.racelaps;
-            g.track = Some(sta.track);
-            g.weather = Some(sta.weather);
-            g.wind = Some(sta.wind);
-            g.flags = sta.flags;
-            let now_racing = matches!(g.racing, RaceInProgress::Racing);
-            (was_racing, now_racing, prev_track, sta.track)
-        };
+    if !was_racing && now_racing {
+        let _ = sender.event(RaceStarted);
+    }
+    if was_racing && !now_racing {
+        let _ = sender.event(RaceEnded);
+    }
+    if prev_track != Some(new_track) {
+        let _ = sender.event(TrackChanged {
+            from: prev_track,
+            to: new_track,
+        });
+    }
+    Ok(())
+}
 
-        if !was_racing && now_racing {
-            let _ = cx.sender.event(RaceStarted);
-        }
-        if was_racing && !now_racing {
-            let _ = cx.sender.event(RaceEnded);
-        }
-        if prev_track != Some(new_track) {
-            let _ = cx.sender.event(TrackChanged {
-                from: prev_track,
-                to: new_track,
-            });
-        }
+/// [`Game`] is its own extractor: register via [`App::install`] (or manually
+/// via `.resource(game).handler(game_on_sta)`) and any handler can take it
+/// by value.
+impl FromContext for Game {
+    fn from_context(cx: &ExtractCx<'_>) -> Option<Self> {
+        cx.extensions.get::<Game>()
     }
 }
 
-/// [`Game`] is its own extractor: register via [`crate::App::extension`] and
-/// any handler can take it by value.
-impl<S: Send + Sync + 'static> FromContext<S> for Game {
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
-        cx.extensions.get::<Game>()
+impl Installable for Game {
+    fn install(self, app: App) -> App {
+        app.resource(self).handler(game_on_sta)
     }
 }

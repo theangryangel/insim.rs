@@ -55,8 +55,8 @@ use insim::{
     insim::{BtnStyle, Con, Crs, Npl, Pit, PlayerType, Pll, RaceLaps, Tiny, TinyType, Toc, Uco},
 };
 use insim_app::{
-    App, AppError, Connected, Disconnected, Event, ExtractCx, Extension, FromContext, Game,
-    HandlerExt, Packet, Presence, RaceEnded, Sender, serve,
+    App, AppError, Connected, Disconnected, Event, ExtractCx, FromContext, Game, HandlerExt,
+    Packet, Presence, RaceEnded, Sender, serve,
     ui::{self, Component, InvalidateHandle, Ui},
     util::mtc,
 };
@@ -439,10 +439,8 @@ impl Phase {
     }
 }
 
-impl<S: Send + Sync + 'static> Extension<S> for Phase {}
-
-impl<S: Send + Sync + 'static> FromContext<S> for Phase {
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+impl FromContext for Phase {
+    fn from_context(cx: &ExtractCx<'_>) -> Option<Self> {
         cx.extensions.get::<Phase>()
     }
 }
@@ -476,10 +474,8 @@ impl Bomb {
     }
 }
 
-impl<S: Send + Sync + 'static> Extension<S> for Bomb {}
-
-impl<S: Send + Sync + 'static> FromContext<S> for Bomb {
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+impl FromContext for Bomb {
+    fn from_context(cx: &ExtractCx<'_>) -> Option<Self> {
         cx.extensions.get::<Bomb>()
     }
 }
@@ -1004,7 +1000,7 @@ async fn main() -> Result<(), AppError> {
         ..BombConfig::default()
     };
 
-    let app = App::<()>::new();
+    let app = App::new();
     let sender = app.sender().clone();
     let runtime_cancel = app.cancel_token().clone();
 
@@ -1027,17 +1023,16 @@ async fn main() -> Result<(), AppError> {
     // Predicate that gates in-round handlers. Annotating the closure's `cx`
     // parameter pins `S = ()` so the framework's generic `in_state` can infer
     // the rest from the closure's typed argument.
-    let while_racing = |cx: &ExtractCx<'_, ()>| {
+    let while_racing = |cx: &ExtractCx<'_>| {
         Phase::from_context(cx).is_some_and(|p| p.is_racing())
     };
 
     let app = app
-        .with_state(())
-        .extension(presence.clone())
-        .extension(game.clone())
-        .extension(ui.clone())
-        .extension(phase.clone())
-        .extension(bomb.clone())
+        .install(presence.clone())
+        .install(game.clone())
+        .install(ui.clone())
+        .resource(phase.clone())
+        .resource(bomb.clone())
         // Phase transitions.
         .handler(on_connected)
         .handler(on_disconnected)

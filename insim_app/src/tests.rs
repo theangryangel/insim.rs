@@ -23,13 +23,12 @@ use tokio::sync::mpsc;
 use tracing_subscriber as _;
 
 use crate::{
-    App, AppError, ChatParser, Connected, Dispatch, Event, Game, HandlerExt, Packet, Presence,
-    RaceStarted, Sender, Spawned, State, TrackChanged, always, app::dispatch_cycle, event::Command,
+    App, AppError, Connected, Dispatch, Event, Game, HandlerExt, Packet, Presence, RaceStarted,
+    Res, Sender, Spawned, TrackChanged, always, app::dispatch_cycle, chat_parser, event::Command,
     in_state, never,
 };
 
-/// A toy typed chat enum for the parser test. In production this would be
-/// `#[derive(insim_extras::chat::Parse)]` with a `FromStr` bridge.
+/// A toy typed chat enum for the parser test.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum TestCmd {
     Ping { who: String },
@@ -58,19 +57,19 @@ struct TestState {
     last_cmd: Arc<Mutex<Option<TestCmd>>>,
 }
 
-async fn count_ncn(Packet(_n): Packet<Ncn>, State(s): State<TestState>) -> Result<(), AppError> {
+async fn count_ncn(Packet(_n): Packet<Ncn>, Res(s): Res<TestState>) -> Result<(), AppError> {
     let _ = s.ncn_hits.fetch_add(1, Ordering::Relaxed);
     Ok(())
 }
 
-async fn count_mso(Packet(_m): Packet<Mso>, State(s): State<TestState>) -> Result<(), AppError> {
+async fn count_mso(Packet(_m): Packet<Mso>, Res(s): Res<TestState>) -> Result<(), AppError> {
     let _ = s.mso_hits.fetch_add(1, Ordering::Relaxed);
     Ok(())
 }
 
 async fn count_connected(
     Event(_c): Event<Connected>,
-    State(s): State<TestState>,
+    Res(s): Res<TestState>,
 ) -> Result<(), AppError> {
     let _ = s.connected_hits.fetch_add(1, Ordering::Relaxed);
     Ok(())
@@ -78,7 +77,7 @@ async fn count_connected(
 
 async fn capture_cmd(
     Event(cmd): Event<TestCmd>,
-    State(s): State<TestState>,
+    Res(s): Res<TestState>,
 ) -> Result<(), AppError> {
     let _ = s.cmd_hits.fetch_add(1, Ordering::Relaxed);
     *s.last_cmd.lock().expect("poison") = Some(cmd);
@@ -106,15 +105,15 @@ fn make_mso(ucid: u8, msg: &str) -> insim::Packet {
     })
 }
 
-fn app_with(state: TestState) -> App<TestState> {
+fn app_with(state: TestState) -> App {
     // Presence needs a Sender for its admin commands; tests don't exercise
     // those, so feed it a sender whose receiver is dropped immediately.
     let (cmd_tx, _) = mpsc::unbounded_channel::<Command>();
     let dummy_sender = Sender::new(cmd_tx);
     App::new()
-        .with_state(state)
-        .extension(Presence::new(dummy_sender))
-        .extension(ChatParser::<TestCmd>::new())
+        .resource(state)
+        .install(Presence::new(dummy_sender))
+        .handler(chat_parser::<TestCmd>)
         .handler(count_ncn)
         .handler(count_mso)
         .handler(count_connected)
@@ -122,26 +121,23 @@ fn app_with(state: TestState) -> App<TestState> {
 }
 
 /// Pull an app apart and drive one dispatch directly. Drains any synthetic
-/// events emitted by extensions, simulating the main loop's behaviour of
+/// events emitted by handlers, simulating the main loop's behaviour of
 /// cycling queued events through fresh dispatch_cycles.
-async fn drive(app: App<TestState>, state: &TestState, d: Dispatch) {
+async fn drive(app: App, d: Dispatch) {
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
-    let chain = app.extension_chain;
     let handlers = app.handlers;
     let extensions = app.extensions;
 
-    dispatch_cycle(d, state, &sender, &chain, &handlers, &extensions, &cancel).await;
+    dispatch_cycle(d, &sender, &handlers, &extensions, &cancel).await;
 
     // Drain anything middleware emitted while we were running.
     while let Ok(cmd) = cmd_rx.try_recv() {
         if let Command::Event(payload) = cmd {
             dispatch_cycle(
                 Dispatch::Synthetic(payload),
-                state,
                 &sender,
-                &chain,
                 &handlers,
                 &extensions,
                 &cancel,
@@ -157,7 +153,6 @@ async fn ncn_routes_to_packet_handler_and_synthetic_connected() {
     let state = TestState::default();
     drive(
         app_with(state.clone()),
-        &state,
         Dispatch::Packet(make_ncn(7, "bob")),
     )
     .await;
@@ -175,7 +170,6 @@ async fn mso_without_prefix_routes_only_to_packet_handler() {
     let state = TestState::default();
     drive(
         app_with(state.clone()),
-        &state,
         Dispatch::Packet(make_mso(3, "hello world")),
     )
     .await;
@@ -191,7 +185,6 @@ async fn chat_parser_emits_typed_event_for_prefixed_mso() {
     let state = TestState::default();
     drive(
         app_with(state.clone()),
-        &state,
         Dispatch::Packet(make_mso(3, "!ping karl")),
     )
     .await;
@@ -217,9 +210,8 @@ async fn chat_parser_emits_typed_event_for_prefixed_mso() {
 #[tokio::test]
 async fn unrelated_packet_fires_no_handlers() {
     let state = TestState::default();
-    // A packet variant with no registered handler.
     let packet = insim::Packet::Tiny(insim::insim::Tiny::default());
-    drive(app_with(state.clone()), &state, Dispatch::Packet(packet)).await;
+    drive(app_with(state.clone()), Dispatch::Packet(packet)).await;
 
     assert_eq!(state.ncn_hits.load(Ordering::Relaxed), 0);
     assert_eq!(state.mso_hits.load(Ordering::Relaxed), 0);
@@ -230,14 +222,13 @@ async fn unrelated_packet_fires_no_handlers() {
 #[tokio::test]
 async fn presence_is_queryable_via_extractor() {
     // The extractor-driven handler reads the live connection map and stashes
-    // the count it saw at the moment of dispatch. Registering `presence` as an
-    // extension wires both the event observer and the extractor source.
+    // the count it saw at the moment of dispatch.
     #[derive(Clone, Default)]
     struct PState {
         last_seen_count: Arc<AtomicUsize>,
     }
 
-    async fn observe_count(presence: Presence, State(s): State<PState>) -> Result<(), AppError> {
+    async fn observe_count(presence: Presence, Res(s): Res<PState>) -> Result<(), AppError> {
         s.last_seen_count.store(presence.count(), Ordering::Relaxed);
         Ok(())
     }
@@ -246,22 +237,19 @@ async fn presence_is_queryable_via_extractor() {
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
     let presence = Presence::new(sender.clone());
-    let app: App<PState> = App::new()
-        .with_state(state.clone())
-        .extension(presence.clone())
+    let app = App::new()
+        .resource(state.clone())
+        .install(presence.clone())
         .handler(observe_count);
 
     let cancel = tokio_util::sync::CancellationToken::new();
-    let chain = app.extension_chain;
     let handlers = app.handlers;
     let extensions = app.extensions;
 
-    // First NCN: presence inserts; handler reads count = 1 after middleware ran.
+    // First NCN: presence inserts; handler reads count = 1.
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
-        &state,
         &sender,
-        &chain,
         &handlers,
         &extensions,
         &cancel,
@@ -272,9 +260,7 @@ async fn presence_is_queryable_via_extractor() {
     // Second NCN: count rises to 2.
     dispatch_cycle(
         Dispatch::Packet(make_ncn(2, "bob")),
-        &state,
         &sender,
-        &chain,
         &handlers,
         &extensions,
         &cancel,
@@ -290,9 +276,6 @@ async fn presence_is_queryable_via_extractor() {
 
 #[tokio::test]
 async fn spawned_handler_spawns_once_and_forwards_dispatches() {
-    // `Spawned` should spawn its async fn exactly once (on first dispatch) and
-    // forward every dispatch - including the very first - into the channel
-    // the spawned task drains.
     let spawn_count = Arc::new(AtomicUsize::new(0));
     let dispatch_count = Arc::new(AtomicUsize::new(0));
 
@@ -307,21 +290,17 @@ async fn spawned_handler_spawns_once_and_forwards_dispatches() {
         }
     });
 
-    let app: App<()> = App::new().with_state(()).handler(spawned);
+    let app = App::new().handler(spawned);
 
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
-    let state = ();
-    let chain = app.extension_chain;
     let handlers = app.handlers;
     let extensions = app.extensions;
 
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
-        &state,
         &sender,
-        &chain,
         &handlers,
         &extensions,
         &cancel,
@@ -329,16 +308,13 @@ async fn spawned_handler_spawns_once_and_forwards_dispatches() {
     .await;
     dispatch_cycle(
         Dispatch::Packet(make_ncn(2, "bob")),
-        &state,
         &sender,
-        &chain,
         &handlers,
         &extensions,
         &cancel,
     )
     .await;
 
-    // Give the spawned task a moment to drain the buffered dispatches.
     tokio::time::sleep(std::time::Duration::from_millis(20)).await;
 
     assert_eq!(
@@ -355,9 +331,6 @@ async fn spawned_handler_spawns_once_and_forwards_dispatches() {
 
 #[tokio::test]
 async fn cancellation_token_extractor_triggers_shutdown() {
-    // A handler that pulls `CancellationToken` via FromContext and calls
-    // `.cancel()` brings the runtime's token down. This is the round-trip
-    // equivalent of a `!quit` chat command.
     async fn quit_on_ncn(
         _: Packet<Ncn>,
         cancel: tokio_util::sync::CancellationToken,
@@ -366,21 +339,17 @@ async fn cancellation_token_extractor_triggers_shutdown() {
         Ok(())
     }
 
-    let app: App<()> = App::new().with_state(()).handler(quit_on_ncn);
+    let app = App::new().handler(quit_on_ncn);
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
-    let state = ();
-    let chain = app.extension_chain;
     let handlers = app.handlers;
     let extensions = app.extensions;
 
     assert!(!cancel.is_cancelled());
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
-        &state,
         &sender,
-        &chain,
         &handlers,
         &extensions,
         &cancel,
@@ -394,10 +363,6 @@ async fn cancellation_token_extractor_triggers_shutdown() {
 
 #[tokio::test]
 async fn spawned_handler_channel_closes_on_cancel() {
-    // When the runtime's cancel token fires, Spawned's internal forwarder
-    // drops the user-facing tx, so a task whose body is just
-    // `while let Some(_) = rx.recv().await {}` exits without needing an
-    // explicit cancel check of its own.
     let task_exited = Arc::new(AtomicUsize::new(0));
 
     let spawned = Spawned::new({
@@ -408,28 +373,22 @@ async fn spawned_handler_channel_closes_on_cancel() {
         }
     });
 
-    let app: App<()> = App::new().with_state(()).handler(spawned);
+    let app = App::new().handler(spawned);
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
-    let state = ();
-    let chain = app.extension_chain;
     let handlers = app.handlers;
     let extensions = app.extensions;
 
-    // First dispatch spawns the user task + forwarder.
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
-        &state,
         &sender,
-        &chain,
         &handlers,
         &extensions,
         &cancel,
     )
     .await;
 
-    // Sanity: task is alive, blocked on rx.recv().
     tokio::time::sleep(std::time::Duration::from_millis(20)).await;
     assert_eq!(
         task_exited.load(Ordering::Relaxed),
@@ -437,7 +396,6 @@ async fn spawned_handler_channel_closes_on_cancel() {
         "task should still be running before cancel"
     );
 
-    // Trigger cancel - forwarder drops user_tx, user rx returns None.
     cancel.cancel();
     tokio::time::sleep(std::time::Duration::from_millis(20)).await;
     assert_eq!(
@@ -449,9 +407,6 @@ async fn spawned_handler_channel_closes_on_cancel() {
 
 #[tokio::test]
 async fn sender_event_pushes_into_back_channel() {
-    // Confirms that Sender::event reaches the dispatcher's back-channel - the
-    // serve loop drains this channel on its own; here we just verify the
-    // command shows up.
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
 
@@ -476,22 +431,19 @@ async fn sender_event_pushes_into_back_channel() {
 #[tokio::test]
 async fn run_if_skips_handler_when_predicate_false() {
     let state = TestState::default();
-    let app: App<TestState> = App::new()
-        .with_state(state.clone())
+    let app = App::new()
+        .resource(state.clone())
         .handler(count_ncn.run_if(never()));
 
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
-    let chain = app.extension_chain;
     let handlers = app.handlers;
     let extensions = app.extensions;
 
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
-        &state,
         &sender,
-        &chain,
         &handlers,
         &extensions,
         &cancel,
@@ -508,22 +460,19 @@ async fn run_if_skips_handler_when_predicate_false() {
 #[tokio::test]
 async fn run_if_runs_handler_when_predicate_true() {
     let state = TestState::default();
-    let app: App<TestState> = App::new()
-        .with_state(state.clone())
+    let app = App::new()
+        .resource(state.clone())
         .handler(count_ncn.run_if(always()));
 
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
-    let chain = app.extension_chain;
     let handlers = app.handlers;
     let extensions = app.extensions;
 
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
-        &state,
         &sender,
-        &chain,
         &handlers,
         &extensions,
         &cancel,
@@ -539,44 +488,38 @@ async fn run_if_runs_handler_when_predicate_true() {
 
 #[tokio::test]
 async fn in_state_reads_extension_and_gates_handler() {
-    // An extension that just holds a boolean. The handler is gated on it
-    // through `in_state`. Flipping the boolean between dispatches changes
-    // whether the handler fires.
+    // A resource that holds a boolean. Handler gated on `in_state`. Flipping
+    // the boolean between dispatches changes whether the handler fires.
     use std::sync::RwLock;
 
-    use crate::{Extension, ExtractCx, FromContext};
+    use crate::{ExtractCx, FromContext};
 
     #[derive(Clone)]
     struct Flag(Arc<RwLock<bool>>);
 
-    impl<S: Send + Sync + 'static> Extension<S> for Flag {}
-
-    impl<S: Send + Sync + 'static> FromContext<S> for Flag {
-        fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+    impl FromContext for Flag {
+        fn from_context(cx: &ExtractCx<'_>) -> Option<Self> {
             cx.extensions.get::<Flag>()
         }
     }
 
     let state = TestState::default();
     let flag = Flag(Arc::new(RwLock::new(false)));
-    let app: App<TestState> = App::new()
-        .with_state(state.clone())
-        .extension(flag.clone())
+    let app = App::new()
+        .resource(state.clone())
+        .resource(flag.clone())
         .handler(count_ncn.run_if(in_state(|f: &Flag| *f.0.read().expect("poison"))));
 
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
-    let chain = app.extension_chain;
     let handlers = app.handlers;
     let extensions = app.extensions;
 
     // flag = false: handler skipped.
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
-        &state,
         &sender,
-        &chain,
         &handlers,
         &extensions,
         &cancel,
@@ -593,9 +536,7 @@ async fn in_state_reads_extension_and_gates_handler() {
 
     dispatch_cycle(
         Dispatch::Packet(make_ncn(2, "bob")),
-        &state,
         &sender,
-        &chain,
         &handlers,
         &extensions,
         &cancel,
@@ -609,6 +550,39 @@ async fn in_state_reads_extension_and_gates_handler() {
 }
 
 #[tokio::test]
+async fn periodic_emits_events_on_schedule() {
+    use std::time::Duration;
+
+    #[derive(Clone, Debug)]
+    struct Tick;
+
+    let mut app = App::new().periodic(Duration::from_millis(5), Tick);
+
+    let mut cmd_rx = app
+        .cmd_rx
+        .take()
+        .expect("cmd_rx present before serve consumes it");
+
+    tokio::time::sleep(Duration::from_millis(40)).await;
+
+    let mut tick_count = 0usize;
+    while let Ok(cmd) = cmd_rx.try_recv() {
+        if let Command::Event(payload) = cmd
+            && payload.is::<Tick>()
+        {
+            tick_count += 1;
+        }
+    }
+
+    assert!(
+        tick_count >= 3,
+        "expected at least 3 ticks in 40ms, got {tick_count}"
+    );
+
+    app.cancel.cancel();
+}
+
+#[tokio::test]
 async fn game_emits_race_started_on_sta_transition() {
     use insim::insim::{RaceInProgress, Sta};
 
@@ -619,13 +593,11 @@ async fn game_emits_race_started_on_sta_transition() {
     let game = Game::new(sender.clone());
     while cmd_rx.try_recv().is_ok() {}
 
-    let app: App<()> = App::new().with_state(()).extension(game.clone());
+    let app = App::new().install(game.clone());
 
     let cancel = tokio_util::sync::CancellationToken::new();
-    let chain = app.extension_chain;
     let handlers = app.handlers;
     let extensions = app.extensions;
-    let state = ();
 
     // First Sta with racing=No: matches initial state, no RaceStarted.
     dispatch_cycle(
@@ -633,9 +605,7 @@ async fn game_emits_race_started_on_sta_transition() {
             raceinprog: RaceInProgress::No,
             ..Default::default()
         })),
-        &state,
         &sender,
-        &chain,
         &handlers,
         &extensions,
         &cancel,
@@ -659,9 +629,7 @@ async fn game_emits_race_started_on_sta_transition() {
             raceinprog: RaceInProgress::Racing,
             ..Default::default()
         })),
-        &state,
         &sender,
-        &chain,
         &handlers,
         &extensions,
         &cancel,
@@ -682,44 +650,6 @@ async fn game_emits_race_started_on_sta_transition() {
 }
 
 #[tokio::test]
-async fn periodic_emits_events_on_schedule() {
-    use std::time::Duration;
-
-    #[derive(Clone, Debug)]
-    struct Tick;
-
-    // Build an App with a fast periodic ticker. Take cmd_rx out and drain it
-    // after a short wait; we should see several Ticks.
-    let mut app: App<()> = App::new()
-        .with_state(())
-        .periodic(Duration::from_millis(5), Tick);
-
-    let mut cmd_rx = app
-        .cmd_rx
-        .take()
-        .expect("cmd_rx present before serve consumes it");
-
-    tokio::time::sleep(Duration::from_millis(40)).await;
-
-    let mut tick_count = 0usize;
-    while let Ok(cmd) = cmd_rx.try_recv() {
-        if let Command::Event(payload) = cmd
-            && payload.is::<Tick>()
-        {
-            tick_count += 1;
-        }
-    }
-
-    assert!(
-        tick_count >= 3,
-        "expected at least 3 ticks in 40ms, got {tick_count}"
-    );
-
-    // Cancel so the spawned task winds down before the runtime drops.
-    app.cancel.cancel();
-}
-
-#[tokio::test]
 async fn game_emits_track_changed_on_track_field_change() {
     use insim::core::track::Track;
     use insim::insim::Sta;
@@ -730,13 +660,11 @@ async fn game_emits_track_changed_on_track_field_change() {
     let game = Game::new(sender.clone());
     while cmd_rx.try_recv().is_ok() {}
 
-    let app: App<()> = App::new().with_state(()).extension(game.clone());
+    let app = App::new().install(game.clone());
 
     let cancel = tokio_util::sync::CancellationToken::new();
-    let chain = app.extension_chain;
     let handlers = app.handlers;
     let extensions = app.extensions;
-    let state = ();
 
     let track_a = Track::ALL[0];
     let track_b = *Track::ALL
@@ -744,15 +672,12 @@ async fn game_emits_track_changed_on_track_field_change() {
         .find(|t| **t != track_a)
         .expect("at least two tracks");
 
-    // First Sta with track_a: prev was None, fires TrackChanged { from: None, to: track_a }.
     dispatch_cycle(
         Dispatch::Packet(insim::Packet::Sta(Sta {
             track: track_a,
             ..Default::default()
         })),
-        &state,
         &sender,
-        &chain,
         &handlers,
         &extensions,
         &cancel,
@@ -773,15 +698,12 @@ async fn game_emits_track_changed_on_track_field_change() {
     assert_eq!(changes[0].from, None);
     assert_eq!(changes[0].to, track_a);
 
-    // Same track again - no event.
     dispatch_cycle(
         Dispatch::Packet(insim::Packet::Sta(Sta {
             track: track_a,
             ..Default::default()
         })),
-        &state,
         &sender,
-        &chain,
         &handlers,
         &extensions,
         &cancel,
@@ -799,15 +721,12 @@ async fn game_emits_track_changed_on_track_field_change() {
         "same track should not emit TrackChanged"
     );
 
-    // Different track - emits with from = Some(track_a), to = track_b.
     dispatch_cycle(
         Dispatch::Packet(insim::Packet::Sta(Sta {
             track: track_b,
             ..Default::default()
         })),
-        &state,
         &sender,
-        &chain,
         &handlers,
         &extensions,
         &cancel,

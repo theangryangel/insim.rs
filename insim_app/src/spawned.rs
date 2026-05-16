@@ -154,13 +154,12 @@ where
     Spawned::new(f)
 }
 
-impl<S, F, Fut> Handler<S, (Sender,)> for Spawned<F>
+impl<F, Fut> Handler<(Sender,)> for Spawned<F>
 where
     F: FnOnce(mpsc::UnboundedReceiver<Dispatch>, Sender) -> Fut + Send + 'static,
     Fut: Future<Output = ()> + Send + 'static,
-    S: Send + Sync + 'static,
 {
-    async fn call(self, cx: &ExtractCx<'_, S>) -> Result<(), AppError> {
+    async fn call(self, cx: &ExtractCx<'_>) -> Result<(), AppError> {
         // First call only: take the receiver + factory, spawn the task plus
         // a cancellation-aware forwarder. The forwarder owns the only tx
         // feeding the user's rx, so when the runtime cancels we drop that

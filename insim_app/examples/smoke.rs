@@ -25,8 +25,8 @@ use insim::{
     insim::{BtnStyle, Mso, Ncn},
 };
 use insim_app::{
-    App, AppError, ChatParser, Connected, Disconnected, Event, ExtractCx, FromContext, Handler,
-    Packet, Presence, Sender, Startup, State, serve,
+    App, AppError, Connected, Disconnected, Event, ExtractCx, FromContext, Handler, Packet,
+    Presence, Res, Sender, Startup, chat_parser, serve,
     ui::{self, Component, InvalidateHandle, Ui},
     util::mtc,
 };
@@ -39,7 +39,7 @@ struct AppState {
     joins: Arc<AtomicUsize>,
 }
 
-async fn log_ncn(Packet(ncn): Packet<Ncn>, State(state): State<AppState>) -> Result<(), AppError> {
+async fn log_ncn(Packet(ncn): Packet<Ncn>, Res(state): Res<AppState>) -> Result<(), AppError> {
     let n = state.joins.fetch_add(1, Ordering::Relaxed) + 1;
     tracing::info!(ucid = %ncn.ucid, uname = %ncn.uname, total = n, "ncn");
     Ok(())
@@ -159,9 +159,9 @@ impl MsoCounter {
     }
 }
 
-impl<S: Send + Sync + 'static> Handler<S, (Packet<Mso>,)> for MsoCounter {
-    async fn call(self, cx: &ExtractCx<'_, S>) -> Result<(), AppError> {
-        let Some(Packet(mso)) = <Packet<Mso> as FromContext<S>>::from_context(cx) else {
+impl Handler<(Packet<Mso>,)> for MsoCounter {
+    async fn call(self, cx: &ExtractCx<'_>) -> Result<(), AppError> {
+        let Some(Packet(mso)) = <Packet<Mso> as FromContext>::from_context(cx) else {
             return Ok(());
         };
         let n = self.seen.fetch_add(1, Ordering::Relaxed) + 1;
@@ -350,7 +350,7 @@ async fn main() -> Result<(), AppError> {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
 
-    let app = App::<AppState>::new();
+    let app = App::new();
     let ui = Ui::<SmokeView, UiGlobal, ()>::new(
         app.sender().clone(),
         UiGlobal::default(),
@@ -359,12 +359,12 @@ async fn main() -> Result<(), AppError> {
     let presence = Presence::new(app.sender().clone());
 
     let app = app
-        .with_state(AppState {
+        .resource(AppState {
             joins: Arc::new(AtomicUsize::new(0)),
         })
-        .extension(presence)
-        .extension(ChatParser::<Cmd>::new())
-        .extension(ui)
+        .install(presence)
+        .install(ui)
+        .handler(chat_parser::<Cmd>)
         .handler(install_ticker)
         .handler(log_ncn)
         .handler(welcome)

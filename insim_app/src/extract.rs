@@ -4,8 +4,13 @@
 //! extractor types as parameters. The dispatcher walks each registered handler
 //! per event and invokes it only if every parameter's extractor returns `Some`,
 //! so `Packet<Ncn>` / `Event<Connected>` act as type-driven routing keys.
+//!
+//! Long-lived state lives in the runtime's *resource registry*. Register a
+//! value with [`crate::App::resource`] and extract it from a handler by
+//! writing a [`FromContext`] impl on the type itself, or wrap with
+//! [`Res<T>`] to extract without writing an impl.
 
-use std::{any::Any, marker::PhantomData};
+use std::any::Any;
 
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -18,23 +23,20 @@ use crate::{
 
 /// Context handed to extractors during one dispatch cycle.
 #[derive(Debug)]
-pub struct ExtractCx<'a, S> {
+pub struct ExtractCx<'a> {
     /// The event currently being routed.
     pub dispatch: &'a Dispatch,
-    /// Shared application state. Extracted by [`State<S>`].
-    pub state: &'a S,
     /// Back-channel handle for sending packets / emitting events. Extracted by [`Sender`].
     pub sender: &'a Sender,
-    /// Extension registry - populated via [`crate::App::extension`]. Middleware
-    /// that wants to be queryable from handlers (e.g. presence) stashes itself
-    /// here and looks up its instance from inside its own `FromContext` impl.
+    /// Resource registry - populated via [`crate::App::resource`]. Handlers
+    /// extract typed values by pulling them out via [`FromContext`].
     pub extensions: &'a Extensions,
     /// Cooperative-shutdown token. Call [`ExtractCx::shutdown`] to request the
     /// runtime exit at its next select iteration.
     pub cancel: &'a CancellationToken,
 }
 
-impl<'a, S> ExtractCx<'a, S> {
+impl<'a> ExtractCx<'a> {
     /// Request graceful shutdown of the runtime.
     pub fn shutdown(&self) {
         self.cancel.cancel();
@@ -50,22 +52,31 @@ impl<'a, S> ExtractCx<'a, S> {
 ///
 /// Returning `None` short-circuits the handler - that's how `Packet<T>` and
 /// `Event<T>` act as routing extractors.
-pub trait FromContext<S>: Sized + Send {
-    /// Try to build `Self` from the current dispatch + state. Return `None` to
-    /// skip the handler this cycle (e.g. wrong event type).
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self>;
+pub trait FromContext: Sized + Send {
+    /// Try to build `Self` from the current dispatch + resources. Return
+    /// `None` to skip the handler this cycle (e.g. wrong event type).
+    fn from_context(cx: &ExtractCx<'_>) -> Option<Self>;
 }
 
-/// Extractor that hands out a clone of the shared application state.
+/// Wrapper extractor for any resource registered via [`crate::App::resource`].
 ///
-/// `S` is expected to be cheap-to-clone (typically a struct of `Arc`s / atomics
-/// / channels), matching the axum convention.
+/// `Res<T>` is the cheapest path to extracting a typed resource from a
+/// handler without writing a [`FromContext`] impl on `T` yourself: any value
+/// registered with `.resource(value)` is automatically extractable as
+/// `Res<T>` provided it is `Clone + Send + Sync + 'static`.
+///
+/// Framework-provided resources (`Presence`, `Game`, `Ui`, …) implement
+/// `FromContext` directly so they can be extracted by their own name; user
+/// types either do the same or use this wrapper.
 #[derive(Debug, Clone)]
-pub struct State<S>(pub S);
+pub struct Res<T>(pub T);
 
-impl<S: Clone + Send + Sync + 'static> FromContext<S> for State<S> {
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
-        Some(State(cx.state.clone()))
+impl<T> FromContext for Res<T>
+where
+    T: Clone + Send + Sync + 'static,
+{
+    fn from_context(cx: &ExtractCx<'_>) -> Option<Self> {
+        cx.extensions.get::<T>().map(Res)
     }
 }
 
@@ -80,12 +91,12 @@ impl<S: Clone + Send + Sync + 'static> FromContext<S> for State<S> {
 #[derive(Debug, Clone)]
 pub struct Packet<T>(pub T);
 
-impl<T, S> FromContext<S> for Packet<T>
+impl<T> FromContext for Packet<T>
 where
     T: Clone + Send + 'static,
     for<'a> &'a T: TryFrom<&'a insim::Packet>,
 {
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+    fn from_context(cx: &ExtractCx<'_>) -> Option<Self> {
         match cx.dispatch {
             Dispatch::Packet(p) => <&T>::try_from(p).ok().cloned().map(Packet),
             _ => None,
@@ -98,11 +109,11 @@ where
 #[derive(Debug, Clone)]
 pub struct Event<T>(pub T);
 
-impl<T, S> FromContext<S> for Event<T>
+impl<T> FromContext for Event<T>
 where
     T: Any + Clone + Send + Sync + 'static,
 {
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+    fn from_context(cx: &ExtractCx<'_>) -> Option<Self> {
         match cx.dispatch {
             Dispatch::Synthetic(a) => a.downcast_ref::<T>().cloned().map(Event),
             _ => None,
@@ -120,9 +131,10 @@ where
 /// - [`Sender::event`]  - inject a synthetic event into a new dispatch cycle.
 ///
 /// Both routes end up at the same receiver in the dispatcher's main loop.
-/// **Emission semantics: regardless of caller (extension, handler, spawned
-/// task), events posted here are processed in a *subsequent* dispatch cycle
-/// - not the current one.** This is the only emission API in the crate.
+/// **Emission semantics: regardless of caller (resource handler, spawned
+/// task, anywhere), events posted here are processed in a *subsequent*
+/// dispatch cycle - not the current one.** This is the only emission API
+/// in the crate.
 #[derive(Clone)]
 pub struct Sender {
     tx: mpsc::UnboundedSender<Command>,
@@ -156,9 +168,19 @@ impl Sender {
     }
 }
 
-impl<S: Send + Sync> FromContext<S> for Sender {
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+impl FromContext for Sender {
+    fn from_context(cx: &ExtractCx<'_>) -> Option<Self> {
         Some(cx.sender.clone())
+    }
+}
+
+/// Extractor that hands out a clone of the current [`Dispatch`] regardless
+/// of its variant. Use for handlers that observe **every** dispatch and want
+/// to pattern-match internally - the typed `Packet<T>` / `Event<T>`
+/// extractors are preferable when you only care about one variant.
+impl FromContext for Dispatch {
+    fn from_context(cx: &ExtractCx<'_>) -> Option<Self> {
+        Some(cx.dispatch.clone())
     }
 }
 
@@ -167,12 +189,8 @@ impl<S: Send + Sync> FromContext<S> for Sender {
 /// Lets handlers trigger graceful shutdown (`token.cancel()`) or check whether
 /// shutdown is already in progress (`token.is_cancelled()`) without needing a
 /// custom `Handler` impl just to read [`ExtractCx::cancel`].
-impl<S: Send + Sync> FromContext<S> for CancellationToken {
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+impl FromContext for CancellationToken {
+    fn from_context(cx: &ExtractCx<'_>) -> Option<Self> {
         Some(cx.cancel.clone())
     }
 }
-
-// Phantom keeps the lint-friendly footprint when an extractor is unused.
-#[allow(dead_code)]
-struct _PhantomExtractor<S>(PhantomData<S>);

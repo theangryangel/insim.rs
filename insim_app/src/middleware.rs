@@ -1,16 +1,21 @@
-//! Extension trait, runtime context, and the bundled `Presence` /
-//! `ChatParser<C>` helpers.
+//! Built-in resources and handlers: [`Presence`] for connection/player
+//! tracking, [`chat_parser`] for typed `Mso` → `C` parsing.
 //!
-//! An [`Extension<S>`] is a registered value that (a) handlers can pull out
-//! via [`FromContext`] and (b) optionally observes every [`Dispatch`] through
-//! the default-overridable `on_event` hook. Pure data extensions accept the
-//! default no-op; ones that need to react (parse chat, track presence) override.
-//! Either way, registration is a single `App::extension(value)` call.
+//! These are plain resources + standalone handler functions registered
+//! against the runtime's resource registry. Each "feature" is a struct (the
+//! resource) plus N handlers that observe specific packet variants and
+//! mutate the resource's state, optionally emitting synthetic events.
+//!
+//! Bundle a resource + its handlers via the [`Installable`](crate::Installable)
+//! trait, which `App::install(...)` consumes:
+//!
+//! ```ignore
+//! app.install(Presence::new(sender.clone()))
+//! ```
 
 use std::{
     any::Any,
     collections::{HashMap, HashSet},
-    future::Future,
     marker::PhantomData,
     net::Ipv4Addr,
     str::FromStr,
@@ -18,94 +23,25 @@ use std::{
     time::Duration,
 };
 
-use futures::future::BoxFuture;
 use insim::{
+    Packet as InsimPacket,
     core::vehicle::Vehicle,
     identifiers::{ConnectionId, PlayerId},
-    insim::{MsoUserType, Ncn, PlayerFlags, PlayerType, TinyType},
+    insim::{
+        Cnl, Cpr, Mso, MsoUserType, Nci, Ncn, Npl, Pfl, Pla, Pll, PlayerFlags, PlayerType, Plp,
+        Slc, Tiny, TinyType, Toc,
+    },
 };
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    AppError,
-    event::Dispatch,
-    extensions::Extensions,
-    extract::{ExtractCx, FromContext, Sender},
+    App, AppError, Installable,
+    extract::{ExtractCx, FromContext, Packet, Sender},
     util::host_command,
 };
 
-/// Context handed to an extension's `on_event`.
-#[derive(Debug)]
-pub struct EventCx<'a, S> {
-    /// The current dispatch.
-    pub dispatch: &'a Dispatch,
-    /// Shared app state (read-only in the PoC).
-    pub state: &'a S,
-    /// Back-channel - same surface handlers see. Use `cx.sender.packet(...)` to
-    /// send a wire packet, `cx.sender.event(...)` to inject a synthetic event
-    /// into a subsequent dispatch cycle.
-    pub sender: &'a Sender,
-    /// Extension registry; same instance handlers see.
-    pub extensions: &'a Extensions,
-    /// Cooperative-shutdown token.
-    pub cancel: &'a CancellationToken,
-}
-
-impl<'a, S> EventCx<'a, S> {
-    /// Request graceful shutdown of the runtime.
-    pub fn shutdown(&self) {
-        self.cancel.cancel();
-    }
-
-    /// Whether shutdown has been requested.
-    pub fn is_shutdown(&self) -> bool {
-        self.cancel.is_cancelled()
-    }
-}
-
-/// A value registered with the [`App`](crate::App). Combines two roles:
-///
-/// 1. **Extractor source** - every registered extension lives in the
-///    [`Extensions`] registry by its `TypeId`, so handlers can pull it out via
-///    [`FromContext`] (the extension author implements [`FromContext`] on the
-///    type itself).
-/// 2. **Optional event observer** - the default no-op `on_event` is overridden
-///    by extensions that need to react to wire packets or synthetic events.
-///
-/// The trait takes `&self` (not `&mut self`) so the runtime can hold a single
-/// `Arc<E>` shared between the registry and the dispatch chain - no `Clone`
-/// bound on `E`, no per-registration clone. Stateful extensions manage their
-/// own mutability internally (`Arc<RwLock<…>>` is the usual pattern).
-///
-/// Like [`crate::Handler`], the trait method is declared with `-> impl Future
-/// + Send` so the runtime can require `Send` at the [`ErasedExtension`]
-/// boundary; impls can still use `async fn` syntax.
-pub trait Extension<S>: Send + Sync + 'static {
-    /// Called for every dispatch (wire packets and synthetic events). Runs
-    /// sequentially, in registration order, *before* handlers. Default is a
-    /// no-op so pure data extensions don't have to write anything.
-    fn on_event<'a>(&'a self, _cx: &'a mut EventCx<'_, S>) -> impl Future<Output = ()> + Send + 'a {
-        async {}
-    }
-}
-
-/// Object-safe shim so heterogeneous extensions can sit behind one Arc.
-pub(crate) trait ErasedExtension<S>: Send + Sync {
-    fn on_event<'a>(&'a self, cx: &'a mut EventCx<'_, S>) -> BoxFuture<'a, ()>;
-}
-
-impl<S, E> ErasedExtension<S> for E
-where
-    E: Extension<S>,
-{
-    fn on_event<'a>(&'a self, cx: &'a mut EventCx<'_, S>) -> BoxFuture<'a, ()> {
-        Box::pin(<Self as Extension<S>>::on_event(self, cx))
-    }
-}
-
 // ---------------------------------------------------------------------------
-// Presence - tracks connections, emits Connected/Disconnected, and acts as
-// its own extractor.
+// Presence - tracks connections + players, emits lifecycle events.
 // ---------------------------------------------------------------------------
 
 /// Per-connection record stored by [`Presence`].
@@ -163,8 +99,7 @@ pub struct Disconnected {
     pub info: Option<ConnectionInfo>,
 }
 
-/// Synthetic event emitted when a connection changes their display name
-/// (`Cpr`).
+/// Synthetic event emitted when a connection changes their display name (`Cpr`).
 #[derive(Debug, Clone)]
 pub struct Renamed {
     /// Connection ID.
@@ -208,8 +143,7 @@ pub struct TakingOver {
     pub after: PlayerInfo,
 }
 
-/// Synthetic event emitted when a player tele-pits (Shift+P via `Plp`). The
-/// player is still in the race but repositioned in the pit lane.
+/// Synthetic event emitted when a player tele-pits (Shift+P via `Plp`).
 #[derive(Debug, Clone)]
 pub struct PlayerTeleportedToPits(pub PlayerInfo);
 
@@ -221,12 +155,12 @@ struct PresenceInner {
     last_known_names: HashMap<String, String>,
 }
 
-/// Extension that tracks active connections and players, emits synthetic
-/// lifecycle events, and exposes admin commands.
+/// Resource that tracks active connections and players. Pair with the
+/// `presence_on_*` handlers (see [`Presence::install`]) to populate it from
+/// wire packets and emit lifecycle synthetic events.
 ///
-/// Registers with `App::extension`; queryable from handlers via
-/// `FromContext`. Internal state lives behind `Arc<RwLock<…>>`; clones of
-/// the handle are cheap and all observe the same maps.
+/// Internal state lives behind `Arc<RwLock<…>>`; clones of the handle are
+/// cheap and all observe the same maps.
 ///
 /// Admin commands (`kick` / `ban` / `unban` / `spec` / `pitlane`) send
 /// `/command <uname>` host commands through the captured [`Sender`]. They
@@ -234,9 +168,7 @@ struct PresenceInner {
 /// confirmation from LFS.
 ///
 /// ```ignore
-/// let app = App::new()
-///     .with_state(MyState { ... })
-///     .extension(Presence::new(app.sender().clone()));
+/// let app = App::new().install(Presence::new(app.sender().clone()));
 ///
 /// async fn handler(presence: Presence) -> Result<(), AppError> {
 ///     tracing::info!(
@@ -263,9 +195,9 @@ impl std::fmt::Debug for Presence {
 }
 
 impl Presence {
-    /// Create a new presence extension with empty state. `sender` is used to
-    /// dispatch admin commands; obtain it from [`crate::App::sender`] before
-    /// registering the presence via `.extension(...)`.
+    /// Create a new presence with empty state. `sender` is used to dispatch
+    /// admin commands; obtain it from [`crate::App::sender`] before
+    /// installing.
     pub fn new(sender: Sender) -> Self {
         Self {
             inner: Arc::new(RwLock::new(PresenceInner::default())),
@@ -283,8 +215,7 @@ impl Presence {
         self.inner.read().expect("poison").connections.len()
     }
 
-    /// Number of tracked players (track participants - subset of connections;
-    /// AI counts).
+    /// Number of tracked players.
     pub fn player_count(&self) -> usize {
         self.inner.read().expect("poison").players.len()
     }
@@ -338,9 +269,7 @@ impl Presence {
         guard.connections.get(&player.ucid).cloned()
     }
 
-    /// Last known display name for an LFS.net username. Survives disconnect -
-    /// useful for attributing async work (DB writes, etc.) to a player who
-    /// may have already left.
+    /// Last known display name for an LFS.net username. Survives disconnect.
     pub fn last_known_name(&self, uname: &str) -> Option<String> {
         self.inner
             .read()
@@ -350,8 +279,7 @@ impl Presence {
             .cloned()
     }
 
-    /// Batch variant of [`Presence::last_known_name`]. Only unames with a
-    /// known display name appear in the returned map.
+    /// Batch variant of [`Presence::last_known_name`].
     pub fn last_known_names<I, S>(&self, unames: I) -> HashMap<String, String>
     where
         I: IntoIterator<Item = S>,
@@ -367,21 +295,16 @@ impl Presence {
             .collect()
     }
 
-    /// Kick a connection. Fire-and-forget; succeeds-by-default unless the
-    /// runtime back-channel is closed.
+    /// Kick a connection. Fire-and-forget.
     pub fn kick(&self, ucid: ConnectionId) -> Result<(), AppError> {
-        let Some(conn) = self.get(ucid) else {
-            return Ok(());
-        };
+        let Some(conn) = self.get(ucid) else { return Ok(()); };
         self.sender
             .packet(host_command(format!("/kick {}", conn.uname)))
     }
 
     /// Ban a connection. `ban_days` of 0 = 12 hours per LFS convention.
     pub fn ban(&self, ucid: ConnectionId, ban_days: u32) -> Result<(), AppError> {
-        let Some(conn) = self.get(ucid) else {
-            return Ok(());
-        };
+        let Some(conn) = self.get(ucid) else { return Ok(()); };
         self.sender
             .packet(host_command(format!("/ban {} {ban_days}", conn.uname)))
     }
@@ -394,18 +317,14 @@ impl Presence {
 
     /// Force a connection to spectate.
     pub fn spec(&self, ucid: ConnectionId) -> Result<(), AppError> {
-        let Some(conn) = self.get(ucid) else {
-            return Ok(());
-        };
+        let Some(conn) = self.get(ucid) else { return Ok(()); };
         self.sender
             .packet(host_command(format!("/spec {}", conn.uname)))
     }
 
     /// Send a connection to the pit lane.
     pub fn pitlane(&self, ucid: ConnectionId) -> Result<(), AppError> {
-        let Some(conn) = self.get(ucid) else {
-            return Ok(());
-        };
+        let Some(conn) = self.get(ucid) else { return Ok(()); };
         self.sender
             .packet(host_command(format!("/pitlane {}", conn.uname)))
     }
@@ -434,7 +353,6 @@ impl Presence {
     }
 
     /// Poll until the player count satisfies `f`, or until `cancel` fires.
-    /// Returns `Some(count)` on success or `None` if cancelled.
     pub async fn wait_for_player_count<F: Fn(usize) -> bool>(
         &self,
         f: F,
@@ -457,298 +375,327 @@ impl Presence {
     }
 }
 
-impl<S: Send + Sync + 'static> Extension<S> for Presence {
-    async fn on_event(&self, cx: &mut EventCx<'_, S>) {
-        let Dispatch::Packet(packet) = cx.dispatch else {
-            return;
-        };
-        match packet {
-            insim::Packet::Ncn(ncn) => self.handle_ncn(cx, ncn),
-            insim::Packet::Cnl(cnl) => self.handle_cnl(cx, cnl),
-            insim::Packet::Nci(nci) => self.handle_nci(cx, nci),
-            insim::Packet::Slc(slc) => self.handle_slc(cx, slc),
-            insim::Packet::Cpr(cpr) => self.handle_cpr(cx, cpr),
-            insim::Packet::Npl(npl) => self.handle_npl(cx, npl),
-            insim::Packet::Pll(pll) => self.handle_pll(cx, pll),
-            insim::Packet::Toc(toc) => self.handle_toc(cx, toc),
-            insim::Packet::Pfl(pfl) => self.handle_pfl(cx, pfl),
-            insim::Packet::Pla(pla) => self.handle_pla(cx, pla),
-            insim::Packet::Plp(plp) => self.handle_plp(cx, plp),
-            insim::Packet::Tiny(tiny) if matches!(tiny.subt, TinyType::Clr) => {
-                let mut guard = self.inner.write().expect("poison");
-                guard.players.clear();
-                for conn in guard.connections.values_mut() {
-                    conn.players.clear();
-                }
-            },
-            _ => {},
-        }
-    }
-}
-
-// Private packet-by-packet handlers. Each clones what it needs out from
-// under the lock, then drops the guard before emitting the synthetic event
-// (so handlers downstream can re-enter the lock if they want).
-impl Presence {
-    fn handle_ncn<S>(&self, cx: &EventCx<'_, S>, ncn: &Ncn) {
-        let info = ConnectionInfo {
-            ucid: ncn.ucid,
-            uname: ncn.uname.clone(),
-            pname: ncn.pname.clone(),
-            admin: ncn.admin,
-            players: HashSet::new(),
-            userid: None,
-            ipaddress: None,
-            selected_vehicle: None,
-        };
-        {
-            let mut guard = self.inner.write().expect("poison");
-            let _ = guard
-                .last_known_names
-                .insert(ncn.uname.clone(), ncn.pname.clone());
-            let _ = guard.connections.insert(info.ucid, info.clone());
-        }
-        let _ = cx.sender.event(Connected(info));
-    }
-
-    fn handle_cnl<S>(&self, cx: &EventCx<'_, S>, cnl: &insim::insim::Cnl) {
-        let (info, departed_players) = {
-            let mut guard = self.inner.write().expect("poison");
-            let info = guard.connections.remove(&cnl.ucid);
-            let mut left = Vec::new();
-            if let Some(ref conn) = info {
-                for plid in &conn.players {
-                    if let Some(p) = guard.players.remove(plid) {
-                        left.push(p);
-                    }
-                }
-            }
-            (info, left)
-        };
-        for player in departed_players {
-            let _ = cx.sender.event(PlayerLeft(player));
-        }
-        let _ = cx.sender.event(Disconnected {
-            ucid: cnl.ucid,
-            info,
-        });
-    }
-
-    fn handle_nci<S>(&self, cx: &EventCx<'_, S>, nci: &insim::insim::Nci) {
-        let updated = {
-            let mut guard = self.inner.write().expect("poison");
-            if let Some(conn) = guard.connections.get_mut(&nci.ucid) {
-                conn.userid = Some(nci.userid);
-                conn.ipaddress = Some(nci.ipaddress);
-                Some(conn.clone())
-            } else {
-                None
-            }
-        };
-        if let Some(conn) = updated {
-            let _ = cx.sender.event(ConnectionDetails(conn));
-        }
-    }
-
-    fn handle_slc<S>(&self, cx: &EventCx<'_, S>, slc: &insim::insim::Slc) {
-        let updated = {
-            let mut guard = self.inner.write().expect("poison");
-            if let Some(conn) = guard.connections.get_mut(&slc.ucid) {
-                conn.selected_vehicle = Some(slc.cname);
-                true
-            } else {
-                false
-            }
-        };
-        if updated {
-            let _ = cx.sender.event(VehicleSelected {
-                ucid: slc.ucid,
-                vehicle: slc.cname,
-            });
-        }
-    }
-
-    fn handle_cpr<S>(&self, cx: &EventCx<'_, S>, cpr: &insim::insim::Cpr) {
-        let event = {
-            let mut guard = self.inner.write().expect("poison");
-            if let Some(conn) = guard.connections.get_mut(&cpr.ucid) {
-                conn.pname = cpr.pname.clone();
-                let uname = conn.uname.clone();
-                let _ = guard.last_known_names.insert(uname.clone(), cpr.pname.clone());
-                Some(Renamed {
-                    ucid: cpr.ucid,
-                    uname,
-                    new_pname: cpr.pname.clone(),
-                })
-            } else {
-                None
-            }
-        };
-        if let Some(e) = event {
-            let _ = cx.sender.event(e);
-        }
-    }
-
-    fn handle_npl<S>(&self, cx: &EventCx<'_, S>, npl: &insim::insim::Npl) {
-        // A join request is signalled by `nump == 0`; the real join arrives
-        // as a subsequent `Npl` with `nump` set.
-        if npl.nump == 0 {
-            return;
-        }
-        let player = PlayerInfo {
-            plid: npl.plid,
-            ucid: npl.ucid,
-            vehicle: npl.cname,
-            ptype: npl.ptype,
-            flags: npl.flags,
-            in_pitlane: false,
-            pname: npl.pname.clone(),
-        };
-        {
-            let mut guard = self.inner.write().expect("poison");
-            let _ = guard.players.insert(npl.plid, player.clone());
-            if let Some(conn) = guard.connections.get_mut(&npl.ucid) {
-                let _ = conn.players.insert(npl.plid);
-            }
-        }
-        let _ = cx.sender.event(PlayerJoined(player));
-    }
-
-    fn handle_pll<S>(&self, cx: &EventCx<'_, S>, pll: &insim::insim::Pll) {
-        let player = {
-            let mut guard = self.inner.write().expect("poison");
-            let player = guard.players.remove(&pll.plid);
-            if let Some(ref p) = player
-                && let Some(conn) = guard.connections.get_mut(&p.ucid)
-            {
-                let _ = conn.players.remove(&p.plid);
-            }
-            player
-        };
-        if let Some(p) = player {
-            let _ = cx.sender.event(PlayerLeft(p));
-        }
-    }
-
-    fn handle_toc<S>(&self, cx: &EventCx<'_, S>, toc: &insim::insim::Toc) {
-        let pair = {
-            let mut guard = self.inner.write().expect("poison");
-            let pair = if let Some(player) = guard.players.get_mut(&toc.plid) {
-                let before = player.clone();
-                player.ucid = toc.newucid;
-                let after = player.clone();
-                Some((before, after))
-            } else {
-                None
-            };
-            if let Some(old) = guard.connections.get_mut(&toc.olducid) {
-                old.players.retain(|&p| p != toc.plid);
-            }
-            if let Some(new) = guard.connections.get_mut(&toc.newucid) {
-                let _ = new.players.insert(toc.plid);
-            }
-            pair
-        };
-        if let Some((before, after)) = pair {
-            let _ = cx.sender.event(TakingOver { before, after });
-        }
-    }
-
-    fn handle_pfl<S>(&self, _cx: &EventCx<'_, S>, pfl: &insim::insim::Pfl) {
-        let mut guard = self.inner.write().expect("poison");
-        if let Some(player) = guard.players.get_mut(&pfl.plid) {
-            player.flags = pfl.flags;
-        }
-    }
-
-    fn handle_pla<S>(&self, _cx: &EventCx<'_, S>, pla: &insim::insim::Pla) {
-        let mut guard = self.inner.write().expect("poison");
-        if let Some(player) = guard.players.get_mut(&pla.plid) {
-            if pla.entered_pitlane() {
-                player.in_pitlane = true;
-            }
-            if pla.exited_pitlane() {
-                player.in_pitlane = false;
-            }
-        }
-    }
-
-    fn handle_plp<S>(&self, cx: &EventCx<'_, S>, plp: &insim::insim::Plp) {
-        let player = self
-            .inner
-            .read()
-            .expect("poison")
-            .players
-            .get(&plp.plid)
-            .cloned();
-        if let Some(p) = player {
-            let _ = cx.sender.event(PlayerTeleportedToPits(p));
-        }
-    }
-}
-
-/// [`Presence`] is its own extractor: register via [`crate::App::extension`]
+/// [`Presence`] is its own extractor: register via `App::install(presence)`
 /// and any handler can take it by value.
-impl<S: Send + Sync + 'static> FromContext<S> for Presence {
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+impl FromContext for Presence {
+    fn from_context(cx: &ExtractCx<'_>) -> Option<Self> {
         cx.extensions.get::<Presence>()
     }
 }
 
+impl Installable for Presence {
+    fn install(self, app: App) -> App {
+        app.resource(self)
+            .handler(presence_on_ncn)
+            .handler(presence_on_cnl)
+            .handler(presence_on_nci)
+            .handler(presence_on_slc)
+            .handler(presence_on_cpr)
+            .handler(presence_on_npl)
+            .handler(presence_on_pll)
+            .handler(presence_on_toc)
+            .handler(presence_on_pfl)
+            .handler(presence_on_pla)
+            .handler(presence_on_plp)
+            .handler(presence_on_tiny_clr)
+    }
+}
+
 // ---------------------------------------------------------------------------
-// ChatParser<C> - typed Mso → C parser. Parses once, dispatches via Event<C>.
+// Presence: handler functions
+//
+// Each handler is a regular extractor-driven async fn. They mutate the
+// Presence resource under its lock, drop the guard, then emit any synthetic
+// event - the same pattern the old Extension::on_event used, just split per
+// packet variant.
 // ---------------------------------------------------------------------------
 
-/// Extension that parses every `Mso` body into a typed value `C` via
+async fn presence_on_ncn(
+    Packet(ncn): Packet<Ncn>,
+    presence: Presence,
+    sender: Sender,
+) -> Result<(), AppError> {
+    let info = ConnectionInfo {
+        ucid: ncn.ucid,
+        uname: ncn.uname.clone(),
+        pname: ncn.pname.clone(),
+        admin: ncn.admin,
+        players: HashSet::new(),
+        userid: None,
+        ipaddress: None,
+        selected_vehicle: None,
+    };
+    {
+        let mut guard = presence.inner.write().expect("poison");
+        let _ = guard
+            .last_known_names
+            .insert(ncn.uname.clone(), ncn.pname.clone());
+        let _ = guard.connections.insert(info.ucid, info.clone());
+    }
+    let _ = sender.event(Connected(info));
+    Ok(())
+}
+
+async fn presence_on_cnl(
+    Packet(cnl): Packet<Cnl>,
+    presence: Presence,
+    sender: Sender,
+) -> Result<(), AppError> {
+    let (info, departed_players) = {
+        let mut guard = presence.inner.write().expect("poison");
+        let info = guard.connections.remove(&cnl.ucid);
+        let mut left = Vec::new();
+        if let Some(ref conn) = info {
+            for plid in &conn.players {
+                if let Some(p) = guard.players.remove(plid) {
+                    left.push(p);
+                }
+            }
+        }
+        (info, left)
+    };
+    for player in departed_players {
+        let _ = sender.event(PlayerLeft(player));
+    }
+    let _ = sender.event(Disconnected {
+        ucid: cnl.ucid,
+        info,
+    });
+    Ok(())
+}
+
+async fn presence_on_nci(
+    Packet(nci): Packet<Nci>,
+    presence: Presence,
+    sender: Sender,
+) -> Result<(), AppError> {
+    let updated = {
+        let mut guard = presence.inner.write().expect("poison");
+        if let Some(conn) = guard.connections.get_mut(&nci.ucid) {
+            conn.userid = Some(nci.userid);
+            conn.ipaddress = Some(nci.ipaddress);
+            Some(conn.clone())
+        } else {
+            None
+        }
+    };
+    if let Some(conn) = updated {
+        let _ = sender.event(ConnectionDetails(conn));
+    }
+    Ok(())
+}
+
+async fn presence_on_slc(
+    Packet(slc): Packet<Slc>,
+    presence: Presence,
+    sender: Sender,
+) -> Result<(), AppError> {
+    let updated = {
+        let mut guard = presence.inner.write().expect("poison");
+        if let Some(conn) = guard.connections.get_mut(&slc.ucid) {
+            conn.selected_vehicle = Some(slc.cname);
+            true
+        } else {
+            false
+        }
+    };
+    if updated {
+        let _ = sender.event(VehicleSelected {
+            ucid: slc.ucid,
+            vehicle: slc.cname,
+        });
+    }
+    Ok(())
+}
+
+async fn presence_on_cpr(
+    Packet(cpr): Packet<Cpr>,
+    presence: Presence,
+    sender: Sender,
+) -> Result<(), AppError> {
+    let event = {
+        let mut guard = presence.inner.write().expect("poison");
+        if let Some(conn) = guard.connections.get_mut(&cpr.ucid) {
+            conn.pname = cpr.pname.clone();
+            let uname = conn.uname.clone();
+            let _ = guard
+                .last_known_names
+                .insert(uname.clone(), cpr.pname.clone());
+            Some(Renamed {
+                ucid: cpr.ucid,
+                uname,
+                new_pname: cpr.pname.clone(),
+            })
+        } else {
+            None
+        }
+    };
+    if let Some(e) = event {
+        let _ = sender.event(e);
+    }
+    Ok(())
+}
+
+async fn presence_on_npl(
+    Packet(npl): Packet<Npl>,
+    presence: Presence,
+    sender: Sender,
+) -> Result<(), AppError> {
+    // A join request is signalled by `nump == 0`; the real join arrives
+    // as a subsequent `Npl` with `nump` set.
+    if npl.nump == 0 {
+        return Ok(());
+    }
+    let player = PlayerInfo {
+        plid: npl.plid,
+        ucid: npl.ucid,
+        vehicle: npl.cname,
+        ptype: npl.ptype,
+        flags: npl.flags,
+        in_pitlane: false,
+        pname: npl.pname.clone(),
+    };
+    {
+        let mut guard = presence.inner.write().expect("poison");
+        let _ = guard.players.insert(npl.plid, player.clone());
+        if let Some(conn) = guard.connections.get_mut(&npl.ucid) {
+            let _ = conn.players.insert(npl.plid);
+        }
+    }
+    let _ = sender.event(PlayerJoined(player));
+    Ok(())
+}
+
+async fn presence_on_pll(
+    Packet(pll): Packet<Pll>,
+    presence: Presence,
+    sender: Sender,
+) -> Result<(), AppError> {
+    let player = {
+        let mut guard = presence.inner.write().expect("poison");
+        let player = guard.players.remove(&pll.plid);
+        if let Some(ref p) = player
+            && let Some(conn) = guard.connections.get_mut(&p.ucid)
+        {
+            let _ = conn.players.remove(&p.plid);
+        }
+        player
+    };
+    if let Some(p) = player {
+        let _ = sender.event(PlayerLeft(p));
+    }
+    Ok(())
+}
+
+async fn presence_on_toc(
+    Packet(toc): Packet<Toc>,
+    presence: Presence,
+    sender: Sender,
+) -> Result<(), AppError> {
+    let pair = {
+        let mut guard = presence.inner.write().expect("poison");
+        let pair = if let Some(player) = guard.players.get_mut(&toc.plid) {
+            let before = player.clone();
+            player.ucid = toc.newucid;
+            let after = player.clone();
+            Some((before, after))
+        } else {
+            None
+        };
+        if let Some(old) = guard.connections.get_mut(&toc.olducid) {
+            old.players.retain(|&p| p != toc.plid);
+        }
+        if let Some(new) = guard.connections.get_mut(&toc.newucid) {
+            let _ = new.players.insert(toc.plid);
+        }
+        pair
+    };
+    if let Some((before, after)) = pair {
+        let _ = sender.event(TakingOver { before, after });
+    }
+    Ok(())
+}
+
+async fn presence_on_pfl(Packet(pfl): Packet<Pfl>, presence: Presence) -> Result<(), AppError> {
+    let mut guard = presence.inner.write().expect("poison");
+    if let Some(player) = guard.players.get_mut(&pfl.plid) {
+        player.flags = pfl.flags;
+    }
+    Ok(())
+}
+
+async fn presence_on_pla(Packet(pla): Packet<Pla>, presence: Presence) -> Result<(), AppError> {
+    let mut guard = presence.inner.write().expect("poison");
+    if let Some(player) = guard.players.get_mut(&pla.plid) {
+        if pla.entered_pitlane() {
+            player.in_pitlane = true;
+        }
+        if pla.exited_pitlane() {
+            player.in_pitlane = false;
+        }
+    }
+    Ok(())
+}
+
+async fn presence_on_plp(
+    Packet(plp): Packet<Plp>,
+    presence: Presence,
+    sender: Sender,
+) -> Result<(), AppError> {
+    let player = presence
+        .inner
+        .read()
+        .expect("poison")
+        .players
+        .get(&plp.plid)
+        .cloned();
+    if let Some(p) = player {
+        let _ = sender.event(PlayerTeleportedToPits(p));
+    }
+    Ok(())
+}
+
+async fn presence_on_tiny_clr(
+    Packet(tiny): Packet<Tiny>,
+    presence: Presence,
+) -> Result<(), AppError> {
+    if !matches!(tiny.subt, TinyType::Clr) {
+        return Ok(());
+    }
+    let mut guard = presence.inner.write().expect("poison");
+    guard.players.clear();
+    for conn in guard.connections.values_mut() {
+        conn.players.clear();
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// ChatParser - typed Mso → C parsing as a generic free handler function.
+// ---------------------------------------------------------------------------
+
+/// Generic handler that parses every `Mso` body into a typed value `C` via
 /// [`FromStr`] and emits the parsed value as a synthetic event.
 ///
-/// **The point of using this over a per-handler parse extractor is that the
-/// parse runs once per `Mso` packet** regardless of how many `Event<C>`
-/// handlers are registered - they all see the same `Arc`-wrapped value.
+/// Register with `app.handler(chat_parser::<MyCmd>)`. Pair with `Event<C>`
+/// handlers to react to typed commands. On parse failure no event is emitted.
 ///
-/// Pair with `Event<C>` handlers and the existing
-/// `insim_extras::chat::Parse` derive (via a small `FromStr` bridge - see
-/// docs on the example crate). On parse failure (wrong prefix, unknown
-/// command, malformed args) no event is emitted.
-pub struct ChatParser<C> {
-    _phantom: PhantomData<fn() -> C>,
-}
-
-impl<C> ChatParser<C> {
-    /// Create a new typed chat parser extension.
-    pub fn new() -> Self {
-        Self {
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<C> Default for ChatParser<C> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<C> std::fmt::Debug for ChatParser<C> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ChatParser").finish_non_exhaustive()
-    }
-}
-
-impl<S, C> Extension<S> for ChatParser<C>
+/// The parser runs once per `Mso` packet regardless of how many `Event<C>`
+/// handlers are registered downstream — they all see the same emitted value.
+pub async fn chat_parser<C>(Packet(mso): Packet<Mso>, sender: Sender) -> Result<(), AppError>
 where
     C: FromStr + Any + Send + Sync + 'static,
-    S: Send + Sync + 'static,
 {
-    async fn on_event(&self, cx: &mut EventCx<'_, S>) {
-        let Dispatch::Packet(insim::Packet::Mso(mso)) = cx.dispatch else {
-            return;
-        };
-        if !matches!(mso.usertype, MsoUserType::User | MsoUserType::Prefix) {
-            return;
-        }
-        if let Ok(c) = mso.msg_from_textstart().trim().parse::<C>() {
-            let _ = cx.sender.event(c);
-        }
+    if !matches!(mso.usertype, MsoUserType::User | MsoUserType::Prefix) {
+        return Ok(());
     }
+    if let Ok(c) = mso.msg_from_textstart().trim().parse::<C>() {
+        let _ = sender.event(c);
+    }
+    Ok(())
 }
+
+// Marker for crate-level imports; silences any unused warning if the file
+// ever ends up not needing a particular import directly.
+#[allow(dead_code)]
+struct _ApiAnchor(PhantomData<InsimPacket>);
