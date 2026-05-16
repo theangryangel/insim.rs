@@ -682,6 +682,44 @@ async fn game_emits_race_started_on_sta_transition() {
 }
 
 #[tokio::test]
+async fn periodic_emits_events_on_schedule() {
+    use std::time::Duration;
+
+    #[derive(Clone, Debug)]
+    struct Tick;
+
+    // Build an App with a fast periodic ticker. Take cmd_rx out and drain it
+    // after a short wait; we should see several Ticks.
+    let mut app: App<()> = App::new()
+        .with_state(())
+        .periodic(Duration::from_millis(5), Tick);
+
+    let mut cmd_rx = app
+        .cmd_rx
+        .take()
+        .expect("cmd_rx present before serve consumes it");
+
+    tokio::time::sleep(Duration::from_millis(40)).await;
+
+    let mut tick_count = 0usize;
+    while let Ok(cmd) = cmd_rx.try_recv() {
+        if let Command::Event(payload) = cmd
+            && payload.is::<Tick>()
+        {
+            tick_count += 1;
+        }
+    }
+
+    assert!(
+        tick_count >= 3,
+        "expected at least 3 ticks in 40ms, got {tick_count}"
+    );
+
+    // Cancel so the spawned task winds down before the runtime drops.
+    app.cancel.cancel();
+}
+
+#[tokio::test]
 async fn game_emits_track_changed_on_track_field_change() {
     use insim::core::track::Track;
     use insim::insim::Sta;

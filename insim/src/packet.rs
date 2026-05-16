@@ -145,6 +145,24 @@ macro_rules! define_packet {
                 Ok(())
             }
         }
+
+        // Variant-extraction conversions: pair with `From<Variant> for Packet`
+        // (emitted by `from_variants`) for full conversion symmetry.
+        $(
+            impl<'a> TryFrom<&'a Packet> for &'a $variant {
+                type Error = ();
+                fn try_from(p: &'a Packet) -> Result<Self, Self::Error> {
+                    if let Packet::$variant(inner) = p { Ok(inner) } else { Err(()) }
+                }
+            }
+
+            impl TryFrom<Packet> for $variant {
+                type Error = Packet;
+                fn try_from(p: Packet) -> Result<Self, Self::Error> {
+                    if let Packet::$variant(inner) = p { Ok(inner) } else { Err(p) }
+                }
+            }
+        )*
     };
 }
 

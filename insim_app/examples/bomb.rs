@@ -25,6 +25,7 @@
 //! - `loop_until_quit`: replaced by `start_setup` being called again from
 //!   `on_race_ended` / `on_setup_aborted` / `on_disconnected` when conditions
 //!   permit. The loop is implicit in the state machine.
+//! - A hand-rolled tick loop: replaced by `App::periodic(TICK_PERIOD, BombTick)`.
 //!
 //! Run with:
 //!     cargo run -p insim_app --example bomb -- 127.0.0.1:29999
@@ -54,14 +55,13 @@ use insim::{
     insim::{BtnStyle, Con, Crs, Npl, Pit, PlayerType, Pll, RaceLaps, Tiny, TinyType, Toc, Uco},
 };
 use insim_app::{
-    App, AppError, Connected, Disconnected, Dispatch, Event, ExtractCx, Extension, FromContext,
-    Game, HandlerExt, Packet, Presence, RaceEnded, Sender, serve, spawned,
+    App, AppError, Connected, Disconnected, Event, ExtractCx, Extension, FromContext, Game,
+    HandlerExt, Packet, Presence, RaceEnded, Sender, serve,
     ui::{self, Component, InvalidateHandle, Ui},
     util::mtc,
 };
 use taffy as _;
 use thiserror as _;
-use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tracing as _;
 
@@ -510,25 +510,6 @@ struct SetupComplete;
 /// timed out, or returned `None` for any other reason.
 #[derive(Clone, Debug)]
 struct SetupAborted;
-
-// ---------------------------------------------------------------------------
-// Ticker - residual Spawned; emits `BombTick` every TICK_PERIOD.
-// ---------------------------------------------------------------------------
-
-async fn bomb_ticker(mut rx: mpsc::UnboundedReceiver<Dispatch>, sender: Sender) {
-    let mut tick = tokio::time::interval(TICK_PERIOD);
-    tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-    loop {
-        tokio::select! {
-            r = rx.recv() => {
-                if r.is_none() { return; }
-            }
-            _ = tick.tick() => {
-                if sender.event(BombTick).is_err() { return; }
-            }
-        }
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Setup: spawn `Game::track_rotation` and signal completion via synthetic events.
@@ -1003,7 +984,7 @@ struct Args {
     admin_password: Option<String>,
 
     /// LFS track code (e.g. BL1, AS1, SO1).
-    #[arg(long, default_value = "BL1")]
+    #[arg(long, default_value = "FE1X")]
     track: String,
 
     /// Optional autocross layout name (loaded via /axload).
@@ -1072,8 +1053,8 @@ async fn main() -> Result<(), AppError> {
         .handler(on_con.run_if(while_racing))
         .handler(on_uco.run_if(while_racing))
         .handler(on_tick.run_if(while_racing))
-        // Background ticker - the residual `Spawned`.
-        .handler(spawned(bomb_ticker));
+        // Background ticker emitting BombTick every TICK_PERIOD.
+        .periodic(TICK_PERIOD, BombTick);
 
     let builder = insim::tcp(args.addr)
         .isi_iname("bomb".to_string())

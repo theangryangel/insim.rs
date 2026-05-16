@@ -29,9 +29,11 @@ use crate::{
 ///
 /// Build up state, handlers, and middleware, then hand the value to [`serve`].
 ///
-/// Long-running background tasks (periodic tickers, polls, etc.) are *not* a
-/// special primitive here: register a handler on [`Event<Startup>`] and call
-/// `tokio::spawn` from inside it.
+/// Periodic synthetic events have a small dedicated helper - see
+/// [`App::periodic`]. Other long-running background tasks aren't a special
+/// primitive: register a handler on [`Event<Startup>`] and `tokio::spawn`
+/// from inside it, or use [`Spawned`](crate::Spawned) for tasks that also
+/// need to observe every dispatch.
 ///
 /// [`Event<Startup>`]: crate::Event
 pub struct App<S> {
@@ -112,6 +114,44 @@ where
         T: Send + 'static,
     {
         self.handlers.push(Box::new(HandlerService::new(handler)));
+        self
+    }
+
+    /// Spawn a background task that emits `event` as a synthetic event every
+    /// `period`, until the runtime's cancel token fires.
+    ///
+    /// Use this for fire-and-forget periodic emitters where the event payload
+    /// is static or cheaply cloneable (a unit struct, a counter, etc.). For
+    /// anything more complex - per-tick state, side effects beyond the event,
+    /// custom shutdown handling - reach for [`crate::Spawned`].
+    ///
+    /// The interval uses [`tokio::time::MissedTickBehavior::Skip`]: if the
+    /// runtime pauses, missed ticks are dropped rather than burst-fired.
+    ///
+    /// The task is spawned immediately, so `App::periodic` **must be called
+    /// inside a tokio runtime context**. Events queue on the runtime's
+    /// back-channel and are drained once [`serve`] begins.
+    #[must_use]
+    pub fn periodic<E>(self, period: std::time::Duration, event: E) -> Self
+    where
+        E: std::any::Any + Clone + Send + Sync + 'static,
+    {
+        let sender = self.sender.clone();
+        let cancel = self.cancel.clone();
+        drop(tokio::spawn(async move {
+            let mut tick = tokio::time::interval(period);
+            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            loop {
+                tokio::select! {
+                    _ = cancel.cancelled() => return,
+                    _ = tick.tick() => {
+                        if sender.event(event.clone()).is_err() {
+                            return;
+                        }
+                    }
+                }
+            }
+        }));
         self
     }
 

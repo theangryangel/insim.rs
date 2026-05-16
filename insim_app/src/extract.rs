@@ -69,46 +69,25 @@ impl<S: Clone + Send + Sync + 'static> FromContext<S> for State<S> {
     }
 }
 
-/// Trait that lets `Packet<T>` extract a typed wire-packet variant from
-/// [`insim::Packet`]. Implementations should match the corresponding variant
-/// and clone (cheap - InSim packet structs are small).
-///
-/// PoC: hand-implemented for the variants the smoke test uses. A macro covering
-/// every variant is a follow-up.
-pub trait PacketVariant: Sized {
-    /// If the given [`insim::Packet`] is this variant, return a reference to it.
-    fn extract(p: &insim::Packet) -> Option<&Self>;
-}
-
-macro_rules! impl_packet_variant {
-    ($($variant:ident),+ $(,)?) => {
-        $(
-            impl PacketVariant for insim::insim::$variant {
-                fn extract(p: &insim::Packet) -> Option<&Self> {
-                    match p {
-                        insim::Packet::$variant(inner) => Some(inner),
-                        _ => None,
-                    }
-                }
-            }
-        )+
-    };
-}
-
-impl_packet_variant!(Ncn, Mso, Cnl, Mtc, Tiny, Npl, Pll, Toc, Pit, Crs, Con, Uco, Sta);
-
 /// Routing extractor for wire packets. Returns `Some` only when the current
 /// dispatch is a matching [`insim::Packet`] variant.
+///
+/// The variant-extraction machinery is provided by stdlib's
+/// [`TryFrom`]: every `insim::Packet` variant comes with a
+/// `TryFrom<&insim::Packet> for &Variant` impl emitted by `insim`'s own
+/// `define_packet!` macro, so this extractor automatically covers every
+/// variant the protocol defines - no hand-maintained list.
 #[derive(Debug, Clone)]
 pub struct Packet<T>(pub T);
 
 impl<T, S> FromContext<S> for Packet<T>
 where
-    T: PacketVariant + Clone + Send + 'static,
+    T: Clone + Send + 'static,
+    for<'a> &'a T: TryFrom<&'a insim::Packet>,
 {
     fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
         match cx.dispatch {
-            Dispatch::Packet(p) => T::extract(p).cloned().map(Packet),
+            Dispatch::Packet(p) => <&T>::try_from(p).ok().cloned().map(Packet),
             _ => None,
         }
     }

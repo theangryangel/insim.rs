@@ -70,7 +70,7 @@ pub use app::{App, serve};
 pub use error::AppError;
 pub use event::{Dispatch, Startup};
 pub use extensions::Extensions;
-pub use extract::{Event, ExtractCx, FromContext, Packet, PacketVariant, Sender, State};
+pub use extract::{Event, ExtractCx, FromContext, Packet, Sender, State};
 pub use game::{Game, GameInfo, RaceEnded, RaceStarted, TrackChanged};
 pub use handler::Handler;
 pub use middleware::{
