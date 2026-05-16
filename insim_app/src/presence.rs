@@ -1,35 +1,29 @@
-//! Built-in resources and handlers: [`Presence`] for connection/player
-//! tracking, [`chat_parser`] for typed `Mso` → `C` parsing.
-//!
-//! These are plain resources + standalone handler functions registered
-//! against the runtime's resource registry. Each "feature" is a struct (the
-//! resource) plus N handlers that observe specific packet variants and
-//! mutate the resource's state, optionally emitting synthetic events.
-//!
-//! Bundle a resource + its handlers via the [`Installable`](crate::Installable)
-//! trait, which `App::install(...)` consumes:
+//! [`Presence`] - tracks connections + players, emits lifecycle synthetic
+//! events. Register via [`crate::App::install`]:
 //!
 //! ```ignore
 //! app.install(Presence::new(sender.clone()))
 //! ```
+//!
+//! The `presence_on_*` handlers below mutate the resource's state under its
+//! lock, drop the guard, then emit a synthetic event the same dispatch cycle.
+//! Downstream handlers see the emitted event in a *subsequent* cycle (per
+//! the framework's emission semantics), where Presence's update has already
+//! landed.
 
 use std::{
-    any::Any,
     collections::{HashMap, HashSet},
-    marker::PhantomData,
     net::Ipv4Addr,
-    str::FromStr,
     sync::{Arc, RwLock},
     time::Duration,
 };
 
 use insim::{
-    Packet as InsimPacket,
     core::vehicle::Vehicle,
     identifiers::{ConnectionId, PlayerId},
     insim::{
-        Cnl, Cpr, Mso, MsoUserType, Nci, Ncn, Npl, Pfl, Pla, Pll, PlayerFlags, PlayerType, Plp,
-        Slc, Tiny, TinyType, Toc,
+        Cnl, Cpr, Nci, Ncn, Npl, Pfl, Pla, Pll, PlayerFlags, PlayerType, Plp, Slc, Tiny, TinyType,
+        Toc,
     },
 };
 use tokio_util::sync::CancellationToken;
@@ -379,7 +373,7 @@ impl Presence {
 /// and any handler can take it by value.
 impl FromContext for Presence {
     fn from_context(cx: &ExtractCx<'_>) -> Option<Self> {
-        cx.extensions.get::<Presence>()
+        cx.resources.get::<Presence>()
     }
 }
 
@@ -670,32 +664,3 @@ async fn presence_on_tiny_clr(
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
-// ChatParser - typed Mso → C parsing as a generic free handler function.
-// ---------------------------------------------------------------------------
-
-/// Generic handler that parses every `Mso` body into a typed value `C` via
-/// [`FromStr`] and emits the parsed value as a synthetic event.
-///
-/// Register with `app.handler(chat_parser::<MyCmd>)`. Pair with `Event<C>`
-/// handlers to react to typed commands. On parse failure no event is emitted.
-///
-/// The parser runs once per `Mso` packet regardless of how many `Event<C>`
-/// handlers are registered downstream — they all see the same emitted value.
-pub async fn chat_parser<C>(Packet(mso): Packet<Mso>, sender: Sender) -> Result<(), AppError>
-where
-    C: FromStr + Any + Send + Sync + 'static,
-{
-    if !matches!(mso.usertype, MsoUserType::User | MsoUserType::Prefix) {
-        return Ok(());
-    }
-    if let Ok(c) = mso.msg_from_textstart().trim().parse::<C>() {
-        let _ = sender.event(c);
-    }
-    Ok(())
-}
-
-// Marker for crate-level imports; silences any unused warning if the file
-// ever ends up not needing a particular import directly.
-#[allow(dead_code)]
-struct _ApiAnchor(PhantomData<InsimPacket>);

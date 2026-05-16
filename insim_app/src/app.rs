@@ -15,7 +15,7 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     error::AppError,
     event::{Command, Dispatch, Startup},
-    extensions::Extensions,
+    resources::Resources,
     extract::{ExtractCx, Sender},
     handler::{ErasedHandler, Handler, HandlerService},
 };
@@ -62,7 +62,7 @@ pub trait Installable {
 /// [`Event<Startup>`]: crate::Event
 pub struct App {
     pub(crate) handlers: Vec<Box<dyn ErasedHandler>>,
-    pub(crate) extensions: Extensions,
+    pub(crate) resources: Resources,
     pub(crate) sender: Sender,
     /// Receiver paired with `sender`. Taken by `serve()`.
     pub(crate) cmd_rx: Option<mpsc::UnboundedReceiver<Command>>,
@@ -75,7 +75,7 @@ impl std::fmt::Debug for App {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("App")
             .field("handlers", &self.handlers.len())
-            .field("extensions", &self.extensions)
+            .field("resources", &self.resources)
             .finish()
     }
 }
@@ -85,7 +85,7 @@ impl Default for App {
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<Command>();
         Self {
             handlers: Vec::new(),
-            extensions: Extensions::new(),
+            resources: Resources::new(),
             sender: Sender::new(cmd_tx),
             cmd_rx: Some(cmd_rx),
             cancel: CancellationToken::new(),
@@ -137,7 +137,7 @@ impl App {
     /// [`FromContext`]: crate::FromContext
     #[must_use]
     pub fn resource<R: Send + Sync + 'static>(mut self, value: R) -> Self {
-        self.extensions.insert_arc(Arc::new(value));
+        self.resources.insert_arc(Arc::new(value));
         self
     }
 
@@ -202,7 +202,7 @@ impl App {
 /// [`Startup`] synthetic event so handlers can install background work.
 pub async fn serve(builder: insim::builder::Builder, app: App) -> Result<(), AppError> {
     let handlers = app.handlers;
-    let extensions = app.extensions;
+    let resources = app.resources;
     let sender = app.sender;
     let cancel = app.cancel;
     let mut cmd_rx = app
@@ -216,7 +216,7 @@ pub async fn serve(builder: insim::builder::Builder, app: App) -> Result<(), App
         Dispatch::Synthetic(Arc::new(Startup)),
         &sender,
         &handlers,
-        &extensions,
+        &resources,
         &cancel,
     )
     .await;
@@ -225,7 +225,7 @@ pub async fn serve(builder: insim::builder::Builder, app: App) -> Result<(), App
         &mut framed,
         &sender,
         &handlers,
-        &extensions,
+        &resources,
         &mut cmd_rx,
         &cancel,
     )
@@ -240,7 +240,7 @@ async fn run_dispatch_loop(
     framed: &mut Framed,
     sender: &Sender,
     handlers: &[Box<dyn ErasedHandler>],
-    extensions: &Extensions,
+    resources: &Resources,
     cmd_rx: &mut mpsc::UnboundedReceiver<Command>,
     cancel: &CancellationToken,
 ) -> Result<(), AppError> {
@@ -252,7 +252,7 @@ async fn run_dispatch_loop(
                 let packet = res?;
                 dispatch_cycle(
                     Dispatch::Packet(packet),
-                    sender, handlers, extensions, cancel,
+                    sender, handlers, resources, cancel,
                 ).await;
             }
             maybe_cmd = cmd_rx.recv() => {
@@ -266,7 +266,7 @@ async fn run_dispatch_loop(
                     Command::Event(payload) => {
                         dispatch_cycle(
                             Dispatch::Synthetic(payload),
-                            sender, handlers, extensions, cancel,
+                            sender, handlers, resources, cancel,
                         ).await;
                     }
                 }
@@ -279,7 +279,7 @@ async fn run_dispatch_loop(
 ///
 /// All registered handlers are tried concurrently via [`FuturesUnordered`] -
 /// each one's extractors filter it in or out, and those that pass run their
-/// bodies in parallel. They observe shared resources via `&Extensions` and
+/// bodies in parallel. They observe shared resources via `&Resources` and
 /// emit through the shared `Sender`, so any state two handlers may mutate
 /// concurrently must be atomic / lock-tolerant (`Arc<AtomicX>`,
 /// `Arc<RwLock<…>>`).
@@ -292,13 +292,13 @@ pub(crate) async fn dispatch_cycle(
     d: Dispatch,
     sender: &Sender,
     handlers: &[Box<dyn ErasedHandler>],
-    extensions: &Extensions,
+    resources: &Resources,
     cancel: &CancellationToken,
 ) {
     let xcx = ExtractCx {
         dispatch: &d,
         sender,
-        extensions,
+        resources,
         cancel,
     };
     let mut pending: FuturesUnordered<_> = handlers.iter().map(|h| h.call(&xcx)).collect();

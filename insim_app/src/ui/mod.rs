@@ -222,7 +222,7 @@ where
     C: Clone + Send + Sync + Default + 'static,
 {
     fn from_context(cx: &ExtractCx<'_>) -> Option<Self> {
-        cx.extensions.get::<Ui<Cmp, G, C>>()
+        cx.resources.get::<Ui<Cmp, G, C>>()
     }
 }
 

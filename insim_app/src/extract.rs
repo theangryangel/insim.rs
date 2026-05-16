@@ -18,7 +18,7 @@ use tokio_util::sync::CancellationToken;
 use crate::{
     error::AppError,
     event::{Command, Dispatch},
-    extensions::Extensions,
+    resources::Resources,
 };
 
 /// Context handed to extractors during one dispatch cycle.
@@ -30,7 +30,7 @@ pub struct ExtractCx<'a> {
     pub sender: &'a Sender,
     /// Resource registry - populated via [`crate::App::resource`]. Handlers
     /// extract typed values by pulling them out via [`FromContext`].
-    pub extensions: &'a Extensions,
+    pub resources: &'a Resources,
     /// Cooperative-shutdown token. Call [`ExtractCx::shutdown`] to request the
     /// runtime exit at its next select iteration.
     pub cancel: &'a CancellationToken,
@@ -76,7 +76,7 @@ where
     T: Clone + Send + Sync + 'static,
 {
     fn from_context(cx: &ExtractCx<'_>) -> Option<Self> {
-        cx.extensions.get::<T>().map(Res)
+        cx.resources.get::<T>().map(Res)
     }
 }
 

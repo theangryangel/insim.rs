@@ -355,7 +355,7 @@ pub async fn game_on_sta(
 /// by value.
 impl FromContext for Game {
     fn from_context(cx: &ExtractCx<'_>) -> Option<Self> {
-        cx.extensions.get::<Game>()
+        cx.resources.get::<Game>()
     }
 }
 

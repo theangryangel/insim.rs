@@ -41,13 +41,14 @@
 //! See `examples/smoke.rs` for an end-to-end example.
 
 mod app;
+mod chat;
 mod error;
 mod event;
-mod extensions;
 mod extract;
 mod game;
 mod handler;
-mod middleware;
+mod presence;
+mod resources;
 pub mod run_if;
 mod spawned;
 pub mod time;
@@ -59,16 +60,16 @@ pub mod util;
 mod tests;
 
 pub use app::{App, Installable, serve};
+pub use chat::chat_parser;
 pub use error::AppError;
 pub use event::{Dispatch, Startup};
-pub use extensions::Extensions;
 pub use extract::{Event, ExtractCx, FromContext, Packet, Res, Sender};
 pub use game::{Game, GameInfo, RaceEnded, RaceStarted, TrackChanged, game_on_sta};
 pub use handler::Handler;
-pub use middleware::{
+pub use presence::{
     Connected, ConnectionDetails, ConnectionInfo, Disconnected, PlayerInfo, PlayerJoined,
     PlayerLeft, PlayerTeleportedToPits, Presence, Renamed, TakingOver, VehicleSelected,
-    chat_parser,
 };
+pub use resources::Resources;
 pub use run_if::{HandlerExt, Predicate, RunIf, always, and, in_state, never, not, or};
 pub use spawned::{Spawned, spawned};

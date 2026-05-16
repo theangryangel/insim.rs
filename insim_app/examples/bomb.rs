@@ -441,7 +441,7 @@ impl Phase {
 
 impl FromContext for Phase {
     fn from_context(cx: &ExtractCx<'_>) -> Option<Self> {
-        cx.extensions.get::<Phase>()
+        cx.resources.get::<Phase>()
     }
 }
 
@@ -476,7 +476,7 @@ impl Bomb {
 
 impl FromContext for Bomb {
     fn from_context(cx: &ExtractCx<'_>) -> Option<Self> {
-        cx.extensions.get::<Bomb>()
+        cx.resources.get::<Bomb>()
     }
 }
 

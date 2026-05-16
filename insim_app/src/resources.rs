@@ -1,11 +1,11 @@
-//! Type-keyed extension registry.
+//! Type-keyed resource registry.
 //!
-//! [`App::extension`](crate::App::extension) inserts cloneable values into a
-//! `TypeId`-keyed map. Handlers/middleware reach them through their context
-//! by calling `cx.extension::<T>()`, which downcasts and clones.
+//! [`App::resource`](crate::App::resource) inserts cloneable values into a
+//! `TypeId`-keyed map. Handlers reach them through their context by calling
+//! `cx.resources.get::<T>()`, which downcasts and clones.
 //!
-//! Used by middleware that wants to expose itself as an extractor - see
-//! [`crate::PresenceMiddleware`] for the canonical example.
+//! Used by every resource that wants to expose itself as an extractor - see
+//! [`crate::Presence`] for the canonical example.
 
 use std::{
     any::{Any, TypeId},
@@ -13,23 +13,23 @@ use std::{
     sync::Arc,
 };
 
-/// Type-keyed map of cloneable values made available to handlers/middleware.
+/// Type-keyed map of cloneable values made available to handlers.
 #[derive(Default)]
-pub struct Extensions {
+pub struct Resources {
     map: HashMap<TypeId, Arc<dyn Any + Send + Sync>>,
 }
 
-impl Extensions {
-    /// Create an empty extensions registry.
+impl Resources {
+    /// Create an empty resource registry.
     pub(crate) fn new() -> Self {
         Self {
             map: HashMap::new(),
         }
     }
 
-    /// Insert a pre-`Arc`-wrapped value. Used by [`App::extension`](crate::App::extension)
-    /// so that one `Arc<E>` allocation can be shared between the registry
-    /// (extractor lookup) and the dispatch chain (`on_event`).
+    /// Insert a pre-`Arc`-wrapped value. Used by [`App::resource`](crate::App::resource)
+    /// so that one `Arc<T>` allocation can be shared between the registry
+    /// and any installable's handler closure captures.
     pub(crate) fn insert_arc<T: Any + Send + Sync + 'static>(&mut self, value: Arc<T>) {
         let _ = self
             .map
@@ -45,9 +45,9 @@ impl Extensions {
     }
 }
 
-impl std::fmt::Debug for Extensions {
+impl std::fmt::Debug for Resources {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Extensions")
+        f.debug_struct("Resources")
             .field("len", &self.map.len())
             .finish()
     }

@@ -128,9 +128,9 @@ async fn drive(app: App, d: Dispatch) {
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let handlers = app.handlers;
-    let extensions = app.extensions;
+    let resources = app.resources;
 
-    dispatch_cycle(d, &sender, &handlers, &extensions, &cancel).await;
+    dispatch_cycle(d, &sender, &handlers, &resources, &cancel).await;
 
     // Drain anything middleware emitted while we were running.
     while let Ok(cmd) = cmd_rx.try_recv() {
@@ -139,7 +139,7 @@ async fn drive(app: App, d: Dispatch) {
                 Dispatch::Synthetic(payload),
                 &sender,
                 &handlers,
-                &extensions,
+                &resources,
                 &cancel,
             )
             .await;
@@ -244,14 +244,14 @@ async fn presence_is_queryable_via_extractor() {
 
     let cancel = tokio_util::sync::CancellationToken::new();
     let handlers = app.handlers;
-    let extensions = app.extensions;
+    let resources = app.resources;
 
     // First NCN: presence inserts; handler reads count = 1.
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
         &sender,
         &handlers,
-        &extensions,
+        &resources,
         &cancel,
     )
     .await;
@@ -262,7 +262,7 @@ async fn presence_is_queryable_via_extractor() {
         Dispatch::Packet(make_ncn(2, "bob")),
         &sender,
         &handlers,
-        &extensions,
+        &resources,
         &cancel,
     )
     .await;
@@ -296,13 +296,13 @@ async fn spawned_handler_spawns_once_and_forwards_dispatches() {
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let handlers = app.handlers;
-    let extensions = app.extensions;
+    let resources = app.resources;
 
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
         &sender,
         &handlers,
-        &extensions,
+        &resources,
         &cancel,
     )
     .await;
@@ -310,7 +310,7 @@ async fn spawned_handler_spawns_once_and_forwards_dispatches() {
         Dispatch::Packet(make_ncn(2, "bob")),
         &sender,
         &handlers,
-        &extensions,
+        &resources,
         &cancel,
     )
     .await;
@@ -344,14 +344,14 @@ async fn cancellation_token_extractor_triggers_shutdown() {
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let handlers = app.handlers;
-    let extensions = app.extensions;
+    let resources = app.resources;
 
     assert!(!cancel.is_cancelled());
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
         &sender,
         &handlers,
-        &extensions,
+        &resources,
         &cancel,
     )
     .await;
@@ -378,13 +378,13 @@ async fn spawned_handler_channel_closes_on_cancel() {
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let handlers = app.handlers;
-    let extensions = app.extensions;
+    let resources = app.resources;
 
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
         &sender,
         &handlers,
-        &extensions,
+        &resources,
         &cancel,
     )
     .await;
@@ -439,13 +439,13 @@ async fn run_if_skips_handler_when_predicate_false() {
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let handlers = app.handlers;
-    let extensions = app.extensions;
+    let resources = app.resources;
 
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
         &sender,
         &handlers,
-        &extensions,
+        &resources,
         &cancel,
     )
     .await;
@@ -468,13 +468,13 @@ async fn run_if_runs_handler_when_predicate_true() {
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let handlers = app.handlers;
-    let extensions = app.extensions;
+    let resources = app.resources;
 
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
         &sender,
         &handlers,
-        &extensions,
+        &resources,
         &cancel,
     )
     .await;
@@ -499,7 +499,7 @@ async fn in_state_reads_extension_and_gates_handler() {
 
     impl FromContext for Flag {
         fn from_context(cx: &ExtractCx<'_>) -> Option<Self> {
-            cx.extensions.get::<Flag>()
+            cx.resources.get::<Flag>()
         }
     }
 
@@ -514,14 +514,14 @@ async fn in_state_reads_extension_and_gates_handler() {
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let handlers = app.handlers;
-    let extensions = app.extensions;
+    let resources = app.resources;
 
     // flag = false: handler skipped.
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
         &sender,
         &handlers,
-        &extensions,
+        &resources,
         &cancel,
     )
     .await;
@@ -538,7 +538,7 @@ async fn in_state_reads_extension_and_gates_handler() {
         Dispatch::Packet(make_ncn(2, "bob")),
         &sender,
         &handlers,
-        &extensions,
+        &resources,
         &cancel,
     )
     .await;
@@ -597,7 +597,7 @@ async fn game_emits_race_started_on_sta_transition() {
 
     let cancel = tokio_util::sync::CancellationToken::new();
     let handlers = app.handlers;
-    let extensions = app.extensions;
+    let resources = app.resources;
 
     // First Sta with racing=No: matches initial state, no RaceStarted.
     dispatch_cycle(
@@ -607,7 +607,7 @@ async fn game_emits_race_started_on_sta_transition() {
         })),
         &sender,
         &handlers,
-        &extensions,
+        &resources,
         &cancel,
     )
     .await;
@@ -631,7 +631,7 @@ async fn game_emits_race_started_on_sta_transition() {
         })),
         &sender,
         &handlers,
-        &extensions,
+        &resources,
         &cancel,
     )
     .await;
@@ -664,7 +664,7 @@ async fn game_emits_track_changed_on_track_field_change() {
 
     let cancel = tokio_util::sync::CancellationToken::new();
     let handlers = app.handlers;
-    let extensions = app.extensions;
+    let resources = app.resources;
 
     let track_a = Track::ALL[0];
     let track_b = *Track::ALL
@@ -679,7 +679,7 @@ async fn game_emits_track_changed_on_track_field_change() {
         })),
         &sender,
         &handlers,
-        &extensions,
+        &resources,
         &cancel,
     )
     .await;
@@ -705,7 +705,7 @@ async fn game_emits_track_changed_on_track_field_change() {
         })),
         &sender,
         &handlers,
-        &extensions,
+        &resources,
         &cancel,
     )
     .await;
@@ -728,7 +728,7 @@ async fn game_emits_track_changed_on_track_field_change() {
         })),
         &sender,
         &handlers,
-        &extensions,
+        &resources,
         &cancel,
     )
     .await;
