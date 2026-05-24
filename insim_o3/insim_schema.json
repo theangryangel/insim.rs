@@ -2374,6 +2374,21 @@
         "camera"
       ]
     },
+    "CentreDiffType": {
+      "description": "Centre differential type.",
+      "oneOf": [
+        {
+          "description": "Open",
+          "type": "string",
+          "const": "Open"
+        },
+        {
+          "description": "Viscous",
+          "type": "string",
+          "const": "Viscous"
+        }
+      ]
+    },
     "Chalk": {
       "description": "Chalk ahead",
       "type": "object",
@@ -3879,6 +3894,31 @@
         ]
       },
       "uniqueItems": true
+    },
+    "DiffType": {
+      "description": "Differential type.",
+      "oneOf": [
+        {
+          "description": "Open",
+          "type": "string",
+          "const": "Open"
+        },
+        {
+          "description": "Locked",
+          "type": "string",
+          "const": "Locked"
+        },
+        {
+          "description": "Viscous",
+          "type": "string",
+          "const": "Viscous"
+        },
+        {
+          "description": "Clutch pack",
+          "type": "string",
+          "const": "ClutchPack"
+        }
+      ]
     },
     "Fin": {
       "description": "Provisional finish notification.\n\n- Not a final result; use [Res](super::Res) for confirmed results.",
@@ -8638,14 +8678,8 @@
           "$ref": "#/$defs/RequestId"
         },
         "setup": {
-          "description": "Raw setup bytes. Same format as SET file, with the following exceptions:\n- less the first 12 bytes\n- gear order is the first 7 gears then final drive ratio",
-          "type": "array",
-          "items": {
-            "type": "integer",
-            "format": "uint8",
-            "maximum": 255,
-            "minimum": 0
-          }
+          "description": "Vehicle setup.",
+          "$ref": "#/$defs/VehicleSetup"
         }
       },
       "required": [
@@ -8668,6 +8702,22 @@
       "type": "array",
       "items": {
         "$ref": "#/$defs/SetFlag"
+      },
+      "uniqueItems": true
+    },
+    "SetupFlag": {
+      "type": "string",
+      "enum": [
+        "PATCH_X",
+        "ABS",
+        "TC",
+        "ASYMMETRICAL"
+      ]
+    },
+    "SetupFlags": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SetupFlag"
       },
       "uniqueItems": true
     },
@@ -9662,6 +9712,36 @@
         }
       ]
     },
+    "TyreBrand": {
+      "description": "Tyre brand.",
+      "oneOf": [
+        {
+          "description": "Cromo plain",
+          "type": "string",
+          "const": "CromoPlain"
+        },
+        {
+          "description": "Cromo",
+          "type": "string",
+          "const": "Cromo"
+        },
+        {
+          "description": "Torro",
+          "type": "string",
+          "const": "Torro"
+        },
+        {
+          "description": "Michelin",
+          "type": "string",
+          "const": "Michelin"
+        },
+        {
+          "description": "Evostar",
+          "type": "string",
+          "const": "Evostar"
+        }
+      ]
+    },
     "TyreColour": {
       "description": "Tyre Stack Colour",
       "oneOf": [
@@ -9958,6 +10038,451 @@
           "type": "string",
           "const": "White"
         }
+      ]
+    },
+    "VehicleSetup": {
+      "description": "Vehicle setup.\n\nWire format matches the SET file minus the first 12 header bytes, with one\ndifference: gear ratios are ordered gears 1-7 then FDR (in the file it is 7th gear then\nFDR then gears 1-6).\n\n# Note\n\nThe SET file format is reverse-engineered rather than formally documented\nAs a result, some fields are left as raw integer types rather than strongly-typed\nenums or newtypes, to avoid silent breakage if the format is updated or our understanding\nturns out to be incomplete.",
+      "type": "object",
+      "properties": {
+        "brake_balance": {
+          "description": "Brake balance.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "brake_strength": {
+          "description": "Brake strength (Nm).",
+          "type": "number",
+          "format": "float"
+        },
+        "car_config": {
+          "description": "Car configuration (e.g. roof on LX4/6 and UF1).",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "centre_diff_torque_split": {
+          "description": "Centre differential torque split.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "centre_diff_type": {
+          "description": "Centre differential type.",
+          "$ref": "#/$defs/CentreDiffType"
+        },
+        "centre_diff_viscous_torque": {
+          "description": "Centre differential viscous torque.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "engine_brake_reduction": {
+          "description": "Engine brake reduction.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "flags": {
+          "description": "Setup option flags (ABS, TC, Asymmetrical, Patch-X format).",
+          "$ref": "#/$defs/SetupFlags"
+        },
+        "front_anti_roll_bar": {
+          "description": "Front anti-roll bar stiffness (N/mm).",
+          "type": "number",
+          "format": "float"
+        },
+        "front_bump_damping": {
+          "description": "Front bump/compression damping (N/mm).",
+          "type": "number",
+          "format": "float"
+        },
+        "front_caster": {
+          "description": "Front caster (divide by ten).",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "front_coast_locking": {
+          "description": "Front coast locking.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "front_diff_clutch_preload": {
+          "description": "Front diff clutch pack pre-load (multiply by ten).",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "front_diff_type": {
+          "description": "Front differential type.",
+          "$ref": "#/$defs/DiffType"
+        },
+        "front_left_camber": {
+          "description": "Front left camber adjust (45=0.0deg, 0=-4.5deg, 90=4.5deg).",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "front_left_tyre_pressure": {
+          "description": "Front left tyre pressure (kPa).",
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "front_power_locking": {
+          "description": "Front power locking.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "front_rebound_damping": {
+          "description": "Front rebound damping (N/mm).",
+          "type": "number",
+          "format": "float"
+        },
+        "front_ride_height": {
+          "description": "Front ride height in mm (not spring motion range).",
+          "type": "number",
+          "format": "float"
+        },
+        "front_right_camber": {
+          "description": "Front right camber adjust (45=0.0deg, 0=-4.5deg, 90=4.5deg).",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "front_right_tyre_pressure": {
+          "description": "Front right tyre pressure (kPa).",
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "front_spring_stiffness": {
+          "description": "Front spring stiffness (N/mm).",
+          "type": "number",
+          "format": "float"
+        },
+        "front_toe": {
+          "description": "Front toe in (0=-0.9deg, 9=0deg, 18=0.9deg).",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "front_tyre_size": {
+          "description": "Front tyre size (alternate GTR configuration).",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "front_tyre_type": {
+          "description": "Front tyre type (R1 through Knobbly).",
+          "$ref": "#/$defs/TyreCompound"
+        },
+        "front_tyre_warmer_temp": {
+          "description": "Front tyre warmer temperature.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "front_viscous_torque": {
+          "description": "Front viscous torque.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "front_wing_angle": {
+          "description": "Front wing angle.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "gear_ratios": {
+          "description": "Gear ratios for gears 1-7 followed by the final drive ratio (0-65534 maps to 0.5-7.5).\n\nIndex 0 = 1st gear, index 6 = 7th gear, index 7 = final drive.",
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint16",
+            "maximum": 65535,
+            "minimum": 0
+          },
+          "maxItems": 8,
+          "minItems": 8
+        },
+        "handbrake_strength": {
+          "description": "Handbrake strength (N.m).",
+          "type": "number",
+          "format": "float"
+        },
+        "handicap_mass_position": {
+          "description": "Handicap mass position.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "max_steering_lock": {
+          "description": "Maximum steering lock.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "parallel_steering": {
+          "description": "Parallel steering.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "passengers": {
+          "description": "Passenger layout.",
+          "$ref": "#/$defs/Passengers"
+        },
+        "rear_anti_roll_bar": {
+          "description": "Rear anti-roll bar stiffness (N/mm).",
+          "type": "number",
+          "format": "float"
+        },
+        "rear_bump_damping": {
+          "description": "Rear compression/bump damping (N/mm).",
+          "type": "number",
+          "format": "float"
+        },
+        "rear_caster": {
+          "description": "Rear caster (always zero).",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "rear_coast_locking": {
+          "description": "Rear coast locking.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "rear_diff_clutch_preload": {
+          "description": "Rear diff clutch pack pre-load (multiply by ten).",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "rear_diff_type": {
+          "description": "Rear differential type.",
+          "$ref": "#/$defs/DiffType"
+        },
+        "rear_left_camber": {
+          "description": "Rear left camber adjust (45=0.0deg, 0=-4.5deg, 90=4.5deg).",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "rear_left_tyre_pressure": {
+          "description": "Rear left tyre pressure (kPa).",
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "rear_power_locking": {
+          "description": "Rear power locking.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "rear_rebound_damping": {
+          "description": "Rear rebound damping (N/mm).",
+          "type": "number",
+          "format": "float"
+        },
+        "rear_ride_height": {
+          "description": "Rear ride height in mm (not spring motion range).",
+          "type": "number",
+          "format": "float"
+        },
+        "rear_right_camber": {
+          "description": "Rear right camber adjust (45=0.0deg, 0=-4.5deg, 90=4.5deg).",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "rear_right_tyre_pressure": {
+          "description": "Rear right tyre pressure (kPa).",
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "rear_spring_stiffness": {
+          "description": "Rear spring stiffness (N/mm).",
+          "type": "number",
+          "format": "float"
+        },
+        "rear_toe": {
+          "description": "Rear toe (0=-0.9deg, 9=0deg, 18=0.9deg).",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "rear_tyre_size": {
+          "description": "Rear tyre size (alternate GTR configuration).",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "rear_tyre_type": {
+          "description": "Rear tyre type (R1 through Knobbly).",
+          "$ref": "#/$defs/TyreCompound"
+        },
+        "rear_tyre_warmer_temp": {
+          "description": "Rear tyre warmer temperature.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "rear_viscous_torque": {
+          "description": "Rear viscous torque.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "rear_wing_angle": {
+          "description": "Rear wing angle.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "tc_engage_speed": {
+          "description": "Traction control engagement speed.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "tc_slip": {
+          "description": "Traction control slip (divide by ten for the actual value).",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "tyre_brand": {
+          "description": "Tyre brand.",
+          "$ref": "#/$defs/TyreBrand"
+        },
+        "unknown": {
+          "description": "Unknown byte.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "voluntary_handicap_mass": {
+          "description": "Voluntary handicap mass.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "voluntary_intake_restriction": {
+          "description": "Voluntary intake restriction.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        }
+      },
+      "required": [
+        "flags",
+        "unknown",
+        "handicap_mass_position",
+        "tyre_brand",
+        "brake_strength",
+        "rear_wing_angle",
+        "front_wing_angle",
+        "voluntary_handicap_mass",
+        "voluntary_intake_restriction",
+        "max_steering_lock",
+        "parallel_steering",
+        "brake_balance",
+        "engine_brake_reduction",
+        "centre_diff_type",
+        "centre_diff_viscous_torque",
+        "centre_diff_torque_split",
+        "gear_ratios",
+        "passengers",
+        "car_config",
+        "tc_slip",
+        "tc_engage_speed",
+        "rear_ride_height",
+        "rear_spring_stiffness",
+        "rear_bump_damping",
+        "rear_rebound_damping",
+        "rear_anti_roll_bar",
+        "handbrake_strength",
+        "rear_toe",
+        "rear_caster",
+        "rear_tyre_type",
+        "rear_tyre_warmer_temp",
+        "rear_left_camber",
+        "rear_right_camber",
+        "rear_tyre_size",
+        "rear_diff_clutch_preload",
+        "rear_diff_type",
+        "rear_viscous_torque",
+        "rear_power_locking",
+        "rear_coast_locking",
+        "rear_left_tyre_pressure",
+        "rear_right_tyre_pressure",
+        "front_ride_height",
+        "front_spring_stiffness",
+        "front_bump_damping",
+        "front_rebound_damping",
+        "front_anti_roll_bar",
+        "front_toe",
+        "front_caster",
+        "front_tyre_type",
+        "front_tyre_warmer_temp",
+        "front_left_camber",
+        "front_right_camber",
+        "front_tyre_size",
+        "front_diff_clutch_preload",
+        "front_diff_type",
+        "front_viscous_torque",
+        "front_power_locking",
+        "front_coast_locking",
+        "front_left_tyre_pressure",
+        "front_right_tyre_pressure"
       ]
     },
     "VehicleTruck": {

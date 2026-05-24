@@ -438,6 +438,13 @@ class CarContact(BaseModel):
     z: Annotated[int, Field(description="Z position.", ge=0, le=255)]
 
 
+class CentreDiffType(StrEnum):
+    """Centre differential type."""
+
+    Open = "Open"
+    Viscous = "Viscous"
+
+
 class Chalk(BaseModel):
     """Chalk ahead"""
 
@@ -1017,6 +1024,15 @@ type DashLights = list[
     | Literal["NEUTRAL"]
     | Literal["ENGINE_SEVERE"]
 ]
+
+
+class DiffType(StrEnum):
+    """Differential type."""
+
+    Open = "Open"
+    Locked = "Locked"
+    Viscous = "Viscous"
+    ClutchPack = "ClutchPack"
 
 
 class FlgType(StrEnum):
@@ -2620,6 +2636,16 @@ class SetFlag(StrEnum):
 type SetFlags = list[SetFlag]
 
 
+class SetupFlag(StrEnum):
+    PATCH_X = "PATCH_X"
+    ABS = "ABS"
+    TC = "TC"
+    ASYMMETRICAL = "ASYMMETRICAL"
+
+
+type SetupFlags = list[SetupFlag]
+
+
 class SignMetal(BaseModel):
     """Metal Sign"""
 
@@ -2878,6 +2904,16 @@ class TtcType(StrEnum):
     SelStop = "SelStop"
 
 
+class TyreBrand(StrEnum):
+    """Tyre brand."""
+
+    CromoPlain = "CromoPlain"
+    Cromo = "Cromo"
+    Torro = "Torro"
+    Michelin = "Michelin"
+    Evostar = "Evostar"
+
+
 class TyreColour(StrEnum):
     """Tyre Stack Colour"""
 
@@ -2955,6 +2991,226 @@ class VehicleSUVColour(StrEnum):
     Orange = "Orange"
     Yellow = "Yellow"
     White = "White"
+
+
+class VehicleSetup(BaseModel):
+    """Vehicle setup."""
+
+    brake_balance: Annotated[int, Field(description="Brake balance.", ge=0, le=255)]
+    brake_strength: Annotated[float, Field(description="Brake strength (Nm).")]
+    car_config: Annotated[
+        int,
+        Field(
+            description="Car configuration (e.g. roof on LX4/6 and UF1).", ge=0, le=255
+        ),
+    ]
+    centre_diff_torque_split: Annotated[
+        int, Field(description="Centre differential torque split.", ge=0, le=255)
+    ]
+    centre_diff_type: Annotated[
+        CentreDiffType, Field(description="Centre differential type.")
+    ]
+    centre_diff_viscous_torque: Annotated[
+        int, Field(description="Centre differential viscous torque.", ge=0, le=255)
+    ]
+    engine_brake_reduction: Annotated[
+        int, Field(description="Engine brake reduction.", ge=0, le=255)
+    ]
+    flags: Annotated[
+        SetupFlags,
+        Field(
+            description="Setup option flags (ABS, TC, Asymmetrical, Patch-X format)."
+        ),
+    ]
+    front_anti_roll_bar: Annotated[
+        float, Field(description="Front anti-roll bar stiffness (N/mm).")
+    ]
+    front_bump_damping: Annotated[
+        float, Field(description="Front bump/compression damping (N/mm).")
+    ]
+    front_caster: Annotated[
+        int, Field(description="Front caster (divide by ten).", ge=0, le=255)
+    ]
+    front_coast_locking: Annotated[
+        int, Field(description="Front coast locking.", ge=0, le=255)
+    ]
+    front_diff_clutch_preload: Annotated[
+        int,
+        Field(
+            description="Front diff clutch pack pre-load (multiply by ten).",
+            ge=0,
+            le=255,
+        ),
+    ]
+    front_diff_type: Annotated[DiffType, Field(description="Front differential type.")]
+    front_left_camber: Annotated[
+        int,
+        Field(
+            description="Front left camber adjust (45=0.0deg, 0=-4.5deg, 90=4.5deg).",
+            ge=0,
+            le=255,
+        ),
+    ]
+    front_left_tyre_pressure: Annotated[
+        int, Field(description="Front left tyre pressure (kPa).", ge=0, le=65535)
+    ]
+    front_power_locking: Annotated[
+        int, Field(description="Front power locking.", ge=0, le=255)
+    ]
+    front_rebound_damping: Annotated[
+        float, Field(description="Front rebound damping (N/mm).")
+    ]
+    front_ride_height: Annotated[
+        float, Field(description="Front ride height in mm (not spring motion range).")
+    ]
+    front_right_camber: Annotated[
+        int,
+        Field(
+            description="Front right camber adjust (45=0.0deg, 0=-4.5deg, 90=4.5deg).",
+            ge=0,
+            le=255,
+        ),
+    ]
+    front_right_tyre_pressure: Annotated[
+        int, Field(description="Front right tyre pressure (kPa).", ge=0, le=65535)
+    ]
+    front_spring_stiffness: Annotated[
+        float, Field(description="Front spring stiffness (N/mm).")
+    ]
+    front_toe: Annotated[
+        int,
+        Field(description="Front toe in (0=-0.9deg, 9=0deg, 18=0.9deg).", ge=0, le=255),
+    ]
+    front_tyre_size: Annotated[
+        int,
+        Field(
+            description="Front tyre size (alternate GTR configuration).", ge=0, le=255
+        ),
+    ]
+    front_tyre_type: Annotated[
+        TyreCompound, Field(description="Front tyre type (R1 through Knobbly).")
+    ]
+    front_tyre_warmer_temp: Annotated[
+        int, Field(description="Front tyre warmer temperature.", ge=0, le=255)
+    ]
+    front_viscous_torque: Annotated[
+        int, Field(description="Front viscous torque.", ge=0, le=255)
+    ]
+    front_wing_angle: Annotated[
+        int, Field(description="Front wing angle.", ge=0, le=255)
+    ]
+    gear_ratios: Annotated[
+        list[int],
+        Field(
+            description="Gear ratios for gears 1-7 followed by the final drive ratio (0-65534 maps to 0.5-7.5).\n\nIndex 0 = 1st gear, index 6 = 7th gear, index 7 = final drive.",
+            min_length=8,
+            max_length=8,
+        ),
+    ]
+    handbrake_strength: Annotated[float, Field(description="Handbrake strength (N.m).")]
+    handicap_mass_position: Annotated[
+        int, Field(description="Handicap mass position.", ge=0, le=255)
+    ]
+    max_steering_lock: Annotated[
+        int, Field(description="Maximum steering lock.", ge=0, le=255)
+    ]
+    parallel_steering: Annotated[
+        int, Field(description="Parallel steering.", ge=0, le=255)
+    ]
+    passengers: Annotated[Passengers, Field(description="Passenger layout.")]
+    rear_anti_roll_bar: Annotated[
+        float, Field(description="Rear anti-roll bar stiffness (N/mm).")
+    ]
+    rear_bump_damping: Annotated[
+        float, Field(description="Rear compression/bump damping (N/mm).")
+    ]
+    rear_caster: Annotated[
+        int, Field(description="Rear caster (always zero).", ge=0, le=255)
+    ]
+    rear_coast_locking: Annotated[
+        int, Field(description="Rear coast locking.", ge=0, le=255)
+    ]
+    rear_diff_clutch_preload: Annotated[
+        int,
+        Field(
+            description="Rear diff clutch pack pre-load (multiply by ten).",
+            ge=0,
+            le=255,
+        ),
+    ]
+    rear_diff_type: Annotated[DiffType, Field(description="Rear differential type.")]
+    rear_left_camber: Annotated[
+        int,
+        Field(
+            description="Rear left camber adjust (45=0.0deg, 0=-4.5deg, 90=4.5deg).",
+            ge=0,
+            le=255,
+        ),
+    ]
+    rear_left_tyre_pressure: Annotated[
+        int, Field(description="Rear left tyre pressure (kPa).", ge=0, le=65535)
+    ]
+    rear_power_locking: Annotated[
+        int, Field(description="Rear power locking.", ge=0, le=255)
+    ]
+    rear_rebound_damping: Annotated[
+        float, Field(description="Rear rebound damping (N/mm).")
+    ]
+    rear_ride_height: Annotated[
+        float, Field(description="Rear ride height in mm (not spring motion range).")
+    ]
+    rear_right_camber: Annotated[
+        int,
+        Field(
+            description="Rear right camber adjust (45=0.0deg, 0=-4.5deg, 90=4.5deg).",
+            ge=0,
+            le=255,
+        ),
+    ]
+    rear_right_tyre_pressure: Annotated[
+        int, Field(description="Rear right tyre pressure (kPa).", ge=0, le=65535)
+    ]
+    rear_spring_stiffness: Annotated[
+        float, Field(description="Rear spring stiffness (N/mm).")
+    ]
+    rear_toe: Annotated[
+        int, Field(description="Rear toe (0=-0.9deg, 9=0deg, 18=0.9deg).", ge=0, le=255)
+    ]
+    rear_tyre_size: Annotated[
+        int,
+        Field(
+            description="Rear tyre size (alternate GTR configuration).", ge=0, le=255
+        ),
+    ]
+    rear_tyre_type: Annotated[
+        TyreCompound, Field(description="Rear tyre type (R1 through Knobbly).")
+    ]
+    rear_tyre_warmer_temp: Annotated[
+        int, Field(description="Rear tyre warmer temperature.", ge=0, le=255)
+    ]
+    rear_viscous_torque: Annotated[
+        int, Field(description="Rear viscous torque.", ge=0, le=255)
+    ]
+    rear_wing_angle: Annotated[int, Field(description="Rear wing angle.", ge=0, le=255)]
+    tc_engage_speed: Annotated[
+        int, Field(description="Traction control engagement speed.", ge=0, le=255)
+    ]
+    tc_slip: Annotated[
+        int,
+        Field(
+            description="Traction control slip (divide by ten for the actual value).",
+            ge=0,
+            le=255,
+        ),
+    ]
+    tyre_brand: Annotated[TyreBrand, Field(description="Tyre brand.")]
+    unknown: Annotated[int, Field(description="Unknown byte.", ge=0, le=255)]
+    voluntary_handicap_mass: Annotated[
+        int, Field(description="Voluntary handicap mass.", ge=0, le=255)
+    ]
+    voluntary_intake_restriction: Annotated[
+        int, Field(description="Voluntary intake restriction.", ge=0, le=255)
+    ]
 
 
 class VehicleTruck(BaseModel):
@@ -4365,12 +4621,7 @@ class Set(BaseModel):
     reqi: Annotated[
         int, Field(description="Request identifier echoed by replies.", ge=0, le=255)
     ]
-    setup: Annotated[
-        list[int],
-        Field(
-            description="Raw setup bytes. Same format as SET file, with the following exceptions:\n- less the first 12 bytes\n- gear order is the first 7 gears then final drive ratio"
-        ),
-    ]
+    setup: Annotated[VehicleSetup, Field(description="Vehicle setup.")]
     type: Literal["Set"] = "Set"
 
 
