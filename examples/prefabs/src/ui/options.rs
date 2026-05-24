@@ -1,5 +1,5 @@
 use insim::insim::BtnStyle;
-use insim_extras::ui;
+use insim_extra::ui;
 
 use crate::{Command, State};
 

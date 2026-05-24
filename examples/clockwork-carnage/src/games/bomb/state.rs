@@ -1,41 +1,33 @@
 use std::{
+    cmp::Reverse,
     collections::HashMap,
+    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
     time::{Duration, Instant},
 };
 
 use insim::{
-    core::vehicle::Vehicle,
     identifiers::{ConnectionId, PlayerId},
+    insim::PlayerType,
 };
+use tokio_util::sync::CancellationToken;
 
-use crate::hud::BombLeaderboard;
+use super::config::{BombConfig, COLLISION_THRESHOLD_MPS};
 
-/// Configuration for the bomb game.
-#[derive(Debug, Clone, Copy)]
-pub struct BombConfig {
-    pub checkpoint_timeout: Duration,
-    pub checkpoint_penalty: Duration,
-    pub collision_max_penalty: Duration,
-}
-
-/// A player's active run in the bomb game.
-#[derive(Debug, Clone)]
-pub struct ActiveRun {
-    pub started_at: Instant,
-    pub deadline: Instant,
-    pub current_timeout: Duration,
-    pub checkpoints: i64,
-    pub vehicle: Vehicle,
-    pub uname: String,
-    pub pname: String,
-    pub ucid: ConnectionId,
+#[derive(Clone, Debug)]
+pub(super) struct ActiveRun {
+    pub(super) started_at: Instant,
+    pub(super) deadline: Instant,
+    pub(super) current_timeout: Duration,
+    pub(super) checkpoints: i64,
+    pub(super) uname: String,
+    pub(super) pname: String,
+    pub(super) ucid: ConnectionId,
 }
 
 impl ActiveRun {
-    pub fn new(
+    pub(super) fn new(
         uname: String,
         pname: String,
-        vehicle: Vehicle,
         ucid: ConnectionId,
         config: &BombConfig,
         now: Instant,
@@ -45,41 +37,35 @@ impl ActiveRun {
             deadline: now + config.checkpoint_timeout,
             current_timeout: config.checkpoint_timeout,
             checkpoints: 0,
-            vehicle,
             uname,
             pname,
             ucid,
         }
     }
 
-    /// Calculates survival time in milliseconds, capped at now if the run is ongoing.
-    pub fn survival_ms(&self, now: Instant) -> i64 {
+    pub(super) fn survival_ms(&self, now: Instant) -> i64 {
         (self.deadline.min(now) - self.started_at).as_millis() as i64
     }
 
-    pub fn time_left(&self, now: Instant) -> Duration {
+    pub(super) fn time_left(&self, now: Instant) -> Duration {
         self.deadline.saturating_duration_since(now)
     }
 }
 
-/// The result of a run completion (death, leave, pit, etc.).
-#[derive(Debug)]
-#[allow(dead_code)]
-pub struct RunResult {
-    pub run: ActiveRun,
-    pub reason: RunEndReason,
+#[derive(Clone, Debug)]
+pub(super) struct PlayerInfo {
+    pub(super) ucid: ConnectionId,
+    pub(super) pname: String,
+    pub(super) uname: String,
+    pub(super) ptype: PlayerType,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum RunEndReason {
-    Exploded, // Timer ran out
-    LeftRace, // Player left server or spectated
-    Pitted,   // Player entered pits
-}
-
-/// The result of hitting a checkpoint.
 #[derive(Debug)]
-pub enum CheckpointResult {
+pub(super) enum CheckpointOutcome {
+    Started {
+        ucid: ConnectionId,
+        uname: String,
+    },
     Refreshed {
         ucid: ConnectionId,
         checkpoints: i64,
@@ -88,59 +74,111 @@ pub enum CheckpointResult {
     Extended {
         ucid: ConnectionId,
         checkpoints: i64,
-        penalty: Duration,
         time_left: Duration,
     },
-    Started {
-        ucid: ConnectionId,
-    },
 }
 
-/// The result of a collision penalty.
-#[derive(Debug)]
-pub struct PenaltyResult {
-    pub ucid: ConnectionId,
-    pub penalty: Duration,
-    pub time_left: Duration,
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub(super) enum BombPhase {
+    #[default]
+    Waiting,
+    SettingUp,
+    Racing,
 }
 
-/// Manages the state of the Bomb game (active runs, leaderboard, settings).
-pub struct BombState {
-    pub config: BombConfig,
-    pub leaderboard: BombLeaderboard,
-    /// Active runs keyed by PlayerId - the canonical in-race identity.
-    pub active_runs: HashMap<PlayerId, ActiveRun>,
+impl BombPhase {
+    pub(super) fn label(self) -> &'static str {
+        match self {
+            BombPhase::Waiting => "waiting for players",
+            BombPhase::SettingUp => "setting up track",
+            BombPhase::Racing => "racing",
+        }
+    }
 }
 
-impl BombState {
-    pub fn new(config: BombConfig, leaderboard: BombLeaderboard) -> Self {
+#[derive(Clone, Default, Debug)]
+pub(super) struct BombGlobal {
+    pub(super) phase: String,
+    pub(super) leaderboard: Vec<(String, String, i64, i64)>,
+    pub(super) active_runs: Vec<(String, String, i64, Instant, Duration)>,
+}
+
+pub(super) struct BombInner {
+    pub(super) config: BombConfig,
+    pub(super) phase: BombPhase,
+    setup_cancel: Option<CancellationToken>,
+    pub(super) runtime_cancel: CancellationToken,
+    pub(super) active_runs: HashMap<PlayerId, ActiveRun>,
+    pub(super) players: HashMap<PlayerId, PlayerInfo>,
+    pub(super) leaderboard: Vec<(String, String, i64, i64)>,
+    pub(super) db: Option<(crate::db::Pool, i64)>,
+}
+
+#[derive(Clone)]
+pub(super) struct Bomb {
+    inner: Arc<RwLock<BombInner>>,
+}
+
+impl Bomb {
+    pub(super) fn new(
+        config: BombConfig,
+        runtime_cancel: CancellationToken,
+        db: Option<(crate::db::Pool, i64)>,
+    ) -> Self {
         Self {
-            config,
-            leaderboard,
-            active_runs: HashMap::new(),
+            inner: Arc::new(RwLock::new(BombInner {
+                config,
+                phase: BombPhase::default(),
+                setup_cancel: None,
+                runtime_cancel,
+                active_runs: HashMap::new(),
+                players: HashMap::new(),
+                leaderboard: Vec::new(),
+                db,
+            })),
         }
     }
 
-    /// Handles a player hitting a checkpoint.
-    /// Returns `Some(CheckpointResult)` if it affected a run or started a new one.
-    #[allow(clippy::too_many_arguments)]
-    pub fn on_checkpoint(
+    pub(super) fn read(&self) -> RwLockReadGuard<'_, BombInner> {
+        self.inner.read().expect("poison")
+    }
+
+    pub(super) fn write(&self) -> RwLockWriteGuard<'_, BombInner> {
+        self.inner.write().expect("poison")
+    }
+}
+
+impl BombInner {
+    pub(super) fn make_setup_cancel(&mut self) -> CancellationToken {
+        let token = self.runtime_cancel.child_token();
+        self.setup_cancel = Some(token.clone());
+        token
+    }
+
+    pub(super) fn cancel_setup(&mut self) {
+        if let Some(c) = self.setup_cancel.take() {
+            c.cancel();
+        }
+    }
+
+    pub(super) fn clear_setup_cancel(&mut self) {
+        self.setup_cancel = None;
+    }
+
+    pub(super) fn on_checkpoint(
         &mut self,
-        uname: String,
-        pname: String,
-        ucid: ConnectionId,
+        p: &PlayerInfo,
         plid: PlayerId,
-        vehicle: Vehicle,
         is_finish: bool,
         now: Instant,
-    ) -> Option<CheckpointResult> {
+    ) -> Option<CheckpointOutcome> {
         if let Some(run) = self.active_runs.get_mut(&plid) {
-            let result = if is_finish {
+            let outcome = if is_finish {
                 run.current_timeout = self.config.checkpoint_timeout;
                 run.deadline = now + self.config.checkpoint_timeout;
                 run.checkpoints += 1;
-                CheckpointResult::Refreshed {
-                    ucid,
+                CheckpointOutcome::Refreshed {
+                    ucid: run.ucid,
                     checkpoints: run.checkpoints,
                     new_window: self.config.checkpoint_timeout,
                 }
@@ -150,90 +188,83 @@ impl BombState {
                     .current_timeout
                     .saturating_sub(self.config.checkpoint_penalty);
                 run.checkpoints += 1;
-                CheckpointResult::Extended {
-                    ucid,
+                CheckpointOutcome::Extended {
+                    ucid: run.ucid,
                     checkpoints: run.checkpoints,
-                    penalty: self.config.checkpoint_penalty,
                     time_left: run.time_left(now),
                 }
             };
-            return Some(result);
+            return Some(outcome);
         }
-
+        if p.ptype.contains(PlayerType::AI) {
+            return None;
+        }
         let _ = self.active_runs.insert(
             plid,
-            ActiveRun::new(uname, pname, vehicle, ucid, &self.config, now),
+            ActiveRun::new(p.uname.clone(), p.pname.clone(), p.ucid, &self.config, now),
         );
-        Some(CheckpointResult::Started { ucid })
-    }
-
-    /// Handles a player leaving the race by PlayerId (Pll/Plp packets).
-    pub fn on_leave(&mut self, plid: PlayerId) -> Option<RunResult> {
-        self.active_runs.remove(&plid).map(|run| RunResult {
-            run,
-            reason: RunEndReason::LeftRace,
+        Some(CheckpointOutcome::Started {
+            ucid: p.ucid,
+            uname: p.uname.clone(),
         })
     }
 
-    /// Handles a driver swap (Toc packet) - updates the stored ucid for the run.
-    pub fn on_toc(&mut self, plid: PlayerId, new_ucid: ConnectionId) {
-        if let Some(run) = self.active_runs.get_mut(&plid) {
-            run.ucid = new_ucid;
-        }
-    }
-
-    pub fn on_pit(&mut self, plid: PlayerId) -> Option<RunResult> {
-        self.active_runs.remove(&plid).map(|run| RunResult {
-            run,
-            reason: RunEndReason::Pitted,
-        })
-    }
-
-    /// Handles a collision penalty.
-    pub fn on_collision(
+    pub(super) fn on_collision(
         &mut self,
         plid: PlayerId,
-        speed_diff: f32, // meters per second
+        speed_diff_mps: f32,
         now: Instant,
-    ) -> Option<PenaltyResult> {
-        const THRESHOLD_MPS: f32 = 30.0;
-        let fraction = (speed_diff / THRESHOLD_MPS).clamp(0.0, 1.0);
+    ) -> Option<(ConnectionId, Duration, Duration)> {
+        let fraction = (speed_diff_mps / COLLISION_THRESHOLD_MPS).clamp(0.0, 1.0);
         let penalty = Duration::from_millis(
             (fraction * self.config.collision_max_penalty.as_millis() as f32) as u64,
         );
-
         if penalty.is_zero() {
             return None;
         }
-
-        if let Some(run) = self.active_runs.get_mut(&plid) {
-            run.deadline -= penalty;
-            return Some(PenaltyResult {
-                ucid: run.ucid,
-                penalty,
-                time_left: run.time_left(now),
-            });
-        }
-        None
+        let run = self.active_runs.get_mut(&plid)?;
+        run.deadline = run.deadline.checked_sub(penalty).unwrap_or(now);
+        Some((run.ucid, penalty, run.time_left(now)))
     }
 
-    /// Handle a car reset penalty.
-    pub fn on_reset(&mut self, plid: PlayerId, now: Instant) -> Option<PenaltyResult> {
-        if let Some(run) = self.active_runs.get_mut(&plid) {
-            let penalty = self.config.checkpoint_penalty;
-            run.deadline -= penalty;
-            return Some(PenaltyResult {
-                ucid: run.ucid,
-                penalty,
-                time_left: run.time_left(now),
-            });
-        }
-        None
+    pub(super) fn on_reset(
+        &mut self,
+        plid: PlayerId,
+        now: Instant,
+    ) -> Option<(ConnectionId, Duration, Duration)> {
+        let penalty = self.config.checkpoint_penalty;
+        let run = self.active_runs.get_mut(&plid)?;
+        run.deadline = run.deadline.checked_sub(penalty).unwrap_or(now);
+        Some((run.ucid, penalty, run.time_left(now)))
     }
 
-    /// Returns active runs sorted by checkpoints desc, then deadline desc - for HUD display.
-    pub fn active_runs_props(&self) -> Vec<(String, String, i64, Instant, Duration)> {
-        let mut runs: Vec<_> = self
+    pub(super) fn finalize(&mut self, run: &ActiveRun, survival_ms: i64) {
+        self.leaderboard.push((
+            run.uname.clone(),
+            run.pname.clone(),
+            run.checkpoints,
+            survival_ms,
+        ));
+        self.leaderboard
+            .sort_by(|a, b| b.2.cmp(&a.2).then(b.3.cmp(&a.3)));
+        self.leaderboard.truncate(10);
+    }
+
+    pub(super) fn tick_expired(&mut self, now: Instant) -> Vec<ActiveRun> {
+        let expired: Vec<PlayerId> = self
+            .active_runs
+            .iter()
+            .filter(|(_, r)| r.deadline < now)
+            .map(|(k, _)| *k)
+            .collect();
+        expired
+            .into_iter()
+            .filter_map(|k| self.active_runs.remove(&k))
+            .collect()
+    }
+
+    pub(super) fn snapshot(&self) -> BombGlobal {
+        let mut active: Vec<_> = self
             .active_runs
             .values()
             .map(|r| {
@@ -246,26 +277,11 @@ impl BombState {
                 )
             })
             .collect();
-        runs.sort_by(|a, b| b.2.cmp(&a.2).then(b.3.cmp(&a.3)));
-        runs
-    }
-
-    /// Checks for expired runs.
-    pub fn tick(&mut self, now: Instant) -> Vec<RunResult> {
-        let keys: Vec<PlayerId> = self
-            .active_runs
-            .iter()
-            .filter(|(_, run)| run.deadline < now)
-            .map(|(k, _)| *k)
-            .collect();
-
-        keys.into_iter()
-            .filter_map(|k| {
-                self.active_runs.remove(&k).map(|run| RunResult {
-                    run,
-                    reason: RunEndReason::Exploded,
-                })
-            })
-            .collect()
+        active.sort_by_key(|r| Reverse(r.2));
+        BombGlobal {
+            phase: self.phase.label().to_string(),
+            leaderboard: self.leaderboard.clone(),
+            active_runs: active,
+        }
     }
 }

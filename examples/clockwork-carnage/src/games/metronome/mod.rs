@@ -1,143 +1,79 @@
-//! MetronomeGame - open-format precision challenge.
+//! Metronome mini-game subcommand. Players drive from checkpoint1 to finish
+//! and try to match the target duration as closely as possible.
+//!
+//! Phase machine: Waiting → SettingUp → Racing (same pattern as bomb).
 
-mod challenge_loop;
-pub mod chat;
+mod config;
+mod events;
+mod handlers;
+mod state;
+mod ui;
 
 use std::time::Duration;
 
-pub use challenge_loop::ChallengeLoop;
-use insim_extras::scenes::{
-    IntoSceneError as _, Scene, SceneError, SceneExt, SceneResult, wait_for_players::WaitForPlayers,
+pub use config::{MetronomeArgs, MetronomeConfig, MetronomeRunConfig};
+use handlers::{
+    on_connected, on_disconnected, on_npl, on_race_ended, on_setup_aborted, on_setup_complete,
+    on_toc, on_uco,
 };
-use sqlx::types::Json;
-use tokio::task::JoinHandle;
+use kitcar::{App, AppError, Game, HandlerExt, Presence, Stage, State, run};
+use state::{Metronome, MetronomeGlobal, MetronomePhase};
 use tokio_util::sync::CancellationToken;
+use ui::{MetronomeUi, MetronomeView};
 
-use super::{MiniGame, MiniGameCtx, ordinal, position_xp, setup_track};
-use crate::{ChatError, MIN_PLAYERS, db};
+pub async fn run_metronome_with(cfg: MetronomeRunConfig) -> Result<(), AppError> {
+    let target = cfg.config.target;
+    let app =
+        App::<Metronome>::with_state(Metronome::new(cfg.config, CancellationToken::new(), cfg.db));
+    app.state().write().runtime_cancel = app.cancel_token().clone();
 
-pub struct MetronomeGame {
-    pub session_id: i64,
-    pub target: Duration,
-    pub track: insim::core::track::Track,
-    pub layout: String,
-    pub chat: chat::EventChat,
-    pub event_name: Option<String>,
+    let sender = app.sender().clone();
+    let ui = MetronomeUi::new(
+        sender.clone(),
+        MetronomeGlobal {
+            target,
+            ..Default::default()
+        },
+        |_ucid, _invalidator| MetronomeView,
+    );
+
+    let presence = Presence::new();
+    let game = Game::new();
+
+    let while_racing = |s: State<Metronome>| s.read().phase == MetronomePhase::Racing;
+
+    let app = app
+        .handle(Stage::Pre, presence)
+        .handle(Stage::Pre, game)
+        .handle(Stage::Pre, ui)
+        .handle(Stage::Update, on_connected)
+        .handle(Stage::Update, on_disconnected)
+        .handle(Stage::Update, on_setup_complete)
+        .handle(Stage::Update, on_setup_aborted)
+        .handle(Stage::Update, on_race_ended)
+        .handle(Stage::Update, on_npl.run_if(while_racing))
+        .handle(Stage::Update, on_toc.run_if(while_racing))
+        .handle(Stage::Update, on_uco.run_if(while_racing));
+
+    let builder = insim::tcp(cfg.insim.addr)
+        .isi_iname("metronome".to_string())
+        .isi_prefix('!')
+        .isi_admin_password(cfg.insim.admin_password);
+
+    run(builder, app).await
 }
 
-pub struct MetronomeGuard {
-    chat_handle: JoinHandle<Result<(), ChatError>>,
-}
-
-impl Drop for MetronomeGuard {
-    fn drop(&mut self) {
-        self.chat_handle.abort();
-    }
-}
-
-impl MiniGame for MetronomeGame {
-    type Guard = MetronomeGuard;
-
-    async fn run(&self, ctx: &MiniGameCtx, cancel: CancellationToken) -> Result<(), SceneError> {
-        let challenge_scene = WaitForPlayers {
-            min_players: MIN_PLAYERS,
-        }
-        .then(|ctx: &MiniGameCtx| {
-            let insim = ctx.insim.clone();
-            async move {
-                let _ = insim.send_message("Get ready!", None).await;
-                Ok(SceneResult::Continue(()))
-            }
-        })
-        .then(
-            setup_track::SetupTrack {
-                min_players: MIN_PLAYERS,
-                track: self.track,
-                layout: Some(self.layout.clone()),
-                mode_name: match &self.event_name {
-                    Some(name) => format!(
-                        "{name} - Metronome: match the target lap time as closely as possible!"
-                    ),
-                    None => {
-                        "Metronome: match the target lap time as closely as possible!".to_string()
-                    },
-                },
-            }
-            .with_timeout(Duration::from_secs(60)),
-        )
-        .then(
-            ChallengeLoop {
-                chat: self.chat.clone(),
-                target: self.target,
-                session_id: self.session_id,
-                base_url: ctx.base_url.clone(),
-            }
-            .until_game_ends(),
-        )
-        .loop_until_quit()
-        .with_cancellation(cancel);
-
-        let _ = challenge_scene.run(ctx).await?;
-        Ok(())
-    }
-
-    async fn setup(
-        event: &db::Event,
-        ctx: &MiniGameCtx,
-    ) -> Result<(Self, Self::Guard), SceneError> {
-        let (chat, chat_handle) = chat::spawn(ctx.insim.clone());
-
-        let target_ms = match event.mode {
-            Json(db::EventMode::Metronome { target_ms }) => target_ms,
-            _ => unimplemented!(),
-        };
-
-        let game = MetronomeGame {
-            session_id: event.id,
-            target: Duration::from_millis(target_ms as u64),
-            track: event.track,
-            layout: event.layout.clone(),
-            chat,
-            event_name: event.name.clone(),
-        };
-
-        let guard = MetronomeGuard { chat_handle };
-        Ok((game, guard))
-    }
-
-    async fn teardown(&self, event: &db::Event, ctx: &MiniGameCtx) -> Result<(), SceneError> {
-        db::complete_event(&ctx.pool, event.id)
-            .await
-            .scene_err("metronome::teardown")?;
-
-        let standings = db::metronome_standings(&ctx.pool, event.id)
-            .await
-            .scene_err("metronome::teardown::standings")?;
-
-        if !standings.is_empty() {
-            let parts: Vec<String> = standings
-                .iter()
-                .enumerate()
-                .map(|(i, s)| {
-                    let xp = position_xp(i);
-                    format!("{} {} (+{xp} XP)", ordinal(i + 1), s.pname)
-                })
-                .collect();
-            let _ = ctx
-                .insim
-                .send_message(format!("Metronome: {}", parts.join(", ")), None)
-                .await;
-
-            for (i, s) in standings.iter().enumerate() {
-                let xp = position_xp(i);
-                if let Err(e) =
-                    db::award_xp(&ctx.pool, &s.uname, xp, "metronome", Some(event.id)).await
-                {
-                    tracing::warn!("Failed to award XP to {}: {e}", s.uname);
-                }
-            }
-        }
-
-        Ok(())
-    }
+/// Ad-hoc entry point: runs metronome without any DB backing.
+pub async fn run_metronome(args: MetronomeArgs) -> Result<(), AppError> {
+    run_metronome_with(MetronomeRunConfig {
+        insim: args.insim,
+        config: MetronomeConfig {
+            target: Duration::from_millis(args.target_ms),
+            track: args.track,
+            layout: args.layout,
+            setup_timeout: Duration::from_secs(60),
+        },
+        db: None,
+    })
+    .await
 }

@@ -1,98 +1,126 @@
 {% extends "base.html" %}
+{% import "partials/event_list.html" as event_list_macros %}
 {% block title %}Events - Clockwork Carnage{% endblock %}
 {% block content %}
 
-{# ── Header ── #}
-<section class="border-b border-primary-container/20 bg-surface-container-lowest px-6 lg:px-16 py-12">
-  <div class="max-w-7xl mx-auto flex items-end justify-between gap-4">
+<main class="px-6 lg:px-12 py-10 max-w-screen-xl mx-auto">
+
+  {# ── Page header ── #}
+  <div class="flex items-end justify-between mb-8 gap-4">
     <div>
-      <h1 class="font-headline text-5xl md:text-7xl font-black uppercase tracking-tighter leading-none text-on-surface">
-        All <span class="text-primary-container">Events</span>
+      <h1 class="text-3xl md:text-4xl font-black tracking-tight mb-1">
+        <span class="text-on-surface">ALL </span><span class="text-primary-container">EVENTS</span>
       </h1>
+      <p class=" text-outline">Every race, every result, every era.</p>
     </div>
-    {% if page.admin %}
-    <a href="/events/new" class="flex-shrink-0 font-headline font-bold text-xs uppercase tracking-widest bg-primary-container text-white px-6 py-3 hover:bg-white hover:text-primary-container transition-all shadow-[0_0_20px_rgba(243,75,0,0.3)]">
-      New Event
+    {% if current_user.admin %}
+    <a href="/events/new" class="text-sm font-bold uppercase tracking-widest bg-primary-container text-white px-6 py-3 hover:bg-primary-container/90 transition-colors flex-shrink-0">
+      NEW EVENT
     </a>
     {% endif %}
   </div>
-</section>
 
-{# ── Table ── #}
-<div class="max-w-7xl mx-auto px-6 lg:px-16 py-12">
-  <div class="bg-surface-container-low">
-    <table class="w-full text-left border-collapse">
-      <thead>
-        <tr class="bg-surface-container-high border-b border-outline-variant/20">
-          <th class="p-4 font-headline uppercase text-xs tracking-widest text-primary w-14">#</th>
-          <th class="p-4 font-headline uppercase text-xs tracking-widest text-primary">Name</th>
-          <th class="p-4 font-headline uppercase text-xs tracking-widest text-primary">Mode</th>
-          <th class="p-4 font-headline uppercase text-xs tracking-widest text-primary">Track</th>
-          <th class="p-4 font-headline uppercase text-xs tracking-widest text-primary">Scheduled</th>
-          <th class="p-4 font-headline uppercase text-xs tracking-widest text-primary">Status</th>
-          {% if page.admin %}
-          <th class="p-4 font-headline uppercase text-xs tracking-widest text-primary">Actions</th>
-          {% endif %}
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-outline-variant/10">
-        {% for event in events %}
-        <tr class="hover:bg-surface-container-high transition-colors group">
-          <td class="p-4 font-headline text-sm text-outline">{{ event.id }}</td>
-          <td class="p-4">
-            <a href="/events/{{ event.id }}" class="font-headline font-bold uppercase tracking-tight text-on-surface group-hover:text-primary-container transition-colors">
-              {% match event.name %}{% when Some with (n) %}{{ n }}{% when None %}Event #{{ event.id }}{% endmatch %}
-            </a>
-          </td>
-          <td class="p-4">
-            {% match *event.mode %}
-            {% when EventMode::Metronome { .. } %}
-            <span class="font-headline text-[10px] uppercase tracking-widest text-primary bg-primary/10 border border-primary/20 px-2.5 py-1">Metronome</span>
-            {% when EventMode::Shortcut %}
-            <span class="font-headline text-[10px] uppercase tracking-widest text-tertiary bg-tertiary/10 border border-tertiary/20 px-2.5 py-1">Shortcut</span>
-            {% when EventMode::Bomb { .. } %}
-            <span class="font-headline text-[10px] uppercase tracking-widest text-outline bg-surface-variant/40 px-2.5 py-1">Bomb</span>
-            {% endmatch %}
-          </td>
-          <td class="p-4 font-headline text-xs uppercase tracking-widest text-outline">
-            {{ event.track }} / {{ event.layout }}
-          </td>
-          <td class="p-4 font-headline text-xs uppercase tracking-widest text-outline">
-            {% match event.scheduled_at %}
-            {% when Some with (s) %}
-            <time datetime="{{ s|as_datetime }}" x-data x-localtime>{{ s|format_timestamp }}</time>
-            {% match event.scheduled_end_at %}
-            {% when Some with (e) %}
-            <span class="text-outline/50"> →
-              <time datetime="{{ e|as_datetime }}" x-data x-localtime>{{ e|format_timestamp }}</time>
-            </span>
-            {% when None %}
-            {% endmatch %}
-            {% when None %}-
-            {% endmatch %}
-          </td>
-          <td class="p-4">
-            {% match event.status %}
-            {% when EventStatus::Active %}
-            <span class="font-headline text-[10px] uppercase tracking-widest text-tertiary-container bg-tertiary-container/10 border border-tertiary-container/20 px-2.5 py-1 flex items-center gap-2 w-fit">
-              <span class="w-1.5 h-1.5 bg-tertiary-container rounded-full animate-pulse"></span>Live
-            </span>
-            {% when EventStatus::Pending %}
-            <span class="font-headline text-[10px] uppercase tracking-widest text-primary bg-primary/10 border border-primary/20 px-2.5 py-1">Upcoming</span>
-            {% when EventStatus::Completed %}
-            <span class="font-headline text-[10px] uppercase tracking-widest text-outline px-2.5 py-1">Completed</span>
-            {% when EventStatus::Cancelled %}
-            <span class="font-headline text-[10px] uppercase tracking-widest text-outline/40 px-2.5 py-1">Cancelled</span>
-            {% endmatch %}
-          </td>
-          {% if page.admin %}
-          <td class="p-4">{% include "partials/event_actions.html" %}</td>
-          {% endif %}
-        </tr>
+  {# ── Filters ── #}
+  <div class="flex flex-wrap items-center justify-between gap-y-3 mb-6">
+
+    {# Status filter tabs #}
+    <div class="flex items-center border-b border-outline-variant/20">
+      <a href="{{ self.status_url("") }}"
+         class="px-4 py-2 text-sm font-bold uppercase tracking-widest transition-colors
+                {% if filter_status.is_empty() %}text-primary-container border-b-2 border-primary-container -mb-px{% else %}text-outline hover:text-on-surface{% endif %}">
+        ALL
+      </a>
+      <a href="{{ self.status_url("live") }}"
+         class="px-4 py-2 text-sm font-bold uppercase tracking-widest transition-colors
+                {% if filter_status == "live" %}text-primary-container border-b-2 border-primary-container -mb-px{% else %}text-outline hover:text-on-surface{% endif %}">
+        LIVE
+      </a>
+      <a href="{{ self.status_url("pending") }}"
+         class="px-4 py-2 text-sm font-bold uppercase tracking-widest transition-colors
+                {% if filter_status == "pending" %}text-primary-container border-b-2 border-primary-container -mb-px{% else %}text-outline hover:text-on-surface{% endif %}">
+        PENDING
+      </a>
+      <a href="{{ self.status_url("completed") }}"
+         class="px-4 py-2 text-sm font-bold uppercase tracking-widest transition-colors
+                {% if filter_status == "completed" %}text-primary-container border-b-2 border-primary-container -mb-px{% else %}text-outline hover:text-on-surface{% endif %}">
+        COMPLETED
+      </a>
+    </div>
+
+    {# Mode filter pills #}
+    <div class="flex items-center">
+      <a href="{{ self.mode_url("") }}"
+         class="px-3 py-1.5 text-sm font-bold uppercase tracking-widest transition-colors
+                {% if filter_mode.is_empty() %}bg-primary-container text-white{% else %}bg-surface-container-low text-outline hover:text-on-surface hover:bg-surface-container-high{% endif %}">
+        All
+      </a>
+      <a href="{{ self.mode_url("shortcut") }}"
+         class="px-3 py-1.5 text-sm font-bold uppercase tracking-widest transition-colors
+                {% if filter_mode == "shortcut" %}bg-[#22c55e] text-white{% else %}bg-surface-container-low text-[#22c55e] hover:bg-surface-container-high{% endif %}">
+        Shortcut
+      </a>
+      <a href="{{ self.mode_url("metronome") }}"
+         class="px-3 py-1.5 text-sm font-bold uppercase tracking-widest transition-colors
+                {% if filter_mode == "metronome" %}bg-[#3b82f6] text-white{% else %}bg-surface-container-low text-[#3b82f6] hover:bg-surface-container-high{% endif %}">
+        Metronome
+      </a>
+      <a href="{{ self.mode_url("bomb") }}"
+         class="px-3 py-1.5 text-sm font-bold uppercase tracking-widest transition-colors
+                {% if filter_mode == "bomb" %}bg-[#f59e0b] text-white{% else %}bg-surface-container-low text-[#f59e0b] hover:bg-surface-container-high{% endif %}">
+        Bomb
+      </a>
+
+    {# Era filter #}
+    {% if !eras.is_empty() %}
+      <select onchange="window.location.href=this.value"
+              class="bg-surface-container-low text-sm ml-2 px-3 py-1.5 font-bold
+              uppercase tracking-widest text-outline focus:outline-none cursor-pointer
+              appearance-none border-none">
+        <option value="{{ self.era_url(None) }}"{% if filter_era.is_none() %} selected{% endif %}>All Eras</option>
+        {% for era in eras %}
+        <option value="{{ self.era_url(Some(*era.id)) }}"{% if filter_era == Some(*era.id) %} selected{% endif %}>{{ era.name }}</option>
         {% endfor %}
-      </tbody>
-    </table>
+      </select>
+    </div>
+    {% endif %}
+
   </div>
-</div>
+
+  {# ── Events table ── #}
+  {% if events.is_empty() %}
+  <div class="flex flex-col items-center justify-center py-24 text-center">
+    <p class="text-lg font-bold text-on-surface mb-1">No events found</p>
+    <p class=" text-outline">Try adjusting the filters above.</p>
+  </div>
+  {% else %}
+  {% call event_list_macros::event_list(events) %}{% endcall %}
+  {% endif %}
+
+  {# ── Pagination ── #}
+  {% if total_pages > 1 %}
+  <div class="flex items-center justify-center gap-3 mt-8 pt-6 border-t border-outline-variant/20">
+    {% if page > 1 %}
+    <a href="{{ self.page_url(page - 1) }}"
+       class="px-5 py-2 text-sm font-bold uppercase tracking-widest text-outline border border-outline-variant/30 hover:border-primary-container hover:text-on-surface transition-colors">
+      ← PREV
+    </a>
+    {% else %}
+    <span class="px-5 py-2 text-sm font-bold uppercase tracking-widest text-outline/30 border border-outline-variant/10">← PREV</span>
+    {% endif %}
+
+    <span class="text-sm text-outline uppercase tracking-widest">Page {{ page }} of {{ total_pages }}</span>
+
+    {% if page < total_pages %}
+    <a href="{{ self.page_url(page + 1) }}"
+       class="px-5 py-2 text-sm font-bold uppercase tracking-widest text-outline border border-outline-variant/30 hover:border-primary-container hover:text-on-surface transition-colors">
+      NEXT →
+    </a>
+    {% else %}
+    <span class="px-5 py-2 text-sm font-bold uppercase tracking-widest text-outline/30 border border-outline-variant/10">NEXT →</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</main>
 
 {% endblock %}

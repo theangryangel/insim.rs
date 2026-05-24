@@ -1,7 +1,7 @@
 use std::{cell::Cell, marker::PhantomData};
 
 use insim::insim::BtnStyle;
-use insim_extras::ui;
+use insim_extra::ui;
 
 pub const PAGE_SIZE: usize = 20;
 

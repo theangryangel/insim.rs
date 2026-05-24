@@ -8,7 +8,7 @@ use insim::{
     identifiers::{ConnectionId, RequestId},
     insim::{Axm, BfnType, Cpp, ObjectInfo, PmoAction, PmoFlags, TinyType, TtcType},
 };
-use insim_extras::ui::{Canvas, Component};
+use insim_extra::ui::{Canvas, Component};
 use tokio::time::{MissedTickBehavior, sleep};
 
 mod tools;

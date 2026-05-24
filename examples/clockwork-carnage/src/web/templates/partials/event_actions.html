@@ -1,68 +1,10 @@
 <div id="event-actions">
-  {% if page.admin %}
-  <div class="flex items-center gap-2 flex-wrap mt-3">
+  {% if current_user.admin %}
+  <div class="flex items-center gap-2 flex-wrap mt-4">
     <a
       href="/events/{{ event.id }}/edit"
-      class="font-headline text-xs uppercase tracking-widest text-outline border border-outline/30 px-4 py-2 hover:text-on-background hover:border-outline/60 transition-colors"
+      class="text-sm font-bold uppercase tracking-widest text-outline border border-outline-variant px-4 py-2 hover:text-on-surface hover:border-outline transition-colors"
     >Edit</a>
-    {% match event.status %}
-    {% when EventStatus::Pending %}
-    <form
-      method="post"
-      action="/events/{{ event.id }}/start"
-      hx-post="/events/{{ event.id }}/start"
-      hx-target="#event-actions"
-      hx-swap="outerHTML"
-    >
-      <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}" />
-      <button
-        type="submit"
-        class="font-headline font-bold text-xs uppercase tracking-widest bg-primary-container text-white px-4 py-2 hover:bg-white hover:text-primary-container transition-all"
-      >Start</button>
-    </form>
-    <form
-      method="post"
-      action="/events/{{ event.id }}/cancel"
-      hx-post="/events/{{ event.id }}/cancel"
-      hx-target="#event-actions"
-      hx-swap="outerHTML"
-    >
-      <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}" />
-      <button
-        type="submit"
-        class="font-headline text-xs uppercase tracking-widest text-outline border border-outline/30 px-4 py-2 hover:text-on-background transition-colors"
-      >Cancel</button>
-    </form>
-    {% when EventStatus::Active %}
-    <form
-      method="post"
-      action="/events/{{ event.id }}/complete"
-      hx-post="/events/{{ event.id }}/complete"
-      hx-target="#event-actions"
-      hx-swap="outerHTML"
-    >
-      <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}" />
-      <button
-        type="submit"
-        class="font-headline font-bold text-xs uppercase tracking-widest bg-tertiary-container text-white px-4 py-2 hover:bg-white hover:text-tertiary-container transition-all"
-      >Complete</button>
-    </form>
-    <form
-      method="post"
-      action="/events/{{ event.id }}/cancel"
-      hx-post="/events/{{ event.id }}/cancel"
-      hx-target="#event-actions"
-      hx-swap="outerHTML"
-    >
-      <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}" />
-      <button
-        type="submit"
-        class="font-headline text-xs uppercase tracking-widest text-outline border border-outline/30 px-4 py-2 hover:text-on-background transition-colors"
-      >Cancel</button>
-    </form>
-    {% when EventStatus::Completed %}
-    {% when EventStatus::Cancelled %}
-    {% endmatch %}
   </div>
   {% endif %}
 </div>
