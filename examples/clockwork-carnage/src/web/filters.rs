@@ -1,31 +1,15 @@
 use insim::core::string::{colours::Colour, escaping::Escape};
-
-use crate::db::Timestamp;
-
-#[askama::filter_fn]
-pub fn format_datetime_local(ts: &Timestamp, _env: &dyn askama::Values) -> askama::Result<String> {
-    Ok(ts
-        .to_zoned(jiff::tz::TimeZone::UTC)
-        .strftime("%Y-%m-%dT%H:%M")
-        .to_string())
-}
+use jiff_sqlx::Timestamp;
 
 #[askama::filter_fn]
 pub fn format_timestamp(ts: &Timestamp, _env: &dyn askama::Values) -> askama::Result<String> {
-    Ok(ts
-        .to_zoned(jiff::tz::TimeZone::UTC)
-        .strftime("%Y-%m-%d %H:%M UTC")
-        .to_string())
+    Ok(ts.to_jiff().strftime("%Y-%m-%d %H:%M UTC").to_string())
 }
 
 /// Outputs an ISO 8601 string at second precision for use in <time datetime="...">.
-/// Truncates sub-seconds so all browsers parse it reliably.
 #[askama::filter_fn]
 pub fn as_datetime(ts: &Timestamp, _env: &dyn askama::Values) -> askama::Result<String> {
-    Ok(ts
-        .to_zoned(jiff::tz::TimeZone::UTC)
-        .strftime("%Y-%m-%dT%H:%M:%SZ")
-        .to_string())
+    Ok(ts.to_jiff().strftime("%Y-%m-%dT%H:%M:%SZ").to_string())
 }
 
 #[askama::filter_fn]
@@ -60,7 +44,7 @@ pub fn colour_html(s: &str, _env: &dyn askama::Values) -> askama::Result<String>
             4 => "text-blue-500",
             5 => "text-purple-500",
             6 => "text-cyan-500",
-            _ => "", // 7 (white) and 8 (default): inherit parent colour
+            _ => "",
         }
     }
 

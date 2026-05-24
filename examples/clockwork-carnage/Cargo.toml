@@ -13,25 +13,27 @@ anyhow = "1"
 askama = "0.15"
 axum = "0.8"
 axum-login = "0.18"
-clap = { workspace = true, features = ["derive"] }
-insim = { path = "../../insim", features = ["serde", "blocking"] }
-insim_extras = { path = "../../insim_extras" }
+clap = { workspace = true, features = ["derive", "env"] }
+insim = { path = "../../insim", features = ["serde"] }
+kitcar = { path = "../../kitcar" }
 oauth2 = { version = "4", features = ["reqwest"] }
 reqwest = { version = "0.12", features = ["json"] }
 serde = { workspace = true, features = ["derive"] }
-toml = "0.8"
-serde_json = "1"
-jiff = "0.2"
-sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "migrate"] }
+serde_json = { workspace = true }
+jiff = { version = "0.2", features = ["serde"] }
+jiff-sqlx = { version = "0.1.1", features = ["postgres"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "migrate"] }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "signal", "time", "sync"]}
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "signal", "time", "sync"] }
 tokio-util = { workspace = true }
 tower-sessions = { version = "0.14", features = ["private"] }
-tower-sessions-sqlx-store = { version = "0.15", features = ["sqlite"] }
-tracing = {workspace = true}
+tower-sessions-sqlx-store = { version = "0.15", features = ["postgres"] }
+tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 rust-embed = "8.11.0"
 mime_guess = "2.0.5"
+serde_urlencoded = "0.7"
+validator = { version = "0.20", features = ["derive"] }
 
 [lints]
 workspace = true

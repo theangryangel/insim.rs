@@ -1,125 +1,77 @@
-//! ShortcutGame - MiniGame implementation for the shortcut/challenge mode.
+//! Shortcut mini-game subcommand. Players race from checkpoint1 to finish
+//! and try to post the fastest time.
+//!
+//! Phase machine: Waiting → SettingUp → Racing (same pattern as bomb).
 
-mod challenge_loop;
-pub mod chat;
+mod config;
+mod events;
+mod handlers;
+mod state;
+mod ui;
 
 use std::time::Duration;
 
-pub use challenge_loop::ChallengeLoop;
-use insim_extras::scenes::{
-    IntoSceneError as _, Scene, SceneError, SceneExt, wait_for_players::WaitForPlayers,
+pub use config::{ShortcutArgs, ShortcutConfig, ShortcutRunConfig};
+use handlers::{
+    on_connected, on_disconnected, on_npl, on_race_ended, on_setup_aborted, on_setup_complete,
+    on_toc, on_uco,
 };
-use tokio::task::JoinHandle;
+use kitcar::{App, AppError, Game, HandlerExt, Presence, Stage, State, run};
+use state::{Shortcut, ShortcutGlobal, ShortcutPhase};
 use tokio_util::sync::CancellationToken;
+use ui::{ShortcutUi, ShortcutView};
 
-use super::{MiniGame, MiniGameCtx, ordinal, position_xp, setup_track};
-use crate::{ChatError, MIN_PLAYERS, db};
+pub async fn run_shortcut_with(cfg: ShortcutRunConfig) -> Result<(), AppError> {
+    let app =
+        App::<Shortcut>::with_state(Shortcut::new(cfg.config, CancellationToken::new(), cfg.db));
+    app.state().write().runtime_cancel = app.cancel_token().clone();
 
-pub struct ShortcutGame {
-    pub session_id: i64,
-    pub track: insim::core::track::Track,
-    pub layout: String,
-    pub chat: chat::ChallengeChat,
-    pub event_name: Option<String>,
+    let sender = app.sender().clone();
+    let ui = ShortcutUi::new(
+        sender.clone(),
+        ShortcutGlobal {
+            phase: ShortcutPhase::Waiting.label().to_string(),
+            ..Default::default()
+        },
+        |_ucid, _invalidator| ShortcutView,
+    );
+
+    let presence = Presence::new();
+    let game = Game::new();
+
+    let while_racing = |s: State<Shortcut>| s.read().phase == ShortcutPhase::Racing;
+
+    let app = app
+        .handle(Stage::Pre, presence)
+        .handle(Stage::Pre, game)
+        .handle(Stage::Pre, ui)
+        .handle(Stage::Update, on_connected)
+        .handle(Stage::Update, on_disconnected)
+        .handle(Stage::Update, on_setup_complete)
+        .handle(Stage::Update, on_setup_aborted)
+        .handle(Stage::Update, on_race_ended)
+        .handle(Stage::Update, on_npl.run_if(while_racing))
+        .handle(Stage::Update, on_toc.run_if(while_racing))
+        .handle(Stage::Update, on_uco.run_if(while_racing));
+
+    let builder = insim::tcp(cfg.insim.addr)
+        .isi_iname("shortcut".to_string())
+        .isi_prefix('!')
+        .isi_admin_password(cfg.insim.admin_password);
+
+    run(builder, app).await
 }
 
-pub struct ShortcutGuard {
-    chat_handle: JoinHandle<Result<(), ChatError>>,
-}
-
-impl Drop for ShortcutGuard {
-    fn drop(&mut self) {
-        self.chat_handle.abort();
-    }
-}
-
-impl MiniGame for ShortcutGame {
-    type Guard = ShortcutGuard;
-
-    async fn run(&self, ctx: &MiniGameCtx, cancel: CancellationToken) -> Result<(), SceneError> {
-        let challenge_scene = WaitForPlayers {
-            min_players: MIN_PLAYERS,
-        }
-        .then(
-            setup_track::SetupTrack {
-                min_players: MIN_PLAYERS,
-                track: self.track,
-                layout: Some(self.layout.clone()),
-                mode_name: match &self.event_name {
-                    Some(name) => {
-                        format!("{name} - Shortcut: find a faster path than your opponents!")
-                    },
-                    None => "Shortcut: find a faster path than your opponents!".to_string(),
-                },
-            }
-            .with_timeout(Duration::from_secs(60)),
-        )
-        .then(
-            ChallengeLoop {
-                chat: self.chat.clone(),
-                session_id: self.session_id,
-                base_url: ctx.base_url.clone(),
-            }
-            .until_game_ends(),
-        )
-        .loop_until_quit()
-        .with_cancellation(cancel);
-
-        let _ = challenge_scene.run(ctx).await?;
-        Ok(())
-    }
-
-    async fn setup(
-        event: &db::Event,
-        ctx: &MiniGameCtx,
-    ) -> Result<(Self, Self::Guard), SceneError> {
-        let (chat, chat_handle) = chat::spawn(ctx.insim.clone());
-
-        let game = ShortcutGame {
-            session_id: event.id,
-            track: event.track,
-            layout: event.layout.clone(),
-            chat,
-            event_name: event.name.clone(),
-        };
-
-        let guard = ShortcutGuard { chat_handle };
-        Ok((game, guard))
-    }
-
-    async fn teardown(&self, event: &db::Event, ctx: &MiniGameCtx) -> Result<(), SceneError> {
-        db::complete_event(&ctx.pool, event.id)
-            .await
-            .scene_err("shortcut::teardown")?;
-
-        let standings = db::shortcut_best_times(&ctx.pool, event.id)
-            .await
-            .scene_err("shortcut::teardown::standings")?;
-
-        if !standings.is_empty() {
-            let parts: Vec<String> = standings
-                .iter()
-                .enumerate()
-                .map(|(i, s)| {
-                    let xp = position_xp(i);
-                    format!("{} {} (+{xp} XP)", ordinal(i + 1), s.pname)
-                })
-                .collect();
-            let _ = ctx
-                .insim
-                .send_message(format!("Shortcut: {}", parts.join(", ")), None)
-                .await;
-
-            for (i, s) in standings.iter().enumerate() {
-                let xp = position_xp(i);
-                if let Err(e) =
-                    db::award_xp(&ctx.pool, &s.uname, xp, "shortcut", Some(event.id)).await
-                {
-                    tracing::warn!("Failed to award XP to {}: {e}", s.uname);
-                }
-            }
-        }
-
-        Ok(())
-    }
+/// Ad-hoc entry point: runs shortcut without any DB backing.
+pub async fn run_shortcut(args: ShortcutArgs) -> Result<(), AppError> {
+    run_shortcut_with(ShortcutRunConfig {
+        insim: args.insim,
+        config: ShortcutConfig {
+            track: args.track,
+            layout: args.layout,
+            setup_timeout: Duration::from_secs(60),
+        },
+        db: None,
+    })
+    .await
 }

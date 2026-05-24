@@ -1,151 +1,100 @@
-//! BombGame - MiniGame implementation for bomb/countdown mode.
+//! Bomb mini-game subcommand. Ported from kitcar/examples/bomb.rs with
+//! optional DB writes when `--db` and `--event-id` are provided.
 
-mod challenge_loop;
-pub mod chat;
-pub mod state;
+mod config;
+mod db;
+mod events;
+mod handlers;
+mod state;
+mod ui;
 
 use std::time::Duration;
 
-pub use challenge_loop::BombLoop;
-use insim_extras::scenes::{
-    IntoSceneError as _, Scene, SceneError, SceneExt, wait_for_players::WaitForPlayers,
+pub use config::{BombArgs, BombConfig, BombRunConfig};
+use config::{PENALTY_CLEAR_DELAY, TICK_PERIOD};
+use events::BombTick;
+use handlers::{
+    on_con, on_connected, on_crs, on_disconnected, on_npl, on_pit, on_player_left,
+    on_player_teleported_to_pits, on_race_ended, on_setup_aborted, on_setup_complete, on_tick,
+    on_toc, on_uco,
 };
-use tokio::task::JoinHandle;
+use kitcar::{App, AppError, Game, HandlerExt, PenaltyClearer, Presence, Stage, State, run};
+use state::{Bomb, BombGlobal, BombPhase};
 use tokio_util::sync::CancellationToken;
+use ui::{BombUi, BombView};
 
-use super::{MiniGame, MiniGameCtx, ordinal, position_xp, setup_track};
-use crate::{ChatError, MIN_PLAYERS, db};
+pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
+    let app = App::<Bomb>::with_state(Bomb::new(cfg.config, CancellationToken::new(), cfg.db));
+    let sender = app.sender().clone();
 
-pub struct BombGame {
-    pub session_id: i64,
-    pub track: insim::core::track::Track,
-    pub layout: String,
-    pub checkpoint_timeout: Duration,
-    pub checkpoint_penalty: Duration,
-    pub collision_max_penalty: Duration,
-    pub chat: chat::BombChat,
-    pub event_name: Option<String>,
-}
+    app.state().write().runtime_cancel = app.cancel_token().clone();
 
-pub struct BombGuard {
-    chat_handle: JoinHandle<Result<(), ChatError>>,
-}
-
-impl Drop for BombGuard {
-    fn drop(&mut self) {
-        self.chat_handle.abort();
-    }
-}
-
-impl MiniGame for BombGame {
-    type Guard = BombGuard;
-
-    async fn run(&self, ctx: &MiniGameCtx, cancel: CancellationToken) -> Result<(), SceneError> {
-        let bomb_scene = WaitForPlayers {
-            min_players: MIN_PLAYERS,
-        }
-        .then(
-            setup_track::SetupTrack {
-                min_players: MIN_PLAYERS,
-                track: self.track,
-                layout: Some(self.layout.clone()),
-                mode_name: match &self.event_name {
-                    Some(name) => {
-                        format!("{name} - Bomb: hit every checkpoint before the clock runs out!")
-                    },
-                    None => "Bomb: hit every checkpoint before the clock runs out!".to_string(),
-                },
-            }
-            .with_timeout(Duration::from_secs(60)),
-        )
-        .then(
-            BombLoop {
-                chat: self.chat.clone(),
-                session_id: self.session_id,
-                checkpoint_timeout: self.checkpoint_timeout,
-                checkpoint_penalty: self.checkpoint_penalty,
-                collision_max_penalty: self.collision_max_penalty,
-                base_url: ctx.base_url.clone(),
-            }
-            .until_game_ends(),
-        )
-        .loop_until_quit()
-        .with_cancellation(cancel);
-
-        let _ = bomb_scene.run(ctx).await?;
-        Ok(())
-    }
-
-    async fn setup(
-        event: &db::Event,
-        ctx: &MiniGameCtx,
-    ) -> Result<(Self, Self::Guard), SceneError> {
-        let (checkpoint_timeout, checkpoint_penalty, collision_max_penalty) = match *event.mode {
-            db::EventMode::Bomb {
-                checkpoint_timeout_secs,
-                checkpoint_penalty_ms,
-                collision_max_penalty_ms,
-            } => (
-                Duration::from_secs(checkpoint_timeout_secs as u64),
-                Duration::from_millis(checkpoint_penalty_ms as u64),
-                Duration::from_millis(collision_max_penalty_ms as u64),
-            ),
-            _ => (
-                Duration::from_secs(30),
-                Duration::from_millis(250),
-                Duration::from_millis(500),
-            ),
-        };
-
-        let (chat, chat_handle) = chat::spawn(ctx.insim.clone());
-
-        let game = BombGame {
-            session_id: event.id,
-            track: event.track,
-            layout: event.layout.clone(),
-            checkpoint_timeout,
-            checkpoint_penalty,
-            collision_max_penalty,
-            chat,
-            event_name: event.name.clone(),
-        };
-
-        let guard = BombGuard { chat_handle };
-        Ok((game, guard))
-    }
-
-    async fn teardown(&self, event: &db::Event, ctx: &MiniGameCtx) -> Result<(), SceneError> {
-        db::complete_event(&ctx.pool, event.id)
-            .await
-            .scene_err("bomb::teardown")?;
-
-        let standings = db::bomb_best_runs(&ctx.pool, event.id)
-            .await
-            .scene_err("bomb::teardown::standings")?;
-
-        if !standings.is_empty() {
-            let parts: Vec<String> = standings
-                .iter()
-                .enumerate()
-                .map(|(i, s)| {
-                    let xp = position_xp(i);
-                    format!("{} {} (+{xp} XP)", ordinal(i + 1), s.pname)
-                })
-                .collect();
-            let _ = ctx
-                .insim
-                .send_message(format!("Bomb: {}", parts.join(", ")), None)
-                .await;
-
-            for (i, s) in standings.iter().enumerate() {
-                let xp = position_xp(i);
-                if let Err(e) = db::award_xp(&ctx.pool, &s.uname, xp, "bomb", Some(event.id)).await
-                {
-                    tracing::warn!("Failed to award XP to {}: {e}", s.uname);
+    let ui = BombUi::new(
+        sender.clone(),
+        BombGlobal {
+            phase: BombPhase::Waiting.label().to_string(),
+            ..Default::default()
+        },
+        |_ucid, invalidator| {
+            let _tick_handle = tokio::spawn(async move {
+                let mut interval = tokio::time::interval(Duration::from_millis(100));
+                loop {
+                    let _ = interval.tick().await;
+                    invalidator.invalidate();
                 }
-            }
-        }
+            });
+            BombView { _tick_handle }
+        },
+    );
 
-        Ok(())
-    }
+    let presence = Presence::new();
+    let game = Game::new();
+    let clearer = PenaltyClearer::new(PENALTY_CLEAR_DELAY);
+
+    let while_racing = |s: State<Bomb>| s.read().phase == BombPhase::Racing;
+
+    let app = app
+        .handle(Stage::Pre, presence)
+        .handle(Stage::Pre, game)
+        .handle(Stage::Pre, clearer)
+        .handle(Stage::Pre, ui)
+        .handle(Stage::Update, on_connected)
+        .handle(Stage::Update, on_disconnected)
+        .handle(Stage::Update, on_setup_complete)
+        .handle(Stage::Update, on_setup_aborted)
+        .handle(Stage::Update, on_race_ended)
+        .handle(Stage::Update, on_npl.run_if(while_racing))
+        .handle(Stage::Update, on_player_left.run_if(while_racing))
+        .handle(Stage::Update, on_toc.run_if(while_racing))
+        .handle(Stage::Update, on_pit.run_if(while_racing))
+        .handle(
+            Stage::Update,
+            on_player_teleported_to_pits.run_if(while_racing),
+        )
+        .handle(Stage::Update, on_crs.run_if(while_racing))
+        .handle(Stage::Update, on_con.run_if(while_racing))
+        .handle(Stage::Update, on_uco.run_if(while_racing))
+        .handle(Stage::Update, on_tick.run_if(while_racing))
+        .periodic(TICK_PERIOD, BombTick);
+
+    let builder = insim::tcp(cfg.insim.addr)
+        .isi_iname("bomb".to_string())
+        .isi_prefix('!')
+        .isi_admin_password(cfg.insim.admin_password);
+
+    run(builder, app).await
+}
+
+/// Ad-hoc entry point: runs bomb without any DB backing.
+pub async fn run_bomb(args: BombArgs) -> Result<(), AppError> {
+    run_bomb_with(BombRunConfig {
+        insim: args.insim,
+        config: BombConfig {
+            track: args.track,
+            layout: args.layout,
+            ..BombConfig::default()
+        },
+        db: None,
+    })
+    .await
 }

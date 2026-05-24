@@ -1,143 +1,38 @@
 {% extends "base.html" %}
+{% import "partials/event_list.html" as event_list_macros %}
 {% block title %}Clockwork Carnage{% endblock %}
 {% block content %}
 
 {# ── Hero ── #}
-<section class="relative w-full flex items-end overflow-hidden border-b border-primary-container/20 bg-surface-container-lowest">
-  <div class="absolute inset-0 z-0 opacity-40">
-    <img alt="Race track" class="w-full h-full object-cover" data-alt="High-speed racing car on a urban track at night with neon light trails and motion blur" src="/assets/track.png">
-    <div class="absolute inset-0 bg-gradient-to-r from-surface via-surface/80 to-transparent"></div>
+<section class="relative min-h-screen overflow-hidden">
+  <div class="absolute inset-0 bg-cover bg-center bg-no-repeat" style="background-image: url('/assets/track.jpg')">
+    <div class="absolute inset-0 bg-gradient-to-l from-surface from-30% via-surface/90 via-60% to-surface/60"></div>
   </div>
-  <div class="relative z-20 w-full max-w-7xl mx-auto px-8 lg:px-16 pt-12 pb-12">
-    <img src="/assets/logo.svg" alt="Clockwork Carnage" class="h-[220px] w-auto" />
-    <p class="font-body text-lg text-secondary max-w-xl mb-10 leading-relaxed opacity-90">
-      High-fidelity mini-game server for Live for Speed. Three challenge modes. No mercy.
-    </p>
-    <div class="flex flex-wrap gap-4 flex-col md:flex-row">
-      <a href="/events" class="bg-primary-container text-white font-headline font-bold
-        uppercase px-10 py-4 hover:bg-white hover:text-primary-container transition-all
-        shadow-[0_0_20px_rgba(243,75,0,0.4)] text-center">
-        View Events
-      </a>
-      <a href="/leaderboard" class="bg-surface-container-high/40 backdrop-blur-sm text-on-background border border-primary-container font-headline font-bold uppercase px-10 py-4 hover:bg-primary-container/10 transition-all text-center">
-        Leaderboard
-      </a>
-      <a href="#" class="backdrop-blur-sm text-on-background
-        border border-tertiary-container font-headline font-bold uppercase px-10 py-4
-        md:ml-auto
-        hover:bg-tertiary-container/10 transition-all text-center">
-        Join Server Now
-      </a>
+  <div class="relative z-10 grid lg:grid-cols-2 gap-12 px-6 lg:px-12 py-12 max-w-screen-xl mx-auto">
+    {# ── Left: branding ── #}
+    <div class="flex flex-col justify-center">
+      <img src="/assets/logo.svg" alt="Clockwork Carnage" class="h-[180px] w-auto mr-auto" />
+      <p class="text-base text-outline max-w-md leading-relaxed mt-8">
+        Mini-game server for Live for Speed. Three challenge modes. No mercy.
+      </p>
     </div>
+
+    {# ── Right: events ── #}
+    <div class="flex flex-col justify-start pt-4">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-bold text-outline uppercase tracking-widest">Current &amp; Upcoming</h2>
+        <a href="/events" class="font-bold text-primary-container hover:underline tracking-wider uppercase">View All</a>
+      </div>
+      <div class="h-px bg-outline-variant/20 mb-4"></div>
+
+      {% if events.is_empty() %}
+      <p class="py-6 text-center text-outline">No events currently scheduled</p>
+      {% else %}
+      {% call event_list_macros::event_list(events) %}{% endcall %}
+      {% endif %}
+    </div>
+
   </div>
 </section>
-
-{# ── Content Grid ── #}
-<div class="max-w-7xl mx-auto">
-  <section class="p-8 lg:p-16 grid grid-cols-1 lg:grid-cols-12 gap-12">
-
-    {# ── Events column (7/12) ── #}
-    <div class="lg:col-span-7 space-y-10">
-      <div class="flex items-center justify-between border-b border-outline-variant/15 pb-6">
-        <h2 class="font-headline text-3xl font-black uppercase tracking-tighter">Current <span class="text-primary-container">Events</span></h2>
-        <a href="/events" class="font-headline text-[11px] font-bold uppercase tracking-widest text-primary-container hover:opacity-70 transition-opacity border-b border-primary-container/30">View All</a>
-      </div>
-
-      <div class="space-y-4">
-        {# Active event #}
-        {% match active %}
-        {% when Some with (active_event) %}
-        <a href="/events/{{ active_event.id }}" class="group relative bg-surface-container-low p-6 flex flex-col md:flex-row justify-between items-center gap-6 border-l-4 border-tertiary-container hover:bg-surface-container transition-all block">
-          <div class="flex items-center gap-6">
-            <div class="text-center bg-surface-container-highest p-3 min-w-[72px] border border-white/5">
-              <p class="font-headline text-[9px] uppercase font-bold text-outline mb-1">Live</p>
-              {% match *active_event.mode %}
-              {% when EventMode::Metronome { .. } %}
-              <p class="font-headline text-2xl font-black">MET</p>
-              {% when EventMode::Shortcut %}
-              <p class="font-headline text-2xl font-black">SCT</p>
-              {% when EventMode::Bomb { .. } %}
-              <p class="font-headline text-2xl font-black">BMB</p>
-              {% endmatch %}
-            </div>
-            <div>
-              <h3 class="font-headline text-xl font-bold uppercase tracking-tight group-hover:text-primary-container transition-colors">
-                {% match active_event.name %}
-                {% when Some with (n) %}{{ n }}
-                {% when None %}{{ active_event.track }} - {{ active_event.layout }}
-                {% endmatch %}
-              </h3>
-              {% match active_event.scheduled_at %}
-              {% when Some with (s) %}
-              <p class="text-[11px] text-secondary/60 mt-1 uppercase font-headline font-medium tracking-wider">
-                <time datetime="{{ s|as_datetime }}" x-data x-localtime>{{ s|format_timestamp }}</time>
-              </p>
-              {% when None %}{% endmatch %}
-            </div>
-          </div>
-          <div class="bg-tertiary-container/10 px-4 py-2.5 flex items-center gap-2.5 border border-tertiary-container/20 flex-shrink-0">
-            <span class="w-2 h-2 bg-tertiary-container animate-pulse rounded-full shadow-[0_0_8px_#3a90ff]"></span>
-            <span class="font-headline text-xs font-bold uppercase text-tertiary-container tracking-widest">In Progress</span>
-          </div>
-        </a>
-        {% when None %}
-        {% endmatch %}
-
-        {# Upcoming events #}
-        {% for event in upcoming %}
-        <a href="/events/{{ event.id }}" class="group relative bg-surface-container-low p-6 flex flex-col md:flex-row justify-between items-center gap-6 border-l-4 border-primary-container/50 hover:bg-surface-container transition-all block">
-          <div class="flex items-center gap-6">
-            <div class="text-center bg-surface-container-highest p-3 min-w-[72px] border border-white/5">
-              {% match event.scheduled_at %}
-              {% when Some with (s) %}
-              <p class="font-headline text-[9px] uppercase font-bold text-outline mb-1">
-                <time datetime="{{ s|as_datetime }}" x-data x-localtime>{{ s|format_timestamp }}</time>
-              </p>
-              {% when None %}
-              <p class="font-headline text-[9px] uppercase font-bold text-outline mb-1">TBD</p>
-              {% endmatch %}
-              {% match *event.mode %}
-              {% when EventMode::Metronome { .. } %}
-              <p class="font-headline text-2xl font-black">MET</p>
-              {% when EventMode::Shortcut %}
-              <p class="font-headline text-2xl font-black">SCT</p>
-              {% when EventMode::Bomb { .. } %}
-              <p class="font-headline text-2xl font-black">BMB</p>
-              {% endmatch %}
-            </div>
-            <div>
-              <h3 class="font-headline text-xl font-bold uppercase tracking-tight group-hover:text-primary-container transition-colors">
-                {% match event.name %}
-                {% when Some with (n) %}{{ n }}
-                {% when None %}{{ event.track }} - {{ event.layout }}
-                {% endmatch %}
-              </h3>
-              <p class="text-[11px] text-secondary/60 mt-1 uppercase font-headline font-medium tracking-wider">{{ event.track }} | {{ event.layout }}</p>
-            </div>
-          </div>
-          <span class="font-headline text-xs font-bold uppercase text-outline tracking-widest px-4 py-2.5 border border-outline/20">Upcoming</span>
-        </a>
-        {% endfor %}
-
-        {% if upcoming.is_empty() %}
-        {% match active %}
-        {% when None %}
-        <p class="font-headline text-xs uppercase tracking-widest text-outline py-8 text-center">Nothing scheduled.</p>
-        {% when Some with (_) %}{% endmatch %}
-        {% endif %}
-      </div>
-    </div>
-
-    {# ── Presence column (5/12) ── #}
-    <div class="lg:col-span-5 space-y-10">
-      <div class="flex items-center justify-between border-b border-outline-variant/15 pb-6">
-        <h2 class="font-headline text-3xl font-black uppercase tracking-tighter">Active
-          <span class="text-primary-container">Players</span></h2>
-      </div>
-      <div hx-get="/presence" hx-trigger="load" hx-swap="outerHTML"></div>
-    </div>
-
-  </section>
-</div>
 
 {% endblock %}

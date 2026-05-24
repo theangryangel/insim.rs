@@ -2,7 +2,7 @@ use insim::{
     core::heading::Heading,
     insim::{BtnStyle, ObjectInfo},
 };
-use insim_extras::{ui, ui::Component as _};
+use insim_extra::{ui, ui::Component as _};
 
 use super::{OptionsMsg, PrefabSummary, ToolboxProps, options, scroll_list};
 use crate::{Command, SpawnOrigin, State, tools};

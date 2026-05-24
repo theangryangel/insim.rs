@@ -1,0 +1,21 @@
+[package]
+name = "insim_extra"
+description = "Standalone Insim components"
+version = "0.1.0+unreleased"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+insim = { path = "../insim" }
+tokio = { workspace = true, features = ["time", "sync", "rt"] }
+tokio-util = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+fixedbitset = { workspace = true }
+taffy = "0.9.2"

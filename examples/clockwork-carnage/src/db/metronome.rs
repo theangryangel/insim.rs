@@ -1,6 +1,6 @@
 use sqlx::Row;
 
-use super::{MetronomeStanding, Pool, Timestamp};
+use super::{MetronomeStanding, Pool};
 
 pub async fn insert_metronome_lap(
     pool: &Pool,
@@ -8,16 +8,14 @@ pub async fn insert_metronome_lap(
     uname: &str,
     delta_ms: i64,
 ) -> Result<i64, sqlx::Error> {
-    let now = Timestamp::now();
     let row = sqlx::query(
         "INSERT INTO metronome_results (event_id, user_id, delta_ms, recorded_at)
-         VALUES (?, (SELECT id FROM users WHERE uname = ?), ?, ?)
+         VALUES ($1, (SELECT id FROM users WHERE uname = $2), $3, NOW())
          RETURNING id",
     )
     .bind(event_id)
     .bind(uname)
     .bind(delta_ms)
-    .bind(now)
     .fetch_one(pool)
     .await?;
     Ok(row.get("id"))
@@ -32,8 +30,8 @@ pub async fn metronome_standings(
         SELECT u.uname, u.pname, u.twitch_username, u.youtube_username, MIN(r.delta_ms) AS best_delta_ms
         FROM metronome_results r
         JOIN users u ON u.id = r.user_id
-        WHERE r.event_id = ?
-        GROUP BY r.user_id
+        WHERE r.event_id = $1
+        GROUP BY r.user_id, u.uname, u.pname, u.twitch_username, u.youtube_username
         ORDER BY best_delta_ms ASC
         "#,
     )
@@ -51,20 +49,4 @@ pub async fn metronome_standings(
             youtube_username: row.get("youtube_username"),
         })
         .collect())
-}
-
-pub async fn metronome_personal_best(
-    pool: &Pool,
-    event_id: i64,
-    uname: &str,
-) -> Result<Option<i64>, sqlx::Error> {
-    sqlx::query_scalar::<_, Option<i64>>(
-        "SELECT MIN(r.delta_ms) FROM metronome_results r
-         JOIN users u ON u.id = r.user_id
-         WHERE r.event_id = ? AND u.uname = ?",
-    )
-    .bind(event_id)
-    .bind(uname)
-    .fetch_one(pool)
-    .await
 }

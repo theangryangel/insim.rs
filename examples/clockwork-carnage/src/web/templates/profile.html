@@ -1,57 +1,66 @@
 {% extends "base.html" %}
+{% import "partials/form.html" as form %}
 {% block title %}Profile - Clockwork Carnage{% endblock %}
 {% block content %}
 
 {# ── Header ── #}
-<section class="border-b border-primary-container/20 bg-surface-container-lowest px-6 lg:px-16 py-12">
-  <div class="max-w-7xl mx-auto">
-    <h1 class="font-headline text-5xl md:text-7xl font-black uppercase tracking-tighter leading-none text-on-surface">
-      Your <span class="text-primary-container">Profile</span>
+<div class="border-b border-outline-variant/20">
+  <div class="max-w-screen-xl mx-auto px-6 lg:px-12 py-6">
+    {% if let Some(uname) = current_user.uname %}
+    <h1 class="text-3xl md:text-4xl font-black tracking-tight">
+      <span class="text-on-surface">HELLO </span><span class="text-primary-container">{{ uname }}</span>
     </h1>
+    {% else %}
+    <h1 class="text-3xl md:text-4xl font-black tracking-tight text-on-surface">PROFILE</h1>
+    {% endif %}
   </div>
-</section>
+</div>
 
 {# ── Form ── #}
-<div class="max-w-7xl mx-auto px-6 lg:px-16 py-12">
-  <div class="max-w-lg">
-    <p class="font-body text-sm text-on-surface-variant mb-8 leading-relaxed">
-      Link your streaming channels - your handles will appear alongside your results so spectators can find your stream.
-    </p>
-    <form method="post" action="/profile" class="space-y-8">
-      <input type="hidden" name="csrf_token" value="{{ page.csrf_token }}" />
+<div class="max-w-screen-xl mx-auto px-6 lg:px-12 py-8">
+  <div class="max-w-2xl">
+    {% call form::form("/profile", csrf_token) %}
+    <div class="space-y-8">
 
-      <div>
-        <label for="twitch_username" class="font-headline text-xs uppercase tracking-widest text-outline block mb-2">Twitch Username</label>
-        <input
-          type="text"
-          id="twitch_username"
-          name="twitch_username"
-          value="{% if let Some(tw) = twitch_username %}{{ tw }}{% endif %}"
-          placeholder="your_twitch_handle"
-          class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors placeholder:text-outline/40"
-        />
-        <p class="mt-2 font-headline text-[10px] uppercase tracking-widest text-outline">Without the @ sign. Leave blank to remove.</p>
-      </div>
+      <section>
+        <h2 class="text-sm font-bold text-outline uppercase tracking-widest mb-1">Streaming Links</h2>
+        <p class=" text-outline mt-2 mb-6 leading-relaxed">
+          Your handles appear alongside your results so spectators can find your stream.
+        </p>
 
-      <div>
-        <label for="youtube_username" class="font-headline text-xs uppercase tracking-widest text-outline block mb-2">YouTube Username</label>
-        <input
-          type="text"
-          id="youtube_username"
-          name="youtube_username"
-          value="{% if let Some(yt) = youtube_username %}{{ yt }}{% endif %}"
-          placeholder="your_youtube_handle"
-          class="bg-surface-container-low w-full px-4 py-3 text-sm text-on-background font-body border-b-2 border-outline focus:border-primary focus:outline-none transition-colors placeholder:text-outline/40"
-        />
-        <p class="mt-2 font-headline text-[10px] uppercase tracking-widest text-outline">Without the @ sign. Leave blank to remove.</p>
-      </div>
+        <div class="space-y-4">
 
-      <div class="flex gap-3 pt-2">
-        <button type="submit" class="font-headline font-bold text-xs uppercase tracking-widest bg-primary-container text-white px-8 py-3 hover:bg-white hover:text-primary-container transition-all">
+          {# Twitch #}
+          <div class="bg-surface-container-low border-l-4 border-[#9146ff] p-5">
+            <div class="flex items-center gap-3 mb-4">
+              <img src="/assets/twitch-icon.svg" class="w-5 h-5 shrink-0" alt="" />
+              <span class=" font-bold text-on-surface uppercase tracking-wider">Twitch</span>
+            </div>
+            {% call form::text_field("twitch_username", "Username", cs.params.twitch_username, "your_handle", cs.error("twitch_username")) %}{% endcall %}
+            <p class="mt-2 text-[10px] uppercase tracking-widest text-outline">Without the @ sign. Leave blank to remove.</p>
+          </div>
+
+          {# YouTube #}
+          <div class="bg-surface-container-low border-l-4 border-[#ff0000] p-5">
+            <div class="flex items-center gap-3 mb-4">
+              <img src="/assets/youtube-icon.svg" class="w-5 h-5 shrink-0" alt="" />
+              <span class=" font-bold text-on-surface uppercase tracking-wider">YouTube</span>
+            </div>
+            {% call form::text_field("youtube_username", "Username", cs.params.youtube_username, "your_handle", cs.error("youtube_username")) %}{% endcall %}
+            <p class="mt-2 text-[10px] uppercase tracking-widest text-outline">Without the @ sign. Leave blank to remove.</p>
+          </div>
+
+        </div>
+      </section>
+
+      <div class="flex items-center justify-end pt-6 border-t border-outline-variant/20">
+        <button type="submit" class="px-8 py-3 bg-primary-container text-white font-bold uppercase tracking-wider  hover:bg-primary-container/90 transition-colors">
           Save
         </button>
       </div>
-    </form>
+
+    </div>
+    {% endcall %}
   </div>
 </div>
 

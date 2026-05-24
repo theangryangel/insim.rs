@@ -1,25 +1,25 @@
 //! Web module: axum-login auth backend + HTTP server.
 
+pub mod changeset;
+pub mod csrf;
 pub mod filters;
 pub mod handlers;
 pub mod state;
 
 use std::{net::SocketAddr, sync::Arc};
 
-use axum::{
-    Router,
-    routing::{get, post},
-};
-use axum_login::AuthManagerLayerBuilder;
-// -- axum-login auth backend --------------------------------------------------
-use axum_login::{AuthUser, AuthnBackend, UserId};
+use axum::{Router, middleware, routing::get};
+use axum_login::{AuthManagerLayerBuilder, AuthUser, AuthnBackend, UserId};
+pub use changeset::{Changeset, empty_string_as_none};
+use clap::Parser;
+pub use csrf::Csrf;
 use handlers::*;
 use state::{AppState, build_oauth_client};
 use tower_sessions::{
     SessionManagerLayer,
     cookie::{Key, SameSite},
 };
-use tower_sessions_sqlx_store::SqliteStore;
+use tower_sessions_sqlx_store::PostgresStore;
 
 use crate::db;
 
@@ -92,8 +92,6 @@ impl AuthnBackend for Backend {
         &self,
         creds: Self::Credentials,
     ) -> Result<Option<Self::User>, Self::Error> {
-        // Exchange code for token via raw POST - LFS returns text/html Content-Type
-        // even for JSON responses, so we bypass the oauth2 crate's content-type check.
         let resp = self
             .http_client
             .post("https://id.lfs.net/oauth2/access_token")
@@ -115,7 +113,6 @@ impl AuthnBackend for Backend {
             .as_str()
             .ok_or_else(|| BackendError::OAuth(format!("missing access_token: {token_data}")))?;
 
-        // Fetch user info from the LFS API
         let userinfo_resp = self
             .http_client
             .get("https://api.lfs.net/userinfo")
@@ -145,27 +142,56 @@ impl AuthnBackend for Backend {
     }
 }
 
-// Convenience
 pub type AuthSession = axum_login::AuthSession<Backend>;
-
-// -- Web configuration --------------------------------------------------------
 
 #[derive(Debug, Clone)]
 pub struct WebConfig {
     pub base_url: String,
     pub oauth_client_id: String,
     pub oauth_client_secret: String,
-    pub session_key: String,
+    pub session_key: Option<String>,
 }
 
-// -- Server entry point -------------------------------------------------------
+#[derive(Parser, Debug)]
+pub struct WebArgs {
+    /// Postgres connection string.
+    #[arg(long)]
+    pub db: String,
 
-pub async fn serve(
-    listen: SocketAddr,
-    pool: db::Pool,
-    cfg: WebConfig,
-    presence: Option<insim_extras::presence::Presence>,
-) -> anyhow::Result<()> {
+    /// Listen address (host:port).
+    #[arg(long, default_value = "0.0.0.0:3000")]
+    pub listen: String,
+
+    /// Base URL for OAuth redirect (e.g. https://example.com).
+    #[arg(long, default_value = "http://localhost:3000")]
+    pub base_url: String,
+
+    /// LFS OAuth client ID.
+    #[arg(long, env = "OAUTH_CLIENT_ID")]
+    pub oauth_client_id: String,
+
+    /// LFS OAuth client secret.
+    #[arg(long, env = "OAUTH_CLIENT_SECRET")]
+    pub oauth_client_secret: String,
+
+    /// Session encryption key (hex or raw). If not set, a random key is used.
+    #[arg(long, env = "SESSION_KEY")]
+    pub session_key: Option<String>,
+}
+
+pub async fn run_web(args: WebArgs) -> anyhow::Result<()> {
+    let pool = db::connect(&args.db).await?;
+    let listen: SocketAddr = args.listen.parse()?;
+    let cfg = WebConfig {
+        base_url: args.base_url,
+        oauth_client_id: args.oauth_client_id,
+        oauth_client_secret: args.oauth_client_secret,
+        session_key: args.session_key,
+    };
+    serve(listen, pool, cfg).await
+}
+
+pub async fn serve(listen: SocketAddr, pool: db::Pool, cfg: WebConfig) -> anyhow::Result<()> {
     let redirect_uri = format!("{}/auth/callback", cfg.base_url);
     let oauth_client = build_oauth_client(&cfg.oauth_client_id, &redirect_uri)?;
     let backend = Backend::new(
@@ -175,10 +201,13 @@ pub async fn serve(
         redirect_uri,
     );
 
-    let session_store = SqliteStore::new(pool.clone());
+    let session_store = PostgresStore::new(pool.clone());
     session_store.migrate().await?;
 
-    let key = Key::from(cfg.session_key.as_bytes());
+    let key = match cfg.session_key {
+        Some(ref k) => Key::from(k.as_bytes()),
+        None => Key::generate(),
+    };
 
     let session_layer = SessionManagerLayer::new(session_store)
         .with_secure(false)
@@ -190,14 +219,13 @@ pub async fn serve(
     let app_state = AppState {
         pool: Arc::new(pool),
         oauth_client,
-        presence,
     };
 
     let app = Router::new()
         .route("/assets/{*file}", get(assets))
         .route("/profile", get(profile_get).post(profile_post))
+        .route("/about", get(about))
         .route("/", get(index))
-        .route("/leaderboard", get(leaderboard))
         .route("/events", get(events))
         .route("/events/new", get(event_new_get).post(event_new_post))
         .route("/events/{id}", get(event_detail))
@@ -205,18 +233,10 @@ pub async fn serve(
             "/events/{id}/edit",
             get(event_edit_get).post(event_edit_post),
         )
-        .route("/events/{id}/standings", get(event_standings))
-        .route("/events/{id}/standings/best", get(event_standings_best))
-        .route("/events/{id}/standings/all", get(event_standings_all))
-        .route("/events/{id}/standings/bomb/best", get(event_bomb_best))
-        .route("/events/{id}/standings/bomb/all", get(event_bomb_all))
-        .route("/events/{id}/start", post(event_start))
-        .route("/events/{id}/complete", post(event_complete))
-        .route("/events/{id}/cancel", post(event_cancel))
-        .route("/presence", get(presence_partial))
         .route("/login", get(login))
         .route("/auth/callback", get(callback))
         .route("/logout", get(logout))
+        .route_layer(middleware::from_fn(csrf::csrf_protect))
         .layer(auth_layer)
         .with_state(app_state);
 

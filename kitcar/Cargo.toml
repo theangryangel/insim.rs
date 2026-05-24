@@ -1,0 +1,30 @@
+[package]
+name = "kitcar"
+description = "A combined Axum and Bevy inspired handler runtime over an Insim connection"
+version = "0.1.0+unreleased"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+
+[lib]
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+insim = { path = "../insim", features = ["tokio"] }
+insim_extra = { path = "../insim_extra" }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "net"] }
+tokio-util = { workspace = true }
+futures = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+indexmap = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "net", "test-util"] }
+tracing-subscriber = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
