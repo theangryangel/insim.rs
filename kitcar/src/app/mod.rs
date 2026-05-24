@@ -64,7 +64,7 @@ pub trait Installable<S = ()> {
 
 /// Composition root for an `kitcar` bot.
 ///
-/// Build up handlers, then hand the value to [`run`].
+/// Build up handlers, then hand the value to [`crate::run`].
 ///
 /// Apps are parameterised by their primary state type `S`. Stateless bots use
 /// `App<()>` via [`App::new`]; stateful bots use [`App::with_state`] to lock
@@ -168,7 +168,7 @@ where
     /// Return a [`crate::State<S>`] containing a clone of the app's primary
     /// state.
     ///
-    /// Useful before [`run`] runs - the typical use is to wire up the
+    /// Useful before [`crate::run`] runs - the typical use is to wire up the
     /// runtime's cancel token into a field on `S` (the app's cancel token is
     /// minted inside `with_state`, so it can't be passed to `S::new` ahead
     /// of time). The clone shares any interior-mutable fields you've built
@@ -227,7 +227,7 @@ where
     ///
     /// The task is spawned immediately, so `App::periodic` **must be called
     /// inside a tokio runtime context**. Events queue on the runtime's
-    /// back-channel and are drained once [`run`] begins.
+    /// back-channel and are drained once [`crate::run`] begins.
     #[must_use]
     pub fn periodic<E>(self, period: Duration, event: E) -> Self
     where
