@@ -18,4 +18,4 @@ tokio-util = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 fixedbitset = { workspace = true }
-taffy = "0.9"
+taffy = "0.10"
