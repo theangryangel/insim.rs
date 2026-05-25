@@ -64,7 +64,6 @@ pub enum Error {
         /// remaining
         remaining: Bytes,
     },
-
 }
 
 #[cfg(feature = "tokio")]
