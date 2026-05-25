@@ -257,8 +257,7 @@ A full working example lives in `examples/ssg-manual/`.
 
 ```rust,ignore
 use std::time::Duration;
-use bytes::{Buf, Bytes, BytesMut};
-use insim::{Packet, core::{Decode, DecodeContext}, insim::SmallType};
+use insim::{Packet, core::Decode, insim::SmallType};
 use outgauge::Outgauge;
 use outsim::OutsimPack;
 use tokio::net::UdpSocket;
@@ -285,18 +284,16 @@ loop {
         },
         res = udp.recv_from(&mut buf) => {
             let (amt, _src) = res?;
-            let mut bytes: Bytes = BytesMut::from(&buf[..amt]).freeze();
 
             if amt == 92 {
                 // Outgauge
-                let packet = Outgauge::decode(&mut DecodeContext::new(&mut bytes))?;
+                let packet = Outgauge::decode_slice(&buf[..amt])?;
             } else if amt == 64 {
                 // Outsim
-                let packet = OutsimPack::decode(&mut DecodeContext::new(&mut bytes))?;
+                let packet = OutsimPack::decode_slice(&buf[..amt])?;
             } else if amt > 1 {
                 // Mci / Nlp - skip the leading length byte
-                bytes.advance(1);
-                let packet = Packet::decode(&mut DecodeContext::new(&mut bytes))?;
+                let packet = Packet::decode_slice(&buf[1..amt])?;
             }
         }
     }

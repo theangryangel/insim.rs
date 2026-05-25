@@ -4,7 +4,7 @@ mod error;
 
 use std::net::Ipv4Addr;
 
-use bytes::BufMut;
+use bytes::{BufMut, Bytes, BytesMut};
 pub use context::EncodeContext;
 pub use error::{EncodeError, EncodeErrorKind};
 
@@ -13,8 +13,18 @@ pub trait Encode: Sized {
     /// Indicates if this is a primitive / leaf to EncodeContext
     const PRIMITIVE: bool = false;
 
-    /// Write
+    /// Encode into a [`EncodeContext`]. Use this directly when you need full control over
+    /// the buffer or want to append to an existing one.
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), EncodeError>;
+
+    /// Convenience shortcut: encode into a fresh [`Bytes`] buffer. For full control use
+    /// [`encode`](Self::encode) with your own [`EncodeContext`] instead.
+    fn to_bytes(&self) -> Result<Bytes, EncodeError> {
+        let mut buf = BytesMut::new();
+        let mut ctx = EncodeContext::new(&mut buf);
+        self.encode(&mut ctx)?;
+        Ok(buf.freeze())
+    }
 }
 
 // impls

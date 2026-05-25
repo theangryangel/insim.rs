@@ -6,7 +6,7 @@ mod error;
 use std::net::Ipv4Addr;
 
 use arrayvec::ArrayVec;
-use bytes::Buf;
+use bytes::{Buf, Bytes};
 pub use context::DecodeContext;
 pub use error::{DecodeError, DecodeErrorKind};
 
@@ -15,8 +15,25 @@ pub trait Decode: Sized {
     /// Indicates if this is a primitive / leaf to DecodeContext
     const PRIMITIVE: bool = false;
 
-    /// Read
+    /// Decode from a [`DecodeContext`]. Use this directly when you need full control over
+    /// the buffer or need to decode from a shared or partially-consumed one.
     fn decode(ctx: &mut DecodeContext) -> Result<Self, DecodeError>;
+
+    /// Convenience shortcut: decode from an existing [`Bytes`] buffer in place; no copy is made.
+    /// For full control use [`decode`](Self::decode) with your own [`DecodeContext`] instead.
+    fn decode_bytes(buf: &mut Bytes) -> Result<Self, DecodeError> {
+        let mut ctx = DecodeContext::new(buf);
+        Self::decode(&mut ctx)
+    }
+
+    /// Convenience shortcut: decode from anything that looks like a byte slice. Always copies
+    /// into a new buffer. For full control use [`decode`](Self::decode) with your own
+    /// [`DecodeContext`] instead.
+    fn decode_slice(buf: impl AsRef<[u8]>) -> Result<Self, DecodeError> {
+        let mut bytes = Bytes::copy_from_slice(buf.as_ref());
+        let mut ctx = DecodeContext::new(&mut bytes);
+        Self::decode(&mut ctx)
+    }
 }
 
 // impls

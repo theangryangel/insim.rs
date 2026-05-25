@@ -1,13 +1,8 @@
 //! High level example of using a combination of TCP and UDP.
 use std::{net::SocketAddr, time::Duration};
 
-use bytes::{Buf, Bytes, BytesMut};
 use clap::Parser;
-use insim::{
-    Packet,
-    core::{Decode, DecodeContext},
-    insim::SmallType,
-};
+use insim::{Packet, core::Decode, insim::SmallType};
 use outgauge::Outgauge;
 use outsim::OutsimPack;
 use tokio::net::UdpSocket;
@@ -84,17 +79,14 @@ pub async fn main() -> anyhow::Result<()> {
             },
             res = udp.recv_from(&mut buf) => {
                 let (amt, src) = res?;
-                let mut buf: Bytes = BytesMut::from(&buf[..amt]).freeze();
 
                 if amt == 92 {
                     // Conventionally it's outgauge
-                    let mut ctx = DecodeContext::new(&mut buf);
-                    let packet = Outgauge::decode(&mut ctx)?;
+                    let packet = Outgauge::decode_slice(&buf[..amt])?;
                     tracing::info!("outgauge: from={:?}, data={:?}", src, packet);
                 } else if amt == 64 {
                     // Conventionally it's outsim
-                    let mut ctx = DecodeContext::new(&mut buf);
-                    let packet = OutsimPack::decode(&mut ctx)?;
+                    let packet = OutsimPack::decode_slice(&buf[..amt])?;
                     tracing::info!("outsim: from={:?}, data={:?}", src, packet);
                 } else if amt > 1 {
                     // Otherwise it's probably a Mci or Nlp packet
@@ -102,9 +94,7 @@ pub async fn main() -> anyhow::Result<()> {
                     // XXX: we need to chop off the first byte, which is the length of the packet.
                     // That's normally handled internally
                     // by the insim crate.
-                    buf.advance(1);
-                    let mut ctx = DecodeContext::new(&mut buf);
-                    let packet = Packet::decode(&mut ctx)?;
+                    let packet = Packet::decode_slice(&buf[1..amt])?;
                     tracing::info!("insim: from={:?}, data={:?}", src, packet);
                 }
             }
