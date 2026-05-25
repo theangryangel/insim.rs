@@ -4,7 +4,7 @@ use insim_core::{Decode, Encode, vehicle::Vehicle};
 use super::Fuel;
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
 
-#[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
+#[derive(Debug, Default, Clone, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]

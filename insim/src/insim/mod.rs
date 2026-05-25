@@ -123,7 +123,7 @@ pub use rip::{Rip, RipError, RipOptions};
 pub use rst::{LapTimingInfo, RaceFlags, Rst};
 pub use scc::Scc;
 pub use sch::{Sch, SchFlags};
-pub use set::Set;
+pub use set::{CentreDiffType, DiffType, Set, SetupFlags, TyreBrand, VehicleSetup};
 pub use sfp::Sfp;
 pub use slc::Slc;
 pub use small::{LclFlags, LcsFlags, Small, SmallType};
