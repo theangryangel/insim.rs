@@ -25,7 +25,6 @@ allow-unknown-packet = []
 blocking = []
 tokio = [
   "dep:tokio",
-  "dep:tokio-util",
 ]
 serde = [
   "dep:serde",
@@ -55,7 +54,6 @@ serde_json = { workspace = true, optional = true }
 digest = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt", "time", "net", "macros", "sync", "tracing", "io-util"], optional = true }
-tokio-util = { workspace = true, optional = true }
 tracing = { workspace = true }
 
 [dev-dependencies]

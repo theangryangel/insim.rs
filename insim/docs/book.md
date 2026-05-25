@@ -123,17 +123,17 @@ use insim::{Packet, insim::{Tiny, TinyType}};
 
 // send will automatically take anything that converts into Packet, so these 3 are
 // functionally the equivalent!
-connection.send(Packet::Tiny(insim::insim::Tiny {
+connection.write(Packet::Tiny(insim::insim::Tiny {
     subt: TinyType::None,
     ..Default::default()
 }));
 
-connection.send(insim::insim::Tiny {
+connection.write(insim::insim::Tiny {
     subt: TinyType::None,
     ..Default::default()
 });
 
-connection.send(TinyType::None);
+connection.write(TinyType::None);
 ```
 
 It's also very common to want to send a [RequestId](crate::identifiers::RequestId)
@@ -145,19 +145,19 @@ To aid this process, you can import the [WithRequestId](crate::WithRequestId) tr
 use insim::{Packet, WithRequestId, identifiers::RequestId, insim::{Tiny, TinyType}};
 
 // so these 3 are also functionally the equivalent!
-connection.send(Packet::Tiny(Tiny {
+connection.write(Packet::Tiny(Tiny {
     reqi: RequestId(1),
     subt: TinyType::None,
     ..Default::default()
 }));
 
-connection.send(Tiny {
+connection.write(Tiny {
     reqi: RequestId(1),
     subt: TinyType::None,
     ..Default::default()
 });
 
-connection.send(TinyType::None.with_request_id(1));
+connection.write(TinyType::None.with_request_id(1));
 ```
 
 # Cookbook / Recipies
@@ -201,40 +201,6 @@ Errors from `write`/`send` calls are different: [`crate::error::Error::Encode`] 
 packet you built was invalid (e.g. too many objects in an [`crate::insim::Axm`]). The
 connection is still alive in that case.
 
-## Spawning a background task
-
-For Tokio applications, [`crate::builder::Builder::spawn`] runs the connection in a
-background task and gives you a cloneable [`crate::builder::InsimTask`] handle with
-`send` / `subscribe` / `shutdown` methods. This is the most convenient pattern for
-applications that need to send packets from many places:
-
-```rust,ignore
-let (task, join_handle) = insim::tcp("127.0.0.1:29999")
-    .isi_flag_mci(true)
-    .isi_interval(Duration::from_secs(1))
-    .spawn(100) // channel capacity
-    .await?;
-
-let mut events = task.subscribe();
-
-tokio::spawn(async move {
-    while let Ok(packet) = events.recv().await {
-        if let insim::Packet::Mci(mci) = packet {
-            for car in &mci.info {
-                println!("plid={} speed={:.1}m/s", car.plid, car.speed.to_meters_per_sec());
-            }
-        }
-    }
-});
-
-// send from anywhere you have a clone of `task`
-task.send_message("Hello!", None).await?;
-
-// graceful shutdown
-task.shutdown().await;
-join_handle.await??;
-```
-
 ## Receiving telemetry (MCI)
 
 MCI requires the [`crate::insim::IsiFlags::MCI`] flag and a non-zero interval set
@@ -266,6 +232,77 @@ loop {
 }
 ```
 
+## Mixed TCP + UDP (Outgauge, Outsim, MCI/NLP via UDP)
+
+LFS can route high-frequency packets - [`crate::insim::Mci`], [`crate::insim::Nlp`],
+Outsim, and Outgauge - over UDP while keeping all other InSim traffic on the TCP
+connection. This avoids head-of-line blocking on the TCP stream for latency-sensitive
+positional data.
+
+The pattern requires:
+
+1. Bind a [`tokio::net::UdpSocket`] yourself and pass its port to the builder via
+   [`crate::builder::Builder::isi_udpport`].
+2. Enable Outsim/Outgauge by sending [`crate::insim::SmallType::Ssp`] and
+   [`crate::insim::SmallType::Ssg`] with the desired interval after connecting.
+3. Drive both sources inside a `tokio::select!` loop.
+
+When reading raw UDP datagrams you are responsible for distinguishing packet types.
+LFS does not prepend a discriminant: use the datagram size as a heuristic (92 bytes →
+Outgauge, 64 bytes → Outsim, anything else → InSim packet). For InSim packets received
+over UDP you must also skip the leading length byte before decoding, as that framing is
+normally handled internally by the crate.
+
+A full working example lives in `examples/ssg-manual/`.
+
+```rust,ignore
+use std::time::Duration;
+use bytes::{Buf, Bytes, BytesMut};
+use insim::{Packet, core::{Decode, DecodeContext}, insim::SmallType};
+use outgauge::Outgauge;
+use outsim::OutsimPack;
+use tokio::net::UdpSocket;
+
+let udp = UdpSocket::bind("0.0.0.0:30000").await?;
+let mut buf = [0u8; 1024];
+
+let mut connection = insim::tcp("127.0.0.1:29999")
+    .isi_flag_mci(true)
+    .isi_interval(Duration::from_secs(1))
+    .isi_udpport(30000)   // tell LFS to send UDP packets here
+    .connect_async()
+    .await?;
+
+// enable Outsim and Outgauge
+connection.write(SmallType::Ssp(Duration::from_secs(1))).await?;
+connection.write(SmallType::Ssg(Duration::from_secs(1))).await?;
+
+loop {
+    tokio::select! {
+        packet = connection.read() => {
+            let packet = packet?;
+            // handle normal InSim packets
+        },
+        res = udp.recv_from(&mut buf) => {
+            let (amt, _src) = res?;
+            let mut bytes: Bytes = BytesMut::from(&buf[..amt]).freeze();
+
+            if amt == 92 {
+                // Outgauge
+                let packet = Outgauge::decode(&mut DecodeContext::new(&mut bytes))?;
+            } else if amt == 64 {
+                // Outsim
+                let packet = OutsimPack::decode(&mut DecodeContext::new(&mut bytes))?;
+            } else if amt > 1 {
+                // Mci / Nlp - skip the leading length byte
+                bytes.advance(1);
+                let packet = Packet::decode(&mut DecodeContext::new(&mut bytes))?;
+            }
+        }
+    }
+}
+```
+
 ## Tracking player join / leave
 
 Connections ([`crate::insim::Ncn`]) and players ([`crate::insim::Npl`]) are separate
@@ -278,8 +315,8 @@ connections and players, send [`crate::insim::TinyType::Ncn`] and
 use insim::{WithRequestId, insim::TinyType};
 
 // request current state - replies arrive as normal Ncn/Npl packets with reqi echoed
-connection.send(TinyType::Ncn.with_request_id(1)).await?;
-connection.send(TinyType::Npl.with_request_id(1)).await?;
+connection.write(TinyType::Ncn.with_request_id(1)).await?;
+connection.write(TinyType::Npl.with_request_id(1)).await?;
 
 loop {
     match connection.read().await? {
@@ -294,18 +331,17 @@ loop {
 
 ## Sending messages
 
-[`crate::builder::InsimTask::send_message`] picks the right packet type automatically.
-If you need direct control:
+Use [`crate::insim::Mst`] to broadcast or [`crate::insim::Mtc`] for a private message:
 
 ```rust,ignore
 use insim::insim::{Mst, Mtc};
 use insim::identifiers::ConnectionId;
 
 // broadcast to all (up to 64 chars via Msx, longer via Mst)
-connection.send(Mst { msg: "Hello track!".into(), ..Default::default() }).await?;
+connection.write(Mst { msg: "Hello track!".into(), ..Default::default() }).await?;
 
 // private message to one connection
-connection.send(Mtc {
+connection.write(Mtc {
     ucid: ConnectionId(3),
     text: "Hello driver!".into(),
     ..Default::default()
