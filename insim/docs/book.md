@@ -123,17 +123,17 @@ use insim::{Packet, insim::{Tiny, TinyType}};
 
 // send will automatically take anything that converts into Packet, so these 3 are
 // functionally the equivalent!
-connection.send(Packet::Tiny(insim::insim::Tiny {
+connection.write(Packet::Tiny(insim::insim::Tiny {
     subt: TinyType::None,
     ..Default::default()
 }));
 
-connection.send(insim::insim::Tiny {
+connection.write(insim::insim::Tiny {
     subt: TinyType::None,
     ..Default::default()
 });
 
-connection.send(TinyType::None);
+connection.write(TinyType::None);
 ```
 
 It's also very common to want to send a [RequestId](crate::identifiers::RequestId)
@@ -145,19 +145,19 @@ To aid this process, you can import the [WithRequestId](crate::WithRequestId) tr
 use insim::{Packet, WithRequestId, identifiers::RequestId, insim::{Tiny, TinyType}};
 
 // so these 3 are also functionally the equivalent!
-connection.send(Packet::Tiny(Tiny {
+connection.write(Packet::Tiny(Tiny {
     reqi: RequestId(1),
     subt: TinyType::None,
     ..Default::default()
 }));
 
-connection.send(Tiny {
+connection.write(Tiny {
     reqi: RequestId(1),
     subt: TinyType::None,
     ..Default::default()
 });
 
-connection.send(TinyType::None.with_request_id(1));
+connection.write(TinyType::None.with_request_id(1));
 ```
 
 # Cookbook / Recipies
@@ -200,40 +200,6 @@ loop {
 Errors from `write`/`send` calls are different: [`crate::error::Error::Encode`] means the
 packet you built was invalid (e.g. too many objects in an [`crate::insim::Axm`]). The
 connection is still alive in that case.
-
-## Spawning a background task
-
-For Tokio applications, [`crate::builder::Builder::spawn`] runs the connection in a
-background task and gives you a cloneable [`crate::builder::InsimTask`] handle with
-`send` / `subscribe` / `shutdown` methods. This is the most convenient pattern for
-applications that need to send packets from many places:
-
-```rust,ignore
-let (task, join_handle) = insim::tcp("127.0.0.1:29999")
-    .isi_flag_mci(true)
-    .isi_interval(Duration::from_secs(1))
-    .spawn(100) // channel capacity
-    .await?;
-
-let mut events = task.subscribe();
-
-tokio::spawn(async move {
-    while let Ok(packet) = events.recv().await {
-        if let insim::Packet::Mci(mci) = packet {
-            for car in &mci.info {
-                println!("plid={} speed={:.1}m/s", car.plid, car.speed.to_meters_per_sec());
-            }
-        }
-    }
-});
-
-// send from anywhere you have a clone of `task`
-task.send_message("Hello!", None).await?;
-
-// graceful shutdown
-task.shutdown().await;
-join_handle.await??;
-```
 
 ## Receiving telemetry (MCI)
 
@@ -278,8 +244,8 @@ connections and players, send [`crate::insim::TinyType::Ncn`] and
 use insim::{WithRequestId, insim::TinyType};
 
 // request current state - replies arrive as normal Ncn/Npl packets with reqi echoed
-connection.send(TinyType::Ncn.with_request_id(1)).await?;
-connection.send(TinyType::Npl.with_request_id(1)).await?;
+connection.write(TinyType::Ncn.with_request_id(1)).await?;
+connection.write(TinyType::Npl.with_request_id(1)).await?;
 
 loop {
     match connection.read().await? {
@@ -294,18 +260,17 @@ loop {
 
 ## Sending messages
 
-[`crate::builder::InsimTask::send_message`] picks the right packet type automatically.
-If you need direct control:
+Use [`crate::insim::Mst`] to broadcast or [`crate::insim::Mtc`] for a private message:
 
 ```rust,ignore
 use insim::insim::{Mst, Mtc};
 use insim::identifiers::ConnectionId;
 
 // broadcast to all (up to 64 chars via Msx, longer via Mst)
-connection.send(Mst { msg: "Hello track!".into(), ..Default::default() }).await?;
+connection.write(Mst { msg: "Hello track!".into(), ..Default::default() }).await?;
 
 // private message to one connection
-connection.send(Mtc {
+connection.write(Mtc {
     ucid: ConnectionId(3),
     text: "Hello driver!".into(),
     ..Default::default()

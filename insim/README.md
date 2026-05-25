@@ -88,8 +88,11 @@ You might also find these related crates useful:
 - `insim_pth` – for reading and writing LFS PTH and PIN files.
 - `outgauge` - "sans-io" implementation of the LFS outgauge protocol.
 - `outsim` - "sans-io" implementation of the LFS outsim protocol.
-- `insim_extras` - an unreleased, unstable suite of micro libraries to help build
-  multi-player mini-games quickly using insim.
+- `insim_extra` - an unreleased, unstable suite of micro libraries to help with common
+  LFS tasks: presence, game state, advanced button/ui abstraction inspired by Phoenix
+  Liveview.
+- `kitcar` - an unreleased library designed to make mini-games for LFS quickly, with an
+  API inspired by Axum and Bevy.
 
 They follow the same design focus and can be found in the same GitHub repository, or on
 crates.io.

@@ -23,7 +23,7 @@ use pyo3::{
 };
 use tokio::{
     runtime::Runtime,
-    sync::{Notify, broadcast::error::RecvError},
+    sync::{Notify, broadcast::error::RecvError, mpsc, oneshot},
 };
 
 /// Shared Tokio runtime managed by `pyo3-async-runtimes`.
@@ -34,19 +34,22 @@ fn runtime() -> &'static Runtime {
     pyo3_async_runtimes::tokio::get_runtime()
 }
 
+type Command = (insim::Packet, oneshot::Sender<insim::Result<()>>);
+
 /// Do not use this directly from Python - the `Insim` facade in
 /// `insim-o3.client` is the public API.
 #[pyclass]
 struct _Insim {
-    task: insim::builder::InsimTask,
+    command_tx: mpsc::Sender<Command>,
+    cancel: Arc<Notify>,
     /// Wrapped in `Arc<Mutex>` so each `recv` future can move a clone into the
     /// `'static` Tokio future returned to asyncio.
     receiver: Arc<tokio::sync::Mutex<tokio::sync::broadcast::Receiver<insim::Packet>>>,
-    /// Set by the watcher task once the network actor exits. Read inside the
-    /// recv loop to handle the race where the watcher fires `notify_waiters`
-    /// before any `recv` future is awaiting.
+    /// Set once the network loop exits. Read inside the recv loop to handle
+    /// the race where the loop fires `notify_waiters` before any `recv` future
+    /// is awaiting.
     is_done: Arc<AtomicBool>,
-    /// Fired by the watcher task to wake any in-flight `recv` immediately.
+    /// Fired by the network loop on exit to wake any in-flight `recv`.
     shutdown_signal: Arc<Notify>,
     /// Pre-formatted exit message, populated before `is_done` is set.
     exit_msg: Arc<Mutex<Option<String>>>,
@@ -93,30 +96,41 @@ impl _Insim {
         };
 
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
-            let (task, handle) = insim::tcp(addr.as_str())
+            let mut net = insim::tcp(addr.as_str())
                 .isi_flags(isi_flags)
                 .isi_iname(iname.unwrap_or_else(|| "insim-o3".to_owned()))
                 .isi_admin_password(admin_password)
                 .isi_interval(interval_ms.map(std::time::Duration::from_millis))
                 .isi_prefix(prefix_char)
-                .spawn(capacity)
+                .connect_async()
                 .await
                 .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 
-            let receiver = Arc::new(tokio::sync::Mutex::new(task.subscribe()));
+            let (event_tx, event_rx) = tokio::sync::broadcast::channel::<insim::Packet>(capacity);
+            let (command_tx, mut command_rx) = mpsc::channel::<Command>(capacity);
+            let cancel = Arc::new(Notify::new());
             let is_done = Arc::new(AtomicBool::new(false));
             let shutdown_signal = Arc::new(Notify::new());
             let exit_msg = Arc::new(Mutex::new(None));
 
             {
+                let cancel = cancel.clone();
                 let is_done = is_done.clone();
                 let shutdown_signal = shutdown_signal.clone();
                 let exit_msg = exit_msg.clone();
-                let _watcher = runtime().spawn(async move {
-                    let msg = match handle.await {
-                        Ok(Ok(())) => "connection closed".to_owned(),
-                        Ok(Err(e)) => e.to_string(),
-                        Err(e) => format!("background task panicked: {e}"),
+                let _ = runtime().spawn(async move {
+                    let msg = loop {
+                        tokio::select! {
+                            _ = cancel.notified() => break "connection closed".to_owned(),
+                            result = net.read() => match result {
+                                Ok(p) => { let _ = event_tx.send(p); }
+                                Err(e) => break e.to_string(),
+                            },
+                            cmd = command_rx.recv() => match cmd {
+                                Some((packet, resp)) => { let _ = resp.send(net.write(packet).await); }
+                                None => break "connection closed".to_owned(),
+                            },
+                        }
                     };
                     if let Ok(mut guard) = exit_msg.lock() {
                         *guard = Some(msg);
@@ -127,8 +141,9 @@ impl _Insim {
             }
 
             Ok(Self {
-                task,
-                receiver,
+                command_tx,
+                cancel,
+                receiver: Arc::new(tokio::sync::Mutex::new(event_rx)),
                 is_done,
                 shutdown_signal,
                 exit_msg,
@@ -184,22 +199,25 @@ impl _Insim {
     /// connection is dead.
     fn send<'py>(&self, py: Python<'py>, data: &str) -> PyResult<Bound<'py, PyAny>> {
         let packet = parse_packet(data)?;
-        let task = self.task.clone();
+        let command_tx = self.command_tx.clone();
 
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
-            task.send(packet)
+            let (resp_tx, resp_rx) = oneshot::channel();
+            command_tx
+                .send((packet, resp_tx))
                 .await
+                .map_err(|_| PyRuntimeError::new_err("connection is dead"))?;
+            resp_rx
+                .await
+                .map_err(|_| PyRuntimeError::new_err("connection is dead"))?
                 .map_err(|e| PyRuntimeError::new_err(e.to_string()))
         })
     }
 
-    /// Signal the background network actor to stop gracefully.
+    /// Signal the background network loop to stop gracefully.
     fn shutdown<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let task = self.task.clone();
-        pyo3_async_runtimes::tokio::future_into_py(py, async move {
-            task.shutdown().await;
-            Ok(())
-        })
+        self.cancel.notify_one();
+        pyo3_async_runtimes::tokio::future_into_py(py, async move { Ok(()) })
     }
 }
 
@@ -219,10 +237,7 @@ fn disconnect_error(exit_msg: &Mutex<Option<String>>) -> PyErr {
 
 impl Drop for _Insim {
     fn drop(&mut self) {
-        // Best-effort: tell the network actor to stop so its socket closes.
-        // The watcher task will then complete and free its captured Arcs.
-        let task = self.task.clone();
-        let _shutdown = runtime().spawn(async move { task.shutdown().await });
+        self.cancel.notify_one();
     }
 }
 

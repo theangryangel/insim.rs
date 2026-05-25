@@ -65,10 +65,6 @@ pub enum Error {
         remaining: Bytes,
     },
 
-    /// The background task spawned via [`crate::builder::Builder::spawn`] has exited.
-    #[cfg(feature = "tokio")]
-    #[error("Unable to send to the spawned insim connection. Task died?")]
-    SpawnedDead,
 }
 
 #[cfg(feature = "tokio")]
