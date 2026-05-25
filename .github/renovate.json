@@ -26,6 +26,12 @@
       "matchPackageNames": ["num-traits"],
       "matchUpdateTypes": ["patch"],
       "enabled": false
+    },
+    {
+      "description": "Group sha2 and digest",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["sha2", "digest"],
+      "groupName": "cargo:digest"
     }
   ]
 }
