@@ -3,6 +3,9 @@
 A collection of crates to assist working with the [Live For Speed](https://lfs.net/)
 racing simulator and it's [Insim](https://en.lfsmanual.net/wiki/InSim.txt) (protocol).
 
+> [!WARNING]
+> The main branch contains unreleased code and may contain breaking changes.
+
 The intention is to provide a strongly typed, native rust implementation, rather
 than a thin layer over a series of bytes and primitive types.
 
