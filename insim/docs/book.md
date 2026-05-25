@@ -232,6 +232,77 @@ loop {
 }
 ```
 
+## Mixed TCP + UDP (Outgauge, Outsim, MCI/NLP via UDP)
+
+LFS can route high-frequency packets - [`crate::insim::Mci`], [`crate::insim::Nlp`],
+Outsim, and Outgauge - over UDP while keeping all other InSim traffic on the TCP
+connection. This avoids head-of-line blocking on the TCP stream for latency-sensitive
+positional data.
+
+The pattern requires:
+
+1. Bind a [`tokio::net::UdpSocket`] yourself and pass its port to the builder via
+   [`crate::builder::Builder::isi_udpport`].
+2. Enable Outsim/Outgauge by sending [`crate::insim::SmallType::Ssp`] and
+   [`crate::insim::SmallType::Ssg`] with the desired interval after connecting.
+3. Drive both sources inside a `tokio::select!` loop.
+
+When reading raw UDP datagrams you are responsible for distinguishing packet types.
+LFS does not prepend a discriminant: use the datagram size as a heuristic (92 bytes →
+Outgauge, 64 bytes → Outsim, anything else → InSim packet). For InSim packets received
+over UDP you must also skip the leading length byte before decoding, as that framing is
+normally handled internally by the crate.
+
+A full working example lives in `examples/ssg-manual/`.
+
+```rust,ignore
+use std::time::Duration;
+use bytes::{Buf, Bytes, BytesMut};
+use insim::{Packet, core::{Decode, DecodeContext}, insim::SmallType};
+use outgauge::Outgauge;
+use outsim::OutsimPack;
+use tokio::net::UdpSocket;
+
+let udp = UdpSocket::bind("0.0.0.0:30000").await?;
+let mut buf = [0u8; 1024];
+
+let mut connection = insim::tcp("127.0.0.1:29999")
+    .isi_flag_mci(true)
+    .isi_interval(Duration::from_secs(1))
+    .isi_udpport(30000)   // tell LFS to send UDP packets here
+    .connect_async()
+    .await?;
+
+// enable Outsim and Outgauge
+connection.write(SmallType::Ssp(Duration::from_secs(1))).await?;
+connection.write(SmallType::Ssg(Duration::from_secs(1))).await?;
+
+loop {
+    tokio::select! {
+        packet = connection.read() => {
+            let packet = packet?;
+            // handle normal InSim packets
+        },
+        res = udp.recv_from(&mut buf) => {
+            let (amt, _src) = res?;
+            let mut bytes: Bytes = BytesMut::from(&buf[..amt]).freeze();
+
+            if amt == 92 {
+                // Outgauge
+                let packet = Outgauge::decode(&mut DecodeContext::new(&mut bytes))?;
+            } else if amt == 64 {
+                // Outsim
+                let packet = OutsimPack::decode(&mut DecodeContext::new(&mut bytes))?;
+            } else if amt > 1 {
+                // Mci / Nlp - skip the leading length byte
+                bytes.advance(1);
+                let packet = Packet::decode(&mut DecodeContext::new(&mut bytes))?;
+            }
+        }
+    }
+}
+```
+
 ## Tracking player join / leave
 
 Connections ([`crate::insim::Ncn`]) and players ([`crate::insim::Npl`]) are separate
