@@ -725,7 +725,7 @@ async fn game_emits_layout_changed_on_layout_field_change() {
 
     dispatch_cycle(
         Dispatch::Packet(insim::Packet::Axi(Axi {
-            lname: track_a.clone(),
+            lname: Some(track_a.clone()),
             ..Default::default()
         })),
         &sender,
@@ -752,7 +752,7 @@ async fn game_emits_layout_changed_on_layout_field_change() {
 
     dispatch_cycle(
         Dispatch::Packet(insim::Packet::Axi(Axi {
-            lname: track_a.clone(),
+            lname: Some(track_a.clone()),
             ..Default::default()
         })),
         &sender,
@@ -776,7 +776,7 @@ async fn game_emits_layout_changed_on_layout_field_change() {
 
     dispatch_cycle(
         Dispatch::Packet(insim::Packet::Axi(Axi {
-            lname: track_b.clone(),
+            lname: Some(track_b.clone()),
             ..Default::default()
         })),
         &sender,

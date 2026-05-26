@@ -100,17 +100,43 @@ impl<'a> DecodeContext<'a> {
         })
     }
 
-    /// Special case: fixed length codepage string
+    /// Decode a codepage string of up to `len` bytes, consuming however many bytes remain up to
+    /// `len`. For fixed-length fields the buffer will have exactly `len` bytes; for
+    /// alignment-padded fields it may have fewer.
     pub fn decode_codepage(
         &mut self,
         name: &'static str,
         len: usize,
     ) -> Result<String, super::DecodeError> {
         self.op(name, true, |reader| {
-            let new = reader.buf.copy_to_bytes(reader.buf.len().min(len));
-            let new =
-                crate::string::codepages::to_lossy_string(crate::string::strip_trailing_nul(&new));
-            Ok(new.to_string())
+            let chunk = reader.buf.split_to(reader.buf.remaining().min(len));
+            Ok(
+                crate::string::codepages::to_lossy_string(crate::string::strip_trailing_nul(
+                    &chunk,
+                ))
+                .to_string(),
+            )
+        })
+    }
+
+    /// Decode an optional codepage string of up to `len` bytes. Returns `None` if all bytes are
+    /// zero (field absent), otherwise behaves identically to `decode_codepage`.
+    pub fn decode_optional_codepage(
+        &mut self,
+        name: &'static str,
+        len: usize,
+    ) -> Result<Option<String>, super::DecodeError> {
+        self.op(name, true, |reader| {
+            let chunk = reader.buf.split_to(reader.buf.remaining().min(len));
+            if chunk.iter().all(|&b| b == 0) {
+                return Ok(None);
+            }
+            Ok(Some(
+                crate::string::codepages::to_lossy_string(crate::string::strip_trailing_nul(
+                    &chunk,
+                ))
+                .to_string(),
+            ))
         })
     }
 

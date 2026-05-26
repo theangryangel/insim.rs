@@ -1,4 +1,14 @@
 use quote::quote;
+use syn::{Type, TypePath};
+
+fn is_option(ty: &Type) -> bool {
+    if let Type::Path(TypePath { path, .. }) = ty
+        && let Some(segment) = path.segments.last()
+    {
+        return segment.ident == "Option";
+    }
+    false
+}
 
 #[derive(Debug, darling::FromMeta, Clone)]
 pub(super) struct AsciiArgs {
@@ -57,9 +67,16 @@ impl Field {
         }
 
         if let Some(CodepageArgs { length, .. }) = f.codepage.as_ref() {
-            tokens = quote! {
-                #tokens
-                let #field_name = ctx.decode_codepage(#context, #length)?;
+            if is_option(&f.ty) {
+                tokens = quote! {
+                    #tokens
+                    let #field_name = ctx.decode_optional_codepage(#context, #length)?;
+                }
+            } else {
+                tokens = quote! {
+                    #tokens
+                    let #field_name = ctx.decode_codepage(#context, #length)?;
+                }
             }
         } else if let Some(AsciiArgs { length, .. }) = f.ascii.as_ref() {
             tokens = quote! {
@@ -126,28 +143,26 @@ impl Field {
             }
         }
 
-        if let Some(codepage_args) = f.codepage.as_ref() {
-            match codepage_args {
-                CodepageArgs {
-                    length,
-                    align_to: None,
-                    trailing_nul,
-                } => {
-                    tokens = quote! {
-                        #tokens
-                        ctx.encode_codepage(#context, &self.#field_name, #length, #trailing_nul)?;
-                    }
-                },
-                CodepageArgs {
-                    length,
-                    align_to,
-                    trailing_nul,
-                } => {
-                    tokens = quote! {
-                        #tokens
-                        ctx.encode_codepage_with_alignment(#context, &self.#field_name, #length, #align_to, #trailing_nul)?;
-                    }
-                },
+        if let Some(CodepageArgs {
+            length,
+            align_to,
+            trailing_nul,
+        }) = f.codepage.as_ref()
+        {
+            let align_to_tokens = match align_to {
+                Some(n) => quote! { Some(#n) },
+                None => quote! { None },
+            };
+            if is_option(&f.ty) {
+                tokens = quote! {
+                    #tokens
+                    ctx.encode_optional_codepage(#context, &self.#field_name, #length, #align_to_tokens, #trailing_nul)?;
+                }
+            } else {
+                tokens = quote! {
+                    #tokens
+                    ctx.encode_codepage(#context, &self.#field_name, #length, #align_to_tokens, #trailing_nul)?;
+                }
             }
         } else if let Some(AsciiArgs {
             length,

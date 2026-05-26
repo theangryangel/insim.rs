@@ -482,7 +482,7 @@ impl Encode for Btn {
                 ctx.buf.put_bytes(0, round_to - written);
             }
         } else {
-            ctx.encode_codepage_with_alignment("text", &self.text, 240, 4, false)?;
+            ctx.encode_codepage("text", &self.text, 240, Some(4), false)?;
         }
 
         Ok(())
@@ -584,7 +584,7 @@ impl Encode for Btt {
         }
         ctx.encode("typein", &typein)?;
         ctx.pad("pad", 1)?;
-        ctx.encode_codepage("text", &self.text, 96, false)?;
+        ctx.encode_codepage("text", &self.text, 96, None, false)?;
         Ok(())
     }
 }
