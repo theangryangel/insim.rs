@@ -3484,7 +3484,9 @@ class Cpp(BaseModel):
 class Ism(BaseModel):
     """Multiplayer host information."""
 
-    hname: Annotated[str, Field(description="Host name of the server.")]
+    hname: (
+        Annotated[str | None, Field(description="Host name of the server.")] | None
+    ) = None
     host: Annotated[
         bool, Field(description="Whether we are the host (true) or a guest (false).")
     ]
@@ -4123,9 +4125,13 @@ class Axi(BaseModel):
     axstart: Annotated[
         int, Field(description="Autocross start position index.", ge=0, le=255)
     ]
-    lname: Annotated[
-        str, Field(description="Name of the last loaded layout (if loaded locally).")
-    ]
+    lname: (
+        Annotated[
+            str | None,
+            Field(description="Name of the last loaded layout (if loaded locally)."),
+        ]
+        | None
+    ) = None
     numcp: Annotated[int, Field(description="Number of checkpoints.", ge=0, le=255)]
     numo: Annotated[int, Field(description="Number of objects.", ge=0, le=65535)]
     reqi: Annotated[
@@ -4253,9 +4259,15 @@ class Rip(BaseModel):
     reqi: Annotated[
         int, Field(description="Request identifier echoed by replies.", ge=0, le=255)
     ]
-    rname: Annotated[
-        str, Field(description="Replay name (empty when querying current replay).")
-    ]
+    rname: (
+        Annotated[
+            str | None,
+            Field(
+                description="Replay name. `None` in a request means use the current replay; `None` in a reply means no\nreplay is loaded."
+            ),
+        ]
+        | None
+    ) = None
     ttime: Annotated[
         int,
         Field(

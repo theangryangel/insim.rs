@@ -18,7 +18,7 @@ pub struct Ism {
 
     /// Host name of the server.
     #[insim(codepage(length = 32))]
-    pub hname: String,
+    pub hname: Option<String>,
 }
 
 #[cfg(test)]
@@ -39,7 +39,7 @@ mod test {
             |parsed: Ism| {
                 assert_eq!(parsed.reqi, RequestId(1));
                 assert_eq!(parsed.host, true);
-                assert_eq!(&parsed.hname, "aBcd");
+                assert_eq!(parsed.hname.as_deref(), Some("aBcd"));
             }
         )
     }

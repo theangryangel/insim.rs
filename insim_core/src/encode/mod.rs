@@ -142,7 +142,7 @@ mod test {
         let input = String::from("abc");
         let mut buf = BytesMut::new();
         let mut ctx = EncodeContext::new(&mut buf);
-        ctx.encode_codepage_with_alignment("test", input, 128, 4, false)
+        ctx.encode_codepage("test", input, 128, Some(4), false)
             .unwrap();
         let inner = buf.freeze();
         assert_eq!(inner.as_ref(), [b'a', b'b', b'c', 0]);
@@ -153,7 +153,7 @@ mod test {
         let input = String::from("abcd");
         let mut buf = BytesMut::new();
         let mut ctx = EncodeContext::new(&mut buf);
-        ctx.encode_codepage_with_alignment("test", input, 128, 4, false)
+        ctx.encode_codepage("test", input, 128, Some(4), false)
             .unwrap();
         let inner = buf.freeze();
         assert_eq!(inner.as_ref(), [b'a', b'b', b'c', b'd']);
@@ -164,7 +164,7 @@ mod test {
         let input = String::from("a");
         let mut buf = BytesMut::new();
         let mut ctx = EncodeContext::new(&mut buf);
-        ctx.encode_codepage_with_alignment("test", input, 2, 2, true)
+        ctx.encode_codepage("test", input, 2, Some(2), true)
             .unwrap();
         let inner = buf.freeze();
         assert_eq!(inner.as_ref(), [b'a', 0]);
@@ -194,7 +194,7 @@ mod test {
         let input = String::from("abcde");
         let mut buf = BytesMut::new();
         let mut ctx = EncodeContext::new(&mut buf);
-        let res = ctx.encode_codepage("test", input, 4, true);
+        let res = ctx.encode_codepage("test", input, 4, None, true);
         assert!(res.is_err());
     }
 }

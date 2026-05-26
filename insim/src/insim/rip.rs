@@ -109,9 +109,10 @@ pub struct Rip {
     #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub ttime: Duration,
 
-    /// Replay name (empty when querying current replay).
+    /// Replay name. `None` in a request means use the current replay; `None` in a reply means no
+    /// replay is loaded.
     #[insim(codepage(length = 64, trailing_nul = true))]
-    pub rname: String,
+    pub rname: Option<String>,
 }
 
 impl_typical_with_request_id!(Rip);
@@ -149,7 +150,7 @@ mod test {
             assert_eq!(parsed.mpr, true);
             assert_eq!(parsed.paused, true);
             assert_eq!(parsed.ctime, Duration::from_millis(141684));
-            assert_eq!(parsed.rname, "name_of_thing");
+            assert_eq!(parsed.rname.as_deref(), Some("name_of_thing"));
         });
     }
 }

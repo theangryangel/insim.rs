@@ -432,21 +432,20 @@ impl Game {
     fn apply_axi(&self, axi: &Axi) -> (Option<String>, Option<String>) {
         let mut g = self.inner.write().expect("poison");
         let prev = g.layout.clone();
-        g.layout = Some(axi.lname.clone());
-        (prev, Some(axi.lname.clone()))
+        g.layout = axi.lname.clone();
+        (prev, axi.lname.clone())
     }
 
     fn apply_ism(&self, ism: &Ism) -> (MultiplayerState, MultiplayerState) {
         let mut g = self.inner.write().expect("poison");
         let prev = g.multiplayer.clone();
         // NOTE: If LFS is not in multiplayer mode, the host name in the ISM will be empty.
-        g.multiplayer = if ism.hname.is_empty() {
-            MultiplayerState::Local
-        } else {
-            MultiplayerState::Multiplayer {
-                host_name: ism.hname.clone(),
+        g.multiplayer = match ism.hname.as_deref() {
+            None | Some("") => MultiplayerState::Local,
+            Some(name) => MultiplayerState::Multiplayer {
+                host_name: name.to_owned(),
                 is_host: ism.host,
-            }
+            },
         };
         (prev, g.multiplayer.clone())
     }

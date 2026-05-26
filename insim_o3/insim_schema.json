@@ -1634,7 +1634,10 @@
         },
         "lname": {
           "description": "Name of the last loaded layout (if loaded locally).",
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "numcp": {
           "description": "Number of checkpoints.",
@@ -1659,8 +1662,7 @@
         "reqi",
         "axstart",
         "numcp",
-        "numo",
-        "lname"
+        "numo"
       ]
     },
     "Axm": {
@@ -4461,7 +4463,10 @@
       "properties": {
         "hname": {
           "description": "Host name of the server.",
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "host": {
           "description": "Whether we are the host (true) or a guest (false).",
@@ -4474,8 +4479,7 @@
       },
       "required": [
         "reqi",
-        "host",
-        "hname"
+        "host"
       ]
     },
     "Jrr": {
@@ -8355,8 +8359,11 @@
           "$ref": "#/$defs/RequestId"
         },
         "rname": {
-          "description": "Replay name (empty when querying current replay).",
-          "type": "string"
+          "description": "Replay name. `None` in a request means use the current replay; `None` in a reply means no\nreplay is loaded.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "ttime": {
           "description": "Replay length (reply) or zero when requesting, in milliseconds.",
@@ -8372,8 +8379,7 @@
         "paused",
         "options",
         "ctime",
-        "ttime",
-        "rname"
+        "ttime"
       ]
     },
     "RipError": {
