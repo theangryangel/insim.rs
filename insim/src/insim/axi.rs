@@ -23,7 +23,7 @@ pub struct Axi {
 
     /// Name of the last loaded layout (if loaded locally).
     #[insim(codepage(length = 32))]
-    pub lname: String,
+    pub lname: Option<String>,
 }
 
 #[cfg(test)]
@@ -47,7 +47,7 @@ mod test {
         buf.put_bytes(0, 32 - 8);
 
         assert_from_to_bytes!(Axi, buf.freeze(), |axi: Axi| {
-            assert_eq!(axi.lname, "test 123");
+            assert_eq!(axi.lname.as_deref(), Some("test 123"));
         });
     }
 }

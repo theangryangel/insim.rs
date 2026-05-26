@@ -114,12 +114,15 @@ impl<'a> EncodeContext<'a> {
         })
     }
 
-    /// Write fixed length codepage
+    /// Write a codepage string. If `align_to` is `Some`, `len` is the maximum length and the
+    /// written bytes are padded to the nearest `align_to`-byte boundary. If `align_to` is `None`,
+    /// `len` is the exact fixed length and the field is always padded to exactly `len` bytes.
     pub fn encode_codepage<T: AsRef<str>>(
         &mut self,
         name: &'static str,
         val: T,
         len: usize,
+        align_to: Option<usize>,
         trailing_nul: bool,
     ) -> Result<(), super::EncodeError> {
         self.op(name, true, |writer| {
@@ -135,48 +138,37 @@ impl<'a> EncodeContext<'a> {
             }
             let len_to_write = new.len().min(max_len);
             writer.buf.extend_from_slice(&new[..len_to_write]);
-            writer.buf.put_bytes(0, len - len_to_write);
+
+            if let Some(alignment) = align_to {
+                let mask = alignment - 1;
+                let min_total = if trailing_nul {
+                    len_to_write + 1
+                } else {
+                    len_to_write
+                };
+                let round_to = ((min_total + mask) & !mask).min(len);
+                if round_to > len_to_write {
+                    writer.buf.put_bytes(0, round_to - len_to_write);
+                }
+            } else {
+                writer.buf.put_bytes(0, len - len_to_write);
+            }
             Ok(())
         })
     }
 
-    /// Write variable length codepage, upto len, aligned to nearest X bytes
-    pub fn encode_codepage_with_alignment<T: AsRef<str>>(
+    /// Write an optional codepage string. See encode_codepage for a breakdown of args.
+    pub fn encode_optional_codepage<T: AsRef<str>>(
         &mut self,
         name: &'static str,
-        val: T,
+        val: &Option<T>,
         len: usize,
-        alignment: usize,
+        align_to: Option<usize>,
         trailing_nul: bool,
     ) -> Result<(), super::EncodeError> {
-        self.op(name, true, |writer| {
-            let new = crate::string::codepages::to_lossy_bytes(val.as_ref());
-            let max_len = if trailing_nul { len - 1 } else { len };
-            if new.len() > max_len {
-                return Err(super::EncodeErrorKind::OutOfRange {
-                    min: 0,
-                    max: max_len,
-                    found: new.len(),
-                }
-                .into());
-            }
-            let len_to_write = new.len().min(max_len);
-            writer.buf.extend_from_slice(&new[..len_to_write]);
-
-            // Always pad to alignment, ensuring trailing_nul if needed
-            let align_to = alignment - 1;
-            let min_total = if trailing_nul {
-                len_to_write + 1
-            } else {
-                len_to_write
-            };
-            let round_to = (min_total + align_to) & !align_to;
-            let round_to = round_to.min(len);
-
-            if round_to > len_to_write {
-                writer.buf.put_bytes(0, round_to - len_to_write);
-            }
-            Ok(())
-        })
+        match val {
+            None => self.encode_codepage(name, "", len, align_to, trailing_nul),
+            Some(v) => self.encode_codepage(name, v.as_ref(), len, align_to, trailing_nul),
+        }
     }
 }

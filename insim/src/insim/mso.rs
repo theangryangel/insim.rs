@@ -141,13 +141,7 @@ impl Encode for Mso {
             }
         } else {
             ctx.buf.put_u8(0);
-            ctx.encode_codepage_with_alignment(
-                "msg",
-                &self.msg,
-                MSO_MSG_MAX_LEN,
-                MSO_MSG_ALIGN,
-                true,
-            )?;
+            ctx.encode_codepage("msg", &self.msg, MSO_MSG_MAX_LEN, Some(MSO_MSG_ALIGN), true)?;
         }
 
         Ok(())
