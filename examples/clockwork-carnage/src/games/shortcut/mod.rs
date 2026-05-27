@@ -13,8 +13,8 @@ use std::time::Duration;
 
 pub use config::{ShortcutArgs, ShortcutConfig, ShortcutRunConfig};
 use handlers::{
-    on_connected, on_disconnected, on_npl, on_race_ended, on_setup_aborted, on_setup_complete,
-    on_toc, on_uco,
+    on_connected, on_disconnected, on_race_ended, on_setup_aborted, on_setup_complete, on_toc,
+    on_uco,
 };
 use kitcar::{App, AppError, Game, HandlerExt, Presence, Stage, State, run};
 use state::{Shortcut, ShortcutGlobal, ShortcutPhase};
@@ -50,7 +50,6 @@ pub async fn run_shortcut_with(cfg: ShortcutRunConfig) -> Result<(), AppError> {
         .handle(Stage::Update, on_setup_complete)
         .handle(Stage::Update, on_setup_aborted)
         .handle(Stage::Update, on_race_ended)
-        .handle(Stage::Update, on_npl.run_if(while_racing))
         .handle(Stage::Update, on_toc.run_if(while_racing))
         .handle(Stage::Update, on_uco.run_if(while_racing));
 

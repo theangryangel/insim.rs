@@ -14,7 +14,7 @@ pub use config::{BombArgs, BombConfig, BombRunConfig};
 use config::{PENALTY_CLEAR_DELAY, TICK_PERIOD};
 use events::BombTick;
 use handlers::{
-    on_con, on_connected, on_crs, on_disconnected, on_npl, on_pit, on_player_left,
+    on_con, on_connected, on_crs, on_disconnected, on_pit, on_player_left,
     on_player_teleported_to_pits, on_race_ended, on_setup_aborted, on_setup_complete, on_tick,
     on_toc, on_uco,
 };
@@ -63,7 +63,6 @@ pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
         .handle(Stage::Update, on_setup_complete)
         .handle(Stage::Update, on_setup_aborted)
         .handle(Stage::Update, on_race_ended)
-        .handle(Stage::Update, on_npl.run_if(while_racing))
         .handle(Stage::Update, on_player_left.run_if(while_racing))
         .handle(Stage::Update, on_toc.run_if(while_racing))
         .handle(Stage::Update, on_pit.run_if(while_racing))

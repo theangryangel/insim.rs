@@ -93,18 +93,9 @@ impl Framed {
         Ok(())
     }
 
-    /// Flush the inner network
-    pub fn flush(&mut self) -> Result<()> {
-        if let Transport::Tcp(stream) = &mut self.inner {
-            stream.flush()?;
-        }
-        Ok(())
-    }
-
     /// Shutdown the inner network. For blocking this currently just a flush
     pub fn shutdown(&mut self) -> Result<()> {
         self.write(TinyType::Close)?;
-        self.flush()?;
         if let Transport::Tcp(stream) = &mut self.inner {
             let _ = stream.shutdown(std::net::Shutdown::Both);
         }

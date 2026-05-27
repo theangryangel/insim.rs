@@ -7,7 +7,7 @@ use insim::{
         insim::{InsimCheckpoint, InsimCheckpointKind},
     },
     identifiers::ConnectionId,
-    insim::{Npl, RaceLaps, Tiny, TinyType, Toc, Uco},
+    insim::{RaceLaps, Toc, Uco},
 };
 use kitcar::{
     AppError, Connected, Disconnected, Event, Game, Packet, Presence, RaceEnded, Sender, State,
@@ -17,7 +17,7 @@ use kitcar::{
 use super::{
     config::MIN_PLAYERS,
     events::{SetupAborted, SetupComplete},
-    state::{Metronome, MetronomePhase, PlayerInfo},
+    state::{Metronome, MetronomePhase},
     ui::{MetronomeConnectionProps, MetronomeUi},
 };
 
@@ -116,7 +116,6 @@ pub(super) async fn on_disconnected(
         MetronomePhase::Racing => {
             {
                 let mut m = state.write();
-                m.players.clear();
                 m.active_runs.clear();
                 m.phase = MetronomePhase::Waiting;
             }
@@ -149,10 +148,6 @@ pub(super) async fn on_setup_complete(
         format!("Metronome - target: {target_secs:.1}s. Cross checkpoint 1 to start."),
         Some(ConnectionId::ALL),
     ))?;
-    sender.packet(insim::Packet::Tiny(Tiny {
-        subt: TinyType::Npl,
-        ..Default::default()
-    }))?;
     refresh_ui(&state, &ui);
     Ok(())
 }
@@ -197,7 +192,6 @@ pub(super) async fn on_race_ended(
         if m.phase != MetronomePhase::Racing {
             return Ok(());
         }
-        m.players.clear();
         m.active_runs.clear();
         m.phase = MetronomePhase::Waiting;
     }
@@ -208,33 +202,11 @@ pub(super) async fn on_race_ended(
     Ok(())
 }
 
-pub(super) async fn on_npl(
-    Packet(npl): Packet<Npl>,
-    state: State<Metronome>,
-    presence: Presence,
-) -> Result<(), AppError> {
-    let uname = presence.get(npl.ucid).map(|c| c.uname).unwrap_or_default();
-    let _ = state.write().players.insert(
-        npl.plid,
-        PlayerInfo {
-            ucid: npl.ucid,
-            pname: npl.pname.clone(),
-            uname,
-            ptype: npl.ptype,
-        },
-    );
-    Ok(())
-}
-
 pub(super) async fn on_toc(
     Packet(toc): Packet<Toc>,
     state: State<Metronome>,
 ) -> Result<(), AppError> {
-    let mut m = state.write();
-    if let Some(p) = m.players.get_mut(&toc.plid) {
-        p.ucid = toc.newucid;
-    }
-    if let Some(r) = m.active_runs.get_mut(&toc.plid) {
+    if let Some(r) = state.write().active_runs.get_mut(&toc.plid) {
         r.0 = toc.newucid;
     }
     Ok(())
@@ -256,23 +228,23 @@ pub(super) async fn on_uco(
         return Ok(());
     }
 
-    let player = {
-        let m = state.read();
-        m.players.get(&uco.plid).cloned()
-    };
-    let Some(player) = player else {
+    let Some(player) = presence.player(uco.plid) else {
         return Ok(());
     };
     if player.ptype.contains(insim::insim::PlayerType::AI) {
         return Ok(());
     }
+    let uname = presence
+        .get(player.ucid)
+        .map(|c| c.uname)
+        .unwrap_or_default();
 
     if is_cp1 {
         let start_time = uco.time;
         let _ = state
             .write()
             .active_runs
-            .insert(uco.plid, (player.ucid, player.uname.clone(), start_time));
+            .insert(uco.plid, (player.ucid, uname.clone(), start_time));
         sender.packets(mtc(
             "Run started - reach the finish!".light_green(),
             Some(player.ucid),
@@ -281,7 +253,7 @@ pub(super) async fn on_uco(
             .assign_player(
                 player.ucid,
                 MetronomeConnectionProps {
-                    uname: player.uname.clone(),
+                    uname: uname.clone(),
                     in_run: true,
                     best_delta_ms: None,
                 },

@@ -7,7 +7,7 @@ use insim::{
         insim::{InsimCheckpoint, InsimCheckpointKind},
     },
     identifiers::ConnectionId,
-    insim::{Con, Crs, Npl, Pit, RaceLaps, Tiny, TinyType, Toc, Uco},
+    insim::{Con, Crs, Pit, RaceLaps, Toc, Uco},
 };
 use kitcar::{
     AppError, Connected, Disconnected, Event, Game, Packet, PenaltyClearer, PlayerLeft,
@@ -18,7 +18,7 @@ use super::{
     config::MIN_PLAYERS,
     db::persist_bomb_run,
     events::{BombTick, SetupAborted, SetupComplete},
-    state::{ActiveRun, Bomb, BombPhase, CheckpointOutcome, PlayerInfo},
+    state::{ActiveRun, Bomb, BombPhase, CheckpointOutcome},
     ui::{BombConnectionProps, BombUi},
 };
 
@@ -116,11 +116,7 @@ pub(super) async fn on_disconnected(
         },
         BombPhase::Racing => {
             let now = Instant::now();
-            let runs: Vec<ActiveRun> = {
-                let mut b = state.write();
-                b.players.clear();
-                b.active_runs.drain().map(|(_, r)| r).collect()
-            };
+            let runs: Vec<ActiveRun> = state.write().active_runs.drain().map(|(_, r)| r).collect();
             for run in &runs {
                 let _ = sender.packets(mtc(
                     format!("Run ended - left race after {} cps", run.checkpoints).red(),
@@ -184,10 +180,6 @@ pub(super) async fn on_setup_complete(
         format!("Bomb - hit checkpoints before the {cfg_secs:.0}s timer expires!"),
         Some(ConnectionId::ALL),
     ))?;
-    sender.packet(insim::Packet::Tiny(Tiny {
-        subt: TinyType::Npl,
-        ..Default::default()
-    }))?;
     refresh_ui(&state, &ui);
     Ok(())
 }
@@ -233,7 +225,6 @@ pub(super) async fn on_race_ended(
         if b.phase != BombPhase::Racing {
             return Ok(());
         }
-        b.players.clear();
         b.active_runs.drain().map(|(_, r)| r).collect()
     };
     let now = Instant::now();
@@ -277,24 +268,6 @@ pub(super) async fn on_race_ended(
     Ok(())
 }
 
-pub(super) async fn on_npl(
-    Packet(npl): Packet<Npl>,
-    state: State<Bomb>,
-    presence: Presence,
-) -> Result<(), AppError> {
-    let uname = presence.get(npl.ucid).map(|c| c.uname).unwrap_or_default();
-    let _ = state.write().players.insert(
-        npl.plid,
-        PlayerInfo {
-            ucid: npl.ucid,
-            pname: npl.pname.clone(),
-            uname,
-            ptype: npl.ptype,
-        },
-    );
-    Ok(())
-}
-
 pub(super) async fn on_player_left(
     Event(PlayerLeft(player)): Event<PlayerLeft>,
     state: State<Bomb>,
@@ -304,7 +277,6 @@ pub(super) async fn on_player_left(
     let now = Instant::now();
     let (run, db) = {
         let mut b = state.write();
-        let _ = b.players.remove(&player.plid);
         let run = b.active_runs.remove(&player.plid);
         let db = b.db.clone();
         (run, db)
@@ -332,11 +304,7 @@ pub(super) async fn on_player_left(
 }
 
 pub(super) async fn on_toc(Packet(toc): Packet<Toc>, state: State<Bomb>) -> Result<(), AppError> {
-    let mut b = state.write();
-    if let Some(p) = b.players.get_mut(&toc.plid) {
-        p.ucid = toc.newucid;
-    }
-    if let Some(r) = b.active_runs.get_mut(&toc.plid) {
+    if let Some(r) = state.write().active_runs.get_mut(&toc.plid) {
         r.ucid = toc.newucid;
     }
     Ok(())
@@ -476,6 +444,7 @@ pub(super) async fn on_con(
 pub(super) async fn on_uco(
     Packet(uco): Packet<Uco>,
     state: State<Bomb>,
+    presence: Presence,
     sender: Sender,
     ui: BombUi,
 ) -> Result<(), AppError> {
@@ -485,14 +454,23 @@ pub(super) async fn on_uco(
     let is_finish = matches!(kind, InsimCheckpointKind::Finish);
     let now = Instant::now();
 
-    let outcome = {
-        let mut b = state.write();
-        let player = match b.players.get(&uco.plid).cloned() {
-            Some(p) => p,
-            None => return Ok(()),
-        };
-        b.on_checkpoint(&player, uco.plid, is_finish, now)
+    let Some(player) = presence.player(uco.plid) else {
+        return Ok(());
     };
+    let uname = presence
+        .get(player.ucid)
+        .map(|c| c.uname)
+        .unwrap_or_default();
+
+    let outcome = state.write().on_checkpoint(
+        uco.plid,
+        player.ucid,
+        &uname,
+        &player.pname,
+        player.ptype,
+        is_finish,
+        now,
+    );
     let Some(outcome) = outcome else {
         return Ok(());
     };
