@@ -1,20 +1,7 @@
-use insim::insim::BtnStyle;
 use kitcar::ui::{self, Component, Ui};
 
 use super::state::MetronomeGlobal;
-
-fn hud_title() -> BtnStyle {
-    BtnStyle::default().dark().yellow()
-}
-fn hud_text() -> BtnStyle {
-    BtnStyle::default().dark().light_grey()
-}
-fn hud_active() -> BtnStyle {
-    BtnStyle::default().dark().white()
-}
-fn hud_muted() -> BtnStyle {
-    BtnStyle::default().dark().grey()
-}
+use crate::components::{hud_active, hud_muted, hud_text, hud_title};
 
 #[derive(Clone, Default, Debug)]
 pub(super) struct MetronomeConnectionProps {

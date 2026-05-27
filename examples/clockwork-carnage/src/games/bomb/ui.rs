@@ -1,9 +1,12 @@
 use std::time::Instant;
 
-use insim::{Colour, insim::BtnStyle};
+use insim::Colour;
 use kitcar::ui::{self, Component, Ui};
 
 use super::state::BombGlobal;
+use crate::components::{
+    Dialog, DialogMsg, DialogProps, hud_active, hud_muted, hud_text, hud_title, topbar,
+};
 
 #[derive(Clone, Default, Debug)]
 pub(super) struct BombConnectionProps {
@@ -11,42 +14,52 @@ pub(super) struct BombConnectionProps {
     pub(super) in_run: bool,
 }
 
-fn hud_title() -> BtnStyle {
-    BtnStyle::default().dark().yellow()
-}
-
-fn hud_text() -> BtnStyle {
-    BtnStyle::default().dark().light_grey()
-}
-
-fn hud_active() -> BtnStyle {
-    BtnStyle::default().dark().white()
-}
-
-fn hud_muted() -> BtnStyle {
-    BtnStyle::default().dark().grey()
-}
-
-fn topbar<Msg>(title: &str) -> ui::Node<Msg> {
-    ui::container()
-        .flex()
-        .flex_row()
-        .justify_center()
-        .with_child(ui::text(title, hud_title()).w(30.0).h(5.0))
-}
+const BOMB_HELP_LINES: &[&str] = &[
+    " - Hit ^2checkpoint^7 objects before the timer expires or your run ends (BOOM).",
+    " - Each checkpoint shrinks the window: ^1next window = current window - penalty^7.",
+    " - Hit a ^3finish^7 object to fully reset the window back to the base time.",
+    " - ^1Resetting your car^7 deducts the penalty directly from your remaining time.",
+    " - ^1Pitting^7 ends your run immediately - commit to your fuel before you start.",
+    " - ^1Collisions^7 cost time - harder impacts cost more, up to the collision max penalty.",
+    " - Score = checkpoints hit. Survival time breaks ties.",
+    " - Your best run is recorded on the leaderboard.",
+    "",
+    "Good luck.",
+];
 
 #[derive(Clone, Debug)]
-pub(super) enum BombMsg {}
+pub(super) enum BombMsg {
+    Help(DialogMsg),
+}
 
 pub(super) struct BombView {
     pub(super) _tick_handle: tokio::task::JoinHandle<()>,
+    pub(super) help: Dialog,
 }
 
 impl Component for BombView {
     type Message = BombMsg;
     type Props<'a> = (&'a BombGlobal, &'a BombConnectionProps);
 
+    fn update(&mut self, msg: Self::Message) {
+        match msg {
+            BombMsg::Help(help_msg) => {
+                Component::update(&mut self.help, help_msg);
+            },
+        }
+    }
+
     fn render(&self, (global, player): Self::Props<'_>) -> ui::Node<Self::Message> {
+        if self.help.is_visible() {
+            return self
+                .help
+                .render(DialogProps {
+                    title: "Bomb",
+                    lines: BOMB_HELP_LINES,
+                })
+                .map(BombMsg::Help);
+        }
+
         let status_str = if player.in_run {
             "In run"
         } else {

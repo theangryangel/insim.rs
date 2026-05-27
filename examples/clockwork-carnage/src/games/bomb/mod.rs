@@ -1,6 +1,7 @@
 //! Bomb mini-game subcommand. Ported from kitcar/examples/bomb.rs with
 //! optional DB writes when `--db` and `--event-id` are provided.
 
+mod chat;
 mod config;
 mod db;
 mod events;
@@ -18,10 +19,17 @@ use handlers::{
     on_player_teleported_to_pits, on_race_ended, on_setup_aborted, on_setup_complete, on_tick,
     on_toc, on_uco,
 };
-use kitcar::{App, AppError, Game, HandlerExt, PenaltyClearer, Presence, Stage, State, run};
+use kitcar::{
+    App, AppError, ChatParser, Game, HandlerExt, PenaltyClearer, Presence, Stage, State, run,
+};
 use state::{Bomb, BombGlobal, BombPhase};
 use tokio_util::sync::CancellationToken;
 use ui::{BombUi, BombView};
+
+use crate::{
+    components::Dialog,
+    games::bomb::ui::{BombConnectionProps, BombMsg},
+};
 
 pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
     let app = App::<Bomb>::with_state(Bomb::new(cfg.config, CancellationToken::new(), cfg.db));
@@ -43,7 +51,10 @@ pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
                     invalidator.invalidate();
                 }
             });
-            BombView { _tick_handle }
+            BombView {
+                _tick_handle,
+                help: Dialog::default(),
+            }
         },
     );
 
@@ -58,6 +69,7 @@ pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
         .handle(Stage::Pre, game)
         .handle(Stage::Pre, clearer)
         .handle(Stage::Pre, ui)
+        .handle(Stage::Update, ChatParser::<chat::Cmd>::new(&['!']))
         .handle(Stage::Update, on_connected)
         .handle(Stage::Update, on_disconnected)
         .handle(Stage::Update, on_setup_complete)
@@ -74,6 +86,7 @@ pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
         .handle(Stage::Update, on_con.run_if(while_racing))
         .handle(Stage::Update, on_uco.run_if(while_racing))
         .handle(Stage::Update, on_tick.run_if(while_racing))
+        .handle(Stage::Update, chat::handle_chat)
         .periodic(TICK_PERIOD, BombTick);
 
     let builder = insim::tcp(cfg.insim.addr)

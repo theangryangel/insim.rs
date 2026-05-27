@@ -1,6 +1,7 @@
 #![allow(missing_docs, missing_debug_implementations)]
 
 mod args;
+mod components;
 mod db;
 mod event;
 mod games;
