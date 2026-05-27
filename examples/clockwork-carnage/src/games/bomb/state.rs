@@ -52,14 +52,6 @@ impl ActiveRun {
     }
 }
 
-#[derive(Clone, Debug)]
-pub(super) struct PlayerInfo {
-    pub(super) ucid: ConnectionId,
-    pub(super) pname: String,
-    pub(super) uname: String,
-    pub(super) ptype: PlayerType,
-}
-
 #[derive(Debug)]
 pub(super) enum CheckpointOutcome {
     Started {
@@ -109,7 +101,6 @@ pub(super) struct BombInner {
     setup_cancel: Option<CancellationToken>,
     pub(super) runtime_cancel: CancellationToken,
     pub(super) active_runs: HashMap<PlayerId, ActiveRun>,
-    pub(super) players: HashMap<PlayerId, PlayerInfo>,
     pub(super) leaderboard: Vec<(String, String, i64, i64)>,
     pub(super) db: Option<(crate::db::Pool, i64)>,
 }
@@ -132,7 +123,6 @@ impl Bomb {
                 setup_cancel: None,
                 runtime_cancel,
                 active_runs: HashMap::new(),
-                players: HashMap::new(),
                 leaderboard: Vec::new(),
                 db,
             })),
@@ -167,8 +157,11 @@ impl BombInner {
 
     pub(super) fn on_checkpoint(
         &mut self,
-        p: &PlayerInfo,
         plid: PlayerId,
+        ucid: ConnectionId,
+        uname: &str,
+        pname: &str,
+        ptype: PlayerType,
         is_finish: bool,
         now: Instant,
     ) -> Option<CheckpointOutcome> {
@@ -196,16 +189,16 @@ impl BombInner {
             };
             return Some(outcome);
         }
-        if p.ptype.contains(PlayerType::AI) {
+        if ptype.contains(PlayerType::AI) {
             return None;
         }
         let _ = self.active_runs.insert(
             plid,
-            ActiveRun::new(p.uname.clone(), p.pname.clone(), p.ucid, &self.config, now),
+            ActiveRun::new(uname.to_owned(), pname.to_owned(), ucid, &self.config, now),
         );
         Some(CheckpointOutcome::Started {
-            ucid: p.ucid,
-            uname: p.uname.clone(),
+            ucid,
+            uname: uname.to_owned(),
         })
     }
 

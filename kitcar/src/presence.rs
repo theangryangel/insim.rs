@@ -3,7 +3,7 @@
 
 use std::future::Future;
 
-use insim::insim::TinyType;
+use insim::{WithRequestId, insim::TinyType};
 pub use insim_extra::presence::{ConnectionInfo, PlayerInfo, Presence, PresenceEvent};
 
 use crate::{AppError, Dispatch, ExtractCx, FromContext, Handler, Sender, Startup};
@@ -96,8 +96,8 @@ impl<S: Send + Sync + 'static> Handler<(), S> for Presence {
         let sender = cx.sender.clone();
         async move {
             if startup {
-                let _ = sender.packet(TinyType::Ncn);
-                let _ = sender.packet(TinyType::Npl);
+                let _ = sender.packet(TinyType::Ncn.with_request_id(2));
+                let _ = sender.packet(TinyType::Npl.with_request_id(3));
             }
             emit_presence_events(events, &sender);
             Ok(())

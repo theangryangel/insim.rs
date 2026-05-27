@@ -133,7 +133,7 @@ pub async fn track_rotation(
     sender.packet(game.ax_clear()).ok()?;
     if let Some(layout) = layout {
         sender.packet(game.ax_load(layout.clone())).ok()?;
-        game.wait_for_layout(layout, cancel.clone()).await?;
+        //game.wait_for_layout(layout, cancel.clone()).await?;
     }
     game.wait_for_racing(cancel).await?;
     Some(())

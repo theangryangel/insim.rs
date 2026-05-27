@@ -475,7 +475,7 @@ impl Presence {
     }
 
     fn apply_ncn(&self, ncn: &Ncn) -> ConnectionInfo {
-        let info = ConnectionInfo {
+        let mut info = ConnectionInfo {
             ucid: ncn.ucid,
             uname: ncn.uname.clone(),
             pname: ncn.pname.clone(),
@@ -489,6 +489,13 @@ impl Presence {
         let _ = guard
             .last_known_names
             .insert(ncn.uname.clone(), ncn.pname.clone());
+        // Backfill players that arrived before their owning connection.
+        // This happens during state sync when Npl packets precede Ncn packets.
+        for (&plid, player) in &guard.players {
+            if player.ucid == ncn.ucid {
+                let _ = info.players.insert(plid);
+            }
+        }
         let _ = guard.connections.insert(info.ucid, info.clone());
         info
     }
@@ -543,11 +550,6 @@ impl Presence {
     }
 
     fn apply_npl(&self, npl: &Npl) -> Option<PlayerInfo> {
-        // A join request is signalled by `nump == 0`; the real join arrives
-        // as a subsequent `Npl` with `nump` set.
-        if npl.nump == 0 {
-            return None;
-        }
         let player = PlayerInfo {
             plid: npl.plid,
             ucid: npl.ucid,
@@ -562,7 +564,8 @@ impl Presence {
         if let Some(conn) = guard.connections.get_mut(&npl.ucid) {
             let _ = conn.players.insert(npl.plid);
         }
-        Some(player)
+        // Only emit PlayerJoined once the join is confirmed (nump > 0).
+        if npl.nump == 0 { None } else { Some(player) }
     }
 
     fn apply_pll(&self, pll: &Pll) -> Option<PlayerInfo> {

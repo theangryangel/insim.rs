@@ -4,10 +4,7 @@ use std::{
     time::Duration,
 };
 
-use insim::{
-    identifiers::{ConnectionId, PlayerId},
-    insim::PlayerType,
-};
+use insim::identifiers::{ConnectionId, PlayerId};
 use tokio_util::sync::CancellationToken;
 
 use super::config::ShortcutConfig;
@@ -30,15 +27,6 @@ impl ShortcutPhase {
     }
 }
 
-#[derive(Clone, Debug)]
-pub(super) struct PlayerInfo {
-    pub(super) ucid: ConnectionId,
-    pub(super) uname: String,
-    pub(super) pname: String,
-    pub(super) ptype: PlayerType,
-    pub(super) vehicle: String,
-}
-
 #[derive(Clone, Default, Debug)]
 pub(super) struct ShortcutGlobal {
     pub(super) phase: String,
@@ -52,7 +40,6 @@ pub(super) struct ShortcutInner {
     pub(super) runtime_cancel: CancellationToken,
     /// plid → (ucid, uname, start_time)
     pub(super) active_runs: HashMap<PlayerId, (ConnectionId, String, Duration)>,
-    pub(super) players: HashMap<PlayerId, PlayerInfo>,
     /// (uname, pname, best_time_ms) sorted by time asc
     pub(super) leaderboard: Vec<(String, String, i64)>,
     pub(super) db: Option<(crate::db::Pool, i64)>,
@@ -76,7 +63,6 @@ impl Shortcut {
                 setup_cancel: None,
                 runtime_cancel,
                 active_runs: HashMap::new(),
-                players: HashMap::new(),
                 leaderboard: Vec::new(),
                 db,
             })),

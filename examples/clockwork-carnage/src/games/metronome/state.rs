@@ -4,10 +4,7 @@ use std::{
     time::Duration,
 };
 
-use insim::{
-    identifiers::{ConnectionId, PlayerId},
-    insim::PlayerType,
-};
+use insim::identifiers::{ConnectionId, PlayerId};
 use tokio_util::sync::CancellationToken;
 
 use super::config::MetronomeConfig;
@@ -18,14 +15,6 @@ pub(super) enum MetronomePhase {
     Waiting,
     SettingUp,
     Racing,
-}
-
-#[derive(Clone, Debug)]
-pub(super) struct PlayerInfo {
-    pub(super) ucid: ConnectionId,
-    pub(super) uname: String,
-    pub(super) pname: String,
-    pub(super) ptype: PlayerType,
 }
 
 #[derive(Clone, Default, Debug)]
@@ -41,7 +30,6 @@ pub(super) struct MetronomeInner {
     pub(super) runtime_cancel: CancellationToken,
     /// plid → (ucid, uname, checkpoint1_time)
     pub(super) active_runs: HashMap<PlayerId, (ConnectionId, String, Duration)>,
-    pub(super) players: HashMap<PlayerId, PlayerInfo>,
     /// (uname, pname, best_delta_ms) sorted by delta asc
     pub(super) leaderboard: Vec<(String, String, i64)>,
     pub(super) db: Option<(crate::db::Pool, i64)>,
@@ -65,7 +53,6 @@ impl Metronome {
                 setup_cancel: None,
                 runtime_cancel,
                 active_runs: HashMap::new(),
-                players: HashMap::new(),
                 leaderboard: Vec::new(),
                 db,
             })),

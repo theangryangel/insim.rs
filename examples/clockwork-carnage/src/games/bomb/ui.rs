@@ -47,7 +47,11 @@ impl Component for BombView {
     type Props<'a> = (&'a BombGlobal, &'a BombConnectionProps);
 
     fn render(&self, (global, player): Self::Props<'_>) -> ui::Node<Self::Message> {
-        let status_str = if player.in_run { "In run" } else { "Waiting" };
+        let status_str = if player.in_run {
+            "In run"
+        } else {
+            "Cross any checkpoint to start"
+        };
         let status_style = if player.in_run {
             hud_active()
         } else {
@@ -133,7 +137,7 @@ impl Component for BombView {
             .flex_col()
             .with_child(
                 topbar(&format!("Bomb - {}", global.phase))
-                    .with_child(ui::text(status_str, status_style).w(15.0).h(5.0)),
+                    .with_child(ui::text(status_str, status_style).w(45.0).h(5.0)),
             )
             .with_child(scoreboard)
     }

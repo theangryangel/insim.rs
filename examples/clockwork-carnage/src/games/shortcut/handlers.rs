@@ -5,7 +5,7 @@ use insim::{
         insim::{InsimCheckpoint, InsimCheckpointKind},
     },
     identifiers::ConnectionId,
-    insim::{Npl, PlayerType, RaceLaps, Tiny, TinyType, Toc, Uco},
+    insim::{PlayerType, RaceLaps, Toc, Uco},
 };
 use kitcar::{
     AppError, Connected, Disconnected, Event, Game, Packet, Presence, RaceEnded, Sender, State,
@@ -15,7 +15,7 @@ use kitcar::{
 use super::{
     config::MIN_PLAYERS,
     events::{SetupAborted, SetupComplete},
-    state::{PlayerInfo, Shortcut, ShortcutPhase},
+    state::{Shortcut, ShortcutPhase},
     ui::{ShortcutConnectionProps, ShortcutUi},
 };
 
@@ -114,7 +114,6 @@ pub(super) async fn on_disconnected(
         ShortcutPhase::Racing => {
             {
                 let mut s = state.write();
-                s.players.clear();
                 s.active_runs.clear();
                 s.phase = ShortcutPhase::Waiting;
             }
@@ -146,10 +145,6 @@ pub(super) async fn on_setup_complete(
         "Shortcut - cross checkpoint 1 to start your timed attempt!",
         Some(ConnectionId::ALL),
     ))?;
-    sender.packet(insim::Packet::Tiny(Tiny {
-        subt: TinyType::Npl,
-        ..Default::default()
-    }))?;
     refresh_ui(&state, &ui);
     Ok(())
 }
@@ -194,7 +189,6 @@ pub(super) async fn on_race_ended(
         if s.phase != ShortcutPhase::Racing {
             return Ok(());
         }
-        s.players.clear();
         s.active_runs.clear();
         s.phase = ShortcutPhase::Waiting;
     }
@@ -205,34 +199,11 @@ pub(super) async fn on_race_ended(
     Ok(())
 }
 
-pub(super) async fn on_npl(
-    Packet(npl): Packet<Npl>,
-    state: State<Shortcut>,
-    presence: Presence,
-) -> Result<(), AppError> {
-    let uname = presence.get(npl.ucid).map(|c| c.uname).unwrap_or_default();
-    let _ = state.write().players.insert(
-        npl.plid,
-        PlayerInfo {
-            ucid: npl.ucid,
-            pname: npl.pname.clone(),
-            uname,
-            ptype: npl.ptype,
-            vehicle: npl.cname.to_string(),
-        },
-    );
-    Ok(())
-}
-
 pub(super) async fn on_toc(
     Packet(toc): Packet<Toc>,
     state: State<Shortcut>,
 ) -> Result<(), AppError> {
-    let mut s = state.write();
-    if let Some(p) = s.players.get_mut(&toc.plid) {
-        p.ucid = toc.newucid;
-    }
-    if let Some(r) = s.active_runs.get_mut(&toc.plid) {
+    if let Some(r) = state.write().active_runs.get_mut(&toc.plid) {
         r.0 = toc.newucid;
     }
     Ok(())
@@ -254,22 +225,22 @@ pub(super) async fn on_uco(
         return Ok(());
     }
 
-    let player = {
-        let s = state.read();
-        s.players.get(&uco.plid).cloned()
-    };
-    let Some(player) = player else {
+    let Some(player) = presence.player(uco.plid) else {
         return Ok(());
     };
     if player.ptype.contains(PlayerType::AI) {
         return Ok(());
     }
+    let uname = presence
+        .get(player.ucid)
+        .map(|c| c.uname)
+        .unwrap_or_default();
 
     if is_cp1 {
         let _ = state
             .write()
             .active_runs
-            .insert(uco.plid, (player.ucid, player.uname.clone(), uco.time));
+            .insert(uco.plid, (player.ucid, uname.clone(), uco.time));
         sender.packets(mtc(
             "Run started - reach the finish!".light_green(),
             Some(player.ucid),
@@ -278,7 +249,7 @@ pub(super) async fn on_uco(
             .assign_player(
                 player.ucid,
                 ShortcutConnectionProps {
-                    uname: player.uname.clone(),
+                    uname: uname.clone(),
                     in_run: true,
                     best_time_ms: None,
                 },
@@ -289,7 +260,7 @@ pub(super) async fn on_uco(
         if let Some((_ucid, uname, start_time)) = run {
             let lap_time = uco.time.saturating_sub(start_time);
             let time_ms = lap_time.as_millis() as i64;
-            let vehicle = player.vehicle.clone();
+            let vehicle = player.vehicle.to_string();
 
             if let Some(pkt) = presence.spec(player.ucid) {
                 let _ = sender.packet(pkt);
