@@ -8,6 +8,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub(super) enum Cmd {
     Help,
+    About,
 }
 
 impl std::str::FromStr for Cmd {
@@ -16,6 +17,7 @@ impl std::str::FromStr for Cmd {
         let (head, _rest) = s.split_once(char::is_whitespace).unwrap_or((s, ""));
         match head {
             "help" => Ok(Cmd::Help),
+            "about" => Ok(Cmd::About),
             _ => Err(()),
         }
     }
@@ -28,6 +30,9 @@ pub(super) async fn handle_chat(
     match cmd.parsed {
         Cmd::Help => {
             let _ = ui.update(cmd.ucid, BombMsg::Help(DialogMsg::Show)).await;
+        },
+        Cmd::About => {
+            let _ = ui.update(cmd.ucid, BombMsg::About(DialogMsg::Show)).await;
         },
     }
     Ok(())

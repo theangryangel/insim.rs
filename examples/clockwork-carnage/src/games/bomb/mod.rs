@@ -27,7 +27,7 @@ use tokio_util::sync::CancellationToken;
 use ui::{BombUi, BombView};
 
 use crate::{
-    components::Dialog,
+    components::{Dialog, Marquee},
     games::bomb::ui::{BombConnectionProps, BombMsg},
 };
 
@@ -44,6 +44,7 @@ pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
             ..Default::default()
         },
         |_ucid, invalidator| {
+            let marquee = Marquee::new(invalidator.clone());
             let _tick_handle = tokio::spawn(async move {
                 let mut interval = tokio::time::interval(Duration::from_millis(100));
                 loop {
@@ -54,6 +55,8 @@ pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
             BombView {
                 _tick_handle,
                 help: Dialog::default(),
+                about: Dialog::default(),
+                marquee,
             }
         },
     );

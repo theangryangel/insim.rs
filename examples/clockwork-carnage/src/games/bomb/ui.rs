@@ -5,7 +5,8 @@ use kitcar::ui::{self, Component, Ui};
 
 use super::state::BombGlobal;
 use crate::components::{
-    Dialog, DialogMsg, DialogProps, hud_active, hud_muted, hud_text, hud_title, topbar,
+    Dialog, DialogMsg, DialogProps, Marquee, MarqueeProps, hud_active, hud_muted, hud_text,
+    hud_title, topbar,
 };
 
 #[derive(Clone, Default, Debug)]
@@ -13,6 +14,14 @@ pub(super) struct BombConnectionProps {
     pub(super) uname: String,
     pub(super) in_run: bool,
 }
+
+const BOMB_ABOUT_LINES: &[&str] = &[
+    "Bomb is part of ^2clockwork-carnage^7, a collection of",
+    "LFS mini-games built with the ^2kitcar^7 framework.",
+    "",
+    "Type ^2!help^7 for game rules.",
+    "Type ^2!about^7 to show this dialog again.",
+];
 
 const BOMB_HELP_LINES: &[&str] = &[
     " - Hit ^2checkpoint^7 objects before the timer expires or your run ends (BOOM).",
@@ -30,11 +39,14 @@ const BOMB_HELP_LINES: &[&str] = &[
 #[derive(Clone, Debug)]
 pub(super) enum BombMsg {
     Help(DialogMsg),
+    About(DialogMsg),
 }
 
 pub(super) struct BombView {
     pub(super) _tick_handle: tokio::task::JoinHandle<()>,
     pub(super) help: Dialog,
+    pub(super) about: Dialog,
+    pub(super) marquee: Marquee,
 }
 
 impl Component for BombView {
@@ -46,18 +58,45 @@ impl Component for BombView {
             BombMsg::Help(help_msg) => {
                 Component::update(&mut self.help, help_msg);
             },
+            BombMsg::About(about_msg) => {
+                Component::update(&mut self.about, about_msg);
+            },
         }
     }
 
     fn render(&self, (global, player): Self::Props<'_>) -> ui::Node<Self::Message> {
-        if self.help.is_visible() {
-            return self
-                .help
-                .render(DialogProps {
-                    title: "Bomb",
-                    lines: BOMB_HELP_LINES,
-                })
-                .map(BombMsg::Help);
+        let any_dialog = self.help.is_visible() || self.about.is_visible();
+        if any_dialog {
+            return ui::container()
+                .flex()
+                .flex_col()
+                .justify_center()
+                .items_center()
+                .w(200.)
+                .h(200.)
+                .with_child(
+                    ui::container()
+                        .flex()
+                        .flex_row()
+                        .with_child(
+                            self.help
+                                .render_panel(DialogProps {
+                                    title: "Bomb - Help",
+                                    lines: BOMB_HELP_LINES,
+                                    key: "help",
+                                })
+                                .map(BombMsg::Help),
+                        )
+                        .with_child(
+                            self.about
+                                .render_panel(DialogProps {
+                                    title: "Bomb - About",
+                                    lines: BOMB_ABOUT_LINES,
+                                    key: "about",
+                                })
+                                .map(BombMsg::About),
+                        ),
+                );
         }
 
         let status_str = if player.in_run {
@@ -150,7 +189,17 @@ impl Component for BombView {
             .flex_col()
             .with_child(
                 topbar(&format!("Bomb - {}", global.phase))
-                    .with_child(ui::text(status_str, status_style).w(45.0).h(5.0)),
+                    .with_child(ui::text(status_str, status_style).w(45.0).h(5.0))
+                    .with_child(
+                        Component::render(
+                            &self.marquee,
+                            MarqueeProps {
+                                text: "Hello World",
+                                width: 20,
+                            },
+                        )
+                        .map(|_| unreachable!()),
+                    ),
             )
             .with_child(scoreboard)
     }
