@@ -15,10 +15,11 @@ pub use config::{BombArgs, BombConfig, BombRunConfig};
 use config::{PENALTY_CLEAR_DELAY, TICK_PERIOD};
 use events::BombTick;
 use handlers::{
-    on_con, on_connected, on_crs, on_disconnected, on_pit, on_player_left,
+    on_axm, on_con, on_connected, on_crs, on_disconnected, on_pit, on_player_left,
     on_player_teleported_to_pits, on_race_ended, on_setup_aborted, on_setup_complete, on_tick,
     on_toc, on_uco,
 };
+use insim::insim::IsiFlags;
 use kitcar::{
     App, AppError, ChatParser, Game, HandlerExt, PenaltyClearer, Presence, Stage, State, run,
 };
@@ -74,6 +75,7 @@ pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
         .handle(Stage::Update, ChatParser::<chat::Cmd>::new(&['!']))
         .handle(Stage::Update, on_connected)
         .handle(Stage::Update, on_disconnected)
+        .handle(Stage::Update, on_axm)
         .handle(Stage::Update, on_setup_complete)
         .handle(Stage::Update, on_setup_aborted)
         .handle(Stage::Update, on_race_ended)
@@ -94,7 +96,8 @@ pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
     let builder = insim::tcp(cfg.insim.addr)
         .isi_iname("bomb".to_string())
         .isi_prefix('!')
-        .isi_admin_password(cfg.insim.admin_password);
+        .isi_admin_password(cfg.insim.admin_password)
+        .isi_flags(IsiFlags::AXM_LOAD);
 
     run(builder, app).await
 }

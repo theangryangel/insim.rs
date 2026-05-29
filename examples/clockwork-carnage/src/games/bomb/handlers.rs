@@ -4,10 +4,10 @@ use insim::{
     Colour,
     core::object::{
         ObjectInfo,
-        insim::{InsimCheckpoint, InsimCheckpointKind},
+        insim::{InsimCheckpoint, InsimCircle},
     },
     identifiers::ConnectionId,
-    insim::{Con, Crs, Pit, RaceLaps, Toc, Uco},
+    insim::{Axm, Con, Crs, Pit, PmoAction, PmoFlags, RaceLaps, Toc, Uco, UcoAction},
 };
 use kitcar::{
     AppError, Connected, Disconnected, Event, Game, Packet, PenaltyClearer, PlayerLeft,
@@ -437,6 +437,30 @@ pub(super) async fn on_con(
     Ok(())
 }
 
+pub(super) async fn on_axm(Packet(axm): Packet<Axm>, state: State<Bomb>) -> Result<(), AppError> {
+    let file_end = axm.flags.contains(PmoFlags::FILE_END);
+    match axm.action {
+        PmoAction::ClearAll => {
+            state.write().clear_circles();
+        },
+        PmoAction::LoadingFile(objects) | PmoAction::TinyAxm(objects) => {
+            let indices = objects.into_iter().filter_map(|o| {
+                if let ObjectInfo::InsimCircle(InsimCircle { index, .. }) = o {
+                    Some(index)
+                } else {
+                    None
+                }
+            });
+            state.write().accumulate_circles(indices);
+            if file_end {
+                state.write().finalize_circles();
+            }
+        },
+        _ => {},
+    }
+    Ok(())
+}
+
 pub(super) async fn on_uco(
     Packet(uco): Packet<Uco>,
     state: State<Bomb>,
@@ -444,29 +468,32 @@ pub(super) async fn on_uco(
     sender: Sender,
     ui: BombUi,
 ) -> Result<(), AppError> {
-    let ObjectInfo::InsimCheckpoint(InsimCheckpoint { kind, .. }) = uco.info else {
-        return Ok(());
-    };
-    let is_finish = matches!(kind, InsimCheckpointKind::Finish);
     let now = Instant::now();
 
-    let Some(player) = presence.player(uco.plid) else {
-        return Ok(());
+    let outcome = match (&uco.ucoaction, &uco.info) {
+        (UcoAction::CircleEnter, ObjectInfo::InsimCircle(InsimCircle { index, .. })) => {
+            let Some(player) = presence.player(uco.plid) else {
+                return Ok(());
+            };
+            let uname = presence
+                .get(player.ucid)
+                .map(|c| c.uname)
+                .unwrap_or_default();
+            state.write().on_checkpoint(
+                uco.plid,
+                player.ucid,
+                &uname,
+                &player.pname,
+                player.ptype,
+                *index,
+                now,
+            )
+        },
+        (_, ObjectInfo::InsimCheckpoint(InsimCheckpoint { .. })) => {
+            state.write().on_time_bonus(uco.plid, now)
+        },
+        _ => return Ok(()),
     };
-    let uname = presence
-        .get(player.ucid)
-        .map(|c| c.uname)
-        .unwrap_or_default();
-
-    let outcome = state.write().on_checkpoint(
-        uco.plid,
-        player.ucid,
-        &uname,
-        &player.pname,
-        player.ptype,
-        is_finish,
-        now,
-    );
     let Some(outcome) = outcome else {
         return Ok(());
     };

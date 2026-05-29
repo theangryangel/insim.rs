@@ -14,6 +14,37 @@ use tokio_util::sync::CancellationToken;
 
 use super::config::{BombConfig, COLLISION_THRESHOLD_MPS};
 
+#[derive(Clone, Debug, Default)]
+pub(super) struct CircleSequence(Vec<u8>);
+
+impl CircleSequence {
+    pub(super) fn accumulate(&mut self, indices: impl Iterator<Item = u8>) {
+        self.0.extend(indices);
+    }
+
+    pub(super) fn finalize(&mut self) {
+        self.0.sort_unstable();
+        self.0.dedup();
+    }
+
+    pub(super) fn clear(&mut self) {
+        self.0.clear();
+    }
+
+    /// Returns true if `candidate` is the circle that should follow `last` in the sequence.
+    /// When the sequence is empty (no layout loaded), any candidate is accepted.
+    pub(super) fn is_next(&self, last: u8, candidate: u8) -> bool {
+        if self.0.is_empty() {
+            return true;
+        }
+        self.0
+            .iter()
+            .position(|&i| i == last)
+            .map(|pos| self.0[(pos + 1) % self.0.len()])
+            == Some(candidate)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(super) struct ActiveRun {
     pub(super) started_at: Instant,
@@ -23,6 +54,7 @@ pub(super) struct ActiveRun {
     pub(super) uname: String,
     pub(super) pname: String,
     pub(super) ucid: ConnectionId,
+    pub(super) last_circle_index: Option<u8>,
 }
 
 impl ActiveRun {
@@ -32,6 +64,7 @@ impl ActiveRun {
         ucid: ConnectionId,
         config: &BombConfig,
         now: Instant,
+        first_circle_index: u8,
     ) -> Self {
         Self {
             started_at: now,
@@ -41,6 +74,7 @@ impl ActiveRun {
             uname,
             pname,
             ucid,
+            last_circle_index: Some(first_circle_index),
         }
     }
 
@@ -105,6 +139,7 @@ pub(super) struct BombInner {
     pub(super) active_runs: HashMap<PlayerId, ActiveRun>,
     pub(super) leaderboard: Vec<(String, String, i64, i64)>,
     pub(super) db: Option<(crate::db::Pool, i64)>,
+    pub(super) circle_sequence: CircleSequence,
 }
 
 #[derive(Clone)]
@@ -123,6 +158,7 @@ impl Bomb {
                 active_runs: HashMap::new(),
                 leaderboard: Vec::new(),
                 db,
+                circle_sequence: CircleSequence::default(),
             })),
         }
     }
@@ -137,6 +173,18 @@ impl Bomb {
 }
 
 impl BombInner {
+    pub(super) fn accumulate_circles(&mut self, indices: impl Iterator<Item = u8>) {
+        self.circle_sequence.accumulate(indices);
+    }
+
+    pub(super) fn finalize_circles(&mut self) {
+        self.circle_sequence.finalize();
+    }
+
+    pub(super) fn clear_circles(&mut self) {
+        self.circle_sequence.clear();
+    }
+
     pub(super) fn make_setup_cancel(&mut self) -> CancellationToken {
         let token = self.runtime_cancel.child_token();
         self.setup_cancel = Some(token.clone());
@@ -160,46 +208,66 @@ impl BombInner {
         uname: &str,
         pname: &str,
         ptype: PlayerType,
-        is_finish: bool,
+        circle_index: u8,
         now: Instant,
     ) -> Option<CheckpointOutcome> {
         if let Some(run) = self.active_runs.get_mut(&plid) {
             if run.deadline < now {
                 return None;
             }
-            let outcome = if is_finish {
-                run.current_timeout = self.config.checkpoint_timeout;
-                run.deadline = now + self.config.checkpoint_timeout;
-                run.checkpoints += 1;
-                CheckpointOutcome::Refreshed {
-                    ucid: run.ucid,
-                    checkpoints: run.checkpoints,
-                    new_window: self.config.checkpoint_timeout,
+            if let Some(last) = run.last_circle_index {
+                if !self.circle_sequence.is_next(last, circle_index) {
+                    return None;
                 }
-            } else {
-                run.deadline = now + run.current_timeout;
-                run.current_timeout = run
-                    .current_timeout
-                    .saturating_sub(self.config.checkpoint_penalty);
-                run.checkpoints += 1;
-                CheckpointOutcome::Extended {
-                    ucid: run.ucid,
-                    checkpoints: run.checkpoints,
-                    time_left: run.time_left(now),
-                }
-            };
-            return Some(outcome);
+            }
+            run.last_circle_index = Some(circle_index);
+            run.deadline = now + run.current_timeout;
+            run.current_timeout = run
+                .current_timeout
+                .saturating_sub(self.config.checkpoint_penalty);
+            run.checkpoints += 1;
+            return Some(CheckpointOutcome::Extended {
+                ucid: run.ucid,
+                checkpoints: run.checkpoints,
+                time_left: run.time_left(now),
+            });
         }
         if ptype.contains(PlayerType::AI) {
             return None;
         }
         let _ = self.active_runs.insert(
             plid,
-            ActiveRun::new(uname.to_owned(), pname.to_owned(), ucid, &self.config, now),
+            ActiveRun::new(
+                uname.to_owned(),
+                pname.to_owned(),
+                ucid,
+                &self.config,
+                now,
+                circle_index,
+            ),
         );
         Some(CheckpointOutcome::Started {
             ucid,
             uname: uname.to_owned(),
+        })
+    }
+
+    pub(super) fn on_time_bonus(
+        &mut self,
+        plid: PlayerId,
+        now: Instant,
+    ) -> Option<CheckpointOutcome> {
+        let run = self.active_runs.get_mut(&plid)?;
+        if run.deadline < now {
+            return None;
+        }
+        run.current_timeout = self.config.checkpoint_timeout;
+        run.deadline = now + self.config.checkpoint_timeout;
+        run.checkpoints += 1;
+        Some(CheckpointOutcome::Refreshed {
+            ucid: run.ucid,
+            checkpoints: run.checkpoints,
+            new_window: self.config.checkpoint_timeout,
         })
     }
 

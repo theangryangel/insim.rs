@@ -91,7 +91,7 @@ where
 /// [`Ui::forward_packet`]. Subscribe to click/type-in events via
 /// [`Ui::subscribe`].
 ///
-/// [`ConnectionId::LOCAL`] (UCID 0) is always ignored — no [`Component`] is
+/// [`ConnectionId::LOCAL`] (UCID 0) is always ignored - no [`Component`] is
 /// mounted for it. For local / single-player tools, use [`Canvas`] directly.
 pub struct Ui<Cmp, G, C>
 where
