@@ -5,6 +5,16 @@
 //! `LocalSet`). Forwards `Ncn` / `Cnl` / `Btc` / `Btt` / `Bfn` packets into
 //! the UI thread via [`Ui::forward_packet`].
 //!
+//! # Multiplayer only
+//!
+//! [`Ui`] is designed exclusively for **dedicated multiplayer servers**. The
+//! host/local connection ([`ConnectionId::LOCAL`] / UCID 0) is silently ignored:
+//! no [`Component`] is mounted for it and no buttons are ever sent to it.
+//!
+//! If you are building a **local / single-player** tool (i.e. connecting with
+//! `IsiFlags::LOCAL` or targeting UCID 0 directly), use [`Canvas`] and
+//! [`Component`] yourself rather than going through [`Ui`].
+//!
 //! ```ignore
 //! use tokio::sync::mpsc;
 //! let (outgoing_tx, mut outgoing_rx) = mpsc::unbounded_channel();
@@ -75,9 +85,14 @@ where
     message_tx: broadcast::Sender<Cmp::Message>,
 }
 
-/// UI handle. Construct with [`Ui::new`] and forward wire packets via
+/// UI handle for dedicated multiplayer servers.
+///
+/// Construct with [`Ui::new`] and forward wire packets via
 /// [`Ui::forward_packet`]. Subscribe to click/type-in events via
 /// [`Ui::subscribe`].
+///
+/// [`ConnectionId::LOCAL`] (UCID 0) is always ignored — no [`Component`] is
+/// mounted for it. For local / single-player tools, use [`Canvas`] directly.
 pub struct Ui<Cmp, G, C>
 where
     Cmp: Component + 'static,
@@ -247,7 +262,7 @@ fn spawn_ui_thread<Cmp, G, C, F>(
                 tokio::select! {
                     pkt = packet_rx.recv(), if !packet_rx_closed => match pkt {
                         Some(Packet::Ncn(ncn)) => {
-                            if active.contains_key(&ncn.ucid) {
+                            if ncn.ucid.local() || active.contains_key(&ncn.ucid) {
                                 continue;
                             }
                             let invalidation_notify = Arc::new(Notify::new());
