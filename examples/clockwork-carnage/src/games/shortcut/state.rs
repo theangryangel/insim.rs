@@ -1,10 +1,7 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
-    time::Duration,
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use insim::identifiers::{ConnectionId, PlayerId};
+use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tokio_util::sync::CancellationToken;
 
 use super::config::ShortcutConfig;
@@ -70,11 +67,11 @@ impl Shortcut {
     }
 
     pub(super) fn read(&self) -> RwLockReadGuard<'_, ShortcutInner> {
-        self.inner.read().expect("poison")
+        self.inner.read()
     }
 
     pub(super) fn write(&self) -> RwLockWriteGuard<'_, ShortcutInner> {
-        self.inner.write().expect("poison")
+        self.inner.write()
     }
 }
 

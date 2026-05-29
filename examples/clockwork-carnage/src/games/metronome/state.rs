@@ -1,10 +1,7 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
-    time::Duration,
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use insim::identifiers::{ConnectionId, PlayerId};
+use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tokio_util::sync::CancellationToken;
 
 use super::config::MetronomeConfig;
@@ -60,11 +57,11 @@ impl Metronome {
     }
 
     pub(super) fn read(&self) -> RwLockReadGuard<'_, MetronomeInner> {
-        self.inner.read().expect("poison")
+        self.inner.read()
     }
 
     pub(super) fn write(&self) -> RwLockWriteGuard<'_, MetronomeInner> {
-        self.inner.write().expect("poison")
+        self.inner.write()
     }
 }
 

@@ -7,7 +7,7 @@
 use std::{
     str::FromStr,
     sync::{
-        Arc, Mutex, RwLock,
+        Arc,
         atomic::{AtomicUsize, Ordering},
     },
 };
@@ -17,6 +17,7 @@ use insim::{
     identifiers::ConnectionId,
     insim::{Mso, MsoUserType, Ncn},
 };
+use parking_lot::{Mutex, RwLock};
 use tokio::sync::mpsc;
 use tracing_subscriber as _;
 
@@ -80,7 +81,7 @@ async fn capture_cmd(
     Svc(s): Svc<TestState>,
 ) -> Result<(), AppError> {
     let _ = s.cmd_hits.fetch_add(1, Ordering::Relaxed);
-    *s.last_cmd.lock().expect("poison") = Some(cmd.parsed);
+    *s.last_cmd.lock() = Some(cmd.parsed);
     Ok(())
 }
 
@@ -199,12 +200,7 @@ async fn chat_parser_emits_typed_event_for_prefixed_mso() {
     assert_eq!(state.mso_hits.load(Ordering::Relaxed), 1);
     // And the typed synthetic event reaches Event<TestCmd>.
     assert_eq!(state.cmd_hits.load(Ordering::Relaxed), 1);
-    let captured = state
-        .last_cmd
-        .lock()
-        .expect("poison")
-        .clone()
-        .expect("command captured");
+    let captured = state.last_cmd.lock().clone().expect("command captured");
     assert_eq!(
         captured,
         TestCmd::Ping {
@@ -226,12 +222,7 @@ async fn chat_parser_emits_typed_event_for_alt_prefixed_mso() {
     assert_eq!(state.mso_hits.load(Ordering::Relaxed), 1);
     // And the typed synthetic event reaches Event<TestCmd>.
     assert_eq!(state.cmd_hits.load(Ordering::Relaxed), 1);
-    let captured = state
-        .last_cmd
-        .lock()
-        .expect("poison")
-        .clone()
-        .expect("command captured");
+    let captured = state.last_cmd.lock().clone().expect("command captured");
     assert_eq!(
         captured,
         TestCmd::Ping {
@@ -431,8 +422,6 @@ async fn run_if_runs_handler_when_predicate_true() {
 async fn in_state_reads_extension_and_gates_handler() {
     // A resource that holds a boolean. Handler gated on `in_state`. Flipping
     // the boolean between dispatches changes whether the handler fires.
-    use std::sync::RwLock;
-
     use crate::{ExtractCx, FromContext};
 
     #[derive(Clone)]
@@ -453,7 +442,7 @@ async fn in_state_reads_extension_and_gates_handler() {
         .handle(Stage::Update, flag.clone())
         .handle(
             Stage::Update,
-            count_ncn.run_if(|f: Flag, _: State<()>| *f.0.read().expect("poison")),
+            count_ncn.run_if(|f: Flag, _: State<()>| *f.0.read()),
         );
 
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
@@ -480,7 +469,7 @@ async fn in_state_reads_extension_and_gates_handler() {
     );
 
     // Flip the flag - the same handler now passes the predicate.
-    *flag.0.write().expect("poison") = true;
+    *flag.0.write() = true;
 
     dispatch_cycle(
         Dispatch::Packet(make_ncn(2, "bob")),
@@ -904,7 +893,7 @@ async fn state_in_run_if_predicate_gates_handler() {
     let flag_inner = flag.0.clone();
     let app = App::with_state(flag).handle(
         Stage::Update,
-        handler.run_if(|s: State<Flag>| *s.0.0.read().expect("poison")),
+        handler.run_if(|s: State<Flag>| *s.0.0.read()),
     );
 
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
@@ -927,7 +916,7 @@ async fn state_in_run_if_predicate_gates_handler() {
     assert_eq!(hit_count.load(Ordering::Relaxed), 0);
 
     // Flip the flag on.
-    *flag_inner.write().expect("poison") = true;
+    *flag_inner.write() = true;
 
     dispatch_cycle(
         Dispatch::Packet(make_ncn(2, "bob")),
@@ -1019,7 +1008,7 @@ async fn pre_handlers_run_sequentially_in_registration_order() {
             _: &ExtractCx<'_, S>,
         ) -> impl std::future::Future<Output = Result<(), AppError>> + Send {
             async move {
-                self.0.lock().expect("poison").push("first");
+                self.0.lock().push("first");
                 Ok(())
             }
         }
@@ -1030,7 +1019,7 @@ async fn pre_handlers_run_sequentially_in_registration_order() {
             _: &ExtractCx<'_, S>,
         ) -> impl std::future::Future<Output = Result<(), AppError>> + Send {
             async move {
-                self.0.lock().expect("poison").push("second");
+                self.0.lock().push("second");
                 Ok(())
             }
         }
@@ -1058,5 +1047,5 @@ async fn pre_handlers_run_sequentially_in_registration_order() {
     )
     .await;
 
-    assert_eq!(*log.lock().expect("poison"), vec!["first", "second"]);
+    assert_eq!(*log.lock(), vec!["first", "second"]);
 }

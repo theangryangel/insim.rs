@@ -23,7 +23,6 @@ use kitcar::{
     App, AppError, ChatParser, Game, HandlerExt, PenaltyClearer, Presence, Stage, State, run,
 };
 use state::{Bomb, BombGlobal, BombPhase};
-use tokio_util::sync::CancellationToken;
 use ui::{BombUi, BombView};
 
 use crate::{
@@ -32,7 +31,7 @@ use crate::{
 };
 
 pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
-    let app = App::<Bomb>::with_state(Bomb::new(cfg.config, CancellationToken::new(), cfg.db));
+    let app = App::<Bomb>::with_state(Bomb::new(cfg.config, cfg.db));
     let sender = app.sender().clone();
 
     app.state().write().runtime_cancel = app.cancel_token().clone();

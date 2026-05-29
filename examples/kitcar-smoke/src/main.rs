@@ -1,14 +1,19 @@
-//! End-to-end smoke test for the `kitcar` PoC.
+//! End-to-end smoke test / getting-started example for `kitcar`.
 //!
-//! Wire-packet handlers, synthetic-event handlers, middleware emitting those
-//! synthetic events, packet sending via the `Sender` extractor, and a
-//! background ticker installed via `Event<Startup>` + `tokio::spawn`.
+//! Demonstrates:
+//! - Wire-packet handlers (`Packet<Ncn>`, `Packet<Mso>`)
+//! - Synthetic-event handlers (`Event<Connected>`, `Event<Disconnected>`)
+//! - Typed chat commands via `ChatParser<C>` middleware + `Event<ChatEvent<C>>`
+//! - A struct-based handler (`MsoCounter`) carrying its own state
+//! - Background work spawned from a one-shot `Event<Startup>` handler
+//! - The `ui` subsystem: global state, per-player state, clickable buttons
 //!
 //! Run with:
-//!     cargo run -p kitcar --example smoke -- 127.0.0.1:29999
-//!     cargo run -p kitcar --example smoke -- 127.0.0.1:29999 --admin-password hunter2
+//!     cargo run -p kitcar-smoke -- --addr 127.0.0.1:29999
+//!     cargo run -p kitcar-smoke -- --addr 127.0.0.1:29999 --admin-password hunter2
 
-// Pulled in transitively by `kitcar`; silence unused-crate lint in this binary.
+#![allow(missing_docs)]
+
 use std::{
     sync::{
         Arc,
@@ -18,20 +23,16 @@ use std::{
 };
 
 use clap::Parser;
-use futures as _;
-use indexmap as _;
 use insim::{
     identifiers::ConnectionId,
     insim::{BtnStyle, Mso, Ncn},
 };
-use insim_extra as _;
 use kitcar::{
     App, AppError, ChatEvent, ChatParser, Connected, Disconnected, Event, ExtractCx, FromContext,
     Handler, Packet, Presence, Sender, Stage, Startup, Svc, run,
     ui::{self, Component, InvalidateHandle, Ui},
     util::mtc,
 };
-use thiserror as _;
 use tokio_util::sync::CancellationToken;
 
 #[derive(Clone)]
@@ -166,11 +167,6 @@ impl Handler<(Packet<Mso>,)> for MsoCounter {
     }
 }
 
-// Long-running background work: react to the one-shot `Startup` event and
-// spawn a task. The task keeps a clone of `Sender` so it can send packets /
-// emit events; when the runtime shuts down, the back-channel closes and the
-// `send` call returns an error - the loop exits naturally.
-
 // A tiny `ui` example: a 3-row in-game button panel per player.
 //
 //   row 1 - "Online: N"   (global state, refreshed when anyone joins/leaves)
@@ -206,7 +202,6 @@ impl Component for SmokeView {
     type Props<'a> = (&'a UiGlobal, &'a ());
 
     fn render(&self, (global, _): Self::Props<'_>) -> ui::Node<Self::Message> {
-        // Left column: the original three rows.
         let left_column = ui::container()
             .flex()
             .flex_col()
@@ -226,10 +221,6 @@ impl Component for SmokeView {
                     .h(5.0),
             );
 
-        // Outer flex_row, justify_end pushes the status text to the right
-        // edge of the layout space; the left column stays anchored on the
-        // left because justify_end only affects flex item placement and the
-        // first child fills the space before the gap.
         ui::container()
             .flex()
             .flex_row()
@@ -282,9 +273,6 @@ async fn refresh_on_disconnect(
     refresh_ui_count(presence, ui).await
 }
 
-/// Observe UI button clicks via the click-bridge: each click also flows
-/// through the dispatcher as a synthetic `Event<SmokeUiMsg>`, so handlers
-/// can react without going through `Component::update`.
 async fn on_ui_click(Event(msg): Event<SmokeUiMsg>, sender: Sender) -> Result<(), AppError> {
     match msg {
         SmokeUiMsg::ButtonClicked => {
@@ -294,6 +282,10 @@ async fn on_ui_click(Event(msg): Event<SmokeUiMsg>, sender: Sender) -> Result<()
     Ok(())
 }
 
+// Long-running background work: react to the one-shot `Startup` event and
+// spawn a task. The task keeps a clone of `Sender` so it can send packets /
+// emit events; when the runtime shuts down, the back-channel closes and the
+// `send` call returns an error - the loop exits naturally.
 async fn install_ticker(
     _: Event<Startup>,
     sender: Sender,
@@ -307,8 +299,6 @@ async fn install_ticker(
             let _ = interval.tick().await;
             beat += 1;
             println!("[ticker] beat {beat}");
-            // Partial update: only touch `beats`. The connect/disconnect
-            // handlers own `online` and update it through `ui.modify`.
             ui.modify(|g| g.beats = beat);
             if sender
                 .packets(mtc(
@@ -325,7 +315,7 @@ async fn install_ticker(
 }
 
 #[derive(Parser, Debug)]
-#[command(about = "kitcar PoC smoke test")]
+#[command(about = "kitcar smoke test / getting-started example")]
 struct Args {
     /// LFS InSim address (host:port).
     #[arg(long, default_value = "127.0.0.1:29999")]

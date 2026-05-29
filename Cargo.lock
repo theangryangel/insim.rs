@@ -525,6 +525,7 @@ dependencies = [
  "kitcar",
  "mime_guess",
  "oauth2",
+ "parking_lot",
  "reqwest 0.12.28",
  "rust-embed",
  "serde",
@@ -1758,6 +1759,7 @@ version = "0.1.0+unreleased"
 dependencies = [
  "fixedbitset",
  "insim",
+ "parking_lot",
  "taffy",
  "thiserror 2.0.18",
  "tokio",
@@ -1916,7 +1918,21 @@ dependencies = [
  "indexmap",
  "insim",
  "insim_extra",
+ "parking_lot",
  "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "kitcar-smoke"
+version = "0.1.0+unreleased"
+dependencies = [
+ "clap",
+ "insim",
+ "kitcar",
  "tokio",
  "tokio-util",
  "tracing",

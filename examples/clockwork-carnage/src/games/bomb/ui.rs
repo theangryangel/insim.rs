@@ -49,6 +49,12 @@ pub(super) struct BombView {
     pub(super) marquee: Marquee,
 }
 
+impl Drop for BombView {
+    fn drop(&mut self) {
+        self._tick_handle.abort();
+    }
+}
+
 impl Component for BombView {
     type Message = BombMsg;
     type Props<'a> = (&'a BombGlobal, &'a BombConnectionProps);

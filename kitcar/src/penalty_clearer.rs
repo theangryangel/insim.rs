@@ -17,11 +17,12 @@
 use std::{
     collections::HashMap,
     future::Future,
-    sync::{Arc, RwLock},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
 use insim::{identifiers::ConnectionId, insim::PenaltyReason};
+use parking_lot::RwLock;
 
 use crate::{AppError, Dispatch, ExtractCx, FromContext, Handler, Presence};
 
@@ -50,22 +51,17 @@ impl PenaltyClearer {
     /// existing timestamp is kept - the clear fires relative to the first
     /// queued penalty, not the most recent.
     pub fn queue(&self, ucid: ConnectionId) {
-        let _ = self
-            .inner
-            .write()
-            .expect("poison")
-            .entry(ucid)
-            .or_insert_with(Instant::now);
+        let _ = self.inner.write().entry(ucid).or_insert_with(Instant::now);
     }
 
     /// Discard all pending clears without issuing them. Call this on round
     /// reset so stale entries don't leak into the next round.
     pub fn clear(&self) {
-        self.inner.write().expect("poison").clear();
+        self.inner.write().clear();
     }
 
     fn drain_expired(&self, now: Instant) -> Vec<ConnectionId> {
-        let mut guard = self.inner.write().expect("poison");
+        let mut guard = self.inner.write();
         let expired: Vec<ConnectionId> = guard
             .iter()
             .filter(|(_, t)| now.duration_since(**t) >= self.delay)

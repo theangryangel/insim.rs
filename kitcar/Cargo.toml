@@ -18,6 +18,7 @@ workspace = true
 [dependencies]
 insim = { path = "../insim", features = ["tokio"] }
 insim_extra = { path = "../insim_extra" }
+parking_lot = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "net"] }
 tokio-util = { workspace = true }
 futures = { workspace = true }

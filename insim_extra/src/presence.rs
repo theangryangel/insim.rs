@@ -25,7 +25,7 @@
 use std::{
     collections::{HashMap, HashSet},
     net::Ipv4Addr,
-    sync::{Arc, RwLock},
+    sync::Arc,
     time::Duration,
 };
 
@@ -37,6 +37,7 @@ use insim::{
         TinyType, Toc,
     },
 };
+use parking_lot::RwLock;
 use tokio_util::sync::CancellationToken;
 
 use crate::util::host_command;
@@ -166,7 +167,7 @@ impl Presence {
 
     /// Number of tracked connections.
     pub fn connection_count(&self) -> usize {
-        self.inner.read().expect("poison").connections.len()
+        self.inner.read().connections.len()
     }
 
     /// Alias for [`connection_count`](Self::connection_count).
@@ -176,66 +177,39 @@ impl Presence {
 
     /// Number of tracked players.
     pub fn player_count(&self) -> usize {
-        self.inner.read().expect("poison").players.len()
+        self.inner.read().players.len()
     }
 
     /// Look up one connection by UCID.
     pub fn get(&self, ucid: ConnectionId) -> Option<ConnectionInfo> {
-        self.inner
-            .read()
-            .expect("poison")
-            .connections
-            .get(&ucid)
-            .cloned()
+        self.inner.read().connections.get(&ucid).cloned()
     }
 
     /// Snapshot of all tracked connections.
     pub fn connections(&self) -> Vec<ConnectionInfo> {
-        self.inner
-            .read()
-            .expect("poison")
-            .connections
-            .values()
-            .cloned()
-            .collect()
+        self.inner.read().connections.values().cloned().collect()
     }
 
     /// Look up one player by `PlayerId`.
     pub fn player(&self, plid: PlayerId) -> Option<PlayerInfo> {
-        self.inner
-            .read()
-            .expect("poison")
-            .players
-            .get(&plid)
-            .cloned()
+        self.inner.read().players.get(&plid).cloned()
     }
 
     /// Snapshot of all tracked players.
     pub fn players(&self) -> Vec<PlayerInfo> {
-        self.inner
-            .read()
-            .expect("poison")
-            .players
-            .values()
-            .cloned()
-            .collect()
+        self.inner.read().players.values().cloned().collect()
     }
 
     /// Look up the connection that currently controls a given player.
     pub fn connection_by_player(&self, plid: PlayerId) -> Option<ConnectionInfo> {
-        let guard = self.inner.read().expect("poison");
+        let guard = self.inner.read();
         let player = guard.players.get(&plid)?;
         guard.connections.get(&player.ucid).cloned()
     }
 
     /// Last known display name for an LFS.net username. Survives disconnect.
     pub fn last_known_name(&self, uname: &str) -> Option<String> {
-        self.inner
-            .read()
-            .expect("poison")
-            .last_known_names
-            .get(uname)
-            .cloned()
+        self.inner.read().last_known_names.get(uname).cloned()
     }
 
     /// Batch variant of [`last_known_name`](Self::last_known_name).
@@ -244,7 +218,7 @@ impl Presence {
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        let guard = self.inner.read().expect("poison");
+        let guard = self.inner.read();
         unames
             .into_iter()
             .filter_map(|u| {
@@ -453,13 +427,7 @@ impl Presence {
                 vec![]
             },
             insim::Packet::Plp(plp) => {
-                let player = self
-                    .inner
-                    .read()
-                    .expect("poison")
-                    .players
-                    .get(&plp.plid)
-                    .cloned();
+                let player = self.inner.read().players.get(&plp.plid).cloned();
                 if let Some(p) = player {
                     vec![PresenceEvent::PlayerTeleportedToPits(p)]
                 } else {
@@ -485,7 +453,7 @@ impl Presence {
             ipaddress: None,
             selected_vehicle: None,
         };
-        let mut guard = self.inner.write().expect("poison");
+        let mut guard = self.inner.write();
         let _ = guard
             .last_known_names
             .insert(ncn.uname.clone(), ncn.pname.clone());
@@ -501,7 +469,7 @@ impl Presence {
     }
 
     fn apply_cnl(&self, cnl: &Cnl) -> (Option<ConnectionInfo>, Vec<PlayerInfo>) {
-        let mut guard = self.inner.write().expect("poison");
+        let mut guard = self.inner.write();
         let info = guard.connections.remove(&cnl.ucid);
         let mut left = Vec::new();
         if let Some(ref conn) = info {
@@ -515,7 +483,7 @@ impl Presence {
     }
 
     fn apply_nci(&self, nci: &Nci) -> Option<ConnectionInfo> {
-        let mut guard = self.inner.write().expect("poison");
+        let mut guard = self.inner.write();
         if let Some(conn) = guard.connections.get_mut(&nci.ucid) {
             conn.userid = Some(nci.userid);
             conn.ipaddress = Some(nci.ipaddress);
@@ -526,7 +494,7 @@ impl Presence {
     }
 
     fn apply_slc(&self, slc: &Slc) -> bool {
-        let mut guard = self.inner.write().expect("poison");
+        let mut guard = self.inner.write();
         if let Some(conn) = guard.connections.get_mut(&slc.ucid) {
             conn.selected_vehicle = Some(slc.cname);
             true
@@ -536,7 +504,7 @@ impl Presence {
     }
 
     fn apply_cpr(&self, cpr: &Cpr) -> Option<(ConnectionId, String, String)> {
-        let mut guard = self.inner.write().expect("poison");
+        let mut guard = self.inner.write();
         if let Some(conn) = guard.connections.get_mut(&cpr.ucid) {
             conn.pname = cpr.pname.clone();
             let uname = conn.uname.clone();
@@ -559,7 +527,7 @@ impl Presence {
             in_pitlane: false,
             pname: npl.pname.clone(),
         };
-        let mut guard = self.inner.write().expect("poison");
+        let mut guard = self.inner.write();
         let _ = guard.players.insert(npl.plid, player.clone());
         if let Some(conn) = guard.connections.get_mut(&npl.ucid) {
             let _ = conn.players.insert(npl.plid);
@@ -569,7 +537,7 @@ impl Presence {
     }
 
     fn apply_pll(&self, pll: &Pll) -> Option<PlayerInfo> {
-        let mut guard = self.inner.write().expect("poison");
+        let mut guard = self.inner.write();
         let player = guard.players.remove(&pll.plid);
         if let Some(ref p) = player
             && let Some(conn) = guard.connections.get_mut(&p.ucid)
@@ -580,7 +548,7 @@ impl Presence {
     }
 
     fn apply_toc(&self, toc: &Toc) -> Option<(PlayerInfo, PlayerInfo)> {
-        let mut guard = self.inner.write().expect("poison");
+        let mut guard = self.inner.write();
         let pair = if let Some(player) = guard.players.get_mut(&toc.plid) {
             let before = player.clone();
             player.ucid = toc.newucid;
@@ -599,14 +567,14 @@ impl Presence {
     }
 
     fn apply_pfl(&self, pfl: &Pfl) {
-        let mut guard = self.inner.write().expect("poison");
+        let mut guard = self.inner.write();
         if let Some(player) = guard.players.get_mut(&pfl.plid) {
             player.flags = pfl.flags;
         }
     }
 
     fn apply_pla(&self, pla: &Pla) {
-        let mut guard = self.inner.write().expect("poison");
+        let mut guard = self.inner.write();
         if let Some(player) = guard.players.get_mut(&pla.plid) {
             if pla.entered_pitlane() {
                 player.in_pitlane = true;
@@ -621,7 +589,7 @@ impl Presence {
         if !matches!(tiny.subt, TinyType::Clr) {
             return;
         }
-        let mut guard = self.inner.write().expect("poison");
+        let mut guard = self.inner.write();
         guard.players.clear();
         for conn in guard.connections.values_mut() {
             conn.players.clear();

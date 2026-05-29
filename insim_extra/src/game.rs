@@ -18,10 +18,7 @@
 //! }
 //! ```
 
-use std::{
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 
 use insim::{
     core::{track::Track, vehicle::Vehicle, wind::Wind},
@@ -31,6 +28,7 @@ use insim::{
         StaFlags, Tiny, TinyType,
     },
 };
+use parking_lot::RwLock;
 use tokio_util::sync::CancellationToken;
 
 use crate::util::host_command;
@@ -196,7 +194,7 @@ impl Game {
 
     /// Snapshot of the current game state.
     pub fn get(&self) -> GameInfo {
-        self.inner.read().expect("poison").clone()
+        self.inner.read().clone()
     }
 
     /// `/end` - finish the current race.
@@ -384,7 +382,7 @@ impl Game {
     /// reply is blank (a known LFS behaviour), making it impossible to match
     /// on the layout name.
     pub async fn wait_for_any_axi(&self, cancel: CancellationToken) -> Option<()> {
-        let before = self.inner.read().expect("poison").axi_count;
+        let before = self.inner.read().axi_count;
         self.wait_for(
             move |info| info.axi_count != before,
             Duration::from_millis(100),
@@ -396,7 +394,7 @@ impl Game {
     /// Wait for any `Rst` packet to be received, indicating a race or
     /// qualifying session has started.
     pub async fn wait_for_any_rst(&self, cancel: CancellationToken) -> Option<()> {
-        let before = self.inner.read().expect("poison").rst_count;
+        let before = self.inner.read().rst_count;
         self.wait_for(
             move |info| info.rst_count != before,
             Duration::from_millis(100),
@@ -477,7 +475,7 @@ impl Game {
     }
 
     fn apply_sta(&self, sta: &Sta) -> (bool, bool, Option<Track>, Track) {
-        let mut g = self.inner.write().expect("poison");
+        let mut g = self.inner.write();
         let was_racing = matches!(g.session, SessionState::Racing { .. });
         let prev_track = g.track;
         g.session = match sta.raceinprog {
@@ -505,9 +503,9 @@ impl Game {
         // the authoritative state set by Sta. Only unsolicited Rst packets
         // (reqi == 0, sent when a race genuinely starts) update state.
         if rst.reqi.0 != 0 {
-            return self.inner.read().expect("poison").rst_count;
+            return self.inner.read().rst_count;
         }
-        let mut g = self.inner.write().expect("poison");
+        let mut g = self.inner.write();
         g.track = Some(rst.track);
         g.weather = Some(rst.weather);
         g.wind = Some(rst.wind);
@@ -527,7 +525,7 @@ impl Game {
     }
 
     fn apply_axi(&self, axi: &Axi) -> ((u64, Option<String>), (u64, Option<String>)) {
-        let mut g = self.inner.write().expect("poison");
+        let mut g = self.inner.write();
         let prev = (g.axi_count, g.layout.clone());
         g.layout = axi.lname.clone();
         g.axi_count = g.axi_count.wrapping_add(1);
@@ -536,7 +534,7 @@ impl Game {
     }
 
     fn apply_ism(&self, ism: &Ism) -> (MultiplayerState, MultiplayerState) {
-        let mut g = self.inner.write().expect("poison");
+        let mut g = self.inner.write();
         let prev = g.multiplayer.clone();
         // NOTE: If LFS is not in multiplayer mode, the host name in the ISM will be empty.
         g.multiplayer = match ism.hname.as_deref() {
@@ -553,7 +551,7 @@ impl Game {
         if !matches!(tiny.subt, TinyType::Axc) {
             return None;
         }
-        let mut g = self.inner.write().expect("poison");
+        let mut g = self.inner.write();
         let prev = g.layout.clone();
         g.layout = None;
         Some(prev)

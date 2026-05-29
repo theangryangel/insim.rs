@@ -17,6 +17,7 @@ axum-login = "0.18"
 clap = { workspace = true, features = ["derive", "env"] }
 insim = { path = "../../insim", features = ["serde"] }
 kitcar = { path = "../../kitcar" }
+parking_lot = { workspace = true }
 oauth2 = { version = "4", features = ["reqwest"] }
 reqwest = { version = "0.12", features = ["json"] }
 serde = { workspace = true, features = ["derive"] }

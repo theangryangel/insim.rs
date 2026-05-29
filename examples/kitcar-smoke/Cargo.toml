@@ -1,0 +1,19 @@
+[package]
+name = "kitcar-smoke"
+version = "0.1.0+unreleased"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+clap = { workspace = true, features = ["derive"] }
+insim = { path = "../../insim", features = ["tokio"] }
+kitcar = { path = "../../kitcar" }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+
+[lints]
+workspace = true

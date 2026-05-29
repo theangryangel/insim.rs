@@ -1,7 +1,7 @@
 use std::{
     cmp::Reverse,
     collections::HashMap,
-    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -9,6 +9,7 @@ use insim::{
     identifiers::{ConnectionId, PlayerId},
     insim::PlayerType,
 };
+use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tokio_util::sync::CancellationToken;
 
 use super::config::{BombConfig, COLLISION_THRESHOLD_MPS};
@@ -112,17 +113,13 @@ pub(super) struct Bomb {
 }
 
 impl Bomb {
-    pub(super) fn new(
-        config: BombConfig,
-        runtime_cancel: CancellationToken,
-        db: Option<(crate::db::Pool, i64)>,
-    ) -> Self {
+    pub(super) fn new(config: BombConfig, db: Option<(crate::db::Pool, i64)>) -> Self {
         Self {
             inner: Arc::new(RwLock::new(BombInner {
                 config,
                 phase: BombPhase::default(),
                 setup_cancel: None,
-                runtime_cancel,
+                runtime_cancel: CancellationToken::new(),
                 active_runs: HashMap::new(),
                 leaderboard: Vec::new(),
                 db,
@@ -131,11 +128,11 @@ impl Bomb {
     }
 
     pub(super) fn read(&self) -> RwLockReadGuard<'_, BombInner> {
-        self.inner.read().expect("poison")
+        self.inner.read()
     }
 
     pub(super) fn write(&self) -> RwLockWriteGuard<'_, BombInner> {
-        self.inner.write().expect("poison")
+        self.inner.write()
     }
 }
 
@@ -167,6 +164,9 @@ impl BombInner {
         now: Instant,
     ) -> Option<CheckpointOutcome> {
         if let Some(run) = self.active_runs.get_mut(&plid) {
+            if run.deadline < now {
+                return None;
+            }
             let outcome = if is_finish {
                 run.current_timeout = self.config.checkpoint_timeout;
                 run.deadline = now + self.config.checkpoint_timeout;
