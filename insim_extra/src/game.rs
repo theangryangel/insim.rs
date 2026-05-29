@@ -27,13 +27,37 @@ use insim::{
     core::{track::Track, vehicle::Vehicle, wind::Wind},
     identifiers::ConnectionId,
     insim::{
-        Axi, Ism, Mal, Plc, PlcAllowedCarsSet, RaceInProgress, RaceLaps, Sta, StaFlags, Tiny,
-        TinyType,
+        Axi, Ism, Mal, Plc, PlcAllowedCarsSet, RaceFlags, RaceInProgress, RaceLaps, Rst, Sta,
+        StaFlags, Tiny, TinyType,
     },
 };
 use tokio_util::sync::CancellationToken;
 
 use crate::util::host_command;
+
+/// High-level description of the current LFS session.
+#[derive(Debug, Default, Clone)]
+pub enum SessionState {
+    /// No `Sta` or `Rst` received yet; state unknown.
+    #[default]
+    Unknown,
+    /// No session active - players are on the track-selection or end screen.
+    Lobby,
+    /// A race session is in progress.
+    Racing {
+        /// Race length configuration.
+        laps: RaceLaps,
+        /// Race flags from the `Rst` packet, or empty if only `Sta` has been received.
+        flags: RaceFlags,
+    },
+    /// A qualifying session is in progress.
+    Qualifying {
+        /// Qualifying duration.
+        duration: Duration,
+        /// Race flags from the `Rst` packet, or empty if only `Sta` has been received.
+        flags: RaceFlags,
+    },
+}
 
 /// Whether LFS is currently running in local or multiplayer mode.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -57,11 +81,13 @@ pub struct GameInfo {
     layout: Option<String>,
     weather: Option<u8>,
     wind: Option<Wind>,
-    racing: RaceInProgress,
-    qualifying_duration: Duration,
-    race_duration: RaceLaps,
+    session: SessionState,
     flags: StaFlags,
     multiplayer: MultiplayerState,
+    /// Incremented each time an `Axi` packet is applied, regardless of lname content.
+    axi_count: u64,
+    /// Incremented each time an `Rst` packet is applied.
+    rst_count: u64,
 }
 
 impl GameInfo {
@@ -85,19 +111,9 @@ impl GameInfo {
         self.wind.as_ref()
     }
 
-    /// Race-in-progress state.
-    pub fn racing(&self) -> &RaceInProgress {
-        &self.racing
-    }
-
-    /// Qualifying duration.
-    pub fn qualifying_duration(&self) -> Duration {
-        self.qualifying_duration
-    }
-
-    /// Race-laps configuration.
-    pub fn race_duration(&self) -> &RaceLaps {
-        &self.race_duration
+    /// Current session state.
+    pub fn session(&self) -> &SessionState {
+        &self.session
     }
 
     /// Overall game flags.
@@ -186,6 +202,11 @@ impl Game {
     /// `/end` - finish the current race.
     pub fn end(&self) -> insim::Packet {
         host_command("/end")
+    }
+
+    /// `/clear` - remove all connections from the server.
+    pub fn clear(&self) -> insim::Packet {
+        host_command("/clear")
     }
 
     /// `/track {track}` - load a different track.
@@ -302,24 +323,34 @@ impl Game {
         }
     }
 
+    /// Wait until state is populated from at least one `Sta` packet - i.e.
+    /// session is no longer [`SessionState::Unknown`] and the current track
+    /// is known.
+    pub async fn wait_for_known_state(&self, cancel: CancellationToken) -> Option<()> {
+        self.wait_for(
+            |info| !matches!(info.session, SessionState::Unknown) && info.track.is_some(),
+            Duration::from_millis(100),
+            cancel,
+        )
+        .await
+    }
+
     /// Wait until the game is no longer in progress.
     pub async fn wait_for_end(&self, cancel: CancellationToken) -> Option<()> {
         self.wait_for(
-            |info| !info.flags.is_in_game() && matches!(info.racing, RaceInProgress::No),
+            |info| matches!(info.session, SessionState::Lobby),
             Duration::from_millis(500),
             cancel,
         )
         .await
     }
 
-    /// Wait until the given track is loaded and the server is on the
-    /// selection screen (not yet racing).
+    /// Wait until the given track is loaded and the session is
+    /// [`SessionState::Lobby`] (selection screen, not yet racing).
     pub async fn wait_for_track(&self, track: Track, cancel: CancellationToken) -> Option<()> {
         self.wait_for(
             |info| {
-                info.track.as_ref() == Some(&track)
-                    && !info.flags.is_in_game()
-                    && matches!(info.racing, RaceInProgress::No)
+                info.track.as_ref() == Some(&track) && matches!(info.session, SessionState::Lobby)
             },
             Duration::from_millis(500),
             cancel,
@@ -327,10 +358,10 @@ impl Game {
         .await
     }
 
-    /// Wait until racing is actually in progress (all players ready).
+    /// Wait until a race session is in progress.
     pub async fn wait_for_racing(&self, cancel: CancellationToken) -> Option<()> {
         self.wait_for(
-            |info| info.flags.is_in_game() && matches!(info.racing, RaceInProgress::Racing),
+            |info| matches!(info.session, SessionState::Racing { .. }),
             Duration::from_millis(500),
             cancel,
         )
@@ -342,6 +373,33 @@ impl Game {
         self.wait_for(
             |info| info.layout.as_deref() == Some(layout.as_str()),
             Duration::from_millis(500),
+            cancel,
+        )
+        .await
+    }
+
+    /// Wait for any `Axi` packet to be received.
+    ///
+    /// Useful when `/axload` is sent but `lname` in the resulting `Axi`
+    /// reply is blank (a known LFS behaviour), making it impossible to match
+    /// on the layout name.
+    pub async fn wait_for_any_axi(&self, cancel: CancellationToken) -> Option<()> {
+        let before = self.inner.read().expect("poison").axi_count;
+        self.wait_for(
+            move |info| info.axi_count != before,
+            Duration::from_millis(100),
+            cancel,
+        )
+        .await
+    }
+
+    /// Wait for any `Rst` packet to be received, indicating a race or
+    /// qualifying session has started.
+    pub async fn wait_for_any_rst(&self, cancel: CancellationToken) -> Option<()> {
+        let before = self.inner.read().expect("poison").rst_count;
+        self.wait_for(
+            move |info| info.rst_count != before,
+            Duration::from_millis(100),
             cancel,
         )
         .await
@@ -374,11 +432,11 @@ impl Game {
                 events
             },
             insim::Packet::Axi(axi) => {
-                let (prev, new) = self.apply_axi(axi);
-                if prev != new {
+                let ((_, prev_lname), (_, new_lname)) = self.apply_axi(axi);
+                if prev_lname != new_lname {
                     vec![GameEvent::LayoutChanged {
-                        from: prev,
-                        to: new,
+                        from: prev_lname,
+                        to: new_lname,
                     }]
                 } else {
                     vec![]
@@ -410,30 +468,71 @@ impl Game {
                     vec![]
                 }
             },
+            insim::Packet::Rst(rst) => {
+                let _ = self.apply_rst(rst);
+                vec![]
+            },
             _ => vec![],
         }
     }
 
     fn apply_sta(&self, sta: &Sta) -> (bool, bool, Option<Track>, Track) {
         let mut g = self.inner.write().expect("poison");
-        let was_racing = matches!(g.racing, RaceInProgress::Racing);
+        let was_racing = matches!(g.session, SessionState::Racing { .. });
         let prev_track = g.track;
-        g.racing = sta.raceinprog.clone();
-        g.qualifying_duration = Duration::from_secs(sta.qualmins as u64 * 60);
-        g.race_duration = sta.racelaps;
+        g.session = match sta.raceinprog {
+            RaceInProgress::No => SessionState::Lobby,
+            RaceInProgress::Racing => SessionState::Racing {
+                laps: sta.racelaps,
+                flags: RaceFlags::empty(),
+            },
+            RaceInProgress::Qualifying => SessionState::Qualifying {
+                duration: Duration::from_secs(sta.qualmins as u64 * 60),
+                flags: RaceFlags::empty(),
+            },
+            _ => SessionState::Unknown,
+        };
         g.track = Some(sta.track);
         g.weather = Some(sta.weather);
         g.wind = Some(sta.wind);
         g.flags = sta.flags;
-        let now_racing = matches!(g.racing, RaceInProgress::Racing);
+        let now_racing = matches!(g.session, SessionState::Racing { .. });
         (was_racing, now_racing, prev_track, sta.track)
     }
 
-    fn apply_axi(&self, axi: &Axi) -> (Option<String>, Option<String>) {
+    fn apply_rst(&self, rst: &Rst) -> u64 {
+        // Solicited replies (reqi != 0) echo stale data and must not overwrite
+        // the authoritative state set by Sta. Only unsolicited Rst packets
+        // (reqi == 0, sent when a race genuinely starts) update state.
+        if rst.reqi.0 != 0 {
+            return self.inner.read().expect("poison").rst_count;
+        }
         let mut g = self.inner.write().expect("poison");
-        let prev = g.layout.clone();
+        g.track = Some(rst.track);
+        g.weather = Some(rst.weather);
+        g.wind = Some(rst.wind);
+        g.session = if rst.qualmins > 0 {
+            SessionState::Qualifying {
+                duration: Duration::from_secs(rst.qualmins as u64 * 60),
+                flags: rst.flags,
+            }
+        } else {
+            SessionState::Racing {
+                laps: rst.racelaps,
+                flags: rst.flags,
+            }
+        };
+        g.rst_count = g.rst_count.wrapping_add(1);
+        g.rst_count
+    }
+
+    fn apply_axi(&self, axi: &Axi) -> ((u64, Option<String>), (u64, Option<String>)) {
+        let mut g = self.inner.write().expect("poison");
+        let prev = (g.axi_count, g.layout.clone());
         g.layout = axi.lname.clone();
-        (prev, axi.lname.clone())
+        g.axi_count = g.axi_count.wrapping_add(1);
+        let current = (g.axi_count, axi.lname.clone());
+        (prev, current)
     }
 
     fn apply_ism(&self, ism: &Ism) -> (MultiplayerState, MultiplayerState) {

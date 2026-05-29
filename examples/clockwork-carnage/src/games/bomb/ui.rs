@@ -3,7 +3,7 @@ use std::time::Instant;
 use insim::Colour;
 use kitcar::ui::{self, Component, Ui};
 
-use super::state::BombGlobal;
+use super::state::{BombGlobal, BombPhase};
 use crate::components::{
     Dialog, DialogMsg, DialogProps, Marquee, MarqueeProps, hud_active, hud_muted, hud_text,
     hud_title, topbar,
@@ -172,21 +172,26 @@ impl Component for BombView {
             })
             .collect();
 
-        let scoreboard = ui::container()
+        let mut scoreboard = ui::container()
             .flex()
             .pl(5.0)
             .w(200.0)
             .mt(10.0)
             .flex_col()
-            .items_start()
-            .with_child(ui::text("Active Runs", hud_title()).w(43.0).h(5.0))
-            .with_children(active_run_rows)
-            .with_child(ui::text("Session Best", hud_title()).w(43.0).h(5.0))
-            .with_children(leaderboard_rows);
+            .items_start();
+
+        if !matches!(global.phase, BombPhase::SettingUp) {
+            scoreboard = scoreboard
+                .with_child(ui::text("Active Runs", hud_title()).w(43.0).h(5.0))
+                .with_children(active_run_rows)
+                .with_child(ui::text("Session Best", hud_title()).w(43.0).h(5.0))
+                .with_children(leaderboard_rows);
+        }
 
         ui::container()
             .flex()
             .flex_col()
+            .w(200.0)
             .with_child(
                 topbar(&format!("Bomb - {}", global.phase))
                     .with_child(ui::text(status_str, status_style).w(45.0).h(5.0))

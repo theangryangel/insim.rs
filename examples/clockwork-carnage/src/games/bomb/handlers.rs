@@ -35,10 +35,6 @@ fn start_setup(state: &State<Bomb>, game: &Game, sender: &Sender, ui: &BombUi) {
         )
     };
 
-    let _ = sender.packets(mtc(
-        "Bomb - setting up track, hit /ready when prompted.",
-        Some(ConnectionId::ALL),
-    ));
     refresh_ui(state, ui);
 
     let game = game.clone();

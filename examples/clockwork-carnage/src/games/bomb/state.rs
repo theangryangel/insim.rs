@@ -78,19 +78,20 @@ pub(super) enum BombPhase {
     Racing,
 }
 
-impl BombPhase {
-    pub(super) fn label(self) -> &'static str {
-        match self {
+impl std::fmt::Display for BombPhase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
             BombPhase::Waiting => "waiting for players",
             BombPhase::SettingUp => "setting up track",
             BombPhase::Racing => "racing",
-        }
+        };
+        f.write_str(s)
     }
 }
 
 #[derive(Clone, Default, Debug)]
 pub(super) struct BombGlobal {
-    pub(super) phase: String,
+    pub(super) phase: BombPhase,
     pub(super) leaderboard: Vec<(String, String, i64, i64)>,
     pub(super) active_runs: Vec<(String, String, i64, Instant, Duration)>,
 }
@@ -272,7 +273,7 @@ impl BombInner {
             .collect();
         active.sort_by_key(|r| Reverse(r.2));
         BombGlobal {
-            phase: self.phase.label().to_string(),
+            phase: self.phase.clone(),
             leaderboard: self.leaderboard.clone(),
             active_runs: active,
         }

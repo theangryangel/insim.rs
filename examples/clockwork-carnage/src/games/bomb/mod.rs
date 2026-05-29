@@ -40,7 +40,7 @@ pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
     let ui = BombUi::new(
         sender.clone(),
         BombGlobal {
-            phase: BombPhase::Waiting.label().to_string(),
+            phase: BombPhase::Waiting,
             ..Default::default()
         },
         |_ucid, invalidator| {
