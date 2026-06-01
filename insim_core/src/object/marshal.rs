@@ -13,6 +13,7 @@ pub struct Marshal {
     pub xyz: ObjectCoordinate,
     /// Kind of Marshal
     pub kind: MarshalKind,
+    /// Flags: watching/left/right
     /// Heading
     pub heading: Heading,
     /// Floating?
@@ -72,9 +73,9 @@ impl ObjectInfoInner for Marshal {
 #[non_exhaustive]
 pub enum MarshalKind {
     #[default]
-    Standing = 1,
-    Left = 2,
-    Right = 3,
+    Standing = 0,
+    Left = 1,
+    Right = 2,
 }
 
 impl TryFrom<u8> for MarshalKind {

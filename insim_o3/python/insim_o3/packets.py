@@ -1454,7 +1454,9 @@ class Marshal(BaseModel):
     """Marshal"""
 
     floating: Annotated[bool, Field(description="Floating?")]
-    heading: Annotated[Heading, Field(description="Heading")]
+    heading: Annotated[
+        Heading, Field(description="Flags: watching/left/right\nHeading")
+    ]
     kind: Annotated[MarshalKind, Field(description="Kind of Marshal")]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
