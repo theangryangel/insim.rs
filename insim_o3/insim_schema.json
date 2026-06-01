@@ -5230,7 +5230,7 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading",
+          "description": "Flags: watching/left/right\nHeading",
           "$ref": "#/$defs/Heading"
         },
         "kind": {
