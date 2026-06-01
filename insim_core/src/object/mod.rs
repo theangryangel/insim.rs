@@ -168,12 +168,7 @@ macro_rules! define_object_info {
 
         impl Encode for ObjectInfo {
             fn encode(&self, ctx: &mut EncodeContext) -> Result<(), EncodeError> {
-                let index: u8 = match self {
-                    $(
-                        ObjectInfo::$variant(_) => $index,
-                    )+
-                    ObjectInfo::Unknown(Raw { index, .. }) => *index,
-                };
+                let index: u8 = self.index();
 
                 let xyz = self.position();
                 let flags = self.flags();
@@ -266,6 +261,16 @@ macro_rules! define_object_info {
                         ObjectInfo::$variant(i) => i.heading_objectinfo_wire(),
                     )+
                     ObjectInfo::Unknown(i) => i.heading_objectinfo_wire(),
+                }
+            }
+
+            /// Returns insim index value for ObjectInfo
+            pub fn index(&self) -> u8 {
+                match self {
+                    $(
+                        ObjectInfo::$variant(_) => $index,
+                    )+
+                    ObjectInfo::Unknown(Raw { index, .. }) => *index,
                 }
             }
         }
