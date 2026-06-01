@@ -4344,6 +4344,13 @@
           "maximum": 255,
           "minimum": 0
         },
+        "radius": {
+          "description": "Radius",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
         "xyz": {
           "description": "Position",
           "$ref": "#/$defs/ObjectCoordinate"
@@ -4352,7 +4359,8 @@
       "required": [
         "xyz",
         "index",
-        "floating"
+        "floating",
+        "radius"
       ]
     },
     "Ipb": {

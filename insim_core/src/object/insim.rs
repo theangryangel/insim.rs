@@ -105,6 +105,8 @@ pub struct InsimCircle {
     pub index: u8,
     /// Floating
     pub floating: bool,
+    /// Radius
+    pub radius: u8,
 }
 
 impl InsimCircle {
@@ -112,10 +114,12 @@ impl InsimCircle {
         let xyz = raw.xyz;
         let index = raw.heading;
         let floating = raw.raw_floating();
+        let radius = raw.flags >> 2;
         Ok(Self {
             xyz,
             index,
             floating,
+            radius,
         })
     }
 }
@@ -125,6 +129,7 @@ impl ObjectInfoInner for InsimCircle {
         if self.floating {
             flags |= 0x80;
         }
+        flags |= self.radius << 2;
         flags
     }
 
