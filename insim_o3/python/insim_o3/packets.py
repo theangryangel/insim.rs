@@ -1142,6 +1142,7 @@ class InsimCircle(BaseModel):
             description="Circle index (stored in heading byte on wire)", ge=0, le=255
         ),
     ]
+    radius: Annotated[int, Field(description="Radius", ge=0, le=255)]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
 

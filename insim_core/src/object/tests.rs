@@ -251,6 +251,7 @@ fn test_insim_circle_basic() {
     let circle = insim::InsimCircle {
         xyz: ObjectCoordinate::new(1000, 1000, 50),
         index: 1,
+        radius: 8,
         floating: false,
     };
 
@@ -264,6 +265,7 @@ fn test_insim_circle_various_indices() {
         let circle = insim::InsimCircle {
             xyz: ObjectCoordinate::new(0, 0, 0),
             index,
+            radius: 4,
             floating: false,
         };
         assert_eq!(circle.index, index);
@@ -275,6 +277,7 @@ fn test_insim_circle_floating() {
     let circle = insim::InsimCircle {
         xyz: ObjectCoordinate::new(500, 500, 25),
         index: 5,
+        radius: 8,
         floating: true,
     };
 
