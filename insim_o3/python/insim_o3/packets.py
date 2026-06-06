@@ -236,18 +236,14 @@ type AiInputType = (
 )
 
 
-class AngVel(BaseModel):
-    """Angular velocity stored as radians per second (f32)."""
-
-    radians_per_sec: float
-
-
 class Armco(BaseModel):
     """Armco 1-5 barrier"""
 
     colour: Annotated[int, Field(description="Colour (3 bits, 0-7)", ge=0, le=255)]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     mapping: Annotated[int, Field(description="Mapping (4 bits, 0-15)", ge=0, le=255)]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -270,7 +266,9 @@ class Arrows(BaseModel):
     arrow: Annotated[Arrow, Field(description="Arrow")]
     colour: Annotated[PaintColour, Field(description="Colour")]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
 
@@ -279,7 +277,9 @@ class Bale(BaseModel):
 
     colour: Annotated[int, Field(description="Colour (3 bits, 0-7)", ge=0, le=255)]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     mapping: Annotated[int, Field(description="Mapping (4 bits, 0-15)", ge=0, le=255)]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -289,7 +289,9 @@ class Banner(BaseModel):
 
     colour: Annotated[BannerColour, Field(description="Colour (3 bits, 0-7)")]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     mapping: Annotated[int, Field(description="Mapping (4 bits, 0-15)", ge=0, le=255)]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -310,7 +312,9 @@ class Barrier(BaseModel):
 
     colour: Annotated[int, Field(description="Colour (3 bits, 0-7)", ge=0, le=255)]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     mapping: Annotated[int, Field(description="Mapping (4 bits, 0-15)", ge=0, le=255)]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -329,7 +333,9 @@ class Bin1(BaseModel):
 
     colour: Annotated[Bin1Colour, Field(description="Colour (3 bits, 0-7)")]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     mapping: Annotated[int, Field(description="Mapping (4 bits, 0-15)", ge=0, le=255)]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -350,7 +356,9 @@ class Bin2(BaseModel):
 
     colour: Annotated[Bin2Colour, Field(description="Colour (3 bits, 0-7)")]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     mapping: Annotated[int, Field(description="Mapping (4 bits, 0-15)", ge=0, le=255)]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -430,9 +438,9 @@ class CameraView(StrEnum):
 class CarContact(BaseModel):
     """Contact details used by collision reports."""
 
-    direction: Annotated[Heading, Field(description="Direction of motion.")]
-    heading: Annotated[Heading, Field(description="Car facing direction.")]
-    speed: Annotated[Speed, Field(description="Speed.")]
+    direction: Annotated[int, Field(description="Direction of motion.", ge=0, le=255)]
+    heading: Annotated[int, Field(description="Car facing direction.", ge=0, le=255)]
+    speed: Annotated[int, Field(description="Speed.", ge=0, le=255)]
     x: Annotated[int, Field(description="X position.", ge=-32768, le=32767)]
     y: Annotated[int, Field(description="Y position.", ge=-32768, le=32767)]
     z: Annotated[int, Field(description="Z position.", ge=0, le=255)]
@@ -450,7 +458,9 @@ class Chalk(BaseModel):
 
     colour: Annotated[ChalkColour, Field(description="Colour")]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
 
@@ -575,7 +585,9 @@ class Chevron(BaseModel):
 
     colour: Annotated[ChevronColour, Field(description="Colour")]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
 
@@ -682,11 +694,14 @@ class CnlReason(StrEnum):
 class CompCar(BaseModel):
     """Per-car telemetry entry used by [Mci]."""
 
-    angvel: Annotated[AngVel, Field(description="Angular velocity of the car.")]
-    direction: Annotated[
-        Heading, Field(description="Direction of motion (heading of velocity).")
+    angvel: Annotated[
+        int, Field(description="Angular velocity of the car.", ge=-32768, le=32767)
     ]
-    heading: Annotated[Heading, Field(description="Car facing direction.")]
+    direction: Annotated[
+        int,
+        Field(description="Direction of motion (heading of velocity).", ge=0, le=65535),
+    ]
+    heading: Annotated[int, Field(description="Car facing direction.", ge=0, le=65535)]
     info: Annotated[CompCarInfo, Field(description="Additional state flags.")]
     lap: Annotated[int, Field(description="Current lap number.", ge=0, le=65535)]
     node: Annotated[
@@ -695,8 +710,8 @@ class CompCar(BaseModel):
     ]
     plid: Annotated[int, Field(description="Player identifier.", ge=0, le=255)]
     position: Annotated[int, Field(description="Race position.", ge=0, le=255)]
-    speed: Annotated[Speed, Field(description="Speed.")]
-    xyz: Annotated[Coordinate, Field(description="World position in meters.")]
+    speed: Annotated[int, Field(description="Speed.", ge=0, le=65535)]
+    xyz: Annotated[Coordinate, Field(description="World position in metres.")]
 
 
 type CompCarInfo = list[CompCarInfoFlag]
@@ -716,21 +731,37 @@ class ConInfo(BaseModel):
     """Per-car contact details used in [Con]."""
 
     accelf: Annotated[
-        int, Field(description="Longitudinal acceleration.", ge=0, le=255)
+        int,
+        Field(
+            description="Longitudinal acceleration in m/s² (forward positive, braking negative).",
+            ge=-128,
+            le=127,
+        ),
     ]
-    accelr: Annotated[int, Field(description="Lateral acceleration.", ge=0, le=255)]
+    accelr: Annotated[
+        int,
+        Field(
+            description="Lateral acceleration in m/s² (rightward positive, leftward negative).",
+            ge=-128,
+            le=127,
+        ),
+    ]
     brk: Annotated[int, Field(description="Brake input (0-15).", ge=0, le=255)]
     clu: Annotated[int, Field(description="Clutch input (0-15).", ge=0, le=255)]
-    direction: Annotated[Heading, Field(description="Direction of motion.")]
+    direction: Annotated[int, Field(description="Direction of motion.", ge=0, le=255)]
     gearsp: Annotated[int, Field(description="Gear selector (0-15).", ge=0, le=255)]
     han: Annotated[int, Field(description="Handbrake input (0-15).", ge=0, le=255)]
-    heading: Annotated[Heading, Field(description="Car facing direction.")]
+    heading: Annotated[int, Field(description="Car facing direction.", ge=0, le=255)]
     info: Annotated[CompCarInfo, Field(description="Additional car state flags.")]
     plid: Annotated[int, Field(description="Player identifier.", ge=0, le=255)]
-    speed: Annotated[Speed, Field(description="Speed.")]
+    speed: Annotated[int, Field(description="Speed.", ge=0, le=255)]
     steer: Annotated[
         int,
-        Field(description="Front wheel steering angle (right positive).", ge=0, le=255),
+        Field(
+            description="Front wheel steering angle in degrees (right positive, left negative).",
+            ge=-128,
+            le=127,
+        ),
     ]
     thr: Annotated[int, Field(description="Throttle input (0-15).", ge=0, le=255)]
     x: Annotated[int, Field(description="X position.", ge=-32768, le=32767)]
@@ -791,7 +822,9 @@ class ConcreteHeight(StrEnum):
 class ConcretePillar(BaseModel):
     """Concrete Pillar"""
 
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     height: Annotated[ConcreteHeight, Field(description="Height")]
     x: Annotated[Size, Field(description="SizeX")]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
@@ -822,7 +855,9 @@ class ConcretePitch(StrEnum):
 class ConcreteRamp(BaseModel):
     """Concrete Ramp"""
 
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     height: Annotated[ConcreteHeight, Field(description="Height")]
     length: Annotated[ConcreteWidthLength, Field(description="Length")]
     width: Annotated[ConcreteWidthLength, Field(description="Width")]
@@ -833,7 +868,9 @@ class ConcreteRampWall(BaseModel):
     """Concrete Ramp Wall"""
 
     colour: Annotated[ConcreteColour, Field(description="Colour")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     height: Annotated[ConcreteHeight, Field(description="Height")]
     length: Annotated[ConcreteWidthLength, Field(description="Length")]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
@@ -843,7 +880,9 @@ class ConcreteShortSlabWall(BaseModel):
     """Concrete Short Slab Wall"""
 
     colour: Annotated[ConcreteColour, Field(description="Colour")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     pitch: Annotated[ConcretePitch, Field(description="Pitch")]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
     y: Annotated[Size, Field(description="Size Y")]
@@ -852,7 +891,9 @@ class ConcreteShortSlabWall(BaseModel):
 class ConcreteSlab(BaseModel):
     """Concrete Slab"""
 
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     length: Annotated[ConcreteWidthLength, Field(description="Length")]
     pitch: Annotated[ConcretePitch, Field(description="Pitch")]
     width: Annotated[ConcreteWidthLength, Field(description="Width")]
@@ -863,7 +904,9 @@ class ConcreteSlabWall(BaseModel):
     """Concrete Slab Wall"""
 
     colour: Annotated[ConcreteColour, Field(description="Colour")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     length: Annotated[ConcreteWidthLength, Field(description="Length")]
     pitch: Annotated[ConcretePitch, Field(description="Pitch")]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
@@ -873,7 +916,9 @@ class ConcreteWall(BaseModel):
     """Concrete Wall"""
 
     colour: Annotated[ConcreteColour, Field(description="Colour")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     height: Annotated[ConcreteHeight, Field(description="Height")]
     length: Annotated[ConcreteWidthLength, Field(description="Length")]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
@@ -884,7 +929,9 @@ class ConcreteWedge(BaseModel):
 
     angle: Annotated[ConcreteAngle, Field(description="Angle")]
     colour: Annotated[ConcreteColour, Field(description="Colour")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     length: Annotated[ConcreteWidthLength, Field(description="Length")]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -903,7 +950,9 @@ class Cone(BaseModel):
 
     colour: Annotated[ConeColour, Field(description="Colour")]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
 
@@ -923,7 +972,7 @@ class Control(BaseModel):
     """Control object"""
 
     floating: Annotated[bool, Field(description="Floating?")]
-    heading: Annotated[Heading, Field(description="Heading")]
+    heading: Annotated[int, Field(description="ObjectHeading", ge=0, le=255)]
     kind: Annotated[ControlKind, Field(description="Kind of Control Object")]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -1099,12 +1148,6 @@ class HcpCarHandicap(BaseModel):
     ]
 
 
-class Heading(BaseModel):
-    """Angular measurement stored as radians (f64)."""
-
-    radians: float
-
-
 class Hlvc(StrEnum):
     """Hot lap validity failure reason."""
 
@@ -1118,7 +1161,9 @@ class InsimCheckpoint(BaseModel):
     """InsimCheckpoint"""
 
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     kind: Annotated[InsimCheckpointKind, Field(description="Kind of checkpoint")]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -1173,7 +1218,7 @@ class JrrAction(StrEnum):
 
 
 class JrrStartPositionCustomPayload(BaseModel):
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[int, Field(description="Heading / Direction", ge=0, le=255)]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
 
@@ -1196,7 +1241,9 @@ class Kerb(BaseModel):
 
     colour: Annotated[int, Field(description="Colour (3 bits, 0-7)", ge=0, le=255)]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     mapping: Annotated[KerbColour, Field(description="Mapping")]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -1341,7 +1388,9 @@ class LetterboardRB(BaseModel):
     character: Annotated[Character2, Field(description="Mapping (6 bits, 0-63)")]
     colour: Annotated[LetterboardRBColour, Field(description="Colour")]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
 
@@ -1358,7 +1407,9 @@ class LetterboardWY(BaseModel):
     character: Annotated[Character2, Field(description="Mapping (6 bits, 0-63)")]
     colour: Annotated[LetterboardWYColour, Field(description="Colour")]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
 
@@ -1375,7 +1426,9 @@ class Letters(BaseModel):
     character: Annotated[Character, Field(description="Character")]
     colour: Annotated[PaintColour, Field(description="Colour")]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
 
@@ -1392,7 +1445,9 @@ class MarkerCorner(BaseModel):
     """Corner Marker"""
 
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     kind: Annotated[MarkerCornerKind, Field(description="Kind of marker")]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -1422,7 +1477,9 @@ class MarkerDistance(BaseModel):
     """Distance Marker"""
 
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     kind: Annotated[MarkerDistanceKind, Field(description="Kind of distance marker")]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -1445,7 +1502,9 @@ class Marquee(BaseModel):
 
     colour: Annotated[int, Field(description="Colour (3 bits, 0-7)", ge=0, le=255)]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     mapping: Annotated[int, Field(description="Mapping (4 bits, 0-15)", ge=0, le=255)]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -1455,7 +1514,8 @@ class Marshal(BaseModel):
 
     floating: Annotated[bool, Field(description="Floating?")]
     heading: Annotated[
-        Heading, Field(description="Flags: watching/left/right\nHeading")
+        int,
+        Field(description="Flags: watching/left/right\nObjectHeading", ge=0, le=255),
     ]
     kind: Annotated[MarshalKind, Field(description="Kind of Marshal")]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
@@ -2262,7 +2322,9 @@ class PitStartPoint(BaseModel):
     """Pit start point"""
 
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     index: Annotated[
         int,
         Field(
@@ -2279,7 +2341,9 @@ class PitStopBox(BaseModel):
 
     colour: Annotated[int, Field(description="Colour (3 bits, 0-7)", ge=0, le=255)]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     mapping: Annotated[int, Field(description="Mapping (4 bits, 0-15)", ge=0, le=255)]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -2461,7 +2525,9 @@ class Post(BaseModel):
 
     colour: Annotated[PostColour, Field(description="Colour (3 bits, 0-7)")]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     mapping: Annotated[int, Field(description="Mapping (4 bits, 0-15)", ge=0, le=255)]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -2541,7 +2607,9 @@ class Railing(BaseModel):
 
     colour: Annotated[int, Field(description="Colour (3 bits, 0-7)", ge=0, le=255)]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     mapping: Annotated[int, Field(description="Mapping (4 bits, 0-15)", ge=0, le=255)]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -2551,7 +2619,9 @@ class Ramp(BaseModel):
 
     colour: Annotated[int, Field(description="Colour (3 bits, 0-7)", ge=0, le=255)]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     mapping: Annotated[int, Field(description="Mapping (4 bits, 0-15)", ge=0, le=255)]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -2654,7 +2724,9 @@ class SignMetal(BaseModel):
 
     colour: Annotated[int, Field(description="Colour (3 bits, 0-7)", ge=0, le=255)]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     kind: Annotated[MetalSignKind, Field(description="Kind")]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -2664,7 +2736,9 @@ class SignSpeed(BaseModel):
 
     colour: Annotated[int, Field(description="Colour (3 bits, 0-7)", ge=0, le=255)]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     mapping: Annotated[SpeedSignMapping, Field(description="Mapping")]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -2782,18 +2856,14 @@ class SoundType(StrEnum):
     Error = "Error"
 
 
-class Speed(BaseModel):
-    """Speed stored as meters per second."""
-
-    inner: float
-
-
 class SpeedHump(BaseModel):
     """Speed hump 10m"""
 
     colour: Annotated[int, Field(description="Colour (3 bits, 0-7)", ge=0, le=255)]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     mapping: Annotated[int, Field(description="Mapping (4 bits, 0-15)", ge=0, le=255)]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -2842,7 +2912,9 @@ class StartLights(BaseModel):
     """StartLights"""
 
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     identifier: Annotated[int, Field(description="identifier", ge=0, le=255)]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -2851,7 +2923,9 @@ class StartPosition(BaseModel):
     """Start Position"""
 
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     index: Annotated[
         int,
         Field(
@@ -2947,7 +3021,9 @@ class Tyres(BaseModel):
 
     colour: Annotated[TyreColour, Field(description="Colour")]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
 
@@ -2968,7 +3044,9 @@ class VehicleAmbulance(BaseModel):
 
     colour: Annotated[int, Field(description="Colour (3 bits, 0-7)", ge=0, le=255)]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     mapping: Annotated[int, Field(description="Mapping (4 bits, 0-15)", ge=0, le=255)]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -2978,7 +3056,9 @@ class VehicleSUV(BaseModel):
 
     colour: Annotated[VehicleSUVColour, Field(description="Colour (3 bits, 0-7)")]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     mapping: Annotated[int, Field(description="Mapping (4 bits, 0-15)", ge=0, le=255)]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -3221,7 +3301,9 @@ class VehicleTruck(BaseModel):
 
     colour: Annotated[VehicleTruckColour, Field(description="Colour (3 bits, 0-7)")]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     mapping: Annotated[int, Field(description="Mapping (4 bits, 0-15)", ge=0, le=255)]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -3243,7 +3325,9 @@ class VehicleVan(BaseModel):
 
     colour: Annotated[VehicleVanColour, Field(description="Colour (3 bits, 0-7)")]
     floating: Annotated[bool, Field(description="Floating")]
-    heading: Annotated[Heading, Field(description="Heading / Direction")]
+    heading: Annotated[
+        int, Field(description="ObjectHeading / Direction", ge=0, le=255)
+    ]
     mapping: Annotated[int, Field(description="Mapping (4 bits, 0-15)", ge=0, le=255)]
     xyz: Annotated[ObjectCoordinate, Field(description="Position")]
 
@@ -3461,7 +3545,9 @@ class Cpp(BaseModel):
 
     flags: Annotated[StaFlags, Field(description="State flags to set")]
     fov: Annotated[float, Field(description="Field of View, in degrees")]
-    h: Annotated[Heading, Field(description="heading - 0 points along Y axis")]
+    h: Annotated[
+        int, Field(description="heading - 0 points along Y axis", ge=0, le=65535)
+    ]
     ingamecam: Annotated[CameraView, Field(description="CameraView")]
     p: Annotated[int, Field(description="Pitch", ge=0, le=65535)]
     pos: Annotated[Coordinate, Field(description="Position vector")]
@@ -4300,7 +4386,9 @@ class Con(BaseModel):
     reqi: Annotated[
         int, Field(description="Request identifier echoed by replies.", ge=0, le=255)
     ]
-    spclose: Annotated[Speed, Field(description="Closing speed at impact.")]
+    spclose: Annotated[
+        int, Field(description="Closing speed at impact.", ge=0, le=65535)
+    ]
     time: Annotated[
         int,
         Field(
@@ -4323,7 +4411,9 @@ class Obh(BaseModel):
     reqi: Annotated[
         int, Field(description="Request identifier echoed by replies.", ge=0, le=255)
     ]
-    spclose: Annotated[Speed, Field(description="Closing speed at impact.")]
+    spclose: Annotated[
+        int, Field(description="Closing speed at impact.", ge=0, le=65535)
+    ]
     time: Annotated[
         int,
         Field(
