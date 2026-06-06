@@ -40,6 +40,7 @@ impl SpeedF32 {
     pub const ZERO: Self = Self(0.0);
 
     /// Construct from metres per second.
+    #[doc(alias = "from_meters_per_sec")]
     pub const fn from_metres_per_sec(value: f32) -> Self {
         Self(value)
     }
@@ -50,16 +51,19 @@ impl SpeedF32 {
     }
 
     /// Speed in metres per second.
+    #[doc(alias = "to_meters_per_sec")]
     pub const fn to_metres_per_sec(self) -> f32 {
         self.0
     }
 
     /// Construct from kilometres per hour.
+    #[doc(alias = "from_kilometers_per_hour")]
     pub fn from_kilometres_per_hour(value: f32) -> Self {
         Self(value * MPS_PER_KMH)
     }
 
     /// Speed in kilometres per hour.
+    #[doc(alias = "to_kilometers_per_hour")]
     pub fn to_kilometres_per_hour(self) -> f32 {
         self.0 * 3.6
     }
@@ -126,6 +130,7 @@ impl SpeedU16 {
     }
 
     /// Construct from metres per second (rounded to the nearest wire unit).
+    #[doc(alias = "from_meters_per_sec")]
     pub fn from_metres_per_sec(value: f32) -> Self {
         Self((value * Self::UNITS_PER_MPS).round() as u16)
     }
@@ -136,16 +141,19 @@ impl SpeedU16 {
     }
 
     /// Speed in metres per second.
+    #[doc(alias = "to_meters_per_sec")]
     pub fn to_metres_per_sec(self) -> f32 {
         self.0 as f32 / Self::UNITS_PER_MPS
     }
 
     /// Construct from kilometres per hour.
+    #[doc(alias = "from_kilometers_per_hour")]
     pub fn from_kilometres_per_hour(value: f32) -> Self {
         Self::from_metres_per_sec(value * MPS_PER_KMH)
     }
 
     /// Speed in kilometres per hour.
+    #[doc(alias = "to_kilometers_per_hour")]
     pub fn to_kilometres_per_hour(self) -> f32 {
         self.to_metres_per_sec() * 3.6
     }
@@ -208,6 +216,7 @@ impl SpeedU8 {
     }
 
     /// Construct from metres per second (rounded and clamped to 0..=255).
+    #[doc(alias = "from_meters_per_sec")]
     pub fn from_metres_per_sec(value: f32) -> Self {
         Self(value.round().clamp(0.0, u8::MAX as f32) as u8)
     }
@@ -218,16 +227,19 @@ impl SpeedU8 {
     }
 
     /// Speed in metres per second.
+    #[doc(alias = "to_meters_per_sec")]
     pub fn to_metres_per_sec(self) -> f32 {
         self.0 as f32
     }
 
     /// Construct from kilometres per hour.
+    #[doc(alias = "from_kilometers_per_hour")]
     pub fn from_kilometres_per_hour(value: f32) -> Self {
         Self::from_metres_per_sec(value * MPS_PER_KMH)
     }
 
     /// Speed in kilometres per hour.
+    #[doc(alias = "to_kilometers_per_hour")]
     pub fn to_kilometres_per_hour(self) -> f32 {
         self.to_metres_per_sec() * 3.6
     }
@@ -295,6 +307,7 @@ impl ClosingSpeed {
     }
 
     /// Construct from metres per second (rounded to the nearest wire unit).
+    #[doc(alias = "from_meters_per_sec")]
     pub fn from_metres_per_sec(value: f32) -> Self {
         Self::from_raw((value * Self::UNITS_PER_MPS).round() as u16)
     }
@@ -306,16 +319,19 @@ impl ClosingSpeed {
     }
 
     /// Closing speed in metres per second.
+    #[doc(alias = "to_meters_per_sec")]
     pub fn to_metres_per_sec(self) -> f32 {
         self.0 as f32 / Self::UNITS_PER_MPS
     }
 
     /// Construct from kilometres per hour.
+    #[doc(alias = "from_kilometers_per_hour")]
     pub fn from_kilometres_per_hour(value: f32) -> Self {
         Self::from_metres_per_sec(value * MPS_PER_KMH)
     }
 
     /// Closing speed in kilometres per hour.
+    #[doc(alias = "to_kilometers_per_hour")]
     pub fn to_kilometres_per_hour(self) -> f32 {
         self.to_metres_per_sec() * 3.6
     }

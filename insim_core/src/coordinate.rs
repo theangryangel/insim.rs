@@ -24,27 +24,32 @@ impl Coordinate {
     const SCALE: i32 = 65536;
 
     /// X (in metres)
+    #[doc(alias = "x_meters")]
     pub fn x_metres(&self) -> f32 {
         self.x as f32 / Self::SCALE as f32
     }
 
     /// Y (in metres)
+    #[doc(alias = "y_meters")]
     pub fn y_metres(&self) -> f32 {
         self.y as f32 / Self::SCALE as f32
     }
 
     /// Z (in metres)
+    #[doc(alias = "z_meters")]
     pub fn z_metres(&self) -> f32 {
         self.z as f32 / Self::SCALE as f32
     }
 
     /// X, Y, Z (in metres)
+    #[doc(alias = "xyz_meters")]
     pub fn xyz_metres(&self) -> (f32, f32, f32) {
         (self.x_metres(), self.y_metres(), self.z_metres())
     }
 
     /// Convert to glam Vec3, where xyz are in metres
     #[cfg(feature = "glam")]
+    #[doc(alias = "to_vec3_meters")]
     pub fn to_vec3_metres(self) -> glam::Vec3 {
         glam::Vec3::new(
             self.x as f32 / Self::SCALE as f32,
@@ -55,6 +60,7 @@ impl Coordinate {
 
     /// Convert from glam Vec3, where the Vec3 is in metres
     #[cfg(feature = "glam")]
+    #[doc(alias = "from_dvec3_meters")]
     pub fn from_dvec3_metres(other: glam::DVec3) -> Self {
         Self {
             x: (other.x * Self::SCALE as f64).round() as i32,
@@ -65,6 +71,7 @@ impl Coordinate {
 
     /// Convert to glam Vec3, where xyz are in metres
     #[cfg(feature = "glam")]
+    #[doc(alias = "to_dvec3_meters")]
     pub fn to_dvec3_metres(self) -> glam::DVec3 {
         glam::DVec3::new(
             self.x as f64 / Self::SCALE as f64,
@@ -75,6 +82,7 @@ impl Coordinate {
 
     /// Convert from glam Vec3, where the Vec3 is in metres
     #[cfg(feature = "glam")]
+    #[doc(alias = "from_vec3_meters")]
     pub fn from_vec3_metres(other: glam::Vec3) -> Self {
         Self {
             x: (other.x * Self::SCALE as f32).round() as i32,

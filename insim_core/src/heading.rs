@@ -105,6 +105,12 @@ macro_rules! define_heading {
             /// Normalise to `[0, 360)`. Wire headings are inherently normalised
             /// (the raw integer wraps), so this returns `self`; it exists for
             /// parity with floating-point angle APIs.
+            ///
+            /// Note: the American spelling `normalize` is retained (rather than the
+            /// British `normalise` used elsewhere in this crate) to mirror the
+            /// wider Rust ecosystem - `glam`, `nalgebra`, and `std` all spell it
+            /// this way, and these headings interoperate with those libraries.
+            #[doc(alias = "normalise")]
             pub fn normalize(self) -> Self {
                 self
             }
