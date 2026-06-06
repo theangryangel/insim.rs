@@ -44,6 +44,11 @@ impl SpeedF32 {
         Self(value)
     }
 
+    /// Consumes `self`, returning the inner value (metres per second).
+    pub const fn into_inner(self) -> f32 {
+        self.0
+    }
+
     /// Speed in metres per second.
     pub const fn to_metres_per_sec(self) -> f32 {
         self.0
@@ -125,6 +130,11 @@ impl SpeedU16 {
         Self((value * Self::UNITS_PER_MPS).round() as u16)
     }
 
+    /// Consumes `self`, returning the raw inner value (same as [`to_raw`](Self::to_raw)).
+    pub const fn into_inner(self) -> u16 {
+        self.0
+    }
+
     /// Speed in metres per second.
     pub fn to_metres_per_sec(self) -> f32 {
         self.0 as f32 / Self::UNITS_PER_MPS
@@ -200,6 +210,11 @@ impl SpeedU8 {
     /// Construct from metres per second (rounded and clamped to 0..=255).
     pub fn from_metres_per_sec(value: f32) -> Self {
         Self(value.round().clamp(0.0, u8::MAX as f32) as u8)
+    }
+
+    /// Consumes `self`, returning the raw inner value (same as [`to_raw`](Self::to_raw)).
+    pub const fn into_inner(self) -> u8 {
+        self.0
     }
 
     /// Speed in metres per second.
@@ -282,6 +297,12 @@ impl ClosingSpeed {
     /// Construct from metres per second (rounded to the nearest wire unit).
     pub fn from_metres_per_sec(value: f32) -> Self {
         Self::from_raw((value * Self::UNITS_PER_MPS).round() as u16)
+    }
+
+    /// Consumes `self`, returning the raw (masked, 12-bit) inner value (same as
+    /// [`to_raw`](Self::to_raw)).
+    pub const fn into_inner(self) -> u16 {
+        self.0
     }
 
     /// Closing speed in metres per second.
