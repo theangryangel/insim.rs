@@ -11,7 +11,7 @@ pub use ::insim_core as core;
 use bytes::Buf;
 use insim_core::{
     Decode, DecodeContext, Encode, EncodeContext, dash_lights::DashLights, gear::Gear,
-    identifiers::PlayerId, speed::Speed, vehicle::Vehicle,
+    identifiers::PlayerId, speed::SpeedF32, vehicle::Vehicle,
 };
 
 bitflags::bitflags! {
@@ -104,7 +104,7 @@ pub struct Outgauge {
     /// Currently viewed player
     pub plid: PlayerId,
     /// Speed in m/s
-    pub speed: Speed,
+    pub speed: SpeedF32,
     /// RPM
     pub rpm: f32,
     /// Turbo pressure
@@ -143,7 +143,7 @@ impl Encode for Outgauge {
         ctx.encode("flags", &self.flags)?;
         ctx.encode("gear", &self.gear)?;
         ctx.encode("plid", &self.plid)?;
-        ctx.encode("speed", &self.speed.to_meters_per_sec())?;
+        ctx.encode("speed", &self.speed)?;
         ctx.encode("rpm", &self.rpm)?;
         ctx.encode("turbo", &self.turbo)?;
         ctx.encode("engtemp", &self.engtemp)?;
@@ -171,7 +171,7 @@ impl Decode for Outgauge {
         let flags = ctx.decode::<OutgaugeFlags>("flags")?;
         let gear = ctx.decode::<Gear>("gear")?;
         let plid = ctx.decode::<PlayerId>("plid")?;
-        let speed = Speed::from_meters_per_sec(ctx.decode::<f32>("speed")?);
+        let speed = ctx.decode::<SpeedF32>("speed")?;
         let rpm = ctx.decode::<f32>("rpm")?;
         let turbo = ctx.decode::<f32>("turbo")?;
         let engtemp = ctx.decode::<f32>("engtemp")?;

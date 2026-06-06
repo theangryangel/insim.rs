@@ -112,7 +112,7 @@ mod test {
                 ));
                 assert!(matches!(parsed.ucoaction, UcoAction::CircleLeave));
                 assert_eq!(parsed.time, Duration::from_millis(151560));
-                assert_eq!(parsed.c.speed.to_meters_per_sec() as u8, 8);
+                assert_eq!(parsed.c.speed.to_raw(), 8);
                 assert_eq!(parsed.c.x, -314);
                 assert_eq!(parsed.c.y, -1496);
                 assert_eq!(parsed.c.z, 10);

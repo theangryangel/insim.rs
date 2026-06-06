@@ -414,7 +414,7 @@ pub(super) async fn on_con(
     ui: BombUi,
 ) -> Result<(), AppError> {
     let now = Instant::now();
-    let mps = con.spclose.to_meters_per_sec();
+    let mps = con.spclose.to_metres_per_sec();
     let mut any_hit = false;
     for plid in [con.a.plid, con.b.plid] {
         let result = state.write().on_collision(plid, mps, now);

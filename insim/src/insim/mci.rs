@@ -1,7 +1,7 @@
 use bitflags::bitflags;
 use insim_core::{
     Decode, DecodeContext, Encode, EncodeContext, angvel::AngVel, coordinate::Coordinate,
-    heading::Heading, speed::Speed,
+    heading::Heading, speed::SpeedU16,
 };
 
 use crate::identifiers::{PlayerId, RequestId};
@@ -71,11 +71,11 @@ pub struct CompCar {
     /// Additional state flags.
     pub info: CompCarInfo,
 
-    /// World position in meters.
+    /// World position in metres.
     pub xyz: Coordinate,
 
     /// Speed.
-    pub speed: Speed,
+    pub speed: SpeedU16,
 
     /// Direction of motion (heading of velocity).
     pub direction: Heading,
@@ -110,8 +110,7 @@ impl Decode for CompCar {
 
         let xyz = ctx.decode::<Coordinate>("xyz")?;
 
-        let speed = (ctx.decode::<u16>("speed")? as f32) / 327.68;
-        let speed = Speed::from_meters_per_sec(speed);
+        let speed = ctx.decode::<SpeedU16>("speed")?;
 
         let direction_raw = ctx.decode::<u16>("direction")?;
         let direction = Heading::from_degrees((direction_raw as f64) * COMPCAR_DEGREES_PER_UNIT);
@@ -144,8 +143,7 @@ impl Encode for CompCar {
         ctx.encode("info", &self.info)?;
         ctx.pad("sp3", 1)?;
         ctx.encode("xyz", &self.xyz)?;
-        let speed = (self.speed.to_meters_per_sec() * 327.68) as u16;
-        ctx.encode("speed", &speed)?;
+        ctx.encode("speed", &self.speed)?;
 
         let direction_units = (self.direction.to_degrees() / COMPCAR_DEGREES_PER_UNIT)
             .round()

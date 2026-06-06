@@ -220,7 +220,7 @@ pub fn main() -> Result<()> {
                 if let Some(i) = info {
                     // deal with the fact that we cant precisely know when the race starts with the
                     // RST, so we should record only when we've started moving.
-                    if i.speed.to_meters_per_sec() < 1.0 {
+                    if i.speed.to_metres_per_sec() < 1.0 {
                         continue;
                     }
                     pos = i.xyz.to_vec3_metres();
