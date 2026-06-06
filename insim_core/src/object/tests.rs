@@ -805,3 +805,19 @@ fn test_coordinate_equality() {
 
     assert_eq!(coord1, coord2);
 }
+
+#[cfg(feature = "glam")]
+#[test]
+fn test_object_coordinate_metres_constructors_round_not_truncate() {
+    // x,y use 16 units = 1m; z uses 4 units = 1m. Fractional metres must scale,
+    // not truncate to whole metres.
+    let c = ObjectCoordinate::from_dvec3_metres(glam::DVec3::new(1.5, -2.25, 3.25));
+    assert_eq!(c.x, 24); // 1.5 * 16
+    assert_eq!(c.y, -36); // -2.25 * 16
+    assert_eq!(c.z, 13); // 3.25 * 4
+
+    let c = ObjectCoordinate::from_vec3_metres(glam::Vec3::new(1.5, -2.25, 3.25));
+    assert_eq!(c.x, 24);
+    assert_eq!(c.y, -36);
+    assert_eq!(c.z, 13);
+}
