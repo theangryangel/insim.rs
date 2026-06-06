@@ -22,8 +22,8 @@ pub struct ConInfo {
     /// Additional car state flags.
     pub info: CompCarInfo,
 
-    /// Front wheel steering angle (right positive).
-    pub steer: u8,
+    /// Front wheel steering angle in degrees (right positive, left negative).
+    pub steer: i8,
 
     /// Throttle input (0-15).
     pub thr: u8,
@@ -49,11 +49,11 @@ pub struct ConInfo {
     /// Car facing direction.
     pub heading: HeadingU8,
 
-    /// Longitudinal acceleration.
-    pub accelf: u8,
+    /// Longitudinal acceleration in m/s² (forward positive, braking negative).
+    pub accelf: i8,
 
-    /// Lateral acceleration.
-    pub accelr: u8,
+    /// Lateral acceleration in m/s² (rightward positive, leftward negative).
+    pub accelr: i8,
 
     /// X position.
     pub x: i16,
@@ -68,7 +68,7 @@ impl Decode for ConInfo {
         let info = ctx.decode::<CompCarInfo>("info")?;
         // pad 1 bytes
         ctx.pad("sp0", 1)?;
-        let steer = ctx.decode::<u8>("steer")?;
+        let steer = ctx.decode::<i8>("steer")?;
 
         let thrbrk = ctx.decode::<u8>("thrbrk")?;
         let thr: u8 = (thrbrk >> 4) & 0x0F; // upper 4 bits
@@ -86,8 +86,8 @@ impl Decode for ConInfo {
         let direction = ctx.decode::<HeadingU8>("direction")?;
         let heading = ctx.decode::<HeadingU8>("heading")?;
 
-        let accelf = ctx.decode::<u8>("accelf")?;
-        let accelr = ctx.decode::<u8>("accelr")?;
+        let accelf = ctx.decode::<i8>("accelf")?;
+        let accelr = ctx.decode::<i8>("accelr")?;
 
         let x = ctx.decode::<i16>("x")?;
         let y = ctx.decode::<i16>("y")?;

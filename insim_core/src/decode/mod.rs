@@ -62,6 +62,14 @@ impl Decode for u8 {
     }
 }
 
+impl Decode for i8 {
+    const PRIMITIVE: bool = true;
+
+    fn decode(ctx: &mut DecodeContext) -> Result<Self, DecodeError> {
+        Ok(ctx.buf.get_i8())
+    }
+}
+
 impl Decode for u16 {
     const PRIMITIVE: bool = true;
 

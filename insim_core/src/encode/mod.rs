@@ -61,6 +61,16 @@ impl Encode for u8 {
     }
 }
 
+impl Encode for i8 {
+    const PRIMITIVE: bool = true;
+
+    fn encode(&self, ctx: &mut EncodeContext) -> Result<(), EncodeError> {
+        ctx.buf.put_i8(*self);
+
+        Ok(())
+    }
+}
+
 impl Encode for u16 {
     const PRIMITIVE: bool = true;
 
