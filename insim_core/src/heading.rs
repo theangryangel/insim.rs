@@ -66,6 +66,11 @@ macro_rules! define_heading {
                 self.0
             }
 
+            /// Consumes `self`, returning the raw inner value (same as [`to_raw`](Self::to_raw)).
+            pub const fn into_inner(self) -> $inner {
+                self.0
+            }
+
             /// Construct from degrees. Values outside `[0, 360)` wrap around - the
             /// wire format cannot represent an un-normalised angle.
             pub fn from_degrees(value: f64) -> Self {

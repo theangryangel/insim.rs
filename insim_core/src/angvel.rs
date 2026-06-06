@@ -43,6 +43,11 @@ impl AngVelI16 {
         self.0
     }
 
+    /// Consumes `self`, returning the raw inner value (same as [`to_raw`](Self::to_raw)).
+    pub const fn into_inner(self) -> i16 {
+        self.0
+    }
+
     /// Construct from degrees per second (rounded to the nearest wire unit).
     pub fn from_degrees_per_sec(value: f32) -> Self {
         let units = (value / 360.0 * Self::UNITS_PER_TURN_PER_SEC).round();
