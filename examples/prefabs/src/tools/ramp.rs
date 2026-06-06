@@ -2,7 +2,7 @@ use anyhow::{Result, ensure};
 use glam::DVec3;
 use insim::{
     core::{
-        heading::Heading,
+        heading::ObjectHeading,
         object::{
             ObjectCoordinate,
             concrete::{
@@ -159,9 +159,9 @@ pub fn build(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Object
             RampMode::AcrossPath => {
                 let quarter_turn = std::f64::consts::FRAC_PI_2;
                 let final_heading = if current_bank_angle < 0.0 {
-                    Heading::from_radians(chord_heading.to_radians() - quarter_turn)
+                    ObjectHeading::from_radians(chord_heading.to_radians() - quarter_turn)
                 } else {
-                    Heading::from_radians(chord_heading.to_radians() + quarter_turn)
+                    ObjectHeading::from_radians(chord_heading.to_radians() + quarter_turn)
                 };
 
                 let fwd = spline::heading_to_forward(chord_heading);
@@ -259,7 +259,7 @@ fn default_slab() -> ConcreteSlab {
         width: ConcreteWidthLength::Four,
         length: ConcreteWidthLength::Four,
         pitch: ConcretePitch::Deg0,
-        heading: Heading::NORTH,
+        heading: ObjectHeading::NORTH,
     }
 }
 
@@ -299,7 +299,7 @@ fn height_from_step(step: u8) -> ConcreteHeight {
 }
 
 /// Absolute angular difference between two headings, normalised to [0, π].
-fn heading_delta_radians(a: Heading, b: Heading) -> f64 {
+fn heading_delta_radians(a: ObjectHeading, b: ObjectHeading) -> f64 {
     let mut diff = a.to_radians() - b.to_radians();
     while diff > std::f64::consts::PI {
         diff -= 2.0 * std::f64::consts::PI;

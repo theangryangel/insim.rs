@@ -1,12 +1,12 @@
 use insim::{
     core::{
-        heading::Heading,
+        heading::ObjectHeading,
         object::{ObjectCoordinate, painted},
     },
     insim::ObjectInfo,
 };
 
-pub fn build(text: &str, anchor: ObjectCoordinate, heading: Heading) -> Vec<ObjectInfo> {
+pub fn build(text: &str, anchor: ObjectCoordinate, heading: ObjectHeading) -> Vec<ObjectInfo> {
     const SPACING_RAW_UNITS: i32 = 16;
     const PADDING_SLOTS: i32 = 2;
 

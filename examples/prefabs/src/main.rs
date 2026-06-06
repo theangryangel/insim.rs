@@ -4,7 +4,7 @@ use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 use clap::Parser;
 use insim::{
     Packet, WithRequestId,
-    core::heading::Heading,
+    core::heading::ObjectHeading,
     identifiers::{ConnectionId, RequestId},
     insim::{Axm, BfnType, Cpp, ObjectInfo, PmoAction, PmoFlags, TinyType, TtcType},
 };
@@ -100,7 +100,7 @@ enum SpawnOrigin {
         roll_degrees: f64,
     },
     Nudge {
-        heading: Heading,
+        heading: ObjectHeading,
         distance_metres: f64,
     },
     JiggleSelection,
@@ -140,13 +140,13 @@ impl fmt::Display for SpawnOrigin {
                 heading,
                 distance_metres,
             } => {
-                let heading = if *heading == Heading::NORTH {
+                let heading = if *heading == ObjectHeading::NORTH {
                     "north"
-                } else if *heading == Heading::SOUTH {
+                } else if *heading == ObjectHeading::SOUTH {
                     "south"
-                } else if *heading == Heading::EAST {
+                } else if *heading == ObjectHeading::EAST {
                     "east"
-                } else if *heading == Heading::WEST {
+                } else if *heading == ObjectHeading::WEST {
                     "west"
                 } else {
                     "unknown"
@@ -495,7 +495,8 @@ pub async fn main() -> anyhow::Result<()> {
                     Packet::Cpp(cpp) => {
                         state.last_cpp = cpp.clone();
                         if state.compass_visible {
-                            let next = Some(tools::compass::generate(cpp.h, COMPASS_WIDTH));
+                            let next =
+                                Some(tools::compass::generate(cpp.h.to_degrees(), COMPASS_WIDTH));
 
                             if state.compass_text != next {
                                 state.compass_text = next;

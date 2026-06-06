@@ -1,6 +1,6 @@
 //! Pit start point object
 use crate::{
-    heading::Heading,
+    heading::ObjectHeading,
     object::{ObjectCoordinate, ObjectInfoInner, Raw},
 };
 
@@ -12,8 +12,8 @@ use crate::{
 pub struct PitStartPoint {
     /// Position
     pub xyz: ObjectCoordinate,
-    /// Heading / Direction
-    pub heading: Heading,
+    /// ObjectHeading / Direction
+    pub heading: ObjectHeading,
     /// Position index (0-47, representing start positions 1-48)
     pub index: u8,
     /// Floating
@@ -23,7 +23,7 @@ pub struct PitStartPoint {
 impl PitStartPoint {
     pub(super) fn new(raw: Raw) -> Result<Self, crate::DecodeError> {
         let xyz = raw.xyz;
-        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let heading = ObjectHeading::from_raw(raw.heading);
         let pos_index = raw.flags & 0x3f;
         let floating = raw.raw_floating();
         Ok(Self {
@@ -43,11 +43,11 @@ impl ObjectInfoInner for PitStartPoint {
         flags
     }
 
-    fn heading_mut(&mut self) -> Option<&mut Heading> {
+    fn heading_mut(&mut self) -> Option<&mut ObjectHeading> {
         Some(&mut self.heading)
     }
 
-    fn heading(&self) -> Option<Heading> {
+    fn heading(&self) -> Option<ObjectHeading> {
         Some(self.heading)
     }
 
@@ -60,6 +60,6 @@ impl ObjectInfoInner for PitStartPoint {
     }
 
     fn heading_objectinfo_wire(&self) -> u8 {
-        self.heading.to_objectinfo_wire()
+        self.heading.to_raw()
     }
 }

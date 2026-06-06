@@ -1,13 +1,10 @@
 use bitflags::bitflags;
 use insim_core::{
     Decode, DecodeContext, Encode, EncodeContext, angvel::AngVel, coordinate::Coordinate,
-    heading::Heading, speed::SpeedU16,
+    heading::HeadingU16, speed::SpeedU16,
 };
 
 use crate::identifiers::{PlayerId, RequestId};
-
-/// CompCar direction scale: 32768 units = 180°
-pub(super) const COMPCAR_DEGREES_PER_UNIT: f64 = 180.0 / 32768.0;
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
@@ -78,10 +75,10 @@ pub struct CompCar {
     pub speed: SpeedU16,
 
     /// Direction of motion (heading of velocity).
-    pub direction: Heading,
+    pub direction: HeadingU16,
 
     /// Car facing direction.
-    pub heading: Heading,
+    pub heading: HeadingU16,
 
     /// Angular velocity of the car.
     pub angvel: AngVel,
@@ -112,11 +109,8 @@ impl Decode for CompCar {
 
         let speed = ctx.decode::<SpeedU16>("speed")?;
 
-        let direction_raw = ctx.decode::<u16>("direction")?;
-        let direction = Heading::from_degrees((direction_raw as f64) * COMPCAR_DEGREES_PER_UNIT);
-
-        let heading_raw = ctx.decode::<u16>("heading")?;
-        let heading = Heading::from_degrees((heading_raw as f64) * COMPCAR_DEGREES_PER_UNIT);
+        let direction = ctx.decode::<HeadingU16>("direction")?;
+        let heading = ctx.decode::<HeadingU16>("heading")?;
 
         let angvel = AngVel::from_wire_i16(ctx.decode::<i16>("angvel")?);
         Ok(Self {
@@ -145,15 +139,8 @@ impl Encode for CompCar {
         ctx.encode("xyz", &self.xyz)?;
         ctx.encode("speed", &self.speed)?;
 
-        let direction_units = (self.direction.to_degrees() / COMPCAR_DEGREES_PER_UNIT)
-            .round()
-            .clamp(0.0, 65535.0) as u16;
-        ctx.encode("direction", &direction_units)?;
-
-        let heading_units = (self.heading.to_degrees() / COMPCAR_DEGREES_PER_UNIT)
-            .round()
-            .clamp(0.0, 65535.0) as u16;
-        ctx.encode("heading", &heading_units)?;
+        ctx.encode("direction", &self.direction)?;
+        ctx.encode("heading", &self.heading)?;
 
         ctx.encode("angvel", &self.angvel.to_wire_i16())?;
         Ok(())

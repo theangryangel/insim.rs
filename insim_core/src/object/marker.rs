@@ -1,7 +1,7 @@
 //! Marker objects
 use crate::{
     DecodeError, DecodeErrorKind,
-    heading::Heading,
+    heading::ObjectHeading,
     object::{ObjectCoordinate, ObjectInfoInner, Raw},
 };
 
@@ -70,8 +70,8 @@ pub struct MarkerCorner {
     pub xyz: ObjectCoordinate,
     /// Kind of marker
     pub kind: MarkerCornerKind,
-    /// Heading / Direction
-    pub heading: Heading,
+    /// ObjectHeading / Direction
+    pub heading: ObjectHeading,
     /// Floating
     pub floating: bool,
 }
@@ -79,7 +79,7 @@ pub struct MarkerCorner {
 impl MarkerCorner {
     pub(super) fn new(raw: Raw) -> Result<Self, crate::DecodeError> {
         let xyz = raw.xyz;
-        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let heading = ObjectHeading::from_raw(raw.heading);
         let kind = MarkerCornerKind::try_from(raw.raw_mapping())?;
         let floating = raw.raw_floating();
         Ok(Self {
@@ -99,11 +99,11 @@ impl ObjectInfoInner for MarkerCorner {
         flags
     }
 
-    fn heading_mut(&mut self) -> Option<&mut Heading> {
+    fn heading_mut(&mut self) -> Option<&mut ObjectHeading> {
         Some(&mut self.heading)
     }
 
-    fn heading(&self) -> Option<Heading> {
+    fn heading(&self) -> Option<ObjectHeading> {
         Some(self.heading)
     }
 
@@ -116,7 +116,7 @@ impl ObjectInfoInner for MarkerCorner {
     }
 
     fn heading_objectinfo_wire(&self) -> u8 {
-        self.heading.to_objectinfo_wire()
+        self.heading.to_raw()
     }
 }
 
@@ -169,8 +169,8 @@ pub struct MarkerDistance {
     pub xyz: ObjectCoordinate,
     /// Kind of distance marker
     pub kind: MarkerDistanceKind,
-    /// Heading / Direction
-    pub heading: Heading,
+    /// ObjectHeading / Direction
+    pub heading: ObjectHeading,
     /// Floating
     pub floating: bool,
 }
@@ -178,7 +178,7 @@ pub struct MarkerDistance {
 impl MarkerDistance {
     pub(super) fn new(raw: Raw) -> Result<Self, crate::DecodeError> {
         let xyz = raw.xyz;
-        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let heading = ObjectHeading::from_raw(raw.heading);
         let kind = MarkerDistanceKind::try_from(raw.raw_mapping())?;
         let floating = raw.raw_floating();
         Ok(Self {
@@ -198,11 +198,11 @@ impl ObjectInfoInner for MarkerDistance {
         flags
     }
 
-    fn heading_mut(&mut self) -> Option<&mut Heading> {
+    fn heading_mut(&mut self) -> Option<&mut ObjectHeading> {
         Some(&mut self.heading)
     }
 
-    fn heading(&self) -> Option<Heading> {
+    fn heading(&self) -> Option<ObjectHeading> {
         Some(self.heading)
     }
 
@@ -215,6 +215,6 @@ impl ObjectInfoInner for MarkerDistance {
     }
 
     fn heading_objectinfo_wire(&self) -> u8 {
-        self.heading.to_objectinfo_wire()
+        self.heading.to_raw()
     }
 }

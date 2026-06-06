@@ -1,7 +1,7 @@
 //! Letterboard WY (White/Yellow) objects
 use super::letterboard_rb::Character;
 use crate::{
-    heading::Heading,
+    heading::ObjectHeading,
     object::{ObjectCoordinate, ObjectInfoInner, Raw},
 };
 
@@ -38,8 +38,8 @@ pub struct LetterboardWY {
     pub xyz: ObjectCoordinate,
     /// Colour
     pub colour: LetterboardWYColour,
-    /// Heading / Direction
-    pub heading: Heading,
+    /// ObjectHeading / Direction
+    pub heading: ObjectHeading,
     /// Mapping (6 bits, 0-63)
     pub character: Character,
     /// Floating
@@ -49,7 +49,7 @@ pub struct LetterboardWY {
 impl LetterboardWY {
     pub(super) fn new(raw: Raw) -> Result<Self, crate::DecodeError> {
         let xyz = raw.xyz;
-        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let heading = ObjectHeading::from_raw(raw.heading);
         let colour = LetterboardWYColour::from(raw.flags);
         let mapping = (raw.flags >> 1) & 0x3f;
         let character = Character::try_from(mapping)?;
@@ -73,11 +73,11 @@ impl ObjectInfoInner for LetterboardWY {
         flags
     }
 
-    fn heading_mut(&mut self) -> Option<&mut Heading> {
+    fn heading_mut(&mut self) -> Option<&mut ObjectHeading> {
         Some(&mut self.heading)
     }
 
-    fn heading(&self) -> Option<Heading> {
+    fn heading(&self) -> Option<ObjectHeading> {
         Some(self.heading)
     }
 
@@ -90,6 +90,6 @@ impl ObjectInfoInner for LetterboardWY {
     }
 
     fn heading_objectinfo_wire(&self) -> u8 {
-        self.heading.to_objectinfo_wire()
+        self.heading.to_raw()
     }
 }

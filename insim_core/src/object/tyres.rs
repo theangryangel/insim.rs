@@ -1,7 +1,7 @@
 //! Tyre single object
 use crate::{
     DecodeError,
-    heading::Heading,
+    heading::ObjectHeading,
     object::{ObjectCoordinate, ObjectInfoInner, Raw},
 };
 
@@ -49,8 +49,8 @@ pub struct Tyres {
     pub xyz: ObjectCoordinate,
     /// Colour
     pub colour: TyreColour,
-    /// Heading / Direction
-    pub heading: Heading,
+    /// ObjectHeading / Direction
+    pub heading: ObjectHeading,
     /// Floating
     pub floating: bool,
 }
@@ -58,7 +58,7 @@ pub struct Tyres {
 impl Tyres {
     pub(super) fn new(raw: Raw) -> Result<Self, DecodeError> {
         let xyz = raw.xyz;
-        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let heading = ObjectHeading::from_raw(raw.heading);
         let colour = TyreColour::from(raw.raw_colour());
         let floating = raw.raw_floating();
         Ok(Self {
@@ -78,11 +78,11 @@ impl ObjectInfoInner for Tyres {
         flags
     }
 
-    fn heading_mut(&mut self) -> Option<&mut Heading> {
+    fn heading_mut(&mut self) -> Option<&mut ObjectHeading> {
         Some(&mut self.heading)
     }
 
-    fn heading(&self) -> Option<Heading> {
+    fn heading(&self) -> Option<ObjectHeading> {
         Some(self.heading)
     }
 
@@ -95,6 +95,6 @@ impl ObjectInfoInner for Tyres {
     }
 
     fn heading_objectinfo_wire(&self) -> u8 {
-        self.heading.to_objectinfo_wire()
+        self.heading.to_raw()
     }
 }

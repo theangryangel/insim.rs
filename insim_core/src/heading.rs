@@ -1,363 +1,248 @@
-//! Heading
+//! Heading / direction wire types.
+//!
+//! LFS encodes headings as fixed-point integers at different resolutions and, in
+//! one case, a different zero-point. Rather than decode to a lossy floating-point
+//! angle and convert back (which is not idempotent on the wire), each wire encoding
+//! has its own newtype that stores the **raw integer** and exposes degree/radian
+//! accessors on demand. Decoding then re-encoding reproduces the original bytes
+//! exactly.
+//!
+//! All types share the same orientation convention as LFS: angles increase
+//! anticlockwise viewed from above, and [`to_degrees`](HeadingU16::to_degrees)
+//! always returns a value in `[0, 360)`.
+//!
+//! | Type | Wire | Scale | Zero |
+//! |------|------|-------|------|
+//! | [`HeadingU16`] | `u16` | 32768 = 180° | 0 = 0° |
+//! | [`HeadingU8`] | `u8` | 128 = 180° | 0 = 0° |
+//! | [`ObjectHeading`] | `u8` | 128 = 180° | 128 = 0° (offset) |
+
 use std::fmt;
 
-/// Angular measurement stored as radians (f64).
-///
-/// - 0° points along world Y, 90° along world -X.
-/// - Values are not auto-normalized; use `normalize()` when needed.
-/// - Includes object-heading wire conversions.
-///
-/// Represents heading or direction in LFS game space. Internally stored as f64 radians
-/// for consistency across the codebase, with convenient conversions to/from degrees.
-/// Uses double precision to minimize cumulative errors in physics calculations and
-/// integration over time.
-///
-/// # Orientation
-/// - 0 = world Y direction** (forward/north)
-/// - 90 = world -X direction** (left/west)
-/// - 180 = -Y direction** (backward/south)
-/// - 270 = world X direction** (right/east)
-///
-/// Angles increase in the anti-clockwise direction when viewed from above.
-///
-/// # Wraparound
-/// Angles are **not** automatically normalized. A Heading created from 450 will
-/// preserve that value internally. Use [`normalize()`](Heading::normalize) to wrap
-/// angles to the 0->360 range if needed.
-///
-/// ```
-/// use insim_core::heading::Heading;
-///
-/// let over = Heading::from_degrees(450.0);
-/// assert!((over.to_degrees() - 450.0).abs() < 0.0001);  // Preserved as-is
-///
-/// let normalized = over.normalize();
-/// assert!((normalized.to_degrees() - 90.0).abs() < 0.0001);  // Wrapped to [0, 360)
-/// ```
-///
-/// # Examples
-/// ```
-/// use insim_core::heading::Heading;
-///
-/// let forward = Heading::from_degrees(0.0);    // Y direction
-/// let left = Heading::from_degrees(90.0);      // -X direction
-/// let backward = Heading::from_degrees(180.0); // -Y direction
-///
-/// assert_eq!(forward.to_degrees(), 0.0);
-/// assert_eq!(left.to_degrees(), 90.0);
-/// ```
-#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct Heading {
-    radians: f64,
-}
+macro_rules! define_heading {
+    (
+        $(#[$meta:meta])*
+        $name:ident, inner = $inner:ty, half_turn = $half:expr, zero_offset = $offset:expr
+    ) => {
+        $(#[$meta])*
+        ///
+        /// Stores the raw wire value; degree/radian conversions are accessors.
+        /// Decoding then encoding reproduces the original value exactly.
+        #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+        #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+        pub struct $name($inner);
 
-impl Heading {
-    /// Heading pointing along world Y (0).
-    ///
-    /// This is typically north/forward in LFS game coordinates.
-    pub const ZERO: Self = Self::from_radians(0.0);
+        impl $name {
+            /// Raw units representing a half turn (180°).
+            const HALF_TURN: u32 = $half;
+            /// Raw units in a full turn (360°).
+            const FULL_TURN: u32 = $half * 2;
+            /// Raw value representing 0°.
+            const ZERO_OFFSET: u32 = $offset;
 
-    /// Heading pointing north (world Y direction, 0).
-    pub const NORTH: Self = Self::from_radians(0.0);
+            const fn raw_for_degrees(deg: u32) -> $inner {
+                (((deg * Self::HALF_TURN / 180) + Self::ZERO_OFFSET) % Self::FULL_TURN) as $inner
+            }
 
-    /// Heading pointing east (world X direction, 270).
-    pub const EAST: Self = Self::from_radians(3.0 * std::f64::consts::FRAC_PI_2);
+            /// Heading of 0° (world Y / forward).
+            pub const ZERO: Self = Self(Self::raw_for_degrees(0));
+            /// 0° - world Y direction (forward/north).
+            pub const NORTH: Self = Self(Self::raw_for_degrees(0));
+            /// 270° - world X direction (right/east).
+            pub const EAST: Self = Self(Self::raw_for_degrees(270));
+            /// 180° - opposite of world Y (backward/south).
+            pub const SOUTH: Self = Self(Self::raw_for_degrees(180));
+            /// 90° - world -X direction (left/west).
+            pub const WEST: Self = Self(Self::raw_for_degrees(90));
 
-    /// Heading pointing south (opposite of world Y, 180).
-    pub const SOUTH: Self = Self::from_radians(std::f64::consts::PI);
+            /// Construct from the raw wire value (lossless).
+            pub const fn from_raw(raw: $inner) -> Self {
+                Self(raw)
+            }
 
-    /// Heading pointing west (opposite of world X, 90).
-    pub const WEST: Self = Self::from_radians(std::f64::consts::FRAC_PI_2);
+            /// The raw wire value (lossless).
+            pub const fn to_raw(self) -> $inner {
+                self.0
+            }
 
-    /// Consumes Heading, returning the inner radian value.
-    pub fn into_inner(self) -> f64 {
-        self.radians
-    }
+            /// Construct from degrees. Values outside `[0, 360)` wrap around - the
+            /// wire format cannot represent an un-normalised angle.
+            pub fn from_degrees(value: f64) -> Self {
+                let units = (value * (Self::HALF_TURN as f64 / 180.0)).round() as i64;
+                let raw = (units + Self::ZERO_OFFSET as i64).rem_euclid(Self::FULL_TURN as i64);
+                Self(raw as $inner)
+            }
 
-    /// Create Heading from radians.
-    ///
-    /// 0 radians = world Y direction (forward)
-    /// π/2 radians = world -X direction (left)
-    /// π radians = -Y direction (backward)
-    /// 3π/2 radians = world X direction (right)
-    pub const fn from_radians(value: f64) -> Self {
-        Self { radians: value }
-    }
+            /// The heading in degrees, in `[0, 360)`.
+            pub fn to_degrees(self) -> f64 {
+                let centred =
+                    (self.0 as i64 - Self::ZERO_OFFSET as i64).rem_euclid(Self::FULL_TURN as i64);
+                centred as f64 * 180.0 / Self::HALF_TURN as f64
+            }
 
-    /// Get the angle in radians.
-    ///
-    /// 0 radians = world Y direction (forward)
-    /// π/2 radians = world -X direction (left)
-    /// π radians = -Y direction (backward)
-    /// 3π/2 radians = world X direction (right)
-    pub const fn to_radians(&self) -> f64 {
-        self.radians
-    }
+            /// Construct from radians (wraps, see [`from_degrees`](Self::from_degrees)).
+            pub fn from_radians(value: f64) -> Self {
+                Self::from_degrees(value.to_degrees())
+            }
 
-    /// Create Heading from degrees.
-    ///
-    /// 0 = world Y direction (forward)
-    /// 90 = world -X direction (left)
-    /// 180 = -Y direction (backward)
-    /// 270 = world X direction (right)
-    pub const fn from_degrees(value: f64) -> Self {
-        Self {
-            radians: value * std::f64::consts::PI / 180.0,
+            /// The heading in radians, in `[0, 2π)`.
+            pub fn to_radians(self) -> f64 {
+                self.to_degrees().to_radians()
+            }
+
+            /// The opposite direction (180° rotation). Exact - a half-turn is a
+            /// whole number of wire units.
+            pub fn opposite(self) -> Self {
+                Self(self.0.wrapping_add(Self::HALF_TURN as $inner))
+            }
+
+            /// Normalise to `[0, 360)`. Wire headings are inherently normalised
+            /// (the raw integer wraps), so this returns `self`; it exists for
+            /// parity with floating-point angle APIs.
+            pub fn normalize(self) -> Self {
+                self
+            }
         }
-    }
 
-    /// Get the angle in degrees.
-    ///
-    /// 0 = world Y direction (forward)
-    /// 90 = world -X direction (left)
-    /// 180 = -Y direction (backward)
-    /// 270 = world X direction (right)
-    pub const fn to_degrees(&self) -> f64 {
-        self.radians * 180.0 / std::f64::consts::PI
-    }
-
-    /// Normalize the angle to the range 0->360.
-    ///
-    /// Useful when you need to compare directions or ensure angles are in a
-    /// canonical form.
-    ///
-    /// # Examples
-    /// ```
-    /// use insim_core::heading::Heading;
-    ///
-    /// // Over-rotation wraps back
-    /// let over = Heading::from_degrees(450.0);
-    /// assert!((over.normalize().to_degrees() - 90.0).abs() < 0.0001);
-    ///
-    /// // Negative angles wrap forward
-    /// let negative = Heading::from_degrees(-90.0);
-    /// assert!((negative.normalize().to_degrees() - 270.0).abs() < 0.0001);
-    ///
-    /// // Already normalized angles unchanged
-    /// let normal = Heading::from_degrees(45.0);
-    /// assert!((normal.normalize().to_degrees() - 45.0).abs() < 0.0001);
-    /// ```
-    pub fn normalize(&self) -> Heading {
-        let degrees = self.to_degrees();
-        let normalized = degrees % 360.0;
-        let normalized = if normalized < 0.0 {
-            normalized + 360.0
-        } else {
-            normalized
-        };
-        Heading::from_degrees(normalized)
-    }
-
-    /// Get the opposite direction (180 rotation).
-    ///
-    /// Returns the direction that is directly opposite, i.e., rotated 180.
-    ///
-    /// # Examples
-    /// ```
-    /// use insim_core::heading::Heading;
-    ///
-    /// let north = Heading::NORTH;
-    /// let south = north.opposite();
-    /// assert!((south.to_degrees() - 180.0).abs() < 0.0001);
-    ///
-    /// let east = Heading::EAST;
-    /// let west = east.opposite().normalize();
-    /// assert!((west.to_degrees() - 90.0).abs() < 0.0001);
-    /// ```
-    pub fn opposite(&self) -> Heading {
-        Heading::from_radians(self.radians + std::f64::consts::PI)
-    }
-
-    /// Convert from LFS object heading u8 to Heading.
-    ///
-    /// LFS encodes object headings as a u8 where 360 degrees is represented in 256 values:
-    /// Heading = (heading_in_degrees + 180) * 256 / 360
-    ///
-    /// Therefore: heading_in_degrees = (heading * 360 / 256) - 180
-    ///
-    /// Examples:
-    /// - 128 = 0 (world Y direction / forward)
-    /// - 192 = 90 (world -X direction / left)
-    /// - 0 = 180 (opposite of world Y direction / backward)
-    /// - 64 = -90 (world X direction / right)
-    pub const fn from_objectinfo_wire(heading: u8) -> Self {
-        let degrees = (heading as f64) * (360.0 / 256.0) - 180.0;
-        Self::from_degrees(degrees)
-    }
-
-    /// Convert Heading to LFS object heading u8.
-    ///
-    /// Returns a u8 in the range 0-255 representing the heading.
-    /// Uses the formula: Heading = (heading_in_degrees + 180) * 256 / 360
-    pub fn to_objectinfo_wire(&self) -> u8 {
-        let mut value = ((self.to_degrees() + 180.0) * 256.0 / 360.0).round() as i32;
-        // Handle wraparound: 256 should map to 0
-        if value == 256 {
-            value = 0;
+        impl Default for $name {
+            fn default() -> Self {
+                Self::ZERO
+            }
         }
-        value as u8
-    }
+
+        impl fmt::Display for $name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{:.2}", self.to_degrees())
+            }
+        }
+
+        impl crate::Decode for $name {
+            fn decode(ctx: &mut crate::DecodeContext) -> Result<Self, crate::DecodeError> {
+                Ok(Self(ctx.decode::<$inner>("heading")?))
+            }
+        }
+
+        impl crate::Encode for $name {
+            fn encode(&self, ctx: &mut crate::EncodeContext) -> Result<(), crate::EncodeError> {
+                ctx.encode("heading", &self.0)
+            }
+        }
+    };
 }
 
-impl fmt::Display for Heading {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:.2}", self.to_degrees())
-    }
+define_heading! {
+    /// Heading as transmitted in `CompCar` (MCI) and `Cpp`: a `u16` where
+    /// 32768 = 180°, zero at 0.
+    HeadingU16, inner = u16, half_turn = 32768, zero_offset = 0
 }
 
-impl Default for Heading {
-    fn default() -> Self {
-        Self::ZERO
-    }
+define_heading! {
+    /// Heading as transmitted in `CarContact`/`ConInfo`: a `u8` where
+    /// 128 = 180°, zero at 0.
+    HeadingU8, inner = u8, half_turn = 128, zero_offset = 0
+}
+
+define_heading! {
+    /// Heading as transmitted in layout `ObjectInfo`: a `u8` where 128 = 180°
+    /// **and the zero-point is offset** so that raw 128 = 0°
+    /// (`raw = (degrees + 180) * 256 / 360`). This is why it is a distinct type
+    /// from [`HeadingU8`] despite the identical scale.
+    ///
+    /// - 128 = 0° (forward), 192 = 90°, 0 = 180°, 64 = 270°.
+    ObjectHeading, inner = u8, half_turn = 128, zero_offset = 128
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{Decode, Encode};
 
     #[test]
-    fn test_radians() {
-        assert_eq!(
-            Heading::from_radians(std::f64::consts::PI).to_degrees(),
-            180.0
-        );
+    fn test_headingu16_raw_roundtrip_exact() {
+        for raw in [0u16, 1, 16384, 32768, 49152, 65535] {
+            assert_eq!(HeadingU16::from_raw(raw).to_raw(), raw);
+        }
     }
 
     #[test]
-    fn test_degrees() {
-        assert!((Heading::from_degrees(180.0).to_radians() - std::f64::consts::PI).abs() < 0.001);
+    fn test_headingu16_degrees() {
+        assert_eq!(HeadingU16::from_raw(0).to_degrees(), 0.0);
+        assert_eq!(HeadingU16::from_raw(16384).to_degrees(), 90.0);
+        assert_eq!(HeadingU16::from_raw(32768).to_degrees(), 180.0);
+        assert_eq!(HeadingU16::from_degrees(90.0).to_raw(), 16384);
     }
 
     #[test]
-    fn test_zero() {
-        assert_eq!(Heading::ZERO.to_degrees(), 0.0);
-        assert_eq!(Heading::ZERO.to_radians(), 0.0);
+    fn test_headingu8_degrees() {
+        assert_eq!(HeadingU8::from_raw(0).to_degrees(), 0.0);
+        assert_eq!(HeadingU8::from_raw(64).to_degrees(), 90.0);
+        assert_eq!(HeadingU8::from_raw(128).to_degrees(), 180.0);
     }
 
     #[test]
-    fn test_roundtrip_degrees() {
-        let original = 45.0;
-        let direction = Heading::from_degrees(original);
-        assert!((direction.to_degrees() - original).abs() < 0.0001);
+    fn test_objectheading_offset() {
+        // raw 128 = 0°, 192 = 90°, 0 = 180°, 64 = 270°
+        assert_eq!(ObjectHeading::from_raw(128).to_degrees(), 0.0);
+        assert_eq!(ObjectHeading::from_raw(192).to_degrees(), 90.0);
+        assert_eq!(ObjectHeading::from_raw(0).to_degrees(), 180.0);
+        assert_eq!(ObjectHeading::from_raw(64).to_degrees(), 270.0);
+
+        // Encode side, including the 256 -> 0 wrap at 180°.
+        assert_eq!(ObjectHeading::from_degrees(0.0).to_raw(), 128);
+        assert_eq!(ObjectHeading::from_degrees(90.0).to_raw(), 192);
+        assert_eq!(ObjectHeading::from_degrees(180.0).to_raw(), 0);
+        assert_eq!(ObjectHeading::from_degrees(-90.0).to_raw(), 64);
     }
 
     #[test]
-    fn test_normalize_over_rotation() {
-        let over = Heading::from_degrees(450.0);
-        let normalized = over.normalize();
-        assert!((normalized.to_degrees() - 90.0).abs() < 0.0001);
+    fn test_raw_roundtrip_all_u8() {
+        // Every u8 must survive raw round-trip for both u8 heading types.
+        for raw in 0u8..=255 {
+            assert_eq!(HeadingU8::from_raw(raw).to_raw(), raw);
+            assert_eq!(ObjectHeading::from_raw(raw).to_raw(), raw);
+        }
     }
 
     #[test]
-    fn test_normalize_negative() {
-        let negative = Heading::from_degrees(-90.0);
-        let normalized = negative.normalize();
-        assert!((normalized.to_degrees() - 270.0).abs() < 0.0001);
+    fn test_opposite_exact() {
+        assert_eq!(HeadingU16::from_raw(0).opposite().to_raw(), 32768);
+        assert_eq!(HeadingU16::from_raw(32768).opposite().to_raw(), 0);
+        assert_eq!(HeadingU8::from_raw(10).opposite().to_raw(), 138);
+        // ObjectHeading 0° (raw 128) opposite is 180° (raw 0)
+        assert_eq!(ObjectHeading::from_raw(128).opposite().to_raw(), 0);
     }
 
     #[test]
-    fn test_normalize_already_normal() {
-        let normal = Heading::from_degrees(45.0);
-        let normalized = normal.normalize();
-        assert!((normalized.to_degrees() - 45.0).abs() < 0.0001);
+    fn test_cardinals() {
+        assert_eq!(HeadingU16::NORTH.to_degrees(), 0.0);
+        assert_eq!(HeadingU16::EAST.to_degrees(), 270.0);
+        assert_eq!(HeadingU16::SOUTH.to_degrees(), 180.0);
+        assert_eq!(HeadingU16::WEST.to_degrees(), 90.0);
+        assert_eq!(ObjectHeading::NORTH.to_raw(), 128);
+        assert_eq!(ObjectHeading::SOUTH.to_raw(), 0);
     }
 
     #[test]
-    fn test_normalize_zero() {
-        let zero = Heading::from_degrees(0.0);
-        let normalized = zero.normalize();
-        assert!((normalized.to_degrees() - 0.0).abs() < 0.0001);
+    fn test_default_is_zero_degrees() {
+        assert_eq!(HeadingU16::default().to_degrees(), 0.0);
+        assert_eq!(HeadingU8::default().to_degrees(), 0.0);
+        // ObjectHeading default must be 0° (raw 128), not raw 0 (which is 180°).
+        assert_eq!(ObjectHeading::default().to_raw(), 128);
+        assert_eq!(ObjectHeading::default().to_degrees(), 0.0);
     }
 
     #[test]
-    fn test_normalize_360() {
-        let full_rotation = Heading::from_degrees(360.0);
-        let normalized = full_rotation.normalize();
-        assert!((normalized.to_degrees() - 0.0).abs() < 0.0001);
-    }
-
-    #[test]
-    fn test_normalize_large_negative() {
-        let large_negative = Heading::from_degrees(-450.0);
-        let normalized = large_negative.normalize();
-        assert!((normalized.to_degrees() - 270.0).abs() < 0.0001);
-    }
-
-    #[test]
-    fn test_no_auto_normalize() {
-        // Verify that construction doesn't auto-normalize
-        let over = Heading::from_degrees(450.0);
-        assert!((over.to_degrees() - 450.0).abs() < 0.0001);
-    }
-
-    #[test]
-    fn test_from_u8_heading() {
-        // Test conversion from u8 heading using formula:
-        // heading_in_degrees = (heading * 360 / 256) - 180
-        let forward = Heading::from_objectinfo_wire(128);
-        assert!((forward.to_degrees() - 0.0).abs() < 0.0001);
-
-        let backward = Heading::from_objectinfo_wire(0);
-        // heading 0 gives -180, which is equivalent to 180 (differ by 360)
-        assert!((backward.to_degrees() - (-180.0)).abs() < 0.0001);
-
-        let left = Heading::from_objectinfo_wire(192);
-        assert!((left.to_degrees() - 90.0).abs() < 0.0001);
-
-        let right = Heading::from_objectinfo_wire(64);
-        assert!((right.to_degrees() - (-90.0)).abs() < 0.0001);
-    }
-
-    #[test]
-    fn test_to_u8_heading() {
-        // Test roundtrip conversion
-        let original = Heading::from_degrees(45.0);
-        let heading = original.to_objectinfo_wire();
-        let restored = Heading::from_objectinfo_wire(heading);
-        assert!((original.to_degrees() - restored.to_degrees()).abs() < 0.2);
-
-        // Test specific values using formula: Heading = (heading_in_degrees + 180) * 256 / 360
-        assert_eq!(Heading::from_degrees(0.0).to_objectinfo_wire(), 128);
-        // 180 wraps around: (180 + 180) * 256 / 360 = 256 -> 0
-        assert_eq!(Heading::from_degrees(180.0).to_objectinfo_wire(), 0);
-        assert_eq!(Heading::from_degrees(90.0).to_objectinfo_wire(), 192);
-        assert_eq!(Heading::from_degrees(-90.0).to_objectinfo_wire(), 64);
-    }
-
-    #[test]
-    fn test_cardinal_directions() {
-        assert!((Heading::NORTH.to_degrees() - 0.0).abs() < 0.0001);
-        assert!((Heading::EAST.to_degrees() - 270.0).abs() < 0.0001);
-        assert!((Heading::SOUTH.to_degrees() - 180.0).abs() < 0.0001);
-        assert!((Heading::WEST.to_degrees() - 90.0).abs() < 0.0001);
-    }
-
-    #[test]
-    fn test_opposite() {
-        let north = Heading::NORTH;
-        let south = north.opposite();
-        assert!((south.to_degrees() - 180.0).abs() < 0.0001);
-
-        let east = Heading::EAST;
-        let west = east.opposite().normalize();
-        assert!((west.to_degrees() - 90.0).abs() < 0.0001);
-    }
-
-    #[test]
-    fn test_opposite_roundtrip() {
-        let original = Heading::from_degrees(45.0);
-        let twice_opposite = original.opposite().opposite();
-        // Note: Heading doesn't auto-normalize, so opposite().opposite() adds 360
-        assert!((twice_opposite.to_degrees() - (original.to_degrees() + 360.0)).abs() < 0.0001);
-    }
-
-    #[test]
-    fn test_opposite_arbitrary_angle() {
-        let dir = Heading::from_degrees(123.45);
-        let opp = dir.opposite();
-        let expected = (123.45 + 180.0) % 360.0;
-        assert!((opp.to_degrees() - expected).abs() < 0.0001);
+    fn test_byte_roundtrip() {
+        for raw in [0u16, 123, 40000, 65535] {
+            let h = HeadingU16::from_raw(raw);
+            let bytes = h.to_bytes().unwrap();
+            assert_eq!(HeadingU16::decode_slice(&bytes).unwrap(), h);
+        }
+        for raw in [0u8, 1, 128, 255] {
+            let h = ObjectHeading::from_raw(raw);
+            let bytes = h.to_bytes().unwrap();
+            assert_eq!(ObjectHeading::decode_slice(&bytes).unwrap(), h);
+        }
     }
 }

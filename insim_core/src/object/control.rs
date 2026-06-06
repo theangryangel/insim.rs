@@ -1,7 +1,7 @@
 //! Control objects
 
 use crate::{
-    heading::Heading,
+    heading::ObjectHeading,
     object::{ObjectCoordinate, ObjectInfoInner, Raw},
 };
 
@@ -14,8 +14,8 @@ pub struct Control {
     pub xyz: ObjectCoordinate,
     /// Kind of Control Object
     pub kind: ControlKind,
-    /// Heading
-    pub heading: Heading,
+    /// ObjectHeading
+    pub heading: ObjectHeading,
     /// Floating?
     pub floating: bool,
 }
@@ -23,7 +23,7 @@ pub struct Control {
 impl Control {
     pub(super) fn new(raw: Raw) -> Result<Self, crate::DecodeError> {
         let xyz = raw.xyz;
-        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let heading = ObjectHeading::from_raw(raw.heading);
         let position_bits = raw.flags & 0b11;
         let half_width = (raw.flags >> 2) & 0b11111;
         let floating = raw.raw_floating();
@@ -65,11 +65,11 @@ impl ObjectInfoInner for Control {
         flags
     }
 
-    fn heading_mut(&mut self) -> Option<&mut Heading> {
+    fn heading_mut(&mut self) -> Option<&mut ObjectHeading> {
         Some(&mut self.heading)
     }
 
-    fn heading(&self) -> Option<Heading> {
+    fn heading(&self) -> Option<ObjectHeading> {
         Some(self.heading)
     }
 
@@ -82,7 +82,7 @@ impl ObjectInfoInner for Control {
     }
 
     fn heading_objectinfo_wire(&self) -> u8 {
-        self.heading.to_objectinfo_wire()
+        self.heading.to_raw()
     }
 }
 

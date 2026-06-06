@@ -1,5 +1,5 @@
 use insim_core::{
-    Decode, DecodeContext, Encode, EncodeContext, heading::Heading, object::ObjectCoordinate,
+    Decode, DecodeContext, Encode, EncodeContext, heading::ObjectHeading, object::ObjectCoordinate,
 };
 
 use crate::identifiers::{ConnectionId, PlayerId, RequestId};
@@ -37,7 +37,7 @@ pub enum JrrStartPosition {
         /// Position
         xyz: ObjectCoordinate,
         /// Heading / Direction
-        heading: Heading,
+        heading: ObjectHeading,
     },
 }
 
@@ -56,7 +56,7 @@ impl Decode for JrrStartPosition {
         } else {
             Ok(Self::Custom {
                 xyz: ObjectCoordinate { x, y, z },
-                heading: Heading::from_objectinfo_wire(heading),
+                heading: ObjectHeading::from_raw(heading),
             })
         }
     }
@@ -72,7 +72,7 @@ impl Encode for JrrStartPosition {
                 ctx.encode("z", &xyz.z)?;
                 ctx.encode("flags", &0x80u8)?;
                 ctx.encode("index", &0u8)?;
-                ctx.encode("heading", &heading.to_objectinfo_wire())?;
+                ctx.encode("heading", &heading.to_raw())?;
             },
         };
         Ok(())

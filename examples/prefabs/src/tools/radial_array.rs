@@ -1,6 +1,6 @@
 use anyhow::{Result, ensure};
 use glam::{DMat2, DVec2};
-use insim::{core::heading::Heading, insim::ObjectInfo};
+use insim::{core::heading::ObjectHeading, insim::ObjectInfo};
 
 /// Arrange `count` copies of `selection` evenly around a circle.
 ///
@@ -61,7 +61,7 @@ pub fn build(
             p.y = crate::clamp_i16((placed.y * 16.0).round() as i32);
 
             if let Some(heading) = new_obj.heading_mut() {
-                *heading = Heading::from_radians(heading.to_radians() + angle);
+                *heading = ObjectHeading::from_radians(heading.to_radians() + angle);
             }
 
             result.push(new_obj);

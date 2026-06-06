@@ -12,8 +12,8 @@ use std::fmt;
 ///
 /// - `from_wire_i16` / `to_wire_i16` use the LFS scaling (16384 = 360°/s).
 /// - Positive values indicate clockwise rotation when viewed from above.
-/// - Stored as `f32` radians/sec for consistency with [`Heading`](crate::heading::Heading)
-///   and [`SpeedF32`](crate::speed::SpeedF32).
+/// - Stored as `f32` radians/sec for consistency with
+///   [`HeadingU16`](crate::heading::HeadingU16) and [`SpeedF32`](crate::speed::SpeedF32).
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]

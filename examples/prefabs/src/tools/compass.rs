@@ -1,6 +1,8 @@
-use insim::{Colour, core::heading::Heading};
+use insim::Colour;
 
-pub fn generate(heading: Heading, width: usize) -> String {
+/// Render a scrolling compass tape centred on `degrees` (any range; wrapped to
+/// `[0, 360)` internally).
+pub fn generate(degrees: f64, width: usize) -> String {
     if width == 0 {
         return String::new();
     }
@@ -19,7 +21,7 @@ pub fn generate(heading: Heading, width: usize) -> String {
     }
 
     let tape_len = tape.len();
-    let degrees = heading.normalize().to_degrees();
+    let degrees = degrees.rem_euclid(360.0);
 
     // map degrees to the tape index
     // total indices = 8 labels + (8 * 4 dashes) = 40 total points
