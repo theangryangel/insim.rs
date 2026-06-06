@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use insim::{
-    core::heading::Heading,
+    core::heading::{HeadingU16, ObjectHeading},
     identifiers::{PlayerId, RequestId},
     insim::{Cpp, ObjectInfo, StaFlags},
 };
@@ -19,8 +19,9 @@ pub fn get_top_down_view(selection: &[ObjectInfo], last_cpp: &Cpp) -> Option<Cpp
     cpp.pos.z = (100.0 * 65536.0) as i32;
 
     // Look down
-    // Heading matches object heading
-    cpp.h = target.heading().unwrap_or(Heading::NORTH);
+    // Heading matches object heading (ObjectHeading -> HeadingU16 via degrees)
+    let target_degrees = target.heading().map(|h| h.to_degrees()).unwrap_or(0.0);
+    cpp.h = HeadingU16::from_degrees(target_degrees);
     // Pitch 90 degrees down. 65536 = 360 deg. 90 deg = 16384.
     cpp.p = 16384;
     cpp.r = 0;
@@ -37,7 +38,7 @@ pub fn get_top_down_view(selection: &[ObjectInfo], last_cpp: &Cpp) -> Option<Cpp
 pub fn get_side_view(selection: &[ObjectInfo], last_cpp: &Cpp) -> Option<Cpp> {
     let target = get_target(selection)?;
     let pos_m = target.position().xyz_metres();
-    let heading = target.heading().unwrap_or(Heading::NORTH);
+    let heading = target.heading().unwrap_or(ObjectHeading::NORTH);
 
     // Place camera 90 degrees to the left of the object heading, 5m away
     // Heading + 90 degrees
@@ -52,7 +53,7 @@ pub fn get_side_view(selection: &[ObjectInfo], last_cpp: &Cpp) -> Option<Cpp> {
     let cam_z = pos_m.2 as f64; // Align to height of object
 
     // Camera look direction: Look back at object.
-    let cam_h = Heading::from_radians(heading.to_radians() - std::f64::consts::FRAC_PI_2);
+    let cam_h = HeadingU16::from_radians(heading.to_radians() - std::f64::consts::FRAC_PI_2);
 
     let mut cpp = Cpp::default();
     cpp.reqi = RequestId(0);

@@ -1,7 +1,7 @@
 //! Speed hump 10m object
 use crate::{
     DecodeError,
-    heading::Heading,
+    heading::ObjectHeading,
     object::{ObjectCoordinate, ObjectInfoInner, Raw},
 };
 
@@ -12,8 +12,8 @@ use crate::{
 pub struct SpeedHump {
     /// Position
     pub xyz: ObjectCoordinate,
-    /// Heading / Direction
-    pub heading: Heading,
+    /// ObjectHeading / Direction
+    pub heading: ObjectHeading,
     /// Colour (3 bits, 0-7)
     pub colour: u8,
     /// Mapping (4 bits, 0-15)
@@ -25,7 +25,7 @@ pub struct SpeedHump {
 impl SpeedHump {
     pub(super) fn new(raw: Raw) -> Result<Self, DecodeError> {
         let xyz = raw.xyz;
-        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let heading = ObjectHeading::from_raw(raw.heading);
         let colour = raw.raw_colour();
         let mapping = raw.raw_mapping();
         let floating = raw.raw_floating();
@@ -48,11 +48,11 @@ impl ObjectInfoInner for SpeedHump {
         flags
     }
 
-    fn heading_mut(&mut self) -> Option<&mut Heading> {
+    fn heading_mut(&mut self) -> Option<&mut ObjectHeading> {
         Some(&mut self.heading)
     }
 
-    fn heading(&self) -> Option<Heading> {
+    fn heading(&self) -> Option<ObjectHeading> {
         Some(self.heading)
     }
 
@@ -65,6 +65,6 @@ impl ObjectInfoInner for SpeedHump {
     }
 
     fn heading_objectinfo_wire(&self) -> u8 {
-        self.heading.to_objectinfo_wire()
+        self.heading.to_raw()
     }
 }

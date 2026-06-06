@@ -3,14 +3,11 @@ use std::time::Duration;
 use bitflags::bitflags;
 use insim_core::{
     Decode, DecodeContext, Encode, EncodeContext,
-    heading::Heading,
+    heading::HeadingU8,
     speed::{ClosingSpeed, SpeedU8},
 };
 
 use crate::identifiers::{PlayerId, RequestId};
-
-/// CarContact direction scale: 128 units = 180°
-const CARCONTACT_DEGREES_PER_UNIT: f64 = 180.0 / 128.0;
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
@@ -45,10 +42,10 @@ impl_bitflags_from_to_bytes!(ObhFlags, u8);
 /// Contact details used by collision reports.
 pub struct CarContact {
     /// Direction of motion.
-    pub direction: Heading,
+    pub direction: HeadingU8,
 
     /// Car facing direction.
-    pub heading: Heading,
+    pub heading: HeadingU8,
 
     /// Speed.
     pub speed: SpeedU8,
@@ -65,11 +62,8 @@ pub struct CarContact {
 
 impl Decode for CarContact {
     fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
-        let direction_raw = ctx.decode::<u8>("direction_raw")?;
-        let direction = Heading::from_degrees((direction_raw as f64) * CARCONTACT_DEGREES_PER_UNIT);
-
-        let heading_raw = ctx.decode::<u8>("heading_raw")?;
-        let heading = Heading::from_degrees((heading_raw as f64) * CARCONTACT_DEGREES_PER_UNIT);
+        let direction = ctx.decode::<HeadingU8>("direction")?;
+        let heading = ctx.decode::<HeadingU8>("heading")?;
 
         let speed = ctx.decode::<SpeedU8>("speed")?;
         let z = ctx.decode::<u8>("z")?;
@@ -88,15 +82,8 @@ impl Decode for CarContact {
 
 impl Encode for CarContact {
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
-        let direction_units = (self.direction.to_degrees() / CARCONTACT_DEGREES_PER_UNIT)
-            .round()
-            .clamp(0.0, 255.0) as u8;
-        ctx.encode("direction", &direction_units)?;
-
-        let heading_units = (self.heading.to_degrees() / CARCONTACT_DEGREES_PER_UNIT)
-            .round()
-            .clamp(0.0, 255.0) as u8;
-        ctx.encode("heading", &heading_units)?;
+        ctx.encode("direction", &self.direction)?;
+        ctx.encode("heading", &self.heading)?;
 
         ctx.encode("speed", &self.speed)?;
         ctx.encode("z", &self.z)?;

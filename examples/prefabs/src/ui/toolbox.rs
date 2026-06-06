@@ -1,5 +1,5 @@
 use insim::{
-    core::heading::Heading,
+    core::heading::ObjectHeading,
     insim::{BtnStyle, ObjectInfo},
 };
 use insim_extra::{ui, ui::Component as _};
@@ -61,7 +61,7 @@ pub enum ToolboxMsg {
     GridLateralOffsetInput(String),
     BuildGrid,
     NudgeDistanceInput(String),
-    Nudge(Heading),
+    Nudge(ObjectHeading),
     JiggleSelection,
     ToggleTopDown,
     ToggleSideView,
@@ -386,7 +386,7 @@ fn nudge_panel(nudge_distance_metres: f64) -> ui::Node<ToolboxMsg> {
             .h(5.)
     };
 
-    let nudge_cell = |label: &'static str, heading: Heading| {
+    let nudge_cell = |label: &'static str, heading: ObjectHeading| {
         ui::clickable(
             label,
             BtnStyle::style_interactive(),
@@ -414,23 +414,23 @@ fn nudge_panel(nudge_distance_metres: f64) -> ui::Node<ToolboxMsg> {
                 .flex()
                 .flex_row()
                 .with_child(blank_cell())
-                .with_child(nudge_cell("N", Heading::NORTH))
+                .with_child(nudge_cell("N", ObjectHeading::NORTH))
                 .with_child(blank_cell()),
         )
         .with_child(
             ui::container()
                 .flex()
                 .flex_row()
-                .with_child(nudge_cell("W", Heading::WEST))
+                .with_child(nudge_cell("W", ObjectHeading::WEST))
                 .with_child(blank_cell())
-                .with_child(nudge_cell("E", Heading::EAST)),
+                .with_child(nudge_cell("E", ObjectHeading::EAST)),
         )
         .with_child(
             ui::container()
                 .flex()
                 .flex_row()
                 .with_child(blank_cell())
-                .with_child(nudge_cell("S", Heading::SOUTH))
+                .with_child(nudge_cell("S", ObjectHeading::SOUTH))
                 .with_child(blank_cell()),
         )
 }

@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 
 use crate::{
     DecodeError, DecodeErrorKind,
-    heading::Heading,
+    heading::ObjectHeading,
     object::{ObjectCoordinate, ObjectInfoInner, Raw},
 };
 
@@ -277,8 +277,8 @@ pub struct Letters {
     pub colour: PaintColour,
     /// Character
     pub character: Character,
-    /// Heading / Direction
-    pub heading: Heading,
+    /// ObjectHeading / Direction
+    pub heading: ObjectHeading,
     /// Floating
     pub floating: bool,
 }
@@ -286,7 +286,7 @@ pub struct Letters {
 impl Letters {
     pub(super) fn new(raw: Raw) -> Result<Self, crate::DecodeError> {
         let xyz = raw.xyz;
-        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let heading = ObjectHeading::from_raw(raw.heading);
         let colour = PaintColour::from(raw.flags);
         let character = Character::try_from(raw.flags)?;
         let floating = raw.raw_floating();
@@ -310,11 +310,11 @@ impl ObjectInfoInner for Letters {
         flags
     }
 
-    fn heading_mut(&mut self) -> Option<&mut Heading> {
+    fn heading_mut(&mut self) -> Option<&mut ObjectHeading> {
         Some(&mut self.heading)
     }
 
-    fn heading(&self) -> Option<Heading> {
+    fn heading(&self) -> Option<ObjectHeading> {
         Some(self.heading)
     }
 
@@ -327,7 +327,7 @@ impl ObjectInfoInner for Letters {
     }
 
     fn heading_objectinfo_wire(&self) -> u8 {
-        self.heading.to_objectinfo_wire()
+        self.heading.to_raw()
     }
 }
 
@@ -380,8 +380,8 @@ pub struct Arrows {
     pub colour: PaintColour,
     /// Arrow
     pub arrow: Arrow,
-    /// Heading / Direction
-    pub heading: Heading,
+    /// ObjectHeading / Direction
+    pub heading: ObjectHeading,
     /// Floating
     pub floating: bool,
 }
@@ -389,7 +389,7 @@ pub struct Arrows {
 impl Arrows {
     pub(super) fn new(raw: Raw) -> Result<Self, crate::DecodeError> {
         let xyz = raw.xyz;
-        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let heading = ObjectHeading::from_raw(raw.heading);
         let colour = PaintColour::from(raw.flags);
         let arrow = Arrow::try_from(raw.flags)?;
         let floating = raw.raw_floating();
@@ -413,11 +413,11 @@ impl ObjectInfoInner for Arrows {
         flags
     }
 
-    fn heading_mut(&mut self) -> Option<&mut Heading> {
+    fn heading_mut(&mut self) -> Option<&mut ObjectHeading> {
         Some(&mut self.heading)
     }
 
-    fn heading(&self) -> Option<Heading> {
+    fn heading(&self) -> Option<ObjectHeading> {
         Some(self.heading)
     }
 
@@ -430,6 +430,6 @@ impl ObjectInfoInner for Arrows {
     }
 
     fn heading_objectinfo_wire(&self) -> u8 {
-        self.heading.to_objectinfo_wire()
+        self.heading.to_raw()
     }
 }

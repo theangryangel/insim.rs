@@ -1,6 +1,6 @@
 //! Cone1 objects
 use crate::{
-    heading::Heading,
+    heading::ObjectHeading,
     object::{ObjectCoordinate, ObjectInfoInner, Raw},
 };
 
@@ -38,8 +38,8 @@ pub struct Chevron {
     pub xyz: ObjectCoordinate,
     /// Colour
     pub colour: ChevronColour,
-    /// Heading / Direction
-    pub heading: Heading,
+    /// ObjectHeading / Direction
+    pub heading: ObjectHeading,
     /// Floating
     pub floating: bool,
 }
@@ -47,7 +47,7 @@ pub struct Chevron {
 impl Chevron {
     pub(super) fn new(raw: Raw) -> Result<Self, crate::DecodeError> {
         let xyz = raw.xyz;
-        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let heading = ObjectHeading::from_raw(raw.heading);
         let colour = ChevronColour::from(raw.raw_colour());
         let floating = raw.raw_floating();
         Ok(Self {
@@ -68,11 +68,11 @@ impl ObjectInfoInner for Chevron {
         flags
     }
 
-    fn heading_mut(&mut self) -> Option<&mut Heading> {
+    fn heading_mut(&mut self) -> Option<&mut ObjectHeading> {
         Some(&mut self.heading)
     }
 
-    fn heading(&self) -> Option<Heading> {
+    fn heading(&self) -> Option<ObjectHeading> {
         Some(self.heading)
     }
 
@@ -85,6 +85,6 @@ impl ObjectInfoInner for Chevron {
     }
 
     fn heading_objectinfo_wire(&self) -> u8 {
-        self.heading.to_objectinfo_wire()
+        self.heading.to_raw()
     }
 }

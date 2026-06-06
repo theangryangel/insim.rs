@@ -4,15 +4,12 @@ use std::time::Duration;
 
 use insim_core::{
     Decode, DecodeContext, Encode, EncodeContext,
-    heading::Heading,
+    heading::HeadingU8,
     speed::{ClosingSpeed, SpeedU8},
 };
 
 use super::CompCarInfo;
 use crate::identifiers::{PlayerId, RequestId};
-
-/// ConInfo direction scale: 128 units = 180°
-const CONINFO_DEGREES_PER_UNIT: f64 = 180.0 / 128.0;
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -47,10 +44,10 @@ pub struct ConInfo {
     pub speed: SpeedU8,
 
     /// Direction of motion.
-    pub direction: Heading,
+    pub direction: HeadingU8,
 
     /// Car facing direction.
-    pub heading: Heading,
+    pub heading: HeadingU8,
 
     /// Longitudinal acceleration.
     pub accelf: u8,
@@ -86,11 +83,8 @@ impl Decode for ConInfo {
 
         let speed = ctx.decode::<SpeedU8>("speed")?;
 
-        let direction_raw = ctx.decode::<u8>("direction_raw")?;
-        let direction = Heading::from_degrees((direction_raw as f64) * CONINFO_DEGREES_PER_UNIT);
-
-        let heading_raw = ctx.decode::<u8>("heading_raw")?;
-        let heading = Heading::from_degrees((heading_raw as f64) * CONINFO_DEGREES_PER_UNIT);
+        let direction = ctx.decode::<HeadingU8>("direction")?;
+        let heading = ctx.decode::<HeadingU8>("heading")?;
 
         let accelf = ctx.decode::<u8>("accelf")?;
         let accelr = ctx.decode::<u8>("accelr")?;
@@ -181,15 +175,8 @@ impl Encode for ConInfo {
 
         ctx.encode("speed", &self.speed)?;
 
-        let direction_units = (self.direction.to_degrees() / CONINFO_DEGREES_PER_UNIT)
-            .round()
-            .clamp(0.0, 255.0) as u8;
-        ctx.encode("direction", &direction_units)?;
-
-        let heading_units = (self.heading.to_degrees() / CONINFO_DEGREES_PER_UNIT)
-            .round()
-            .clamp(0.0, 255.0) as u8;
-        ctx.encode("heading", &heading_units)?;
+        ctx.encode("direction", &self.direction)?;
+        ctx.encode("heading", &self.heading)?;
 
         ctx.encode("accelf", &self.accelf)?;
         ctx.encode("accelr", &self.accelr)?;

@@ -1,10 +1,14 @@
 use glam::DVec3;
 use insim::{
-    core::{heading::Heading, object::ObjectCoordinate},
+    core::{heading::ObjectHeading, object::ObjectCoordinate},
     insim::ObjectInfo,
 };
 
-pub fn nudge(selection: &[ObjectInfo], heading: Heading, distance_metres: f64) -> Vec<ObjectInfo> {
+pub fn nudge(
+    selection: &[ObjectInfo],
+    heading: ObjectHeading,
+    distance_metres: f64,
+) -> Vec<ObjectInfo> {
     let mut output = Vec::with_capacity(selection.len());
     let rads = heading.to_radians();
     let translation = DVec3::new(rads.sin(), -rads.cos(), 0.0) * distance_metres;

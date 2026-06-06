@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use glam::DVec3;
 use insim::{
-    core::{heading::Heading, object::ObjectCoordinate},
+    core::{heading::ObjectHeading, object::ObjectCoordinate},
     insim::ObjectInfo,
 };
 
@@ -28,7 +28,7 @@ pub fn build(
     let (lut, total_len) = spline::build_lut(&points, steps_per_segment, initial);
 
     let prototype = &selection[0];
-    let proto_heading = prototype.heading().unwrap_or(Heading::NORTH);
+    let proto_heading = prototype.heading().unwrap_or(ObjectHeading::NORTH);
 
     // generate spaced-out objects
     let num_objects = (total_len / spacing_meters).floor() as usize + 1;
