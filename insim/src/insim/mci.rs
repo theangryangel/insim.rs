@@ -1,6 +1,6 @@
 use bitflags::bitflags;
 use insim_core::{
-    Decode, DecodeContext, Encode, EncodeContext, angvel::AngVel, coordinate::Coordinate,
+    Decode, DecodeContext, Encode, EncodeContext, angvel::AngVelI16, coordinate::Coordinate,
     heading::HeadingU16, speed::SpeedU16,
 };
 
@@ -81,7 +81,7 @@ pub struct CompCar {
     pub heading: HeadingU16,
 
     /// Angular velocity of the car.
-    pub angvel: AngVel,
+    pub angvel: AngVelI16,
 }
 
 impl CompCar {
@@ -112,7 +112,7 @@ impl Decode for CompCar {
         let direction = ctx.decode::<HeadingU16>("direction")?;
         let heading = ctx.decode::<HeadingU16>("heading")?;
 
-        let angvel = AngVel::from_wire_i16(ctx.decode::<i16>("angvel")?);
+        let angvel = ctx.decode::<AngVelI16>("angvel")?;
         Ok(Self {
             node,
             lap,
@@ -142,7 +142,7 @@ impl Encode for CompCar {
         ctx.encode("direction", &self.direction)?;
         ctx.encode("heading", &self.heading)?;
 
-        ctx.encode("angvel", &self.angvel.to_wire_i16())?;
+        ctx.encode("angvel", &self.angvel)?;
         Ok(())
     }
 }
