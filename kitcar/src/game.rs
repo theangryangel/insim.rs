@@ -64,7 +64,7 @@ impl<S> FromContext<S> for Game {
     }
 }
 
-/// [`Handler`] impl delegates to [`Game::apply_events`] and emits each
+/// [`Handler`] impl delegates to [`Game::apply_packet`] and emits each
 /// change as a typed synthetic event. Register at [`crate::Stage::Pre`] so the
 /// game-state mirror is settled before Update-stage handlers read it.
 ///
@@ -74,7 +74,7 @@ impl<S> FromContext<S> for Game {
 impl<S: Send + Sync + 'static> Handler<(), S> for Game {
     fn call(self, cx: &ExtractCx<'_, S>) -> impl Future<Output = Result<(), AppError>> + Send {
         let events = if let Dispatch::Packet(p) = cx.dispatch {
-            self.apply_events(p)
+            self.apply_packet(p)
         } else {
             vec![]
         };

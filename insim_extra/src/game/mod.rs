@@ -1,14 +1,14 @@
 //! [`Game`] mirrors game state from a bare `insim` packet stream.
 //!
 //! Host commands return [`insim::Packet`] values; multi-packet commands return
-//! [`Vec<insim::Packet>`]. Feed packets with [`apply`](Game::apply) (state only) or
-//! [`apply_events`](Game::apply_events) (state + change events).
+//! [`Vec<insim::Packet>`]. Feed packets with [`apply_packet`](Game::apply_packet)
+//! to update state and collect change events.
 //!
 //! ```ignore
 //! let game = Game::new();
 //!
 //! while let Some(packet) = conn.next().await {
-//!     for event in game.apply_events(&packet) {
+//!     for event in game.apply_packet(&packet) {
 //!         match event {
 //!             GameEvent::RaceStarted => println!("race started!"),
 //!             GameEvent::TrackChanged { to, .. } => println!("track: {to}"),
@@ -18,20 +18,16 @@
 //! }
 //! ```
 
+mod commands;
 use std::{sync::Arc, time::Duration};
 
+pub use commands::{GridMode, Month, TimeDemoPreset, TimeSet};
 use insim::{
-    core::{track::Track, vehicle::Vehicle, wind::Wind},
-    identifiers::ConnectionId,
-    insim::{
-        Axi, Ism, Mal, Plc, PlcAllowedCarsSet, RaceFlags, RaceInProgress, RaceLaps, Rst, Sta,
-        StaFlags, Tiny, TinyType,
-    },
+    core::{track::Track, wind::Wind},
+    insim::{Axi, Ism, RaceFlags, RaceInProgress, RaceLaps, Rst, Sta, StaFlags, Tiny, TinyType},
 };
 use parking_lot::RwLock;
 use tokio_util::sync::CancellationToken;
-
-use crate::util::host_command;
 
 /// High-level description of the current LFS session.
 #[derive(Debug, Default, Clone)]
@@ -128,7 +124,7 @@ impl GameInfo {
     }
 }
 
-/// State-change events produced by [`Game::apply_events`].
+/// State-change events produced by [`Game::apply_packet`].
 ///
 /// Standalone users pattern-match this directly. `kitcar` users receive
 /// individual typed events via `Event<T>` extractors.
@@ -169,7 +165,7 @@ pub enum GameEvent {
 /// Mirrors game state from a stream of `insim` packets.
 #[derive(Clone)]
 pub struct Game {
-    inner: Arc<RwLock<GameInfo>>,
+    pub(crate) inner: Arc<RwLock<GameInfo>>,
 }
 
 impl Default for Game {
@@ -195,108 +191,6 @@ impl Game {
     /// Snapshot of the current game state.
     pub fn get(&self) -> GameInfo {
         self.inner.read().clone()
-    }
-
-    /// `/end` - finish the current race.
-    pub fn end(&self) -> insim::Packet {
-        host_command("/end")
-    }
-
-    /// `/clear` - remove all connections from the server.
-    pub fn clear(&self) -> insim::Packet {
-        host_command("/clear")
-    }
-
-    /// `/track {track}` - load a different track.
-    pub fn change_track(&self, track: Track) -> insim::Packet {
-        host_command(format!("/track {track}"))
-    }
-
-    /// Change race length. Maps onto `/laps`, `/hours`, or `/laps no`.
-    pub fn change_laps(&self, laps: RaceLaps) -> insim::Packet {
-        let cmd = match laps {
-            RaceLaps::Untimed => "/laps no".to_string(),
-            RaceLaps::Hours(h) => format!("/hours {h}"),
-            other => format!("/laps {}", Into::<u8>::into(other)),
-        };
-        host_command(cmd)
-    }
-
-    /// `/wind {wind}` - set wind strength (0..=2 typically).
-    pub fn change_wind(&self, wind: u8) -> insim::Packet {
-        host_command(format!("/wind {wind}"))
-    }
-
-    /// `/axclear` - clear the autocross layout.
-    pub fn ax_clear(&self) -> insim::Packet {
-        host_command("/axclear")
-    }
-
-    /// `/axload {layout}` - load an autocross layout by name.
-    pub fn ax_load(&self, layout: impl Into<String>) -> insim::Packet {
-        host_command(format!("/axload {}", layout.into()))
-    }
-
-    /// `/restart` - start a race.
-    pub fn restart(&self) -> insim::Packet {
-        host_command("/restart")
-    }
-
-    /// `/qualify` - start qualifying.
-    pub fn qualify(&self) -> insim::Packet {
-        host_command("/qualify")
-    }
-
-    /// `/reinit` - full restart, kicks all connections.
-    pub fn reinit(&self) -> insim::Packet {
-        host_command("/reinit")
-    }
-
-    /// `/weather {weather}` - set weather/lighting.
-    pub fn change_weather(&self, weather: u8) -> insim::Packet {
-        host_command(format!("/weather {weather}"))
-    }
-
-    /// `/qual {minutes}` - set qualifying duration. `0` = no qualifying.
-    pub fn change_qual(&self, minutes: u8) -> insim::Packet {
-        host_command(format!("/qual {minutes}"))
-    }
-
-    /// `/pit_all` - send every player to the pits.
-    pub fn pit_all(&self) -> insim::Packet {
-        host_command("/pit_all")
-    }
-
-    /// Apply vehicle restrictions server-wide (ucid = `ConnectionId::ALL`).
-    ///
-    /// Sends a `Plc` packet for standard cars and a `Mal` packet for mods.
-    /// Pass an empty slice to clear all restrictions.
-    pub fn restrict_vehicles(&self, vehicles: &[Vehicle]) -> Vec<insim::Packet> {
-        let mut mal = Mal::default();
-        let cars = if vehicles.is_empty() {
-            PlcAllowedCarsSet::all()
-        } else {
-            let mut cars = PlcAllowedCarsSet::default();
-            for v in vehicles {
-                match v {
-                    Vehicle::Mod(_) => {
-                        let _ = mal.insert(*v);
-                    },
-                    _ => {
-                        let _ = cars.insert(*v);
-                    },
-                }
-            }
-            cars
-        };
-        vec![
-            insim::Packet::from(Plc {
-                cars,
-                ucid: ConnectionId::ALL,
-                ..Plc::default()
-            }),
-            insim::Packet::from(mal),
-        ]
     }
 
     /// Poll `predicate` against the current state every `poll_interval`
@@ -403,14 +297,8 @@ impl Game {
         .await
     }
 
-    /// Apply one raw packet to the internal state mirror without returning
-    /// any events.
-    pub fn apply(&self, packet: &insim::Packet) {
-        let _ = self.apply_events(packet);
-    }
-
-    /// Apply one raw packet and return the resulting state-change events.
-    pub fn apply_events(&self, packet: &insim::Packet) -> Vec<GameEvent> {
+    /// Apply one raw packet, update internal state, and return any state-change events.
+    pub fn apply_packet(&self, packet: &insim::Packet) -> Vec<GameEvent> {
         match packet {
             insim::Packet::Sta(sta) => {
                 let (was_racing, now_racing, prev_track, new_track) = self.apply_sta(sta);

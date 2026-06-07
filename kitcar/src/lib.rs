@@ -78,6 +78,7 @@ mod error;
 mod game;
 mod penalty_clearer;
 mod presence;
+mod race;
 #[allow(missing_docs)]
 pub mod ui;
 pub mod util;
@@ -101,4 +102,8 @@ pub use penalty_clearer::PenaltyClearer;
 pub use presence::{
     Connected, ConnectionDetails, ConnectionInfo, Disconnected, PlayerInfo, PlayerJoined,
     PlayerLeft, PlayerTeleportedToPits, Presence, Renamed, TakingOver, VehicleSelected,
+};
+pub use race::{
+    DriverRecord, EntrantId, EntrantState, FinishStatus, LapRecord, PitRecord, RaceEvent,
+    RaceTracker,
 };
