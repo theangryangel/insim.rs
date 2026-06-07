@@ -21,3 +21,4 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 fixedbitset = { workspace = true }
 taffy = "0.10"
+multi_index_map = "0.15"

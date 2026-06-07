@@ -357,12 +357,10 @@ impl Decode for Btn {
             ctx.buf.advance(1);
 
             // find the caption ending
-            let split = if let Some(split) = ctx.buf.iter().position(|c| c == &0_u8) {
-                split
-            } else {
-                return Err(DecodeErrorKind::ExpectedNull
-                    .context("Btn: Expected caption but found no \0 in text field"));
-            };
+            let split = ctx.buf.iter().position(|c| c == &0_u8).ok_or_else(|| {
+                DecodeErrorKind::ExpectedNull
+                    .context("Btn: Expected caption but found no \0 in text field")
+            })?;
 
             let caption = ctx.buf.split_to(split);
             let caption = insim_core::string::codepages::to_lossy_string(&caption);

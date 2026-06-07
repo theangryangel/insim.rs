@@ -430,7 +430,7 @@ impl Game {
                 events
             },
             insim::Packet::Axi(axi) => {
-                let ((_, prev_lname), (_, new_lname)) = self.apply_axi(axi);
+                let (prev_lname, new_lname) = self.apply_axi(axi);
                 if prev_lname != new_lname {
                     vec![GameEvent::LayoutChanged {
                         from: prev_lname,
@@ -452,22 +452,16 @@ impl Game {
                     MultiplayerState::Local => vec![GameEvent::MultiplayerLeft],
                 }
             },
-            insim::Packet::Tiny(tiny) => {
-                if let Some(prev) = self.apply_tiny_axc(tiny) {
-                    if prev.is_some() {
-                        vec![GameEvent::LayoutChanged {
-                            from: prev,
-                            to: None,
-                        }]
-                    } else {
-                        vec![]
-                    }
-                } else {
-                    vec![]
-                }
-            },
+            insim::Packet::Tiny(tiny) => self
+                .apply_tiny_axc(tiny)
+                .map(|prev| GameEvent::LayoutChanged {
+                    from: Some(prev),
+                    to: None,
+                })
+                .into_iter()
+                .collect(),
             insim::Packet::Rst(rst) => {
-                let _ = self.apply_rst(rst);
+                self.apply_rst(rst);
                 vec![]
             },
             _ => vec![],
@@ -498,12 +492,12 @@ impl Game {
         (was_racing, now_racing, prev_track, sta.track)
     }
 
-    fn apply_rst(&self, rst: &Rst) -> u64 {
+    fn apply_rst(&self, rst: &Rst) {
         // Solicited replies (reqi != 0) echo stale data and must not overwrite
         // the authoritative state set by Sta. Only unsolicited Rst packets
         // (reqi == 0, sent when a race genuinely starts) update state.
         if rst.reqi.0 != 0 {
-            return self.inner.read().rst_count;
+            return;
         }
         let mut g = self.inner.write();
         g.track = Some(rst.track);
@@ -521,16 +515,14 @@ impl Game {
             }
         };
         g.rst_count = g.rst_count.wrapping_add(1);
-        g.rst_count
     }
 
-    fn apply_axi(&self, axi: &Axi) -> ((u64, Option<String>), (u64, Option<String>)) {
+    fn apply_axi(&self, axi: &Axi) -> (Option<String>, Option<String>) {
         let mut g = self.inner.write();
-        let prev = (g.axi_count, g.layout.clone());
+        let prev = g.layout.clone();
         g.layout = axi.lname.clone();
         g.axi_count = g.axi_count.wrapping_add(1);
-        let current = (g.axi_count, axi.lname.clone());
-        (prev, current)
+        (prev, axi.lname.clone())
     }
 
     fn apply_ism(&self, ism: &Ism) -> (MultiplayerState, MultiplayerState) {
@@ -547,13 +539,11 @@ impl Game {
         (prev, g.multiplayer.clone())
     }
 
-    fn apply_tiny_axc(&self, tiny: &Tiny) -> Option<Option<String>> {
+    fn apply_tiny_axc(&self, tiny: &Tiny) -> Option<String> {
         if !matches!(tiny.subt, TinyType::Axc) {
             return None;
         }
         let mut g = self.inner.write();
-        let prev = g.layout.clone();
-        g.layout = None;
-        Some(prev)
+        g.layout.take()
     }
 }
