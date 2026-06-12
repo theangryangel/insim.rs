@@ -3,7 +3,7 @@
 
 use std::future::Future;
 
-use insim::{WithRequestId, identifiers::RequestId, insim::TinyType};
+use insim::{WithRequestId, identifiers::RequestId};
 pub use insim_extra::race::{
     DriverRecord, EntrantId, EntrantState, FinishStatus, LapRecord, PitRecord, RaceEvent,
     RaceTracker,
@@ -11,7 +11,7 @@ pub use insim_extra::race::{
 
 use crate::{
     AppError, Dispatch, ExtractCx, FromContext, Handler,
-    game::{SessionEnded, SessionKind, SessionStarted},
+    game::{SessionEnded, SessionStarted},
     presence::{Connected, Disconnected, PlayerJoined, PlayerLeft, Renamed, TakingOver},
 };
 
@@ -72,9 +72,8 @@ impl<S> FromContext<S> for RaceTracker {
 impl<S: Send + Sync + 'static> Handler<(), S> for RaceTracker {
     fn call(self, cx: &ExtractCx<'_, S>) -> impl Future<Output = Result<(), AppError>> + Send {
         // Set when a session just started so the freshly-cleared tracker can be
-        // repopulated by re-requesting the player list (and, for sessions with a
-        // grid, the grid order).
-        let mut resync: Option<SessionKind> = None;
+        // repopulated by re-requesting the player list and grid order.
+        let mut resync = false;
         let events = match cx.dispatch {
             Dispatch::Packet(p) => self.apply_packet(p),
             Dispatch::Synthetic(s) => {
@@ -94,7 +93,7 @@ impl<S: Send + Sync + 'static> Handler<(), S> for RaceTracker {
                 } else if let Some(ev) = s.downcast_ref::<TakingOver>() {
                     self.apply_taking_over(&ev.before, &ev.after)
                 } else if let Some(ev) = s.downcast_ref::<SessionStarted>() {
-                    resync = Some(ev.kind);
+                    resync = true;
                     self.apply_session_started(ev.kind)
                 } else if s.downcast_ref::<SessionEnded>().is_some() {
                     self.apply_race_ended();
@@ -106,12 +105,11 @@ impl<S: Send + Sync + 'static> Handler<(), S> for RaceTracker {
         };
         let sender = cx.sender.clone();
         async move {
-            if let Some(kind) = resync {
+            if resync {
                 // LFS does not push these on session start, so request them to
                 // rebuild the entrant list that `apply_session_started` cleared.
-                let _ = sender.packet(TinyType::Npl.with_request_id(RequestId(1)));
-                if matches!(kind, SessionKind::Race | SessionKind::Qualifying) {
-                    let _ = sender.packet(TinyType::Reo.with_request_id(RequestId(1)));
+                for t in RaceTracker::SESSION_REQUESTS {
+                    let _ = sender.packet(t.clone().with_request_id(RequestId(1)));
                 }
             }
             for event in events {

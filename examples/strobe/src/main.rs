@@ -22,8 +22,8 @@ struct Cli {
 
 /// One step in the light sequence.
 ///
-/// `flags` is a `|`-separated list of [`LclFlags`] names, e.g.
-/// `SIGNAL_LEFT | LIGHT_OFF | FOG_FRONT_OFF | FOG_REAR_OFF`.
+/// `flags` is a YAML sequence of [`LclFlags`] names, e.g.
+/// `[SIGNAL_LEFT, LIGHT_OFF, FOG_FRONT_OFF, FOG_REAR_OFF]`.
 #[derive(Deserialize)]
 struct StepConfig {
     duration_ms: u64,
@@ -61,7 +61,7 @@ pub async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Read and parse the YAML sequence file. LclFlags deserialises from a
-    // `|`-separated string of flag names via the bitflags serde integration.
+    // sequence of flag-name strings via the bitflags serde integration.
     let content = std::fs::read_to_string(&cli.file)?;
     let config: Config = serde_norway::from_str(&content)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;

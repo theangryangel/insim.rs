@@ -38,7 +38,7 @@ pub use event::RaceEvent;
 use insim::{
     Packet,
     identifiers::{ConnectionId, PlayerId},
-    insim::{Fin, Lap, Pen, PenaltyInfo, Pit, Plp, Psf, Reo, Res, Spx},
+    insim::{Fin, Lap, Pen, PenaltyInfo, Pit, Plp, Psf, Reo, Res, Spx, TinyType},
 };
 use parking_lot::RwLock;
 
@@ -110,6 +110,12 @@ impl std::fmt::Debug for RaceTracker {
 }
 
 impl RaceTracker {
+    /// Tiny requests to re-send on each [`RaceEvent::SessionStarted`] so the
+    /// cleared entrant list is rebuilt (`Npl`) and the starting grid order is
+    /// fetched (`Reo`). Requesting `Reo` in a practice/untimed session is
+    /// harmless - LFS replies with no grid and it is ignored.
+    pub const SESSION_REQUESTS: &[TinyType] = &[TinyType::Npl, TinyType::Reo];
+
     /// Create a new tracker with empty state.
     pub fn new() -> Self {
         Self::default()

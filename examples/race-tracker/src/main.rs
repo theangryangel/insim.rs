@@ -16,7 +16,7 @@
 #![allow(missing_docs)]
 
 use clap::Parser;
-use insim::{WithRequestId, insim::TinyType};
+use insim::WithRequestId;
 use insim_extra::{
     game::{Game, GameEvent},
     presence::Presence,
@@ -56,12 +56,14 @@ async fn main() -> insim::Result<()> {
     let mut conn = builder.connect_async().await?;
     tracing::info!("connected");
 
-    // Request current connection, player, session state, and grid order from
-    // LFS. LFS does not send these automatically on connect.
-    conn.write(TinyType::Ncn.with_request_id(1)).await?;
-    conn.write(TinyType::Npl.with_request_id(2)).await?;
-    conn.write(TinyType::Sst.with_request_id(3)).await?;
-    conn.write(TinyType::Reo.with_request_id(4)).await?;
+    // Request current state from LFS (not sent automatically on connect). Each
+    // tracker declares the packets it needs, so we just send those lists.
+    for t in Presence::STARTUP_REQUESTS {
+        conn.write(t.clone().with_request_id(1)).await?;
+    }
+    for t in Game::STARTUP_REQUESTS {
+        conn.write(t.clone().with_request_id(1)).await?;
+    }
 
     let presence = Presence::new();
     let game = Game::new();
@@ -83,10 +85,11 @@ async fn main() -> insim::Result<()> {
             match event {
                 GameEvent::SessionStarted { kind } => {
                     tracing::info!(?kind, "session started");
-                    // The tracker just cleared - re-request players and grid
-                    // order so it repopulates for the new session.
-                    conn.write(TinyType::Npl.with_request_id(2)).await?;
-                    conn.write(TinyType::Reo.with_request_id(4)).await?;
+                    // The tracker just cleared - re-request its packets so it
+                    // repopulates for the new session.
+                    for t in RaceTracker::SESSION_REQUESTS {
+                        conn.write(t.clone().with_request_id(1)).await?;
+                    }
                 },
                 GameEvent::SessionEnded => {
                     tracing::info!("session ended");

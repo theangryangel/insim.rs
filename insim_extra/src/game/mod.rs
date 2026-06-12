@@ -288,6 +288,20 @@ impl std::fmt::Debug for Game {
 }
 
 impl Game {
+    /// Tiny requests to send once on connect to sync game/session state,
+    /// allowed cars, and allowed mods. LFS does not send these automatically.
+    pub const STARTUP_REQUESTS: &[TinyType] = &[
+        TinyType::Sst,
+        TinyType::Axi,
+        TinyType::Ism,
+        TinyType::Alc,
+        TinyType::Mal,
+    ];
+
+    /// Tiny requests to re-send on each [`GameEvent::SessionStarted`], since a
+    /// new session can change the allowed cars/mods.
+    pub const SESSION_REQUESTS: &[TinyType] = &[TinyType::Alc, TinyType::Mal];
+
     /// Create a new game mirror with empty state.
     pub fn new() -> Self {
         Self {

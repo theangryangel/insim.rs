@@ -154,6 +154,10 @@ impl std::fmt::Debug for Presence {
 }
 
 impl Presence {
+    /// Tiny requests to send once on connect to sync the current connection
+    /// and player lists. LFS does not send these automatically on connect.
+    pub const STARTUP_REQUESTS: &[TinyType] = &[TinyType::Ncn, TinyType::Npl];
+
     /// Create a new presence tracker with empty state.
     pub fn new() -> Self {
         Self::default()

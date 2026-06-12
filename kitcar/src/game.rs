@@ -8,7 +8,7 @@ use insim::{
     WithRequestId,
     core::{game_version::GameVersion, track::Track, vehicle::Vehicle},
     identifiers::{ConnectionId, RequestId},
-    insim::{PlcAllowedCarsSet, RaceLaps, TinyType},
+    insim::{PlcAllowedCarsSet, RaceLaps},
 };
 pub use insim_extra::game::{Game, GameEvent, GameInfo, SessionKind, SessionState, VersionInfo};
 use insim_extra::util::mtc;
@@ -121,13 +121,13 @@ impl<S: Send + Sync + 'static> Handler<(), S> for Game {
         let sender = cx.sender.clone();
         async move {
             if startup {
-                let _ = sender.packet(TinyType::Sst.with_request_id(RequestId(1)));
-                let _ = sender.packet(TinyType::Axi.with_request_id(RequestId(1)));
-                let _ = sender.packet(TinyType::Ism.with_request_id(RequestId(1)));
-            }
-            if startup || session_started {
-                let _ = sender.packet(TinyType::Alc.with_request_id(RequestId(1)));
-                let _ = sender.packet(TinyType::Mal.with_request_id(RequestId(1)));
+                for t in Game::STARTUP_REQUESTS {
+                    let _ = sender.packet(t.clone().with_request_id(RequestId(1)));
+                }
+            } else if session_started {
+                for t in Game::SESSION_REQUESTS {
+                    let _ = sender.packet(t.clone().with_request_id(RequestId(1)));
+                }
             }
             emit_game_events(events, &sender);
             Ok(())
