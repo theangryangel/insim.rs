@@ -6,24 +6,52 @@ use std::future::Future;
 
 use insim::{
     WithRequestId,
-    core::track::Track,
+    core::{game_version::GameVersion, track::Track, vehicle::Vehicle},
     identifiers::{ConnectionId, RequestId},
-    insim::{RaceLaps, TinyType},
+    insim::{PlcAllowedCarsSet, RaceLaps},
 };
-pub use insim_extra::game::{Game, GameEvent, GameInfo, SessionState};
+pub use insim_extra::game::{Game, GameEvent, GameInfo, SessionKind, SessionState, VersionInfo};
 use insim_extra::util::mtc;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 
 use crate::{AppError, Dispatch, ExtractCx, FromContext, Handler, Sender, Startup};
 
-/// Synthetic event emitted when the race transitions to racing.
+/// Synthetic event emitted when an `Rst` starts a new race, qualifying,
+/// practice or untimed session. This is the authoritative session-start signal.
 #[derive(Debug, Clone)]
-pub struct RaceStarted;
+pub struct SessionStarted {
+    /// Whether the session is a race, qualifying, practice or untimed.
+    pub kind: SessionKind,
+}
 
-/// Synthetic event emitted when the race transitions from racing to non-racing.
+/// Synthetic event emitted when LFS returns to the entry/lobby screen
+/// (`Sta` reports no race or qualifying in progress).
 #[derive(Debug, Clone)]
-pub struct RaceEnded;
+pub struct SessionEnded;
+
+/// Synthetic event emitted when the server's allowed-cars set changes.
+#[derive(Debug, Clone)]
+pub struct AllowedCarsChanged {
+    /// The new allowed-cars set.
+    pub cars: PlcAllowedCarsSet,
+}
+
+/// Synthetic event emitted when the server's allowed-mods list changes.
+#[derive(Debug, Clone)]
+pub struct AllowedModsChanged {
+    /// The new allowed-mods list (empty means unrestricted).
+    pub mods: Vec<Vehicle>,
+}
+
+/// Synthetic event emitted when version information is received.
+#[derive(Debug, Clone)]
+pub struct VersionReceived {
+    /// Product name (e.g. `"S3"`).
+    pub product: String,
+    /// LFS game version.
+    pub version: GameVersion,
+}
 
 /// Synthetic event emitted when the track changes.
 #[derive(Debug, Clone)]
@@ -64,17 +92,19 @@ impl<S> FromContext<S> for Game {
     }
 }
 
-/// [`Handler`] impl delegates to [`Game::apply_events`] and emits each
+/// [`Handler`] impl delegates to [`Game::apply_packet`] and emits each
 /// change as a typed synthetic event. Register at [`crate::Stage::Pre`] so the
 /// game-state mirror is settled before Update-stage handlers read it.
 ///
-/// On [`Startup`] it also sends `Tiny::Sst`, `Tiny::Axi`, and `Tiny::Ism`
-/// to request the current game state (LFS does not send these automatically
-/// on connect).
+/// On [`Startup`] it also sends `Tiny::Sst`, `Tiny::Axi`, `Tiny::Ism`,
+/// `Tiny::Alc`, and `Tiny::Mal` to request the current game state, allowed
+/// cars, and allowed mods (LFS does not send these automatically on connect).
+/// `Tiny::Alc` and `Tiny::Mal` are also re-requested on each `SessionStarted`,
+/// since a new session can change the allowed cars/mods.
 impl<S: Send + Sync + 'static> Handler<(), S> for Game {
     fn call(self, cx: &ExtractCx<'_, S>) -> impl Future<Output = Result<(), AppError>> + Send {
         let events = if let Dispatch::Packet(p) = cx.dispatch {
-            self.apply_events(p)
+            self.apply_packet(p)
         } else {
             vec![]
         };
@@ -83,12 +113,21 @@ impl<S: Send + Sync + 'static> Handler<(), S> for Game {
         } else {
             false
         };
+        // A new session can change the allowed cars/mods, so re-request them on
+        // session start (mirrors LFS re-sending these in reply to a TINY on Rst).
+        let session_started = events
+            .iter()
+            .any(|e| matches!(e, GameEvent::SessionStarted { .. }));
         let sender = cx.sender.clone();
         async move {
             if startup {
-                let _ = sender.packet(TinyType::Sst.with_request_id(RequestId(1)));
-                let _ = sender.packet(TinyType::Axi.with_request_id(RequestId(1)));
-                let _ = sender.packet(TinyType::Ism.with_request_id(RequestId(1)));
+                for t in Game::STARTUP_REQUESTS {
+                    let _ = sender.packet(t.clone().with_request_id(RequestId(1)));
+                }
+            } else if session_started {
+                for t in Game::SESSION_REQUESTS {
+                    let _ = sender.packet(t.clone().with_request_id(RequestId(1)));
+                }
             }
             emit_game_events(events, &sender);
             Ok(())
@@ -99,14 +138,19 @@ impl<S: Send + Sync + 'static> Handler<(), S> for Game {
 fn emit_game_events(events: Vec<GameEvent>, sender: &Sender) {
     for event in events {
         let _ = match event {
-            GameEvent::RaceStarted => sender.event(RaceStarted),
-            GameEvent::RaceEnded => sender.event(RaceEnded),
+            GameEvent::SessionStarted { kind } => sender.event(SessionStarted { kind }),
+            GameEvent::SessionEnded => sender.event(SessionEnded),
             GameEvent::TrackChanged { from, to } => sender.event(TrackChanged { from, to }),
             GameEvent::LayoutChanged { from, to } => sender.event(LayoutChanged { from, to }),
             GameEvent::MultiplayerJoined { host_name, is_host } => {
                 sender.event(MultiplayerJoined { host_name, is_host })
             },
             GameEvent::MultiplayerLeft => sender.event(MultiplayerLeft),
+            GameEvent::AllowedCarsChanged { cars } => sender.event(AllowedCarsChanged { cars }),
+            GameEvent::AllowedModsChanged { mods } => sender.event(AllowedModsChanged { mods }),
+            GameEvent::VersionReceived { product, version } => {
+                sender.event(VersionReceived { product, version })
+            },
         };
     }
 }

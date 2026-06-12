@@ -16,9 +16,9 @@ use super::spline;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum GridMode {
     #[default]
-    StartGrid, // → StartPosition
-    Pit,    // → PitStartPoint
-    PitBox, // → PitStopBox
+    StartGrid, // -> StartPosition
+    Pit,    // -> PitStartPoint
+    PitBox, // -> PitStopBox
 }
 
 impl GridMode {

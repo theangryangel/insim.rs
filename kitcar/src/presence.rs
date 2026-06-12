@@ -3,7 +3,7 @@
 
 use std::future::Future;
 
-use insim::{WithRequestId, insim::TinyType};
+use insim::WithRequestId;
 pub use insim_extra::presence::{ConnectionInfo, PlayerInfo, Presence, PresenceEvent};
 
 use crate::{AppError, Dispatch, ExtractCx, FromContext, Handler, Sender, Startup};
@@ -74,7 +74,7 @@ impl<S> FromContext<S> for Presence {
     }
 }
 
-/// [`Handler`] impl delegates to [`Presence::apply_events`] and emits each
+/// [`Handler`] impl delegates to [`Presence::apply_packet`] and emits each
 /// change as a typed synthetic event. Register at [`crate::Stage::Pre`] so the
 /// connection / player maps are settled before any Update-stage handler reads them.
 ///
@@ -84,7 +84,7 @@ impl<S> FromContext<S> for Presence {
 impl<S: Send + Sync + 'static> Handler<(), S> for Presence {
     fn call(self, cx: &ExtractCx<'_, S>) -> impl Future<Output = Result<(), AppError>> + Send {
         let events = if let Dispatch::Packet(p) = cx.dispatch {
-            self.apply_events(p)
+            self.apply_packet(p)
         } else {
             vec![]
         };
@@ -96,8 +96,9 @@ impl<S: Send + Sync + 'static> Handler<(), S> for Presence {
         let sender = cx.sender.clone();
         async move {
             if startup {
-                let _ = sender.packet(TinyType::Ncn.with_request_id(2));
-                let _ = sender.packet(TinyType::Npl.with_request_id(3));
+                for t in Presence::STARTUP_REQUESTS {
+                    let _ = sender.packet(t.clone().with_request_id(1));
+                }
             }
             emit_presence_events(events, &sender);
             Ok(())

@@ -22,7 +22,7 @@ pub enum Fuel200 {
 impl Fuel200 {
     /// Returns fuel as a fraction in `0.0..=1.0`, or `None` when `/showfuel` is disabled.
     ///
-    /// The wire value is double the fuel percentage, so `Percentage(200)` → `Some(1.0)`.
+    /// The wire value is double the fuel percentage, so `Percentage(200)` -> `Some(1.0)`.
     pub fn as_percentage(&self) -> Option<f32> {
         match self {
             Self::Percentage(v) => Some(*v as f32 / 200.0),

@@ -11,7 +11,7 @@ use insim::{
 };
 use kitcar::{
     AppError, Connected, Disconnected, Event, Game, Packet, PenaltyClearer, PlayerLeft,
-    PlayerTeleportedToPits, Presence, RaceEnded, Sender, State, track_rotation, util::mtc,
+    PlayerTeleportedToPits, Presence, Sender, SessionEnded, State, track_rotation, util::mtc,
 };
 
 use super::{
@@ -208,7 +208,7 @@ pub(super) async fn on_setup_aborted(
 }
 
 pub(super) async fn on_race_ended(
-    _: Event<RaceEnded>,
+    _: Event<SessionEnded>,
     state: State<Bomb>,
     presence: Presence,
     ui: BombUi,

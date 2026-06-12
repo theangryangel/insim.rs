@@ -78,6 +78,7 @@ mod error;
 mod game;
 mod penalty_clearer;
 mod presence;
+mod race;
 #[allow(missing_docs)]
 pub mod ui;
 pub mod util;
@@ -94,11 +95,16 @@ pub use app::{
 pub use chat::{ChatEvent, ChatParser};
 pub use error::AppError;
 pub use game::{
-    Game, GameInfo, LayoutChanged, MultiplayerJoined, MultiplayerLeft, RaceEnded, RaceStarted,
-    TrackChanged, track_rotation,
+    AllowedCarsChanged, AllowedModsChanged, Game, GameInfo, LayoutChanged, MultiplayerJoined,
+    MultiplayerLeft, SessionEnded, SessionKind, SessionStarted, TrackChanged, VersionInfo,
+    VersionReceived, track_rotation,
 };
 pub use penalty_clearer::PenaltyClearer;
 pub use presence::{
     Connected, ConnectionDetails, ConnectionInfo, Disconnected, PlayerInfo, PlayerJoined,
     PlayerLeft, PlayerTeleportedToPits, Presence, Renamed, TakingOver, VehicleSelected,
+};
+pub use race::{
+    DriverRecord, EntrantId, EntrantState, FinishStatus, LapRecord, PitRecord, RaceEvent,
+    RaceTracker,
 };

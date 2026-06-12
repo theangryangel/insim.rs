@@ -14,8 +14,8 @@
 //! | [`RequestId`] | ReqI | You set it on an outbound packet | Echoed back in the reply |
 //! | [`ClickId`] | ClickID | You create a [`crate::insim::Btn`] | Lives as long as the button |
 //!
-//! A single connection can have many players over its lifetime (e.g. spectate → join race → pit
-//! → join again). The [`PlayerId`] changes each time; the [`ConnectionId`] does not.
+//! A single connection can have many players over its lifetime (e.g. spectate -> join race -> pit
+//! -> join again). The [`PlayerId`] changes each time; the [`ConnectionId`] does not.
 //! The two values are unrelated - you cannot convert between them.
 
 mod click;

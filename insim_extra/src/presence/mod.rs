@@ -7,13 +7,8 @@
 //! ```ignore
 //! let presence = Presence::new();
 //!
-//! // In a bare insim loop:
 //! while let Some(packet) = conn.next().await {
-//!     // state-only, no events:
-//!     presence.apply(&packet);
-//!
-//!     // or collect state-change events:
-//!     for event in presence.apply_events(&packet) {
+//!     for event in presence.apply_packet(&packet) {
 //!         match event {
 //!             PresenceEvent::Connected(info) => println!("{} joined", info.pname),
 //!             _ => {}
@@ -22,17 +17,17 @@
 //! }
 //! ```
 
+mod commands;
+
 use std::{collections::HashMap, net::Ipv4Addr, sync::Arc, time::Duration};
 
 use insim::{
     core::vehicle::Vehicle,
     identifiers::{ConnectionId, PlayerId},
-    insim::{Cnl, Cpr, Nci, Ncn, Npl, PenaltyInfo, Pfl, Pla, Pll, Slc, Tiny, TinyType, Toc},
+    insim::{Cnl, Cpr, Nci, Ncn, Npl, Pfl, Pla, Pll, Slc, Tiny, TinyType, Toc},
 };
 use parking_lot::RwLock;
 use tokio_util::sync::CancellationToken;
-
-use crate::util::host_command;
 
 /// Per-connection record stored by [`Presence`].
 #[derive(Debug, Clone)]
@@ -91,7 +86,7 @@ mod player_info {
 use player_info::MultiIndexPlayerInfoMap;
 pub use player_info::PlayerInfo;
 
-/// State-change events produced by [`Presence::apply_events`].
+/// State-change events produced by [`Presence::apply_packet`].
 #[derive(Debug, Clone)]
 pub enum PresenceEvent {
     /// A new connection joined.
@@ -149,9 +144,8 @@ struct PresenceInner {
 /// State lives behind `Arc<RwLock<…>>`; clones are cheap and share the same
 /// maps.
 ///
-/// Feed packets with [`apply`](Self::apply) (state-only) or
-/// [`apply_events`](Self::apply_events) (state + change events). Admin commands
-/// return packets for the caller to send.
+/// Feed packets with [`apply_packet`](Self::apply_packet) to update state and
+/// collect change events. Admin commands return packets for the caller to send.
 #[derive(Clone, Default)]
 pub struct Presence {
     inner: Arc<RwLock<PresenceInner>>,
@@ -167,6 +161,10 @@ impl std::fmt::Debug for Presence {
 }
 
 impl Presence {
+    /// Tiny requests to send once on connect to sync the current connection
+    /// and player lists. LFS does not send these automatically on connect.
+    pub const STARTUP_REQUESTS: &[TinyType] = &[TinyType::Ncn, TinyType::Npl];
+
     /// Create a new presence tracker with empty state.
     pub fn new() -> Self {
         Self::default()
@@ -251,80 +249,6 @@ impl Presence {
             .collect()
     }
 
-    /// Returns a `/kick` packet for the given UCID, or `None` if not found.
-    pub fn kick(&self, ucid: ConnectionId) -> Option<insim::Packet> {
-        let conn = self.get(ucid)?;
-        Some(host_command(format!("/kick {}", conn.uname)))
-    }
-
-    /// Returns a `/ban` packet. `ban_days = 0` means 12 hours (LFS convention).
-    pub fn ban(&self, ucid: ConnectionId, ban_days: u32) -> Option<insim::Packet> {
-        let conn = self.get(ucid)?;
-        Some(host_command(format!("/ban {} {ban_days}", conn.uname)))
-    }
-
-    /// Returns an `/unban` packet.
-    pub fn unban(&self, uname: impl Into<String>) -> insim::Packet {
-        host_command(format!("/unban {}", uname.into()))
-    }
-
-    /// Returns a `/spec` packet for the given UCID, or `None` if not found.
-    pub fn spec(&self, ucid: ConnectionId) -> Option<insim::Packet> {
-        let conn = self.get(ucid)?;
-        Some(host_command(format!("/spec {}", conn.uname)))
-    }
-
-    /// Returns a `/pitlane` packet for the given UCID, or `None` if not found.
-    pub fn pitlane(&self, ucid: ConnectionId) -> Option<insim::Packet> {
-        let conn = self.get(ucid)?;
-        Some(host_command(format!("/pitlane {}", conn.uname)))
-    }
-
-    /// Returns a `/p_clear` packet for the given UCID, or `None` if not found.
-    pub fn clear_penalty(&self, ucid: ConnectionId) -> Option<insim::Packet> {
-        let conn = self.get(ucid)?;
-        Some(host_command(format!("/p_clear {}", conn.uname)))
-    }
-
-    /// Returns the packets needed to set and display a Race Control Message.
-    ///
-    /// Pass [`ConnectionId::ALL`] to broadcast to all connections.
-    /// Returns up to 2 packets; send them all.
-    pub fn send_rcm(&self, message: &str, ucid: ConnectionId) -> Vec<insim::Packet> {
-        let mut packets = vec![host_command(format!("/rcm {message}"))];
-        if ucid == ConnectionId::ALL {
-            packets.push(host_command("/rcm_all"));
-        } else if let Some(conn) = self.get(ucid) {
-            packets.push(host_command(format!("/rcm_ply {}", conn.uname)));
-        }
-        packets
-    }
-
-    /// Returns the packets needed to clear a Race Control Message.
-    ///
-    /// Pass [`ConnectionId::ALL`] to clear for everyone.
-    pub fn clear_rcm(&self, ucid: ConnectionId) -> Option<insim::Packet> {
-        if ucid == ConnectionId::ALL {
-            return Some(host_command("/rcc_all"));
-        }
-        let conn = self.get(ucid)?;
-        Some(host_command(format!("/rcc_ply {}", conn.uname)))
-    }
-
-    /// Returns a penalty packet for the given UCID. Returns `None` if the
-    /// UCID is not found or the penalty variant is not issueable.
-    pub fn give_penalty(&self, ucid: ConnectionId, penalty: PenaltyInfo) -> Option<insim::Packet> {
-        let conn = self.get(ucid)?;
-        let cmd = match penalty {
-            PenaltyInfo::Dt => format!("/p_dt {}", conn.uname),
-            PenaltyInfo::Sg => format!("/p_sg {}", conn.uname),
-            PenaltyInfo::Seconds30 => format!("/p_30 {}", conn.uname),
-            PenaltyInfo::Seconds45 => format!("/p_45 {}", conn.uname),
-            _ => return None,
-        };
-        Some(host_command(cmd))
-    }
-
     /// Poll until the connection count satisfies `f`, or until `cancel` fires.
     /// Returns `Some(count)` on success or `None` if cancelled.
     pub async fn wait_for_connection_count<F: Fn(usize) -> bool>(
@@ -370,16 +294,8 @@ impl Presence {
         }
     }
 
-    /// Apply one raw packet to the internal state maps without returning
-    /// any events. Use when you only need queryable state.
-    pub fn apply(&self, packet: &insim::Packet) {
-        let _ = self.apply_events(packet);
-    }
-
-    /// Apply one raw packet and return the resulting state-change events.
-    /// Also mutates internal state - call this instead of [`apply`](Self::apply)
-    /// when you want to react to changes.
-    pub fn apply_events(&self, packet: &insim::Packet) -> Vec<PresenceEvent> {
+    /// Apply one raw packet, update internal state, and return any state-change events.
+    pub fn apply_packet(&self, packet: &insim::Packet) -> Vec<PresenceEvent> {
         match packet {
             insim::Packet::Ncn(ncn) => vec![PresenceEvent::Connected(self.apply_ncn(ncn))],
             insim::Packet::Cnl(cnl) => {

@@ -25,7 +25,7 @@ pub(super) struct MetronomeInner {
     pub(super) phase: MetronomePhase,
     setup_cancel: Option<CancellationToken>,
     pub(super) runtime_cancel: CancellationToken,
-    /// plid → (ucid, uname, checkpoint1_time)
+    /// plid -> (ucid, uname, checkpoint1_time)
     pub(super) active_runs: HashMap<PlayerId, (ConnectionId, String, Duration)>,
     /// (uname, pname, best_delta_ms) sorted by delta asc
     pub(super) leaderboard: Vec<(String, String, i64)>,

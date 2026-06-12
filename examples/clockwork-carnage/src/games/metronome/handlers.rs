@@ -10,7 +10,7 @@ use insim::{
     insim::{RaceLaps, Toc, Uco},
 };
 use kitcar::{
-    AppError, Connected, Disconnected, Event, Game, Packet, Presence, RaceEnded, Sender, State,
+    AppError, Connected, Disconnected, Event, Game, Packet, Presence, Sender, SessionEnded, State,
     track_rotation, util::mtc,
 };
 
@@ -180,7 +180,7 @@ pub(super) async fn on_setup_aborted(
 }
 
 pub(super) async fn on_race_ended(
-    _: Event<RaceEnded>,
+    _: Event<SessionEnded>,
     state: State<Metronome>,
     presence: Presence,
     ui: MetronomeUi,
