@@ -317,97 +317,97 @@ impl<Msg> Node<Msg> {
     }
 
     pub fn items_start(mut self) -> Self {
-        self.style_mut().align_items = Some(taffy::AlignItems::Start);
+        self.style_mut().align_items = Some(taffy::AlignItems::START);
         self
     }
 
     pub fn items_end(mut self) -> Self {
-        self.style_mut().align_items = Some(taffy::AlignItems::End);
+        self.style_mut().align_items = Some(taffy::AlignItems::END);
         self
     }
 
     pub fn items_center(mut self) -> Self {
-        self.style_mut().align_items = Some(taffy::AlignItems::Center);
+        self.style_mut().align_items = Some(taffy::AlignItems::CENTER);
         self
     }
 
     pub fn items_baseline(mut self) -> Self {
-        self.style_mut().align_items = Some(taffy::AlignItems::Baseline);
+        self.style_mut().align_items = Some(taffy::AlignItems::BASELINE);
         self
     }
 
     pub fn justify_start(mut self) -> Self {
-        self.style_mut().justify_content = Some(taffy::JustifyContent::Start);
+        self.style_mut().justify_content = Some(taffy::JustifyContent::START);
         self
     }
 
     pub fn justify_end(mut self) -> Self {
-        self.style_mut().justify_content = Some(taffy::JustifyContent::End);
+        self.style_mut().justify_content = Some(taffy::JustifyContent::END);
         self
     }
 
     pub fn justify_center(mut self) -> Self {
-        self.style_mut().justify_content = Some(taffy::JustifyContent::Center);
+        self.style_mut().justify_content = Some(taffy::JustifyContent::CENTER);
         self
     }
 
     pub fn justify_between(mut self) -> Self {
-        self.style_mut().justify_content = Some(taffy::JustifyContent::SpaceBetween);
+        self.style_mut().justify_content = Some(taffy::JustifyContent::SPACE_BETWEEN);
         self
     }
 
     pub fn justify_around(mut self) -> Self {
-        self.style_mut().justify_content = Some(taffy::JustifyContent::SpaceAround);
+        self.style_mut().justify_content = Some(taffy::JustifyContent::SPACE_AROUND);
         self
     }
 
     pub fn content_start(mut self) -> Self {
-        self.style_mut().align_content = Some(taffy::AlignContent::Start);
+        self.style_mut().align_content = Some(taffy::AlignContent::START);
         self
     }
 
     pub fn content_end(mut self) -> Self {
-        self.style_mut().align_content = Some(taffy::AlignContent::End);
+        self.style_mut().align_content = Some(taffy::AlignContent::END);
         self
     }
 
     pub fn content_around(mut self) -> Self {
-        self.style_mut().align_content = Some(taffy::AlignContent::SpaceAround);
+        self.style_mut().align_content = Some(taffy::AlignContent::SPACE_AROUND);
         self
     }
 
     pub fn content_between(mut self) -> Self {
-        self.style_mut().align_content = Some(taffy::AlignContent::SpaceBetween);
+        self.style_mut().align_content = Some(taffy::AlignContent::SPACE_BETWEEN);
         self
     }
 
     pub fn content_evenly(mut self) -> Self {
-        self.style_mut().align_content = Some(taffy::AlignContent::SpaceEvenly);
+        self.style_mut().align_content = Some(taffy::AlignContent::SPACE_EVENLY);
         self
     }
 
     pub fn content_stretch(mut self) -> Self {
-        self.style_mut().align_content = Some(taffy::AlignContent::Stretch);
+        self.style_mut().align_content = Some(taffy::AlignContent::STRETCH);
         self
     }
 
     pub fn self_start(mut self) -> Self {
-        self.style_mut().align_self = Some(taffy::AlignSelf::FlexStart);
+        self.style_mut().align_self = Some(taffy::AlignSelf::FLEX_START);
         self
     }
 
     pub fn self_end(mut self) -> Self {
-        self.style_mut().align_self = Some(taffy::AlignSelf::FlexEnd);
+        self.style_mut().align_self = Some(taffy::AlignSelf::FLEX_END);
         self
     }
 
     pub fn self_center(mut self) -> Self {
-        self.style_mut().align_self = Some(taffy::AlignSelf::Center);
+        self.style_mut().align_self = Some(taffy::AlignSelf::CENTER);
         self
     }
 
     pub fn self_stretch(mut self) -> Self {
-        self.style_mut().align_self = Some(taffy::AlignSelf::Stretch);
+        self.style_mut().align_self = Some(taffy::AlignSelf::STRETCH);
         self
     }
 
@@ -914,22 +914,22 @@ mod tests {
         let start: Node<TestMsg> = Node::container().items_start();
         assert_eq!(
             start.style.unwrap().align_items,
-            Some(taffy::AlignItems::Start)
+            Some(taffy::AlignItems::START)
         );
 
         let end: Node<TestMsg> = Node::container().items_end();
-        assert_eq!(end.style.unwrap().align_items, Some(taffy::AlignItems::End));
+        assert_eq!(end.style.unwrap().align_items, Some(taffy::AlignItems::END));
 
         let center: Node<TestMsg> = Node::container().items_center();
         assert_eq!(
             center.style.unwrap().align_items,
-            Some(taffy::AlignItems::Center)
+            Some(taffy::AlignItems::CENTER)
         );
 
         let baseline: Node<TestMsg> = Node::container().items_baseline();
         assert_eq!(
             baseline.style.unwrap().align_items,
-            Some(taffy::AlignItems::Baseline)
+            Some(taffy::AlignItems::BASELINE)
         );
     }
 
@@ -938,31 +938,31 @@ mod tests {
         let start: Node<TestMsg> = Node::container().justify_start();
         assert_eq!(
             start.style.unwrap().justify_content,
-            Some(taffy::JustifyContent::Start)
+            Some(taffy::JustifyContent::START)
         );
 
         let end: Node<TestMsg> = Node::container().justify_end();
         assert_eq!(
             end.style.unwrap().justify_content,
-            Some(taffy::JustifyContent::End)
+            Some(taffy::JustifyContent::END)
         );
 
         let center: Node<TestMsg> = Node::container().justify_center();
         assert_eq!(
             center.style.unwrap().justify_content,
-            Some(taffy::JustifyContent::Center)
+            Some(taffy::JustifyContent::CENTER)
         );
 
         let between: Node<TestMsg> = Node::container().justify_between();
         assert_eq!(
             between.style.unwrap().justify_content,
-            Some(taffy::JustifyContent::SpaceBetween)
+            Some(taffy::JustifyContent::SPACE_BETWEEN)
         );
 
         let around: Node<TestMsg> = Node::container().justify_around();
         assert_eq!(
             around.style.unwrap().justify_content,
-            Some(taffy::JustifyContent::SpaceAround)
+            Some(taffy::JustifyContent::SPACE_AROUND)
         );
     }
 
@@ -971,37 +971,37 @@ mod tests {
         let start: Node<TestMsg> = Node::container().content_start();
         assert_eq!(
             start.style.unwrap().align_content,
-            Some(taffy::AlignContent::Start)
+            Some(taffy::AlignContent::START)
         );
 
         let end: Node<TestMsg> = Node::container().content_end();
         assert_eq!(
             end.style.unwrap().align_content,
-            Some(taffy::AlignContent::End)
+            Some(taffy::AlignContent::END)
         );
 
         let around: Node<TestMsg> = Node::container().content_around();
         assert_eq!(
             around.style.unwrap().align_content,
-            Some(taffy::AlignContent::SpaceAround)
+            Some(taffy::AlignContent::SPACE_AROUND)
         );
 
         let between: Node<TestMsg> = Node::container().content_between();
         assert_eq!(
             between.style.unwrap().align_content,
-            Some(taffy::AlignContent::SpaceBetween)
+            Some(taffy::AlignContent::SPACE_BETWEEN)
         );
 
         let evenly: Node<TestMsg> = Node::container().content_evenly();
         assert_eq!(
             evenly.style.unwrap().align_content,
-            Some(taffy::AlignContent::SpaceEvenly)
+            Some(taffy::AlignContent::SPACE_EVENLY)
         );
 
         let stretch: Node<TestMsg> = Node::container().content_stretch();
         assert_eq!(
             stretch.style.unwrap().align_content,
-            Some(taffy::AlignContent::Stretch)
+            Some(taffy::AlignContent::STRETCH)
         );
     }
 
@@ -1010,25 +1010,25 @@ mod tests {
         let start: Node<TestMsg> = Node::container().self_start();
         assert_eq!(
             start.style.unwrap().align_self,
-            Some(taffy::AlignSelf::FlexStart)
+            Some(taffy::AlignSelf::FLEX_START)
         );
 
         let end: Node<TestMsg> = Node::container().self_end();
         assert_eq!(
             end.style.unwrap().align_self,
-            Some(taffy::AlignSelf::FlexEnd)
+            Some(taffy::AlignSelf::FLEX_END)
         );
 
         let center: Node<TestMsg> = Node::container().self_center();
         assert_eq!(
             center.style.unwrap().align_self,
-            Some(taffy::AlignSelf::Center)
+            Some(taffy::AlignSelf::CENTER)
         );
 
         let stretch: Node<TestMsg> = Node::container().self_stretch();
         assert_eq!(
             stretch.style.unwrap().align_self,
-            Some(taffy::AlignSelf::Stretch)
+            Some(taffy::AlignSelf::STRETCH)
         );
     }
 
@@ -1181,10 +1181,10 @@ mod tests {
         assert_eq!(style.size.height, taffy::Dimension::length(100.0));
         assert_eq!(style.padding, taffy::Rect::length(5.0));
         assert_eq!(style.margin, taffy::Rect::length(10.0));
-        assert_eq!(style.align_items, Some(taffy::AlignItems::Center));
+        assert_eq!(style.align_items, Some(taffy::AlignItems::CENTER));
         assert_eq!(
             style.justify_content,
-            Some(taffy::JustifyContent::SpaceBetween)
+            Some(taffy::JustifyContent::SPACE_BETWEEN)
         );
     }
 }
