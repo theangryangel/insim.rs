@@ -1,4 +1,4 @@
-use crate::{heading::Heading, object::*};
+use crate::{heading::ObjectHeading, object::*};
 
 fn raw_flags(flags: u8) -> Raw {
     Raw {
@@ -9,12 +9,12 @@ fn raw_flags(flags: u8) -> Raw {
     }
 }
 
-fn raw_with(xyz: ObjectCoordinate, flags: u8, heading: Heading) -> Raw {
+fn raw_with(xyz: ObjectCoordinate, flags: u8, heading: ObjectHeading) -> Raw {
     Raw {
         index: 0,
         xyz,
         flags,
-        heading: heading.to_objectinfo_wire(),
+        heading: heading.to_raw(),
     }
 }
 
@@ -30,7 +30,7 @@ fn raw_with_heading_u8(xyz: ObjectCoordinate, flags: u8, heading: u8) -> Raw {
 #[test]
 fn test_armco1_basic_creation() {
     let coord = ObjectCoordinate::new(100, 200, 50);
-    let heading = Heading::from_degrees(45.0);
+    let heading = ObjectHeading::from_degrees(45.0);
     let armco = armco::Armco {
         xyz: coord,
         heading,
@@ -51,7 +51,7 @@ fn test_armco1_basic_creation() {
 fn test_armco1_floating() {
     let armco = armco::Armco {
         xyz: ObjectCoordinate::new(0, 0, 0),
-        heading: Heading::from_degrees(0.0),
+        heading: ObjectHeading::from_degrees(0.0),
         colour: 1,
         mapping: 1,
         floating: true,
@@ -64,7 +64,7 @@ fn test_armco1_floating() {
 fn test_armco1_flags_conversion() {
     let armco = armco::Armco {
         xyz: ObjectCoordinate::new(0, 0, 0),
-        heading: Heading::from_degrees(0.0),
+        heading: ObjectHeading::from_degrees(0.0),
         colour: 3,
         mapping: 5,
         floating: true,
@@ -83,7 +83,7 @@ fn test_armco1_flags_conversion() {
 fn test_armco1_colour_boundary() {
     let armco = armco::Armco {
         xyz: ObjectCoordinate::new(0, 0, 0),
-        heading: Heading::from_degrees(0.0),
+        heading: ObjectHeading::from_degrees(0.0),
         colour: 7, // Max 3-bit value
         mapping: 0,
         floating: false,
@@ -96,7 +96,7 @@ fn test_armco1_colour_boundary() {
 fn test_armco1_mapping_boundary() {
     let armco = armco::Armco {
         xyz: ObjectCoordinate::new(0, 0, 0),
-        heading: Heading::from_degrees(0.0),
+        heading: ObjectHeading::from_degrees(0.0),
         colour: 0,
         mapping: 15, // Max 4-bit value
         floating: false,
@@ -108,7 +108,7 @@ fn test_armco1_mapping_boundary() {
 #[test]
 fn test_chalk_basic_creation() {
     let coord = ObjectCoordinate::new(150, 250, 30);
-    let heading = Heading::from_degrees(90.0);
+    let heading = ObjectHeading::from_degrees(90.0);
     let chalk = chalk::Chalk {
         xyz: coord,
         colour: chalk::ChalkColour::Red,
@@ -135,7 +135,7 @@ fn test_chalk_all_colours() {
         let chalk = chalk::Chalk {
             xyz: ObjectCoordinate::new(0, 0, 0),
             colour,
-            heading: Heading::from_degrees(0.0),
+            heading: ObjectHeading::from_degrees(0.0),
             floating: false,
         };
         assert_eq!(chalk.colour, colour);
@@ -147,7 +147,7 @@ fn test_chalk_colour_conversion() {
     let chalk_white = chalk::Chalk {
         xyz: ObjectCoordinate::new(0, 0, 0),
         colour: chalk::ChalkColour::White,
-        heading: Heading::from_degrees(0.0),
+        heading: ObjectHeading::from_degrees(0.0),
         floating: false,
     };
 
@@ -160,7 +160,7 @@ fn test_chalk_floating_flag() {
     let chalk = chalk::Chalk {
         xyz: ObjectCoordinate::new(0, 0, 0),
         colour: chalk::ChalkColour::Blue,
-        heading: Heading::from_degrees(0.0),
+        heading: ObjectHeading::from_degrees(0.0),
         floating: true,
     };
 
@@ -171,7 +171,7 @@ fn test_chalk_floating_flag() {
 #[test]
 fn test_chalk_from_flags() {
     let flags = raw_flags(0x82); // floating + colour 2 (blue)
-    let heading = Heading::from_degrees(45.0);
+    let heading = ObjectHeading::from_degrees(45.0);
     let result = chalk::Chalk::new(raw_with(
         ObjectCoordinate::new(100, 100, 10),
         flags.flags,
@@ -189,7 +189,7 @@ fn test_insim_checkpoint_finish() {
     let checkpoint = insim::InsimCheckpoint {
         xyz: ObjectCoordinate::new(500, 500, 0),
         kind: insim::InsimCheckpointKind::Finish,
-        heading: Heading::from_degrees(0.0),
+        heading: ObjectHeading::from_degrees(0.0),
         floating: false,
     };
 
@@ -209,7 +209,7 @@ fn test_insim_checkpoint_all_kinds() {
         let checkpoint = insim::InsimCheckpoint {
             xyz: ObjectCoordinate::new(0, 0, 0),
             kind,
-            heading: Heading::from_degrees(0.0),
+            heading: ObjectHeading::from_degrees(0.0),
             floating: false,
         };
         assert_eq!(checkpoint.kind, kind);
@@ -221,7 +221,7 @@ fn test_insim_checkpoint_floating() {
     let checkpoint = insim::InsimCheckpoint {
         xyz: ObjectCoordinate::new(0, 0, 0),
         kind: insim::InsimCheckpointKind::Checkpoint1,
-        heading: Heading::from_degrees(0.0),
+        heading: ObjectHeading::from_degrees(0.0),
         floating: true,
     };
 
@@ -233,7 +233,7 @@ fn test_insim_checkpoint_floating() {
 #[test]
 fn test_insim_checkpoint_from_flags() {
     let flags = raw_flags(0x82); // floating + kind checkpoint2
-    let heading = Heading::from_degrees(90.0);
+    let heading = ObjectHeading::from_degrees(90.0);
     let result = insim::InsimCheckpoint::new(raw_with(
         ObjectCoordinate::new(200, 300, 5),
         flags.flags,
@@ -307,7 +307,7 @@ fn test_paint_letters_basic() {
         xyz: ObjectCoordinate::new(300, 400, 20),
         colour: painted::PaintColour::White,
         character: painted::Character::A,
-        heading: Heading::from_degrees(0.0),
+        heading: ObjectHeading::from_degrees(0.0),
         floating: false,
     };
 
@@ -330,7 +330,7 @@ fn test_paint_letters_various_characters() {
             xyz: ObjectCoordinate::new(0, 0, 0),
             colour: painted::PaintColour::White,
             character,
-            heading: Heading::from_degrees(0.0),
+            heading: ObjectHeading::from_degrees(0.0),
             floating: false,
         };
         assert_eq!(letters.character, character);
@@ -346,7 +346,7 @@ fn test_paint_letters_colours() {
             xyz: ObjectCoordinate::new(0, 0, 0),
             colour,
             character: painted::Character::A,
-            heading: Heading::from_degrees(0.0),
+            heading: ObjectHeading::from_degrees(0.0),
             floating: false,
         };
         assert_eq!(letters.colour, colour);
@@ -370,7 +370,7 @@ fn test_paint_letters_floating() {
         xyz: ObjectCoordinate::new(0, 0, 0),
         colour: painted::PaintColour::Yellow,
         character: painted::Character::B,
-        heading: Heading::from_degrees(45.0),
+        heading: ObjectHeading::from_degrees(45.0),
         floating: true,
     };
 
@@ -382,7 +382,7 @@ fn test_letterboard_rb_basic() {
     let board = letterboard_rb::LetterboardRB {
         xyz: ObjectCoordinate::new(600, 700, 40),
         colour: letterboard_rb::LetterboardRBColour::Red,
-        heading: Heading::from_degrees(0.0),
+        heading: ObjectHeading::from_degrees(0.0),
         character: letterboard_rb::Character::A,
         floating: false,
     };
@@ -396,7 +396,7 @@ fn test_letterboard_rb_colours() {
     let board_red = letterboard_rb::LetterboardRB {
         xyz: ObjectCoordinate::new(0, 0, 0),
         colour: letterboard_rb::LetterboardRBColour::Red,
-        heading: Heading::from_degrees(0.0),
+        heading: ObjectHeading::from_degrees(0.0),
         character: letterboard_rb::Character::A,
         floating: false,
     };
@@ -404,7 +404,7 @@ fn test_letterboard_rb_colours() {
     let board_blue = letterboard_rb::LetterboardRB {
         xyz: ObjectCoordinate::new(0, 0, 0),
         colour: letterboard_rb::LetterboardRBColour::Blue,
-        heading: Heading::from_degrees(0.0),
+        heading: ObjectHeading::from_degrees(0.0),
         character: letterboard_rb::Character::A,
         floating: false,
     };
@@ -418,7 +418,7 @@ fn test_letterboard_rb_blank_character() {
     let board = letterboard_rb::LetterboardRB {
         xyz: ObjectCoordinate::new(0, 0, 0),
         colour: letterboard_rb::LetterboardRBColour::Red,
-        heading: Heading::from_degrees(0.0),
+        heading: ObjectHeading::from_degrees(0.0),
         character: letterboard_rb::Character::Blank,
         floating: false,
     };
@@ -433,7 +433,7 @@ fn test_letterboard_rb_floating() {
     let board = letterboard_rb::LetterboardRB {
         xyz: ObjectCoordinate::new(0, 0, 0),
         colour: letterboard_rb::LetterboardRBColour::Blue,
-        heading: Heading::from_degrees(90.0),
+        heading: ObjectHeading::from_degrees(90.0),
         character: letterboard_rb::Character::Z,
         floating: true,
     };
@@ -446,7 +446,7 @@ fn test_letterboard_rb_floating() {
 #[test]
 fn test_letterboard_rb_from_flags() {
     let flags = raw_flags(0x81); // floating + colour blue + character A
-    let heading = Heading::from_degrees(0.0);
+    let heading = ObjectHeading::from_degrees(0.0);
     let result = letterboard_rb::LetterboardRB::new(raw_with(
         ObjectCoordinate::new(0, 0, 0),
         flags.flags,
@@ -464,7 +464,7 @@ fn test_tyre_stack2_basic() {
     let tyre = tyres::Tyres {
         xyz: ObjectCoordinate::new(200, 300, 0),
         colour: tyres::TyreColour::Black,
-        heading: Heading::from_degrees(0.0),
+        heading: ObjectHeading::from_degrees(0.0),
         floating: false,
     };
 
@@ -486,7 +486,7 @@ fn test_tyre_stack2_all_colours() {
         let tyre = tyres::Tyres {
             xyz: ObjectCoordinate::new(0, 0, 0),
             colour,
-            heading: Heading::from_degrees(0.0),
+            heading: ObjectHeading::from_degrees(0.0),
             floating: false,
         };
         assert_eq!(tyre.colour, colour);
@@ -498,7 +498,7 @@ fn test_tyre_stack2_flags_conversion() {
     let tyre = tyres::Tyres {
         xyz: ObjectCoordinate::new(0, 0, 0),
         colour: tyres::TyreColour::Red,
-        heading: Heading::from_degrees(0.0),
+        heading: ObjectHeading::from_degrees(0.0),
         floating: false,
     };
 
@@ -511,7 +511,7 @@ fn test_tyre_stack2_floating() {
     let tyre = tyres::Tyres {
         xyz: ObjectCoordinate::new(100, 100, 0),
         colour: tyres::TyreColour::Yellow,
-        heading: Heading::from_degrees(45.0),
+        heading: ObjectHeading::from_degrees(45.0),
         floating: true,
     };
 
@@ -523,7 +523,7 @@ fn test_tyre_stack2_floating() {
 #[test]
 fn test_tyre_stack2_from_flags() {
     let flags = raw_flags(0x83); // floating + colour green (4)
-    let heading = Heading::from_degrees(180.0);
+    let heading = ObjectHeading::from_degrees(180.0);
     let result = tyres::Tyres::new(raw_with(
         ObjectCoordinate::new(50, 50, 0),
         flags.flags,
@@ -539,7 +539,7 @@ fn test_tyre_stack2_from_flags() {
 fn test_post_basic() {
     let post = post::Post {
         xyz: ObjectCoordinate::new(400, 500, 100),
-        heading: Heading::from_degrees(0.0),
+        heading: ObjectHeading::from_degrees(0.0),
         colour: post::PostColour::Green,
         mapping: 1,
         floating: false,
@@ -564,7 +564,7 @@ fn test_post_all_colours() {
     for colour in colours {
         let post = post::Post {
             xyz: ObjectCoordinate::new(0, 0, 0),
-            heading: Heading::from_degrees(0.0),
+            heading: ObjectHeading::from_degrees(0.0),
             colour,
             mapping: 0,
             floating: false,
@@ -578,7 +578,7 @@ fn test_post_mapping_range() {
     for mapping in 0u8..=15 {
         let post = post::Post {
             xyz: ObjectCoordinate::new(0, 0, 0),
-            heading: Heading::from_degrees(0.0),
+            heading: ObjectHeading::from_degrees(0.0),
             colour: post::PostColour::Red,
             mapping,
             floating: false,
@@ -591,7 +591,7 @@ fn test_post_mapping_range() {
 fn test_post_floating() {
     let post = post::Post {
         xyz: ObjectCoordinate::new(0, 0, 0),
-        heading: Heading::from_degrees(0.0),
+        heading: ObjectHeading::from_degrees(0.0),
         colour: post::PostColour::Blue,
         mapping: 5,
         floating: true,
@@ -605,7 +605,7 @@ fn test_post_floating() {
 #[test]
 fn test_post_from_flags() {
     let flags = raw_flags(0x8A); // floating + colour 2 (red) + mapping 1
-    let heading = Heading::from_degrees(270.0);
+    let heading = ObjectHeading::from_degrees(270.0);
     let result = post::Post::new(raw_with(
         ObjectCoordinate::new(0, 0, 0),
         flags.flags,
@@ -623,7 +623,7 @@ fn test_post_from_flags() {
 fn test_start_lights_basic() {
     let lights = start_lights::StartLights {
         xyz: ObjectCoordinate::new(0, 0, 200),
-        heading: Heading::from_degrees(0.0),
+        heading: ObjectHeading::from_degrees(0.0),
         identifier: 0,
         floating: false,
     };
@@ -636,7 +636,7 @@ fn test_start_lights_identifier_range() {
     for id in 0u8..=63 {
         let lights = start_lights::StartLights {
             xyz: ObjectCoordinate::new(0, 0, 0),
-            heading: Heading::from_degrees(0.0),
+            heading: ObjectHeading::from_degrees(0.0),
             identifier: id,
             floating: false,
         };
@@ -648,7 +648,7 @@ fn test_start_lights_identifier_range() {
 fn test_start_lights_flags_conversion() {
     let lights = start_lights::StartLights {
         xyz: ObjectCoordinate::new(0, 0, 0),
-        heading: Heading::from_degrees(0.0),
+        heading: ObjectHeading::from_degrees(0.0),
         identifier: 42,
         floating: false,
     };
@@ -661,7 +661,7 @@ fn test_start_lights_flags_conversion() {
 fn test_start_lights_floating() {
     let lights = start_lights::StartLights {
         xyz: ObjectCoordinate::new(100, 100, 150),
-        heading: Heading::from_degrees(90.0),
+        heading: ObjectHeading::from_degrees(90.0),
         identifier: 15,
         floating: true,
     };
@@ -674,7 +674,7 @@ fn test_start_lights_floating() {
 #[test]
 fn test_start_lights_from_flags() {
     let flags = raw_flags(0xAA); // floating + identifier 42 (0x2A)
-    let heading = Heading::from_degrees(45.0);
+    let heading = ObjectHeading::from_degrees(45.0);
     let result = start_lights::StartLights::new(raw_with(
         ObjectCoordinate::new(0, 0, 0),
         flags.flags,
@@ -691,7 +691,7 @@ fn test_start_lights_from_flags() {
 fn test_vehicle_van_basic() {
     let van = vehicle_van::VehicleVan {
         xyz: ObjectCoordinate::new(800, 900, 50),
-        heading: Heading::from_degrees(0.0),
+        heading: ObjectHeading::from_degrees(0.0),
         colour: vehicle_van::VehicleVanColour::White,
         mapping: 2,
         floating: false,
@@ -716,7 +716,7 @@ fn test_vehicle_van_all_colours() {
     for colour in colours {
         let van = vehicle_van::VehicleVan {
             xyz: ObjectCoordinate::new(0, 0, 0),
-            heading: Heading::from_degrees(0.0),
+            heading: ObjectHeading::from_degrees(0.0),
             colour,
             mapping: 0,
             floating: false,
@@ -730,7 +730,7 @@ fn test_vehicle_van_mapping_range() {
     for mapping in 0u8..=15 {
         let van = vehicle_van::VehicleVan {
             xyz: ObjectCoordinate::new(0, 0, 0),
-            heading: Heading::from_degrees(0.0),
+            heading: ObjectHeading::from_degrees(0.0),
             colour: vehicle_van::VehicleVanColour::Blue,
             mapping,
             floating: false,
@@ -743,7 +743,7 @@ fn test_vehicle_van_mapping_range() {
 fn test_vehicle_van_floating() {
     let van = vehicle_van::VehicleVan {
         xyz: ObjectCoordinate::new(0, 0, 0),
-        heading: Heading::from_degrees(180.0),
+        heading: ObjectHeading::from_degrees(180.0),
         colour: vehicle_van::VehicleVanColour::Red,
         mapping: 7,
         floating: true,
@@ -757,7 +757,7 @@ fn test_vehicle_van_floating() {
 #[test]
 fn test_vehicle_van_from_flags() {
     let flags = raw_flags(0x89); // floating + colour 1 (red) + mapping 1
-    let heading = Heading::from_degrees(315.0);
+    let heading = ObjectHeading::from_degrees(315.0);
     let result = vehicle_van::VehicleVan::new(raw_with(
         ObjectCoordinate::new(0, 0, 0),
         flags.flags,
@@ -804,4 +804,20 @@ fn test_coordinate_equality() {
     let coord2 = ObjectCoordinate::new(100, 200, 50);
 
     assert_eq!(coord1, coord2);
+}
+
+#[cfg(feature = "glam")]
+#[test]
+fn test_object_coordinate_metres_constructors_round_not_truncate() {
+    // x,y use 16 units = 1m; z uses 4 units = 1m. Fractional metres must scale,
+    // not truncate to whole metres.
+    let c = ObjectCoordinate::from_dvec3_metres(glam::DVec3::new(1.5, -2.25, 3.25));
+    assert_eq!(c.x, 24); // 1.5 * 16
+    assert_eq!(c.y, -36); // -2.25 * 16
+    assert_eq!(c.z, 13); // 3.25 * 4
+
+    let c = ObjectCoordinate::from_vec3_metres(glam::Vec3::new(1.5, -2.25, 3.25));
+    assert_eq!(c.x, 24);
+    assert_eq!(c.y, -36);
+    assert_eq!(c.z, 13);
 }

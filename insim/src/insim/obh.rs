@@ -1,16 +1,13 @@
 use std::time::Duration;
 
 use bitflags::bitflags;
-use insim_core::{Decode, DecodeContext, Encode, EncodeContext, heading::Heading, speed::Speed};
+use insim_core::{
+    Decode, DecodeContext, Encode, EncodeContext,
+    heading::HeadingU8,
+    speed::{ClosingSpeed, SpeedU8},
+};
 
 use crate::identifiers::{PlayerId, RequestId};
-
-/// CarContact direction scale: 128 units = 180°
-const CARCONTACT_DEGREES_PER_UNIT: f64 = 180.0 / 128.0;
-
-pub(crate) fn spclose_strip_high_bits(val: u16) -> u16 {
-    val & !61440
-}
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
@@ -45,13 +42,13 @@ impl_bitflags_from_to_bytes!(ObhFlags, u8);
 /// Contact details used by collision reports.
 pub struct CarContact {
     /// Direction of motion.
-    pub direction: Heading,
+    pub direction: HeadingU8,
 
     /// Car facing direction.
-    pub heading: Heading,
+    pub heading: HeadingU8,
 
     /// Speed.
-    pub speed: Speed,
+    pub speed: SpeedU8,
 
     /// Z position.
     pub z: u8,
@@ -65,13 +62,10 @@ pub struct CarContact {
 
 impl Decode for CarContact {
     fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
-        let direction_raw = ctx.decode::<u8>("direction_raw")?;
-        let direction = Heading::from_degrees((direction_raw as f64) * CARCONTACT_DEGREES_PER_UNIT);
+        let direction = ctx.decode::<HeadingU8>("direction")?;
+        let heading = ctx.decode::<HeadingU8>("heading")?;
 
-        let heading_raw = ctx.decode::<u8>("heading_raw")?;
-        let heading = Heading::from_degrees((heading_raw as f64) * CARCONTACT_DEGREES_PER_UNIT);
-
-        let speed = Speed::from_meters_per_sec(ctx.decode::<u8>("speed")? as f32);
+        let speed = ctx.decode::<SpeedU8>("speed")?;
         let z = ctx.decode::<u8>("z")?;
         let x = ctx.decode::<i16>("x")?;
         let y = ctx.decode::<i16>("y")?;
@@ -88,17 +82,10 @@ impl Decode for CarContact {
 
 impl Encode for CarContact {
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
-        let direction_units = (self.direction.to_degrees() / CARCONTACT_DEGREES_PER_UNIT)
-            .round()
-            .clamp(0.0, 255.0) as u8;
-        ctx.encode("direction", &direction_units)?;
+        ctx.encode("direction", &self.direction)?;
+        ctx.encode("heading", &self.heading)?;
 
-        let heading_units = (self.heading.to_degrees() / CARCONTACT_DEGREES_PER_UNIT)
-            .round()
-            .clamp(0.0, 255.0) as u8;
-        ctx.encode("heading", &heading_units)?;
-
-        ctx.encode("speed", &(self.speed.to_meters_per_sec() as u8))?;
+        ctx.encode("speed", &self.speed)?;
         ctx.encode("z", &self.z)?;
         ctx.encode("x", &self.x)?;
         ctx.encode("y", &self.y)?;
@@ -120,7 +107,7 @@ pub struct Obh {
     pub plid: PlayerId,
 
     /// Closing speed at impact.
-    pub spclose: Speed,
+    pub spclose: ClosingSpeed,
 
     /// Time since session start, in milliseconds (wraps periodically).
     #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
@@ -150,9 +137,8 @@ impl Decode for Obh {
     fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
         let reqi = ctx.decode::<RequestId>("reqi")?;
         let plid = ctx.decode::<PlayerId>("plid")?;
-        // automatically strip off the first 4 bits as they're reserved
-        let spclose = spclose_strip_high_bits(ctx.decode::<u16>("spclose")?);
-        let spclose = Speed::from_meters_per_sec(spclose as f32 / 10.0);
+        // ClosingSpeed masks off the reserved top 4 bits on decode.
+        let spclose = ctx.decode::<ClosingSpeed>("spclose")?;
         ctx.pad("spw", 2)?;
 
         let time = ctx.decode_duration::<u32>("time")?;
@@ -183,9 +169,7 @@ impl Encode for Obh {
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
         ctx.encode("reqi", &self.reqi)?;
         ctx.encode("plid", &self.plid)?;
-        // automatically strip off the first 4 bits as they're reserved
-        let spclose = spclose_strip_high_bits((self.spclose.into_inner() * 10.0) as u16);
-        ctx.encode("spclose", &spclose)?;
+        ctx.encode("spclose", &self.spclose)?;
         ctx.pad("spw", 2)?;
         ctx.encode_duration::<u32>("time", self.time)?;
         ctx.encode("c", &self.c)?;
@@ -239,15 +223,8 @@ mod tests {
                 assert_eq!(obh.reqi, RequestId(0));
                 assert_eq!(obh.plid, PlayerId(3));
                 assert_eq!(obh.time, Duration::from_millis(4970));
-                assert_eq!(obh.spclose.into_inner(), 23.0 / 10.0);
+                assert_eq!(obh.spclose.to_metres_per_sec(), 23.0 / 10.0);
             }
         );
-    }
-
-    #[test]
-    fn ensure_high_bits_stripped() {
-        assert_eq!(spclose_strip_high_bits(61441), 1);
-
-        assert_eq!(spclose_strip_high_bits(63495,), 2055);
     }
 }

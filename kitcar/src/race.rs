@@ -46,7 +46,7 @@ impl<S> FromContext<S> for RaceTracker {
 /// (`Tiny::Reo`) so the entrant list is rebuilt for the new session.
 ///
 /// Each resulting [`RaceEvent`] is emitted as a synthetic via
-/// [`Sender::event`] for Update-stage handlers to consume via
+/// [`crate::Sender::event`] for Update-stage handlers to consume via
 /// `Event<RaceEvent>`.
 ///
 /// ## Example

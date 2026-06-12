@@ -436,7 +436,7 @@ impl Game {
                 events
             },
             insim::Packet::Axi(axi) => {
-                let ((_, prev_lname), (_, new_lname)) = self.apply_axi(axi);
+                let (prev_lname, new_lname) = self.apply_axi(axi);
                 if prev_lname != new_lname {
                     vec![GameEvent::LayoutChanged {
                         from: prev_lname,
@@ -458,20 +458,14 @@ impl Game {
                     MultiplayerState::Local => vec![GameEvent::MultiplayerLeft],
                 }
             },
-            insim::Packet::Tiny(tiny) => {
-                if let Some(prev) = self.apply_tiny_axc(tiny) {
-                    if prev.is_some() {
-                        vec![GameEvent::LayoutChanged {
-                            from: prev,
-                            to: None,
-                        }]
-                    } else {
-                        vec![]
-                    }
-                } else {
-                    vec![]
-                }
-            },
+            insim::Packet::Tiny(tiny) => self
+                .apply_tiny_axc(tiny)
+                .map(|prev| GameEvent::LayoutChanged {
+                    from: Some(prev),
+                    to: None,
+                })
+                .into_iter()
+                .collect(),
             insim::Packet::Rst(rst) => {
                 if let Some(kind) = self.apply_rst(rst) {
                     vec![GameEvent::SessionStarted { kind }]
@@ -608,13 +602,12 @@ impl Game {
         });
     }
 
-    fn apply_axi(&self, axi: &Axi) -> ((u64, Option<String>), (u64, Option<String>)) {
+    fn apply_axi(&self, axi: &Axi) -> (Option<String>, Option<String>) {
         let mut g = self.inner.write();
-        let prev = (g.axi_count, g.layout.clone());
+        let prev = g.layout.clone();
         g.layout = axi.lname.clone();
         g.axi_count = g.axi_count.wrapping_add(1);
-        let current = (g.axi_count, axi.lname.clone());
-        (prev, current)
+        (prev, axi.lname.clone())
     }
 
     fn apply_ism(&self, ism: &Ism) -> (MultiplayerState, MultiplayerState) {
@@ -631,13 +624,11 @@ impl Game {
         (prev, g.multiplayer.clone())
     }
 
-    fn apply_tiny_axc(&self, tiny: &Tiny) -> Option<Option<String>> {
+    fn apply_tiny_axc(&self, tiny: &Tiny) -> Option<String> {
         if !matches!(tiny.subt, TinyType::Axc) {
             return None;
         }
         let mut g = self.inner.write();
-        let prev = g.layout.clone();
-        g.layout = None;
-        Some(prev)
+        g.layout.take()
     }
 }

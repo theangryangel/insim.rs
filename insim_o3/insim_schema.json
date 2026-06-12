@@ -1523,18 +1523,12 @@
         "showlights"
       ]
     },
-    "AngVel": {
-      "description": "Angular velocity stored as radians per second (f32).\n\n- `from_wire_i16` / `to_wire_i16` use the LFS scaling (16384 = 360°/s).\n- Positive values indicate clockwise rotation when viewed from above.\n- Stored as `f32` radians/sec for consistency with [`Heading`](crate::heading::Heading)\n  and [`Speed`](crate::speed::Speed).",
-      "type": "object",
-      "properties": {
-        "radians_per_sec": {
-          "type": "number",
-          "format": "float"
-        }
-      },
-      "required": [
-        "radians_per_sec"
-      ]
+    "AngVelI16": {
+      "description": "Angular velocity as transmitted in `CompCar` (MCI): a signed `i16` where\n16384 = 360°/s.\n\nStores the raw wire value; conversions to degrees/radians per second are\naccessors. Decoding then encoding reproduces the original `i16` exactly.",
+      "type": "integer",
+      "format": "int16",
+      "maximum": 32767,
+      "minimum": -32768
     },
     "Armco": {
       "description": "Armco 1-5 barrier",
@@ -1552,8 +1546,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "mapping": {
           "description": "Mapping (4 bits, 0-15)",
@@ -1605,8 +1599,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "xyz": {
           "description": "Position",
@@ -1727,8 +1721,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "mapping": {
           "description": "Mapping (4 bits, 0-15)",
@@ -1763,8 +1757,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "mapping": {
           "description": "Mapping (4 bits, 0-15)",
@@ -1814,8 +1808,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "mapping": {
           "description": "Mapping (4 bits, 0-15)",
@@ -1916,8 +1910,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "mapping": {
           "description": "Mapping (4 bits, 0-15)",
@@ -1964,8 +1958,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "mapping": {
           "description": "Mapping (4 bits, 0-15)",
@@ -2312,15 +2306,15 @@
       "properties": {
         "direction": {
           "description": "Direction of motion.",
-          "$ref": "#/$defs/Heading"
+          "$ref": "#/$defs/HeadingU8"
         },
         "heading": {
           "description": "Car facing direction.",
-          "$ref": "#/$defs/Heading"
+          "$ref": "#/$defs/HeadingU8"
         },
         "speed": {
           "description": "Speed.",
-          "$ref": "#/$defs/Speed"
+          "$ref": "#/$defs/SpeedU8"
         },
         "x": {
           "description": "X position.",
@@ -2404,8 +2398,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "xyz": {
           "description": "Position",
@@ -2551,8 +2545,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "xyz": {
           "description": "Position",
@@ -2797,6 +2791,13 @@
       "maximum": 255,
       "minimum": 0
     },
+    "ClosingSpeed": {
+      "description": "Closing speed as transmitted in `Con`/`Obh` `spclose`: a `u16` where 10 units =\n1 m/s. The top 4 bits of the wire field are reserved and are masked off on\ndecode (and never written on encode).\n\nStores the raw (masked) wire value; decoding then encoding reproduces the\noriginal 12-bit value exactly.",
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
     "Cnl": {
       "description": "Connection left notification.\n\n- Reports the reason and current connection count.",
       "type": "object",
@@ -2889,15 +2890,15 @@
       "properties": {
         "angvel": {
           "description": "Angular velocity of the car.",
-          "$ref": "#/$defs/AngVel"
+          "$ref": "#/$defs/AngVelI16"
         },
         "direction": {
           "description": "Direction of motion (heading of velocity).",
-          "$ref": "#/$defs/Heading"
+          "$ref": "#/$defs/HeadingU16"
         },
         "heading": {
           "description": "Car facing direction.",
-          "$ref": "#/$defs/Heading"
+          "$ref": "#/$defs/HeadingU16"
         },
         "info": {
           "description": "Additional state flags.",
@@ -2930,10 +2931,10 @@
         },
         "speed": {
           "description": "Speed.",
-          "$ref": "#/$defs/Speed"
+          "$ref": "#/$defs/SpeedU16"
         },
         "xyz": {
-          "description": "World position in meters.",
+          "description": "World position in metres.",
           "$ref": "#/$defs/Coordinate"
         }
       },
@@ -2987,7 +2988,7 @@
         },
         "spclose": {
           "description": "Closing speed at impact.",
-          "$ref": "#/$defs/Speed"
+          "$ref": "#/$defs/ClosingSpeed"
         },
         "time": {
           "description": "Time since session start, in milliseconds (wraps periodically).",
@@ -3009,18 +3010,18 @@
       "type": "object",
       "properties": {
         "accelf": {
-          "description": "Longitudinal acceleration.",
+          "description": "Longitudinal acceleration in m/s² (forward positive, braking negative).",
           "type": "integer",
-          "format": "uint8",
-          "maximum": 255,
-          "minimum": 0
+          "format": "int8",
+          "maximum": 127,
+          "minimum": -128
         },
         "accelr": {
-          "description": "Lateral acceleration.",
+          "description": "Lateral acceleration in m/s² (rightward positive, leftward negative).",
           "type": "integer",
-          "format": "uint8",
-          "maximum": 255,
-          "minimum": 0
+          "format": "int8",
+          "maximum": 127,
+          "minimum": -128
         },
         "brk": {
           "description": "Brake input (0-15).",
@@ -3038,7 +3039,7 @@
         },
         "direction": {
           "description": "Direction of motion.",
-          "$ref": "#/$defs/Heading"
+          "$ref": "#/$defs/HeadingU8"
         },
         "gearsp": {
           "description": "Gear selector (0-15).",
@@ -3056,7 +3057,7 @@
         },
         "heading": {
           "description": "Car facing direction.",
-          "$ref": "#/$defs/Heading"
+          "$ref": "#/$defs/HeadingU8"
         },
         "info": {
           "description": "Additional car state flags.",
@@ -3068,14 +3069,14 @@
         },
         "speed": {
           "description": "Speed.",
-          "$ref": "#/$defs/Speed"
+          "$ref": "#/$defs/SpeedU8"
         },
         "steer": {
-          "description": "Front wheel steering angle (right positive).",
+          "description": "Front wheel steering angle in degrees (right positive, left negative).",
           "type": "integer",
-          "format": "uint8",
-          "maximum": 255,
-          "minimum": 0
+          "format": "int8",
+          "maximum": 127,
+          "minimum": -128
         },
         "thr": {
           "description": "Throttle input (0-15).",
@@ -3176,8 +3177,8 @@
       "type": "object",
       "properties": {
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "height": {
           "description": "Height",
@@ -3231,8 +3232,8 @@
       "type": "object",
       "properties": {
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "height": {
           "description": "Height",
@@ -3268,8 +3269,8 @@
           "$ref": "#/$defs/ConcreteColour"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "height": {
           "description": "Height",
@@ -3301,8 +3302,8 @@
           "$ref": "#/$defs/ConcreteColour"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "pitch": {
           "description": "Pitch",
@@ -3330,8 +3331,8 @@
       "type": "object",
       "properties": {
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "length": {
           "description": "Length",
@@ -3367,8 +3368,8 @@
           "$ref": "#/$defs/ConcreteColour"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "length": {
           "description": "Length",
@@ -3400,8 +3401,8 @@
           "$ref": "#/$defs/ConcreteColour"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "height": {
           "description": "Height",
@@ -3437,8 +3438,8 @@
           "$ref": "#/$defs/ConcreteColour"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "length": {
           "description": "Length",
@@ -3480,8 +3481,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "xyz": {
           "description": "Position",
@@ -3551,8 +3552,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "kind": {
           "description": "Kind of Control Object",
@@ -3721,7 +3722,7 @@
         },
         "h": {
           "description": "heading - 0 points along Y axis",
-          "$ref": "#/$defs/Heading"
+          "$ref": "#/$defs/HeadingU16"
         },
         "ingamecam": {
           "description": "CameraView",
@@ -4175,18 +4176,19 @@
         "h_tres"
       ]
     },
-    "Heading": {
-      "description": "Angular measurement stored as radians (f64).\n\n- 0° points along world Y, 90° along world -X.\n- Values are not auto-normalized; use `normalize()` when needed.\n- Includes object-heading wire conversions.\n\nRepresents heading or direction in LFS game space. Internally stored as f64 radians\nfor consistency across the codebase, with convenient conversions to/from degrees.\nUses double precision to minimize cumulative errors in physics calculations and\nintegration over time.\n\n# Orientation\n- 0 = world Y direction** (forward/north)\n- 90 = world -X direction** (left/west)\n- 180 = -Y direction** (backward/south)\n- 270 = world X direction** (right/east)\n\nAngles increase in the anti-clockwise direction when viewed from above.\n\n# Wraparound\nAngles are **not** automatically normalized. A Heading created from 450 will\npreserve that value internally. Use [`normalize()`](Heading::normalize) to wrap\nangles to the 0->360 range if needed.\n\n```\nuse insim_core::heading::Heading;\n\nlet over = Heading::from_degrees(450.0);\nassert!((over.to_degrees() - 450.0).abs() < 0.0001);  // Preserved as-is\n\nlet normalized = over.normalize();\nassert!((normalized.to_degrees() - 90.0).abs() < 0.0001);  // Wrapped to [0, 360)\n```\n\n# Examples\n```\nuse insim_core::heading::Heading;\n\nlet forward = Heading::from_degrees(0.0);    // Y direction\nlet left = Heading::from_degrees(90.0);      // -X direction\nlet backward = Heading::from_degrees(180.0); // -Y direction\n\nassert_eq!(forward.to_degrees(), 0.0);\nassert_eq!(left.to_degrees(), 90.0);\n```",
-      "type": "object",
-      "properties": {
-        "radians": {
-          "type": "number",
-          "format": "double"
-        }
-      },
-      "required": [
-        "radians"
-      ]
+    "HeadingU16": {
+      "description": "Heading as transmitted in `CompCar` (MCI) and `Cpp`: a `u16` where\n32768 = 180°, zero at 0.\n\nStores the raw wire value; degree/radian conversions are accessors.\nDecoding then encoding reproduces the original value exactly.",
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "HeadingU8": {
+      "description": "Heading as transmitted in `CarContact`/`ConInfo`: a `u8` where\n128 = 180°, zero at 0.\n\nStores the raw wire value; degree/radian conversions are accessors.\nDecoding then encoding reproduces the original value exactly.",
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
     },
     "Hlv": {
       "description": "Hot lap validity violation report.\n\n- Sent when HLVC is enabled in [IsiFlags](crate::insim::IsiFlags).",
@@ -4285,8 +4287,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "kind": {
           "description": "Kind of checkpoint",
@@ -4565,7 +4567,7 @@
               "properties": {
                 "heading": {
                   "description": "Heading / Direction",
-                  "$ref": "#/$defs/Heading"
+                  "$ref": "#/$defs/ObjectHeading"
                 },
                 "xyz": {
                   "description": "Position",
@@ -4601,8 +4603,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "mapping": {
           "description": "Mapping",
@@ -4936,8 +4938,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "xyz": {
           "description": "Position",
@@ -4984,8 +4986,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "xyz": {
           "description": "Position",
@@ -5032,8 +5034,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "xyz": {
           "description": "Position",
@@ -5107,8 +5109,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "kind": {
           "description": "Kind of marker",
@@ -5157,8 +5159,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "kind": {
           "description": "Kind of distance marker",
@@ -5206,8 +5208,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "mapping": {
           "description": "Mapping (4 bits, 0-15)",
@@ -5238,8 +5240,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Flags: watching/left/right\nHeading",
-          "$ref": "#/$defs/Heading"
+          "description": "Flags: watching/left/right\nObjectHeading",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "kind": {
           "description": "Kind of Marshal",
@@ -5852,7 +5854,7 @@
         },
         "spclose": {
           "description": "Closing speed at impact.",
-          "$ref": "#/$defs/Speed"
+          "$ref": "#/$defs/ClosingSpeed"
         },
         "time": {
           "description": "Time since session start, in milliseconds (wraps periodically).",
@@ -5942,6 +5944,13 @@
         "y",
         "z"
       ]
+    },
+    "ObjectHeading": {
+      "description": "Heading as transmitted in layout `ObjectInfo`: a `u8` where 128 = 180°\n**and the zero-point is offset** so that raw 128 = 0°\n(`raw = (degrees + 180) * 256 / 360`). This is why it is a distinct type\nfrom [`HeadingU8`] despite the identical scale.\n\n- 128 = 0° (forward), 192 = 90°, 0 = 180°, 64 = 270°.\n\nStores the raw wire value; degree/radian conversions are accessors.\nDecoding then encoding reproduces the original value exactly.",
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
     },
     "ObjectInfo": {
       "description": "Layout Object",
@@ -7385,8 +7394,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "index": {
           "description": "Position index (0-47, representing start positions 1-48)",
@@ -7423,8 +7432,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "mapping": {
           "description": "Mapping (4 bits, 0-15)",
@@ -7870,8 +7879,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "mapping": {
           "description": "Mapping (4 bits, 0-15)",
@@ -8056,8 +8065,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "mapping": {
           "description": "Mapping (4 bits, 0-15)",
@@ -8095,8 +8104,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "mapping": {
           "description": "Mapping (4 bits, 0-15)",
@@ -8774,8 +8783,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "kind": {
           "description": "Kind",
@@ -8810,8 +8819,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "mapping": {
           "description": "Mapping",
@@ -9074,19 +9083,6 @@
         }
       ]
     },
-    "Speed": {
-      "description": "Speed stored as meters per second.\n\n- Internal units are m/s.\n- Helper methods convert to and from kph and mph.",
-      "type": "object",
-      "properties": {
-        "inner": {
-          "type": "number",
-          "format": "float"
-        }
-      },
-      "required": [
-        "inner"
-      ]
-    },
     "SpeedHump": {
       "description": "Speed hump 10m",
       "type": "object",
@@ -9103,8 +9099,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "mapping": {
           "description": "Mapping (4 bits, 0-15)",
@@ -9150,6 +9146,20 @@
           "const": "Speed40Mph"
         }
       ]
+    },
+    "SpeedU16": {
+      "description": "Speed as transmitted in [`Mci`](crate)'s `CompCar`: a `u16` where\n`327.68` units = 1 m/s (i.e. `32768` = 100 m/s).\n\nStores the raw wire value; conversions to m/s, km/h and mph are provided as\naccessors. Decoding then encoding reproduces the original `u16` exactly.",
+      "type": "integer",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0
+    },
+    "SpeedU8": {
+      "description": "Speed as transmitted in `CarContact`/`ConInfo`: a `u8` where 1 unit = 1 m/s.\n\nRange is therefore 0..=255 m/s in whole-metre-per-second steps. Stores the raw\nwire value; decoding then encoding reproduces the original `u8` exactly.",
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
     },
     "Spx": {
       "description": "Split timing for a player.\n\n- Sent when a player crosses a split.",
@@ -9396,8 +9406,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "identifier": {
           "description": "identifier",
@@ -9427,8 +9437,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "index": {
           "description": "Position index (0-47, representing start positions 1-48)",
@@ -9854,8 +9864,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "xyz": {
           "description": "Position",
@@ -9973,8 +9983,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "mapping": {
           "description": "Mapping (4 bits, 0-15)",
@@ -10009,8 +10019,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "mapping": {
           "description": "Mapping (4 bits, 0-15)",
@@ -10512,8 +10522,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "mapping": {
           "description": "Mapping (4 bits, 0-15)",
@@ -10561,8 +10571,8 @@
           "type": "boolean"
         },
         "heading": {
-          "description": "Heading / Direction",
-          "$ref": "#/$defs/Heading"
+          "description": "ObjectHeading / Direction",
+          "$ref": "#/$defs/ObjectHeading"
         },
         "mapping": {
           "description": "Mapping (4 bits, 0-15)",

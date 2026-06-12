@@ -1,6 +1,6 @@
 //! Marshal objects
 use crate::{
-    heading::Heading,
+    heading::ObjectHeading,
     object::{ObjectCoordinate, ObjectInfoInner, Raw},
 };
 
@@ -14,8 +14,8 @@ pub struct Marshal {
     /// Kind of Marshal
     pub kind: MarshalKind,
     /// Flags: watching/left/right
-    /// Heading
-    pub heading: Heading,
+    /// ObjectHeading
+    pub heading: ObjectHeading,
     /// Floating?
     pub floating: bool,
 }
@@ -23,7 +23,7 @@ pub struct Marshal {
 impl Marshal {
     pub(super) fn new(raw: Raw) -> Result<Self, crate::DecodeError> {
         let xyz = raw.xyz;
-        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let heading = ObjectHeading::from_raw(raw.heading);
         let kind = MarshalKind::try_from(raw.flags)?;
         let floating = raw.raw_floating();
 
@@ -44,11 +44,11 @@ impl ObjectInfoInner for Marshal {
         flags
     }
 
-    fn heading_mut(&mut self) -> Option<&mut Heading> {
+    fn heading_mut(&mut self) -> Option<&mut ObjectHeading> {
         Some(&mut self.heading)
     }
 
-    fn heading(&self) -> Option<Heading> {
+    fn heading(&self) -> Option<ObjectHeading> {
         Some(self.heading)
     }
 
@@ -61,7 +61,7 @@ impl ObjectInfoInner for Marshal {
     }
 
     fn heading_objectinfo_wire(&self) -> u8 {
-        self.heading.to_objectinfo_wire()
+        self.heading.to_raw()
     }
 }
 

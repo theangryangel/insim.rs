@@ -1,7 +1,7 @@
 //! Speed sign objects
 use crate::{
     DecodeError, DecodeErrorKind,
-    heading::Heading,
+    heading::ObjectHeading,
     object::{ObjectCoordinate, ObjectInfoInner, Raw},
 };
 
@@ -50,8 +50,8 @@ pub struct SignSpeed {
     pub xyz: ObjectCoordinate,
     /// Mapping
     pub mapping: SpeedSignMapping,
-    /// Heading / Direction
-    pub heading: Heading,
+    /// ObjectHeading / Direction
+    pub heading: ObjectHeading,
     /// Colour (3 bits, 0-7)
     pub colour: u8,
     /// Floating
@@ -61,7 +61,7 @@ pub struct SignSpeed {
 impl SignSpeed {
     pub(super) fn new(raw: Raw) -> Result<Self, crate::DecodeError> {
         let xyz = raw.xyz;
-        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let heading = ObjectHeading::from_raw(raw.heading);
         let mapping = SpeedSignMapping::try_from(raw.raw_mapping())?;
         let colour = raw.raw_colour();
         let floating = raw.raw_floating();
@@ -84,11 +84,11 @@ impl ObjectInfoInner for SignSpeed {
         flags
     }
 
-    fn heading_mut(&mut self) -> Option<&mut Heading> {
+    fn heading_mut(&mut self) -> Option<&mut ObjectHeading> {
         Some(&mut self.heading)
     }
 
-    fn heading(&self) -> Option<Heading> {
+    fn heading(&self) -> Option<ObjectHeading> {
         Some(self.heading)
     }
 
@@ -101,6 +101,6 @@ impl ObjectInfoInner for SignSpeed {
     }
 
     fn heading_objectinfo_wire(&self) -> u8 {
-        self.heading.to_objectinfo_wire()
+        self.heading.to_raw()
     }
 }

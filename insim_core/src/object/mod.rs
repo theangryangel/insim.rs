@@ -42,17 +42,17 @@ mod tests;
 pub use object_coordinate::ObjectCoordinate;
 
 use crate::{
-    Decode, DecodeContext, DecodeError, Encode, EncodeContext, EncodeError, heading::Heading,
+    Decode, DecodeContext, DecodeError, Encode, EncodeContext, EncodeError, heading::ObjectHeading,
 };
 
 trait ObjectInfoInner {
     fn flags(&self) -> u8;
 
-    fn heading_mut(&mut self) -> Option<&mut Heading> {
+    fn heading_mut(&mut self) -> Option<&mut ObjectHeading> {
         None
     }
 
-    fn heading(&self) -> Option<Heading> {
+    fn heading(&self) -> Option<ObjectHeading> {
         None
     }
 
@@ -65,9 +65,7 @@ trait ObjectInfoInner {
     }
 
     fn heading_objectinfo_wire(&self) -> u8 {
-        self.heading()
-            .map(|h| h.to_objectinfo_wire())
-            .unwrap_or_default()
+        self.heading().map(|h| h.to_raw()).unwrap_or_default()
     }
 }
 
@@ -216,7 +214,7 @@ macro_rules! define_object_info {
             }
 
             /// Get mutable heading if this object has one
-            pub fn heading_mut(&mut self) -> Option<&mut Heading> {
+            pub fn heading_mut(&mut self) -> Option<&mut ObjectHeading> {
                 match self {
                     $(
                         ObjectInfo::$variant(i) => i.heading_mut(),
@@ -226,7 +224,7 @@ macro_rules! define_object_info {
             }
 
             /// Get heading if this object has one
-            pub fn heading(&self) -> Option<Heading> {
+            pub fn heading(&self) -> Option<ObjectHeading> {
                 match self {
                     $(
                         ObjectInfo::$variant(i) => i.heading(),

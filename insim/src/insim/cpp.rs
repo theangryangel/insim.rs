@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use insim_core::{
-    Decode, DecodeContext, Encode, EncodeContext, coordinate::Coordinate, heading::Heading,
+    Decode, DecodeContext, Encode, EncodeContext, coordinate::Coordinate, heading::HeadingU16,
 };
 
 use super::{CameraView, StaFlags};
@@ -20,7 +20,7 @@ pub struct Cpp {
     pub pos: Coordinate,
 
     /// heading - 0 points along Y axis
-    pub h: Heading,
+    pub h: HeadingU16,
 
     /// Pitch
     pub p: u16,
@@ -52,9 +52,7 @@ impl Decode for Cpp {
         ctx.pad("zero", 1)?;
         let pos = ctx.decode::<Coordinate>("pos")?;
 
-        let h = Heading::from_degrees(
-            (ctx.decode::<u16>("h")? as f64) * super::mci::COMPCAR_DEGREES_PER_UNIT,
-        );
+        let h = ctx.decode::<HeadingU16>("h")?;
         let p = ctx.decode::<u16>("p")?;
         let r = ctx.decode::<u16>("r")?;
 
@@ -85,10 +83,7 @@ impl Encode for Cpp {
         ctx.encode("reqi", &self.reqi)?;
         ctx.pad("zero", 1)?;
         ctx.encode("pos", &self.pos)?;
-        let h = (self.h.to_degrees() / super::mci::COMPCAR_DEGREES_PER_UNIT)
-            .round()
-            .clamp(0.0, 65535.0) as u16;
-        ctx.encode("h", &h)?;
+        ctx.encode("h", &self.h)?;
         ctx.encode("p", &self.p)?;
         ctx.encode("r", &self.r)?;
         ctx.encode("viewplid", &self.viewplid)?;

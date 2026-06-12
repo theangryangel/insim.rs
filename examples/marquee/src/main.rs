@@ -56,7 +56,7 @@ use glam::DVec3;
 use insim::{
     Packet, WithRequestId,
     core::{
-        heading::Heading,
+        heading::ObjectHeading,
         object::{ObjectCoordinate, ObjectInfo, chalk, concrete, letterboard_rb, painted, tyres},
     },
     identifiers::PlayerId,
@@ -66,11 +66,11 @@ use insim::{
 fn position_text_common(
     text: &str,
     center: DVec3,
-    heading: Heading,
+    heading: ObjectHeading,
     spacing_meters: f64,
     forward_meters: f64,
     elapsed: Duration,
-) -> impl Iterator<Item = (usize, char, DVec3, Heading)> {
+) -> impl Iterator<Item = (usize, char, DVec3, ObjectHeading)> {
     const SPEED: f64 = 1.0;
     const MAX_VISIBLE: f64 = 10.0;
     const PADDING: usize = 2;
@@ -99,7 +99,7 @@ fn position_text_common(
 fn position_letterboard(
     text: &str,
     center: DVec3,
-    heading: Heading,
+    heading: ObjectHeading,
     spacing_meters: f64,
     forward_meters: f64,
     elapsed: Duration,
@@ -121,7 +121,7 @@ fn position_letterboard(
         Some(ObjectInfo::LetterboardRB(letterboard_rb::LetterboardRB {
             xyz: ObjectCoordinate::from_dvec3_metres(position),
             character: letter,
-            heading: Heading::from_radians(heading.to_radians() + std::f64::consts::PI),
+            heading: ObjectHeading::from_radians(heading.to_radians() + std::f64::consts::PI),
             colour: letterboard_rb::LetterboardRBColour::Red,
             floating: false,
         }))
@@ -132,7 +132,7 @@ fn position_letterboard(
 fn position_painted(
     text: &str,
     center: DVec3,
-    heading: Heading,
+    heading: ObjectHeading,
     spacing_meters: f64,
     forward_meters: f64,
     elapsed: Duration,
@@ -154,7 +154,7 @@ fn position_painted(
         Some(ObjectInfo::PaintLetters(painted::Letters {
             xyz: ObjectCoordinate::from_dvec3_metres(position),
             character: letter,
-            heading: Heading::from_radians(heading.to_radians()),
+            heading: ObjectHeading::from_radians(heading.to_radians()),
             colour: painted::PaintColour::Yellow,
             floating: false,
         }))
@@ -164,7 +164,7 @@ fn position_painted(
 
 fn position_tyrestack_circle(
     center: DVec3,
-    heading: Heading,
+    heading: ObjectHeading,
     radius_metres: f64,
     elapsed: Duration,
     max: u8,
@@ -201,7 +201,7 @@ fn position_tyrestack_circle(
         .collect()
 }
 
-pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<ObjectInfo> {
+pub fn generate_checkpoint_signal(location: DVec3, heading: ObjectHeading) -> Vec<ObjectInfo> {
     use std::f64::consts::FRAC_PI_2;
 
     // Structure: (Local Position, The Object with Local Rotation)
@@ -216,7 +216,7 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
                 x: concrete::Size::ThreeQuarter,
                 y: concrete::Size::ThreeQuarter,
                 height: concrete::ConcreteHeight::M4_00,
-                heading: Heading::from_radians(0.0),
+                heading: ObjectHeading::from_radians(0.0),
             }),
         ),
         (
@@ -226,7 +226,7 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
                 x: concrete::Size::ThreeQuarter,
                 y: concrete::Size::ThreeQuarter,
                 height: concrete::ConcreteHeight::M2_25,
-                heading: Heading::from_radians(0.0),
+                heading: ObjectHeading::from_radians(0.0),
             }),
         ),
         // LEFT Arms (Offset 1.70m Right, Rotated -90 deg) --
@@ -237,7 +237,7 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
                 colour: concrete::ConcreteColour::Yellow,
                 length: concrete::ConcreteWidthLength::Four,
                 pitch: concrete::ConcretePitch::Deg42,
-                heading: Heading::from_radians(-FRAC_PI_2), // Facing Right
+                heading: ObjectHeading::from_radians(-FRAC_PI_2), // Facing Right
             }),
         ),
         (
@@ -247,7 +247,7 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
                 colour: concrete::ConcreteColour::Red,
                 length: concrete::ConcreteWidthLength::Four,
                 pitch: concrete::ConcretePitch::Deg42,
-                heading: Heading::from_radians(-FRAC_PI_2),
+                heading: ObjectHeading::from_radians(-FRAC_PI_2),
             }),
         ),
         (
@@ -257,7 +257,7 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
                 colour: concrete::ConcreteColour::Blue,
                 length: concrete::ConcreteWidthLength::Four,
                 pitch: concrete::ConcretePitch::Deg42,
-                heading: Heading::from_radians(-FRAC_PI_2),
+                heading: ObjectHeading::from_radians(-FRAC_PI_2),
             }),
         ),
         // Chalk line on floor
@@ -298,7 +298,7 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
                 x: concrete::Size::ThreeQuarter,
                 y: concrete::Size::ThreeQuarter,
                 height: concrete::ConcreteHeight::M4_00,
-                heading: Heading::from_radians(0.0),
+                heading: ObjectHeading::from_radians(0.0),
             }),
         ),
         (
@@ -308,7 +308,7 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
                 x: concrete::Size::ThreeQuarter,
                 y: concrete::Size::ThreeQuarter,
                 height: concrete::ConcreteHeight::M2_25,
-                heading: Heading::from_radians(0.0),
+                heading: ObjectHeading::from_radians(0.0),
             }),
         ),
         // LEFT Arms (Offset 1.70m Right, Rotated 90 deg) --
@@ -319,7 +319,7 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
                 colour: concrete::ConcreteColour::Yellow,
                 length: concrete::ConcreteWidthLength::Four,
                 pitch: concrete::ConcretePitch::Deg42,
-                heading: Heading::from_radians(FRAC_PI_2), // Facing LEFT
+                heading: ObjectHeading::from_radians(FRAC_PI_2), // Facing LEFT
             }),
         ),
         (
@@ -329,7 +329,7 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
                 colour: concrete::ConcreteColour::Red,
                 length: concrete::ConcreteWidthLength::Four,
                 pitch: concrete::ConcretePitch::Deg42,
-                heading: Heading::from_radians(FRAC_PI_2),
+                heading: ObjectHeading::from_radians(FRAC_PI_2),
             }),
         ),
         (
@@ -339,7 +339,7 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
                 colour: concrete::ConcreteColour::Blue,
                 length: concrete::ConcreteWidthLength::Four,
                 pitch: concrete::ConcretePitch::Deg42,
-                heading: Heading::from_radians(FRAC_PI_2),
+                heading: ObjectHeading::from_radians(FRAC_PI_2),
             }),
         ),
     ];
@@ -370,10 +370,10 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: Heading) -> Vec<Obje
             // We update the 'kind' in place by adding the global heading to its local heading
             match &mut kind {
                 ObjectInfo::ConcretePillar(p) => {
-                    p.heading = Heading::from_radians(global_rad + p.heading.to_radians());
+                    p.heading = ObjectHeading::from_radians(global_rad + p.heading.to_radians());
                 },
                 ObjectInfo::ConcreteSlabWall(w) => {
-                    w.heading = Heading::from_radians(global_rad + w.heading.to_radians());
+                    w.heading = ObjectHeading::from_radians(global_rad + w.heading.to_radians());
                 },
                 _ => {}, // Handle other types if necessary
             }
@@ -446,7 +446,8 @@ pub async fn main() -> Result<()> {
         },
         Mode::Signal { x, y, z, heading } => {
             let center = DVec3::new(*x, *y, *z);
-            last_objects = generate_checkpoint_signal(center, Heading::from_radians(*heading));
+            last_objects =
+                generate_checkpoint_signal(center, ObjectHeading::from_radians(*heading));
 
             connection
                 .write(Axm {
@@ -495,19 +496,19 @@ pub async fn main() -> Result<()> {
                                 text,
                             } => {
                                 let center = DVec3::new(*x, *y, *z);
-                                let dir = Heading::from_radians(*heading);
+                                let dir = ObjectHeading::from_radians(*heading);
                                 last_objects = position_letterboard(&text, center, dir, 1.0, 10.0, started.elapsed());
                             },
                             Mode::Painted {
                                 x, y, z, heading, text
                             } => {
                                 let center = DVec3::new(*x, *y, *z);
-                                let dir = Heading::from_radians(*heading);
+                                let dir = ObjectHeading::from_radians(*heading);
                                 last_objects = position_painted(&text, center, dir, 1.0, 10.0, started.elapsed());
                             },
                             Mode::Circle { x, y, z, heading, radius, count } => {
                                 let center = DVec3::new(*x, *y, *z);
-                                let dir = Heading::from_radians(*heading);
+                                let dir = ObjectHeading::from_radians(*heading);
                                 last_objects = position_tyrestack_circle(center, dir, *radius, started.elapsed(), *count);
                             },
                             _ => {

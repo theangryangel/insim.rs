@@ -1,4 +1,4 @@
-use insim::{core::heading::Heading, insim::ObjectInfo};
+use insim::{core::heading::ObjectHeading, insim::ObjectInfo};
 use noise::{NoiseFn, Perlin};
 use rand_distr::{Distribution, Normal};
 
@@ -34,7 +34,7 @@ pub fn jiggle(
         // 3. Combine and Apply
         let final_rads = current_rads + spatial_jiggle + individual_jiggle;
         if let Some(heading) = new_obj.heading_mut() {
-            *heading = Heading::from_radians(final_rads);
+            *heading = ObjectHeading::from_radians(final_rads);
         }
 
         output.push(new_obj);

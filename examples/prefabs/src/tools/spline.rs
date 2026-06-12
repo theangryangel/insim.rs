@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use glam::{DVec2, DVec3};
-use insim::core::heading::Heading;
+use insim::core::heading::ObjectHeading;
 
 #[derive(Debug, Clone, Copy)]
 pub struct LutEntry {
@@ -122,17 +122,17 @@ pub fn sample_lut(lut: &[LutEntry], target_distance: f64) -> LutEntry {
     }
 }
 
-pub fn heading_to_forward(heading: Heading) -> DVec2 {
+pub fn heading_to_forward(heading: ObjectHeading) -> DVec2 {
     let radians = heading.to_radians();
     DVec2::new(-radians.sin(), radians.cos())
 }
 
-pub fn heading_from_vec2_or_fallback(vector: DVec2, fallback: Heading) -> Heading {
+pub fn heading_from_vec2_or_fallback(vector: DVec2, fallback: ObjectHeading) -> ObjectHeading {
     if vector.length_squared() <= f64::EPSILON {
         return fallback;
     }
     let tangent = vector.normalize();
-    Heading::from_radians((-tangent.x).atan2(tangent.y))
+    ObjectHeading::from_radians((-tangent.x).atan2(tangent.y))
 }
 
 pub fn normalize_or_fallback(vector: DVec3, fallback: DVec3) -> DVec3 {

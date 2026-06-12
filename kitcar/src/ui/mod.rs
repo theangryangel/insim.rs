@@ -2,7 +2,7 @@
 //!
 //! Drives a per-connection [`Component`] tree on its own background thread
 //! (necessary because `taffy` layout isn't `Send`, so view tasks run on a
-//! `LocalSet`). Registers as a [`Handler`](crate::Handler) so the runtime forwards
+//! `LocalSet`). Registers as a [`Handler`] so the runtime forwards
 //! `Ncn` / `Cnl` / `Btc` / `Btt` / `Bfn` packets into the UI thread, and
 //! as an extractor so handlers can pull the [`Ui`] handle by value to push
 //! global state updates / per-player state / view messages.

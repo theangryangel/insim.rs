@@ -1,5 +1,5 @@
 use anyhow::{Result, ensure};
-use insim::{core::heading::Heading, insim::ObjectInfo};
+use insim::{core::heading::ObjectHeading, insim::ObjectInfo};
 
 /// Rotates each object's heading in place by `degrees`, without moving positions.
 pub fn build(selection: &[ObjectInfo], degrees: f64) -> Result<Vec<ObjectInfo>> {
@@ -19,7 +19,7 @@ pub fn build(selection: &[ObjectInfo], degrees: f64) -> Result<Vec<ObjectInfo>> 
         .cloned()
         .map(|mut obj| {
             if let Some(heading) = obj.heading_mut() {
-                *heading = Heading::from_radians(heading.to_radians() + radians);
+                *heading = ObjectHeading::from_radians(heading.to_radians() + radians);
             }
             obj
         })

@@ -1,6 +1,6 @@
 //! Kerb objects
 use crate::{
-    heading::Heading,
+    heading::ObjectHeading,
     object::{ObjectCoordinate, ObjectInfoInner, Raw},
 };
 
@@ -78,8 +78,8 @@ impl From<u8> for KerbColour {
 pub struct Kerb {
     /// Position
     pub xyz: ObjectCoordinate,
-    /// Heading / Direction
-    pub heading: Heading,
+    /// ObjectHeading / Direction
+    pub heading: ObjectHeading,
     /// Colour (3 bits, 0-7)
     pub colour: u8,
     /// Mapping
@@ -91,7 +91,7 @@ pub struct Kerb {
 impl Kerb {
     pub(super) fn new(raw: Raw) -> Result<Self, crate::DecodeError> {
         let xyz = raw.xyz;
-        let heading = Heading::from_objectinfo_wire(raw.heading);
+        let heading = ObjectHeading::from_raw(raw.heading);
         let colour = raw.raw_colour();
         let mapping = KerbColour::from(raw.raw_mapping());
         let floating = raw.raw_floating();
@@ -114,11 +114,11 @@ impl ObjectInfoInner for Kerb {
         flags
     }
 
-    fn heading_mut(&mut self) -> Option<&mut Heading> {
+    fn heading_mut(&mut self) -> Option<&mut ObjectHeading> {
         Some(&mut self.heading)
     }
 
-    fn heading(&self) -> Option<Heading> {
+    fn heading(&self) -> Option<ObjectHeading> {
         Some(self.heading)
     }
 
@@ -131,6 +131,6 @@ impl ObjectInfoInner for Kerb {
     }
 
     fn heading_objectinfo_wire(&self) -> u8 {
-        self.heading.to_objectinfo_wire()
+        self.heading.to_raw()
     }
 }

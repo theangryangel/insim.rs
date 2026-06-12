@@ -1,6 +1,6 @@
 use anyhow::{Result, ensure};
 use glam::DVec2;
-use insim::{core::heading::Heading, insim::ObjectInfo};
+use insim::{core::heading::ObjectHeading, insim::ObjectInfo};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MirrorAxis {
@@ -44,7 +44,7 @@ pub fn build(selection: &[ObjectInfo], axis: MirrorAxis) -> Result<Vec<ObjectInf
                     MirrorAxis::X => std::f64::consts::PI - h,
                     MirrorAxis::Y => -h,
                 };
-                *heading = Heading::from_radians(new_h);
+                *heading = ObjectHeading::from_radians(new_h);
             }
 
             obj

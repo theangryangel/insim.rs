@@ -19,19 +19,12 @@
 
 mod commands;
 
-use std::{
-    collections::{HashMap, HashSet},
-    net::Ipv4Addr,
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashMap, net::Ipv4Addr, sync::Arc, time::Duration};
 
 use insim::{
     core::vehicle::Vehicle,
     identifiers::{ConnectionId, PlayerId},
-    insim::{
-        Cnl, Cpr, Nci, Ncn, Npl, Pfl, Pla, PlayerFlags, PlayerType, Pll, Slc, Tiny, TinyType, Toc,
-    },
+    insim::{Cnl, Cpr, Nci, Ncn, Npl, Pfl, Pla, Pll, Slc, Tiny, TinyType, Toc},
 };
 use parking_lot::RwLock;
 use tokio_util::sync::CancellationToken;
@@ -47,8 +40,6 @@ pub struct ConnectionInfo {
     pub pname: String,
     /// Whether the connection has admin privileges.
     pub admin: bool,
-    /// All players (including AI) controlled by this connection.
-    pub players: HashSet<PlayerId>,
     /// LFS.net user ID. Only populated when the host has an admin password
     /// set and an `Nci` packet has been received for this connection.
     pub userid: Option<u32>,
@@ -59,24 +50,41 @@ pub struct ConnectionInfo {
     pub selected_vehicle: Option<Vehicle>,
 }
 
-/// Per-player record stored by [`Presence`].
-#[derive(Debug, Clone)]
-pub struct PlayerInfo {
-    /// Player ID.
-    pub plid: PlayerId,
-    /// Owning connection ID.
-    pub ucid: ConnectionId,
-    /// Vehicle in use.
-    pub vehicle: Vehicle,
-    /// Player type flags (AI, female, remote, etc.).
-    pub ptype: PlayerType,
-    /// Player flags (pit-stop done, swap-out allowed, etc.).
-    pub flags: PlayerFlags,
-    /// Whether the player is currently in the pit lane.
-    pub in_pitlane: bool,
-    /// Player nickname at the moment of join.
-    pub pname: String,
+// XXX: `MultiIndexMap` generates a map struct and associated methods that cannot
+// carry doc comments, so `missing_docs` is suppressed for this module only.
+#[allow(missing_docs)]
+mod player_info {
+    use insim::{
+        core::vehicle::Vehicle,
+        identifiers::{ConnectionId, PlayerId},
+        insim::{PlayerFlags, PlayerType},
+    };
+    use multi_index_map::MultiIndexMap;
+
+    /// Per-player record stored by [`super::Presence`].
+    #[derive(MultiIndexMap, Debug, Clone)]
+    pub struct PlayerInfo {
+        /// Player ID.
+        #[multi_index(hashed_unique)]
+        pub plid: PlayerId,
+        /// Owning connection ID.
+        #[multi_index(hashed_non_unique)]
+        pub ucid: ConnectionId,
+        /// Vehicle in use.
+        pub vehicle: Vehicle,
+        /// Player type flags (AI, female, remote, etc.).
+        pub ptype: PlayerType,
+        /// Player flags (pit-stop done, swap-out allowed, etc.).
+        pub flags: PlayerFlags,
+        /// Whether the player is currently in the pit lane.
+        pub in_pitlane: bool,
+        /// Player nickname at the moment of join.
+        pub pname: String,
+    }
 }
+
+use player_info::MultiIndexPlayerInfoMap;
+pub use player_info::PlayerInfo;
 
 /// State-change events produced by [`Presence::apply_packet`].
 #[derive(Debug, Clone)]
@@ -126,8 +134,8 @@ pub enum PresenceEvent {
 #[derive(Default)]
 struct PresenceInner {
     connections: HashMap<ConnectionId, ConnectionInfo>,
-    players: HashMap<PlayerId, PlayerInfo>,
-    /// Survives `Cnl`: maps LFS.net username -> last seen display name.
+    players: MultiIndexPlayerInfoMap,
+    /// Survives `Cnl`: maps LFS.net username → last seen display name.
     last_known_names: HashMap<String, String>,
 }
 
@@ -136,9 +144,8 @@ struct PresenceInner {
 /// State lives behind `Arc<RwLock<…>>`; clones are cheap and share the same
 /// maps.
 ///
-/// Feed packets with [`apply`](Self::apply) (state-only) or
-/// [`apply_packet`](Self::apply_packet) (state + change events). Admin commands
-/// return packets for the caller to send.
+/// Feed packets with [`apply_packet`](Self::apply_packet) to update state and
+/// collect change events. Admin commands return packets for the caller to send.
 #[derive(Clone, Default)]
 pub struct Presence {
     inner: Arc<RwLock<PresenceInner>>,
@@ -190,18 +197,34 @@ impl Presence {
 
     /// Look up one player by `PlayerId`.
     pub fn player(&self, plid: PlayerId) -> Option<PlayerInfo> {
-        self.inner.read().players.get(&plid).cloned()
+        self.inner.read().players.get_by_plid(&plid).cloned()
     }
 
     /// Snapshot of all tracked players.
     pub fn players(&self) -> Vec<PlayerInfo> {
-        self.inner.read().players.values().cloned().collect()
+        self.inner
+            .read()
+            .players
+            .iter()
+            .map(|(_, p)| p.clone())
+            .collect()
+    }
+
+    /// All players currently owned by a given connection.
+    pub fn players_by_connection(&self, ucid: ConnectionId) -> Vec<PlayerInfo> {
+        self.inner
+            .read()
+            .players
+            .get_by_ucid(&ucid)
+            .into_iter()
+            .cloned()
+            .collect()
     }
 
     /// Look up the connection that currently controls a given player.
     pub fn connection_by_player(&self, plid: PlayerId) -> Option<ConnectionInfo> {
         let guard = self.inner.read();
-        let player = guard.players.get(&plid)?;
+        let player = guard.players.get_by_plid(&plid)?;
         guard.connections.get(&player.ucid).cloned()
     }
 
@@ -234,24 +257,24 @@ impl Presence {
         poll_interval: Duration,
         cancel: CancellationToken,
     ) -> Option<usize> {
-        let mut interval = tokio::time::interval(poll_interval);
-        loop {
-            tokio::select! {
-                biased;
-                _ = cancel.cancelled() => return None,
-                _ = interval.tick() => {
-                    let count = self.connection_count();
-                    if f(count) {
-                        return Some(count);
-                    }
-                }
-            }
-        }
+        self.wait_for_count(Self::connection_count, f, poll_interval, cancel)
+            .await
     }
 
     /// Poll until the player count satisfies `f`, or until `cancel` fires.
     pub async fn wait_for_player_count<F: Fn(usize) -> bool>(
         &self,
+        f: F,
+        poll_interval: Duration,
+        cancel: CancellationToken,
+    ) -> Option<usize> {
+        self.wait_for_count(Self::player_count, f, poll_interval, cancel)
+            .await
+    }
+
+    async fn wait_for_count<F: Fn(usize) -> bool>(
+        &self,
+        count_fn: fn(&Self) -> usize,
         f: F,
         poll_interval: Duration,
         cancel: CancellationToken,
@@ -262,7 +285,7 @@ impl Presence {
                 biased;
                 _ = cancel.cancelled() => return None,
                 _ = interval.tick() => {
-                    let count = self.player_count();
+                    let count = count_fn(self);
                     if f(count) {
                         return Some(count);
                     }
@@ -277,21 +300,20 @@ impl Presence {
             insim::Packet::Ncn(ncn) => vec![PresenceEvent::Connected(self.apply_ncn(ncn))],
             insim::Packet::Cnl(cnl) => {
                 let (info, players) = self.apply_cnl(cnl);
-                let mut events: Vec<PresenceEvent> =
-                    players.into_iter().map(PresenceEvent::PlayerLeft).collect();
-                events.push(PresenceEvent::Disconnected {
-                    ucid: cnl.ucid,
-                    info,
-                });
-                events
+                players
+                    .into_iter()
+                    .map(PresenceEvent::PlayerLeft)
+                    .chain(std::iter::once(PresenceEvent::Disconnected {
+                        ucid: cnl.ucid,
+                        info,
+                    }))
+                    .collect()
             },
-            insim::Packet::Nci(nci) => {
-                if let Some(conn) = self.apply_nci(nci) {
-                    vec![PresenceEvent::ConnectionDetails(conn)]
-                } else {
-                    vec![]
-                }
-            },
+            insim::Packet::Nci(nci) => self
+                .apply_nci(nci)
+                .map(PresenceEvent::ConnectionDetails)
+                .into_iter()
+                .collect(),
             insim::Packet::Slc(slc) => {
                 if self.apply_slc(slc) {
                     vec![PresenceEvent::VehicleSelected {
@@ -302,38 +324,30 @@ impl Presence {
                     vec![]
                 }
             },
-            insim::Packet::Cpr(cpr) => {
-                if let Some((ucid, uname, new_pname)) = self.apply_cpr(cpr) {
-                    vec![PresenceEvent::Renamed {
-                        ucid,
-                        uname,
-                        new_pname,
-                    }]
-                } else {
-                    vec![]
-                }
-            },
-            insim::Packet::Npl(npl) => {
-                if let Some(p) = self.apply_npl(npl) {
-                    vec![PresenceEvent::PlayerJoined(p)]
-                } else {
-                    vec![]
-                }
-            },
-            insim::Packet::Pll(pll) => {
-                if let Some(p) = self.apply_pll(pll) {
-                    vec![PresenceEvent::PlayerLeft(p)]
-                } else {
-                    vec![]
-                }
-            },
-            insim::Packet::Toc(toc) => {
-                if let Some((before, after)) = self.apply_toc(toc) {
-                    vec![PresenceEvent::TakingOver { before, after }]
-                } else {
-                    vec![]
-                }
-            },
+            insim::Packet::Cpr(cpr) => self
+                .apply_cpr(cpr)
+                .map(|(ucid, uname, new_pname)| PresenceEvent::Renamed {
+                    ucid,
+                    uname,
+                    new_pname,
+                })
+                .into_iter()
+                .collect(),
+            insim::Packet::Npl(npl) => self
+                .apply_npl(npl)
+                .map(PresenceEvent::PlayerJoined)
+                .into_iter()
+                .collect(),
+            insim::Packet::Pll(pll) => self
+                .apply_pll(pll)
+                .map(PresenceEvent::PlayerLeft)
+                .into_iter()
+                .collect(),
+            insim::Packet::Toc(toc) => self
+                .apply_toc(toc)
+                .map(|(before, after)| PresenceEvent::TakingOver { before, after })
+                .into_iter()
+                .collect(),
             insim::Packet::Pfl(pfl) => {
                 self.apply_pfl(pfl);
                 vec![]
@@ -343,7 +357,7 @@ impl Presence {
                 vec![]
             },
             insim::Packet::Plp(plp) => {
-                let player = self.inner.read().players.get(&plp.plid).cloned();
+                let player = self.inner.read().players.get_by_plid(&plp.plid).cloned();
                 if let Some(p) = player {
                     vec![PresenceEvent::PlayerTeleportedToPits(p)]
                 } else {
@@ -359,12 +373,11 @@ impl Presence {
     }
 
     fn apply_ncn(&self, ncn: &Ncn) -> ConnectionInfo {
-        let mut info = ConnectionInfo {
+        let info = ConnectionInfo {
             ucid: ncn.ucid,
             uname: ncn.uname.clone(),
             pname: ncn.pname.clone(),
             admin: ncn.admin,
-            players: HashSet::new(),
             userid: None,
             ipaddress: None,
             selected_vehicle: None,
@@ -373,13 +386,6 @@ impl Presence {
         let _ = guard
             .last_known_names
             .insert(ncn.uname.clone(), ncn.pname.clone());
-        // Backfill players that arrived before their owning connection.
-        // This happens during state sync when Npl packets precede Ncn packets.
-        for (&plid, player) in &guard.players {
-            if player.ucid == ncn.ucid {
-                let _ = info.players.insert(plid);
-            }
-        }
         let _ = guard.connections.insert(info.ucid, info.clone());
         info
     }
@@ -387,26 +393,16 @@ impl Presence {
     fn apply_cnl(&self, cnl: &Cnl) -> (Option<ConnectionInfo>, Vec<PlayerInfo>) {
         let mut guard = self.inner.write();
         let info = guard.connections.remove(&cnl.ucid);
-        let mut left = Vec::new();
-        if let Some(ref conn) = info {
-            for plid in &conn.players {
-                if let Some(p) = guard.players.remove(plid) {
-                    left.push(p);
-                }
-            }
-        }
+        let left = guard.players.remove_by_ucid(&cnl.ucid);
         (info, left)
     }
 
     fn apply_nci(&self, nci: &Nci) -> Option<ConnectionInfo> {
         let mut guard = self.inner.write();
-        if let Some(conn) = guard.connections.get_mut(&nci.ucid) {
-            conn.userid = Some(nci.userid);
-            conn.ipaddress = Some(nci.ipaddress);
-            Some(conn.clone())
-        } else {
-            None
-        }
+        let conn = guard.connections.get_mut(&nci.ucid)?;
+        conn.userid = Some(nci.userid);
+        conn.ipaddress = Some(nci.ipaddress);
+        Some(conn.clone())
     }
 
     fn apply_slc(&self, slc: &Slc) -> bool {
@@ -421,16 +417,13 @@ impl Presence {
 
     fn apply_cpr(&self, cpr: &Cpr) -> Option<(ConnectionId, String, String)> {
         let mut guard = self.inner.write();
-        if let Some(conn) = guard.connections.get_mut(&cpr.ucid) {
-            conn.pname = cpr.pname.clone();
-            let uname = conn.uname.clone();
-            let _ = guard
-                .last_known_names
-                .insert(uname.clone(), cpr.pname.clone());
-            Some((cpr.ucid, uname, cpr.pname.clone()))
-        } else {
-            None
-        }
+        let conn = guard.connections.get_mut(&cpr.ucid)?;
+        conn.pname = cpr.pname.clone();
+        let uname = conn.uname.clone();
+        let _ = guard
+            .last_known_names
+            .insert(uname.clone(), cpr.pname.clone());
+        Some((cpr.ucid, uname, cpr.pname.clone()))
     }
 
     fn apply_npl(&self, npl: &Npl) -> Option<PlayerInfo> {
@@ -443,72 +436,48 @@ impl Presence {
             in_pitlane: false,
             pname: npl.pname.clone(),
         };
-        let mut guard = self.inner.write();
-        let _ = guard.players.insert(npl.plid, player.clone());
-        if let Some(conn) = guard.connections.get_mut(&npl.ucid) {
-            let _ = conn.players.insert(npl.plid);
-        }
+        let _ = self.inner.write().players.insert(player.clone());
         // Only emit PlayerJoined once the join is confirmed (nump > 0).
         if npl.nump == 0 { None } else { Some(player) }
     }
 
     fn apply_pll(&self, pll: &Pll) -> Option<PlayerInfo> {
-        let mut guard = self.inner.write();
-        let player = guard.players.remove(&pll.plid);
-        if let Some(ref p) = player
-            && let Some(conn) = guard.connections.get_mut(&p.ucid)
-        {
-            let _ = conn.players.remove(&p.plid);
-        }
-        player
+        self.inner.write().players.remove_by_plid(&pll.plid)
     }
 
     fn apply_toc(&self, toc: &Toc) -> Option<(PlayerInfo, PlayerInfo)> {
         let mut guard = self.inner.write();
-        let pair = if let Some(player) = guard.players.get_mut(&toc.plid) {
-            let before = player.clone();
-            player.ucid = toc.newucid;
-            let after = player.clone();
-            Some((before, after))
-        } else {
-            None
-        };
-        if let Some(old) = guard.connections.get_mut(&toc.olducid) {
-            old.players.retain(|&p| p != toc.plid);
-        }
-        if let Some(new) = guard.connections.get_mut(&toc.newucid) {
-            let _ = new.players.insert(toc.plid);
-        }
-        pair
+        let before = guard.players.get_by_plid(&toc.plid)?.clone();
+        let after = guard
+            .players
+            .modify_by_plid(&toc.plid, |p| p.ucid = toc.newucid)?
+            .clone();
+        Some((before, after))
     }
 
     fn apply_pfl(&self, pfl: &Pfl) {
-        let mut guard = self.inner.write();
-        if let Some(player) = guard.players.get_mut(&pfl.plid) {
-            player.flags = pfl.flags;
-        }
+        let _ = self
+            .inner
+            .write()
+            .players
+            .modify_by_plid(&pfl.plid, |p| p.flags = pfl.flags);
     }
 
     fn apply_pla(&self, pla: &Pla) {
-        let mut guard = self.inner.write();
-        if let Some(player) = guard.players.get_mut(&pla.plid) {
+        let _ = self.inner.write().players.modify_by_plid(&pla.plid, |p| {
             if pla.entered_pitlane() {
-                player.in_pitlane = true;
+                p.in_pitlane = true;
             }
             if pla.exited_pitlane() {
-                player.in_pitlane = false;
+                p.in_pitlane = false;
             }
-        }
+        });
     }
 
     fn apply_tiny_clr(&self, tiny: &Tiny) {
         if !matches!(tiny.subt, TinyType::Clr) {
             return;
         }
-        let mut guard = self.inner.write();
-        guard.players.clear();
-        for conn in guard.connections.values_mut() {
-            conn.players.clear();
-        }
+        self.inner.write().players.clear();
     }
 }

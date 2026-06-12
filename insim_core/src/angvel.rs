@@ -1,122 +1,112 @@
-//! Angular Velocity
+//! Angular velocity wire type.
 //!
-//! AngVel represents the rate of change of heading (angular velocity), normalized internally
-//! to radians per second. The LFS protocol encodes this as a signed i16 where:
-//! - 16384 = 360 deg/s (clockwise when viewed from above)
-//! - 8192 = 180 deg/s (clockwise when viewed from above)
-//! - Negative values indicate anticlockwise rotation
+//! LFS (in `Mci`'s `CompCar`) encodes angular velocity as a signed `i16` where
+//! 16384 = 360°/s. Rather than decode to a lossy floating-point value and convert
+//! back (which is not idempotent on the wire), [`AngVelI16`] stores the **raw
+//! integer** and exposes degree/radian accessors on demand. Decoding then encoding
+//! reproduces the original `i16` exactly.
+//!
+//! - 16384 = 360°/s, 8192 = 180°/s.
+//! - Positive values are clockwise viewed from above; negative anticlockwise.
+//!
+//! Note: OutSim transmits angular velocity as a [`Vector`](crate::vector::Vector)
+//! of real `f32`s, not this fixed-point form.
 
 use std::fmt;
 
-/// Angular velocity stored as radians per second (f32).
+use crate::{Decode, Encode};
+
+/// Angular velocity as transmitted in `CompCar` (MCI): a signed `i16` where
+/// 16384 = 360°/s.
 ///
-/// - `from_wire_i16` / `to_wire_i16` use the LFS scaling (16384 = 360°/s).
-/// - Positive values indicate clockwise rotation when viewed from above.
-/// - Stored as `f32` radians/sec for consistency with [`Heading`](crate::heading::Heading)
-///   and [`Speed`](crate::speed::Speed).
-#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
+/// Stores the raw wire value; conversions to degrees/radians per second are
+/// accessors. Decoding then encoding reproduces the original `i16` exactly.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct AngVel {
-    radians_per_sec: f32,
-}
+pub struct AngVelI16(i16);
 
-impl AngVel {
-    /// AngVel of zero (no rotation).
-    pub const ZERO: Self = Self::from_radians_per_sec(0.0);
+impl AngVelI16 {
+    /// Zero angular velocity.
+    pub const ZERO: Self = Self(0);
 
-    /// LFS protocol scale: 16384 = 360 deg/s
-    const SCALE: f32 = 360.0 / 16384.0;
+    /// Raw wire units per 360°/s.
+    const UNITS_PER_TURN_PER_SEC: f32 = 16384.0;
 
-    /// Consumes AngVel, returning the inner radian/sec value.
-    pub fn into_inner(self) -> f32 {
-        self.radians_per_sec
+    /// Construct from the raw wire value (lossless).
+    pub const fn from_raw(raw: i16) -> Self {
+        Self(raw)
     }
 
-    /// Create AngVel from radians per second.
-    pub const fn from_radians_per_sec(value: f32) -> Self {
-        Self {
-            radians_per_sec: value,
-        }
+    /// The raw wire value (lossless).
+    pub const fn to_raw(self) -> i16 {
+        self.0
     }
 
-    /// Get the angular velocity in radians per second.
-    pub const fn to_radians_per_sec(&self) -> f32 {
-        self.radians_per_sec
+    /// Consumes `self`, returning the raw inner value (same as [`to_raw`](Self::to_raw)).
+    pub const fn into_inner(self) -> i16 {
+        self.0
     }
 
-    /// Create AngVel from degrees per second.
-    pub const fn from_degrees_per_sec(value: f32) -> Self {
-        Self {
-            radians_per_sec: value * std::f32::consts::PI / 180.0,
-        }
+    /// Construct from degrees per second (rounded to the nearest wire unit).
+    pub fn from_degrees_per_sec(value: f32) -> Self {
+        let units = (value / 360.0 * Self::UNITS_PER_TURN_PER_SEC).round();
+        Self(units.clamp(i16::MIN as f32, i16::MAX as f32) as i16)
     }
 
-    /// Get the angular velocity in degrees per second.
-    pub fn to_degrees_per_sec(&self) -> f32 {
-        self.radians_per_sec * 180.0 / std::f32::consts::PI
+    /// Angular velocity in degrees per second.
+    pub fn to_degrees_per_sec(self) -> f32 {
+        self.0 as f32 / Self::UNITS_PER_TURN_PER_SEC * 360.0
     }
 
-    /// Create AngVel from LFS protocol raw i16 value (16384 = 360 deg/s).
-    pub fn from_wire_i16(raw: i16) -> Self {
-        let degrees_per_sec = raw as f32 * Self::SCALE;
-        Self::from_degrees_per_sec(degrees_per_sec)
+    /// Construct from radians per second.
+    pub fn from_radians_per_sec(value: f32) -> Self {
+        Self::from_degrees_per_sec(value.to_degrees())
     }
 
-    /// Get the LFS protocol raw i16 value (16384 = 360 deg/s).
-    pub fn to_wire_i16(&self) -> i16 {
-        (self.to_degrees_per_sec() / Self::SCALE).round() as i16
+    /// Angular velocity in radians per second.
+    pub fn to_radians_per_sec(self) -> f32 {
+        self.to_degrees_per_sec().to_radians()
     }
 
-    /// Check if this angular velocity represents clockwise rotation (when viewed from above).
-    ///
-    /// Returns true if the angular velocity is positive (clockwise), false otherwise.
-    ///
-    /// # Examples
-    /// ```
-    /// use insim_core::angvel::AngVel;
-    /// let clockwise = AngVel::from_degrees_per_sec(90.0);
-    /// assert!(clockwise.clockwise());
-    ///
-    /// let anticlockwise = AngVel::from_degrees_per_sec(-90.0);
-    /// assert!(!anticlockwise.clockwise());
-    /// ```
-    pub fn clockwise(&self) -> bool {
-        self.radians_per_sec > 0.0
+    /// Whether this represents clockwise rotation (viewed from above), i.e. the
+    /// raw value is positive.
+    pub const fn clockwise(self) -> bool {
+        self.0 > 0
     }
 
-    /// Check if this angular velocity represents anticlockwise rotation (when viewed from above).
-    ///
-    /// Returns true if the angular velocity is negative (anticlockwise), false otherwise.
-    ///
-    /// # Examples
-    /// ```
-    /// use insim_core::angvel::AngVel;
-    /// let anticlockwise = AngVel::from_degrees_per_sec(-90.0);
-    /// assert!(anticlockwise.anticlockwise());
-    ///
-    /// let clockwise = AngVel::from_degrees_per_sec(90.0);
-    /// assert!(!clockwise.anticlockwise());
-    /// ```
-    pub fn anticlockwise(&self) -> bool {
-        self.radians_per_sec < 0.0
+    /// Whether this represents anticlockwise rotation (viewed from above), i.e.
+    /// the raw value is negative.
+    pub const fn anticlockwise(self) -> bool {
+        self.0 < 0
+    }
+
+    /// Whether this is exactly zero.
+    pub const fn is_zero(self) -> bool {
+        self.0 == 0
     }
 }
 
-impl Default for AngVel {
-    fn default() -> Self {
-        Self::ZERO
-    }
-}
-
-impl fmt::Display for AngVel {
+impl fmt::Display for AngVelI16 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{:.2} rad/s ({:.2}°/s)",
-            self.radians_per_sec,
+            self.to_radians_per_sec(),
             self.to_degrees_per_sec()
         )
+    }
+}
+
+impl Decode for AngVelI16 {
+    fn decode(ctx: &mut crate::DecodeContext) -> Result<Self, crate::DecodeError> {
+        Ok(Self(ctx.decode::<i16>("angvel")?))
+    }
+}
+
+impl Encode for AngVelI16 {
+    fn encode(&self, ctx: &mut crate::EncodeContext) -> Result<(), crate::EncodeError> {
+        ctx.encode("angvel", &self.0)
     }
 }
 
@@ -125,151 +115,41 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_zero() {
-        assert_eq!(AngVel::ZERO.to_radians_per_sec(), 0.0);
-        assert_eq!(AngVel::ZERO.to_degrees_per_sec(), 0.0);
+    fn test_raw_roundtrip_exact() {
+        for raw in [i16::MIN, -8192, -1, 0, 1, 8192, 16384, i16::MAX] {
+            assert_eq!(AngVelI16::from_raw(raw).to_raw(), raw);
+        }
     }
 
     #[test]
-    fn test_from_radians_per_sec() {
-        let av = AngVel::from_radians_per_sec(std::f32::consts::PI);
-        assert!((av.to_radians_per_sec() - std::f32::consts::PI).abs() < 0.0001);
+    fn test_degrees_per_sec() {
+        // 16384 = 360°/s, 8192 = 180°/s
+        assert_eq!(AngVelI16::from_raw(16384).to_degrees_per_sec(), 360.0);
+        assert_eq!(AngVelI16::from_raw(8192).to_degrees_per_sec(), 180.0);
+        assert_eq!(AngVelI16::from_raw(-8192).to_degrees_per_sec(), -180.0);
+
+        assert_eq!(AngVelI16::from_degrees_per_sec(360.0).to_raw(), 16384);
+        assert_eq!(AngVelI16::from_degrees_per_sec(180.0).to_raw(), 8192);
     }
 
     #[test]
-    fn test_from_degrees_per_sec() {
-        let av = AngVel::from_degrees_per_sec(180.0);
-        assert!((av.to_degrees_per_sec() - 180.0).abs() < 0.0001);
-    }
-
-    #[test]
-    fn test_roundtrip_radians_per_sec() {
-        let original = 2.5;
-        let av = AngVel::from_radians_per_sec(original);
-        assert!((av.to_radians_per_sec() - original).abs() < 0.0001);
-    }
-
-    #[test]
-    fn test_roundtrip_degrees_per_sec() {
-        let original = 45.0;
-        let av = AngVel::from_degrees_per_sec(original);
-        assert!((av.to_degrees_per_sec() - original).abs() < 0.0001);
-    }
-
-    #[test]
-    fn test_conversion_radians_to_degrees() {
-        // π rad/s = 180 deg/s
-        let av = AngVel::from_radians_per_sec(std::f32::consts::PI);
-        assert!((av.to_degrees_per_sec() - 180.0).abs() < 0.0001);
-    }
-
-    #[test]
-    fn test_conversion_degrees_to_radians() {
-        // 180 deg/s = π rad/s
-        let av = AngVel::from_degrees_per_sec(180.0);
-        assert!((av.to_radians_per_sec() - std::f32::consts::PI).abs() < 0.0001);
-    }
-
-    #[test]
-    fn test_lfs_raw_360_degrees() {
-        // 16384 = 360 deg/s
-        let av = AngVel::from_wire_i16(16384);
-        assert!((av.to_degrees_per_sec() - 360.0).abs() < 0.0001);
-    }
-
-    #[test]
-    fn test_lfs_raw_180_degrees() {
-        // 8192 = 180 deg/s
-        let av = AngVel::from_wire_i16(8192);
-        assert!((av.to_degrees_per_sec() - 180.0).abs() < 0.0001);
-    }
-
-    #[test]
-    fn test_lfs_raw_negative() {
-        // Negative values indicate anticlockwise rotation
-        let av = AngVel::from_wire_i16(-8192);
-        assert!((av.to_degrees_per_sec() - (-180.0)).abs() < 0.0001);
-    }
-
-    #[test]
-    fn test_to_lfs_i16_roundtrip() {
-        let original = 12345i16;
-        let av = AngVel::from_wire_i16(original);
-        let roundtrip = av.to_wire_i16();
-        assert_eq!(roundtrip, original);
-    }
-
-    #[test]
-    fn test_to_lfs_i16_360_degrees() {
-        let av = AngVel::from_degrees_per_sec(360.0);
-        assert_eq!(av.to_wire_i16(), 16384);
-    }
-
-    #[test]
-    fn test_to_lfs_i16_180_degrees() {
-        let av = AngVel::from_degrees_per_sec(180.0);
-        assert_eq!(av.to_wire_i16(), 8192);
-    }
-
-    #[test]
-    fn test_into_inner() {
-        let original = 1.5;
-        let av = AngVel::from_radians_per_sec(original);
-        assert_eq!(av.into_inner(), original);
-    }
-
-    #[test]
-    fn test_default() {
-        let av = AngVel::default();
-        assert_eq!(av.to_radians_per_sec(), 0.0);
-    }
-
-    #[test]
-    fn test_display() {
-        let av = AngVel::from_degrees_per_sec(90.0);
-        let display_str = format!("{}", av);
-        // Should contain both rad/s and deg/s representations
-        assert!(display_str.contains("rad/s"));
-        assert!(display_str.contains("°/s"));
-    }
-
-    #[test]
-    fn test_partial_eq() {
-        let av1 = AngVel::from_degrees_per_sec(45.0);
-        let av2 = AngVel::from_degrees_per_sec(45.0);
-        let av3 = AngVel::from_degrees_per_sec(90.0);
-
-        assert_eq!(av1, av2);
-        assert_ne!(av1, av3);
-    }
-
-    #[test]
-    fn test_partial_ord() {
-        let av1 = AngVel::from_degrees_per_sec(45.0);
-        let av2 = AngVel::from_degrees_per_sec(90.0);
-
-        assert!(av1 < av2);
-        assert!(av2 > av1);
+    fn test_radians_per_sec() {
+        let av = AngVelI16::from_raw(8192);
+        assert!((av.to_radians_per_sec() - std::f32::consts::PI).abs() < 1e-4);
     }
 
     #[test]
     fn test_clockwise() {
-        let clockwise = AngVel::from_degrees_per_sec(90.0);
-        assert!(clockwise.clockwise());
-        assert!(!clockwise.anticlockwise());
+        assert!(AngVelI16::from_raw(90).clockwise());
+        assert!(!AngVelI16::from_raw(90).anticlockwise());
+        assert!(AngVelI16::from_raw(-90).anticlockwise());
+        assert!(!AngVelI16::ZERO.clockwise());
+        assert!(!AngVelI16::ZERO.anticlockwise());
     }
 
     #[test]
-    fn test_anticlockwise() {
-        let anticlockwise = AngVel::from_degrees_per_sec(-90.0);
-        assert!(anticlockwise.anticlockwise());
-        assert!(!anticlockwise.clockwise());
-    }
-
-    #[test]
-    fn test_clockwise_zero() {
-        let zero = AngVel::ZERO;
-        assert!(!zero.clockwise());
-        assert!(!zero.anticlockwise());
+    fn test_default_and_zero() {
+        assert!(AngVelI16::default().is_zero());
+        assert_eq!(AngVelI16::default(), AngVelI16::ZERO);
     }
 }

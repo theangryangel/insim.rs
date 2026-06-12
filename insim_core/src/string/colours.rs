@@ -138,7 +138,7 @@ pub fn spans(input: &str) -> impl Iterator<Item = (u8, &str)> + '_ {
                     let _ = iter.next();
                 },
 
-                // ^n (color code)
+                // ^n (colour code)
                 Some(&(next_idx, next)) if next.is_lfs_colour() => {
                     let chunk = &input[chunk_start..idx];
                     let yielded_colour = current_colour;
@@ -146,7 +146,7 @@ pub fn spans(input: &str) -> impl Iterator<Item = (u8, &str)> + '_ {
                     // update state for the *next* iteration
                     current_colour = next.to_digit(10).unwrap_or(0) as u8;
                     chunk_start = next_idx + next.len_utf8();
-                    let _ = iter.next(); // consume the color digit
+                    let _ = iter.next(); // consume the colour digit
 
                     // only yield if there is actual text (skips empty chunks like ^1^2)
                     if !chunk.is_empty() {

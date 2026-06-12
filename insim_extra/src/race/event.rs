@@ -110,7 +110,7 @@ pub enum RaceEvent {
         plid: PlayerId,
     },
     /// A disconnected player rejoined and was matched to their prior
-    /// [`EntrantState`] by LFS.net username.
+    /// [`super::EntrantState`] by LFS.net username.
     ///
     /// The existing [`EntrantId`] is reused and all prior lap history is
     /// preserved. A [`lap_offset`](super::EntrantState::lap_offset) is applied

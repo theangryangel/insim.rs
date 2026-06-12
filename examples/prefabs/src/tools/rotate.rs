@@ -1,6 +1,6 @@
 use anyhow::{Result, ensure};
 use glam::{DMat2, DVec2};
-use insim::{core::heading::Heading, insim::ObjectInfo};
+use insim::{core::heading::ObjectHeading, insim::ObjectInfo};
 
 pub fn build(selection: &[ObjectInfo], degrees: f64) -> Result<Vec<ObjectInfo>> {
     ensure!(
@@ -35,7 +35,7 @@ pub fn build(selection: &[ObjectInfo], degrees: f64) -> Result<Vec<ObjectInfo>> 
             pos.y = crate::clamp_i16((final_pos.y * 16.0).round() as i32);
 
             if let Some(heading) = obj.heading_mut() {
-                *heading = Heading::from_radians(heading.to_radians() + radians);
+                *heading = ObjectHeading::from_radians(heading.to_radians() + radians);
             }
 
             obj

@@ -2,7 +2,7 @@ use anyhow::{Result, ensure};
 use glam::{DVec2, DVec3};
 use insim::{
     core::{
-        heading::Heading,
+        heading::ObjectHeading,
         object::{
             ObjectCoordinate, pit::PitStopBox, pit_start_point::PitStartPoint,
             start_position::StartPosition,
@@ -79,7 +79,7 @@ fn mode_max_index(mode: GridMode) -> usize {
 fn make_object(
     mode: GridMode,
     pos: DVec3,
-    heading: Heading,
+    heading: ObjectHeading,
     floating: bool,
     index: u8,
 ) -> ObjectInfo {
@@ -121,7 +121,7 @@ fn build_flat(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Objec
 
     let prototype = selection.first().unwrap();
     let origin = prototype.position().to_dvec3_metres();
-    let heading = prototype.heading().unwrap_or(Heading::NORTH);
+    let heading = prototype.heading().unwrap_or(ObjectHeading::NORTH);
     let floating = prototype.floating().unwrap_or(false);
     let z = origin.z;
 
@@ -163,7 +163,7 @@ fn build_spline(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Obj
     );
 
     let prototype = selection.first().unwrap();
-    let proto_heading = prototype.heading().unwrap_or(Heading::NORTH);
+    let proto_heading = prototype.heading().unwrap_or(ObjectHeading::NORTH);
     let floating = prototype.floating().unwrap_or(false);
 
     let steps_per_segment = 100usize;

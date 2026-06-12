@@ -2,13 +2,14 @@
 // Do not name this file `con.rs`.
 use std::time::Duration;
 
-use insim_core::{Decode, DecodeContext, Encode, EncodeContext, heading::Heading, speed::Speed};
+use insim_core::{
+    Decode, DecodeContext, Encode, EncodeContext,
+    heading::HeadingU8,
+    speed::{ClosingSpeed, SpeedU8},
+};
 
-use super::{CompCarInfo, obh::spclose_strip_high_bits};
+use super::CompCarInfo;
 use crate::identifiers::{PlayerId, RequestId};
-
-/// ConInfo direction scale: 128 units = 180°
-const CONINFO_DEGREES_PER_UNIT: f64 = 180.0 / 128.0;
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -21,8 +22,8 @@ pub struct ConInfo {
     /// Additional car state flags.
     pub info: CompCarInfo,
 
-    /// Front wheel steering angle (right positive).
-    pub steer: u8,
+    /// Front wheel steering angle in degrees (right positive, left negative).
+    pub steer: i8,
 
     /// Throttle input (0-15).
     pub thr: u8,
@@ -40,19 +41,19 @@ pub struct ConInfo {
     pub gearsp: u8,
 
     /// Speed.
-    pub speed: Speed,
+    pub speed: SpeedU8,
 
     /// Direction of motion.
-    pub direction: Heading,
+    pub direction: HeadingU8,
 
     /// Car facing direction.
-    pub heading: Heading,
+    pub heading: HeadingU8,
 
-    /// Longitudinal acceleration.
-    pub accelf: u8,
+    /// Longitudinal acceleration in m/s² (forward positive, braking negative).
+    pub accelf: i8,
 
-    /// Lateral acceleration.
-    pub accelr: u8,
+    /// Lateral acceleration in m/s² (rightward positive, leftward negative).
+    pub accelr: i8,
 
     /// X position.
     pub x: i16,
@@ -67,7 +68,7 @@ impl Decode for ConInfo {
         let info = ctx.decode::<CompCarInfo>("info")?;
         // pad 1 bytes
         ctx.pad("sp0", 1)?;
-        let steer = ctx.decode::<u8>("steer")?;
+        let steer = ctx.decode::<i8>("steer")?;
 
         let thrbrk = ctx.decode::<u8>("thrbrk")?;
         let thr: u8 = (thrbrk >> 4) & 0x0F; // upper 4 bits
@@ -80,16 +81,13 @@ impl Decode for ConInfo {
         let gearsp = ctx.decode::<u8>("gearsp")?;
         let gearsp = (gearsp >> 4) & 0x0F; // gearsp is only first 4 bits
 
-        let speed = Speed::from_meters_per_sec(ctx.decode::<u8>("speed")? as f32);
+        let speed = ctx.decode::<SpeedU8>("speed")?;
 
-        let direction_raw = ctx.decode::<u8>("direction_raw")?;
-        let direction = Heading::from_degrees((direction_raw as f64) * CONINFO_DEGREES_PER_UNIT);
+        let direction = ctx.decode::<HeadingU8>("direction")?;
+        let heading = ctx.decode::<HeadingU8>("heading")?;
 
-        let heading_raw = ctx.decode::<u8>("heading_raw")?;
-        let heading = Heading::from_degrees((heading_raw as f64) * CONINFO_DEGREES_PER_UNIT);
-
-        let accelf = ctx.decode::<u8>("accelf")?;
-        let accelr = ctx.decode::<u8>("accelr")?;
+        let accelf = ctx.decode::<i8>("accelf")?;
+        let accelr = ctx.decode::<i8>("accelr")?;
 
         let x = ctx.decode::<i16>("x")?;
         let y = ctx.decode::<i16>("y")?;
@@ -175,17 +173,10 @@ impl Encode for ConInfo {
         let gearsp = self.gearsp << 4;
         ctx.encode("gearsp", &gearsp)?;
 
-        ctx.encode("speed", &(self.speed.to_meters_per_sec() as u8))?;
+        ctx.encode("speed", &self.speed)?;
 
-        let direction_units = (self.direction.to_degrees() / CONINFO_DEGREES_PER_UNIT)
-            .round()
-            .clamp(0.0, 255.0) as u8;
-        ctx.encode("direction", &direction_units)?;
-
-        let heading_units = (self.heading.to_degrees() / CONINFO_DEGREES_PER_UNIT)
-            .round()
-            .clamp(0.0, 255.0) as u8;
-        ctx.encode("heading", &heading_units)?;
+        ctx.encode("direction", &self.direction)?;
+        ctx.encode("heading", &self.heading)?;
 
         ctx.encode("accelf", &self.accelf)?;
         ctx.encode("accelr", &self.accelr)?;
@@ -207,7 +198,7 @@ pub struct Con {
     pub reqi: RequestId,
 
     /// Closing speed at impact.
-    pub spclose: Speed,
+    pub spclose: ClosingSpeed,
 
     /// Time since session start, in milliseconds (wraps periodically).
     #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
@@ -225,8 +216,7 @@ impl Decode for Con {
     fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
         let reqi = ctx.decode::<RequestId>("reqi")?;
         ctx.pad("sp0", 1)?;
-        let spclose = spclose_strip_high_bits(ctx.decode::<u16>("spclose")?);
-        let spclose = Speed::from_meters_per_sec(spclose as f32 / 10.0);
+        let spclose = ctx.decode::<ClosingSpeed>("spclose")?;
         ctx.pad("spw", 2)?;
         let time = ctx.decode_duration::<u32>("time")?;
 
@@ -247,10 +237,7 @@ impl Encode for Con {
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
         ctx.encode("reqi", &self.reqi)?;
         ctx.pad("sp0", 1)?;
-        ctx.encode(
-            "spclose",
-            &spclose_strip_high_bits((self.spclose.to_meters_per_sec() * 10.0) as u16),
-        )?;
+        ctx.encode("spclose", &self.spclose)?;
         ctx.encode_duration::<u32>("time", self.time)?;
         ctx.encode("a", &self.a)?;
         ctx.encode("b", &self.b)?;
