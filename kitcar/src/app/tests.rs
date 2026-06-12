@@ -24,8 +24,8 @@ use tracing_subscriber as _;
 use super::{event::Command, runtime::dispatch_cycle};
 use crate::{
     App, AppError, ChatEvent, ChatParser, Connected, Dispatch, Event, ExtractCx, Game, Handler,
-    HandlerExt, LayoutChanged, Packet, Presence, RaceStarted, Sender, Stage, State, Svc,
-    TrackChanged,
+    HandlerExt, LayoutChanged, Packet, Presence, Sender, SessionEnded, SessionStarted, Stage,
+    State, Svc, TrackChanged,
 };
 
 /// A toy typed chat enum for the parser test.
@@ -183,7 +183,7 @@ async fn mso_without_prefix_routes_only_to_packet_handler() {
 
     assert_eq!(state.mso_hits.load(Ordering::Relaxed), 1);
     assert_eq!(state.ncn_hits.load(Ordering::Relaxed), 0);
-    // No prefix → no typed synthetic event.
+    // No prefix -> no typed synthetic event.
     assert_eq!(state.cmd_hits.load(Ordering::Relaxed), 0);
 }
 
@@ -521,7 +521,52 @@ async fn periodic_emits_events_on_schedule() {
 }
 
 #[tokio::test]
-async fn game_emits_race_started_on_sta_transition() {
+async fn game_emits_session_started_on_rst() {
+    use insim::insim::{RaceLaps, Rst};
+
+    let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<Command>();
+    let sender = Sender::new(cmd_tx);
+
+    // Game::new() fires an Sst request - drop any commands it queued.
+    let game = Game::new();
+    while cmd_rx.try_recv().is_ok() {}
+
+    let app = App::new().handle(Stage::Pre, game.clone());
+
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let app_state = app.state;
+    let pre_handlers = app.pre_handlers;
+    let update_handlers = app.update_handlers;
+
+    // An unsolicited Rst (reqi == 0) with a lap count starts a race session.
+    dispatch_cycle(
+        Dispatch::Packet(insim::Packet::Rst(Rst {
+            racelaps: RaceLaps::Laps(5),
+            ..Default::default()
+        })),
+        &sender,
+        &app_state,
+        &pre_handlers,
+        &update_handlers,
+        &cancel,
+    )
+    .await;
+
+    let mut events = Vec::new();
+    while let Ok(cmd) = cmd_rx.try_recv() {
+        if let Command::Event(payload) = cmd {
+            events.push(payload);
+        }
+    }
+    let started = events
+        .iter()
+        .filter_map(|p| p.downcast_ref::<SessionStarted>())
+        .count();
+    assert_eq!(started, 1, "SessionStarted should fire once on Rst");
+}
+
+#[tokio::test]
+async fn game_emits_session_ended_on_sta_leaving_race() {
     use insim::insim::{RaceInProgress, Sta};
 
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<Command>();
@@ -538,7 +583,22 @@ async fn game_emits_race_started_on_sta_transition() {
     let pre_handlers = app.pre_handlers;
     let update_handlers = app.update_handlers;
 
-    // First Sta with racing=No: matches initial state, no RaceStarted.
+    // Sta with racing in progress: no SessionEnded.
+    dispatch_cycle(
+        Dispatch::Packet(insim::Packet::Sta(Sta {
+            raceinprog: RaceInProgress::Racing,
+            ..Default::default()
+        })),
+        &sender,
+        &app_state,
+        &pre_handlers,
+        &update_handlers,
+        &cancel,
+    )
+    .await;
+    while cmd_rx.try_recv().is_ok() {}
+
+    // Sta back to no race: SessionEnded fires once.
     dispatch_cycle(
         Dispatch::Packet(insim::Packet::Sta(Sta {
             raceinprog: RaceInProgress::No,
@@ -558,35 +618,13 @@ async fn game_emits_race_started_on_sta_transition() {
             events.push(payload);
         }
     }
-    assert!(
-        !events.iter().any(|p| p.is::<RaceStarted>()),
-        "no RaceStarted expected on No → No"
-    );
-
-    // Second Sta with racing=Racing: transition fires RaceStarted.
-    dispatch_cycle(
-        Dispatch::Packet(insim::Packet::Sta(Sta {
-            raceinprog: RaceInProgress::Racing,
-            ..Default::default()
-        })),
-        &sender,
-        &app_state,
-        &pre_handlers,
-        &update_handlers,
-        &cancel,
-    )
-    .await;
-
-    let mut events = Vec::new();
-    while let Ok(cmd) = cmd_rx.try_recv() {
-        if let Command::Event(payload) = cmd {
-            events.push(payload);
-        }
-    }
-    let started = events.iter().filter(|p| p.is::<RaceStarted>()).count();
+    let ended = events
+        .iter()
+        .filter_map(|p| p.downcast_ref::<SessionEnded>())
+        .count();
     assert_eq!(
-        started, 1,
-        "RaceStarted should fire exactly once on transition to Racing"
+        ended, 1,
+        "SessionEnded should fire once on Racing -> No transition"
     );
 }
 

@@ -248,8 +248,8 @@ The pattern requires:
 3. Drive both sources inside a `tokio::select!` loop.
 
 When reading raw UDP datagrams you are responsible for distinguishing packet types.
-LFS does not prepend a discriminant: use the datagram size as a heuristic (92 bytes →
-Outgauge, 64 bytes → Outsim, anything else → InSim packet). For InSim packets received
+LFS does not prepend a discriminant: use the datagram size as a heuristic (92 bytes ->
+Outgauge, 64 bytes -> Outsim, anything else -> InSim packet). For InSim packets received
 over UDP you must also skip the leading length byte before decoding, as that framing is
 normally handled internally by the crate.
 

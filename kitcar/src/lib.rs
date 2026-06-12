@@ -95,8 +95,9 @@ pub use app::{
 pub use chat::{ChatEvent, ChatParser};
 pub use error::AppError;
 pub use game::{
-    Game, GameInfo, LayoutChanged, MultiplayerJoined, MultiplayerLeft, RaceEnded, RaceStarted,
-    TrackChanged, track_rotation,
+    AllowedCarsChanged, AllowedModsChanged, Game, GameInfo, LayoutChanged, MultiplayerJoined,
+    MultiplayerLeft, SessionEnded, SessionKind, SessionStarted, TrackChanged, VersionInfo,
+    VersionReceived, track_rotation,
 };
 pub use penalty_clearer::PenaltyClearer;
 pub use presence::{

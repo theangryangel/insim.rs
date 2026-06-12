@@ -7,7 +7,7 @@ use insim::{
     insim::{PenaltyInfo, PitStopWorkFlags, RaceConfirmFlags},
 };
 
-/// Stable identity for one race entry (one `Npl` → leave lifecycle).
+/// Stable identity for one race entry (one `Npl` -> leave lifecycle).
 ///
 /// Never reused within a [`super::RaceTracker`] instance, even if LFS
 /// reuses the same [`PlayerId`].
@@ -96,9 +96,9 @@ pub struct EntrantState {
     pub laps_done: u16,
     /// Added to the raw LFS lap counter to produce the true running total.
     ///
-    /// Non-zero after [`apply_player_rejoined`](super::RaceTracker::apply_player_rejoined)
-    /// or [`apply_telepit_resume`](super::RaceTracker::apply_telepit_resume), where LFS
-    /// resets its internal lap counter to 1 but we want to preserve continuity.
+    /// Non-zero after [`apply_player_rejoined`](super::RaceTracker::apply_player_rejoined),
+    /// where LFS issues a fresh `Npl` and resets its internal lap counter to 1
+    /// but we want to preserve continuity across the reconnect.
     pub lap_offset: u16,
     /// Fastest lap time recorded.
     pub best_lap: Option<Duration>,
@@ -114,6 +114,9 @@ pub struct EntrantState {
     pub status: FinishStatus,
     /// Driver history. The current driver is the last entry.
     pub drivers: Vec<DriverRecord>,
+    /// Starting grid position (1-indexed), from the `Reo` packet. `None` until
+    /// a grid order has been received for this entrant.
+    pub grid_position: Option<u8>,
     /// Pending pit stop: `Pit` received, waiting for matching `Psf`.
     pub(super) pending_pit: Option<PitRecord>,
     /// Active penalty.

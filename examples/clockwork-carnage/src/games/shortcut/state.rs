@@ -35,7 +35,7 @@ pub(super) struct ShortcutInner {
     pub(super) phase: ShortcutPhase,
     setup_cancel: Option<CancellationToken>,
     pub(super) runtime_cancel: CancellationToken,
-    /// plid → (ucid, uname, start_time)
+    /// plid -> (ucid, uname, start_time)
     pub(super) active_runs: HashMap<PlayerId, (ConnectionId, String, Duration)>,
     /// (uname, pname, best_time_ms) sorted by time asc
     pub(super) leaderboard: Vec<(String, String, i64)>,

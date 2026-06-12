@@ -1,4 +1,4 @@
-# Knight Rider-style woosh: sweeps left→centre→right→centre and loops,
+# Knight Rider-style woosh: sweeps left->centre->right->centre and loops,
 # giving a smooth back-and-forth bounce rather than a hard jump-cut reset.
 steps:
   - duration_ms: 80

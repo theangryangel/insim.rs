@@ -99,7 +99,7 @@ pub struct TimeSet {
     pub date: Option<(u8, Month)>,
     /// Hour and minute `(0..=23, 0..=59)`.
     pub time: Option<(u8, u8)>,
-    /// UTC offset in whole hours (e.g. `5` → `utc+5`, `-3` → `utc-3`).
+    /// UTC offset in whole hours (e.g. `5` -> `utc+5`, `-3` -> `utc-3`).
     pub utc_offset: Option<i8>,
 }
 

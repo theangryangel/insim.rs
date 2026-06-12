@@ -1,7 +1,7 @@
 //! Metronome mini-game subcommand. Players drive from checkpoint1 to finish
 //! and try to match the target duration as closely as possible.
 //!
-//! Phase machine: Waiting → SettingUp → Racing (same pattern as bomb).
+//! Phase machine: Waiting -> SettingUp -> Racing (same pattern as bomb).
 
 mod config;
 mod events;

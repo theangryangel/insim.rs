@@ -753,7 +753,7 @@
       floating: false
 
 # 8. hump_escalator
-# Speed humps in ascending size order: 1M → 2M → 6M → 10M.
+# Speed humps in ascending size order: 1M -> 2M -> 6M -> 10M.
 # Each one is bigger and slower to cross. By the end you'll feel everything.
 - name: hump_escalator
   objects:
@@ -1093,7 +1093,7 @@
       height: M0_25
       heading:
         radians: 0.0
-    # Exit ramp: anchor at x=256, heading=π → high end at x=192 (z=8), low at x=256
+    # Exit ramp: anchor at x=256, heading=π -> high end at x=192 (z=8), low at x=256
     - !ConcreteRamp
       xyz:
         x: 256
@@ -1587,7 +1587,7 @@
       heading:
         radians: 0.0
       floating: false
-    # Exit ramp: anchor at x=256, heading=π → high end at x=192 (z=8), low at x=256
+    # Exit ramp: anchor at x=256, heading=π -> high end at x=192 (z=8), low at x=256
     - !ConcreteRamp
       xyz:
         x: 256

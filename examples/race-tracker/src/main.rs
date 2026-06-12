@@ -1,7 +1,14 @@
 //! Bare-insim race tracker example.
 //!
 //! Wires [`Presence`], [`Game`], and [`RaceTracker`] together in a plain async
-//! packet loop - no kitcar. Prints a results table when the race ends.
+//! packet loop - no kitcar.
+//!
+//! - On `SessionStarted` (an `Rst`) the tracker clears, so it re-requests the
+//!   player list and grid order to repopulate for the new session.
+//! - On each confirmed result (`Res` -> `ResultConfirmed`) it reprints the
+//!   table, so the classification builds up live as drivers cross the line.
+//! - On `SessionEnded` (back to the lobby screen) it prints the final results
+//!   table, including each entrant's starting grid position.
 //!
 //! Run with:
 //!     cargo run -p race-tracker -- --addr 127.0.0.1:29999
@@ -11,7 +18,7 @@
 use clap::Parser;
 use insim::{WithRequestId, insim::TinyType};
 use insim_extra::{
-    game::Game,
+    game::{Game, GameEvent},
     presence::Presence,
     race::{EntrantState, FinishStatus, RaceEvent, RaceTracker},
 };
@@ -49,11 +56,12 @@ async fn main() -> insim::Result<()> {
     let mut conn = builder.connect_async().await?;
     tracing::info!("connected");
 
-    // Request current connection, player, and session state from LFS.
-    // LFS does not send these automatically on connect.
+    // Request current connection, player, session state, and grid order from
+    // LFS. LFS does not send these automatically on connect.
     conn.write(TinyType::Ncn.with_request_id(1)).await?;
     conn.write(TinyType::Npl.with_request_id(2)).await?;
     conn.write(TinyType::Sst.with_request_id(3)).await?;
+    conn.write(TinyType::Reo.with_request_id(4)).await?;
 
     let presence = Presence::new();
     let game = Game::new();
@@ -69,13 +77,22 @@ async fn main() -> insim::Result<()> {
         }
 
         for event in game.apply_packet(&packet) {
-            let is_race_ended = matches!(event, insim_extra::game::GameEvent::RaceEnded);
             for e in race.apply_game_event(&event) {
                 tracing::debug!(?e, "race event");
             }
-            if is_race_ended {
-                tracing::info!("race ended");
-                print_results(&race);
+            match event {
+                GameEvent::SessionStarted { kind } => {
+                    tracing::info!(?kind, "session started");
+                    // The tracker just cleared - re-request players and grid
+                    // order so it repopulates for the new session.
+                    conn.write(TinyType::Npl.with_request_id(2)).await?;
+                    conn.write(TinyType::Reo.with_request_id(4)).await?;
+                },
+                GameEvent::SessionEnded => {
+                    tracing::info!("session ended");
+                    print_results(&race, "Final Race Results");
+                },
+                _ => {},
             }
         }
 
@@ -111,6 +128,19 @@ async fn main() -> insim::Result<()> {
                         .unwrap_or_else(|| "?".to_string());
                     println!("[FL] {:<20}  {}  lap {}", driver, fmt_duration(*time), lap);
                 },
+                // Each confirmed result classifies one more driver. Reprint the
+                // table so it builds up live as drivers cross the line; the
+                // final copy is printed on session end.
+                RaceEvent::ResultConfirmed {
+                    result_num,
+                    num_results,
+                    ..
+                } => {
+                    print_results(
+                        &race,
+                        &format!("Results ({}/{} classified)", result_num + 1, num_results),
+                    );
+                },
                 _ => tracing::debug!(?e, "race event"),
             }
         }
@@ -126,6 +156,8 @@ fn fmt_duration(d: std::time::Duration) -> String {
 struct ResultRow {
     #[tabled(rename = "#")]
     pos: String,
+    #[tabled(rename = "Grid")]
+    grid: String,
     #[tabled(rename = "Driver")]
     driver: String,
     #[tabled(rename = "Laps")]
@@ -138,9 +170,9 @@ struct ResultRow {
     status: String,
 }
 
-fn print_results(race: &RaceTracker) {
+fn print_results(race: &RaceTracker, title: &str) {
     let mut entrants = race.entrants();
-    entrants.sort_by(|a, b| position_key(a).cmp(&position_key(b)));
+    entrants.sort_by_key(position_key);
 
     let fl_id = race.fastest_lap().map(|(id, _, _)| id);
 
@@ -171,8 +203,14 @@ fn print_results(race: &RaceTracker) {
                 FinishStatus::Dnf => ("-".to_string(), "DNF".to_string()),
             };
 
+            let grid = e
+                .grid_position
+                .map(|g| g.to_string())
+                .unwrap_or_else(|| "-".to_string());
+
             ResultRow {
                 pos,
+                grid,
                 driver,
                 laps: e.laps_done,
                 best_lap,
@@ -183,7 +221,7 @@ fn print_results(race: &RaceTracker) {
         .collect();
 
     println!();
-    println!("=== Race Results ===");
+    println!("=== {title} ===");
     println!("{}", Table::new(rows).with(Style::sharp()));
     println!();
 }

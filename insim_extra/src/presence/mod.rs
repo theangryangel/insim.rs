@@ -127,7 +127,7 @@ pub enum PresenceEvent {
 struct PresenceInner {
     connections: HashMap<ConnectionId, ConnectionInfo>,
     players: HashMap<PlayerId, PlayerInfo>,
-    /// Survives `Cnl`: maps LFS.net username → last seen display name.
+    /// Survives `Cnl`: maps LFS.net username -> last seen display name.
     last_known_names: HashMap<String, String>,
 }
 

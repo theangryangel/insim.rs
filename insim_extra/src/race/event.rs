@@ -8,13 +8,18 @@ use insim::{
 };
 
 use super::entrant::{EntrantId, LapRecord, PitRecord};
+use crate::game::SessionKind;
 
 /// Events emitted by [`super::RaceTracker`] `apply_*` methods.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum RaceEvent {
-    /// A race session started and all prior state was cleared.
-    RaceStarted,
+    /// A race or qualifying session started (`Rst`) and all prior state was
+    /// cleared.
+    SessionStarted {
+        /// Whether the new session is a race or qualifying.
+        kind: SessionKind,
+    },
     /// A new entrant joined the track.
     EntrantJoined {
         /// Stable entrant identifier.
@@ -155,10 +160,9 @@ pub enum RaceEvent {
     },
     /// A player teleported to the pits (Shift+P / `Plp` packet).
     ///
-    /// Emitted by both [`super::RaceTracker::apply_telepit`] and
-    /// [`super::RaceTracker::apply_telepit_resume`]. The caller can
-    /// distinguish which was called by context - both methods document their
-    /// effect on lap state.
+    /// Emitted by [`super::RaceTracker::apply_telepit`]. The in-progress lap is
+    /// discarded but the running lap total is left untouched - LFS does not
+    /// reset the lap counter on a telepit.
     TeleportedToPits {
         /// Stable entrant identifier.
         id: EntrantId,

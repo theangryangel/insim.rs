@@ -1,7 +1,7 @@
 //! Shortcut mini-game subcommand. Players race from checkpoint1 to finish
 //! and try to post the fastest time.
 //!
-//! Phase machine: Waiting → SettingUp → Racing (same pattern as bomb).
+//! Phase machine: Waiting -> SettingUp -> Racing (same pattern as bomb).
 
 mod config;
 mod events;

@@ -38,26 +38,36 @@ pub use event::RaceEvent;
 use insim::{
     Packet,
     identifiers::{ConnectionId, PlayerId},
-    insim::{Fin, Lap, Pen, PenaltyInfo, Pit, Plp, Psf, Res, Spx},
+    insim::{Fin, Lap, Pen, PenaltyInfo, Pit, Plp, Psf, Reo, Res, Spx},
 };
 use parking_lot::RwLock;
 
 use crate::{
-    game::GameEvent,
+    game::{GameEvent, SessionKind},
     presence::{ConnectionInfo, PlayerInfo, PresenceEvent},
 };
+
+/// LFS uses 1:00:00.000 as a placeholder for an invalid/missing split time.
+const INVALID_SPLIT: Duration = Duration::from_secs(3600);
 
 #[derive(Default)]
 struct RaceTrackerInner {
     next_id: u64,
     entrants: HashMap<EntrantId, EntrantState>,
-    /// Maps currently-active [`PlayerId`] → [`EntrantId`]. Removed on player
+    /// Maps currently-active [`PlayerId`] -> [`EntrantId`]. Removed on player
     /// left; the entrant record in `entrants` is kept for post-race querying.
     live: HashMap<PlayerId, EntrantId>,
     /// Name cache: populated from connection joined/renamed events so that
     /// `uname` can be baked into [`DriverRecord`] at join/swap time.
     connections: HashMap<ConnectionId, (String, String)>,
     race_active: bool,
+    /// Kind of the current session, set on [`RaceTracker::apply_session_started`].
+    /// Used to interpret `Fin` correctly (a finish in a race, a per-lap signal
+    /// in qualifying).
+    session_kind: Option<SessionKind>,
+    /// Grid positions from a `Reo` that arrived before the matching `Npl`.
+    /// Drained into [`EntrantState::grid_position`] when the player joins.
+    pending_grid: HashMap<PlayerId, u8>,
     /// Session fastest lap: set the first time any entrant completes a lap,
     /// updated whenever a faster time is recorded.
     fastest_lap: Option<(EntrantId, PlayerId, Duration)>,
@@ -112,8 +122,15 @@ impl RaceTracker {
         g.entrants.clear();
         g.live.clear();
         g.connections.clear();
+        g.pending_grid.clear();
         g.race_active = false;
+        g.session_kind = None;
         g.fastest_lap = None;
+    }
+
+    /// The kind of the current session, if one has started.
+    pub fn session_kind(&self) -> Option<SessionKind> {
+        self.inner.read().session_kind
     }
 
     /// The current session fastest lap: the entrant, their player ID, and the
@@ -188,9 +205,23 @@ impl RaceTracker {
     /// back to this behaviour automatically if no match is found.
     pub fn apply_player_joined(&self, info: &PlayerInfo) -> Vec<RaceEvent> {
         let mut g = self.inner.write();
+        // Idempotent per live plid: LFS announces each player with an `Npl` at
+        // grid formation *and* again in reply to a `TINY_NPL` request, so the
+        // same plid can arrive twice. If it is already live, fold in any pending
+        // grid position and ignore the duplicate rather than creating a phantom
+        // second entrant.
+        if let Some(&id) = g.live.get(&info.plid) {
+            if let Some(grid) = g.pending_grid.remove(&info.plid)
+                && let Some(entrant) = g.entrants.get_mut(&id)
+            {
+                entrant.grid_position = Some(grid);
+            }
+            return vec![];
+        }
         let id = g.alloc_id();
         let uname = g.uname_for(info.ucid);
         let pname = g.pname_for(info.ucid).unwrap_or_else(|| info.pname.clone());
+        let grid_position = g.pending_grid.remove(&info.plid);
         let state = EntrantState {
             id,
             plid: info.plid,
@@ -208,6 +239,7 @@ impl RaceTracker {
                 uname,
                 from_lap: 0,
             }],
+            grid_position,
             pending_pit: None,
             penalty: PenaltyInfo::None,
         };
@@ -287,6 +319,16 @@ impl RaceTracker {
     /// accidentally merging unrelated entries.
     pub fn apply_player_rejoined(&self, info: &PlayerInfo) -> Vec<RaceEvent> {
         let mut g = self.inner.write();
+        // Idempotent per live plid: ignore a duplicate `Npl` for an entrant that
+        // is already on track (see [`apply_player_joined`](Self::apply_player_joined)).
+        if let Some(&id) = g.live.get(&info.plid) {
+            if let Some(grid) = g.pending_grid.remove(&info.plid)
+                && let Some(entrant) = g.entrants.get_mut(&id)
+            {
+                entrant.grid_position = Some(grid);
+            }
+            return vec![];
+        }
         let uname = g.uname_for(info.ucid);
         if let Some(prior_id) = uname
             .as_deref()
@@ -315,6 +357,7 @@ impl RaceTracker {
         // No match - fresh join
         let id = g.alloc_id();
         let pname = g.pname_for(info.ucid).unwrap_or_else(|| info.pname.clone());
+        let grid_position = g.pending_grid.remove(&info.plid);
         let state = EntrantState {
             id,
             plid: info.plid,
@@ -332,6 +375,7 @@ impl RaceTracker {
                 uname,
                 from_lap: 0,
             }],
+            grid_position,
             pending_pit: None,
             penalty: PenaltyInfo::None,
         };
@@ -343,17 +387,30 @@ impl RaceTracker {
         }]
     }
 
-    /// Clear all per-race state and mark the race as active. Call on `RaceStarted` / `GameEvent::RaceStarted`.
-    pub fn apply_race_started(&self) -> Vec<RaceEvent> {
+    /// Clear all per-session state and start a new session of the given
+    /// [`SessionKind`]. Call on `SessionStarted` / `GameEvent::SessionStarted`
+    /// (driven by the `Rst` packet).
+    ///
+    /// Clears entrants, the live map, pending grid order, and the fastest lap;
+    /// the connection name cache is preserved (connections persist across
+    /// sessions). LFS re-sends `Npl` for every player after `Rst`, which
+    /// repopulates the entrant list.
+    pub fn apply_session_started(&self, kind: SessionKind) -> Vec<RaceEvent> {
         let mut g = self.inner.write();
         g.entrants.clear();
         g.live.clear();
+        g.pending_grid.clear();
         g.race_active = true;
+        g.session_kind = Some(kind);
         g.fastest_lap = None;
-        vec![RaceEvent::RaceStarted]
+        vec![RaceEvent::SessionStarted { kind }]
     }
 
-    /// Mark the race as no longer active. Call on `RaceEnded` / `GameEvent::RaceEnded`.
+    /// Mark the session as no longer active. Call on `SessionEnded` /
+    /// `GameEvent::SessionEnded` (LFS returned to the entry/lobby screen).
+    ///
+    /// Accumulated entrant data is **not** cleared - it stays queryable for
+    /// post-session results until the next [`apply_session_started`](Self::apply_session_started).
     pub fn apply_race_ended(&self) {
         self.inner.write().race_active = false;
     }
@@ -390,12 +447,12 @@ impl RaceTracker {
 
     /// Route a [`GameEvent`] to the appropriate `apply_*` method.
     ///
-    /// Handles `RaceStarted` and `RaceEnded`; all other variants are ignored
-    /// and return an empty vec.
+    /// Handles `SessionStarted` and `SessionEnded`; all other variants are
+    /// ignored and return an empty vec.
     pub fn apply_game_event(&self, event: &GameEvent) -> Vec<RaceEvent> {
         match event {
-            GameEvent::RaceStarted => self.apply_race_started(),
-            GameEvent::RaceEnded => {
+            GameEvent::SessionStarted { kind } => self.apply_session_started(*kind),
+            GameEvent::SessionEnded => {
                 self.apply_race_ended();
                 vec![]
             },
@@ -414,26 +471,46 @@ impl RaceTracker {
             insim::Packet::Psf(v) => self.apply_pit_stop_finished(v),
             insim::Packet::Pen(v) => self.apply_penalty_changed(v),
             insim::Packet::Plp(v) => self.apply_telepit(v),
+            insim::Packet::Reo(v) => self.apply_grid_order(v),
             _ => vec![],
         }
     }
 
-    /// Record a telepit (Shift+P) and **reset** lap state to mirror LFS.
+    /// Record the starting grid order. Call on [`insim::Packet::Reo`].
     ///
-    /// **Use this in short-form races**, or whenever you want `RaceTracker`'s
-    /// lap counter to stay in sync with what LFS reports. After a telepit LFS
-    /// restarts the player's lap counter from 1; this method resets
-    /// [`laps_done`](EntrantState::laps_done) and
-    /// [`lap_offset`](EntrantState::lap_offset) to 0 so subsequent
-    /// [`apply_lap`](Self::apply_lap) calls store the same lap numbers LFS
-    /// reports.
+    /// Assigns a 1-indexed [`grid_position`](EntrantState::grid_position) to
+    /// each entrant in finishing order. `Reo` can arrive before the matching
+    /// `Npl` packets (LFS re-sends both after `Rst`); positions for not-yet-seen
+    /// players are buffered and applied when they join.
     ///
-    /// In-progress lap data (`current_splits`, `pending_pit`) is cleared as
-    /// it is no longer valid. Completed lap records and best-lap data are
-    /// preserved as historical data.
+    /// Returns no events - grid order is queried via the entrant snapshot.
+    pub fn apply_grid_order(&self, reo: &Reo) -> Vec<RaceEvent> {
+        let mut g = self.inner.write();
+        let count = (reo.nump as usize).min(reo.plid.len());
+        for (i, &plid) in reo.plid.iter().take(count).enumerate() {
+            let pos = (i + 1) as u8;
+            match g.live.get(&plid).copied() {
+                Some(id) => {
+                    if let Some(entrant) = g.entrants.get_mut(&id) {
+                        entrant.grid_position = Some(pos);
+                    }
+                },
+                None => {
+                    let _ = g.pending_grid.insert(plid, pos);
+                },
+            }
+        }
+        vec![]
+    }
+
+    /// Record a telepit (Shift+P / `Plp` packet). Call on [`insim::Packet::Plp`].
     ///
-    /// For long-form races where a telepit should not lose the running lap
-    /// total, use [`apply_telepit_resume`](Self::apply_telepit_resume) instead.
+    /// The in-progress lap is abandoned, so `current_splits` and any pending
+    /// pit stop are discarded. The running lap total
+    /// ([`laps_done`](EntrantState::laps_done) /
+    /// [`lap_offset`](EntrantState::lap_offset)) is **left untouched**: unlike a
+    /// spectate-and-rejoin (which issues a fresh `Npl`), LFS does not reset the
+    /// lap counter on a telepit, so neither do we.
     pub fn apply_telepit(&self, plp: &Plp) -> Vec<RaceEvent> {
         let mut g = self.inner.write();
         let Some(&id) = g.live.get(&plp.plid) else {
@@ -442,45 +519,16 @@ impl RaceTracker {
         let Some(entrant) = g.entrants.get_mut(&id) else {
             return vec![];
         };
-        entrant.laps_done = 0;
-        entrant.lap_offset = 0;
-        entrant.current_splits.clear();
-        entrant.pending_pit = None;
-        vec![RaceEvent::TeleportedToPits { id, plid: plp.plid }]
-    }
-
-    /// Record a telepit (Shift+P) and **preserve** the running lap total via
-    /// a lap offset.
-    ///
-    /// **Use this in long-form races** (endurance, multi-hour) where a telepit
-    /// should not reset the lap counter. After a telepit LFS restarts the
-    /// player's lap counter from 1; this method increments
-    /// [`lap_offset`](EntrantState::lap_offset) by the current
-    /// [`laps_done`](EntrantState::laps_done) so subsequent
-    /// [`apply_lap`](Self::apply_lap) calls transparently correct the raw LFS
-    /// lap number to the true running total.
-    ///
-    /// In-progress lap data (`current_splits`, `pending_pit`) is cleared as
-    /// it is no longer valid. All completed laps, pit stops, and best-lap
-    /// records are preserved.
-    ///
-    /// For short-form races, or when you want LFS-accurate lap numbers, use
-    /// [`apply_telepit`](Self::apply_telepit) instead.
-    pub fn apply_telepit_resume(&self, plp: &Plp) -> Vec<RaceEvent> {
-        let mut g = self.inner.write();
-        let Some(&id) = g.live.get(&plp.plid) else {
-            return vec![];
-        };
-        let Some(entrant) = g.entrants.get_mut(&id) else {
-            return vec![];
-        };
-        entrant.lap_offset = entrant.lap_offset.wrapping_add(entrant.laps_done);
         entrant.current_splits.clear();
         entrant.pending_pit = None;
         vec![RaceEvent::TeleportedToPits { id, plid: plp.plid }]
     }
 
     /// Record a completed lap. Call on [`insim::Packet::Lap`].
+    ///
+    /// Ignored once the entrant has finished (a finished car still emits `Lap`
+    /// packets during its slow-down lap, which would otherwise corrupt the lap
+    /// list and best/fastest-lap tracking).
     pub fn apply_lap(&self, lap: &Lap) -> Vec<RaceEvent> {
         let mut g = self.inner.write();
         let Some(&id) = g.live.get(&lap.plid) else {
@@ -489,6 +537,9 @@ impl RaceTracker {
         let Some(entrant) = g.entrants.get_mut(&id) else {
             return vec![];
         };
+        if matches!(entrant.status, FinishStatus::Finished { .. }) {
+            return vec![];
+        }
         let effective_lap = lap.lapsdone.wrapping_add(entrant.lap_offset);
         let record = LapRecord {
             lap: effective_lap,
@@ -533,7 +584,13 @@ impl RaceTracker {
     }
 
     /// Record a split crossing. Call on [`insim::Packet::Spx`].
+    ///
+    /// Ignored once the entrant has finished, and for LFS's invalid-split
+    /// placeholder (a split time of 1:00:00.000).
     pub fn apply_split(&self, spx: &Spx) -> Vec<RaceEvent> {
+        if spx.stime >= INVALID_SPLIT {
+            return vec![];
+        }
         let mut g = self.inner.write();
         let Some(&id) = g.live.get(&spx.plid) else {
             return vec![];
@@ -541,6 +598,9 @@ impl RaceTracker {
         let Some(entrant) = g.entrants.get_mut(&id) else {
             return vec![];
         };
+        if matches!(entrant.status, FinishStatus::Finished { .. }) {
+            return vec![];
+        }
         entrant.current_splits.push(spx.stime);
         vec![RaceEvent::SplitCompleted {
             id,
@@ -551,8 +611,19 @@ impl RaceTracker {
     }
 
     /// Record a provisional finish. Call on [`insim::Packet::Fin`].
+    ///
+    /// In qualifying, practice and untimed sessions `Fin` fires after *every*
+    /// completed lap rather than marking a finish, so it is ignored there. The
+    /// finish is only recorded for races (or when no session kind is known, to
+    /// stay robust for a tracker started mid-race).
     pub fn apply_finish(&self, fin: &Fin) -> Vec<RaceEvent> {
         let mut g = self.inner.write();
+        if matches!(
+            g.session_kind,
+            Some(SessionKind::Qualifying | SessionKind::Practice | SessionKind::Untimed)
+        ) {
+            return vec![];
+        }
         let Some(&id) = g.live.get(&fin.plid) else {
             return vec![];
         };
@@ -576,10 +647,18 @@ impl RaceTracker {
     }
 
     /// Record a confirmed result. Call on [`insim::Packet::Res`].
+    ///
+    /// `Res` can arrive after the player has already left the track (and so is
+    /// no longer in the live map). In that case the classification is applied
+    /// to the entrant's preserved record, matched by [`PlayerId`].
     pub fn apply_result(&self, res: &Res) -> Vec<RaceEvent> {
         let mut g = self.inner.write();
-        let Some(&id) = g.live.get(&res.plid) else {
-            return vec![];
+        let id = match g.live.get(&res.plid).copied() {
+            Some(id) => id,
+            None => match find_entrant_by_plid(&g, res.plid) {
+                Some(id) => id,
+                None => return vec![],
+            },
         };
         let Some(entrant) = g.entrants.get_mut(&id) else {
             return vec![];
@@ -662,5 +741,17 @@ fn find_disconnected_by_uname(inner: &RaceTrackerInner, uname: &str) -> Option<E
         .iter()
         .filter(|(id, _)| !inner.live.values().any(|live_id| live_id == *id))
         .find(|(_, e)| e.drivers.last().and_then(|d| d.uname.as_deref()) == Some(uname))
+        .map(|(id, _)| *id)
+}
+
+/// Returns the [`EntrantId`] of a non-live entrant (in `entrants` but no longer
+/// `live`) whose last-known [`PlayerId`] matches `plid`. Used to apply a `Res`
+/// that arrives after the player has left the track.
+fn find_entrant_by_plid(inner: &RaceTrackerInner, plid: PlayerId) -> Option<EntrantId> {
+    inner
+        .entrants
+        .iter()
+        .filter(|(id, _)| !inner.live.values().any(|live_id| live_id == *id))
+        .find(|(_, e)| e.plid == plid)
         .map(|(id, _)| *id)
 }

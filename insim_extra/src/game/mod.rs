@@ -10,7 +10,7 @@
 //! while let Some(packet) = conn.next().await {
 //!     for event in game.apply_packet(&packet) {
 //!         match event {
-//!             GameEvent::RaceStarted => println!("race started!"),
+//!             GameEvent::SessionStarted { kind } => println!("session started: {kind:?}"),
 //!             GameEvent::TrackChanged { to, .. } => println!("track: {to}"),
 //!             _ => {}
 //!         }
@@ -23,11 +23,41 @@ use std::{sync::Arc, time::Duration};
 
 pub use commands::{GridMode, Month, TimeDemoPreset, TimeSet};
 use insim::{
-    core::{track::Track, wind::Wind},
-    insim::{Axi, Ism, RaceFlags, RaceInProgress, RaceLaps, Rst, Sta, StaFlags, Tiny, TinyType},
+    core::{game_version::GameVersion, track::Track, vehicle::Vehicle, wind::Wind},
+    insim::{
+        Axi, Ism, PlcAllowedCarsSet, RaceFlags, RaceInProgress, RaceLaps, Rst, SmallType, Sta,
+        StaFlags, Tiny, TinyType, Ver,
+    },
 };
 use parking_lot::RwLock;
 use tokio_util::sync::CancellationToken;
+
+/// The kind of session that an [`Rst`] packet started.
+///
+/// Carried by [`GameEvent::SessionStarted`] so consumers (notably the race
+/// tracker) can interpret subsequent packets correctly - most importantly
+/// `Fin`, which marks a finish in a race but fires after every lap in
+/// qualifying.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SessionKind {
+    /// A race session (`Rst` with `qualmins == 0` and a lap/hour count).
+    Race,
+    /// A qualifying session (`Rst` with `qualmins > 0`).
+    Qualifying,
+    /// A practice session (`Rst` with `qualmins == 0` and
+    /// [`RaceLaps::Practice`], i.e. 0 laps).
+    ///
+    /// LFS reports no race in progress, so this is only distinguishable from
+    /// the `Rst` packet. Like qualifying, `Fin` here is a per-lap signal rather
+    /// than a finish.
+    Practice,
+    /// An untimed open/cruise session (`Rst` with `qualmins == 0` and
+    /// [`RaceLaps::Untimed`]).
+    ///
+    /// Like [`Practice`](Self::Practice) LFS reports no race in progress, and
+    /// `Fin` is a per-lap signal rather than a finish.
+    Untimed,
+}
 
 /// High-level description of the current LFS session.
 #[derive(Debug, Default, Clone)]
@@ -68,6 +98,15 @@ pub enum MultiplayerState {
     },
 }
 
+/// Version information about the connected LFS instance, from a `Ver` packet.
+#[derive(Debug, Default, Clone)]
+pub struct VersionInfo {
+    /// Product name (e.g. `"S3"`).
+    pub product: String,
+    /// LFS game version.
+    pub version: GameVersion,
+}
+
 /// Mirror of the relevant fields from an `Sta` packet.
 #[derive(Debug, Default, Clone)]
 pub struct GameInfo {
@@ -78,6 +117,13 @@ pub struct GameInfo {
     session: SessionState,
     flags: StaFlags,
     multiplayer: MultiplayerState,
+    /// Server's allowed-cars set, from a `Small`/`Alc` reply. `None` until seen.
+    allowed_cars: Option<PlcAllowedCarsSet>,
+    /// Server's allowed-mods list, from a `Mal` packet. Empty = unrestricted or
+    /// not yet received.
+    allowed_mods: Vec<Vehicle>,
+    /// Version information, from a `Ver` packet. `None` until received.
+    version: Option<VersionInfo>,
     /// Incremented each time an `Axi` packet is applied, regardless of lname content.
     axi_count: u64,
     /// Incremented each time an `Rst` packet is applied.
@@ -122,6 +168,30 @@ impl GameInfo {
     pub fn multiplayer(&self) -> &MultiplayerState {
         &self.multiplayer
     }
+
+    /// Server's allowed-cars set, if a `Small`/`Alc` has been received.
+    ///
+    /// Populated by requesting `TinyType::Alc`, or when the host changes the
+    /// allowed cars mid-session.
+    pub fn allowed_cars(&self) -> Option<&PlcAllowedCarsSet> {
+        self.allowed_cars.as_ref()
+    }
+
+    /// Server's allowed-mods list, if a `Mal` has been received. Empty means
+    /// unrestricted (any mod) or not yet received.
+    ///
+    /// Populated by requesting `TinyType::Mal`, or when the host changes the
+    /// allowed mods mid-session.
+    pub fn allowed_mods(&self) -> &[Vehicle] {
+        &self.allowed_mods
+    }
+
+    /// Version information about the connected LFS instance, if a `Ver` has
+    /// been received. LFS sends this on connect when `Isi::reqi` is non-zero,
+    /// or in reply to `TinyType::Ver`.
+    pub fn version(&self) -> Option<&VersionInfo> {
+        self.version.as_ref()
+    }
 }
 
 /// State-change events produced by [`Game::apply_packet`].
@@ -130,10 +200,26 @@ impl GameInfo {
 /// individual typed events via `Event<T>` extractors.
 #[derive(Debug, Clone)]
 pub enum GameEvent {
-    /// Race transitioned from non-racing → racing.
-    RaceStarted,
-    /// Race transitioned from racing → non-racing.
-    RaceEnded,
+    /// An `Rst` packet started a new race, qualifying, practice or untimed
+    /// session.
+    ///
+    /// This is the authoritative session-start signal: LFS sends an
+    /// unsolicited `Rst` precisely when a session starts or restarts, carrying
+    /// enough information to tell races, qualifying and practice/untimed apart
+    /// (see [`SessionKind`]). Consumers that accumulate per-session state
+    /// should clear it here.
+    SessionStarted {
+        /// The kind of session that started.
+        kind: SessionKind,
+    },
+    /// LFS returned to the entry/lobby screen: an `Sta` reported no race or
+    /// qualifying in progress where the previous state had one.
+    ///
+    /// This is the session-end signal - there is no `Rst`-based equivalent, as
+    /// `Rst` only ever starts a session. Note that practice/untimed sessions
+    /// are reported by LFS as "no race in progress", so this does not fire for
+    /// them.
+    SessionEnded,
     /// Track changed (also fired for the first `Sta` when `from` is `None`).
     TrackChanged {
         /// Previously known track.
@@ -160,6 +246,27 @@ pub enum GameEvent {
     },
     /// LFS left multiplayer (received an `ISM` with an empty host name).
     MultiplayerLeft,
+    /// The server's allowed-cars set changed (from a `Small`/`Alc`).
+    ///
+    /// Also fired the first time the set is received.
+    AllowedCarsChanged {
+        /// The new allowed-cars set.
+        cars: PlcAllowedCarsSet,
+    },
+    /// The server's allowed-mods list changed (from a `Mal`).
+    ///
+    /// Also fired the first time the list is received.
+    AllowedModsChanged {
+        /// The new allowed-mods list (empty means unrestricted).
+        mods: Vec<Vehicle>,
+    },
+    /// Version information was received (from a `Ver`).
+    VersionReceived {
+        /// Product name (e.g. `"S3"`).
+        product: String,
+        /// LFS game version.
+        version: GameVersion,
+    },
 }
 
 /// Mirrors game state from a stream of `insim` packets.
@@ -301,13 +408,10 @@ impl Game {
     pub fn apply_packet(&self, packet: &insim::Packet) -> Vec<GameEvent> {
         match packet {
             insim::Packet::Sta(sta) => {
-                let (was_racing, now_racing, prev_track, new_track) = self.apply_sta(sta);
+                let (was_in_session, now_in_session, prev_track, new_track) = self.apply_sta(sta);
                 let mut events = Vec::new();
-                if !was_racing && now_racing {
-                    events.push(GameEvent::RaceStarted);
-                }
-                if was_racing && !now_racing {
-                    events.push(GameEvent::RaceEnded);
+                if was_in_session && !now_in_session {
+                    events.push(GameEvent::SessionEnded);
                 }
                 if prev_track != Some(new_track) {
                     events.push(GameEvent::TrackChanged {
@@ -355,16 +459,50 @@ impl Game {
                 }
             },
             insim::Packet::Rst(rst) => {
-                let _ = self.apply_rst(rst);
-                vec![]
+                if let Some(kind) = self.apply_rst(rst) {
+                    vec![GameEvent::SessionStarted { kind }]
+                } else {
+                    vec![]
+                }
+            },
+            insim::Packet::Small(small) => {
+                if let SmallType::Alc(cars) = &small.subt {
+                    if self.apply_allowed_cars(cars) {
+                        vec![GameEvent::AllowedCarsChanged { cars: cars.clone() }]
+                    } else {
+                        vec![]
+                    }
+                } else {
+                    vec![]
+                }
+            },
+            insim::Packet::Mal(mal) => {
+                let mods: Vec<Vehicle> = mal.iter().copied().collect();
+                if self.apply_allowed_mods(&mods) {
+                    vec![GameEvent::AllowedModsChanged { mods }]
+                } else {
+                    vec![]
+                }
+            },
+            insim::Packet::Ver(ver) => {
+                self.apply_version(ver);
+                vec![GameEvent::VersionReceived {
+                    product: ver.product.clone(),
+                    version: ver.version.clone(),
+                }]
             },
             _ => vec![],
         }
     }
 
+    /// Returns `(was_in_session, now_in_session, prev_track, new_track)`, where
+    /// "in session" means a race or qualifying session is in progress.
     fn apply_sta(&self, sta: &Sta) -> (bool, bool, Option<Track>, Track) {
         let mut g = self.inner.write();
-        let was_racing = matches!(g.session, SessionState::Racing { .. });
+        let was_in_session = matches!(
+            g.session,
+            SessionState::Racing { .. } | SessionState::Qualifying { .. }
+        );
         let prev_track = g.track;
         g.session = match sta.raceinprog {
             RaceInProgress::No => SessionState::Lobby,
@@ -382,34 +520,78 @@ impl Game {
         g.weather = Some(sta.weather);
         g.wind = Some(sta.wind);
         g.flags = sta.flags;
-        let now_racing = matches!(g.session, SessionState::Racing { .. });
-        (was_racing, now_racing, prev_track, sta.track)
+        let now_in_session = matches!(
+            g.session,
+            SessionState::Racing { .. } | SessionState::Qualifying { .. }
+        );
+        (was_in_session, now_in_session, prev_track, sta.track)
     }
 
-    fn apply_rst(&self, rst: &Rst) -> u64 {
+    /// Returns the [`SessionKind`] that this `Rst` started, or `None` if the
+    /// packet was a solicited reply that must not be treated as a fresh start.
+    fn apply_rst(&self, rst: &Rst) -> Option<SessionKind> {
         // Solicited replies (reqi != 0) echo stale data and must not overwrite
         // the authoritative state set by Sta. Only unsolicited Rst packets
         // (reqi == 0, sent when a race genuinely starts) update state.
         if rst.reqi.0 != 0 {
-            return self.inner.read().rst_count;
+            return None;
         }
         let mut g = self.inner.write();
         g.track = Some(rst.track);
         g.weather = Some(rst.weather);
         g.wind = Some(rst.wind);
-        g.session = if rst.qualmins > 0 {
-            SessionState::Qualifying {
+        let kind = if rst.qualmins > 0 {
+            g.session = SessionState::Qualifying {
                 duration: Duration::from_secs(rst.qualmins as u64 * 60),
                 flags: rst.flags,
+            };
+            SessionKind::Qualifying
+        } else if let RaceLaps::Practice | RaceLaps::Untimed = rst.racelaps {
+            // Practice / open / cruise: LFS reports no race in progress, so the
+            // Sta-derived SessionState is left untouched - only the kind is
+            // recorded so consumers can interpret Fin etc. correctly.
+            if matches!(rst.racelaps, RaceLaps::Untimed) {
+                SessionKind::Untimed
+            } else {
+                SessionKind::Practice
             }
         } else {
-            SessionState::Racing {
+            g.session = SessionState::Racing {
                 laps: rst.racelaps,
                 flags: rst.flags,
-            }
+            };
+            SessionKind::Race
         };
         g.rst_count = g.rst_count.wrapping_add(1);
-        g.rst_count
+        Some(kind)
+    }
+
+    /// Returns `true` if the allowed-cars set changed.
+    fn apply_allowed_cars(&self, cars: &PlcAllowedCarsSet) -> bool {
+        let mut g = self.inner.write();
+        if g.allowed_cars.as_ref() == Some(cars) {
+            return false;
+        }
+        g.allowed_cars = Some(cars.clone());
+        true
+    }
+
+    /// Returns `true` if the allowed-mods list changed.
+    fn apply_allowed_mods(&self, mods: &[Vehicle]) -> bool {
+        let mut g = self.inner.write();
+        if g.allowed_mods.as_slice() == mods {
+            return false;
+        }
+        g.allowed_mods = mods.to_vec();
+        true
+    }
+
+    fn apply_version(&self, ver: &Ver) {
+        let mut g = self.inner.write();
+        g.version = Some(VersionInfo {
+            product: ver.product.clone(),
+            version: ver.version.clone(),
+        });
     }
 
     fn apply_axi(&self, axi: &Axi) -> ((u64, Option<String>), (u64, Option<String>)) {

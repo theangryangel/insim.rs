@@ -102,10 +102,10 @@
     {% if page > 1 %}
     <a href="{{ self.page_url(page - 1) }}"
        class="px-5 py-2 text-sm font-bold uppercase tracking-widest text-outline border border-outline-variant/30 hover:border-primary-container hover:text-on-surface transition-colors">
-      ← PREV
+      <- PREV
     </a>
     {% else %}
-    <span class="px-5 py-2 text-sm font-bold uppercase tracking-widest text-outline/30 border border-outline-variant/10">← PREV</span>
+    <span class="px-5 py-2 text-sm font-bold uppercase tracking-widest text-outline/30 border border-outline-variant/10"><- PREV</span>
     {% endif %}
 
     <span class="text-sm text-outline uppercase tracking-widest">Page {{ page }} of {{ total_pages }}</span>
@@ -113,10 +113,10 @@
     {% if page < total_pages %}
     <a href="{{ self.page_url(page + 1) }}"
        class="px-5 py-2 text-sm font-bold uppercase tracking-widest text-outline border border-outline-variant/30 hover:border-primary-container hover:text-on-surface transition-colors">
-      NEXT →
+      NEXT ->
     </a>
     {% else %}
-    <span class="px-5 py-2 text-sm font-bold uppercase tracking-widest text-outline/30 border border-outline-variant/10">NEXT →</span>
+    <span class="px-5 py-2 text-sm font-bold uppercase tracking-widest text-outline/30 border border-outline-variant/10">NEXT -></span>
     {% endif %}
   </div>
   {% endif %}
