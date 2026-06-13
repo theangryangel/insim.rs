@@ -59,6 +59,23 @@ pub enum SessionKind {
     Untimed,
 }
 
+impl SessionKind {
+    /// Whether this is a race session (DNF semantics apply, `Fin` marks a finish).
+    pub fn is_race(self) -> bool {
+        matches!(self, Self::Race)
+    }
+
+    /// Whether this session kind warrants lap and entrant tracking.
+    ///
+    /// Returns `true` for [`Race`](Self::Race), [`Qualifying`](Self::Qualifying),
+    /// and [`Practice`](Self::Practice). Returns `false` for
+    /// [`Untimed`](Self::Untimed) (custom game modes where race tracking is
+    /// meaningless).
+    pub fn is_tracking(self) -> bool {
+        matches!(self, Self::Race | Self::Qualifying | Self::Practice)
+    }
+}
+
 /// High-level description of the current LFS session.
 #[derive(Debug, Default, Clone)]
 pub enum SessionState {

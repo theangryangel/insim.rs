@@ -50,6 +50,7 @@ use crate::{
 /// LFS uses 1:00:00.000 as a placeholder for an invalid/missing split time.
 const INVALID_SPLIT: Duration = Duration::from_secs(3600);
 
+
 #[derive(Default)]
 struct RaceTrackerInner {
     next_id: u64,
@@ -60,10 +61,8 @@ struct RaceTrackerInner {
     /// Name cache: populated from connection joined/renamed events so that
     /// `uname` can be baked into [`DriverRecord`] at join/swap time.
     connections: HashMap<ConnectionId, (String, String)>,
-    race_active: bool,
-    /// Kind of the current session, set on [`RaceTracker::apply_session_started`].
-    /// Used to interpret `Fin` correctly (a finish in a race, a per-lap signal
-    /// in qualifying).
+    /// Kind of the current session. `None` means lobby / no session active.
+    /// Drives both tracking-active checks and DNF semantics.
     session_kind: Option<SessionKind>,
     /// Grid positions from a `Reo` that arrived before the matching `Npl`.
     /// Drained into [`EntrantState::grid_position`] when the player joins.
@@ -104,7 +103,7 @@ impl std::fmt::Debug for RaceTracker {
         f.debug_struct("RaceTracker")
             .field("entrants", &g.entrants.len())
             .field("live", &g.live.len())
-            .field("race_active", &g.race_active)
+            .field("session_kind", &g.session_kind)
             .finish()
     }
 }
@@ -129,7 +128,6 @@ impl RaceTracker {
         g.live.clear();
         g.connections.clear();
         g.pending_grid.clear();
-        g.race_active = false;
         g.session_kind = None;
         g.fastest_lap = None;
     }
@@ -145,9 +143,9 @@ impl RaceTracker {
         self.inner.read().fastest_lap
     }
 
-    /// Whether a race session is currently active.
+    /// Whether a race session (not qualifying or practice) is currently active.
     pub fn race_active(&self) -> bool {
-        self.inner.read().race_active
+        self.inner.read().session_kind.is_some_and(|k| k.is_race())
     }
 
     /// Look up an entrant by their stable [`EntrantId`].
@@ -211,6 +209,9 @@ impl RaceTracker {
     /// back to this behaviour automatically if no match is found.
     pub fn apply_player_joined(&self, info: &PlayerInfo) -> Vec<RaceEvent> {
         let mut g = self.inner.write();
+        if !g.session_kind.is_some_and(|k| k.is_tracking()) {
+            return vec![];
+        }
         // Idempotent per live plid: LFS announces each player with an `Npl` at
         // grid formation *and* again in reply to a `TINY_NPL` request, so the
         // same plid can arrive twice. If it is already live, fold in any pending
@@ -257,13 +258,16 @@ impl RaceTracker {
         }]
     }
 
-    /// Mark an entrant as DNF if the race is active. Call on `PlayerLeft` / `PresenceEvent::PlayerLeft`.
+    /// Mark an entrant as DNF if a race is active. Call on `PlayerLeft` / `PresenceEvent::PlayerLeft`.
+    ///
+    /// DNF is only emitted for [`Race`](SessionKind::Race) sessions; players
+    /// leaving during qualifying or practice are simply removed from the live map.
     pub fn apply_player_left(&self, info: &PlayerInfo) -> Vec<RaceEvent> {
         let mut g = self.inner.write();
         let Some(id) = g.live.remove(&info.plid) else {
             return vec![];
         };
-        if g.race_active
+        if g.session_kind.is_some_and(|k| k.is_race())
             && let Some(entrant) = g.entrants.get_mut(&id)
             && matches!(entrant.status, FinishStatus::Racing)
         {
@@ -279,6 +283,9 @@ impl RaceTracker {
     /// Record a driver swap. Call on `TakingOver` / `PresenceEvent::TakingOver`.
     pub fn apply_taking_over(&self, before: &PlayerInfo, after: &PlayerInfo) -> Vec<RaceEvent> {
         let mut g = self.inner.write();
+        if !g.session_kind.is_some_and(|k| k.is_tracking()) {
+            return vec![];
+        }
         let Some(&id) = g.live.get(&before.plid) else {
             return vec![];
         };
@@ -325,6 +332,9 @@ impl RaceTracker {
     /// accidentally merging unrelated entries.
     pub fn apply_player_rejoined(&self, info: &PlayerInfo) -> Vec<RaceEvent> {
         let mut g = self.inner.write();
+        if !g.session_kind.is_some_and(|k| k.is_tracking()) {
+            return vec![];
+        }
         // Idempotent per live plid: ignore a duplicate `Npl` for an entrant that
         // is already on track (see [`apply_player_joined`](Self::apply_player_joined)).
         if let Some(&id) = g.live.get(&info.plid) {
@@ -400,25 +410,28 @@ impl RaceTracker {
     /// Clears entrants, the live map, pending grid order, and the fastest lap;
     /// the connection name cache is preserved (connections persist across
     /// sessions). LFS re-sends `Npl` for every player after `Rst`, which
-    /// repopulates the entrant list.
+    /// repopulates the entrant list for tracking sessions.
+    ///
+    /// [`SessionStarted`](RaceEvent::SessionStarted) is emitted for **all**
+    /// session kinds including [`Untimed`](SessionKind::Untimed); callers can
+    /// react to the session change even when no lap/entrant tracking will occur.
     pub fn apply_session_started(&self, kind: SessionKind) -> Vec<RaceEvent> {
         let mut g = self.inner.write();
         g.entrants.clear();
         g.live.clear();
         g.pending_grid.clear();
-        g.race_active = true;
         g.session_kind = Some(kind);
         g.fastest_lap = None;
         vec![RaceEvent::SessionStarted { kind }]
     }
 
-    /// Mark the session as no longer active. Call on `SessionEnded` /
-    /// `GameEvent::SessionEnded` (LFS returned to the entry/lobby screen).
+    /// Mark the session as no longer active (LFS returned to lobby).
+    /// Call on `SessionEnded` / `GameEvent::SessionEnded`.
     ///
     /// Accumulated entrant data is **not** cleared - it stays queryable for
     /// post-session results until the next [`apply_session_started`](Self::apply_session_started).
     pub fn apply_race_ended(&self) {
-        self.inner.write().race_active = false;
+        self.inner.write().session_kind = None;
     }
 
     /// Route a [`PresenceEvent`] to the appropriate `apply_*` method.
@@ -492,6 +505,9 @@ impl RaceTracker {
     /// Returns no events - grid order is queried via the entrant snapshot.
     pub fn apply_grid_order(&self, reo: &Reo) -> Vec<RaceEvent> {
         let mut g = self.inner.write();
+        if !g.session_kind.is_some_and(|k| k.is_tracking()) {
+            return vec![];
+        }
         let count = (reo.nump as usize).min(reo.plid.len());
         for (i, &plid) in reo.plid.iter().take(count).enumerate() {
             let pos = (i + 1) as u8;
@@ -519,6 +535,9 @@ impl RaceTracker {
     /// lap counter on a telepit, so neither do we.
     pub fn apply_telepit(&self, plp: &Plp) -> Vec<RaceEvent> {
         let mut g = self.inner.write();
+        if !g.session_kind.is_some_and(|k| k.is_tracking()) {
+            return vec![];
+        }
         let Some(&id) = g.live.get(&plp.plid) else {
             return vec![];
         };
@@ -537,6 +556,9 @@ impl RaceTracker {
     /// list and best/fastest-lap tracking).
     pub fn apply_lap(&self, lap: &Lap) -> Vec<RaceEvent> {
         let mut g = self.inner.write();
+        if !g.session_kind.is_some_and(|k| k.is_tracking()) {
+            return vec![];
+        }
         let Some(&id) = g.live.get(&lap.plid) else {
             return vec![];
         };
@@ -598,6 +620,9 @@ impl RaceTracker {
             return vec![];
         }
         let mut g = self.inner.write();
+        if !g.session_kind.is_some_and(|k| k.is_tracking()) {
+            return vec![];
+        }
         let Some(&id) = g.live.get(&spx.plid) else {
             return vec![];
         };
@@ -624,10 +649,7 @@ impl RaceTracker {
     /// stay robust for a tracker started mid-race).
     pub fn apply_finish(&self, fin: &Fin) -> Vec<RaceEvent> {
         let mut g = self.inner.write();
-        if matches!(
-            g.session_kind,
-            Some(SessionKind::Qualifying | SessionKind::Practice | SessionKind::Untimed)
-        ) {
+        if !g.session_kind.is_some_and(|k| k.is_race()) {
             return vec![];
         }
         let Some(&id) = g.live.get(&fin.plid) else {
@@ -659,6 +681,9 @@ impl RaceTracker {
     /// to the entrant's preserved record, matched by [`PlayerId`].
     pub fn apply_result(&self, res: &Res) -> Vec<RaceEvent> {
         let mut g = self.inner.write();
+        if !g.session_kind.is_some_and(|k| k.is_tracking()) {
+            return vec![];
+        }
         let id = match g.live.get(&res.plid).copied() {
             Some(id) => id,
             None => match find_entrant_by_plid(&g, res.plid) {
@@ -683,6 +708,9 @@ impl RaceTracker {
     /// Open a pending pit stop record. Call on [`insim::Packet::Pit`].
     pub fn apply_pit_stop(&self, pit: &Pit) -> Vec<RaceEvent> {
         let mut g = self.inner.write();
+        if !g.session_kind.is_some_and(|k| k.is_tracking()) {
+            return vec![];
+        }
         let Some(&id) = g.live.get(&pit.plid) else {
             return vec![];
         };
@@ -701,6 +729,9 @@ impl RaceTracker {
     /// Complete the pending pit stop. Call on [`insim::Packet::Psf`].
     pub fn apply_pit_stop_finished(&self, psf: &Psf) -> Vec<RaceEvent> {
         let mut g = self.inner.write();
+        if !g.session_kind.is_some_and(|k| k.is_tracking()) {
+            return vec![];
+        }
         let Some(&id) = g.live.get(&psf.plid) else {
             return vec![];
         };
@@ -722,6 +753,9 @@ impl RaceTracker {
     /// Record a penalty change. Call on [`insim::Packet::Pen`].
     pub fn apply_penalty_changed(&self, pen: &Pen) -> Vec<RaceEvent> {
         let mut g = self.inner.write();
+        if !g.session_kind.is_some_and(|k| k.is_tracking()) {
+            return vec![];
+        }
         let Some(&id) = g.live.get(&pen.plid) else {
             return vec![];
         };
