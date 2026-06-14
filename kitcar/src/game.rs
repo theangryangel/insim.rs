@@ -11,7 +11,7 @@ use insim::{
     insim::{PlcAllowedCarsSet, RaceLaps},
 };
 pub use insim_extra::game::{Game, GameEvent, GameInfo, SessionKind, SessionState, VersionInfo};
-use insim_extra::util::mtc;
+use insim_extra::{util::mtc, world::World};
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 
@@ -84,11 +84,10 @@ pub struct MultiplayerJoined {
 #[derive(Debug, Clone)]
 pub struct MultiplayerLeft;
 
-/// [`Game`] is its own extractor: register via
-/// `app.handle(Stage::Pre, Game::new())` and any handler can take it by value.
+/// Extract [`Game`] from a registered [`World`].
 impl<S> FromContext<S> for Game {
     fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
-        cx.lookup::<Game>()
+        cx.lookup::<World>().map(|w| w.game().clone())
     }
 }
 

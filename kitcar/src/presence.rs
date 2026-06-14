@@ -5,6 +5,7 @@ use std::future::Future;
 
 use insim::WithRequestId;
 pub use insim_extra::presence::{ConnectionInfo, PlayerInfo, Presence, PresenceEvent};
+use insim_extra::world::World;
 
 use crate::{AppError, Dispatch, ExtractCx, FromContext, Handler, Sender, Startup};
 
@@ -66,11 +67,10 @@ pub struct TakingOver {
 #[derive(Debug, Clone)]
 pub struct PlayerTeleportedToPits(pub PlayerInfo);
 
-/// [`Presence`] is its own extractor: register via
-/// `app.handle(Stage::Pre, Presence::new())` and any handler can take it by value.
+/// Extract [`Presence`] from a registered [`World`].
 impl<S> FromContext<S> for Presence {
     fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
-        cx.lookup::<Presence>()
+        cx.lookup::<World>().map(|w| w.presence().clone())
     }
 }
 

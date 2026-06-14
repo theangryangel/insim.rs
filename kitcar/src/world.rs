@@ -1,0 +1,160 @@
+//! [`Handler`] and [`FromContext`] impls for [`insim_extra::world::World`].
+
+use std::future::Future;
+
+use insim::{WithRequestId, identifiers::RequestId};
+pub use insim_extra::world::{World, WorldEvent};
+use insim_extra::{
+    game::{Game, GameEvent},
+    presence::{Presence, PresenceEvent},
+    race::RaceTracker,
+};
+
+use crate::{
+    AppError, Dispatch, ExtractCx, FromContext, Handler, Sender, Startup,
+    game::{
+        AllowedCarsChanged, AllowedModsChanged, LayoutChanged, MultiplayerJoined, MultiplayerLeft,
+        SessionEnded, SessionStarted, TrackChanged, VersionReceived,
+    },
+    presence::{
+        Connected, ConnectionDetails, Disconnected, PlayerJoined, PlayerLeft,
+        PlayerTeleportedToPits, Renamed, TakingOver, VehicleSelected,
+    },
+};
+
+/// [`World`] is its own extractor: register via
+/// `app.handle(Stage::Pre, World::new())` and any handler can take it by value.
+impl<S> FromContext<S> for World {
+    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+        cx.lookup::<World>()
+    }
+}
+
+/// [`Handler`] impl for [`World`].
+///
+/// Replaces the three separate `Presence`, `Game`, and `RaceTracker` Pre-stage
+/// handlers with one aggregate. On each packet, [`World::apply_packet`] runs
+/// all three state mirrors in the correct order in a single call (no
+/// inter-cycle lag), then emits the same individual synthetic event types the
+/// existing split setup produced, so Update-stage handlers using
+/// `Event<Connected>`, `Event<RaceEvent>`, etc. are unchanged.
+///
+/// On [`Startup`] it sends the combined startup requests for `Presence` and
+/// `Game`. On [`SessionStarted`] it sends `Game::SESSION_REQUESTS` and
+/// `RaceTracker::SESSION_REQUESTS` together rather than across two cycles.
+///
+/// ## Example
+///
+/// ```ignore
+/// app.handle(Stage::Pre, World::new())
+///    .handle(Stage::Update, on_entrant_joined)
+///
+/// async fn on_entrant_joined(
+///     Event(event): Event<RaceEvent>,
+///     world: World,
+/// ) -> Result<(), AppError> {
+///     if let RaceEvent::EntrantJoined { id, plid } = event {
+///         // world.presence(), world.game(), world.race() all available
+///     }
+///     Ok(())
+/// }
+/// ```
+impl<S: Send + Sync + 'static> Handler<(), S> for World {
+    fn call(self, cx: &ExtractCx<'_, S>) -> impl Future<Output = Result<(), AppError>> + Send {
+        let events = if let Dispatch::Packet(p) = cx.dispatch {
+            self.apply_packet(p)
+        } else {
+            vec![]
+        };
+        let startup = if let Dispatch::Synthetic(s) = cx.dispatch {
+            s.downcast_ref::<Startup>().is_some()
+        } else {
+            false
+        };
+        let session_started = events
+            .iter()
+            .any(|e| matches!(e, WorldEvent::Game(GameEvent::SessionStarted { .. })));
+        let sender = cx.sender.clone();
+        async move {
+            if startup {
+                for t in Presence::STARTUP_REQUESTS {
+                    let _ = sender.packet(t.clone().with_request_id(RequestId(1)));
+                }
+                for t in Game::STARTUP_REQUESTS {
+                    let _ = sender.packet(t.clone().with_request_id(RequestId(1)));
+                }
+            } else if session_started {
+                for t in Game::SESSION_REQUESTS {
+                    let _ = sender.packet(t.clone().with_request_id(RequestId(1)));
+                }
+                for t in RaceTracker::SESSION_REQUESTS {
+                    let _ = sender.packet(t.clone().with_request_id(RequestId(1)));
+                }
+            }
+            emit_world_events(events, &sender);
+            Ok(())
+        }
+    }
+}
+
+fn emit_world_events(events: Vec<WorldEvent>, sender: &Sender) {
+    for event in events {
+        match event {
+            WorldEvent::Presence(pe) => {
+                let _ = match pe {
+                    PresenceEvent::Connected(info) => sender.event(Connected(info)),
+                    PresenceEvent::Disconnected { ucid, info } => {
+                        sender.event(Disconnected { ucid, info })
+                    },
+                    PresenceEvent::ConnectionDetails(info) => sender.event(ConnectionDetails(info)),
+                    PresenceEvent::VehicleSelected { ucid, vehicle } => {
+                        sender.event(VehicleSelected { ucid, vehicle })
+                    },
+                    PresenceEvent::Renamed {
+                        ucid,
+                        uname,
+                        new_pname,
+                    } => sender.event(Renamed {
+                        ucid,
+                        uname,
+                        new_pname,
+                    }),
+                    PresenceEvent::PlayerJoined(p) => sender.event(PlayerJoined(p)),
+                    PresenceEvent::PlayerLeft(p) => sender.event(PlayerLeft(p)),
+                    PresenceEvent::TakingOver { before, after } => {
+                        sender.event(TakingOver { before, after })
+                    },
+                    PresenceEvent::PlayerTeleportedToPits(p) => {
+                        sender.event(PlayerTeleportedToPits(p))
+                    },
+                };
+            },
+            WorldEvent::Game(ge) => {
+                let _ = match ge {
+                    GameEvent::SessionStarted { kind } => sender.event(SessionStarted { kind }),
+                    GameEvent::SessionEnded => sender.event(SessionEnded),
+                    GameEvent::TrackChanged { from, to } => sender.event(TrackChanged { from, to }),
+                    GameEvent::LayoutChanged { from, to } => {
+                        sender.event(LayoutChanged { from, to })
+                    },
+                    GameEvent::MultiplayerJoined { host_name, is_host } => {
+                        sender.event(MultiplayerJoined { host_name, is_host })
+                    },
+                    GameEvent::MultiplayerLeft => sender.event(MultiplayerLeft),
+                    GameEvent::AllowedCarsChanged { cars } => {
+                        sender.event(AllowedCarsChanged { cars })
+                    },
+                    GameEvent::AllowedModsChanged { mods } => {
+                        sender.event(AllowedModsChanged { mods })
+                    },
+                    GameEvent::VersionReceived { product, version } => {
+                        sender.event(VersionReceived { product, version })
+                    },
+                };
+            },
+            WorldEvent::Race(re) => {
+                let _ = sender.event(re);
+            },
+        }
+    }
+}

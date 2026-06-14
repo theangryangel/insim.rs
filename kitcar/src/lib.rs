@@ -82,6 +82,7 @@ mod race;
 #[allow(missing_docs)]
 pub mod ui;
 pub mod util;
+mod world;
 
 pub use app::{
     App, Installable, Stage,
@@ -108,3 +109,4 @@ pub use race::{
     DriverRecord, EntrantId, EntrantState, FinishStatus, LapRecord, PitRecord, RaceEvent,
     RaceTracker,
 };
+pub use world::{World, WorldEvent};
