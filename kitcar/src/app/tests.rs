@@ -23,9 +23,9 @@ use tracing_subscriber as _;
 
 use super::{event::Command, runtime::dispatch_cycle};
 use crate::{
-    App, AppError, ChatEvent, ChatParser, Connected, Dispatch, Event, ExtractCx, Game, Handler,
-    HandlerExt, LayoutChanged, Packet, Presence, Sender, SessionEnded, SessionStarted, Stage,
-    State, Svc, TrackChanged, World,
+    App, AppError, ChatEvent, ChatParser, Connected, Dispatch, Event, ExtractCx, Handler,
+    HandlerExt, LayoutChanged, Packet, Sender, SessionEnded, SessionStarted, Stage, State, Svc,
+    TrackChanged, World,
 };
 
 /// A toy typed chat enum for the parser test.
@@ -109,7 +109,7 @@ fn make_mso(ucid: u8, msg: &str) -> insim::Packet {
 fn app_with(state: TestState) -> App {
     App::new()
         .handle(Stage::Update, state)
-        .handle(Stage::Pre, Presence::new())
+        .handle(Stage::Pre, World::new())
         .handle(Stage::Update, ChatParser::<TestCmd>::new(&['!', '?']))
         .handle(Stage::Update, count_ncn)
         .handle(Stage::Update, count_mso)
@@ -254,8 +254,8 @@ async fn presence_is_queryable_via_extractor() {
 
     impl<S: Send + Sync + 'static> Handler<(), S> for PState {}
 
-    async fn observe_count(presence: Presence, Svc(s): Svc<PState>) -> Result<(), AppError> {
-        s.last_seen_count.store(presence.count(), Ordering::Relaxed);
+    async fn observe_count(world: World, Svc(s): Svc<PState>) -> Result<(), AppError> {
+        s.last_seen_count.store(world.count(), Ordering::Relaxed);
         Ok(())
     }
 
@@ -263,7 +263,7 @@ async fn presence_is_queryable_via_extractor() {
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
     let world = World::new();
-    let presence = world.presence().clone();
+    let world_handle = world.clone();
     let app = App::new()
         .handle(Stage::Update, state.clone())
         .handle(Stage::Pre, world)
@@ -298,10 +298,10 @@ async fn presence_is_queryable_via_extractor() {
     .await;
     assert_eq!(state.last_seen_count.load(Ordering::Relaxed), 2);
 
-    // External read via the same `presence` handle reflects the live state.
-    assert_eq!(presence.count(), 2);
-    assert!(presence.get(ConnectionId(1)).is_some());
-    assert!(presence.get(ConnectionId(2)).is_some());
+    // External read via the same world handle reflects the live state.
+    assert_eq!(world_handle.count(), 2);
+    assert!(world_handle.get(ConnectionId(1)).is_some());
+    assert!(world_handle.get(ConnectionId(2)).is_some());
 }
 
 #[tokio::test]
@@ -528,11 +528,11 @@ async fn game_emits_session_started_on_rst() {
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
 
-    // Game::new() fires an Sst request - drop any commands it queued.
-    let game = Game::new();
+    // World::new() - drop any commands it queued on startup.
+    let world = World::new();
     while cmd_rx.try_recv().is_ok() {}
 
-    let app = App::new().handle(Stage::Pre, game.clone());
+    let app = App::new().handle(Stage::Pre, world.clone());
 
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
@@ -573,11 +573,11 @@ async fn game_emits_session_ended_on_sta_leaving_race() {
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
 
-    // Game::new() fires an Sst request - drop any commands it queued.
-    let game = Game::new();
+    // World::new() - drop any commands it queued on startup.
+    let world = World::new();
     while cmd_rx.try_recv().is_ok() {}
 
-    let app = App::new().handle(Stage::Pre, game.clone());
+    let app = App::new().handle(Stage::Pre, world.clone());
 
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
@@ -636,10 +636,10 @@ async fn game_emits_track_changed_on_track_field_change() {
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
 
-    let game = Game::new();
+    let world = World::new();
     while cmd_rx.try_recv().is_ok() {}
 
-    let app = App::new().handle(Stage::Pre, game.clone());
+    let app = App::new().handle(Stage::Pre, world.clone());
 
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
@@ -738,10 +738,10 @@ async fn game_emits_layout_changed_on_layout_field_change() {
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
 
-    let game = Game::new();
+    let world = World::new();
     while cmd_rx.try_recv().is_ok() {}
 
-    let app = App::new().handle(Stage::Pre, game.clone());
+    let app = App::new().handle(Stage::Pre, world.clone());
 
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;

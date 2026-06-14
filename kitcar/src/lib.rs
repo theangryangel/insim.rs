@@ -96,14 +96,14 @@ pub use app::{
 pub use chat::{ChatEvent, ChatParser};
 pub use error::AppError;
 pub use game::{
-    AllowedCarsChanged, AllowedModsChanged, Game, GameInfo, LayoutChanged, MultiplayerJoined,
+    AllowedCarsChanged, AllowedModsChanged, GameInfo, LayoutChanged, MultiplayerJoined,
     MultiplayerLeft, SessionEnded, SessionKind, SessionStarted, TrackChanged, VersionInfo,
     VersionReceived, track_rotation,
 };
 pub use penalty_clearer::PenaltyClearer;
 pub use presence::{
     Connected, ConnectionDetails, ConnectionInfo, Disconnected, PlayerInfo, PlayerJoined,
-    PlayerLeft, PlayerTeleportedToPits, Presence, Renamed, TakingOver, VehicleSelected,
+    PlayerLeft, PlayerTeleportedToPits, Renamed, TakingOver, VehicleSelected,
 };
 pub use race::{
     DriverRecord, EntrantId, EntrantState, FinishStatus, LapRecord, PitRecord, RaceEvent,

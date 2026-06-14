@@ -37,11 +37,11 @@ fn start_setup(state: &State<Bomb>, world: &World, sender: &Sender, ui: &BombUi)
 
     refresh_ui(state, ui);
 
-    let game = world.game().clone();
+    let world = world.clone();
     let sender = sender.clone();
     drop(tokio::spawn(async move {
         let result = tokio::select! {
-            r = track_rotation(&game, track, RaceLaps::Untimed, 0, layout, setup_cancel.clone(), &sender) => r,
+            r = track_rotation(&world, track, RaceLaps::Untimed, 0, layout, setup_cancel.clone(), &sender) => r,
             _ = tokio::time::sleep(setup_timeout) => None,
         };
         match result {
@@ -472,10 +472,7 @@ pub(super) async fn on_uco(
             let Some(player) = world.player(uco.plid) else {
                 return Ok(());
             };
-            let uname = world
-                .get(player.ucid)
-                .map(|c| c.uname)
-                .unwrap_or_default();
+            let uname = world.get(player.ucid).map(|c| c.uname).unwrap_or_default();
             state.write().on_checkpoint(
                 uco.plid,
                 player.ucid,

@@ -1,36 +1,17 @@
-//! [`Game`] mirrors game state from a bare `insim` packet stream.
+//! Game-state types used by [`crate::world::World`].
 //!
-//! Host commands return [`insim::Packet`] values; multi-packet commands return
-//! [`Vec<insim::Packet>`]. Feed packets with [`apply_packet`](Game::apply_packet)
-//! to update state and collect change events.
-//!
-//! ```ignore
-//! let game = Game::new();
-//!
-//! while let Some(packet) = conn.next().await {
-//!     for event in game.apply_packet(&packet) {
-//!         match event {
-//!             GameEvent::SessionStarted { kind } => println!("session started: {kind:?}"),
-//!             GameEvent::TrackChanged { to, .. } => println!("track: {to}"),
-//!             _ => {}
-//!         }
-//!     }
-//! }
-//! ```
+//! The [`GameEvent`] enum, [`SessionState`], [`SessionKind`], [`MultiplayerState`],
+//! [`GameInfo`], and related types are defined here. The actual state is owned by
+//! [`World`](crate::world::World), which exposes query methods directly.
 
 mod commands;
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 pub use commands::{GridMode, Month, TimeDemoPreset, TimeSet};
 use insim::{
     core::{game_version::GameVersion, track::Track, vehicle::Vehicle, wind::Wind},
-    insim::{
-        Axi, Ism, PlcAllowedCarsSet, RaceFlags, RaceInProgress, RaceLaps, Rst, SmallType, Sta,
-        StaFlags, Tiny, TinyType, Ver,
-    },
+    insim::{PlcAllowedCarsSet, RaceFlags, RaceLaps, StaFlags},
 };
-use parking_lot::RwLock;
-use tokio_util::sync::CancellationToken;
 
 /// The kind of session that an [`Rst`] packet started.
 ///
@@ -124,27 +105,27 @@ pub struct VersionInfo {
     pub version: GameVersion,
 }
 
-/// Mirror of the relevant fields from an `Sta` packet.
+/// Snapshot of the game state, produced by [`World::game_info()`](crate::world::World::game_info).
 #[derive(Debug, Default, Clone)]
 pub struct GameInfo {
-    track: Option<Track>,
-    layout: Option<String>,
-    weather: Option<u8>,
-    wind: Option<Wind>,
-    session: SessionState,
-    flags: StaFlags,
-    multiplayer: MultiplayerState,
+    pub(crate) track: Option<Track>,
+    pub(crate) layout: Option<String>,
+    pub(crate) weather: Option<u8>,
+    pub(crate) wind: Option<Wind>,
+    pub(crate) session: SessionState,
+    pub(crate) flags: StaFlags,
+    pub(crate) multiplayer: MultiplayerState,
     /// Server's allowed-cars set, from a `Small`/`Alc` reply. `None` until seen.
-    allowed_cars: Option<PlcAllowedCarsSet>,
+    pub(crate) allowed_cars: Option<PlcAllowedCarsSet>,
     /// Server's allowed-mods list, from a `Mal` packet. Empty = unrestricted or
     /// not yet received.
-    allowed_mods: Vec<Vehicle>,
+    pub(crate) allowed_mods: Vec<Vehicle>,
     /// Version information, from a `Ver` packet. `None` until received.
-    version: Option<VersionInfo>,
+    pub(crate) version: Option<VersionInfo>,
     /// Incremented each time an `Axi` packet is applied, regardless of lname content.
-    axi_count: u64,
+    pub(crate) axi_count: u64,
     /// Incremented each time an `Rst` packet is applied.
-    rst_count: u64,
+    pub(crate) rst_count: u64,
 }
 
 impl GameInfo {
@@ -211,7 +192,7 @@ impl GameInfo {
     }
 }
 
-/// State-change events produced by [`Game::apply_packet`].
+/// State-change events produced by game packet processing in [`World::apply_packet`](crate::world::World::apply_packet).
 ///
 /// Standalone users pattern-match this directly. `kitcar` users receive
 /// individual typed events via `Event<T>` extractors.
@@ -284,369 +265,4 @@ pub enum GameEvent {
         /// LFS game version.
         version: GameVersion,
     },
-}
-
-/// Mirrors game state from a stream of `insim` packets.
-// TODO: Merge directly into World
-#[derive(Clone)]
-pub struct Game {
-    pub(crate) inner: Arc<RwLock<GameInfo>>,
-}
-
-impl Default for Game {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl std::fmt::Debug for Game {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Game").finish_non_exhaustive()
-    }
-}
-
-impl Game {
-    /// Tiny requests to send once on connect to sync game/session state,
-    /// allowed cars, and allowed mods. LFS does not send these automatically.
-    pub const STARTUP_REQUESTS: &[TinyType] = &[
-        TinyType::Sst,
-        TinyType::Axi,
-        TinyType::Ism,
-        TinyType::Alc,
-        TinyType::Mal,
-    ];
-
-    /// Tiny requests to re-send on each [`GameEvent::SessionStarted`], since a
-    /// new session can change the allowed cars/mods.
-    pub const SESSION_REQUESTS: &[TinyType] = &[TinyType::Alc, TinyType::Mal];
-
-    /// Create a new game mirror with empty state.
-    pub fn new() -> Self {
-        Self {
-            inner: Arc::new(RwLock::new(GameInfo::default())),
-        }
-    }
-
-    /// Snapshot of the current game state.
-    pub fn get(&self) -> GameInfo {
-        self.inner.read().clone()
-    }
-
-    /// Poll `predicate` against the current state every `poll_interval`
-    /// until it returns true. Returns `None` if `cancel` fires first.
-    pub async fn wait_for<F: Fn(&GameInfo) -> bool>(
-        &self,
-        predicate: F,
-        poll_interval: Duration,
-        cancel: CancellationToken,
-    ) -> Option<()> {
-        let mut interval = tokio::time::interval(poll_interval);
-        loop {
-            tokio::select! {
-                biased;
-                _ = cancel.cancelled() => return None,
-                _ = interval.tick() => {
-                    if predicate(&self.get()) {
-                        return Some(());
-                    }
-                }
-            }
-        }
-    }
-
-    /// Wait until state is populated from at least one `Sta` packet - i.e.
-    /// session is no longer [`SessionState::Unknown`] and the current track
-    /// is known.
-    pub async fn wait_for_known_state(&self, cancel: CancellationToken) -> Option<()> {
-        self.wait_for(
-            |info| !matches!(info.session, SessionState::Unknown) && info.track.is_some(),
-            Duration::from_millis(100),
-            cancel,
-        )
-        .await
-    }
-
-    /// Wait until the game is no longer in progress.
-    pub async fn wait_for_end(&self, cancel: CancellationToken) -> Option<()> {
-        self.wait_for(
-            |info| matches!(info.session, SessionState::Lobby),
-            Duration::from_millis(500),
-            cancel,
-        )
-        .await
-    }
-
-    /// Wait until the given track is loaded and the session is
-    /// [`SessionState::Lobby`] (selection screen, not yet racing).
-    pub async fn wait_for_track(&self, track: Track, cancel: CancellationToken) -> Option<()> {
-        self.wait_for(
-            |info| {
-                info.track.as_ref() == Some(&track) && matches!(info.session, SessionState::Lobby)
-            },
-            Duration::from_millis(500),
-            cancel,
-        )
-        .await
-    }
-
-    /// Wait until a race session is in progress.
-    pub async fn wait_for_racing(&self, cancel: CancellationToken) -> Option<()> {
-        self.wait_for(
-            |info| matches!(info.session, SessionState::Racing { .. }),
-            Duration::from_millis(500),
-            cancel,
-        )
-        .await
-    }
-
-    /// Wait for a specific layout to be loaded.
-    pub async fn wait_for_layout(&self, layout: String, cancel: CancellationToken) -> Option<()> {
-        self.wait_for(
-            |info| info.layout.as_deref() == Some(layout.as_str()),
-            Duration::from_millis(500),
-            cancel,
-        )
-        .await
-    }
-
-    /// Wait for any `Axi` packet to be received.
-    ///
-    /// Useful when `/axload` is sent but `lname` in the resulting `Axi`
-    /// reply is blank (a known LFS behaviour), making it impossible to match
-    /// on the layout name.
-    pub async fn wait_for_any_axi(&self, cancel: CancellationToken) -> Option<()> {
-        let before = self.inner.read().axi_count;
-        self.wait_for(
-            move |info| info.axi_count != before,
-            Duration::from_millis(100),
-            cancel,
-        )
-        .await
-    }
-
-    /// Wait for any `Rst` packet to be received, indicating a race or
-    /// qualifying session has started.
-    pub async fn wait_for_any_rst(&self, cancel: CancellationToken) -> Option<()> {
-        let before = self.inner.read().rst_count;
-        self.wait_for(
-            move |info| info.rst_count != before,
-            Duration::from_millis(100),
-            cancel,
-        )
-        .await
-    }
-
-    /// Apply one raw packet, update internal state, and return any state-change events.
-    pub fn apply_packet(&self, packet: &insim::Packet) -> Vec<GameEvent> {
-        match packet {
-            insim::Packet::Sta(sta) => {
-                let (was_in_session, now_in_session, prev_track, new_track) = self.apply_sta(sta);
-                let mut events = Vec::new();
-                if was_in_session && !now_in_session {
-                    events.push(GameEvent::SessionEnded);
-                }
-                if prev_track != Some(new_track) {
-                    events.push(GameEvent::TrackChanged {
-                        from: prev_track,
-                        to: new_track,
-                    });
-                }
-                events
-            },
-            insim::Packet::Axi(axi) => {
-                let (prev_lname, new_lname) = self.apply_axi(axi);
-                if prev_lname != new_lname {
-                    vec![GameEvent::LayoutChanged {
-                        from: prev_lname,
-                        to: new_lname,
-                    }]
-                } else {
-                    vec![]
-                }
-            },
-            insim::Packet::Ism(ism) => {
-                let (prev, new) = self.apply_ism(ism);
-                if prev == new {
-                    return vec![];
-                }
-                match new {
-                    MultiplayerState::Multiplayer { host_name, is_host } => {
-                        vec![GameEvent::MultiplayerJoined { host_name, is_host }]
-                    },
-                    MultiplayerState::Local => vec![GameEvent::MultiplayerLeft],
-                }
-            },
-            insim::Packet::Tiny(tiny) => self
-                .apply_tiny_axc(tiny)
-                .map(|prev| GameEvent::LayoutChanged {
-                    from: Some(prev),
-                    to: None,
-                })
-                .into_iter()
-                .collect(),
-            insim::Packet::Rst(rst) => {
-                if let Some(kind) = self.apply_rst(rst) {
-                    vec![GameEvent::SessionStarted { kind }]
-                } else {
-                    vec![]
-                }
-            },
-            insim::Packet::Small(small) => {
-                if let SmallType::Alc(cars) = &small.subt {
-                    if self.apply_allowed_cars(cars) {
-                        vec![GameEvent::AllowedCarsChanged { cars: cars.clone() }]
-                    } else {
-                        vec![]
-                    }
-                } else {
-                    vec![]
-                }
-            },
-            insim::Packet::Mal(mal) => {
-                let mods: Vec<Vehicle> = mal.iter().copied().collect();
-                if self.apply_allowed_mods(&mods) {
-                    vec![GameEvent::AllowedModsChanged { mods }]
-                } else {
-                    vec![]
-                }
-            },
-            insim::Packet::Ver(ver) => {
-                self.apply_version(ver);
-                vec![GameEvent::VersionReceived {
-                    product: ver.product.clone(),
-                    version: ver.version.clone(),
-                }]
-            },
-            _ => vec![],
-        }
-    }
-
-    /// Returns `(was_in_session, now_in_session, prev_track, new_track)`, where
-    /// "in session" means a race or qualifying session is in progress.
-    fn apply_sta(&self, sta: &Sta) -> (bool, bool, Option<Track>, Track) {
-        let mut g = self.inner.write();
-        let was_in_session = matches!(
-            g.session,
-            SessionState::Racing { .. } | SessionState::Qualifying { .. }
-        );
-        let prev_track = g.track;
-        g.session = match sta.raceinprog {
-            RaceInProgress::No => SessionState::Lobby,
-            RaceInProgress::Racing => SessionState::Racing {
-                laps: sta.racelaps,
-                flags: RaceFlags::empty(),
-            },
-            RaceInProgress::Qualifying => SessionState::Qualifying {
-                duration: Duration::from_secs(sta.qualmins as u64 * 60),
-                flags: RaceFlags::empty(),
-            },
-            _ => SessionState::Unknown,
-        };
-        g.track = Some(sta.track);
-        g.weather = Some(sta.weather);
-        g.wind = Some(sta.wind);
-        g.flags = sta.flags;
-        let now_in_session = matches!(
-            g.session,
-            SessionState::Racing { .. } | SessionState::Qualifying { .. }
-        );
-        (was_in_session, now_in_session, prev_track, sta.track)
-    }
-
-    /// Returns the [`SessionKind`] that this `Rst` started, or `None` if the
-    /// packet was a solicited reply that must not be treated as a fresh start.
-    fn apply_rst(&self, rst: &Rst) -> Option<SessionKind> {
-        // Solicited replies (reqi != 0) echo stale data and must not overwrite
-        // the authoritative state set by Sta. Only unsolicited Rst packets
-        // (reqi == 0, sent when a race genuinely starts) update state.
-        if rst.reqi.0 != 0 {
-            return None;
-        }
-        let mut g = self.inner.write();
-        g.track = Some(rst.track);
-        g.weather = Some(rst.weather);
-        g.wind = Some(rst.wind);
-        let kind = if rst.qualmins > 0 {
-            g.session = SessionState::Qualifying {
-                duration: Duration::from_secs(rst.qualmins as u64 * 60),
-                flags: rst.flags,
-            };
-            SessionKind::Qualifying
-        } else if let RaceLaps::Practice | RaceLaps::Untimed = rst.racelaps {
-            // Practice / open / cruise: LFS reports no race in progress, so the
-            // Sta-derived SessionState is left untouched - only the kind is
-            // recorded so consumers can interpret Fin etc. correctly.
-            if matches!(rst.racelaps, RaceLaps::Untimed) {
-                SessionKind::Untimed
-            } else {
-                SessionKind::Practice
-            }
-        } else {
-            g.session = SessionState::Racing {
-                laps: rst.racelaps,
-                flags: rst.flags,
-            };
-            SessionKind::Race
-        };
-        g.rst_count = g.rst_count.wrapping_add(1);
-        Some(kind)
-    }
-
-    /// Returns `true` if the allowed-cars set changed.
-    fn apply_allowed_cars(&self, cars: &PlcAllowedCarsSet) -> bool {
-        let mut g = self.inner.write();
-        if g.allowed_cars.as_ref() == Some(cars) {
-            return false;
-        }
-        g.allowed_cars = Some(cars.clone());
-        true
-    }
-
-    /// Returns `true` if the allowed-mods list changed.
-    fn apply_allowed_mods(&self, mods: &[Vehicle]) -> bool {
-        let mut g = self.inner.write();
-        if g.allowed_mods.as_slice() == mods {
-            return false;
-        }
-        g.allowed_mods = mods.to_vec();
-        true
-    }
-
-    fn apply_version(&self, ver: &Ver) {
-        let mut g = self.inner.write();
-        g.version = Some(VersionInfo {
-            product: ver.product.clone(),
-            version: ver.version.clone(),
-        });
-    }
-
-    fn apply_axi(&self, axi: &Axi) -> (Option<String>, Option<String>) {
-        let mut g = self.inner.write();
-        let prev = g.layout.clone();
-        g.layout = axi.lname.clone();
-        g.axi_count = g.axi_count.wrapping_add(1);
-        (prev, axi.lname.clone())
-    }
-
-    fn apply_ism(&self, ism: &Ism) -> (MultiplayerState, MultiplayerState) {
-        let mut g = self.inner.write();
-        let prev = g.multiplayer.clone();
-        // NOTE: If LFS is not in multiplayer mode, the host name in the ISM will be empty.
-        g.multiplayer = match ism.hname.as_deref() {
-            None | Some("") => MultiplayerState::Local,
-            Some(name) => MultiplayerState::Multiplayer {
-                host_name: name.to_owned(),
-                is_host: ism.host,
-            },
-        };
-        (prev, g.multiplayer.clone())
-    }
-
-    fn apply_tiny_axc(&self, tiny: &Tiny) -> Option<String> {
-        if !matches!(tiny.subt, TinyType::Axc) {
-            return None;
-        }
-        let mut g = self.inner.write();
-        g.layout.take()
-    }
 }
