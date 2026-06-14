@@ -38,6 +38,6 @@
       "matchManagers": ["cargo"],
       "matchPackageNames": ["pyo3", "pyo3-async-runtimes"],
       "groupName": "cargo:pyo3"
-    },
+    }
   ]
 }
