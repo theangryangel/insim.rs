@@ -10,7 +10,7 @@ use insim::{
     insim::{RaceLaps, Toc, Uco},
 };
 use kitcar::{
-    AppError, Connected, Disconnected, Event, Game, Packet, Presence, Sender, SessionEnded, State,
+    AppError, Connected, Disconnected, Event, Packet, Sender, SessionEnded, State, World,
     track_rotation, util::mtc,
 };
 
@@ -21,7 +21,7 @@ use super::{
     ui::{MetronomeConnectionProps, MetronomeUi},
 };
 
-fn start_setup(state: &State<Metronome>, game: &Game, sender: &Sender, ui: &MetronomeUi) {
+fn start_setup(state: &State<Metronome>, world: &World, sender: &Sender, ui: &MetronomeUi) {
     let (track, layout, setup_timeout, setup_cancel) = {
         let mut m = state.write();
         m.phase = MetronomePhase::SettingUp;
@@ -40,7 +40,7 @@ fn start_setup(state: &State<Metronome>, game: &Game, sender: &Sender, ui: &Metr
     ));
     refresh_ui(state, ui);
 
-    let game = game.clone();
+    let game = world.game().clone();
     let sender = sender.clone();
     drop(tokio::spawn(async move {
         let result = tokio::select! {
@@ -66,9 +66,8 @@ fn refresh_ui(state: &State<Metronome>, ui: &MetronomeUi) {
 pub(super) async fn on_connected(
     Event(Connected(info)): Event<Connected>,
     state: State<Metronome>,
-    presence: Presence,
+    world: World,
     ui: MetronomeUi,
-    game: Game,
     sender: Sender,
 ) -> Result<(), AppError> {
     let _ = ui
@@ -83,24 +82,24 @@ pub(super) async fn on_connected(
         .await;
     let should_start = {
         let m = state.read();
-        m.phase == MetronomePhase::Waiting && presence.count() >= MIN_PLAYERS
+        m.phase == MetronomePhase::Waiting && world.count() >= MIN_PLAYERS
     };
     if !should_start {
         refresh_ui(&state, &ui);
         return Ok(());
     }
-    start_setup(&state, &game, &sender, &ui);
+    start_setup(&state, &world, &sender, &ui);
     Ok(())
 }
 
 pub(super) async fn on_disconnected(
     _: Event<Disconnected>,
     state: State<Metronome>,
-    presence: Presence,
+    world: World,
     sender: Sender,
     ui: MetronomeUi,
 ) -> Result<(), AppError> {
-    if presence.count() >= MIN_PLAYERS {
+    if world.count() >= MIN_PLAYERS {
         refresh_ui(&state, &ui);
         return Ok(());
     }
@@ -155,9 +154,8 @@ pub(super) async fn on_setup_complete(
 pub(super) async fn on_setup_aborted(
     _: Event<SetupAborted>,
     state: State<Metronome>,
-    presence: Presence,
+    world: World,
     ui: MetronomeUi,
-    game: Game,
     sender: Sender,
 ) -> Result<(), AppError> {
     {
@@ -173,8 +171,8 @@ pub(super) async fn on_setup_aborted(
         Some(ConnectionId::ALL),
     ))?;
     refresh_ui(&state, &ui);
-    if presence.count() >= MIN_PLAYERS {
-        start_setup(&state, &game, &sender, &ui);
+    if world.count() >= MIN_PLAYERS {
+        start_setup(&state, &world, &sender, &ui);
     }
     Ok(())
 }
@@ -182,9 +180,8 @@ pub(super) async fn on_setup_aborted(
 pub(super) async fn on_race_ended(
     _: Event<SessionEnded>,
     state: State<Metronome>,
-    presence: Presence,
+    world: World,
     ui: MetronomeUi,
-    game: Game,
     sender: Sender,
 ) -> Result<(), AppError> {
     {
@@ -196,8 +193,8 @@ pub(super) async fn on_race_ended(
         m.phase = MetronomePhase::Waiting;
     }
     refresh_ui(&state, &ui);
-    if presence.count() >= MIN_PLAYERS {
-        start_setup(&state, &game, &sender, &ui);
+    if world.count() >= MIN_PLAYERS {
+        start_setup(&state, &world, &sender, &ui);
     }
     Ok(())
 }
@@ -217,7 +214,7 @@ pub(super) async fn on_uco(
     state: State<Metronome>,
     sender: Sender,
     ui: MetronomeUi,
-    presence: Presence,
+    world: World,
 ) -> Result<(), AppError> {
     let ObjectInfo::InsimCheckpoint(InsimCheckpoint { kind, .. }) = uco.info else {
         return Ok(());
@@ -228,13 +225,13 @@ pub(super) async fn on_uco(
         return Ok(());
     }
 
-    let Some(player) = presence.player(uco.plid) else {
+    let Some(player) = world.player(uco.plid) else {
         return Ok(());
     };
     if player.ptype.contains(insim::insim::PlayerType::AI) {
         return Ok(());
     }
-    let uname = presence
+    let uname = world
         .get(player.ucid)
         .map(|c| c.uname)
         .unwrap_or_default();
@@ -267,7 +264,7 @@ pub(super) async fn on_uco(
             let delta = target.abs_diff(elapsed);
             let delta_ms = delta.as_millis() as i64;
 
-            if let Some(pkt) = presence.spec(player.ucid) {
+            if let Some(pkt) = world.spec(player.ucid) {
                 let _ = sender.packet(pkt);
             }
 
