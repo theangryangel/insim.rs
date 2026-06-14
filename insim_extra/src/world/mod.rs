@@ -141,4 +141,49 @@ impl World {
     pub fn race(&self) -> &RaceTracker {
         &self.race
     }
+
+    /// Number of tracked connections.
+    pub fn count(&self) -> usize {
+        self.presence.count()
+    }
+
+    /// Look up a connection by ID.
+    pub fn get(
+        &self,
+        ucid: insim::identifiers::ConnectionId,
+    ) -> Option<crate::presence::ConnectionInfo> {
+        self.presence.get(ucid)
+    }
+
+    /// Look up a player by player ID.
+    pub fn player(
+        &self,
+        plid: insim::identifiers::PlayerId,
+    ) -> Option<crate::presence::PlayerInfo> {
+        self.presence.player(plid)
+    }
+
+    /// Look up the connection that owns a given player.
+    pub fn connection_by_player(
+        &self,
+        plid: insim::identifiers::PlayerId,
+    ) -> Option<crate::presence::ConnectionInfo> {
+        self.presence.connection_by_player(plid)
+    }
+
+    /// Send a spec command for the given connection (returns `None` if not found).
+    pub fn spec(
+        &self,
+        ucid: insim::identifiers::ConnectionId,
+    ) -> Option<insim::Packet> {
+        self.presence.spec(ucid)
+    }
+
+    /// Clear the penalty for the given connection (returns `None` if not found).
+    pub fn clear_penalty(
+        &self,
+        ucid: insim::identifiers::ConnectionId,
+    ) -> Option<insim::Packet> {
+        self.presence.clear_penalty(ucid)
+    }
 }

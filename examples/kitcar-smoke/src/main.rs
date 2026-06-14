@@ -29,7 +29,7 @@ use insim::{
 };
 use kitcar::{
     App, AppError, ChatEvent, ChatParser, Connected, Disconnected, Event, ExtractCx, FromContext,
-    Handler, Packet, Presence, Sender, Stage, Startup, Svc, World, run,
+    Handler, Packet, Sender, Stage, Startup, Svc, World, run,
     ui::{self, Component, InvalidateHandle, Ui},
     util::mtc,
 };
@@ -50,10 +50,10 @@ async fn log_ncn(Packet(ncn): Packet<Ncn>, Svc(state): Svc<AppState>) -> Result<
 
 async fn welcome(
     Event(Connected(info)): Event<Connected>,
-    presence: Presence,
+    world: World,
     sender: Sender,
 ) -> Result<(), AppError> {
-    let total = presence.count();
+    let total = world.count();
     sender.packets(mtc(
         format!("^2Welcome ^7{} ^8(now {total} online)", info.uname),
         Some(info.ucid),
@@ -248,29 +248,29 @@ impl Component for SmokeView {
 }
 
 async fn refresh_ui_count(
-    presence: Presence,
+    world: World,
     ui: Ui<SmokeView, UiGlobal, ()>,
 ) -> Result<(), AppError> {
     // Partial update: only touch `online`. `beats` is owned by the ticker
     // and would be clobbered by an `assign(UiGlobal { online, ..default })`.
-    ui.modify(|g| g.online = presence.count() as u64);
+    ui.modify(|g| g.online = world.count() as u64);
     Ok(())
 }
 
 async fn refresh_on_connect(
     _: Event<Connected>,
-    presence: Presence,
+    world: World,
     ui: Ui<SmokeView, UiGlobal, ()>,
 ) -> Result<(), AppError> {
-    refresh_ui_count(presence, ui).await
+    refresh_ui_count(world, ui).await
 }
 
 async fn refresh_on_disconnect(
     _: Event<Disconnected>,
-    presence: Presence,
+    world: World,
     ui: Ui<SmokeView, UiGlobal, ()>,
 ) -> Result<(), AppError> {
-    refresh_ui_count(presence, ui).await
+    refresh_ui_count(world, ui).await
 }
 
 async fn on_ui_click(Event(msg): Event<SmokeUiMsg>, sender: Sender) -> Result<(), AppError> {

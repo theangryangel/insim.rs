@@ -10,8 +10,8 @@ use insim::{
     insim::{Axm, Con, Crs, Pit, PmoAction, PmoFlags, RaceLaps, Toc, Uco, UcoAction},
 };
 use kitcar::{
-    AppError, Connected, Disconnected, Event, Game, Packet, PenaltyClearer, PlayerLeft,
-    PlayerTeleportedToPits, Presence, Sender, SessionEnded, State, track_rotation, util::mtc,
+    AppError, Connected, Disconnected, Event, Packet, PenaltyClearer, PlayerLeft,
+    PlayerTeleportedToPits, Sender, SessionEnded, State, World, track_rotation, util::mtc,
 };
 
 use super::{
@@ -22,7 +22,7 @@ use super::{
     ui::{BombConnectionProps, BombUi},
 };
 
-fn start_setup(state: &State<Bomb>, game: &Game, sender: &Sender, ui: &BombUi) {
+fn start_setup(state: &State<Bomb>, world: &World, sender: &Sender, ui: &BombUi) {
     let (track, layout, setup_timeout, setup_cancel) = {
         let mut b = state.write();
         b.phase = BombPhase::SettingUp;
@@ -37,7 +37,7 @@ fn start_setup(state: &State<Bomb>, game: &Game, sender: &Sender, ui: &BombUi) {
 
     refresh_ui(state, ui);
 
-    let game = game.clone();
+    let game = world.game().clone();
     let sender = sender.clone();
     drop(tokio::spawn(async move {
         let result = tokio::select! {
@@ -63,9 +63,8 @@ fn refresh_ui(state: &State<Bomb>, ui: &BombUi) {
 pub(super) async fn on_connected(
     Event(Connected(info)): Event<Connected>,
     state: State<Bomb>,
-    presence: Presence,
+    world: World,
     ui: BombUi,
-    game: Game,
     sender: Sender,
 ) -> Result<(), AppError> {
     let _ = ui
@@ -79,25 +78,25 @@ pub(super) async fn on_connected(
         .await;
     let should_start = {
         let b = state.read();
-        b.phase == BombPhase::Waiting && presence.count() >= MIN_PLAYERS
+        b.phase == BombPhase::Waiting && world.count() >= MIN_PLAYERS
     };
     if !should_start {
         refresh_ui(&state, &ui);
         return Ok(());
     }
-    start_setup(&state, &game, &sender, &ui);
+    start_setup(&state, &world, &sender, &ui);
     Ok(())
 }
 
 pub(super) async fn on_disconnected(
     _: Event<Disconnected>,
     state: State<Bomb>,
-    presence: Presence,
+    world: World,
     sender: Sender,
     ui: BombUi,
     clearer: PenaltyClearer,
 ) -> Result<(), AppError> {
-    if presence.count() >= MIN_PLAYERS {
+    if world.count() >= MIN_PLAYERS {
         refresh_ui(&state, &ui);
         return Ok(());
     }
@@ -183,9 +182,8 @@ pub(super) async fn on_setup_complete(
 pub(super) async fn on_setup_aborted(
     _: Event<SetupAborted>,
     state: State<Bomb>,
-    presence: Presence,
+    world: World,
     ui: BombUi,
-    game: Game,
     sender: Sender,
 ) -> Result<(), AppError> {
     {
@@ -201,8 +199,8 @@ pub(super) async fn on_setup_aborted(
         Some(ConnectionId::ALL),
     ))?;
     refresh_ui(&state, &ui);
-    if presence.count() >= MIN_PLAYERS {
-        start_setup(&state, &game, &sender, &ui);
+    if world.count() >= MIN_PLAYERS {
+        start_setup(&state, &world, &sender, &ui);
     }
     Ok(())
 }
@@ -210,9 +208,8 @@ pub(super) async fn on_setup_aborted(
 pub(super) async fn on_race_ended(
     _: Event<SessionEnded>,
     state: State<Bomb>,
-    presence: Presence,
+    world: World,
     ui: BombUi,
-    game: Game,
     sender: Sender,
     clearer: PenaltyClearer,
 ) -> Result<(), AppError> {
@@ -258,8 +255,8 @@ pub(super) async fn on_race_ended(
     }
     clearer.clear();
     refresh_ui(&state, &ui);
-    if presence.count() >= MIN_PLAYERS {
-        start_setup(&state, &game, &sender, &ui);
+    if world.count() >= MIN_PLAYERS {
+        start_setup(&state, &world, &sender, &ui);
     }
     Ok(())
 }
@@ -464,7 +461,7 @@ pub(super) async fn on_axm(Packet(axm): Packet<Axm>, state: State<Bomb>) -> Resu
 pub(super) async fn on_uco(
     Packet(uco): Packet<Uco>,
     state: State<Bomb>,
-    presence: Presence,
+    world: World,
     sender: Sender,
     ui: BombUi,
 ) -> Result<(), AppError> {
@@ -472,10 +469,10 @@ pub(super) async fn on_uco(
 
     let outcome = match (&uco.ucoaction, &uco.info) {
         (UcoAction::CircleEnter, ObjectInfo::InsimCircle(InsimCircle { index, .. })) => {
-            let Some(player) = presence.player(uco.plid) else {
+            let Some(player) = world.player(uco.plid) else {
                 return Ok(());
             };
-            let uname = presence
+            let uname = world
                 .get(player.ucid)
                 .map(|c| c.uname)
                 .unwrap_or_default();

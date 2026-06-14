@@ -8,7 +8,7 @@ use insim::{
     insim::{PlayerType, RaceLaps, Toc, Uco},
 };
 use kitcar::{
-    AppError, Connected, Disconnected, Event, Game, Packet, Presence, Sender, SessionEnded, State,
+    AppError, Connected, Disconnected, Event, Packet, Sender, SessionEnded, State, World,
     track_rotation, util::mtc,
 };
 
@@ -19,7 +19,7 @@ use super::{
     ui::{ShortcutConnectionProps, ShortcutUi},
 };
 
-fn start_setup(state: &State<Shortcut>, game: &Game, sender: &Sender, ui: &ShortcutUi) {
+fn start_setup(state: &State<Shortcut>, world: &World, sender: &Sender, ui: &ShortcutUi) {
     let (track, layout, setup_timeout, setup_cancel) = {
         let mut s = state.write();
         s.phase = ShortcutPhase::SettingUp;
@@ -38,7 +38,7 @@ fn start_setup(state: &State<Shortcut>, game: &Game, sender: &Sender, ui: &Short
     ));
     refresh_ui(state, ui);
 
-    let game = game.clone();
+    let game = world.game().clone();
     let sender = sender.clone();
     drop(tokio::spawn(async move {
         let result = tokio::select! {
@@ -64,9 +64,8 @@ fn refresh_ui(state: &State<Shortcut>, ui: &ShortcutUi) {
 pub(super) async fn on_connected(
     Event(Connected(info)): Event<Connected>,
     state: State<Shortcut>,
-    presence: Presence,
+    world: World,
     ui: ShortcutUi,
-    game: Game,
     sender: Sender,
 ) -> Result<(), AppError> {
     let _ = ui
@@ -81,24 +80,24 @@ pub(super) async fn on_connected(
         .await;
     let should_start = {
         let s = state.read();
-        s.phase == ShortcutPhase::Waiting && presence.count() >= MIN_PLAYERS
+        s.phase == ShortcutPhase::Waiting && world.count() >= MIN_PLAYERS
     };
     if !should_start {
         refresh_ui(&state, &ui);
         return Ok(());
     }
-    start_setup(&state, &game, &sender, &ui);
+    start_setup(&state, &world, &sender, &ui);
     Ok(())
 }
 
 pub(super) async fn on_disconnected(
     _: Event<Disconnected>,
     state: State<Shortcut>,
-    presence: Presence,
+    world: World,
     sender: Sender,
     ui: ShortcutUi,
 ) -> Result<(), AppError> {
-    if presence.count() >= MIN_PLAYERS {
+    if world.count() >= MIN_PLAYERS {
         refresh_ui(&state, &ui);
         return Ok(());
     }
@@ -152,9 +151,8 @@ pub(super) async fn on_setup_complete(
 pub(super) async fn on_setup_aborted(
     _: Event<SetupAborted>,
     state: State<Shortcut>,
-    presence: Presence,
+    world: World,
     ui: ShortcutUi,
-    game: Game,
     sender: Sender,
 ) -> Result<(), AppError> {
     {
@@ -170,8 +168,8 @@ pub(super) async fn on_setup_aborted(
         Some(ConnectionId::ALL),
     ))?;
     refresh_ui(&state, &ui);
-    if presence.count() >= MIN_PLAYERS {
-        start_setup(&state, &game, &sender, &ui);
+    if world.count() >= MIN_PLAYERS {
+        start_setup(&state, &world, &sender, &ui);
     }
     Ok(())
 }
@@ -179,9 +177,8 @@ pub(super) async fn on_setup_aborted(
 pub(super) async fn on_race_ended(
     _: Event<SessionEnded>,
     state: State<Shortcut>,
-    presence: Presence,
+    world: World,
     ui: ShortcutUi,
-    game: Game,
     sender: Sender,
 ) -> Result<(), AppError> {
     {
@@ -193,8 +190,8 @@ pub(super) async fn on_race_ended(
         s.phase = ShortcutPhase::Waiting;
     }
     refresh_ui(&state, &ui);
-    if presence.count() >= MIN_PLAYERS {
-        start_setup(&state, &game, &sender, &ui);
+    if world.count() >= MIN_PLAYERS {
+        start_setup(&state, &world, &sender, &ui);
     }
     Ok(())
 }
@@ -214,7 +211,7 @@ pub(super) async fn on_uco(
     state: State<Shortcut>,
     sender: Sender,
     ui: ShortcutUi,
-    presence: Presence,
+    world: World,
 ) -> Result<(), AppError> {
     let ObjectInfo::InsimCheckpoint(InsimCheckpoint { kind, .. }) = uco.info else {
         return Ok(());
@@ -225,13 +222,13 @@ pub(super) async fn on_uco(
         return Ok(());
     }
 
-    let Some(player) = presence.player(uco.plid) else {
+    let Some(player) = world.player(uco.plid) else {
         return Ok(());
     };
     if player.ptype.contains(PlayerType::AI) {
         return Ok(());
     }
-    let uname = presence
+    let uname = world
         .get(player.ucid)
         .map(|c| c.uname)
         .unwrap_or_default();
@@ -262,7 +259,7 @@ pub(super) async fn on_uco(
             let time_ms = lap_time.as_millis() as i64;
             let vehicle = player.vehicle.to_string();
 
-            if let Some(pkt) = presence.spec(player.ucid) {
+            if let Some(pkt) = world.spec(player.ucid) {
                 let _ = sender.packet(pkt);
             }
 
