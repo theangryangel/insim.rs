@@ -287,6 +287,7 @@ pub enum GameEvent {
 }
 
 /// Mirrors game state from a stream of `insim` packets.
+// TODO: Merge directly into World
 #[derive(Clone)]
 pub struct Game {
     pub(crate) inner: Arc<RwLock<GameInfo>>,

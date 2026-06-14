@@ -20,9 +20,7 @@ use handlers::{
     on_toc, on_uco,
 };
 use insim::insim::IsiFlags;
-use kitcar::{
-    App, AppError, ChatParser, Game, HandlerExt, PenaltyClearer, Presence, Stage, State, run,
-};
+use kitcar::{App, AppError, ChatParser, HandlerExt, PenaltyClearer, Stage, State, World, run};
 use state::{Bomb, BombGlobal, BombPhase};
 use ui::{BombUi, BombView};
 
@@ -61,15 +59,12 @@ pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
         },
     );
 
-    let presence = Presence::new();
-    let game = Game::new();
     let clearer = PenaltyClearer::new(PENALTY_CLEAR_DELAY);
 
     let while_racing = |s: State<Bomb>| s.read().phase == BombPhase::Racing;
 
     let app = app
-        .handle(Stage::Pre, presence)
-        .handle(Stage::Pre, game)
+        .handle(Stage::Pre, World::new())
         .handle(Stage::Pre, clearer)
         .handle(Stage::Pre, ui)
         .handle(Stage::Update, ChatParser::<chat::Cmd>::new(&['!']))
