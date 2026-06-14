@@ -29,7 +29,7 @@ use insim::{
 };
 use kitcar::{
     App, AppError, ChatEvent, ChatParser, Connected, Disconnected, Event, ExtractCx, FromContext,
-    Handler, Packet, Presence, Sender, Stage, Startup, Svc, run,
+    Handler, Packet, Presence, Sender, Stage, Startup, Svc, World, run,
     ui::{self, Component, InvalidateHandle, Ui},
     util::mtc,
 };
@@ -337,8 +337,6 @@ async fn main() -> Result<(), AppError> {
         UiGlobal::default(),
         |ucid, _invalidator: InvalidateHandle| SmokeView { ucid, clicks: 0 },
     );
-    let presence = Presence::new();
-
     let app = app
         .handle(
             Stage::Update,
@@ -346,7 +344,7 @@ async fn main() -> Result<(), AppError> {
                 joins: Arc::new(AtomicUsize::new(0)),
             },
         )
-        .handle(Stage::Pre, presence)
+        .handle(Stage::Pre, World::new())
         .handle(Stage::Pre, ui)
         .handle(Stage::Update, ChatParser::<Cmd>::new(&['!']))
         .handle(Stage::Update, install_ticker)
