@@ -4,11 +4,7 @@ use std::future::Future;
 
 use insim::{WithRequestId, identifiers::RequestId};
 pub use insim_extra::world::{World, WorldEvent};
-use insim_extra::{
-    game::{Game, GameEvent},
-    presence::{Presence, PresenceEvent},
-    race::RaceTracker,
-};
+use insim_extra::{game::GameEvent, presence::PresenceEvent};
 
 use crate::{
     AppError, Dispatch, ExtractCx, FromContext, Handler, Sender, Startup,
@@ -39,9 +35,9 @@ impl<S> FromContext<S> for World {
 /// existing split setup produced, so Update-stage handlers using
 /// `Event<Connected>`, `Event<RaceEvent>`, etc. are unchanged.
 ///
-/// On [`Startup`] it sends the combined startup requests for `Presence` and
-/// `Game`. On [`SessionStarted`] it sends `Game::SESSION_REQUESTS` and
-/// `RaceTracker::SESSION_REQUESTS` together rather than across two cycles.
+/// On [`Startup`] it sends the combined startup requests from
+/// [`World::STARTUP_REQUESTS`]. On [`SessionStarted`] it sends
+/// [`World::SESSION_REQUESTS`].
 ///
 /// ## Example
 ///
@@ -54,7 +50,7 @@ impl<S> FromContext<S> for World {
 ///     world: World,
 /// ) -> Result<(), AppError> {
 ///     if let RaceEvent::EntrantJoined { id, plid } = event {
-///         // world.presence(), world.game(), world.race() all available
+///         // world.race(), world.current_track(), world.session() all available
 ///     }
 ///     Ok(())
 /// }
@@ -77,17 +73,11 @@ impl<S: Send + Sync + 'static> Handler<(), S> for World {
         let sender = cx.sender.clone();
         async move {
             if startup {
-                for t in Presence::STARTUP_REQUESTS {
-                    let _ = sender.packet(t.clone().with_request_id(RequestId(1)));
-                }
-                for t in Game::STARTUP_REQUESTS {
+                for t in World::STARTUP_REQUESTS {
                     let _ = sender.packet(t.clone().with_request_id(RequestId(1)));
                 }
             } else if session_started {
-                for t in Game::SESSION_REQUESTS {
-                    let _ = sender.packet(t.clone().with_request_id(RequestId(1)));
-                }
-                for t in RaceTracker::SESSION_REQUESTS {
+                for t in World::SESSION_REQUESTS {
                     let _ = sender.packet(t.clone().with_request_id(RequestId(1)));
                 }
             }

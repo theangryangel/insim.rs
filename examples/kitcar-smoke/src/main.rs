@@ -247,10 +247,7 @@ impl Component for SmokeView {
     }
 }
 
-async fn refresh_ui_count(
-    world: World,
-    ui: Ui<SmokeView, UiGlobal, ()>,
-) -> Result<(), AppError> {
+async fn refresh_ui_count(world: World, ui: Ui<SmokeView, UiGlobal, ()>) -> Result<(), AppError> {
     // Partial update: only touch `online`. `beats` is owned by the ticker
     // and would be clobbered by an `assign(UiGlobal { online, ..default })`.
     ui.modify(|g| g.online = world.count() as u64);
