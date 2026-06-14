@@ -50,7 +50,6 @@ use crate::{
 /// LFS uses 1:00:00.000 as a placeholder for an invalid/missing split time.
 const INVALID_SPLIT: Duration = Duration::from_secs(3600);
 
-
 #[derive(Default)]
 struct RaceTrackerInner {
     next_id: u64,
