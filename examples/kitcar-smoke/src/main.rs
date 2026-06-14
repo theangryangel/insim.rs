@@ -29,9 +29,8 @@ use insim::{
 };
 use kitcar::{
     App, AppError, ChatEvent, ChatParser, Connected, Disconnected, Event, ExtractCx, FromContext,
-    Handler, Packet, Sender, Stage, Startup, Svc, World, run,
+    Handler, Packet, Sender, Stage, Startup, Svc, World, mtc, run,
     ui::{self, Component, InvalidateHandle, Ui},
-    util::mtc,
 };
 use tokio_util::sync::CancellationToken;
 

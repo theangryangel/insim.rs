@@ -6,7 +6,7 @@ use insim::{
     identifiers::ConnectionId,
     insim::{PlcAllowedCarsSet, RaceLaps},
 };
-pub use insim_extra::game::{GameInfo, SessionKind, SessionState, VersionInfo};
+pub use insim_extra::game::{GameInfo, SessionKind, VersionInfo};
 use insim_extra::{util::mtc, world::World};
 use tokio_util::sync::CancellationToken;
 use tracing::info;
@@ -110,7 +110,7 @@ pub async fn track_rotation(
 
     let in_game = matches!(
         session,
-        SessionState::Racing { .. } | SessionState::Qualifying { .. }
+        Some(SessionKind::Race { .. }) | Some(SessionKind::Qualifying { .. })
     );
     let track_differs = current_track != Some(track);
 
