@@ -146,6 +146,7 @@ struct PresenceInner {
 ///
 /// Feed packets with [`apply_packet`](Self::apply_packet) to update state and
 /// collect change events. Admin commands return packets for the caller to send.
+// TODO: Merge directly into World
 #[derive(Clone, Default)]
 pub struct Presence {
     inner: Arc<RwLock<PresenceInner>>,

@@ -16,7 +16,7 @@ use handlers::{
     on_connected, on_disconnected, on_race_ended, on_setup_aborted, on_setup_complete, on_toc,
     on_uco,
 };
-use kitcar::{App, AppError, Game, HandlerExt, Presence, Stage, State, run};
+use kitcar::{App, AppError, HandlerExt, Stage, State, World, run};
 use state::{Shortcut, ShortcutGlobal, ShortcutPhase};
 use tokio_util::sync::CancellationToken;
 use ui::{ShortcutUi, ShortcutView};
@@ -36,14 +36,10 @@ pub async fn run_shortcut_with(cfg: ShortcutRunConfig) -> Result<(), AppError> {
         |_ucid, _invalidator| ShortcutView,
     );
 
-    let presence = Presence::new();
-    let game = Game::new();
-
     let while_racing = |s: State<Shortcut>| s.read().phase == ShortcutPhase::Racing;
 
     let app = app
-        .handle(Stage::Pre, presence)
-        .handle(Stage::Pre, game)
+        .handle(Stage::Pre, World::new())
         .handle(Stage::Pre, ui)
         .handle(Stage::Update, on_connected)
         .handle(Stage::Update, on_disconnected)
