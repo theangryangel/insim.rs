@@ -32,6 +32,12 @@
       "matchManagers": ["cargo"],
       "matchPackageNames": ["sha2", "digest"],
       "groupName": "cargo:digest"
-    }
+    },
+    {
+      "description": "Group pyo3",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["pyo3", "pyo3-async-runtimes"],
+      "groupName": "cargo:pyo3"
+    },
   ]
 }
