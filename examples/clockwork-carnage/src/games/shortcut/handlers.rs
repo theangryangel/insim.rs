@@ -8,8 +8,8 @@ use insim::{
     insim::{PlayerType, RaceLaps, Toc, Uco},
 };
 use kitcar::{
-    AppError, Connected, Disconnected, Event, Packet, Sender, SessionEnded, State, World,
-    track_rotation, util::mtc,
+    AppError, Connected, Disconnected, Event, Packet, Sender, SessionEnded, State, World, mtc,
+    track_rotation,
 };
 
 use super::{

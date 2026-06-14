@@ -11,7 +11,7 @@ use insim::{
 };
 use kitcar::{
     AppError, Connected, Disconnected, Event, Packet, PenaltyClearer, PlayerLeft,
-    PlayerTeleportedToPits, Sender, SessionEnded, State, World, track_rotation, util::mtc,
+    PlayerTeleportedToPits, Sender, SessionEnded, State, World, mtc, track_rotation,
 };
 
 use super::{

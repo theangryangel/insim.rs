@@ -4,7 +4,6 @@ use std::future::Future;
 
 use insim::{WithRequestId, identifiers::RequestId};
 pub use insim_extra::world::{World, WorldEvent};
-use insim_extra::{game::GameEvent, presence::PresenceEvent};
 
 use crate::{
     AppError, Dispatch, ExtractCx, FromContext, Handler, Sender, Startup,
@@ -36,7 +35,7 @@ impl<S> FromContext<S> for World {
 /// `Event<Connected>`, `Event<RaceEvent>`, etc. are unchanged.
 ///
 /// On [`Startup`] it sends the combined startup requests from
-/// [`World::STARTUP_REQUESTS`]. On [`SessionStarted`] it sends
+/// [`World::STARTUP_REQUESTS`]. On [`WorldEvent::SessionStarted`] it sends
 /// [`World::SESSION_REQUESTS`].
 ///
 /// ## Example
@@ -69,7 +68,7 @@ impl<S: Send + Sync + 'static> Handler<(), S> for World {
         };
         let session_started = events
             .iter()
-            .any(|e| matches!(e, WorldEvent::Game(GameEvent::SessionStarted { .. })));
+            .any(|e| matches!(e, WorldEvent::SessionStarted { .. }));
         let sender = cx.sender.clone();
         async move {
             if startup {
@@ -89,62 +88,40 @@ impl<S: Send + Sync + 'static> Handler<(), S> for World {
 
 fn emit_world_events(events: Vec<WorldEvent>, sender: &Sender) {
     for event in events {
-        match event {
-            WorldEvent::Presence(pe) => {
-                let _ = match pe {
-                    PresenceEvent::Connected(info) => sender.event(Connected(info)),
-                    PresenceEvent::Disconnected { ucid, info } => {
-                        sender.event(Disconnected { ucid, info })
-                    },
-                    PresenceEvent::ConnectionDetails(info) => sender.event(ConnectionDetails(info)),
-                    PresenceEvent::VehicleSelected { ucid, vehicle } => {
-                        sender.event(VehicleSelected { ucid, vehicle })
-                    },
-                    PresenceEvent::Renamed {
-                        ucid,
-                        uname,
-                        new_pname,
-                    } => sender.event(Renamed {
-                        ucid,
-                        uname,
-                        new_pname,
-                    }),
-                    PresenceEvent::PlayerJoined(p) => sender.event(PlayerJoined(p)),
-                    PresenceEvent::PlayerLeft(p) => sender.event(PlayerLeft(p)),
-                    PresenceEvent::TakingOver { before, after } => {
-                        sender.event(TakingOver { before, after })
-                    },
-                    PresenceEvent::PlayerTeleportedToPits(p) => {
-                        sender.event(PlayerTeleportedToPits(p))
-                    },
-                };
+        let _ = match event {
+            WorldEvent::Connected(info) => sender.event(Connected(info)),
+            WorldEvent::Disconnected { ucid, info } => sender.event(Disconnected { ucid, info }),
+            WorldEvent::ConnectionDetails(info) => sender.event(ConnectionDetails(info)),
+            WorldEvent::VehicleSelected { ucid, vehicle } => {
+                sender.event(VehicleSelected { ucid, vehicle })
             },
-            WorldEvent::Game(ge) => {
-                let _ = match ge {
-                    GameEvent::SessionStarted { kind } => sender.event(SessionStarted { kind }),
-                    GameEvent::SessionEnded => sender.event(SessionEnded),
-                    GameEvent::TrackChanged { from, to } => sender.event(TrackChanged { from, to }),
-                    GameEvent::LayoutChanged { from, to } => {
-                        sender.event(LayoutChanged { from, to })
-                    },
-                    GameEvent::MultiplayerJoined { host_name, is_host } => {
-                        sender.event(MultiplayerJoined { host_name, is_host })
-                    },
-                    GameEvent::MultiplayerLeft => sender.event(MultiplayerLeft),
-                    GameEvent::AllowedCarsChanged { cars } => {
-                        sender.event(AllowedCarsChanged { cars })
-                    },
-                    GameEvent::AllowedModsChanged { mods } => {
-                        sender.event(AllowedModsChanged { mods })
-                    },
-                    GameEvent::VersionReceived { product, version } => {
-                        sender.event(VersionReceived { product, version })
-                    },
-                };
+            WorldEvent::Renamed {
+                ucid,
+                uname,
+                new_pname,
+            } => sender.event(Renamed {
+                ucid,
+                uname,
+                new_pname,
+            }),
+            WorldEvent::PlayerJoined(p) => sender.event(PlayerJoined(p)),
+            WorldEvent::PlayerLeft(p) => sender.event(PlayerLeft(p)),
+            WorldEvent::TakingOver { before, after } => sender.event(TakingOver { before, after }),
+            WorldEvent::PlayerTeleportedToPits(p) => sender.event(PlayerTeleportedToPits(p)),
+            WorldEvent::SessionStarted { kind } => sender.event(SessionStarted { kind }),
+            WorldEvent::SessionEnded => sender.event(SessionEnded),
+            WorldEvent::TrackChanged { from, to } => sender.event(TrackChanged { from, to }),
+            WorldEvent::LayoutChanged { from, to } => sender.event(LayoutChanged { from, to }),
+            WorldEvent::MultiplayerJoined { host_name, is_host } => {
+                sender.event(MultiplayerJoined { host_name, is_host })
             },
-            WorldEvent::Race(re) => {
-                let _ = sender.event(re);
+            WorldEvent::MultiplayerLeft => sender.event(MultiplayerLeft),
+            WorldEvent::AllowedCarsChanged { cars } => sender.event(AllowedCarsChanged { cars }),
+            WorldEvent::AllowedModsChanged { mods } => sender.event(AllowedModsChanged { mods }),
+            WorldEvent::VersionReceived { product, version } => {
+                sender.event(VersionReceived { product, version })
             },
-        }
+            WorldEvent::Race(re) => sender.event(re),
+        };
     }
 }

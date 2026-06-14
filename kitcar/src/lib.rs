@@ -78,10 +78,8 @@ mod error;
 mod game;
 mod penalty_clearer;
 mod presence;
-mod race;
 #[allow(missing_docs)]
 pub mod ui;
-pub mod util;
 mod world;
 
 pub use app::{
@@ -100,12 +98,13 @@ pub use game::{
     MultiplayerLeft, SessionEnded, SessionKind, SessionStarted, TrackChanged, VersionInfo,
     VersionReceived, track_rotation,
 };
+pub use insim_extra::{
+    race::{DriverRecord, EntrantId, EntrantState, FinishStatus, LapRecord, PitRecord, RaceEvent},
+    util::{host_command, mtc},
+};
 pub use penalty_clearer::PenaltyClearer;
 pub use presence::{
     Connected, ConnectionDetails, ConnectionInfo, Disconnected, PlayerInfo, PlayerJoined,
     PlayerLeft, PlayerTeleportedToPits, Renamed, TakingOver, VehicleSelected,
-};
-pub use race::{
-    DriverRecord, EntrantId, EntrantState, FinishStatus, LapRecord, PitRecord, RaceEvent,
 };
 pub use world::{World, WorldEvent};

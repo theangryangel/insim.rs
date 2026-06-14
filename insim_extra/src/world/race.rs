@@ -14,15 +14,13 @@ use insim::{
 
 use super::WorldInner;
 use crate::{
-    game::{GameEvent, SessionKind},
-    presence::{ConnectionInfo, PlayerInfo, PresenceEvent},
+    game::SessionKind,
+    presence::{ConnectionInfo, PlayerInfo},
     race::{DriverRecord, EntrantId, EntrantState, FinishStatus, LapRecord, PitRecord, RaceEvent},
 };
 
 /// LFS uses 1:00:00.000 as a placeholder for an invalid/missing split time.
 const INVALID_SPLIT: Duration = Duration::from_secs(3600);
-
-// ── Small helpers ─────────────────────────────────────────────────────────────
 
 fn uname_for(
     connections: &HashMap<ConnectionId, ConnectionInfo>,
@@ -37,8 +35,6 @@ fn pname_for(
 ) -> Option<String> {
     connections.get(&ucid).map(|c| c.pname.clone())
 }
-
-// ── RaceState ─────────────────────────────────────────────────────────────────
 
 #[derive(Default)]
 pub(super) struct RaceState {
@@ -75,6 +71,20 @@ impl RaceState {
             .filter(|(id, _)| !self.live.values().any(|live_id| live_id == *id))
             .find(|(_, e)| e.plid == plid)
             .map(|(id, _)| *id)
+    }
+
+    pub(super) fn on_player_joined(
+        &mut self,
+        info: &PlayerInfo,
+        connections: &HashMap<ConnectionId, ConnectionInfo>,
+        session_kind: Option<SessionKind>,
+        rejoin: bool,
+    ) -> Vec<RaceEvent> {
+        if rejoin {
+            self.apply_player_rejoined(info, connections, session_kind)
+        } else {
+            self.apply_player_joined(info, connections, session_kind)
+        }
     }
 
     fn apply_player_joined(
@@ -132,7 +142,7 @@ impl RaceState {
         }]
     }
 
-    fn apply_player_left(
+    pub(super) fn on_player_left(
         &mut self,
         info: &PlayerInfo,
         session_kind: Option<SessionKind>,
@@ -153,7 +163,7 @@ impl RaceState {
         vec![]
     }
 
-    fn apply_taking_over(
+    pub(super) fn on_taking_over(
         &mut self,
         before: &PlayerInfo,
         after: &PlayerInfo,
@@ -498,52 +508,14 @@ impl RaceState {
     }
 }
 
-// ── Public interface (visible to parent world/mod.rs) ─────────────────────────
-
-/// Route a [`PresenceEvent`] to the appropriate race-tracking method.
-pub(super) fn apply_presence_event(
-    inner: &mut WorldInner,
-    event: &PresenceEvent,
-    rejoin: bool,
-) -> Vec<RaceEvent> {
-    let sk = inner.session_kind;
-    let WorldInner {
-        connections, race, ..
-    } = inner;
-    match event {
-        PresenceEvent::PlayerJoined(info) => {
-            if rejoin {
-                race.apply_player_rejoined(info, connections, sk)
-            } else {
-                race.apply_player_joined(info, connections, sk)
-            }
-        },
-        PresenceEvent::PlayerLeft(info) => race.apply_player_left(info, sk),
-        PresenceEvent::TakingOver { before, after } => {
-            race.apply_taking_over(before, after, connections, sk)
-        },
-        // No name cache to maintain - presence data is authoritative.
-        _ => vec![],
-    }
-}
-
-/// Route a [`GameEvent`] to the appropriate race-tracking method.
-pub(super) fn apply_game_event(inner: &mut WorldInner, event: &GameEvent) -> Vec<RaceEvent> {
-    match event {
-        GameEvent::SessionStarted { kind } => {
-            inner.race.entrants.clear();
-            inner.race.live.clear();
-            inner.race.pending_grid.clear();
-            inner.race.fastest_lap = None;
-            inner.session_kind = Some(*kind);
-            vec![RaceEvent::SessionStarted { kind: *kind }]
-        },
-        GameEvent::SessionEnded => {
-            inner.session_kind = None;
-            vec![]
-        },
-        _ => vec![],
-    }
+/// Handle a session starting: clear race state and set session_kind.
+pub(super) fn on_session_started(inner: &mut WorldInner, kind: SessionKind) -> Vec<RaceEvent> {
+    inner.race.entrants.clear();
+    inner.race.live.clear();
+    inner.race.pending_grid.clear();
+    inner.race.fastest_lap = None;
+    inner.session_kind = Some(kind);
+    vec![RaceEvent::SessionStarted { kind }]
 }
 
 /// Route a raw [`Packet`] to the appropriate race-tracking method.

@@ -1,8 +1,7 @@
 //! Connection and player types used by [`crate::world::World`].
 //!
 //! Admin commands are implemented on [`ConnectionInfo`] and re-exposed by
-//! [`World`](crate::world::World) methods. [`PresenceEvent`] describes the
-//! changes produced when packets are applied.
+//! [`World`](crate::world::World) methods.
 
 mod commands;
 
@@ -66,48 +65,3 @@ mod player_info {
 
 pub(crate) use player_info::MultiIndexPlayerInfoMap;
 pub use player_info::PlayerInfo;
-
-/// State-change events produced by presence packet processing in [`World::apply_packet`](crate::world::World::apply_packet).
-#[derive(Debug, Clone)]
-pub enum PresenceEvent {
-    /// A new connection joined.
-    Connected(ConnectionInfo),
-    /// A connection left.
-    Disconnected {
-        /// The connection that left.
-        ucid: ConnectionId,
-        /// Last known info (cloned before removal).
-        info: Option<ConnectionInfo>,
-    },
-    /// Extra connection details arrived via `Nci`.
-    ConnectionDetails(ConnectionInfo),
-    /// A connection selected a vehicle in the garage.
-    VehicleSelected {
-        /// The connection.
-        ucid: ConnectionId,
-        /// The selected vehicle.
-        vehicle: Vehicle,
-    },
-    /// A connection changed their display name.
-    Renamed {
-        /// Connection ID.
-        ucid: ConnectionId,
-        /// Stable LFS.net username.
-        uname: String,
-        /// New display name.
-        new_pname: String,
-    },
-    /// A player joined the track.
-    PlayerJoined(PlayerInfo),
-    /// A player left the track.
-    PlayerLeft(PlayerInfo),
-    /// A driver swap occurred.
-    TakingOver {
-        /// Player state before the swap.
-        before: PlayerInfo,
-        /// Player state after the swap.
-        after: PlayerInfo,
-    },
-    /// A player tele-pitted (Shift+P).
-    PlayerTeleportedToPits(PlayerInfo),
-}
