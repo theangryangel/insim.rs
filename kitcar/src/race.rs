@@ -8,6 +8,7 @@ pub use insim_extra::race::{
     DriverRecord, EntrantId, EntrantState, FinishStatus, LapRecord, PitRecord, RaceEvent,
     RaceTracker,
 };
+use insim_extra::world::World;
 
 use crate::{
     AppError, Dispatch, ExtractCx, FromContext, Handler,
@@ -15,12 +16,10 @@ use crate::{
     presence::{Connected, Disconnected, PlayerJoined, PlayerLeft, Renamed, TakingOver},
 };
 
-/// [`RaceTracker`] is its own extractor: register via
-/// `app.handle(Stage::Pre, RaceTracker::new())` and any handler can take it
-/// by value.
+/// Extract [`RaceTracker`] from a registered [`World`].
 impl<S> FromContext<S> for RaceTracker {
     fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
-        cx.lookup::<RaceTracker>()
+        cx.lookup::<World>().map(|w| w.race().clone())
     }
 }
 
