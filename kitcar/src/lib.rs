@@ -107,6 +107,5 @@ pub use presence::{
 };
 pub use race::{
     DriverRecord, EntrantId, EntrantState, FinishStatus, LapRecord, PitRecord, RaceEvent,
-    RaceTracker,
 };
 pub use world::{World, WorldEvent};

@@ -1,4 +1,4 @@
-//! [`RaceEvent`] - output events emitted by [`super::RaceTracker`] methods.
+//! [`RaceEvent`] - output events emitted by race-tracking functions.
 
 use std::time::Duration;
 
@@ -10,7 +10,7 @@ use insim::{
 use super::entrant::{EntrantId, LapRecord, PitRecord};
 use crate::game::SessionKind;
 
-/// Events emitted by [`super::RaceTracker`] `apply_*` methods.
+/// Events emitted by race-tracking `apply_*` functions in [`crate::world`].
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum RaceEvent {
@@ -117,7 +117,7 @@ pub enum RaceEvent {
     /// so subsequent [`RaceEvent::LapCompleted`] records carry the true
     /// running lap total rather than LFS's reset-to-1 counter.
     ///
-    /// Only emitted by [`super::RaceTracker::apply_player_rejoined`].
+    /// Only emitted when a world was created with [`crate::world::World::with_rejoin`].
     EntrantRejoined {
         /// Stable entrant identifier (same as before the disconnect).
         id: EntrantId,
@@ -160,9 +160,8 @@ pub enum RaceEvent {
     },
     /// A player teleported to the pits (Shift+P / `Plp` packet).
     ///
-    /// Emitted by [`super::RaceTracker::apply_telepit`]. The in-progress lap is
-    /// discarded but the running lap total is left untouched - LFS does not
-    /// reset the lap counter on a telepit.
+    /// The in-progress lap is discarded but the running lap total is left
+    /// untouched - LFS does not reset the lap counter on a telepit.
     TeleportedToPits {
         /// Stable entrant identifier.
         id: EntrantId,

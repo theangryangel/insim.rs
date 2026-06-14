@@ -1,4 +1,4 @@
-//! Per-entrant state types stored by [`super::RaceTracker`].
+//! Per-entrant state types stored by [`crate::world::World`].
 
 use std::time::Duration;
 
@@ -9,10 +9,10 @@ use insim::{
 
 /// Stable identity for one race entry (one `Npl` -> leave lifecycle).
 ///
-/// Never reused within a [`super::RaceTracker`] instance, even if LFS
+/// Never reused within a [`crate::world::World`] instance, even if LFS
 /// reuses the same [`PlayerId`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct EntrantId(pub(super) u64);
+pub struct EntrantId(pub(crate) u64);
 
 impl std::fmt::Display for EntrantId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -84,7 +84,7 @@ pub struct DriverRecord {
     pub from_lap: u16,
 }
 
-/// Per-entrant race state stored by [`super::RaceTracker`].
+/// Per-entrant race state stored by [`crate::world::World`].
 #[derive(Debug, Clone)]
 pub struct EntrantState {
     /// Stable synthetic identifier.
@@ -96,7 +96,7 @@ pub struct EntrantState {
     pub laps_done: u16,
     /// Added to the raw LFS lap counter to produce the true running total.
     ///
-    /// Non-zero after [`apply_player_rejoined`](super::RaceTracker::apply_player_rejoined),
+    /// Non-zero after a player rejoins (via [`crate::world::World::with_rejoin`]),
     /// where LFS issues a fresh `Npl` and resets its internal lap counter to 1
     /// but we want to preserve continuity across the reconnect.
     pub lap_offset: u16,
@@ -118,7 +118,7 @@ pub struct EntrantState {
     /// a grid order has been received for this entrant.
     pub grid_position: Option<u8>,
     /// Pending pit stop: `Pit` received, waiting for matching `Psf`.
-    pub(super) pending_pit: Option<PitRecord>,
+    pub(crate) pending_pit: Option<PitRecord>,
     /// Active penalty.
     pub penalty: PenaltyInfo,
 }

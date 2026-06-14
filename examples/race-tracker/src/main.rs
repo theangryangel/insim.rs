@@ -1,7 +1,4 @@
-//! Bare-insim race tracker example.
-//!
-//! Wires [`Presence`], [`Game`], and [`RaceTracker`] together in a plain async
-//! packet loop - no kitcar.
+//! Bare-insim race tracker example using [`World`].
 //!
 //! - On `SessionStarted` (an `Rst`) the tracker clears, so it re-requests the
 //!   player list and grid order to repopulate for the new session.
@@ -18,9 +15,9 @@
 use clap::Parser;
 use insim::WithRequestId;
 use insim_extra::{
-    game::{Game, GameEvent},
-    presence::Presence,
-    race::{EntrantState, FinishStatus, RaceEvent, RaceTracker},
+    game::GameEvent,
+    race::{EntrantState, FinishStatus, RaceEvent},
+    world::{World, WorldEvent},
 };
 use tabled::{Table, Tabled, settings::Style};
 
@@ -56,95 +53,78 @@ async fn main() -> insim::Result<()> {
     let mut conn = builder.connect_async().await?;
     tracing::info!("connected");
 
-    // Request current state from LFS (not sent automatically on connect). Each
-    // tracker declares the packets it needs, so we just send those lists.
-    for t in Presence::STARTUP_REQUESTS {
-        conn.write(t.clone().with_request_id(1)).await?;
-    }
-    for t in Game::STARTUP_REQUESTS {
+    // Send startup requests once to sync state from LFS.
+    for t in World::STARTUP_REQUESTS {
         conn.write(t.clone().with_request_id(1)).await?;
     }
 
-    let presence = Presence::new();
-    let game = Game::new();
-    let race = RaceTracker::new();
+    let world = World::new();
 
     loop {
         let packet = conn.read().await?;
 
-        for event in presence.apply_packet(&packet) {
-            for e in race.apply_presence_event(&event) {
-                tracing::debug!(?e, "race event");
-            }
-        }
-
-        for event in game.apply_packet(&packet) {
-            for e in race.apply_game_event(&event) {
-                tracing::debug!(?e, "race event");
-            }
+        for event in world.apply_packet(&packet) {
             match event {
-                GameEvent::SessionStarted { kind } => {
+                WorldEvent::Game(GameEvent::SessionStarted { kind }) => {
                     tracing::info!(?kind, "session started");
                     // The tracker just cleared - re-request its packets so it
                     // repopulates for the new session.
-                    for t in RaceTracker::SESSION_REQUESTS {
+                    for t in World::SESSION_REQUESTS {
                         conn.write(t.clone().with_request_id(1)).await?;
                     }
                 },
-                GameEvent::SessionEnded => {
+                WorldEvent::Game(GameEvent::SessionEnded) => {
                     tracing::info!("session ended");
-                    print_results(&race, "Final Race Results");
+                    print_results(&world, "Final Race Results");
+                },
+                WorldEvent::Race(ref e) => {
+                    match e {
+                        RaceEvent::PersonalBest {
+                            id,
+                            lap,
+                            time,
+                            previous,
+                            ..
+                        } => {
+                            let driver = world
+                                .entrant(*id)
+                                .and_then(|e| e.drivers.last().map(|d| d.pname.clone()))
+                                .unwrap_or_else(|| "?".to_string());
+                            let prev = previous
+                                .map(|p| format!(" (was {})", fmt_duration(p)))
+                                .unwrap_or_default();
+                            println!(
+                                "[PB] {:<20}  {}{}  lap {}",
+                                driver,
+                                fmt_duration(*time),
+                                prev,
+                                lap
+                            );
+                        },
+                        RaceEvent::FastestLap { id, lap, time, .. } => {
+                            let driver = world
+                                .entrant(*id)
+                                .and_then(|e| e.drivers.last().map(|d| d.pname.clone()))
+                                .unwrap_or_else(|| "?".to_string());
+                            println!("[FL] {:<20}  {}  lap {}", driver, fmt_duration(*time), lap);
+                        },
+                        // Each confirmed result classifies one more driver. Reprint the
+                        // table so it builds up live as drivers cross the line; the
+                        // final copy is printed on session end.
+                        RaceEvent::ResultConfirmed {
+                            result_num,
+                            num_results,
+                            ..
+                        } => {
+                            print_results(
+                                &world,
+                                &format!("Results ({}/{} classified)", result_num + 1, num_results),
+                            );
+                        },
+                        _ => tracing::debug!(?e, "race event"),
+                    }
                 },
                 _ => {},
-            }
-        }
-
-        let race_events = race.apply_packet(&packet);
-        for e in &race_events {
-            match e {
-                RaceEvent::PersonalBest {
-                    id,
-                    lap,
-                    time,
-                    previous,
-                    ..
-                } => {
-                    let driver = race
-                        .entrant(*id)
-                        .and_then(|e| e.drivers.last().map(|d| d.pname.clone()))
-                        .unwrap_or_else(|| "?".to_string());
-                    let prev = previous
-                        .map(|p| format!(" (was {})", fmt_duration(p)))
-                        .unwrap_or_default();
-                    println!(
-                        "[PB] {:<20}  {}{}  lap {}",
-                        driver,
-                        fmt_duration(*time),
-                        prev,
-                        lap
-                    );
-                },
-                RaceEvent::FastestLap { id, lap, time, .. } => {
-                    let driver = race
-                        .entrant(*id)
-                        .and_then(|e| e.drivers.last().map(|d| d.pname.clone()))
-                        .unwrap_or_else(|| "?".to_string());
-                    println!("[FL] {:<20}  {}  lap {}", driver, fmt_duration(*time), lap);
-                },
-                // Each confirmed result classifies one more driver. Reprint the
-                // table so it builds up live as drivers cross the line; the
-                // final copy is printed on session end.
-                RaceEvent::ResultConfirmed {
-                    result_num,
-                    num_results,
-                    ..
-                } => {
-                    print_results(
-                        &race,
-                        &format!("Results ({}/{} classified)", result_num + 1, num_results),
-                    );
-                },
-                _ => tracing::debug!(?e, "race event"),
             }
         }
     }
@@ -173,11 +153,11 @@ struct ResultRow {
     status: String,
 }
 
-fn print_results(race: &RaceTracker, title: &str) {
-    let mut entrants = race.entrants();
+fn print_results(world: &World, title: &str) {
+    let mut entrants = world.entrants();
     entrants.sort_by_key(position_key);
 
-    let fl_id = race.fastest_lap().map(|(id, _, _)| id);
+    let fl_id = world.fastest_lap().map(|(id, _, _)| id);
 
     let rows: Vec<ResultRow> = entrants
         .iter()
@@ -190,7 +170,7 @@ fn print_results(race: &RaceTracker, title: &str) {
             let best_lap = e
                 .best_lap
                 .map(|d| {
-                    let fl = if fl_id == Some(e.id) { " ★" } else { "" };
+                    let fl = if fl_id == Some(e.id) { " *" } else { "" };
                     format!("{}{}", fmt_duration(d), fl)
                 })
                 .unwrap_or_else(|| "-".to_string());

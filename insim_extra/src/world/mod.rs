@@ -39,9 +39,12 @@ use crate::{
         TimeSet, VersionInfo,
     },
     presence::{ConnectionInfo, MultiIndexPlayerInfoMap, PlayerInfo, PresenceEvent},
-    race::{RaceEvent, RaceTracker},
+    race::{EntrantId, EntrantState, RaceEvent},
     util::host_command,
 };
+
+mod race;
+use race::RaceState;
 
 /// Aggregate event produced by [`World::apply_packet`].
 #[derive(Debug, Clone)]
@@ -80,6 +83,11 @@ struct WorldInner {
     axi_count: u64,
     /// Incremented each time an `Rst` packet is applied.
     rst_count: u64,
+
+    /// Kind of the current session. `None` means lobby / no session active.
+    session_kind: Option<SessionKind>,
+    /// Race tracking state.
+    race: RaceState,
 }
 
 impl WorldInner {
@@ -464,7 +472,6 @@ fn apply_game_packet(inner: &mut WorldInner, packet: &insim::Packet) -> Vec<Game
 #[derive(Clone)]
 pub struct World {
     inner: Arc<RwLock<WorldInner>>,
-    race: RaceTracker,
     rejoin: bool,
 }
 
@@ -472,7 +479,6 @@ impl Default for World {
     fn default() -> Self {
         Self {
             inner: Arc::new(RwLock::new(WorldInner::default())),
-            race: RaceTracker::default(),
             rejoin: false,
         }
     }
@@ -486,7 +492,8 @@ impl std::fmt::Debug for World {
             .field("players", &g.players.len())
             .field("track", &g.track)
             .field("session", &g.session)
-            .field("race", &self.race)
+            .field("race_entrants", &g.race.entrants.len())
+            .field("race_session_kind", &g.session_kind)
             .field("rejoin", &self.rejoin)
             .finish()
     }
@@ -531,51 +538,44 @@ impl World {
 
     /// Apply one raw packet, update all internal state, and return any events.
     ///
-    /// Processing order:
-    /// 1. Presence - connection and player events (write lock acquired once)
+    /// Processing order (all inside a single write-lock acquisition):
+    /// 1. Presence - connection and player events.
     /// 2. Each [`PresenceEvent`] is immediately routed into the race tracker
     ///    (no deferred cycle), producing [`RaceEvent`]s inline.
-    /// 3. Game - session and track events (from the same write lock)
+    /// 3. Game - session and track events.
     /// 4. Each [`GameEvent`] is immediately routed into the race tracker.
     /// 5. Timing packets (`Lap`, `Spx`, `Fin`, `Res`, `Pit`, `Psf`, `Pen`,
     ///    `Plp`, `Reo`) are routed directly to the race tracker.
     pub fn apply_packet(&self, packet: &insim::Packet) -> Vec<WorldEvent> {
-        let (presence_events, game_events) = {
-            let mut inner = self.inner.write();
-            let pe = apply_presence_packet(&mut inner, packet);
-            let ge = apply_game_packet(&mut inner, packet);
-            (pe, ge)
-        };
-
         let mut events = Vec::new();
+        {
+            let mut inner = self.inner.write();
 
-        for pe in presence_events {
-            let race_events = if self.rejoin {
-                if let PresenceEvent::PlayerJoined(ref info) = pe {
-                    self.race.apply_player_rejoined(info)
-                } else {
-                    self.race.apply_presence_event(&pe)
+            // Presence
+            let presence_events = apply_presence_packet(&mut inner, packet);
+            for pe in presence_events {
+                let race_evs = race::apply_presence_event(&mut inner, &pe, self.rejoin);
+                for re in race_evs {
+                    events.push(WorldEvent::Race(re));
                 }
-            } else {
-                self.race.apply_presence_event(&pe)
-            };
-            for re in race_events {
+                events.push(WorldEvent::Presence(pe));
+            }
+
+            // Game
+            let game_events = apply_game_packet(&mut inner, packet);
+            for ge in game_events {
+                let race_evs = race::apply_game_event(&mut inner, &ge);
+                for re in race_evs {
+                    events.push(WorldEvent::Race(re));
+                }
+                events.push(WorldEvent::Game(ge));
+            }
+
+            // Direct race packets
+            for re in race::apply_packet(&mut inner, packet) {
                 events.push(WorldEvent::Race(re));
             }
-            events.push(WorldEvent::Presence(pe));
         }
-
-        for ge in game_events {
-            for re in self.race.apply_game_event(&ge) {
-                events.push(WorldEvent::Race(re));
-            }
-            events.push(WorldEvent::Game(ge));
-        }
-
-        for re in self.race.apply_packet(packet) {
-            events.push(WorldEvent::Race(re));
-        }
-
         events
     }
 
@@ -1126,10 +1126,47 @@ impl World {
         Some(self.get(ucid)?.clear_rcm())
     }
 
-    // ── Race accessor ─────────────────────────────────────────────────────────
+    // ── Race query methods ────────────────────────────────────────────────────
 
-    /// Access the underlying [`RaceTracker`].
-    pub fn race(&self) -> &RaceTracker {
-        &self.race
+    /// The kind of the current session, if one has started.
+    pub fn session_kind(&self) -> Option<SessionKind> {
+        self.inner.read().session_kind
+    }
+
+    /// The current session fastest lap: entrant, player ID, and time.
+    pub fn fastest_lap(&self) -> Option<(EntrantId, PlayerId, Duration)> {
+        self.inner.read().race.fastest_lap
+    }
+
+    /// Whether a race session (not qualifying or practice) is currently active.
+    pub fn race_active(&self) -> bool {
+        self.inner.read().session_kind.is_some_and(|k| k.is_race())
+    }
+
+    /// Look up an entrant by their stable [`EntrantId`].
+    pub fn entrant(&self, id: EntrantId) -> Option<EntrantState> {
+        self.inner.read().race.entrants.get(&id).cloned()
+    }
+
+    /// Look up the currently-live entrant for a [`PlayerId`].
+    pub fn entrant_by_plid(&self, plid: PlayerId) -> Option<EntrantState> {
+        let g = self.inner.read();
+        let id = g.race.live.get(&plid)?;
+        g.race.entrants.get(id).cloned()
+    }
+
+    /// Snapshot of all entrants (racing, finished, and DNF).
+    pub fn entrants(&self) -> Vec<EntrantState> {
+        self.inner.read().race.entrants.values().cloned().collect()
+    }
+
+    /// Snapshot of entrants currently on track.
+    pub fn live_entrants(&self) -> Vec<EntrantState> {
+        let g = self.inner.read();
+        g.race
+            .live
+            .values()
+            .filter_map(|id| g.race.entrants.get(id).cloned())
+            .collect()
     }
 }
