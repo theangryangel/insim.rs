@@ -25,7 +25,7 @@ use super::{event::Command, runtime::dispatch_cycle};
 use crate::{
     App, AppError, ChatEvent, ChatParser, Connected, Dispatch, Event, ExtractCx, Game, Handler,
     HandlerExt, LayoutChanged, Packet, Presence, Sender, SessionEnded, SessionStarted, Stage,
-    State, Svc, TrackChanged,
+    State, Svc, TrackChanged, World,
 };
 
 /// A toy typed chat enum for the parser test.
@@ -262,10 +262,11 @@ async fn presence_is_queryable_via_extractor() {
     let state = PState::default();
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
-    let presence = Presence::new();
+    let world = World::new();
+    let presence = world.presence().clone();
     let app = App::new()
         .handle(Stage::Update, state.clone())
-        .handle(Stage::Pre, presence.clone())
+        .handle(Stage::Pre, world)
         .handle(Stage::Update, observe_count);
 
     let cancel = tokio_util::sync::CancellationToken::new();
