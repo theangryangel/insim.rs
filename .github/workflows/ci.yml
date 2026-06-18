@@ -14,7 +14,7 @@ jobs:
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -23,7 +23,7 @@ jobs:
   check_codepage_lut:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Check generated codepage LUT (lookup table) is up to date
@@ -38,7 +38,7 @@ jobs:
       matrix:
         channel: [stable, nightly]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.channel }}
@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [pre-commit, check_codepage_lut]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -80,7 +80,7 @@ jobs:
       matrix:
         channel: [stable, nightly]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.channel }}
@@ -92,7 +92,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [pre-commit, check_codepage_lut]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Get MSRV from package metadata
         id: msrv
         run: grep rust-version Cargo.toml | cut -d'"' -f2 | sed 's/^/version=/' >> $GITHUB_OUTPUT
