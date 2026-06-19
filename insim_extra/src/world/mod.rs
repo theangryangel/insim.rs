@@ -27,15 +27,14 @@ use insim::{
     core::{track::Track, vehicle::Vehicle, wind::Wind},
     identifiers::{ConnectionId, PlayerId},
     insim::{
-        Axi, Cnl, Cpr, Ism, Mal, Nci, Ncn, Npl, Pfl, Pla, Plc, PlcAllowedCarsSet, Pll, RaceFlags,
+        Axi, Cnl, Cpr, Ism, Nci, Ncn, Npl, Pfl, Pla, PlcAllowedCarsSet, Pll, RaceFlags,
         RaceInProgress, RaceLaps, Rst, Slc, SmallType, Sta, StaFlags, Tiny, TinyType, Toc, Ver,
     },
 };
 use parking_lot::RwLock;
 use tokio_util::sync::CancellationToken;
 
-use crate::util::host_command;
-
+mod commands;
 mod connection;
 mod event;
 mod game;
@@ -58,18 +57,23 @@ pub use race::{
 };
 
 #[derive(Default)]
-struct WorldInner {
+pub(crate) struct WorldInner {
     // Presence:
-    connections: HashMap<ConnectionId, ConnectionInfo>,
+    pub(crate) connections: HashMap<ConnectionId, ConnectionInfo>,
     players: MultiIndexPlayerInfoMap,
     /// Survives `Cnl`: maps LFS.net username to last seen display name.
     last_known_names: HashMap<String, String>,
 
     /// Game state snapshot, including the current `session_kind`.
-    game: GameInfo,
+    pub(crate) game: GameInfo,
 
     /// Race tracking state.
-    race: RaceState,
+    pub(crate) race: RaceState,
+
+    /// When `true`, a joining player first attempts to resume a prior
+    /// disconnected entrant (matched by LFS.net username) before falling back
+    /// to a fresh entrant. Set once at construction.
+    pub(crate) rejoin: bool,
 }
 
 impl WorldInner {
@@ -129,6 +133,14 @@ impl WorldInner {
             in_pitlane: false,
             pname: npl.pname.clone(),
         };
+        // Upsert: LFS re-announces existing players (e.g. in reply to the
+        // `TINY_NPL` that `STARTUP_REQUESTS`/`SESSION_REQUESTS` issue), so the
+        // same `plid` can arrive again. The `plid` index is unique, so a blind
+        // `insert` would panic - replace any existing entry instead. We still
+        // return `Some` for a re-announce: after a session restart the race
+        // state is cleared while this map persists, and the race layer must see
+        // the join to recreate the entrant (it dedupes via its own `live` map).
+        let _ = self.players.remove_by_plid(&npl.plid);
         let _ = self.players.insert(player.clone());
         if npl.nump == 0 { None } else { Some(player) }
     }
@@ -275,20 +287,14 @@ impl WorldInner {
 /// connection and session packets call into [`RaceState`] inline so race events
 /// are interleaved in causal order with the presence/game events that triggered
 /// them.
-fn dispatch(
-    inner: &mut WorldInner,
-    packet: &insim::Packet,
-    rejoin: bool,
-    events: &mut Vec<WorldEvent>,
-) {
+fn dispatch(inner: &mut WorldInner, packet: &insim::Packet, events: &mut Vec<WorldEvent>) {
     use insim::Packet;
 
-    // Push every race event from a timing-packet handler, reading `session_kind`
-    // first to avoid borrowing `inner` twice.
-    macro_rules! race_timing {
-        ($method:ident, $v:expr) => {{
-            let sk = inner.game.session_kind;
-            for re in inner.race.$method($v, sk) {
+    // Wrap a race-handler call, pushing each emitted [`RaceEvent`]. The handlers
+    // live on `WorldInner` and read `session_kind`/`connections` themselves.
+    macro_rules! push_race {
+        ($call:expr) => {{
+            for re in $call {
                 events.push(WorldEvent::Race(re));
             }
         }};
@@ -301,11 +307,8 @@ fn dispatch(
         },
         Packet::Cnl(cnl) => {
             let (info, players) = inner.apply_cnl(cnl);
-            let sk = inner.game.session_kind;
             for p in players {
-                for re in inner.race.on_player_left(&p, sk) {
-                    events.push(WorldEvent::Race(re));
-                }
+                push_race!(inner.on_player_left(&p));
                 events.push(WorldEvent::PlayerLeft(PlayerLeft(p)));
             }
             events.push(WorldEvent::Disconnected(Disconnected {
@@ -337,34 +340,19 @@ fn dispatch(
         },
         Packet::Npl(npl) => {
             if let Some(info) = inner.apply_npl(npl) {
-                let sk = inner.game.session_kind;
-                let WorldInner {
-                    race, connections, ..
-                } = inner;
-                for re in race.on_player_joined(&info, connections, sk, rejoin) {
-                    events.push(WorldEvent::Race(re));
-                }
+                push_race!(inner.on_player_joined(&info));
                 events.push(WorldEvent::PlayerJoined(PlayerJoined(info)));
             }
         },
         Packet::Pll(pll) => {
             if let Some(info) = inner.apply_pll(pll) {
-                let sk = inner.game.session_kind;
-                for re in inner.race.on_player_left(&info, sk) {
-                    events.push(WorldEvent::Race(re));
-                }
+                push_race!(inner.on_player_left(&info));
                 events.push(WorldEvent::PlayerLeft(PlayerLeft(info)));
             }
         },
         Packet::Toc(toc) => {
             if let Some((before, after)) = inner.apply_toc(toc) {
-                let sk = inner.game.session_kind;
-                let WorldInner {
-                    race, connections, ..
-                } = inner;
-                for re in race.on_taking_over(&before, &after, connections, sk) {
-                    events.push(WorldEvent::Race(re));
-                }
+                push_race!(inner.on_taking_over(&before, &after));
                 events.push(WorldEvent::TakingOver(TakingOver { before, after }));
             }
         },
@@ -377,7 +365,7 @@ fn dispatch(
                     p,
                 )));
             }
-            race_timing!(apply_telepit, plp);
+            push_race!(inner.apply_telepit(plp));
         },
         Packet::Tiny(tiny) => {
             inner.apply_tiny_clr(tiny);
@@ -454,14 +442,14 @@ fn dispatch(
                 version: ver.version.clone(),
             }));
         },
-        Packet::Lap(v) => race_timing!(apply_lap, v),
-        Packet::Spx(v) => race_timing!(apply_split, v),
-        Packet::Fin(v) => race_timing!(apply_finish, v),
-        Packet::Res(v) => race_timing!(apply_result, v),
-        Packet::Pit(v) => race_timing!(apply_pit_stop, v),
-        Packet::Psf(v) => race_timing!(apply_pit_stop_finished, v),
-        Packet::Pen(v) => race_timing!(apply_penalty_changed, v),
-        Packet::Reo(v) => race_timing!(apply_grid_order, v),
+        Packet::Lap(v) => push_race!(inner.apply_lap(v)),
+        Packet::Spx(v) => push_race!(inner.apply_split(v)),
+        Packet::Fin(v) => push_race!(inner.apply_finish(v)),
+        Packet::Res(v) => push_race!(inner.apply_result(v)),
+        Packet::Pit(v) => push_race!(inner.apply_pit_stop(v)),
+        Packet::Psf(v) => push_race!(inner.apply_pit_stop_finished(v)),
+        Packet::Pen(v) => push_race!(inner.apply_penalty_changed(v)),
+        Packet::Reo(v) => push_race!(inner.apply_grid_order(v)),
         _ => {},
     }
 }
@@ -478,14 +466,12 @@ fn dispatch(
 #[derive(Clone)]
 pub struct World {
     inner: Arc<RwLock<WorldInner>>,
-    rejoin: bool,
 }
 
 impl Default for World {
     fn default() -> Self {
         Self {
             inner: Arc::new(RwLock::new(WorldInner::default())),
-            rejoin: false,
         }
     }
 }
@@ -499,7 +485,7 @@ impl std::fmt::Debug for World {
             .field("track", &g.game.track)
             .field("session_kind", &g.game.session_kind)
             .field("race_entrants", &g.race.entrants.len())
-            .field("rejoin", &self.rejoin)
+            .field("rejoin", &g.rejoin)
             .finish()
     }
 }
@@ -536,8 +522,10 @@ impl World {
     /// phantom duplicate entrants.
     pub fn with_rejoin() -> Self {
         Self {
-            rejoin: true,
-            ..Self::default()
+            inner: Arc::new(RwLock::new(WorldInner {
+                rejoin: true,
+                ..Default::default()
+            })),
         }
     }
 
@@ -549,7 +537,7 @@ impl World {
         let mut events = Vec::new();
         {
             let mut inner = self.inner.write();
-            dispatch(&mut inner, packet, self.rejoin, &mut events);
+            dispatch(&mut inner, packet, &mut events);
         }
         events
     }
@@ -632,19 +620,11 @@ impl World {
         poll_interval: Duration,
         cancel: CancellationToken,
     ) -> Option<usize> {
-        let mut interval = tokio::time::interval(poll_interval);
-        loop {
-            tokio::select! {
-                biased;
-                _ = cancel.cancelled() => return None,
-                _ = interval.tick() => {
-                    let count = self.connection_count();
-                    if f(count) {
-                        return Some(count);
-                    }
-                }
-            }
-        }
+        self.poll(poll_interval, cancel, || {
+            let count = self.connection_count();
+            f(count).then_some(count)
+        })
+        .await
     }
 
     /// Poll until the player count satisfies `f`, or until `cancel` fires.
@@ -654,19 +634,11 @@ impl World {
         poll_interval: Duration,
         cancel: CancellationToken,
     ) -> Option<usize> {
-        let mut interval = tokio::time::interval(poll_interval);
-        loop {
-            tokio::select! {
-                biased;
-                _ = cancel.cancelled() => return None,
-                _ = interval.tick() => {
-                    let count = self.player_count();
-                    if f(count) {
-                        return Some(count);
-                    }
-                }
-            }
-        }
+        self.poll(poll_interval, cancel, || {
+            let count = self.player_count();
+            f(count).then_some(count)
+        })
+        .await
     }
 
     /// Currently selected track, if known.
@@ -724,20 +696,23 @@ impl World {
         self.inner.read().game.clone()
     }
 
-    async fn wait_for_game<F: Fn(&GameInfo) -> bool>(
+    /// Poll `f` on a fixed interval until it returns `Some`, or until `cancel`
+    /// fires (in which case `None`). The single primitive behind every
+    /// `wait_for_*` helper.
+    async fn poll<T>(
         &self,
-        predicate: F,
         poll_interval: Duration,
         cancel: CancellationToken,
-    ) -> Option<()> {
+        f: impl Fn() -> Option<T>,
+    ) -> Option<T> {
         let mut interval = tokio::time::interval(poll_interval);
         loop {
             tokio::select! {
                 biased;
                 _ = cancel.cancelled() => return None,
                 _ = interval.tick() => {
-                    if predicate(&self.game_info()) {
-                        return Some(());
+                    if let Some(v) = f() {
+                        return Some(v);
                     }
                 }
             }
@@ -747,79 +722,51 @@ impl World {
     /// Wait until state is populated from at least one `Sta` packet - i.e.
     /// the current track is known.
     pub async fn wait_for_known_state(&self, cancel: CancellationToken) -> Option<()> {
-        self.wait_for_game(
-            |info| info.current_track().is_some(),
-            Duration::from_millis(100),
-            cancel,
-        )
+        self.poll(Duration::from_millis(100), cancel, || {
+            self.current_track().map(|_| ())
+        })
         .await
     }
 
     /// Wait until the game is no longer in progress.
     pub async fn wait_for_end(&self, cancel: CancellationToken) -> Option<()> {
-        let mut interval = tokio::time::interval(Duration::from_millis(500));
-        loop {
-            tokio::select! {
-                biased;
-                _ = cancel.cancelled() => return None,
-                _ = interval.tick() => {
-                    if self.inner.read().game.session_kind.is_none() {
-                        return Some(());
-                    }
-                }
-            }
-        }
+        self.poll(Duration::from_millis(500), cancel, || {
+            self.session().is_none().then_some(())
+        })
+        .await
     }
 
     /// Wait until the given track is loaded and no session is active
     /// (selection screen, not yet racing).
     pub async fn wait_for_track(&self, track: Track, cancel: CancellationToken) -> Option<()> {
-        self.wait_for_game(
-            move |info| info.current_track() == Some(&track),
-            Duration::from_millis(500),
-            cancel,
-        )
+        self.poll(Duration::from_millis(500), cancel, move || {
+            (self.current_track() == Some(track)).then_some(())
+        })
         .await
     }
 
     /// Wait until a race session is in progress.
     pub async fn wait_for_racing(&self, cancel: CancellationToken) -> Option<()> {
-        let mut interval = tokio::time::interval(Duration::from_millis(500));
-        loop {
-            tokio::select! {
-                biased;
-                _ = cancel.cancelled() => return None,
-                _ = interval.tick() => {
-                    if matches!(self.inner.read().game.session_kind, Some(SessionKind::Race { .. })) {
-                        return Some(());
-                    }
-                }
-            }
-        }
+        self.poll(Duration::from_millis(500), cancel, || {
+            matches!(self.session(), Some(SessionKind::Race { .. })).then_some(())
+        })
+        .await
     }
 
     /// Wait for a specific layout to be loaded.
     pub async fn wait_for_layout(&self, layout: String, cancel: CancellationToken) -> Option<()> {
-        self.wait_for_game(
-            move |info| {
-                info.current_layout()
-                    .map(|l| l.as_str() == layout.as_str())
-                    .unwrap_or(false)
-            },
-            Duration::from_millis(500),
-            cancel,
-        )
+        self.poll(Duration::from_millis(500), cancel, move || {
+            (self.current_layout().as_deref() == Some(layout.as_str())).then_some(())
+        })
         .await
     }
 
     /// Wait for any `Axi` packet to be received.
     pub async fn wait_for_any_axi(&self, cancel: CancellationToken) -> Option<()> {
         let before = self.inner.read().game.axi_count;
-        self.wait_for_game(
-            move |info| info.axi_count != before,
-            Duration::from_millis(100),
-            cancel,
-        )
+        self.poll(Duration::from_millis(100), cancel, move || {
+            (self.inner.read().game.axi_count != before).then_some(())
+        })
         .await
     }
 
@@ -827,251 +774,10 @@ impl World {
     /// qualifying session has started.
     pub async fn wait_for_any_rst(&self, cancel: CancellationToken) -> Option<()> {
         let before = self.inner.read().game.rst_count;
-        self.wait_for_game(
-            move |info| info.rst_count != before,
-            Duration::from_millis(100),
-            cancel,
-        )
-        .await
-    }
-
-    /// `/end` - finish the current race.
-    pub fn end(&self) -> insim::Packet {
-        host_command("/end")
-    }
-
-    /// `/clear` - remove all connections from the server.
-    pub fn clear(&self) -> insim::Packet {
-        host_command("/clear")
-    }
-
-    /// `/track {track}` - load a different track.
-    pub fn change_track(&self, track: Track) -> insim::Packet {
-        host_command(format!("/track {track}"))
-    }
-
-    /// Change race length. Maps onto `/laps`, `/hours`, or `/laps no`.
-    pub fn change_laps(&self, laps: RaceLaps) -> insim::Packet {
-        let cmd = match laps {
-            RaceLaps::Untimed => "/laps no".to_string(),
-            RaceLaps::Hours(h) => format!("/hours {h}"),
-            other => format!("/laps {}", Into::<u8>::into(other)),
-        };
-        host_command(cmd)
-    }
-
-    /// `/wind {wind}` - set wind strength (0..=2 typically).
-    pub fn change_wind(&self, wind: u8) -> insim::Packet {
-        host_command(format!("/wind {wind}"))
-    }
-
-    /// `/axclear` - clear the autocross layout.
-    pub fn ax_clear(&self) -> insim::Packet {
-        host_command("/axclear")
-    }
-
-    /// `/axload {layout}` - load an autocross layout by name.
-    pub fn ax_load(&self, layout: impl Into<String>) -> insim::Packet {
-        host_command(format!("/axload {}", layout.into()))
-    }
-
-    /// `/restart` - start a race.
-    pub fn restart(&self) -> insim::Packet {
-        host_command("/restart")
-    }
-
-    /// `/qualify` - start qualifying.
-    pub fn qualify(&self) -> insim::Packet {
-        host_command("/qualify")
-    }
-
-    /// `/reinit` - full restart, kicks all connections.
-    pub fn reinit(&self) -> insim::Packet {
-        host_command("/reinit")
-    }
-
-    /// `/weather {weather}` - set weather/lighting.
-    pub fn change_weather(&self, weather: u8) -> insim::Packet {
-        host_command(format!("/weather {weather}"))
-    }
-
-    /// `/qual {minutes}` - set qualifying duration. `0` = no qualifying.
-    pub fn change_qual(&self, minutes: u8) -> insim::Packet {
-        host_command(format!("/qual {minutes}"))
-    }
-
-    /// `/time` - report the current in-game time status.
-    pub fn time_status(&self) -> insim::Packet {
-        host_command("/time")
-    }
-
-    /// `/time live` - switch to live (real-world) time.
-    pub fn time_live(&self) -> insim::Packet {
-        host_command("/time live")
-    }
-
-    /// `/time offset [days] [HH:MM]` - shift in-game time by an offset.
-    pub fn time_offset(&self, days: Option<i32>, minutes: Option<i32>) -> insim::Packet {
-        let mut cmd = String::from("/time offset");
-        if let Some(d) = days {
-            let sign = if d < 0 { '-' } else { '+' };
-            cmd.push_str(&format!(" {sign}{}", d.unsigned_abs()));
-        }
-        if let Some(m) = minutes {
-            let sign = if m < 0 { '-' } else { '+' };
-            let abs = m.unsigned_abs();
-            cmd.push_str(&format!(" {sign}{}:{:02}", abs / 60, abs % 60));
-        }
-        host_command(cmd)
-    }
-
-    /// `/time set [DD Mon] [HH:MM] [utc±offset]` - set in-game time explicitly.
-    pub fn time_set(&self, params: TimeSet) -> insim::Packet {
-        let mut cmd = String::from("/time set");
-        if let Some((day, month)) = params.date {
-            cmd.push_str(&format!(" {day} {month}"));
-        }
-        if let Some((hour, minute)) = params.time {
-            cmd.push_str(&format!(" {hour:02}:{minute:02}"));
-        }
-        if let Some(off) = params.utc_offset {
-            let sign = if off < 0 { '-' } else { '+' };
-            cmd.push_str(&format!(" utc{sign}{}", off.unsigned_abs()));
-        }
-        host_command(cmd)
-    }
-
-    /// `/time mul {0..=240}` - set the time multiplier (set-time mode only).
-    pub fn time_multiplier(&self, factor: u8) -> insim::Packet {
-        host_command(format!("/time mul {factor}"))
-    }
-
-    /// `/time demo {preset}` - activate a demo time-of-day preset.
-    pub fn time_demo(&self, preset: TimeDemoPreset) -> insim::Packet {
-        host_command(format!("/time demo {preset}"))
-    }
-
-    /// `/pit_all` - send every player to the pits.
-    pub fn pit_all(&self) -> insim::Packet {
-        host_command("/pit_all")
-    }
-
-    /// `/spec_all` - spectate all players.
-    pub fn spec_all(&self) -> insim::Packet {
-        host_command("/spec_all")
-    }
-
-    /// `/grid open|self|lock` - set who can modify the grid in the game setup screen.
-    pub fn change_grid(&self, mode: GridMode) -> insim::Packet {
-        host_command(format!("/grid {mode}"))
-    }
-
-    /// `/grid real yes` / `/grid real no` - allow or disallow real players joining.
-    pub fn change_grid_real(&self, allow: bool) -> insim::Packet {
-        host_command(if allow {
-            "/grid real yes"
-        } else {
-            "/grid real no"
+        self.poll(Duration::from_millis(100), cancel, move || {
+            (self.inner.read().game.rst_count != before).then_some(())
         })
-    }
-
-    /// `/grid ai yes` / `/grid ai no` - allow or disallow AI players joining.
-    pub fn change_grid_ai(&self, allow: bool) -> insim::Packet {
-        host_command(if allow { "/grid ai yes" } else { "/grid ai no" })
-    }
-
-    /// `/flood yes` / `/flood no` - switch floodlights on or off.
-    pub fn change_flood(&self, on: bool) -> insim::Packet {
-        host_command(if on { "/flood yes" } else { "/flood no" })
-    }
-
-    /// Apply vehicle restrictions server-wide (ucid = `ConnectionId::ALL`).
-    pub fn restrict_vehicles(&self, vehicles: &[Vehicle]) -> Vec<insim::Packet> {
-        let mut mal = Mal::default();
-        let cars = if vehicles.is_empty() {
-            PlcAllowedCarsSet::all()
-        } else {
-            let mut cars = PlcAllowedCarsSet::default();
-            for v in vehicles {
-                match v {
-                    Vehicle::Mod(_) => {
-                        let _ = mal.insert(*v);
-                    },
-                    _ => {
-                        let _ = cars.insert(*v);
-                    },
-                }
-            }
-            cars
-        };
-        vec![
-            insim::Packet::from(Plc {
-                cars,
-                ucid: ConnectionId::ALL,
-                ..Plc::default()
-            }),
-            insim::Packet::from(mal),
-        ]
-    }
-
-    /// Returns an `/unban` packet.
-    pub fn unban(&self, uname: impl Into<String>) -> insim::Packet {
-        host_command(format!("/unban {}", uname.into()))
-    }
-
-    /// Returns a `/kick` packet for the given UCID, or `None` if not found.
-    pub fn kick(&self, ucid: ConnectionId) -> Option<insim::Packet> {
-        Some(self.get(ucid)?.kick())
-    }
-
-    /// Returns a `/ban` packet. `ban_days = 0` means 12 hours (LFS convention).
-    pub fn ban(&self, ucid: ConnectionId, ban_days: u32) -> Option<insim::Packet> {
-        Some(self.get(ucid)?.ban(ban_days))
-    }
-
-    /// Returns a `/spec` packet for the given UCID, or `None` if not found.
-    pub fn spec(&self, ucid: ConnectionId) -> Option<insim::Packet> {
-        Some(self.get(ucid)?.spec())
-    }
-
-    /// Returns a `/pitlane` packet for the given UCID, or `None` if not found.
-    pub fn pitlane(&self, ucid: ConnectionId) -> Option<insim::Packet> {
-        Some(self.get(ucid)?.pitlane())
-    }
-
-    /// Returns a `/p_clear` packet for the given UCID, or `None` if not found.
-    pub fn clear_penalty(&self, ucid: ConnectionId) -> Option<insim::Packet> {
-        Some(self.get(ucid)?.clear_penalty())
-    }
-
-    /// Returns a penalty packet for the given UCID.
-    pub fn give_penalty(
-        &self,
-        ucid: ConnectionId,
-        penalty: insim::insim::PenaltyInfo,
-    ) -> Option<insim::Packet> {
-        self.get(ucid)?.give_penalty(penalty)
-    }
-
-    /// Returns the packets needed to set and display a Race Control Message.
-    pub fn send_rcm(&self, message: &str, ucid: ConnectionId) -> Vec<insim::Packet> {
-        if ucid == ConnectionId::ALL {
-            return vec![
-                host_command(format!("/rcm {message}")),
-                host_command("/rcm_all"),
-            ];
-        }
-        self.get(ucid)
-            .map(|conn| conn.send_rcm(message))
-            .unwrap_or_default()
-    }
-
-    /// Returns the packets needed to clear a Race Control Message.
-    pub fn clear_rcm(&self, ucid: ConnectionId) -> Option<insim::Packet> {
-        if ucid == ConnectionId::ALL {
-            return Some(host_command("/rcc_all"));
-        }
-        Some(self.get(ucid)?.clear_rcm())
+        .await
     }
 
     /// The current session fastest lap: entrant, player ID, and time.

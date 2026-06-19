@@ -1,8 +1,12 @@
-//! Race-tracking logic as methods on [`RaceState`].
+//! Race-tracking logic.
 //!
-//! This module is private to [`crate::world`]. The public API surface is the
-//! query methods on [`crate::world::World`]; the [`RaceState`] methods here are
-//! driven by the unified packet dispatch in [`crate::world`].
+//! This module is private to [`crate::world`]. [`RaceState`] holds the
+//! cohesive race data (entrants, the live plid→entrant index, pending grid
+//! positions, fastest lap); the packet **handlers** are implemented on
+//! [`WorldInner`](crate::world::WorldInner) so they can read sibling state
+//! (`game.session_kind`, `connections`) directly via disjoint field borrows,
+//! rather than threading it through as parameters. The public API surface is
+//! the query methods on [`crate::world::World`].
 
 use std::{collections::HashMap, time::Duration};
 
@@ -13,8 +17,8 @@ use insim::{
 
 use super::{DriverRecord, EntrantId, EntrantState, FinishStatus, LapRecord, PitRecord, RaceEvent};
 use crate::world::{
+    WorldInner,
     connection::{ConnectionInfo, PlayerInfo},
-    game::SessionKind,
 };
 
 /// LFS uses 1:00:00.000 as a placeholder for an invalid/missing split time.
@@ -71,46 +75,41 @@ impl RaceState {
             .map(|(id, _)| *id)
     }
 
-    pub(crate) fn on_player_joined(
-        &mut self,
-        info: &PlayerInfo,
-        connections: &HashMap<ConnectionId, ConnectionInfo>,
-        session_kind: Option<SessionKind>,
-        rejoin: bool,
-    ) -> Vec<RaceEvent> {
-        if rejoin {
-            self.apply_player_rejoined(info, connections, session_kind)
-        } else {
-            self.apply_player_joined(info, connections, session_kind)
+    /// Clear all per-session race state. Called when a new session starts
+    /// (`Rst`), before the new session's entrants are tracked.
+    pub(crate) fn clear_for_session(&mut self) {
+        self.entrants.clear();
+        self.live.clear();
+        self.pending_grid.clear();
+        self.fastest_lap = None;
+    }
+}
+
+/// Race packet handlers, driven by the unified dispatch in [`crate::world`].
+///
+/// These live on [`WorldInner`] (rather than [`RaceState`]) so they can read
+/// `self.game.session_kind` and `self.connections` directly while mutating
+/// `self.race` - the session/connection context they depend on lives a layer
+/// up, and disjoint field borrows let one method touch all three.
+impl WorldInner {
+    /// The live entrant for `plid`, but only while a tracking session is
+    /// active. `None` if not tracking or the plid is not currently on track.
+    fn live_entrant_mut(&mut self, plid: PlayerId) -> Option<&mut EntrantState> {
+        if !self.game.session_kind.is_some_and(|k| k.is_tracking()) {
+            return None;
         }
+        let id = *self.race.live.get(&plid)?;
+        self.race.entrants.get_mut(&id)
     }
 
-    fn apply_player_joined(
-        &mut self,
-        info: &PlayerInfo,
-        connections: &HashMap<ConnectionId, ConnectionInfo>,
-        session_kind: Option<SessionKind>,
-    ) -> Vec<RaceEvent> {
-        if !session_kind.is_some_and(|k| k.is_tracking()) {
-            return vec![];
-        }
-        // Idempotent per live plid: LFS announces each player with an `Npl` at
-        // grid formation *and* again in reply to a `TINY_NPL` request, so the
-        // same plid can arrive twice. If it is already live, fold in any pending
-        // grid position and ignore the duplicate rather than creating a phantom
-        // second entrant.
-        if let Some(&id) = self.live.get(&info.plid) {
-            if let Some(grid) = self.pending_grid.remove(&info.plid)
-                && let Some(entrant) = self.entrants.get_mut(&id)
-            {
-                entrant.grid_position = Some(grid);
-            }
-            return vec![];
-        }
-        let id = self.alloc_id();
-        let uname = uname_for(connections, info.ucid);
-        let pname = pname_for(connections, info.ucid).unwrap_or_else(|| info.pname.clone());
-        let grid_position = self.pending_grid.remove(&info.plid);
+    /// Allocate a fresh entrant for `info`, resolving its display/LFS.net names
+    /// from `connections` and applying any buffered grid position. Returns the
+    /// new [`EntrantId`]. Shared by the fresh-join and rejoin-no-match paths.
+    fn insert_fresh_entrant(&mut self, info: &PlayerInfo) -> EntrantId {
+        let id = self.race.alloc_id();
+        let uname = uname_for(&self.connections, info.ucid);
+        let pname = pname_for(&self.connections, info.ucid).unwrap_or_else(|| info.pname.clone());
+        let grid_position = self.race.pending_grid.remove(&info.plid);
         let state = EntrantState {
             id,
             plid: info.plid,
@@ -132,24 +131,50 @@ impl RaceState {
             pending_pit: None,
             penalty: PenaltyInfo::None,
         };
-        let _ = self.entrants.insert(id, state);
-        let _ = self.live.insert(info.plid, id);
+        let _ = self.race.entrants.insert(id, state);
+        let _ = self.race.live.insert(info.plid, id);
+        id
+    }
+
+    pub(crate) fn on_player_joined(&mut self, info: &PlayerInfo) -> Vec<RaceEvent> {
+        if self.rejoin {
+            self.apply_player_rejoined(info)
+        } else {
+            self.apply_player_joined(info)
+        }
+    }
+
+    fn apply_player_joined(&mut self, info: &PlayerInfo) -> Vec<RaceEvent> {
+        if !self.game.session_kind.is_some_and(|k| k.is_tracking()) {
+            return vec![];
+        }
+        // Idempotent per live plid: LFS announces each player with an `Npl` at
+        // grid formation *and* again in reply to a `TINY_NPL` request, so the
+        // same plid can arrive twice. If it is already live, fold in any pending
+        // grid position and ignore the duplicate rather than creating a phantom
+        // second entrant.
+        if let Some(&id) = self.race.live.get(&info.plid) {
+            if let Some(grid) = self.race.pending_grid.remove(&info.plid)
+                && let Some(entrant) = self.race.entrants.get_mut(&id)
+            {
+                entrant.grid_position = Some(grid);
+            }
+            return vec![];
+        }
+        let id = self.insert_fresh_entrant(info);
         vec![RaceEvent::EntrantJoined {
             id,
             plid: info.plid,
         }]
     }
 
-    pub(crate) fn on_player_left(
-        &mut self,
-        info: &PlayerInfo,
-        session_kind: Option<SessionKind>,
-    ) -> Vec<RaceEvent> {
-        let Some(id) = self.live.remove(&info.plid) else {
+    pub(crate) fn on_player_left(&mut self, info: &PlayerInfo) -> Vec<RaceEvent> {
+        // Always drop from the live index, even outside a tracking session.
+        let Some(id) = self.race.live.remove(&info.plid) else {
             return vec![];
         };
-        if session_kind.is_some_and(|k| k.is_race())
-            && let Some(entrant) = self.entrants.get_mut(&id)
+        if self.game.session_kind.is_some_and(|k| k.is_race())
+            && let Some(entrant) = self.race.entrants.get_mut(&id)
             && matches!(entrant.status, FinishStatus::Racing)
         {
             entrant.status = FinishStatus::Dnf;
@@ -165,18 +190,16 @@ impl RaceState {
         &mut self,
         before: &PlayerInfo,
         after: &PlayerInfo,
-        connections: &HashMap<ConnectionId, ConnectionInfo>,
-        session_kind: Option<SessionKind>,
     ) -> Vec<RaceEvent> {
-        if !session_kind.is_some_and(|k| k.is_tracking()) {
+        if !self.game.session_kind.is_some_and(|k| k.is_tracking()) {
             return vec![];
         }
-        let Some(&id) = self.live.get(&before.plid) else {
+        let Some(&id) = self.race.live.get(&before.plid) else {
             return vec![];
         };
-        let uname = uname_for(connections, after.ucid);
-        let pname = pname_for(connections, after.ucid).unwrap_or_else(|| after.pname.clone());
-        if let Some(entrant) = self.entrants.get_mut(&id) {
+        let uname = uname_for(&self.connections, after.ucid);
+        let pname = pname_for(&self.connections, after.ucid).unwrap_or_else(|| after.pname.clone());
+        if let Some(entrant) = self.race.entrants.get_mut(&id) {
             entrant.drivers.push(DriverRecord {
                 ucid: after.ucid,
                 pname,
@@ -191,32 +214,28 @@ impl RaceState {
         }]
     }
 
-    fn apply_player_rejoined(
-        &mut self,
-        info: &PlayerInfo,
-        connections: &HashMap<ConnectionId, ConnectionInfo>,
-        session_kind: Option<SessionKind>,
-    ) -> Vec<RaceEvent> {
-        if !session_kind.is_some_and(|k| k.is_tracking()) {
+    fn apply_player_rejoined(&mut self, info: &PlayerInfo) -> Vec<RaceEvent> {
+        if !self.game.session_kind.is_some_and(|k| k.is_tracking()) {
             return vec![];
         }
         // Idempotent per live plid: ignore a duplicate `Npl` for an entrant
         // already on track.
-        if let Some(&id) = self.live.get(&info.plid) {
-            if let Some(grid) = self.pending_grid.remove(&info.plid)
-                && let Some(entrant) = self.entrants.get_mut(&id)
+        if let Some(&id) = self.race.live.get(&info.plid) {
+            if let Some(grid) = self.race.pending_grid.remove(&info.plid)
+                && let Some(entrant) = self.race.entrants.get_mut(&id)
             {
                 entrant.grid_position = Some(grid);
             }
             return vec![];
         }
-        let uname = uname_for(connections, info.ucid);
+        let uname = uname_for(&self.connections, info.ucid);
         if let Some(prior_id) = uname
             .as_deref()
-            .and_then(|u| self.find_disconnected_by_uname(u))
+            .and_then(|u| self.race.find_disconnected_by_uname(u))
         {
-            let pname = pname_for(connections, info.ucid).unwrap_or_else(|| info.pname.clone());
-            let entrant = self.entrants.get_mut(&prior_id).unwrap();
+            let pname =
+                pname_for(&self.connections, info.ucid).unwrap_or_else(|| info.pname.clone());
+            let entrant = self.race.entrants.get_mut(&prior_id).unwrap();
             let pre_offset = entrant.laps_done;
             entrant.lap_offset = entrant.lap_offset.wrapping_add(entrant.laps_done);
             entrant.current_splits.clear();
@@ -229,106 +248,59 @@ impl RaceState {
                 uname,
                 from_lap: pre_offset,
             });
-            let _ = self.live.insert(info.plid, prior_id);
+            let _ = self.race.live.insert(info.plid, prior_id);
             return vec![RaceEvent::EntrantRejoined {
                 id: prior_id,
                 plid: info.plid,
             }];
         }
         // No match - fresh join
-        let id = self.alloc_id();
-        let pname = pname_for(connections, info.ucid).unwrap_or_else(|| info.pname.clone());
-        let grid_position = self.pending_grid.remove(&info.plid);
-        let state = EntrantState {
-            id,
-            plid: info.plid,
-            laps_done: 0,
-            lap_offset: 0,
-            best_lap: None,
-            best_lap_num: None,
-            laps: Vec::new(),
-            current_splits: Vec::new(),
-            pit_stops: Vec::new(),
-            status: FinishStatus::Racing,
-            drivers: vec![DriverRecord {
-                ucid: info.ucid,
-                pname,
-                uname,
-                from_lap: 0,
-            }],
-            grid_position,
-            pending_pit: None,
-            penalty: PenaltyInfo::None,
-        };
-        let _ = self.entrants.insert(id, state);
-        let _ = self.live.insert(info.plid, id);
+        let id = self.insert_fresh_entrant(info);
         vec![RaceEvent::EntrantJoined {
             id,
             plid: info.plid,
         }]
     }
 
-    pub(crate) fn apply_grid_order(
-        &mut self,
-        reo: &Reo,
-        session_kind: Option<SessionKind>,
-    ) -> Vec<RaceEvent> {
-        if !session_kind.is_some_and(|k| k.is_tracking()) {
+    pub(crate) fn apply_grid_order(&mut self, reo: &Reo) -> Vec<RaceEvent> {
+        if !self.game.session_kind.is_some_and(|k| k.is_tracking()) {
             return vec![];
         }
         let count = (reo.nump as usize).min(reo.plid.len());
         for (i, &plid) in reo.plid.iter().take(count).enumerate() {
             let pos = (i + 1) as u8;
-            match self.live.get(&plid).copied() {
+            match self.race.live.get(&plid).copied() {
                 Some(id) => {
-                    if let Some(entrant) = self.entrants.get_mut(&id) {
+                    if let Some(entrant) = self.race.entrants.get_mut(&id) {
                         entrant.grid_position = Some(pos);
                     }
                 },
                 None => {
-                    let _ = self.pending_grid.insert(plid, pos);
+                    let _ = self.race.pending_grid.insert(plid, pos);
                 },
             }
         }
         vec![]
     }
 
-    pub(crate) fn apply_telepit(
-        &mut self,
-        plp: &Plp,
-        session_kind: Option<SessionKind>,
-    ) -> Vec<RaceEvent> {
-        if !session_kind.is_some_and(|k| k.is_tracking()) {
-            return vec![];
-        }
-        let Some(&id) = self.live.get(&plp.plid) else {
+    pub(crate) fn apply_telepit(&mut self, plp: &Plp) -> Vec<RaceEvent> {
+        let Some(entrant) = self.live_entrant_mut(plp.plid) else {
             return vec![];
         };
-        let Some(entrant) = self.entrants.get_mut(&id) else {
-            return vec![];
-        };
+        let id = entrant.id;
         entrant.current_splits.clear();
         entrant.pending_pit = None;
         vec![RaceEvent::TeleportedToPits { id, plid: plp.plid }]
     }
 
-    pub(crate) fn apply_lap(
-        &mut self,
-        lap: &Lap,
-        session_kind: Option<SessionKind>,
-    ) -> Vec<RaceEvent> {
-        if !session_kind.is_some_and(|k| k.is_tracking()) {
-            return vec![];
-        }
-        let Some(&id) = self.live.get(&lap.plid) else {
-            return vec![];
-        };
-        let Some(entrant) = self.entrants.get_mut(&id) else {
+    pub(crate) fn apply_lap(&mut self, lap: &Lap) -> Vec<RaceEvent> {
+        let Some(entrant) = self.live_entrant_mut(lap.plid) else {
             return vec![];
         };
         if matches!(entrant.status, FinishStatus::Finished { .. }) {
             return vec![];
         }
+        let id = entrant.id;
         let effective_lap = lap.lapsdone.wrapping_add(entrant.lap_offset);
         let record = LapRecord {
             lap: effective_lap,
@@ -345,6 +317,8 @@ impl RaceState {
         }
         entrant.laps_done = effective_lap;
         entrant.laps.push(record.clone());
+        // `entrant`'s borrow of `*self` ends here; `self.race.fastest_lap` below
+        // is a separate field access.
         let mut events = vec![RaceEvent::LapCompleted {
             id,
             plid: lap.plid,
@@ -359,9 +333,9 @@ impl RaceState {
                 previous: previous_best,
             });
         }
-        let is_session_fastest = self.fastest_lap.is_none_or(|(_, _, t)| lap.ltime < t);
+        let is_session_fastest = self.race.fastest_lap.is_none_or(|(_, _, t)| lap.ltime < t);
         if is_session_fastest {
-            self.fastest_lap = Some((id, lap.plid, lap.ltime));
+            self.race.fastest_lap = Some((id, lap.plid, lap.ltime));
             events.push(RaceEvent::FastestLap {
                 id,
                 plid: lap.plid,
@@ -372,26 +346,17 @@ impl RaceState {
         events
     }
 
-    pub(crate) fn apply_split(
-        &mut self,
-        spx: &Spx,
-        session_kind: Option<SessionKind>,
-    ) -> Vec<RaceEvent> {
+    pub(crate) fn apply_split(&mut self, spx: &Spx) -> Vec<RaceEvent> {
         if spx.stime >= INVALID_SPLIT {
             return vec![];
         }
-        if !session_kind.is_some_and(|k| k.is_tracking()) {
-            return vec![];
-        }
-        let Some(&id) = self.live.get(&spx.plid) else {
-            return vec![];
-        };
-        let Some(entrant) = self.entrants.get_mut(&id) else {
+        let Some(entrant) = self.live_entrant_mut(spx.plid) else {
             return vec![];
         };
         if matches!(entrant.status, FinishStatus::Finished { .. }) {
             return vec![];
         }
+        let id = entrant.id;
         entrant.current_splits.push(spx.stime);
         vec![RaceEvent::SplitCompleted {
             id,
@@ -401,18 +366,15 @@ impl RaceState {
         }]
     }
 
-    pub(crate) fn apply_finish(
-        &mut self,
-        fin: &Fin,
-        session_kind: Option<SessionKind>,
-    ) -> Vec<RaceEvent> {
-        if !session_kind.is_some_and(|k| k.is_race()) {
+    pub(crate) fn apply_finish(&mut self, fin: &Fin) -> Vec<RaceEvent> {
+        // Finishes only count in a race; `Fin` fires per-lap in qualifying etc.
+        if !self.game.session_kind.is_some_and(|k| k.is_race()) {
             return vec![];
         }
-        let Some(&id) = self.live.get(&fin.plid) else {
+        let Some(&id) = self.race.live.get(&fin.plid) else {
             return vec![];
         };
-        let Some(entrant) = self.entrants.get_mut(&id) else {
+        let Some(entrant) = self.race.entrants.get_mut(&id) else {
             return vec![];
         };
         entrant.status = FinishStatus::Finished {
@@ -431,22 +393,18 @@ impl RaceState {
         }]
     }
 
-    pub(crate) fn apply_result(
-        &mut self,
-        res: &Res,
-        session_kind: Option<SessionKind>,
-    ) -> Vec<RaceEvent> {
-        if !session_kind.is_some_and(|k| k.is_tracking()) {
+    pub(crate) fn apply_result(&mut self, res: &Res) -> Vec<RaceEvent> {
+        if !self.game.session_kind.is_some_and(|k| k.is_tracking()) {
             return vec![];
         }
-        let id = match self.live.get(&res.plid).copied() {
+        let id = match self.race.live.get(&res.plid).copied() {
             Some(id) => id,
-            None => match self.find_entrant_by_plid(res.plid) {
+            None => match self.race.find_entrant_by_plid(res.plid) {
                 Some(id) => id,
                 None => return vec![],
             },
         };
-        let Some(entrant) = self.entrants.get_mut(&id) else {
+        let Some(entrant) = self.race.entrants.get_mut(&id) else {
             return vec![];
         };
         if let FinishStatus::Finished { result_num, .. } = &mut entrant.status {
@@ -460,18 +418,8 @@ impl RaceState {
         }]
     }
 
-    pub(crate) fn apply_pit_stop(
-        &mut self,
-        pit: &Pit,
-        session_kind: Option<SessionKind>,
-    ) -> Vec<RaceEvent> {
-        if !session_kind.is_some_and(|k| k.is_tracking()) {
-            return vec![];
-        }
-        let Some(&id) = self.live.get(&pit.plid) else {
-            return vec![];
-        };
-        let Some(entrant) = self.entrants.get_mut(&id) else {
+    pub(crate) fn apply_pit_stop(&mut self, pit: &Pit) -> Vec<RaceEvent> {
+        let Some(entrant) = self.live_entrant_mut(pit.plid) else {
             return vec![];
         };
         entrant.pending_pit = Some(PitRecord {
@@ -483,23 +431,14 @@ impl RaceState {
         vec![]
     }
 
-    pub(crate) fn apply_pit_stop_finished(
-        &mut self,
-        psf: &Psf,
-        session_kind: Option<SessionKind>,
-    ) -> Vec<RaceEvent> {
-        if !session_kind.is_some_and(|k| k.is_tracking()) {
-            return vec![];
-        }
-        let Some(&id) = self.live.get(&psf.plid) else {
-            return vec![];
-        };
-        let Some(entrant) = self.entrants.get_mut(&id) else {
+    pub(crate) fn apply_pit_stop_finished(&mut self, psf: &Psf) -> Vec<RaceEvent> {
+        let Some(entrant) = self.live_entrant_mut(psf.plid) else {
             return vec![];
         };
         let Some(mut record) = entrant.pending_pit.take() else {
             return vec![];
         };
+        let id = entrant.id;
         record.stop_time = Some(psf.stime);
         entrant.pit_stops.push(record.clone());
         vec![RaceEvent::PitStopComplete {
@@ -509,20 +448,11 @@ impl RaceState {
         }]
     }
 
-    pub(crate) fn apply_penalty_changed(
-        &mut self,
-        pen: &Pen,
-        session_kind: Option<SessionKind>,
-    ) -> Vec<RaceEvent> {
-        if !session_kind.is_some_and(|k| k.is_tracking()) {
-            return vec![];
-        }
-        let Some(&id) = self.live.get(&pen.plid) else {
+    pub(crate) fn apply_penalty_changed(&mut self, pen: &Pen) -> Vec<RaceEvent> {
+        let Some(entrant) = self.live_entrant_mut(pen.plid) else {
             return vec![];
         };
-        let Some(entrant) = self.entrants.get_mut(&id) else {
-            return vec![];
-        };
+        let id = entrant.id;
         entrant.penalty = pen.newpen;
         vec![RaceEvent::PenaltyChanged {
             id,
@@ -531,14 +461,5 @@ impl RaceState {
             newpen: pen.newpen,
             reason: pen.reason.clone(),
         }]
-    }
-
-    /// Clear all per-session race state. Called when a new session starts
-    /// (`Rst`), before the new session's entrants are tracked.
-    pub(crate) fn clear_for_session(&mut self) {
-        self.entrants.clear();
-        self.live.clear();
-        self.pending_grid.clear();
-        self.fastest_lap = None;
     }
 }

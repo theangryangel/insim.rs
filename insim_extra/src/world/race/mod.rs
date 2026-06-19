@@ -5,6 +5,9 @@ mod entrant;
 mod event;
 mod state;
 
+#[cfg(test)]
+mod tests;
+
 pub use entrant::{DriverRecord, EntrantId, EntrantState, FinishStatus, LapRecord, PitRecord};
 pub use event::RaceEvent;
 pub(crate) use state::RaceState;
