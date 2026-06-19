@@ -99,8 +99,8 @@ pub use game::{
     VersionReceived, track_rotation,
 };
 pub use insim_extra::{
-    race::{DriverRecord, EntrantId, EntrantState, FinishStatus, LapRecord, PitRecord, RaceEvent},
     util::{host_command, mtc},
+    world::{DriverRecord, EntrantId, EntrantState, FinishStatus, LapRecord, PitRecord, RaceEvent},
 };
 pub use penalty_clearer::PenaltyClearer;
 pub use presence::{

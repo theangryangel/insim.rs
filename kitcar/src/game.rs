@@ -1,84 +1,17 @@
-//! Synthetic event structs for game-state changes and the [`track_rotation`]
-//! orchestration combinator.
+//! Game-state event types (re-exported from [`insim_extra::world`]) and the
+//! [`track_rotation`] orchestration combinator.
 
-use insim::{
-    core::{game_version::GameVersion, track::Track, vehicle::Vehicle},
-    identifiers::ConnectionId,
-    insim::{PlcAllowedCarsSet, RaceLaps},
+use insim::{core::track::Track, identifiers::ConnectionId, insim::RaceLaps};
+pub use insim_extra::world::{
+    AllowedCarsChanged, AllowedModsChanged, GameInfo, LayoutChanged, MultiplayerJoined,
+    MultiplayerLeft, SessionEnded, SessionKind, SessionStarted, TrackChanged, VersionInfo,
+    VersionReceived,
 };
-pub use insim_extra::game::{GameInfo, SessionKind, VersionInfo};
 use insim_extra::{util::mtc, world::World};
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 
 use crate::Sender;
-
-/// Synthetic event emitted when an `Rst` starts a new race, qualifying,
-/// practice or untimed session. This is the authoritative session-start signal.
-#[derive(Debug, Clone)]
-pub struct SessionStarted {
-    /// Whether the session is a race, qualifying, practice or untimed.
-    pub kind: SessionKind,
-}
-
-/// Synthetic event emitted when LFS returns to the entry/lobby screen
-/// (`Sta` reports no race or qualifying in progress).
-#[derive(Debug, Clone)]
-pub struct SessionEnded;
-
-/// Synthetic event emitted when the server's allowed-cars set changes.
-#[derive(Debug, Clone)]
-pub struct AllowedCarsChanged {
-    /// The new allowed-cars set.
-    pub cars: PlcAllowedCarsSet,
-}
-
-/// Synthetic event emitted when the server's allowed-mods list changes.
-#[derive(Debug, Clone)]
-pub struct AllowedModsChanged {
-    /// The new allowed-mods list (empty means unrestricted).
-    pub mods: Vec<Vehicle>,
-}
-
-/// Synthetic event emitted when version information is received.
-#[derive(Debug, Clone)]
-pub struct VersionReceived {
-    /// Product name (e.g. `"S3"`).
-    pub product: String,
-    /// LFS game version.
-    pub version: GameVersion,
-}
-
-/// Synthetic event emitted when the track changes.
-#[derive(Debug, Clone)]
-pub struct TrackChanged {
-    /// Previously known track, if any.
-    pub from: Option<Track>,
-    /// Track now reported by LFS.
-    pub to: Track,
-}
-
-/// Synthetic event emitted when the layout changes or is cleared.
-#[derive(Debug, Clone)]
-pub struct LayoutChanged {
-    /// Previously known layout, if any.
-    pub from: Option<String>,
-    /// New layout, or `None` if cleared.
-    pub to: Option<String>,
-}
-
-/// Synthetic event emitted when LFS joins or starts a multiplayer session.
-#[derive(Debug, Clone)]
-pub struct MultiplayerJoined {
-    /// Host name of the server.
-    pub host_name: String,
-    /// `true` if this instance is the host.
-    pub is_host: bool,
-}
-
-/// Synthetic event emitted when LFS leaves multiplayer (ISM with empty host name).
-#[derive(Debug, Clone)]
-pub struct MultiplayerLeft;
 
 /// Full track-rotation combinator.
 ///

@@ -1,7 +1,7 @@
 //! [`PenaltyClearer`] - queues deferred penalty clears and drains them once
 //! a configurable delay has elapsed.
 //!
-//! Register at [`crate::Stage::Pre`] alongside [`crate::Presence`]:
+//! Register at [`crate::Stage::Pre`] alongside [`crate::World`]:
 //!
 //! ```ignore
 //! app.handle(Stage::Pre, PenaltyClearer::new(Duration::from_secs(15)))
@@ -9,7 +9,7 @@
 //!
 //! On each dispatch cycle the `Handler` impl:
 //! - Queues a deferred clear when a `Pen` packet arrives with a non-`Unknown`
-//!   reason, resolved to a `ConnectionId` via [`Presence`].
+//!   reason, resolved to a `ConnectionId` via [`World`].
 //! - Drains any entries whose delay has elapsed and issues `/p_clear` for each.
 //!
 //! Call [`PenaltyClearer::clear`] on round reset to discard stale entries.
@@ -29,7 +29,7 @@ use crate::{AppError, Dispatch, ExtractCx, FromContext, Handler};
 
 /// Service that queues deferred penalty clears and drains them after a fixed
 /// delay. On each dispatch cycle it queues incoming `Pen` packets and clears
-/// expired entries via [`Presence`].
+/// expired entries via [`World`].
 ///
 /// Clones are cheap - all share the same inner map.
 #[derive(Clone, Debug)]

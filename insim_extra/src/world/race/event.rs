@@ -8,18 +8,14 @@ use insim::{
 };
 
 use super::entrant::{EntrantId, LapRecord, PitRecord};
-use crate::game::SessionKind;
 
 /// Events emitted by race-tracking `apply_*` functions in [`crate::world`].
+///
+/// Session start is reported by [`crate::world::WorldEvent::SessionStarted`],
+/// not here.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum RaceEvent {
-    /// A race or qualifying session started (`Rst`) and all prior state was
-    /// cleared.
-    SessionStarted {
-        /// Whether the new session is a race or qualifying.
-        kind: SessionKind,
-    },
     /// A new entrant joined the track.
     EntrantJoined {
         /// Stable entrant identifier.
