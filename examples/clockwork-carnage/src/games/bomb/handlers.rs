@@ -7,53 +7,20 @@ use insim::{
         insim::{InsimCheckpoint, InsimCircle},
     },
     identifiers::ConnectionId,
-    insim::{Axm, Con, Crs, Pit, PmoAction, PmoFlags, RaceLaps, Toc, Uco, UcoAction},
+    insim::{Axm, Con, Crs, Pit, PmoAction, PmoFlags, Toc, Uco, UcoAction},
 };
 use kitcar::{
     AppError, Connected, Disconnected, Event, Packet, PenaltyClearer, PlayerLeft,
-    PlayerTeleportedToPits, Sender, SessionEnded, State, World, mtc, track_rotation,
+    PlayerTeleportedToPits, RoundEndReason, RoundEnded, RoundManager, RoundStarted, Sender, State,
+    World, mtc,
 };
 
 use super::{
-    config::MIN_PLAYERS,
     db::persist_bomb_run,
-    events::{BombTick, SetupAborted, SetupComplete},
-    state::{ActiveRun, Bomb, BombPhase, CheckpointOutcome},
+    events::BombTick,
+    state::{ActiveRun, Bomb, CheckpointOutcome},
     ui::{BombConnectionProps, BombUi},
 };
-
-fn start_setup(state: &State<Bomb>, world: &World, sender: &Sender, ui: &BombUi) {
-    let (track, layout, setup_timeout, setup_cancel) = {
-        let mut b = state.write();
-        b.phase = BombPhase::SettingUp;
-        let token = b.make_setup_cancel();
-        (
-            b.config.track,
-            b.config.layout.clone(),
-            b.config.setup_timeout,
-            token,
-        )
-    };
-
-    refresh_ui(state, ui);
-
-    let world = world.clone();
-    let sender = sender.clone();
-    drop(tokio::spawn(async move {
-        let result = tokio::select! {
-            r = track_rotation(&world, track, RaceLaps::Untimed, 0, layout, setup_cancel.clone(), &sender) => r,
-            _ = tokio::time::sleep(setup_timeout) => None,
-        };
-        match result {
-            Some(()) => {
-                let _ = sender.event(SetupComplete);
-            },
-            None => {
-                let _ = sender.event(SetupAborted);
-            },
-        }
-    }));
-}
 
 fn refresh_ui(state: &State<Bomb>, ui: &BombUi) {
     let snapshot = state.read().snapshot();
@@ -63,9 +30,8 @@ fn refresh_ui(state: &State<Bomb>, ui: &BombUi) {
 pub(super) async fn on_connected(
     Event(Connected(info)): Event<Connected>,
     state: State<Bomb>,
-    world: World,
     ui: BombUi,
-    sender: Sender,
+    rounds: RoundManager,
 ) -> Result<(), AppError> {
     let _ = ui
         .assign_player(
@@ -76,101 +42,38 @@ pub(super) async fn on_connected(
             },
         )
         .await;
-    let should_start = {
-        let b = state.read();
-        b.phase == BombPhase::Waiting && world.count() >= MIN_PLAYERS
-    };
-    if !should_start {
-        refresh_ui(&state, &ui);
-        return Ok(());
-    }
-    start_setup(&state, &world, &sender, &ui);
+    // RoundManager owns starting/rotation; mirror its phase for the UI.
+    state.write().phase = rounds.phase();
+    refresh_ui(&state, &ui);
     Ok(())
 }
 
 pub(super) async fn on_disconnected(
     _: Event<Disconnected>,
     state: State<Bomb>,
-    world: World,
-    sender: Sender,
     ui: BombUi,
-    clearer: PenaltyClearer,
+    rounds: RoundManager,
 ) -> Result<(), AppError> {
-    if world.count() >= MIN_PLAYERS {
-        refresh_ui(&state, &ui);
-        return Ok(());
-    }
-    let phase = state.read().phase;
-    match phase {
-        BombPhase::Waiting => {
-            refresh_ui(&state, &ui);
-        },
-        BombPhase::SettingUp => {
-            state.write().cancel_setup();
-            refresh_ui(&state, &ui);
-        },
-        BombPhase::Racing => {
-            let now = Instant::now();
-            let runs: Vec<ActiveRun> = state.write().active_runs.drain().map(|(_, r)| r).collect();
-            for run in &runs {
-                let _ = sender.packets(mtc(
-                    format!("Run ended - left race after {} cps", run.checkpoints).red(),
-                    Some(run.ucid),
-                ));
-                let _ = ui
-                    .assign_player(
-                        run.ucid,
-                        BombConnectionProps {
-                            uname: run.uname.clone(),
-                            in_run: false,
-                        },
-                    )
-                    .await;
-            }
-            let db = state.read().db.clone();
-            let finalized: Vec<(ActiveRun, i64)> = {
-                let mut b = state.write();
-                let result: Vec<(ActiveRun, i64)> = runs
-                    .iter()
-                    .map(|run| {
-                        let survival_ms = run.survival_ms(now);
-                        b.finalize(run, survival_ms);
-                        (run.clone(), survival_ms)
-                    })
-                    .collect();
-                b.phase = BombPhase::Waiting;
-                result
-            };
-            for (run, survival_ms) in &finalized {
-                persist_bomb_run(&db, run, *survival_ms).await;
-            }
-            clearer.clear();
-            sender.packets(mtc(
-                "Bomb - not enough players, restarting.",
-                Some(ConnectionId::ALL),
-            ))?;
-            refresh_ui(&state, &ui);
-        },
-    }
+    // RoundManager fires RoundEnded(NotEnoughPlayers) when the count drops too
+    // low; the round teardown lives in `on_round_ended`. Here we just track the
+    // phase for the UI.
+    state.write().phase = rounds.phase();
+    refresh_ui(&state, &ui);
     Ok(())
 }
 
-pub(super) async fn on_setup_complete(
-    _: Event<SetupComplete>,
+pub(super) async fn on_round_started(
+    _: Event<RoundStarted>,
     state: State<Bomb>,
     sender: Sender,
     ui: BombUi,
+    rounds: RoundManager,
 ) -> Result<(), AppError> {
     let cfg_secs = {
         let mut b = state.write();
-        if b.phase != BombPhase::SettingUp {
-            return Ok(());
-        }
-        b.phase = BombPhase::Racing;
-        b.clear_setup_cancel();
+        b.phase = rounds.phase();
         b.config.checkpoint_timeout.as_secs_f64()
     };
-
     sender.packets(mtc(
         format!("Bomb - hit checkpoints before the {cfg_secs:.0}s timer expires!"),
         Some(ConnectionId::ALL),
@@ -179,51 +82,23 @@ pub(super) async fn on_setup_complete(
     Ok(())
 }
 
-pub(super) async fn on_setup_aborted(
-    _: Event<SetupAborted>,
+pub(super) async fn on_round_ended(
+    Event(RoundEnded(reason)): Event<RoundEnded>,
     state: State<Bomb>,
-    world: World,
     ui: BombUi,
     sender: Sender,
-) -> Result<(), AppError> {
-    {
-        let mut b = state.write();
-        if b.phase != BombPhase::SettingUp {
-            return Ok(());
-        }
-        b.phase = BombPhase::Waiting;
-        b.clear_setup_cancel();
-    }
-    sender.packets(mtc(
-        "Bomb - setup failed, restarting.",
-        Some(ConnectionId::ALL),
-    ))?;
-    refresh_ui(&state, &ui);
-    if world.count() >= MIN_PLAYERS {
-        start_setup(&state, &world, &sender, &ui);
-    }
-    Ok(())
-}
-
-pub(super) async fn on_race_ended(
-    _: Event<SessionEnded>,
-    state: State<Bomb>,
-    world: World,
-    ui: BombUi,
-    sender: Sender,
+    rounds: RoundManager,
     clearer: PenaltyClearer,
 ) -> Result<(), AppError> {
-    let runs: Vec<ActiveRun> = {
-        let mut b = state.write();
-        if b.phase != BombPhase::Racing {
-            return Ok(());
-        }
-        b.active_runs.drain().map(|(_, r)| r).collect()
-    };
     let now = Instant::now();
+    let runs: Vec<ActiveRun> = state.write().active_runs.drain().map(|(_, r)| r).collect();
+    let ended_msg = match reason {
+        RoundEndReason::SessionEnded => "Run ended - race finished after",
+        RoundEndReason::NotEnoughPlayers => "Run ended - not enough players after",
+    };
     for run in &runs {
         let _ = sender.packets(mtc(
-            format!("Run ended - race finished after {} cps", run.checkpoints).yellow(),
+            format!("{ended_msg} {} cps", run.checkpoints).yellow(),
             Some(run.ucid),
         ));
         let _ = ui
@@ -247,17 +122,20 @@ pub(super) async fn on_race_ended(
                 (run.clone(), survival_ms)
             })
             .collect();
-        b.phase = BombPhase::Waiting;
+        b.phase = rounds.phase();
         result
     };
     for (run, survival_ms) in &finalized {
         persist_bomb_run(&db, run, *survival_ms).await;
     }
     clearer.clear();
-    refresh_ui(&state, &ui);
-    if world.count() >= MIN_PLAYERS {
-        start_setup(&state, &world, &sender, &ui);
+    if matches!(reason, RoundEndReason::NotEnoughPlayers) {
+        let _ = sender.packets(mtc(
+            "Bomb - not enough players, restarting.",
+            Some(ConnectionId::ALL),
+        ));
     }
+    refresh_ui(&state, &ui);
     Ok(())
 }
 

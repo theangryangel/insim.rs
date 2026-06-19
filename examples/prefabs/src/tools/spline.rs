@@ -11,7 +11,7 @@ pub struct LutEntry {
 }
 
 /// Centripetal Catmull-Rom interpolation over 4 consecutive points.
-/// `t_norm` is in [0, 1] and maps to the segment between pts[1] and pts[2].
+/// `t_norm` is in `[0, 1]` and maps to the segment between `pts[1]` and `pts[2]`.
 pub fn catmull_rom(pts: &[DVec3], t_norm: f64) -> DVec3 {
     let alpha = 0.5;
     let dt0 = pts[0].distance(pts[1]).powf(alpha);

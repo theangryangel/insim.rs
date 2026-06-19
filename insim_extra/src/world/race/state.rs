@@ -45,6 +45,11 @@ pub(crate) struct RaceState {
     pub(crate) live: HashMap<PlayerId, EntrantId>,
     pending_grid: HashMap<PlayerId, u8>,
     pub(crate) fastest_lap: Option<(EntrantId, PlayerId, Duration)>,
+    /// Set by a session-starting `Rst`; the actual clear of the prior session's
+    /// data is deferred until the next packet so that the just-ended session's
+    /// results stay readable while consumers handle `SessionEnded`. See the
+    /// dispatch loop in [`crate::world`].
+    pub(crate) pending_reset: bool,
 }
 
 impl RaceState {

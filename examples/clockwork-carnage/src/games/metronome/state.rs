@@ -2,17 +2,8 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use insim::identifiers::{ConnectionId, PlayerId};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-use tokio_util::sync::CancellationToken;
 
 use super::config::MetronomeConfig;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub(super) enum MetronomePhase {
-    #[default]
-    Waiting,
-    SettingUp,
-    Racing,
-}
 
 #[derive(Clone, Default, Debug)]
 pub(super) struct MetronomeGlobal {
@@ -22,9 +13,6 @@ pub(super) struct MetronomeGlobal {
 
 pub(super) struct MetronomeInner {
     pub(super) config: MetronomeConfig,
-    pub(super) phase: MetronomePhase,
-    setup_cancel: Option<CancellationToken>,
-    pub(super) runtime_cancel: CancellationToken,
     /// plid -> (ucid, uname, checkpoint1_time)
     pub(super) active_runs: HashMap<PlayerId, (ConnectionId, String, Duration)>,
     /// (uname, pname, best_delta_ms) sorted by delta asc
@@ -38,17 +26,10 @@ pub(super) struct Metronome {
 }
 
 impl Metronome {
-    pub(super) fn new(
-        config: MetronomeConfig,
-        runtime_cancel: CancellationToken,
-        db: Option<(crate::db::Pool, i64)>,
-    ) -> Self {
+    pub(super) fn new(config: MetronomeConfig, db: Option<(crate::db::Pool, i64)>) -> Self {
         Self {
             inner: Arc::new(RwLock::new(MetronomeInner {
                 config,
-                phase: MetronomePhase::default(),
-                setup_cancel: None,
-                runtime_cancel,
                 active_runs: HashMap::new(),
                 leaderboard: Vec::new(),
                 db,
@@ -66,22 +47,6 @@ impl Metronome {
 }
 
 impl MetronomeInner {
-    pub(super) fn make_setup_cancel(&mut self) -> CancellationToken {
-        let token = self.runtime_cancel.child_token();
-        self.setup_cancel = Some(token.clone());
-        token
-    }
-
-    pub(super) fn cancel_setup(&mut self) {
-        if let Some(c) = self.setup_cancel.take() {
-            c.cancel();
-        }
-    }
-
-    pub(super) fn clear_setup_cancel(&mut self) {
-        self.setup_cancel = None;
-    }
-
     pub(super) fn update_leaderboard(&mut self, uname: &str, pname: &str, delta_ms: i64) {
         if let Some(entry) = self.leaderboard.iter_mut().find(|e| e.0 == uname) {
             if delta_ms < entry.2 {

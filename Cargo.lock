@@ -540,7 +540,6 @@ dependencies = [
  "sqlx",
  "thiserror 2.0.18",
  "tokio",
- "tokio-util",
  "tower-sessions",
  "tower-sessions-sqlx-store",
  "tracing",

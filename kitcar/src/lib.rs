@@ -78,6 +78,7 @@ mod error;
 mod game;
 mod penalty_clearer;
 mod presence;
+mod round;
 #[allow(missing_docs)]
 pub mod ui;
 mod world;
@@ -106,5 +107,8 @@ pub use penalty_clearer::PenaltyClearer;
 pub use presence::{
     Connected, ConnectionDetails, ConnectionInfo, Disconnected, PlayerInfo, PlayerJoined,
     PlayerLeft, PlayerTeleportedToPits, Renamed, TakingOver, VehicleSelected,
+};
+pub use round::{
+    RoundEndReason, RoundEnded, RoundManager, RoundPhase, RoundPolicy, RoundSpec, RoundStarted,
 };
 pub use world::{World, WorldEvent};

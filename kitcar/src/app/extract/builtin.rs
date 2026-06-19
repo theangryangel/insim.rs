@@ -17,10 +17,10 @@ use crate::app::event::Dispatch;
 /// whose concrete type is registered (via `app.handle(stage, value)`) is
 /// extractable as `Svc<T>` provided it is `Clone + Send + Sync + 'static`.
 ///
-/// Framework-provided stateful handlers ([`crate::Presence`],
-/// [`crate::Game`], [`crate::ui::Ui`]) implement `FromContext` directly so
-/// they can be extracted by their own name; user types either do the same
-/// or use this wrapper.
+/// Framework-provided stateful handlers ([`crate::World`],
+/// [`crate::ui::Ui`]) implement `FromContext` directly so they can be
+/// extracted by their own name; user types either do the same or use this
+/// wrapper.
 #[derive(Debug, Clone)]
 pub struct Svc<T>(pub T);
 

@@ -19,8 +19,6 @@ use insim::{
 
 use crate::world::{FinishStatus, RaceEvent, World, WorldEvent};
 
-// ── packet builders ───────────────────────────────────────────────────────
-
 fn ncn(ucid: u8, uname: &str, pname: &str) -> insim::Packet {
     Ncn {
         ucid: ConnectionId(ucid),
@@ -196,8 +194,6 @@ fn rst_untimed() -> insim::Packet {
     .into()
 }
 
-// ── helpers ───────────────────────────────────────────────────────────────
-
 /// Apply a packet and return only the race events it produced.
 fn race_events(world: &World, packet: insim::Packet) -> Vec<RaceEvent> {
     world
@@ -214,8 +210,6 @@ fn race_events(world: &World, packet: insim::Packet) -> Vec<RaceEvent> {
 fn apply(world: &World, packet: insim::Packet) {
     let _ = world.apply_packet(&packet);
 }
-
-// ── session gating ──────────────────────────────────────────────────────────
 
 #[test]
 fn no_session_means_no_race_tracking() {
@@ -266,8 +260,6 @@ fn qualifying_tracks_laps_but_fin_does_not_finish() {
     let e = world.entrant_by_plid(PlayerId(1)).unwrap();
     assert!(matches!(e.status, FinishStatus::Racing));
 }
-
-// ── join / lap / split / personal-best / fastest ────────────────────────────
 
 #[test]
 fn join_split_lap_emits_ordered_events_and_records_splits() {
@@ -358,8 +350,6 @@ fn fastest_lap_tracks_across_entrants() {
     );
 }
 
-// ── DNF ──────────────────────────────────────────────────────────────────────
-
 #[test]
 fn leaving_during_a_race_is_a_dnf() {
     let world = World::new();
@@ -393,8 +383,6 @@ fn leaving_during_qualifying_is_not_a_dnf() {
     assert!(race_events(&world, pll(1)).is_empty());
 }
 
-// ── idempotency / grid ───────────────────────────────────────────────────────
-
 #[test]
 fn duplicate_npl_does_not_panic_or_duplicate_entrant() {
     // LFS re-announces existing players in reply to TINY_NPL. The repeated Npl
@@ -423,13 +411,15 @@ fn npl_after_restart_recreates_entrant() {
     apply(&world, rst_race(5));
     apply(&world, npl(1, 1, "Alice"));
     apply(&world, lap(1, 1, 90_000));
-    apply(&world, rst_race(5)); // new session: race state cleared
-    assert!(world.entrants().is_empty());
+    apply(&world, rst_race(5)); // new session: prior race state pending clear
+    // The re-announced Npl clears the deferred prior session, then recreates the
+    // entrant fresh for the new session.
     assert!(matches!(
         race_events(&world, npl(1, 1, "Alice")).as_slice(),
         [RaceEvent::EntrantJoined { .. }]
     ));
     assert_eq!(world.entrants().len(), 1);
+    assert_eq!(world.entrant_by_plid(PlayerId(1)).unwrap().laps_done, 0);
 }
 
 #[test]
@@ -449,8 +439,6 @@ fn pending_grid_is_applied_on_join() {
         Some(1)
     );
 }
-
-// ── takeover ─────────────────────────────────────────────────────────────────
 
 #[test]
 fn takeover_appends_driver_record_with_from_lap() {
@@ -474,8 +462,6 @@ fn takeover_appends_driver_record_with_from_lap() {
     assert_eq!(last.from_lap, 1);
     assert_eq!(last.uname.as_deref(), Some("bob"));
 }
-
-// ── rejoin ───────────────────────────────────────────────────────────────────
 
 #[test]
 fn rejoin_resumes_same_entrant_with_lap_offset() {
@@ -524,8 +510,6 @@ fn rejoin_with_no_match_creates_fresh_entrant() {
         "no prior entrant to match -> fresh join: {events:?}"
     );
 }
-
-// ── pit stops ────────────────────────────────────────────────────────────────
 
 #[test]
 fn pit_then_psf_pairs_into_a_pit_record() {
@@ -615,19 +599,56 @@ fn telepit_discards_in_progress_lap() {
     );
 }
 
-// ── session reset ────────────────────────────────────────────────────────────
-
 #[test]
-fn rst_clears_prior_session_state() {
+fn restart_ends_prior_session_and_defers_clear() {
     let world = World::new();
     apply(&world, rst_race(5));
     apply(&world, npl(1, 1, "Alice"));
     apply(&world, lap(1, 1, 90_000));
     assert!(!world.entrants().is_empty());
     assert!(world.fastest_lap().is_some());
-    // A new session resets everything.
-    apply(&world, rst_race(5));
-    assert!(world.entrants().is_empty());
+
+    // A restart (Rst while a session is active) ends the prior session without
+    // passing through the lobby, so it must emit SessionEnded then
+    // SessionStarted - mirroring the /end (Sta -> No) path.
+    let events = world.apply_packet(&rst_race(5));
+    let kinds: Vec<&str> = events
+        .iter()
+        .map(|e| match e {
+            WorldEvent::SessionEnded(_) => "ended",
+            WorldEvent::SessionStarted(_) => "started",
+            _ => "other",
+        })
+        .collect();
+    assert_eq!(kinds, ["ended", "started"]);
+    // The clear is deferred: the prior session's results stay readable while a
+    // consumer handles SessionEnded.
+    assert!(!world.entrants().is_empty());
+    assert!(world.fastest_lap().is_some());
+
+    // The next packet performs the deferred clear before it is applied, so the
+    // new session starts fresh.
+    apply(&world, npl(2, 2, "Bob"));
     assert!(world.fastest_lap().is_none());
     assert!(world.entrant_by_plid(PlayerId(1)).is_none());
+    assert_eq!(world.entrants().len(), 1);
+    assert!(world.entrant_by_plid(PlayerId(2)).is_some());
+}
+
+#[test]
+fn first_session_start_does_not_emit_session_ended() {
+    // Starting from the lobby (no active session), the opening Rst must emit
+    // only SessionStarted - not a spurious SessionEnded.
+    let world = World::new();
+    let events = world.apply_packet(&rst_race(5));
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, WorldEvent::SessionStarted(_)))
+    );
+    assert!(
+        !events
+            .iter()
+            .any(|e| matches!(e, WorldEvent::SessionEnded(_)))
+    );
 }

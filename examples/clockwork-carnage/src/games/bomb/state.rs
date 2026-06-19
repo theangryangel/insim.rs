@@ -9,8 +9,8 @@ use insim::{
     identifiers::{ConnectionId, PlayerId},
     insim::PlayerType,
 };
+use kitcar::RoundPhase;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-use tokio_util::sync::CancellationToken;
 
 use super::config::{BombConfig, COLLISION_THRESHOLD_MPS};
 
@@ -105,37 +105,16 @@ pub(super) enum CheckpointOutcome {
     },
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub(super) enum BombPhase {
-    #[default]
-    Waiting,
-    SettingUp,
-    Racing,
-}
-
-impl std::fmt::Display for BombPhase {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            BombPhase::Waiting => "waiting for players",
-            BombPhase::SettingUp => "setting up track",
-            BombPhase::Racing => "racing",
-        };
-        f.write_str(s)
-    }
-}
-
 #[derive(Clone, Default, Debug)]
 pub(super) struct BombGlobal {
-    pub(super) phase: BombPhase,
+    pub(super) phase: RoundPhase,
     pub(super) leaderboard: Vec<(String, String, i64, i64)>,
     pub(super) active_runs: Vec<(String, String, i64, Instant, Duration)>,
 }
 
 pub(super) struct BombInner {
     pub(super) config: BombConfig,
-    pub(super) phase: BombPhase,
-    setup_cancel: Option<CancellationToken>,
-    pub(super) runtime_cancel: CancellationToken,
+    pub(super) phase: RoundPhase,
     pub(super) active_runs: HashMap<PlayerId, ActiveRun>,
     pub(super) leaderboard: Vec<(String, String, i64, i64)>,
     pub(super) db: Option<(crate::db::Pool, i64)>,
@@ -152,9 +131,7 @@ impl Bomb {
         Self {
             inner: Arc::new(RwLock::new(BombInner {
                 config,
-                phase: BombPhase::default(),
-                setup_cancel: None,
-                runtime_cancel: CancellationToken::new(),
+                phase: RoundPhase::default(),
                 active_runs: HashMap::new(),
                 leaderboard: Vec::new(),
                 db,
@@ -183,22 +160,6 @@ impl BombInner {
 
     pub(super) fn clear_circles(&mut self) {
         self.circle_sequence.clear();
-    }
-
-    pub(super) fn make_setup_cancel(&mut self) -> CancellationToken {
-        let token = self.runtime_cancel.child_token();
-        self.setup_cancel = Some(token.clone());
-        token
-    }
-
-    pub(super) fn cancel_setup(&mut self) {
-        if let Some(c) = self.setup_cancel.take() {
-            c.cancel();
-        }
-    }
-
-    pub(super) fn clear_setup_cancel(&mut self) {
-        self.setup_cancel = None;
     }
 
     pub(super) fn on_checkpoint(
@@ -341,7 +302,7 @@ impl BombInner {
             .collect();
         active.sort_by_key(|r| Reverse(r.2));
         BombGlobal {
-            phase: self.phase.clone(),
+            phase: self.phase,
             leaderboard: self.leaderboard.clone(),
             active_runs: active,
         }

@@ -5,56 +5,17 @@ use insim::{
         insim::{InsimCheckpoint, InsimCheckpointKind},
     },
     identifiers::ConnectionId,
-    insim::{PlayerType, RaceLaps, Toc, Uco},
+    insim::{PlayerType, Toc, Uco},
 };
 use kitcar::{
-    AppError, Connected, Disconnected, Event, Packet, Sender, SessionEnded, State, World, mtc,
-    track_rotation,
+    AppError, Connected, Disconnected, Event, Packet, RoundEndReason, RoundEnded, RoundManager,
+    RoundStarted, Sender, State, World, mtc,
 };
 
 use super::{
-    config::MIN_PLAYERS,
-    events::{SetupAborted, SetupComplete},
-    state::{Shortcut, ShortcutPhase},
+    state::Shortcut,
     ui::{ShortcutConnectionProps, ShortcutUi},
 };
-
-fn start_setup(state: &State<Shortcut>, world: &World, sender: &Sender, ui: &ShortcutUi) {
-    let (track, layout, setup_timeout, setup_cancel) = {
-        let mut s = state.write();
-        s.phase = ShortcutPhase::SettingUp;
-        let token = s.make_setup_cancel();
-        (
-            s.config.track,
-            s.config.layout.clone(),
-            s.config.setup_timeout,
-            token,
-        )
-    };
-
-    let _ = sender.packets(mtc(
-        "Shortcut - setting up track, hit /ready when prompted.",
-        Some(ConnectionId::ALL),
-    ));
-    refresh_ui(state, ui);
-
-    let world = world.clone();
-    let sender = sender.clone();
-    drop(tokio::spawn(async move {
-        let result = tokio::select! {
-            r = track_rotation(&world, track, RaceLaps::Untimed, 0, layout, setup_cancel.clone(), &sender) => r,
-            _ = tokio::time::sleep(setup_timeout) => None,
-        };
-        match result {
-            Some(()) => {
-                let _ = sender.event(SetupComplete);
-            },
-            None => {
-                let _ = sender.event(SetupAborted);
-            },
-        }
-    }));
-}
 
 fn refresh_ui(state: &State<Shortcut>, ui: &ShortcutUi) {
     let snapshot = state.read().snapshot();
@@ -64,9 +25,8 @@ fn refresh_ui(state: &State<Shortcut>, ui: &ShortcutUi) {
 pub(super) async fn on_connected(
     Event(Connected(info)): Event<Connected>,
     state: State<Shortcut>,
-    world: World,
     ui: ShortcutUi,
-    sender: Sender,
+    rounds: RoundManager,
 ) -> Result<(), AppError> {
     let _ = ui
         .assign_player(
@@ -78,68 +38,30 @@ pub(super) async fn on_connected(
             },
         )
         .await;
-    let should_start = {
-        let s = state.read();
-        s.phase == ShortcutPhase::Waiting && world.count() >= MIN_PLAYERS
-    };
-    if !should_start {
-        refresh_ui(&state, &ui);
-        return Ok(());
-    }
-    start_setup(&state, &world, &sender, &ui);
+    state.write().phase = rounds.phase();
+    refresh_ui(&state, &ui);
     Ok(())
 }
 
 pub(super) async fn on_disconnected(
     _: Event<Disconnected>,
     state: State<Shortcut>,
-    world: World,
-    sender: Sender,
     ui: ShortcutUi,
+    rounds: RoundManager,
 ) -> Result<(), AppError> {
-    if world.count() >= MIN_PLAYERS {
-        refresh_ui(&state, &ui);
-        return Ok(());
-    }
-    let phase = state.read().phase;
-    match phase {
-        ShortcutPhase::Waiting => {
-            refresh_ui(&state, &ui);
-        },
-        ShortcutPhase::SettingUp => {
-            state.write().cancel_setup();
-            refresh_ui(&state, &ui);
-        },
-        ShortcutPhase::Racing => {
-            {
-                let mut s = state.write();
-                s.active_runs.clear();
-                s.phase = ShortcutPhase::Waiting;
-            }
-            sender.packets(mtc(
-                "Shortcut - not enough players, restarting.",
-                Some(ConnectionId::ALL),
-            ))?;
-            refresh_ui(&state, &ui);
-        },
-    }
+    state.write().phase = rounds.phase();
+    refresh_ui(&state, &ui);
     Ok(())
 }
 
-pub(super) async fn on_setup_complete(
-    _: Event<SetupComplete>,
+pub(super) async fn on_round_started(
+    _: Event<RoundStarted>,
     state: State<Shortcut>,
     sender: Sender,
     ui: ShortcutUi,
+    rounds: RoundManager,
 ) -> Result<(), AppError> {
-    {
-        let mut s = state.write();
-        if s.phase != ShortcutPhase::SettingUp {
-            return Ok(());
-        }
-        s.phase = ShortcutPhase::Racing;
-        s.clear_setup_cancel();
-    }
+    state.write().phase = rounds.phase();
     sender.packets(mtc(
         "Shortcut - cross checkpoint 1 to start your timed attempt!",
         Some(ConnectionId::ALL),
@@ -148,51 +70,25 @@ pub(super) async fn on_setup_complete(
     Ok(())
 }
 
-pub(super) async fn on_setup_aborted(
-    _: Event<SetupAborted>,
+pub(super) async fn on_round_ended(
+    Event(RoundEnded(reason)): Event<RoundEnded>,
     state: State<Shortcut>,
-    world: World,
     ui: ShortcutUi,
     sender: Sender,
+    rounds: RoundManager,
 ) -> Result<(), AppError> {
     {
         let mut s = state.write();
-        if s.phase != ShortcutPhase::SettingUp {
-            return Ok(());
-        }
-        s.phase = ShortcutPhase::Waiting;
-        s.clear_setup_cancel();
-    }
-    sender.packets(mtc(
-        "Shortcut - setup failed, restarting.",
-        Some(ConnectionId::ALL),
-    ))?;
-    refresh_ui(&state, &ui);
-    if world.count() >= MIN_PLAYERS {
-        start_setup(&state, &world, &sender, &ui);
-    }
-    Ok(())
-}
-
-pub(super) async fn on_race_ended(
-    _: Event<SessionEnded>,
-    state: State<Shortcut>,
-    world: World,
-    ui: ShortcutUi,
-    sender: Sender,
-) -> Result<(), AppError> {
-    {
-        let mut s = state.write();
-        if s.phase != ShortcutPhase::Racing {
-            return Ok(());
-        }
         s.active_runs.clear();
-        s.phase = ShortcutPhase::Waiting;
+        s.phase = rounds.phase();
+    }
+    if matches!(reason, RoundEndReason::NotEnoughPlayers) {
+        let _ = sender.packets(mtc(
+            "Shortcut - not enough players, restarting.",
+            Some(ConnectionId::ALL),
+        ));
     }
     refresh_ui(&state, &ui);
-    if world.count() >= MIN_PLAYERS {
-        start_setup(&state, &world, &sender, &ui);
-    }
     Ok(())
 }
 
@@ -256,7 +152,7 @@ pub(super) async fn on_uco(
             let time_ms = lap_time.as_millis() as i64;
             let vehicle = player.vehicle.to_string();
 
-            if let Some(pkt) = world.spec(player.ucid) {
+            if let Some(pkt) = world.get(player.ucid).map(|c| c.spec()) {
                 let _ = sender.packet(pkt);
             }
 

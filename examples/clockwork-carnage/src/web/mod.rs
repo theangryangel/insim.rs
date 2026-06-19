@@ -162,7 +162,7 @@ pub struct WebArgs {
     #[arg(long, default_value = "0.0.0.0:3000")]
     pub listen: String,
 
-    /// Base URL for OAuth redirect (e.g. https://example.com).
+    /// Base URL for OAuth redirect (e.g. <https://example.com>).
     #[arg(long, default_value = "http://localhost:3000")]
     pub base_url: String,
 
