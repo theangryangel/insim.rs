@@ -12,9 +12,10 @@
 //! while let Some(packet) = conn.next().await {
 //!     for event in world.apply_packet(&packet) {
 //!         match event {
-//!             WorldEvent::Connected(info) => { /* ... */ }
-//!             WorldEvent::SessionStarted { kind } => { /* ... */ }
+//!             WorldEvent::Connected(Connected(info)) => { /* ... */ }
+//!             WorldEvent::SessionStarted(SessionStarted { kind }) => { /* ... */ }
 //!             WorldEvent::Race(re) => { /* ... */ }
+//!             _ => {}
 //!         }
 //!     }
 //! }
@@ -33,113 +34,28 @@ use insim::{
 use parking_lot::RwLock;
 use tokio_util::sync::CancellationToken;
 
-use crate::{
-    game::{
-        GameInfo, GridMode, MultiplayerState, SessionKind, TimeDemoPreset, TimeSet, VersionInfo,
-    },
-    presence::{ConnectionInfo, MultiIndexPlayerInfoMap, PlayerInfo},
-    race::{EntrantId, EntrantState, RaceEvent},
-    util::host_command,
-};
+use crate::util::host_command;
 
+mod connection;
+mod event;
+mod game;
 mod race;
-use race::RaceState;
 
-/// Aggregate event produced by [`World::apply_packet`].
-#[derive(Debug, Clone)]
-pub enum WorldEvent {
-    // From former PresenceEvent:
-    /// A new connection joined.
-    Connected(ConnectionInfo),
-    /// A connection left.
-    Disconnected {
-        /// The connection that left.
-        ucid: ConnectionId,
-        /// Last known info (cloned before removal).
-        info: Option<ConnectionInfo>,
-    },
-    /// Extra connection details arrived via `Nci`.
-    ConnectionDetails(ConnectionInfo),
-    /// A connection selected a vehicle in the garage.
-    VehicleSelected {
-        /// The connection.
-        ucid: ConnectionId,
-        /// The selected vehicle.
-        vehicle: Vehicle,
-    },
-    /// A connection changed their display name.
-    Renamed {
-        /// Connection ID.
-        ucid: ConnectionId,
-        /// Stable LFS.net username.
-        uname: String,
-        /// New display name.
-        new_pname: String,
-    },
-    /// A player joined the track.
-    PlayerJoined(PlayerInfo),
-    /// A player left the track.
-    PlayerLeft(PlayerInfo),
-    /// A driver swap occurred.
-    TakingOver {
-        /// Player state before the swap.
-        before: PlayerInfo,
-        /// Player state after the swap.
-        after: PlayerInfo,
-    },
-    /// A player tele-pitted (Shift+P).
-    PlayerTeleportedToPits(PlayerInfo),
-    // From former GameEvent:
-    /// An `Rst` packet started a new race, qualifying, practice or untimed session.
-    SessionStarted {
-        /// The kind of session that started.
-        kind: SessionKind,
-    },
-    /// LFS returned to the entry/lobby screen.
-    SessionEnded,
-    /// Track changed (also fired for the first `Sta` when `from` is `None`).
-    TrackChanged {
-        /// Previously known track.
-        from: Option<Track>,
-        /// New track.
-        to: Track,
-    },
-    /// Layout changed or cleared.
-    LayoutChanged {
-        /// Previously known layout.
-        from: Option<String>,
-        /// New layout, or `None` if cleared.
-        to: Option<String>,
-    },
-    /// LFS joined or started a multiplayer session.
-    MultiplayerJoined {
-        /// Multiplayer host name.
-        host_name: String,
-        /// `true` if this instance is the host.
-        is_host: bool,
-    },
-    /// LFS left multiplayer (received an `ISM` with an empty host name).
-    MultiplayerLeft,
-    /// The server's allowed-cars set changed (from a `Small`/`Alc`).
-    AllowedCarsChanged {
-        /// The new allowed-cars set.
-        cars: PlcAllowedCarsSet,
-    },
-    /// The server's allowed-mods list changed (from a `Mal`).
-    AllowedModsChanged {
-        /// The new allowed-mods list (empty means unrestricted).
-        mods: Vec<Vehicle>,
-    },
-    /// Version information was received (from a `Ver`).
-    VersionReceived {
-        /// Product name (e.g. `"S3"`).
-        product: String,
-        /// LFS game version.
-        version: insim::core::game_version::GameVersion,
-    },
-    /// A race event (entrant joined, lap completed, finished, etc.).
-    Race(RaceEvent),
-}
+use connection::MultiIndexPlayerInfoMap;
+pub use connection::{ConnectionInfo, PlayerInfo};
+pub use event::{
+    AllowedCarsChanged, AllowedModsChanged, Connected, ConnectionDetails, Disconnected,
+    LayoutChanged, MultiplayerJoined, MultiplayerLeft, PlayerJoined, PlayerLeft,
+    PlayerTeleportedToPits, Renamed, SessionEnded, SessionStarted, TakingOver, TrackChanged,
+    VehicleSelected, VersionReceived, WorldEvent,
+};
+pub use game::{
+    GameInfo, GridMode, Month, MultiplayerState, SessionKind, TimeDemoPreset, TimeSet, VersionInfo,
+};
+use race::RaceState;
+pub use race::{
+    DriverRecord, EntrantId, EntrantState, FinishStatus, LapRecord, PitRecord, RaceEvent,
+};
 
 #[derive(Default)]
 struct WorldInner {
@@ -149,11 +65,7 @@ struct WorldInner {
     /// Survives `Cnl`: maps LFS.net username to last seen display name.
     last_known_names: HashMap<String, String>,
 
-    /// Kind of the current session. `None` means lobby / no session active.
-    /// Top-level because the race module reads it constantly.
-    session_kind: Option<SessionKind>,
-
-    /// Game state snapshot.
+    /// Game state snapshot, including the current `session_kind`.
     game: GameInfo,
 
     /// Race tracking state.
@@ -191,13 +103,10 @@ impl WorldInner {
         Some(conn.clone())
     }
 
-    fn apply_slc(&mut self, slc: &Slc) -> bool {
-        if let Some(conn) = self.connections.get_mut(&slc.ucid) {
-            conn.selected_vehicle = Some(slc.cname);
-            true
-        } else {
-            false
-        }
+    fn apply_slc(&mut self, slc: &Slc) -> Option<Vehicle> {
+        let conn = self.connections.get_mut(&slc.ucid)?;
+        conn.selected_vehicle = Some(slc.cname);
+        Some(slc.cname)
     }
 
     fn apply_cpr(&mut self, cpr: &Cpr) -> Option<(ConnectionId, String, String)> {
@@ -261,9 +170,9 @@ impl WorldInner {
     }
 
     fn apply_sta(&mut self, sta: &Sta) -> (bool, bool, Option<Track>, Track) {
-        let was_in_session = self.session_kind.is_some();
+        let was_in_session = self.game.session_kind.is_some();
         let prev_track = self.game.track;
-        self.session_kind = match sta.raceinprog {
+        self.game.session_kind = match sta.raceinprog {
             RaceInProgress::No => None,
             RaceInProgress::Racing => Some(SessionKind::Race {
                 laps: sta.racelaps,
@@ -273,13 +182,13 @@ impl WorldInner {
                 duration: Duration::from_secs(sta.qualmins as u64 * 60),
                 flags: RaceFlags::empty(),
             }),
-            _ => self.session_kind,
+            _ => self.game.session_kind,
         };
         self.game.track = Some(sta.track);
         self.game.weather = Some(sta.weather);
         self.game.wind = Some(sta.wind);
         self.game.flags = sta.flags;
-        let now_in_session = self.session_kind.is_some();
+        let now_in_session = self.game.session_kind.is_some();
         (was_in_session, now_in_session, prev_track, sta.track)
     }
 
@@ -359,178 +268,200 @@ impl WorldInner {
     }
 }
 
-fn presence_dispatch(
+/// Apply one packet to `inner`, pushing any resulting [`WorldEvent`]s.
+///
+/// A single match over the packet type drives all three state mirrors
+/// (connections/players, game state, race tracking) in one pass. Race-relevant
+/// connection and session packets call into [`RaceState`] inline so race events
+/// are interleaved in causal order with the presence/game events that triggered
+/// them.
+fn dispatch(
     inner: &mut WorldInner,
     packet: &insim::Packet,
     rejoin: bool,
     events: &mut Vec<WorldEvent>,
 ) {
+    use insim::Packet;
+
+    // Push every race event from a timing-packet handler, reading `session_kind`
+    // first to avoid borrowing `inner` twice.
+    macro_rules! race_timing {
+        ($method:ident, $v:expr) => {{
+            let sk = inner.game.session_kind;
+            for re in inner.race.$method($v, sk) {
+                events.push(WorldEvent::Race(re));
+            }
+        }};
+    }
+
     match packet {
-        insim::Packet::Ncn(ncn) => {
+        Packet::Ncn(ncn) => {
             let info = inner.apply_ncn(ncn);
-            events.push(WorldEvent::Connected(info));
+            events.push(WorldEvent::Connected(Connected(info)));
         },
-        insim::Packet::Cnl(cnl) => {
+        Packet::Cnl(cnl) => {
             let (info, players) = inner.apply_cnl(cnl);
-            let sk = inner.session_kind;
+            let sk = inner.game.session_kind;
             for p in players {
-                let WorldInner { race, .. } = inner;
-                for re in race.on_player_left(&p, sk) {
+                for re in inner.race.on_player_left(&p, sk) {
                     events.push(WorldEvent::Race(re));
                 }
-                events.push(WorldEvent::PlayerLeft(p));
+                events.push(WorldEvent::PlayerLeft(PlayerLeft(p)));
             }
-            events.push(WorldEvent::Disconnected {
+            events.push(WorldEvent::Disconnected(Disconnected {
                 ucid: cnl.ucid,
                 info,
-            });
+            }));
         },
-        insim::Packet::Nci(nci) => {
+        Packet::Nci(nci) => {
             if let Some(info) = inner.apply_nci(nci) {
-                events.push(WorldEvent::ConnectionDetails(info));
+                events.push(WorldEvent::ConnectionDetails(ConnectionDetails(info)));
             }
         },
-        insim::Packet::Slc(slc) => {
-            if inner.apply_slc(slc) {
-                events.push(WorldEvent::VehicleSelected {
+        Packet::Slc(slc) => {
+            if let Some(vehicle) = inner.apply_slc(slc) {
+                events.push(WorldEvent::VehicleSelected(VehicleSelected {
                     ucid: slc.ucid,
-                    vehicle: slc.cname,
-                });
+                    vehicle,
+                }));
             }
         },
-        insim::Packet::Cpr(cpr) => {
+        Packet::Cpr(cpr) => {
             if let Some((ucid, uname, new_pname)) = inner.apply_cpr(cpr) {
-                events.push(WorldEvent::Renamed {
+                events.push(WorldEvent::Renamed(Renamed {
                     ucid,
                     uname,
                     new_pname,
-                });
+                }));
             }
         },
-        insim::Packet::Npl(npl) => {
+        Packet::Npl(npl) => {
             if let Some(info) = inner.apply_npl(npl) {
-                let sk = inner.session_kind;
+                let sk = inner.game.session_kind;
                 let WorldInner {
                     race, connections, ..
                 } = inner;
                 for re in race.on_player_joined(&info, connections, sk, rejoin) {
                     events.push(WorldEvent::Race(re));
                 }
-                events.push(WorldEvent::PlayerJoined(info));
+                events.push(WorldEvent::PlayerJoined(PlayerJoined(info)));
             }
         },
-        insim::Packet::Pll(pll) => {
+        Packet::Pll(pll) => {
             if let Some(info) = inner.apply_pll(pll) {
-                let sk = inner.session_kind;
-                let WorldInner { race, .. } = inner;
-                for re in race.on_player_left(&info, sk) {
+                let sk = inner.game.session_kind;
+                for re in inner.race.on_player_left(&info, sk) {
                     events.push(WorldEvent::Race(re));
                 }
-                events.push(WorldEvent::PlayerLeft(info));
+                events.push(WorldEvent::PlayerLeft(PlayerLeft(info)));
             }
         },
-        insim::Packet::Toc(toc) => {
+        Packet::Toc(toc) => {
             if let Some((before, after)) = inner.apply_toc(toc) {
-                let sk = inner.session_kind;
+                let sk = inner.game.session_kind;
                 let WorldInner {
                     race, connections, ..
                 } = inner;
                 for re in race.on_taking_over(&before, &after, connections, sk) {
                     events.push(WorldEvent::Race(re));
                 }
-                events.push(WorldEvent::TakingOver { before, after });
+                events.push(WorldEvent::TakingOver(TakingOver { before, after }));
             }
         },
-        insim::Packet::Pfl(pfl) => {
-            inner.apply_pfl(pfl);
-        },
-        insim::Packet::Pla(pla) => {
-            inner.apply_pla(pla);
-        },
-        insim::Packet::Plp(plp) => {
+        Packet::Pfl(pfl) => inner.apply_pfl(pfl),
+        Packet::Pla(pla) => inner.apply_pla(pla),
+        Packet::Plp(plp) => {
+            // Presence-level and race-level views of the same tele-pit.
             if let Some(p) = inner.players.get_by_plid(&plp.plid).cloned() {
-                events.push(WorldEvent::PlayerTeleportedToPits(p));
+                events.push(WorldEvent::PlayerTeleportedToPits(PlayerTeleportedToPits(
+                    p,
+                )));
+            }
+            race_timing!(apply_telepit, plp);
+        },
+        Packet::Tiny(tiny) => {
+            inner.apply_tiny_clr(tiny);
+            if let Some(prev) = inner.apply_tiny_axc(tiny) {
+                events.push(WorldEvent::LayoutChanged(LayoutChanged {
+                    from: Some(prev),
+                    to: None,
+                }));
             }
         },
-        insim::Packet::Tiny(tiny) => {
-            inner.apply_tiny_clr(tiny);
-        },
-        _ => {},
-    }
-}
-
-fn game_dispatch(inner: &mut WorldInner, packet: &insim::Packet, events: &mut Vec<WorldEvent>) {
-    match packet {
-        insim::Packet::Sta(sta) => {
+        Packet::Sta(sta) => {
             let (was_in_session, now_in_session, prev_track, new_track) = inner.apply_sta(sta);
             if was_in_session && !now_in_session {
-                events.push(WorldEvent::SessionEnded);
+                events.push(WorldEvent::SessionEnded(SessionEnded));
             }
             if prev_track != Some(new_track) {
-                events.push(WorldEvent::TrackChanged {
+                events.push(WorldEvent::TrackChanged(TrackChanged {
                     from: prev_track,
                     to: new_track,
-                });
+                }));
             }
         },
-        insim::Packet::Rst(rst) => {
+        Packet::Rst(rst) => {
             if let Some(kind) = inner.apply_rst(rst) {
-                for re in race::on_session_started(inner, kind) {
-                    events.push(WorldEvent::Race(re));
-                }
-                events.push(WorldEvent::SessionStarted { kind });
+                inner.game.session_kind = Some(kind);
+                inner.race.clear_for_session();
+                events.push(WorldEvent::SessionStarted(SessionStarted { kind }));
             }
         },
-        insim::Packet::Axi(axi) => {
+        Packet::Axi(axi) => {
             let (prev_lname, new_lname) = inner.apply_axi(axi);
             if prev_lname != new_lname {
-                events.push(WorldEvent::LayoutChanged {
+                events.push(WorldEvent::LayoutChanged(LayoutChanged {
                     from: prev_lname,
                     to: new_lname,
-                });
+                }));
             }
         },
-        insim::Packet::Ism(ism) => {
+        Packet::Ism(ism) => {
             let (prev, new) = inner.apply_ism(ism);
             if prev != new {
                 match new {
                     MultiplayerState::Multiplayer { host_name, is_host } => {
-                        events.push(WorldEvent::MultiplayerJoined { host_name, is_host });
+                        events.push(WorldEvent::MultiplayerJoined(MultiplayerJoined {
+                            host_name,
+                            is_host,
+                        }));
                     },
                     MultiplayerState::Local => {
-                        events.push(WorldEvent::MultiplayerLeft);
+                        events.push(WorldEvent::MultiplayerLeft(MultiplayerLeft));
                     },
                 }
             }
         },
-        insim::Packet::Tiny(tiny) => {
-            if let Some(prev) = inner.apply_tiny_axc(tiny) {
-                events.push(WorldEvent::LayoutChanged {
-                    from: Some(prev),
-                    to: None,
-                });
-            }
-        },
-        insim::Packet::Small(small) => {
+        Packet::Small(small) => {
             if let SmallType::Alc(cars) = &small.subt
                 && inner.apply_allowed_cars(cars)
             {
-                events.push(WorldEvent::AllowedCarsChanged { cars: cars.clone() });
+                events.push(WorldEvent::AllowedCarsChanged(AllowedCarsChanged {
+                    cars: cars.clone(),
+                }));
             }
         },
-        insim::Packet::Mal(mal) => {
+        Packet::Mal(mal) => {
             let mods: Vec<Vehicle> = mal.iter().copied().collect();
             if inner.apply_allowed_mods(&mods) {
-                events.push(WorldEvent::AllowedModsChanged { mods });
+                events.push(WorldEvent::AllowedModsChanged(AllowedModsChanged { mods }));
             }
         },
-        insim::Packet::Ver(ver) => {
+        Packet::Ver(ver) => {
             inner.apply_version(ver);
-            events.push(WorldEvent::VersionReceived {
+            events.push(WorldEvent::VersionReceived(VersionReceived {
                 product: ver.product.clone(),
                 version: ver.version.clone(),
-            });
+            }));
         },
+        Packet::Lap(v) => race_timing!(apply_lap, v),
+        Packet::Spx(v) => race_timing!(apply_split, v),
+        Packet::Fin(v) => race_timing!(apply_finish, v),
+        Packet::Res(v) => race_timing!(apply_result, v),
+        Packet::Pit(v) => race_timing!(apply_pit_stop, v),
+        Packet::Psf(v) => race_timing!(apply_pit_stop_finished, v),
+        Packet::Pen(v) => race_timing!(apply_penalty_changed, v),
+        Packet::Reo(v) => race_timing!(apply_grid_order, v),
         _ => {},
     }
 }
@@ -566,7 +497,7 @@ impl std::fmt::Debug for World {
             .field("connections", &g.connections.len())
             .field("players", &g.players.len())
             .field("track", &g.game.track)
-            .field("session_kind", &g.session_kind)
+            .field("session_kind", &g.game.session_kind)
             .field("race_entrants", &g.race.entrants.len())
             .field("rejoin", &self.rejoin)
             .finish()
@@ -612,20 +543,13 @@ impl World {
 
     /// Apply one raw packet, update all internal state, and return any events.
     ///
-    /// Processing order (all inside a single write-lock acquisition):
-    /// 1. Presence - connection and player events, with race events inline.
-    /// 2. Game - session and track events, with race events inline.
-    /// 3. Timing packets (`Lap`, `Spx`, `Fin`, `Res`, `Pit`, `Psf`, `Pen`,
-    ///    `Plp`, `Reo`) are routed directly to the race tracker.
+    /// A single match over the packet type drives the connection/player, game,
+    /// and race mirrors in one pass, inside one write-lock acquisition.
     pub fn apply_packet(&self, packet: &insim::Packet) -> Vec<WorldEvent> {
         let mut events = Vec::new();
         {
             let mut inner = self.inner.write();
-            presence_dispatch(&mut inner, packet, self.rejoin, &mut events);
-            game_dispatch(&mut inner, packet, &mut events);
-            for re in race::apply_packet(&mut inner, packet) {
-                events.push(WorldEvent::Race(re));
-            }
+            dispatch(&mut inner, packet, self.rejoin, &mut events);
         }
         events
     }
@@ -767,7 +691,7 @@ impl World {
 
     /// Current session kind. `None` means lobby / no session active.
     pub fn session(&self) -> Option<SessionKind> {
-        self.inner.read().session_kind
+        self.inner.read().game.session_kind
     }
 
     /// Overall game flags.
@@ -839,7 +763,7 @@ impl World {
                 biased;
                 _ = cancel.cancelled() => return None,
                 _ = interval.tick() => {
-                    if self.inner.read().session_kind.is_none() {
+                    if self.inner.read().game.session_kind.is_none() {
                         return Some(());
                     }
                 }
@@ -866,7 +790,7 @@ impl World {
                 biased;
                 _ = cancel.cancelled() => return None,
                 _ = interval.tick() => {
-                    if matches!(self.inner.read().session_kind, Some(SessionKind::Race { .. })) {
+                    if matches!(self.inner.read().game.session_kind, Some(SessionKind::Race { .. })) {
                         return Some(());
                     }
                 }
@@ -1157,7 +1081,11 @@ impl World {
 
     /// Whether a race session (not qualifying or practice) is currently active.
     pub fn race_active(&self) -> bool {
-        self.inner.read().session_kind.is_some_and(|k| k.is_race())
+        self.inner
+            .read()
+            .game
+            .session_kind
+            .is_some_and(|k| k.is_race())
     }
 
     /// Look up an entrant by their stable [`EntrantId`].

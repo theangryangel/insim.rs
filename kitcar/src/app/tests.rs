@@ -3,6 +3,15 @@
 //! These exercise the runtime *without* a network connection by driving
 //! [`crate::app::dispatch_cycle`] directly with hand-built `Dispatch` values.
 
+// Tests run on `App<()>`, so the `let app_state = app.state;` destructuring
+// (kept uniform with `run()`) binds the unit type; allow it crate-test-wide
+// rather than special-casing every test body.
+#![allow(clippy::let_unit_value)]
+// Test `Handler::call` impls are written long-hand to carry the trait's
+// `impl Future + Send` bound (an `async fn` desugaring would drop `Send`),
+// same as the real impls; silence the false-positive suggestion.
+#![allow(clippy::manual_async_fn)]
+
 // dev-deps used by examples but not by these tests; silence unused-crate lint.
 use std::{
     str::FromStr,

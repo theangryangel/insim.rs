@@ -14,9 +14,8 @@
 
 use clap::Parser;
 use insim::WithRequestId;
-use insim_extra::{
-    race::{EntrantState, FinishStatus, RaceEvent},
-    world::{World, WorldEvent},
+use insim_extra::world::{
+    EntrantState, FinishStatus, RaceEvent, SessionEnded, SessionStarted, World, WorldEvent,
 };
 use tabled::{Table, Tabled, settings::Style};
 
@@ -64,7 +63,7 @@ async fn main() -> insim::Result<()> {
 
         for event in world.apply_packet(&packet) {
             match event {
-                WorldEvent::SessionStarted { kind } => {
+                WorldEvent::SessionStarted(SessionStarted { kind }) => {
                     tracing::info!(?kind, "session started");
                     // The tracker just cleared - re-request its packets so it
                     // repopulates for the new session.
@@ -72,7 +71,7 @@ async fn main() -> insim::Result<()> {
                         conn.write(t.clone().with_request_id(1)).await?;
                     }
                 },
-                WorldEvent::SessionEnded => {
+                WorldEvent::SessionEnded(SessionEnded) => {
                     tracing::info!("session ended");
                     print_results(&world, "Final Race Results");
                 },

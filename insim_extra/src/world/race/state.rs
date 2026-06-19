@@ -1,22 +1,20 @@
-//! Race-tracking logic as methods on [`RaceState`], with bridge free functions
-//! operating on [`super::WorldInner`].
+//! Race-tracking logic as methods on [`RaceState`].
 //!
 //! This module is private to [`crate::world`]. The public API surface is the
-//! query methods on [`super::World`].
+//! query methods on [`crate::world::World`]; the [`RaceState`] methods here are
+//! driven by the unified packet dispatch in [`crate::world`].
 
 use std::{collections::HashMap, time::Duration};
 
 use insim::{
-    Packet,
     identifiers::{ConnectionId, PlayerId},
     insim::{Fin, Lap, Pen, PenaltyInfo, Pit, Plp, Psf, Reo, Res, Spx},
 };
 
-use super::WorldInner;
-use crate::{
+use super::{DriverRecord, EntrantId, EntrantState, FinishStatus, LapRecord, PitRecord, RaceEvent};
+use crate::world::{
+    connection::{ConnectionInfo, PlayerInfo},
     game::SessionKind,
-    presence::{ConnectionInfo, PlayerInfo},
-    race::{DriverRecord, EntrantId, EntrantState, FinishStatus, LapRecord, PitRecord, RaceEvent},
 };
 
 /// LFS uses 1:00:00.000 as a placeholder for an invalid/missing split time.
@@ -37,12 +35,12 @@ fn pname_for(
 }
 
 #[derive(Default)]
-pub(super) struct RaceState {
+pub(crate) struct RaceState {
     next_id: u64,
-    pub(super) entrants: HashMap<EntrantId, EntrantState>,
-    pub(super) live: HashMap<PlayerId, EntrantId>,
+    pub(crate) entrants: HashMap<EntrantId, EntrantState>,
+    pub(crate) live: HashMap<PlayerId, EntrantId>,
     pending_grid: HashMap<PlayerId, u8>,
-    pub(super) fastest_lap: Option<(EntrantId, PlayerId, Duration)>,
+    pub(crate) fastest_lap: Option<(EntrantId, PlayerId, Duration)>,
 }
 
 impl RaceState {
@@ -73,7 +71,7 @@ impl RaceState {
             .map(|(id, _)| *id)
     }
 
-    pub(super) fn on_player_joined(
+    pub(crate) fn on_player_joined(
         &mut self,
         info: &PlayerInfo,
         connections: &HashMap<ConnectionId, ConnectionInfo>,
@@ -142,7 +140,7 @@ impl RaceState {
         }]
     }
 
-    pub(super) fn on_player_left(
+    pub(crate) fn on_player_left(
         &mut self,
         info: &PlayerInfo,
         session_kind: Option<SessionKind>,
@@ -163,7 +161,7 @@ impl RaceState {
         vec![]
     }
 
-    pub(super) fn on_taking_over(
+    pub(crate) fn on_taking_over(
         &mut self,
         before: &PlayerInfo,
         after: &PlayerInfo,
@@ -270,7 +268,11 @@ impl RaceState {
         }]
     }
 
-    fn apply_grid_order(&mut self, reo: &Reo, session_kind: Option<SessionKind>) -> Vec<RaceEvent> {
+    pub(crate) fn apply_grid_order(
+        &mut self,
+        reo: &Reo,
+        session_kind: Option<SessionKind>,
+    ) -> Vec<RaceEvent> {
         if !session_kind.is_some_and(|k| k.is_tracking()) {
             return vec![];
         }
@@ -291,7 +293,11 @@ impl RaceState {
         vec![]
     }
 
-    fn apply_telepit(&mut self, plp: &Plp, session_kind: Option<SessionKind>) -> Vec<RaceEvent> {
+    pub(crate) fn apply_telepit(
+        &mut self,
+        plp: &Plp,
+        session_kind: Option<SessionKind>,
+    ) -> Vec<RaceEvent> {
         if !session_kind.is_some_and(|k| k.is_tracking()) {
             return vec![];
         }
@@ -306,7 +312,11 @@ impl RaceState {
         vec![RaceEvent::TeleportedToPits { id, plid: plp.plid }]
     }
 
-    fn apply_lap(&mut self, lap: &Lap, session_kind: Option<SessionKind>) -> Vec<RaceEvent> {
+    pub(crate) fn apply_lap(
+        &mut self,
+        lap: &Lap,
+        session_kind: Option<SessionKind>,
+    ) -> Vec<RaceEvent> {
         if !session_kind.is_some_and(|k| k.is_tracking()) {
             return vec![];
         }
@@ -362,7 +372,11 @@ impl RaceState {
         events
     }
 
-    fn apply_split(&mut self, spx: &Spx, session_kind: Option<SessionKind>) -> Vec<RaceEvent> {
+    pub(crate) fn apply_split(
+        &mut self,
+        spx: &Spx,
+        session_kind: Option<SessionKind>,
+    ) -> Vec<RaceEvent> {
         if spx.stime >= INVALID_SPLIT {
             return vec![];
         }
@@ -387,7 +401,11 @@ impl RaceState {
         }]
     }
 
-    fn apply_finish(&mut self, fin: &Fin, session_kind: Option<SessionKind>) -> Vec<RaceEvent> {
+    pub(crate) fn apply_finish(
+        &mut self,
+        fin: &Fin,
+        session_kind: Option<SessionKind>,
+    ) -> Vec<RaceEvent> {
         if !session_kind.is_some_and(|k| k.is_race()) {
             return vec![];
         }
@@ -413,7 +431,11 @@ impl RaceState {
         }]
     }
 
-    fn apply_result(&mut self, res: &Res, session_kind: Option<SessionKind>) -> Vec<RaceEvent> {
+    pub(crate) fn apply_result(
+        &mut self,
+        res: &Res,
+        session_kind: Option<SessionKind>,
+    ) -> Vec<RaceEvent> {
         if !session_kind.is_some_and(|k| k.is_tracking()) {
             return vec![];
         }
@@ -438,7 +460,11 @@ impl RaceState {
         }]
     }
 
-    fn apply_pit_stop(&mut self, pit: &Pit, session_kind: Option<SessionKind>) -> Vec<RaceEvent> {
+    pub(crate) fn apply_pit_stop(
+        &mut self,
+        pit: &Pit,
+        session_kind: Option<SessionKind>,
+    ) -> Vec<RaceEvent> {
         if !session_kind.is_some_and(|k| k.is_tracking()) {
             return vec![];
         }
@@ -457,7 +483,7 @@ impl RaceState {
         vec![]
     }
 
-    fn apply_pit_stop_finished(
+    pub(crate) fn apply_pit_stop_finished(
         &mut self,
         psf: &Psf,
         session_kind: Option<SessionKind>,
@@ -483,7 +509,7 @@ impl RaceState {
         }]
     }
 
-    fn apply_penalty_changed(
+    pub(crate) fn apply_penalty_changed(
         &mut self,
         pen: &Pen,
         session_kind: Option<SessionKind>,
@@ -506,31 +532,13 @@ impl RaceState {
             reason: pen.reason.clone(),
         }]
     }
-}
 
-/// Handle a session starting: clear race state and set session_kind.
-pub(super) fn on_session_started(inner: &mut WorldInner, kind: SessionKind) -> Vec<RaceEvent> {
-    inner.race.entrants.clear();
-    inner.race.live.clear();
-    inner.race.pending_grid.clear();
-    inner.race.fastest_lap = None;
-    inner.session_kind = Some(kind);
-    vec![RaceEvent::SessionStarted { kind }]
-}
-
-/// Route a raw [`Packet`] to the appropriate race-tracking method.
-pub(super) fn apply_packet(inner: &mut WorldInner, packet: &Packet) -> Vec<RaceEvent> {
-    let sk = inner.session_kind;
-    match packet {
-        Packet::Lap(v) => inner.race.apply_lap(v, sk),
-        Packet::Spx(v) => inner.race.apply_split(v, sk),
-        Packet::Fin(v) => inner.race.apply_finish(v, sk),
-        Packet::Res(v) => inner.race.apply_result(v, sk),
-        Packet::Pit(v) => inner.race.apply_pit_stop(v, sk),
-        Packet::Psf(v) => inner.race.apply_pit_stop_finished(v, sk),
-        Packet::Pen(v) => inner.race.apply_penalty_changed(v, sk),
-        Packet::Plp(v) => inner.race.apply_telepit(v, sk),
-        Packet::Reo(v) => inner.race.apply_grid_order(v, sk),
-        _ => vec![],
+    /// Clear all per-session race state. Called when a new session starts
+    /// (`Rst`), before the new session's entrants are tracked.
+    pub(crate) fn clear_for_session(&mut self) {
+        self.entrants.clear();
+        self.live.clear();
+        self.pending_grid.clear();
+        self.fastest_lap = None;
     }
 }

@@ -5,17 +5,7 @@ use std::future::Future;
 use insim::{WithRequestId, identifiers::RequestId};
 pub use insim_extra::world::{World, WorldEvent};
 
-use crate::{
-    AppError, Dispatch, ExtractCx, FromContext, Handler, Sender, Startup,
-    game::{
-        AllowedCarsChanged, AllowedModsChanged, LayoutChanged, MultiplayerJoined, MultiplayerLeft,
-        SessionEnded, SessionStarted, TrackChanged, VersionReceived,
-    },
-    presence::{
-        Connected, ConnectionDetails, Disconnected, PlayerJoined, PlayerLeft,
-        PlayerTeleportedToPits, Renamed, TakingOver, VehicleSelected,
-    },
-};
+use crate::{AppError, Dispatch, ExtractCx, FromContext, Handler, Sender, Startup};
 
 /// [`World`] is its own extractor: register via
 /// `app.handle(Stage::Pre, World::new())` and any handler can take it by value.
@@ -30,9 +20,9 @@ impl<S> FromContext<S> for World {
 /// Replaces the three separate `Presence`, `Game`, and `RaceTracker` Pre-stage
 /// handlers with one aggregate. On each packet, [`World::apply_packet`] runs
 /// all three state mirrors in the correct order in a single call (no
-/// inter-cycle lag), then emits the same individual synthetic event types the
-/// existing split setup produced, so Update-stage handlers using
-/// `Event<Connected>`, `Event<RaceEvent>`, etc. are unchanged.
+/// inter-cycle lag), then emits each event's individual payload struct (see
+/// [`emit_world_events`]) so Update-stage handlers using `Event<Connected>`,
+/// `Event<RaceEvent>`, etc. fire as before.
 ///
 /// On [`Startup`] it sends the combined startup requests from
 /// [`World::STARTUP_REQUESTS`]. On [`WorldEvent::SessionStarted`] it sends
@@ -49,7 +39,7 @@ impl<S> FromContext<S> for World {
 ///     world: World,
 /// ) -> Result<(), AppError> {
 ///     if let RaceEvent::EntrantJoined { id, plid } = event {
-///         // world.race(), world.current_track(), world.session() all available
+///         // world.entrant(id), world.current_track(), world.session() available
 ///     }
 ///     Ok(())
 /// }
@@ -68,7 +58,7 @@ impl<S: Send + Sync + 'static> Handler<(), S> for World {
         };
         let session_started = events
             .iter()
-            .any(|e| matches!(e, WorldEvent::SessionStarted { .. }));
+            .any(|e| matches!(e, WorldEvent::SessionStarted(_)));
         let sender = cx.sender.clone();
         async move {
             if startup {
@@ -86,42 +76,32 @@ impl<S: Send + Sync + 'static> Handler<(), S> for World {
     }
 }
 
+/// Fan each [`WorldEvent`] out as its concrete payload type so the `Event<T>`
+/// extractor can dispatch on it. Each arm injects the wrapped payload struct
+/// (not the `WorldEvent`), so handlers taking `Event<Connected>`,
+/// `Event<RaceEvent>`, etc. fire as before.
 fn emit_world_events(events: Vec<WorldEvent>, sender: &Sender) {
     for event in events {
         let _ = match event {
-            WorldEvent::Connected(info) => sender.event(Connected(info)),
-            WorldEvent::Disconnected { ucid, info } => sender.event(Disconnected { ucid, info }),
-            WorldEvent::ConnectionDetails(info) => sender.event(ConnectionDetails(info)),
-            WorldEvent::VehicleSelected { ucid, vehicle } => {
-                sender.event(VehicleSelected { ucid, vehicle })
-            },
-            WorldEvent::Renamed {
-                ucid,
-                uname,
-                new_pname,
-            } => sender.event(Renamed {
-                ucid,
-                uname,
-                new_pname,
-            }),
-            WorldEvent::PlayerJoined(p) => sender.event(PlayerJoined(p)),
-            WorldEvent::PlayerLeft(p) => sender.event(PlayerLeft(p)),
-            WorldEvent::TakingOver { before, after } => sender.event(TakingOver { before, after }),
-            WorldEvent::PlayerTeleportedToPits(p) => sender.event(PlayerTeleportedToPits(p)),
-            WorldEvent::SessionStarted { kind } => sender.event(SessionStarted { kind }),
-            WorldEvent::SessionEnded => sender.event(SessionEnded),
-            WorldEvent::TrackChanged { from, to } => sender.event(TrackChanged { from, to }),
-            WorldEvent::LayoutChanged { from, to } => sender.event(LayoutChanged { from, to }),
-            WorldEvent::MultiplayerJoined { host_name, is_host } => {
-                sender.event(MultiplayerJoined { host_name, is_host })
-            },
-            WorldEvent::MultiplayerLeft => sender.event(MultiplayerLeft),
-            WorldEvent::AllowedCarsChanged { cars } => sender.event(AllowedCarsChanged { cars }),
-            WorldEvent::AllowedModsChanged { mods } => sender.event(AllowedModsChanged { mods }),
-            WorldEvent::VersionReceived { product, version } => {
-                sender.event(VersionReceived { product, version })
-            },
-            WorldEvent::Race(re) => sender.event(re),
+            WorldEvent::Connected(e) => sender.event(e),
+            WorldEvent::Disconnected(e) => sender.event(e),
+            WorldEvent::ConnectionDetails(e) => sender.event(e),
+            WorldEvent::VehicleSelected(e) => sender.event(e),
+            WorldEvent::Renamed(e) => sender.event(e),
+            WorldEvent::PlayerJoined(e) => sender.event(e),
+            WorldEvent::PlayerLeft(e) => sender.event(e),
+            WorldEvent::TakingOver(e) => sender.event(e),
+            WorldEvent::PlayerTeleportedToPits(e) => sender.event(e),
+            WorldEvent::SessionStarted(e) => sender.event(e),
+            WorldEvent::SessionEnded(e) => sender.event(e),
+            WorldEvent::TrackChanged(e) => sender.event(e),
+            WorldEvent::LayoutChanged(e) => sender.event(e),
+            WorldEvent::MultiplayerJoined(e) => sender.event(e),
+            WorldEvent::MultiplayerLeft(e) => sender.event(e),
+            WorldEvent::AllowedCarsChanged(e) => sender.event(e),
+            WorldEvent::AllowedModsChanged(e) => sender.event(e),
+            WorldEvent::VersionReceived(e) => sender.event(e),
+            WorldEvent::Race(e) => sender.event(e),
         };
     }
 }
