@@ -1,9 +1,12 @@
 use std::time::Instant;
 
 use insim::Colour;
-use kitcar::ui::{self, Component, Ui};
+use kitcar::{
+    RoundPhase,
+    ui::{self, Component, Ui},
+};
 
-use super::state::{BombGlobal, BombPhase};
+use super::state::BombGlobal;
 use crate::components::{
     Dialog, DialogMsg, DialogProps, Marquee, MarqueeProps, hud_active, hud_muted, hud_text,
     hud_title, topbar,
@@ -186,7 +189,7 @@ impl Component for BombView {
             .flex_col()
             .items_start();
 
-        if !matches!(global.phase, BombPhase::SettingUp) {
+        if !matches!(global.phase, RoundPhase::SettingUp) {
             scoreboard = scoreboard
                 .with_child(ui::text("Active Runs", hud_title()).w(43.0).h(5.0))
                 .with_children(active_run_rows)

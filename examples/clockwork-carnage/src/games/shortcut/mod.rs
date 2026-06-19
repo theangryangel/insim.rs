@@ -1,51 +1,60 @@
 //! Shortcut mini-game subcommand. Players race from checkpoint1 to finish
 //! and try to post the fastest time.
 //!
-//! Phase machine: Waiting -> SettingUp -> Racing (same pattern as bomb).
+//! Round lifecycle is owned by [`kitcar::RoundManager`].
 
 mod config;
-mod events;
 mod handlers;
 mod state;
 mod ui;
 
 use std::time::Duration;
 
+use config::MIN_PLAYERS;
 pub use config::{ShortcutArgs, ShortcutConfig, ShortcutRunConfig};
-use handlers::{
-    on_connected, on_disconnected, on_race_ended, on_setup_aborted, on_setup_complete, on_toc,
-    on_uco,
+use handlers::{on_connected, on_disconnected, on_round_ended, on_round_started, on_toc, on_uco};
+use insim::insim::RaceLaps;
+use kitcar::{
+    App, AppError, HandlerExt, RoundManager, RoundPhase, RoundPolicy, RoundSpec, Stage, World, run,
 };
-use kitcar::{App, AppError, HandlerExt, Stage, State, World, run};
-use state::{Shortcut, ShortcutGlobal, ShortcutPhase};
-use tokio_util::sync::CancellationToken;
+use state::{Shortcut, ShortcutGlobal};
 use ui::{ShortcutUi, ShortcutView};
 
 pub async fn run_shortcut_with(cfg: ShortcutRunConfig) -> Result<(), AppError> {
-    let app =
-        App::<Shortcut>::with_state(Shortcut::new(cfg.config, CancellationToken::new(), cfg.db));
-    app.state().write().runtime_cancel = app.cancel_token().clone();
+    let rounds = RoundManager::new(
+        RoundPolicy {
+            min_players: MIN_PLAYERS,
+            setup_timeout: cfg.config.setup_timeout,
+        },
+        vec![RoundSpec {
+            track: cfg.config.track,
+            laps: RaceLaps::Untimed,
+            wind: 0,
+            layout: cfg.config.layout.clone(),
+        }],
+    );
 
+    let app = App::<Shortcut>::with_state(Shortcut::new(cfg.db));
     let sender = app.sender().clone();
     let ui = ShortcutUi::new(
         sender.clone(),
         ShortcutGlobal {
-            phase: ShortcutPhase::Waiting.label().to_string(),
+            phase: RoundPhase::Waiting.to_string(),
             ..Default::default()
         },
         |_ucid, _invalidator| ShortcutView,
     );
 
-    let while_racing = |s: State<Shortcut>| s.read().phase == ShortcutPhase::Racing;
+    let while_racing = |r: RoundManager| r.is_racing();
 
     let app = app
         .handle(Stage::Pre, World::new())
         .handle(Stage::Pre, ui)
+        .handle(Stage::Pre, rounds)
         .handle(Stage::Update, on_connected)
         .handle(Stage::Update, on_disconnected)
-        .handle(Stage::Update, on_setup_complete)
-        .handle(Stage::Update, on_setup_aborted)
-        .handle(Stage::Update, on_race_ended)
+        .handle(Stage::Update, on_round_started)
+        .handle(Stage::Update, on_round_ended)
         .handle(Stage::Update, on_toc.run_if(while_racing))
         .handle(Stage::Update, on_uco.run_if(while_racing));
 

@@ -1,7 +1,8 @@
 //! Connection and player types used by [`crate::world::World`].
 //!
-//! Admin commands are implemented on [`ConnectionInfo`] and re-exposed by
-//! [`World`](crate::world::World) methods.
+//! Per-connection admin commands are implemented on [`ConnectionInfo`]; reach
+//! them via [`World::get`](crate::world::World::get) or
+//! [`World::connection_by_player`](crate::world::World::connection_by_player).
 
 use std::net::Ipv4Addr;
 

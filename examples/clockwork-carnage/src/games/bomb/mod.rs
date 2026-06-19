@@ -12,16 +12,18 @@ mod ui;
 use std::time::Duration;
 
 pub use config::{BombArgs, BombConfig, BombRunConfig};
-use config::{PENALTY_CLEAR_DELAY, TICK_PERIOD};
+use config::{MIN_PLAYERS, PENALTY_CLEAR_DELAY, TICK_PERIOD};
 use events::BombTick;
 use handlers::{
     on_axm, on_con, on_connected, on_crs, on_disconnected, on_pit, on_player_left,
-    on_player_teleported_to_pits, on_race_ended, on_setup_aborted, on_setup_complete, on_tick,
-    on_toc, on_uco,
+    on_player_teleported_to_pits, on_round_ended, on_round_started, on_tick, on_toc, on_uco,
 };
-use insim::insim::IsiFlags;
-use kitcar::{App, AppError, ChatParser, HandlerExt, PenaltyClearer, Stage, State, World, run};
-use state::{Bomb, BombGlobal, BombPhase};
+use insim::insim::{IsiFlags, RaceLaps};
+use kitcar::{
+    App, AppError, ChatParser, HandlerExt, PenaltyClearer, RoundManager, RoundPolicy, RoundSpec,
+    Stage, World, run,
+};
+use state::{Bomb, BombGlobal};
 use ui::{BombUi, BombView};
 
 use crate::{
@@ -30,17 +32,26 @@ use crate::{
 };
 
 pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
+    // Capture rotation parameters before `cfg.config` is moved into the state.
+    let rounds = RoundManager::new(
+        RoundPolicy {
+            min_players: MIN_PLAYERS,
+            setup_timeout: cfg.config.setup_timeout,
+        },
+        vec![RoundSpec {
+            track: cfg.config.track,
+            laps: RaceLaps::Untimed,
+            wind: 0,
+            layout: cfg.config.layout.clone(),
+        }],
+    );
+
     let app = App::<Bomb>::with_state(Bomb::new(cfg.config, cfg.db));
     let sender = app.sender().clone();
 
-    app.state().write().runtime_cancel = app.cancel_token().clone();
-
     let ui = BombUi::new(
         sender.clone(),
-        BombGlobal {
-            phase: BombPhase::Waiting,
-            ..Default::default()
-        },
+        BombGlobal::default(),
         |_ucid, invalidator| {
             let marquee = Marquee::new(invalidator.clone());
             let _tick_handle = tokio::spawn(async move {
@@ -61,19 +72,19 @@ pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
 
     let clearer = PenaltyClearer::new(PENALTY_CLEAR_DELAY);
 
-    let while_racing = |s: State<Bomb>| s.read().phase == BombPhase::Racing;
+    let while_racing = |r: RoundManager| r.is_racing();
 
     let app = app
         .handle(Stage::Pre, World::new())
         .handle(Stage::Pre, clearer)
         .handle(Stage::Pre, ui)
+        .handle(Stage::Pre, rounds)
         .handle(Stage::Update, ChatParser::<chat::Cmd>::new(&['!']))
         .handle(Stage::Update, on_connected)
         .handle(Stage::Update, on_disconnected)
         .handle(Stage::Update, on_axm)
-        .handle(Stage::Update, on_setup_complete)
-        .handle(Stage::Update, on_setup_aborted)
-        .handle(Stage::Update, on_race_ended)
+        .handle(Stage::Update, on_round_started)
+        .handle(Stage::Update, on_round_ended)
         .handle(Stage::Update, on_player_left.run_if(while_racing))
         .handle(Stage::Update, on_toc.run_if(while_racing))
         .handle(Stage::Update, on_pit.run_if(while_racing))

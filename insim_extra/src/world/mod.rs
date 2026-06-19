@@ -300,6 +300,14 @@ fn dispatch(inner: &mut WorldInner, packet: &insim::Packet, events: &mut Vec<Wor
         }};
     }
 
+    // Deferred reset: a session-starting `Rst` marks the prior session's race
+    // data for clearing but leaves it intact so `SessionEnded` consumers can
+    // read the final results. Clear it now, before applying the first packet of
+    // the new session.
+    if std::mem::take(&mut inner.race.pending_reset) {
+        inner.race.clear_for_session();
+    }
+
     match packet {
         Packet::Ncn(ncn) => {
             let info = inner.apply_ncn(ncn);
@@ -390,8 +398,16 @@ fn dispatch(inner: &mut WorldInner, packet: &insim::Packet, events: &mut Vec<Wor
         },
         Packet::Rst(rst) => {
             if let Some(kind) = inner.apply_rst(rst) {
+                // A `Rst` while a session is already active (e.g. a `/restart`)
+                // ends that session without passing through the lobby, so the
+                // `Sta`-driven `SessionEnded` never fires. Surface it here -
+                // before deferring the clear - so consumers can read the final
+                // results just like on the `/end` path.
+                if inner.game.session_kind.is_some() {
+                    events.push(WorldEvent::SessionEnded(SessionEnded));
+                }
                 inner.game.session_kind = Some(kind);
-                inner.race.clear_for_session();
+                inner.race.pending_reset = true;
                 events.push(WorldEvent::SessionStarted(SessionStarted { kind }));
             }
         },
@@ -541,8 +557,6 @@ impl World {
         }
         events
     }
-
-    // ── Presence query methods ────────────────────────────────────────────────
 
     /// Number of tracked connections.
     pub fn connection_count(&self) -> usize {

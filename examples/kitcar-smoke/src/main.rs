@@ -180,7 +180,7 @@ impl Handler<(Packet<Mso>,)> for MsoCounter {
 struct UiGlobal {
     online: u64,
     /// Heartbeat count - updated by the ticker every 30s. Drives the right-
-    /// hand "[STATUS]" line in the smoke view, demonstrating partial-update
+    /// hand `[STATUS]` line in the smoke view, demonstrating partial-update
     /// composition: the ticker pushes `beats` via `ui.modify`, the connect
     /// handlers push `online` via `ui.modify`, neither clobbers the other.
     beats: u32,

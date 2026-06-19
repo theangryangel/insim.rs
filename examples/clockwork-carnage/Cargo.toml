@@ -27,7 +27,6 @@ jiff-sqlx = { version = "0.1.1", features = ["postgres"] }
 sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "migrate"] }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "signal", "time", "sync"] }
-tokio-util = { workspace = true }
 tower-sessions = { version = "0.14", features = ["private"] }
 tower-sessions-sqlx-store = { version = "0.15", features = ["postgres"] }
 tracing = { workspace = true }

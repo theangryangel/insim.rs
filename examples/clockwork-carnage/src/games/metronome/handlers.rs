@@ -7,56 +7,17 @@ use insim::{
         insim::{InsimCheckpoint, InsimCheckpointKind},
     },
     identifiers::ConnectionId,
-    insim::{RaceLaps, Toc, Uco},
+    insim::{Toc, Uco},
 };
 use kitcar::{
-    AppError, Connected, Disconnected, Event, Packet, Sender, SessionEnded, State, World, mtc,
-    track_rotation,
+    AppError, Connected, Disconnected, Event, Packet, RoundEndReason, RoundEnded, RoundStarted,
+    Sender, State, World, mtc,
 };
 
 use super::{
-    config::MIN_PLAYERS,
-    events::{SetupAborted, SetupComplete},
-    state::{Metronome, MetronomePhase},
+    state::Metronome,
     ui::{MetronomeConnectionProps, MetronomeUi},
 };
-
-fn start_setup(state: &State<Metronome>, world: &World, sender: &Sender, ui: &MetronomeUi) {
-    let (track, layout, setup_timeout, setup_cancel) = {
-        let mut m = state.write();
-        m.phase = MetronomePhase::SettingUp;
-        let token = m.make_setup_cancel();
-        (
-            m.config.track,
-            m.config.layout.clone(),
-            m.config.setup_timeout,
-            token,
-        )
-    };
-
-    let _ = sender.packets(mtc(
-        "Metronome - setting up track, hit /ready when prompted.",
-        Some(ConnectionId::ALL),
-    ));
-    refresh_ui(state, ui);
-
-    let world = world.clone();
-    let sender = sender.clone();
-    drop(tokio::spawn(async move {
-        let result = tokio::select! {
-            r = track_rotation(&world, track, RaceLaps::Untimed, 0, layout, setup_cancel.clone(), &sender) => r,
-            _ = tokio::time::sleep(setup_timeout) => None,
-        };
-        match result {
-            Some(()) => {
-                let _ = sender.event(SetupComplete);
-            },
-            None => {
-                let _ = sender.event(SetupAborted);
-            },
-        }
-    }));
-}
 
 fn refresh_ui(state: &State<Metronome>, ui: &MetronomeUi) {
     let snapshot = state.read().snapshot();
@@ -66,9 +27,7 @@ fn refresh_ui(state: &State<Metronome>, ui: &MetronomeUi) {
 pub(super) async fn on_connected(
     Event(Connected(info)): Event<Connected>,
     state: State<Metronome>,
-    world: World,
     ui: MetronomeUi,
-    sender: Sender,
 ) -> Result<(), AppError> {
     let _ = ui
         .assign_player(
@@ -80,69 +39,27 @@ pub(super) async fn on_connected(
             },
         )
         .await;
-    let should_start = {
-        let m = state.read();
-        m.phase == MetronomePhase::Waiting && world.count() >= MIN_PLAYERS
-    };
-    if !should_start {
-        refresh_ui(&state, &ui);
-        return Ok(());
-    }
-    start_setup(&state, &world, &sender, &ui);
+    refresh_ui(&state, &ui);
     Ok(())
 }
 
 pub(super) async fn on_disconnected(
     _: Event<Disconnected>,
     state: State<Metronome>,
-    world: World,
-    sender: Sender,
     ui: MetronomeUi,
 ) -> Result<(), AppError> {
-    if world.count() >= MIN_PLAYERS {
-        refresh_ui(&state, &ui);
-        return Ok(());
-    }
-    let phase = state.read().phase;
-    match phase {
-        MetronomePhase::Waiting => {
-            refresh_ui(&state, &ui);
-        },
-        MetronomePhase::SettingUp => {
-            state.write().cancel_setup();
-            refresh_ui(&state, &ui);
-        },
-        MetronomePhase::Racing => {
-            {
-                let mut m = state.write();
-                m.active_runs.clear();
-                m.phase = MetronomePhase::Waiting;
-            }
-            sender.packets(mtc(
-                "Metronome - not enough players, restarting.",
-                Some(ConnectionId::ALL),
-            ))?;
-            refresh_ui(&state, &ui);
-        },
-    }
+    // Round start/teardown is owned by RoundManager (see on_round_ended).
+    refresh_ui(&state, &ui);
     Ok(())
 }
 
-pub(super) async fn on_setup_complete(
-    _: Event<SetupComplete>,
+pub(super) async fn on_round_started(
+    _: Event<RoundStarted>,
     state: State<Metronome>,
     sender: Sender,
     ui: MetronomeUi,
 ) -> Result<(), AppError> {
-    let target_secs = {
-        let mut m = state.write();
-        if m.phase != MetronomePhase::SettingUp {
-            return Ok(());
-        }
-        m.phase = MetronomePhase::Racing;
-        m.clear_setup_cancel();
-        m.config.target.as_secs_f64()
-    };
+    let target_secs = state.read().config.target.as_secs_f64();
     sender.packets(mtc(
         format!("Metronome - target: {target_secs:.1}s. Cross checkpoint 1 to start."),
         Some(ConnectionId::ALL),
@@ -151,51 +68,20 @@ pub(super) async fn on_setup_complete(
     Ok(())
 }
 
-pub(super) async fn on_setup_aborted(
-    _: Event<SetupAborted>,
+pub(super) async fn on_round_ended(
+    Event(RoundEnded(reason)): Event<RoundEnded>,
     state: State<Metronome>,
-    world: World,
     ui: MetronomeUi,
     sender: Sender,
 ) -> Result<(), AppError> {
-    {
-        let mut m = state.write();
-        if m.phase != MetronomePhase::SettingUp {
-            return Ok(());
-        }
-        m.phase = MetronomePhase::Waiting;
-        m.clear_setup_cancel();
-    }
-    sender.packets(mtc(
-        "Metronome - setup failed, restarting.",
-        Some(ConnectionId::ALL),
-    ))?;
-    refresh_ui(&state, &ui);
-    if world.count() >= MIN_PLAYERS {
-        start_setup(&state, &world, &sender, &ui);
-    }
-    Ok(())
-}
-
-pub(super) async fn on_race_ended(
-    _: Event<SessionEnded>,
-    state: State<Metronome>,
-    world: World,
-    ui: MetronomeUi,
-    sender: Sender,
-) -> Result<(), AppError> {
-    {
-        let mut m = state.write();
-        if m.phase != MetronomePhase::Racing {
-            return Ok(());
-        }
-        m.active_runs.clear();
-        m.phase = MetronomePhase::Waiting;
+    state.write().active_runs.clear();
+    if matches!(reason, RoundEndReason::NotEnoughPlayers) {
+        let _ = sender.packets(mtc(
+            "Metronome - not enough players, restarting.",
+            Some(ConnectionId::ALL),
+        ));
     }
     refresh_ui(&state, &ui);
-    if world.count() >= MIN_PLAYERS {
-        start_setup(&state, &world, &sender, &ui);
-    }
     Ok(())
 }
 
@@ -261,7 +147,7 @@ pub(super) async fn on_uco(
             let delta = target.abs_diff(elapsed);
             let delta_ms = delta.as_millis() as i64;
 
-            if let Some(pkt) = world.spec(player.ucid) {
+            if let Some(pkt) = world.get(player.ucid).map(|c| c.spec()) {
                 let _ = sender.packet(pkt);
             }
 

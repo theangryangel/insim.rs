@@ -11,7 +11,7 @@ use insim::{
     insim::{PlcAllowedCarsSet, RaceFlags, RaceLaps, StaFlags},
 };
 
-/// The kind of session that an [`Rst`] packet started.
+/// The kind of session that an `Rst` packet started.
 ///
 /// Carried by session-started events so consumers (notably the race
 /// tracker) can interpret subsequent packets correctly - most importantly

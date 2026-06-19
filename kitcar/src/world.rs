@@ -21,7 +21,7 @@ impl<S> FromContext<S> for World {
 /// handlers with one aggregate. On each packet, [`World::apply_packet`] runs
 /// all three state mirrors in the correct order in a single call (no
 /// inter-cycle lag), then emits each event's individual payload struct (see
-/// [`emit_world_events`]) so Update-stage handlers using `Event<Connected>`,
+/// `emit_world_events`) so Update-stage handlers using `Event<Connected>`,
 /// `Event<RaceEvent>`, etc. fire as before.
 ///
 /// On [`Startup`] it sends the combined startup requests from
