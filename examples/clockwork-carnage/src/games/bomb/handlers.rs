@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::{cmp::Reverse, time::Instant};
 
 use insim::{
     Colour,
@@ -7,24 +7,47 @@ use insim::{
         insim::{InsimCheckpoint, InsimCircle},
     },
     identifiers::ConnectionId,
-    insim::{Axm, Con, Crs, Pit, PmoAction, PmoFlags, Toc, Uco, UcoAction},
+    insim::{Axm, Con, Crs, Pit, PmoAction, PmoFlags, Uco, UcoAction},
 };
 use kitcar::{
-    AppError, Connected, Disconnected, Event, Packet, PenaltyClearer, PlayerLeft,
-    PlayerTeleportedToPits, RoundEndReason, RoundEnded, RoundManager, RoundStarted, Sender, State,
-    World, mtc,
+    AppError, Connected, Disconnected, Event, Packet, PenaltyClearer, RoundEndReason, RoundEnded,
+    RoundManager, RoundStarted, Sender, State, World, mtc,
 };
 
 use super::{
     db::persist_bomb_run,
     events::BombTick,
-    state::{ActiveRun, Bomb, CheckpointOutcome},
+    state::{ActiveRun, Bomb, BombGlobal, CheckpointOutcome},
     ui::{BombConnectionProps, BombUi},
 };
+use crate::run_registry::{RunEndReason, RunEnded, RunRegistry};
 
-fn refresh_ui(state: &State<Bomb>, ui: &BombUi) {
-    let snapshot = state.read().snapshot();
-    ui.assign_global(snapshot);
+/// Rebuild the global board from authoritative state: phase + leaderboard from
+/// the bomb state, in-progress runs from the registry.
+fn refresh_ui(state: &State<Bomb>, runs: &RunRegistry<ActiveRun>, ui: &BombUi) {
+    let (phase, leaderboard) = {
+        let b = state.read();
+        (b.phase, b.leaderboard.clone())
+    };
+    let mut active: Vec<(String, String, i64, Instant, std::time::Duration)> = runs
+        .snapshot()
+        .into_iter()
+        .map(|(_, r)| {
+            (
+                r.uname,
+                r.pname,
+                r.checkpoints,
+                r.deadline,
+                r.current_timeout,
+            )
+        })
+        .collect();
+    active.sort_by_key(|r| Reverse(r.2));
+    ui.assign_global(BombGlobal {
+        phase,
+        leaderboard,
+        active_runs: active,
+    });
 }
 
 /// Push one player's per-connection UI props (their name + whether they're
@@ -35,59 +58,64 @@ async fn set_player(ui: &BombUi, ucid: ConnectionId, uname: String, in_run: bool
         .await;
 }
 
-/// Tear down a single active run: announce `message` to the driver, persist
-/// the result, fold it into the leaderboard, clear their per-player UI, and
-/// refresh the global board.
-///
-/// Every run-ending path funnels through here - timeout (BOOM), pit, leave,
-/// tele-pit, and round end - differing only in the message shown.
+/// Finalize an already-removed run: announce `message` to the driver (if still
+/// connected), persist the result, fold it into the leaderboard, clear their
+/// HUD, and refresh the board. The caller is responsible for having removed the
+/// run from the registry and for resolving `ucid` from the world (`None` if the
+/// player has already left).
 async fn end_run(
     state: &State<Bomb>,
+    runs: &RunRegistry<ActiveRun>,
     ui: &BombUi,
     sender: &Sender,
-    run: ActiveRun,
-    now: Instant,
+    ucid: Option<ConnectionId>,
+    run: &ActiveRun,
     message: String,
 ) {
+    let now = Instant::now();
     let survival_ms = run.survival_ms(now);
     let db = state.read().db.clone();
-    let _ = sender.packets(mtc(message, Some(run.ucid)));
-    persist_bomb_run(&db, &run, survival_ms).await;
-    state.write().finalize(&run, survival_ms);
-    set_player(ui, run.ucid, run.uname.clone(), false).await;
-    refresh_ui(state, ui);
+    if let Some(ucid) = ucid {
+        let _ = sender.packets(mtc(message, Some(ucid)));
+        set_player(ui, ucid, run.uname.clone(), false).await;
+    }
+    persist_bomb_run(&db, run, survival_ms).await;
+    state.write().finalize(run, survival_ms);
+    refresh_ui(state, runs, ui);
 }
 
 pub(super) async fn on_connected(
     Event(Connected(info)): Event<Connected>,
     state: State<Bomb>,
+    runs: RunRegistry<ActiveRun>,
     ui: BombUi,
     rounds: RoundManager,
 ) -> Result<(), AppError> {
     set_player(&ui, info.ucid, info.uname.clone(), false).await;
     // RoundManager owns starting/rotation; mirror its phase for the UI.
     state.write().phase = rounds.phase();
-    refresh_ui(&state, &ui);
+    refresh_ui(&state, &runs, &ui);
     Ok(())
 }
 
 pub(super) async fn on_disconnected(
     _: Event<Disconnected>,
     state: State<Bomb>,
+    runs: RunRegistry<ActiveRun>,
     ui: BombUi,
     rounds: RoundManager,
 ) -> Result<(), AppError> {
-    // RoundManager fires RoundEnded(NotEnoughPlayers) when the count drops too
-    // low; the round teardown lives in `on_round_ended`. Here we just track the
-    // phase for the UI.
+    // The registry already evicted any run the leaving player had (emitting
+    // RunEnded); here we just track the phase for the UI.
     state.write().phase = rounds.phase();
-    refresh_ui(&state, &ui);
+    refresh_ui(&state, &runs, &ui);
     Ok(())
 }
 
 pub(super) async fn on_round_started(
     _: Event<RoundStarted>,
     state: State<Bomb>,
+    runs: RunRegistry<ActiveRun>,
     sender: Sender,
     ui: BombUi,
     rounds: RoundManager,
@@ -101,27 +129,29 @@ pub(super) async fn on_round_started(
         format!("Bomb - hit checkpoints before the {cfg_secs:.0}s timer expires!"),
         Some(ConnectionId::ALL),
     ))?;
-    refresh_ui(&state, &ui);
+    refresh_ui(&state, &runs, &ui);
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)] // a handler's args are all magic extractors
 pub(super) async fn on_round_ended(
     Event(RoundEnded(reason)): Event<RoundEnded>,
     state: State<Bomb>,
+    runs: RunRegistry<ActiveRun>,
+    world: World,
     ui: BombUi,
     sender: Sender,
     rounds: RoundManager,
     clearer: PenaltyClearer,
 ) -> Result<(), AppError> {
-    let now = Instant::now();
-    let runs: Vec<ActiveRun> = state.write().active_runs.drain().map(|(_, r)| r).collect();
     let ended_msg = match reason {
         RoundEndReason::SessionEnded => "Run ended - race finished after",
         RoundEndReason::NotEnoughPlayers => "Run ended - not enough players after",
     };
-    for run in runs {
+    for (plid, run) in runs.drain_where(|_| true) {
+        let ucid = world.player(plid).map(|p| p.ucid);
         let message = format!("{ended_msg} {} cps", run.checkpoints).yellow();
-        end_run(&state, &ui, &sender, run, now, message).await;
+        end_run(&state, &runs, &ui, &sender, ucid, &run, message).await;
     }
     state.write().phase = rounds.phase();
     clearer.clear();
@@ -131,66 +161,48 @@ pub(super) async fn on_round_ended(
             Some(ConnectionId::ALL),
         ));
     }
-    refresh_ui(&state, &ui);
+    refresh_ui(&state, &runs, &ui);
     Ok(())
 }
 
-pub(super) async fn on_player_left(
-    Event(PlayerLeft(player)): Event<PlayerLeft>,
+/// A run was auto-evicted because its owner left the track or tele-pitted.
+pub(super) async fn on_run_ended(
+    Event(RunEnded { plid, run, reason }): Event<RunEnded<ActiveRun>>,
     state: State<Bomb>,
+    runs: RunRegistry<ActiveRun>,
+    world: World,
     sender: Sender,
     ui: BombUi,
 ) -> Result<(), AppError> {
-    let now = Instant::now();
-    let run = state.write().active_runs.remove(&player.plid);
-    if let Some(run) = run {
-        let message = format!("Run ended - left race after {} cps", run.checkpoints).red();
-        end_run(&state, &ui, &sender, run, now, message).await;
-    }
-    Ok(())
-}
-
-pub(super) async fn on_toc(Packet(toc): Packet<Toc>, state: State<Bomb>) -> Result<(), AppError> {
-    if let Some(r) = state.write().active_runs.get_mut(&toc.plid) {
-        r.ucid = toc.newucid;
-    }
+    let ucid = world.player(plid).map(|p| p.ucid);
+    let message = match reason {
+        RunEndReason::Left => format!("Run ended - left race after {} cps", run.checkpoints).red(),
+        RunEndReason::TeleportedToPits => format!(
+            "TELE-PITTED - run ended after {} cps. No shortcuts.",
+            run.checkpoints
+        )
+        .red(),
+    };
+    end_run(&state, &runs, &ui, &sender, ucid, &run, message).await;
     Ok(())
 }
 
 pub(super) async fn on_pit(
     Packet(pit): Packet<Pit>,
     state: State<Bomb>,
+    runs: RunRegistry<ActiveRun>,
+    world: World,
     sender: Sender,
     ui: BombUi,
 ) -> Result<(), AppError> {
-    let now = Instant::now();
-    let run = state.write().active_runs.remove(&pit.plid);
-    if let Some(run) = run {
+    if let Some(run) = runs.finish(pit.plid) {
+        let ucid = world.player(pit.plid).map(|p| p.ucid);
         let message = format!(
             "PITTED - run ended after {} cps. Commit to your fuel.",
             run.checkpoints
         )
         .red();
-        end_run(&state, &ui, &sender, run, now, message).await;
-    }
-    Ok(())
-}
-
-pub(super) async fn on_player_teleported_to_pits(
-    Event(PlayerTeleportedToPits(player)): Event<PlayerTeleportedToPits>,
-    state: State<Bomb>,
-    sender: Sender,
-    ui: BombUi,
-) -> Result<(), AppError> {
-    let now = Instant::now();
-    let run = state.write().active_runs.remove(&player.plid);
-    if let Some(run) = run {
-        let message = format!(
-            "TELE-PITTED - run ended after {} cps. No shortcuts.",
-            run.checkpoints
-        )
-        .red();
-        end_run(&state, &ui, &sender, run, now, message).await;
+        end_run(&state, &runs, &ui, &sender, ucid, &run, message).await;
     }
     Ok(())
 }
@@ -198,38 +210,14 @@ pub(super) async fn on_player_teleported_to_pits(
 pub(super) async fn on_crs(
     Packet(crs): Packet<Crs>,
     state: State<Bomb>,
+    runs: RunRegistry<ActiveRun>,
+    world: World,
     sender: Sender,
     ui: BombUi,
 ) -> Result<(), AppError> {
     let now = Instant::now();
-    let result = state.write().on_reset(crs.plid, now);
-    if let Some((ucid, penalty, time_left)) = result {
-        sender.packets(mtc(
-            format!(
-                "PENALTY -{:.2}s - {:.1}s left",
-                penalty.as_secs_f64(),
-                time_left.as_secs_f64()
-            )
-            .red(),
-            Some(ucid),
-        ))?;
-        refresh_ui(&state, &ui);
-    }
-    Ok(())
-}
-
-pub(super) async fn on_con(
-    Packet(con): Packet<Con>,
-    state: State<Bomb>,
-    sender: Sender,
-    ui: BombUi,
-) -> Result<(), AppError> {
-    let now = Instant::now();
-    let mps = con.spclose.to_metres_per_sec();
-    let mut any_hit = false;
-    for plid in [con.a.plid, con.b.plid] {
-        let result = state.write().on_collision(plid, mps, now);
-        if let Some((ucid, penalty, time_left)) = result {
+    if let Some((penalty, time_left)) = state.read().on_reset(&runs, crs.plid, now) {
+        if let Some(ucid) = world.player(crs.plid).map(|p| p.ucid) {
             sender.packets(mtc(
                 format!(
                     "PENALTY -{:.2}s - {:.1}s left",
@@ -239,11 +227,41 @@ pub(super) async fn on_con(
                 .red(),
                 Some(ucid),
             ))?;
+        }
+        refresh_ui(&state, &runs, &ui);
+    }
+    Ok(())
+}
+
+pub(super) async fn on_con(
+    Packet(con): Packet<Con>,
+    state: State<Bomb>,
+    runs: RunRegistry<ActiveRun>,
+    world: World,
+    sender: Sender,
+    ui: BombUi,
+) -> Result<(), AppError> {
+    let now = Instant::now();
+    let mps = con.spclose.to_metres_per_sec();
+    let mut any_hit = false;
+    for plid in [con.a.plid, con.b.plid] {
+        if let Some((penalty, time_left)) = state.read().on_collision(&runs, plid, mps, now) {
+            if let Some(ucid) = world.player(plid).map(|p| p.ucid) {
+                sender.packets(mtc(
+                    format!(
+                        "PENALTY -{:.2}s - {:.1}s left",
+                        penalty.as_secs_f64(),
+                        time_left.as_secs_f64()
+                    )
+                    .red(),
+                    Some(ucid),
+                ))?;
+            }
             any_hit = true;
         }
     }
     if any_hit {
-        refresh_ui(&state, &ui);
+        refresh_ui(&state, &runs, &ui);
     }
     Ok(())
 }
@@ -275,6 +293,7 @@ pub(super) async fn on_axm(Packet(axm): Packet<Axm>, state: State<Bomb>) -> Resu
 pub(super) async fn on_uco(
     Packet(uco): Packet<Uco>,
     state: State<Bomb>,
+    runs: RunRegistry<ActiveRun>,
     world: World,
     sender: Sender,
     ui: BombUi,
@@ -290,27 +309,24 @@ pub(super) async fn on_uco(
                 .connection(player.ucid)
                 .map(|c| c.uname)
                 .unwrap_or_default();
-            state.write().on_checkpoint(
-                uco.plid,
-                player.ucid,
-                &uname,
-                &player.pname,
-                player.ptype,
-                *index,
-                now,
-            )
+            state
+                .read()
+                .on_checkpoint(&runs, &uname, &player, *index, now)
         },
         (_, ObjectInfo::InsimCheckpoint(InsimCheckpoint { .. })) => {
-            state.write().on_time_bonus(uco.plid, now)
+            state.read().on_time_bonus(&runs, uco.plid, now)
         },
         _ => return Ok(()),
     };
     let Some(outcome) = outcome else {
         return Ok(());
     };
+    let Some(ucid) = world.player(uco.plid).map(|p| p.ucid) else {
+        return Ok(());
+    };
 
     match outcome {
-        CheckpointOutcome::Started { ucid, uname } => {
+        CheckpointOutcome::Started { uname } => {
             sender.packets(mtc(
                 "Run started - hit every checkpoint!".light_green(),
                 Some(ucid),
@@ -318,7 +334,6 @@ pub(super) async fn on_uco(
             set_player(&ui, ucid, uname, true).await;
         },
         CheckpointOutcome::Refreshed {
-            ucid,
             checkpoints,
             new_window,
         } => {
@@ -332,7 +347,6 @@ pub(super) async fn on_uco(
             ))?;
         },
         CheckpointOutcome::Extended {
-            ucid,
             checkpoints,
             time_left,
         } => {
@@ -342,33 +356,35 @@ pub(super) async fn on_uco(
             ))?;
         },
     }
-    refresh_ui(&state, &ui);
+    refresh_ui(&state, &runs, &ui);
     Ok(())
 }
 
 pub(super) async fn on_tick(
     _: Event<BombTick>,
     state: State<Bomb>,
+    runs: RunRegistry<ActiveRun>,
+    world: World,
     sender: Sender,
     ui: BombUi,
 ) -> Result<(), AppError> {
     let now = Instant::now();
-    let expired = state.write().tick_expired(now);
+    let expired = runs.drain_where(|r| r.deadline < now);
     let nothing_expired = expired.is_empty();
-    for run in expired {
-        let survival_ms = run.survival_ms(now);
+    for (plid, run) in &expired {
+        let ucid = world.player(*plid).map(|p| p.ucid);
         let message = format!(
             "BOOM - {} cps, {:.1}s",
             run.checkpoints,
-            survival_ms as f64 / 1000.0
+            run.survival_ms(now) as f64 / 1000.0
         )
         .red();
-        end_run(&state, &ui, &sender, run, now, message).await;
+        end_run(&state, &runs, &ui, &sender, ucid, run, message).await;
     }
     // Nothing expired this tick, but active runs still need their countdown
     // rows kept fresh.
-    if nothing_expired && !state.read().active_runs.is_empty() {
-        refresh_ui(&state, &ui);
+    if nothing_expired && !runs.is_empty() {
+        refresh_ui(&state, &runs, &ui);
     }
     Ok(())
 }

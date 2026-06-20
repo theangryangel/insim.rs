@@ -15,20 +15,21 @@ pub use config::{BombArgs, BombConfig, BombRunConfig};
 use config::{MIN_PLAYERS, PENALTY_CLEAR_DELAY, TICK_PERIOD};
 use events::BombTick;
 use handlers::{
-    on_axm, on_con, on_connected, on_crs, on_disconnected, on_pit, on_player_left,
-    on_player_teleported_to_pits, on_round_ended, on_round_started, on_tick, on_toc, on_uco,
+    on_axm, on_con, on_connected, on_crs, on_disconnected, on_pit, on_round_ended,
+    on_round_started, on_run_ended, on_tick, on_uco,
 };
 use insim::insim::{IsiFlags, RaceLaps};
 use kitcar::{
     App, AppError, ChatParser, HandlerExt, PenaltyClearer, RoundManager, RoundPolicy, RoundSpec,
     Stage, run,
 };
-use state::{Bomb, BombGlobal};
+use state::{ActiveRun, Bomb, BombGlobal};
 use ui::{BombUi, BombView};
 
 use crate::{
     components::{Dialog, Marquee},
     games::bomb::ui::{BombConnectionProps, BombMsg},
+    run_registry::RunRegistry,
 };
 
 pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
@@ -71,6 +72,10 @@ pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
     );
 
     let clearer = PenaltyClearer::new(PENALTY_CLEAR_DELAY);
+    // Active runs, keyed by player and torn down by the world lifecycle: leaving
+    // the track / disconnecting / tele-pitting all evict the run and emit
+    // RunEnded (handled by `on_run_ended`).
+    let runs = RunRegistry::<ActiveRun>::new().evict_on_pit();
 
     let while_racing = |r: RoundManager| r.is_racing();
 
@@ -78,19 +83,17 @@ pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
         .handle(Stage::Pre, clearer)
         .handle(Stage::Pre, ui)
         .handle(Stage::Pre, rounds)
+        .handle(Stage::Pre, runs)
         .handle(Stage::Update, ChatParser::<chat::Cmd>::new(&['!']))
         .handle(Stage::Update, on_connected)
         .handle(Stage::Update, on_disconnected)
         .handle(Stage::Update, on_axm)
         .handle(Stage::Update, on_round_started)
         .handle(Stage::Update, on_round_ended)
-        .handle(Stage::Update, on_player_left.run_if(while_racing))
-        .handle(Stage::Update, on_toc.run_if(while_racing))
+        // Ungated: a run evicted as the round ends must still be scored even
+        // though the phase has already left Racing by the time this fires.
+        .handle(Stage::Update, on_run_ended)
         .handle(Stage::Update, on_pit.run_if(while_racing))
-        .handle(
-            Stage::Update,
-            on_player_teleported_to_pits.run_if(while_racing),
-        )
         .handle(Stage::Update, on_crs.run_if(while_racing))
         .handle(Stage::Update, on_con.run_if(while_racing))
         .handle(Stage::Update, on_uco.run_if(while_racing))
