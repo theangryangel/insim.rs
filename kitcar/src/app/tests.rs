@@ -309,8 +309,8 @@ async fn presence_is_queryable_via_extractor() {
 
     // External read via the same world handle reflects the live state.
     assert_eq!(world_handle.count(), 2);
-    assert!(world_handle.get(ConnectionId(1)).is_some());
-    assert!(world_handle.get(ConnectionId(2)).is_some());
+    assert!(world_handle.connection(ConnectionId(1)).is_some());
+    assert!(world_handle.connection(ConnectionId(2)).is_some());
 }
 
 #[tokio::test]

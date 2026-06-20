@@ -350,7 +350,10 @@ pub(super) async fn on_uco(
             let Some(player) = world.player(uco.plid) else {
                 return Ok(());
             };
-            let uname = world.get(player.ucid).map(|c| c.uname).unwrap_or_default();
+            let uname = world
+                .connection(player.ucid)
+                .map(|c| c.uname)
+                .unwrap_or_default();
             state.write().on_checkpoint(
                 uco.plid,
                 player.ucid,

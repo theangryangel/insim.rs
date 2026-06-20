@@ -124,7 +124,10 @@ pub(super) async fn on_uco(
     if player.ptype.contains(PlayerType::AI) {
         return Ok(());
     }
-    let uname = world.get(player.ucid).map(|c| c.uname).unwrap_or_default();
+    let uname = world
+        .connection(player.ucid)
+        .map(|c| c.uname)
+        .unwrap_or_default();
 
     if is_cp1 {
         let _ = state
@@ -152,7 +155,7 @@ pub(super) async fn on_uco(
             let time_ms = lap_time.as_millis() as i64;
             let vehicle = player.vehicle.to_string();
 
-            if let Some(pkt) = world.get(player.ucid).map(|c| c.spec()) {
+            if let Some(pkt) = world.connection(player.ucid).map(|c| c.spec()) {
                 let _ = sender.packet(pkt);
             }
 

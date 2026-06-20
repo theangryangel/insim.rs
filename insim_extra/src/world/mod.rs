@@ -574,7 +574,7 @@ impl World {
     }
 
     /// Look up one connection by UCID.
-    pub fn get(&self, ucid: ConnectionId) -> Option<ConnectionInfo> {
+    pub fn connection(&self, ucid: ConnectionId) -> Option<ConnectionInfo> {
         self.inner.read().connections.get(&ucid).cloned()
     }
 
@@ -656,12 +656,12 @@ impl World {
     }
 
     /// Currently selected track, if known.
-    pub fn current_track(&self) -> Option<Track> {
+    pub fn track(&self) -> Option<Track> {
         self.inner.read().game.track
     }
 
     /// Currently loaded layout, if known.
-    pub fn current_layout(&self) -> Option<String> {
+    pub fn layout(&self) -> Option<String> {
         self.inner.read().game.layout.clone()
     }
 
@@ -737,7 +737,7 @@ impl World {
     /// the current track is known.
     pub async fn wait_for_known_state(&self, cancel: CancellationToken) -> Option<()> {
         self.poll(Duration::from_millis(100), cancel, || {
-            self.current_track().map(|_| ())
+            self.track().map(|_| ())
         })
         .await
     }
@@ -754,7 +754,7 @@ impl World {
     /// (selection screen, not yet racing).
     pub async fn wait_for_track(&self, track: Track, cancel: CancellationToken) -> Option<()> {
         self.poll(Duration::from_millis(500), cancel, move || {
-            (self.current_track() == Some(track)).then_some(())
+            (self.track() == Some(track)).then_some(())
         })
         .await
     }
@@ -770,7 +770,7 @@ impl World {
     /// Wait for a specific layout to be loaded.
     pub async fn wait_for_layout(&self, layout: String, cancel: CancellationToken) -> Option<()> {
         self.poll(Duration::from_millis(500), cancel, move || {
-            (self.current_layout().as_deref() == Some(layout.as_str())).then_some(())
+            (self.layout().as_deref() == Some(layout.as_str())).then_some(())
         })
         .await
     }

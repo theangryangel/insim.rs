@@ -117,7 +117,10 @@ pub(super) async fn on_uco(
     if player.ptype.contains(insim::insim::PlayerType::AI) {
         return Ok(());
     }
-    let uname = world.get(player.ucid).map(|c| c.uname).unwrap_or_default();
+    let uname = world
+        .connection(player.ucid)
+        .map(|c| c.uname)
+        .unwrap_or_default();
 
     if is_cp1 {
         let start_time = uco.time;
@@ -147,7 +150,7 @@ pub(super) async fn on_uco(
             let delta = target.abs_diff(elapsed);
             let delta_ms = delta.as_millis() as i64;
 
-            if let Some(pkt) = world.get(player.ucid).map(|c| c.spec()) {
+            if let Some(pkt) = world.connection(player.ucid).map(|c| c.spec()) {
                 let _ = sender.packet(pkt);
             }
 
