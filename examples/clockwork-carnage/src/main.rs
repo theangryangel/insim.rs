@@ -5,6 +5,7 @@ mod components;
 mod db;
 mod event;
 mod games;
+mod run_registry;
 mod web;
 
 use clap::{Parser, Subcommand};

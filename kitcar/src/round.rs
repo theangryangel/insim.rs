@@ -203,12 +203,12 @@ impl<S> FromContext<S> for RoundManager {
 
 impl<S: Send + Sync + 'static> Handler<(), S> for RoundManager {
     fn call(self, cx: &ExtractCx<'_, S>) -> impl Future<Output = Result<(), AppError>> + Send {
-        let world = cx.lookup::<World>();
+        let world = cx.world.clone();
         let sender = cx.sender.clone();
         let cancel = cx.cancel.clone();
         let mut ended: Option<RoundEndReason> = None;
 
-        if let Some(world) = world {
+        {
             let count = world.count();
             let session_active = world.session().is_some();
 

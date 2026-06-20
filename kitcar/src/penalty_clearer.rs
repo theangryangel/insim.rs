@@ -22,14 +22,13 @@ use std::{
 };
 
 use insim::{identifiers::ConnectionId, insim::PenaltyReason};
-use insim_extra::world::World;
 use parking_lot::RwLock;
 
 use crate::{AppError, Dispatch, ExtractCx, FromContext, Handler};
 
 /// Service that queues deferred penalty clears and drains them after a fixed
 /// delay. On each dispatch cycle it queues incoming `Pen` packets and clears
-/// expired entries via [`World`].
+/// expired entries via [`crate::World`].
 ///
 /// Clones are cheap - all share the same inner map.
 #[derive(Clone, Debug)]
@@ -83,23 +82,19 @@ impl<S> FromContext<S> for PenaltyClearer {
 
 impl<S: Send + Sync + 'static> Handler<(), S> for PenaltyClearer {
     fn call(self, cx: &ExtractCx<'_, S>) -> impl Future<Output = Result<(), AppError>> + Send {
-        let world = cx.lookup::<World>();
+        let world = cx.world.clone();
         let sender = cx.sender.clone();
 
         // Queue incoming penalties before draining so a penalty that arrives
         // exactly at the delay boundary doesn't get cleared in the same cycle.
         if let Dispatch::Packet(insim::Packet::Pen(pen)) = cx.dispatch
             && !matches!(pen.reason, PenaltyReason::Unknown)
-            && let Some(ref world) = world
             && let Some(conn) = world.connection_by_player(pen.plid)
         {
             self.queue(conn.ucid);
         }
 
         async move {
-            let Some(world) = world else {
-                return Ok(());
-            };
             for ucid in self.drain_expired(Instant::now()) {
                 if let Some(packet) = world.connection(ucid).map(|c| c.clear_penalty()) {
                     let _ = sender.packet(packet);
