@@ -340,7 +340,6 @@ async fn main() -> Result<(), AppError> {
                 joins: Arc::new(AtomicUsize::new(0)),
             },
         )
-        .handle(Stage::Pre, World::new())
         .handle(Stage::Pre, ui)
         .handle(Stage::Update, ChatParser::<Cmd>::new(&['!']))
         .handle(Stage::Update, install_ticker)

@@ -33,8 +33,7 @@ use tracing_subscriber as _;
 use super::{event::Command, runtime::dispatch_cycle};
 use crate::{
     App, AppError, ChatEvent, ChatParser, Connected, Dispatch, Event, ExtractCx, Handler,
-    HandlerExt, LayoutChanged, Packet, Sender, SessionEnded, SessionStarted, Stage, State, Svc,
-    TrackChanged, World,
+    HandlerExt, Packet, Sender, Stage, State, Svc, World,
 };
 
 /// A toy typed chat enum for the parser test.
@@ -118,7 +117,6 @@ fn make_mso(ucid: u8, msg: &str) -> insim::Packet {
 fn app_with(state: TestState) -> App {
     App::new()
         .handle(Stage::Update, state)
-        .handle(Stage::Pre, World::new())
         .handle(Stage::Update, ChatParser::<TestCmd>::new(&['!', '?']))
         .handle(Stage::Update, count_ncn)
         .handle(Stage::Update, count_mso)
@@ -126,20 +124,24 @@ fn app_with(state: TestState) -> App {
         .handle(Stage::Update, capture_cmd)
 }
 
-/// Pull an app apart and drive one dispatch directly. Drains any synthetic
-/// events emitted by handlers, simulating the main loop's behaviour of
-/// cycling queued events through fresh dispatch_cycles.
+/// Pull an app apart and drive one dispatch directly, mirroring the runtime
+/// loop. `dispatch_cycle` folds packets into the intrinsic world and dispatches
+/// the derived world events synchronously; we then drain any *user* events
+/// handlers emitted via the back-channel (e.g. `ChatParser`'s typed events) and
+/// cycle those too.
 async fn drive(app: App, d: Dispatch) {
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
+    let world = app.world;
     let pre_handlers = app.pre_handlers;
     let update_handlers = app.update_handlers;
 
     dispatch_cycle(
         d,
         &sender,
+        &world,
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -153,6 +155,7 @@ async fn drive(app: App, d: Dispatch) {
             dispatch_cycle(
                 Dispatch::Synthetic(payload),
                 &sender,
+                &world,
                 &app_state,
                 &pre_handlers,
                 &update_handlers,
@@ -271,22 +274,21 @@ async fn presence_is_queryable_via_extractor() {
     let state = PState::default();
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
-    let world = World::new();
-    let world_handle = world.clone();
     let app = App::new()
         .handle(Stage::Update, state.clone())
-        .handle(Stage::Pre, world)
         .handle(Stage::Update, observe_count);
 
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
+    let world = app.world;
     let pre_handlers = app.pre_handlers;
     let update_handlers = app.update_handlers;
 
-    // First NCN: presence inserts; handler reads count = 1.
+    // First NCN: the intrinsic world folds it in; handler reads count = 1.
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
         &sender,
+        &world,
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -299,6 +301,7 @@ async fn presence_is_queryable_via_extractor() {
     dispatch_cycle(
         Dispatch::Packet(make_ncn(2, "bob")),
         &sender,
+        &world,
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -307,10 +310,10 @@ async fn presence_is_queryable_via_extractor() {
     .await;
     assert_eq!(state.last_seen_count.load(Ordering::Relaxed), 2);
 
-    // External read via the same world handle reflects the live state.
-    assert_eq!(world_handle.count(), 2);
-    assert!(world_handle.connection(ConnectionId(1)).is_some());
-    assert!(world_handle.connection(ConnectionId(2)).is_some());
+    // External read via the intrinsic world handle reflects the live state.
+    assert_eq!(world.count(), 2);
+    assert!(world.connection(ConnectionId(1)).is_some());
+    assert!(world.connection(ConnectionId(2)).is_some());
 }
 
 #[tokio::test]
@@ -328,6 +331,7 @@ async fn cancellation_token_extractor_triggers_shutdown() {
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
+    let world = app.world;
     let pre_handlers = app.pre_handlers;
     let update_handlers = app.update_handlers;
 
@@ -335,6 +339,7 @@ async fn cancellation_token_extractor_triggers_shutdown() {
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
         &sender,
+        &world,
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -377,12 +382,14 @@ async fn run_if_skips_handler_when_predicate_false() {
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
+    let world = app.world;
     let pre_handlers = app.pre_handlers;
     let update_handlers = app.update_handlers;
 
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
         &sender,
+        &world,
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -408,12 +415,14 @@ async fn run_if_runs_handler_when_predicate_true() {
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
+    let world = app.world;
     let pre_handlers = app.pre_handlers;
     let update_handlers = app.update_handlers;
 
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
         &sender,
+        &world,
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -459,6 +468,7 @@ async fn in_state_reads_extension_and_gates_handler() {
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
+    let world = app.world;
     let pre_handlers = app.pre_handlers;
     let update_handlers = app.update_handlers;
 
@@ -466,6 +476,7 @@ async fn in_state_reads_extension_and_gates_handler() {
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
         &sender,
+        &world,
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -484,6 +495,7 @@ async fn in_state_reads_extension_and_gates_handler() {
     dispatch_cycle(
         Dispatch::Packet(make_ncn(2, "bob")),
         &sender,
+        &world,
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -531,315 +543,6 @@ async fn periodic_emits_events_on_schedule() {
 }
 
 #[tokio::test]
-async fn game_emits_session_started_on_rst() {
-    use insim::insim::{RaceLaps, Rst};
-
-    let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<Command>();
-    let sender = Sender::new(cmd_tx);
-
-    // World::new() - drop any commands it queued on startup.
-    let world = World::new();
-    while cmd_rx.try_recv().is_ok() {}
-
-    let app = App::new().handle(Stage::Pre, world.clone());
-
-    let cancel = tokio_util::sync::CancellationToken::new();
-    let app_state = app.state;
-    let pre_handlers = app.pre_handlers;
-    let update_handlers = app.update_handlers;
-
-    // An unsolicited Rst (reqi == 0) with a lap count starts a race session.
-    dispatch_cycle(
-        Dispatch::Packet(insim::Packet::Rst(Rst {
-            racelaps: RaceLaps::Laps(5),
-            ..Default::default()
-        })),
-        &sender,
-        &app_state,
-        &pre_handlers,
-        &update_handlers,
-        &cancel,
-    )
-    .await;
-
-    let mut events = Vec::new();
-    while let Ok(cmd) = cmd_rx.try_recv() {
-        if let Command::Event(payload) = cmd {
-            events.push(payload);
-        }
-    }
-    let started = events
-        .iter()
-        .filter_map(|p| p.downcast_ref::<SessionStarted>())
-        .count();
-    assert_eq!(started, 1, "SessionStarted should fire once on Rst");
-}
-
-#[tokio::test]
-async fn game_emits_session_ended_on_sta_leaving_race() {
-    use insim::insim::{RaceInProgress, Sta};
-
-    let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<Command>();
-    let sender = Sender::new(cmd_tx);
-
-    // World::new() - drop any commands it queued on startup.
-    let world = World::new();
-    while cmd_rx.try_recv().is_ok() {}
-
-    let app = App::new().handle(Stage::Pre, world.clone());
-
-    let cancel = tokio_util::sync::CancellationToken::new();
-    let app_state = app.state;
-    let pre_handlers = app.pre_handlers;
-    let update_handlers = app.update_handlers;
-
-    // Sta with racing in progress: no SessionEnded.
-    dispatch_cycle(
-        Dispatch::Packet(insim::Packet::Sta(Sta {
-            raceinprog: RaceInProgress::Racing,
-            ..Default::default()
-        })),
-        &sender,
-        &app_state,
-        &pre_handlers,
-        &update_handlers,
-        &cancel,
-    )
-    .await;
-    while cmd_rx.try_recv().is_ok() {}
-
-    // Sta back to no race: SessionEnded fires once.
-    dispatch_cycle(
-        Dispatch::Packet(insim::Packet::Sta(Sta {
-            raceinprog: RaceInProgress::No,
-            ..Default::default()
-        })),
-        &sender,
-        &app_state,
-        &pre_handlers,
-        &update_handlers,
-        &cancel,
-    )
-    .await;
-
-    let mut events = Vec::new();
-    while let Ok(cmd) = cmd_rx.try_recv() {
-        if let Command::Event(payload) = cmd {
-            events.push(payload);
-        }
-    }
-    let ended = events
-        .iter()
-        .filter_map(|p| p.downcast_ref::<SessionEnded>())
-        .count();
-    assert_eq!(
-        ended, 1,
-        "SessionEnded should fire once on Racing -> No transition"
-    );
-}
-
-#[tokio::test]
-async fn game_emits_track_changed_on_track_field_change() {
-    use insim::{core::track::Track, insim::Sta};
-
-    let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<Command>();
-    let sender = Sender::new(cmd_tx);
-
-    let world = World::new();
-    while cmd_rx.try_recv().is_ok() {}
-
-    let app = App::new().handle(Stage::Pre, world.clone());
-
-    let cancel = tokio_util::sync::CancellationToken::new();
-    let app_state = app.state;
-    let pre_handlers = app.pre_handlers;
-    let update_handlers = app.update_handlers;
-
-    let track_a = Track::ALL[0];
-    let track_b = *Track::ALL
-        .iter()
-        .find(|t| **t != track_a)
-        .expect("at least two tracks");
-
-    dispatch_cycle(
-        Dispatch::Packet(insim::Packet::Sta(Sta {
-            track: track_a,
-            ..Default::default()
-        })),
-        &sender,
-        &app_state,
-        &pre_handlers,
-        &update_handlers,
-        &cancel,
-    )
-    .await;
-
-    let mut events = Vec::new();
-    while let Ok(cmd) = cmd_rx.try_recv() {
-        if let Command::Event(payload) = cmd {
-            events.push(payload);
-        }
-    }
-    let changes: Vec<_> = events
-        .iter()
-        .filter_map(|p| p.downcast_ref::<TrackChanged>())
-        .collect();
-    assert_eq!(changes.len(), 1, "first Sta should emit TrackChanged");
-    assert_eq!(changes[0].from, None);
-    assert_eq!(changes[0].to, track_a);
-
-    dispatch_cycle(
-        Dispatch::Packet(insim::Packet::Sta(Sta {
-            track: track_a,
-            ..Default::default()
-        })),
-        &sender,
-        &app_state,
-        &pre_handlers,
-        &update_handlers,
-        &cancel,
-    )
-    .await;
-
-    let mut events = Vec::new();
-    while let Ok(cmd) = cmd_rx.try_recv() {
-        if let Command::Event(payload) = cmd {
-            events.push(payload);
-        }
-    }
-    assert!(
-        !events.iter().any(|p| p.is::<TrackChanged>()),
-        "same track should not emit TrackChanged"
-    );
-
-    dispatch_cycle(
-        Dispatch::Packet(insim::Packet::Sta(Sta {
-            track: track_b,
-            ..Default::default()
-        })),
-        &sender,
-        &app_state,
-        &pre_handlers,
-        &update_handlers,
-        &cancel,
-    )
-    .await;
-
-    let mut events = Vec::new();
-    while let Ok(cmd) = cmd_rx.try_recv() {
-        if let Command::Event(payload) = cmd {
-            events.push(payload);
-        }
-    }
-    let changes: Vec<_> = events
-        .iter()
-        .filter_map(|p| p.downcast_ref::<TrackChanged>())
-        .collect();
-    assert_eq!(changes.len(), 1, "track change should emit TrackChanged");
-    assert_eq!(changes[0].from, Some(track_a));
-    assert_eq!(changes[0].to, track_b);
-}
-
-#[tokio::test]
-async fn game_emits_layout_changed_on_layout_field_change() {
-    use insim::insim::Axi;
-
-    let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<Command>();
-    let sender = Sender::new(cmd_tx);
-
-    let world = World::new();
-    while cmd_rx.try_recv().is_ok() {}
-
-    let app = App::new().handle(Stage::Pre, world.clone());
-
-    let cancel = tokio_util::sync::CancellationToken::new();
-    let app_state = app.state;
-    let pre_handlers = app.pre_handlers;
-    let update_handlers = app.update_handlers;
-
-    let track_a = "".to_string();
-    let track_b = "test".to_string();
-
-    dispatch_cycle(
-        Dispatch::Packet(insim::Packet::Axi(Axi {
-            lname: Some(track_a.clone()),
-            ..Default::default()
-        })),
-        &sender,
-        &app_state,
-        &pre_handlers,
-        &update_handlers,
-        &cancel,
-    )
-    .await;
-
-    let mut events = Vec::new();
-    while let Ok(cmd) = cmd_rx.try_recv() {
-        if let Command::Event(payload) = cmd {
-            events.push(payload);
-        }
-    }
-    let changes: Vec<_> = events
-        .iter()
-        .filter_map(|p| p.downcast_ref::<LayoutChanged>())
-        .collect();
-    assert_eq!(changes.len(), 1, "first Axi should emit LayoutChanged");
-    assert_eq!(changes[0].from, None);
-    assert_eq!(changes[0].to, Some(track_a.clone()));
-
-    dispatch_cycle(
-        Dispatch::Packet(insim::Packet::Axi(Axi {
-            lname: Some(track_a.clone()),
-            ..Default::default()
-        })),
-        &sender,
-        &app_state,
-        &pre_handlers,
-        &update_handlers,
-        &cancel,
-    )
-    .await;
-
-    let mut events = Vec::new();
-    while let Ok(cmd) = cmd_rx.try_recv() {
-        if let Command::Event(payload) = cmd {
-            events.push(payload);
-        }
-    }
-    assert!(
-        !events.iter().any(|p| p.is::<LayoutChanged>()),
-        "same layout should not emit LayoutChanged"
-    );
-
-    dispatch_cycle(
-        Dispatch::Packet(insim::Packet::Axi(Axi {
-            lname: Some(track_b.clone()),
-            ..Default::default()
-        })),
-        &sender,
-        &app_state,
-        &pre_handlers,
-        &update_handlers,
-        &cancel,
-    )
-    .await;
-
-    let mut events = Vec::new();
-    while let Ok(cmd) = cmd_rx.try_recv() {
-        if let Command::Event(payload) = cmd {
-            events.push(payload);
-        }
-    }
-    let changes: Vec<_> = events
-        .iter()
-        .filter_map(|p| p.downcast_ref::<LayoutChanged>())
-        .collect();
-    assert_eq!(changes.len(), 1, "layout change should emit LayoutChanged");
-    assert_eq!(changes[0].from, Some(track_a));
-    assert_eq!(changes[0].to, Some(track_b));
-}
-
-#[tokio::test]
 async fn with_state_holds_typed_value() {
     #[derive(Clone)]
     struct MyState {
@@ -864,12 +567,16 @@ async fn with_state_holds_typed_value() {
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
+    let world = app.world;
     let pre_handlers = app.pre_handlers;
     let update_handlers = app.update_handlers;
 
+    // A Tiny yields no world events, so the ungated observe handler runs exactly
+    // once (an Ncn would also inject a derived Connected dispatch).
     dispatch_cycle(
-        Dispatch::Packet(make_ncn(1, "alice")),
+        Dispatch::Packet(insim::Packet::Tiny(insim::insim::Tiny::default())),
         &sender,
+        &world,
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -901,6 +608,7 @@ async fn state_mutation_visible_across_dispatches() {
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
+    let world = app.world;
     let pre_handlers = app.pre_handlers;
     let update_handlers = app.update_handlers;
 
@@ -908,6 +616,7 @@ async fn state_mutation_visible_across_dispatches() {
         dispatch_cycle(
             Dispatch::Packet(make_ncn(i, "alice")),
             &sender,
+            &world,
             &app_state,
             &pre_handlers,
             &update_handlers,
@@ -948,6 +657,7 @@ async fn state_in_run_if_predicate_gates_handler() {
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
+    let world = app.world;
     let pre_handlers = app.pre_handlers;
     let update_handlers = app.update_handlers;
 
@@ -955,6 +665,7 @@ async fn state_in_run_if_predicate_gates_handler() {
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
         &sender,
+        &world,
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -969,6 +680,7 @@ async fn state_in_run_if_predicate_gates_handler() {
     dispatch_cycle(
         Dispatch::Packet(make_ncn(2, "bob")),
         &sender,
+        &world,
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -1024,12 +736,14 @@ async fn pre_handler_runs_before_update_handler() {
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
+    let world = app.world;
     let pre_handlers = app.pre_handlers;
     let update_handlers = app.update_handlers;
 
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
         &sender,
+        &world,
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -1082,12 +796,16 @@ async fn pre_handlers_run_sequentially_in_registration_order() {
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
+    let world = app.world;
     let pre_handlers = app.pre_handlers;
     let update_handlers = app.update_handlers;
 
+    // A Tiny yields no world events, so the two Pre handlers run exactly once
+    // (an Ncn would also inject a derived Connected dispatch, running them again).
     dispatch_cycle(
-        Dispatch::Packet(make_ncn(1, "alice")),
+        Dispatch::Packet(insim::Packet::Tiny(insim::insim::Tiny::default())),
         &sender,
+        &world,
         &app_state,
         &pre_handlers,
         &update_handlers,

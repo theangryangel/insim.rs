@@ -12,10 +12,13 @@ use std::time::Duration;
 
 use config::MIN_PLAYERS;
 pub use config::{ShortcutArgs, ShortcutConfig, ShortcutRunConfig};
-use handlers::{on_connected, on_disconnected, on_round_ended, on_round_started, on_toc, on_uco};
+use handlers::{
+    on_connected, on_disconnected, on_player_left, on_player_teleported_to_pits, on_round_ended,
+    on_round_started, on_toc, on_uco,
+};
 use insim::insim::RaceLaps;
 use kitcar::{
-    App, AppError, HandlerExt, RoundManager, RoundPhase, RoundPolicy, RoundSpec, Stage, World, run,
+    App, AppError, HandlerExt, RoundManager, RoundPhase, RoundPolicy, RoundSpec, Stage, run,
 };
 use state::{Shortcut, ShortcutGlobal};
 use ui::{ShortcutUi, ShortcutView};
@@ -48,13 +51,17 @@ pub async fn run_shortcut_with(cfg: ShortcutRunConfig) -> Result<(), AppError> {
     let while_racing = |r: RoundManager| r.is_racing();
 
     let app = app
-        .handle(Stage::Pre, World::new())
         .handle(Stage::Pre, ui)
         .handle(Stage::Pre, rounds)
         .handle(Stage::Update, on_connected)
         .handle(Stage::Update, on_disconnected)
         .handle(Stage::Update, on_round_started)
         .handle(Stage::Update, on_round_ended)
+        .handle(Stage::Update, on_player_left.run_if(while_racing))
+        .handle(
+            Stage::Update,
+            on_player_teleported_to_pits.run_if(while_racing),
+        )
         .handle(Stage::Update, on_toc.run_if(while_racing))
         .handle(Stage::Update, on_uco.run_if(while_racing));
 

@@ -27,21 +27,44 @@ fn refresh_ui(state: &State<Bomb>, ui: &BombUi) {
     ui.assign_global(snapshot);
 }
 
+/// Push one player's per-connection UI props (their name + whether they're
+/// mid-run).
+async fn set_player(ui: &BombUi, ucid: ConnectionId, uname: String, in_run: bool) {
+    let _ = ui
+        .assign_player(ucid, BombConnectionProps { uname, in_run })
+        .await;
+}
+
+/// Tear down a single active run: announce `message` to the driver, persist
+/// the result, fold it into the leaderboard, clear their per-player UI, and
+/// refresh the global board.
+///
+/// Every run-ending path funnels through here - timeout (BOOM), pit, leave,
+/// tele-pit, and round end - differing only in the message shown.
+async fn end_run(
+    state: &State<Bomb>,
+    ui: &BombUi,
+    sender: &Sender,
+    run: ActiveRun,
+    now: Instant,
+    message: String,
+) {
+    let survival_ms = run.survival_ms(now);
+    let db = state.read().db.clone();
+    let _ = sender.packets(mtc(message, Some(run.ucid)));
+    persist_bomb_run(&db, &run, survival_ms).await;
+    state.write().finalize(&run, survival_ms);
+    set_player(ui, run.ucid, run.uname.clone(), false).await;
+    refresh_ui(state, ui);
+}
+
 pub(super) async fn on_connected(
     Event(Connected(info)): Event<Connected>,
     state: State<Bomb>,
     ui: BombUi,
     rounds: RoundManager,
 ) -> Result<(), AppError> {
-    let _ = ui
-        .assign_player(
-            info.ucid,
-            BombConnectionProps {
-                uname: info.uname.clone(),
-                in_run: false,
-            },
-        )
-        .await;
+    set_player(&ui, info.ucid, info.uname.clone(), false).await;
     // RoundManager owns starting/rotation; mirror its phase for the UI.
     state.write().phase = rounds.phase();
     refresh_ui(&state, &ui);
@@ -96,38 +119,11 @@ pub(super) async fn on_round_ended(
         RoundEndReason::SessionEnded => "Run ended - race finished after",
         RoundEndReason::NotEnoughPlayers => "Run ended - not enough players after",
     };
-    for run in &runs {
-        let _ = sender.packets(mtc(
-            format!("{ended_msg} {} cps", run.checkpoints).yellow(),
-            Some(run.ucid),
-        ));
-        let _ = ui
-            .assign_player(
-                run.ucid,
-                BombConnectionProps {
-                    uname: run.uname.clone(),
-                    in_run: false,
-                },
-            )
-            .await;
+    for run in runs {
+        let message = format!("{ended_msg} {} cps", run.checkpoints).yellow();
+        end_run(&state, &ui, &sender, run, now, message).await;
     }
-    let db = state.read().db.clone();
-    let finalized: Vec<(ActiveRun, i64)> = {
-        let mut b = state.write();
-        let result: Vec<(ActiveRun, i64)> = runs
-            .iter()
-            .map(|run| {
-                let survival_ms = run.survival_ms(now);
-                b.finalize(run, survival_ms);
-                (run.clone(), survival_ms)
-            })
-            .collect();
-        b.phase = rounds.phase();
-        result
-    };
-    for (run, survival_ms) in &finalized {
-        persist_bomb_run(&db, run, *survival_ms).await;
-    }
+    state.write().phase = rounds.phase();
     clearer.clear();
     if matches!(reason, RoundEndReason::NotEnoughPlayers) {
         let _ = sender.packets(mtc(
@@ -146,30 +142,10 @@ pub(super) async fn on_player_left(
     ui: BombUi,
 ) -> Result<(), AppError> {
     let now = Instant::now();
-    let (run, db) = {
-        let mut b = state.write();
-        let run = b.active_runs.remove(&player.plid);
-        let db = b.db.clone();
-        (run, db)
-    };
+    let run = state.write().active_runs.remove(&player.plid);
     if let Some(run) = run {
-        let survival_ms = run.survival_ms(now);
-        sender.packets(mtc(
-            format!("Run ended - left race after {} cps", run.checkpoints).red(),
-            Some(run.ucid),
-        ))?;
-        persist_bomb_run(&db, &run, survival_ms).await;
-        state.write().finalize(&run, survival_ms);
-        let _ = ui
-            .assign_player(
-                run.ucid,
-                BombConnectionProps {
-                    uname: run.uname.clone(),
-                    in_run: false,
-                },
-            )
-            .await;
-        refresh_ui(&state, &ui);
+        let message = format!("Run ended - left race after {} cps", run.checkpoints).red();
+        end_run(&state, &ui, &sender, run, now, message).await;
     }
     Ok(())
 }
@@ -188,34 +164,14 @@ pub(super) async fn on_pit(
     ui: BombUi,
 ) -> Result<(), AppError> {
     let now = Instant::now();
-    let (run, db) = {
-        let mut b = state.write();
-        let run = b.active_runs.remove(&pit.plid);
-        let db = b.db.clone();
-        (run, db)
-    };
+    let run = state.write().active_runs.remove(&pit.plid);
     if let Some(run) = run {
-        let survival_ms = run.survival_ms(now);
-        sender.packets(mtc(
-            format!(
-                "PITTED - run ended after {} cps. Commit to your fuel.",
-                run.checkpoints
-            )
-            .red(),
-            Some(run.ucid),
-        ))?;
-        persist_bomb_run(&db, &run, survival_ms).await;
-        state.write().finalize(&run, survival_ms);
-        let _ = ui
-            .assign_player(
-                run.ucid,
-                BombConnectionProps {
-                    uname: run.uname.clone(),
-                    in_run: false,
-                },
-            )
-            .await;
-        refresh_ui(&state, &ui);
+        let message = format!(
+            "PITTED - run ended after {} cps. Commit to your fuel.",
+            run.checkpoints
+        )
+        .red();
+        end_run(&state, &ui, &sender, run, now, message).await;
     }
     Ok(())
 }
@@ -227,34 +183,14 @@ pub(super) async fn on_player_teleported_to_pits(
     ui: BombUi,
 ) -> Result<(), AppError> {
     let now = Instant::now();
-    let (run, db) = {
-        let mut b = state.write();
-        let run = b.active_runs.remove(&player.plid);
-        let db = b.db.clone();
-        (run, db)
-    };
+    let run = state.write().active_runs.remove(&player.plid);
     if let Some(run) = run {
-        let survival_ms = run.survival_ms(now);
-        sender.packets(mtc(
-            format!(
-                "TELE-PITTED - run ended after {} cps. No shortcuts.",
-                run.checkpoints
-            )
-            .red(),
-            Some(run.ucid),
-        ))?;
-        persist_bomb_run(&db, &run, survival_ms).await;
-        state.write().finalize(&run, survival_ms);
-        let _ = ui
-            .assign_player(
-                run.ucid,
-                BombConnectionProps {
-                    uname: run.uname.clone(),
-                    in_run: false,
-                },
-            )
-            .await;
-        refresh_ui(&state, &ui);
+        let message = format!(
+            "TELE-PITTED - run ended after {} cps. No shortcuts.",
+            run.checkpoints
+        )
+        .red();
+        end_run(&state, &ui, &sender, run, now, message).await;
     }
     Ok(())
 }
@@ -379,15 +315,7 @@ pub(super) async fn on_uco(
                 "Run started - hit every checkpoint!".light_green(),
                 Some(ucid),
             ))?;
-            let _ = ui
-                .assign_player(
-                    ucid,
-                    BombConnectionProps {
-                        uname,
-                        in_run: true,
-                    },
-                )
-                .await;
+            set_player(&ui, ucid, uname, true).await;
         },
         CheckpointOutcome::Refreshed {
             ucid,
@@ -426,33 +354,20 @@ pub(super) async fn on_tick(
 ) -> Result<(), AppError> {
     let now = Instant::now();
     let expired = state.write().tick_expired(now);
-    let had_expired = !expired.is_empty();
-    for run in &expired {
+    let nothing_expired = expired.is_empty();
+    for run in expired {
         let survival_ms = run.survival_ms(now);
-        let _ = sender.packets(mtc(
-            format!(
-                "BOOM - {} cps, {:.1}s",
-                run.checkpoints,
-                survival_ms as f64 / 1000.0
-            )
-            .red(),
-            Some(run.ucid),
-        ));
-        let db = state.read().db.clone();
-        persist_bomb_run(&db, run, survival_ms).await;
-        state.write().finalize(run, survival_ms);
-        let _ = ui
-            .assign_player(
-                run.ucid,
-                BombConnectionProps {
-                    uname: run.uname.clone(),
-                    in_run: false,
-                },
-            )
-            .await;
+        let message = format!(
+            "BOOM - {} cps, {:.1}s",
+            run.checkpoints,
+            survival_ms as f64 / 1000.0
+        )
+        .red();
+        end_run(&state, &ui, &sender, run, now, message).await;
     }
-    let has_active = !had_expired && !state.read().active_runs.is_empty();
-    if had_expired || has_active {
+    // Nothing expired this tick, but active runs still need their countdown
+    // rows kept fresh.
+    if nothing_expired && !state.read().active_runs.is_empty() {
         refresh_ui(&state, &ui);
     }
     Ok(())

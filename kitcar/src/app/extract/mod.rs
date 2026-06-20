@@ -28,6 +28,7 @@ use indexmap::IndexMap;
 use tokio_util::sync::CancellationToken;
 
 use super::{event::Dispatch, handler::ErasedHandler, runtime::Sender};
+use crate::World;
 
 /// Context handed to extractors during one dispatch cycle.
 ///
@@ -39,6 +40,10 @@ pub struct ExtractCx<'a, S = ()> {
     pub dispatch: &'a Dispatch,
     /// Back-channel handle for sending packets / emitting events. Extracted by [`Sender`].
     pub sender: &'a Sender,
+    /// The intrinsic world-state mirror for this run. Already folded for the
+    /// current dispatch by the runtime's mirror step before any handler runs.
+    /// Extracted by `world: World`.
+    pub world: &'a World,
     /// Pre-stage handlers, also serving as the typed registry for extraction
     /// (looked up by `TypeId`).
     pub(crate) pre_handlers: &'a IndexMap<std::any::TypeId, Box<dyn ErasedHandler<S>>>,
