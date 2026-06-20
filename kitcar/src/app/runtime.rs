@@ -24,7 +24,7 @@ use super::{
     extract::{ExtractCx, FromContext},
     handler::ErasedHandler,
 };
-use crate::error::AppError;
+use crate::{World, error::AppError};
 
 /// Back-channel handle to the runtime.
 ///
@@ -106,6 +106,7 @@ where
     S: Send + Sync + 'static,
 {
     let state = app.state;
+    let world = app.world;
     let pre_handlers = app.pre_handlers;
     let update_handlers = app.update_handlers;
     let sender = app.sender;
@@ -116,10 +117,14 @@ where
 
     let mut framed = builder.connect_async().await?;
 
+    // Sync the world with the server's current state (LFS does not volunteer it).
+    crate::world::send_startup_requests(&sender);
+
     // One-shot lifecycle event so handlers can `tokio::spawn` background work.
     dispatch_cycle(
         Dispatch::Synthetic(Arc::new(Startup)),
         &sender,
+        &world,
         &state,
         &pre_handlers,
         &update_handlers,
@@ -130,6 +135,7 @@ where
     let result = run_dispatch_loop(
         &mut framed,
         &sender,
+        &world,
         &state,
         &pre_handlers,
         &update_handlers,
@@ -145,6 +151,7 @@ where
     dispatch_cycle(
         Dispatch::Synthetic(Arc::new(Shutdown)),
         &sender,
+        &world,
         &state,
         &pre_handlers,
         &update_handlers,
@@ -163,9 +170,11 @@ where
     result
 }
 
+#[allow(clippy::too_many_arguments)] // runtime plumbing; bundling would re-churn the dispatch_cycle call sites
 async fn run_dispatch_loop<S>(
     framed: &mut Framed,
     sender: &Sender,
+    world: &World,
     state: &S,
     pre_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
     update_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
@@ -183,7 +192,7 @@ where
                 let packet = res?;
                 dispatch_cycle(
                     Dispatch::Packet(packet),
-                    sender, state, pre_handlers, update_handlers, cancel,
+                    sender, world, state, pre_handlers, update_handlers, cancel,
                 ).await;
             }
             maybe_cmd = cmd_rx.recv() => {
@@ -197,7 +206,7 @@ where
                     Command::Event(payload) => {
                         dispatch_cycle(
                             Dispatch::Synthetic(payload),
-                            sender, state, pre_handlers, update_handlers, cancel,
+                            sender, world, state, pre_handlers, update_handlers, cancel,
                         ).await;
                     }
                 }
@@ -206,20 +215,70 @@ where
     }
 }
 
-/// Drive one dispatch cycle for one event, in two phases.
+/// Drive one dispatch for one event.
 ///
-/// 1. **Pre** - each handler is awaited *sequentially* in registration
-///    order. State-mirror handlers (Presence, Game) live here so subsequent
-///    handlers observe a settled world.
+/// A wire packet is first folded into the intrinsic [`World`] mirror (via
+/// [`fold_packet`]), so every handler observes settled state. The packet is
+/// then run through the two handler phases, and finally each world event the
+/// fold produced is run through them too - in this same call, right after the
+/// causing packet, so there is **no inter-cycle delay** for world events.
+///
+/// The two phases (see [`run_handlers`]):
+///
+/// 1. **Pre** - handlers awaited *sequentially* in registration order.
 /// 2. **Update** - handlers run *concurrently* via [`FuturesUnordered`].
-///    Most game logic lives here.
 ///
-/// Synthetic events injected via `sender.event(...)` are *not* drained in
-/// this cycle. They land on the runtime's back-channel and trigger their
-/// own future cycles.
+/// Synthetic events injected by handlers via `sender.event(...)` are *not*
+/// drained here. They land on the runtime's back-channel and trigger their own
+/// future cycles.
 pub(crate) async fn dispatch_cycle<S>(
     d: Dispatch,
     sender: &Sender,
+    world: &World,
+    state: &S,
+    pre_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
+    update_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
+    cancel: &CancellationToken,
+) where
+    S: Send + Sync + 'static,
+{
+    let derived = if let Dispatch::Packet(packet) = &d {
+        crate::world::fold_packet(world, packet, sender)
+    } else {
+        Vec::new()
+    };
+
+    run_handlers(
+        &d,
+        sender,
+        world,
+        state,
+        pre_handlers,
+        update_handlers,
+        cancel,
+    )
+    .await;
+
+    for event in derived {
+        run_handlers(
+            &event,
+            sender,
+            world,
+            state,
+            pre_handlers,
+            update_handlers,
+            cancel,
+        )
+        .await;
+    }
+}
+
+/// Run one dispatch through the Pre (sequential) then Update (concurrent)
+/// handler phases against a freshly built [`ExtractCx`].
+async fn run_handlers<S>(
+    d: &Dispatch,
+    sender: &Sender,
+    world: &World,
     state: &S,
     pre_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
     update_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
@@ -228,8 +287,9 @@ pub(crate) async fn dispatch_cycle<S>(
     S: Send + Sync + 'static,
 {
     let xcx = ExtractCx {
-        dispatch: &d,
+        dispatch: d,
         sender,
+        world,
         pre_handlers,
         update_handlers,
         cancel,

@@ -6,12 +6,12 @@ use insim::{
         ObjectInfo,
         insim::{InsimCheckpoint, InsimCheckpointKind},
     },
-    identifiers::ConnectionId,
-    insim::{Toc, Uco},
+    identifiers::{ConnectionId, PlayerId},
+    insim::Uco,
 };
 use kitcar::{
-    AppError, Connected, Disconnected, Event, Packet, RoundEndReason, RoundEnded, RoundStarted,
-    Sender, State, World, mtc,
+    AppError, Connected, Disconnected, Event, Packet, PlayerLeft, PlayerTeleportedToPits,
+    RoundEndReason, RoundEnded, RoundStarted, Sender, State, TakingOver, World, mtc,
 };
 
 use super::{
@@ -22,6 +22,33 @@ use super::{
 fn refresh_ui(state: &State<Metronome>, ui: &MetronomeUi) {
     let snapshot = state.read().snapshot();
     ui.assign_global(snapshot);
+}
+
+/// Drop a player's in-progress run without scoring it - used when they leave
+/// the track or tele-pit mid-attempt (an incomplete timed run doesn't count).
+/// Resetting the per-player props clears their `in_run` HUD state if they're
+/// still connected.
+async fn abandon_run(state: &State<Metronome>, ui: &MetronomeUi, plid: PlayerId) {
+    let run = state.write().active_runs.remove(&plid);
+    if let Some((ucid, uname, _start)) = run {
+        let best_delta_ms = state
+            .read()
+            .leaderboard
+            .iter()
+            .find(|e| e.0 == uname)
+            .map(|e| e.2);
+        let _ = ui
+            .assign_player(
+                ucid,
+                MetronomeConnectionProps {
+                    uname,
+                    in_run: false,
+                    best_delta_ms,
+                },
+            )
+            .await;
+        refresh_ui(state, ui);
+    }
 }
 
 pub(super) async fn on_connected(
@@ -86,12 +113,30 @@ pub(super) async fn on_round_ended(
 }
 
 pub(super) async fn on_toc(
-    Packet(toc): Packet<Toc>,
+    Event(TakingOver { after, .. }): Event<TakingOver>,
     state: State<Metronome>,
 ) -> Result<(), AppError> {
-    if let Some(r) = state.write().active_runs.get_mut(&toc.plid) {
-        r.0 = toc.newucid;
+    if let Some(r) = state.write().active_runs.get_mut(&after.plid) {
+        r.0 = after.ucid;
     }
+    Ok(())
+}
+
+pub(super) async fn on_player_left(
+    Event(PlayerLeft(player)): Event<PlayerLeft>,
+    state: State<Metronome>,
+    ui: MetronomeUi,
+) -> Result<(), AppError> {
+    abandon_run(&state, &ui, player.plid).await;
+    Ok(())
+}
+
+pub(super) async fn on_player_teleported_to_pits(
+    Event(PlayerTeleportedToPits(player)): Event<PlayerTeleportedToPits>,
+    state: State<Metronome>,
+    ui: MetronomeUi,
+) -> Result<(), AppError> {
+    abandon_run(&state, &ui, player.plid).await;
     Ok(())
 }
 

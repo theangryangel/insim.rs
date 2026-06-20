@@ -12,9 +12,12 @@ use std::time::Duration;
 
 use config::MIN_PLAYERS;
 pub use config::{MetronomeArgs, MetronomeConfig, MetronomeRunConfig};
-use handlers::{on_connected, on_disconnected, on_round_ended, on_round_started, on_toc, on_uco};
+use handlers::{
+    on_connected, on_disconnected, on_player_left, on_player_teleported_to_pits, on_round_ended,
+    on_round_started, on_toc, on_uco,
+};
 use insim::insim::RaceLaps;
-use kitcar::{App, AppError, HandlerExt, RoundManager, RoundPolicy, RoundSpec, Stage, World, run};
+use kitcar::{App, AppError, HandlerExt, RoundManager, RoundPolicy, RoundSpec, Stage, run};
 use state::{Metronome, MetronomeGlobal};
 use ui::{MetronomeUi, MetronomeView};
 
@@ -47,13 +50,17 @@ pub async fn run_metronome_with(cfg: MetronomeRunConfig) -> Result<(), AppError>
     let while_racing = |r: RoundManager| r.is_racing();
 
     let app = app
-        .handle(Stage::Pre, World::new())
         .handle(Stage::Pre, ui)
         .handle(Stage::Pre, rounds)
         .handle(Stage::Update, on_connected)
         .handle(Stage::Update, on_disconnected)
         .handle(Stage::Update, on_round_started)
         .handle(Stage::Update, on_round_ended)
+        .handle(Stage::Update, on_player_left.run_if(while_racing))
+        .handle(
+            Stage::Update,
+            on_player_teleported_to_pits.run_if(while_racing),
+        )
         .handle(Stage::Update, on_toc.run_if(while_racing))
         .handle(Stage::Update, on_uco.run_if(while_racing));
 

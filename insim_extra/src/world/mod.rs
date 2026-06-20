@@ -835,3 +835,138 @@ impl World {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod emission_tests {
+    use insim::{
+        core::track::Track,
+        insim::{Axi, RaceInProgress, RaceLaps, Rst, Sta},
+    };
+
+    use super::{World, WorldEvent};
+
+    fn count(events: &[WorldEvent], pred: impl Fn(&WorldEvent) -> bool) -> usize {
+        events.iter().filter(|e| pred(e)).count()
+    }
+
+    #[test]
+    fn rst_emits_session_started() {
+        let world = World::new();
+        let events = world.apply_packet(&insim::Packet::Rst(Rst {
+            racelaps: RaceLaps::Laps(5),
+            ..Default::default()
+        }));
+        assert_eq!(
+            count(&events, |e| matches!(e, WorldEvent::SessionStarted(_))),
+            1,
+            "SessionStarted should fire once on Rst"
+        );
+    }
+
+    #[test]
+    fn sta_emits_session_ended_on_leaving_race() {
+        let world = World::new();
+
+        // Racing in progress: no SessionEnded.
+        let events = world.apply_packet(&insim::Packet::Sta(Sta {
+            raceinprog: RaceInProgress::Racing,
+            ..Default::default()
+        }));
+        assert_eq!(
+            count(&events, |e| matches!(e, WorldEvent::SessionEnded(_))),
+            0
+        );
+
+        // Back to no race: SessionEnded fires once.
+        let events = world.apply_packet(&insim::Packet::Sta(Sta {
+            raceinprog: RaceInProgress::No,
+            ..Default::default()
+        }));
+        assert_eq!(
+            count(&events, |e| matches!(e, WorldEvent::SessionEnded(_))),
+            1,
+            "SessionEnded should fire once on Racing -> No transition"
+        );
+    }
+
+    #[test]
+    fn sta_emits_track_changed_on_track_field_change() {
+        let world = World::new();
+        let track_a = Track::ALL[0];
+        let track_b = *Track::ALL
+            .iter()
+            .find(|t| **t != track_a)
+            .expect("at least two tracks");
+
+        let sta = |track| {
+            insim::Packet::Sta(Sta {
+                track,
+                ..Default::default()
+            })
+        };
+        let track_changes = |events: &[WorldEvent]| -> Vec<(Option<Track>, Track)> {
+            events
+                .iter()
+                .filter_map(|e| match e {
+                    WorldEvent::TrackChanged(t) => Some((t.from, t.to)),
+                    _ => None,
+                })
+                .collect()
+        };
+
+        let changes = track_changes(&world.apply_packet(&sta(track_a)));
+        assert_eq!(
+            changes,
+            vec![(None, track_a)],
+            "first Sta emits TrackChanged"
+        );
+
+        let changes = track_changes(&world.apply_packet(&sta(track_a)));
+        assert!(
+            changes.is_empty(),
+            "same track should not emit TrackChanged"
+        );
+
+        let changes = track_changes(&world.apply_packet(&sta(track_b)));
+        assert_eq!(changes, vec![(Some(track_a), track_b)]);
+    }
+
+    #[test]
+    fn axi_emits_layout_changed_on_layout_field_change() {
+        let world = World::new();
+        let layout_a = String::new();
+        let layout_b = "test".to_string();
+
+        let axi = |lname: &str| {
+            insim::Packet::Axi(Axi {
+                lname: Some(lname.to_string()),
+                ..Default::default()
+            })
+        };
+        let layout_changes = |events: &[WorldEvent]| -> Vec<(Option<String>, Option<String>)> {
+            events
+                .iter()
+                .filter_map(|e| match e {
+                    WorldEvent::LayoutChanged(l) => Some((l.from.clone(), l.to.clone())),
+                    _ => None,
+                })
+                .collect()
+        };
+
+        let changes = layout_changes(&world.apply_packet(&axi(&layout_a)));
+        assert_eq!(
+            changes,
+            vec![(None, Some(layout_a.clone()))],
+            "first Axi emits LayoutChanged"
+        );
+
+        let changes = layout_changes(&world.apply_packet(&axi(&layout_a)));
+        assert!(
+            changes.is_empty(),
+            "same layout should not emit LayoutChanged"
+        );
+
+        let changes = layout_changes(&world.apply_packet(&axi(&layout_b)));
+        assert_eq!(changes, vec![(Some(layout_a), Some(layout_b))]);
+    }
+}

@@ -37,8 +37,10 @@
 //! Every dispatch runs in two phases:
 //!
 //! 1. **[`Stage::Pre`]** - handlers run *sequentially* in registration
-//!    order. State-mirror handlers (Presence, Game, Ui) live here so later
-//!    handlers observe settled state.
+//!    order. Deciders that the concurrent Update handlers gate on (e.g.
+//!    [`RoundManager`]) live here so their effects are settled first. (The
+//!    intrinsic [`World`] mirror is folded by the runtime *ahead of both
+//!    stages*, so every handler already observes settled world state.)
 //! 2. **[`Stage::Update`]** - handlers run *concurrently* via
 //!    [`futures::stream::FuturesUnordered`]. Most game logic lives here.
 //!

@@ -22,12 +22,15 @@ use self::{
     handler::{ErasedHandler, Handler, HandlerService},
     runtime::Sender,
 };
+use crate::World;
 
 /// Which stage of the dispatch cycle a handler runs in.
 ///
 /// - [`Stage::Pre`] - handlers run *sequentially* in registration order at
-///   the start of each dispatch. State-mirror handlers (Presence, Game,
-///   Ui) live here so later handlers observe settled state.
+///   the start of each dispatch. Deciders that Update handlers gate on (e.g.
+///   [`crate::RoundManager`]) live here so their effects settle first. The
+///   intrinsic [`crate::World`] mirror is folded by the runtime ahead of both
+///   stages.
 /// - [`Stage::Update`] - handlers run *concurrently* after every Pre
 ///   handler has finished. Most game logic belongs here.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -77,7 +80,8 @@ pub trait Installable<S = ()> {
 /// Every dispatch runs in two phases:
 ///
 /// 1. **Pre** - [`Stage::Pre`] handlers run *sequentially* in registration
-///    order. State-mirror handlers (Presence, Game, Ui) belong here.
+///    order. Deciders that Update handlers gate on (e.g. [`crate::RoundManager`])
+///    belong here.
 /// 2. **Update** - [`Stage::Update`] handlers run *concurrently* via
 ///    [`futures::stream::FuturesUnordered`]. Most game logic belongs here.
 ///
@@ -91,6 +95,10 @@ pub trait Installable<S = ()> {
 /// [`App::periodic`].
 pub struct App<S = ()> {
     pub(crate) state: S,
+    /// The world-state mirror, intrinsic to every app (as core as the
+    /// connection itself). Folded by the runtime's mirror step before any
+    /// handler runs each cycle, and extractable via `world: World`.
+    pub(crate) world: World,
     /// Pre-stage handlers, keyed by handler `TypeId`. IndexMap preserves
     /// insertion order for dispatch and supports O(1) lookup for extraction.
     pub(crate) pre_handlers: IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
@@ -107,6 +115,7 @@ pub struct App<S = ()> {
 impl<S> std::fmt::Debug for App<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("App")
+            .field("world", &self.world)
             .field("pre_handlers", &self.pre_handlers.len())
             .field("update_handlers", &self.update_handlers.len())
             .finish()
@@ -143,12 +152,34 @@ where
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<Command>();
         Self {
             state,
+            world: World::new(),
             pre_handlers: IndexMap::new(),
             update_handlers: IndexMap::new(),
             sender: Sender::new(cmd_tx),
             cmd_rx: Some(cmd_rx),
             cancel: CancellationToken::new(),
         }
+    }
+
+    /// Switch the embedded [`World`] into rejoin mode (see
+    /// [`World::with_rejoin`]).
+    ///
+    /// Use for endurance / multi-hour races where mid-race reconnects should
+    /// resume a prior disconnected entrant (matched by LFS.net username) rather
+    /// than create a phantom duplicate. Call before [`crate::run`].
+    #[must_use]
+    pub fn rejoin(mut self) -> Self {
+        self.world = World::with_rejoin();
+        self
+    }
+
+    /// The [`World`] state mirror embedded in every app.
+    ///
+    /// The runtime folds each dispatch into it before any handler runs;
+    /// this accessor exists to seed or inspect it before [`crate::run`].
+    /// `World` is a cheap `Arc`-handle, so clone it freely.
+    pub fn world(&self) -> &World {
+        &self.world
     }
 
     /// Borrow the runtime's outbound `Sender`. Cloneable; lives for the

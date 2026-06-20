@@ -21,7 +21,7 @@ use handlers::{
 use insim::insim::{IsiFlags, RaceLaps};
 use kitcar::{
     App, AppError, ChatParser, HandlerExt, PenaltyClearer, RoundManager, RoundPolicy, RoundSpec,
-    Stage, World, run,
+    Stage, run,
 };
 use state::{Bomb, BombGlobal};
 use ui::{BombUi, BombView};
@@ -75,7 +75,6 @@ pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
     let while_racing = |r: RoundManager| r.is_racing();
 
     let app = app
-        .handle(Stage::Pre, World::new())
         .handle(Stage::Pre, clearer)
         .handle(Stage::Pre, ui)
         .handle(Stage::Pre, rounds)
