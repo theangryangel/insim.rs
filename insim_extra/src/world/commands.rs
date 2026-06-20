@@ -204,7 +204,7 @@ impl World {
     ///
     /// For a single connection use
     /// [`ConnectionInfo::send_rcm`](crate::world::ConnectionInfo::send_rcm).
-    pub fn broadcast_rcm(&self, message: &str) -> Vec<insim::Packet> {
+    pub fn rcm_all(&self, message: &str) -> Vec<insim::Packet> {
         vec![
             host_command(format!("/rcm {message}")),
             host_command("/rcm_all"),

@@ -29,7 +29,7 @@ pub async fn track_rotation(
     cancel: CancellationToken,
     sender: &Sender,
 ) -> Option<()> {
-    let current_track = world.current_track();
+    let current_track = world.track();
     let session = world.session();
     info!(
         ?track,

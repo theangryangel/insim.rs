@@ -101,7 +101,7 @@ impl<S: Send + Sync + 'static> Handler<(), S> for PenaltyClearer {
                 return Ok(());
             };
             for ucid in self.drain_expired(Instant::now()) {
-                if let Some(packet) = world.get(ucid).map(|c| c.clear_penalty()) {
+                if let Some(packet) = world.connection(ucid).map(|c| c.clear_penalty()) {
                     let _ = sender.packet(packet);
                 }
             }
