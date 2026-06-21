@@ -107,6 +107,7 @@ where
 {
     let state = app.state;
     let world = app.world;
+    let ui = app.ui;
     let pre_handlers = app.pre_handlers;
     let update_handlers = app.update_handlers;
     let sender = app.sender;
@@ -125,6 +126,7 @@ where
         Dispatch::Synthetic(Arc::new(Startup)),
         &sender,
         &world,
+        ui.as_deref(),
         &state,
         &pre_handlers,
         &update_handlers,
@@ -136,6 +138,7 @@ where
         &mut framed,
         &sender,
         &world,
+        ui.as_deref(),
         &state,
         &pre_handlers,
         &update_handlers,
@@ -152,6 +155,7 @@ where
         Dispatch::Synthetic(Arc::new(Shutdown)),
         &sender,
         &world,
+        ui.as_deref(),
         &state,
         &pre_handlers,
         &update_handlers,
@@ -175,6 +179,7 @@ async fn run_dispatch_loop<S>(
     framed: &mut Framed,
     sender: &Sender,
     world: &World,
+    ui: Option<&dyn crate::ui::UiSink>,
     state: &S,
     pre_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
     update_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
@@ -192,7 +197,7 @@ where
                 let packet = res?;
                 dispatch_cycle(
                     Dispatch::Packet(packet),
-                    sender, world, state, pre_handlers, update_handlers, cancel,
+                    sender, world, ui, state, pre_handlers, update_handlers, cancel,
                 ).await;
             }
             maybe_cmd = cmd_rx.recv() => {
@@ -206,7 +211,7 @@ where
                     Command::Event(payload) => {
                         dispatch_cycle(
                             Dispatch::Synthetic(payload),
-                            sender, world, state, pre_handlers, update_handlers, cancel,
+                            sender, world, ui, state, pre_handlers, update_handlers, cancel,
                         ).await;
                     }
                 }
@@ -231,10 +236,12 @@ where
 /// Synthetic events injected by handlers via `sender.event(...)` are *not*
 /// drained here. They land on the runtime's back-channel and trigger their own
 /// future cycles.
+#[allow(clippy::too_many_arguments)] // runtime plumbing; threads world + ui through each cycle
 pub(crate) async fn dispatch_cycle<S>(
     d: Dispatch,
     sender: &Sender,
     world: &World,
+    ui: Option<&dyn crate::ui::UiSink>,
     state: &S,
     pre_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
     update_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
@@ -243,6 +250,11 @@ pub(crate) async fn dispatch_cycle<S>(
     S: Send + Sync + 'static,
 {
     let derived = if let Dispatch::Packet(packet) = &d {
+        // Drive the UI before folding the world, so it sees every packet (the UI
+        // runs on its own thread; this only enqueues).
+        if let Some(ui) = ui {
+            ui.forward_packet(packet);
+        }
         crate::world::fold_packet(world, packet, sender)
     } else {
         Vec::new()
@@ -252,6 +264,7 @@ pub(crate) async fn dispatch_cycle<S>(
         &d,
         sender,
         world,
+        ui,
         state,
         pre_handlers,
         update_handlers,
@@ -264,6 +277,7 @@ pub(crate) async fn dispatch_cycle<S>(
             &event,
             sender,
             world,
+            ui,
             state,
             pre_handlers,
             update_handlers,
@@ -275,10 +289,12 @@ pub(crate) async fn dispatch_cycle<S>(
 
 /// Run one dispatch through the Pre (sequential) then Update (concurrent)
 /// handler phases against a freshly built [`ExtractCx`].
+#[allow(clippy::too_many_arguments)] // runtime plumbing; threads world + ui through each cycle
 async fn run_handlers<S>(
     d: &Dispatch,
     sender: &Sender,
     world: &World,
+    ui: Option<&dyn crate::ui::UiSink>,
     state: &S,
     pre_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
     update_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
@@ -290,6 +306,7 @@ async fn run_handlers<S>(
         dispatch: d,
         sender,
         world,
+        ui,
         pre_handlers,
         update_handlers,
         cancel,

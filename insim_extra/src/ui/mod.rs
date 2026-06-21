@@ -18,7 +18,7 @@
 //! ```ignore
 //! use tokio::sync::mpsc;
 //! let (outgoing_tx, mut outgoing_rx) = mpsc::unbounded_channel();
-//! let ui = Ui::<MyView, GlobalProps, PlayerProps>::new(
+//! let ui = Ui::<MyView>::new(
 //!     outgoing_tx,
 //!     initial_global,
 //!     |ucid, invalidator| MyView::new(ucid, invalidator),
@@ -54,7 +54,7 @@ use tokio::{
     sync::{Notify, broadcast, mpsc, watch},
     task::LocalSet,
 };
-pub use view::{Component, InvalidateHandle};
+pub use view::{Component, InvalidateHandle, View};
 use view::{RunViewArgs, ViewInput, run_view};
 
 /// Errors from the UI subsystem.
@@ -72,17 +72,17 @@ struct ActiveViewChannels<M: Clone + Send + 'static, C: Clone + Send + Sync + 's
     view_event_tx: mpsc::UnboundedSender<ViewInput<M>>,
 }
 
-struct UiInner<Cmp, G, C>
+struct UiInner<V>
 where
-    Cmp: Component,
+    V: View,
 {
-    global: watch::Sender<Arc<G>>,
-    connection_props: mpsc::Sender<(ConnectionId, C)>,
-    view_messages: mpsc::Sender<(ConnectionId, Cmp::Message)>,
+    global: watch::Sender<Arc<V::Global>>,
+    connection_props: mpsc::Sender<(ConnectionId, V::Connection)>,
+    view_messages: mpsc::Sender<(ConnectionId, V::Message)>,
     // Inbound: wire packets from LFS into the UI thread.
     packet_tx: mpsc::UnboundedSender<Packet>,
     // Outbound: click/type-in events broadcast to subscribers.
-    message_tx: broadcast::Sender<Cmp::Message>,
+    message_tx: broadcast::Sender<V::Message>,
 }
 
 /// UI handle for dedicated multiplayer servers.
@@ -93,16 +93,16 @@ where
 ///
 /// [`ConnectionId::LOCAL`] (UCID 0) is always ignored - no [`Component`] is
 /// mounted for it. For local / single-player tools, use [`Canvas`] directly.
-pub struct Ui<Cmp, G, C>
+pub struct Ui<V>
 where
-    Cmp: Component + 'static,
+    V: View + 'static,
 {
-    inner: Arc<UiInner<Cmp, G, C>>,
+    inner: Arc<UiInner<V>>,
 }
 
-impl<Cmp, G, C> Clone for Ui<Cmp, G, C>
+impl<V> Clone for Ui<V>
 where
-    Cmp: Component + 'static,
+    V: View + 'static,
 {
     fn clone(&self) -> Self {
         Self {
@@ -111,34 +111,31 @@ where
     }
 }
 
-impl<Cmp, G, C> std::fmt::Debug for Ui<Cmp, G, C>
+impl<V> std::fmt::Debug for Ui<V>
 where
-    Cmp: Component + 'static,
+    V: View + 'static,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Ui").finish_non_exhaustive()
     }
 }
 
-impl<Cmp, G, C> Ui<Cmp, G, C>
+impl<V> Ui<V>
 where
-    Cmp: Component + 'static,
-    for<'a> Cmp::Props<'a>: From<(&'a G, &'a C)>,
-    G: Send + Sync + 'static,
-    C: Clone + Send + Sync + Default + 'static,
+    V: View + 'static,
 {
     /// Create a new UI handle and spawn its background LocalSet thread.
     ///
     /// `outgoing_tx` receives button render packets that should be forwarded to
-    /// the InSim connection. `initial_global` is the starting global props value.
+    /// the InSim connection. `initial_global` is the starting global state value.
     /// `make_root` is called once per connection when an `Ncn` packet is seen.
     pub fn new<F>(
         outgoing_tx: mpsc::UnboundedSender<Packet>,
-        initial_global: G,
+        initial_global: V::Global,
         make_root: F,
     ) -> Self
     where
-        F: FnMut(ConnectionId, InvalidateHandle) -> Cmp + Send + 'static,
+        F: FnMut(ConnectionId, InvalidateHandle) -> V + Send + 'static,
     {
         let (global, _) = watch::channel(Arc::new(initial_global));
         let (connection_props, connection_props_rx) = mpsc::channel(100);
@@ -146,7 +143,7 @@ where
         let (packet_tx, packet_rx) = mpsc::unbounded_channel();
         let (message_tx, _) = broadcast::channel(64);
 
-        spawn_ui_thread::<Cmp, G, C, F>(
+        spawn_ui_thread::<V, F>(
             global.clone(),
             make_root,
             connection_props_rx,
@@ -168,29 +165,29 @@ where
     }
 
     /// Subscribe to click and type-in events produced by any active view.
-    pub fn subscribe(&self) -> broadcast::Receiver<Cmp::Message> {
+    pub fn subscribe(&self) -> broadcast::Receiver<V::Message> {
         self.inner.message_tx.subscribe()
     }
 
-    /// Replace the global props. All active views re-render against the new value.
-    pub fn assign_global(&self, value: G) {
+    /// Replace the global state. All active views re-render against the new value.
+    pub fn assign_global(&self, value: V::Global) {
         let _ = self.inner.global.send_replace(Arc::new(value));
     }
 
-    /// Apply a closure to the current global props in place.
-    pub fn modify<F: FnOnce(&mut G)>(&self, f: F)
+    /// Apply a closure to the current global state in place.
+    pub fn modify<F: FnOnce(&mut V::Global)>(&self, f: F)
     where
-        G: Clone,
+        V::Global: Clone,
     {
         self.inner.global.send_modify(|arc| f(Arc::make_mut(arc)));
     }
 
-    /// Push per-connection props to a specific player's view.
+    /// Push per-connection state to a specific player's view.
     pub async fn assign_player(
         &self,
         ucid: ConnectionId,
-        props: C,
-    ) -> Result<(), mpsc::error::SendError<(ConnectionId, C)>> {
+        props: V::Connection,
+    ) -> Result<(), mpsc::error::SendError<(ConnectionId, V::Connection)>> {
         self.inner.connection_props.send((ucid, props)).await
     }
 
@@ -198,8 +195,8 @@ where
     pub async fn update(
         &self,
         ucid: ConnectionId,
-        msg: Cmp::Message,
-    ) -> Result<(), mpsc::error::SendError<(ConnectionId, Cmp::Message)>> {
+        msg: V::Message,
+    ) -> Result<(), mpsc::error::SendError<(ConnectionId, V::Message)>> {
         self.inner.view_messages.send((ucid, msg)).await
     }
 
@@ -215,20 +212,17 @@ where
     }
 }
 
-fn spawn_ui_thread<Cmp, G, C, F>(
-    global: watch::Sender<Arc<G>>,
+fn spawn_ui_thread<V, F>(
+    global: watch::Sender<Arc<V::Global>>,
     make_root: F,
-    mut connection_props_rx: mpsc::Receiver<(ConnectionId, C)>,
-    mut view_msg_rx: mpsc::Receiver<(ConnectionId, Cmp::Message)>,
+    mut connection_props_rx: mpsc::Receiver<(ConnectionId, V::Connection)>,
+    mut view_msg_rx: mpsc::Receiver<(ConnectionId, V::Message)>,
     mut packet_rx: mpsc::UnboundedReceiver<Packet>,
     outgoing_tx: mpsc::UnboundedSender<Packet>,
-    message_tx: broadcast::Sender<Cmp::Message>,
+    message_tx: broadcast::Sender<V::Message>,
 ) where
-    Cmp: Component + 'static,
-    for<'a> Cmp::Props<'a>: From<(&'a G, &'a C)>,
-    G: Send + Sync + 'static,
-    C: Clone + Send + Sync + Default + 'static,
-    F: FnMut(ConnectionId, InvalidateHandle) -> Cmp + Send + 'static,
+    V: View + 'static,
+    F: FnMut(ConnectionId, InvalidateHandle) -> V + Send + 'static,
 {
     // Own thread because Taffy isn't Send and view tasks must run on a LocalSet.
     let _ = std::thread::spawn(move || {
@@ -246,7 +240,7 @@ fn spawn_ui_thread<Cmp, G, C, F>(
         let local = LocalSet::new();
         local.block_on(&rt, async move {
             let mut make_root = make_root;
-            let mut active: HashMap<ConnectionId, ActiveViewChannels<Cmp::Message, C>> =
+            let mut active: HashMap<ConnectionId, ActiveViewChannels<V::Message, V::Connection>> =
                 HashMap::new();
             let mut view_msg_rx_closed = false;
             let mut connection_props_rx_closed = false;
@@ -270,7 +264,7 @@ fn spawn_ui_thread<Cmp, G, C, F>(
                                 ncn.ucid,
                                 InvalidateHandle::new(invalidation_notify.clone()),
                             );
-                            let (props_tx, props_rx) = watch::channel(C::default());
+                            let (props_tx, props_rx) = watch::channel(V::Connection::default());
                             let (event_tx, event_rx) = mpsc::unbounded_channel();
                             run_view(RunViewArgs {
                                 ucid: ncn.ucid,

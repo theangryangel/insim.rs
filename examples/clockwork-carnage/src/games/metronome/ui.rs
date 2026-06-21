@@ -1,4 +1,4 @@
-use kitcar::ui::{self, Component, Ui};
+use kitcar::ui::{self, Component, Ui, View};
 
 use super::state::MetronomeGlobal;
 use crate::components::{hud_active, hud_muted, hud_text, hud_title};
@@ -82,4 +82,16 @@ impl Component for MetronomeView {
     }
 }
 
-pub(super) type MetronomeUi = Ui<MetronomeView, MetronomeGlobal, MetronomeConnectionProps>;
+impl View for MetronomeView {
+    type Global = MetronomeGlobal;
+    type Connection = MetronomeConnectionProps;
+
+    fn props<'a>(
+        global: &'a MetronomeGlobal,
+        connection: &'a MetronomeConnectionProps,
+    ) -> Self::Props<'a> {
+        (global, connection)
+    }
+}
+
+pub(super) type MetronomeUi = Ui<MetronomeView>;

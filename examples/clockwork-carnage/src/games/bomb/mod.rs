@@ -28,7 +28,7 @@ use ui::{BombUi, BombView};
 
 use crate::{
     components::{Dialog, Marquee},
-    games::bomb::ui::{BombConnectionProps, BombMsg},
+    games::bomb::ui::BombMsg,
     run_registry::RunRegistry,
 };
 
@@ -81,7 +81,7 @@ pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
 
     let app = app
         .handle(Stage::Pre, clearer)
-        .handle(Stage::Pre, ui)
+        .with_ui(ui)
         .handle(Stage::Pre, rounds)
         .handle(Stage::Pre, runs)
         .handle(Stage::Update, ChatParser::<chat::Cmd>::new(&['!']))

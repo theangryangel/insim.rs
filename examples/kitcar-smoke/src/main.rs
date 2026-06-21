@@ -30,7 +30,7 @@ use insim::{
 use kitcar::{
     App, AppError, ChatEvent, ChatParser, Connected, Disconnected, Event, ExtractCx, FromContext,
     Handler, Packet, Sender, Stage, Startup, Svc, World, mtc, run,
-    ui::{self, Component, InvalidateHandle, Ui},
+    ui::{self, Component, InvalidateHandle, Ui, View},
 };
 use tokio_util::sync::CancellationToken;
 
@@ -246,7 +246,16 @@ impl Component for SmokeView {
     }
 }
 
-async fn refresh_ui_count(world: World, ui: Ui<SmokeView, UiGlobal, ()>) -> Result<(), AppError> {
+impl View for SmokeView {
+    type Global = UiGlobal;
+    type Connection = ();
+
+    fn props<'a>(global: &'a UiGlobal, connection: &'a ()) -> Self::Props<'a> {
+        (global, connection)
+    }
+}
+
+async fn refresh_ui_count(world: World, ui: Ui<SmokeView>) -> Result<(), AppError> {
     // Partial update: only touch `online`. `beats` is owned by the ticker
     // and would be clobbered by an `assign(UiGlobal { online, ..default })`.
     ui.modify(|g| g.online = world.count() as u64);
@@ -256,7 +265,7 @@ async fn refresh_ui_count(world: World, ui: Ui<SmokeView, UiGlobal, ()>) -> Resu
 async fn refresh_on_connect(
     _: Event<Connected>,
     world: World,
-    ui: Ui<SmokeView, UiGlobal, ()>,
+    ui: Ui<SmokeView>,
 ) -> Result<(), AppError> {
     refresh_ui_count(world, ui).await
 }
@@ -264,7 +273,7 @@ async fn refresh_on_connect(
 async fn refresh_on_disconnect(
     _: Event<Disconnected>,
     world: World,
-    ui: Ui<SmokeView, UiGlobal, ()>,
+    ui: Ui<SmokeView>,
 ) -> Result<(), AppError> {
     refresh_ui_count(world, ui).await
 }
@@ -285,7 +294,7 @@ async fn on_ui_click(Event(msg): Event<SmokeUiMsg>, sender: Sender) -> Result<()
 async fn install_ticker(
     _: Event<Startup>,
     sender: Sender,
-    ui: Ui<SmokeView, UiGlobal, ()>,
+    ui: Ui<SmokeView>,
 ) -> Result<(), AppError> {
     let _ticker = tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(30));
@@ -328,19 +337,19 @@ async fn main() -> Result<(), AppError> {
     let args = Args::parse();
 
     let app = App::new();
-    let ui = Ui::<SmokeView, UiGlobal, ()>::new(
+    let ui = Ui::<SmokeView>::new(
         app.sender().clone(),
         UiGlobal::default(),
         |ucid, _invalidator: InvalidateHandle| SmokeView { ucid, clicks: 0 },
     );
     let app = app
+        .with_ui(ui)
         .handle(
             Stage::Update,
             AppState {
                 joins: Arc::new(AtomicUsize::new(0)),
             },
         )
-        .handle(Stage::Pre, ui)
         .handle(Stage::Update, ChatParser::<Cmd>::new(&['!']))
         .handle(Stage::Update, install_ticker)
         .handle(Stage::Update, log_ncn)

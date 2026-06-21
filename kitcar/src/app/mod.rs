@@ -99,6 +99,10 @@ pub struct App<S = ()> {
     /// connection itself). Folded by the runtime's mirror step before any
     /// handler runs each cycle, and extractable via `world: World`.
     pub(crate) world: World,
+    /// The app's optional UI. Like `world`, it's a dedicated runtime-driven slot
+    /// (not a handler): the runtime forwards packets to it each cycle before
+    /// handlers run. Set via [`App::with_ui`]; extracted as `ui: Ui<V>`.
+    pub(crate) ui: Option<Box<dyn crate::ui::UiSink>>,
     /// Pre-stage handlers, keyed by handler `TypeId`. IndexMap preserves
     /// insertion order for dispatch and supports O(1) lookup for extraction.
     pub(crate) pre_handlers: IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
@@ -153,6 +157,7 @@ where
         Self {
             state,
             world: World::new(),
+            ui: None,
             pre_handlers: IndexMap::new(),
             update_handlers: IndexMap::new(),
             sender: Sender::new(cmd_tx),
@@ -237,6 +242,20 @@ where
                 let _ = self.update_handlers.insert(key, entry);
             },
         }
+        self
+    }
+
+    /// Register the app's UI in its dedicated runtime-driven slot (not the
+    /// handler maps): the runtime forwards `Ncn` / `Cnl` / `Btc` / `Btt` / `Bfn`
+    /// packets into it each cycle before handlers run, and handlers extract the
+    /// concrete [`Ui<V>`](crate::ui::Ui) via `ui: Ui<V>`. At most one UI per app
+    /// - registering again replaces the previous one.
+    #[must_use]
+    pub fn with_ui<V>(mut self, ui: crate::ui::Ui<V>) -> Self
+    where
+        V: crate::ui::View + 'static,
+    {
+        self.ui = Some(Box::new(ui));
         self
     }
 

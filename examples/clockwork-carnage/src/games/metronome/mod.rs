@@ -50,7 +50,7 @@ pub async fn run_metronome_with(cfg: MetronomeRunConfig) -> Result<(), AppError>
     let while_racing = |r: RoundManager| r.is_racing();
 
     let app = app
-        .handle(Stage::Pre, ui)
+        .with_ui(ui)
         .handle(Stage::Pre, rounds)
         .handle(Stage::Update, on_connected)
         .handle(Stage::Update, on_disconnected)
