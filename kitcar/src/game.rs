@@ -53,7 +53,9 @@ pub async fn track_rotation(
         info!("track_rotation: in_game + track differs, sending /end, waiting for end");
         let _ = sender.packets(mtc("^3Setting up - changing track, please wait...", all));
         sender.packet(world.end()).ok()?;
-        world.wait_for_end(cancel.clone()).await?;
+        world
+            .wait_until(cancel.clone(), |w| w.session().is_none().then_some(()))
+            .await?;
         info!("track_rotation: end confirmed, sending /clear");
         sender.packet(world.clear()).ok()?;
     }
@@ -76,10 +78,19 @@ pub async fn track_rotation(
     if let Some(layout) = layout {
         info!(?layout, "track_rotation: sending /axload, waiting for Axi");
         let _ = sender.packets(mtc("^3Setting up - loading layout, please wait...", all));
+        let axi_before = world.axi_count();
         sender.packet(world.ax_load(layout)).ok()?;
-        world.wait_for_any_axi(cancel.clone()).await?;
+        world
+            .wait_until(cancel.clone(), |w| {
+                (w.axi_count() != axi_before).then_some(())
+            })
+            .await?;
         info!("track_rotation: Axi received");
     }
+
+    // Snapshot before sending /restart so an Rst that lands before we start
+    // waiting is still observed.
+    let rst_before = world.rst_count();
 
     if in_game {
         info!("track_rotation: in_game, sending /restart");
@@ -91,7 +102,9 @@ pub async fn track_rotation(
     }
 
     info!("track_rotation: waiting for Rst");
-    world.wait_for_any_rst(cancel).await?;
+    world
+        .wait_until(cancel, |w| (w.rst_count() != rst_before).then_some(()))
+        .await?;
     info!("track_rotation: Rst received, done");
     Some(())
 }
