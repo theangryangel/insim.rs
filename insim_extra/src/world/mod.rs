@@ -32,6 +32,7 @@ use insim::{
     },
 };
 use parking_lot::RwLock;
+use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
 
 mod commands;
@@ -482,13 +483,25 @@ fn dispatch(inner: &mut WorldInner, packet: &insim::Packet, events: &mut Vec<Wor
 #[derive(Clone)]
 pub struct World {
     inner: Arc<RwLock<WorldInner>>,
+    /// Generation counter bumped after every [`apply_packet`](World::apply_packet).
+    /// Waiters in [`wait_until`](World::wait_until) block on changes to this
+    /// instead of polling.
+    version: Arc<watch::Sender<u64>>,
+}
+
+impl World {
+    fn from_inner(inner: WorldInner) -> Self {
+        let (version, _) = watch::channel(0u64);
+        Self {
+            inner: Arc::new(RwLock::new(inner)),
+            version: Arc::new(version),
+        }
+    }
 }
 
 impl Default for World {
     fn default() -> Self {
-        Self {
-            inner: Arc::new(RwLock::new(WorldInner::default())),
-        }
+        Self::from_inner(WorldInner::default())
     }
 }
 
@@ -537,12 +550,10 @@ impl World {
     /// endurance / multi-hour races where mid-race reconnects should not create
     /// phantom duplicate entrants.
     pub fn with_rejoin() -> Self {
-        Self {
-            inner: Arc::new(RwLock::new(WorldInner {
-                rejoin: true,
-                ..Default::default()
-            })),
-        }
+        Self::from_inner(WorldInner {
+            rejoin: true,
+            ..Default::default()
+        })
     }
 
     /// Apply one raw packet, update all internal state, and return any events.
@@ -555,6 +566,8 @@ impl World {
             let mut inner = self.inner.write();
             dispatch(&mut inner, packet, &mut events);
         }
+        // Wake any `wait_until` waiters so they re-check their predicate.
+        self.version.send_modify(|v| *v = v.wrapping_add(1));
         events
     }
 
@@ -626,35 +639,6 @@ impl World {
             .collect()
     }
 
-    /// Poll until the connection count satisfies `f`, or until `cancel` fires.
-    /// Returns `Some(count)` on success or `None` if cancelled.
-    pub async fn wait_for_connection_count<F: Fn(usize) -> bool>(
-        &self,
-        f: F,
-        poll_interval: Duration,
-        cancel: CancellationToken,
-    ) -> Option<usize> {
-        self.poll(poll_interval, cancel, || {
-            let count = self.connection_count();
-            f(count).then_some(count)
-        })
-        .await
-    }
-
-    /// Poll until the player count satisfies `f`, or until `cancel` fires.
-    pub async fn wait_for_player_count<F: Fn(usize) -> bool>(
-        &self,
-        f: F,
-        poll_interval: Duration,
-        cancel: CancellationToken,
-    ) -> Option<usize> {
-        self.poll(poll_interval, cancel, || {
-            let count = self.player_count();
-            f(count).then_some(count)
-        })
-        .await
-    }
-
     /// Currently selected track, if known.
     pub fn track(&self) -> Option<Track> {
         self.inner.read().game.track
@@ -710,88 +694,43 @@ impl World {
         self.inner.read().game.clone()
     }
 
-    /// Poll `f` on a fixed interval until it returns `Some`, or until `cancel`
-    /// fires (in which case `None`). The single primitive behind every
-    /// `wait_for_*` helper.
-    async fn poll<T>(
+    /// Number of `Axi` (autocross info) packets received so far. Snapshot this
+    /// before issuing a layout command, then [`wait_until`](Self::wait_until)
+    /// the count changes to detect the confirming `Axi`.
+    pub fn axi_count(&self) -> u64 {
+        self.inner.read().game.axi_count
+    }
+
+    /// Number of `Rst` (race start) packets received so far. Snapshot this
+    /// before issuing a restart, then [`wait_until`](Self::wait_until) the count
+    /// changes to detect the confirming `Rst`.
+    pub fn rst_count(&self) -> u64 {
+        self.inner.read().game.rst_count
+    }
+
+    /// Block until `f` returns `Some`, re-evaluating it each time state changes
+    /// (i.e. after each [`apply_packet`](Self::apply_packet)), or until `cancel`
+    /// fires (in which case `None`).
+    ///
+    /// This is edge-triggered with re-check, not polled: the receiver is created
+    /// before the first evaluation, so a state change racing the predicate check
+    /// is never missed.
+    pub async fn wait_until<T>(
         &self,
-        poll_interval: Duration,
         cancel: CancellationToken,
-        f: impl Fn() -> Option<T>,
+        f: impl Fn(&World) -> Option<T>,
     ) -> Option<T> {
-        let mut interval = tokio::time::interval(poll_interval);
+        let mut rx = self.version.subscribe();
         loop {
+            if let Some(v) = f(self) {
+                return Some(v);
+            }
             tokio::select! {
                 biased;
                 _ = cancel.cancelled() => return None,
-                _ = interval.tick() => {
-                    if let Some(v) = f() {
-                        return Some(v);
-                    }
-                }
+                res = rx.changed() => res.ok()?,
             }
         }
-    }
-
-    /// Wait until state is populated from at least one `Sta` packet - i.e.
-    /// the current track is known.
-    pub async fn wait_for_known_state(&self, cancel: CancellationToken) -> Option<()> {
-        self.poll(Duration::from_millis(100), cancel, || {
-            self.track().map(|_| ())
-        })
-        .await
-    }
-
-    /// Wait until the game is no longer in progress.
-    pub async fn wait_for_end(&self, cancel: CancellationToken) -> Option<()> {
-        self.poll(Duration::from_millis(500), cancel, || {
-            self.session().is_none().then_some(())
-        })
-        .await
-    }
-
-    /// Wait until the given track is loaded and no session is active
-    /// (selection screen, not yet racing).
-    pub async fn wait_for_track(&self, track: Track, cancel: CancellationToken) -> Option<()> {
-        self.poll(Duration::from_millis(500), cancel, move || {
-            (self.track() == Some(track)).then_some(())
-        })
-        .await
-    }
-
-    /// Wait until a race session is in progress.
-    pub async fn wait_for_racing(&self, cancel: CancellationToken) -> Option<()> {
-        self.poll(Duration::from_millis(500), cancel, || {
-            matches!(self.session(), Some(SessionKind::Race { .. })).then_some(())
-        })
-        .await
-    }
-
-    /// Wait for a specific layout to be loaded.
-    pub async fn wait_for_layout(&self, layout: String, cancel: CancellationToken) -> Option<()> {
-        self.poll(Duration::from_millis(500), cancel, move || {
-            (self.layout().as_deref() == Some(layout.as_str())).then_some(())
-        })
-        .await
-    }
-
-    /// Wait for any `Axi` packet to be received.
-    pub async fn wait_for_any_axi(&self, cancel: CancellationToken) -> Option<()> {
-        let before = self.inner.read().game.axi_count;
-        self.poll(Duration::from_millis(100), cancel, move || {
-            (self.inner.read().game.axi_count != before).then_some(())
-        })
-        .await
-    }
-
-    /// Wait for any `Rst` packet to be received, indicating a race or
-    /// qualifying session has started.
-    pub async fn wait_for_any_rst(&self, cancel: CancellationToken) -> Option<()> {
-        let before = self.inner.read().game.rst_count;
-        self.poll(Duration::from_millis(100), cancel, move || {
-            (self.inner.read().game.rst_count != before).then_some(())
-        })
-        .await
     }
 
     /// The current session fastest lap: entrant, player ID, and time.
