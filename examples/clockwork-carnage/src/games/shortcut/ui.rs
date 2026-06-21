@@ -1,4 +1,4 @@
-use kitcar::ui::{self, Component, Ui};
+use kitcar::ui::{self, Component, Ui, View};
 
 use super::state::ShortcutGlobal;
 use crate::components::{hud_active, hud_muted, hud_text, hud_title};
@@ -92,4 +92,16 @@ impl Component for ShortcutView {
     }
 }
 
-pub(super) type ShortcutUi = Ui<ShortcutView, ShortcutGlobal, ShortcutConnectionProps>;
+impl View for ShortcutView {
+    type Global = ShortcutGlobal;
+    type Connection = ShortcutConnectionProps;
+
+    fn props<'a>(
+        global: &'a ShortcutGlobal,
+        connection: &'a ShortcutConnectionProps,
+    ) -> Self::Props<'a> {
+        (global, connection)
+    }
+}
+
+pub(super) type ShortcutUi = Ui<ShortcutView>;

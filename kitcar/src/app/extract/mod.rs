@@ -44,6 +44,10 @@ pub struct ExtractCx<'a, S = ()> {
     /// current dispatch by the runtime's mirror step before any handler runs.
     /// Extracted by `world: World`.
     pub world: &'a World,
+    /// The app's optional UI, if one was registered via
+    /// [`App::with_ui`](crate::App::with_ui). The runtime forwards packets to it
+    /// before handlers run; handlers extract the concrete `Ui<V>` from it.
+    pub(crate) ui: Option<&'a dyn crate::ui::UiSink>,
     /// Pre-stage handlers, also serving as the typed registry for extraction
     /// (looked up by `TypeId`).
     pub(crate) pre_handlers: &'a IndexMap<std::any::TypeId, Box<dyn ErasedHandler<S>>>,

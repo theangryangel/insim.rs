@@ -2,7 +2,7 @@ use kitcar::{AppError, ChatEvent, Event, ui::Ui};
 
 use crate::{
     components::DialogMsg,
-    games::bomb::{BombConnectionProps, BombGlobal, BombMsg, BombView},
+    games::bomb::{BombMsg, BombView},
 };
 
 #[derive(Debug, Clone)]
@@ -25,7 +25,7 @@ impl std::str::FromStr for Cmd {
 
 pub(super) async fn handle_chat(
     Event(cmd): Event<ChatEvent<Cmd>>,
-    ui: Ui<BombView, BombGlobal, BombConnectionProps>,
+    ui: Ui<BombView>,
 ) -> Result<(), AppError> {
     match cmd.parsed {
         Cmd::Help => {

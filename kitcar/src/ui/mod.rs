@@ -1,55 +1,57 @@
 //! UI extension.
 //!
-//! Drives a per-connection [`Component`] tree on its own background thread
-//! (necessary because `taffy` layout isn't `Send`, so view tasks run on a
-//! `LocalSet`). Registers as a [`Handler`] so the runtime forwards
-//! `Ncn` / `Cnl` / `Btc` / `Btt` / `Bfn` packets into the UI thread, and
-//! as an extractor so handlers can pull the [`Ui`] handle by value to push
-//! global state updates / per-player state / view messages.
+//! Drives a per-connection [`View`] tree on its own background thread (necessary
+//! because `taffy` layout isn't `Send`, so view tasks run on a `LocalSet`). The
+//! UI is a **first-class part of the app**: register it once with
+//! [`App::with_ui`](crate::App::with_ui) and the runtime forwards
+//! `Ncn` / `Cnl` / `Btc` / `Btt` / `Bfn` packets into the UI thread each cycle,
+//! before handlers run. Handlers pull the [`Ui`] handle by value (via
+//! [`FromContext`]) to push global state / per-player state / view messages.
 //!
-//! For PoC purposes the root [`Component`] is fixed at construction. Swapping
-//! UIs at runtime is intentionally out of scope.
+//! For PoC purposes the root [`View`] is fixed at construction. Swapping UIs at
+//! runtime is intentionally out of scope.
 //!
 //! ```ignore
 //! let app = App::new();
-//! let ui = Ui::<MyView, GlobalProps, PlayerProps>::new(
+//! let ui = Ui::<MyView>::new(
 //!     app.sender().clone(),
 //!     initial_global,
 //!     |ucid, invalidator| MyView::new(ucid, invalidator),
 //! );
 //! let app = app
-//!     .with_state(...)
-//!     .extension(ui)
-//!     .handler(my_handler);
+//!     .with_ui(ui)
+//!     .handle(Stage::Update, my_handler);
 //!
-//! async fn my_handler(ui: Ui<MyView, GlobalProps, PlayerProps>) -> Result<(), AppError> {
-//!     ui.assign(new_global_props);
+//! async fn my_handler(ui: Ui<MyView>) -> Result<(), AppError> {
+//!     ui.assign_global(new_global_state);
 //!     Ok(())
 //! }
 //! ```
 
+use std::any::Any;
+
 use insim::identifiers::ConnectionId;
 use insim_extra::ui::Ui as InnerUi;
 pub use insim_extra::ui::{
-    Canvas, CanvasDiff, Component, InvalidateHandle, Node, NodeKind, TypeInMapper, UiError,
+    Canvas, CanvasDiff, Component, InvalidateHandle, Node, NodeKind, TypeInMapper, UiError, View,
     background, clickable, container, empty, text, typein,
 };
 use tokio::sync::{broadcast, mpsc};
 
-use crate::{Dispatch, ExtractCx, FromContext, Handler, Sender};
+use crate::{ExtractCx, FromContext, Sender};
 
 /// UI handle. Construct with [`Ui::new`] and register via
-/// [`crate::App::install`]. Pulled into handlers via [`FromContext`].
-pub struct Ui<Cmp, G, C>
+/// [`crate::App::with_ui`]. Pulled into handlers via [`FromContext`].
+pub struct Ui<V>
 where
-    Cmp: Component + 'static,
+    V: View + 'static,
 {
-    inner: InnerUi<Cmp, G, C>,
+    inner: InnerUi<V>,
 }
 
-impl<Cmp, G, C> Clone for Ui<Cmp, G, C>
+impl<V> Clone for Ui<V>
 where
-    Cmp: Component + 'static,
+    V: View + 'static,
 {
     fn clone(&self) -> Self {
         Self {
@@ -58,32 +60,29 @@ where
     }
 }
 
-impl<Cmp, G, C> std::fmt::Debug for Ui<Cmp, G, C>
+impl<V> std::fmt::Debug for Ui<V>
 where
-    Cmp: Component + 'static,
+    V: View + 'static,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Ui").finish_non_exhaustive()
     }
 }
 
-impl<Cmp, G, C> Ui<Cmp, G, C>
+impl<V> Ui<V>
 where
-    Cmp: Component + 'static,
-    for<'a> Cmp::Props<'a>: From<(&'a G, &'a C)>,
-    G: Send + Sync + 'static,
-    C: Clone + Send + Sync + Default + 'static,
+    V: View + 'static,
 {
     /// Create a new UI handle and spawn its background LocalSet thread.
     ///
     /// `sender` is the runtime back-channel - get it from
     /// [`App::sender`](crate::App::sender) **before** registering the `Ui` via
-    /// `.extension(...)`. `initial_global` is the starting value for the
-    /// global props; update later via [`Ui::assign_global`]. `make_root` is
-    /// called once per connection when an `Ncn` packet arrives.
-    pub fn new<F>(sender: Sender, initial_global: G, make_root: F) -> Self
+    /// [`with_ui`](crate::App::with_ui). `initial_global` is the starting value
+    /// for the global state; update later via [`Ui::assign_global`]. `make_root`
+    /// is called once per connection when an `Ncn` packet arrives.
+    pub fn new<F>(sender: Sender, initial_global: V::Global, make_root: F) -> Self
     where
-        F: FnMut(ConnectionId, InvalidateHandle) -> Cmp + Send + 'static,
+        F: FnMut(ConnectionId, InvalidateHandle) -> V + Send + 'static,
     {
         let (outgoing_tx, mut outgoing_rx) = mpsc::unbounded_channel::<insim::Packet>();
         let inner = InnerUi::new(outgoing_tx, initial_global, make_root);
@@ -120,25 +119,25 @@ where
         Self { inner }
     }
 
-    /// Replace the global props. All active views re-render against the new value.
-    pub fn assign_global(&self, value: G) {
+    /// Replace the global state. All active views re-render against the new value.
+    pub fn assign_global(&self, value: V::Global) {
         self.inner.assign_global(value);
     }
 
-    /// Apply a closure to the current global props in place.
-    pub fn modify<F: FnOnce(&mut G)>(&self, f: F)
+    /// Apply a closure to the current global state in place.
+    pub fn modify<F: FnOnce(&mut V::Global)>(&self, f: F)
     where
-        G: Clone,
+        V::Global: Clone,
     {
         self.inner.modify(f);
     }
 
-    /// Push per-connection props to a specific player's view.
+    /// Push per-connection state to a specific player's view.
     pub async fn assign_player(
         &self,
         ucid: ConnectionId,
-        props: C,
-    ) -> Result<(), mpsc::error::SendError<(ConnectionId, C)>> {
+        props: V::Connection,
+    ) -> Result<(), mpsc::error::SendError<(ConnectionId, V::Connection)>> {
         self.inner.assign_player(ucid, props).await
     }
 
@@ -146,8 +145,8 @@ where
     pub async fn update(
         &self,
         ucid: ConnectionId,
-        msg: Cmp::Message,
-    ) -> Result<(), mpsc::error::SendError<(ConnectionId, Cmp::Message)>> {
+        msg: V::Message,
+    ) -> Result<(), mpsc::error::SendError<(ConnectionId, V::Message)>> {
         self.inner.update(ucid, msg).await
     }
 
@@ -157,36 +156,31 @@ where
     }
 }
 
-impl<S, Cmp, G, C> FromContext<S> for Ui<Cmp, G, C>
-where
-    Cmp: Component + 'static,
-    for<'a> Cmp::Props<'a>: From<(&'a G, &'a C)>,
-    G: Send + Sync + 'static,
-    C: Clone + Send + Sync + Default + 'static,
-{
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
-        cx.lookup::<Ui<Cmp, G, C>>()
+/// Object-safe driver the runtime holds in [`App`](crate::App)'s UI slot so it can
+/// forward packets to the one mounted UI without naming its view type, and hand
+/// the concrete [`Ui<V>`] back to handlers via downcast.
+pub trait UiSink: Send + Sync {
+    /// Forward a wire packet into the UI thread.
+    fn forward_packet(&self, p: &insim::Packet);
+    /// Recover the concrete `Ui<V>` for the [`FromContext`] extractor.
+    fn as_any(&self) -> &dyn Any;
+}
+
+impl<V: View + 'static> UiSink for Ui<V> {
+    fn forward_packet(&self, p: &insim::Packet) {
+        self.inner.forward_packet(p);
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
-impl<S, Cmp, G, C> Handler<(), S> for Ui<Cmp, G, C>
+impl<S, V> FromContext<S> for Ui<V>
 where
-    S: Send + Sync + 'static,
-    Cmp: Component + 'static,
-    for<'a> Cmp::Props<'a>: From<(&'a G, &'a C)>,
-    G: Send + Sync + 'static,
-    C: Clone + Send + Sync + Default + 'static,
+    V: View + 'static,
 {
-    fn call(
-        self,
-        cx: &ExtractCx<'_, S>,
-    ) -> impl std::future::Future<Output = Result<(), crate::AppError>> + Send {
-        let d = cx.dispatch.clone();
-        async move {
-            if let Dispatch::Packet(p) = d {
-                self.forward_packet(&p);
-            }
-            Ok(())
-        }
+    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+        cx.ui?.as_any().downcast_ref::<Ui<V>>().cloned()
     }
 }

@@ -3,7 +3,7 @@ use std::time::Instant;
 use insim::Colour;
 use kitcar::{
     RoundPhase,
-    ui::{self, Component, Ui},
+    ui::{self, Component, Ui, View},
 };
 
 use super::state::BombGlobal;
@@ -219,4 +219,13 @@ impl Component for BombView {
     }
 }
 
-pub(super) type BombUi = Ui<BombView, BombGlobal, BombConnectionProps>;
+impl View for BombView {
+    type Global = BombGlobal;
+    type Connection = BombConnectionProps;
+
+    fn props<'a>(global: &'a BombGlobal, connection: &'a BombConnectionProps) -> Self::Props<'a> {
+        (global, connection)
+    }
+}
+
+pub(super) type BombUi = Ui<BombView>;
