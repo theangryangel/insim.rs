@@ -54,7 +54,7 @@ pub struct MarqueeProps<'a> {
 }
 
 impl ui::Component for Marquee {
-    type Message = ();
+    type Message = std::convert::Infallible;
     type Props<'a> = MarqueeProps<'a>;
 
     fn render(&self, props: Self::Props<'_>) -> ui::Node<Self::Message> {

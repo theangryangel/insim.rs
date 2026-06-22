@@ -76,36 +76,26 @@ impl Component for BombView {
     fn render(&self, (global, player): Self::Props<'_>) -> ui::Node<Self::Message> {
         let any_dialog = self.help.is_visible() || self.about.is_visible();
         if any_dialog {
-            return ui::container()
-                .flex()
-                .flex_col()
-                .justify_center()
-                .items_center()
-                .w(200.)
-                .h(200.)
-                .with_child(
-                    ui::container()
-                        .flex()
-                        .flex_row()
-                        .with_child(
-                            self.help
-                                .render_panel(DialogProps {
-                                    title: "Bomb - Help",
-                                    lines: BOMB_HELP_LINES,
-                                    key: "help",
-                                })
-                                .map(BombMsg::Help),
-                        )
-                        .with_child(
-                            self.about
-                                .render_panel(DialogProps {
-                                    title: "Bomb - About",
-                                    lines: BOMB_ABOUT_LINES,
-                                    key: "about",
-                                })
-                                .map(BombMsg::About),
-                        ),
-                );
+            return ui::col([ui::row([
+                self.help
+                    .render_panel(DialogProps {
+                        title: "Bomb - Help",
+                        lines: BOMB_HELP_LINES,
+                        key: "help",
+                    })
+                    .map(BombMsg::Help),
+                self.about
+                    .render_panel(DialogProps {
+                        title: "Bomb - About",
+                        lines: BOMB_ABOUT_LINES,
+                        key: "about",
+                    })
+                    .map(BombMsg::About),
+            ])])
+            .justify_center()
+            .items_center()
+            .w(200.)
+            .h(200.);
         }
 
         let status_str = if player.in_run {
@@ -149,7 +139,7 @@ impl Component for BombView {
                 } else {
                     hud_text()
                 };
-                ui::container().flex().flex_row().with_children([
+                ui::row([
                     ui::text(pname.as_str(), style.align_left()).w(15.0).h(5.0),
                     ui::text(cps_str, style.align_right()).w(8.0).h(5.0),
                     ui::text(time_str, style.align_right()).w(10.0).h(5.0),
@@ -172,7 +162,7 @@ impl Component for BombView {
                 let rank = format!("#{}", i + 1);
                 let cps_str = format!("{cps} cps");
                 let survival_str = format!("{:.1}s", *ms as f64 / 1000.0);
-                ui::container().flex().flex_row().with_children([
+                ui::row([
                     ui::text(rank, style).w(5.0).h(5.0),
                     ui::text(pname.as_str(), style.align_left()).w(20.0).h(5.0),
                     ui::text(cps_str, style.align_right()).w(8.0).h(5.0),
@@ -181,41 +171,36 @@ impl Component for BombView {
             })
             .collect();
 
-        let mut scoreboard = ui::container()
+        let scoreboard = ui::container()
             .flex()
+            .flex_col()
             .pl(5.0)
             .w(200.0)
             .mt(10.0)
-            .flex_col()
-            .items_start();
+            .items_start()
+            .when(!matches!(global.phase, RoundPhase::SettingUp), |b| {
+                b.with_child(ui::text("Active Runs", hud_title()).w(43.0).h(5.0))
+                    .with_children(active_run_rows)
+                    .with_child(ui::text("Session Best", hud_title()).w(43.0).h(5.0))
+                    .with_children(leaderboard_rows)
+            });
 
-        if !matches!(global.phase, RoundPhase::SettingUp) {
-            scoreboard = scoreboard
-                .with_child(ui::text("Active Runs", hud_title()).w(43.0).h(5.0))
-                .with_children(active_run_rows)
-                .with_child(ui::text("Session Best", hud_title()).w(43.0).h(5.0))
-                .with_children(leaderboard_rows);
-        }
-
-        ui::container()
-            .flex()
-            .flex_col()
-            .w(200.0)
-            .with_child(
-                topbar(&format!("Bomb - {}", global.phase))
-                    .with_child(ui::text(status_str, status_style).w(45.0).h(5.0))
-                    .with_child(
-                        Component::render(
-                            &self.marquee,
-                            MarqueeProps {
-                                text: "Hello World",
-                                width: 20,
-                            },
-                        )
-                        .map(|_| unreachable!()),
-                    ),
-            )
-            .with_child(scoreboard)
+        ui::col([
+            topbar(&format!("Bomb - {}", global.phase))
+                .with_child(ui::text(status_str, status_style).w(45.0).h(5.0))
+                .with_child(
+                    Component::render(
+                        &self.marquee,
+                        MarqueeProps {
+                            text: "Hello World",
+                            width: 20,
+                        },
+                    )
+                    .cast(),
+                ),
+            scoreboard,
+        ])
+        .w(200.0)
     }
 }
 
