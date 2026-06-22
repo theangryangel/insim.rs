@@ -29,7 +29,7 @@ use insim::identifiers::ConnectionId;
 use insim_extra::ui::Ui as InnerUi;
 pub use insim_extra::ui::{
     Canvas, CanvasDiff, Component, InvalidateHandle, Node, NodeKind, TypeInMapper, UiError, View,
-    ViewHandle, background, clickable, container, empty, text, typein,
+    ViewHandle, background, clickable, col, container, empty, row, text, typein,
 };
 use tokio::sync::{broadcast, mpsc};
 

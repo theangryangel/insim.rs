@@ -353,6 +353,24 @@ pub fn container<Msg>() -> node::Node<Msg> {
     node::Node::container()
 }
 
+/// Horizontal flex container holding `children`. Shorthand for
+/// `container().flex().flex_row().with_children(children)`.
+pub fn row<Msg>(children: impl IntoIterator<Item = node::Node<Msg>>) -> node::Node<Msg> {
+    node::Node::container()
+        .flex()
+        .flex_row()
+        .with_children(children)
+}
+
+/// Vertical flex container holding `children`. Shorthand for
+/// `container().flex().flex_col().with_children(children)`.
+pub fn col<Msg>(children: impl IntoIterator<Item = node::Node<Msg>>) -> node::Node<Msg> {
+    node::Node::container()
+        .flex()
+        .flex_col()
+        .with_children(children)
+}
+
 /// Filled background node (no text).
 pub fn background<Msg>(bstyle: insim::insim::BtnStyle) -> node::Node<Msg> {
     node::Node::background(bstyle)

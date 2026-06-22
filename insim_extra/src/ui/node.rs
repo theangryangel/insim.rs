@@ -209,6 +209,14 @@ impl<Msg> Node<Msg> {
         self
     }
 
+    /// Conditionally apply a run of builder steps, staying in the fluent chain.
+    /// `f` is invoked with `self` only when `condition` holds; otherwise `self`
+    /// is returned untouched. Generalises [`with_child_if`](Self::with_child_if)
+    /// to any sequence of modifications.
+    pub fn when<F: FnOnce(Self) -> Self>(self, condition: bool, f: F) -> Self {
+        if condition { f(self) } else { self }
+    }
+
     pub fn bstyle(&self) -> Option<&BtnStyle> {
         match self.kind {
             NodeKind::Container { ref bstyle, .. } => Some(bstyle),
@@ -499,11 +507,6 @@ impl<Msg> Node<Msg> {
         self
     }
 
-    pub fn sized(mut self, width: f32, height: f32) -> Self {
-        self = self.w(width).h(height);
-        self
-    }
-
     // Maps/wraps child msg -> parent msg
     // Usage: component.render(ctx).map(RootMsg::ParentVariant)
     pub fn map<F, ParentMsg>(self, f: F) -> Node<ParentMsg>
@@ -541,6 +544,19 @@ impl<Msg> Node<Msg> {
             kind,
             style: self.style,
         }
+    }
+}
+
+impl Node<std::convert::Infallible> {
+    /// Lift a node that provably emits no messages into any message type.
+    ///
+    /// A `Node<Infallible>` can never carry a message (no value of
+    /// [`Infallible`](std::convert::Infallible) exists), so this is a total,
+    /// panic-free cast - use it to embed a pure display component (one whose
+    /// `Message = Infallible`) into a parent of any message type, instead of
+    /// `.map(|_| unreachable!())`.
+    pub fn cast<Msg: 'static>(self) -> Node<Msg> {
+        self.map(|never| match never {})
     }
 }
 
@@ -1144,14 +1160,6 @@ mod tests {
         let style = node.style.unwrap();
         assert_eq!(style.size.width, taffy::Dimension::auto());
         assert_eq!(style.size.height, taffy::Dimension::auto());
-    }
-
-    #[test]
-    fn test_sized() {
-        let node: Node<TestMsg> = Node::container().sized(100.0, 50.0);
-        let style = node.style.unwrap();
-        assert_eq!(style.size.width, taffy::Dimension::length(100.0));
-        assert_eq!(style.size.height, taffy::Dimension::length(50.0));
     }
 
     #[test]

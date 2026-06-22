@@ -18,39 +18,34 @@ impl Dialog {
         }
 
         let close_key = format!("{}-close", props.key);
-        ui::container()
-            .flex()
-            .flex_col()
-            .with_child(
-                ui::background(hud_panel_bg())
-                    .w(100.0)
-                    .flex()
-                    .flex_col()
-                    .p(1.)
-                    .with_child(
-                        ui::text(props.title, hud_overlay_text().align_left().yellow())
-                            .h(8.)
-                            .mb(2.)
-                            .w_auto(),
-                    )
-                    .with_children(props.lines.iter().map(|t| {
-                        ui::text(t.to_owned(), hud_overlay_text().align_left().white())
-                            .w_auto()
-                            .h(6.)
-                    })),
-            )
-            .with_child(
-                ui::clickable(
-                    "Close",
-                    hud_overlay_action().green().dark(),
-                    DialogMsg::Hide,
+        ui::col([
+            ui::background(hud_panel_bg())
+                .w(100.0)
+                .flex()
+                .flex_col()
+                .p(1.)
+                .with_child(
+                    ui::text(props.title, hud_overlay_text().align_left().yellow())
+                        .h(8.)
+                        .mb(2.)
+                        .w_auto(),
                 )
-                .self_end()
-                .w(12.)
-                .h(8.)
-                .mt(2.)
-                .key(close_key),
+                .with_children(props.lines.iter().map(|t| {
+                    ui::text(t.to_owned(), hud_overlay_text().align_left().white())
+                        .w_auto()
+                        .h(6.)
+                })),
+            ui::clickable(
+                "Close",
+                hud_overlay_action().green().dark(),
+                DialogMsg::Hide,
             )
+            .self_end()
+            .w(12.)
+            .h(8.)
+            .mt(2.)
+            .key(close_key),
+        ])
     }
 }
 
@@ -78,17 +73,6 @@ impl ui::Component for Dialog {
     }
 
     fn render(&self, props: Self::Props<'_>) -> ui::Node<Self::Message> {
-        if !self.visible {
-            return ui::Node::empty();
-        }
-
-        ui::container()
-            .flex()
-            .flex_col()
-            .justify_center()
-            .items_center()
-            .w(200.)
-            .h(200.)
-            .with_child(self.render_panel(props))
+        self.render_panel(props)
     }
 }

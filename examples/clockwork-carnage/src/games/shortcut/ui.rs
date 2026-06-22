@@ -52,7 +52,7 @@ impl Component for ShortcutView {
                 } else {
                     hud_text()
                 };
-                ui::container().flex().flex_row().with_children([
+                ui::row([
                     ui::text(rank, style).w(5.0).h(5.0),
                     ui::text(pname.as_str(), style.align_left()).w(20.0).h(5.0),
                     ui::text(time_str, style.align_right()).w(15.0).h(5.0),
@@ -60,32 +60,23 @@ impl Component for ShortcutView {
             })
             .collect();
 
-        let scoreboard = ui::container()
-            .flex()
+        let scoreboard = ui::col([ui::text("Best Times", hud_title()).w(40.0).h(5.0)])
             .pl(5.0)
             .w(200.0)
             .mt(10.0)
-            .flex_col()
             .items_start()
-            .with_child(ui::text("Best Times", hud_title()).w(40.0).h(5.0))
             .with_children(lb_rows);
 
-        ui::container()
-            .flex()
-            .flex_col()
-            .with_child(
-                ui::container()
-                    .flex()
-                    .flex_row()
-                    .justify_center()
-                    .with_child(
-                        ui::text(&format!("Shortcut - {}", global.phase), hud_title())
-                            .w(40.0)
-                            .h(5.0),
-                    )
-                    .with_child(ui::text(status_str, status_style).w(20.0).h(5.0)),
-            )
-            .with_child(scoreboard)
+        ui::col([
+            ui::row([
+                ui::text(format!("Shortcut - {}", global.phase), hud_title())
+                    .w(40.0)
+                    .h(5.0),
+                ui::text(status_str, status_style).w(20.0).h(5.0),
+            ])
+            .justify_center(),
+            scoreboard,
+        ])
     }
 }
 
