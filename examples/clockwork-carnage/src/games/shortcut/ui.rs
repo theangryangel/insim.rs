@@ -10,13 +10,10 @@ pub(super) struct ShortcutConnectionProps {
     pub(super) best_time_ms: Option<i64>,
 }
 
-#[derive(Clone, Debug)]
-pub(super) enum ShortcutMsg {}
-
 pub(super) struct ShortcutView;
 
 impl Component for ShortcutView {
-    type Message = ShortcutMsg;
+    type Message = ();
     type Props<'a> = (&'a ShortcutGlobal, &'a ShortcutConnectionProps);
 
     fn render(&self, (global, player): Self::Props<'_>) -> ui::Node<Self::Message> {
@@ -39,7 +36,7 @@ impl Component for ShortcutView {
             hud_muted()
         };
 
-        let lb_rows: Vec<ui::Node<ShortcutMsg>> = global
+        let lb_rows: Vec<ui::Node<()>> = global
             .leaderboard
             .iter()
             .take(8)

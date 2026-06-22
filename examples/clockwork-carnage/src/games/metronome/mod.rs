@@ -42,13 +42,10 @@ pub async fn run_metronome_with(cfg: MetronomeRunConfig) -> Result<(), AppError>
 
     // `with_ui` fixes the app's view type and must come before any handlers.
     let app = App::<Metronome>::with_state(Metronome::new(cfg.config, cfg.db))
-        .with_ui(
-            MetronomeGlobal {
-                target,
-                ..Default::default()
-            },
-            |_ucid, _invalidator| MetronomeView,
-        )
+        .with_ui::<MetronomeView>(MetronomeGlobal {
+            target,
+            ..Default::default()
+        })
         .handle(Stage::Pre, rounds)
         .handle(Stage::Update, on_connected)
         .handle(Stage::Update, on_disconnected)
