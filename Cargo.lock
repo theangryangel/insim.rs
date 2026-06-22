@@ -1729,7 +1729,7 @@ dependencies = [
 
 [[package]]
 name = "insim"
-version = "4.1.0"
+version = "5.0.0"
 dependencies = [
  "bitflags 2.11.1",
  "bytes",
@@ -1749,7 +1749,7 @@ dependencies = [
 
 [[package]]
 name = "insim_core"
-version = "3.0.0"
+version = "4.0.0"
 dependencies = [
  "arrayvec",
  "bitflags 2.11.1",
@@ -1793,7 +1793,7 @@ dependencies = [
 
 [[package]]
 name = "insim_macros"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "darling 0.23.0",
  "proc-macro2",
@@ -1815,7 +1815,7 @@ dependencies = [
 
 [[package]]
 name = "insim_pth"
-version = "3.1.0"
+version = "4.0.0"
 dependencies = [
  "bitflags 2.11.1",
  "bytes",
@@ -2315,7 +2315,7 @@ dependencies = [
 
 [[package]]
 name = "outgauge"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bitflags 2.11.1",
  "bytes",
@@ -2325,7 +2325,7 @@ dependencies = [
 
 [[package]]
 name = "outsim"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "bitflags 2.11.1",
  "bytes",
