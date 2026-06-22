@@ -1,4 +1,3 @@
-use askama::Template;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -15,17 +14,6 @@ use crate::{
         state::{AppState, User},
     },
 };
-
-#[derive(Template)]
-#[template(path = "event_edit.html")]
-pub struct EventEditTemplate {
-    pub current_user: User,
-    pub csrf_token: String,
-    pub event: db::Event,
-    pub tracks: &'static [Track],
-    pub eras: Vec<db::Era>,
-    pub cs: Changeset<EditEventInput>,
-}
 
 #[derive(serde::Deserialize, Default, Validate)]
 pub struct EditEventInput {
@@ -47,6 +35,9 @@ pub struct EditEventInput {
     pub allowed_vehicles: String,
     #[serde(default)]
     pub status: EventStatus,
+    /// phx-change marker: `"change"` = live re-render (no commit).
+    #[serde(default, rename = "_event")]
+    pub event: Option<String>,
 }
 
 pub async fn event_edit_get(
@@ -64,13 +55,7 @@ pub async fn event_edit_get(
         .map_err(internal_error)?
         .ok_or(StatusCode::NOT_FOUND)?;
     let eras = db::all_eras(&state.pool).await.map_err(internal_error)?;
-    let allowed_vehicles = event
-        .allowed_vehicles
-        .0
-        .iter()
-        .cloned()
-        .collect::<Vec<_>>()
-        .join(", ");
+    let allowed_vehicles = event.allowed_vehicles.0.join(", ");
     let (target, checkpoint_timeout) = match &*event.mode {
         EventMode::Metronome { target_ms } => (Some((target_ms / 1000) as u64), None),
         EventMode::Bomb {
@@ -95,18 +80,11 @@ pub async fn event_edit_get(
         checkpoint_timeout,
         allowed_vehicles,
         status: event.status.clone(),
+        event: None,
     });
     Ok(Html(
-        EventEditTemplate {
-            current_user,
-            csrf_token: csrf.token,
-            event,
-            tracks: Track::ALL,
-            eras,
-            cs,
-        }
-        .render()
-        .map_err(internal_error)?,
+        crate::web::views::event_edit(&current_user, &csrf.token, &event, Track::ALL, &eras, &cs)
+            .into_string(),
     ))
 }
 
@@ -121,23 +99,39 @@ pub async fn event_edit_post(
     if !current_user.admin {
         return Err(StatusCode::NOT_FOUND);
     }
+
+    // phx-change: re-render the form from the changeset; the client morphs it
+    // back in via Alpine.
+    if cs.params.event.as_deref() == Some("change") {
+        let event = db::get_event(&state.pool, id)
+            .await
+            .map_err(internal_error)?
+            .ok_or(StatusCode::NOT_FOUND)?;
+        let eras = db::all_eras(&state.pool).await.map_err(internal_error)?;
+        return Ok(Html(
+            crate::web::views::event_edit_form(&csrf.token, &event, Track::ALL, &eras, &cs)
+                .into_string(),
+        )
+        .into_response());
+    }
+
     if !cs.is_valid() {
         let event = db::get_event(&state.pool, id)
             .await
             .map_err(internal_error)?
             .ok_or(StatusCode::NOT_FOUND)?;
         let eras = db::all_eras(&state.pool).await.map_err(internal_error)?;
-        return Ok(EventEditTemplate {
-            current_user,
-            csrf_token: csrf.token,
-            event,
-            tracks: Track::ALL,
-            eras,
-            cs,
-        }
-        .render()
-        .map_err(internal_error)
-        .map(Html)?
+        return Ok(Html(
+            crate::web::views::event_edit(
+                &current_user,
+                &csrf.token,
+                &event,
+                Track::ALL,
+                &eras,
+                &cs,
+            )
+            .into_string(),
+        )
         .into_response());
     }
     let name = cs.params.name.as_deref().filter(|s| !s.is_empty());

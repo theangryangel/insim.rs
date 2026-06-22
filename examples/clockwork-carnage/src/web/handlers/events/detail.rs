@@ -1,4 +1,3 @@
-use askama::Template;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -7,10 +6,11 @@ use axum::{
 
 use super::internal_error;
 use crate::{
-    db::{self, Event, EventMode, EventStatus},
+    db::{self, Event, EventMode},
     web::{
-        AuthSession, filters,
+        AuthSession,
         state::{AppState, User},
+        views,
     },
 };
 
@@ -29,12 +29,41 @@ pub enum EventResults {
     },
 }
 
-#[derive(Template)]
-#[template(path = "event_detail.html")]
-pub struct EventDetailTemplate {
-    pub current_user: User,
-    pub event: Event,
-    pub results: EventResults,
+/// Load the leaderboard/results for an event. Shared by the full page render
+/// and the standalone fragment route.
+pub async fn load_event_results(
+    pool: &db::Pool,
+    event: &Event,
+) -> Result<EventResults, StatusCode> {
+    Ok(match &*event.mode {
+        EventMode::Metronome { target_ms } => {
+            let standings = db::metronome_standings(pool, event.id)
+                .await
+                .map_err(internal_error)?;
+            EventResults::Metronome {
+                standings,
+                target_ms: *target_ms,
+            }
+        },
+        EventMode::Shortcut => {
+            let best = db::shortcut_best_times(pool, event.id)
+                .await
+                .map_err(internal_error)?;
+            let all = db::shortcut_all_times(pool, event.id)
+                .await
+                .map_err(internal_error)?;
+            EventResults::Shortcut { best, all }
+        },
+        EventMode::Bomb { .. } => {
+            let best = db::bomb_best_runs(pool, event.id)
+                .await
+                .map_err(internal_error)?;
+            let all = db::bomb_all_runs(pool, event.id)
+                .await
+                .map_err(internal_error)?;
+            EventResults::Bomb { best, all }
+        },
+    })
 }
 
 pub async fn event_detail(
@@ -48,43 +77,23 @@ pub async fn event_detail(
         .map_err(internal_error)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    let results = match &*event.mode {
-        EventMode::Metronome { target_ms } => {
-            let standings = db::metronome_standings(&state.pool, event.id)
-                .await
-                .map_err(internal_error)?;
-            EventResults::Metronome {
-                standings,
-                target_ms: *target_ms,
-            }
-        },
-        EventMode::Shortcut => {
-            let best = db::shortcut_best_times(&state.pool, event.id)
-                .await
-                .map_err(internal_error)?;
-            let all = db::shortcut_all_times(&state.pool, event.id)
-                .await
-                .map_err(internal_error)?;
-            EventResults::Shortcut { best, all }
-        },
-        EventMode::Bomb { .. } => {
-            let best = db::bomb_best_runs(&state.pool, event.id)
-                .await
-                .map_err(internal_error)?;
-            let all = db::bomb_all_runs(&state.pool, event.id)
-                .await
-                .map_err(internal_error)?;
-            EventResults::Bomb { best, all }
-        },
-    };
+    let results = load_event_results(&state.pool, &event).await?;
 
     Ok(Html(
-        EventDetailTemplate {
-            current_user,
-            event,
-            results,
-        }
-        .render()
-        .map_err(internal_error)?,
+        crate::web::views::event_detail(&current_user, &event, &results).into_string(),
     ))
+}
+
+/// Standalone `#event-results` fragment — same Maud function as the page embeds.
+/// This is the seam an SSE push (or poll) would render into.
+pub async fn event_results_fragment(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Html<String>, StatusCode> {
+    let event = db::get_event(&state.pool, id)
+        .await
+        .map_err(internal_error)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+    let results = load_event_results(&state.pool, &event).await?;
+    Ok(Html(views::event_results(&results).into_string()))
 }

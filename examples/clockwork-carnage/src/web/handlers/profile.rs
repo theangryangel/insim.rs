@@ -1,4 +1,3 @@
-use askama::Template;
 use axum::{
     extract::State,
     http::StatusCode,
@@ -14,14 +13,6 @@ use crate::{
         state::{AppState, User},
     },
 };
-
-#[derive(Template)]
-#[template(path = "profile.html")]
-pub struct ProfileTemplate {
-    pub current_user: User,
-    pub csrf_token: String,
-    pub cs: Changeset<ProfileInput>,
-}
 
 #[derive(serde::Deserialize, Default, Validate)]
 pub struct ProfileInput {
@@ -53,16 +44,10 @@ pub async fn profile_get(
         twitch_username,
         youtube_username,
     });
-    Ok(Html(
-        ProfileTemplate {
-            current_user,
-            csrf_token: csrf.token,
-            cs,
-        }
-        .render()
-        .map_err(internal_error)?,
+    Ok(
+        Html(crate::web::views::profile(&current_user, &csrf.token, &cs).into_string())
+            .into_response(),
     )
-    .into_response())
 }
 
 pub async fn profile_post(

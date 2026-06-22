@@ -1,21 +1,14 @@
-use askama::Template;
 use axum::{extract::State, http::StatusCode, response::Html};
 
 use super::internal_error;
 use crate::{
-    db::{self, Event, EventStatus},
+    db,
     web::{
-        AuthSession, filters,
+        AuthSession,
         state::{AppState, User},
+        views,
     },
 };
-
-#[derive(Template)]
-#[template(path = "index.html")]
-pub struct IndexTemplate {
-    pub current_user: User,
-    pub events: Vec<Event>,
-}
 
 pub async fn index(
     auth: AuthSession,
@@ -34,12 +27,5 @@ pub async fn index(
             .await
             .map_err(internal_error)?,
     );
-    Ok(Html(
-        IndexTemplate {
-            current_user,
-            events,
-        }
-        .render()
-        .map_err(internal_error)?,
-    ))
+    Ok(Html(views::index(&current_user, &events).into_string()))
 }

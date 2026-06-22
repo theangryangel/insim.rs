@@ -1,4 +1,3 @@
-use askama::Template;
 use axum::{
     extract::State,
     http::StatusCode,
@@ -13,18 +12,9 @@ use crate::{
     web::{
         AuthSession, Changeset, Csrf,
         state::{AppState, User},
+        views,
     },
 };
-
-#[derive(Template)]
-#[template(path = "event_new.html")]
-pub struct EventNewTemplate {
-    pub current_user: User,
-    pub csrf_token: String,
-    pub tracks: &'static [Track],
-    pub eras: Vec<db::Era>,
-    pub cs: Changeset<NewEventInput>,
-}
 
 #[derive(serde::Deserialize, Validate)]
 pub struct NewEventInput {
@@ -53,6 +43,9 @@ pub struct NewEventInput {
     pub allowed_vehicles: String,
     #[serde(default)]
     pub status: EventStatus,
+    /// phx-change marker: `"change"` = live re-render (no commit).
+    #[serde(default, rename = "_event")]
+    pub event: Option<String>,
 }
 
 fn default_target() -> u64 {
@@ -85,6 +78,7 @@ impl Default for NewEventInput {
             collision_max_penalty_ms: default_collision_max_penalty_ms(),
             allowed_vehicles: String::new(),
             status: EventStatus::Pending,
+            event: None,
         }
     }
 }
@@ -99,16 +93,9 @@ pub async fn event_new_get(
         return Err(StatusCode::NOT_FOUND);
     }
     let eras = db::all_eras(&state.pool).await.map_err(internal_error)?;
+    let cs = Changeset::empty();
     Ok(Html(
-        EventNewTemplate {
-            current_user,
-            csrf_token: csrf.token,
-            tracks: Track::ALL,
-            eras,
-            cs: Changeset::empty(),
-        }
-        .render()
-        .map_err(internal_error)?,
+        views::event_new(&current_user, &csrf.token, Track::ALL, &eras, &cs).into_string(),
     ))
 }
 
@@ -122,18 +109,22 @@ pub async fn event_new_post(
     if !current_user.admin {
         return Err(StatusCode::NOT_FOUND);
     }
+
+    // phx-change: re-render the form from the changeset; the client morphs it
+    // back in via Alpine. No commit, no side effects.
+    if cs.params.event.as_deref() == Some("change") {
+        let eras = db::all_eras(&state.pool).await.map_err(internal_error)?;
+        return Ok(
+            Html(views::event_new_form(&csrf.token, Track::ALL, &eras, &cs).into_string())
+                .into_response(),
+        );
+    }
+
     if !cs.is_valid() {
         let eras = db::all_eras(&state.pool).await.map_err(internal_error)?;
-        return Ok(EventNewTemplate {
-            current_user,
-            csrf_token: csrf.token,
-            tracks: Track::ALL,
-            eras,
-            cs,
-        }
-        .render()
-        .map_err(internal_error)
-        .map(Html)?
+        return Ok(Html(
+            views::event_new(&current_user, &csrf.token, Track::ALL, &eras, &cs).into_string(),
+        )
         .into_response());
     }
     let name = cs

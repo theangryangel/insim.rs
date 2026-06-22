@@ -5,6 +5,7 @@ pub mod csrf;
 pub mod filters;
 pub mod handlers;
 pub mod state;
+pub mod views;
 
 use std::{net::SocketAddr, sync::Arc};
 
@@ -229,6 +230,7 @@ pub async fn serve(listen: SocketAddr, pool: db::Pool, cfg: WebConfig) -> anyhow
         .route("/events", get(events))
         .route("/events/new", get(event_new_get).post(event_new_post))
         .route("/events/{id}", get(event_detail))
+        .route("/events/{id}/results", get(event_results_fragment))
         .route(
             "/events/{id}/edit",
             get(event_edit_get).post(event_edit_post),
