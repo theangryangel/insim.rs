@@ -18,11 +18,8 @@
 //! ```ignore
 //! use tokio::sync::mpsc;
 //! let (outgoing_tx, mut outgoing_rx) = mpsc::unbounded_channel();
-//! let ui = Ui::<MyView>::new(
-//!     outgoing_tx,
-//!     initial_global,
-//!     |ucid, invalidator| MyView::new(ucid, invalidator),
-//! );
+//! let ui = Ui::<MyView>::new(outgoing_tx, initial_global);
+//! // Each connection's view is built via `MyView::mount` when its `Ncn` arrives.
 //!
 //! // Bridge outgoing button packets to your connection
 //! tokio::spawn(async move {

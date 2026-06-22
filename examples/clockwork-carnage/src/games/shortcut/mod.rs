@@ -43,13 +43,10 @@ pub async fn run_shortcut_with(cfg: ShortcutRunConfig) -> Result<(), AppError> {
 
     // `with_ui` fixes the app's view type and must come before any handlers.
     let app = App::<Shortcut>::with_state(Shortcut::new(cfg.db))
-        .with_ui(
-            ShortcutGlobal {
-                phase: RoundPhase::Waiting.to_string(),
-                ..Default::default()
-            },
-            |_ucid, _invalidator| ShortcutView,
-        )
+        .with_ui::<ShortcutView>(ShortcutGlobal {
+            phase: RoundPhase::Waiting.to_string(),
+            ..Default::default()
+        })
         .handle(Stage::Pre, rounds)
         .handle(Stage::Update, on_connected)
         .handle(Stage::Update, on_disconnected)

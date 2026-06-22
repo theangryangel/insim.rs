@@ -16,7 +16,7 @@
 //!
 //! ```ignore
 //! let app = App::with_state(state)
-//!     .with_ui(initial_global, |ucid, invalidator| MyView::new(ucid, invalidator))
+//!     .with_ui::<MyView>(initial_global)
 //!     .handle(Stage::Update, my_handler);
 //!
 //! async fn my_handler(ui: Ui<MyView>) -> Result<(), AppError> {

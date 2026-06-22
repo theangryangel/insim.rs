@@ -10,13 +10,10 @@ pub(super) struct MetronomeConnectionProps {
     pub(super) best_delta_ms: Option<i64>,
 }
 
-#[derive(Clone, Debug)]
-pub(super) enum MetronomeMsg {}
-
 pub(super) struct MetronomeView;
 
 impl Component for MetronomeView {
-    type Message = MetronomeMsg;
+    type Message = ();
     type Props<'a> = (&'a MetronomeGlobal, &'a MetronomeConnectionProps);
 
     fn render(&self, (global, player): Self::Props<'_>) -> ui::Node<Self::Message> {
@@ -36,7 +33,7 @@ impl Component for MetronomeView {
 
         let target_str = format!("Target: {:.2}s", global.target.as_secs_f64());
 
-        let lb_rows: Vec<ui::Node<MetronomeMsg>> = global
+        let lb_rows: Vec<ui::Node<()>> = global
             .leaderboard
             .iter()
             .take(8)
