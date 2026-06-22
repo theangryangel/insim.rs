@@ -37,8 +37,8 @@ use crate::{Dispatch, ExtractCx, FromContext, Sender};
 ///     Ok(())
 /// }
 /// ```
-impl<S> FromContext<S> for World {
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+impl<S, V: crate::ui::View + 'static> FromContext<S, V> for World {
+    fn from_context(cx: &ExtractCx<'_, S, V>) -> Option<Self> {
         Some(cx.world.clone())
     }
 }

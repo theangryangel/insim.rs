@@ -39,7 +39,7 @@ struct AppState {
     joins: Arc<AtomicUsize>,
 }
 
-impl<S: Send + Sync + 'static> Handler<(), S> for AppState {}
+impl<S: Send + Sync + 'static, V: View + 'static> Handler<(), S, V> for AppState {}
 
 async fn log_ncn(Packet(ncn): Packet<Ncn>, Svc(state): Svc<AppState>) -> Result<(), AppError> {
     let n = state.joins.fetch_add(1, Ordering::Relaxed) + 1;
@@ -155,9 +155,9 @@ impl MsoCounter {
     }
 }
 
-impl Handler<(Packet<Mso>,)> for MsoCounter {
-    async fn call(self, cx: &ExtractCx<'_>) -> Result<(), AppError> {
-        let Some(Packet(mso)) = <Packet<Mso> as FromContext>::from_context(cx) else {
+impl<S: Send + Sync + 'static, V: View + 'static> Handler<(Packet<Mso>,), S, V> for MsoCounter {
+    async fn call(self, cx: &ExtractCx<'_, S, V>) -> Result<(), AppError> {
+        let Some(Packet(mso)) = <Packet<Mso> as FromContext<S, V>>::from_context(cx) else {
             return Ok(());
         };
         let n = self.seen.fetch_add(1, Ordering::Relaxed) + 1;
@@ -250,6 +250,10 @@ impl View for SmokeView {
     type Global = UiGlobal;
     type Connection = ();
 
+    fn mount(ucid: ConnectionId, _invalidator: InvalidateHandle) -> Self {
+        SmokeView { ucid, clicks: 0 }
+    }
+
     fn props<'a>(global: &'a UiGlobal, connection: &'a ()) -> Self::Props<'a> {
         (global, connection)
     }
@@ -336,14 +340,8 @@ async fn main() -> Result<(), AppError> {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
 
-    let app = App::new();
-    let ui = Ui::<SmokeView>::new(
-        app.sender().clone(),
-        UiGlobal::default(),
-        |ucid, _invalidator: InvalidateHandle| SmokeView { ucid, clicks: 0 },
-    );
-    let app = app
-        .with_ui(ui)
+    let app = App::new()
+        .with_ui::<SmokeView>(UiGlobal::default())
         .handle(
             Stage::Update,
             AppState {

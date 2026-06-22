@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use insim::Colour;
 use kitcar::{
@@ -222,6 +222,24 @@ impl Component for BombView {
 impl View for BombView {
     type Global = BombGlobal;
     type Connection = BombConnectionProps;
+
+    fn mount(_ucid: insim::identifiers::ConnectionId, invalidator: ui::InvalidateHandle) -> Self {
+        let marquee = Marquee::new(invalidator.clone());
+        // Drive periodic redraws (marquee animation) without external input.
+        let _tick_handle = tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_millis(100));
+            loop {
+                let _ = interval.tick().await;
+                invalidator.invalidate();
+            }
+        });
+        BombView {
+            _tick_handle,
+            help: Dialog::default(),
+            about: Dialog::default(),
+            marquee,
+        }
+    }
 
     fn props<'a>(global: &'a BombGlobal, connection: &'a BombConnectionProps) -> Self::Props<'a> {
         (global, connection)

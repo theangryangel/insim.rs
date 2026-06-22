@@ -18,16 +18,19 @@ use super::{
     extract::{ExtractCx, FromContext},
     handler::Handler,
 };
-use crate::error::AppError;
+use crate::{error::AppError, ui::NoView};
 
 /// A synchronous predicate over the dispatch context.
 ///
 /// Implemented automatically for `Fn(E0, E1, …) -> bool` closures (arities
 /// 0–4) whose arguments all implement [`FromContext<S>`]. Implement manually
 /// for custom predicate types.
-pub trait RunIf<T, S = ()>: Clone + Send + Sync + 'static {
+pub trait RunIf<T, S = (), V = NoView>: Clone + Send + Sync + 'static
+where
+    V: crate::ui::View + 'static,
+{
     /// Evaluate the predicate. Returns `false` if any extractor returns `None`.
-    fn check(&self, cx: &ExtractCx<'_, S>) -> bool;
+    fn check(&self, cx: &ExtractCx<'_, S, V>) -> bool;
 }
 
 /// Blanket impls for `Fn(…) -> bool` closures.
@@ -39,14 +42,15 @@ pub trait RunIf<T, S = ()>: Clone + Send + Sync + 'static {
 macro_rules! impl_run_if {
     ( $($ty:ident),* ) => {
         #[allow(non_snake_case)]
-        impl<F, S, $($ty),*> RunIf<($($ty,)*), S> for F
+        impl<F, S, V, $($ty),*> RunIf<($($ty,)*), S, V> for F
         where
             F: Fn($($ty),*) -> bool + Clone + Send + Sync + 'static,
-            $( $ty: FromContext<S> + 'static, )*
+            $( $ty: FromContext<S, V> + 'static, )*
             S: Send + Sync + 'static,
+            V: crate::ui::View + 'static,
         {
             #[allow(unused)]
-            fn check(&self, cx: &ExtractCx<'_, S>) -> bool {
+            fn check(&self, cx: &ExtractCx<'_, S, V>) -> bool {
                 $(
                     let Some($ty) = $ty::from_context(cx) else {
                         return false;
@@ -98,15 +102,16 @@ impl<H: Clone, P: Clone, PT> Clone for Conditional<H, P, PT> {
     }
 }
 
-impl<H, P, HT, PT, S> Handler<HT, S> for Conditional<H, P, PT>
+impl<H, P, HT, PT, S, V> Handler<HT, S, V> for Conditional<H, P, PT>
 where
-    H: Handler<HT, S>,
-    P: RunIf<PT, S>,
+    H: Handler<HT, S, V>,
+    P: RunIf<PT, S, V>,
     HT: Send + 'static,
     PT: Send + 'static,
     S: Send + Sync + 'static,
+    V: crate::ui::View + 'static,
 {
-    async fn call(self, cx: &ExtractCx<'_, S>) -> Result<(), AppError> {
+    async fn call(self, cx: &ExtractCx<'_, S, V>) -> Result<(), AppError> {
         if !self.predicate.check(cx) {
             return Ok(());
         }
@@ -115,11 +120,14 @@ where
 }
 
 /// Adds `.run_if(predicate)` to every [`Handler`].
-pub trait HandlerExt<T, S = ()>: Handler<T, S> {
+pub trait HandlerExt<T, S = (), V = NoView>: Handler<T, S, V>
+where
+    V: crate::ui::View + 'static,
+{
     /// Wrap this handler so it only runs when `predicate` returns `true`.
     fn run_if<P, PT>(self, predicate: P) -> Conditional<Self, P, PT>
     where
-        P: RunIf<PT, S>,
+        P: RunIf<PT, S, V>,
         PT: Send + 'static,
     {
         Conditional {
@@ -130,4 +138,4 @@ pub trait HandlerExt<T, S = ()>: Handler<T, S> {
     }
 }
 
-impl<T, S, H: Handler<T, S>> HandlerExt<T, S> for H {}
+impl<T, S, V: crate::ui::View + 'static, H: Handler<T, S, V>> HandlerExt<T, S, V> for H {}

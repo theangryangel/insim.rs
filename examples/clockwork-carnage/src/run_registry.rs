@@ -135,8 +135,10 @@ impl<T: Clone + Send + Sync + 'static> RunRegistry<T> {
     }
 }
 
-impl<S, T: Clone + Send + Sync + 'static> FromContext<S> for RunRegistry<T> {
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+impl<S, V: kitcar::ui::View + 'static, T: Clone + Send + Sync + 'static> FromContext<S, V>
+    for RunRegistry<T>
+{
+    fn from_context(cx: &ExtractCx<'_, S, V>) -> Option<Self> {
         cx.lookup::<RunRegistry<T>>()
     }
 }
@@ -144,8 +146,10 @@ impl<S, T: Clone + Send + Sync + 'static> FromContext<S> for RunRegistry<T> {
 /// Rides the world lifecycle: on the (synchronous) `PlayerLeft` /
 /// `PlayerTeleportedToPits` dispatch, remove the owner's run and emit
 /// [`RunEnded<T>`] for the game to react to.
-impl<S: Send + Sync + 'static, T: Clone + Send + Sync + 'static> Handler<(), S> for RunRegistry<T> {
-    fn call(self, cx: &ExtractCx<'_, S>) -> impl Future<Output = Result<(), AppError>> + Send {
+impl<S: Send + Sync + 'static, V: kitcar::ui::View + 'static, T: Clone + Send + Sync + 'static>
+    Handler<(), S, V> for RunRegistry<T>
+{
+    fn call(self, cx: &ExtractCx<'_, S, V>) -> impl Future<Output = Result<(), AppError>> + Send {
         let evicted = if let Dispatch::Synthetic(payload) = cx.dispatch {
             if let Some(PlayerLeft(info)) = payload.downcast_ref::<PlayerLeft>() {
                 self.inner.write().remove(&info.plid).map(|run| RunEnded {

@@ -6,12 +6,13 @@ pub use insim_extra::chat::{ChatEvent, ChatParser};
 
 use crate::{AppError, Dispatch, ExtractCx, Handler};
 
-impl<S, C> Handler<(), S> for ChatParser<C>
+impl<S, V, C> Handler<(), S, V> for ChatParser<C>
 where
     S: Send + Sync + 'static,
+    V: crate::ui::View + 'static,
     C: FromStr + Any + Send + Sync + Clone + 'static,
 {
-    fn call(self, cx: &ExtractCx<'_, S>) -> impl Future<Output = Result<(), AppError>> + Send {
+    fn call(self, cx: &ExtractCx<'_, S, V>) -> impl Future<Output = Result<(), AppError>> + Send {
         let maybe_packet = if let Dispatch::Packet(p) = cx.dispatch {
             Some(p.clone())
         } else {

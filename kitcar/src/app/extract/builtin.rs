@@ -24,11 +24,12 @@ use crate::app::event::Dispatch;
 #[derive(Debug, Clone)]
 pub struct Svc<T>(pub T);
 
-impl<S, T> FromContext<S> for Svc<T>
+impl<S, V, T> FromContext<S, V> for Svc<T>
 where
+    V: crate::ui::View + 'static,
     T: Clone + Send + Sync + 'static,
 {
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+    fn from_context(cx: &ExtractCx<'_, S, V>) -> Option<Self> {
         cx.lookup::<T>().map(Svc)
     }
 }
@@ -64,11 +65,12 @@ impl<S> std::ops::DerefMut for State<S> {
     }
 }
 
-impl<S> FromContext<S> for State<S>
+impl<S, V> FromContext<S, V> for State<S>
 where
+    V: crate::ui::View + 'static,
     S: Clone + Send + Sync + 'static,
 {
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+    fn from_context(cx: &ExtractCx<'_, S, V>) -> Option<Self> {
         Some(State(cx.state.clone()))
     }
 }
@@ -84,12 +86,13 @@ where
 #[derive(Debug, Clone)]
 pub struct Packet<T>(pub T);
 
-impl<S, T> FromContext<S> for Packet<T>
+impl<S, V, T> FromContext<S, V> for Packet<T>
 where
+    V: crate::ui::View + 'static,
     T: Clone + Send + 'static,
     for<'a> &'a T: TryFrom<&'a insim::Packet>,
 {
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+    fn from_context(cx: &ExtractCx<'_, S, V>) -> Option<Self> {
         match cx.dispatch {
             Dispatch::Packet(p) => <&T>::try_from(p).ok().cloned().map(Packet),
             _ => None,
@@ -102,11 +105,12 @@ where
 #[derive(Debug, Clone)]
 pub struct Event<T>(pub T);
 
-impl<S, T> FromContext<S> for Event<T>
+impl<S, V, T> FromContext<S, V> for Event<T>
 where
+    V: crate::ui::View + 'static,
     T: Any + Clone + Send + Sync + 'static,
 {
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+    fn from_context(cx: &ExtractCx<'_, S, V>) -> Option<Self> {
         match cx.dispatch {
             Dispatch::Synthetic(a) => a.downcast_ref::<T>().cloned().map(Event),
             _ => None,

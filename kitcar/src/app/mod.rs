@@ -22,7 +22,10 @@ use self::{
     handler::{ErasedHandler, Handler, HandlerService},
     runtime::Sender,
 };
-use crate::World;
+use crate::{
+    World,
+    ui::{NoView, View},
+};
 
 /// Which stage of the dispatch cycle a handler runs in.
 ///
@@ -60,9 +63,12 @@ pub enum Stage {
 ///     }
 /// }
 /// ```
-pub trait Installable<S = ()> {
-    /// Consume the [`App<S>`], add this bundle's registrations, return it.
-    fn install(self, app: App<S>) -> App<S>;
+pub trait Installable<S = (), V = NoView>
+where
+    V: View + 'static,
+{
+    /// Consume the [`App<S, V>`], add this bundle's registrations, return it.
+    fn install(self, app: App<S, V>) -> App<S, V>;
 }
 
 /// Composition root for an `kitcar` bot.
@@ -93,21 +99,26 @@ pub trait Installable<S = ()> {
 ///
 /// Periodic synthetic events have a small dedicated helper - see
 /// [`App::periodic`].
-pub struct App<S = ()> {
+pub struct App<S = (), V = NoView>
+where
+    V: View + 'static,
+{
     pub(crate) state: S,
     /// The world-state mirror, intrinsic to every app (as core as the
     /// connection itself). Folded by the runtime's mirror step before any
     /// handler runs each cycle, and extractable via `world: World`.
     pub(crate) world: World,
-    /// The app's optional UI. Like `world`, it's a dedicated runtime-driven slot
-    /// (not a handler): the runtime forwards packets to it each cycle before
-    /// handlers run. Set via [`App::with_ui`]; extracted as `ui: Ui<V>`.
-    pub(crate) ui: Option<Box<dyn crate::ui::UiSink>>,
+    /// The app's UI, intrinsic like `world` and parameterising the app via `V`.
+    /// A dedicated runtime-driven slot (not a handler): the runtime forwards
+    /// packets to it each cycle before handlers run. Set via [`App::with_ui`];
+    /// extracted infallibly as `ui: Ui<V>`. An app with no UI keeps the inert
+    /// [`NoView`] handle.
+    pub(crate) ui: crate::ui::Ui<V>,
     /// Pre-stage handlers, keyed by handler `TypeId`. IndexMap preserves
     /// insertion order for dispatch and supports O(1) lookup for extraction.
-    pub(crate) pre_handlers: IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
+    pub(crate) pre_handlers: IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
     /// Update-stage handlers, ditto.
-    pub(crate) update_handlers: IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
+    pub(crate) update_handlers: IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
     pub(crate) sender: Sender,
     /// Receiver paired with `sender`. Taken by `run()`.
     pub(crate) cmd_rx: Option<mpsc::UnboundedReceiver<Command>>,
@@ -116,10 +127,11 @@ pub struct App<S = ()> {
     pub(crate) cancel: CancellationToken,
 }
 
-impl<S> std::fmt::Debug for App<S> {
+impl<S, V: View + 'static> std::fmt::Debug for App<S, V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("App")
             .field("world", &self.world)
+            .field("ui", &self.ui)
             .field("pre_handlers", &self.pre_handlers.len())
             .field("update_handlers", &self.update_handlers.len())
             .finish()
@@ -141,7 +153,7 @@ impl App<()> {
     }
 }
 
-impl<S> App<S>
+impl<S> App<S, NoView>
 where
     S: Clone + Send + Sync + 'static,
 {
@@ -152,12 +164,14 @@ where
     /// wrap your state in any lock - if you need shared mutability, build
     /// it into `S` (`Arc<Mutex<…>>`, `Arc<RwLock<…>>`, `Arc<AtomicX>`, or
     /// plain `Arc<…>` for read-only data).
+    ///
+    /// The app starts with no UI ([`NoView`]); add one with [`App::with_ui`].
     pub fn with_state(state: S) -> Self {
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<Command>();
         Self {
             state,
             world: World::new(),
-            ui: None,
+            ui: crate::ui::Ui::disabled(),
             pre_handlers: IndexMap::new(),
             update_handlers: IndexMap::new(),
             sender: Sender::new(cmd_tx),
@@ -166,6 +180,44 @@ where
         }
     }
 
+    /// Register the app's UI, fixing the view type `V` and switching the app to
+    /// `App<S, V>`. Builds the [`Ui`](crate::ui::Ui) from the app's own sender;
+    /// `initial_global` seeds the global state, and each connection's view is
+    /// constructed via [`View::mount`].
+    ///
+    /// **Must be called before any handlers are registered** (it resets the
+    /// handler maps to the new view type); a `debug_assert` guards against
+    /// late calls. The UI then lives in a dedicated runtime-driven slot - the
+    /// runtime forwards packets to it each cycle before handlers run, and
+    /// handlers extract it infallibly as `ui: Ui<V>`.
+    #[must_use]
+    pub fn with_ui<V>(self, initial_global: V::Global) -> App<S, V>
+    where
+        V: View + 'static,
+    {
+        debug_assert!(
+            self.pre_handlers.is_empty() && self.update_handlers.is_empty(),
+            "App::with_ui must be called before any handlers are registered"
+        );
+        let ui = crate::ui::Ui::new(self.sender.clone(), initial_global);
+        App {
+            state: self.state,
+            world: self.world,
+            ui,
+            pre_handlers: IndexMap::new(),
+            update_handlers: IndexMap::new(),
+            sender: self.sender,
+            cmd_rx: self.cmd_rx,
+            cancel: self.cancel,
+        }
+    }
+}
+
+impl<S, V> App<S, V>
+where
+    S: Clone + Send + Sync + 'static,
+    V: View + 'static,
+{
     /// Switch the embedded [`World`] into rejoin mode (see
     /// [`World::with_rejoin`]).
     ///
@@ -229,11 +281,11 @@ where
     #[must_use]
     pub fn handle<T, H>(mut self, stage: Stage, handler: H) -> Self
     where
-        H: Handler<T, S> + 'static,
+        H: Handler<T, S, V> + 'static,
         T: Send + 'static,
     {
         let key = TypeId::of::<H>();
-        let entry: Box<dyn ErasedHandler<S>> = Box::new(HandlerService::new(handler));
+        let entry: Box<dyn ErasedHandler<S, V>> = Box::new(HandlerService::new(handler));
         match stage {
             Stage::Pre => {
                 let _ = self.pre_handlers.insert(key, entry);
@@ -245,24 +297,10 @@ where
         self
     }
 
-    /// Register the app's UI in its dedicated runtime-driven slot (not the
-    /// handler maps): the runtime forwards `Ncn` / `Cnl` / `Btc` / `Btt` / `Bfn`
-    /// packets into it each cycle before handlers run, and handlers extract the
-    /// concrete [`Ui<V>`](crate::ui::Ui) via `ui: Ui<V>`. At most one UI per app
-    /// - registering again replaces the previous one.
-    #[must_use]
-    pub fn with_ui<V>(mut self, ui: crate::ui::Ui<V>) -> Self
-    where
-        V: crate::ui::View + 'static,
-    {
-        self.ui = Some(Box::new(ui));
-        self
-    }
-
     /// Install an [`Installable`] bundle of handlers. Equivalent to
     /// `installable.install(self)`.
     #[must_use]
-    pub fn install<I: Installable<S>>(self, installable: I) -> Self {
+    pub fn install<I: Installable<S, V>>(self, installable: I) -> Self {
         installable.install(self)
     }
 

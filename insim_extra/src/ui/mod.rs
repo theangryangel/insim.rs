@@ -128,24 +128,17 @@ where
     ///
     /// `outgoing_tx` receives button render packets that should be forwarded to
     /// the InSim connection. `initial_global` is the starting global state value.
-    /// `make_root` is called once per connection when an `Ncn` packet is seen.
-    pub fn new<F>(
-        outgoing_tx: mpsc::UnboundedSender<Packet>,
-        initial_global: V::Global,
-        make_root: F,
-    ) -> Self
-    where
-        F: FnMut(ConnectionId, InvalidateHandle) -> V + Send + 'static,
-    {
+    /// Each connection's view is constructed via [`View::mount`] when its `Ncn`
+    /// packet is seen.
+    pub fn new(outgoing_tx: mpsc::UnboundedSender<Packet>, initial_global: V::Global) -> Self {
         let (global, _) = watch::channel(Arc::new(initial_global));
         let (connection_props, connection_props_rx) = mpsc::channel(100);
         let (view_messages, view_msg_rx) = mpsc::channel(100);
         let (packet_tx, packet_rx) = mpsc::unbounded_channel();
         let (message_tx, _) = broadcast::channel(64);
 
-        spawn_ui_thread::<V, F>(
+        spawn_ui_thread::<V>(
             global.clone(),
-            make_root,
             connection_props_rx,
             view_msg_rx,
             packet_rx,
@@ -212,9 +205,8 @@ where
     }
 }
 
-fn spawn_ui_thread<V, F>(
+fn spawn_ui_thread<V>(
     global: watch::Sender<Arc<V::Global>>,
-    make_root: F,
     mut connection_props_rx: mpsc::Receiver<(ConnectionId, V::Connection)>,
     mut view_msg_rx: mpsc::Receiver<(ConnectionId, V::Message)>,
     mut packet_rx: mpsc::UnboundedReceiver<Packet>,
@@ -222,7 +214,6 @@ fn spawn_ui_thread<V, F>(
     message_tx: broadcast::Sender<V::Message>,
 ) where
     V: View + 'static,
-    F: FnMut(ConnectionId, InvalidateHandle) -> V + Send + 'static,
 {
     // Own thread because Taffy isn't Send and view tasks must run on a LocalSet.
     let _ = std::thread::spawn(move || {
@@ -239,7 +230,6 @@ fn spawn_ui_thread<V, F>(
 
         let local = LocalSet::new();
         local.block_on(&rt, async move {
-            let mut make_root = make_root;
             let mut active: HashMap<ConnectionId, ActiveViewChannels<V::Message, V::Connection>> =
                 HashMap::new();
             let mut view_msg_rx_closed = false;
@@ -260,7 +250,7 @@ fn spawn_ui_thread<V, F>(
                                 continue;
                             }
                             let invalidation_notify = Arc::new(Notify::new());
-                            let root = make_root(
+                            let root = V::mount(
                                 ncn.ucid,
                                 InvalidateHandle::new(invalidation_notify.clone()),
                             );
