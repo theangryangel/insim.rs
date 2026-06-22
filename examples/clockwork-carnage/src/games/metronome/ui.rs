@@ -86,6 +86,10 @@ impl View for MetronomeView {
     type Global = MetronomeGlobal;
     type Connection = MetronomeConnectionProps;
 
+    fn mount(_ucid: insim::identifiers::ConnectionId, _invalidator: ui::InvalidateHandle) -> Self {
+        MetronomeView
+    }
+
     fn props<'a>(
         global: &'a MetronomeGlobal,
         connection: &'a MetronomeConnectionProps,

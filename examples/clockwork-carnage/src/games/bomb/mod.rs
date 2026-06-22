@@ -9,8 +9,6 @@ mod handlers;
 mod state;
 mod ui;
 
-use std::time::Duration;
-
 pub use config::{BombArgs, BombConfig, BombRunConfig};
 use config::{MIN_PLAYERS, PENALTY_CLEAR_DELAY, TICK_PERIOD};
 use events::BombTick;
@@ -24,13 +22,9 @@ use kitcar::{
     Stage, run,
 };
 use state::{ActiveRun, Bomb, BombGlobal};
-use ui::{BombUi, BombView};
+use ui::BombView;
 
-use crate::{
-    components::{Dialog, Marquee},
-    games::bomb::ui::BombMsg,
-    run_registry::RunRegistry,
-};
+use crate::{games::bomb::ui::BombMsg, run_registry::RunRegistry};
 
 pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
     // Capture rotation parameters before `cfg.config` is moved into the state.
@@ -47,30 +41,6 @@ pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
         }],
     );
 
-    let app = App::<Bomb>::with_state(Bomb::new(cfg.config, cfg.db));
-    let sender = app.sender().clone();
-
-    let ui = BombUi::new(
-        sender.clone(),
-        BombGlobal::default(),
-        |_ucid, invalidator| {
-            let marquee = Marquee::new(invalidator.clone());
-            let _tick_handle = tokio::spawn(async move {
-                let mut interval = tokio::time::interval(Duration::from_millis(100));
-                loop {
-                    let _ = interval.tick().await;
-                    invalidator.invalidate();
-                }
-            });
-            BombView {
-                _tick_handle,
-                help: Dialog::default(),
-                about: Dialog::default(),
-                marquee,
-            }
-        },
-    );
-
     let clearer = PenaltyClearer::new(PENALTY_CLEAR_DELAY);
     // Active runs, keyed by player and torn down by the world lifecycle: leaving
     // the track / disconnecting / tele-pitting all evict the run and emit
@@ -79,9 +49,10 @@ pub async fn run_bomb_with(cfg: BombRunConfig) -> Result<(), AppError> {
 
     let while_racing = |r: RoundManager| r.is_racing();
 
-    let app = app
+    // `with_ui` fixes the app's view type and must come before any handlers.
+    let app = App::<Bomb>::with_state(Bomb::new(cfg.config, cfg.db))
+        .with_ui::<BombView>(BombGlobal::default())
         .handle(Stage::Pre, clearer)
-        .with_ui(ui)
         .handle(Stage::Pre, rounds)
         .handle(Stage::Pre, runs)
         .handle(Stage::Update, ChatParser::<chat::Cmd>::new(&['!']))

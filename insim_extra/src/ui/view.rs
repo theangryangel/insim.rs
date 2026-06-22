@@ -52,6 +52,12 @@ pub trait View: Component {
     /// Per-connection state pushed to a single view.
     type Connection: Clone + Send + Sync + Default + 'static;
 
+    /// Construct the view for a connection. The `Ui` calls this once per
+    /// connection when its `Ncn` arrives. `invalidator` lets the view request
+    /// its own redraws (e.g. for timers / marquees that animate without external
+    /// input).
+    fn mount(ucid: ConnectionId, invalidator: InvalidateHandle) -> Self;
+
     /// Assemble the component's render [`Props`](Component::Props) from the
     /// current global and per-connection state. For the common
     /// `Props<'a> = (&'a Global, &'a Connection)` this is just `(global, connection)`.

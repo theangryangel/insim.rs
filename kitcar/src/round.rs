@@ -195,14 +195,14 @@ impl RoundManager {
     }
 }
 
-impl<S> FromContext<S> for RoundManager {
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+impl<S, V: crate::ui::View + 'static> FromContext<S, V> for RoundManager {
+    fn from_context(cx: &ExtractCx<'_, S, V>) -> Option<Self> {
         cx.lookup::<RoundManager>()
     }
 }
 
-impl<S: Send + Sync + 'static> Handler<(), S> for RoundManager {
-    fn call(self, cx: &ExtractCx<'_, S>) -> impl Future<Output = Result<(), AppError>> + Send {
+impl<S: Send + Sync + 'static, V: crate::ui::View + 'static> Handler<(), S, V> for RoundManager {
+    fn call(self, cx: &ExtractCx<'_, S, V>) -> impl Future<Output = Result<(), AppError>> + Send {
         let world = cx.world.clone();
         let sender = cx.sender.clone();
         let cancel = cx.cancel.clone();

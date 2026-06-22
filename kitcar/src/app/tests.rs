@@ -34,6 +34,7 @@ use super::{event::Command, runtime::dispatch_cycle};
 use crate::{
     App, AppError, ChatEvent, ChatParser, Connected, Dispatch, Event, ExtractCx, Handler,
     HandlerExt, Packet, Sender, Stage, State, Svc, World,
+    ui::{NoView, Ui},
 };
 
 /// A toy typed chat enum for the parser test.
@@ -64,7 +65,7 @@ struct TestState {
     last_cmd: Arc<Mutex<Option<TestCmd>>>,
 }
 
-impl<S: Send + Sync + 'static> Handler<(), S> for TestState {}
+impl<S: Send + Sync + 'static, V: crate::ui::View + 'static> Handler<(), S, V> for TestState {}
 
 async fn count_ncn(Packet(_n): Packet<Ncn>, Svc(s): Svc<TestState>) -> Result<(), AppError> {
     let _ = s.ncn_hits.fetch_add(1, Ordering::Relaxed);
@@ -142,7 +143,7 @@ async fn drive(app: App, d: Dispatch) {
         d,
         &sender,
         &world,
-        None,
+        &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -157,7 +158,7 @@ async fn drive(app: App, d: Dispatch) {
                 Dispatch::Synthetic(payload),
                 &sender,
                 &world,
-                None,
+                &crate::ui::Ui::<crate::ui::NoView>::disabled(),
                 &app_state,
                 &pre_handlers,
                 &update_handlers,
@@ -266,7 +267,7 @@ async fn presence_is_queryable_via_extractor() {
         last_seen_count: Arc<AtomicUsize>,
     }
 
-    impl<S: Send + Sync + 'static> Handler<(), S> for PState {}
+    impl<S: Send + Sync + 'static, V: crate::ui::View + 'static> Handler<(), S, V> for PState {}
 
     async fn observe_count(world: World, Svc(s): Svc<PState>) -> Result<(), AppError> {
         s.last_seen_count.store(world.count(), Ordering::Relaxed);
@@ -291,7 +292,7 @@ async fn presence_is_queryable_via_extractor() {
         Dispatch::Packet(make_ncn(1, "alice")),
         &sender,
         &world,
-        None,
+        &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -305,7 +306,7 @@ async fn presence_is_queryable_via_extractor() {
         Dispatch::Packet(make_ncn(2, "bob")),
         &sender,
         &world,
-        None,
+        &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -344,7 +345,7 @@ async fn cancellation_token_extractor_triggers_shutdown() {
         Dispatch::Packet(make_ncn(1, "alice")),
         &sender,
         &world,
-        None,
+        &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -379,9 +380,10 @@ async fn sender_event_pushes_into_back_channel() {
 #[tokio::test]
 async fn run_if_skips_handler_when_predicate_false() {
     let state = TestState::default();
-    let app = App::new()
-        .handle(Stage::Update, state.clone())
-        .handle(Stage::Update, count_ncn.run_if(|_: State<()>| false));
+    let app = App::new().handle(Stage::Update, state.clone()).handle(
+        Stage::Update,
+        count_ncn.run_if(|_: State<()>, _: Ui<NoView>| false),
+    );
 
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
@@ -395,7 +397,7 @@ async fn run_if_skips_handler_when_predicate_false() {
         Dispatch::Packet(make_ncn(1, "alice")),
         &sender,
         &world,
-        None,
+        &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -413,9 +415,10 @@ async fn run_if_skips_handler_when_predicate_false() {
 #[tokio::test]
 async fn run_if_runs_handler_when_predicate_true() {
     let state = TestState::default();
-    let app = App::new()
-        .handle(Stage::Update, state.clone())
-        .handle(Stage::Update, count_ncn.run_if(|_: State<()>| true));
+    let app = App::new().handle(Stage::Update, state.clone()).handle(
+        Stage::Update,
+        count_ncn.run_if(|_: State<()>, _: Ui<NoView>| true),
+    );
 
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
@@ -429,7 +432,7 @@ async fn run_if_runs_handler_when_predicate_true() {
         Dispatch::Packet(make_ncn(1, "alice")),
         &sender,
         &world,
-        None,
+        &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -453,13 +456,13 @@ async fn in_state_reads_extension_and_gates_handler() {
     #[derive(Clone)]
     struct Flag(Arc<RwLock<bool>>);
 
-    impl<S> FromContext<S> for Flag {
-        fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+    impl<S, V: crate::ui::View + 'static> FromContext<S, V> for Flag {
+        fn from_context(cx: &ExtractCx<'_, S, V>) -> Option<Self> {
             cx.lookup::<Flag>()
         }
     }
 
-    impl<S: Send + Sync + 'static> Handler<(), S> for Flag {}
+    impl<S: Send + Sync + 'static, V: crate::ui::View + 'static> Handler<(), S, V> for Flag {}
 
     let state = TestState::default();
     let flag = Flag(Arc::new(RwLock::new(false)));
@@ -468,7 +471,7 @@ async fn in_state_reads_extension_and_gates_handler() {
         .handle(Stage::Update, flag.clone())
         .handle(
             Stage::Update,
-            count_ncn.run_if(|f: Flag, _: State<()>| *f.0.read()),
+            count_ncn.run_if(|f: Flag, _: State<()>, _: Ui<NoView>| *f.0.read()),
         );
 
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
@@ -484,7 +487,7 @@ async fn in_state_reads_extension_and_gates_handler() {
         Dispatch::Packet(make_ncn(1, "alice")),
         &sender,
         &world,
-        None,
+        &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -504,7 +507,7 @@ async fn in_state_reads_extension_and_gates_handler() {
         Dispatch::Packet(make_ncn(2, "bob")),
         &sender,
         &world,
-        None,
+        &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -586,7 +589,7 @@ async fn with_state_holds_typed_value() {
         Dispatch::Packet(insim::Packet::Tiny(insim::insim::Tiny::default())),
         &sender,
         &world,
-        None,
+        &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -627,7 +630,7 @@ async fn state_mutation_visible_across_dispatches() {
             Dispatch::Packet(make_ncn(i, "alice")),
             &sender,
             &world,
-            None,
+            &crate::ui::Ui::<crate::ui::NoView>::disabled(),
             &app_state,
             &pre_handlers,
             &update_handlers,
@@ -661,7 +664,7 @@ async fn state_in_run_if_predicate_gates_handler() {
     let flag_inner = flag.0.clone();
     let app = App::with_state(flag).handle(
         Stage::Update,
-        handler.run_if(|s: State<Flag>| *s.0.0.read()),
+        handler.run_if(|s: State<Flag>, _: Ui<NoView>| *s.0.0.read()),
     );
 
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
@@ -677,7 +680,7 @@ async fn state_in_run_if_predicate_gates_handler() {
         Dispatch::Packet(make_ncn(1, "alice")),
         &sender,
         &world,
-        None,
+        &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -693,7 +696,7 @@ async fn state_in_run_if_predicate_gates_handler() {
         Dispatch::Packet(make_ncn(2, "bob")),
         &sender,
         &world,
-        None,
+        &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -713,10 +716,10 @@ async fn pre_handler_runs_before_update_handler() {
         n: Arc<AtomicUsize>,
     }
 
-    impl<S: Send + Sync + 'static> Handler<(), S> for Counter {
+    impl<S: Send + Sync + 'static, V: crate::ui::View + 'static> Handler<(), S, V> for Counter {
         fn call(
             self,
-            _cx: &ExtractCx<'_, S>,
+            _cx: &ExtractCx<'_, S, V>,
         ) -> impl std::future::Future<Output = Result<(), AppError>> + Send {
             async move {
                 let _ = self.n.fetch_add(1, Ordering::Relaxed);
@@ -727,7 +730,7 @@ async fn pre_handler_runs_before_update_handler() {
 
     #[derive(Clone, Default)]
     struct Observed(Arc<AtomicUsize>);
-    impl<S: Send + Sync + 'static> Handler<(), S> for Observed {}
+    impl<S: Send + Sync + 'static, V: crate::ui::View + 'static> Handler<(), S, V> for Observed {}
 
     async fn observe(
         _: Packet<Ncn>,
@@ -757,7 +760,7 @@ async fn pre_handler_runs_before_update_handler() {
         Dispatch::Packet(make_ncn(1, "alice")),
         &sender,
         &world,
-        None,
+        &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
         &pre_handlers,
         &update_handlers,
@@ -778,10 +781,10 @@ async fn pre_handlers_run_sequentially_in_registration_order() {
     #[derive(Clone)]
     struct Second(Arc<Mutex<Vec<&'static str>>>);
 
-    impl<S: Send + Sync + 'static> Handler<(), S> for First {
+    impl<S: Send + Sync + 'static, V: crate::ui::View + 'static> Handler<(), S, V> for First {
         fn call(
             self,
-            _: &ExtractCx<'_, S>,
+            _: &ExtractCx<'_, S, V>,
         ) -> impl std::future::Future<Output = Result<(), AppError>> + Send {
             async move {
                 self.0.lock().push("first");
@@ -789,10 +792,10 @@ async fn pre_handlers_run_sequentially_in_registration_order() {
             }
         }
     }
-    impl<S: Send + Sync + 'static> Handler<(), S> for Second {
+    impl<S: Send + Sync + 'static, V: crate::ui::View + 'static> Handler<(), S, V> for Second {
         fn call(
             self,
-            _: &ExtractCx<'_, S>,
+            _: &ExtractCx<'_, S, V>,
         ) -> impl std::future::Future<Output = Result<(), AppError>> + Send {
             async move {
                 self.0.lock().push("second");
@@ -820,7 +823,7 @@ async fn pre_handlers_run_sequentially_in_registration_order() {
         Dispatch::Packet(insim::Packet::Tiny(insim::insim::Tiny::default())),
         &sender,
         &world,
-        None,
+        &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
         &pre_handlers,
         &update_handlers,

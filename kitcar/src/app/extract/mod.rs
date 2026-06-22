@@ -28,14 +28,17 @@ use indexmap::IndexMap;
 use tokio_util::sync::CancellationToken;
 
 use super::{event::Dispatch, handler::ErasedHandler, runtime::Sender};
-use crate::World;
+use crate::{World, ui::NoView};
 
 /// Context handed to extractors during one dispatch cycle.
 ///
-/// Parameterised by the app's state type `S`. For stateless apps the default
-/// `S = ()` is used; for stateful apps built with [`crate::App::with_state`],
-/// `S` is the value passed in.
-pub struct ExtractCx<'a, S = ()> {
+/// Parameterised by the app's state type `S` and view type `V` (defaulting to
+/// `()` and [`NoView`] respectively) - the same two parameters as
+/// [`App<S, V>`](crate::App).
+pub struct ExtractCx<'a, S = (), V = NoView>
+where
+    V: crate::ui::View + 'static,
+{
     /// The event currently being routed.
     pub dispatch: &'a Dispatch,
     /// Back-channel handle for sending packets / emitting events. Extracted by [`Sender`].
@@ -44,15 +47,15 @@ pub struct ExtractCx<'a, S = ()> {
     /// current dispatch by the runtime's mirror step before any handler runs.
     /// Extracted by `world: World`.
     pub world: &'a World,
-    /// The app's optional UI, if one was registered via
-    /// [`App::with_ui`](crate::App::with_ui). The runtime forwards packets to it
-    /// before handlers run; handlers extract the concrete `Ui<V>` from it.
-    pub(crate) ui: Option<&'a dyn crate::ui::UiSink>,
+    /// The app's UI, intrinsic like `world`. The runtime forwards packets to it
+    /// before handlers run; handlers extract it infallibly as `ui: Ui<V>`. For
+    /// an app with no UI this is the inert [`NoView`] handle.
+    pub(crate) ui: &'a crate::ui::Ui<V>,
     /// Pre-stage handlers, also serving as the typed registry for extraction
     /// (looked up by `TypeId`).
-    pub(crate) pre_handlers: &'a IndexMap<std::any::TypeId, Box<dyn ErasedHandler<S>>>,
+    pub(crate) pre_handlers: &'a IndexMap<std::any::TypeId, Box<dyn ErasedHandler<S, V>>>,
     /// Update-stage handlers, ditto.
-    pub(crate) update_handlers: &'a IndexMap<std::any::TypeId, Box<dyn ErasedHandler<S>>>,
+    pub(crate) update_handlers: &'a IndexMap<std::any::TypeId, Box<dyn ErasedHandler<S, V>>>,
     /// Cooperative-shutdown token. Call [`ExtractCx::shutdown`] to request the
     /// runtime exit at its next select iteration.
     pub cancel: &'a CancellationToken,
@@ -61,7 +64,7 @@ pub struct ExtractCx<'a, S = ()> {
     pub state: &'a S,
 }
 
-impl<S> std::fmt::Debug for ExtractCx<'_, S> {
+impl<S, V: crate::ui::View + 'static> std::fmt::Debug for ExtractCx<'_, S, V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ExtractCx")
             .field("dispatch", &self.dispatch)
@@ -71,7 +74,7 @@ impl<S> std::fmt::Debug for ExtractCx<'_, S> {
     }
 }
 
-impl<S> ExtractCx<'_, S> {
+impl<S, V: crate::ui::View + 'static> ExtractCx<'_, S, V> {
     /// Request graceful shutdown of the runtime.
     pub fn shutdown(&self) {
         self.cancel.cancel();
@@ -107,23 +110,26 @@ impl<S> ExtractCx<'_, S> {
 /// Parameterised by the app's state type `S`. Extractors that don't touch
 /// state are implemented for all `S` (i.e. `impl<S> FromContext<S> for Foo`);
 /// only [`State<S>`] is bound to a specific state type.
-pub trait FromContext<S = ()>: Sized + Send {
+pub trait FromContext<S = (), V = NoView>: Sized + Send
+where
+    V: crate::ui::View + 'static,
+{
     /// Try to build `Self` from the current dispatch context. Return
     /// `None` to skip the handler this cycle (e.g. wrong event type).
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self>;
+    fn from_context(cx: &ExtractCx<'_, S, V>) -> Option<Self>;
 }
 
 /// Extractor that hands out a clone of the current [`Dispatch`] regardless
 /// of its variant.
-impl<S> FromContext<S> for Dispatch {
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+impl<S, V: crate::ui::View + 'static> FromContext<S, V> for Dispatch {
+    fn from_context(cx: &ExtractCx<'_, S, V>) -> Option<Self> {
         Some(cx.dispatch.clone())
     }
 }
 
 /// Extractor that hands out a clone of the runtime's [`CancellationToken`].
-impl<S> FromContext<S> for CancellationToken {
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+impl<S, V: crate::ui::View + 'static> FromContext<S, V> for CancellationToken {
+    fn from_context(cx: &ExtractCx<'_, S, V>) -> Option<Self> {
         Some(cx.cancel.clone())
     }
 }

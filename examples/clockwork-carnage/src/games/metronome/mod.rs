@@ -36,21 +36,19 @@ pub async fn run_metronome_with(cfg: MetronomeRunConfig) -> Result<(), AppError>
         }],
     );
 
-    let app = App::<Metronome>::with_state(Metronome::new(cfg.config, cfg.db));
-    let sender = app.sender().clone();
-    let ui = MetronomeUi::new(
-        sender.clone(),
-        MetronomeGlobal {
-            target,
-            ..Default::default()
-        },
-        |_ucid, _invalidator| MetronomeView,
-    );
+    // The `MetronomeUi` parameter is unused by the predicate but pins the view
+    // type `V` for `run_if` on handlers that don't otherwise extract the UI.
+    let while_racing = |r: RoundManager, _ui: MetronomeUi| r.is_racing();
 
-    let while_racing = |r: RoundManager| r.is_racing();
-
-    let app = app
-        .with_ui(ui)
+    // `with_ui` fixes the app's view type and must come before any handlers.
+    let app = App::<Metronome>::with_state(Metronome::new(cfg.config, cfg.db))
+        .with_ui(
+            MetronomeGlobal {
+                target,
+                ..Default::default()
+            },
+            |_ucid, _invalidator| MetronomeView,
+        )
         .handle(Stage::Pre, rounds)
         .handle(Stage::Update, on_connected)
         .handle(Stage::Update, on_disconnected)

@@ -24,7 +24,10 @@ use std::{any::Any, future::Future, marker::PhantomData};
 use futures::future::BoxFuture;
 
 use super::extract::{ExtractCx, FromContext};
-use crate::error::AppError;
+use crate::{
+    error::AppError,
+    ui::{NoView, View},
+};
 
 /// A handler: a plain async fn whose parameters are magic extractors, or
 /// any struct that owns state and impls this trait manually.
@@ -40,11 +43,14 @@ use crate::error::AppError;
 /// the future to be `Send`. Implementors can write `async fn call(...)` in
 /// their impls - Rust accepts that as long as the body produces a Send
 /// future.
-pub trait Handler<T, S = ()>: Clone + Send + Sync + Sized + 'static {
+pub trait Handler<T, S = (), V = NoView>: Clone + Send + Sync + Sized + 'static
+where
+    V: View + 'static,
+{
     /// Call the handler against the current dispatch context. Default body
     /// is a no-op `Ok(())`, used by passive value types that just want to
     /// sit in the registry for extraction.
-    fn call(self, _cx: &ExtractCx<'_, S>) -> impl Future<Output = Result<(), AppError>> + Send {
+    fn call(self, _cx: &ExtractCx<'_, S, V>) -> impl Future<Output = Result<(), AppError>> + Send {
         async { Ok(()) }
     }
 }
@@ -53,8 +59,11 @@ pub trait Handler<T, S = ()>: Clone + Send + Sync + Sized + 'static {
 /// in the per-stage handler maps. Also exposes the underlying `H` value as
 /// `&dyn Any` so `FromContext` impls can downcast and clone for typed
 /// extraction.
-pub(crate) trait ErasedHandler<S>: Send + Sync {
-    fn call<'a>(&'a self, cx: &'a ExtractCx<'_, S>) -> BoxFuture<'a, Result<(), AppError>>;
+pub(crate) trait ErasedHandler<S, V>: Send + Sync
+where
+    V: View + 'static,
+{
+    fn call<'a>(&'a self, cx: &'a ExtractCx<'_, S, V>) -> BoxFuture<'a, Result<(), AppError>>;
     fn handler_as_any(&self) -> &dyn Any;
 }
 
@@ -72,13 +81,14 @@ impl<T, H, S> HandlerService<T, H, S> {
     }
 }
 
-impl<T, H, S> ErasedHandler<S> for HandlerService<T, H, S>
+impl<T, H, S, V> ErasedHandler<S, V> for HandlerService<T, H, S>
 where
-    H: Handler<T, S> + 'static,
+    H: Handler<T, S, V> + 'static,
     T: Send + 'static,
     S: Send + Sync + 'static,
+    V: View + 'static,
 {
-    fn call<'a>(&'a self, cx: &'a ExtractCx<'_, S>) -> BoxFuture<'a, Result<(), AppError>> {
+    fn call<'a>(&'a self, cx: &'a ExtractCx<'_, S, V>) -> BoxFuture<'a, Result<(), AppError>> {
         let h = self.handler.clone();
         Box::pin(async move { h.call(cx).await })
     }
@@ -91,15 +101,16 @@ where
 macro_rules! impl_handler {
     ( $($ty:ident),* ) => {
         #[allow(non_snake_case)]
-        impl<F, Fut, S, $($ty),*> Handler<($($ty,)*), S> for F
+        impl<F, Fut, S, V, $($ty),*> Handler<($($ty,)*), S, V> for F
         where
             F: FnOnce($($ty),*) -> Fut + Clone + Send + Sync + 'static,
-            $( $ty: FromContext<S> + 'static, )*
+            $( $ty: FromContext<S, V> + 'static, )*
             Fut: Future<Output = Result<(), AppError>> + Send,
             S: Send + Sync + 'static,
+            V: View + 'static,
         {
             #[allow(unused)]
-            async fn call(self, cx: &ExtractCx<'_, S>) -> Result<(), AppError> {
+            async fn call(self, cx: &ExtractCx<'_, S, V>) -> Result<(), AppError> {
                 // Extract each parameter, returning early if extraction fails
                 $(
                     let Some($ty) = $ty::from_context(cx) else {

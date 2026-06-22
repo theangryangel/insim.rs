@@ -87,8 +87,8 @@ impl Sender {
     }
 }
 
-impl<S> FromContext<S> for Sender {
-    fn from_context(cx: &ExtractCx<'_, S>) -> Option<Self> {
+impl<S, V: crate::ui::View + 'static> FromContext<S, V> for Sender {
+    fn from_context(cx: &ExtractCx<'_, S, V>) -> Option<Self> {
         Some(cx.sender.clone())
     }
 }
@@ -101,9 +101,10 @@ impl<S> FromContext<S> for Sender {
 ///
 /// Immediately after the connection is established the runtime emits a
 /// [`Startup`] synthetic event so handlers can install background work.
-pub async fn run<S>(builder: insim::builder::Builder, app: App<S>) -> Result<(), AppError>
+pub async fn run<S, V>(builder: insim::builder::Builder, app: App<S, V>) -> Result<(), AppError>
 where
     S: Send + Sync + 'static,
+    V: crate::ui::View + 'static,
 {
     let state = app.state;
     let world = app.world;
@@ -126,7 +127,7 @@ where
         Dispatch::Synthetic(Arc::new(Startup)),
         &sender,
         &world,
-        ui.as_deref(),
+        &ui,
         &state,
         &pre_handlers,
         &update_handlers,
@@ -138,7 +139,7 @@ where
         &mut framed,
         &sender,
         &world,
-        ui.as_deref(),
+        &ui,
         &state,
         &pre_handlers,
         &update_handlers,
@@ -155,7 +156,7 @@ where
         Dispatch::Synthetic(Arc::new(Shutdown)),
         &sender,
         &world,
-        ui.as_deref(),
+        &ui,
         &state,
         &pre_handlers,
         &update_handlers,
@@ -175,19 +176,20 @@ where
 }
 
 #[allow(clippy::too_many_arguments)] // runtime plumbing; bundling would re-churn the dispatch_cycle call sites
-async fn run_dispatch_loop<S>(
+async fn run_dispatch_loop<S, V>(
     framed: &mut Framed,
     sender: &Sender,
     world: &World,
-    ui: Option<&dyn crate::ui::UiSink>,
+    ui: &crate::ui::Ui<V>,
     state: &S,
-    pre_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
-    update_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
+    pre_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
+    update_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
     cmd_rx: &mut mpsc::UnboundedReceiver<Command>,
     cancel: &CancellationToken,
 ) -> Result<(), AppError>
 where
     S: Send + Sync + 'static,
+    V: crate::ui::View + 'static,
 {
     loop {
         tokio::select! {
@@ -237,24 +239,23 @@ where
 /// drained here. They land on the runtime's back-channel and trigger their own
 /// future cycles.
 #[allow(clippy::too_many_arguments)] // runtime plumbing; threads world + ui through each cycle
-pub(crate) async fn dispatch_cycle<S>(
+pub(crate) async fn dispatch_cycle<S, V>(
     d: Dispatch,
     sender: &Sender,
     world: &World,
-    ui: Option<&dyn crate::ui::UiSink>,
+    ui: &crate::ui::Ui<V>,
     state: &S,
-    pre_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
-    update_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
+    pre_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
+    update_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
     cancel: &CancellationToken,
 ) where
     S: Send + Sync + 'static,
+    V: crate::ui::View + 'static,
 {
     let derived = if let Dispatch::Packet(packet) = &d {
         // Drive the UI before folding the world, so it sees every packet (the UI
-        // runs on its own thread; this only enqueues).
-        if let Some(ui) = ui {
-            ui.forward_packet(packet);
-        }
+        // runs on its own thread; this only enqueues, and is a no-op when inert).
+        ui.forward_packet(packet);
         crate::world::fold_packet(world, packet, sender)
     } else {
         Vec::new()
@@ -290,17 +291,18 @@ pub(crate) async fn dispatch_cycle<S>(
 /// Run one dispatch through the Pre (sequential) then Update (concurrent)
 /// handler phases against a freshly built [`ExtractCx`].
 #[allow(clippy::too_many_arguments)] // runtime plumbing; threads world + ui through each cycle
-async fn run_handlers<S>(
+async fn run_handlers<S, V>(
     d: &Dispatch,
     sender: &Sender,
     world: &World,
-    ui: Option<&dyn crate::ui::UiSink>,
+    ui: &crate::ui::Ui<V>,
     state: &S,
-    pre_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
-    update_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S>>>,
+    pre_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
+    update_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
     cancel: &CancellationToken,
 ) where
     S: Send + Sync + 'static,
+    V: crate::ui::View + 'static,
 {
     let xcx = ExtractCx {
         dispatch: d,

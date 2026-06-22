@@ -37,21 +37,19 @@ pub async fn run_shortcut_with(cfg: ShortcutRunConfig) -> Result<(), AppError> {
         }],
     );
 
-    let app = App::<Shortcut>::with_state(Shortcut::new(cfg.db));
-    let sender = app.sender().clone();
-    let ui = ShortcutUi::new(
-        sender.clone(),
-        ShortcutGlobal {
-            phase: RoundPhase::Waiting.to_string(),
-            ..Default::default()
-        },
-        |_ucid, _invalidator| ShortcutView,
-    );
+    // The `ShortcutUi` parameter is unused by the predicate but pins the view
+    // type `V` for `run_if` on handlers that don't otherwise extract the UI.
+    let while_racing = |r: RoundManager, _ui: ShortcutUi| r.is_racing();
 
-    let while_racing = |r: RoundManager| r.is_racing();
-
-    let app = app
-        .with_ui(ui)
+    // `with_ui` fixes the app's view type and must come before any handlers.
+    let app = App::<Shortcut>::with_state(Shortcut::new(cfg.db))
+        .with_ui(
+            ShortcutGlobal {
+                phase: RoundPhase::Waiting.to_string(),
+                ..Default::default()
+            },
+            |_ucid, _invalidator| ShortcutView,
+        )
         .handle(Stage::Pre, rounds)
         .handle(Stage::Update, on_connected)
         .handle(Stage::Update, on_disconnected)
