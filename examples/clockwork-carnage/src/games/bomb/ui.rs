@@ -223,14 +223,17 @@ impl View for BombView {
     type Global = BombGlobal;
     type Connection = BombConnectionProps;
 
-    fn mount(_ucid: insim::identifiers::ConnectionId, invalidator: ui::InvalidateHandle) -> Self {
-        let marquee = Marquee::new(invalidator.clone());
+    fn mount(
+        _ucid: insim::identifiers::ConnectionId,
+        handle: ui::ViewHandle<Self::Message>,
+    ) -> Self {
+        let marquee = Marquee::new(handle.invalidator());
         // Drive periodic redraws (marquee animation) without external input.
         let _tick_handle = tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_millis(100));
             loop {
                 let _ = interval.tick().await;
-                invalidator.invalidate();
+                handle.invalidate();
             }
         });
         BombView {

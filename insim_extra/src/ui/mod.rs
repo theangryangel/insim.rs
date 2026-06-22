@@ -51,7 +51,7 @@ use tokio::{
     sync::{Notify, broadcast, mpsc, watch},
     task::LocalSet,
 };
-pub use view::{Component, InvalidateHandle, View};
+pub use view::{Component, InvalidateHandle, View, ViewHandle};
 use view::{RunViewArgs, ViewInput, run_view};
 
 /// Errors from the UI subsystem.
@@ -247,12 +247,15 @@ fn spawn_ui_thread<V>(
                                 continue;
                             }
                             let invalidation_notify = Arc::new(Notify::new());
+                            let (event_tx, event_rx) = mpsc::unbounded_channel();
                             let root = V::mount(
                                 ncn.ucid,
-                                InvalidateHandle::new(invalidation_notify.clone()),
+                                ViewHandle::new(
+                                    InvalidateHandle::new(invalidation_notify.clone()),
+                                    event_tx.clone(),
+                                ),
                             );
                             let (props_tx, props_rx) = watch::channel(V::Connection::default());
-                            let (event_tx, event_rx) = mpsc::unbounded_channel();
                             run_view(RunViewArgs {
                                 ucid: ncn.ucid,
                                 root,

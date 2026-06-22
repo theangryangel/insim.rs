@@ -93,7 +93,10 @@ impl View for ShortcutView {
     type Global = ShortcutGlobal;
     type Connection = ShortcutConnectionProps;
 
-    fn mount(_ucid: insim::identifiers::ConnectionId, _invalidator: ui::InvalidateHandle) -> Self {
+    fn mount(
+        _ucid: insim::identifiers::ConnectionId,
+        _handle: ui::ViewHandle<Self::Message>,
+    ) -> Self {
         ShortcutView
     }
 
