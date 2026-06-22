@@ -83,7 +83,10 @@ impl View for MetronomeView {
     type Global = MetronomeGlobal;
     type Connection = MetronomeConnectionProps;
 
-    fn mount(_ucid: insim::identifiers::ConnectionId, _invalidator: ui::InvalidateHandle) -> Self {
+    fn mount(
+        _ucid: insim::identifiers::ConnectionId,
+        _handle: ui::ViewHandle<Self::Message>,
+    ) -> Self {
         MetronomeView
     }
 

@@ -30,7 +30,7 @@ use insim::{
 use kitcar::{
     App, AppError, ChatEvent, ChatParser, Connected, Disconnected, Event, ExtractCx, FromContext,
     Handler, Packet, Sender, Stage, Startup, Svc, World, mtc, run,
-    ui::{self, Component, InvalidateHandle, Ui, View},
+    ui::{self, Component, Ui, View, ViewHandle},
 };
 use tokio_util::sync::CancellationToken;
 
@@ -250,7 +250,7 @@ impl View for SmokeView {
     type Global = UiGlobal;
     type Connection = ();
 
-    fn mount(ucid: ConnectionId, _invalidator: InvalidateHandle) -> Self {
+    fn mount(ucid: ConnectionId, _handle: ViewHandle<Self::Message>) -> Self {
         SmokeView { ucid, clicks: 0 }
     }
 

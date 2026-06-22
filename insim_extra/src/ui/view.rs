@@ -53,10 +53,13 @@ pub trait View: Component {
     type Connection: Clone + Send + Sync + Default + 'static;
 
     /// Construct the view for a connection. The `Ui` calls this once per
-    /// connection when its `Ncn` arrives. `invalidator` lets the view request
-    /// its own redraws (e.g. for timers / marquees that animate without external
-    /// input).
-    fn mount(ucid: ConnectionId, invalidator: InvalidateHandle) -> Self;
+    /// connection when its `Ncn` arrives. `handle` lets the view drive itself
+    /// after mount: request a redraw with [`invalidate`](ViewHandle::invalidate)
+    /// (e.g. timers / marquees that animate without external input), or feed a
+    /// message back into its own [`update`](Component::update) with
+    /// [`send`](ViewHandle::send) (e.g. from a timer or an external
+    /// subscription).
+    fn mount(ucid: ConnectionId, handle: ViewHandle<Self::Message>) -> Self;
 
     /// Assemble the component's render [`Props`](Component::Props) from the
     /// current global and per-connection state. For the common
@@ -78,6 +81,62 @@ impl InvalidateHandle {
     /// Request a re-render of the current view instance.
     pub fn invalidate(&self) {
         self.notify.notify_one();
+    }
+}
+
+/// Handle a [`View`] receives at [`mount`](View::mount), letting it drive itself
+/// after construction.
+///
+/// Two capabilities: [`invalidate`](Self::invalidate) requests a redraw without
+/// touching state (for animations that re-read the world each frame), and
+/// [`send`](Self::send) feeds a message into the view's own
+/// [`update`](Component::update) (for timers or external subscriptions that
+/// fold into state). A redraw-only [`InvalidateHandle`] can be split off via
+/// [`invalidator`](Self::invalidator) and handed to child components that only
+/// animate.
+pub struct ViewHandle<M> {
+    invalidate: InvalidateHandle,
+    tx: mpsc::UnboundedSender<ViewInput<M>>,
+}
+
+impl<M> Clone for ViewHandle<M> {
+    fn clone(&self) -> Self {
+        Self {
+            invalidate: self.invalidate.clone(),
+            tx: self.tx.clone(),
+        }
+    }
+}
+
+impl<M> std::fmt::Debug for ViewHandle<M> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ViewHandle").finish_non_exhaustive()
+    }
+}
+
+impl<M> ViewHandle<M> {
+    pub(super) fn new(
+        invalidate: InvalidateHandle,
+        tx: mpsc::UnboundedSender<ViewInput<M>>,
+    ) -> Self {
+        Self { invalidate, tx }
+    }
+
+    /// Request a re-render of this view without changing its state.
+    pub fn invalidate(&self) {
+        self.invalidate.invalidate();
+    }
+
+    /// Feed a message into this view's [`update`](Component::update) and redraw.
+    /// Returns `false` if the view has already shut down.
+    pub fn send(&self, msg: M) -> bool {
+        self.tx.send(ViewInput::Message(msg)).is_ok()
+    }
+
+    /// Split off a redraw-only handle for child components that only need to
+    /// request repaints (e.g. animations) and never send messages.
+    pub fn invalidator(&self) -> InvalidateHandle {
+        self.invalidate.clone()
     }
 }
 

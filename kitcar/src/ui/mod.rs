@@ -29,7 +29,7 @@ use insim::identifiers::ConnectionId;
 use insim_extra::ui::Ui as InnerUi;
 pub use insim_extra::ui::{
     Canvas, CanvasDiff, Component, InvalidateHandle, Node, NodeKind, TypeInMapper, UiError, View,
-    background, clickable, container, empty, text, typein,
+    ViewHandle, background, clickable, container, empty, text, typein,
 };
 use tokio::sync::{broadcast, mpsc};
 
@@ -54,7 +54,7 @@ impl View for NoView {
     type Global = ();
     type Connection = ();
 
-    fn mount(_ucid: ConnectionId, _invalidator: InvalidateHandle) -> Self {
+    fn mount(_ucid: ConnectionId, _handle: ViewHandle<Self::Message>) -> Self {
         NoView
     }
 
