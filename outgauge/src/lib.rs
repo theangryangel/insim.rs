@@ -317,8 +317,8 @@ mod test {
         assert_eq!(outgauge.car, Vehicle::Xrt);
         assert!(matches!(outgauge.gear, Gear::Gear(2)));
         assert_eq!(outgauge.plid, PlayerId(1));
-        assert_eq!(outgauge.rpm, 2450.390625);
-        assert_eq!(outgauge.turbo, -0.9999896883964539);
+        assert_eq!(outgauge.rpm, 2_450.390_6);
+        assert_eq!(outgauge.turbo, -0.999_989_7);
         assert_eq!(outgauge.engtemp, 0.0);
         assert_eq!(outgauge.display1.trim_end_matches(' '), "Fuel 99.9%");
         assert_eq!(outgauge.display2.trim_end_matches(' '), "Brake Bal Fr 75%");

@@ -5,8 +5,8 @@ pub(super) async fn persist_bomb_run(
     run: &ActiveRun,
     survival_ms: i64,
 ) {
-    if let Some((pool, event_id)) = db {
-        if let Err(e) = crate::db::insert_bomb_run(
+    if let Some((pool, event_id)) = db
+        && let Err(e) = crate::db::insert_bomb_run(
             pool,
             *event_id,
             &run.uname,
@@ -15,8 +15,7 @@ pub(super) async fn persist_bomb_run(
             survival_ms,
         )
         .await
-        {
-            tracing::warn!("Failed to persist bomb run: {e}");
-        }
+    {
+        tracing::warn!("Failed to persist bomb run: {e}");
     }
 }

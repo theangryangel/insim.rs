@@ -61,6 +61,8 @@ impl _Insim {
     /// ready `_Insim`.
     #[staticmethod]
     #[pyo3(signature = (addr, *, flags=None, iname=None, admin_password=None, interval_ms=None, prefix=None, capacity=512))]
+    // These map 1:1 to the Python keyword arguments in the signature above.
+    #[allow(clippy::too_many_arguments)]
     fn connect<'py>(
         py: Python<'py>,
         addr: String,
@@ -118,7 +120,7 @@ impl _Insim {
                 let is_done = is_done.clone();
                 let shutdown_signal = shutdown_signal.clone();
                 let exit_msg = exit_msg.clone();
-                let _ = runtime().spawn(async move {
+                let _task = runtime().spawn(async move {
                     let msg = loop {
                         tokio::select! {
                             _ = cancel.notified() => break "connection closed".to_owned(),

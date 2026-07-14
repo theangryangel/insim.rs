@@ -1,4 +1,11 @@
-#![allow(missing_docs, missing_debug_implementations, unused_results)]
+// This bench binary links insim_core's full dependency set but only exercises
+// the codepages functions, so unused_crate_dependencies fires for the rest.
+#![allow(
+    missing_docs,
+    missing_debug_implementations,
+    unused_results,
+    unused_crate_dependencies
+)]
 
 use std::hint::black_box;
 

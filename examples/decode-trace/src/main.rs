@@ -93,7 +93,7 @@ fn main() {
     } else {
         let hex_input: String = joined.chars().filter(|c| c.is_ascii_hexdigit()).collect();
 
-        if hex_input.len() % 2 != 0 {
+        if !hex_input.len().is_multiple_of(2) {
             eprintln!("error: odd number of hex digits");
             std::process::exit(1);
         }

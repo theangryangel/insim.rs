@@ -64,13 +64,7 @@ pub async fn event_edit_get(
         .map_err(internal_error)?
         .ok_or(StatusCode::NOT_FOUND)?;
     let eras = db::all_eras(&state.pool).await.map_err(internal_error)?;
-    let allowed_vehicles = event
-        .allowed_vehicles
-        .0
-        .iter()
-        .cloned()
-        .collect::<Vec<_>>()
-        .join(", ");
+    let allowed_vehicles = event.allowed_vehicles.0.to_vec().join(", ");
     let (target, checkpoint_timeout) = match &*event.mode {
         EventMode::Metronome { target_ms } => (Some((target_ms / 1000) as u64), None),
         EventMode::Bomb {

@@ -257,7 +257,7 @@ mod tests {
         ];
 
         for i in version.iter() {
-            let parsed = GameVersion::from_str(&i).unwrap();
+            let parsed = GameVersion::from_str(i).unwrap();
             assert_eq!(i, &parsed.to_string());
         }
     }

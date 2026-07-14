@@ -10,7 +10,7 @@ pub use new::*;
 
 pub(super) use super::internal_error;
 
-pub(self) fn parse_datetime_local(s: &str) -> Result<jiff::Timestamp, axum::http::StatusCode> {
+fn parse_datetime_local(s: &str) -> Result<jiff::Timestamp, axum::http::StatusCode> {
     let rfc3339 = match s.len() {
         16 => format!("{s}:00Z"),
         19 => format!("{s}Z"),

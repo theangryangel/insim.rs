@@ -21,10 +21,15 @@ pub enum ScrollMsg {
     ItemClicked(usize),
 }
 
+/// Renders a single item (given its index) into a UI node.
+pub type RenderItemFn<Item> = Box<dyn Fn(&Item, usize) -> ui::Node<ScrollMsg>>;
+/// Returns whether an item matches the current filter string.
+pub type FilterItemFn<Item> = Box<dyn Fn(&Item, &str) -> bool>;
+
 pub struct ScrollListProps<'a, Item> {
     pub items: &'a [Item],
-    pub render_item: Box<dyn Fn(&Item, usize) -> ui::Node<ScrollMsg>>,
-    pub filter_item: Box<dyn Fn(&Item, &str) -> bool>,
+    pub render_item: RenderItemFn<Item>,
+    pub filter_item: FilterItemFn<Item>,
 }
 
 impl<Item: 'static> ui::Component for ScrollList<Item> {

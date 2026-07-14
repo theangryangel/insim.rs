@@ -10,27 +10,27 @@ pub fn get_top_down_view(selection: &[ObjectInfo], last_cpp: &Cpp) -> Option<Cpp
     let target = get_target(selection)?;
     let pos_m = target.position().xyz_metres();
 
-    let mut cpp = Cpp::default();
-    cpp.reqi = RequestId(0);
+    // Look down. Heading matches object heading (ObjectHeading -> HeadingU16 via degrees)
+    let target_degrees = target.heading().map(|h| h.to_degrees()).unwrap_or(0.0);
+
+    let mut cpp = Cpp {
+        reqi: RequestId(0),
+        h: HeadingU16::from_degrees(target_degrees),
+        // Pitch 90 degrees down. 65536 = 360 deg. 90 deg = 16384.
+        p: 16384,
+        r: 0,
+        viewplid: PlayerId(0),
+        ingamecam: last_cpp.ingamecam.clone(),
+        fov: last_cpp.fov,                // Use current FOV
+        time: Duration::from_millis(500), // Smooth transition
+        flags: StaFlags::SHIFTU,
+        ..Default::default()
+    };
 
     // Position camera at target X, Y, but fixed height 100m
     cpp.pos.x = (pos_m.0 * 65536.0) as i32;
     cpp.pos.y = (pos_m.1 * 65536.0) as i32;
     cpp.pos.z = (100.0 * 65536.0) as i32;
-
-    // Look down
-    // Heading matches object heading (ObjectHeading -> HeadingU16 via degrees)
-    let target_degrees = target.heading().map(|h| h.to_degrees()).unwrap_or(0.0);
-    cpp.h = HeadingU16::from_degrees(target_degrees);
-    // Pitch 90 degrees down. 65536 = 360 deg. 90 deg = 16384.
-    cpp.p = 16384;
-    cpp.r = 0;
-
-    cpp.viewplid = PlayerId(0);
-    cpp.ingamecam = last_cpp.ingamecam.clone();
-    cpp.fov = last_cpp.fov; // Use current FOV
-    cpp.time = Duration::from_millis(500); // Smooth transition
-    cpp.flags = StaFlags::SHIFTU;
 
     Some(cpp)
 }
@@ -55,21 +55,21 @@ pub fn get_side_view(selection: &[ObjectInfo], last_cpp: &Cpp) -> Option<Cpp> {
     // Camera look direction: Look back at object.
     let cam_h = HeadingU16::from_radians(heading.to_radians() - std::f64::consts::FRAC_PI_2);
 
-    let mut cpp = Cpp::default();
-    cpp.reqi = RequestId(0);
+    let mut cpp = Cpp {
+        reqi: RequestId(0),
+        h: cam_h,
+        p: 0, // Level
+        r: 0,
+        viewplid: PlayerId(0),
+        ingamecam: last_cpp.ingamecam.clone(),
+        fov: last_cpp.fov, // Use current FOV
+        time: Duration::from_millis(500),
+        flags: StaFlags::SHIFTU,
+        ..Default::default()
+    };
     cpp.pos.x = (cam_x * 65536.0) as i32;
     cpp.pos.y = (cam_y * 65536.0) as i32;
     cpp.pos.z = (cam_z * 65536.0) as i32;
-
-    cpp.h = cam_h;
-    cpp.p = 0; // Level
-    cpp.r = 0;
-
-    cpp.viewplid = PlayerId(0);
-    cpp.ingamecam = last_cpp.ingamecam.clone();
-    cpp.fov = last_cpp.fov; // Use current FOV
-    cpp.time = Duration::from_millis(500);
-    cpp.flags = StaFlags::SHIFTU;
 
     Some(cpp)
 }

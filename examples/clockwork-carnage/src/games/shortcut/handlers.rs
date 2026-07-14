@@ -216,13 +216,12 @@ pub(super) async fn on_uco(
             };
 
             let db = state.read().db.clone();
-            if let Some((pool, event_id)) = &db {
-                if let Err(e) =
+            if let Some((pool, event_id)) = &db
+                && let Err(e) =
                     crate::db::insert_shortcut_time(pool, *event_id, &uname, &vehicle, time_ms)
                         .await
-                {
-                    tracing::warn!("Failed to persist shortcut time: {e}");
-                }
+            {
+                tracing::warn!("Failed to persist shortcut time: {e}");
             }
 
             state

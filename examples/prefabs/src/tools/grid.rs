@@ -220,7 +220,7 @@ fn build_spline(selection: &[ObjectInfo], config: BuildConfig) -> Result<Vec<Obj
         let fwd = spline::heading_to_forward(heading);
         let right = DVec2::new(fwd.y, -fwd.x); // 90° clockwise
 
-        let lateral = if seq % 2 == 0 {
+        let lateral = if seq.is_multiple_of(2) {
             config.lateral_offset
         } else {
             -config.lateral_offset

@@ -876,11 +876,7 @@ pub(super) fn reduce(state: &mut State, msg: ToolboxMsg) -> Option<Command> {
             None
         },
         ToolboxMsg::Nudge(heading) => Some(Command::SpawnObjects {
-            objects: tools::nudge::nudge(
-                &state.selection,
-                heading.clone(),
-                state.nudge_distance_metres,
-            ),
+            objects: tools::nudge::nudge(&state.selection, heading, state.nudge_distance_metres),
             action: crate::SpawnAction::AddObjects,
             origin: SpawnOrigin::Nudge {
                 heading,

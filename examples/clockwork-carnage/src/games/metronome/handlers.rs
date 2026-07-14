@@ -200,12 +200,11 @@ pub(super) async fn on_uco(
             }
 
             let db = state.read().db.clone();
-            if let Some((pool, event_id)) = &db {
-                if let Err(e) =
+            if let Some((pool, event_id)) = &db
+                && let Err(e) =
                     crate::db::insert_metronome_lap(pool, *event_id, &uname, delta_ms).await
-                {
-                    tracing::warn!("Failed to persist metronome lap: {e}");
-                }
+            {
+                tracing::warn!("Failed to persist metronome lap: {e}");
             }
 
             let prev_best = state

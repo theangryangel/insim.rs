@@ -108,7 +108,7 @@ pub async fn main() -> Result<()> {
                 connection.write(current_flags).await?;
                 // Advance the deadline by this step's duration before moving
                 // on, so any processing delay doesn't cause drift over time.
-                next_tick = next_tick + current_duration;
+                next_tick += current_duration;
                 (current_duration, current_flags) = *steps.next().unwrap();
             },
 
@@ -117,27 +117,25 @@ pub async fn main() -> Result<()> {
                     // Npl fires when a player joins the track (including when
                     // returning from the pits). We only care about the local
                     // human player - remote and AI players are ignored.
-                    Packet::Npl(npl) => {
-                        if !npl.ptype.is_remote() && !npl.ptype.is_ai() {
+                    Packet::Npl(npl)
+                        if !npl.ptype.is_remote() && !npl.ptype.is_ai() => {
                             plid = Some(npl.plid);
                             // Reset the deadline so the sequence starts
                             // immediately rather than mid-sleep.
                             next_tick = tokio::time::Instant::now();
                             tracing::info!("Local player joined! {:?}", plid);
-                        }
-                    },
+                        },
 
                     // Pll fires when a player leaves the session entirely;
                     // Plp fires when they drive into the pits. Both should
                     // pause the strobe and reset the sequence to the start.
-                    p @ (Packet::Pll(_) | Packet::Plp(_)) => {
-                        if p.plid() == plid {
+                    p @ (Packet::Pll(_) | Packet::Plp(_))
+                        if p.plid() == plid => {
                             tracing::info!("Local player left! {:?}", plid);
                             plid = None;
                             steps = step_vec.iter().cycle();
                             (current_duration, current_flags) = *steps.next().unwrap();
-                        }
-                    },
+                        },
 
                     _ => {}
                 }

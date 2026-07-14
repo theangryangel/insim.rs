@@ -360,7 +360,7 @@ mod tests {
     #[test]
     fn test_retain_colours() {
         let raw = "^1abc ^2efg";
-        let as_bytes = to_lossy_bytes(&raw);
+        let as_bytes = to_lossy_bytes(raw);
 
         assert_eq!(as_bytes, raw.as_bytes());
     }
@@ -368,7 +368,7 @@ mod tests {
     #[test]
     fn test_retain_escaping() {
         let raw = "^^";
-        let as_bytes = to_lossy_bytes(&raw);
+        let as_bytes = to_lossy_bytes(raw);
         assert_eq!(as_bytes, raw.as_bytes());
         assert_eq!(raw, to_lossy_string(&as_bytes));
     }

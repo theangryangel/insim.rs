@@ -57,11 +57,12 @@ fn build_disjoint_ranges() -> Vec<RangeMask> {
         };
         let mask = codepage_mask_for_char(ch);
 
-        if let Some(last) = ranges.last_mut() {
-            if last.mask == mask && last.end + 1 == cp {
-                last.end = cp;
-                continue;
-            }
+        if let Some(last) = ranges.last_mut()
+            && last.mask == mask
+            && last.end + 1 == cp
+        {
+            last.end = cp;
+            continue;
         }
 
         ranges.push(RangeMask {
