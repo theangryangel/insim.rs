@@ -1,0 +1,143 @@
+# Configuration file for `prek`, a git hook framework written in Rust.
+# See https://prek.j178.dev for more information.
+#
+# This project is prek-only. We use `repo = "builtin"` and `language = "system"`
+# hooks, neither of which stock pre-commit understands, so there is deliberately
+# no `.pre-commit-config.yaml` - run everything through `prek`.
+#
+# Design note: we have deliberately avoided third-party (upstream) hook repos
+# and gone almost entirely local. The stock pre-commit-hooks are provided by
+# prek's `repo = "builtin"`, the Rust toolchain hooks are inlined as local
+# `system` hooks (the old doublify/pre-commit-rust has been unmaintained since
+# v1.0), and prettier/ruff run as local hooks with pinned dependencies. This
+# removes a whole class of "remote repo rev drifted" duplication and keeps every
+# hook's behaviour visible in this one file.
+#:schema https://www.schemastore.org/prek.json
+
+exclude = '''
+(?x)
+^LICENSE$|
+^Cargo\.lock$|
+# Askama templates - prettier would mangle the {% %} tag syntax.
+^examples/clockwork-carnage/src/web/templates/|
+# Generated, kept verbatim - see xtask-insim-o3-schema and generate_packets.py.
+^insim_o3/insim_schema\.json$|
+^insim_o3/python/insim_o3/packets\.py$
+'''
+
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "prettier"
+name = "prettier"
+entry = "prettier"
+args = ["--write", "--list-different", "--ignore-unknown"]
+# Web + docs assets only. Deliberately NOT `types = ["text"]` - prettier cannot
+# format Rust, and letting it open *.rs files races cargo fmt.
+files = '\.(css|scss|html|js|jsx|ts|tsx|mjs|cjs|json|ya?ml|md)$'
+language = "node"
+additional_dependencies = ["prettier@3.9.5"]
+
+[[repos]]
+repo = "builtin"
+
+# These three rewrite files, so exclude *.rs (owned by cargo fmt). prettier
+# already normalises whitespace/eol for the file types it formats.
+[[repos.hooks]]
+id = "trailing-whitespace"
+exclude = '\.rs$'
+
+[[repos.hooks]]
+id = "end-of-file-fixer"
+exclude = '\.rs$'
+
+[[repos.hooks]]
+id = "mixed-line-ending"
+args = ["--fix=lf"]
+exclude = '\.rs$'
+
+[[repos.hooks]]
+id = "check-case-conflict"
+
+[[repos.hooks]]
+id = "check-merge-conflict"
+
+[[repos.hooks]]
+id = "check-symlinks"
+
+# Rust toolchain hooks, inlined as local `system` hooks (was
+# doublify/pre-commit-rust, unmaintained since v1.0). Using local hooks lets us
+# scope check/clippy to Rust + manifest changes and use the installed toolchain.
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "fmt"
+name = "cargo fmt"
+description = "Format Rust sources with cargo fmt."
+entry = "cargo fmt --all"
+language = "system"
+types = ["rust"]
+pass_filenames = false
+args = [
+  "--",
+  "--config",
+  # XXX: Unstable options are not read from .rustfmt.toml, however they can be
+  # applied via args to rustfmt. When stable, remove from here and add to
+  # .rustfmt.toml.
+  # See https://github.com/rust-lang/rustfmt/issues/5083
+  # See https://github.com/rust-lang/rustfmt/issues/4991
+  "group_imports=StdExternalCrate,imports_granularity=Crate",
+]
+stages = ["pre-commit", "pre-merge-commit", "manual"]
+
+[[repos.hooks]]
+id = "clippy"
+name = "cargo clippy"
+# clippy compiles the workspace, so it subsumes `cargo check` - no separate
+# check hook.
+description = "Lint Rust sources with clippy."
+entry = "cargo clippy --workspace --all-targets --all-features"
+language = "system"
+args = ["--", "-D", "warnings"]
+types = ["file"]
+files = '(Cargo\.(toml|lock)|\.rs)$'
+pass_filenames = false
+stages = ["pre-commit", "pre-merge-commit", "pre-push", "manual"]
+
+[[repos.hooks]]
+id = "test"
+name = "cargo test"
+description = "Run the test suite with cargo test."
+entry = "cargo test --workspace"
+language = "system"
+types = ["file"]
+files = '(Cargo\.(toml|lock)|\.rs)$'
+pass_filenames = false
+stages = ["pre-push", "pre-merge-commit", "manual"]
+
+# Python linting/formatting for the insim_o3 bindings. Local `language = "python"`
+# hooks with a pinned ruff (was astral-sh/ruff-pre-commit); ruff discovers its
+# config from insim_o3/pyproject.toml by walking up from each file.
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "ruff"
+name = "ruff"
+description = "Lint Python sources with ruff."
+entry = "ruff check"
+args = ["--fix", "--exit-non-zero-on-fix"]
+language = "python"
+types = ["python"]
+additional_dependencies = ["ruff==0.15.12"]
+
+[[repos.hooks]]
+id = "ruff-format"
+name = "ruff-format"
+description = "Format Python sources with ruff."
+entry = "ruff format"
+language = "python"
+types = ["python"]
+additional_dependencies = ["ruff==0.15.12"]

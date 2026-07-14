@@ -45,13 +45,17 @@ workflow that ensures that the proposed changes meet the minimal quality.
 
 - We are not fussy about commit messages, but just ask that you try and keep
   them clean. [How to write a commit message](https://chris.beams.io/posts/git-commit/) may be helpful.
-- We use [pre-commit](https://pre-commit.com/) to help run all of our linting.
-  Before you raise a Pull Request, ensure that you've installed pre-commit, and
-  run pre-commit. This will execute rustfmt, clippy, etc.
+- We use [prek](https://prek.j178.dev) (a fast, Rust-based reimplementation of
+  pre-commit) to help run all of our linting. Before you raise a Pull Request,
+  ensure that you've installed prek and run it. This will execute rustfmt,
+  clippy, ruff, etc.
   ```bash
-  pip install pre-commit
-  pre-commit run --all
+  # See https://prek.j178.dev for other installation methods.
+  uv tool install prek
+  prek run --all-files
   ```
+  Our hooks are configured entirely in `prek.toml`; there is no
+  `.pre-commit-config.yaml`.
 
 ## AI / LLM usage
 

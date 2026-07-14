@@ -1,5 +1,5 @@
 match_block_trailing_comma = true
 max_width = 100
-# XXX: These are unstable options. See .pre-commit-config.yaml
+# XXX: These are unstable options. See prek.toml
 # group_imports = "StdExternalCrate"
 # imports_granularity = "Crate"
