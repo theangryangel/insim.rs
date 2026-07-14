@@ -18,8 +18,6 @@ exclude = '''
 (?x)
 ^LICENSE$|
 ^Cargo\.lock$|
-# Askama templates - prettier would mangle the {% %} tag syntax.
-^examples/clockwork-carnage/src/web/templates/|
 # Generated, kept verbatim - see xtask-insim-o3-schema and generate_packets.py.
 ^insim_o3/insim_schema\.json$|
 ^insim_o3/python/insim_o3/packets\.py$

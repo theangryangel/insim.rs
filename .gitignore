@@ -4,7 +4,6 @@ examples/pth2svg/*.svg
 examples/**/*.db
 examples/**/*.db-shm
 examples/**/*.db-wal
-examples/**/clockwork-carnage.toml
 
 ### Rust
 
