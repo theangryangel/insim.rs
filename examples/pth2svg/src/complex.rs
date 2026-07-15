@@ -106,7 +106,7 @@ impl ComplexArgs {
         }
 
         if let Some(i) = self.racing_line {
-            let p = Pth::from_path(&i).context(format!("Failed to read {:?}", &i))?;
+            let p = Pth::from_path(&i).context(format!("Failed to read {:?}", i))?;
 
             let point = p.iter_nodes().next().unwrap().get_center(SCALE.into());
 

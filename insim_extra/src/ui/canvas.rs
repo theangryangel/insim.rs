@@ -91,7 +91,7 @@ impl<M: Clone + 'static> Canvas<M> {
         );
 
         if let Some(root_id) = root_id
-            && let Err(e) = tree.compute_layout(root_id, taffy::Size::length(200.0))
+            && let Err(e) = tree.compute_layout(root_id, taffy::Size::length(200.0_f32))
         {
             tracing::error!("Failed to compute UI layout: {e}");
             return None;
