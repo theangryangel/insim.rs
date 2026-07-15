@@ -123,7 +123,7 @@ mod test {
         match &p {
             Pth::LfsPth0(as1) => {
                 assert_eq!(as1.revision, 0);
-                assert_valid_as1_pth(&as1);
+                assert_valid_as1_pth(as1);
                 let mut inner = Vec::new();
                 let written = p.write(&mut inner).expect("Expected to write");
 

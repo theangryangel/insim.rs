@@ -18,7 +18,7 @@ impl SimpleArgs {
         let mut viewbox_x: (f32, f32) = (0.0, 0.0);
         let mut viewbox_y: (f32, f32) = (0.0, 0.0);
 
-        let p = Pth::from_path(&self.pth).context(format!("Failed to read {:?}", &self.pth))?;
+        let p = Pth::from_path(&self.pth).context(format!("Failed to read {:?}", self.pth))?;
 
         let first = p.iter_nodes().next().unwrap().get_center(SCALE.into());
         let limit = p.iter_nodes().next().unwrap().get_outer_limit(SCALE.into());

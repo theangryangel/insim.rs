@@ -37,7 +37,7 @@ fn main() -> Result<()> {
     if args.output.exists() {
         if !args.force {
             let err = Err(std::io::Error::from(std::io::ErrorKind::AlreadyExists));
-            return err.context(format!("Output path already exists {:?}", &args.output));
+            return err.context(format!("Output path already exists {:?}", args.output));
         }
 
         std::fs::remove_file(&args.output)?;
@@ -49,7 +49,7 @@ fn main() -> Result<()> {
     };
 
     svg::save(&args.output, &document)
-        .context(format!("Could not save output SVG to '{:?}'", &args.output))?;
+        .context(format!("Could not save output SVG to '{:?}'", args.output))?;
 
     Ok(())
 }

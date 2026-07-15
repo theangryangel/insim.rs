@@ -179,13 +179,13 @@ fn position_tyrestack_circle(
     (0..max)
         .map(|i| {
             let base_angle = i as f64 * angle_step;
-            let x = center.x + (radius_metres as f64) * base_angle.cos();
-            let y = center.y + (radius_metres as f64) * base_angle.sin();
+            let x = center.x + radius_metres * base_angle.cos();
+            let y = center.y + radius_metres * base_angle.sin();
             let position = DVec3::new(x, y, center.z);
 
             // Rotate color pattern based on time (completes full rotation every max seconds)
             let color_index = ((i as f64 + time_offset) % max as f64).floor() as u8;
-            let is_dark = color_index % 2 == 0;
+            let is_dark = color_index.is_multiple_of(2);
 
             ObjectInfo::TyreStack4(tyres::Tyres {
                 xyz: ObjectCoordinate::from_dvec3_metres(position),
@@ -265,7 +265,7 @@ pub fn generate_checkpoint_signal(location: DVec3, heading: ObjectHeading) -> Ve
             DVec3::new(4.5, 0.0, 0.00),
             ObjectInfo::ChalkLine(chalk::Chalk {
                 xyz: ObjectCoordinate::default(),
-                heading: heading,
+                heading,
                 colour: chalk::ChalkColour::Yellow,
                 floating: false,
             }),
@@ -423,7 +423,7 @@ pub async fn main() -> Result<()> {
 
                     Packet::Mci(mci) => {
                         // Find the viewed player's position in MCI
-                        if let Some(comp_car) = mci.info.iter().next() {
+                        if let Some(comp_car) = mci.info.first() {
                             if comp_car.plid != viewed {
                                 continue;
                             }
@@ -497,14 +497,14 @@ pub async fn main() -> Result<()> {
                             } => {
                                 let center = DVec3::new(*x, *y, *z);
                                 let dir = ObjectHeading::from_radians(*heading);
-                                last_objects = position_letterboard(&text, center, dir, 1.0, 10.0, started.elapsed());
+                                last_objects = position_letterboard(text, center, dir, 1.0, 10.0, started.elapsed());
                             },
                             Mode::Painted {
                                 x, y, z, heading, text
                             } => {
                                 let center = DVec3::new(*x, *y, *z);
                                 let dir = ObjectHeading::from_radians(*heading);
-                                last_objects = position_painted(&text, center, dir, 1.0, 10.0, started.elapsed());
+                                last_objects = position_painted(text, center, dir, 1.0, 10.0, started.elapsed());
                             },
                             Mode::Circle { x, y, z, heading, radius, count } => {
                                 let center = DVec3::new(*x, *y, *z);
@@ -527,7 +527,7 @@ pub async fn main() -> Result<()> {
     }
 
     if !last_objects.is_empty() {
-        let _ = connection
+        connection
             .write(Axm {
                 action: PmoAction::DelObjects(last_objects),
                 ..Default::default()

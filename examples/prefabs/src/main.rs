@@ -506,12 +506,11 @@ pub async fn main() -> anyhow::Result<()> {
                         None
                     },
                     Packet::Axm(axm) => {
-                        if axm.reqi == REQI_SELECTION {
-                            if let PmoAction::TtcSel(info) = axm.action {
+                        if axm.reqi == REQI_SELECTION
+                            && let PmoAction::TtcSel(info) = axm.action {
                                 state.selection = info;
                                 dirty = true;
                             }
-                        }
 
                         None
                     },

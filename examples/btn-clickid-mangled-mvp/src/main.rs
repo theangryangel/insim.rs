@@ -42,14 +42,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         let packet = net.read().await?;
-        if let Packet::Btc(btc) = packet {
-            if btc.clickid == ClickId(5) {
-                println!(
-                    "BTC received for ClickID=5 (should stop after non-clickable update): {:?}",
-                    btc
-                );
-                break;
-            }
+        if let Packet::Btc(btc) = packet
+            && btc.clickid == ClickId(5)
+        {
+            println!(
+                "BTC received for ClickID=5 (should stop after non-clickable update): {:?}",
+                btc
+            );
+            break;
         }
     }
 
@@ -83,14 +83,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         let packet = net.read().await?;
-        if let Packet::Btc(btc) = packet {
-            if btc.clickid == ClickId(5) {
-                println!(
-                    "BTC received for ClickID=5 after non-clickable update: {:?}",
-                    btc
-                );
-                break;
-            }
+        if let Packet::Btc(btc) = packet
+            && btc.clickid == ClickId(5)
+        {
+            println!(
+                "BTC received for ClickID=5 after non-clickable update: {:?}",
+                btc
+            );
+            break;
         }
     }
 

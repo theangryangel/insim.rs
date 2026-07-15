@@ -56,7 +56,7 @@ mod test {
                 0,  // sp3
             ],
             |flg: Flg| {
-                assert_eq!(flg.offon, true);
+                assert!(flg.offon);
                 assert!(matches!(flg.flag, FlgType::Yellow));
             }
         );

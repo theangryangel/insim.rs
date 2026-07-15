@@ -12,7 +12,6 @@ Each example is setup as its own crate so its dependencies are clear.
 ## Catalog
 
 - `btn-clickid-mangled-mvp` - Minimal repro: update same ClickID from clickable to non-clickable.
-- `clockwork-carnage` - insim_extras proof-of-concept/dogfooding (WIP).
 - `live-delta` - Live delta timing displayed with in-game buttons.
 - `marquee` - Layout objects and AXM packet tooling experiments.
 - `pth2svg` - Convert a LFS PTH file to an SVG.

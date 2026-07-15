@@ -147,8 +147,8 @@ mod test {
 
         assert_from_to_bytes!(Rip, data.as_ref(), |parsed: Rip| {
             assert_eq!(parsed.reqi, RequestId(2));
-            assert_eq!(parsed.mpr, true);
-            assert_eq!(parsed.paused, true);
+            assert!(parsed.mpr);
+            assert!(parsed.paused);
             assert_eq!(parsed.ctime, Duration::from_millis(141684));
             assert_eq!(parsed.rname.as_deref(), Some("name_of_thing"));
         });

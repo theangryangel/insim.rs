@@ -1,4 +1,7 @@
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{Result, anyhow};
 use insim::{core::object::ObjectCoordinate, insim::ObjectInfo};
@@ -141,7 +144,7 @@ fn to_safe_filename(name: &str) -> String {
     s.trim_matches('_').to_string()
 }
 
-fn unique_path(dir: &PathBuf, stem: &str) -> PathBuf {
+fn unique_path(dir: &Path, stem: &str) -> PathBuf {
     let path = dir.join(format!("{stem}.yaml"));
     if !path.exists() {
         return path;

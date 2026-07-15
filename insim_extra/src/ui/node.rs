@@ -1036,7 +1036,7 @@ mod tests {
     fn test_margin_methods() {
         let m: Node<TestMsg> = Node::container().m(5.0);
         let style = m.style.unwrap();
-        assert_eq!(style.margin, taffy::Rect::length(5.0));
+        assert_eq!(style.margin, taffy::Rect::length(5.0_f32));
 
         let mt: Node<TestMsg> = Node::container().mt(1.0);
         assert_eq!(
@@ -1105,7 +1105,7 @@ mod tests {
     fn test_padding_methods() {
         let p: Node<TestMsg> = Node::container().p(5.0);
         let style = p.style.unwrap();
-        assert_eq!(style.padding, taffy::Rect::length(5.0));
+        assert_eq!(style.padding, taffy::Rect::length(5.0_f32));
 
         let pt: Node<TestMsg> = Node::container().pt(1.0);
         assert_eq!(
@@ -1179,8 +1179,8 @@ mod tests {
         assert_eq!(style.flex_direction, taffy::FlexDirection::Column);
         assert_eq!(style.size.width, taffy::Dimension::length(200.0));
         assert_eq!(style.size.height, taffy::Dimension::length(100.0));
-        assert_eq!(style.padding, taffy::Rect::length(5.0));
-        assert_eq!(style.margin, taffy::Rect::length(10.0));
+        assert_eq!(style.padding, taffy::Rect::length(5.0_f32));
+        assert_eq!(style.margin, taffy::Rect::length(10.0_f32));
         assert_eq!(style.align_items, Some(taffy::AlignItems::CENTER));
         assert_eq!(
             style.justify_content,

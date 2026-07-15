@@ -17,7 +17,7 @@ members = [
 exclude = ['examples/*']
 # Only check / build main crates by default (check all with `--workspace`)
 default-members = ["insim", "insim_core", "insim_macros", "insim_pth", "insim_lyt", "outgauge", "outsim", "insim_extra", "kitcar"]
-resolver = "2"
+resolver = "3"
 
 [workspace.package]
 authors = ["Karl Southern <karl@theangryangel.co.uk>"]

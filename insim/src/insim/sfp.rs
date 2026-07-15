@@ -41,7 +41,7 @@ mod test {
             ],
             |parsed: Sfp| {
                 assert_eq!(parsed.reqi, RequestId(0));
-                assert_eq!(parsed.onoff, true);
+                assert!(parsed.onoff);
             }
         );
     }

@@ -372,7 +372,7 @@ mod test {
 
         assert_eq!(
             setup.digest::<sha2::Sha512>(),
-            sha2::Sha512::digest(&file_payload)
+            sha2::Sha512::digest(file_payload)
         );
     }
 

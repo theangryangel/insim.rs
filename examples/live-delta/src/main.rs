@@ -25,6 +25,12 @@ pub struct DeltaTracker {
     current_lap: Vec<RefPoint>,
 }
 
+impl Default for DeltaTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DeltaTracker {
     pub fn clear(&mut self) {
         self.reference_lap = None;
@@ -103,12 +109,12 @@ fn project_onto_segment(p: &Vec3, a: &Vec3, b: &Vec3) -> Vec3 {
     let ab = b - a;
     let ap = p - a;
 
-    let ab_len2 = ab.dot(ab) as f32;
+    let ab_len2 = ab.dot(ab);
     if ab_len2 == 0.0 {
-        return a.clone();
+        return *a;
     }
 
-    let t = ap.dot(ab) as f32 / ab_len2;
+    let t = ap.dot(ab) / ab_len2;
     let t = t.clamp(0.0, 1.0);
 
     a + ab * t
@@ -118,12 +124,12 @@ fn project_ratio(p: &Vec3, a: &Vec3, b: &Vec3) -> f32 {
     let ab = b - a;
     let ap = p - a;
 
-    let ab_len2 = ab.dot(ab) as f32;
+    let ab_len2 = ab.dot(ab);
     if ab_len2 == 0.0 {
         return 0.0;
     }
 
-    (ap.dot(ab) as f32 / ab_len2).clamp(0.0, 1.0)
+    (ap.dot(ab) / ab_len2).clamp(0.0, 1.0)
 }
 
 #[derive(Parser)]
@@ -185,30 +191,24 @@ pub fn main() -> Result<()> {
                 }
             },
 
-            Packet::Npl(npl) => {
-                if !npl.ptype.is_remote() && !npl.ptype.is_ai() {
-                    plid = Some(npl.plid);
-                    tracing::info!("Woot! local player joined! {:?}", plid);
+            Packet::Npl(npl) if !npl.ptype.is_remote() && !npl.ptype.is_ai() => {
+                plid = Some(npl.plid);
+                tracing::info!("Woot! local player joined! {:?}", plid);
 
-                    connection.write(TinyType::Rst.with_request_id(3))?;
-                }
+                connection.write(TinyType::Rst.with_request_id(3))?;
             },
 
-            Packet::Plp(plp) => {
-                if recording && plid.is_some_and(|id| id == plp.plid) {
-                    recording = false;
-                    deltas.clear();
-                }
+            Packet::Plp(plp) if recording && plid.is_some_and(|id| id == plp.plid) => {
+                recording = false;
+                deltas.clear();
             },
 
-            Packet::Pll(pll) => {
-                if plid.map_or(false, |p| p == pll.plid) {
-                    plid = None;
+            Packet::Pll(pll) if plid == Some(pll.plid) => {
+                plid = None;
 
-                    tracing::info!("Local player left!");
-                    recording = false;
-                    deltas.clear();
-                }
+                tracing::info!("Local player left!");
+                recording = false;
+                deltas.clear();
             },
 
             Packet::Mci(mci) => {
@@ -224,21 +224,17 @@ pub fn main() -> Result<()> {
                         continue;
                     }
                     pos = i.xyz.to_vec3_metres();
-                    deltas.record(pos.clone(), Instant::now());
+                    deltas.record(pos, Instant::now());
                 }
             },
 
-            Packet::Lap(lap) => {
-                if recording && plid.is_some_and(|id| id == lap.plid) {
-                    deltas.lap();
-                }
+            Packet::Lap(lap) if recording && plid.is_some_and(|id| id == lap.plid) => {
+                deltas.lap();
             },
 
-            Packet::Fin(fin) => {
-                if plid.is_some_and(|id| id == fin.plid) {
-                    recording = false;
-                    //deltas.clear();
-                }
+            Packet::Fin(fin) if plid.is_some_and(|id| id == fin.plid) => {
+                recording = false;
+                //deltas.clear();
             },
 
             _ => {},

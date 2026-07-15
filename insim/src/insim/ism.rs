@@ -38,7 +38,7 @@ mod test {
             ],
             |parsed: Ism| {
                 assert_eq!(parsed.reqi, RequestId(1));
-                assert_eq!(parsed.host, true);
+                assert!(parsed.host);
                 assert_eq!(parsed.hname.as_deref(), Some("aBcd"));
             }
         )

@@ -300,7 +300,7 @@ mod test {
     #[test]
     fn test_header_only() {
         let mut input = BytesMut::new();
-        input.extend_from_slice(&[b'L', b'F', b'S', b'T']);
+        input.extend_from_slice(b"LFST");
 
         let opts = OutSimOpts::HEADER;
 

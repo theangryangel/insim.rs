@@ -150,7 +150,7 @@ impl Encode for Mso {
 
 #[cfg(test)]
 mod tests {
-    use bytes::{BufMut, Bytes, BytesMut};
+    use bytes::{BufMut, BytesMut};
     use insim_core::{DecodeContext, EncodeContext};
 
     use super::*;
@@ -164,7 +164,7 @@ mod tests {
         comparison.put_u8(74); // plid
         comparison.put_u8(0); // usertype
         comparison.put_u8(0); // textstart
-        comparison.extend_from_slice(&"two".to_string().as_bytes()); // msg
+        comparison.extend_from_slice("two".to_string().as_bytes()); // msg
         comparison.put_bytes(0, 1);
 
         assert_from_to_bytes!(Mso, comparison.as_ref(), |parsed: Mso| {
@@ -186,14 +186,14 @@ mod tests {
         raw.put_u8(74); // plid
         raw.put_u8(0); // usertype
         raw.put_u8(0); // textstart
-        raw.extend_from_slice(&"Downloaded Skin : XFG_PRO38".to_string().as_bytes()); // ms
+        raw.extend_from_slice("Downloaded Skin : XFG_PRO38".to_string().as_bytes()); // ms
         // We are intentionally dropping the trailing nul byte here to ensure that we handle
         // packets that are too short somehow. For this reason we're not using
         // assert_from_to_bytes!
         //raw.put_bytes(0, 1);
         let raw = raw.freeze();
 
-        let mut buf = Bytes::from(raw.clone());
+        let mut buf = raw.clone();
         let res = Mso::decode(&mut DecodeContext::new(&mut buf)).unwrap();
         assert_eq!(res.textstart, 0);
         assert_eq!(res.msg, "Downloaded Skin : XFG_PRO38");
@@ -214,7 +214,7 @@ mod tests {
         // when reading we want to handle too long entries, but ensure that when we convert to
         // bytes it's appropriately truncated
 
-        let mut bytes = Bytes::from(raw.clone());
+        let mut bytes = raw.clone();
         let res = Mso::decode(&mut DecodeContext::new(&mut bytes)).unwrap();
         assert_eq!(res.textstart, 0);
         assert_eq!(res.msg.len(), MSO_MSG_MAX_LEN + 10);
