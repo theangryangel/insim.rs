@@ -1,11 +1,11 @@
-//! Runtime: the [`run`] entry point that drives an [`crate::App`] against a
-//! live connection, and the [`Sender`] back-channel that hands packets/events
-//! to the runtime from anywhere.
+//! Runtime: the [`run`] and [`run_connection`] entry points that drive an
+//! [`crate::App`] against a live connection, and the [`Sender`] back-channel
+//! that hands packets/events to the runtime from anywhere.
 //!
-//! [`run`] consumes an [`crate::App`] together with an `insim::Builder`,
-//! opens the connection, emits a one-shot [`crate::Startup`] synthetic event,
-//! then runs the dispatch loop until the connection drops or the back-channel
-//! closes.
+//! [`run`] is a convenience wrapper that opens a connection from an
+//! `insim::Builder`. [`run_connection`] accepts an already-established
+//! connection, emits a one-shot [`crate::Startup`] synthetic event, then runs
+//! the dispatch loop until the connection drops or the back-channel closes.
 
 use std::{
     any::{Any, TypeId},
@@ -106,6 +106,22 @@ where
     S: Send + Sync + 'static,
     V: crate::ui::View + 'static,
 {
+    let connection = builder.connect_async().await?;
+    run_connection(connection, app).await
+}
+
+/// Run `app` against an established InSim connection until the connection
+/// drops or the app shuts down.
+///
+/// One call represents one connection epoch. The app's world is synchronized
+/// with LFS, [`Startup`] is emitted once, and [`Shutdown`] is emitted before
+/// returning. Callers that supervise or reconnect should construct a fresh
+/// [`App`] for each connection and call this function again.
+pub async fn run_connection<S, V>(mut connection: Framed, app: App<S, V>) -> Result<(), AppError>
+where
+    S: Send + Sync + 'static,
+    V: crate::ui::View + 'static,
+{
     let state = app.state;
     let world = app.world;
     let ui = app.ui;
@@ -115,9 +131,7 @@ where
     let cancel = app.cancel;
     let mut cmd_rx = app
         .cmd_rx
-        .expect("App::cmd_rx already taken - run() must be called at most once");
-
-    let mut framed = builder.connect_async().await?;
+        .expect("App::cmd_rx already taken - an App can only be run once");
 
     // Sync the world with the server's current state (LFS does not volunteer it).
     crate::world::send_startup_requests(&sender);
@@ -136,7 +150,7 @@ where
     .await;
 
     let result = run_dispatch_loop(
-        &mut framed,
+        &mut connection,
         &sender,
         &world,
         &ui,
@@ -168,7 +182,7 @@ where
     // already be gone so write errors are ignored.
     while let Ok(cmd) = cmd_rx.try_recv() {
         if let Command::Packet(p) = cmd {
-            let _ = framed.write(p).await;
+            let _ = connection.write(p).await;
         }
     }
 

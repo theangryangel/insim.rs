@@ -92,7 +92,7 @@ pub use app::{
     handler::Handler,
     run_if,
     run_if::{HandlerExt, RunIf},
-    runtime::{Sender, run},
+    runtime::{Sender, run, run_connection},
 };
 pub use chat::{ChatEvent, ChatParser};
 pub use error::AppError;
