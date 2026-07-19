@@ -58,6 +58,15 @@ impl Ipb {
     }
 }
 
+impl<'a> IntoIterator for &'a Ipb {
+    type Item = &'a Ipv4Addr;
+    type IntoIter = IndexSetIter<'a, Ipv4Addr>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl Decode for Ipb {
     fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
         let reqi = ctx.decode::<RequestId>("reqi")?;

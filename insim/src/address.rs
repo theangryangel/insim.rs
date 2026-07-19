@@ -71,3 +71,19 @@ impl From<String> for Addr {
         Self::String(value)
     }
 }
+
+impl Addr {
+    #[cfg(feature = "tokio")]
+    pub(crate) async fn to_socket_addrs_async(&self) -> io::Result<Vec<SocketAddr>> {
+        match self {
+            Self::SocketAddr(addr) => Ok(vec![*addr]),
+            Self::IpAddr(host, port) => Ok(vec![SocketAddr::new(*host, *port)]),
+            Self::String(value) => tokio::net::lookup_host(value.as_str())
+                .await
+                .map(Iterator::collect),
+            Self::Tuple(host, port) => tokio::net::lookup_host((host.as_str(), *port))
+                .await
+                .map(Iterator::collect),
+        }
+    }
+}

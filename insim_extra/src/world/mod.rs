@@ -176,9 +176,17 @@ impl WorldInner {
         });
     }
 
-    fn apply_tiny_clr(&mut self, tiny: &Tiny) {
+    fn apply_tiny_clr(&mut self, tiny: &Tiny) -> Vec<PlayerInfo> {
         if matches!(tiny.subt, TinyType::Clr) {
+            let players = self
+                .players
+                .iter()
+                .map(|(_, player)| player.clone())
+                .collect();
             self.players.clear();
+            players
+        } else {
+            Vec::new()
         }
     }
 
@@ -377,7 +385,10 @@ fn dispatch(inner: &mut WorldInner, packet: &insim::Packet, events: &mut Vec<Wor
             push_race!(inner.apply_telepit(plp));
         },
         Packet::Tiny(tiny) => {
-            inner.apply_tiny_clr(tiny);
+            for player in inner.apply_tiny_clr(tiny) {
+                push_race!(inner.on_player_left(&player));
+                events.push(WorldEvent::PlayerLeft(PlayerLeft(player)));
+            }
             if let Some(prev) = inner.apply_tiny_axc(tiny) {
                 events.push(WorldEvent::LayoutChanged(LayoutChanged {
                     from: Some(prev),
@@ -515,7 +526,7 @@ impl std::fmt::Debug for World {
             .field("session_kind", &g.game.session_kind)
             .field("race_entrants", &g.race.entrants.len())
             .field("rejoin", &g.rejoin)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -779,7 +790,8 @@ impl World {
 mod emission_tests {
     use insim::{
         core::track::Track,
-        insim::{Axi, RaceInProgress, RaceLaps, Rst, Sta},
+        identifiers::{ConnectionId, PlayerId},
+        insim::{Axi, Ncn, Npl, RaceInProgress, RaceLaps, Rst, Sta, Tiny, TinyType},
     };
 
     use super::{World, WorldEvent};
@@ -799,6 +811,58 @@ mod emission_tests {
             count(&events, |e| matches!(e, WorldEvent::SessionStarted(_))),
             1,
             "SessionStarted should fire once on Rst"
+        );
+    }
+
+    #[test]
+    fn tiny_clr_reconciles_players_and_live_race_entrants() {
+        let world = World::new();
+        let _ = world.apply_packet(
+            &Ncn {
+                ucid: ConnectionId(1),
+                uname: "user".into(),
+                pname: "driver".into(),
+                ..Default::default()
+            }
+            .into(),
+        );
+        let _ = world.apply_packet(
+            &Rst {
+                racelaps: RaceLaps::Laps(5),
+                ..Default::default()
+            }
+            .into(),
+        );
+        let _ = world.apply_packet(
+            &Npl {
+                plid: PlayerId(1),
+                ucid: ConnectionId(1),
+                nump: 1,
+                pname: "driver".into(),
+                ..Default::default()
+            }
+            .into(),
+        );
+
+        let events = world.apply_packet(
+            &Tiny {
+                subt: TinyType::Clr,
+                ..Default::default()
+            }
+            .into(),
+        );
+
+        assert_eq!(world.player_count(), 0);
+        assert!(world.live_entrants().is_empty());
+        assert!(
+            events
+                .iter()
+                .any(|event| matches!(event, WorldEvent::PlayerLeft(_)))
+        );
+        assert!(
+            events
+                .iter()
+                .any(|event| matches!(event, WorldEvent::Race(super::RaceEvent::Dnf { .. })))
         );
     }
 

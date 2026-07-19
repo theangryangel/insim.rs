@@ -22,16 +22,30 @@ fn tcpstream_connect_to_any<A: ToSocketAddrs>(
     addrs: A,
     timeout: Duration,
 ) -> std::io::Result<std::net::TcpStream> {
+    let deadline = std::time::Instant::now()
+        .checked_add(timeout)
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "timeout overflow"))?;
+    let mut last_error = None;
     for addr in addrs.to_socket_addrs()? {
-        match std::net::TcpStream::connect_timeout(&addr, timeout) {
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        if remaining.is_zero() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "connection timed out",
+            ));
+        }
+        match std::net::TcpStream::connect_timeout(&addr, remaining) {
             Ok(stream) => return Ok(stream),
-            Err(_) => {
-                continue;
-            },
+            Err(error) => last_error = Some(error),
         }
     }
 
-    Err(std::io::Error::other("All connection attempts failed"))
+    Err(last_error.unwrap_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::AddrNotAvailable,
+            "address resolved to no socket addresses",
+        )
+    }))
 }
 
 #[derive(Clone, Debug, Default)]
@@ -324,7 +338,7 @@ impl Builder {
                     stream.set_nonblocking(true)?;
                 }
 
-                let port = self.isi_udpport.unwrap_or(local.port());
+                let port = self.isi_udpport.unwrap_or(stream.local_addr()?.port());
                 let isi = self.isi(Some(port));
 
                 let mut stream: BlockingFramed = stream.into();
@@ -343,10 +357,28 @@ impl Builder {
     pub async fn connect_async(&self) -> Result<AsyncFramed> {
         match self.proto {
             Proto::Tcp => {
-                let stream = tcpstream_connect_to_any(&self.remote, self.connect_timeout)?;
+                let connect = async {
+                    let addrs = self.remote.to_socket_addrs_async().await?;
+                    let mut last_error = None;
+                    for addr in addrs {
+                        match tokio::net::TcpStream::connect(addr).await {
+                            Ok(stream) => return Ok(stream),
+                            Err(error) => last_error = Some(error),
+                        }
+                    }
+                    Err(last_error.unwrap_or_else(|| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::AddrNotAvailable,
+                            "address resolved to no socket addresses",
+                        )
+                    }))
+                };
+                let stream = tokio::time::timeout(self.connect_timeout, connect)
+                    .await
+                    .map_err(|_| {
+                        std::io::Error::new(std::io::ErrorKind::TimedOut, "connection timed out")
+                    })??;
                 stream.set_nodelay(self.tcp_nodelay)?;
-                stream.set_nonblocking(true)?;
-                let stream = tokio::net::TcpStream::from_std(stream)?;
 
                 let mut stream: AsyncFramed = stream.into();
                 stream.write(self.isi(self.isi_udpport)).await?;
@@ -356,13 +388,17 @@ impl Builder {
             Proto::Udp => {
                 let local = self.udp_local_address.unwrap_or("0.0.0.0:0".parse()?);
 
-                let stream = std::net::UdpSocket::bind(local)?;
-                stream.connect(&self.remote)?;
-                stream.set_nonblocking(true)?;
+                let stream = tokio::net::UdpSocket::bind(local).await?;
+                let addrs = self.remote.to_socket_addrs_async().await?;
+                let remote = addrs.into_iter().next().ok_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::AddrNotAvailable,
+                        "address resolved to no socket addresses",
+                    )
+                })?;
+                stream.connect(remote).await?;
 
-                let stream = tokio::net::UdpSocket::from_std(stream)?;
-
-                let port = self.isi_udpport.unwrap_or(local.port());
+                let port = self.isi_udpport.unwrap_or(stream.local_addr()?.port());
                 let isi = self.isi(Some(port));
 
                 let mut stream: AsyncFramed = stream.into();

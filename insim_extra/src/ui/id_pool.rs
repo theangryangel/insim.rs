@@ -6,7 +6,7 @@ use insim::identifiers::ClickId;
 /// Helper alias for a Btn ClickId Pool
 pub type ClickIdPool = IdPool<1, 239>;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 /// ClickId Pool - handles allocation and deallocation of unique IDs for buttons
 pub struct IdPool<const MIN: u8, const MAX: u8> {
     // Bit set where 1 = available, 0 = allocated
