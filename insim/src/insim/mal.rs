@@ -70,6 +70,15 @@ impl Mal {
     }
 }
 
+impl<'a> IntoIterator for &'a Mal {
+    type Item = &'a Vehicle;
+    type IntoIter = IndexSetIter<'a, Vehicle>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl Decode for Mal {
     fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
         let reqi = ctx.decode::<RequestId>("reqi")?;

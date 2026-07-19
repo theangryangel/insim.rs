@@ -56,7 +56,7 @@ impl<M: Clone + 'static> std::fmt::Debug for Canvas<M> {
             .field("ucid", &self.ucid)
             .field("buttons", &self.buttons.len())
             .field("click_map", &self.click_map.len())
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -73,6 +73,7 @@ impl<M: Clone + 'static> Canvas<M> {
     pub fn reconcile(&mut self, root: Node<M>) -> Option<CanvasDiff> {
         let mut click_map = HashMap::new();
         let mut new_buttons = HashMap::new();
+        let mut pool = self.pool.clone();
 
         let mut tree = taffy::TaffyTree::new();
         let mut node_map = Vec::new();
@@ -83,7 +84,7 @@ impl<M: Clone + 'static> Canvas<M> {
             0,
             self.ucid,
             &self.buttons,
-            &mut self.pool,
+            &mut pool,
             &mut new_buttons,
             &mut tree,
             &mut node_map,
@@ -107,7 +108,7 @@ impl<M: Clone + 'static> Canvas<M> {
 
         // release dead ids
         if !dead_ids.is_empty() {
-            self.pool.release(&dead_ids);
+            pool.release(&dead_ids);
         }
 
         self.click_map = click_map;
@@ -181,6 +182,7 @@ impl<M: Clone + 'static> Canvas<M> {
         }));
 
         self.buttons = new_buttons;
+        self.pool = pool;
 
         if updates.is_empty() && removals.is_empty() {
             None

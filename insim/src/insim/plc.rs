@@ -208,6 +208,15 @@ impl PlcAllowedCarsSet {
     }
 }
 
+impl<'a> IntoIterator for &'a PlcAllowedCarsSet {
+    type Item = &'a Vehicle;
+    type IntoIter = IndexSetIter<'a, Vehicle>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
