@@ -21,7 +21,7 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - uses: j178/prek-action@v2
+      - uses: j178/prek-action@v3.0.0
 
   check_codepage_lut:
     runs-on: ubuntu-latest
