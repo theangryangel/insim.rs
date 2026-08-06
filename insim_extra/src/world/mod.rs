@@ -43,9 +43,9 @@ use connection::MultiIndexPlayerInfoMap;
 pub use connection::{ConnectionInfo, PlayerInfo};
 pub use event::{
     AllowedCarsChanged, AllowedModsChanged, Connected, ConnectionDetails, Disconnected,
-    LayoutChanged, MultiplayerJoined, MultiplayerLeft, PlayerJoined, PlayerLeft,
-    PlayerTeleportedToPits, Renamed, SessionEnded, SessionStarted, TakingOver, TrackChanged,
-    VehicleSelected, VersionReceived, WorldEvent,
+    LayoutChanged, LobbyEntered, LobbyNotReady, LobbyReady, MultiplayerJoined, MultiplayerLeft,
+    PlayerJoined, PlayerLeft, PlayerTeleportedToPits, Renamed, SessionEnded, SessionStarted,
+    TakingOver, TrackChanged, VehicleSelected, VersionReceived, WorldEvent,
 };
 pub use game::{
     GameInfo, GridMode, Month, MultiplayerState, SessionKind, TimeDemoPreset, TimeSet, VersionInfo,
@@ -73,6 +73,10 @@ pub(crate) struct WorldInner {
     /// disconnected entrant (matched by LFS.net username) before falling back
     /// to a fresh entrant. Set once at construction.
     pub(crate) rejoin: bool,
+}
+
+fn lobby_ready(inner: &WorldInner) -> bool {
+    inner.game.session_kind.is_none() && inner.connections.keys().any(|ucid| ucid.0 != 0)
 }
 
 impl WorldInner {
@@ -396,6 +400,7 @@ fn dispatch(inner: &mut WorldInner, packet: &insim::Packet, events: &mut Vec<Wor
             let (was_in_session, now_in_session, prev_track, new_track) = inner.apply_sta(sta);
             if was_in_session && !now_in_session {
                 events.push(WorldEvent::SessionEnded(SessionEnded));
+                events.push(WorldEvent::LobbyEntered(LobbyEntered));
             }
             if prev_track != Some(new_track) {
                 events.push(WorldEvent::TrackChanged(TrackChanged {
@@ -565,7 +570,13 @@ impl World {
         let mut events = Vec::new();
         {
             let mut inner = self.inner.write();
+            let was_lobby_ready = lobby_ready(&inner);
             dispatch(&mut inner, packet, &mut events);
+            match (was_lobby_ready, lobby_ready(&inner)) {
+                (false, true) => events.push(WorldEvent::LobbyReady(LobbyReady)),
+                (true, false) => events.push(WorldEvent::LobbyNotReady(LobbyNotReady)),
+                _ => {},
+            }
         }
         events
     }
@@ -578,6 +589,17 @@ impl World {
     /// Alias for [`connection_count`](Self::connection_count).
     pub fn count(&self) -> usize {
         self.connection_count()
+    }
+
+    /// Number of connected clients, excluding LFS's own server connection
+    /// (which always has connection ID zero).
+    pub fn client_count(&self) -> usize {
+        self.inner
+            .read()
+            .connections
+            .keys()
+            .filter(|ucid| ucid.0 != 0)
+            .count()
     }
 
     /// Number of tracked players.
@@ -740,13 +762,23 @@ mod emission_tests {
     use insim::{
         core::track::Track,
         identifiers::{ConnectionId, PlayerId},
-        insim::{Axi, Ncn, Npl, RaceInProgress, RaceLaps, Rst, Sta, Tiny, TinyType},
+        insim::{Axi, Cnl, Ncn, Npl, RaceInProgress, RaceLaps, Rst, Sta, Tiny, TinyType},
     };
 
     use super::{World, WorldEvent};
 
     fn count(events: &[WorldEvent], pred: impl Fn(&WorldEvent) -> bool) -> usize {
         events.iter().filter(|e| pred(e)).count()
+    }
+
+    fn connection(ucid: u8) -> insim::Packet {
+        Ncn {
+            ucid: ConnectionId(ucid),
+            uname: format!("user-{ucid}"),
+            pname: format!("driver-{ucid}"),
+            ..Default::default()
+        }
+        .into()
     }
 
     #[test]
@@ -838,6 +870,102 @@ mod emission_tests {
             count(&events, |e| matches!(e, WorldEvent::SessionEnded(_))),
             1,
             "SessionEnded should fire once on Racing -> No transition"
+        );
+        assert_eq!(
+            count(&events, |e| matches!(e, WorldEvent::LobbyEntered(_))),
+            1,
+            "LobbyEntered should fire once on Racing -> No transition"
+        );
+    }
+
+    #[test]
+    fn lobby_becomes_ready_when_entered_with_a_client_present() {
+        let world = World::new();
+        let _ = world.apply_packet(&connection(0));
+        let _ = world.apply_packet(&connection(1));
+        let _ = world.apply_packet(
+            &Rst {
+                racelaps: RaceLaps::Laps(5),
+                ..Default::default()
+            }
+            .into(),
+        );
+
+        let events = world.apply_packet(
+            &Sta {
+                raceinprog: RaceInProgress::No,
+                ..Default::default()
+            }
+            .into(),
+        );
+
+        assert_eq!(world.client_count(), 1);
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, WorldEvent::LobbyEntered(_)))
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, WorldEvent::LobbyReady(_)))
+        );
+    }
+
+    #[test]
+    fn lobby_becomes_ready_when_a_client_joins_in_the_lobby() {
+        let world = World::new();
+        let server_events = world.apply_packet(&connection(0));
+        assert_eq!(world.client_count(), 0);
+        assert!(
+            !server_events
+                .iter()
+                .any(|e| matches!(e, WorldEvent::LobbyReady(_)))
+        );
+
+        let events = world.apply_packet(&connection(1));
+        assert_eq!(world.client_count(), 1);
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, WorldEvent::LobbyReady(_)))
+        );
+
+        let events = world.apply_packet(
+            &Cnl {
+                ucid: ConnectionId(1),
+                ..Default::default()
+            }
+            .into(),
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, WorldEvent::LobbyNotReady(_)))
+        );
+    }
+
+    #[test]
+    fn restart_does_not_emit_lobby_entered() {
+        let world = World::new();
+        let rst = || {
+            insim::Packet::Rst(Rst {
+                racelaps: RaceLaps::Laps(5),
+                ..Default::default()
+            })
+        };
+        let _ = world.apply_packet(&rst());
+
+        let events = world.apply_packet(&rst());
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, WorldEvent::SessionEnded(_)))
+        );
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, WorldEvent::LobbyEntered(_)))
         );
     }
 

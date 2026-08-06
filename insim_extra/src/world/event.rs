@@ -86,6 +86,18 @@ pub struct SessionStarted {
 #[derive(Debug, Clone)]
 pub struct SessionEnded;
 
+/// LFS transitioned from an active session to the lobby.
+#[derive(Debug, Clone)]
+pub struct LobbyEntered;
+
+/// The lobby became actionable because at least one non-server client is connected.
+#[derive(Debug, Clone)]
+pub struct LobbyReady;
+
+/// The lobby stopped being actionable.
+#[derive(Debug, Clone)]
+pub struct LobbyNotReady;
+
 /// Track changed (also fired for the first `Sta` when `from` is `None`).
 #[derive(Debug, Clone)]
 pub struct TrackChanged {
@@ -168,6 +180,12 @@ pub enum WorldEvent {
     SessionStarted(SessionStarted),
     /// LFS returned to the entry/lobby screen.
     SessionEnded(SessionEnded),
+    /// LFS transitioned from an active session to the lobby.
+    LobbyEntered(LobbyEntered),
+    /// LFS is in the lobby with at least one non-server client connected.
+    LobbyReady(LobbyReady),
+    /// LFS is no longer in the lobby with a non-server client connected.
+    LobbyNotReady(LobbyNotReady),
     /// Track changed.
     TrackChanged(TrackChanged),
     /// Layout changed or cleared.

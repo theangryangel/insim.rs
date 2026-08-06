@@ -80,9 +80,9 @@ pub use app::{
 pub use chat::{ChatEvent, ChatParser};
 pub use error::AppError;
 pub use game::{
-    AllowedCarsChanged, AllowedModsChanged, GameInfo, LayoutChanged, MultiplayerJoined,
-    MultiplayerLeft, SessionEnded, SessionKind, SessionStarted, TrackChanged, VersionInfo,
-    VersionReceived,
+    AllowedCarsChanged, AllowedModsChanged, GameInfo, LayoutChanged, LobbyEntered, LobbyNotReady,
+    LobbyReady, MultiplayerJoined, MultiplayerLeft, SessionEnded, SessionKind, SessionStarted,
+    TrackChanged, VersionInfo, VersionReceived,
 };
 pub use insim_extra::{
     util::{host_command, mtc},
