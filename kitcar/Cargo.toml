@@ -18,7 +18,6 @@ workspace = true
 [dependencies]
 insim = { path = "../insim", features = ["tokio"] }
 insim_extra = { path = "../insim_extra" }
-parking_lot = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "net"] }
 tokio-util = { workspace = true }
 futures = { workspace = true }
@@ -27,6 +26,7 @@ tracing = { workspace = true }
 indexmap = { workspace = true }
 
 [dev-dependencies]
+parking_lot = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "net", "test-util"] }
 tracing-subscriber = { workspace = true }
 clap = { workspace = true, features = ["derive"] }

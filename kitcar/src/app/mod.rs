@@ -1,6 +1,6 @@
 //! [`App`] - the composition root.
 //!
-//! [`App`] holds handlers (one IndexMap per stage); it does not itself open a
+//! [`App`] holds an ordered handler collection; it does not itself open a
 //! connection. Hand the value to [`crate::run`] when ready to run.
 
 pub(crate) mod event;
@@ -27,25 +27,6 @@ use crate::{
     ui::{NoView, View},
 };
 
-/// Which stage of the dispatch cycle a handler runs in.
-///
-/// - [`Stage::Pre`] - handlers run *sequentially* in registration order at
-///   the start of each dispatch. Deciders that Update handlers gate on (e.g.
-///   [`crate::RoundManager`]) live here so their effects settle first. The
-///   intrinsic [`crate::World`] mirror is folded by the runtime ahead of both
-///   stages.
-/// - [`Stage::Update`] - handlers run *concurrently* after every Pre
-///   handler has finished. Most game logic belongs here.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Stage {
-    /// Sequential stage running first. Use for state mirrors and other
-    /// handlers that must finish before any Update handler observes the
-    /// same dispatch.
-    Pre,
-    /// Concurrent stage running after Pre. Most handlers belong here.
-    Update,
-}
-
 /// A bundle of registrations that consume an [`App<S>`] and return one.
 ///
 /// Useful when a plugin wants to add several handlers (and/or sub-handlers)
@@ -58,8 +39,8 @@ pub enum Stage {
 ///
 /// impl<S: Send + Sync + 'static> Installable<S> for MyChatCommands {
 ///     fn install(self, app: App<S>) -> App<S> {
-///         app.handle(Stage::Update, on_help)
-///            .handle(Stage::Update, on_ping)
+///         app.handle(on_help)
+///            .handle(on_ping)
 ///     }
 /// }
 /// ```
@@ -83,19 +64,12 @@ where
 ///
 /// ## Dispatch model
 ///
-/// Every dispatch runs in two phases:
+/// Every dispatch runs handlers sequentially in registration order. Register
+/// state-maintaining handlers before consumers that must observe their effects.
 ///
-/// 1. **Pre** - [`Stage::Pre`] handlers run *sequentially* in registration
-///    order. Deciders that Update handlers gate on (e.g. [`crate::RoundManager`])
-///    belong here.
-/// 2. **Update** - [`Stage::Update`] handlers run *concurrently* via
-///    [`futures::stream::FuturesUnordered`]. Most game logic belongs here.
-///
-/// Every handler registered via [`App::handle`] is also inserted into a
-/// per-stage `TypeId`-keyed map; that map serves both for dispatch (ordered
-/// iteration) and for typed extraction (other handlers extract a stateful
-/// handler value by its concrete type). There is no separate "registry"
-/// data structure.
+/// Every handler registered via [`App::handle`] is inserted into a
+/// `TypeId`-keyed map used only for ordered dispatch. Handlers are uniquely
+/// owned runtime processors, not an extractable service registry.
 ///
 /// Periodic synthetic events have a small dedicated helper - see
 /// [`App::periodic`].
@@ -114,11 +88,9 @@ where
     /// extracted infallibly as `ui: Ui<V>`. An app with no UI keeps the inert
     /// [`NoView`] handle.
     pub(crate) ui: crate::ui::Ui<V>,
-    /// Pre-stage handlers, keyed by handler `TypeId`. IndexMap preserves
-    /// insertion order for dispatch and supports O(1) lookup for extraction.
-    pub(crate) pre_handlers: IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
-    /// Update-stage handlers, ditto.
-    pub(crate) update_handlers: IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
+    /// Handlers keyed by concrete `TypeId`. `IndexMap` preserves registration
+    /// order for deterministic dispatch.
+    pub(crate) handlers: IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
     pub(crate) sender: Sender,
     /// Receiver paired with `sender`. Taken by `run()`.
     pub(crate) cmd_rx: Option<mpsc::UnboundedReceiver<Command>>,
@@ -132,8 +104,7 @@ impl<S, V: View + 'static> std::fmt::Debug for App<S, V> {
         f.debug_struct("App")
             .field("world", &self.world)
             .field("ui", &self.ui)
-            .field("pre_handlers", &self.pre_handlers.len())
-            .field("update_handlers", &self.update_handlers.len())
+            .field("handlers", &self.handlers.len())
             .finish()
     }
 }
@@ -172,8 +143,7 @@ where
             state,
             world: World::new(),
             ui: crate::ui::Ui::disabled(),
-            pre_handlers: IndexMap::new(),
-            update_handlers: IndexMap::new(),
+            handlers: IndexMap::new(),
             sender: Sender::new(cmd_tx),
             cmd_rx: Some(cmd_rx),
             cancel: CancellationToken::new(),
@@ -196,7 +166,7 @@ where
         V: View + 'static,
     {
         debug_assert!(
-            self.pre_handlers.is_empty() && self.update_handlers.is_empty(),
+            self.handlers.is_empty(),
             "App::with_ui must be called before any handlers are registered"
         );
         let ui = crate::ui::Ui::new(self.sender.clone(), initial_global);
@@ -204,8 +174,7 @@ where
             state: self.state,
             world: self.world,
             ui,
-            pre_handlers: IndexMap::new(),
-            update_handlers: IndexMap::new(),
+            handlers: IndexMap::new(),
             sender: self.sender,
             cmd_rx: self.cmd_rx,
             cancel: self.cancel,
@@ -265,35 +234,25 @@ where
         extract::State(self.state.clone())
     }
 
-    /// Register a handler at `stage`.
+    /// Register a handler. Handlers run sequentially in registration order.
     ///
-    /// The handler is stored in the stage's IndexMap keyed by its concrete
-    /// type's `TypeId`, which means it's also available for typed
-    /// extraction by other handlers (via [`crate::FromContext`] /
-    /// [`crate::Svc<T>`]). Re-registering a type at the same stage
-    /// overwrites the previous entry.
+    /// The handler is keyed by its concrete `TypeId`; re-registering the same
+    /// concrete type overwrites the previous entry without changing its place.
     ///
     /// Two flavours of handler register here uniformly:
     /// - **Stateless handlers** - plain async fns, closures, anything that
     ///   gets the blanket impl of [`Handler`].
-    /// - **Stateful handlers** - structs that manually impl [`Handler`].
-    ///   These are also extractable by other handlers via their type.
+    /// - **Stateful handlers** - structs that manually impl [`Handler`] and
+    ///   keep state private to that registration.
     #[must_use]
-    pub fn handle<T, H>(mut self, stage: Stage, handler: H) -> Self
+    pub fn handle<T, H>(mut self, handler: H) -> Self
     where
         H: Handler<T, S, V> + 'static,
         T: Send + 'static,
     {
         let key = TypeId::of::<H>();
         let entry: Box<dyn ErasedHandler<S, V>> = Box::new(HandlerService::new(handler));
-        match stage {
-            Stage::Pre => {
-                let _ = self.pre_handlers.insert(key, entry);
-            },
-            Stage::Update => {
-                let _ = self.update_handlers.insert(key, entry);
-            },
-        }
+        let _ = self.handlers.insert(key, entry);
         self
     }
 

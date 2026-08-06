@@ -106,10 +106,6 @@ pub struct GameInfo {
     pub(crate) allowed_mods: Vec<Vehicle>,
     /// Version information, from a `Ver` packet. `None` until received.
     pub(crate) version: Option<VersionInfo>,
-    /// Incremented each time an `Axi` packet is applied, regardless of lname content.
-    pub(crate) axi_count: u64,
-    /// Incremented each time an `Rst` packet is applied.
-    pub(crate) rst_count: u64,
 }
 
 impl GameInfo {
