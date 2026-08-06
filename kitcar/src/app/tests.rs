@@ -33,7 +33,7 @@ use tracing_subscriber as _;
 use super::{event::Command, runtime::dispatch_cycle};
 use crate::{
     App, AppError, ChatEvent, ChatParser, Connected, Dispatch, Event, ExtractCx, Handler,
-    HandlerExt, Packet, Sender, Stage, State, Svc, World,
+    HandlerExt, Packet, Sender, State, World,
     ui::{NoView, Ui},
 };
 
@@ -65,21 +65,19 @@ struct TestState {
     last_cmd: Arc<Mutex<Option<TestCmd>>>,
 }
 
-impl<S: Send + Sync + 'static, V: crate::ui::View + 'static> Handler<(), S, V> for TestState {}
-
-async fn count_ncn(Packet(_n): Packet<Ncn>, Svc(s): Svc<TestState>) -> Result<(), AppError> {
+async fn count_ncn(Packet(_n): Packet<Ncn>, State(s): State<TestState>) -> Result<(), AppError> {
     let _ = s.ncn_hits.fetch_add(1, Ordering::Relaxed);
     Ok(())
 }
 
-async fn count_mso(Packet(_m): Packet<Mso>, Svc(s): Svc<TestState>) -> Result<(), AppError> {
+async fn count_mso(Packet(_m): Packet<Mso>, State(s): State<TestState>) -> Result<(), AppError> {
     let _ = s.mso_hits.fetch_add(1, Ordering::Relaxed);
     Ok(())
 }
 
 async fn count_connected(
     Event(_c): Event<Connected>,
-    Svc(s): Svc<TestState>,
+    State(s): State<TestState>,
 ) -> Result<(), AppError> {
     let _ = s.connected_hits.fetch_add(1, Ordering::Relaxed);
     Ok(())
@@ -87,7 +85,7 @@ async fn count_connected(
 
 async fn capture_cmd(
     Event(cmd): Event<ChatEvent<TestCmd>>,
-    Svc(s): Svc<TestState>,
+    State(s): State<TestState>,
 ) -> Result<(), AppError> {
     let _ = s.cmd_hits.fetch_add(1, Ordering::Relaxed);
     *s.last_cmd.lock() = Some(cmd.parsed);
@@ -115,14 +113,13 @@ fn make_mso(ucid: u8, msg: &str) -> insim::Packet {
     })
 }
 
-fn app_with(state: TestState) -> App {
-    App::new()
-        .handle(Stage::Update, state)
-        .handle(Stage::Update, ChatParser::<TestCmd>::new(&['!', '?']))
-        .handle(Stage::Update, count_ncn)
-        .handle(Stage::Update, count_mso)
-        .handle(Stage::Update, count_connected)
-        .handle(Stage::Update, capture_cmd)
+fn app_with(state: TestState) -> App<TestState> {
+    App::with_state(state)
+        .handle(ChatParser::<TestCmd>::new(&['!', '?']))
+        .handle(count_ncn)
+        .handle(count_mso)
+        .handle(count_connected)
+        .handle(capture_cmd)
 }
 
 /// Pull an app apart and drive one dispatch directly, mirroring the runtime
@@ -130,14 +127,13 @@ fn app_with(state: TestState) -> App {
 /// the derived world events synchronously; we then drain any *user* events
 /// handlers emitted via the back-channel (e.g. `ChatParser`'s typed events) and
 /// cycle those too.
-async fn drive(app: App, d: Dispatch) {
+async fn drive(app: App<TestState>, d: Dispatch) {
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
     let world = app.world;
-    let pre_handlers = app.pre_handlers;
-    let update_handlers = app.update_handlers;
+    let mut handlers = app.handlers;
 
     dispatch_cycle(
         d,
@@ -145,8 +141,7 @@ async fn drive(app: App, d: Dispatch) {
         &world,
         &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
-        &pre_handlers,
-        &update_handlers,
+        &mut handlers,
         &cancel,
     )
     .await;
@@ -160,8 +155,7 @@ async fn drive(app: App, d: Dispatch) {
                 &world,
                 &crate::ui::Ui::<crate::ui::NoView>::disabled(),
                 &app_state,
-                &pre_handlers,
-                &update_handlers,
+                &mut handlers,
                 &cancel,
             )
             .await;
@@ -267,9 +261,7 @@ async fn presence_is_queryable_via_extractor() {
         last_seen_count: Arc<AtomicUsize>,
     }
 
-    impl<S: Send + Sync + 'static, V: crate::ui::View + 'static> Handler<(), S, V> for PState {}
-
-    async fn observe_count(world: World, Svc(s): Svc<PState>) -> Result<(), AppError> {
+    async fn observe_count(world: World, State(s): State<PState>) -> Result<(), AppError> {
         s.last_seen_count.store(world.count(), Ordering::Relaxed);
         Ok(())
     }
@@ -277,15 +269,12 @@ async fn presence_is_queryable_via_extractor() {
     let state = PState::default();
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
-    let app = App::new()
-        .handle(Stage::Update, state.clone())
-        .handle(Stage::Update, observe_count);
+    let app = App::with_state(state.clone()).handle(observe_count);
 
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
     let world = app.world;
-    let pre_handlers = app.pre_handlers;
-    let update_handlers = app.update_handlers;
+    let mut handlers = app.handlers;
 
     // First NCN: the intrinsic world folds it in; handler reads count = 1.
     dispatch_cycle(
@@ -294,8 +283,7 @@ async fn presence_is_queryable_via_extractor() {
         &world,
         &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
-        &pre_handlers,
-        &update_handlers,
+        &mut handlers,
         &cancel,
     )
     .await;
@@ -308,8 +296,7 @@ async fn presence_is_queryable_via_extractor() {
         &world,
         &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
-        &pre_handlers,
-        &update_handlers,
+        &mut handlers,
         &cancel,
     )
     .await;
@@ -331,14 +318,13 @@ async fn cancellation_token_extractor_triggers_shutdown() {
         Ok(())
     }
 
-    let app = App::new().handle(Stage::Update, quit_on_ncn);
+    let app = App::new().handle(quit_on_ncn);
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
     let world = app.world;
-    let pre_handlers = app.pre_handlers;
-    let update_handlers = app.update_handlers;
+    let mut handlers = app.handlers;
 
     assert!(!cancel.is_cancelled());
     dispatch_cycle(
@@ -347,8 +333,7 @@ async fn cancellation_token_extractor_triggers_shutdown() {
         &world,
         &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
-        &pre_handlers,
-        &update_handlers,
+        &mut handlers,
         &cancel,
     )
     .await;
@@ -380,18 +365,15 @@ async fn sender_event_pushes_into_back_channel() {
 #[tokio::test]
 async fn run_if_skips_handler_when_predicate_false() {
     let state = TestState::default();
-    let app = App::new().handle(Stage::Update, state.clone()).handle(
-        Stage::Update,
-        count_ncn.run_if(|_: State<()>, _: Ui<NoView>| false),
-    );
+    let app = App::with_state(state.clone())
+        .handle(count_ncn.run_if(|_: State<TestState>, _: Ui<NoView>| false));
 
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
     let world = app.world;
-    let pre_handlers = app.pre_handlers;
-    let update_handlers = app.update_handlers;
+    let mut handlers = app.handlers;
 
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
@@ -399,8 +381,7 @@ async fn run_if_skips_handler_when_predicate_false() {
         &world,
         &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
-        &pre_handlers,
-        &update_handlers,
+        &mut handlers,
         &cancel,
     )
     .await;
@@ -415,18 +396,15 @@ async fn run_if_skips_handler_when_predicate_false() {
 #[tokio::test]
 async fn run_if_runs_handler_when_predicate_true() {
     let state = TestState::default();
-    let app = App::new().handle(Stage::Update, state.clone()).handle(
-        Stage::Update,
-        count_ncn.run_if(|_: State<()>, _: Ui<NoView>| true),
-    );
+    let app = App::with_state(state.clone())
+        .handle(count_ncn.run_if(|_: State<TestState>, _: Ui<NoView>| true));
 
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
     let world = app.world;
-    let pre_handlers = app.pre_handlers;
-    let update_handlers = app.update_handlers;
+    let mut handlers = app.handlers;
 
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
@@ -434,8 +412,7 @@ async fn run_if_runs_handler_when_predicate_true() {
         &world,
         &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
-        &pre_handlers,
-        &update_handlers,
+        &mut handlers,
         &cancel,
     )
     .await;
@@ -451,36 +428,18 @@ async fn run_if_runs_handler_when_predicate_true() {
 async fn in_state_reads_extension_and_gates_handler() {
     // A resource that holds a boolean. Handler gated on `in_state`. Flipping
     // the boolean between dispatches changes whether the handler fires.
-    use crate::{ExtractCx, FromContext};
-
-    #[derive(Clone)]
-    struct Flag(Arc<RwLock<bool>>);
-
-    impl<S, V: crate::ui::View + 'static> FromContext<S, V> for Flag {
-        fn from_context(cx: &ExtractCx<'_, S, V>) -> Option<Self> {
-            cx.lookup::<Flag>()
-        }
-    }
-
-    impl<S: Send + Sync + 'static, V: crate::ui::View + 'static> Handler<(), S, V> for Flag {}
-
     let state = TestState::default();
-    let flag = Flag(Arc::new(RwLock::new(false)));
-    let app = App::new()
-        .handle(Stage::Update, state.clone())
-        .handle(Stage::Update, flag.clone())
-        .handle(
-            Stage::Update,
-            count_ncn.run_if(|f: Flag, _: State<()>, _: Ui<NoView>| *f.0.read()),
-        );
+    let flag = Arc::new(RwLock::new(false));
+    let gate = flag.clone();
+    let app = App::with_state(state.clone())
+        .handle(count_ncn.run_if(move |_: State<TestState>, _: Ui<NoView>| *gate.read()));
 
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
     let world = app.world;
-    let pre_handlers = app.pre_handlers;
-    let update_handlers = app.update_handlers;
+    let mut handlers = app.handlers;
 
     // flag = false: handler skipped.
     dispatch_cycle(
@@ -489,8 +448,7 @@ async fn in_state_reads_extension_and_gates_handler() {
         &world,
         &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
-        &pre_handlers,
-        &update_handlers,
+        &mut handlers,
         &cancel,
     )
     .await;
@@ -501,7 +459,7 @@ async fn in_state_reads_extension_and_gates_handler() {
     );
 
     // Flip the flag - the same handler now passes the predicate.
-    *flag.0.write() = true;
+    *flag.write() = true;
 
     dispatch_cycle(
         Dispatch::Packet(make_ncn(2, "bob")),
@@ -509,8 +467,7 @@ async fn in_state_reads_extension_and_gates_handler() {
         &world,
         &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
-        &pre_handlers,
-        &update_handlers,
+        &mut handlers,
         &cancel,
     )
     .await;
@@ -573,15 +530,14 @@ async fn with_state_holds_typed_value() {
         Ok(())
     }
 
-    let app = App::with_state(state_value).handle(Stage::Update, observe);
+    let app = App::with_state(state_value).handle(observe);
 
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
     let world = app.world;
-    let pre_handlers = app.pre_handlers;
-    let update_handlers = app.update_handlers;
+    let mut handlers = app.handlers;
 
     // A Tiny yields no world events, so the ungated observe handler runs exactly
     // once (an Ncn would also inject a derived Connected dispatch).
@@ -591,8 +547,7 @@ async fn with_state_holds_typed_value() {
         &world,
         &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
-        &pre_handlers,
-        &update_handlers,
+        &mut handlers,
         &cancel,
     )
     .await;
@@ -615,15 +570,14 @@ async fn state_mutation_visible_across_dispatches() {
 
     let counter = Counter::default();
     let observed = counter.n.clone();
-    let app = App::with_state(counter).handle(Stage::Update, bump);
+    let app = App::with_state(counter).handle(bump);
 
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
     let world = app.world;
-    let pre_handlers = app.pre_handlers;
-    let update_handlers = app.update_handlers;
+    let mut handlers = app.handlers;
 
     for i in 1..=3 {
         dispatch_cycle(
@@ -632,8 +586,7 @@ async fn state_mutation_visible_across_dispatches() {
             &world,
             &crate::ui::Ui::<crate::ui::NoView>::disabled(),
             &app_state,
-            &pre_handlers,
-            &update_handlers,
+            &mut handlers,
             &cancel,
         )
         .await;
@@ -662,18 +615,15 @@ async fn state_in_run_if_predicate_gates_handler() {
 
     let flag = Flag::default();
     let flag_inner = flag.0.clone();
-    let app = App::with_state(flag).handle(
-        Stage::Update,
-        handler.run_if(|s: State<Flag>, _: Ui<NoView>| *s.0.0.read()),
-    );
+    let app =
+        App::with_state(flag).handle(handler.run_if(|s: State<Flag>, _: Ui<NoView>| *s.0.0.read()));
 
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
     let world = app.world;
-    let pre_handlers = app.pre_handlers;
-    let update_handlers = app.update_handlers;
+    let mut handlers = app.handlers;
 
     // Flag off - handler should be gated.
     dispatch_cycle(
@@ -682,8 +632,7 @@ async fn state_in_run_if_predicate_gates_handler() {
         &world,
         &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
-        &pre_handlers,
-        &update_handlers,
+        &mut handlers,
         &cancel,
     )
     .await;
@@ -698,8 +647,7 @@ async fn state_in_run_if_predicate_gates_handler() {
         &world,
         &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
-        &pre_handlers,
-        &update_handlers,
+        &mut handlers,
         &cancel,
     )
     .await;
@@ -707,10 +655,9 @@ async fn state_in_run_if_predicate_gates_handler() {
 }
 
 #[tokio::test]
-async fn pre_handler_runs_before_update_handler() {
-    // A Pre handler bumps a counter on Packet<Ncn>; an Update handler reads
-    // it during the same dispatch. Because Pre handlers run sequentially
-    // first, the Update handler must observe the bumped value.
+async fn earlier_handler_settles_before_later_handler() {
+    // The first handler bumps a counter; the next handler reads it during the
+    // same dispatch and must observe the updated value.
     #[derive(Clone, Default)]
     struct Counter {
         n: Arc<AtomicUsize>,
@@ -718,7 +665,7 @@ async fn pre_handler_runs_before_update_handler() {
 
     impl<S: Send + Sync + 'static, V: crate::ui::View + 'static> Handler<(), S, V> for Counter {
         fn call(
-            self,
+            &mut self,
             _cx: &ExtractCx<'_, S, V>,
         ) -> impl std::future::Future<Output = Result<(), AppError>> + Send {
             async move {
@@ -728,33 +675,25 @@ async fn pre_handler_runs_before_update_handler() {
         }
     }
 
-    #[derive(Clone, Default)]
-    struct Observed(Arc<AtomicUsize>);
-    impl<S: Send + Sync + 'static, V: crate::ui::View + 'static> Handler<(), S, V> for Observed {}
-
-    async fn observe(
-        _: Packet<Ncn>,
-        Svc(c): Svc<Counter>,
-        Svc(o): Svc<Observed>,
-    ) -> Result<(), AppError> {
-        o.0.store(c.n.load(Ordering::Relaxed), Ordering::Relaxed);
-        Ok(())
-    }
-
     let counter = Counter::default();
-    let observed = Observed::default();
-    let app = App::new()
-        .handle(Stage::Pre, counter.clone())
-        .handle(Stage::Update, observed.clone())
-        .handle(Stage::Update, observe);
+    let observed = Arc::new(AtomicUsize::new(0));
+    let counter_for_observer = counter.n.clone();
+    let observed_for_handler = observed.clone();
+    let observe = move |_: Packet<Ncn>| {
+        observed_for_handler.store(
+            counter_for_observer.load(Ordering::Relaxed),
+            Ordering::Relaxed,
+        );
+        async { Ok(()) }
+    };
+    let app = App::new().handle(counter).handle(observe);
 
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
     let world = app.world;
-    let pre_handlers = app.pre_handlers;
-    let update_handlers = app.update_handlers;
+    let mut handlers = app.handlers;
 
     dispatch_cycle(
         Dispatch::Packet(make_ncn(1, "alice")),
@@ -762,18 +701,17 @@ async fn pre_handler_runs_before_update_handler() {
         &world,
         &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
-        &pre_handlers,
-        &update_handlers,
+        &mut handlers,
         &cancel,
     )
     .await;
 
-    assert_eq!(observed.0.load(Ordering::Relaxed), 1);
+    assert_eq!(observed.load(Ordering::Relaxed), 1);
 }
 
 #[tokio::test]
-async fn pre_handlers_run_sequentially_in_registration_order() {
-    // Two Pre handlers append to a shared Vec on Packet<Ncn>; the order in
+async fn handlers_run_sequentially_in_registration_order() {
+    // Two handlers append to a shared Vec; the order in
     // the Vec must match the handler registration order. Distinct newtypes
     // give each handler its own TypeId slot in the IndexMap.
     #[derive(Clone)]
@@ -783,7 +721,7 @@ async fn pre_handlers_run_sequentially_in_registration_order() {
 
     impl<S: Send + Sync + 'static, V: crate::ui::View + 'static> Handler<(), S, V> for First {
         fn call(
-            self,
+            &mut self,
             _: &ExtractCx<'_, S, V>,
         ) -> impl std::future::Future<Output = Result<(), AppError>> + Send {
             async move {
@@ -794,7 +732,7 @@ async fn pre_handlers_run_sequentially_in_registration_order() {
     }
     impl<S: Send + Sync + 'static, V: crate::ui::View + 'static> Handler<(), S, V> for Second {
         fn call(
-            self,
+            &mut self,
             _: &ExtractCx<'_, S, V>,
         ) -> impl std::future::Future<Output = Result<(), AppError>> + Send {
             async move {
@@ -806,18 +744,17 @@ async fn pre_handlers_run_sequentially_in_registration_order() {
 
     let log = Arc::new(Mutex::new(Vec::new()));
     let app = App::new()
-        .handle(Stage::Pre, First(log.clone()))
-        .handle(Stage::Pre, Second(log.clone()));
+        .handle(First(log.clone()))
+        .handle(Second(log.clone()));
 
     let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
     let sender = Sender::new(cmd_tx);
     let cancel = tokio_util::sync::CancellationToken::new();
     let app_state = app.state;
     let world = app.world;
-    let pre_handlers = app.pre_handlers;
-    let update_handlers = app.update_handlers;
+    let mut handlers = app.handlers;
 
-    // A Tiny yields no world events, so the two Pre handlers run exactly once
+    // A Tiny yields no world events, so the two handlers run exactly once
     // (an Ncn would also inject a derived Connected dispatch, running them again).
     dispatch_cycle(
         Dispatch::Packet(insim::Packet::Tiny(insim::insim::Tiny::default())),
@@ -825,8 +762,7 @@ async fn pre_handlers_run_sequentially_in_registration_order() {
         &world,
         &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
-        &pre_handlers,
-        &update_handlers,
+        &mut handlers,
         &cancel,
     )
     .await;

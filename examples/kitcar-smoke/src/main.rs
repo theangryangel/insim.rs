@@ -29,7 +29,7 @@ use insim::{
 };
 use kitcar::{
     App, AppError, ChatEvent, ChatParser, Connected, Disconnected, Event, ExtractCx, FromContext,
-    Handler, Packet, Sender, Stage, Startup, Svc, World, mtc, run,
+    Handler, Packet, Sender, Startup, State, World, mtc, run,
     ui::{self, Component, Ui, View, ViewHandle},
 };
 use tokio_util::sync::CancellationToken;
@@ -39,9 +39,7 @@ struct AppState {
     joins: Arc<AtomicUsize>,
 }
 
-impl<S: Send + Sync + 'static, V: View + 'static> Handler<(), S, V> for AppState {}
-
-async fn log_ncn(Packet(ncn): Packet<Ncn>, Svc(state): Svc<AppState>) -> Result<(), AppError> {
+async fn log_ncn(Packet(ncn): Packet<Ncn>, State(state): State<AppState>) -> Result<(), AppError> {
     let n = state.joins.fetch_add(1, Ordering::Relaxed) + 1;
     tracing::info!(ucid = %ncn.ucid, uname = %ncn.uname, total = n, "ncn");
     Ok(())
@@ -142,26 +140,23 @@ async fn handle_typed_chat(
 //   - the handler carries state that doesn't belong in the global `S` (e.g. a
 //     local counter, a small LRU cache, a per-handler debouncer);
 //   - you want to package extractor logic and behaviour together for reuse.
-#[derive(Clone)]
 struct MsoCounter {
-    seen: Arc<AtomicUsize>,
+    seen: usize,
 }
 
 impl MsoCounter {
     fn new() -> Self {
-        Self {
-            seen: Arc::new(AtomicUsize::new(0)),
-        }
+        Self { seen: 0 }
     }
 }
 
 impl<S: Send + Sync + 'static, V: View + 'static> Handler<(Packet<Mso>,), S, V> for MsoCounter {
-    async fn call(self, cx: &ExtractCx<'_, S, V>) -> Result<(), AppError> {
+    async fn call(&mut self, cx: &ExtractCx<'_, S, V>) -> Result<(), AppError> {
         let Some(Packet(mso)) = <Packet<Mso> as FromContext<S, V>>::from_context(cx) else {
             return Ok(());
         };
-        let n = self.seen.fetch_add(1, Ordering::Relaxed) + 1;
-        tracing::info!(ucid = %mso.ucid, total = n, "MsoCounter saw chat");
+        self.seen += 1;
+        tracing::info!(ucid = %mso.ucid, total = self.seen, "MsoCounter saw chat");
         Ok(())
     }
 }
@@ -340,24 +335,20 @@ async fn main() -> Result<(), AppError> {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
 
-    let app = App::new()
-        .with_ui::<SmokeView>(UiGlobal::default())
-        .handle(
-            Stage::Update,
-            AppState {
-                joins: Arc::new(AtomicUsize::new(0)),
-            },
-        )
-        .handle(Stage::Update, ChatParser::<Cmd>::new(&['!']))
-        .handle(Stage::Update, install_ticker)
-        .handle(Stage::Update, log_ncn)
-        .handle(Stage::Update, welcome)
-        .handle(Stage::Update, refresh_on_connect)
-        .handle(Stage::Update, refresh_on_disconnect)
-        .handle(Stage::Update, on_ui_click)
-        .handle(Stage::Update, handle_typed_chat)
-        .handle(Stage::Update, echo_mso)
-        .handle(Stage::Update, MsoCounter::new());
+    let app = App::with_state(AppState {
+        joins: Arc::new(AtomicUsize::new(0)),
+    })
+    .with_ui::<SmokeView>(UiGlobal::default())
+    .handle(ChatParser::<Cmd>::new(&['!']))
+    .handle(install_ticker)
+    .handle(log_ncn)
+    .handle(welcome)
+    .handle(refresh_on_connect)
+    .handle(refresh_on_disconnect)
+    .handle(on_ui_click)
+    .handle(handle_typed_chat)
+    .handle(echo_mso)
+    .handle(MsoCounter::new());
 
     let builder = insim::tcp(args.addr)
         .isi_iname("kitcar".to_string())

@@ -1,4 +1,4 @@
-//! Built-in magic-extractor types: [`State`], [`Svc`], [`Packet`], [`Event`].
+//! Built-in magic-extractor types: [`State`], [`Packet`], and [`Event`].
 //!
 //! The `FromContext` impls for [`crate::Dispatch`] and
 //! [`tokio_util::sync::CancellationToken`] live in the parent module since
@@ -8,31 +8,6 @@ use std::any::Any;
 
 use super::{ExtractCx, FromContext};
 use crate::app::event::Dispatch;
-
-/// Wrapper extractor for any handler value registered via
-/// [`crate::App::handle`].
-///
-/// `Svc<T>` is the cheapest path to extracting a typed handler value
-/// without writing a [`FromContext`] impl on `T` yourself: any value
-/// whose concrete type is registered (via `app.handle(stage, value)`) is
-/// extractable as `Svc<T>` provided it is `Clone + Send + Sync + 'static`.
-///
-/// Framework-provided stateful handlers ([`crate::World`],
-/// [`crate::ui::Ui`]) implement `FromContext` directly so they can be
-/// extracted by their own name; user types either do the same or use this
-/// wrapper.
-#[derive(Debug, Clone)]
-pub struct Svc<T>(pub T);
-
-impl<S, V, T> FromContext<S, V> for Svc<T>
-where
-    V: crate::ui::View + 'static,
-    T: Clone + Send + Sync + 'static,
-{
-    fn from_context(cx: &ExtractCx<'_, S, V>) -> Option<Self> {
-        cx.lookup::<T>().map(Svc)
-    }
-}
 
 /// Extractor for the app's primary state value.
 ///

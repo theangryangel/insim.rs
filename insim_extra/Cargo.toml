@@ -16,7 +16,6 @@ workspace = true
 insim = { path = "../insim" }
 parking_lot = { workspace = true }
 tokio = { workspace = true, features = ["time", "sync", "rt"] }
-tokio-util = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 fixedbitset = { workspace = true }

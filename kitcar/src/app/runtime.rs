@@ -12,7 +12,6 @@ use std::{
     sync::Arc,
 };
 
-use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
 use insim::net::tokio_impl::Framed;
 use tokio::sync::mpsc;
@@ -125,8 +124,7 @@ where
     let state = app.state;
     let world = app.world;
     let ui = app.ui;
-    let pre_handlers = app.pre_handlers;
-    let update_handlers = app.update_handlers;
+    let mut handlers = app.handlers;
     let sender = app.sender;
     let cancel = app.cancel;
     let mut cmd_rx = app
@@ -143,8 +141,7 @@ where
         &world,
         &ui,
         &state,
-        &pre_handlers,
-        &update_handlers,
+        &mut handlers,
         &cancel,
     )
     .await;
@@ -155,8 +152,7 @@ where
         &world,
         &ui,
         &state,
-        &pre_handlers,
-        &update_handlers,
+        &mut handlers,
         &mut cmd_rx,
         &cancel,
     )
@@ -172,8 +168,7 @@ where
         &world,
         &ui,
         &state,
-        &pre_handlers,
-        &update_handlers,
+        &mut handlers,
         &cancel,
     )
     .await;
@@ -196,8 +191,7 @@ async fn run_dispatch_loop<S, V>(
     world: &World,
     ui: &crate::ui::Ui<V>,
     state: &S,
-    pre_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
-    update_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
+    handlers: &mut IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
     cmd_rx: &mut mpsc::UnboundedReceiver<Command>,
     cancel: &CancellationToken,
 ) -> Result<(), AppError>
@@ -213,7 +207,7 @@ where
                 let packet = res?;
                 dispatch_cycle(
                     Dispatch::Packet(packet),
-                    sender, world, ui, state, pre_handlers, update_handlers, cancel,
+                    sender, world, ui, state, handlers, cancel,
                 ).await;
             }
             maybe_cmd = cmd_rx.recv() => {
@@ -227,7 +221,7 @@ where
                     Command::Event(payload) => {
                         dispatch_cycle(
                             Dispatch::Synthetic(payload),
-                            sender, world, ui, state, pre_handlers, update_handlers, cancel,
+                            sender, world, ui, state, handlers, cancel,
                         ).await;
                     }
                 }
@@ -240,14 +234,11 @@ where
 ///
 /// A wire packet is first folded into the intrinsic [`World`] mirror (via
 /// [`fold_packet`]), so every handler observes settled state. The packet is
-/// then run through the two handler phases, and finally each world event the
-/// fold produced is run through them too - in this same call, right after the
+/// then run through the handlers, and finally each world event the fold
+/// produced is run through them too - in this same call, right after the
 /// causing packet, so there is **no inter-cycle delay** for world events.
 ///
-/// The two phases (see [`run_handlers`]):
-///
-/// 1. **Pre** - handlers awaited *sequentially* in registration order.
-/// 2. **Update** - handlers run *concurrently* via [`FuturesUnordered`].
+/// Handlers are awaited sequentially in registration order.
 ///
 /// Synthetic events injected by handlers via `sender.event(...)` are *not*
 /// drained here. They land on the runtime's back-channel and trigger their own
@@ -259,8 +250,7 @@ pub(crate) async fn dispatch_cycle<S, V>(
     world: &World,
     ui: &crate::ui::Ui<V>,
     state: &S,
-    pre_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
-    update_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
+    handlers: &mut IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
     cancel: &CancellationToken,
 ) where
     S: Send + Sync + 'static,
@@ -275,35 +265,14 @@ pub(crate) async fn dispatch_cycle<S, V>(
         Vec::new()
     };
 
-    run_handlers(
-        &d,
-        sender,
-        world,
-        ui,
-        state,
-        pre_handlers,
-        update_handlers,
-        cancel,
-    )
-    .await;
+    run_handlers(&d, sender, world, ui, state, handlers, cancel).await;
 
     for event in derived {
-        run_handlers(
-            &event,
-            sender,
-            world,
-            ui,
-            state,
-            pre_handlers,
-            update_handlers,
-            cancel,
-        )
-        .await;
+        run_handlers(&event, sender, world, ui, state, handlers, cancel).await;
     }
 }
 
-/// Run one dispatch through the Pre (sequential) then Update (concurrent)
-/// handler phases against a freshly built [`ExtractCx`].
+/// Run one dispatch sequentially through the registered handlers.
 #[allow(clippy::too_many_arguments)] // runtime plumbing; threads world + ui through each cycle
 async fn run_handlers<S, V>(
     d: &Dispatch,
@@ -311,8 +280,7 @@ async fn run_handlers<S, V>(
     world: &World,
     ui: &crate::ui::Ui<V>,
     state: &S,
-    pre_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
-    update_handlers: &IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
+    handlers: &mut IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
     cancel: &CancellationToken,
 ) where
     S: Send + Sync + 'static,
@@ -323,22 +291,13 @@ async fn run_handlers<S, V>(
         sender,
         world,
         ui,
-        pre_handlers,
-        update_handlers,
         cancel,
         state,
     };
 
-    for h in pre_handlers.values() {
+    for h in handlers.values_mut() {
         if let Err(e) = h.call(&xcx).await {
-            tracing::error!(?e, "pre handler failed");
-        }
-    }
-
-    let mut pending: FuturesUnordered<_> = update_handlers.values().map(|h| h.call(&xcx)).collect();
-    while let Some(result) = pending.next().await {
-        if let Err(e) = result {
-            tracing::error!(?e, "update handler failed");
+            tracing::error!(?e, "handler failed");
         }
     }
 }

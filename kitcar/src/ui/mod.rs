@@ -17,7 +17,7 @@
 //! ```ignore
 //! let app = App::with_state(state)
 //!     .with_ui::<MyView>(initial_global)
-//!     .handle(Stage::Update, my_handler);
+//!     .handle(my_handler);
 //!
 //! async fn my_handler(ui: Ui<MyView>) -> Result<(), AppError> {
 //!     ui.assign_global(new_global_state);

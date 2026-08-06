@@ -728,7 +728,6 @@ dependencies = [
  "taffy",
  "thiserror",
  "tokio",
- "tokio-util",
  "tracing",
 ]
 

@@ -12,7 +12,10 @@ where
     V: crate::ui::View + 'static,
     C: FromStr + Any + Send + Sync + Clone + 'static,
 {
-    fn call(self, cx: &ExtractCx<'_, S, V>) -> impl Future<Output = Result<(), AppError>> + Send {
+    fn call(
+        &mut self,
+        cx: &ExtractCx<'_, S, V>,
+    ) -> impl Future<Output = Result<(), AppError>> + Send {
         let maybe_packet = if let Dispatch::Packet(p) = cx.dispatch {
             Some(p.clone())
         } else {

@@ -25,12 +25,12 @@ use crate::{error::AppError, ui::NoView};
 /// Implemented automatically for `Fn(E0, E1, …) -> bool` closures (arities
 /// 0–4) whose arguments all implement [`FromContext<S>`]. Implement manually
 /// for custom predicate types.
-pub trait RunIf<T, S = (), V = NoView>: Clone + Send + Sync + 'static
+pub trait RunIf<T, S = (), V = NoView>: Send + 'static
 where
     V: crate::ui::View + 'static,
 {
     /// Evaluate the predicate. Returns `false` if any extractor returns `None`.
-    fn check(&self, cx: &ExtractCx<'_, S, V>) -> bool;
+    fn check(&mut self, cx: &ExtractCx<'_, S, V>) -> bool;
 }
 
 /// Blanket impls for `Fn(…) -> bool` closures.
@@ -44,13 +44,13 @@ macro_rules! impl_run_if {
         #[allow(non_snake_case)]
         impl<F, S, V, $($ty),*> RunIf<($($ty,)*), S, V> for F
         where
-            F: Fn($($ty),*) -> bool + Clone + Send + Sync + 'static,
+            F: FnMut($($ty),*) -> bool + Send + 'static,
             $( $ty: FromContext<S, V> + 'static, )*
             S: Send + Sync + 'static,
             V: crate::ui::View + 'static,
         {
             #[allow(unused)]
-            fn check(&self, cx: &ExtractCx<'_, S, V>) -> bool {
+            fn check(&mut self, cx: &ExtractCx<'_, S, V>) -> bool {
                 $(
                     let Some($ty) = $ty::from_context(cx) else {
                         return false;
@@ -92,16 +92,6 @@ impl<H, P, PT> std::fmt::Debug for Conditional<H, P, PT> {
     }
 }
 
-impl<H: Clone, P: Clone, PT> Clone for Conditional<H, P, PT> {
-    fn clone(&self) -> Self {
-        Self {
-            handler: self.handler.clone(),
-            predicate: self.predicate.clone(),
-            _phantom: PhantomData,
-        }
-    }
-}
-
 impl<H, P, HT, PT, S, V> Handler<HT, S, V> for Conditional<H, P, PT>
 where
     H: Handler<HT, S, V>,
@@ -111,7 +101,7 @@ where
     S: Send + Sync + 'static,
     V: crate::ui::View + 'static,
 {
-    async fn call(self, cx: &ExtractCx<'_, S, V>) -> Result<(), AppError> {
+    async fn call(&mut self, cx: &ExtractCx<'_, S, V>) -> Result<(), AppError> {
         if !self.predicate.check(cx) {
             return Ok(());
         }

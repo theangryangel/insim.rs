@@ -6,28 +6,21 @@
 //! per event and invokes it only if every parameter's extractor returns `Some`,
 //! so `Packet<Ncn>` / `Event<Connected>` act as type-driven routing keys.
 //!
-//! The built-in extractors ([`State`], [`Svc`], [`Packet`], [`Event`], plus
+//! The built-in extractors ([`State`], [`Packet`], [`Event`], plus
 //! `FromContext` impls for [`crate::Dispatch`] and
 //! [`tokio_util::sync::CancellationToken`]) live in [`builtin`] and are
 //! re-exported here.
 //!
-//! Long-lived storage lives in one of two places:
-//!
-//! - **[`State<S>`]** - the bot's primary, type-checked state value. Set
-//!   once via [`crate::App::with_state`]; extract via [`State`].
-//! - **The handler maps** - every handler registered via
-//!   [`crate::App::handle`] is also inserted into a TypeId-keyed map per
-//!   stage. Handlers (and any value that impls `Handler`, including
-//!   passive data types via the trait's default no-op `call`) are
-//!   extractable by their concrete type via [`FromContext`] / [`Svc<T>`].
+//! Shared long-lived storage belongs in the bot's primary, type-checked
+//! [`State<S>`], set via [`crate::App::with_state`]. Handler-local state can
+//! live directly in a manual handler or captured `FnMut` closure.
 
 mod builtin;
 
-pub use builtin::{Event, Packet, State, Svc};
-use indexmap::IndexMap;
+pub use builtin::{Event, Packet, State};
 use tokio_util::sync::CancellationToken;
 
-use super::{event::Dispatch, handler::ErasedHandler, runtime::Sender};
+use super::{event::Dispatch, runtime::Sender};
 use crate::{World, ui::NoView};
 
 /// Context handed to extractors during one dispatch cycle.
@@ -51,11 +44,6 @@ where
     /// before handlers run; handlers extract it infallibly as `ui: Ui<V>`. For
     /// an app with no UI this is the inert [`NoView`] handle.
     pub(crate) ui: &'a crate::ui::Ui<V>,
-    /// Pre-stage handlers, also serving as the typed registry for extraction
-    /// (looked up by `TypeId`).
-    pub(crate) pre_handlers: &'a IndexMap<std::any::TypeId, Box<dyn ErasedHandler<S, V>>>,
-    /// Update-stage handlers, ditto.
-    pub(crate) update_handlers: &'a IndexMap<std::any::TypeId, Box<dyn ErasedHandler<S, V>>>,
     /// Cooperative-shutdown token. Call [`ExtractCx::shutdown`] to request the
     /// runtime exit at its next select iteration.
     pub cancel: &'a CancellationToken,
@@ -68,8 +56,6 @@ impl<S, V: crate::ui::View + 'static> std::fmt::Debug for ExtractCx<'_, S, V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ExtractCx")
             .field("dispatch", &self.dispatch)
-            .field("pre_handlers", &self.pre_handlers.len())
-            .field("update_handlers", &self.update_handlers.len())
             .finish_non_exhaustive()
     }
 }
@@ -83,22 +69,6 @@ impl<S, V: crate::ui::View + 'static> ExtractCx<'_, S, V> {
     /// Whether shutdown has been requested.
     pub fn is_shutdown(&self) -> bool {
         self.cancel.is_cancelled()
-    }
-
-    /// Look up a registered handler value by its concrete type and return a
-    /// clone. Searches both the pre-stage and update-stage maps. Returns
-    /// `None` if no handler of type `T` has been registered.
-    ///
-    /// This is the mechanism `FromContext` impls on stateful handler types
-    /// use; users normally extract via that path (`presence: Presence` in a
-    /// handler signature) rather than calling `lookup` directly.
-    pub fn lookup<T: Clone + Send + Sync + 'static>(&self) -> Option<T> {
-        let tid = std::any::TypeId::of::<T>();
-        let entry = self
-            .pre_handlers
-            .get(&tid)
-            .or_else(|| self.update_handlers.get(&tid))?;
-        entry.handler_as_any().downcast_ref::<T>().cloned()
     }
 }
 

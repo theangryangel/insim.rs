@@ -32,8 +32,6 @@ use insim::{
     },
 };
 use parking_lot::RwLock;
-use tokio::sync::watch;
-use tokio_util::sync::CancellationToken;
 
 mod commands;
 mod connection;
@@ -235,7 +233,6 @@ impl WorldInner {
                 flags: rst.flags,
             }
         };
-        self.game.rst_count = self.game.rst_count.wrapping_add(1);
         Some(kind)
     }
 
@@ -265,7 +262,6 @@ impl WorldInner {
     fn apply_axi(&mut self, axi: &Axi) -> (Option<String>, Option<String>) {
         let prev = self.game.layout.clone();
         self.game.layout = axi.lname.clone();
-        self.game.axi_count = self.game.axi_count.wrapping_add(1);
         (prev, axi.lname.clone())
     }
 
@@ -494,18 +490,12 @@ fn dispatch(inner: &mut WorldInner, packet: &insim::Packet, events: &mut Vec<Wor
 #[derive(Clone)]
 pub struct World {
     inner: Arc<RwLock<WorldInner>>,
-    /// Generation counter bumped after every [`apply_packet`](World::apply_packet).
-    /// Waiters in [`wait_until`](World::wait_until) block on changes to this
-    /// instead of polling.
-    version: Arc<watch::Sender<u64>>,
 }
 
 impl World {
     fn from_inner(inner: WorldInner) -> Self {
-        let (version, _) = watch::channel(0u64);
         Self {
             inner: Arc::new(RwLock::new(inner)),
-            version: Arc::new(version),
         }
     }
 }
@@ -577,8 +567,6 @@ impl World {
             let mut inner = self.inner.write();
             dispatch(&mut inner, packet, &mut events);
         }
-        // Wake any `wait_until` waiters so they re-check their predicate.
-        self.version.send_modify(|v| *v = v.wrapping_add(1));
         events
     }
 
@@ -703,45 +691,6 @@ impl World {
     /// Snapshot of the current game state as a [`GameInfo`].
     pub fn game_info(&self) -> GameInfo {
         self.inner.read().game.clone()
-    }
-
-    /// Number of `Axi` (autocross info) packets received so far. Snapshot this
-    /// before issuing a layout command, then [`wait_until`](Self::wait_until)
-    /// the count changes to detect the confirming `Axi`.
-    pub fn axi_count(&self) -> u64 {
-        self.inner.read().game.axi_count
-    }
-
-    /// Number of `Rst` (race start) packets received so far. Snapshot this
-    /// before issuing a restart, then [`wait_until`](Self::wait_until) the count
-    /// changes to detect the confirming `Rst`.
-    pub fn rst_count(&self) -> u64 {
-        self.inner.read().game.rst_count
-    }
-
-    /// Block until `f` returns `Some`, re-evaluating it each time state changes
-    /// (i.e. after each [`apply_packet`](Self::apply_packet)), or until `cancel`
-    /// fires (in which case `None`).
-    ///
-    /// This is edge-triggered with re-check, not polled: the receiver is created
-    /// before the first evaluation, so a state change racing the predicate check
-    /// is never missed.
-    pub async fn wait_until<T>(
-        &self,
-        cancel: CancellationToken,
-        f: impl Fn(&World) -> Option<T>,
-    ) -> Option<T> {
-        let mut rx = self.version.subscribe();
-        loop {
-            if let Some(v) = f(self) {
-                return Some(v);
-            }
-            tokio::select! {
-                biased;
-                _ = cancel.cancelled() => return None,
-                res = rx.changed() => res.ok()?,
-            }
-        }
     }
 
     /// The current session fastest lap: entrant, player ID, and time.
