@@ -7,12 +7,8 @@
 //! connection, emits a one-shot [`crate::Startup`] synthetic event, then runs
 //! the dispatch loop until the connection drops or the back-channel closes.
 
-use std::{
-    any::{Any, TypeId},
-    sync::Arc,
-};
+use std::{any::Any, sync::Arc};
 
-use indexmap::IndexMap;
 use insim::net::tokio_impl::Framed;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -191,7 +187,7 @@ async fn run_dispatch_loop<S, V>(
     world: &World,
     ui: &crate::ui::Ui<V>,
     state: &S,
-    handlers: &mut IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
+    handlers: &mut [Box<dyn ErasedHandler<S, V>>],
     cmd_rx: &mut mpsc::UnboundedReceiver<Command>,
     cancel: &CancellationToken,
 ) -> Result<(), AppError>
@@ -250,7 +246,7 @@ pub(crate) async fn dispatch_cycle<S, V>(
     world: &World,
     ui: &crate::ui::Ui<V>,
     state: &S,
-    handlers: &mut IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
+    handlers: &mut [Box<dyn ErasedHandler<S, V>>],
     cancel: &CancellationToken,
 ) where
     S: Send + Sync + 'static,
@@ -280,7 +276,7 @@ async fn run_handlers<S, V>(
     world: &World,
     ui: &crate::ui::Ui<V>,
     state: &S,
-    handlers: &mut IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
+    handlers: &mut [Box<dyn ErasedHandler<S, V>>],
     cancel: &CancellationToken,
 ) where
     S: Send + Sync + 'static,
@@ -295,7 +291,7 @@ async fn run_handlers<S, V>(
         state,
     };
 
-    for h in handlers.values_mut() {
+    for h in handlers.iter_mut() {
         if let Err(e) = h.call(&xcx).await {
             tracing::error!(?e, "handler failed");
         }

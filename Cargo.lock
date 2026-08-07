@@ -821,7 +821,6 @@ version = "0.1.0+unreleased"
 dependencies = [
  "clap",
  "futures",
- "indexmap",
  "insim",
  "insim_extra",
  "parking_lot",
