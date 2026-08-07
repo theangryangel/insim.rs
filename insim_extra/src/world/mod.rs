@@ -65,6 +65,9 @@ pub(crate) struct WorldInner {
 
     /// Game state snapshot, including the current `session_kind`.
     pub(crate) game: GameInfo,
+    /// Whether at least one STA game-state snapshot has been received.
+    /// Until then, `session_kind == None` means unknown rather than lobby.
+    sta_received: bool,
 
     /// Race tracking state.
     pub(crate) race: RaceState,
@@ -76,7 +79,9 @@ pub(crate) struct WorldInner {
 }
 
 fn lobby_ready(inner: &WorldInner) -> bool {
-    inner.game.session_kind.is_none() && inner.connections.keys().any(|ucid| ucid.0 != 0)
+    inner.sta_received
+        && inner.game.session_kind.is_none()
+        && inner.connections.keys().any(|ucid| ucid.0 != 0)
 }
 
 impl WorldInner {
@@ -398,6 +403,7 @@ fn dispatch(inner: &mut WorldInner, packet: &insim::Packet, events: &mut Vec<Wor
         },
         Packet::Sta(sta) => {
             let (was_in_session, now_in_session, prev_track, new_track) = inner.apply_sta(sta);
+            inner.sta_received = true;
             if was_in_session && !now_in_session {
                 events.push(WorldEvent::SessionEnded(SessionEnded));
                 events.push(WorldEvent::LobbyEntered(LobbyEntered));
@@ -519,6 +525,7 @@ impl std::fmt::Debug for World {
             .field("players", &g.players.len())
             .field("track", &g.game.track)
             .field("session_kind", &g.game.session_kind)
+            .field("sta_received", &g.sta_received)
             .field("race_entrants", &g.race.entrants.len())
             .field("rejoin", &g.rejoin)
             .finish_non_exhaustive()
@@ -680,7 +687,8 @@ impl World {
         self.inner.read().game.wind
     }
 
-    /// Current session kind. `None` means lobby / no session active.
+    /// Current session kind. `None` means no active session, or that the
+    /// initial `STA` game-state snapshot has not arrived yet.
     pub fn session(&self) -> Option<SessionKind> {
         self.inner.read().game.session_kind
     }
@@ -923,6 +931,19 @@ mod emission_tests {
                 .any(|e| matches!(e, WorldEvent::LobbyReady(_)))
         );
 
+        let sta_events = world.apply_packet(
+            &Sta {
+                raceinprog: RaceInProgress::No,
+                ..Default::default()
+            }
+            .into(),
+        );
+        assert!(
+            !sta_events
+                .iter()
+                .any(|e| matches!(e, WorldEvent::LobbyReady(_)))
+        );
+
         let events = world.apply_packet(&connection(1));
         assert_eq!(world.client_count(), 1);
         assert!(
@@ -942,6 +963,32 @@ mod emission_tests {
             events
                 .iter()
                 .any(|e| matches!(e, WorldEvent::LobbyNotReady(_)))
+        );
+    }
+
+    #[test]
+    fn client_before_initial_sta_does_not_imply_lobby_ready() {
+        let world = World::new();
+
+        let events = world.apply_packet(&connection(1));
+        assert_eq!(world.client_count(), 1);
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, WorldEvent::LobbyReady(_)))
+        );
+
+        let events = world.apply_packet(
+            &Sta {
+                raceinprog: RaceInProgress::No,
+                ..Default::default()
+            }
+            .into(),
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, WorldEvent::LobbyReady(_)))
         );
     }
 
