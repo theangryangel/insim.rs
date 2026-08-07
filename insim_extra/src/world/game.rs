@@ -91,7 +91,8 @@ pub struct VersionInfo {
 /// Snapshot of the game state, produced by [`World::game_info()`](crate::world::World::game_info).
 #[derive(Debug, Default, Clone)]
 pub struct GameInfo {
-    /// Kind of the current session. `None` means lobby / no session active.
+    /// Kind of the current session. `None` means no active session, or that the
+    /// initial `STA` game-state snapshot has not arrived yet.
     pub(crate) session_kind: Option<SessionKind>,
     pub(crate) track: Option<Track>,
     pub(crate) layout: Option<String>,
@@ -109,7 +110,8 @@ pub struct GameInfo {
 }
 
 impl GameInfo {
-    /// Current session kind. `None` means lobby / no session active.
+    /// Current session kind. `None` means no active session, or that the
+    /// initial `STA` game-state snapshot has not arrived yet.
     pub fn session(&self) -> Option<SessionKind> {
         self.session_kind
     }
