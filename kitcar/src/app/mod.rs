@@ -11,9 +11,8 @@ pub(crate) mod runtime;
 #[cfg(test)]
 mod tests;
 
-use std::{any::TypeId, time::Duration};
+use std::time::Duration;
 
-use indexmap::IndexMap;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
@@ -67,9 +66,9 @@ where
 /// Every dispatch runs handlers sequentially in registration order. Register
 /// state-maintaining handlers before consumers that must observe their effects.
 ///
-/// Every handler registered via [`App::handle`] is inserted into a
-/// `TypeId`-keyed map used only for ordered dispatch. Handlers are uniquely
-/// owned runtime processors, not an extractable service registry.
+/// Every handler registered via [`App::handle`] is retained in registration
+/// order. Handlers are uniquely owned runtime processors, not an extractable
+/// service registry.
 ///
 /// Periodic synthetic events have a small dedicated helper - see
 /// [`App::periodic`].
@@ -88,9 +87,8 @@ where
     /// extracted infallibly as `ui: Ui<V>`. An app with no UI keeps the inert
     /// [`NoView`] handle.
     pub(crate) ui: crate::ui::Ui<V>,
-    /// Handlers keyed by concrete `TypeId`. `IndexMap` preserves registration
-    /// order for deterministic dispatch.
-    pub(crate) handlers: IndexMap<TypeId, Box<dyn ErasedHandler<S, V>>>,
+    /// Handlers retained in registration order for deterministic dispatch.
+    pub(crate) handlers: Vec<Box<dyn ErasedHandler<S, V>>>,
     pub(crate) sender: Sender,
     /// Receiver paired with `sender`. Taken by `run()`.
     pub(crate) cmd_rx: Option<mpsc::UnboundedReceiver<Command>>,
@@ -143,7 +141,7 @@ where
             state,
             world: World::new(),
             ui: crate::ui::Ui::disabled(),
-            handlers: IndexMap::new(),
+            handlers: Vec::new(),
             sender: Sender::new(cmd_tx),
             cmd_rx: Some(cmd_rx),
             cancel: CancellationToken::new(),
@@ -174,7 +172,7 @@ where
             state: self.state,
             world: self.world,
             ui,
-            handlers: IndexMap::new(),
+            handlers: Vec::new(),
             sender: self.sender,
             cmd_rx: self.cmd_rx,
             cancel: self.cancel,
@@ -236,8 +234,8 @@ where
 
     /// Register a handler. Handlers run sequentially in registration order.
     ///
-    /// The handler is keyed by its concrete `TypeId`; re-registering the same
-    /// concrete type overwrites the previous entry without changing its place.
+    /// Each call creates a distinct registration, including when the same
+    /// concrete handler type is registered more than once.
     ///
     /// Two flavours of handler register here uniformly:
     /// - **Stateless handlers** - plain async fns, closures, anything that
@@ -250,9 +248,8 @@ where
         H: Handler<T, S, V> + 'static,
         T: Send + 'static,
     {
-        let key = TypeId::of::<H>();
         let entry: Box<dyn ErasedHandler<S, V>> = Box::new(HandlerService::new(handler));
-        let _ = self.handlers.insert(key, entry);
+        self.handlers.push(entry);
         self
     }
 

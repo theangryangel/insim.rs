@@ -712,8 +712,7 @@ async fn earlier_handler_settles_before_later_handler() {
 #[tokio::test]
 async fn handlers_run_sequentially_in_registration_order() {
     // Two handlers append to a shared Vec; the order in
-    // the Vec must match the handler registration order. Distinct newtypes
-    // give each handler its own TypeId slot in the IndexMap.
+    // the Vec must match the handler registration order.
     #[derive(Clone)]
     struct First(Arc<Mutex<Vec<&'static str>>>);
     #[derive(Clone)]
@@ -762,6 +761,50 @@ async fn handlers_run_sequentially_in_registration_order() {
         &world,
         &crate::ui::Ui::<crate::ui::NoView>::disabled(),
         &app_state,
+        &mut handlers,
+        &cancel,
+    )
+    .await;
+
+    assert_eq!(*log.lock(), vec!["first", "second"]);
+}
+
+#[tokio::test]
+async fn multiple_registrations_of_same_handler_type_are_retained() {
+    struct Recorder {
+        label: &'static str,
+        log: Arc<Mutex<Vec<&'static str>>>,
+    }
+
+    impl<S: Send + Sync + 'static, V: crate::ui::View + 'static> Handler<(), S, V> for Recorder {
+        async fn call(&mut self, _: &ExtractCx<'_, S, V>) -> Result<(), AppError> {
+            self.log.lock().push(self.label);
+            Ok(())
+        }
+    }
+
+    let log = Arc::new(Mutex::new(Vec::new()));
+    let app = App::new()
+        .handle(Recorder {
+            label: "first",
+            log: log.clone(),
+        })
+        .handle(Recorder {
+            label: "second",
+            log: log.clone(),
+        });
+
+    let (cmd_tx, _cmd_rx) = mpsc::unbounded_channel::<Command>();
+    let sender = Sender::new(cmd_tx);
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let mut handlers = app.handlers;
+
+    dispatch_cycle(
+        Dispatch::Packet(insim::Packet::Tiny(insim::insim::Tiny::default())),
+        &sender,
+        &app.world,
+        &crate::ui::Ui::<crate::ui::NoView>::disabled(),
+        &app.state,
         &mut handlers,
         &cancel,
     )
