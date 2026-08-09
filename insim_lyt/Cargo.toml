@@ -12,7 +12,7 @@ publish = false  # XXX: remove when we're comfortable releasing
 [dependencies]
 bytes = { workspace = true }
 thiserror = { workspace = true }
-insim_core = { path = "../insim_core", version = "3.0.0" }
+insim_core = { path = "../insim_core", version = "4.0.0" }
 
 [lints]
 workspace = true
