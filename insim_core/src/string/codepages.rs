@@ -12,63 +12,131 @@ use smallvec::SmallVec;
 /// String.
 use super::control::ControlMarker;
 
-const DEFAULT_CODEPAGE: char = 'L';
-
-trait CodepageMarker {
-    /// This is a valid codepage marker/identifier?
-    fn is_lfs_codepage(&self) -> bool;
-    /// Get the encoding_rs lookup table
-    fn as_lfs_codepage(&self) -> Option<&'static encoding_rs::Encoding>;
-    /// Should this codepage control character be propagated
-    fn propagate_lfs_codepage(self) -> bool;
+/// An LFS code page. Numeric values correspond to the `LID_x` identifiers.
+///
+/// Convert from a `u8` identifier or a `char` marker (without the `^` prefix).
+/// `^8` is a reset control, rather than a code page, and is handled separately.
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[repr(u8)]
+pub enum Codepage {
+    /// The `^L` code page.
+    #[default]
+    Latin = 0,
+    /// The `^E` code page.
+    European = 1,
+    /// The `^T` code page.
+    Turkish = 2,
+    /// The `^B` code page.
+    Baltic = 3,
+    /// The `^J` code page.
+    Japanese = 4,
+    /// The `^C` code page.
+    Cyrillic = 5,
+    /// The `^G` code page.
+    Greek = 6,
+    /// The `^H` code page.
+    TraditionalChinese = 7,
+    /// The `^S` code page.
+    SimplifiedChinese = 8,
+    /// The `^K` code page.
+    Korean = 9,
 }
 
-impl CodepageMarker for char {
-    fn is_lfs_codepage(&self) -> bool {
-        matches!(
-            self,
-            'L' | 'G' | 'C' | 'E' | 'T' | 'B' | 'J' | 'H' | 'S' | 'K' | '8'
-        )
-    }
+/// An invalid LFS code page identifier or marker.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, thiserror::Error)]
+pub enum CodepageError {
+    /// The numeric value is not a defined `LID_x` identifier.
+    #[error("invalid code page identifier: {0}")]
+    InvalidIdentifier(u8),
+    /// The character is not a code page marker.
+    #[error("invalid code page marker: {0}")]
+    InvalidMarker(char),
+}
 
-    fn propagate_lfs_codepage(self) -> bool {
-        self == '8'
-    }
+impl TryFrom<u8> for Codepage {
+    type Error = CodepageError;
 
-    fn as_lfs_codepage(&self) -> Option<&'static encoding_rs::Encoding> {
-        // Some of these are substitutes, based on
-        // encoding_rs' generate-encoding-data
-        // https://github.com/hsivonen/encoding_rs/blob/acae06412c97df212797bebee9845b9b1c12569b/generate-encoding-data.py
-
-        match self {
-            'L' | '8' => Some(encoding_rs::WINDOWS_1252), // Latin-1 CP1252
-            'G' => Some(encoding_rs::ISO_8859_7),         // Greek ISO-8859-7
-            'C' => Some(encoding_rs::WINDOWS_1251),       // Cyrillic CP1251
-            'E' => Some(encoding_rs::ISO_8859_2),         // Central Europe ISO-8859-2
-            'T' => Some(encoding_rs::WINDOWS_1254),       // Turkish ISO-8859-9 / CP1254
-            'B' => Some(encoding_rs::ISO_8859_13),        // Baltic ISO-8859-13 / Latin-7
-            'J' => Some(encoding_rs::SHIFT_JIS),          // Japanese SHIFT-JIS
-            'H' => Some(encoding_rs::GBK),                // Traditional Chinese CP936
-            'S' => Some(encoding_rs::EUC_KR),             // Simplified Chinese CP949
-            'K' => Some(encoding_rs::BIG5),               // Korean CP950
-            _ => None,                                    // Not a codepage
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Latin),
+            1 => Ok(Self::European),
+            2 => Ok(Self::Turkish),
+            3 => Ok(Self::Baltic),
+            4 => Ok(Self::Japanese),
+            5 => Ok(Self::Cyrillic),
+            6 => Ok(Self::Greek),
+            7 => Ok(Self::TraditionalChinese),
+            8 => Ok(Self::SimplifiedChinese),
+            9 => Ok(Self::Korean),
+            _ => Err(CodepageError::InvalidIdentifier(value)),
         }
     }
 }
 
-impl CodepageMarker for u8 {
-    fn is_lfs_codepage(&self) -> bool {
-        (*self as char).is_lfs_codepage()
-    }
+impl TryFrom<char> for Codepage {
+    type Error = CodepageError;
 
-    fn propagate_lfs_codepage(self) -> bool {
-        (self as char).propagate_lfs_codepage()
-    }
-
-    fn as_lfs_codepage(&self) -> Option<&'static encoding_rs::Encoding> {
-        (*self as char).as_lfs_codepage()
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        match value {
+            'L' => Ok(Self::Latin),
+            'E' => Ok(Self::European),
+            'T' => Ok(Self::Turkish),
+            'B' => Ok(Self::Baltic),
+            'J' => Ok(Self::Japanese),
+            'C' => Ok(Self::Cyrillic),
+            'G' => Ok(Self::Greek),
+            'H' => Ok(Self::TraditionalChinese),
+            'S' => Ok(Self::SimplifiedChinese),
+            'K' => Ok(Self::Korean),
+            _ => Err(CodepageError::InvalidMarker(value)),
+        }
     }
 }
+
+impl From<Codepage> for char {
+    fn from(value: Codepage) -> Self {
+        match value {
+            Codepage::Latin => 'L',
+            Codepage::European => 'E',
+            Codepage::Turkish => 'T',
+            Codepage::Baltic => 'B',
+            Codepage::Japanese => 'J',
+            Codepage::Cyrillic => 'C',
+            Codepage::Greek => 'G',
+            Codepage::TraditionalChinese => 'H',
+            Codepage::SimplifiedChinese => 'S',
+            Codepage::Korean => 'K',
+        }
+    }
+}
+
+impl From<Codepage> for u8 {
+    fn from(value: Codepage) -> Self {
+        value as Self
+    }
+}
+
+impl Codepage {
+    fn encoding(self) -> &'static encoding_rs::Encoding {
+        // Preserve the existing encoding_rs substitutes for LFS code pages.
+        match self {
+            Self::Latin => encoding_rs::WINDOWS_1252,
+            Self::European => encoding_rs::ISO_8859_2,
+            Self::Turkish => encoding_rs::WINDOWS_1254,
+            Self::Baltic => encoding_rs::ISO_8859_13,
+            Self::Japanese => encoding_rs::SHIFT_JIS,
+            Self::Cyrillic => encoding_rs::WINDOWS_1251,
+            Self::Greek => encoding_rs::ISO_8859_7,
+            Self::TraditionalChinese => encoding_rs::GBK,
+            Self::SimplifiedChinese => encoding_rs::EUC_KR,
+            Self::Korean => encoding_rs::BIG5,
+        }
+    }
+}
+
+const DEFAULT_CODEPAGE: Codepage = Codepage::Latin;
 
 /// Convert from a String, with potential lossy conversion to an Insim Codepage String
 /// Assumes you will escape any characters ahead of time, it will do not this for you.
@@ -81,10 +149,8 @@ pub fn to_lossy_bytes(input: &'_ str) -> Cow<'_, [u8]> {
     }
 
     let mut output = Vec::with_capacity(input.len());
-    let mut current_control = DEFAULT_CODEPAGE;
-    let mut current_encoding = current_control
-        .as_lfs_codepage()
-        .unwrap_or_else(|| unreachable!());
+    let mut current_control = char::from(DEFAULT_CODEPAGE);
+    let mut current_encoding = DEFAULT_CODEPAGE.encoding();
     let mut encoder = current_encoding.new_encoder();
 
     let mut src_offset = 0;
@@ -118,9 +184,9 @@ pub fn to_lossy_bytes(input: &'_ str) -> Cow<'_, [u8]> {
                     continue;
                 };
 
-                let candidate_encoding = candidate_control
-                    .as_lfs_codepage()
-                    .unwrap_or_else(|| unreachable!());
+                let candidate_encoding = Codepage::try_from(candidate_control)
+                    .expect("lookup table contains only code page markers")
+                    .encoding();
                 let (cow, _, error) = candidate_encoding.encode(char_as_bytes);
 
                 // Lookup table guarantees this, but be defensive in case of drift.
@@ -160,10 +226,7 @@ pub fn to_lossy_string(input: &'_ [u8]) -> Cow<'_, str> {
         return "".into();
     }
 
-    // allowing unwrap because if this panics we're screwed
-    let default_lfs_codepage = DEFAULT_CODEPAGE
-        .as_lfs_codepage()
-        .unwrap_or_else(|| unreachable!());
+    let default_lfs_codepage = DEFAULT_CODEPAGE.encoding();
 
     // fastest possible path - we have no *potential* control characters at all
     if !input.iter().any(|b| b.is_lfs_control_char()) {
@@ -195,7 +258,7 @@ pub fn to_lossy_string(input: &'_ [u8]) -> Cow<'_, str> {
                 // greedy handling for escaped control markers (^^)
                 // we consume the next char so we don't process it again
                 let _ = iter.next();
-            } else if next.is_lfs_codepage() {
+            } else if **next == b'8' || Codepage::try_from(char::from(**next)).is_ok() {
                 // found a valid codepage marker (^L, ^B, etc)
                 indices.push(i);
                 // consume the next char as part of this marker
@@ -203,11 +266,6 @@ pub fn to_lossy_string(input: &'_ [u8]) -> Cow<'_, str> {
             }
         }
     }
-
-    // allowing unwrap because if this panics we're screwed
-    let default_lfs_codepage = DEFAULT_CODEPAGE
-        .as_lfs_codepage()
-        .unwrap_or_else(|| unreachable!());
 
     if indices.is_empty() {
         // no mappings at all, just encode it all as the default
@@ -242,7 +300,12 @@ pub fn to_lossy_string(input: &'_ [u8]) -> Cow<'_, str> {
             continue;
         }
 
-        match (range[0].is_lfs_control_char(), range[1].as_lfs_codepage()) {
+        let codepage = if range[1] == b'8' {
+            Some(DEFAULT_CODEPAGE)
+        } else {
+            Codepage::try_from(char::from(range[1])).ok()
+        };
+        match (range[0].is_lfs_control_char(), codepage) {
             (false, _) | (true, None) => {
                 // No control character
                 // OR
@@ -257,13 +320,13 @@ pub fn to_lossy_string(input: &'_ [u8]) -> Cow<'_, str> {
 
                 // do we need to propagate the codepage because it has dual meaning?
                 // i.e. ^8
-                if range[1].propagate_lfs_codepage() {
+                if range[1] == b'8' {
                     result.push(char::lfs_control_char());
                     result.push(range[1] as char);
                 }
 
                 // encode everything except the markers
-                let (cow, _encoding_used, _had_errors) = mapping.decode(&range[2..]);
+                let (cow, _encoding_used, _had_errors) = mapping.encoding().decode(&range[2..]);
                 result.push_str(&cow);
             },
         };
@@ -275,6 +338,35 @@ pub fn to_lossy_string(input: &'_ [u8]) -> Cow<'_, str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn codepage_conversions() {
+        let markers = ['L', 'E', 'T', 'B', 'J', 'C', 'G', 'H', 'S', 'K'];
+        for (id, marker) in (0_u8..).zip(markers) {
+            let codepage = Codepage::try_from(id).unwrap();
+            assert_eq!(u8::from(codepage), id);
+            assert_eq!(char::from(codepage), marker);
+            assert_eq!(Codepage::try_from(marker), Ok(codepage));
+        }
+        for id in 10..=u8::MAX {
+            assert_eq!(
+                Codepage::try_from(id),
+                Err(CodepageError::InvalidIdentifier(id))
+            );
+        }
+        for marker in ['8', 'l', '^', '0', 'é'] {
+            assert_eq!(
+                Codepage::try_from(marker),
+                Err(CodepageError::InvalidMarker(marker))
+            );
+        }
+        assert_eq!(Codepage::default(), Codepage::Latin);
+    }
+
+    #[test]
+    fn reset_restores_latin_and_preserves_colour_control() {
+        assert_eq!(to_lossy_string(b"^C\xff^8\xff"), "я^8ÿ");
+    }
 
     #[test]
     fn test_codepage_hello_world() {
@@ -314,7 +406,7 @@ mod tests {
         let mut expected_output: Vec<u8> = Vec::new();
         raw.iter().for_each(|x| {
             // Not using fold to avoid the copying of the accumulator
-            let cp = x.0.as_lfs_codepage().unwrap_or_else(|| unreachable!());
+            let cp = Codepage::try_from(x.0).unwrap().encoding();
             let (cow, _, error) = cp.encode(x.1);
             assert!(!error);
             expected_output.push(b'^');
