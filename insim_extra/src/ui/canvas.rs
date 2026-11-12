@@ -98,6 +98,17 @@ impl<M: Clone + 'static> Canvas<M> {
             return None;
         }
 
+        let positions = match root_id
+            .map(|root| screen_positions(&tree, root))
+            .transpose()
+        {
+            Ok(positions) => positions.unwrap_or_default(),
+            Err(e) => {
+                tracing::error!("Failed to resolve UI screen positions: {e}");
+                return None;
+            },
+        };
+
         // identify ids that were allocated in previous frames but not seen in this one
         let dead_ids: Vec<ClickId> = self
             .buttons
@@ -117,7 +128,7 @@ impl<M: Clone + 'static> Canvas<M> {
         let mut transition_removals = Vec::new();
 
         for (nodeid, stable_hash, mut btn) in node_map {
-            let (x, y) = match get_taffy_abs_position(&tree, &nodeid) {
+            let (x, y) = match positions.get(&nodeid).copied() {
                 Some(position) => position,
                 None => {
                     tracing::warn!("Failed to resolve absolute UI position for button");
@@ -456,28 +467,29 @@ impl<M: Clone + 'static> Canvas<M> {
     }
 }
 
-fn get_taffy_abs_position(taffy: &taffy::TaffyTree, node_id: &taffy::NodeId) -> Option<(f32, f32)> {
-    let mut current_node = *node_id;
-    let mut absolute_location = (0.0, 0.0);
-
-    loop {
-        let layout = taffy.layout(current_node).ok()?;
-        absolute_location.0 += layout.location.x;
-        absolute_location.1 += layout.location.y;
-
-        // Get the parent of the current node
-        let parent = taffy.parent(current_node);
-
-        if let Some(parent_node) = parent {
-            // If there is a parent, move up the tree
-            current_node = parent_node;
-        } else {
-            // If there is no parent, we've reached the root
-            break;
+// Follow the same containing-block traversal as Taffy's rounding pass. Hoisted
+// boxes have locations relative to their containing block, not their tree parent.
+fn screen_positions(
+    tree: &taffy::TaffyTree,
+    root: taffy::NodeId,
+) -> Result<HashMap<taffy::NodeId, (f32, f32)>, taffy::TaffyError> {
+    let mut positions = HashMap::with_capacity(tree.total_node_count());
+    let mut pending = vec![(root, (0.0, 0.0))];
+    while let Some((node, (parent_x, parent_y))) = pending.pop() {
+        let location = tree.layout(node)?.location;
+        let position = (parent_x + location.x, parent_y + location.y);
+        let _ = positions.insert(node, position);
+        for child in tree.children(node)? {
+            let style = tree.style(child)?;
+            if !style.position.is_out_of_flow() || style.display == taffy::Display::None {
+                pending.push((child, position));
+            }
+        }
+        for &child in tree.hoisted_children(node)? {
+            pending.push((child, position));
         }
     }
-
-    Some(absolute_location)
+    Ok(positions)
 }
 
 #[cfg(test)]
@@ -490,6 +502,227 @@ mod tests {
     enum TestMsg {
         Click,
         TypeIn(String),
+    }
+
+    fn label(text: &str) -> Node<TestMsg> {
+        Node::text(text, BtnStyle::default()).w(10).h(10u8)
+    }
+
+    fn button_position(diff: &CanvasDiff, text: &str) -> (u8, u8) {
+        let btn = diff.update.iter().find(|btn| btn.text == text).unwrap();
+        (btn.l, btn.t)
+    }
+
+    #[test]
+    fn static_ignores_insets_and_relative_preserves_flow() {
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
+        let root = Node::container().flex_col().with_children([
+            label("static").position_static().left(30).top(40u8),
+            label("relative").position_relative().left(5i16).top(6.0f32),
+            label("following"),
+        ]);
+        let diff = canvas.reconcile(root).unwrap();
+        assert_eq!(button_position(&diff, "static"), (0, 0));
+        assert_eq!(button_position(&diff, "relative"), (5, 16));
+        assert_eq!(button_position(&diff, "following"), (0, 20));
+    }
+
+    #[test]
+    fn absolute_uses_containing_block_and_fixed_uses_viewport() {
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
+        let root = Node::container()
+            .position_relative()
+            .left(20.0)
+            .top(30.0)
+            .w(100.0)
+            .h(100.0)
+            .with_child(
+                Node::container().p(15.0).with_children([
+                    Node::container()
+                        .position_absolute()
+                        .left(7.0)
+                        .top(9.0)
+                        .w(20.0)
+                        .h(20.0)
+                        .p(2.0)
+                        .with_child(label("absolute child")),
+                    label("fixed").position_fixed().right(5.0).bottom(6.0),
+                ]),
+            );
+        let diff = canvas.reconcile(root.clone()).unwrap();
+        assert_eq!(button_position(&diff, "absolute child"), (29, 41));
+        assert_eq!(button_position(&diff, "fixed"), (185, 184));
+        assert!(canvas.reconcile(root).is_none());
+    }
+
+    #[test]
+    fn absolute_without_positioned_ancestor_uses_viewport() {
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
+        let root = Node::container().m(20.0).w(100.0).h(100.0).with_child(
+            Node::container().p(15.0).with_children([
+                label("absolute").position_absolute().right(5.0).bottom(6.0),
+                Node::container()
+                    .position_fixed()
+                    .left(7.0)
+                    .top(9.0)
+                    .w(20.0)
+                    .h(20.0)
+                    .p(2.0)
+                    .with_child(label("fixed child")),
+            ]),
+        );
+        let diff = canvas.reconcile(root).unwrap();
+        assert_eq!(button_position(&diff, "absolute"), (185, 184));
+        assert_eq!(button_position(&diff, "fixed child"), (9, 11));
+    }
+
+    #[test]
+    fn out_of_flow_auto_insets_use_flex_static_alignment_without_taking_space() {
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
+        let root = Node::container().flex_col().p(5.0).with_children([
+            label("first"),
+            label("absolute")
+                .position_absolute()
+                .left(50.0)
+                .left_auto()
+                .top(50.0)
+                .top_auto()
+                .right(50.0)
+                .right_auto()
+                .bottom(50.0)
+                .bottom_auto(),
+            label("following"),
+        ]);
+        let diff = canvas.reconcile(root).unwrap();
+        // Flex static alignment treats the out-of-flow box as the only item.
+        assert_eq!(button_position(&diff, "absolute"), (5, 5));
+        assert_eq!(button_position(&diff, "following"), (5, 15));
+    }
+
+    #[test]
+    fn fractional_offsets_accumulate_through_hoisted_containers() {
+        let mut canvas = Canvas::<TestMsg>::new(ConnectionId(1));
+        let root = Node::container()
+            .position_relative()
+            .left(0.4)
+            .top(0.4)
+            .with_child(
+                Node::container().p(10.0).with_child(
+                    Node::container()
+                        .position_absolute()
+                        .left(0.4)
+                        .top(0.4)
+                        .w(20.0)
+                        .h(20.0)
+                        .p(0.4)
+                        .with_child(label("nested")),
+                ),
+            );
+        let diff = canvas.reconcile(root).unwrap();
+        assert_eq!(button_position(&diff, "nested"), (1, 1));
+    }
+
+    #[test]
+    fn flex_direction_helpers_enable_flex_and_gaps_use_physical_axes() {
+        for (root, expected) in [
+            (Node::container().block().flex_row(), (23, 0)),
+            (Node::container().block().flex_col(), (0, 17)),
+            (Node::container().block().flex_row_reverse(), (67, 0)),
+            (Node::container().block().flex_col_reverse(), (0, 73)),
+        ] {
+            let root = root
+                .w(100.0)
+                .h(100.0)
+                .gap(2u8)
+                .gap_x(13)
+                .gap_y(7.0f64)
+                .with_children([label("first"), label("second")]);
+            let diff = Canvas::<TestMsg>::new(ConnectionId(1))
+                .reconcile(root)
+                .unwrap();
+            assert_eq!(button_position(&diff, "second"), expected);
+        }
+    }
+
+    #[test]
+    fn inset_helpers_stretch_fixed_overlay_against_viewport() {
+        let root = Node::container().w(50.0).h(50.0).with_child(
+            Node::background(BtnStyle::default())
+                .position_fixed()
+                .inset(5)
+                .inset_x(10u16)
+                .inset_y(15.0f64),
+        );
+        let diff = Canvas::<TestMsg>::new(ConnectionId(1))
+            .reconcile(root)
+            .unwrap();
+        let btn = &diff.update[0];
+        assert_eq!((btn.l, btn.t, btn.w, btn.h), (10, 15, 180, 170));
+    }
+
+    #[test]
+    fn fit_content_shrinks_block_while_size_auto_fills_available_width() {
+        for (fit, expected_width) in [(true, 10), (false, 100)] {
+            let background = Node::background(BtnStyle::default())
+                .block()
+                .w(80.0)
+                .h(80.0)
+                .with_child(label("child"));
+            let background = if fit {
+                background.fit_content()
+            } else {
+                background.size_auto()
+            };
+            let root = Node::container().block().w(100.0).with_child(background);
+            let diff = Canvas::<TestMsg>::new(ConnectionId(1))
+                .reconcile(root)
+                .unwrap();
+            let btn = &diff.update[0];
+            assert_eq!((btn.w, btn.h), (expected_width, 10));
+        }
+    }
+
+    #[test]
+    fn percentage_sizes_respect_minimum_and_maximum_dimensions() {
+        let root = Node::container().block().size(100, 80).with_children([
+            label("percent").w_percent(50).h_percent(25),
+            label("min").w_percent(10).h_percent(10).min_w(20).min_h(15),
+            label("max")
+                .w_percent(100)
+                .h_percent(100)
+                .max_w(30)
+                .max_h(20),
+        ]);
+        let diff = Canvas::<TestMsg>::new(ConnectionId(1))
+            .reconcile(root)
+            .unwrap();
+        for (text, expected) in [("percent", (50, 20)), ("min", (20, 15)), ("max", (30, 20))] {
+            let btn = diff.update.iter().find(|btn| btn.text == text).unwrap();
+            assert_eq!((btn.w, btn.h), expected);
+        }
+    }
+
+    #[test]
+    fn self_auto_restores_container_stretch_alignment() {
+        let root = Node::container()
+            .flex_row()
+            .size(100, 40)
+            .items_stretch()
+            .with_children([
+                label("square").square(15u8),
+                label("stretch").h_auto().self_start().self_auto(),
+            ]);
+        let diff = Canvas::<TestMsg>::new(ConnectionId(1))
+            .reconcile(root)
+            .unwrap();
+        let square = diff.update.iter().find(|btn| btn.text == "square").unwrap();
+        let stretch = diff
+            .update
+            .iter()
+            .find(|btn| btn.text == "stretch")
+            .unwrap();
+        assert_eq!((square.w, square.h), (15, 15));
+        assert_eq!((stretch.w, stretch.h), (10, 40));
     }
 
     #[test]

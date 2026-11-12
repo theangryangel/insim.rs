@@ -182,6 +182,11 @@ impl<Msg> Node<Msg> {
         self
     }
 
+    /// Append a child only when `condition` is true.
+    #[deprecated(
+        since = "0.2.0",
+        note = "use .when(condition, |node| node.with_child(child)) or .with_child(condition.then(|| child))"
+    )]
     pub fn with_child_if(mut self, val: Self, condition: bool) -> Self {
         if condition {
             self = self.with_child(val);
@@ -189,9 +194,25 @@ impl<Msg> Node<Msg> {
         self
     }
 
-    pub fn with_children<I>(mut self, children: I) -> Self
+    /// Append nodes or optional nodes, skipping `None` entries.
+    ///
+    /// Items in a collection must share a type; wrap unconditional nodes in
+    /// `Some` when mixing them with optional nodes.
+    ///
+    /// ```
+    /// use insim::insim::BtnStyle;
+    /// use insim_extra::ui::Node;
+    ///
+    /// let show_delta = false;
+    /// let hud: Node<()> = Node::container().with_children([
+    ///     Some(Node::text("Lap 3 / 10", BtnStyle::default())),
+    ///     show_delta.then(|| Node::text("+0.5", BtnStyle::default())),
+    /// ]);
+    /// ```
+    pub fn with_children<I, E>(mut self, children: I) -> Self
     where
-        I: IntoIterator<Item = Self>,
+        I: IntoIterator<Item = E>,
+        E: Into<Option<Self>>,
     {
         for child in children.into_iter() {
             self = self.with_child(child);
@@ -199,9 +220,15 @@ impl<Msg> Node<Msg> {
         self
     }
 
-    pub fn with_children_if<I>(mut self, children: I, condition: bool) -> Self
+    /// Append nodes or optional nodes only when `condition` is true.
+    #[deprecated(
+        since = "0.2.0",
+        note = "use .when(condition, |node| node.with_children(children))"
+    )]
+    pub fn with_children_if<I, E>(mut self, children: I, condition: bool) -> Self
     where
-        I: IntoIterator<Item = Self>,
+        I: IntoIterator<Item = E>,
+        E: Into<Option<Self>>,
     {
         if condition {
             self = self.with_children(children);
@@ -211,8 +238,21 @@ impl<Msg> Node<Msg> {
 
     /// Conditionally apply a run of builder steps, staying in the fluent chain.
     /// `f` is invoked with `self` only when `condition` holds; otherwise `self`
-    /// is returned untouched. Generalises [`with_child_if`](Self::with_child_if)
-    /// to any sequence of modifications.
+    /// is returned untouched. Construct children inside the closure to avoid
+    /// building them when the condition is false.
+    ///
+    /// ```
+    /// use insim::insim::BtnStyle;
+    /// use insim_extra::ui::Node;
+    ///
+    /// let show_hud = true;
+    /// let hud: Node<()> = Node::container()
+    ///     .when(show_hud, |node| node.with_children([
+    ///         Node::text("Lap 3 / 10", BtnStyle::default()),
+    ///         Node::text("Fuel 20%", BtnStyle::default()),
+    ///     ]))
+    ///     .when(false, |_| panic!("skipped branches are never evaluated"));
+    /// ```
     pub fn when<F: FnOnce(Self) -> Self>(self, condition: bool, f: F) -> Self {
         if condition { f(self) } else { self }
     }
@@ -241,7 +281,111 @@ impl<Msg> Node<Msg> {
         self.style.get_or_insert_with(Default::default)
     }
 
-    pub fn w(mut self, val: f32) -> Self {
+    /// Configure Taffy properties while staying in the builder chain.
+    ///
+    /// The closure receives the existing style, preserving earlier builder steps.
+    pub fn with_style(mut self, f: impl FnOnce(&mut taffy::Style)) -> Self {
+        f(self.style_mut());
+        self
+    }
+
+    /// Keep this node in normal flow and ignore its insets (the default).
+    pub fn position_static(mut self) -> Self {
+        self.style_mut().position = taffy::Position::Static;
+        self
+    }
+
+    /// Offset this node in normal flow and anchor absolute descendants to it.
+    pub fn position_relative(mut self) -> Self {
+        self.style_mut().position = taffy::Position::Relative;
+        self
+    }
+
+    /// Remove this node from normal flow and anchor it to its containing block.
+    pub fn position_absolute(mut self) -> Self {
+        self.style_mut().position = taffy::Position::Absolute;
+        self
+    }
+
+    /// Remove this node from normal flow and anchor it to the 200 × 200 viewport.
+    pub fn position_fixed(mut self) -> Self {
+        self.style_mut().position = taffy::Position::Fixed;
+        self
+    }
+
+    /// Set all four insets in UI units. Static nodes ignore insets.
+    pub fn inset(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
+        self.style_mut().inset = taffy::Rect::length(val);
+        self
+    }
+
+    /// Set left and right insets in UI units. Static nodes ignore insets.
+    pub fn inset_x(self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
+        self.left(val).right(val)
+    }
+
+    /// Set top and bottom insets in UI units. Static nodes ignore insets.
+    pub fn inset_y(self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
+        self.top(val).bottom(val)
+    }
+
+    /// Set the top inset in UI units. Static nodes ignore insets.
+    pub fn top(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
+        self.style_mut().inset.top = taffy::LengthPercentageAuto::length(val);
+        self
+    }
+
+    /// Reset the top inset to automatic positioning.
+    pub fn top_auto(mut self) -> Self {
+        self.style_mut().inset.top = taffy::LengthPercentageAuto::auto();
+        self
+    }
+
+    /// Set the right inset in UI units. Static nodes ignore insets.
+    pub fn right(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
+        self.style_mut().inset.right = taffy::LengthPercentageAuto::length(val);
+        self
+    }
+
+    /// Reset the right inset to automatic positioning.
+    pub fn right_auto(mut self) -> Self {
+        self.style_mut().inset.right = taffy::LengthPercentageAuto::auto();
+        self
+    }
+
+    /// Set the bottom inset in UI units. Static nodes ignore insets.
+    pub fn bottom(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
+        self.style_mut().inset.bottom = taffy::LengthPercentageAuto::length(val);
+        self
+    }
+
+    /// Reset the bottom inset to automatic positioning.
+    pub fn bottom_auto(mut self) -> Self {
+        self.style_mut().inset.bottom = taffy::LengthPercentageAuto::auto();
+        self
+    }
+
+    /// Set the left inset in UI units. Static nodes ignore insets.
+    pub fn left(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
+        self.style_mut().inset.left = taffy::LengthPercentageAuto::length(val);
+        self
+    }
+
+    /// Reset the left inset to automatic positioning.
+    pub fn left_auto(mut self) -> Self {
+        self.style_mut().inset.left = taffy::LengthPercentageAuto::auto();
+        self
+    }
+
+    pub fn w(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
         self.style_mut().size.width = taffy::Dimension::length(val);
         self
     }
@@ -251,13 +395,63 @@ impl<Msg> Node<Msg> {
         self
     }
 
-    pub fn h(mut self, val: f32) -> Self {
+    pub fn h(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
         self.style_mut().size.height = taffy::Dimension::length(val);
         self
     }
 
     pub fn h_auto(mut self) -> Self {
         self.style_mut().size.height = taffy::Dimension::auto();
+        self
+    }
+
+    /// Set width and height in UI units.
+    pub fn size(self, width: impl Into<f64>, height: impl Into<f64>) -> Self {
+        self.w(width).h(height)
+    }
+
+    /// Set equal width and height in UI units.
+    pub fn square(self, size: impl Into<f64>) -> Self {
+        let size = size.into();
+        self.size(size, size)
+    }
+
+    /// Set width as a percentage of the containing block's width.
+    /// Uses CSS percentage values: `50` means 50%, `100` means 100%.
+    pub fn w_percent(mut self, val: impl Into<f64>) -> Self {
+        self.style_mut().size.width = taffy::Dimension::percent((val.into() / 100.0) as f32);
+        self
+    }
+
+    /// Set the minimum width in UI units.
+    pub fn min_w(mut self, val: impl Into<f64>) -> Self {
+        self.style_mut().min_size.width = taffy::LengthPercentageAuto::length(val.into() as f32);
+        self
+    }
+
+    /// Set the maximum width in UI units.
+    pub fn max_w(mut self, val: impl Into<f64>) -> Self {
+        self.style_mut().max_size.width = taffy::LengthPercentageAuto::length(val.into() as f32);
+        self
+    }
+
+    /// Set height as a percentage of the containing block's height.
+    /// Uses CSS percentage values: `50` means 50%, `100` means 100%.
+    pub fn h_percent(mut self, val: impl Into<f64>) -> Self {
+        self.style_mut().size.height = taffy::Dimension::percent((val.into() / 100.0) as f32);
+        self
+    }
+
+    /// Set the minimum height in UI units.
+    pub fn min_h(mut self, val: impl Into<f64>) -> Self {
+        self.style_mut().min_size.height = taffy::LengthPercentageAuto::length(val.into() as f32);
+        self
+    }
+
+    /// Set the maximum height in UI units.
+    pub fn max_h(mut self, val: impl Into<f64>) -> Self {
+        self.style_mut().max_size.height = taffy::LengthPercentageAuto::length(val.into() as f32);
         self
     }
 
@@ -271,32 +465,63 @@ impl<Msg> Node<Msg> {
         self
     }
 
+    /// Enable flex layout with col direction.
     pub fn flex_col(mut self) -> Self {
+        self.style_mut().display = taffy::Display::Flex;
         self.style_mut().flex_direction = taffy::FlexDirection::Column;
         self
     }
 
+    /// Enable flex layout with row direction.
     pub fn flex_row(mut self) -> Self {
+        self.style_mut().display = taffy::Display::Flex;
         self.style_mut().flex_direction = taffy::FlexDirection::Row;
         self
     }
 
+    /// Enable flex layout with col reverse direction.
     pub fn flex_col_reverse(mut self) -> Self {
+        self.style_mut().display = taffy::Display::Flex;
         self.style_mut().flex_direction = taffy::FlexDirection::ColumnReverse;
         self
     }
 
+    /// Enable flex layout with row reverse direction.
     pub fn flex_row_reverse(mut self) -> Self {
+        self.style_mut().display = taffy::Display::Flex;
         self.style_mut().flex_direction = taffy::FlexDirection::RowReverse;
         self
     }
 
-    pub fn flex_grow(mut self, val: f32) -> Self {
+    /// Set horizontal and vertical spacing between flex or grid items.
+    pub fn gap(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
+        self.style_mut().gap = taffy::Size::length(val);
+        self
+    }
+
+    /// Set horizontal spacing between columns, independent of flex direction.
+    pub fn gap_x(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
+        self.style_mut().gap.width = taffy::LengthPercentage::length(val);
+        self
+    }
+
+    /// Set vertical spacing between rows, independent of flex direction.
+    pub fn gap_y(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
+        self.style_mut().gap.height = taffy::LengthPercentage::length(val);
+        self
+    }
+
+    pub fn flex_grow(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
         self.style_mut().flex_grow = val;
         self
     }
 
-    pub fn flex_shrink(mut self, val: f32) -> Self {
+    pub fn flex_shrink(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
         self.style_mut().flex_shrink = val;
         self
     }
@@ -317,77 +542,89 @@ impl<Msg> Node<Msg> {
     }
 
     pub fn items_start(mut self) -> Self {
-        self.style_mut().align_items = Some(taffy::AlignItems::START);
+        self.style_mut().align_items = taffy::AlignItems::START;
         self
     }
 
     pub fn items_end(mut self) -> Self {
-        self.style_mut().align_items = Some(taffy::AlignItems::END);
+        self.style_mut().align_items = taffy::AlignItems::END;
         self
     }
 
     pub fn items_center(mut self) -> Self {
-        self.style_mut().align_items = Some(taffy::AlignItems::CENTER);
+        self.style_mut().align_items = taffy::AlignItems::CENTER;
+        self
+    }
+
+    /// Stretch children with automatic cross sizes to fill the cross axis.
+    pub fn items_stretch(mut self) -> Self {
+        self.style_mut().align_items = taffy::AlignItems::STRETCH;
         self
     }
 
     pub fn items_baseline(mut self) -> Self {
-        self.style_mut().align_items = Some(taffy::AlignItems::BASELINE);
+        self.style_mut().align_items = taffy::AlignItems::BASELINE;
         self
     }
 
     pub fn justify_start(mut self) -> Self {
-        self.style_mut().justify_content = Some(taffy::JustifyContent::START);
+        self.style_mut().justify_content = taffy::JustifyContent::START;
         self
     }
 
     pub fn justify_end(mut self) -> Self {
-        self.style_mut().justify_content = Some(taffy::JustifyContent::END);
+        self.style_mut().justify_content = taffy::JustifyContent::END;
         self
     }
 
     pub fn justify_center(mut self) -> Self {
-        self.style_mut().justify_content = Some(taffy::JustifyContent::CENTER);
+        self.style_mut().justify_content = taffy::JustifyContent::CENTER;
         self
     }
 
     pub fn justify_between(mut self) -> Self {
-        self.style_mut().justify_content = Some(taffy::JustifyContent::SPACE_BETWEEN);
+        self.style_mut().justify_content = taffy::JustifyContent::SPACE_BETWEEN;
         self
     }
 
     pub fn justify_around(mut self) -> Self {
-        self.style_mut().justify_content = Some(taffy::JustifyContent::SPACE_AROUND);
+        self.style_mut().justify_content = taffy::JustifyContent::SPACE_AROUND;
         self
     }
 
     pub fn content_start(mut self) -> Self {
-        self.style_mut().align_content = Some(taffy::AlignContent::START);
+        self.style_mut().align_content = taffy::AlignContent::START;
         self
     }
 
     pub fn content_end(mut self) -> Self {
-        self.style_mut().align_content = Some(taffy::AlignContent::END);
+        self.style_mut().align_content = taffy::AlignContent::END;
         self
     }
 
     pub fn content_around(mut self) -> Self {
-        self.style_mut().align_content = Some(taffy::AlignContent::SPACE_AROUND);
+        self.style_mut().align_content = taffy::AlignContent::SPACE_AROUND;
         self
     }
 
     pub fn content_between(mut self) -> Self {
-        self.style_mut().align_content = Some(taffy::AlignContent::SPACE_BETWEEN);
+        self.style_mut().align_content = taffy::AlignContent::SPACE_BETWEEN;
         self
     }
 
     pub fn content_evenly(mut self) -> Self {
-        self.style_mut().align_content = Some(taffy::AlignContent::SPACE_EVENLY);
+        self.style_mut().align_content = taffy::AlignContent::SPACE_EVENLY;
         self
     }
 
     pub fn content_stretch(mut self) -> Self {
-        self.style_mut().align_content = Some(taffy::AlignContent::STRETCH);
+        self.style_mut().align_content = taffy::AlignContent::STRETCH;
+        self
+    }
+
+    /// Reset self alignment to `auto`, following the container's item alignment.
+    pub fn self_auto(mut self) -> Self {
+        self.style_mut().align_self = None;
         self
     }
 
@@ -411,7 +648,8 @@ impl<Msg> Node<Msg> {
         self
     }
 
-    pub fn m(mut self, val: f32) -> Self {
+    pub fn m(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
         self.style_mut().margin = taffy::Rect::length(val);
         self
     }
@@ -421,33 +659,39 @@ impl<Msg> Node<Msg> {
         self
     }
 
-    pub fn mt(mut self, val: f32) -> Self {
+    pub fn mt(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
         self.style_mut().margin.top = taffy::LengthPercentageAuto::length(val);
         self
     }
 
-    pub fn mb(mut self, val: f32) -> Self {
+    pub fn mb(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
         self.style_mut().margin.bottom = taffy::LengthPercentageAuto::length(val);
         self
     }
 
-    pub fn ml(mut self, val: f32) -> Self {
+    pub fn ml(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
         self.style_mut().margin.left = taffy::LengthPercentageAuto::length(val);
         self
     }
 
-    pub fn mr(mut self, val: f32) -> Self {
+    pub fn mr(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
         self.style_mut().margin.right = taffy::LengthPercentageAuto::length(val);
         self
     }
 
-    pub fn mx(mut self, val: f32) -> Self {
+    pub fn mx(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
         self.style_mut().margin.left = taffy::LengthPercentageAuto::length(val);
         self.style_mut().margin.right = taffy::LengthPercentageAuto::length(val);
         self
     }
 
-    pub fn my(mut self, val: f32) -> Self {
+    pub fn my(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
         self.style_mut().margin.top = taffy::LengthPercentageAuto::length(val);
         self.style_mut().margin.bottom = taffy::LengthPercentageAuto::length(val);
         self
@@ -465,46 +709,74 @@ impl<Msg> Node<Msg> {
         self
     }
 
-    pub fn p(mut self, val: f32) -> Self {
+    pub fn p(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
         self.style_mut().padding = taffy::Rect::length(val);
         self
     }
 
-    pub fn pt(mut self, val: f32) -> Self {
+    pub fn pt(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
         self.style_mut().padding.top = taffy::LengthPercentage::length(val);
         self
     }
 
-    pub fn pb(mut self, val: f32) -> Self {
+    pub fn pb(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
         self.style_mut().padding.bottom = taffy::LengthPercentage::length(val);
         self
     }
 
-    pub fn pl(mut self, val: f32) -> Self {
+    pub fn pl(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
         self.style_mut().padding.left = taffy::LengthPercentage::length(val);
         self
     }
 
-    pub fn pr(mut self, val: f32) -> Self {
+    pub fn pr(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
         self.style_mut().padding.right = taffy::LengthPercentage::length(val);
         self
     }
 
-    pub fn px(mut self, val: f32) -> Self {
+    pub fn px(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
         self.style_mut().padding.left = taffy::LengthPercentage::length(val);
         self.style_mut().padding.right = taffy::LengthPercentage::length(val);
         self
     }
 
-    pub fn py(mut self, val: f32) -> Self {
+    pub fn py(mut self, val: impl Into<f64>) -> Self {
+        let val = val.into() as f32;
         self.style_mut().padding.top = taffy::LengthPercentage::length(val);
         self.style_mut().padding.bottom = taffy::LengthPercentage::length(val);
         self
     }
 
-    pub fn fit_content(mut self) -> Self {
-        self = self.w_auto().h_auto();
+    /// Reset width and height to `auto` (the behavior of `fit_content` before 0.2).
+    pub fn size_auto(self) -> Self {
+        self.w_auto().h_auto()
+    }
+
+    /// Set width to CSS `fit-content`, clamped between intrinsic content sizes
+    /// according to the available space. This does not measure button text.
+    pub fn w_fit_content(mut self) -> Self {
+        self.style_mut().size.width = taffy::Dimension::fit_content();
         self
+    }
+
+    /// Set height to CSS `fit-content`. This does not measure button text.
+    pub fn h_fit_content(mut self) -> Self {
+        self.style_mut().size.height = taffy::Dimension::fit_content();
+        self
+    }
+
+    /// Set both dimensions to CSS `fit-content`.
+    ///
+    /// Before 0.2 this set both dimensions to `auto`; use [`Self::size_auto`]
+    /// to retain that behavior. Button text is not measured automatically.
+    pub fn fit_content(self) -> Self {
+        self.w_fit_content().h_fit_content()
     }
 
     // Maps/wraps child msg -> parent msg
@@ -664,6 +936,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)] // Verify compatibility until the deprecated helper is removed.
     fn test_with_child_if_true() {
         let child = Node::text("child", BtnStyle::default());
         let container: Node<TestMsg> = Node::container().with_child_if(child, true);
@@ -680,6 +953,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)] // Verify compatibility until the deprecated helper is removed.
     fn test_with_child_if_false() {
         let child: Node<TestMsg> = Node::text("child", BtnStyle::default());
         let container: Node<TestMsg> = Node::container().with_child_if(child, false);
@@ -697,9 +971,11 @@ mod tests {
     #[test]
     fn test_with_children() {
         let children = vec![
-            Node::text("a", BtnStyle::default()),
-            Node::text("b", BtnStyle::default()),
-            Node::text("c", BtnStyle::default()),
+            Some(Node::text("a", BtnStyle::default())),
+            None,
+            Some(Node::text("b", BtnStyle::default())),
+            false.then(|| Node::text("hidden", BtnStyle::default())),
+            Some(Node::text("c", BtnStyle::default())),
         ];
         let container: Node<TestMsg> = Node::container().with_children(children);
 
@@ -708,13 +984,21 @@ mod tests {
                 children: Some(children),
                 ..
             } => {
-                assert_eq!(children.len(), 3);
+                let texts: Vec<_> = children
+                    .iter()
+                    .map(|child| match &child.kind {
+                        NodeKind::Button { text, .. } => text.as_str(),
+                        _ => panic!("Expected text button"),
+                    })
+                    .collect();
+                assert_eq!(texts, ["a", "b", "c"]);
             },
             _ => panic!("Expected Container with children"),
         }
     }
 
     #[test]
+    #[allow(deprecated)] // Verify compatibility until the deprecated helper is removed.
     fn test_with_children_if_true() {
         let children = vec![
             Node::text("a", BtnStyle::default()),
@@ -734,6 +1018,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)] // Verify compatibility until the deprecated helper is removed.
     fn test_with_children_if_false() {
         let children: Vec<Node<TestMsg>> = vec![
             Node::text("a", BtnStyle::default()),
@@ -912,24 +1197,18 @@ mod tests {
     #[test]
     fn test_align_items_methods() {
         let start: Node<TestMsg> = Node::container().items_start();
-        assert_eq!(
-            start.style.unwrap().align_items,
-            Some(taffy::AlignItems::START)
-        );
+        assert_eq!(start.style.unwrap().align_items, taffy::AlignItems::START);
 
         let end: Node<TestMsg> = Node::container().items_end();
-        assert_eq!(end.style.unwrap().align_items, Some(taffy::AlignItems::END));
+        assert_eq!(end.style.unwrap().align_items, taffy::AlignItems::END);
 
         let center: Node<TestMsg> = Node::container().items_center();
-        assert_eq!(
-            center.style.unwrap().align_items,
-            Some(taffy::AlignItems::CENTER)
-        );
+        assert_eq!(center.style.unwrap().align_items, taffy::AlignItems::CENTER);
 
         let baseline: Node<TestMsg> = Node::container().items_baseline();
         assert_eq!(
             baseline.style.unwrap().align_items,
-            Some(taffy::AlignItems::BASELINE)
+            taffy::AlignItems::BASELINE
         );
     }
 
@@ -938,31 +1217,31 @@ mod tests {
         let start: Node<TestMsg> = Node::container().justify_start();
         assert_eq!(
             start.style.unwrap().justify_content,
-            Some(taffy::JustifyContent::START)
+            taffy::JustifyContent::START
         );
 
         let end: Node<TestMsg> = Node::container().justify_end();
         assert_eq!(
             end.style.unwrap().justify_content,
-            Some(taffy::JustifyContent::END)
+            taffy::JustifyContent::END
         );
 
         let center: Node<TestMsg> = Node::container().justify_center();
         assert_eq!(
             center.style.unwrap().justify_content,
-            Some(taffy::JustifyContent::CENTER)
+            taffy::JustifyContent::CENTER
         );
 
         let between: Node<TestMsg> = Node::container().justify_between();
         assert_eq!(
             between.style.unwrap().justify_content,
-            Some(taffy::JustifyContent::SPACE_BETWEEN)
+            taffy::JustifyContent::SPACE_BETWEEN
         );
 
         let around: Node<TestMsg> = Node::container().justify_around();
         assert_eq!(
             around.style.unwrap().justify_content,
-            Some(taffy::JustifyContent::SPACE_AROUND)
+            taffy::JustifyContent::SPACE_AROUND
         );
     }
 
@@ -971,37 +1250,34 @@ mod tests {
         let start: Node<TestMsg> = Node::container().content_start();
         assert_eq!(
             start.style.unwrap().align_content,
-            Some(taffy::AlignContent::START)
+            taffy::AlignContent::START
         );
 
         let end: Node<TestMsg> = Node::container().content_end();
-        assert_eq!(
-            end.style.unwrap().align_content,
-            Some(taffy::AlignContent::END)
-        );
+        assert_eq!(end.style.unwrap().align_content, taffy::AlignContent::END);
 
         let around: Node<TestMsg> = Node::container().content_around();
         assert_eq!(
             around.style.unwrap().align_content,
-            Some(taffy::AlignContent::SPACE_AROUND)
+            taffy::AlignContent::SPACE_AROUND
         );
 
         let between: Node<TestMsg> = Node::container().content_between();
         assert_eq!(
             between.style.unwrap().align_content,
-            Some(taffy::AlignContent::SPACE_BETWEEN)
+            taffy::AlignContent::SPACE_BETWEEN
         );
 
         let evenly: Node<TestMsg> = Node::container().content_evenly();
         assert_eq!(
             evenly.style.unwrap().align_content,
-            Some(taffy::AlignContent::SPACE_EVENLY)
+            taffy::AlignContent::SPACE_EVENLY
         );
 
         let stretch: Node<TestMsg> = Node::container().content_stretch();
         assert_eq!(
             stretch.style.unwrap().align_content,
-            Some(taffy::AlignContent::STRETCH)
+            taffy::AlignContent::STRETCH
         );
     }
 
@@ -1158,8 +1434,27 @@ mod tests {
     fn test_fit_content() {
         let node: Node<TestMsg> = Node::container().fit_content();
         let style = node.style.unwrap();
-        assert_eq!(style.size.width, taffy::Dimension::auto());
-        assert_eq!(style.size.height, taffy::Dimension::auto());
+        assert_eq!(style.size.width, taffy::Dimension::fit_content());
+        assert_eq!(style.size.height, taffy::Dimension::fit_content());
+    }
+
+    #[test]
+    fn with_style_preserves_existing_properties_and_allows_later_overrides() {
+        let spacing = 3.0;
+        let node: Node<TestMsg> = Node::container()
+            .w(50.0)
+            .with_style(|style| {
+                style.display = taffy::Display::Grid;
+                style.gap = taffy::Size::length(spacing);
+            })
+            .gap_x(5.0)
+            .h(20.0);
+        let style = node.style.unwrap();
+        assert_eq!(style.display, taffy::Display::Grid);
+        assert_eq!(style.size.width, taffy::Dimension::length(50.0));
+        assert_eq!(style.size.height, taffy::Dimension::length(20.0));
+        assert_eq!(style.gap.width, taffy::LengthPercentage::length(5.0));
+        assert_eq!(style.gap.height, taffy::LengthPercentage::length(3.0));
     }
 
     #[test]
@@ -1181,10 +1476,7 @@ mod tests {
         assert_eq!(style.size.height, taffy::Dimension::length(100.0));
         assert_eq!(style.padding, taffy::Rect::length(5.0_f32));
         assert_eq!(style.margin, taffy::Rect::length(10.0_f32));
-        assert_eq!(style.align_items, Some(taffy::AlignItems::CENTER));
-        assert_eq!(
-            style.justify_content,
-            Some(taffy::JustifyContent::SPACE_BETWEEN)
-        );
+        assert_eq!(style.align_items, taffy::AlignItems::CENTER);
+        assert_eq!(style.justify_content, taffy::JustifyContent::SPACE_BETWEEN);
     }
 }

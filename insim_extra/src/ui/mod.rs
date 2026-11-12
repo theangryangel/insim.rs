@@ -5,6 +5,42 @@
 //! `LocalSet`). Forwards `Ncn` / `Cnl` / `Btc` / `Btt` / `Bfn` packets into
 //! the UI thread via [`Ui::forward_packet`].
 //!
+//! # Positioning
+//!
+//! Nodes default to static positioning: insets are ignored. Use
+//! [`Node::position_relative`] to apply insets in normal flow or establish a
+//! containing block for absolute descendants. [`Node::position_absolute`] and
+//! [`Node::position_fixed`] remove a node from normal flow; fixed nodes use the
+//! 200 × 200 UI viewport even when the root is smaller or offset.
+//! When migrating from Taffy 0.13, explicitly select relative positioning for
+//! nodes that previously relied on the default position applying insets.
+//!
+//! # Layout builders
+//!
+//! Flex direction helpers enable flex layout, including after `block()`.
+//! Use `gap`, `gap_x`, and `gap_y` for spacing between items. Horizontal and
+//! vertical gap axes do not change with flex direction. Use `with_style` to
+//! configure additional Taffy properties without leaving the builder chain.
+//! Numeric builders accept integers and floats via `Into<f64>`, for example
+//! `.w(30).h(6).p(2).top(5)`. Values are converted to Taffy's `f32` layout
+//! units internally; fractional and negative offsets remain supported.
+//!
+//! Use `.when(condition, |node| node.with_children(children))` to toggle a
+//! group, constructing children inside the closure to skip building them when
+//! false. `with_child_if` and `with_children_if` are deprecated in favor of
+//! `when` or optional children.
+//!
+//! `size(width, height)` and `square(size)` set dimensions in UI units.
+//! `w_percent(50)` and `h_percent(50)` mean 50% of the containing block's
+//! corresponding dimension; percentage heights need a definite containing
+//! height. Use `min_w`, `max_w`, `min_h`, and `max_h` for size limits in UI units.
+//! `items_stretch()` fills children's automatic cross sizes; `self_auto()`
+//! resets a child's alignment to follow its container.
+//!
+//! `fit_content()` now sets CSS `fit-content` sizing. Use `size_auto()` for
+//! its pre-0.2 behavior of resetting both dimensions to `auto`. Content sizing
+//! uses the layout of children; button text is not measured automatically.
+//!
 //! # Multiplayer only
 //!
 //! [`Ui`] is designed exclusively for **dedicated multiplayer servers**. The
