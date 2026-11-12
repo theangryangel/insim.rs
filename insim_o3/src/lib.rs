@@ -275,14 +275,14 @@ fn escape(input: &str) -> String {
 
 /// Split an LFS string into ``(colour_index, text)`` spans.
 ///
-/// Colour index is ``0``–``8`` (matching LFS ``^0``–``^8``).  Spans with no
+/// Colour index is ``0``–``8``; both ``^8`` and ``^9`` select index ``8``. Spans with no
 /// text are skipped.  The text slices may still contain escaped sequences
 /// (``^^``); call :func:`unescape` on each span if you need the final display
 /// string.
 #[pyfunction]
 fn colour_spans(input: &str) -> Vec<(u8, String)> {
     insim::core::string::colours::spans(input)
-        .map(|(c, s)| (c, s.to_owned()))
+        .map(|(c, s)| (u8::from(c), s.to_owned()))
         .collect()
 }
 

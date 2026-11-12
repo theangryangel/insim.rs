@@ -4,23 +4,101 @@ use std::borrow::Cow;
 
 use super::control::ControlMarker;
 
-/// Trait to help identify colour markers/identifiers
-/// Left public to allow users to implement their own variation on colour stripping or replacement.
-/// i.e. ASCII or HTML.
-pub(super) trait ColourMarker {
-    /// Is this a supported colour control character within LFS
-    fn is_lfs_colour(&self) -> bool;
+/// The effective display colour of an LFS text span.
+///
+/// Both `^8` (colour and code page reset) and `^9` (colour reset) select
+/// [`Self::Default`]. This describes display state, not the original control.
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[repr(u8)]
+pub enum ColourCode {
+    /// Black.
+    Black = 0,
+    /// Red.
+    Red = 1,
+    /// Light Green.
+    LightGreen = 2,
+    /// Yellow.
+    Yellow = 3,
+    /// Blue.
+    Blue = 4,
+    /// Purple.
+    Purple = 5,
+    /// Light Blue.
+    LightBlue = 6,
+    /// White.
+    White = 7,
+    /// The default display colour (dark green).
+    #[default]
+    Default = 8,
 }
 
-impl ColourMarker for char {
-    fn is_lfs_colour(&self) -> bool {
-        matches!(self, '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8')
+/// A character that is not an LFS colour marker.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, thiserror::Error)]
+#[error("invalid colour marker: {0}")]
+pub struct ColourCodeError(pub char);
+
+impl TryFrom<char> for ColourCode {
+    type Error = ColourCodeError;
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        match value {
+            '0' => Ok(Self::Black),
+            '1' => Ok(Self::Red),
+            '2' => Ok(Self::LightGreen),
+            '3' => Ok(Self::Yellow),
+            '4' => Ok(Self::Blue),
+            '5' => Ok(Self::Purple),
+            '6' => Ok(Self::LightBlue),
+            '7' => Ok(Self::White),
+            '8' | '9' => Ok(Self::Default),
+            _ => Err(ColourCodeError(value)),
+        }
     }
 }
 
-impl ColourMarker for u8 {
-    fn is_lfs_colour(&self) -> bool {
-        (*self as char).is_lfs_colour()
+/// Convert a display colour to its canonical marker, without the `^` prefix.
+/// The default colour uses `8`; the original reset instruction is not retained.
+impl From<ColourCode> for char {
+    fn from(value: ColourCode) -> Self {
+        char::from(b'0' + u8::from(value))
+    }
+}
+
+/// Convert a display colour to its index (`0..=8`).
+impl From<ColourCode> for u8 {
+    fn from(value: ColourCode) -> Self {
+        value as Self
+    }
+}
+
+// Preserve the distinction between reset controls while parsing markers.
+#[derive(Clone, Copy)]
+pub(super) enum ColourMarker {
+    Colour(ColourCode),
+    ResetColourAndCodepage,
+    ResetColour,
+}
+
+impl TryFrom<char> for ColourMarker {
+    type Error = ColourCodeError;
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        match value {
+            '8' => Ok(Self::ResetColourAndCodepage),
+            '9' => Ok(Self::ResetColour),
+            _ => ColourCode::try_from(value).map(Self::Colour),
+        }
+    }
+}
+
+impl ColourMarker {
+    fn colour(self) -> ColourCode {
+        match self {
+            Self::Colour(colour) => colour,
+            Self::ResetColourAndCodepage | Self::ResetColour => ColourCode::Default,
+        }
     }
 }
 
@@ -53,14 +131,14 @@ pub trait Colour {
     /// Split an escaped LFS string into colour spans/chunks.
     ///
     /// This parses colour markers (`^0`..`^9`) while preserving escaped control markers (`^^`) as
-    /// literal text. Chunks are yielded as `(colour, text)` where `colour` is `0..=9` and `text` is a
+    /// literal text. Chunks are yielded as `(colour, text)` where `colour` is the effective display colour and `text` is a
     /// slice of the original input. Empty chunks are skipped.
     ///
     /// The yielded spans maybe raw escape sequences (like ^^): You must call unescape
     /// on the text to obtain the final display string.
     ///
     /// Use cases include converting to ansi colours, or html, etc.
-    fn colour_spans(&self) -> impl Iterator<Item = (u8, &str)>;
+    fn colour_spans(&self) -> impl Iterator<Item = (ColourCode, &str)>;
 }
 
 impl<T: AsRef<str>> Colour for T {
@@ -104,25 +182,25 @@ impl<T: AsRef<str>> Colour for T {
         strip(self.as_ref())
     }
 
-    fn colour_spans(&self) -> impl Iterator<Item = (u8, &str)> {
+    fn colour_spans(&self) -> impl Iterator<Item = (ColourCode, &str)> {
         spans(self.as_ref())
     }
 }
 
 /// Split an escaped LFS string into colour chunks.
 ///
-/// This parses colour markers (`^0`..`^8`) while preserving escaped control markers (`^^`) as
-/// literal text. Chunks are yielded as `(colour, text)` where `colour` is `0..=9` and `text` is a
+/// This parses colour markers (`^0`..`^9`) while preserving escaped control markers (`^^`) as
+/// literal text. Chunks are yielded as `(colour, text)` where `colour` is the effective display colour and `text` is a
 /// slice of the original input. Empty chunks are skipped.
 ///
 /// The yielded spans maybe raw escape sequences (like ^^): You must call .unescape()
 /// on the text to obtain the final display string.
 ///
 /// Use cases include converting to ansi colours, or html, etc.
-pub fn spans(input: &str) -> impl Iterator<Item = (u8, &str)> + '_ {
+pub fn spans(input: &str) -> impl Iterator<Item = (ColourCode, &str)> + '_ {
     let mut iter = input.char_indices().peekable();
     let mut chunk_start = 0;
-    let mut current_colour = 8;
+    let mut current_colour = ColourCode::default();
 
     std::iter::from_fn(move || {
         while let Some((idx, ch)) = iter.next() {
@@ -139,12 +217,12 @@ pub fn spans(input: &str) -> impl Iterator<Item = (u8, &str)> + '_ {
                 },
 
                 // ^n (colour code)
-                Some(&(next_idx, next)) if next.is_lfs_colour() => {
+                Some(&(next_idx, next)) if let Ok(marker) = ColourMarker::try_from(next) => {
                     let chunk = &input[chunk_start..idx];
                     let yielded_colour = current_colour;
 
                     // update state for the *next* iteration
-                    current_colour = next.to_digit(10).unwrap_or(0) as u8;
+                    current_colour = marker.colour();
                     chunk_start = next_idx + next.len_utf8();
                     let _ = iter.next(); // consume the colour digit
 
@@ -203,7 +281,7 @@ pub fn strip(input: &'_ str) -> Cow<'_, str> {
 
         if i.is_lfs_control_char()
             && let Some(k) = j
-            && k.is_lfs_colour()
+            && ColourMarker::try_from(*k).is_ok()
         {
             let _ = iter.next();
             continue;
@@ -218,6 +296,50 @@ pub fn strip(input: &'_ str) -> Cow<'_, str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn typed_colour_conversions() {
+        let colours = [
+            ColourCode::Black,
+            ColourCode::Red,
+            ColourCode::LightGreen,
+            ColourCode::Yellow,
+            ColourCode::Blue,
+            ColourCode::Purple,
+            ColourCode::LightBlue,
+            ColourCode::White,
+            ColourCode::Default,
+        ];
+        for (index, colour) in (0_u8..).zip(colours) {
+            assert_eq!(u8::from(colour), index);
+            assert_eq!(char::from(colour), char::from(b'0' + index));
+            assert_eq!(ColourCode::try_from(char::from(colour)), Ok(colour));
+        }
+        assert_eq!(ColourCode::try_from('9'), Ok(ColourCode::Default));
+        for marker in ['^', 'L', 'a', 'é'] {
+            assert_eq!(ColourCode::try_from(marker), Err(ColourCodeError(marker)));
+        }
+    }
+
+    #[test]
+    fn reset_controls_select_default_colour() {
+        let input = "^1red^9default^2green^8default";
+        let expected = vec![
+            (ColourCode::Red, "red"),
+            (ColourCode::Default, "default"),
+            (ColourCode::LightGreen, "green"),
+            (ColourCode::Default, "default"),
+        ];
+        assert_eq!(spans(input).collect::<Vec<_>>(), expected);
+        assert_eq!(input.colour_spans().collect::<Vec<_>>(), expected);
+        assert_eq!(strip(input), "reddefaultgreendefault");
+        assert_eq!(
+            spans("^^9").collect::<Vec<_>>(),
+            vec![(ColourCode::Default, "^^9")]
+        );
+        assert_eq!(strip("^^9"), "^^9");
+        assert_eq!(crate::string::escaping::escape("^9default"), "^9default");
+    }
 
     #[test]
     fn test_strip_colours_only() {
@@ -238,27 +360,36 @@ mod tests {
 
     #[test]
     fn test_colour_spans_default() {
-        assert_eq!(spans("abc").collect::<Vec<_>>(), vec![(8, "abc")]);
+        assert_eq!(
+            spans("abc").collect::<Vec<_>>(),
+            vec![(ColourCode::Default, "abc")]
+        );
     }
 
     #[test]
     fn test_colour_spans_with_markers() {
         assert_eq!(
             spans("^1abc ^2efg").collect::<Vec<_>>(),
-            vec![(1, "abc "), (2, "efg")]
+            vec![(ColourCode::Red, "abc "), (ColourCode::LightGreen, "efg")]
         );
     }
 
     #[test]
     fn test_colour_spans_escaped_marker_not_colour() {
-        assert_eq!(spans("^^0").collect::<Vec<_>>(), vec![(8, "^^0")]);
+        assert_eq!(
+            spans("^^0").collect::<Vec<_>>(),
+            vec![(ColourCode::Default, "^^0")]
+        );
     }
 
     #[test]
     fn test_colour_spans_with_markers_escaped() {
         assert_eq!(
             spans("^1a^^0bc ^2efg").collect::<Vec<_>>(),
-            vec![(1, "a^^0bc "), (2, "efg")]
+            vec![
+                (ColourCode::Red, "a^^0bc "),
+                (ColourCode::LightGreen, "efg")
+            ]
         );
     }
 
@@ -266,18 +397,24 @@ mod tests {
     fn test_colour_spans_greedy_escape_then_colour() {
         assert_eq!(
             spans("^^^1abc").collect::<Vec<_>>(),
-            vec![(8, "^^"), (1, "abc")]
+            vec![(ColourCode::Default, "^^"), (ColourCode::Red, "abc")]
         );
     }
 
     #[test]
     fn test_colour_spans_skip_empty_segments() {
-        assert_eq!(spans("^1^2abc").collect::<Vec<_>>(), vec![(2, "abc")]);
+        assert_eq!(
+            spans("^1^2abc").collect::<Vec<_>>(),
+            vec![(ColourCode::LightGreen, "abc")]
+        );
     }
 
     #[test]
     fn test_colour_spans_trailing_colour_marker() {
-        assert_eq!(spans("abc^1").collect::<Vec<_>>(), vec![(8, "abc")]);
+        assert_eq!(
+            spans("abc^1").collect::<Vec<_>>(),
+            vec![(ColourCode::Default, "abc")]
+        );
     }
 
     #[test]

@@ -116,7 +116,7 @@ pub fn escape(input: &'_ str) -> Cow<'_, str> {
         // is the current char a marker? and do we have a follow up character?
         if c.is_lfs_control_char()
             && let Some(d) = chars.peek()
-            && d.is_lfs_colour()
+            && ColourMarker::try_from(*d).is_ok()
             && let Some(d) = chars.next()
         {
             // is this a colour?
