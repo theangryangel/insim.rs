@@ -22,7 +22,7 @@ resolver = "3"
 [workspace.package]
 authors = ["Karl Southern <karl@theangryangel.co.uk>"]
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.95"
 repository = "https://github.com/theangryangel/insim.rs"
 license = "MIT"
 homepage = "https://github.com/theangryangel/insim.rs"
