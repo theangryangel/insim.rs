@@ -166,7 +166,7 @@ macro_rules! define_packet {
     };
 }
 
-define_packet! (
+define_packet!(
     /// Instruction - handshake or init
     Isi = 1,
     /// Information - version info

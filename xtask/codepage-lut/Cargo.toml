@@ -8,3 +8,6 @@ publish = false
 
 [dependencies]
 encoding_rs = { workspace = true }
+
+[lints]
+workspace = true

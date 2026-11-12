@@ -1,3 +1,5 @@
+//! Generate the packet schema for the Python bindings.
+
 use std::{
     path::{Path, PathBuf},
     process::Command,

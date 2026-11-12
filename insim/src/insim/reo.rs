@@ -96,8 +96,8 @@ mod test {
         assert_from_to_bytes!(Reo, buf.as_ref(), |parsed: Reo| {
             assert_eq!(parsed.reqi, RequestId(0));
             assert_eq!(parsed.nump, REO_MAX_PLAYERS as u8);
-            for i in 0..40 {
-                assert_eq!(parsed.plid[i], PlayerId(i as u8));
+            for (i, plid) in parsed.plid.iter().enumerate() {
+                assert_eq!(*plid, PlayerId(i as u8));
             }
         });
     }

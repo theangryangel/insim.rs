@@ -6,7 +6,6 @@ edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 license.workspace = true
-homepage.workspace = true
 publish = false
 
 [dependencies]
@@ -14,3 +13,6 @@ insim_pth = { path = "../../insim_pth" }
 clap = { workspace = true, features = ["derive"] }
 svg = "0.18.0"
 anyhow = "1.0.86"
+
+[lints]
+workspace = true

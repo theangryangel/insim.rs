@@ -9,3 +9,6 @@ publish = false
 [dependencies]
 insim = { path = "../../insim", default-features = false, features = ["tokio"] }
 tokio = { workspace = true, features = ["full"] }
+
+[lints]
+workspace = true

@@ -1,3 +1,5 @@
+//! Generate the Unicode-to-LFS code page lookup table.
+
 use std::{collections::BTreeSet, fmt::Write as _, fs, path::PathBuf};
 
 use encoding_rs::Encoding;
