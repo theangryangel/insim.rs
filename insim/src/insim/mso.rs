@@ -66,23 +66,35 @@ impl Mso {
 impl Decode for Mso {
     fn decode(ctx: &mut DecodeContext) -> Result<Self, insim_core::DecodeError> {
         let reqi = ctx.decode::<RequestId>("reqi")?;
-        ctx.pad("pad", 1)?;
+        let mso_data = ctx.decode::<u8>("mso_data")?;
+        // Unknown identifiers fall back to Latin, as do pre-0.8C27 packets.
+        let codepage = codepages::Codepage::try_from(mso_data & 0x0f).unwrap_or_default();
         let ucid = ctx.decode::<ConnectionId>("ucid")?;
         let plid = ctx.decode::<PlayerId>("plid")?;
         let usertype = ctx.decode::<MsoUserType>("usertype")?;
         let textstart = ctx.decode::<u8>("textstart")?;
 
-        let (textstart, msg) = if textstart > 0 {
-            let mut name = ctx.buf.split_to(textstart as usize);
-            let name_len = name.len();
-            let name = DecodeContext::new(&mut name).decode_codepage("name", name_len)?;
-            let msg_len = ctx.buf.len();
-            let msg = ctx.decode_codepage("msg", msg_len)?;
-            (name.len() as u8, format!("{name}{msg}"))
-        } else {
-            let msg_len = ctx.buf.len();
-            (0_u8, ctx.decode_codepage("msg", msg_len)?)
-        };
+        let raw = ctx.buf.clone();
+        if usize::from(textstart) > raw.len() {
+            return Err(
+                insim_core::DecodeError::from(insim_core::DecodeErrorKind::UnexpectedEof)
+                    .context("Mso::textstart"),
+            );
+        }
+        // Decode the prefix to translate the wire byte offset into a UTF-8 byte offset.
+        // Decode the full message together so code page switches carry across the boundary.
+        let prefix =
+            codepages::to_lossy_string_with_codepage(&raw[..usize::from(textstart)], codepage);
+        let textstart = u8::try_from(prefix.len()).map_err(|_| {
+            insim_core::DecodeErrorKind::OutOfRange {
+                min: 0,
+                max: usize::from(u8::MAX),
+                found: prefix.len(),
+            }
+            .context("Mso::textstart")
+        })?;
+        let msg_len = raw.len();
+        let msg = ctx.decode_codepage_with_codepage("msg", msg_len, codepage)?;
 
         Ok(Self {
             reqi,
@@ -98,7 +110,8 @@ impl Decode for Mso {
 impl Encode for Mso {
     fn encode(&self, ctx: &mut EncodeContext) -> Result<(), insim_core::EncodeError> {
         ctx.encode("reqi", &self.reqi)?;
-        ctx.pad("pad", 1)?;
+        // Encoding uses Latin as the default, regardless of the received code page.
+        ctx.encode("mso_data", &u8::from(codepages::Codepage::Latin))?;
         ctx.encode("ucid", &self.ucid)?;
         ctx.encode("plid", &self.plid)?;
         ctx.encode("usertype", &self.usertype)?;
@@ -107,8 +120,31 @@ impl Encode for Mso {
             let name = &self.msg[..self.textstart as usize];
             let msg = &self.msg[(self.textstart as usize)..];
 
-            let name = codepages::to_lossy_bytes(name);
+            let mut name = codepages::to_lossy_bytes(name);
             let msg = codepages::to_lossy_bytes(msg);
+
+            // The body is encoded independently with a Latin default. Restore that
+            // state at the boundary if the name switched to another code page.
+            let mut active = codepages::Codepage::Latin;
+            let mut i = 0;
+            while i + 1 < name.len() {
+                if name[i] == b'^' {
+                    if name[i + 1] == b'8' {
+                        active = codepages::Codepage::Latin;
+                    } else if let Ok(cp) = codepages::Codepage::try_from(char::from(name[i + 1])) {
+                        active = cp;
+                    }
+                    i += 2;
+                } else {
+                    i += 1;
+                }
+            }
+            let body_sets_codepage = msg.len() >= 2
+                && msg[0] == b'^'
+                && (msg[1] == b'8' || codepages::Codepage::try_from(char::from(msg[1])).is_ok());
+            if active != codepages::Codepage::Latin && !body_sets_codepage {
+                name.to_mut().extend_from_slice(b"^L");
+            }
 
             if (name.len() + msg.len()) > (MSO_MSG_MAX_LEN - 1) {
                 return Err(insim_core::EncodeErrorKind::OutOfRange {
@@ -154,6 +190,58 @@ mod tests {
     use insim_core::{DecodeContext, EncodeContext};
 
     use super::*;
+
+    #[test]
+    fn unsplit_non_latin_message() {
+        let mut raw = bytes::Bytes::from_static(b"\0\x05\0\0\0\0\xff^8\xff\0");
+        let mso = Mso::decode(&mut DecodeContext::new(&mut raw)).unwrap();
+        assert_eq!(mso.msg, "я^8я");
+        assert_eq!(mso.msg_from_textstart(), "я^8я");
+    }
+
+    #[test]
+    fn non_latin_mso_uses_low_nibble_and_reencodes_as_latin() {
+        let mut raw = bytes::Bytes::from_static(b"\0\xa1\x02\x04\x01\x04\xec : \xe8^L\xff^8\xec\0");
+        let mso = Mso::decode(&mut DecodeContext::new(&mut raw)).unwrap();
+        assert_eq!(mso.msg, "ě : čÿ^8ě");
+        assert_eq!(mso.textstart, 5);
+        assert_eq!(mso.msg_from_textstart(), "čÿ^8ě");
+        let mut encoded = BytesMut::new();
+        mso.encode(&mut EncodeContext::new(&mut encoded)).unwrap();
+        assert_eq!(encoded[1], 0);
+        let decoded = Mso::decode(&mut DecodeContext::new(&mut encoded.freeze())).unwrap();
+        assert_eq!(decoded.msg, mso.msg);
+        assert_eq!(decoded.textstart, mso.textstart);
+    }
+
+    #[test]
+    fn codepage_switch_in_name_carries_into_body() {
+        let mut raw = bytes::Bytes::from_static(b"\0\0\x02\x04\x01\x06^E\xec : \xe8\0");
+        let mso = Mso::decode(&mut DecodeContext::new(&mut raw)).unwrap();
+        assert_eq!(mso.msg, "ě : č");
+        assert_eq!(mso.msg_from_textstart(), "č");
+    }
+
+    #[test]
+    fn independently_encoded_body_restores_latin_after_name() {
+        let mso = Mso {
+            msg: "ě : ÿ".into(),
+            textstart: 5,
+            ..Default::default()
+        };
+        let mut encoded = BytesMut::new();
+        mso.encode(&mut EncodeContext::new(&mut encoded)).unwrap();
+        let decoded = Mso::decode(&mut DecodeContext::new(&mut encoded.freeze())).unwrap();
+        assert_eq!(decoded.msg, mso.msg);
+        assert_eq!(decoded.msg_from_textstart(), "ÿ");
+    }
+
+    #[test]
+    fn unknown_codepage_falls_back_to_latin() {
+        let mut raw = bytes::Bytes::from_static(b"\0\x0f\0\0\0\0\xff\0");
+        let mso = Mso::decode(&mut DecodeContext::new(&mut raw)).unwrap();
+        assert_eq!(mso.msg, "ÿ");
+    }
 
     #[test]
     fn test_mso() {

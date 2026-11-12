@@ -6,15 +6,15 @@ const MAX_UNICODE: u32 = 0x10FFFF;
 // XXX: 8 is left off this by design to prevent double checking LATIN1
 const CODEPAGES: [(char, &Encoding); 10] = [
     ('L', encoding_rs::WINDOWS_1252),
-    ('G', encoding_rs::ISO_8859_7),
+    ('G', encoding_rs::WINDOWS_1253),
     ('C', encoding_rs::WINDOWS_1251),
-    ('E', encoding_rs::ISO_8859_2),
+    ('E', encoding_rs::WINDOWS_1250),
     ('T', encoding_rs::WINDOWS_1254),
-    ('B', encoding_rs::ISO_8859_13),
+    ('B', encoding_rs::WINDOWS_1257),
     ('J', encoding_rs::SHIFT_JIS),
-    ('H', encoding_rs::GBK),
-    ('S', encoding_rs::EUC_KR),
-    ('K', encoding_rs::BIG5),
+    ('H', encoding_rs::BIG5),
+    ('S', encoding_rs::GBK),
+    ('K', encoding_rs::EUC_KR),
 ];
 
 #[derive(Debug, Clone)]

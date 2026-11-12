@@ -125,8 +125,31 @@ impl<'a> EncodeContext<'a> {
         align_to: Option<usize>,
         trailing_nul: bool,
     ) -> Result<(), super::EncodeError> {
+        self.encode_codepage_with_codepage(
+            name,
+            val,
+            len,
+            align_to,
+            trailing_nul,
+            crate::string::codepages::Codepage::Latin,
+        )
+    }
+
+    /// Write a string with an explicit initial/reset code page.
+    /// Length, alignment and termination behave as in [`Self::encode_codepage`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn encode_codepage_with_codepage<T: AsRef<str>>(
+        &mut self,
+        name: &'static str,
+        val: T,
+        len: usize,
+        align_to: Option<usize>,
+        trailing_nul: bool,
+        codepage: crate::string::codepages::Codepage,
+    ) -> Result<(), super::EncodeError> {
         self.op(name, true, |writer| {
-            let new = crate::string::codepages::to_lossy_bytes(val.as_ref());
+            let new =
+                crate::string::codepages::to_lossy_bytes_with_codepage(val.as_ref(), codepage);
             let max_len = if trailing_nul { len - 1 } else { len };
             if new.len() > max_len {
                 return Err(super::EncodeErrorKind::OutOfRange {
