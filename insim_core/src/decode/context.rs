@@ -108,14 +108,23 @@ impl<'a> DecodeContext<'a> {
         name: &'static str,
         len: usize,
     ) -> Result<String, super::DecodeError> {
+        self.decode_codepage_with_codepage(name, len, crate::string::codepages::Codepage::Latin)
+    }
+
+    /// Decode a string with an explicit initial/reset code page.
+    pub fn decode_codepage_with_codepage(
+        &mut self,
+        name: &'static str,
+        len: usize,
+        codepage: crate::string::codepages::Codepage,
+    ) -> Result<String, super::DecodeError> {
         self.op(name, true, |reader| {
             let chunk = reader.buf.split_to(reader.buf.remaining().min(len));
-            Ok(
-                crate::string::codepages::to_lossy_string(crate::string::strip_trailing_nul(
-                    &chunk,
-                ))
-                .to_string(),
+            Ok(crate::string::codepages::to_lossy_string_with_codepage(
+                crate::string::strip_trailing_nul(&chunk),
+                codepage,
             )
+            .to_string())
         })
     }
 

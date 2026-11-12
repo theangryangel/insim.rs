@@ -120,18 +120,18 @@ impl From<Codepage> for u8 {
 
 impl Codepage {
     fn encoding(self) -> &'static encoding_rs::Encoding {
-        // Preserve the existing encoding_rs substitutes for LFS code pages.
+        // Windows code page equivalents used by LFS.
         match self {
             Self::Latin => encoding_rs::WINDOWS_1252,
-            Self::European => encoding_rs::ISO_8859_2,
+            Self::European => encoding_rs::WINDOWS_1250,
             Self::Turkish => encoding_rs::WINDOWS_1254,
-            Self::Baltic => encoding_rs::ISO_8859_13,
+            Self::Baltic => encoding_rs::WINDOWS_1257,
             Self::Japanese => encoding_rs::SHIFT_JIS,
             Self::Cyrillic => encoding_rs::WINDOWS_1251,
-            Self::Greek => encoding_rs::ISO_8859_7,
-            Self::TraditionalChinese => encoding_rs::GBK,
-            Self::SimplifiedChinese => encoding_rs::EUC_KR,
-            Self::Korean => encoding_rs::BIG5,
+            Self::Greek => encoding_rs::WINDOWS_1253,
+            Self::TraditionalChinese => encoding_rs::BIG5,
+            Self::SimplifiedChinese => encoding_rs::GBK,
+            Self::Korean => encoding_rs::EUC_KR,
         }
     }
 }
@@ -142,6 +142,49 @@ const DEFAULT_CODEPAGE: Codepage = Codepage::Latin;
 /// Assumes you will escape any characters ahead of time, it will do not this for you.
 /// See <https://github.com/theangryangel/insim.rs/issues/92> for further details.
 pub fn to_lossy_bytes(input: &'_ str) -> Cow<'_, [u8]> {
+    to_lossy_bytes_with_codepage(input, DEFAULT_CODEPAGE)
+}
+
+/// Encode text using `codepage` as the initial encoding and the target of `^8` resets.
+/// Explicit code page markers are preserved and change the active encoding.
+pub fn to_lossy_bytes_with_codepage(input: &str, codepage: Codepage) -> Cow<'_, [u8]> {
+    if input.is_ascii() {
+        return input.as_bytes().into();
+    }
+    let mut output = Vec::with_capacity(input.len());
+    let mut active = codepage;
+    let mut start = 0;
+    let mut i = 0;
+    let bytes = input.as_bytes();
+    while i + 1 < bytes.len() {
+        if bytes[i] != b'^' {
+            i += 1;
+            continue;
+        }
+        if bytes[i + 1] == b'^' {
+            i += 2;
+            continue;
+        }
+        let next = if bytes[i + 1] == b'8' {
+            Some(codepage)
+        } else {
+            Codepage::try_from(char::from(bytes[i + 1])).ok()
+        };
+        if let Some(next) = next {
+            output.extend_from_slice(&encode_segment(&input[start..i], active));
+            output.extend_from_slice(&bytes[i..i + 2]);
+            active = next;
+            i += 2;
+            start = i;
+        } else {
+            i += 1;
+        }
+    }
+    output.extend_from_slice(&encode_segment(&input[start..], active));
+    output.into()
+}
+
+fn encode_segment(input: &str, codepage: Codepage) -> Cow<'_, [u8]> {
     if input.is_ascii() {
         // all codepages share ascii values
         // therefore if it's all ascii, we can just dump it.
@@ -149,8 +192,8 @@ pub fn to_lossy_bytes(input: &'_ str) -> Cow<'_, [u8]> {
     }
 
     let mut output = Vec::with_capacity(input.len());
-    let mut current_control = char::from(DEFAULT_CODEPAGE);
-    let mut current_encoding = DEFAULT_CODEPAGE.encoding();
+    let mut current_control = char::from(codepage);
+    let mut current_encoding = codepage.encoding();
     let mut encoder = current_encoding.new_encoder();
 
     let mut src_offset = 0;
@@ -221,12 +264,18 @@ pub fn to_lossy_bytes(input: &'_ str) -> Cow<'_, [u8]> {
 ///
 /// This decodes codepage markers only. It does not unescape LFS escape sequences.
 pub fn to_lossy_string(input: &'_ [u8]) -> Cow<'_, str> {
+    to_lossy_string_with_codepage(input, DEFAULT_CODEPAGE)
+}
+
+/// Decode text using `codepage` for unmarked text and `^8` resets.
+/// Explicit code page markers override it; `^8` is preserved for its colour meaning.
+pub fn to_lossy_string_with_codepage(input: &[u8], codepage: Codepage) -> Cow<'_, str> {
     // empty string
     if input.is_empty() {
         return "".into();
     }
 
-    let default_lfs_codepage = DEFAULT_CODEPAGE.encoding();
+    let default_lfs_codepage = codepage.encoding();
 
     // fastest possible path - we have no *potential* control characters at all
     if !input.iter().any(|b| b.is_lfs_control_char()) {
@@ -301,7 +350,7 @@ pub fn to_lossy_string(input: &'_ [u8]) -> Cow<'_, str> {
         }
 
         let codepage = if range[1] == b'8' {
-            Some(DEFAULT_CODEPAGE)
+            Some(codepage)
         } else {
             Codepage::try_from(char::from(range[1])).ok()
         };
@@ -338,6 +387,78 @@ pub fn to_lossy_string(input: &'_ [u8]) -> Cow<'_, str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn windows_codepage_byte_mappings() {
+        // Fixed wire bytes distinguish the Windows encodings from the former ISO
+        // substitutes and the three formerly transposed Asian encodings.
+        let cases: [(Codepage, &str, &[u8]); 10] = [
+            (Codepage::Latin, "é", b"\xe9"),
+            (Codepage::European, "š", b"\x9a"),
+            (Codepage::Turkish, "ı", b"\xfd"),
+            (Codepage::Baltic, "Ą", b"\xc0"),
+            (Codepage::Japanese, "あ", b"\x82\xa0"),
+            (Codepage::Cyrillic, "я", b"\xff"),
+            (Codepage::Greek, "€", b"\x80"),
+            (Codepage::TraditionalChinese, "中", b"\xa4\xa4"),
+            (Codepage::SimplifiedChinese, "中", b"\xd6\xd0"),
+            (Codepage::Korean, "한", b"\xc7\xd1"),
+        ];
+        for (codepage, text, wire) in cases {
+            assert_eq!(to_lossy_bytes_with_codepage(text, codepage).as_ref(), wire);
+            assert_eq!(to_lossy_string_with_codepage(wire, codepage), text);
+            let marked = [vec![b'^', char::from(codepage) as u8], wire.to_vec()].concat();
+            assert_eq!(to_lossy_string(&marked), text);
+        }
+    }
+
+    #[test]
+    fn context_helpers_use_configured_codepage_and_preserve_padding() {
+        let mut buf = bytes::BytesMut::new();
+        crate::EncodeContext::new(&mut buf)
+            .encode_codepage_with_codepage("msg", "ě^8č", 12, Some(4), true, Codepage::European)
+            .unwrap();
+        assert_eq!(buf.as_ref(), b"\xec^8\xe8\0\0\0\0");
+        let mut buf = buf.freeze();
+        let decoded = crate::DecodeContext::new(&mut buf)
+            .decode_codepage_with_codepage("msg", 12, Codepage::European)
+            .unwrap();
+        assert_eq!(decoded, "ě^8č");
+        assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn configurable_default_and_reset() {
+        assert_eq!(
+            to_lossy_string_with_codepage(b"\xec^L\xff^8\xe8", Codepage::European),
+            "ěÿ^8č"
+        );
+        assert_eq!(
+            to_lossy_string_with_codepage(b"^1\xec", Codepage::European),
+            "^1ě"
+        );
+        assert_eq!(
+            to_lossy_bytes_with_codepage("ěč", Codepage::European).as_ref(),
+            b"\xec\xe8"
+        );
+    }
+
+    #[test]
+    fn encoder_tracks_explicit_markers_and_resets() {
+        for default in [Codepage::Latin, Codepage::European, Codepage::Cyrillic] {
+            for text in ["ě^8ÿ", "^Cя^8ě", "^^Cě^8ÿ", "ě^Lÿ", "ě^8č"] {
+                let bytes = to_lossy_bytes_with_codepage(text, default);
+                let expected = text.replace("^C", "").replace("^L", "");
+                // Escaped markers remain literal.
+                let expected = if text.starts_with("^^") {
+                    text.to_string()
+                } else {
+                    expected
+                };
+                assert_eq!(to_lossy_string_with_codepage(&bytes, default), expected);
+            }
+        }
+    }
 
     #[test]
     fn codepage_conversions() {
