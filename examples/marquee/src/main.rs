@@ -1,3 +1,5 @@
+//! Demonstrate animated marquee effects using layout objects.
+
 use std::{
     net::SocketAddr,
     time::{Duration, Instant},
@@ -201,7 +203,7 @@ fn position_tyrestack_circle(
         .collect()
 }
 
-pub fn generate_checkpoint_signal(location: DVec3, heading: ObjectHeading) -> Vec<ObjectInfo> {
+fn generate_checkpoint_signal(location: DVec3, heading: ObjectHeading) -> Vec<ObjectInfo> {
     use std::f64::consts::FRAC_PI_2;
 
     // Structure: (Local Position, The Object with Local Rotation)
@@ -396,7 +398,7 @@ fn setup_tracing_subscriber() {
 }
 
 #[tokio::main]
-pub async fn main() -> Result<()> {
+async fn main() -> Result<()> {
     setup_tracing_subscriber();
 
     let args = Cli::parse();
@@ -462,7 +464,7 @@ pub async fn main() -> Result<()> {
                         break;
                     },
                     res = connection.read() => {
-                        res?;
+                        let _ = res?;
                     },
                 }
             }
@@ -477,7 +479,7 @@ pub async fn main() -> Result<()> {
                         break;
                     },
                     res = connection.read() => {
-                        res?;
+                        let _ = res?;
                     },
                     _ = interval.tick() => {
                         if !last_objects.is_empty() {

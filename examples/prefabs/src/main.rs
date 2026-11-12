@@ -308,7 +308,7 @@ async fn spawn_at_selection(
         selection_before: state.selection.clone(),
     });
     if state.undo_stack.len() > 20 {
-        state.undo_stack.remove(0);
+        let _ = state.undo_stack.remove(0);
     }
 
     if !state.selection.is_empty() {
@@ -353,7 +353,7 @@ async fn spawn_at_selection(
 }
 
 #[tokio::main]
-pub async fn main() -> anyhow::Result<()> {
+async fn main() -> anyhow::Result<()> {
     setup_tracing_subscriber();
 
     let cli = Cli::parse();

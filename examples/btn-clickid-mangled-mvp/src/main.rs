@@ -1,3 +1,5 @@
+//! Demonstrate button click identifier handling.
+
 use insim::{
     Packet,
     identifiers::{ClickId, ConnectionId, RequestId},

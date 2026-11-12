@@ -14,13 +14,13 @@ use insim::{
 use tracing_subscriber::fmt::format::FmtSpan;
 
 #[derive(Clone, Debug)]
-pub struct RefPoint {
-    pub position: Vec3,
-    pub time: Instant,
+struct RefPoint {
+    position: Vec3,
+    time: Instant,
 }
 
 #[derive(Debug)]
-pub struct DeltaTracker {
+struct DeltaTracker {
     reference_lap: Option<Vec<RefPoint>>,
     current_lap: Vec<RefPoint>,
 }
@@ -32,19 +32,19 @@ impl Default for DeltaTracker {
 }
 
 impl DeltaTracker {
-    pub fn clear(&mut self) {
+    fn clear(&mut self) {
         self.reference_lap = None;
         self.current_lap.clear();
     }
 
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             reference_lap: None,
             current_lap: Vec::new(),
         }
     }
 
-    pub fn record(&mut self, pos: Vec3, time: Instant) {
+    fn record(&mut self, pos: Vec3, time: Instant) {
         self.current_lap.push(RefPoint {
             position: pos,
             time,
@@ -52,13 +52,13 @@ impl DeltaTracker {
     }
 
     /// We just did a lap
-    pub fn lap(&mut self) {
+    fn lap(&mut self) {
         self.reference_lap = Some(self.current_lap.clone());
         self.current_lap.clear();
     }
 
     /// Delta in seconds
-    pub fn delta(&self, current_pos: Vec3) -> Option<f32> {
+    fn delta(&self, current_pos: Vec3) -> Option<f32> {
         let reference_lap = self.reference_lap.as_ref()?;
         let lap_start = self.current_lap.first()?;
 
@@ -140,7 +140,7 @@ struct Cli {
     addr: SocketAddr,
 }
 
-pub fn main() -> Result<()> {
+fn main() -> Result<()> {
     // Setup tracing_subcriber with some sane defaults
     tracing_subscriber::fmt::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())

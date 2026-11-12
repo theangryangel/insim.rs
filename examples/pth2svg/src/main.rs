@@ -1,3 +1,5 @@
+//! Render an LFS path file as SVG.
+
 use std::path;
 
 use anyhow::{Context, Result};

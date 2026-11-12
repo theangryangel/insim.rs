@@ -49,7 +49,7 @@ fn setup_tracing_subscriber() {
         .init();
 }
 
-pub fn main() -> insim::Result<()> {
+fn main() -> insim::Result<()> {
     // Setup tracing_subcriber with some sane defaults
     setup_tracing_subscriber();
 

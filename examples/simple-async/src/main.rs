@@ -50,7 +50,7 @@ fn setup_tracing_subscriber() {
 }
 
 #[tokio::main]
-pub async fn main() -> insim::Result<()> {
+async fn main() -> insim::Result<()> {
     // Setup tracing_subcriber with some sane defaults
     setup_tracing_subscriber();
 

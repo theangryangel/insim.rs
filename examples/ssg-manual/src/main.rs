@@ -34,7 +34,7 @@ fn setup_tracing_subscriber() {
 }
 
 #[tokio::main]
-pub async fn main() -> anyhow::Result<()> {
+async fn main() -> anyhow::Result<()> {
     // Setup tracing_subcriber with some sane defaults
     setup_tracing_subscriber();
 

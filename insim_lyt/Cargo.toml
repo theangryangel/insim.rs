@@ -6,7 +6,6 @@ edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 license.workspace = true
-homepage.workspace = true
 publish = false  # XXX: remove when we're comfortable releasing
 
 [dependencies]
