@@ -47,13 +47,12 @@ bitflags! {
         const PSE_REFUEL = (1 << 16);
     }
 }
-impl_bitflags_json_schema!(PitStopWorkFlags, "PitStopWorkFlag");
+impl_bitflags_serde!(PitStopWorkFlags);
 
 impl_bitflags_from_to_bytes!(PitStopWorkFlags, u32);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Pit stop at the garage (not a teleport).
 ///
 /// - Reports work done and tyres used.
@@ -90,7 +89,6 @@ pub struct Pit {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Pit stop finished event.
 pub struct Psf {
     /// Request identifier echoed by replies.
@@ -102,13 +100,11 @@ pub struct Psf {
     #[insim(duration= u32, pad_after = 4)]
     /// Total stop time in milliseconds.
     #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
-    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub stime: Duration,
 }
 
 #[derive(Debug, Default, PartialEq, Eq, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Pit lane event type used by [Pla].
@@ -145,7 +141,6 @@ impl fmt::Display for PitLaneFact {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Pit lane enter/exit event.
 pub struct Pla {
     /// Request identifier echoed by replies.

@@ -16,14 +16,13 @@ bitflags::bitflags! {
         const ALWAYSON = (1 << 7);
     }
 }
-impl_bitflags_json_schema!(BtnInst, "BtnInstFlag");
+impl_bitflags_serde!(BtnInst);
 
 impl_bitflags_from_to_bytes!(BtnInst, u8);
 
 /// Colour
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum BtnStyleColour {
     /// NotEditable, defaults to light grey
     #[default]
@@ -64,11 +63,10 @@ bitflags::bitflags! {
         const RIGHT = (1 << 7);
     }
 }
-impl_bitflags_json_schema!(BtnStyleFlags, "BtnStyleFlag");
+impl_bitflags_serde!(BtnStyleFlags);
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Button style configuration (colour + flags).
 pub struct BtnStyle {
     /// Colour selection.
@@ -240,13 +238,12 @@ bitflags::bitflags! {
         const SHIFT = (1 << 3);
     }
 }
-impl_bitflags_json_schema!(BtnClickFlags, "BtnClickFlag");
+impl_bitflags_serde!(BtnClickFlags);
 
 impl_bitflags_from_to_bytes!(BtnClickFlags, u8);
 
 #[derive(Debug, Default, Clone, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Action type for [Bfn].
@@ -267,7 +264,6 @@ pub enum BfnType {
 
 #[derive(Debug, Clone, Default, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Button management command or notification.
 ///
 /// - Deletes or clears buttons, or reports user button actions.
@@ -295,7 +291,6 @@ impl_typical_with_request_id!(Bfn);
 
 #[derive(Debug, Clone, PartialEq, Default, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Create or update a button.
 ///
 /// - Buttons can include optional captions and input fields.
@@ -491,7 +486,6 @@ impl_typical_with_request_id!(Btn);
 
 #[derive(Debug, Clone, Default, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Sent when a user clicks a button.
 ///
 /// - Reports the button id and click modifiers.
@@ -513,7 +507,6 @@ pub struct Btc {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Sent when a user types into a text entry button.
 ///
 /// - Includes the input text and the original `typein` limit.

@@ -1,4 +1,4 @@
-//! Serde/schemars helpers for representing `std::time::Duration` as
+//! Serde helpers for representing `std::time::Duration` as
 //! milliseconds.
 //!
 //! Use with `#[cfg_attr(feature = "serde", serde(with = "insim::duration_serde"))]`

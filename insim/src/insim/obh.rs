@@ -23,7 +23,7 @@ bitflags! {
         const ON_SPOT = (1 << 3);
     }
 }
-impl_bitflags_json_schema!(ObhFlags, "ObhFlag");
+impl_bitflags_serde!(ObhFlags);
 
 generate_bitflag_helpers! {
     ObhFlags,
@@ -38,7 +38,6 @@ impl_bitflags_from_to_bytes!(ObhFlags, u8);
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Contact details used by collision reports.
 pub struct CarContact {
     /// Direction of motion.
@@ -95,7 +94,6 @@ impl Encode for CarContact {
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Object hit report.
 ///
 /// - Sent when object hit reporting is enabled in [IsiFlags](crate::insim::IsiFlags).
@@ -111,7 +109,6 @@ pub struct Obh {
 
     /// Time since session start, in milliseconds (wraps periodically).
     #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
-    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub time: Duration,
 
     /// Contact details.

@@ -21,7 +21,6 @@ If you're not sure where to start, you probably want to look at the [examples](h
 | `outsim`       | Implements "sans-io" Outsim protocol implementation.                             |
 | `insim_extra`  | Unreleased and unstable series of micro libraries.                               |
 | `kitcar`       | Unreleased and unstable combined Axum and Bevy inspired handler runtime.         |
-| `insim_o3`     | Unreleased insim.rs bindings for python.                                         |
 
 `insim_smx` has been dropped due to the deprecation of this file format and SMX not
 being available for all tracks.

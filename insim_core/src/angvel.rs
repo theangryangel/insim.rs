@@ -23,7 +23,6 @@ use crate::{Decode, Encode};
 /// accessors. Decoding then encoding reproduces the original `i16` exactly.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AngVelI16(i16);
 
 impl AngVelI16 {

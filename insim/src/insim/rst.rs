@@ -36,7 +36,7 @@ bitflags! {
         const NO_FLOOD = (1 << 15);
     }
 }
-impl_bitflags_json_schema!(RaceFlags, "RaceFlag");
+impl_bitflags_serde!(RaceFlags);
 
 generate_bitflag_helpers!(
     RaceFlags,
@@ -58,7 +58,6 @@ impl_bitflags_from_to_bytes!(RaceFlags, u16);
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Lap timing configuration for the current session.
 pub enum LapTimingInfo {
     /// Standard lap timing with a given number of checkpoints.
@@ -105,7 +104,6 @@ impl Encode for LapTimingInfo {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Race start information and session configuration.
 ///
 /// - Sent when a race or qualifying session begins.

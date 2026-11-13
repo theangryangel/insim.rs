@@ -7,7 +7,6 @@ use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Confirmed race or qualifying result.
 ///
 /// - Includes player identity, car, and timing details.
@@ -36,13 +35,11 @@ pub struct Res {
     #[insim(duration = u32)]
     /// Total time in milliseconds.
     #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
-    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub ttime: Duration,
 
     #[insim(duration = u32, pad_after = 1)]
     /// Best lap time in milliseconds.
     #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
-    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub btime: Duration,
 
     /// Number of pit stops.

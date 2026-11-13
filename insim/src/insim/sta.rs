@@ -8,7 +8,6 @@ use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Game racing state
@@ -88,7 +87,7 @@ bitflags! {
         const TEXT_ENTRY = (1 << 15);
     }
 }
-impl_bitflags_json_schema!(StaFlags, "StaFlag");
+impl_bitflags_serde!(StaFlags);
 
 generate_bitflag_helpers! {
     StaFlags,
@@ -108,7 +107,6 @@ impl_bitflags_from_to_bytes!(StaFlags, u16);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Game state snapshot.
 ///
 /// - Sent when state changes.

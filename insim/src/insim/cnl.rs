@@ -4,7 +4,6 @@ use crate::identifiers::{ConnectionId, RequestId};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Used within [Cnl] to indicate the leave reason.
@@ -61,7 +60,6 @@ impl fmt::Display for CnlReason {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Connection left notification.
 ///
 /// - Reports the reason and current connection count.

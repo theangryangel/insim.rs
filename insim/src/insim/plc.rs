@@ -8,13 +8,8 @@ use crate::{
 
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Set of allowed standard vehicles for [Plc].
 pub struct PlcAllowedCarsSet {
-    #[cfg_attr(
-        feature = "schemars",
-        schemars(with = "Vec<insim_core::vehicle::Vehicle>")
-    )]
     inner: IndexSet<Vehicle>,
 }
 
@@ -219,7 +214,6 @@ impl<'a> IntoIterator for &'a PlcAllowedCarsSet {
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Restrict which standard vehicles a connection may select.
 ///
 /// - Applies to standard (non-mod) vehicles only.

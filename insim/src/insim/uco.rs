@@ -5,7 +5,6 @@ use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Action reported by [Uco].
@@ -26,7 +25,6 @@ pub enum UcoAction {
 
 #[derive(Debug, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// User control object event.
 ///
 /// - Reports crossing a checkpoint or entering/leaving a circle.
@@ -45,7 +43,6 @@ pub struct Uco {
     /// Time since session start, in milliseconds (wraps periodically).
     #[insim(duration = u32)]
     #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
-    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub time: Duration,
 
     /// Contact details, if relevant.

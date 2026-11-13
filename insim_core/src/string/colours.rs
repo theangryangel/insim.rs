@@ -10,7 +10,6 @@ use super::control::ControlMarker;
 /// [`Self::Default`]. This describes display state, not the original control.
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 pub enum ColourCode {
     /// Black.

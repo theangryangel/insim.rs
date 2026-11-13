@@ -62,25 +62,6 @@ impl<'de> serde::Deserialize<'de> for DashLights {
     }
 }
 
-#[cfg(feature = "schemars")]
-impl schemars::JsonSchema for DashLights {
-    fn schema_name() -> ::std::borrow::Cow<'static, str> {
-        "DashLights".into()
-    }
-
-    fn json_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        let names: Vec<String> = <DashLights as ::bitflags::Flags>::FLAGS
-            .iter()
-            .map(|f: &::bitflags::Flag<DashLights>| f.name().to_owned())
-            .collect();
-        schemars::json_schema!({
-            "type": "array",
-            "items": { "type": "string", "enum": names },
-            "uniqueItems": true
-        })
-    }
-}
-
 impl crate::Encode for DashLights {
     fn encode(&self, ctx: &mut crate::EncodeContext) -> Result<(), crate::EncodeError> {
         ctx.encode("bits", &self.bits())

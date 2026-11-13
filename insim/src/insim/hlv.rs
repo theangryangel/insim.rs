@@ -5,7 +5,6 @@ use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Hot lap validity failure reason.
@@ -26,7 +25,6 @@ pub enum Hlvc {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Hot lap validity violation report.
 ///
 /// - Sent when HLVC is enabled in [IsiFlags](crate::insim::IsiFlags).
@@ -44,7 +42,6 @@ pub struct Hlv {
     #[insim(duration = u32)]
     /// Time since session start, in milliseconds (wraps periodically).
     #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
-    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub time: Duration,
 
     /// Contact details, if relevant.

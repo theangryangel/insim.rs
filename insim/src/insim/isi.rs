@@ -43,7 +43,7 @@ bitflags! {
         const SET = (1 << 12);
     }
 }
-impl_bitflags_json_schema!(IsiFlags, "IsiFlag");
+impl_bitflags_serde!(IsiFlags);
 
 impl IsiFlags {
     /// Clear all flags
@@ -65,7 +65,6 @@ impl_bitflags_from_to_bytes!(IsiFlags, u16);
 
 #[derive(Debug, Clone, Eq, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// InSim init/handshake packet sent to start communication.
 ///
 /// - Sends initial connection options (which updates you want and how often).
@@ -97,7 +96,6 @@ pub struct Isi {
     /// Interval between [Nlp](super::Nlp) or [Mci](super::Mci) updates, in milliseconds (0 = disabled).
     #[insim(duration = u16)]
     #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
-    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub interval: Duration,
 
     /// Admin password (empty if none).

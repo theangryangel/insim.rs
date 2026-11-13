@@ -9,7 +9,6 @@ const IPB_MAX_BANS: usize = 120;
 
 #[derive(Debug, Clone, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// IP ban list (host only).
 ///
 /// - Used to set or retrieve banned IP addresses.
@@ -17,7 +16,6 @@ pub struct Ipb {
     /// Request identifier echoed by replies.
     pub reqi: RequestId,
 
-    #[cfg_attr(feature = "schemars", schemars(with = "Vec<std::net::Ipv4Addr>"))]
     banips: IndexSet<Ipv4Addr>,
 }
 

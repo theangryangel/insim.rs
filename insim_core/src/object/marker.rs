@@ -7,7 +7,6 @@ use crate::{
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -64,7 +63,6 @@ impl TryFrom<u8> for MarkerCornerKind {
 /// Corner Marker
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct MarkerCorner {
     /// Position
     pub xyz: ObjectCoordinate,
@@ -122,7 +120,6 @@ impl ObjectInfoInner for MarkerCorner {
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -163,7 +160,6 @@ impl TryFrom<u8> for MarkerDistanceKind {
 /// Distance Marker
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct MarkerDistance {
     /// Position
     pub xyz: ObjectCoordinate,

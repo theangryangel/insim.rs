@@ -13,7 +13,6 @@ use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Per-car contact details used in [Con].
 pub struct ConInfo {
     /// Player identifier.
@@ -189,7 +188,6 @@ impl Encode for ConInfo {
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Vehicle-to-vehicle contact report.
 ///
 /// - Sent when collision reporting is enabled in [IsiFlags](crate::insim::IsiFlags).
@@ -202,7 +200,6 @@ pub struct Con {
 
     /// Time since session start, in milliseconds (wraps periodically).
     #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
-    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub time: Duration,
 
     /// Contact information for vehicle A.
