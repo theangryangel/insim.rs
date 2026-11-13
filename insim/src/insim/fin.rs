@@ -23,7 +23,7 @@ bitflags::bitflags! {
         const DID_NOT_PIT = (1 << 6);
     }
 }
-impl_bitflags_json_schema!(RaceConfirmFlags, "RaceConfirmFlag");
+impl_bitflags_serde!(RaceConfirmFlags);
 
 impl_bitflags_from_to_bytes!(RaceConfirmFlags, u8);
 
@@ -67,7 +67,6 @@ impl RaceConfirmFlags {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Provisional finish notification.
 ///
 /// - Not a final result; use [Res](super::Res) for confirmed results.
@@ -81,13 +80,11 @@ pub struct Fin {
     #[insim(duration = u32)]
     /// Total race time in milliseconds.
     #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
-    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub ttime: Duration,
 
     #[insim(duration = u32, pad_after = 1)]
     /// Best lap time in milliseconds.
     #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
-    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub btime: Duration,
 
     /// Number of pit stops.

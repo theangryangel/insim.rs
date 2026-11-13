@@ -48,10 +48,10 @@ workflow that ensures that the proposed changes meet the minimal quality.
 - We use [prek](https://prek.j178.dev) (a fast, Rust-based reimplementation of
   pre-commit) to help run all of our linting. Before you raise a Pull Request,
   ensure that you've installed prek and run it. This will execute rustfmt,
-  clippy, ruff, etc.
+  clippy, prettier, etc.
   ```bash
   # See https://prek.j178.dev for other installation methods.
-  uv tool install prek
+  cargo install prek --locked
   prek run --all-files
   ```
   Our hooks are configured entirely in `prek.toml`; there is no

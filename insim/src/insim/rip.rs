@@ -4,7 +4,6 @@ use crate::identifiers::RequestId;
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Replay control result.
@@ -61,7 +60,7 @@ bitflags::bitflags! {
         const FULL_PHYS = (1 << 2);
     }
 }
-impl_bitflags_json_schema!(RipOptions, "RipOption");
+impl_bitflags_serde!(RipOptions);
 
 generate_bitflag_helpers! {
     RipOptions,
@@ -75,7 +74,6 @@ impl_bitflags_from_to_bytes!(RipOptions, u8);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Replay control and status packet.
 ///
 /// - Used to request replay actions and receive replay status.
@@ -100,13 +98,11 @@ pub struct Rip {
     /// Requested destination time (request) or current position (reply), in milliseconds.
     #[insim(duration = u32)]
     #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
-    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub ctime: Duration,
 
     /// Replay length (reply) or zero when requesting, in milliseconds.
     #[insim(duration = u32)]
     #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
-    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub ttime: Duration,
 
     /// Replay name. `None` in a request means use the current replay; `None` in a reply means no

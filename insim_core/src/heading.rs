@@ -30,7 +30,6 @@ macro_rules! define_heading {
         /// Decoding then encoding reproduces the original value exactly.
         #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
         #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-        #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
         pub struct $name($inner);
 
         impl $name {

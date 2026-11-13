@@ -8,7 +8,6 @@ use crate::{
 /// Speed hump 10m
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct SpeedHump {
     /// Position
     pub xyz: ObjectCoordinate,

@@ -19,12 +19,11 @@ bitflags::bitflags! {
         const ASYMMETRICAL = (1 << 0);
     }
 }
-impl_bitflags_json_schema!(SetupFlags, "SetupFlag");
+impl_bitflags_serde!(SetupFlags);
 impl_bitflags_from_to_bytes!(SetupFlags, u8);
 
 #[derive(Debug, Default, Clone, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Tyre brand.
@@ -44,7 +43,6 @@ pub enum TyreBrand {
 
 #[derive(Debug, Default, Clone, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Centre differential type.
@@ -58,7 +56,6 @@ pub enum CentreDiffType {
 
 #[derive(Debug, Default, Clone, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Differential type.
@@ -76,7 +73,6 @@ pub enum DiffType {
 
 #[derive(Debug, Default, Clone, PartialEq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Vehicle setup.
 ///
 /// Wire format matches the SET file minus the first 12 header bytes, with one
@@ -317,7 +313,6 @@ impl VehicleSetup {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Player sent setup to host
 ///
 /// - Sent when SET is enabled in [IsiFlags](crate::insim::IsiFlags).

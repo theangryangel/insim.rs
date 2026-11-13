@@ -5,7 +5,6 @@ use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Split timing for a player.
 ///
 /// - Sent when a player crosses a split.
@@ -19,13 +18,11 @@ pub struct Spx {
     #[insim(duration = u32)]
     /// Split time in milliseconds.
     #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
-    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub stime: Duration,
 
     #[insim(duration = u32)]
     /// Total elapsed time since session start, in milliseconds.
     #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
-    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub etime: Duration,
 
     /// Split index (1-3).

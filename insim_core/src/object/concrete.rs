@@ -9,7 +9,6 @@ use crate::{
 /// Represents Width and Length (2m, 4m, 8m, 16m)
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -40,7 +39,6 @@ impl TryFrom<u8> for ConcreteWidthLength {
 /// Represents Size X/Y (0.25x to 1.0x)
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -72,7 +70,6 @@ impl TryFrom<u8> for Size {
 /// Represents Colour options
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -105,7 +102,6 @@ impl TryFrom<u8> for ConcreteColour {
 /// Using specific enum variants allows IDE autocomplete to guide the user.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -161,7 +157,6 @@ impl TryFrom<u8> for ConcreteHeight {
 /// Represents Pitch from 0 to 90 degrees in 6-degree steps.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -218,7 +213,6 @@ impl TryFrom<u8> for ConcretePitch {
 /// Naming simplifies the fractional decimals for readability.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -274,7 +268,6 @@ impl TryFrom<u8> for ConcreteAngle {
 /// Concrete Slab
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct ConcreteSlab {
     /// Position
     pub xyz: ObjectCoordinate,
@@ -329,7 +322,6 @@ impl ObjectInfoInner for ConcreteSlab {
 /// Concrete Ramp
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct ConcreteRamp {
     /// Position
     pub xyz: ObjectCoordinate,
@@ -384,7 +376,6 @@ impl ObjectInfoInner for ConcreteRamp {
 /// Concrete Wall
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct ConcreteWall {
     /// Position
     pub xyz: ObjectCoordinate,
@@ -439,7 +430,6 @@ impl ObjectInfoInner for ConcreteWall {
 /// Concrete Pillar
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct ConcretePillar {
     /// Position
     pub xyz: ObjectCoordinate,
@@ -494,7 +484,6 @@ impl ObjectInfoInner for ConcretePillar {
 /// Concrete Slab Wall
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct ConcreteSlabWall {
     /// Position
     pub xyz: ObjectCoordinate,
@@ -549,7 +538,6 @@ impl ObjectInfoInner for ConcreteSlabWall {
 /// Concrete Ramp Wall
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct ConcreteRampWall {
     /// Position
     pub xyz: ObjectCoordinate,
@@ -604,7 +592,6 @@ impl ObjectInfoInner for ConcreteRampWall {
 /// Concrete Short Slab Wall
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct ConcreteShortSlabWall {
     /// Position
     pub xyz: ObjectCoordinate,
@@ -659,7 +646,6 @@ impl ObjectInfoInner for ConcreteShortSlabWall {
 /// Concrete Wedge
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct ConcreteWedge {
     /// Position
     pub xyz: ObjectCoordinate,

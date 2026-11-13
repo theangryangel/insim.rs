@@ -73,7 +73,7 @@ bitflags! {
         const SIREN_SLOW = Self::SET_SIREN.bits() | (2 << 20);
     }
 }
-impl_bitflags_json_schema!(LcsFlags, "LcsFlag");
+impl_bitflags_serde!(LcsFlags);
 
 bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
@@ -126,11 +126,10 @@ bitflags! {
         const EXTRA = Self::SET_EXTRA.bits() | (1 << 2);
     }
 }
-impl_bitflags_json_schema!(LclFlags, "LclFlag");
+impl_bitflags_serde!(LclFlags);
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 /// Subtype for the [Small] packet.
 pub enum SmallType {
@@ -139,18 +138,10 @@ pub enum SmallType {
     None,
 
     /// Request node and lap updates at the specified interval, in milliseconds.
-    Ssp(
-        #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
-        #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
-        Duration,
-    ),
+    Ssp(#[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))] Duration),
 
     /// Request outgauge-style updates at the specified interval, in milliseconds.
-    Ssg(
-        #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
-        #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
-        Duration,
-    ),
+    Ssg(#[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))] Duration),
 
     /// Vote action notification or request.
     Vta(VtnAction),
@@ -159,25 +150,13 @@ pub enum SmallType {
     Tms(bool),
 
     /// Time step duration in milliseconds.
-    Stp(
-        #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
-        #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
-        Duration,
-    ),
+    Stp(#[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))] Duration),
 
     /// Race time reply, in milliseconds. Sent in response to [`TinyType::Gtm`](crate::insim::TinyType::Gtm).
-    Rtp(
-        #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
-        #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
-        Duration,
-    ),
+    Rtp(#[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))] Duration),
 
     /// Set the node/lap interval used for [Nlp](super::Nlp), in milliseconds.
-    Nli(
-        #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
-        #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
-        Duration,
-    ),
+    Nli(#[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))] Duration),
 
     /// Set or reply with allowed cars.
     Alc(PlcAllowedCarsSet),
@@ -329,7 +308,6 @@ impl Encode for SmallType {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// General purpose packet carrying a subtype and an integer value.
 ///
 /// - Used for requests, replies, and small control messages.

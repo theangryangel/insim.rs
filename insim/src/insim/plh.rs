@@ -13,13 +13,12 @@ bitflags::bitflags! {
          const SILENT = (1 << 7);
     }
 }
-impl_bitflags_json_schema!(PlayerHandicapFlags, "PlayerHandicapFlag");
+impl_bitflags_serde!(PlayerHandicapFlags);
 
 impl_bitflags_from_to_bytes!(PlayerHandicapFlags, u8);
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Handicap settings for a single player.
 pub struct PlayerHandicap {
     /// Player identifier.
@@ -80,7 +79,6 @@ impl Encode for PlayerHandicap {
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Player handicap updates.
 ///
 /// - Sets or reports per-player handicaps.

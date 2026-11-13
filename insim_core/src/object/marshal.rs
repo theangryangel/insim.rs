@@ -6,7 +6,6 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Marshal
 pub struct Marshal {
     /// Position
@@ -67,7 +66,6 @@ impl ObjectInfoInner for Marshal {
 
 #[derive(Debug, Default, Clone, Copy, Hash, PartialEq, PartialOrd, Ord, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -94,7 +92,6 @@ impl TryFrom<u8> for MarshalKind {
 /// Marshall Circle / Restricted Area
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct RestrictedArea {
     /// Position
     pub xyz: ObjectCoordinate,
@@ -142,7 +139,6 @@ impl ObjectInfoInner for RestrictedArea {
 /// Route Check
 #[derive(Debug, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct RouteChecker {
     /// Position
     pub xyz: ObjectCoordinate,

@@ -20,13 +20,12 @@ bitflags! {
         const AUTOCLUTCH = (1 << 9);
     }
 }
-impl_bitflags_json_schema!(AiHelpFlags, "AiHelpFlag");
+impl_bitflags_serde!(AiHelpFlags);
 
 impl_bitflags_from_to_bytes!(AiHelpFlags, u16);
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 /// Toggle mode for AI controls.
 pub enum AiInputToggle {
@@ -61,7 +60,6 @@ impl From<AiInputToggle> for u16 {
 
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 /// AI input command.
 pub enum AiInputType {
@@ -144,7 +142,6 @@ pub enum AiInputType {
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// AI input control value with optional duration.
 pub struct AiInput {
     /// Input command.
@@ -152,7 +149,6 @@ pub struct AiInput {
 
     /// Duration for the input (if supported), in milliseconds.
     #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde::option"))]
-    #[cfg_attr(feature = "schemars", schemars(with = "Option<u64>"))]
     pub time: Option<Duration>,
 }
 
@@ -514,7 +510,6 @@ impl Encode for AiInput {
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// AI input control packet.
 ///
 /// - Sends a sequence of AI input commands.

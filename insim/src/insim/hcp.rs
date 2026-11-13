@@ -4,7 +4,6 @@ use crate::identifiers::RequestId;
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Handicap settings for a single vehicle.
 pub struct HcpCarHandicap {
     /// Added mass (0-200 kg).
@@ -16,7 +15,6 @@ pub struct HcpCarHandicap {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Per-vehicle handicap settings.
 ///
 /// - Applies mass and intake restrictions per car model.

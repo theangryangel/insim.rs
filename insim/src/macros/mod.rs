@@ -8,4 +8,4 @@ mod assert_from_to_bytes;
 #[macro_use]
 mod impl_bitflags_from_to_bytes;
 #[macro_use]
-mod impl_bitflags_json_schema;
+mod impl_bitflags_serde;

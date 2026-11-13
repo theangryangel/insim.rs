@@ -18,7 +18,6 @@ use super::control::ControlMarker;
 /// `^8` is a reset control, rather than a code page, and is handled separately.
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 pub enum Codepage {
     /// The `^L` code page.

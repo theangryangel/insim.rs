@@ -32,7 +32,7 @@ bitflags! {
         const LAST = (1 << 7);
     }
 }
-impl_bitflags_json_schema!(CompCarInfo, "CompCarInfoFlag");
+impl_bitflags_serde!(CompCarInfo);
 
 generate_bitflag_helpers! {
     CompCarInfo,
@@ -50,7 +50,6 @@ impl_bitflags_from_to_bytes!(CompCarInfo, u8);
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Per-car telemetry entry used by [Mci].
 pub struct CompCar {
     /// Index of the last node the player passed.
@@ -149,7 +148,6 @@ impl Encode for CompCar {
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Multi-car telemetry updates.
 ///
 /// - Contains position, speed, and heading for a subset of players.

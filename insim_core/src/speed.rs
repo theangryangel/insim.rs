@@ -32,7 +32,6 @@ const CLOSING_SPEED_MASK: u16 = 0x0FFF;
 /// conversions and type-safety; the stored value is metres per second.
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct SpeedF32(f32);
 
 impl SpeedF32 {
@@ -109,7 +108,6 @@ impl Encode for SpeedF32 {
 /// accessors. Decoding then encoding reproduces the original `u16` exactly.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct SpeedU16(u16);
 
 impl SpeedU16 {
@@ -198,7 +196,6 @@ impl Encode for SpeedU16 {
 /// wire value; decoding then encoding reproduces the original `u8` exactly.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct SpeedU8(u8);
 
 impl SpeedU8 {
@@ -286,7 +283,6 @@ impl Encode for SpeedU8 {
 /// original 12-bit value exactly.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct ClosingSpeed(u16);
 
 impl ClosingSpeed {

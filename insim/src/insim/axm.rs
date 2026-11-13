@@ -8,7 +8,6 @@ pub use insim_core::object::ObjectInfo;
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 enum PmoActionWire {
     #[default]
@@ -44,7 +43,7 @@ bitflags::bitflags! {
         const AVOID_CHECK = (1 << 3);
     }
 }
-impl_bitflags_json_schema!(PmoFlags, "PmoFlag");
+impl_bitflags_serde!(PmoFlags);
 
 impl_bitflags_from_to_bytes!(PmoFlags, u8);
 
@@ -55,7 +54,6 @@ impl_bitflags_from_to_bytes!(PmoFlags, u8);
 /// `adjusted` indicates whether the adjustment succeeded.
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct GetZEntry {
     /// Position (X, Y, input or output Z).
     pub xyz: ObjectCoordinate,
@@ -69,7 +67,6 @@ pub struct GetZEntry {
 /// live on [`Axm::flags`] rather than inside the variant.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub enum PmoAction {
     /// Sent by the layout loading system while loading a file.
@@ -122,7 +119,6 @@ impl Default for PmoAction {
 /// [`flags`](Axm::flags); the action and its data are on [`action`](Axm::action).
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Axm {
     /// Request identifier echoed by replies.
     pub reqi: RequestId,

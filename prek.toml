@@ -9,7 +9,7 @@
 # and gone almost entirely local. The stock pre-commit-hooks are provided by
 # prek's `repo = "builtin"`, the Rust toolchain hooks are inlined as local
 # `system` hooks (the old doublify/pre-commit-rust has been unmaintained since
-# v1.0), and prettier/ruff run as local hooks with pinned dependencies. This
+# v1.0), and prettier runs as a local hook with pinned dependencies. This
 # removes a whole class of "remote repo rev drifted" duplication and keeps every
 # hook's behaviour visible in this one file.
 #:schema https://www.schemastore.org/prek.json
@@ -17,10 +17,7 @@
 exclude = '''
 (?x)
 ^LICENSE$|
-^Cargo\.lock$|
-# Generated, kept verbatim - see xtask-insim-o3-schema and generate_packets.py.
-^insim_o3/insim_schema\.json$|
-^insim_o3/python/insim_o3/packets\.py$
+^Cargo\.lock$
 '''
 
 [[repos]]
@@ -114,28 +111,3 @@ types = ["file"]
 files = '(Cargo\.(toml|lock)|\.rs)$'
 pass_filenames = false
 stages = ["pre-push", "pre-merge-commit", "manual"]
-
-# Python linting/formatting for the insim_o3 bindings. Local `language = "python"`
-# hooks with a pinned ruff (was astral-sh/ruff-pre-commit); ruff discovers its
-# config from insim_o3/pyproject.toml by walking up from each file.
-[[repos]]
-repo = "local"
-
-[[repos.hooks]]
-id = "ruff"
-name = "ruff"
-description = "Lint Python sources with ruff."
-entry = "ruff check"
-args = ["--fix", "--exit-non-zero-on-fix"]
-language = "python"
-types = ["python"]
-additional_dependencies = ["ruff==0.15.12"]
-
-[[repos.hooks]]
-id = "ruff-format"
-name = "ruff-format"
-description = "Format Python sources with ruff."
-entry = "ruff format"
-language = "python"
-types = ["python"]
-additional_dependencies = ["ruff==0.15.12"]

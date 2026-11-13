@@ -30,17 +30,6 @@ macro_rules! define_vehicles {
             Unknown,
         }
 
-        #[cfg(feature = "schemars")]
-        impl schemars::JsonSchema for Vehicle {
-            fn schema_name() -> ::std::borrow::Cow<'static, str> {
-                "Vehicle".into()
-            }
-
-            fn json_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
-                schemars::json_schema!({ "type": "string" })
-            }
-        }
-
         impl Vehicle {
             /// This is a built-in vehicle?
             pub fn is_builtin(&self) -> bool {

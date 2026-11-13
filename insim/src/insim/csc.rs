@@ -5,7 +5,6 @@ use crate::identifiers::{PlayerId, RequestId};
 
 #[derive(Debug, Default, Clone, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(u8)]
 #[non_exhaustive]
 /// Action type reported by [Csc].
@@ -20,7 +19,6 @@ pub enum CscAction {
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Car state changed event.
 ///
 /// - Reports start/stop transitions for a car.
@@ -39,7 +37,6 @@ pub struct Csc {
     /// Time since session start, in milliseconds (wraps periodically).
     #[insim(duration = u32)]
     #[cfg_attr(feature = "serde", serde(with = "crate::duration_serde"))]
-    #[cfg_attr(feature = "schemars", schemars(with = "u64"))]
     pub time: Duration,
 
     /// Contact details, if relevant.

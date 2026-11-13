@@ -8,7 +8,7 @@ bitflags::bitflags! {
         const REMOTE = (1 << 2);
     }
 }
-impl_bitflags_json_schema!(NcnFlags, "NcnFlag");
+impl_bitflags_serde!(NcnFlags);
 
 generate_bitflag_helpers! {
     NcnFlags,
@@ -19,7 +19,6 @@ impl_bitflags_from_to_bytes!(NcnFlags, u8);
 
 #[derive(Debug, Clone, Default, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 /// Connection joined notification.
 ///
 /// - Sent when a connection joins the host.
