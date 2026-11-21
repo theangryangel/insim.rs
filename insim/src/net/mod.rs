@@ -1,7 +1,11 @@
 //! Sessions, pure codecs and composable UDP listeners.
 mod context;
 mod insim_codec;
+mod request;
 mod session;
+#[cfg(feature = "tokio")]
+mod split;
+mod tap;
 
 pub use context::Context;
 pub use insim_codec::InsimCodec;
@@ -15,7 +19,11 @@ pub use insim_core::net::{
 };
 pub use outgauge::OutGaugeCodec;
 pub use outsim::OutSimCodec;
+pub use request::{DEFAULT_REQUEST_IDS, REQUEST_ALL_QUIET, Replies, Reply, Response};
 pub use session::{Session, Unstarted};
+#[cfg(feature = "tokio")]
+pub use split::{Driver, Receiver, Sender};
+pub use tap::{Policy, Tap};
 
 /// InSim inactivity timeout. OutGauge and OutSim do not reset it.
 pub const DEFAULT_TIMEOUT_SECS: u64 = 70;

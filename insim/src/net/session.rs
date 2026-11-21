@@ -1,10 +1,16 @@
-use std::{collections::VecDeque, fmt::Debug, time::Instant};
+use std::{
+    collections::VecDeque,
+    fmt::Debug,
+    time::{Duration, Instant},
+};
 
 use insim_core::net::{self, ReceiveTransport};
 
 use super::{
     Context, DatagramSocket, Decoder, InsimCodec, Interest, Runtime, Socket, StreamSocket,
     Transport,
+    request::{self, Pending, Replies, Reply, RequestIds, Response},
+    tap::{self, Filter, Policy, Sink, Tap, Taps},
 };
 #[cfg(any(feature = "tokio", feature = "blocking"))]
 use crate::insim::Isi;
@@ -63,6 +69,8 @@ pub struct Session<R: Runtime> {
     // Deliver buffered packets before returning a terminal error.
     deferred: Option<Error>,
     next_source: usize,
+    taps: Taps,
+    request_ids: RequestIds,
 }
 
 /// An owned link whose InSim handshake has not yet started.
@@ -89,6 +97,8 @@ impl<R: Runtime> Session<R> {
                 incoming: VecDeque::new(),
                 deferred: None,
                 next_source: 0,
+                taps: Taps::default(),
+                request_ids: RequestIds::default(),
             },
         })
     }
@@ -129,6 +139,97 @@ impl<R: Runtime> Session<R> {
         self.control.queue(packet)?;
         Ok(())
     }
+    /// Copy packets accepted by `filter` to a [`Tap`], according to `policy`.
+    ///
+    /// Matching packets are still returned by `read()`. The tap fills while the
+    /// session is driven and ends when its policy is satisfied or the session ends.
+    pub fn tap<F>(&mut self, filter: F, policy: Policy) -> Tap
+    where
+        F: FnMut(&Packet) -> bool + Send + 'static,
+    {
+        let (sink, tap) = tap::channel(policy);
+        self.insert_tap(sink, Box::new(filter));
+        tap
+    }
+    pub(super) fn insert_tap(&mut self, sink: Sink, filter: Filter) {
+        self.taps.insert(sink, filter, Instant::now());
+    }
+    /// Set the ReqIs that `request` and `request_all` cycle through. The default is
+    /// [`DEFAULT_REQUEST_IDS`](super::DEFAULT_REQUEST_IDS) (128–255). Use ReqIs
+    /// outside this range for packets you send yourself. Requests already in
+    /// flight keep their ReqIs.
+    ///
+    /// # Panics
+    /// If `ids` is empty or includes 0, which LFS does not correlate.
+    pub fn set_request_ids(&mut self, ids: std::ops::RangeInclusive<u8>) {
+        self.request_ids = RequestIds::new(ids);
+    }
+    /// The ReqIs that `request` and `request_all` cycle through.
+    pub fn request_ids(&self) -> std::ops::RangeInclusive<u8> {
+        self.request_ids.range().clone()
+    }
+    /// Queue `packet` with the next ReqI from [`request_ids`](Self::request_ids) and
+    /// return a ticket for the first reply of type `T` that echoes it.
+    ///
+    /// The ticket fills in while you keep driving the session, and the reply is
+    /// still returned by `read()`.
+    ///
+    /// ```rust,no_run
+    /// # async fn example(session: &mut insim::Session<insim::net::Tokio>) -> insim::Result<()> {
+    /// use insim::insim::{Ism, TinyType};
+    ///
+    /// let mut ism = session.request::<Ism>(TinyType::Ism)?;
+    /// loop {
+    ///     tokio::select! {
+    ///         packet = session.read() => println!("{:?}", packet?),
+    ///         ism = &mut ism => {
+    ///             println!("host: {:?}", ism?.hname);
+    ///             break;
+    ///         }
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn request<T: Response>(&mut self, packet: impl Into<Packet>) -> Result<Reply<T>> {
+        let (pending, reply) = request::reply(packet.into());
+        self.begin_request(pending)?;
+        Ok(reply)
+    }
+    /// Like [`request`](Self::request), but collect every reply of type `T` until
+    /// none has arrived for [`REQUEST_ALL_QUIET`](super::REQUEST_ALL_QUIET).
+    pub fn request_all<T: Response>(&mut self, packet: impl Into<Packet>) -> Result<Replies<T>> {
+        self.request_all_within(packet, super::REQUEST_ALL_QUIET)
+    }
+    /// Like [`request_all`](Self::request_all), with an explicit quiet period.
+    pub fn request_all_within<T: Response>(
+        &mut self,
+        packet: impl Into<Packet>,
+        quiet: Duration,
+    ) -> Result<Replies<T>> {
+        let (pending, replies) = request::replies(packet.into(), quiet);
+        self.begin_request(pending)?;
+        Ok(replies)
+    }
+    /// Stamp a request with the next reserved ReqI.
+    pub(super) fn stamp(&mut self, pending: Pending) -> (Packet, Sink, Filter) {
+        pending.start(self.request_ids.next())
+    }
+    /// Queue the request, then register its tap. Nothing is read in between.
+    fn begin_request(&mut self, pending: Pending) -> Result<()> {
+        let (packet, sink, filter) = self.stamp(pending);
+        self.queue(packet)?;
+        self.insert_tap(sink, filter);
+        Ok(())
+    }
+    /// Earliest protocol or tap deadline.
+    #[cfg(any(feature = "tokio", feature = "blocking"))]
+    fn deadline(&self) -> Option<Instant> {
+        match (self.context.deadline(), self.taps.deadline()) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (a, b) => a.or(b),
+        }
+    }
     /// Attempt nonblocking progress and return one packet if available.
     /// This also advances protocol deadlines and pending writes. Malformed UDP
     /// input is logged and skipped; TCP and socket errors are returned.
@@ -156,7 +257,15 @@ impl<R: Runtime> Session<R> {
         self.incoming.len() >= INCOMING_LIMIT
     }
     fn tick_and_flush(&mut self) -> Result<()> {
+        let result = self.tick_and_flush_inner();
+        if result.is_err() {
+            self.taps.close();
+        }
+        result
+    }
+    fn tick_and_flush_inner(&mut self) -> Result<()> {
         let now = Instant::now();
+        self.taps.advance(now);
         if self.is_full() {
             // Backpressure must not trigger the inactivity timeout.
             self.context.hold(now);
@@ -171,6 +280,13 @@ impl<R: Runtime> Session<R> {
         Ok(())
     }
     fn pump(&mut self) -> Result<bool> {
+        let result = self.pump_inner();
+        if result.is_err() {
+            self.taps.close();
+        }
+        result
+    }
+    fn pump_inner(&mut self) -> Result<bool> {
         self.tick_and_flush()?;
         if self.is_full() {
             return Ok(false);
@@ -211,7 +327,9 @@ impl<R: Runtime> Session<R> {
                 },
             };
             self.next_source = (index + 1) % sources;
-            let response = self.context.receive(&packet, Instant::now());
+            let now = Instant::now();
+            let response = self.context.receive(&packet, now);
+            self.taps.offer(&packet, now);
             // Retain input if queuing or flushing the response fails.
             self.incoming.push_back(Ok(packet));
             if let Some(response) = response? {
@@ -274,6 +392,15 @@ impl<R: Runtime> Unstarted<R> {
         self.session = self.session.attach_udp(socket, decoder)?;
         Ok(self)
     }
+    /// Set the ReqIs that `request` and `request_all` will cycle through. See
+    /// [`Session::set_request_ids`].
+    ///
+    /// # Panics
+    /// If `ids` is empty or includes 0, which LFS does not correlate.
+    pub fn with_request_ids(mut self, ids: std::ops::RangeInclusive<u8>) -> Self {
+        self.session.set_request_ids(ids);
+        self
+    }
     /// Skip initialization for a conversation that is already running.
     pub fn resume(mut self) -> Session<R> {
         self.session.context = Context::resume(Instant::now());
@@ -293,7 +420,7 @@ macro_rules! runtime_methods {
             pub $($async)* fn read(&mut self) -> Result<Packet> {
                 loop {
                     if let Some(packet) = self.try_read()? { return Ok(packet); }
-                    <$runtime>::wait(&self.interests(), self.context.deadline())$($await)*?;
+                    <$runtime>::wait(&self.interests(), self.deadline())$($await)*?;
                 }
             }
             /// Drive the whole session until all queued output is accepted by the socket.
@@ -301,7 +428,7 @@ macro_rules! runtime_methods {
                 loop {
                     let progress = self.pump()?;
                     if self.control.pending() == 0 { return Ok(()); }
-                    if !progress { <$runtime>::wait(&self.interests(), self.context.deadline())$($await)*?; }
+                    if !progress { <$runtime>::wait(&self.interests(), self.deadline())$($await)*?; }
                 }
             }
             /// Queue once, then flush. Cancelling after acceptance leaves output queued.
@@ -315,6 +442,7 @@ macro_rules! runtime_methods {
                 self.write(TinyType::Close)$($await)*?;
                 self.control.socket().shutdown()?;
                 self.context.close();
+                self.taps.close();
                 Ok(())
             }
         }
@@ -329,7 +457,7 @@ macro_rules! runtime_methods {
                         return Ok(self.session);
                     }
                     if !progress {
-                        <$runtime>::wait(&self.session.interests(), self.session.context.deadline())$($await)*?;
+                        <$runtime>::wait(&self.session.interests(), self.session.deadline())$($await)*?;
                     }
                 }
             }
@@ -338,6 +466,43 @@ macro_rules! runtime_methods {
         }
     };
 }
+/// Progress without delivery, for a driver that forwards packets elsewhere.
+#[cfg(feature = "tokio")]
+impl Session<super::Tokio> {
+    /// Read, reply and flush until stalled. A terminal error is kept until the
+    /// packets before it have been taken.
+    pub(super) fn fill(&mut self) {
+        while self.deferred.is_none() {
+            match self.pump() {
+                Ok(true) => continue,
+                Ok(false) => return,
+                Err(error) => self.deferred = Some(error),
+            }
+        }
+    }
+    /// The next packet or error, in order, and whether it ends the session.
+    pub(super) fn take(&mut self) -> Option<(Result<Packet>, bool)> {
+        match self.incoming.pop_front() {
+            Some(item) => Some((item, false)),
+            None => self.deferred.take().map(|error| (Err(error), true)),
+        }
+    }
+    pub(super) fn has_output(&self) -> bool {
+        !self.incoming.is_empty() || self.deferred.is_some()
+    }
+    pub(super) fn can_queue(&self) -> bool {
+        self.control.pending() < OUTGOING_LIMIT
+    }
+    /// Wait for readiness or a deadline. A wait failure ends the session.
+    pub(super) async fn wait(&mut self) {
+        if let Err(error) = super::Tokio::wait(&self.interests(), self.deadline()).await {
+            self.context.close();
+            self.taps.close();
+            let _ = self.deferred.get_or_insert(error.into());
+        }
+    }
+}
+
 #[cfg(feature = "blocking")]
 runtime_methods!(super::Blocking, [], []);
 #[cfg(feature = "tokio")]
@@ -1114,5 +1279,64 @@ mod udp_tests {
         })
         .await
         .unwrap();
+    }
+}
+
+#[cfg(all(test, feature = "blocking"))]
+mod blocking_request_tests {
+    use std::{
+        io::{Read, Write},
+        net::{TcpListener, TcpStream},
+        time::Duration,
+    };
+
+    use bytes::BytesMut;
+    use insim_core::net::{Decoder, Encoder};
+
+    use super::*;
+    use crate::{
+        identifiers::RequestId,
+        insim::{Ism, TinyType},
+    };
+
+    #[test]
+    fn blocking_request_is_checked_between_reads() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let stream = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let (mut lfs, _) = listener.accept().unwrap();
+        lfs.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
+        let peer = std::thread::spawn(move || {
+            let mut input = BytesMut::new();
+            let request = loop {
+                if let Some(packet) = InsimCodec.decode(&mut input).unwrap() {
+                    break packet;
+                }
+                let mut buf = [0; 64];
+                let n = lfs.read(&mut buf).unwrap();
+                input.extend_from_slice(&buf[..n]);
+            };
+            let mut bytes = BytesMut::new();
+            InsimCodec
+                .encode(
+                    &Ism {
+                        reqi: request.request_id().unwrap(),
+                        ..Default::default()
+                    }
+                    .into(),
+                    &mut bytes,
+                )
+                .unwrap();
+            lfs.write_all(&bytes).unwrap();
+            lfs
+        });
+        let mut session = Session::tcp(stream).unwrap().resume();
+        let mut ism = session.request::<Ism>(TinyType::Ism).unwrap();
+        assert!(ism.try_get().is_none());
+        let packet = session.read().unwrap();
+        let reply = ism.try_get().unwrap().unwrap();
+        assert!(matches!(packet, Packet::Ism(_)));
+        assert!(session.request_ids().contains(&reply.reqi.0));
+        assert_ne!(reply.reqi, RequestId(0));
+        drop(peer.join().unwrap());
     }
 }
