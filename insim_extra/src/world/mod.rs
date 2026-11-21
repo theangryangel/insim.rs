@@ -2,7 +2,8 @@
 //! game-state mirroring, and race tracking in a single structure.
 //!
 //! Feed packets with [`apply_packet`](World::apply_packet) to update state and
-//! collect change events. Query connection/player/game state directly on the
+//! collect change events, or let [`attach`](World::attach) keep it in step with
+//! a split session. Query connection/player/game state directly on the
 //! `World` value, and issue admin commands that return [`insim::Packet`] values
 //! for the caller to send.
 //!
@@ -33,6 +34,7 @@ use insim::{
 };
 use parking_lot::RwLock;
 
+mod attach;
 mod commands;
 mod connection;
 mod event;
@@ -45,7 +47,7 @@ pub use event::{
     AllowedCarsChanged, AllowedModsChanged, Connected, ConnectionDetails, Disconnected,
     LayoutChanged, LobbyEntered, LobbyNotReady, LobbyReady, MultiplayerJoined, MultiplayerLeft,
     PlayerJoined, PlayerLeft, PlayerTeleportedToPits, Renamed, SessionEnded, SessionStarted,
-    TakingOver, TrackChanged, VehicleSelected, VersionReceived, WorldEvent,
+    TakingOver, TrackChanged, VehicleSelected, VersionReceived, WorldEvent, WorldReady,
 };
 pub use game::{
     GameInfo, GridMode, Month, MultiplayerState, SessionKind, TimeDemoPreset, TimeSet, VersionInfo,

@@ -717,6 +717,7 @@ name = "insim_extra"
 version = "0.2.0"
 dependencies = [
  "fixedbitset",
+ "futures",
  "insim",
  "multi_index_map",
  "parking_lot 0.13.0",

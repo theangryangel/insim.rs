@@ -13,13 +13,13 @@ mod tests;
 
 use std::time::Duration;
 
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 use tokio_util::sync::CancellationToken;
 
 use self::{
     event::Command,
     handler::{ErasedHandler, Handler, HandlerService},
-    runtime::Sender,
+    runtime::{Link, Sender},
 };
 use crate::{
     World,
@@ -81,17 +81,18 @@ where
     /// connection itself). Folded by the runtime's mirror step before any
     /// handler runs each cycle, and extractable via `world: World`.
     pub(crate) world: World,
-    /// The app's UI, intrinsic like `world` and parameterising the app via `V`.
-    /// A dedicated runtime-driven slot (not a handler): the runtime forwards
-    /// packets to it each cycle before handlers run. Set via [`App::with_ui`];
-    /// extracted infallibly as `ui: Ui<V>`. An app with no UI keeps the inert
+    /// The app's UI, parameterising the app via `V`: its initial global state,
+    /// until the runtime attaches it to the connection. Set via [`App::with_ui`];
+    /// extracted infallibly as `ui: Ui<V>`. An app with no UI gets the inert
     /// [`NoView`] handle.
-    pub(crate) ui: crate::ui::Ui<V>,
+    pub(crate) ui: Option<V::Global>,
     /// Handlers retained in registration order for deterministic dispatch.
     pub(crate) handlers: Vec<Box<dyn ErasedHandler<S, V>>>,
     pub(crate) sender: Sender,
-    /// Receiver paired with `sender`. Taken by `run()`.
-    pub(crate) cmd_rx: Option<mpsc::UnboundedReceiver<Command>>,
+    /// Binds `sender` to the connection once the app is run.
+    pub(crate) link: watch::Sender<Link>,
+    /// Synthetic events from `sender`. Taken by `run()`.
+    pub(crate) events: Option<mpsc::UnboundedReceiver<Command>>,
     /// Runtime cancellation. Cloned into [`ExtractCx`] so handlers can call
     /// `cx.shutdown()` to bring `run` down.
     pub(crate) cancel: CancellationToken,
@@ -101,7 +102,7 @@ impl<S, V: View + 'static> std::fmt::Debug for App<S, V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("App")
             .field("world", &self.world)
-            .field("ui", &self.ui)
+            .field("ui", &self.ui.is_some())
             .field("handlers", &self.handlers.len())
             .finish()
     }
@@ -136,28 +137,29 @@ where
     ///
     /// The app starts with no UI ([`NoView`]); add one with [`App::with_ui`].
     pub fn with_state(state: S) -> Self {
-        let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<Command>();
+        let (events_tx, events) = mpsc::unbounded_channel::<Command>();
+        let (sender, link) = Sender::pending(events_tx);
         Self {
             state,
             world: World::new(),
-            ui: crate::ui::Ui::disabled(),
+            ui: None,
             handlers: Vec::new(),
-            sender: Sender::new(cmd_tx),
-            cmd_rx: Some(cmd_rx),
+            sender,
+            link,
+            events: Some(events),
             cancel: CancellationToken::new(),
         }
     }
 
     /// Register the app's UI, fixing the view type `V` and switching the app to
-    /// `App<S, V>`. Builds the [`Ui`](crate::ui::Ui) from the app's own sender;
-    /// `initial_global` seeds the global state, and each connection's view is
-    /// constructed via [`View::mount`].
+    /// `App<S, V>`. The runtime attaches the [`Ui`](crate::ui::Ui) to the
+    /// connection when the app is run; `initial_global` seeds the global state,
+    /// and each connection's view is constructed via [`View::mount`].
     ///
     /// **Must be called before any handlers are registered** (it resets the
     /// handler maps to the new view type); a `debug_assert` guards against
-    /// late calls. The UI then lives in a dedicated runtime-driven slot - the
-    /// runtime forwards packets to it each cycle before handlers run, and
-    /// handlers extract it infallibly as `ui: Ui<V>`.
+    /// late calls. The UI follows the connection on its own thread, and handlers
+    /// extract it infallibly as `ui: Ui<V>`.
     #[must_use]
     pub fn with_ui<V>(self, initial_global: V::Global) -> App<S, V>
     where
@@ -167,14 +169,14 @@ where
             self.handlers.is_empty(),
             "App::with_ui must be called before any handlers are registered"
         );
-        let ui = crate::ui::Ui::new(self.sender.clone(), initial_global);
         App {
             state: self.state,
             world: self.world,
-            ui,
+            ui: Some(initial_global),
             handlers: Vec::new(),
             sender: self.sender,
-            cmd_rx: self.cmd_rx,
+            link: self.link,
+            events: self.events,
             cancel: self.cancel,
         }
     }

@@ -15,9 +15,14 @@ workspace = true
 [dependencies]
 insim = { path = "../insim" }
 parking_lot = { workspace = true }
-tokio = { workspace = true, features = ["time", "sync", "rt"] }
+tokio = { workspace = true, features = ["time", "sync", "rt", "macros"] }
+futures = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 fixedbitset = { workspace = true }
 taffy = "0.15"
 multi_index_map = "0.16"
+
+[dev-dependencies]
+insim = { path = "../insim", features = ["test-util"] }
+tokio = { workspace = true, features = ["time", "sync", "rt", "macros", "net"] }

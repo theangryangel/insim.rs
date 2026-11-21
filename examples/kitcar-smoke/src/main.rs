@@ -52,10 +52,12 @@ async fn welcome(
     sender: Sender,
 ) -> Result<(), AppError> {
     let total = world.count();
-    sender.packets(mtc(
-        format!("^2Welcome ^7{} ^8(now {total} online)", info.uname),
-        Some(info.ucid),
-    ))
+    sender
+        .packets(mtc(
+            format!("^2Welcome ^7{} ^8(now {total} online)", info.uname),
+            Some(info.ucid),
+        ))
+        .await
 }
 
 async fn echo_mso(Packet(mso): Packet<Mso>) -> Result<(), AppError> {
@@ -116,19 +118,25 @@ async fn handle_typed_chat(
 ) -> Result<(), AppError> {
     match cmd.parsed {
         Cmd::Hello => {
-            sender.packets(mtc("hi from typed handler!", Some(ConnectionId::ALL)))?;
+            sender
+                .packets(mtc("hi from typed handler!", Some(ConnectionId::ALL)))
+                .await?;
         },
         Cmd::Ping => {
-            sender.packets(mtc("pong", Some(ConnectionId::ALL)))?;
+            sender.packets(mtc("pong", Some(ConnectionId::ALL))).await?;
         },
         Cmd::Echo { message } => {
-            sender.packets(mtc(
-                format!("typed-echo: {message}"),
-                Some(ConnectionId::ALL),
-            ))?;
+            sender
+                .packets(mtc(
+                    format!("typed-echo: {message}"),
+                    Some(ConnectionId::ALL),
+                ))
+                .await?;
         },
         Cmd::Quit => {
-            sender.packets(mtc("shutting down...", Some(ConnectionId::ALL)))?;
+            sender
+                .packets(mtc("shutting down...", Some(ConnectionId::ALL)))
+                .await?;
             cancel.cancel();
         },
     }
@@ -281,7 +289,9 @@ async fn refresh_on_disconnect(
 async fn on_ui_click(Event(msg): Event<SmokeUiMsg>, sender: Sender) -> Result<(), AppError> {
     match msg {
         SmokeUiMsg::ButtonClicked => {
-            sender.packets(mtc("button clicked!", Some(ConnectionId::ALL)))?;
+            sender
+                .packets(mtc("button clicked!", Some(ConnectionId::ALL)))
+                .await?;
         },
     }
     Ok(())
@@ -310,6 +320,7 @@ async fn install_ticker(
                     format!("[ticker] beat {beat}"),
                     Some(ConnectionId::ALL),
                 ))
+                .await
                 .is_err()
             {
                 return;

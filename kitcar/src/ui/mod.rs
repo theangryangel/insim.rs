@@ -4,9 +4,9 @@
 //! because `taffy` layout isn't `Send`, so view tasks run on a `LocalSet`). The
 //! UI is a **first-class part of the app**, parameterising [`App<S, V>`](crate::App)
 //! alongside the state `S` - exactly like the intrinsic [`World`](crate::World).
-//! Register it with [`App::with_ui`](crate::App::with_ui) (which builds it from
-//! the app's sender) and the runtime forwards `Ncn` / `Cnl` / `Btc` / `Btt` /
-//! `Bfn` packets into the UI thread each cycle, before handlers run. Handlers
+//! Register it with [`App::with_ui`](crate::App::with_ui) and the runtime
+//! attaches it to the connection when the app runs: it follows `Ncn` / `Cnl` /
+//! `Btc` / `Btt` / `Bfn` packets through a tap, on its own thread. Handlers
 //! pull the [`Ui<V>`] handle by value (via [`FromContext`]); because the view
 //! type is fixed in the app's type, that extraction is infallible and asking for
 //! the wrong view type is a compile error.
@@ -104,45 +104,31 @@ where
         Self { inner: None }
     }
 
-    /// Create a live UI handle and spawn its background LocalSet thread.
-    ///
-    /// `sender` is the runtime back-channel. `initial_global` is the starting
-    /// value for the global state; update later via [`Ui::assign_global`]. Each
-    /// connection's view is built via [`View::mount`] when its `Ncn` arrives.
-    pub fn new(sender: Sender, initial_global: V::Global) -> Self {
-        let (outgoing_tx, mut outgoing_rx) = mpsc::unbounded_channel::<insim::Packet>();
-        let inner = InnerUi::new(outgoing_tx, initial_global);
-
-        // Forward outgoing UI button packets to LFS via sender.
-        {
-            let sender = sender.clone();
-            drop(tokio::spawn(async move {
-                while let Some(p) = outgoing_rx.recv().await {
-                    if let Err(e) = sender.packet(p) {
-                        tracing::warn!("UI packet forward failed: {e}");
-                        break;
-                    }
-                }
-            }));
-        }
+    /// Attach a live UI to the connection and spawn its background LocalSet
+    /// thread. Called by the runtime; clicks and type-ins become events on
+    /// `events`.
+    pub(crate) async fn attach(
+        connection: &insim::net::Sender,
+        events: Sender,
+        initial_global: V::Global,
+    ) -> Result<Self, crate::AppError> {
+        let inner = InnerUi::attach(connection, initial_global).await?;
 
         // Broadcast click/type-in events into the app event bus.
-        {
-            let mut rx = inner.subscribe();
-            drop(tokio::spawn(async move {
-                loop {
-                    match rx.recv().await {
-                        Ok(msg) => {
-                            let _ = sender.event(msg);
-                        },
-                        Err(broadcast::error::RecvError::Lagged(_)) => continue,
-                        Err(broadcast::error::RecvError::Closed) => break,
-                    }
+        let mut rx = inner.subscribe();
+        drop(tokio::spawn(async move {
+            loop {
+                match rx.recv().await {
+                    Ok(msg) => {
+                        let _ = events.event(msg);
+                    },
+                    Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(broadcast::error::RecvError::Closed) => break,
                 }
-            }));
-        }
+            }
+        }));
 
-        Self { inner: Some(inner) }
+        Ok(Self { inner: Some(inner) })
     }
 
     /// Replace the global state. All active views re-render against the new value.
@@ -183,13 +169,6 @@ where
         match &self.inner {
             Some(inner) => inner.update(ucid, msg).await,
             None => Ok(()),
-        }
-    }
-
-    /// Forward a wire packet into the UI thread (no-op when inert).
-    pub fn forward_packet(&self, p: &insim::Packet) {
-        if let Some(inner) = &self.inner {
-            inner.forward_packet(p);
         }
     }
 }

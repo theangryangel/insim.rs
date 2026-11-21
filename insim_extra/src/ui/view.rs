@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use insim::{
-    Packet,
     identifiers::{ClickId, ConnectionId},
     insim::BfnType,
 };
@@ -158,7 +157,7 @@ where
     pub global_props: watch::Receiver<Arc<V::Global>>,
     pub connection_props: watch::Receiver<V::Connection>,
     pub view_event_rx: mpsc::UnboundedReceiver<ViewInput<V::Message>>,
-    pub outgoing_tx: mpsc::UnboundedSender<Packet>,
+    pub sender: insim::net::Sender,
     pub message_tx: broadcast::Sender<V::Message>,
 }
 
@@ -174,7 +173,7 @@ where
         mut global_props,
         mut connection_props,
         mut view_event_rx,
-        outgoing_tx,
+        sender,
         message_tx,
     } = args;
 
@@ -196,8 +195,8 @@ where
                 if let Some(diff) = canvas.reconcile(vdom) {
                     let mut any_err = false;
                     for packet in diff.merge() {
-                        if outgoing_tx.send(packet).is_err() {
-                            tracing::error!("Failed to send UI packet: receiver closed");
+                        if let Err(e) = sender.send(packet).await {
+                            tracing::error!("Failed to send UI packet: {e}");
                             any_err = true;
                             break;
                         }

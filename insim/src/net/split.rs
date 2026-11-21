@@ -34,7 +34,9 @@ impl Session<Tokio> {
     /// while the receiver is not being polled. `capacity` (at least 1) bounds both
     /// the command queue and the packets waiting for the receiver. When the receiver
     /// falls behind, the driver keeps reading into the session's own buffer and
-    /// pauses only once that buffer is full, as `read()` does.
+    /// pauses only once that buffer is full, as `read()` does. If you only use
+    /// taps and requests, drop the receiver: the driver then discards packets
+    /// once taps have copied them, instead of eventually pausing.
     ///
     /// ```rust,no_run
     /// # async fn example(session: insim::Session<insim::net::Tokio>) -> insim::Result<()> {
@@ -299,60 +301,19 @@ async fn finish(mut session: Session<Tokio>, events: &mpsc::Sender<Result<Packet
 mod tests {
     use std::time::Duration;
 
-    use bytes::BytesMut;
-    use insim_core::net::{Decoder, Encoder};
-    use tokio::{
-        io::{AsyncReadExt, AsyncWriteExt},
-        net::{TcpListener, TcpStream},
-    };
-
     use super::*;
     use crate::{
         identifiers::RequestId,
         insim::{Ism, Ncn, Tiny, TinyType},
-        net::InsimCodec,
+        test::{Lfs, pair, pair_unstarted},
     };
 
-    /// A scripted LFS on the other end of a loopback TCP connection.
-    struct Peer {
-        stream: TcpStream,
-        input: BytesMut,
+    async fn connect() -> (Session<Tokio>, Lfs) {
+        pair().await
     }
-    impl Peer {
-        async fn recv(&mut self) -> Packet {
-            loop {
-                if let Some(packet) = InsimCodec.decode(&mut self.input).unwrap() {
-                    return packet;
-                }
-                let mut buf = [0; 1024];
-                let n = self.stream.read(&mut buf).await.unwrap();
-                assert_ne!(n, 0, "session closed the connection");
-                self.input.extend_from_slice(&buf[..n]);
-            }
-        }
-        async fn send(&mut self, packet: impl Into<Packet>) {
-            let mut bytes = BytesMut::new();
-            InsimCodec.encode(&packet.into(), &mut bytes).unwrap();
-            self.stream.write_all(&bytes).await.unwrap();
-        }
-    }
-    async fn connect() -> (Session<Tokio>, Peer) {
-        connect_with(crate::net::DEFAULT_REQUEST_IDS).await
-    }
-    async fn connect_with(ids: std::ops::RangeInclusive<u8>) -> (Session<Tokio>, Peer) {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let stream = TcpStream::connect(listener.local_addr().unwrap())
-            .await
-            .unwrap();
-        let (lfs, _) = listener.accept().await.unwrap();
-        let session = Session::tcp(stream).unwrap().with_request_ids(ids).resume();
-        (
-            session,
-            Peer {
-                stream: lfs,
-                input: BytesMut::new(),
-            },
-        )
+    async fn connect_with(ids: std::ops::RangeInclusive<u8>) -> (Session<Tokio>, Lfs) {
+        let (unstarted, lfs) = pair_unstarted().await;
+        (unstarted.with_request_ids(ids).resume(), lfs)
     }
     fn reqi(packet: &Packet) -> u8 {
         packet.request_id().unwrap().0
@@ -366,7 +327,7 @@ mod tests {
             let driver = tokio::spawn(driver);
 
             let peer = async {
-                let request = lfs.recv().await;
+                let request = lfs.recv().await.unwrap();
                 assert!(matches!(
                     request,
                     Packet::Tiny(Tiny {
@@ -389,7 +350,7 @@ mod tests {
                 })
                 .await;
 
-                let request = lfs.recv().await;
+                let request = lfs.recv().await.unwrap();
                 let id = reqi(&request);
                 for ucid in 0..3 {
                     lfs.send(Ncn {
@@ -429,7 +390,7 @@ mod tests {
 
             sender.shutdown().await.unwrap();
             assert!(matches!(
-                lfs.recv().await,
+                lfs.recv().await.unwrap(),
                 Packet::Tiny(Tiny {
                     subt: TinyType::Close,
                     ..
@@ -458,7 +419,7 @@ mod tests {
                 .await;
             }
             lfs.send(Tiny::default()).await;
-            assert!(matches!(lfs.recv().await, Packet::Tiny(t) if t.is_keepalive()));
+            assert!(matches!(lfs.recv().await.unwrap(), Packet::Tiny(t) if t.is_keepalive()));
             // Everything is still delivered, in order.
             for id in [1, 2, 3, 0] {
                 assert_eq!(reqi(&receiver.recv().await.unwrap().unwrap()), id);
@@ -500,7 +461,7 @@ mod tests {
             let mut ism = session.request::<Ism>(TinyType::Ism).unwrap();
             let mut latest = session.tap(|p| matches!(p, Packet::Tiny(_)), Policy::Latest);
             session.flush().await.unwrap();
-            let id = reqi(&lfs.recv().await);
+            let id = reqi(&lfs.recv().await.unwrap());
             lfs.send(Tiny {
                 reqi: RequestId(1),
                 subt: TinyType::Ping,

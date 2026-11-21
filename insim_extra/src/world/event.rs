@@ -17,6 +17,13 @@ use crate::world::{
     race::RaceEvent,
 };
 
+/// The world has caught up with the server: every reply to the startup requests
+/// has been folded. From here it mirrors the connections, players, track, layout
+/// and allowed cars that existed before you connected.
+#[derive(Debug, Clone, Copy, Default)]
+#[non_exhaustive]
+pub struct WorldReady;
+
 /// A new connection joined.
 #[derive(Debug, Clone)]
 pub struct Connected(pub ConnectionInfo);
@@ -202,4 +209,8 @@ pub enum WorldEvent {
     VersionReceived(VersionReceived),
     /// A race event (entrant joined, lap completed, finished, etc.).
     Race(RaceEvent),
+    /// Every reply to [`World::STARTUP_REQUESTS`](crate::world::World::STARTUP_REQUESTS)
+    /// has been folded. Never produced by `apply_packet`; emitted by whatever
+    /// drives the world (`World::attach`, or kitcar's runtime).
+    Ready(WorldReady),
 }
