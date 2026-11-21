@@ -229,6 +229,72 @@ connection.write(TinyType::Ver.with_request_id(1)).await?;
 Attached OutGauge and OutSim variants are receive-only. Converting them to
 `Packet` does not make them valid outgoing InSim packets.
 
+### Requests and taps
+
+A [Tap](crate::net::Tap) copies the packets you're interested in while the session
+reads. It never takes anything away from `read()`. Its
+[Policy](crate::net::Policy) decides what it keeps: `Queue` (every match),
+`Latest` (only the newest), `Once` (the first match, then done) or
+`UntilQuiet(duration)` (matches until none arrive for that long).
+
+`request` and `request_all` build on taps. They send a packet with a ReqI from
+the session's request range and return a ticket for the replies that echo it.
+The range defaults to [DEFAULT_REQUEST_IDS](crate::net::DEFAULT_REQUEST_IDS)
+(128–255) and can be set to any part of 1–255 with
+[with_request_ids](crate::Unstarted::with_request_ids) before the handshake,
+or [set_request_ids](crate::Session::set_request_ids) afterwards. Use ReqIs outside it for
+packets you send yourself. The
+ticket fills in while you keep reading, and every reply is still returned by
+`read()`:
+
+```rust,no_run
+# #[cfg(feature = "tokio")]
+# async fn example(session: &mut insim::Session<insim::net::Tokio>) -> insim::Result<()> {
+use insim::insim::{Ism, TinyType};
+
+let mut ism = session.request::<Ism>(TinyType::Ism)?;
+loop {
+    tokio::select! {
+        packet = session.read() => println!("{:?}", packet?), // the Ism shows up here too
+        ism = &mut ism => {
+            println!("{:?}", ism?);
+            break;
+        }
+    }
+}
+# Ok(())
+# }
+```
+
+LFS doesn't answer every request (`TINY_ISM` gets no reply outside multiplayer, for
+example), so wrap a `request` in a timeout if that matters. `request_all` finishes
+once no reply has arrived for [REQUEST_ALL_QUIET](crate::net::REQUEST_ALL_QUIET).
+
+### Splitting a session (Tokio)
+
+`into_split` hands the session to a driver task and returns a cloneable
+[Sender](crate::net::Sender) and a [Receiver](crate::net::Receiver). The driver
+is always reading, so keepalives are answered even while your handlers are slow:
+
+```rust,no_run
+# #[cfg(feature = "tokio")]
+# async fn example(session: insim::Session<insim::net::Tokio>) -> insim::Result<()> {
+use insim::insim::{Ism, Ncn, TinyType};
+
+let (sender, mut receiver, driver) = session.into_split(256);
+let _ = tokio::spawn(driver);
+
+sender.send(TinyType::Ping).await?;
+let ism: Ism = sender.request(TinyType::Ism).await?;
+let ncns: Vec<Ncn> = sender.request_all(TinyType::Ncn).await?;
+
+while let Some(packet) = receiver.recv().await {
+    println!("{:?}", packet?);
+}
+# Ok(())
+# }
+```
+
 # Cookbook
 
 Working applications are available in the repository's

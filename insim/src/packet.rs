@@ -102,6 +102,20 @@ macro_rules! define_packet {
             }
         }
 
+        impl Packet {
+            /// The request identifier, or `None` for telemetry and unknown packets.
+            pub fn request_id(&self) -> Option<crate::identifiers::RequestId> {
+                match self {
+                    $(
+                        Self::$variant(inner) => Some(inner.reqi),
+                    )*
+                    Self::Outgauge(_) | Self::Outsim(_) | Self::Outsim2(_) => None,
+                    #[cfg(feature = "allow-unknown-packet")]
+                    Self::Unknown(_) => None,
+                }
+            }
+        }
+
         impl Decode for Packet {
             fn decode(ctx: &mut insim_core::DecodeContext) -> Result<Self, insim_core::DecodeError> {
                 let discriminator = ctx.decode::<u8>("discriminator")?;
