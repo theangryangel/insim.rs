@@ -2,14 +2,14 @@
 //! [`crate::App`] against a live connection, and the [`Sender`] back-channel
 //! that hands packets/events to the runtime from anywhere.
 //!
-//! [`run`] is a convenience wrapper that opens a connection from an
-//! `insim::Builder`. [`run_connection`] accepts an already-established
+//! [`run`] is a deprecated convenience wrapper that opens a connection from an
+//! `insim::builder::Builder`. [`run_connection`] accepts an already-established
 //! connection, emits a one-shot [`crate::Startup`] synthetic event, then runs
 //! the dispatch loop until the connection drops or the back-channel closes.
 
 use std::{any::Any, sync::Arc};
 
-use insim::net::tokio_impl::Framed;
+use insim::net::{Session, Tokio};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
@@ -96,6 +96,10 @@ impl<S, V: crate::ui::View + 'static> FromContext<S, V> for Sender {
 ///
 /// Immediately after the connection is established the runtime emits a
 /// [`Startup`] synthetic event so handlers can install background work.
+#[deprecated(
+    note = "Create and handshake an insim::Session, then call run_connection(session, app)"
+)]
+#[allow(deprecated)]
 pub async fn run<S, V>(builder: insim::builder::Builder, app: App<S, V>) -> Result<(), AppError>
 where
     S: Send + Sync + 'static,
@@ -112,7 +116,10 @@ where
 /// with LFS, [`Startup`] is emitted once, and [`Shutdown`] is emitted before
 /// returning. Callers that supervise or reconnect should construct a fresh
 /// [`App`] for each connection and call this function again.
-pub async fn run_connection<S, V>(mut connection: Framed, app: App<S, V>) -> Result<(), AppError>
+pub async fn run_connection<S, V>(
+    mut connection: Session<Tokio>,
+    app: App<S, V>,
+) -> Result<(), AppError>
 where
     S: Send + Sync + 'static,
     V: crate::ui::View + 'static,
@@ -182,7 +189,7 @@ where
 
 #[allow(clippy::too_many_arguments)] // runtime plumbing; bundling would re-churn the dispatch_cycle call sites
 async fn run_dispatch_loop<S, V>(
-    framed: &mut Framed,
+    framed: &mut Session<Tokio>,
     sender: &Sender,
     world: &World,
     ui: &crate::ui::Ui<V>,

@@ -1,303 +1,465 @@
-# Introduction & Assumptions
+# Introduction and assumptions
 
-This book is intended as an introduction to the the insim crate.
+This book introduces the `insim` crate. It assumes a basic understanding of Rust
+and the InSim protocol, including connections (UCID), players (PLID), packets and
+request identifiers.
 
-The guide does assume basic understanding of both rust, and the insim protocol and
-concepts and conventions within Live For Speed.
+The crate provides typed packets, protocol handling and networking for Live for
+Speed. Packet and flag names follow InSim.txt where practical, dropping prefixes
+such as `IS_` and `ISF_`. Some packed wire fields are split into separate Rust
+fields for convenience.
 
-Fundamentally the insim crate is not just a thin wrapper on top of a series of bytes. It
-actively tries to make things as easy for you as possible by providing abstractions and
-opinionated standards.
+The API uses Rust types for protocol concepts:
 
-## Compatibility with InSim.txt?
+- `Duration` for packet intervals and other time values.
+- Bitflags for options such as [IsiFlags](crate::insim::IsiFlags).
+- [ConnectionId](crate::identifiers::ConnectionId) and
+  [PlayerId](crate::identifiers::PlayerId) to distinguish connections from players.
+- [RaceLaps](crate::insim::RaceLaps) for lap counts and timed races.
+- [ObjectInfo](crate::insim::ObjectInfo) for layout objects.
 
-- Where ever possible we have attempted to ensure that packets, fields and flags named closely to the original insim spec
-- There are some exceptions to this, such as thrbrk in the contact packet, which we have
-  split for ergonomics.
-- By convention we have generally dropped the `IS_` prefix from packets and any prefix
-  from flags (such as `ISF_`) as we have a stand alone bitflags based struct to interact
-  with.
-- Where ever possible/reasonable we prefer rust native types:
-  - Duration instead of milliseconds or seconds
-  - bitflags over manual bit fiddling
-- Where ever possible we provide higher level abstractions, such as (this is a
-  non-exhaustive list):
-  - [RaceLaps](crate::insim::RaceLaps) to avoid the user of the library needing to constantly reimplement protocol level rules.
-  - [Connectionid](crate::identifiers::ConnectionId), [PlayerId](crate::identifiers::PlayerId) to avoid confusing plid and ucid.
-  - [ObjectInfo](crate::insim::ObjectInfo) for layout objects
-  - `Duration` instead of raw milliseconds/centiseconds/seconds
-  - etc.
+## Tokio, blocking and sans-I/O
 
-## Tokio vs blocking vs sans-io?
+The `tokio` and `blocking` features are both enabled by default. Disable default
+features and enable only the runtime you need when appropriate.
 
-Selecting the right paradigm depends on your application's architecture, scalability requirements, and the specific features of the Live For Speed protocol you intend to use.
+Your socket selects the session's runtime:
 
-Where ever possible we've tried to keep compatibility between blocking and tokio
-features almost identical. Infact the only change you need in 99.9% of cases is your
-`read`, `write` and `connnect` calls need to been awaited.
+- Tokio sockets produce `Session<Tokio>`. Waiting operations such as `handshake`,
+  `read`, `write`, `flush` and `shutdown` are async. The application supplies the
+  Tokio runtime.
+- Standard-library sockets produce `Session<Blocking>`. The same operations block
+  the calling thread. Internally the sockets are nonblocking; the blocking adapter
+  waits for readiness across the control socket and attached sockets.
+- Operations that do not wait, such as `queue`, `try_read` and `attach`, have the
+  same calling style for both runtimes.
 
-### Tokio (Async)
+Tokio examples below belong inside an async function. Network examples are
+compile-checked as `no_run` doctests, so testing the documentation does not require
+LFS. Examples that take an existing `connection` assume a mutable Tokio session.
 
-The `tokio` feature is the default choice for modern Rust async networking.
-
-It leverages an asynchronous runtime to manage non-blocking I/O, allowing your application to remain responsive while waiting for data to arrive from the simulator.
-
-- Pick Tokio when: If you are building a high-performance server, such as a relay or a complex race management bot that must handle many concurrent connections or intensive background tasks without stalling.
-- Trade-offs: It requires an async executor and introduces "function coloring," meaning your code must be async throughout the call chain to avoid blocking the runtime.
-
-### Blocking (Synchronous)
-
-The blocking feature provides a straightforward, procedural API where each network operation halts execution until it completes.
-
-- Pick blocking when: Ideal for simple scripts, small command-line utilities, or "quick and dirty" race clients where procedural simplicity is prioritized over scalability. It is often sufficient for most race-day tools because "computers are fast actually," and a few OS threads are more than enough to handle race telemetry.
-- Trade-offs: It has lower cognitive overhead than async code but the moment you want to do stuff in the background or you want to manage dozens of concurrent connections simultaneously it gets more complicated.
-
-### Sans-IO (Bring your Own IO)
-
-The "Sans-IO" approach is a design pattern that separates the protocol logic (state machine, packet parsing, encoding and connection upkeep) from the actual byte-shoveling of network sockets. In the insim crate, this core logic is exposed through [net::Codec](crate::net::Codec).
-
-- Pick sans-io when:
-  - Mixed Protocols: This is the only way to easily mix TCP (for reliable game state) and UDP (for high-frequency positional updates like MCI packets) within a single application loop.
-  - Custom Runtimes: Pick this if you are using an alternative async runtime (like smol or async-std) or targeting restricted environments like WASM or no_std embedded hardware where standard network sockets are not available.
-  - Testing: It is the best choice for complex testing, as you can verify logic deterministically without mocking sockets.
-- Trade-offs: It requires you to implement your own "event loop" to drive the protocol forward, manually feeding bytes into the [Codec](crate::net::Codec) and pulling packets and connection upkeep information out.
+For applications that provide their own I/O,
+[InsimCodec](crate::net::InsimCodec) translates framed bytes and packets, while
+[Context](crate::net::Context) handles the conversation using time supplied by the
+caller. Neither component owns a socket or reads the clock.
 
 ## Establishing a connection
 
-Establishing a connection is about as simple as it can be, if you use either of the 2
-connection helpers:
+Create a socket, pass it to [Session](crate::Session), then start InSim with an
+[Isi](crate::insim::Isi) handshake. Here, "session" means a link to LFS, rather than
+a race session.
 
-- [tcp](crate::tcp)
-- [udp](crate::udp)
+```rust,no_run
+# #[cfg(feature = "tokio")]
+# async fn example() -> insim::Result<()> {
+use insim::{Session, identifiers::RequestId, insim::Isi};
+use tokio::net::TcpStream;
 
-These both return a [builder](crate::builder::Builder), which has a `connect` function (amongst others to handle setting values on the Isi / handshake packet) for both tokio and blocking
-features, which will attempt to connect to Live For Speed.
-
-This builder handles:
-
-- The connection to LFS via tcp or udp.
-- The initial handshake (creation and send of [Isi](crate::insim::Isi) packet).
-- The upkeep of the connection (automatically responding to keep alive requests) - as
-  long as the connection is polled (for tokio and blocking this means calling read
-  reliably).
-
-## Understanding the packet loop / Maintaining the connection
-
-In the context of networking for Live For Speed (LFS), the "packet loop" is the heartbeat of your application. Since LFS uses a stateful connection (typically via InSim), the protocol expects a constant dialogue to confirm that your insim client is still "alive".
-
-The most critical constraint of the LFS network stack is the timeout threshold. If the LFS server does not see activity from your connection-specifically, if you fail to acknowledge or poll the socket-it assumes a "ghost" connection and drops it.
-
-We handle this for you, but only if you poll the read buffer.
-
-> **Warning:** You must poll the read buffer at least once every 70 seconds.
-> Failure to do so will cause Live For Speed to timeout the connection.
-> We recommend at least every 30 seconds.
-
-In a typical implementation, your loop would look something like this conceptually:
-
-```rust,ignore
-let conn = insim::tcp("127.0.0.1:29999").connect_async().await?;
-loop {
-    let packet = conn.read().await?;
-    println!("{:?}", packet);
-}
-```
-
-## Shortcuting the creation of packets
-
-`insim` has a monolothic [Packet](crate::Packet) enum to help quickly and easily
-identify all packets when receiving them, but also when sending.
-
-Every Packet enum variant is conventionally a NewType.
-
-However, it can be quite tedious to do this by hand.
-
-Fortunately all packet variants payloads implement `Into<Packet>`.
-
-Also fortunately many of the appropriate subtypes also implement `Into<Packet>`,
-allowing you to just send those. For example, all the [TinyType](crate::insim::TinyType)
-subtypes.
-
-```rust,ignore
-use insim::{Packet, insim::{Tiny, TinyType}};
-
-// send will automatically take anything that converts into Packet, so these 3 are
-// functionally the equivalent!
-connection.write(Packet::Tiny(insim::insim::Tiny {
-    subt: TinyType::None,
-    ..Default::default()
-}));
-
-connection.write(insim::insim::Tiny {
-    subt: TinyType::None,
-    ..Default::default()
-});
-
-connection.write(TinyType::None);
-```
-
-It's also very common to want to send a [RequestId](crate::identifiers::RequestId)
-against a packet. LFS will only send a reply to packets where `reqi` is non-zero, and
-it echoes the value back so you can correlate a response to its original request.
-To aid this process, you can import the [WithRequestId](crate::WithRequestId) trait:
-
-```rust,ignore
-use insim::{Packet, WithRequestId, identifiers::RequestId, insim::{Tiny, TinyType}};
-
-// so these 3 are also functionally the equivalent!
-connection.write(Packet::Tiny(Tiny {
+let stream = TcpStream::connect("127.0.0.1:29999").await?;
+let isi = Isi {
     reqi: RequestId(1),
-    subt: TinyType::None,
-    ..Default::default()
-}));
-
-connection.write(Tiny {
-    reqi: RequestId(1),
-    subt: TinyType::None,
-    ..Default::default()
-});
-
-connection.write(TinyType::None.with_request_id(1));
-```
-
-# Cookbook / Recipies
-
-You can find a wide range of examples in the upstream repository under [examples/](https://github.com/theangryangel/insim.rs/tree/main/examples).
-
-What you will find there:
-
-- Connection basics (async and blocking TCP/UDP).
-- Layout objects / AXM packet tooling.
-- Live telemetry and in-game UI.
-- Other protocols (Outsim and Outgauge).
-- PTH tooling (PTH to SVG conversion).
-
-If you're finding something missing, PRs are always welcome.
-
-## Error handling
-
-All connection read/write operations return `Result<_, insim::Error>`. Most errors are
-fatal - the connection is no longer usable once one is returned and you should
-reconnect. See [`crate::error::Error`] for the full list.
-
-```rust,ignore
-loop {
-    match connection.read().await {
-        Ok(packet) => { /* handle packet */ },
-        Err(insim::Error::Disconnected) => {
-            // LFS closed the connection (shutdown, kick, etc.) - reconnect
-            break;
-        },
-        Err(insim::Error::Timeout(_)) => {
-            // No data received within the timeout window - reconnect
-            break;
-        },
-        Err(e) => return Err(e.into()),
-    }
-}
-```
-
-Errors from `write`/`send` calls are different: [`crate::error::Error::Encode`] means the
-packet you built was invalid (e.g. too many objects in an [`crate::insim::Axm`]). The
-connection is still alive in that case.
-
-## Receiving telemetry (MCI)
-
-MCI requires the [`crate::insim::IsiFlags::MCI`] flag and a non-zero interval set
-during the handshake. Each [`crate::insim::Mci`] packet carries a `Vec` of
-[`crate::insim::CompCar`] entries, one per car currently on track:
-
-```rust,ignore
-let mut connection = insim::tcp("127.0.0.1:29999")
-    .isi_flag_mci(true)
-    .isi_interval(Duration::from_millis(200))
-    .connect_async()
-    .await?;
+    ..Isi::default()
+};
+let mut connection = Session::tcp(stream)?.handshake(isi).await?;
 
 loop {
     let packet = connection.read().await?;
+    println!("{packet:?}");
+}
+# }
+```
 
-    if let insim::Packet::Mci(mci) = packet {
+`Session::tcp` and `Session::udp` initially return
+[Unstarted](crate::Unstarted). `handshake` sends `Isi`, waits for a matching `Ver`,
+and checks the protocol version. `Isi.reqi` must be nonzero, because zero does not
+request that reply. The `Ver` packet remains available through `read()`.
+
+For UDP control, connect the socket to LFS first:
+
+```rust,no_run
+# #[cfg(feature = "tokio")]
+# async fn example() -> insim::Result<()> {
+use insim::{Session, identifiers::RequestId, insim::Isi};
+use tokio::net::UdpSocket;
+
+let socket = UdpSocket::bind("0.0.0.0:0").await?;
+socket.connect("127.0.0.1:29999").await?;
+let isi = Isi {
+    reqi: RequestId(1),
+    udpport: socket.local_addr()?.port(),
+    ..Isi::default()
+};
+let mut connection = Session::udp(socket)?.handshake(isi).await?;
+let packet = connection.read().await?;
+println!("{packet:?}");
+# Ok(())
+# }
+```
+
+The session does not rewrite `Isi.udpport`. Set it to the port LFS should send to;
+zero requests replies at the UDP control socket's source port. UDP handshakes
+retry initialization until a matching reply arrives or the handshake times out.
+
+The blocking equivalent uses standard-library sockets:
+
+```rust,no_run
+# #[cfg(feature = "blocking")]
+# fn example() -> insim::Result<()> {
+use insim::{Session, identifiers::RequestId, insim::Isi};
+use std::net::TcpStream;
+
+let stream = TcpStream::connect("127.0.0.1:29999")?;
+let isi = Isi {
+    reqi: RequestId(1),
+    ..Isi::default()
+};
+let mut connection = Session::tcp(stream)?.handshake(isi)?;
+let packet = connection.read()?;
+println!("{packet:?}");
+# Ok(())
+# }
+```
+
+If the caller has already initialized the link, `Session::tcp(socket)?.resume()`
+or `Session::udp(socket)?.resume()` skips the handshake. Before choosing handshake
+or resume, `Unstarted` can receive attached telemetry but cannot send application
+InSim packets.
+
+The older `insim::tcp`, `insim::udp` and `builder::Builder` APIs are deprecated.
+Use explicit sockets and a session for new code.
+
+## Driving the session and maintaining the connection
+
+A session has no background task. Keep driving `read()` or `flush()` so incoming
+packets, automatic keepalive replies and deadlines make progress. `write()` also
+drives the session while flushing its output. A slow handler inside the read loop
+can stall that progress; periodically entering the loop is not a guarantee that
+keepalives will be handled in time.
+
+Once InSim is active, its inactivity deadline is 70 seconds without a successfully
+processed InSim packet. InSim packets on either the control socket or an attached
+socket refresh that deadline. OutGauge and OutSim do not. Standalone telemetry
+listeners and unstarted conversations have no inactivity timeout.
+
+### Queueing, flushing and cancellation
+
+`queue(packet)` encodes and accepts output without waiting. `flush()` drives both
+reads and writes until the socket has accepted all queued output:
+
+```rust,no_run
+# #[cfg(feature = "tokio")]
+# async fn example(connection: &mut insim::Session<insim::net::Tokio>) -> insim::Result<()> {
+use insim::{WithRequestId, insim::TinyType};
+
+connection.queue(TinyType::Ver.with_request_id(1))?;
+connection.queue(TinyType::Sst.with_request_id(2))?;
+connection.flush().await?;
+# Ok(())
+# }
+```
+
+`write(packet).await` queues once and then flushes. Cancelling `read`, `write` or
+`flush` preserves accepted output and partial I/O progress. A cancelled write may
+already have been sent or remain queued: call `flush()` to finish pending output.
+Repeating `write(packet)` can send a duplicate.
+
+Socket acceptance is not acknowledgement from LFS. Output still requires the
+session to be driven, and dropping the session drops its pending output. The
+owning `handshake` future is different from a borrowed read or write: cancelling
+it drops the link.
+
+Use `shutdown()` to send `TINY_CLOSE`, drain output and close the TCP write
+direction. For Tokio, await it; for blocking sessions, call it directly.
+
+## Constructing packets
+
+[Packet](crate::Packet) identifies incoming InSim and attached telemetry packets.
+Its payload types implement `Into<Packet>`. InSim subtypes such as
+[TinyType](crate::insim::TinyType) can also be converted directly.
+
+These three forms send the same InSim packet:
+
+```rust,no_run
+# #[cfg(feature = "tokio")]
+# async fn example(connection: &mut insim::Session<insim::net::Tokio>) -> insim::Result<()> {
+use insim::{Packet, insim::{Tiny, TinyType}};
+
+connection.write(Packet::Tiny(Tiny {
+    subt: TinyType::Ver,
+    ..Tiny::default()
+})).await?;
+
+connection.write(Tiny {
+    subt: TinyType::Ver,
+    ..Tiny::default()
+}).await?;
+
+connection.write(TinyType::Ver).await?;
+# Ok(())
+# }
+```
+
+For requests that support replies, set a nonzero
+[RequestId](crate::identifiers::RequestId). LFS echoes it in the response. This
+correlates a request with its replies; it does not turn every instruction into a
+request or suppress unsolicited packets.
+
+The [WithRequestId](crate::WithRequestId) trait avoids constructing a full packet:
+
+```rust,no_run
+# #[cfg(feature = "tokio")]
+# async fn example(connection: &mut insim::Session<insim::net::Tokio>) -> insim::Result<()> {
+use insim::{Packet, WithRequestId, identifiers::RequestId, insim::{Tiny, TinyType}};
+
+connection.write(Packet::Tiny(Tiny {
+    reqi: RequestId(1),
+    subt: TinyType::Ver,
+})).await?;
+
+connection.write(Tiny {
+    reqi: RequestId(1),
+    subt: TinyType::Ver,
+}).await?;
+
+connection.write(TinyType::Ver.with_request_id(1)).await?;
+# Ok(())
+# }
+```
+
+Attached OutGauge and OutSim variants are receive-only. Converting them to
+`Packet` does not make them valid outgoing InSim packets.
+
+# Cookbook
+
+Working applications are available in the repository's
+[examples directory](https://github.com/theangryangel/insim.rs/tree/main/examples),
+including connection basics, telemetry, layout editing, in-game UI and PTH tools.
+
+## Error handling
+
+Session operations return `Result<_, insim::Error>`. Connection failures, version
+mismatches, InSim timeouts and incoming-buffer overflow are terminal.
+
+Complete UDP packets are returned in order. If a later packet is malformed, the
+session logs a warning and discards only the malformed remainder. It continues
+with other input without failing `read`, `flush`, `write` or `handshake` for that
+decode error. Standalone listeners and low-level transports still report their
+UDP decoding errors to their callers.
+
+TCP framing/decoding errors and socket I/O errors remain terminal session errors.
+
+```rust,no_run
+# #[cfg(feature = "tokio")]
+# async fn example(connection: &mut insim::Session<insim::net::Tokio>) -> insim::Result<()> {
+use insim::Error;
+
+loop {
+    match connection.read().await {
+        Ok(packet) => println!("{packet:?}"),
+        Err(Error::Disconnected | Error::Timeout(_)) => break,
+        Err(error) => return Err(error),
+    }
+}
+# Ok(())
+# }
+```
+
+`Error::Encode` means an outgoing packet could not be encoded. That packet was not
+accepted, previously queued output remains intact, and the connection can still
+be used. `Error::OutgoingOverflow` returned by application `queue()` means there
+is no room for another packet; flush pending output before retrying.
+
+While `flush` or `handshake` drives incoming traffic, the session buffers up to
+16384 incoming packets. When the buffer is full it stops reading until you call
+`read`: unread input waits in the operating system's socket buffers, TCP flow
+control slows LFS, and the inactivity timeout is held. On UDP the operating
+system may drop datagrams once its own buffer fills. Exhausting the reserved
+automatic-response output capacity also closes the session.
+
+## Receiving telemetry (MCI)
+
+Enable [IsiFlags::MCI](crate::insim::IsiFlags::MCI) and a nonzero interval in the
+handshake. Each [Mci](crate::insim::Mci) packet contains a batch of
+[CompCar](crate::insim::CompCar) entries; an update can span multiple packets.
+Coordinates are stored in fixed-point units, so use metre conversion helpers for
+display:
+
+```rust,no_run
+# #[cfg(feature = "tokio")]
+# async fn example() -> insim::Result<()> {
+use insim::{Session, identifiers::RequestId, insim::{Isi, IsiFlags}};
+use std::time::Duration;
+use tokio::net::TcpStream;
+
+let stream = TcpStream::connect("127.0.0.1:29999").await?;
+let isi = Isi {
+    reqi: RequestId(1),
+    flags: IsiFlags::MCI,
+    interval: Duration::from_millis(200),
+    ..Isi::default()
+};
+let mut connection = Session::tcp(stream)?.handshake(isi).await?;
+
+loop {
+    if let insim::Packet::Mci(mci) = connection.read().await? {
         for car in &mci.info {
+            let (x, y, z) = car.xyz.xyz_metres();
             println!(
-                "plid={} speed={:.1}m/s x={} y={} z={}",
+                "plid={} speed={:.1}m/s x={x:.1}m y={y:.1}m z={z:.1}m",
                 car.plid,
-                car.speed.to_meters_per_sec(),
-                car.x,
-                car.y,
-                car.z,
+                car.speed.to_metres_per_sec(),
             );
         }
     }
 }
+# }
 ```
 
-## Mixed TCP + UDP (Outgauge, Outsim, MCI/NLP via UDP)
+## Mixed TCP and UDP
 
-LFS can route high-frequency packets - [`crate::insim::Mci`], [`crate::insim::Nlp`],
-Outsim, and Outgauge - over UDP while keeping all other InSim traffic on the TCP
-connection. This avoids head-of-line blocking on the TCP stream for latency-sensitive
-positional data.
+Keep control traffic on TCP and receive positional updates and telemetry on an
+attached UDP socket. Bind the socket, put its actual local port in `Isi.udpport`,
+and attach a decoder before starting the handshake. Using the actual port also
+supports binding to port `0`.
 
-The pattern requires:
+[Demux](crate::net::Demux) allows several protocols to share the UDP socket. All
+packets then arrive through one `read()` loop; the session handles InSim framing
+and routes automatic responses through the control transport.
 
-1. Bind a [`tokio::net::UdpSocket`] yourself and pass its port to the builder via
-   [`crate::builder::Builder::isi_udpport`].
-2. Enable Outsim/Outgauge by sending [`crate::insim::SmallType::Ssp`] and
-   [`crate::insim::SmallType::Ssg`] with the desired interval after connecting.
-3. Drive both sources inside a `tokio::select!` loop.
-
-When reading raw UDP datagrams you are responsible for distinguishing packet types.
-LFS does not prepend a discriminant: use the datagram size as a heuristic (92 bytes ->
-Outgauge, 64 bytes -> Outsim, anything else -> InSim packet). For InSim packets received
-over UDP you must also skip the leading length byte before decoding, as that framing is
-normally handled internally by the crate.
-
-A full working example lives in `examples/ssg-manual/`.
-
-```rust,ignore
+```rust,no_run
+# #[cfg(feature = "tokio")]
+# async fn example() -> insim::Result<()> {
+use insim::{
+    Packet, Session,
+    identifiers::RequestId,
+    insim::{Isi, IsiFlags, SmallType},
+    net::{Demux, InsimCodec, OutGaugeCodec, OutSimCodec},
+};
 use std::time::Duration;
-use insim::{Packet, core::Decode, insim::SmallType};
-use outgauge::Outgauge;
-use outsim::OutsimPack;
-use tokio::net::UdpSocket;
+use tokio::net::{TcpStream, UdpSocket};
 
-let udp = UdpSocket::bind("0.0.0.0:30000").await?;
-let mut buf = [0u8; 1024];
+let stream = TcpStream::connect("127.0.0.1:29999").await?;
+let udp = UdpSocket::bind("0.0.0.0:0").await?;
+let isi = Isi {
+    reqi: RequestId(1),
+    udpport: udp.local_addr()?.port(),
+    flags: IsiFlags::MCI,
+    interval: Duration::from_secs(1),
+    ..Isi::default()
+};
+let decoder = Demux::new()
+    .with(OutGaugeCodec)
+    .with(OutSimCodec::default())
+    .with(InsimCodec);
+let mut connection = Session::tcp(stream)?
+    .attach_udp(udp, decoder)?
+    .handshake(isi).await?;
 
-let mut connection = insim::tcp("127.0.0.1:29999")
-    .isi_flag_mci(true)
-    .isi_interval(Duration::from_secs(1))
-    .isi_udpport(30000)   // tell LFS to send UDP packets here
-    .connect_async()
-    .await?;
-
-// enable Outsim and Outgauge
+// Start OutSim and OutGauge when they are not already configured in cfg.txt.
 connection.write(SmallType::Ssp(Duration::from_secs(1))).await?;
 connection.write(SmallType::Ssg(Duration::from_secs(1))).await?;
 
 loop {
-    tokio::select! {
-        packet = connection.read() => {
-            let packet = packet?;
-            // handle normal InSim packets
-        },
-        res = udp.recv_from(&mut buf) => {
-            let (amt, _src) = res?;
-
-            if amt == 92 {
-                // Outgauge
-                let packet = Outgauge::decode_slice(&buf[..amt])?;
-            } else if amt == 64 {
-                // Outsim
-                let packet = OutsimPack::decode_slice(&buf[..amt])?;
-            } else if amt > 1 {
-                // Mci / Nlp - skip the leading length byte
-                let packet = Packet::decode_slice(&buf[1..amt])?;
-            }
-        }
+    match connection.read().await? {
+        Packet::Mci(packet) => println!("MCI: {packet:?}"),
+        Packet::Outgauge(packet) => println!("OutGauge: {packet:?}"),
+        Packet::Outsim(packet) => println!("OutSim: {packet:?}"),
+        packet => println!("InSim: {packet:?}"),
     }
 }
+# }
+```
+
+The stack tries decoders in order; the first decoder that claims a datagram wins.
+`SMALL_SSG` and `SMALL_SSP` send OutGauge and OutSim to `Isi.udpport`, the same
+port as MCI and NLP, so they cannot be given separate ports from InSim. OutGauge
+and original OutSim have no protocol markers and are recognized by size: OutSim
+is 64 or 68 bytes and OutGauge 92 or 96. MCI never has those sizes, but an NLP
+for 10 or 15 players is 64 or 96 bytes. Put the telemetry decoders first and
+[InsimCodec](crate::net::InsimCodec) last. Known issue: with this order, an NLP
+for 10 or 15 players is decoded as OutSim or OutGauge, with no error. Telemetry configured in LFS's
+`cfg.txt` can instead be sent to a separate port with its own listener.
+A decoder that claims malformed input returns an error instead of falling through
+to another decoder. The session logs and skips that UDP input. Packets from different sockets have no common arrival ordering,
+and `read()` does not currently report which socket supplied them.
+
+All attached sockets must use the same runtime. `Isi.udpport` is passed unchanged
+to LFS, allowing NAT or port forwarding. A port without a matching local UDP
+socket produces a warning at handshake rather than an error.
+
+The complete mixed-protocol example is in `examples/ssg-manual/`.
+
+### Standalone and attached listeners
+
+OutGauge and OutSim can also be received without an InSim session. Their listeners
+have no inactivity timeout. `try_read()` returns a packet if available without
+waiting; `read()` waits using the socket's runtime.
+
+```rust,no_run
+# #[cfg(feature = "tokio")]
+# async fn example() -> insim::Result<()> {
+use tokio::net::UdpSocket;
+
+let socket = UdpSocket::bind("0.0.0.0:30000").await?;
+let mut gauges = outgauge::Listener::udp(socket)?;
+let gauge: outgauge::Outgauge = gauges.read().await?;
+println!("{gauge:?}");
+
+let socket = UdpSocket::bind("0.0.0.0:30001").await?;
+let mut positions = outsim::Listener::udp(socket)?;
+let position: outsim::OutsimPack = positions.read().await?;
+println!("{position:?}");
+# Ok(())
+# }
+```
+
+Enable the corresponding `tokio` or `blocking` feature on the `outgauge` or
+`outsim` dependency when calling its runtime-specific `read()` method.
+
+OutSim's format is an explicit choice. The default codec and `Listener::udp`
+return the original `OutsimPack`. For the extended format, configure LFS's
+`OutSim Opts` in `cfg.txt` and supply the same options to the decoder or listener:
+
+```rust,no_run
+# #[cfg(feature = "tokio")]
+# async fn example() -> insim::Result<()> {
+use outsim::outsimpack2::{OutSimOpts, OutsimPack2};
+use tokio::net::UdpSocket;
+
+let opts = OutSimOpts::all(); // must match OutSim Opts in LFS's cfg.txt
+let socket = UdpSocket::bind("0.0.0.0:30002").await?;
+let mut positions = outsim::Listener::extended(socket, opts)?;
+let position: OutsimPack2 = positions.read().await?;
+println!("{position:?}");
+# Ok(())
+# }
+```
+
+For an attached decoder stack, use `OutSimCodec::extended(opts)` instead of
+`OutSimCodec::default()`. The extended packet reaches a session as
+`Packet::Outsim2`; the original format reaches it as `Packet::Outsim`.
+`SMALL_SSP` controls the update interval; it does not select extended fields.
+
+A standalone listener can be consumed by `attach`:
+
+```rust,no_run
+# #[cfg(feature = "tokio")]
+# async fn example() -> insim::Result<()> {
+use insim::{Session, identifiers::RequestId, insim::Isi};
+use tokio::net::{TcpStream, UdpSocket};
+
+let stream = TcpStream::connect("127.0.0.1:29999").await?;
+// This example receives OutGauge configured in LFS to send to port 30000.
+let socket = UdpSocket::bind("0.0.0.0:30000").await?;
+let gauges = outgauge::Listener::udp(socket)?;
+let isi = Isi { reqi: RequestId(1), ..Isi::default() };
+let mut connection = Session::tcp(stream)?
+    .attach(gauges)
+    .handshake(isi).await?;
+let packet = connection.read().await?;
+println!("{packet:?}");
+# Ok(())
+# }
 ```
 
 ## Tracking player join / leave
@@ -308,7 +470,9 @@ player (e.g. after pitting to spectate). To get an initial snapshot of all curre
 connections and players, send [`crate::insim::TinyType::Ncn`] and
 [`crate::insim::TinyType::Npl`] after connecting:
 
-```rust,ignore
+```rust,no_run
+# #[cfg(feature = "tokio")]
+# async fn example(connection: &mut insim::Session<insim::net::Tokio>) -> insim::Result<()> {
 use insim::{WithRequestId, insim::TinyType};
 
 // request current state - replies arrive as normal Ncn/Npl packets with reqi echoed
@@ -324,32 +488,44 @@ loop {
         _ => {},
     }
 }
+# Ok(())
+# }
 ```
 
 ## Sending messages
 
-Use [`crate::insim::Mst`] to broadcast or [`crate::insim::Mtc`] for a private message:
+Use [`crate::insim::Mst`] for chat text or slash commands, [`crate::insim::Msx`]
+for longer chat text, and [`crate::insim::Mtc`] for a private message from the host.
+`Mst` has a 64-byte text field; `Msx` has a 96-byte field. One byte is reserved for
+termination, leaving up to 63 and 95 encoded text bytes respectively. Limits are
+in encoded bytes, including codepage and colour sequences, rather than Rust
+character counts.
 
-```rust,ignore
-use insim::insim::{Mst, Mtc};
+```rust,no_run
+# #[cfg(feature = "tokio")]
+# async fn example(connection: &mut insim::Session<insim::net::Tokio>) -> insim::Result<()> {
+use insim::insim::{Mst, Msx, Mtc};
 use insim::identifiers::ConnectionId;
 
-// broadcast to all (up to 64 chars via Msx, longer via Mst)
+// Send chat text or a command using the shorter Mst field.
 connection.write(Mst { msg: "Hello track!".into(), ..Default::default() }).await?;
 
-// private message to one connection
+connection.write(Msx { msg: "A longer chat message".into(), ..Default::default() }).await?;
+
+// Private message to one connection (requires host privileges).
 connection.write(Mtc {
     ucid: ConnectionId(3),
     text: "Hello driver!".into(),
     ..Default::default()
 }).await?;
+# Ok(())
+# }
 ```
 
 ## Colouring strings
 
 `insim` re-exports string helpers from the internal core crate for convenience, allowing
-you to quickly build strings with colours, without having to constantly lookup what
-colours are what numbers..
+you to build coloured strings without looking up numeric colour codes.
 
 ```rust
 use insim::Colour;
@@ -392,8 +568,8 @@ was originally escaped text or a real colour control sequence.
 
 ## Layout objects
 
-The insim crate now provides higher level layout object abstraction, allowing you to
-just get busy building stuff.
+Layout objects use typed variants to represent their coordinates, colours and
+other options.
 
 You'll find most of it documented under [crate::insim::ObjectInfo].
 
@@ -417,11 +593,13 @@ Two variants have non-standard wire layouts and are handled transparently:
 
 A simple example adding a single tyre stack to the track:
 
-```rust,ignore
-use insim::insim::{Axm, PmoAction, PmoFlags};
+```rust,no_run
+# #[cfg(feature = "tokio")]
+# async fn example(connection: &mut insim::Session<insim::net::Tokio>) -> insim::Result<()> {
+use insim::insim::{Axm, PmoAction};
 use insim::core::object::{ObjectInfo, ObjectCoordinate};
 use insim::core::object::tyres::{Tyres, TyreColour};
-use insim::core::heading::Heading;
+use insim::core::heading::ObjectHeading;
 
 connection.write(Axm {
     action: PmoAction::AddObjects(vec![
@@ -429,9 +607,11 @@ connection.write(Axm {
             xyz: ObjectCoordinate::new(0, 0, 0),
             colour: TyreColour::Blue,
             floating: false,
-            heading: Heading::ZERO,
+            heading: ObjectHeading::ZERO,
         })
     ]),
     ..Default::default()
 }).await?;
+# Ok(())
+# }
 ```

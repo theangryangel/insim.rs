@@ -89,7 +89,7 @@ impl Encode for OutgaugeId {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Outgauge packet
 pub struct Outgauge {
@@ -348,3 +348,7 @@ mod test {
         );
     }
 }
+
+/// UDP reception and pure datagram decoding.
+pub mod net;
+pub use net::{Listener, OutGaugeCodec};

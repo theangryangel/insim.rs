@@ -48,6 +48,8 @@ jobs:
         run: cargo test --all --all-targets --all-features
       - name: Run cargo test (default features)
         run: cargo test --all --all-targets
+      - name: Compile and test InSim documentation
+        run: cargo test -p insim --doc --all-features
 
   docs:
     runs-on: ubuntu-latest

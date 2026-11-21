@@ -3,9 +3,9 @@ use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
 use clap::Parser;
 use insim::{
-    Packet, Result, WithRequestId,
-    identifiers::PlayerId,
-    insim::{LclFlags, TinyType},
+    Packet, Result, Session, WithRequestId,
+    identifiers::{PlayerId, RequestId},
+    insim::{Isi, IsiFlags, LclFlags, TinyType},
 };
 use serde::Deserialize;
 
@@ -74,13 +74,19 @@ async fn main() -> Result<()> {
 
     let mut steps = step_vec.iter().cycle();
 
-    // Connect to LFS. `isi_flag_local` tells LFS that we are local insim application.
-    // `isi_iname` is the application name.
-    let mut connection = insim::tcp(cli.addr)
-        .isi_flag_local(true)
-        .isi_iname(Some("insim.rs/strobe".to_string()))
-        .connect_async()
-        .await?;
+    let stream = tokio::time::timeout(
+        Duration::from_secs(10),
+        tokio::net::TcpStream::connect(cli.addr),
+    )
+    .await??;
+    stream.set_nodelay(true)?;
+    let isi = Isi {
+        reqi: RequestId(1),
+        flags: IsiFlags::LOCAL,
+        iname: "insim.rs/strobe".into(),
+        ..Isi::default()
+    };
+    let mut connection = Session::tcp(stream)?.handshake(isi).await?;
 
     tracing::info!("Connected!");
 

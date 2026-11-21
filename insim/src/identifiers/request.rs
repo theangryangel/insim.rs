@@ -13,9 +13,13 @@ use insim_core::{Decode, DecodeContext, Encode, EncodeContext};
 /// Use [`crate::WithRequestId`] to attach a request id without constructing the full
 /// packet struct by hand:
 ///
-/// ```rust,ignore
+/// ```rust,no_run
+/// # #[cfg(feature = "tokio")]
+/// # async fn example(connection: &mut insim::Session<insim::net::Tokio>) -> insim::Result<()> {
 /// use insim::{WithRequestId, insim::TinyType};
-/// connection.send(TinyType::Ncn.with_request_id(1));
+/// connection.write(TinyType::Ncn.with_request_id(1)).await?;
+/// # Ok(())
+/// # }
 /// ```
 ///
 /// The echo value has no special meaning beyond correlation - any non-zero `u8` works.

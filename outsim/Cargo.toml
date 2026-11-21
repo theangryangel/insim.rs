@@ -21,6 +21,8 @@ rustdoc-args = ["--cfg", "docrs"]
 
 [features]
 default = []
+tokio = ["insim_core/tokio"]
+blocking = ["insim_core/blocking"]
 glam = [
   "insim_core/glam",
 ]

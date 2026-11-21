@@ -1,18 +1,26 @@
 //! Demonstrate button click identifier handling.
 
 use insim::{
-    Packet,
+    Packet, Session,
     identifiers::{ClickId, ConnectionId, RequestId},
-    insim::{Bfn, BfnType, Btn, BtnStyle},
+    insim::{Bfn, BfnType, Btn, BtnStyle, Isi, IsiFlags},
 };
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut net = insim::tcp("172.24.64.1:29999")
-        .isi_iname("btn-clickid-mvp".to_string())
-        .isi_flag_local(true)
-        .connect_async()
-        .await?;
+    let stream = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        tokio::net::TcpStream::connect("172.24.64.1:29999"),
+    )
+    .await??;
+    stream.set_nodelay(true)?;
+    let isi = Isi {
+        reqi: RequestId(1),
+        iname: "btn-clickid-mvp".into(),
+        flags: IsiFlags::LOCAL,
+        ..Isi::default()
+    };
+    let mut net = Session::tcp(stream)?.handshake(isi).await?;
 
     // Clean slate for click id 5.
     net.write(Bfn {
