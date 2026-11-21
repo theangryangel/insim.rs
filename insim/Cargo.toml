@@ -10,7 +10,6 @@ homepage.workspace = true
 
 [lib]
 bench = false
-doctest = false
 
 [lints]
 workspace = true
@@ -22,21 +21,28 @@ rustdoc-args = ["--cfg", "docrs"]
 [features]
 default = ["tokio", "blocking"]
 allow-unknown-packet = []
-blocking = []
+blocking = ["insim_core/blocking", "outgauge/blocking", "outsim/blocking"]
 tokio = [
   "dep:tokio",
+  "insim_core/tokio",
+  "outgauge/tokio",
+  "outsim/tokio",
 ]
 serde = [
   "dep:serde",
   "insim_core/serde",
   "indexmap/serde",
   "bytes/serde",
+  "outgauge/serde",
+  "outsim/serde",
 ]
 glam = [
   "insim_core/glam"
 ]
 
 [dependencies]
+outgauge = { path = "../outgauge", version = "0.1.0" }
+outsim = { path = "../outsim", version = "0.1.1" }
 bitflags = { workspace = true }
 bytes = { workspace = true }
 from_variants = { workspace = true }
@@ -50,4 +56,3 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 sha2 = { workspace = true }
-tokio-test = { workspace = true }

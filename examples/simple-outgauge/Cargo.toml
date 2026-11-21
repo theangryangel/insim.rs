@@ -9,8 +9,7 @@ license.workspace = true
 publish = false
 
 [dependencies]
-bytes = { workspace = true }
-outgauge = { path = "../../outgauge" }
+outgauge = { path = "../../outgauge", features = ["blocking"] }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 tracing = { workspace = true }
 

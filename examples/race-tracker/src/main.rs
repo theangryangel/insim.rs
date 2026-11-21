@@ -12,8 +12,10 @@
 
 #![allow(missing_docs)]
 
+use std::time::Duration;
+
 use clap::Parser;
-use insim::WithRequestId;
+use insim::{Session, WithRequestId, identifiers::RequestId, insim::Isi};
 use insim_extra::world::{
     EntrantState, FinishStatus, RaceEvent, SessionEnded, SessionStarted, World, WorldEvent,
 };
@@ -43,12 +45,19 @@ async fn main() -> insim::Result<()> {
 
     let args = Args::parse();
 
-    let mut builder = insim::tcp(args.addr.as_str()).isi_iname("race-tracker".to_string());
-    if let Some(pw) = args.admin_password {
-        builder = builder.isi_admin_password(pw);
-    }
-
-    let mut conn = builder.connect_async().await?;
+    let stream = tokio::time::timeout(
+        Duration::from_secs(10),
+        tokio::net::TcpStream::connect(args.addr.as_str()),
+    )
+    .await??;
+    stream.set_nodelay(true)?;
+    let isi = Isi {
+        reqi: RequestId(1),
+        iname: "race-tracker".into(),
+        admin: args.admin_password.unwrap_or_default(),
+        ..Isi::default()
+    };
+    let mut conn = Session::tcp(stream)?.handshake(isi).await?;
     tracing::info!("connected");
 
     // Send startup requests once to sync state from LFS.

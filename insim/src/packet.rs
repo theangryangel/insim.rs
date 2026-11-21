@@ -73,6 +73,12 @@ macro_rules! define_packet {
                 $(#[$variant_attr])*
                 $variant($variant),
             )*
+            /// OutGauge telemetry received from an attached UDP listener.
+            Outgauge(outgauge::Outgauge),
+            /// Original-format OutSim telemetry received from an attached UDP listener.
+            Outsim(outsim::OutsimPack),
+            /// Extended OutSim telemetry received from an attached UDP listener.
+            Outsim2(Box<outsim::outsimpack2::OutsimPack2>),
             #[cfg(feature = "allow-unknown-packet")]
             /// Raw binary capture of an unknown packet.
             Unknown(Raw)
@@ -88,10 +94,25 @@ macro_rules! define_packet {
                     $(
                         Self::$variant(inner) => inner.reqi = reqi,
                     )*
+                    Self::Outgauge(_) | Self::Outsim(_) | Self::Outsim2(_) => {},
                     #[cfg(feature = "allow-unknown-packet")]
                     Self::Unknown(_) => {},
                 }
                 self
+            }
+        }
+
+        impl Packet {
+            /// The request identifier, or `None` for telemetry and unknown packets.
+            pub fn request_id(&self) -> Option<crate::identifiers::RequestId> {
+                match self {
+                    $(
+                        Self::$variant(inner) => Some(inner.reqi),
+                    )*
+                    Self::Outgauge(_) | Self::Outsim(_) | Self::Outsim2(_) => None,
+                    #[cfg(feature = "allow-unknown-packet")]
+                    Self::Unknown(_) => None,
+                }
             }
         }
 
@@ -108,7 +129,7 @@ macro_rules! define_packet {
                             Ok(Self::Unknown(
                                 Raw {
                                     discriminator: i,
-                                    data: ctx.buf.clone(),
+                                    data: ctx.buf.split_to(ctx.buf.len()),
                                 }
                             ))
                         }
@@ -133,6 +154,10 @@ macro_rules! define_packet {
                             inner.encode(ctx)?;
                         },
                     )*
+                    Self::Outgauge(_) | Self::Outsim(_) | Self::Outsim2(_) => {
+                        return Err(insim_core::EncodeErrorKind::NoVariantMatch { found: 0 }
+                            .context("telemetry cannot be sent as an InSim packet"));
+                    },
                     #[cfg(feature = "allow-unknown-packet")]
                     Self::Unknown(Raw { discriminator, data }) => {
                         ctx.encode("discriminator", discriminator)?;
@@ -305,6 +330,12 @@ define_packet!(
     /// Information - Player sent setup to host
     Set = 70
 );
+
+impl From<outsim::outsimpack2::OutsimPack2> for Packet {
+    fn from(packet: outsim::outsimpack2::OutsimPack2) -> Self {
+        Self::Outsim2(Box::new(packet))
+    }
+}
 
 impl Default for Packet {
     /// A Tiny with Type of None was selected as the default as it's a non-damaging packet

@@ -56,13 +56,13 @@ struct Cli {
 
 use glam::DVec3;
 use insim::{
-    Packet, WithRequestId,
+    Packet, Session, WithRequestId,
     core::{
         heading::ObjectHeading,
         object::{ObjectCoordinate, ObjectInfo, chalk, concrete, letterboard_rb, painted, tyres},
     },
-    identifiers::PlayerId,
-    insim::{Axm, PmoAction, TinyType},
+    identifiers::{PlayerId, RequestId},
+    insim::{Axm, Isi, IsiFlags, PmoAction, TinyType},
 };
 
 fn position_text_common(
@@ -403,12 +403,19 @@ async fn main() -> Result<()> {
 
     let args = Cli::parse();
 
-    let mut connection = insim::tcp(args.addr)
-        .isi_flag_local(true)
-        .isi_iname(Some("paint".to_string()))
-        .isi_flag_axm_edit(true)
-        .connect_async()
-        .await?;
+    let stream = tokio::time::timeout(
+        Duration::from_secs(10),
+        tokio::net::TcpStream::connect(args.addr),
+    )
+    .await??;
+    stream.set_nodelay(true)?;
+    let isi = Isi {
+        reqi: RequestId(1),
+        flags: IsiFlags::LOCAL | IsiFlags::AXM_EDIT,
+        iname: "paint".into(),
+        ..Isi::default()
+    };
+    let mut connection = Session::tcp(stream)?.handshake(isi).await?;
 
     let mut last_objects: Vec<ObjectInfo> = vec![];
 

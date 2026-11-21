@@ -7,3 +7,7 @@ pub mod outsimpack2;
 pub use ::insim_core as core;
 pub use identifiers::OutsimId;
 pub use outsimpack::OutsimPack;
+
+/// UDP reception and pure datagram decoding.
+pub mod net;
+pub use net::{Listener, OutSimCodec};

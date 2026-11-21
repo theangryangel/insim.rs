@@ -26,3 +26,6 @@ pub mod wind;
 pub use decode::{Decode, DecodeContext, DecodeError, DecodeErrorKind};
 pub use encode::{Encode, EncodeContext, EncodeError, EncodeErrorKind};
 pub use insim_macros::{Decode, Encode};
+
+/// Runtime-independent network transport and decoder composition.
+pub mod net;

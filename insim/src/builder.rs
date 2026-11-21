@@ -1,16 +1,15 @@
-//! Tools to build a connection to LFS using Insim
-use std::{
-    fmt::Debug,
-    net::{SocketAddr, ToSocketAddrs},
-    time::Duration,
-};
+//! Deprecated connection builder. Prefer explicit sockets with [`crate::Session`].
+#![allow(deprecated)]
+use std::{fmt::Debug, net::SocketAddr, time::Duration};
 
-#[cfg(feature = "blocking")]
-#[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
-use crate::net::blocking_impl::Framed as BlockingFramed;
+#[cfg(all(feature = "tokio", not(feature = "blocking")))]
+use crate::net::Session;
 #[cfg(feature = "tokio")]
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
-use crate::net::tokio_impl::Framed as AsyncFramed;
+use crate::net::Tokio;
+#[cfg(feature = "blocking")]
+#[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
+use crate::net::{Blocking, Session};
 use crate::{
     address::Addr,
     identifiers::RequestId,
@@ -18,7 +17,8 @@ use crate::{
     result::Result,
 };
 
-fn tcpstream_connect_to_any<A: ToSocketAddrs>(
+#[cfg(feature = "blocking")]
+fn tcpstream_connect_to_any<A: std::net::ToSocketAddrs>(
     addrs: A,
     timeout: Duration,
 ) -> std::io::Result<std::net::TcpStream> {
@@ -57,6 +57,9 @@ enum Proto {
 
 #[derive(Debug)]
 /// Builder to help you connect to Insim
+#[deprecated(
+    note = "Create a socket, then use Session::tcp(socket) or Session::udp(socket) followed by handshake(isi)"
+)]
 pub struct Builder {
     proto: Proto,
 
@@ -80,7 +83,6 @@ pub struct Builder {
     // Why would they do this? Absolutely no idea. However, by separating out the fields, it
     // massively simplifies things for us.
     tcp_nodelay: bool,
-    non_blocking: bool,
     udp_local_address: Option<SocketAddr>,
 }
 
@@ -93,7 +95,6 @@ impl Default for Builder {
             remote: ("127.0.0.1", 29999_u16).into(),
 
             tcp_nodelay: true,
-            non_blocking: false,
             udp_local_address: None,
 
             isi_admin_password: None,
@@ -139,11 +140,10 @@ impl Builder {
         self
     }
 
-    /// Set whether sockets are non-blocking.
-    /// Default is `false` if blocking.
-    /// Always forced for tokio implementation.
-    pub fn set_non_blocking(mut self, non_blocking: bool) -> Self {
-        self.non_blocking = non_blocking;
+    /// Previously set whether sockets were non-blocking. Sessions now always use
+    /// nonblocking sockets internally, so this has no effect.
+    #[deprecated(note = "Has no effect; sessions always use nonblocking sockets internally")]
+    pub fn set_non_blocking(self, _non_blocking: bool) -> Self {
         self
     }
 
@@ -165,7 +165,7 @@ impl Builder {
     /// handshake.
     /// If not provided 1 is used by default. Any non-zero value will result in LFS responding with
     /// a Ver packet, which will be verified by the library.
-    /// Set to 0 if you wish to circumvent this.
+    /// Zero is rejected by the explicit handshake. Use `Session::resume` to skip initialization.
     pub fn isi_reqi(mut self, i: RequestId) -> Self {
         self.isi_reqi = i;
         self
@@ -275,13 +275,10 @@ impl Builder {
     /// - NAT/PAT (read: port forwarding) reasons
     /// - You want to receive positional and other information over UDP, whilst using TCP.
     ///
-    /// If you choose to use a combination of Tcp and Udp (insim protocol dictates that if a udpport is provided
-    /// then [crate::Packet::Mci], [crate::Packet::Nlp], Outgauge and Outsim packets will be sent to the
-    /// udpport) be aware that this library *does not* currently automatically handle this protocol split for
-    /// you. You **must** spawn the relevant UdpSocket by hand. You can find an example of this in
-    /// the examples/ssg-manual/ directory.
-    ///
-    /// This may change in future versions.
+    /// This builder does not bind an additional receiver for this port. To receive
+    /// these packets in the same session, construct a session from your sockets
+    /// and use `attach` or `attach_udp` before the handshake. The port is passed
+    /// unchanged to LFS, allowing NAT or port forwarding.
     pub fn isi_udpport<P: Into<Option<u16>>>(mut self, udpport: P) -> Self {
         self.isi_udpport = udpport.into();
         self
@@ -310,41 +307,20 @@ impl Builder {
     /// The `Builder` is not consumed and may be reused.
     #[cfg(feature = "blocking")]
     #[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
-    pub fn connect_blocking(&self) -> Result<BlockingFramed> {
-        use crate::net::DEFAULT_TIMEOUT_SECS;
-
+    pub fn connect_blocking(&self) -> Result<Session<Blocking>> {
         match self.proto {
             Proto::Tcp => {
                 let stream = tcpstream_connect_to_any(&self.remote, self.connect_timeout)?;
                 stream.set_nodelay(self.tcp_nodelay)?;
-                stream.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
-                stream.set_write_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
-                if self.non_blocking {
-                    stream.set_nonblocking(true)?;
-                }
-                let mut stream: BlockingFramed = stream.into();
-                stream.write(self.isi(self.isi_udpport))?;
-
-                Ok(stream)
+                Session::tcp(stream)?.handshake(self.isi(self.isi_udpport))
             },
             Proto::Udp => {
                 let local = self.udp_local_address.unwrap_or("0.0.0.0:0".parse()?);
 
                 let stream = std::net::UdpSocket::bind(local)?;
                 stream.connect(&self.remote)?;
-                stream.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
-                stream.set_write_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))?;
-                if self.non_blocking {
-                    stream.set_nonblocking(true)?;
-                }
-
                 let port = self.isi_udpport.unwrap_or(stream.local_addr()?.port());
-                let isi = self.isi(Some(port));
-
-                let mut stream: BlockingFramed = stream.into();
-                stream.write(isi)?;
-
-                Ok(stream)
+                Session::udp(stream)?.handshake(self.isi(Some(port)))
             },
         }
     }
@@ -354,7 +330,7 @@ impl Builder {
     /// The `Builder` is not consumed and may be reused.
     #[cfg(feature = "tokio")]
     #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
-    pub async fn connect_async(&self) -> Result<AsyncFramed> {
+    pub async fn connect_async(&self) -> Result<Session<Tokio>> {
         match self.proto {
             Proto::Tcp => {
                 let connect = async {
@@ -380,10 +356,9 @@ impl Builder {
                     })??;
                 stream.set_nodelay(self.tcp_nodelay)?;
 
-                let mut stream: AsyncFramed = stream.into();
-                stream.write(self.isi(self.isi_udpport)).await?;
-
-                Ok(stream)
+                Session::tcp(stream)?
+                    .handshake(self.isi(self.isi_udpport))
+                    .await
             },
             Proto::Udp => {
                 let local = self.udp_local_address.unwrap_or("0.0.0.0:0".parse()?);
@@ -401,10 +376,7 @@ impl Builder {
                 let port = self.isi_udpport.unwrap_or(stream.local_addr()?.port());
                 let isi = self.isi(Some(port));
 
-                let mut stream: AsyncFramed = stream.into();
-                stream.write(isi).await?;
-
-                Ok(stream)
+                Session::udp(stream)?.handshake(isi).await
             },
         }
     }

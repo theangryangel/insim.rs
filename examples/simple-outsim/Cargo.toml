@@ -9,8 +9,7 @@ license.workspace = true
 publish = false
 
 [dependencies]
-bytes = { workspace = true }
-outsim = { path = "../../outsim" }
+outsim = { path = "../../outsim", features = ["blocking"] }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 tracing = { workspace = true }
 

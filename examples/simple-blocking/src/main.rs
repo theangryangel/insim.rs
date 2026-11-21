@@ -1,8 +1,16 @@
-//! High level example
-//! This example showcases the shortcut methods
-use std::{net::SocketAddr, time::Duration};
+//! Explicit standard-library sockets and an InSim session handshake.
+use std::{
+    net::{SocketAddr, TcpStream, UdpSocket},
+    time::Duration,
+};
 
 use clap::{Parser, Subcommand};
+use insim::{
+    Session,
+    identifiers::RequestId,
+    insim::{Isi, IsiFlags},
+    net::InsimCodec,
+};
 use tracing_subscriber::fmt::format::FmtSpan;
 
 #[derive(Parser)]
@@ -34,6 +42,10 @@ enum Commands {
         #[arg(long)]
         /// host:port of LFS to connect to
         addr: SocketAddr,
+
+        #[arg(long)]
+        /// Bind an additional UDP socket for MCI/NLP replies (use port 0 for a random port).
+        udp_bind: Option<SocketAddr>,
     },
 }
 
@@ -50,42 +62,50 @@ fn setup_tracing_subscriber() {
 }
 
 fn main() -> insim::Result<()> {
-    // Setup tracing_subcriber with some sane defaults
     setup_tracing_subscriber();
 
-    // Parse our command line arguments, using clap
     let cli = Cli::parse();
 
-    // Create an insim connection builder
-    let mut builder = match &cli.command {
+    // The handshake requires a nonzero ReqI.
+    let mut isi = Isi {
+        reqi: RequestId(1),
+        flags: IsiFlags::MSO_COLS
+            | IsiFlags::MCI
+            | IsiFlags::CON
+            | IsiFlags::OBH
+            | IsiFlags::AXM_LOAD
+            | IsiFlags::AXM_EDIT
+            | IsiFlags::HLV,
+        interval: Duration::from_secs(cli.isi_interval.unwrap_or(1).into()),
+        ..Isi::default()
+    };
+
+    let session = match cli.command {
         Commands::Udp { bind, addr } => {
             tracing::info!("Connecting via UDP!");
-            // use udp
-            insim::udp(*addr, *bind)
+            let socket = UdpSocket::bind(bind.unwrap_or_else(|| ([0, 0, 0, 0], 0).into()))?;
+            socket.connect(addr)?;
+            isi.udpport = socket.local_addr()?.port();
+            Session::udp(socket)?
         },
-        Commands::Tcp { addr } => {
+        Commands::Tcp { addr, udp_bind } => {
             tracing::info!("Connecting via TCP!");
-            // use udp
-            insim::tcp(*addr)
+            let stream = TcpStream::connect_timeout(&addr, Duration::from_secs(10))?;
+            stream.set_nodelay(true)?;
+            let session = Session::tcp(stream)?;
+            if let Some(bind) = udp_bind {
+                let socket = UdpSocket::bind(bind)?;
+                let local_addr = socket.local_addr()?;
+                isi.udpport = local_addr.port();
+                tracing::info!(%local_addr, "Receiving MCI/NLP over UDP; control uses TCP");
+                session.attach_udp(socket, InsimCodec)?
+            } else {
+                session
+            }
         },
     };
 
-    // set our IsiFlags
-    builder = builder
-        .isi_flag_mso_cols(true)
-        .isi_flag_mci(true)
-        .isi_flag_con(true)
-        .isi_flag_obh(true)
-        .isi_flag_axm_load(true)
-        .isi_flag_axm_edit(true)
-        .isi_flag_hlv(true);
-
-    if let Some(interval) = &cli.isi_interval {
-        builder = builder.isi_interval(Duration::from_secs((*interval).into()));
-    }
-
-    // Establish a connection
-    let mut connection = builder.connect_blocking()?;
+    let mut connection = session.handshake(isi)?;
     tracing::info!("Connected!");
 
     let mut i: usize = 0;
