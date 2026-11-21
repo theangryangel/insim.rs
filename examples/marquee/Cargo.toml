@@ -11,7 +11,6 @@ anyhow = "1.0.86"
 clap = { workspace = true, features = ["derive"] }
 insim = { path = "../../insim", features = ["tokio", "glam"] }
 tokio = { workspace = true, features = ["full"] }
-tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 glam = { workspace = true }
 

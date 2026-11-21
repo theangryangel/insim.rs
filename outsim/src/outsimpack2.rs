@@ -97,6 +97,7 @@ impl Decode for OutsimMain {
 }
 
 #[derive(Debug, Clone, Copy, Encode, Decode, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Outsim Inputs, used as part of OutsimPack2
 pub struct OutsimInputs {
     /// Throttle, 0-1
@@ -112,6 +113,7 @@ pub struct OutsimInputs {
 }
 
 #[derive(Debug, Clone, Copy, Encode, Decode, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Outsim Inputs, used as part of OutsimPack2
 pub struct OutsimWheel {
     /// Compression, from unloaded
@@ -141,7 +143,8 @@ pub struct OutsimWheel {
     pub tanslipangle: f32,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(missing_docs)]
 /// OutsimPack2
 pub struct OutsimPack2 {

@@ -1,8 +1,24 @@
 # simple-async
 
-Demonstrates how to use the insim crate to make a connection. It uses the
-simplest path, using tokio.
+Demonstrates creating Tokio TCP or UDP sockets, configuring an `Isi` packet,
+and starting an InSim `Session` with an explicit handshake, without the builder.
 
 ## Usage
 
 - Check `cargo run -- --help`
+
+TCP only:
+
+```sh
+cargo run -p simple-async -- tcp --addr 127.0.0.1:29999
+```
+
+TCP control with MCI/NLP received over an attached UDP socket:
+
+```sh
+cargo run -p simple-async -- tcp --addr 127.0.0.1:29999 --udp-bind 0.0.0.0:0
+```
+
+Port `0` selects an available local port, which is passed to LFS in `Isi.udpport`.
+Choose a fixed port instead when needed, for example `--udp-bind 0.0.0.0:30000`.
+Packets from both sockets arrive through the same `session.read()` loop.

@@ -4,11 +4,21 @@ use bytes::Bytes;
 #[derive(thiserror::Error, Debug)]
 /// Errors that may occur during an InSim connection.
 ///
-/// Most variants are fatal - once returned, the connection is no longer usable and you
-/// should reconnect via [`crate::builder::Builder`]. The exceptions are [`Error::Encode`],
-/// [`Error::VehicleNotAMod`], and [`Error::VehicleNotStandard`], which indicate a problem
-/// with a packet you tried to send and leave the connection intact.
+/// Connection failures and protocol timeouts are terminal. Encoding errors and
+/// application queue capacity errors leave the connection usable. Sessions log
+/// and skip malformed UDP input; TCP decode errors and socket errors are returned.
 pub enum Error {
+    /// Invalid explicit handshake configuration.
+    #[error("invalid handshake: {0}")]
+    InvalidHandshake(&'static str),
+    /// Transport framing failed. Sessions log and skip UDP framing/decoding errors;
+    /// TCP framing errors remain terminal.
+    #[error(transparent)]
+    Transport(insim_core::net::Error),
+    /// Outgoing storage reached its capacity; flush before queueing more.
+    #[error("session outgoing buffer is full")]
+    OutgoingOverflow,
+
     /// Connection is disconnected
     #[error("Disconnected")]
     Disconnected,
@@ -55,7 +65,9 @@ pub enum Error {
         error: insim_core::DecodeError,
     },
 
-    /// Partial decode
+    /// Partial decode. The packet was framed and decoded but left bytes unread,
+    /// which usually means a packet definition does not match LFS. The connection
+    /// remains usable.
     #[error("Partial decode. Likely invalid packet definition. Decoded {:?}, remaining {:?}", input.as_ref(), remaining.as_ref())]
     IncompleteDecode {
         /// original input
@@ -71,5 +83,28 @@ pub enum Error {
 impl From<tokio::time::error::Elapsed> for Error {
     fn from(value: tokio::time::error::Elapsed) -> Self {
         Error::Timeout(value.to_string())
+    }
+}
+
+impl From<insim_core::net::Error> for Error {
+    fn from(error: insim_core::net::Error) -> Self {
+        match error {
+            insim_core::net::Error::Io(error) => Self::IO(error),
+            insim_core::net::Error::Disconnected => Self::Disconnected,
+            insim_core::net::Error::Encode(error) => Self::Encode(error),
+            insim_core::net::Error::Decode {
+                input,
+                offset,
+                error,
+            } => Self::Decode {
+                input,
+                offset,
+                error,
+            },
+            insim_core::net::Error::IncompleteDecode { input, remaining } => {
+                Self::IncompleteDecode { input, remaining }
+            },
+            error => Self::Transport(error),
+        }
     }
 }

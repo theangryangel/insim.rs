@@ -21,6 +21,8 @@ rustdoc-args = ["--cfg", "docrs"]
 
 [features]
 default = []
+tokio = ["insim_core/tokio"]
+blocking = ["insim_core/blocking"]
 serde = [
   "dep:serde",
   "insim_core/serde",

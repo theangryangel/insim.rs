@@ -290,9 +290,14 @@ impl VehicleSetup {
     ///
     /// Or in Rust:
     ///
-    /// ```rust,ignore
-    /// let bytes = std::fs::read(path)?;
-    /// let hash = sha2::Sha256::digest(&bytes[12..]);
+    /// ```rust,no_run
+    /// # fn main() -> std::io::Result<()> {
+    /// use sha2::{Digest, Sha256};
+    ///
+    /// let bytes = std::fs::read("approved.set")?;
+    /// let hash = Sha256::digest(&bytes[12..]);
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn digest<D: Digest>(&self) -> digest::Output<D> {
         let mut buf = BytesMut::with_capacity(Self::SET_PAYLOAD_LEN);

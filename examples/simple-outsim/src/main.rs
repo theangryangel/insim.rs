@@ -1,11 +1,6 @@
 //! A simple demo of the outgauge library
 use std::net::UdpSocket;
 
-use bytes::{Bytes, BytesMut};
-use outsim::{
-    OutsimPack,
-    core::{Decode, DecodeContext},
-};
 use tracing_subscriber::fmt::format::FmtSpan;
 
 /// Setup tracing output
@@ -28,13 +23,9 @@ pub fn main() {
 
     let socket = UdpSocket::bind("0.0.0.0:34254").unwrap();
 
+    let mut listener = outsim::Listener::udp(socket).unwrap();
     loop {
-        let mut raw = [0; 68];
-        let (amt, src) = socket.recv_from(&mut raw).unwrap();
-
-        let mut buf: Bytes = BytesMut::from(&raw[..amt]).freeze();
-        let mut ctx = DecodeContext::new(&mut buf);
-        let packet = OutsimPack::decode(&mut ctx).unwrap();
-        tracing::info!("from={:?}, len={:?}, data={:?}", src, amt, packet);
+        let packet = listener.read().unwrap();
+        tracing::info!(?packet);
     }
 }

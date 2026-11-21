@@ -3,10 +3,10 @@ use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
 use clap::Parser;
 use insim::{
-    Packet, WithRequestId,
+    Packet, Session, WithRequestId,
     core::heading::ObjectHeading,
     identifiers::{ConnectionId, RequestId},
-    insim::{Axm, BfnType, Cpp, ObjectInfo, PmoAction, PmoFlags, TinyType, TtcType},
+    insim::{Axm, BfnType, Cpp, Isi, IsiFlags, ObjectInfo, PmoAction, PmoFlags, TinyType, TtcType},
 };
 use insim_extra::ui::{Canvas, Component};
 use tokio::time::{MissedTickBehavior, sleep};
@@ -179,7 +179,7 @@ impl fmt::Display for SpawnOrigin {
 }
 
 async fn run_command(
-    connection: &mut FramedConnection,
+    connection: &mut LfsSession,
     state: &mut State,
     command: Command,
 ) -> anyhow::Result<()> {
@@ -272,7 +272,7 @@ async fn run_command(
     Ok(())
 }
 
-type FramedConnection = insim::net::tokio_impl::Framed;
+type LfsSession = insim::Session<insim::net::Tokio>;
 
 fn setup_tracing_subscriber() {
     tracing_subscriber::fmt::fmt()
@@ -293,7 +293,7 @@ fn clamp_u8(value: i32) -> u8 {
 }
 
 async fn spawn_at_selection(
-    connection: &mut FramedConnection,
+    connection: &mut LfsSession,
     state: &mut State,
     objects: Vec<ObjectInfo>,
     action: SpawnAction,
@@ -360,12 +360,19 @@ async fn main() -> anyhow::Result<()> {
     let prefabs = tools::prefabs::Prefabs::load(cli.prefabs.clone())?;
 
     tracing::info!("Connecting via TCP to {}", &cli.addr);
-    let mut connection = insim::tcp(cli.addr)
-        .isi_iname(Some("prefab-toolbox".to_string()))
-        .isi_flag_local(true)
-        .isi_flag_axm_edit(true)
-        .connect_async()
-        .await?;
+    let stream = tokio::time::timeout(
+        Duration::from_secs(10),
+        tokio::net::TcpStream::connect(cli.addr),
+    )
+    .await??;
+    stream.set_nodelay(true)?;
+    let isi = Isi {
+        reqi: RequestId(1),
+        flags: IsiFlags::LOCAL | IsiFlags::AXM_EDIT,
+        iname: "prefab-toolbox".into(),
+        ..Isi::default()
+    };
+    let mut connection = Session::tcp(stream)?.handshake(isi).await?;
 
     tracing::info!("Connected");
 

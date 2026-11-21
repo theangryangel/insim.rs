@@ -24,12 +24,13 @@ use std::{
 
 use clap::Parser;
 use insim::{
-    identifiers::ConnectionId,
-    insim::{BtnStyle, Mso, Ncn},
+    Session,
+    identifiers::{ConnectionId, RequestId},
+    insim::{BtnStyle, Isi, Mso, Ncn},
 };
 use kitcar::{
     App, AppError, ChatEvent, ChatParser, Connected, Disconnected, Event, ExtractCx, FromContext,
-    Handler, Packet, Sender, Startup, State, World, mtc, run,
+    Handler, Packet, Sender, Startup, State, World, mtc, run_connection,
     ui::{self, Component, Ui, View, ViewHandle},
 };
 use tokio_util::sync::CancellationToken;
@@ -350,10 +351,21 @@ async fn main() -> Result<(), AppError> {
     .handle(echo_mso)
     .handle(MsoCounter::new());
 
-    let builder = insim::tcp(args.addr)
-        .isi_iname("kitcar".to_string())
-        .isi_prefix('!')
-        .isi_admin_password(args.admin_password);
-
-    run(builder, app).await
+    let stream = tokio::time::timeout(
+        Duration::from_secs(10),
+        tokio::net::TcpStream::connect(args.addr.as_str()),
+    )
+    .await
+    .map_err(insim::Error::from)?
+    .map_err(insim::Error::from)?;
+    stream.set_nodelay(true).map_err(insim::Error::from)?;
+    let isi = Isi {
+        reqi: RequestId(1),
+        iname: "kitcar".into(),
+        prefix: '!',
+        admin: args.admin_password.unwrap_or_default(),
+        ..Isi::default()
+    };
+    let connection = Session::tcp(stream)?.handshake(isi).await?;
+    run_connection(connection, app).await
 }

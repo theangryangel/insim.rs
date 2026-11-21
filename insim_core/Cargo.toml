@@ -21,6 +21,8 @@ doctest = false
 
 [features]
 default = []
+blocking = ["dep:polling"]
+tokio = ["dep:tokio", "dep:socket2"]
 serde = [
   "dep:serde",
   "glam?/serde",
@@ -31,6 +33,9 @@ glam = [
 ]
 
 [dependencies]
+socket2 = { version = "0.6", optional = true }
+polling = { version = "3", optional = true }
+tokio = { workspace = true, features = ["net", "time", "rt", "macros"], optional = true }
 arrayvec = { workspace = true }
 bitflags = { workspace = true }
 bytes = { workspace = true }

@@ -1,11 +1,14 @@
-//! High level example of using a combination of TCP and UDP.
+//! TCP control with InSim, OutGauge and OutSim sharing an attached UDP socket.
 use std::{net::SocketAddr, time::Duration};
 
 use clap::Parser;
-use insim::{Packet, core::Decode, insim::SmallType};
-use outgauge::Outgauge;
-use outsim::OutsimPack;
-use tokio::net::UdpSocket;
+use insim::{
+    Session,
+    identifiers::RequestId,
+    insim::{Isi, IsiFlags, SmallType},
+    net::{Demux, InsimCodec, OutGaugeCodec, OutSimCodec},
+};
+use tokio::net::{TcpStream, UdpSocket};
 use tracing_subscriber::fmt::format::FmtSpan;
 
 #[derive(Parser)]
@@ -17,7 +20,7 @@ struct Cli {
     addr: SocketAddr,
 
     #[arg(long)]
-    /// host:port to bind a udp listener to.
+    /// host:port to bind a UDP listener to (port 0 selects an available port).
     udp_listen_addr: SocketAddr,
 }
 
@@ -34,7 +37,7 @@ fn setup_tracing_subscriber() {
 }
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> insim::Result<()> {
     // Setup tracing_subcriber with some sane defaults
     setup_tracing_subscriber();
 
@@ -42,24 +45,37 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     let udp = UdpSocket::bind(cli.udp_listen_addr).await?;
-    // Make a buffer for the UdpSocket, we'll reuse this across recv_from calls
-    let mut buf = [0; 1024];
+    let udp_addr = udp.local_addr()?;
+    let stream =
+        tokio::time::timeout(Duration::from_secs(10), TcpStream::connect(cli.addr)).await??;
+    stream.set_nodelay(true)?;
 
-    // Make our TCP connection
-    let mut connection = insim::tcp(cli.addr)
-        .isi_flag_mci(true)
-        .isi_flag_con(true)
-        .isi_flag_obh(true)
-        .isi_flag_axm_load(true)
-        .isi_flag_axm_edit(true)
-        .isi_interval(Duration::from_secs(1))
-        // Force the UDP port, so that it's sent to our socket
-        .isi_udpport(cli.udp_listen_addr.port())
-        .connect_async()
+    let isi = Isi {
+        reqi: RequestId(1),
+        udpport: udp_addr.port(),
+        flags: IsiFlags::MCI
+            | IsiFlags::CON
+            | IsiFlags::OBH
+            | IsiFlags::AXM_LOAD
+            | IsiFlags::AXM_EDIT,
+        interval: Duration::from_secs(1),
+        ..Isi::default()
+    };
+
+    // SSG and SSP send OutGauge and OutSim to Isi.udpport, alongside MCI and NLP.
+    // Telemetry is recognized by size, so InsimCodec goes last. Known issue: an
+    // NLP for 10 or 15 players has a telemetry size and is misread (NLP is not
+    // enabled here).
+    let decoder = Demux::new()
+        .with(OutGaugeCodec)
+        .with(OutSimCodec::default())
+        .with(InsimCodec);
+    let mut connection = Session::tcp(stream)?
+        .attach_udp(udp, decoder)?
+        .handshake(isi)
         .await?;
 
-    // Establish a connection
-    tracing::info!("Connected!");
+    tracing::info!(%udp_addr, "Connected; receiving InSim, OutGauge and OutSim over UDP");
 
     // Start sending gauges (outgauge)
     connection
@@ -72,32 +88,7 @@ async fn main() -> anyhow::Result<()> {
         .await?;
 
     loop {
-        tokio::select! {
-            packet = connection.read() => {
-                let packet = packet?;
-                tracing::info!("{:?}", packet);
-            },
-            res = udp.recv_from(&mut buf) => {
-                let (amt, src) = res?;
-
-                if amt == 92 {
-                    // Conventionally it's outgauge
-                    let packet = Outgauge::decode_slice(&buf[..amt])?;
-                    tracing::info!("outgauge: from={:?}, data={:?}", src, packet);
-                } else if amt == 64 {
-                    // Conventionally it's outsim
-                    let packet = OutsimPack::decode_slice(&buf[..amt])?;
-                    tracing::info!("outsim: from={:?}, data={:?}", src, packet);
-                } else if amt > 1 {
-                    // Otherwise it's probably a Mci or Nlp packet
-                    //
-                    // XXX: we need to chop off the first byte, which is the length of the packet.
-                    // That's normally handled internally
-                    // by the insim crate.
-                    let packet = Packet::decode_slice(&buf[1..amt])?;
-                    tracing::info!("insim: from={:?}, data={:?}", src, packet);
-                }
-            }
-        }
+        let packet = connection.read().await?;
+        tracing::info!(?packet);
     }
 }

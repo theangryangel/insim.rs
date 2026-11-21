@@ -1,15 +1,15 @@
 //! Live deltas
 use std::{
-    net::SocketAddr,
+    net::{SocketAddr, TcpStream},
     time::{Duration, Instant},
 };
 
 use clap::Parser;
 use glam::Vec3;
 use insim::{
-    Packet, Result, WithRequestId,
+    Packet, Result, Session, WithRequestId,
     identifiers::{ClickId, PlayerId, RequestId},
-    insim::{Btn, BtnStyle, LapTimingInfo, TinyType},
+    insim::{Btn, BtnStyle, Isi, IsiFlags, LapTimingInfo, TinyType},
 };
 use tracing_subscriber::fmt::format::FmtSpan;
 
@@ -151,12 +151,16 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Establish a connection
-    let mut connection = insim::tcp(cli.addr)
-        .isi_flag_local(true)
-        .isi_flag_mci(true)
-        .isi_iname(Some("insim.rs/delta".to_string()))
-        .isi_interval(Duration::from_millis(100))
-        .connect_blocking()?;
+    let stream = TcpStream::connect_timeout(&cli.addr, Duration::from_secs(10))?;
+    stream.set_nodelay(true)?;
+    let isi = Isi {
+        reqi: RequestId(1),
+        flags: IsiFlags::LOCAL | IsiFlags::MCI,
+        iname: "insim.rs/delta".into(),
+        interval: Duration::from_millis(100),
+        ..Isi::default()
+    };
+    let mut connection = Session::tcp(stream)?.handshake(isi)?;
 
     tracing::info!("Connected!");
 

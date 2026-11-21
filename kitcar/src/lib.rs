@@ -68,6 +68,8 @@ mod presence;
 pub mod ui;
 mod world;
 
+#[allow(deprecated)]
+pub use app::runtime::run;
 pub use app::{
     App, Installable,
     event::{Dispatch, Shutdown, Startup},
@@ -75,7 +77,7 @@ pub use app::{
     handler::Handler,
     run_if,
     run_if::{HandlerExt, RunIf},
-    runtime::{Sender, run, run_connection},
+    runtime::{Sender, run_connection},
 };
 pub use chat::{ChatEvent, ChatParser};
 pub use error::AppError;

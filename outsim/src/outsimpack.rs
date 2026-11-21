@@ -8,7 +8,7 @@ use insim_core::{
 
 use crate::OutsimId;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 /// Outsim packet
 pub struct OutsimPack {
