@@ -18,7 +18,7 @@
 use std::sync::Arc;
 
 use insim::{WithRequestId, identifiers::RequestId};
-pub use insim_extra::world::{World, WorldEvent};
+pub use insim_extra::world::{World, WorldEvent, WorldReady};
 
 use crate::{Dispatch, ExtractCx, FromContext, Sender};
 
@@ -43,15 +43,6 @@ impl<S, V: crate::ui::View + 'static> FromContext<S, V> for World {
     }
 }
 
-/// Send the combined startup requests ([`World::STARTUP_REQUESTS`]) once on
-/// connect. LFS does not send these automatically, so the world would never
-/// learn the existing connection/player/session state without them.
-pub(crate) fn send_startup_requests(sender: &Sender) {
-    for t in World::STARTUP_REQUESTS {
-        let _ = sender.packet(t.clone().with_request_id(RequestId(1)));
-    }
-}
-
 /// Fold one wire packet into [`World`] and return its downstream events as
 /// ready-to-dispatch synthetics.
 ///
@@ -60,14 +51,22 @@ pub(crate) fn send_startup_requests(sender: &Sender) {
 /// [`World::SESSION_REQUESTS`] are re-sent. Each resulting [`WorldEvent`] is
 /// wrapped as its concrete payload struct (see [`world_event_dispatch`]) so the
 /// caller can dispatch it through the normal `Event<T>` machinery.
-pub(crate) fn fold_packet(world: &World, packet: &insim::Packet, sender: &Sender) -> Vec<Dispatch> {
+pub(crate) async fn fold_packet(
+    world: &World,
+    packet: &insim::Packet,
+    sender: &Sender,
+) -> Vec<Dispatch> {
     let events = world.apply_packet(packet);
     let session_started = events
         .iter()
         .any(|e| matches!(e, WorldEvent::SessionStarted(_)));
     if session_started {
-        for t in World::SESSION_REQUESTS {
-            let _ = sender.packet(t.clone().with_request_id(RequestId(1)));
+        let requests = World::SESSION_REQUESTS
+            .iter()
+            .map(|t| t.clone().with_request_id(RequestId(1)).into())
+            .collect::<Vec<insim::Packet>>();
+        if let Err(error) = sender.packets(requests).await {
+            tracing::warn!(%error, "failed to send session requests");
         }
     }
     events.into_iter().map(world_event_dispatch).collect()
@@ -103,5 +102,6 @@ fn world_event_dispatch(event: WorldEvent) -> Dispatch {
         WorldEvent::AllowedModsChanged(e) => synthetic(e),
         WorldEvent::VersionReceived(e) => synthetic(e),
         WorldEvent::Race(e) => synthetic(e),
+        WorldEvent::Ready(e) => synthetic(e),
     }
 }

@@ -107,7 +107,7 @@ impl<S: Send + Sync + 'static, V: crate::ui::View + 'static> Handler<(), S, V> f
         async move {
             for ucid in expired {
                 if let Some(packet) = world.connection(ucid).map(|c| c.clear_penalty()) {
-                    let _ = sender.packet(packet);
+                    let _ = sender.packet(packet).await;
                 }
             }
             Ok(())

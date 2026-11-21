@@ -44,7 +44,8 @@
 //! ## Emission semantics
 //!
 //! One emission API: [`Sender`]. From anywhere (handler, spawned task, UI
-//! thread) `sender.packet(p)` writes a single packet out, `sender.packets(iter)` writes multiple, `sender.event(e)` injects
+//! thread) `sender.packet(p).await` writes a single packet out, `sender.packets(iter).await` writes
+//! multiple, `sender.request(p).await` waits for a reply, `sender.event(e)` injects
 //! a synthetic event. **Events fire in a subsequent dispatch cycle, not the
 //! current one** - the back-channel is drained by the main runtime loop
 //! between cycles.
@@ -95,4 +96,4 @@ pub use presence::{
     Connected, ConnectionDetails, ConnectionInfo, Disconnected, PlayerInfo, PlayerJoined,
     PlayerLeft, PlayerTeleportedToPits, Renamed, TakingOver, VehicleSelected,
 };
-pub use world::{World, WorldEvent};
+pub use world::{World, WorldEvent, WorldReady};

@@ -25,6 +25,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+insim = { path = "../insim", features = ["tokio", "test-util"] }
 parking_lot = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "net", "test-util"] }
 tracing-subscriber = { workspace = true }

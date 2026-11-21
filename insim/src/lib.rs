@@ -24,6 +24,9 @@ pub mod net;
 pub mod packet;
 #[doc(hidden)]
 pub mod result;
+#[cfg(all(feature = "tokio", any(test, feature = "test-util")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
+pub mod test;
 
 #[doc = include_str!("../docs/book.md")]
 pub mod _book {}

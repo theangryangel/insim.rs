@@ -28,6 +28,8 @@ tokio = [
   "outgauge/tokio",
   "outsim/tokio",
 ]
+# Helpers for testing code that uses a Session, such as `test::pair()`.
+test-util = ["tokio"]
 serde = [
   "dep:serde",
   "insim_core/serde",

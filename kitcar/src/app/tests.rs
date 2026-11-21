@@ -147,8 +147,8 @@ async fn drive(app: App<TestState>, d: Dispatch) {
     .await;
 
     // Drain anything middleware emitted while we were running.
-    while let Ok(cmd) = cmd_rx.try_recv() {
-        if let Command::Event(payload) = cmd {
+    while let Ok(Command::Event(payload)) = cmd_rx.try_recv() {
+        {
             dispatch_cycle(
                 Dispatch::Synthetic(payload),
                 &sender,
@@ -160,7 +160,6 @@ async fn drive(app: App<TestState>, d: Dispatch) {
             )
             .await;
         }
-        // Command::Packet is dropped - no wire to write to in tests.
     }
 }
 
@@ -349,17 +348,12 @@ async fn sender_event_pushes_into_back_channel() {
     let sender = Sender::new(cmd_tx);
 
     sender.event("hello".to_string()).expect("event ok");
-    let cmd = cmd_rx.recv().await.expect("got command");
-    match cmd {
-        Command::Event(payload) => {
-            let s = payload
-                .downcast_ref::<String>()
-                .expect("payload is String")
-                .clone();
-            assert_eq!(s, "hello");
-        },
-        _ => panic!("expected Command::Event"),
-    }
+    let Command::Event(payload) = cmd_rx.recv().await.expect("got command");
+    let s = payload
+        .downcast_ref::<String>()
+        .expect("payload is String")
+        .clone();
+    assert_eq!(s, "hello");
 }
 
 #[tokio::test]
@@ -488,17 +482,15 @@ async fn periodic_emits_events_on_schedule() {
     let mut app = App::new().periodic(Duration::from_millis(5), Tick);
 
     let mut cmd_rx = app
-        .cmd_rx
+        .events
         .take()
-        .expect("cmd_rx present before serve consumes it");
+        .expect("events present before serve consumes it");
 
     tokio::time::sleep(Duration::from_millis(40)).await;
 
     let mut tick_count = 0usize;
-    while let Ok(cmd) = cmd_rx.try_recv() {
-        if let Command::Event(payload) = cmd
-            && payload.is::<Tick>()
-        {
+    while let Ok(Command::Event(payload)) = cmd_rx.try_recv() {
+        if payload.is::<Tick>() {
             tick_count += 1;
         }
     }
@@ -811,4 +803,66 @@ async fn multiple_registrations_of_same_handler_type_are_retained() {
     .await;
 
     assert_eq!(*log.lock(), vec!["first", "second"]);
+}
+
+#[derive(Clone, Default)]
+struct ReadyState {
+    connections_at_ready: Arc<Mutex<Option<usize>>>,
+}
+
+async fn on_world_ready(
+    Event(_ready): Event<crate::WorldReady>,
+    world: World,
+    sender: Sender,
+    State(s): State<ReadyState>,
+) -> Result<(), AppError> {
+    let known = [1, 2]
+        .into_iter()
+        .filter(|ucid| world.connection(ConnectionId(*ucid)).is_some())
+        .count();
+    *s.connections_at_ready.lock() = Some(known);
+    sender.packet(insim::insim::TinyType::Ping).await
+}
+
+/// End to end against a fake LFS: startup requests go out, `WorldReady` fires
+/// only once their replies are folded, handler packets reach the wire, and
+/// shutdown ends with TINY_CLOSE.
+#[tokio::test]
+async fn run_connection_syncs_the_world_before_world_ready() {
+    use insim::insim::{Tiny, TinyType};
+
+    tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        let (session, mut lfs) = insim::test::pair().await;
+        let state = ReadyState::default();
+        let app = App::with_state(state.clone()).handle(on_world_ready);
+        let cancel = app.cancel_token().clone();
+        let run = tokio::spawn(crate::run_connection(session, app));
+
+        for _ in World::STARTUP_REQUESTS {
+            let request: Tiny = lfs.expect().await;
+            assert!(request.reqi.0 >= 128, "startup requests use reserved ReqIs");
+            if request.subt == TinyType::Ncn {
+                for ucid in [1, 2] {
+                    lfs.send(Ncn {
+                        reqi: request.reqi,
+                        ucid: ConnectionId(ucid),
+                        uname: format!("user{ucid}"),
+                        ..Default::default()
+                    })
+                    .await;
+                }
+            }
+        }
+
+        let ping: Tiny = lfs.expect().await;
+        assert_eq!(ping.subt, TinyType::Ping);
+        assert_eq!(*state.connections_at_ready.lock(), Some(2));
+
+        cancel.cancel();
+        let close: Tiny = lfs.expect().await;
+        assert_eq!(close.subt, TinyType::Close);
+        run.await.unwrap().unwrap();
+    })
+    .await
+    .unwrap();
 }

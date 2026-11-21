@@ -14,9 +14,10 @@ use tokio::time::{MissedTickBehavior, sleep};
 mod tools;
 mod ui;
 
-const REQI_SELECTION: RequestId = RequestId(200);
-const REQI_CAMERA: RequestId = RequestId(201);
-const REQI_STATE: RequestId = RequestId(202);
+// Keep hand-picked ReqIs below 128: 128-255 are reserved for Session::request.
+const REQI_SELECTION: RequestId = RequestId(10);
+const REQI_CAMERA: RequestId = RequestId(11);
+const REQI_STATE: RequestId = RequestId(12);
 const COMPASS_WIDTH: usize = 31;
 
 #[derive(Parser)]

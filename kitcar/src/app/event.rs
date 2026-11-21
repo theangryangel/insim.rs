@@ -26,11 +26,10 @@ impl std::fmt::Debug for Dispatch {
 }
 
 /// Internal command sent to the dispatcher through the shared back-channel
-/// (via [`crate::Sender`]). The runtime drains this in its main loop.
+/// (via [`crate::Sender`]). The runtime drains this in its main loop. Packets
+/// go straight to the connection instead.
 #[derive(Debug)]
 pub(crate) enum Command {
-    /// Send a packet to LFS.
-    Packet(insim::Packet),
     /// Inject a synthetic event into a new dispatch cycle.
     Event(Arc<dyn Any + Send + Sync>),
 }
@@ -50,7 +49,7 @@ pub struct Startup;
 ///
 /// The cancellation token is already fired when this event is dispatched.
 /// Any packets sent via [`crate::Sender::packet`] during this cycle are
-/// drained and written to the wire before `run` returns; the connection
+/// flushed, followed by `TINY_CLOSE`, before `run` returns; the connection
 /// may already be broken (e.g. dropped by LFS), so write errors are
 /// silently ignored.
 #[derive(Debug, Clone, Default)]

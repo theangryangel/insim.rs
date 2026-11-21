@@ -2,8 +2,9 @@
 //!
 //! Drives a per-connection [`Component`] tree on its own background thread
 //! (necessary because `taffy` layout isn't `Send`, so view tasks run on a
-//! `LocalSet`). Forwards `Ncn` / `Cnl` / `Btc` / `Btt` / `Bfn` packets into
-//! the UI thread via [`Ui::forward_packet`].
+//! `LocalSet`). [`Ui::attach`] connects it to a split session: a tap copies
+//! `Ncn` / `Cnl` / `Btc` / `Btt` / `Bfn` packets into the UI thread, and buttons
+//! are sent through the session's bounded sender.
 //!
 //! # Positioning
 //!
@@ -52,15 +53,10 @@
 //! [`Component`] yourself rather than going through [`Ui`].
 //!
 //! ```ignore
-//! use tokio::sync::mpsc;
-//! let (outgoing_tx, mut outgoing_rx) = mpsc::unbounded_channel();
-//! let ui = Ui::<MyView>::new(outgoing_tx, initial_global);
+//! let (sender, receiver, driver) = session.into_split(256);
+//! tokio::spawn(driver);
+//! let ui = Ui::<MyView>::attach(&sender, initial_global).await?;
 //! // Each connection's view is built via `MyView::mount` when its `Ncn` arrives.
-//!
-//! // Bridge outgoing button packets to your connection
-//! tokio::spawn(async move {
-//!     while let Some(p) = outgoing_rx.recv().await { connection.send(p).await; }
-//! });
 //!
 //! // Subscribe to click/type-in events
 //! let mut rx = ui.subscribe();
@@ -78,9 +74,10 @@ use std::{collections::HashMap, sync::Arc};
 
 pub use canvas::{Canvas, CanvasDiff};
 use insim::{
-    Packet, WithRequestId,
+    Packet,
     identifiers::ConnectionId,
-    insim::{Bfn, BfnType, TinyType},
+    insim::{Bfn, BfnType, Ncn, TinyType},
+    net::{Policy, Sender, Tap},
 };
 pub use node::*;
 use tokio::{
@@ -112,16 +109,13 @@ where
     global: watch::Sender<Arc<V::Global>>,
     connection_props: mpsc::Sender<(ConnectionId, V::Connection)>,
     view_messages: mpsc::Sender<(ConnectionId, V::Message)>,
-    // Inbound: wire packets from LFS into the UI thread.
-    packet_tx: mpsc::UnboundedSender<Packet>,
     // Outbound: click/type-in events broadcast to subscribers.
     message_tx: broadcast::Sender<V::Message>,
 }
 
 /// UI handle for dedicated multiplayer servers.
 ///
-/// Construct with [`Ui::new`] and forward wire packets via
-/// [`Ui::forward_packet`]. Subscribe to click/type-in events via
+/// Construct with [`Ui::attach`]. Subscribe to click/type-in events via
 /// [`Ui::subscribe`].
 ///
 /// [`ConnectionId::LOCAL`] (UCID 0) is always ignored - no [`Component`] is
@@ -157,37 +151,55 @@ impl<V> Ui<V>
 where
     V: View + 'static,
 {
-    /// Create a new UI handle and spawn its background LocalSet thread.
+    /// Attach a UI to a split session and spawn its background LocalSet thread.
     ///
-    /// `outgoing_tx` receives button render packets that should be forwarded to
-    /// the InSim connection. `initial_global` is the starting global state value.
-    /// Each connection's view is constructed via [`View::mount`] when its `Ncn`
-    /// packet is seen.
-    pub fn new(outgoing_tx: mpsc::UnboundedSender<Packet>, initial_global: V::Global) -> Self {
+    /// A tap copies the packets the UI needs (`Ncn` / `Cnl` / `Btc` / `Btt` /
+    /// `Bfn`); nothing is taken from the session's receiver. Buttons are sent
+    /// through `sender`, so a large re-render waits for room rather than queueing
+    /// without limit. The UI requests the current connection list itself.
+    ///
+    /// `initial_global` is the starting global state value. Each connection's
+    /// view is constructed via [`View::mount`] when its `Ncn` packet is seen. The
+    /// UI stops, clearing its buttons, once every handle is dropped or the
+    /// session ends.
+    pub async fn attach(sender: &Sender, initial_global: V::Global) -> insim::Result<Self> {
+        let tap = sender
+            .tap(
+                |p| {
+                    matches!(
+                        p,
+                        Packet::Ncn(_)
+                            | Packet::Cnl(_)
+                            | Packet::Btc(_)
+                            | Packet::Btt(_)
+                            | Packet::Bfn(_)
+                    )
+                },
+                Policy::Queue,
+            )
+            .await?;
         let (global, _) = watch::channel(Arc::new(initial_global));
         let (connection_props, connection_props_rx) = mpsc::channel(100);
         let (view_messages, view_msg_rx) = mpsc::channel(100);
-        let (packet_tx, packet_rx) = mpsc::unbounded_channel();
         let (message_tx, _) = broadcast::channel(64);
 
         spawn_ui_thread::<V>(
             global.clone(),
             connection_props_rx,
             view_msg_rx,
-            packet_rx,
-            outgoing_tx,
+            tap,
+            sender.clone(),
             message_tx.clone(),
         );
 
-        Self {
+        Ok(Self {
             inner: Arc::new(UiInner {
                 global,
                 connection_props,
                 view_messages,
-                packet_tx,
                 message_tx,
             }),
-        }
+        })
     }
 
     /// Subscribe to click and type-in events produced by any active view.
@@ -225,25 +237,14 @@ where
     ) -> Result<(), mpsc::error::SendError<(ConnectionId, V::Message)>> {
         self.inner.view_messages.send((ucid, msg)).await
     }
-
-    /// Forward a wire packet into the UI thread if it's one the UI cares
-    /// about (Ncn/Cnl/Btc/Btt/Bfn). Other packets are ignored.
-    pub fn forward_packet(&self, p: &Packet) {
-        match p {
-            Packet::Ncn(_) | Packet::Cnl(_) | Packet::Btc(_) | Packet::Btt(_) | Packet::Bfn(_) => {
-                let _ = self.inner.packet_tx.send(p.clone());
-            },
-            _ => {},
-        }
-    }
 }
 
 fn spawn_ui_thread<V>(
     global: watch::Sender<Arc<V::Global>>,
     mut connection_props_rx: mpsc::Receiver<(ConnectionId, V::Connection)>,
     mut view_msg_rx: mpsc::Receiver<(ConnectionId, V::Message)>,
-    mut packet_rx: mpsc::UnboundedReceiver<Packet>,
-    outgoing_tx: mpsc::UnboundedSender<Packet>,
+    mut tap: Tap,
+    sender: Sender,
     message_tx: broadcast::Sender<V::Message>,
 ) where
     V: View + 'static,
@@ -270,14 +271,21 @@ fn spawn_ui_thread<V>(
             let mut packet_rx_closed = false;
 
             // Ask LFS for the current connection list so the UI catches up on
-            // bot restart against a running server.
-            if outgoing_tx.send(TinyType::Ncn.with_request_id(1).into()).is_err() {
-                tracing::warn!("UI: failed to request current connections");
+            // bot restart against a running server. The replies reach the tap
+            // like any other Ncn.
+            {
+                let sender = sender.clone();
+                #[allow(clippy::let_underscore_future)]
+                let _ = tokio::task::spawn_local(async move {
+                    if let Err(e) = sender.request_all::<Ncn>(TinyType::Ncn).await {
+                        tracing::warn!("UI: failed to request current connections: {e}");
+                    }
+                });
             }
 
             loop {
                 tokio::select! {
-                    pkt = packet_rx.recv(), if !packet_rx_closed => match pkt {
+                    pkt = tap.recv(), if !packet_rx_closed => match pkt {
                         Some(Packet::Ncn(ncn)) => {
                             if ncn.ucid.local() || active.contains_key(&ncn.ucid) {
                                 continue;
@@ -299,7 +307,7 @@ fn spawn_ui_thread<V>(
                                 global_props: global.subscribe(),
                                 connection_props: props_rx,
                                 view_event_rx: event_rx,
-                                outgoing_tx: outgoing_tx.clone(),
+                                sender: sender.clone(),
                                 message_tx: message_tx.clone(),
                             });
                             let _ = active.insert(
@@ -360,8 +368,9 @@ fn spawn_ui_thread<V>(
                     },
                 }
 
-                // If everything has hung up, shut down.
-                if packet_rx_closed && connection_props_rx_closed && view_msg_rx_closed {
+                // Stop when the session has ended, or when every `Ui` handle has
+                // been dropped (while the session can still carry the clears).
+                if packet_rx_closed || (connection_props_rx_closed && view_msg_rx_closed) {
                     break;
                 }
             }
@@ -376,8 +385,9 @@ fn spawn_ui_thread<V>(
                 })
                 .collect();
             for bfn in clears {
-                if outgoing_tx.send(Packet::from(bfn)).is_err() {
+                if sender.send(bfn).await.is_err() {
                     tracing::warn!("UI shutdown clear failed");
+                    break;
                 }
             }
         });
@@ -442,4 +452,90 @@ where
 /// Zero-sized placeholder node.
 pub fn empty<Msg>() -> node::Node<Msg> {
     node::Node::empty()
+}
+
+#[cfg(test)]
+mod attach_tests {
+    use std::time::Duration;
+
+    use insim::insim::{Btc, Btn, BtnStyle, Ncn, Tiny};
+
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq)]
+    enum Msg {
+        Clicked,
+    }
+
+    struct Clicker {
+        clicks: u32,
+    }
+    impl Component for Clicker {
+        type Message = Msg;
+        type Props<'a> = ();
+        fn update(&mut self, _msg: Msg) {
+            self.clicks += 1;
+        }
+        fn render(&self, _props: ()) -> Node<Msg> {
+            clickable(
+                format!("clicks {}", self.clicks),
+                BtnStyle::default(),
+                Msg::Clicked,
+            )
+            .w(20)
+            .h(5)
+        }
+    }
+    impl View for Clicker {
+        type Global = ();
+        type Connection = ();
+        fn mount(_ucid: ConnectionId, _handle: ViewHandle<Msg>) -> Self {
+            Clicker { clicks: 0 }
+        }
+        fn props<'a>(_global: &'a (), _connection: &'a ()) -> Self::Props<'a> {}
+    }
+
+    /// Ncn in -> buttons out -> Btc click -> message and re-render -> clear on drop.
+    #[tokio::test]
+    async fn attached_ui_renders_handles_clicks_and_clears_on_drop() {
+        tokio::time::timeout(Duration::from_secs(10), async {
+            let (session, mut lfs) = insim::test::pair().await;
+            let (sender, _receiver, driver) = session.into_split(16);
+            let _driver = tokio::spawn(driver);
+            let ui = Ui::<Clicker>::attach(&sender, ()).await.unwrap();
+            let mut messages = ui.subscribe();
+
+            // The UI asks for the current connections itself.
+            let request: Tiny = lfs.expect().await;
+            assert_eq!(request.subt, TinyType::Ncn);
+            lfs.send(Ncn {
+                reqi: request.reqi,
+                ucid: ConnectionId(5),
+                ..Default::default()
+            })
+            .await;
+
+            let button: Btn = lfs.expect().await;
+            assert_eq!(button.ucid, ConnectionId(5));
+            assert_eq!(button.text, "clicks 0");
+
+            lfs.send(Btc {
+                ucid: ConnectionId(5),
+                clickid: button.clickid,
+                ..Default::default()
+            })
+            .await;
+            assert_eq!(messages.recv().await.unwrap(), Msg::Clicked);
+            let rerendered: Btn = lfs.expect().await;
+            assert_eq!(rerendered.clickid, button.clickid);
+            assert_eq!(rerendered.text, "clicks 1");
+
+            drop((ui, messages));
+            let clear: Bfn = lfs.expect().await;
+            assert_eq!(clear.ucid, ConnectionId(5));
+            assert_eq!(clear.subt, BfnType::Clear);
+        })
+        .await
+        .unwrap();
+    }
 }

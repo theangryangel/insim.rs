@@ -56,13 +56,14 @@ struct Cli {
 
 use glam::DVec3;
 use insim::{
-    Packet, Session, WithRequestId,
+    Session,
     core::{
         heading::ObjectHeading,
         object::{ObjectCoordinate, ObjectInfo, chalk, concrete, letterboard_rb, painted, tyres},
     },
-    identifiers::{PlayerId, RequestId},
-    insim::{Axm, Isi, IsiFlags, PmoAction, TinyType},
+    identifiers::RequestId,
+    insim::{Axm, Isi, IsiFlags, Mci, PmoAction, Sta, Tiny, TinyType},
+    net::Tokio,
 };
 
 fn position_text_common(
@@ -397,6 +398,25 @@ fn setup_tracing_subscriber() {
         .init();
 }
 
+/// Send a request and keep reading (and discarding) packets until its replies are in.
+/// `start` is `Session::request` or `Session::request_all`.
+async fn until<F, T>(
+    connection: &mut Session<Tokio>,
+    request: TinyType,
+    start: impl FnOnce(&mut Session<Tokio>, TinyType) -> insim::Result<F>,
+) -> insim::Result<T>
+where
+    F: std::future::Future<Output = insim::Result<T>> + Unpin,
+{
+    let mut reply = start(connection, request)?;
+    loop {
+        tokio::select! {
+            packet = connection.read() => { let _ = packet?; },
+            reply = &mut reply => return reply,
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     setup_tracing_subscriber();
@@ -421,36 +441,22 @@ async fn main() -> Result<()> {
 
     match &args.mode {
         Mode::WhereTheFuckIAm => {
-            connection.write(TinyType::Sst.with_request_id(1)).await?;
-            connection.write(TinyType::Mci.with_request_id(2)).await?;
-            let mut viewed = PlayerId(0);
-            loop {
-                match connection.read().await? {
-                    Packet::Sta(sta) => {
-                        viewed = sta.viewplid;
-                    },
-
-                    Packet::Mci(mci) => {
-                        // Find the viewed player's position in MCI
-                        if let Some(comp_car) = mci.info.first() {
-                            if comp_car.plid != viewed {
-                                continue;
-                            }
-                            let pos = comp_car.xyz.to_dvec3_metres();
-
-                            println!(
-                                "{} {} {} {}",
-                                pos.x,
-                                pos.y,
-                                pos.z,
-                                comp_car.heading.to_radians()
-                            );
-                            break;
-                        }
-                    },
-
-                    _ => {},
-                }
+            // Which player is the camera on, then where is their car? Each request
+            // gets its own ReqI, so the replies cannot be confused with anything else.
+            let sta: Sta = until(&mut connection, TinyType::Sst, Session::request).await?;
+            let mcis: Vec<Mci> =
+                until(&mut connection, TinyType::Mci, Session::request_all).await?;
+            // Several MCI packets arrive when there are more than 8 cars.
+            match mcis
+                .iter()
+                .flat_map(|mci| &mci.info)
+                .find(|car| car.plid == sta.viewplid)
+            {
+                Some(car) => {
+                    let pos = car.xyz.to_dvec3_metres();
+                    println!("{} {} {} {}", pos.x, pos.y, pos.z, car.heading.to_radians());
+                },
+                None => eprintln!("the viewed player has no car on track"),
             }
         },
         Mode::Signal { x, y, z, heading } => {
@@ -542,9 +548,9 @@ async fn main() -> Result<()> {
                 ..Default::default()
             })
             .await?;
-        // wait for lfs to respond to the clean up... eeh. not a fan of this hack.
-        // but it seems to be how LFS processes things
-        let _ = tokio::time::sleep(Duration::from_millis(200)).await;
+        // LFS handles packets in order, so once it answers this ping it has also
+        // removed the objects. Closing any earlier can leave them behind.
+        let _: Tiny = until(&mut connection, TinyType::Ping, Session::request).await?;
         connection.shutdown().await?;
     }
 
