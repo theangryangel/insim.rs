@@ -1,4 +1,8 @@
 //! The Bomb service: one update function over the game's state.
+//!
+//! Bomb doesn't set up the server or start races; the `RaceDirector` (or an
+//! admin) does. Bomb follows the session and asks LFS for the layout when a
+//! race starts.
 
 use std::time::{Duration, Instant};
 
@@ -8,15 +12,12 @@ use insim::{
         ObjectInfo,
         insim::{InsimCheckpoint, InsimCircle},
     },
-    identifiers::{ConnectionId, PlayerId},
-    insim::{Axm, Con, PmoAction, PmoFlags, Uco, UcoAction},
+    identifiers::{ConnectionId, PlayerId, RequestId},
+    insim::{Axm, Con, PmoAction, PmoFlags, Tiny, TinyType, Uco, UcoAction},
 };
 use insim_extra::{
     chat::{ChatCommand, ChatParser},
-    kitcar::{
-        ClearPenalty, Context, Effects, Input, Layout, Lifecycle, PenaltyClearer, Phase, Service,
-        Setup, Transition,
-    },
+    kitcar::{Context, Effects, Input, Service},
     world::{Connected, PlayerLeft, PlayerTeleportedToPits, WorldEvent},
 };
 
@@ -25,12 +26,12 @@ use crate::{
     view::{ABOUT, DialogMsg, HELP},
 };
 
-/// How often the countdowns and marquee are redrawn.
+/// How often countdowns and the marquee redraw.
 const REPAINT: Duration = Duration::from_millis(200);
-/// How long after a penalty it is cleared.
-const PENALTY_CLEAR_DELAY: Duration = Duration::from_secs(15);
-/// How many results the leaderboard keeps.
+/// Leaderboard length.
 const BOARD_SIZE: usize = 10;
+/// Tags our layout request, so we know the reply.
+const LAYOUT_REQUEST: RequestId = RequestId(2);
 
 #[derive(Debug, Clone)]
 pub enum Msg {
@@ -40,7 +41,6 @@ pub enum Msg {
     Repaint,
     /// A player clicked the `?` button.
     OpenHelp(ConnectionId),
-    Penalty(ClearPenalty),
 }
 
 /// One timer per run: rescheduling with the same key moves the deadline.
@@ -56,7 +56,7 @@ enum Cmd {
     About,
 }
 
-/// A finished run, as shown on the leaderboard.
+/// A leaderboard entry.
 #[derive(Debug, Clone)]
 pub struct Standing {
     pub uname: String,
@@ -71,64 +71,53 @@ enum End {
     Left,
     TeleportedToPits,
     Pitted,
-    SessionOver { shortfall: bool },
+    SessionOver,
+    /// The game is stopping, such as for a rotation.
+    Closing,
 }
 
 pub struct Bomb {
-    pub(crate) lifecycle: Lifecycle,
     pub(crate) rules: Rules,
     pub(crate) board: Vec<Standing>,
     pub(crate) started: Instant,
     chat: ChatParser<Cmd>,
-    clearer: PenaltyClearer,
 }
 
 impl Bomb {
-    pub fn new(config: Config, setup: Setup) -> Self {
-        let mut rules = Rules::new(config);
-        // Objects we send ourselves are not echoed back, so learn their order now.
-        if let Some(Layout::Objects(objects)) = &setup.layout {
-            rules
-                .circles
-                .accumulate(objects.iter().filter_map(circle_index));
-            rules.circles.finalize();
-        }
+    pub fn new(config: Config) -> Self {
         Self {
-            lifecycle: Lifecycle::new(setup),
-            rules,
+            rules: Rules::new(config),
             board: Vec::new(),
             started: Instant::now(),
             chat: ChatParser::new(&['!']),
-            clearer: PenaltyClearer::new(PENALTY_CLEAR_DELAY),
         }
     }
 
-    pub(crate) fn phase(&self) -> Phase {
-        self.lifecycle.phase()
+    /// Forget the circles and ask LFS for the full layout, since the director
+    /// or an admin may have loaded it. It arrives as `Axm` packets; the last
+    /// has `FILE_END`.
+    fn request_layout(&mut self) -> Effects<Msg> {
+        self.rules.circles.clear();
+        Effects::new().packet(Tiny {
+            reqi: LAYOUT_REQUEST,
+            subt: TinyType::Axm,
+        })
     }
 
-    fn transition(&mut self, transition: Transition, cx: &Context<'_>) -> Effects<Msg> {
-        match transition {
-            Transition::SetupStarted => Effects::none(),
-            Transition::Racing => {
-                let secs = self.rules.config.checkpoint_timeout.as_secs();
-                Effects::new().message(
-                    format!("Bomb - hit checkpoints before the {secs}s timer expires!"),
-                    ConnectionId::ALL,
-                )
-            },
-            Transition::Ended { shortfall } => {
-                let runs: Vec<PlayerId> = self.rules.runs.keys().copied().collect();
-                let mut effects = runs.into_iter().fold(Effects::new(), |fx, plid| {
-                    fx.and(self.end_run(plid, End::SessionOver { shortfall }, cx))
-                });
-                if shortfall {
-                    effects = effects
-                        .message("Bomb - not enough players, restarting.", ConnectionId::ALL);
-                }
-                effects
-            },
-        }
+    fn race_started(&mut self) -> Effects<Msg> {
+        let secs = self.rules.config.checkpoint_timeout.as_secs();
+        self.request_layout().message(
+            format!("Bomb - hit checkpoints before the {secs}s timer expires!"),
+            ConnectionId::ALL,
+        )
+    }
+
+    /// End every run in progress.
+    fn end_all(&mut self, end: End, cx: &Context<'_>) -> Effects<Msg> {
+        let runs: Vec<PlayerId> = self.rules.runs.keys().copied().collect();
+        runs.into_iter().fold(Effects::new(), |fx, plid| {
+            fx.and(self.end_run(plid, end, cx))
+        })
     }
 
     /// Score a run, tell its driver, and disarm its timer.
@@ -148,12 +137,8 @@ impl Bomb {
             End::Pitted => {
                 format!("PITTED - run ended after {cps} cps. Commit to your fuel.").red()
             },
-            End::SessionOver { shortfall: true } => {
-                format!("Run ended - not enough players after {cps} cps").yellow()
-            },
-            End::SessionOver { shortfall: false } => {
-                format!("Run ended - race finished after {cps} cps").yellow()
-            },
+            End::SessionOver => format!("Run ended - race finished after {cps} cps").yellow(),
+            End::Closing => format!("Run ended - Bomb is closing after {cps} cps").yellow(),
         };
         let effects = Effects::new().cancel(Fuse(plid));
         match cx.world().player(plid) {
@@ -290,19 +275,19 @@ impl Service for Bomb {
     type Msg = Msg;
 
     fn update(&mut self, input: Input<Msg>, cx: &Context<'_>) -> Effects<Msg> {
-        // Components first: they see every input.
-        let mut effects = self.clearer.update(&input, cx).map(Msg::Penalty);
-        let (setup, transition) = self.lifecycle.update(&input, cx);
-        effects = effects.and(setup);
-        if let Some(transition) = transition {
-            effects = effects.and(self.transition(transition, cx));
-        }
-        let racing = self.lifecycle.racing();
+        // Started by the `RaceDirector`, an admin, or before we connected.
+        let racing = cx.world().session().is_some();
 
-        effects.and(match input {
+        match input {
             Input::Started => Effects::new().every(Repaint, REPAINT, Msg::Repaint),
 
-            // Greet people who join after we connected with the About dialog.
+            // A race starts, or ends (finish, /end, /restart, or everyone leaving).
+            Input::World(WorldEvent::SessionStarted(_)) => self.race_started(),
+            Input::World(WorldEvent::SessionEnded(_)) => self.end_all(End::SessionOver, cx),
+            // Connected mid-race: learn the layout now.
+            Input::World(WorldEvent::Ready(_)) if racing => self.request_layout(),
+
+            // Greet newcomers, not those already here, with the About dialog.
             Input::World(WorldEvent::Connected(Connected {
                 info,
                 existing: false,
@@ -343,11 +328,15 @@ impl Service for Bomb {
 
             Input::Msg(Msg::Boom(plid)) => self.end_run(plid, End::Boom, cx),
             Input::Msg(Msg::OpenHelp(ucid)) => Effects::new().send(ucid, HELP, DialogMsg::Show),
-            Input::Msg(Msg::Penalty(clear)) => self.clearer.clear(clear, cx),
-            // Nothing to do: any update redraws, which moves the countdowns on.
+            // Every update redraws, so the countdowns tick by themselves.
             Input::Msg(Msg::Repaint) => Effects::none(),
+            // Score runs in progress. The host still sends these packets, then
+            // clears our buttons and timers.
+            Input::Stopping => self
+                .end_all(End::Closing, cx)
+                .message("Bomb is closing - thanks for playing!", ConnectionId::ALL),
             _ => Effects::none(),
-        })
+        }
     }
 
     fn view(
@@ -390,13 +379,185 @@ mod tests {
         })
     }
 
+    /// Apply a packet to the world, then feed it and its events to Bomb, as
+    /// the host does.
+    fn feed(world: &mut insim_extra::world::World, bomb: &mut Bomb, packet: Packet) -> Vec<Packet> {
+        let events = world.apply_packet(&packet);
+        let cx = Context::new(world, Instant::now());
+        let inputs =
+            std::iter::once(Input::Packet(packet)).chain(events.into_iter().map(Input::World));
+        let mut sent = Vec::new();
+        for input in inputs {
+            sent.extend(bomb.update(input, &cx).packets_sent().cloned());
+        }
+        sent
+    }
+
+    fn circles(indices: &[u8], file_end: bool) -> Packet {
+        Axm {
+            flags: if file_end {
+                PmoFlags::FILE_END
+            } else {
+                PmoFlags::empty()
+            },
+            action: PmoAction::TinyAxm(
+                indices
+                    .iter()
+                    .map(|&index| {
+                        ObjectInfo::InsimCircle(InsimCircle {
+                            index,
+                            ..Default::default()
+                        })
+                    })
+                    .collect(),
+            ),
+            ..Default::default()
+        }
+        .into()
+    }
+
+    #[test]
+    fn a_race_starting_asks_for_the_layout_and_ending_scores_runs() {
+        use insim::insim::{Npl, RaceInProgress, Rst, Sta};
+        use insim_extra::world::World;
+
+        let track = "FE1X".parse().unwrap();
+        let mut world = World::new();
+        let mut bomb = Bomb::new(Config::default());
+        // Circles left over from an earlier layout.
+        bomb.rules.circles.accumulate([9].into_iter());
+        let _ = feed(
+            &mut world,
+            &mut bomb,
+            Ncn {
+                ucid: ConnectionId(2),
+                uname: "driver".into(),
+                ..Default::default()
+            }
+            .into(),
+        );
+        let _ = feed(
+            &mut world,
+            &mut bomb,
+            Npl {
+                ucid: ConnectionId(2),
+                plid: PlayerId(5),
+                nump: 1,
+                ..Default::default()
+            }
+            .into(),
+        );
+
+        // Someone else started the race: Bomb drops the old circles and asks.
+        let sent = feed(
+            &mut world,
+            &mut bomb,
+            Rst {
+                track,
+                ..Default::default()
+            }
+            .into(),
+        );
+        assert!(
+            sent.iter().any(|p| matches!(
+                p,
+                Packet::Tiny(Tiny {
+                    subt: TinyType::Axm,
+                    ..
+                })
+            )),
+            "{sent:?}"
+        );
+        assert!(bomb.rules.circles.indices().is_empty());
+
+        // The reply spans two packets; the last has FILE_END.
+        let _ = feed(&mut world, &mut bomb, circles(&[3, 1], false));
+        let _ = feed(&mut world, &mut bomb, circles(&[2], true));
+        assert_eq!(bomb.rules.circles.indices(), [1, 2, 3]);
+
+        // A run starts, then an admin's /end scores it.
+        let now = Instant::now();
+        let player = world.player(PlayerId(5)).unwrap().clone();
+        assert!(bomb.rules.checkpoint("driver", &player, 1, now).is_some());
+        let sent = feed(
+            &mut world,
+            &mut bomb,
+            Sta {
+                track,
+                raceinprog: RaceInProgress::No,
+                ..Default::default()
+            }
+            .into(),
+        );
+        assert!(bomb.rules.runs.is_empty());
+        assert_eq!(bomb.board.len(), 1);
+        assert!(
+            sent.iter()
+                .any(|p| matches!(p, Packet::Mtc(m) if m.text.contains("race finished"))),
+            "{sent:?}"
+        );
+    }
+
+    #[test]
+    fn stopping_scores_runs_in_progress_and_says_goodbye() {
+        use insim::insim::Npl;
+        use insim_extra::world::World;
+
+        let mut world = World::new();
+        let _ = world.apply_packet(
+            &Ncn {
+                ucid: ConnectionId(2),
+                uname: "driver".into(),
+                ..Default::default()
+            }
+            .into(),
+        );
+        let _ = world.apply_packet(
+            &Npl {
+                ucid: ConnectionId(2),
+                plid: PlayerId(5),
+                pname: "Driver".into(),
+                nump: 1,
+                ..Default::default()
+            }
+            .into(),
+        );
+        let now = Instant::now();
+        let cx = Context::new(&world, now);
+        let mut bomb = Bomb::new(Config::default());
+        let player = world.player(PlayerId(5)).unwrap();
+        assert!(bomb.rules.checkpoint("driver", player, 1, now).is_some());
+
+        let effects = bomb.update(Input::Stopping, &cx);
+        assert!(bomb.rules.runs.is_empty());
+        assert_eq!(bomb.board.len(), 1);
+        assert_eq!(bomb.board[0].uname, "driver");
+        let texts: Vec<&str> = effects
+            .packets_sent()
+            .filter_map(|p| match p {
+                Packet::Mtc(mtc) => Some(mtc.text.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            texts
+                .iter()
+                .any(|t| t.contains("Bomb is closing after 0 cps")),
+            "{texts:?}"
+        );
+        assert!(
+            texts.iter().any(|t| t.contains("thanks for playing")),
+            "{texts:?}"
+        );
+    }
+
     #[tokio::test]
     async fn a_player_sees_the_hud_and_can_open_and_close_help() {
         tokio::time::timeout(Duration::from_secs(10), async {
             let (session, mut lfs) = pair().await;
             let host = Host::spawn(session);
             let _bomb = host
-                .start(Bomb::new(Config::default(), Setup::untimed(Default::default())))
+                .start(Bomb::new(Config::default()))
                 .await
                 .unwrap();
             let player = ConnectionId(2);
@@ -409,7 +570,7 @@ mod tests {
             .await;
 
             let hud = buttons_until(&mut lfs, |p| {
-                ["Bomb - waiting for players", "?", "Cross any checkpoint to start"]
+                ["Bomb - waiting for a race", "?", "Cross any checkpoint to start"]
                     .iter()
                     .all(|text| button(p, text).is_some())
             })

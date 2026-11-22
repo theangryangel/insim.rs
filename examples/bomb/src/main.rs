@@ -1,12 +1,12 @@
 //! Bomb: an in-memory fork of the anomalous mini-game, for testing and
-//! development. No database: the leaderboard lives for as long as the process.
+//! development. The leaderboard lasts as long as the process.
 //!
-//! Drive through InSim circles in order before your timer runs out. Each one
-//! shrinks the window; a finish object resets it; resets, pitting and collisions
-//! cost you. Type `!help` or `!about` in chat, or click `?`.
+//! Drive through InSim circles in order before your timer runs out. Each circle
+//! shrinks the window; a finish object resets it; resets, pitting and
+//! collisions cost time. Type `!help` or `!about`, or click `?`.
 //!
-//! The layout needs InSim circles (and optionally InSim checkpoints as finish
-//! objects). Load one by name from the server, or send one from a `.lyt` file:
+//! The layout needs InSim circles, plus optional InSim checkpoints as finish
+//! objects. Load one from the server by name, or send a `.lyt` file:
 //!
 //!     cargo run -p bomb -- --addr 127.0.0.1:29999 --track FE1X --layout bomb
 //!     cargo run -p bomb -- --addr 127.0.0.1:29999 --layout-file ./bomb.lyt
@@ -26,7 +26,13 @@ use insim::{
     identifiers::RequestId,
     insim::{Isi, IsiFlags},
 };
-use insim_extra::kitcar::{Host, Layout, Setup};
+use insim_extra::kitcar::{
+    Host,
+    services::{
+        penalty_clearer::PenaltyClearer,
+        race_director::{Combo, Layout, RaceDirector},
+    },
+};
 
 use crate::{game::Bomb, rules::Config};
 
@@ -70,7 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     let layout = match (args.layout, args.layout_file) {
-        (Some(name), _) => Some(Layout::Named(name)),
+        (Some(name), _) => Some(Layout::Axload(name)),
         (None, Some(path)) => Some(Layout::Objects(insim_lyt::Lyt::from_path(&path)?.objects)),
         (None, None) => None,
     };
@@ -90,15 +96,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         iname: "bomb".into(),
         prefix: '!',
         admin: args.admin_password.unwrap_or_default(),
-        // Layout objects (to learn the circle order) and car contacts.
+        // Layout objects (for the circle order) and car contacts.
         flags: IsiFlags::AXM_LOAD | IsiFlags::CON,
         ..Isi::default()
     };
     let session = Session::tcp(stream)?.handshake(isi).await?;
 
     let mut host = Host::spawn(session);
-    let setup = Setup::untimed(args.track).layout(layout);
-    let mut bomb = host.start(Bomb::new(config, setup)).await?;
+    // Three services: `RaceDirector` sets up the track and layout (one setup,
+    // so it never rotates), `PenaltyClearer` clears penalties, and Bomb plays
+    // whatever race is running.
+    let _director = host
+        .start(RaceDirector::new(Combo::untimed(args.track).layout(layout)))
+        .await?;
+    let mut bomb = host.start(Bomb::new(config)).await?;
+    let _clearer = host
+        .start(PenaltyClearer::new(Duration::from_secs(15)))
+        .await?;
 
     tokio::select! {
         () = bomb.finished() => host.shutdown().await?,

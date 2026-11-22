@@ -1,5 +1,5 @@
 //! Proc macros for `insim_extra`. Use them through `insim_extra`, which
-//! re-exports them alongside the traits they implement.
+//! re-exports them with their traits.
 extern crate proc_macro;
 
 use darling::FromDeriveInput;

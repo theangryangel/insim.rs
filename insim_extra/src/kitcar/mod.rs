@@ -1,9 +1,8 @@
 //! Run games and services on an InSim connection.
 //!
-//! A [`Host`] owns one connection for as long as it lasts and keeps a [`World`]
-//! in step with the server. It runs any number of [`Service`]s: a game such as a
-//! time trial, the idle screen between events, or a long-lived service. Services can
-//! be started and stopped at any time without reconnecting.
+//! A [`Host`] owns one connection and keeps a [`World`] in step with the
+//! server. It runs any number of [`Service`]s: a game, the idle screen between
+//! events, or something long-lived. Start and stop them without reconnecting.
 //!
 //! A service is one update function over its own state:
 //!
@@ -22,40 +21,57 @@
 //! }
 //! ```
 //!
-//! - **Ordered.** The host folds each packet into the [`World`] first, then gives
-//!   it to every service, followed by the world events it caused. Inputs arrive one
-//!   at a time, so state needs no locks.
+//! - **Ordered.** Each packet updates the [`World`] first, then reaches every
+//!   service, followed by the world events it caused. Inputs arrive one at a
+//!   time, so state needs no locks.
 //! - **No I/O in updates.** `update` is synchronous and returns [`Effects`]:
-//!   packets to send, timers (keyed, so they can be replaced or cancelled), and
-//!   tasks for slow work such as database queries, whose results come back as
-//!   messages. This keeps services deterministic and easy to test: call `update`
-//!   with an input and a [`Context`], and inspect the effects.
-//! - **Components, not handlers.** Reusable behaviour such as [`Lifecycle`] and
-//!   [`PenaltyClearer`] is a plain struct held as a field, with its own update
-//!   method. Combine effects with [`Effects::and`], and lift a component's
-//!   messages into your own with [`Effects::map`].
+//!   packets, keyed timers and tasks for slow work, whose results come back as
+//!   messages. Services stay deterministic, so a test is just `update` with an
+//!   input and a [`Context`].
+//! - **Services side by side.** Behaviour that needs nothing from a game, such
+//!   as [`RaceDirector`] and [`PenaltyClearer`], runs as its own service. The
+//!   game follows the session through the [`World`], so it doesn't matter who
+//!   started a race. Behaviour that needs a service's state is a struct field
+//!   with its own update method: combine with [`Effects::and`], lift messages
+//!   with [`Effects::map`].
+//!
+//! # Routers
+//!
+//! A bot that mostly reacts to events and commands doesn't need a whole
+//! `update`. [`Router`] is a [`Service`] built from handlers, each picked by
+//! the type it takes:
+//!
+//! ```ignore
+//! Router::new(Bot::default())
+//!     .on(joined)          // fn(&mut Bot, &Connected, &Context) -> Effects<()>
+//!     .on(uco)             // fn(&mut Bot, &Uco, &Context) -> ...
+//!     .commands(command)   // fn(&mut Bot, Caller, Cmd, &Context) -> ...
+//! ```
+//!
+//! Routers suit things that react. Games and other state machines, where the
+//! order of checks matters, are clearer as a hand-written `update`.
 //!
 //! # Multiplayer only
 //!
-//! kitcar targets multiplayer servers. The local connection (UCID 0) is always
-//! the server, never a player: views are never drawn for it, and
-//! [`World::connections`] leaves it out. Local and single-player tools can drive
-//! an [`crate::ui::Canvas`] or [`crate::ui::Screen`] directly.
+//! kitcar targets multiplayer servers. The local connection (UCID 0) is the
+//! server, never a player: it gets no views, and [`World::connections`] leaves
+//! it out. Local and single-player tools can drive a [`crate::ui::Canvas`] or
+//! [`crate::ui::Screen`] directly.
 //!
 //! [`World`]: crate::world::World
+//! [`Router`]: services::router::Router
+//! [`RaceDirector`]: services::race_director::RaceDirector
+//! [`PenaltyClearer`]: services::penalty_clearer::PenaltyClearer
 //! [`World::connections`]: crate::world::World::connections
 
-mod effects;
-mod error;
-mod host;
-mod lifecycle;
-mod penalty_clearer;
-mod service;
+pub mod effects;
+pub mod error;
+pub mod host;
+pub mod input;
+pub mod service;
+pub mod services;
 mod timers;
 
-pub use effects::{Effects, TimerKey};
-pub use error::AppError;
-pub use host::{Host, ServiceHandle};
-pub use lifecycle::{Layout, Lifecycle, Phase, Setup, Transition};
-pub use penalty_clearer::{ClearPenalty, PenaltyClearer};
+pub use effects::Effects;
+pub use host::Host;
 pub use service::{Context, Input, Service};

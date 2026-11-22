@@ -1,13 +1,13 @@
-//! End-to-end smoke test / getting-started example for `kitcar`.
+//! End-to-end smoke test and getting-started example for `kitcar`.
 //!
-//! One [`Service`] demonstrating:
+//! One [`Service`] showing:
 //! - Packets and world events as inputs (`Mso`, `Connected`, `WorldEvent::Ready`)
 //! - Typed chat commands via `ChatParser<C>`
 //! - A repeating keyed timer (the heartbeat)
-//! - A view drawn straight from the service's state: nothing to keep in sync
-//! - Self-contained components with per-player state: a click counter that
-//!   reports each click to the service, and a help dialog opened by `!help`
-//! - A service stopping itself (`!quit`), after which the host shuts down
+//! - A view drawn from the service's state, with nothing to keep in sync
+//! - Components with per-player state: a click counter that reports to the
+//!   service, and a help dialog opened by `!help`
+//! - A service stopping itself (`!quit`), which shuts the host down
 //!
 //! Run with:
 //!     cargo run -p kitcar-smoke -- --addr 127.0.0.1:29999
@@ -25,14 +25,13 @@ use insim::{
 };
 use insim_extra::{
     chat::{ChatCommand, ChatParser},
-    kitcar::{AppError, Context, Effects, Host, Input, Service},
+    kitcar::{Context, Effects, Host, Input, Service, error::HostError},
     ui::{self, Child, Component, Node, Ui},
     world::{Connected, WorldEvent},
 };
 
-// Typed chat commands. `ChatParser<C>` parses each chat message into `C`,
-// after stripping the `!` prefix. The derive writes the parser, and each
-// variant's doc comment becomes its help text.
+// `ChatParser<C>` strips the `!` prefix and parses the rest into `C`. Each
+// variant's doc comment is its help text.
 #[derive(Debug, Clone, ChatCommand)]
 enum Cmd {
     /// Say hello to everyone.
@@ -45,8 +44,8 @@ enum Cmd {
     Quit,
 }
 
-// A self-contained component: each player gets their own count, kept by the
-// host between renders. It reports every click to its parent.
+// Each player gets their own count, kept by the host between renders. Clicks
+// are reported to the parent.
 #[derive(Default)]
 struct ClickCounter {
     clicks: u32,
@@ -77,8 +76,8 @@ impl Component for ClickCounter {
     }
 }
 
-// Another self-contained component: opened by the service with
-// `Effects::send(ucid, "help", DialogMsg::Show)`, closed by its own button.
+// Opened by the service with `Effects::send(ucid, "help", DialogMsg::Show)`;
+// closed by its own button.
 #[derive(Default)]
 struct HelpDialog {
     open: bool,
@@ -108,7 +107,6 @@ impl Component for HelpDialog {
             ui::text("^3Commands", BtnStyle::default().dark())
                 .w(50)
                 .h(6),
-            // One line per command, straight from `Cmd`.
             ui::col(Cmd::COMMANDS.iter().map(|cmd| {
                 ui::text(
                     format!("^7!{cmd} ^8- {}", cmd.help()),
@@ -164,7 +162,7 @@ impl Service for Smoke {
                 tracing::info!(online = cx.world().connection_count(), "world ready");
                 Effects::none()
             },
-            // Only greet people who join now, not those already connected.
+            // Greet only newcomers, not those already connected.
             Input::World(WorldEvent::Connected(Connected {
                 info,
                 existing: false,
@@ -196,7 +194,6 @@ impl Service for Smoke {
         }
     }
 
-    // Drawn from the service's own state on every change.
     fn view(
         &self,
         ucid: ConnectionId,
@@ -250,7 +247,7 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), AppError> {
+async fn main() -> Result<(), HostError> {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
 
@@ -281,7 +278,7 @@ async fn main() -> Result<(), AppError> {
         .await?;
 
     tokio::select! {
-        // `!quit` stops the service; then close the connection politely.
+        // `!quit` stops the service; then disconnect politely.
         () = service.finished() => host.shutdown().await,
         result = host.closed() => result,
     }

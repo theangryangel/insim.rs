@@ -1,5 +1,5 @@
-//! Bomb's rules: runs, checkpoints and penalties. Plain state and methods; time
-//! is passed in, so they are easy to test.
+//! Bomb's rules: runs, checkpoints and penalties. Time is passed in, so
+//! they're easy to test.
 
 use std::{
     collections::HashMap,
@@ -49,6 +49,11 @@ impl CircleSequence {
 
     pub fn clear(&mut self) {
         self.0.clear();
+    }
+
+    #[cfg(test)]
+    pub fn indices(&self) -> &[u8] {
+        &self.0
     }
 
     fn is_next(&self, last: u8, candidate: u8) -> bool {
@@ -146,7 +151,6 @@ impl Rules {
             });
         }
 
-        // Only humans can start runs.
         if player.ptype.contains(PlayerType::AI) {
             return None;
         }

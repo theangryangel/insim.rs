@@ -26,8 +26,10 @@ bitflags::bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
     /// Flags for an [`Axm`] packet.
     pub struct PmoFlags: u8 {
-        /// LFS has reached the end of a layout file, or (on [`PmoAction::AddObjects`])
-        /// requests client-side optimisation of all objects.
+        /// LFS has reached the end of a layout file ([`PmoAction::LoadingFile`]),
+        /// this is the last packet of a reply to [`TinyType::Axm`](crate::insim::TinyType::Axm)
+        /// ([`PmoAction::TinyAxm`]), or (on [`PmoAction::AddObjects`]) requests
+        /// client-side optimisation of all objects.
         const FILE_END = (1 << 0);
 
         /// This packet is one of a paired [`PmoAction::DelObjects`] /

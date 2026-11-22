@@ -1,19 +1,11 @@
-//! [`PenaltyClearer`]: clears a penalty a fixed time after it is given.
+//! [`PenaltyClearer`]: clears each penalty after a fixed delay.
 //!
-//! A component: hold it as a field of your service, pass it every input, and route
-//! its message back to it.
+//! Start it next to your game. It needs nothing from the game, so its messages
+//! and timers stay out of the game's way.
 //!
 //! ```ignore
-//! enum Msg { Penalty(ClearPenalty), /* ... */ }
-//!
-//! fn update(&mut self, input: Input<Msg>, cx: &Context) -> Effects<Msg> {
-//!     let fx = self.clearer.update(&input, cx).map(Msg::Penalty);
-//!     fx.and(match input {
-//!         Input::Msg(Msg::Penalty(clear)) => self.clearer.clear(clear, cx),
-//!         // ...
-//!         _ => Effects::none(),
-//!     })
-//! }
+//! let _game = host.start(MyGame::new()).await?;
+//! let _clearer = host.start(PenaltyClearer::new(Duration::from_secs(15))).await?;
 //! ```
 
 use std::time::Duration;
@@ -21,32 +13,36 @@ use std::time::Duration;
 use insim::{Packet, identifiers::ConnectionId, insim::PenaltyReason};
 
 use crate::{
-    kitcar::{Context, Effects, Input},
+    kitcar::{Context, Effects, Input, Service},
     world::WorldEvent,
 };
 
-/// The clear for one connection is due. Hand it to [`PenaltyClearer::clear`].
+/// A connection's clear is due. The [`PenaltyClearer`]'s own message.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ClearPenalty(pub ConnectionId);
+pub struct ClearPenalty(ConnectionId);
 
+/// One pending clear per connection, so a new penalty restarts the delay.
 #[derive(Debug, PartialEq)]
 struct Pending(ConnectionId);
 
 /// Clears each penalty `delay` after it is given. A new penalty restarts the
-/// delay, and pending clears are dropped when a session starts or ends.
+/// delay. A session starting or ending drops pending clears.
 #[derive(Debug, Clone, Copy)]
 pub struct PenaltyClearer {
     delay: Duration,
 }
 
 impl PenaltyClearer {
-    /// Clear penalties `delay` after they are given.
+    /// Clear penalties after `delay`.
     pub fn new(delay: Duration) -> Self {
         Self { delay }
     }
+}
 
-    /// Schedule or discard clears. Pass every input.
-    pub fn update<M>(&mut self, input: &Input<M>, cx: &Context<'_>) -> Effects<ClearPenalty> {
+impl Service for PenaltyClearer {
+    type Msg = ClearPenalty;
+
+    fn update(&mut self, input: Input<ClearPenalty>, cx: &Context<'_>) -> Effects<ClearPenalty> {
         match input {
             Input::Packet(Packet::Pen(pen)) if !matches!(pen.reason, PenaltyReason::Unknown) => {
                 match cx.world().connection_by_player(pen.plid) {
@@ -61,15 +57,11 @@ impl PenaltyClearer {
             Input::World(WorldEvent::SessionStarted(_) | WorldEvent::SessionEnded(_)) => {
                 Effects::new().cancel_all::<Pending>()
             },
+            Input::Msg(ClearPenalty(ucid)) => match cx.world().connection(ucid) {
+                Some(conn) => Effects::new().packet(conn.clear_penalty()),
+                None => Effects::none(),
+            },
             _ => Effects::none(),
-        }
-    }
-
-    /// Carry out a due clear, if the connection is still there.
-    pub fn clear<M: Send + 'static>(&self, due: ClearPenalty, cx: &Context<'_>) -> Effects<M> {
-        match cx.world().connection(due.0) {
-            Some(conn) => Effects::new().packet(conn.clear_penalty()),
-            None => Effects::none(),
         }
     }
 }
@@ -108,7 +100,7 @@ mod tests {
         );
         let cx = Context::new(&world, Instant::now());
         let mut clearer = PenaltyClearer::new(Duration::from_secs(15));
-        let pen = Input::<()>::Packet(
+        let pen = Input::Packet(
             Pen {
                 plid: PlayerId(9),
                 reason: PenaltyReason::FalseStart,
@@ -116,11 +108,11 @@ mod tests {
             }
             .into(),
         );
-        let effects = clearer.update(&pen, &cx);
+        let effects = clearer.update(pen, &cx);
         let timers: Vec<_> = effects.timers().map(|(_, msg)| *msg).collect();
         assert_eq!(timers, [ClearPenalty(ConnectionId(4))]);
 
-        let cleared: Effects<()> = clearer.clear(ClearPenalty(ConnectionId(4)), &cx);
+        let cleared = clearer.update(Input::Msg(ClearPenalty(ConnectionId(4))), &cx);
         assert!(matches!(
             cleared.packets_sent().next(),
             Some(Packet::Mst(mst)) if mst.msg == "/p_clear driver"

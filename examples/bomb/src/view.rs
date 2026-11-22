@@ -2,13 +2,13 @@
 
 use insim::{Colour, identifiers::ConnectionId, insim::BtnStyle};
 use insim_extra::{
-    kitcar::{Context, Phase},
+    kitcar::Context,
     ui::{self, Child, Component, Node, Ui},
 };
 
 use crate::game::{Bomb, Msg};
 
-/// Keys for the dialogs, so chat commands can open them.
+/// Dialog keys, so chat commands can open them.
 pub const HELP: &str = "help";
 pub const ABOUT: &str = "about";
 
@@ -45,8 +45,8 @@ fn muted() -> BtnStyle {
     BtnStyle::default().dark().grey()
 }
 
-/// A dialog that opens when sent `Show` and closes itself. Each player has their
-/// own, kept by the host; the game never tracks whether it is open.
+/// A dialog that opens on `Show` and closes itself. The host keeps one per
+/// player, so the game never tracks whether it's open.
 #[derive(Default)]
 pub struct Dialog {
     open: bool,
@@ -185,9 +185,16 @@ pub fn view(bomb: &Bomb, ucid: ConnectionId, ui: &mut Ui<'_, Msg>, cx: &Context<
     };
 
     let topbar = ui::row([
-        ui::text(format!("Bomb - {}", bomb.phase()), title())
-            .w(30)
-            .h(5),
+        ui::text(
+            if cx.world().session().is_some() {
+                "Bomb - racing"
+            } else {
+                "Bomb - waiting for a race"
+            },
+            title(),
+        )
+        .w(30)
+        .h(5),
         ui::text(status, status_style).w(45).h(5),
         ui::text(
             marquee("in-memory build - no database", 20, now - bomb.started),
@@ -205,16 +212,13 @@ pub fn view(bomb: &Bomb, ucid: ConnectionId, ui: &mut Ui<'_, Msg>, cx: &Context<
         .pl(5)
         .mt(10)
         .items_start()
-        .when(bomb.phase() != Phase::SettingUp, |board| {
-            board
-                .with_child(ui::text("Active Runs", title()).w(43).h(5))
-                .with_children(run_rows)
-                .with_child(ui::text("Session Best", title()).w(43).h(5))
-                .with_children(board_rows)
-        });
+        .with_child(ui::text("Active Runs", title()).w(43).h(5))
+        .with_children(run_rows)
+        .with_child(ui::text("Session Best", title()).w(43).h(5))
+        .with_children(board_rows);
 
-    // Dialogs float over everything, centred. Each one is its own component, so
-    // each player's dialogs open and close independently.
+    // Dialogs float centred over everything. Each is its own component, so it
+    // opens and closes per player.
     let dialogs = ui::row([
         ui.child(
             Child::with_props(

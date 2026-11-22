@@ -1,14 +1,14 @@
-//! Crate-wide error type.
+//! [`HostError`]: errors from a [`Host`](crate::kitcar::Host).
 
 /// Errors from a [`Host`](crate::kitcar::Host).
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
-pub enum AppError {
+pub enum HostError {
     /// The connection failed.
     #[error(transparent)]
     Insim(#[from] insim::Error),
 
-    /// The host has stopped, so services can no longer be started or stopped.
+    /// The host has stopped.
     #[error("host closed")]
     Closed,
 }
