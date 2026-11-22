@@ -1,0 +1,22 @@
+[package]
+name = "insim_extra_macros"
+description = "Proc macros for insim_extra"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+publish = false  # XXX: remove when we're comfortable releasing
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { workspace = true, features = ["full"] }
+quote = { workspace = true }
+darling = { workspace = true }
+proc-macro2 = { workspace = true }
+
+[lints]
+workspace = true

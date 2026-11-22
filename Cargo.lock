@@ -118,8 +118,8 @@ version = "0.1.0+unreleased"
 dependencies = [
  "clap",
  "insim",
+ "insim_extra",
  "insim_lyt",
- "kitcar",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -732,12 +732,23 @@ dependencies = [
  "fixedbitset",
  "futures",
  "insim",
+ "insim_extra_macros",
  "multi_index_map",
  "parking_lot 0.13.0",
  "taffy",
  "thiserror",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "insim_extra_macros"
+version = "0.1.0"
+dependencies = [
+ "darling 0.24.0",
+ "proc-macro2",
+ "quote",
+ "syn 3.0.3",
 ]
 
 [[package]]
@@ -813,24 +824,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "kitcar"
-version = "0.1.0+unreleased"
-dependencies = [
- "futures",
- "insim",
- "insim_extra",
- "thiserror",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "kitcar-smoke"
 version = "0.1.0+unreleased"
 dependencies = [
  "clap",
  "insim",
- "kitcar",
+ "insim_extra",
  "tokio",
  "tracing",
  "tracing-subscriber",

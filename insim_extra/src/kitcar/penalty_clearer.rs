@@ -19,9 +19,11 @@
 use std::time::Duration;
 
 use insim::{Packet, identifiers::ConnectionId, insim::PenaltyReason};
-use insim_extra::world::WorldEvent;
 
-use crate::{Context, Effects, Input};
+use crate::{
+    kitcar::{Context, Effects, Input},
+    world::WorldEvent,
+};
 
 /// The clear for one connection is due. Hand it to [`PenaltyClearer::clear`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -80,9 +82,9 @@ mod tests {
         identifiers::PlayerId,
         insim::{Ncn, Npl, Pen},
     };
-    use insim_extra::world::World;
 
     use super::*;
+    use crate::world::World;
 
     #[test]
     fn a_penalty_schedules_one_clear_that_sends_p_clear() {

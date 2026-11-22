@@ -1,17 +1,17 @@
-//! [`Service`]: a game or service run by a [`Host`](crate::Host), written as one
+//! [`Service`]: a game or service run by a [`Host`](crate::kitcar::Host), written as one
 //! update function over its own state.
 
 use std::{any::Any, collections::HashMap, time::Instant};
 
 use insim::{Packet, identifiers::ConnectionId};
-use insim_extra::{
+
+use crate::{
+    kitcar::Effects,
     ui::{Key, Node, Screen, Ui, id_pool::ClickIdPool},
     world::{World, WorldEvent},
 };
 
-use crate::Effects;
-
-/// Something a [`Host`](crate::Host) runs on a connection: a game such as Bomb,
+/// Something a [`Host`](crate::kitcar::Host) runs on a connection: a game such as Bomb,
 /// the idle screen, or a long-lived service such as licensing.
 ///
 /// Unlike tower's `Service`, this is not request/response: it is a stateful
@@ -31,8 +31,8 @@ use crate::Effects;
 /// player's buttons straight from the service's state, so there is nothing to
 /// keep in sync. The host redraws after every update and sends only what
 /// changed. Per-player UI state (an open dialog, a scroll position) lives in
-/// [`Component`](insim_extra::ui::Component)s placed with
-/// [`Ui::component`](insim_extra::ui::Ui::component), which the host keeps for
+/// [`Component`](crate::ui::Component)s placed with
+/// [`Ui::component`](crate::ui::Ui::component), which the host keeps for
 /// each player.
 pub trait Service: Send + 'static {
     /// The service's own messages: timer payloads, task results, button clicks.

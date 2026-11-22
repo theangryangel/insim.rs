@@ -1,8 +1,8 @@
 //! What each player sees, drawn straight from the game's state.
 
 use insim::{Colour, identifiers::ConnectionId, insim::BtnStyle};
-use kitcar::{
-    Context, Phase,
+use insim_extra::{
+    kitcar::{Context, Phase},
     ui::{self, Child, Component, Node, Ui},
 };
 

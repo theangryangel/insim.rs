@@ -1,6 +1,6 @@
-//! [`Effects`]: what a [`Service`](crate::Service) asks the runtime to do.
+//! [`Effects`]: what a [`Service`](crate::kitcar::Service) asks the runtime to do.
 //!
-//! A service never performs I/O itself. It returns effects, and the [`Host`](crate::Host)
+//! A service never performs I/O itself. It returns effects, and the [`Host`](crate::kitcar::Host)
 //! carries them out: packets are sent in order, timers are kept until they fire,
 //! and tasks run off the dispatch loop with their results delivered back as
 //! messages.
@@ -15,7 +15,8 @@ use std::{
 
 use futures::{FutureExt, Stream, StreamExt, future::BoxFuture, stream::BoxStream};
 use insim::{Packet, identifiers::ConnectionId};
-use insim_extra::ui::Key;
+
+use crate::ui::Key;
 
 /// Identifies a timer so that scheduling it again replaces it, and so it can be
 /// cancelled. Implemented for any `Debug + PartialEq + Send + 'static` type; a
@@ -90,7 +91,7 @@ pub(crate) enum Effect<M> {
 
 /// A list of things for the runtime to do, in order.
 ///
-/// Built with chained calls and returned from [`Service::update`](crate::Service::update):
+/// Built with chained calls and returned from [`Service::update`](crate::kitcar::Service::update):
 ///
 /// ```ignore
 /// Effects::new()
@@ -155,7 +156,7 @@ impl<M: Send + 'static> Effects<M> {
     /// Send a chat message to one connection, or everyone with
     /// [`ConnectionId::ALL`]. Long text is split into several messages.
     pub fn message(self, text: impl Into<String>, ucid: ConnectionId) -> Self {
-        self.packets(insim_extra::util::mtc(text, Some(ucid)))
+        self.packets(crate::util::mtc(text, Some(ucid)))
     }
 
     /// Deliver `msg` after `delay`.
@@ -222,7 +223,7 @@ impl<M: Send + 'static> Effects<M> {
         self.push(Effect::Stream(stream.boxed()))
     }
     /// Send `msg` to one player's component placed with `key`
-    /// ([`Child::key`](insim_extra::ui::Child::key)), as if it came from one of
+    /// ([`Child::key`](crate::ui::Child::key)), as if it came from one of
     /// its buttons. For example, open a player's help dialog from a chat command.
     pub fn send(self, ucid: ConnectionId, key: impl Key, msg: impl Any + Send + Sync) -> Self {
         self.push(Effect::Send {

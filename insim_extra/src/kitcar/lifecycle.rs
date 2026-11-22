@@ -25,9 +25,11 @@ use insim::{
     identifiers::ConnectionId,
     insim::{Axm, PmoAction, PmoFlags, RaceLaps},
 };
-use insim_extra::world::{World, WorldEvent};
 
-use crate::{Context, Effects, Input};
+use crate::{
+    kitcar::{Context, Effects, Input},
+    world::{World, WorldEvent},
+};
 
 /// Where the round is.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

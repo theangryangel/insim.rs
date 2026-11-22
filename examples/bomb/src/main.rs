@@ -26,7 +26,7 @@ use insim::{
     identifiers::RequestId,
     insim::{Isi, IsiFlags},
 };
-use kitcar::{Host, Layout, Setup};
+use insim_extra::kitcar::{Host, Layout, Setup};
 
 use crate::{game::Bomb, rules::Config};
 

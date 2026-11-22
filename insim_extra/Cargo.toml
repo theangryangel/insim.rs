@@ -13,7 +13,8 @@ publish = false  # XXX: remove when we're comfortable releasing
 workspace = true
 
 [dependencies]
-insim = { path = "../insim" }
+insim = { path = "../insim", features = ["tokio"] }
+insim_extra_macros = { path = "../insim_extra_macros" }
 parking_lot = { workspace = true }
 tokio = { workspace = true, features = ["time", "sync", "rt", "macros"] }
 futures = { workspace = true }
@@ -25,4 +26,4 @@ multi_index_map = "0.16"
 
 [dev-dependencies]
 insim = { path = "../insim", features = ["test-util"] }
-tokio = { workspace = true, features = ["time", "sync", "rt", "macros", "net"] }
+tokio = { workspace = true, features = ["time", "sync", "rt", "macros", "net", "test-util"] }

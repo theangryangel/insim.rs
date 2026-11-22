@@ -1,6 +1,6 @@
 //! Crate-wide error type.
 
-/// Errors from a [`Host`](crate::Host).
+/// Errors from a [`Host`](crate::kitcar::Host).
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum AppError {
