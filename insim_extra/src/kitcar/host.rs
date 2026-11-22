@@ -16,15 +16,16 @@ use tokio::{
 
 use crate::{
     kitcar::{
-        AppError, Effects,
+        Effects,
         effects::Effect,
+        error::HostError,
         service::{AnyMsg, Context, ErasedService, Input, Pools, Service, Typed},
         timers::Timers,
     },
     world::{SharedWorld, World, WorldEvent, WorldReady},
 };
 
-/// Bound on the connection's outgoing queue and on packets waiting for the host.
+/// Bound on the outgoing queue and on packets waiting for the host.
 const CAPACITY: usize = 256;
 
 /// Buttons are redrawn at most this often, however fast inputs arrive.
@@ -45,12 +46,12 @@ enum Command {
     },
 }
 
-/// Owns one connection to LFS for as long as it lasts, and runs [`Service`]s on it.
+/// Owns one LFS connection and runs [`Service`]s on it.
 ///
-/// The host keeps the [`World`] in step with the server, folding each packet
-/// before any service sees it, and requests the server's state when it starts
-/// (then delivers [`WorldEvent::Ready`]). Services can be started and stopped at
-/// any time without reconnecting, which is how a server manager rotates games:
+/// Each packet updates the [`World`] before any service sees it. On start, the
+/// host requests the server's state, then delivers [`WorldEvent::Ready`].
+/// Services start and stop without reconnecting, which is how a server manager
+/// rotates games:
 ///
 /// ```ignore
 /// let host = Host::spawn(session);
@@ -64,19 +65,18 @@ enum Command {
 /// }
 /// ```
 ///
-/// A game is a service that is swapped out; licensing or ranking are services
-/// that are never stopped. Every running service sees every input, in order.
+/// Games get swapped out; licensing or ranking run for good. Every running
+/// service sees every input, in order.
 #[derive(Debug)]
 pub struct Host {
     commands: mpsc::Sender<Command>,
     sender: net::Sender,
     world: SharedWorld,
-    task: Option<JoinHandle<Result<(), AppError>>>,
+    task: Option<JoinHandle<Result<(), HostError>>>,
 }
 
 impl Host {
-    /// Take over an established session and start the host on the current Tokio
-    /// runtime.
+    /// Take over a session, running on the current Tokio runtime.
     pub fn spawn(session: Session<Tokio>) -> Self {
         Self::spawn_with(session, World::new())
     }
@@ -121,20 +121,20 @@ impl Host {
         }
     }
 
-    /// The connection, for work that has to happen outside a service, such as
-    /// attaching a UI before starting the service that owns it.
+    /// The connection, for work outside a service, such as attaching a UI
+    /// before starting the service that owns it.
     pub fn sender(&self) -> &net::Sender {
         &self.sender
     }
 
-    /// The server mirror the host keeps up to date.
+    /// The server mirror.
     pub fn world(&self) -> &SharedWorld {
         &self.world
     }
 
-    /// Start a service. It receives [`Input::Started`] first, then every input
-    /// from that point on.
-    pub async fn start<M: Service>(&self, service: M) -> Result<ServiceHandle, AppError> {
+    /// Start a service. It gets [`Input::Started`], then every input from then
+    /// on.
+    pub async fn start<M: Service>(&self, service: M) -> Result<ServiceHandle, HostError> {
         let (reply, id) = oneshot::channel();
         let (done, done_rx) = oneshot::channel();
         self.commands
@@ -144,8 +144,8 @@ impl Host {
                 reply,
             })
             .await
-            .map_err(|_| AppError::Closed)?;
-        let id = id.await.map_err(|_| AppError::Closed)?;
+            .map_err(|_| HostError::Closed)?;
+        let id = id.await.map_err(|_| HostError::Closed)?;
         Ok(ServiceHandle {
             id,
             commands: self.commands.clone(),
@@ -154,24 +154,24 @@ impl Host {
     }
 
     /// Wait until the connection ends, returning its error if it failed.
-    /// Every service is stopped first. Returns `Err(Closed)` if already awaited.
-    pub async fn closed(&mut self) -> Result<(), AppError> {
+    /// Services are stopped first. `Err(Closed)` if already awaited.
+    pub async fn closed(&mut self) -> Result<(), HostError> {
         match self.task.as_mut() {
             Some(task) => {
                 let result = task.await;
                 self.task = None;
                 result.unwrap_or_else(|error| {
                     tracing::error!(%error, "host panicked");
-                    Err(AppError::Closed)
+                    Err(HostError::Closed)
                 })
             },
-            None => Err(AppError::Closed),
+            None => Err(HostError::Closed),
         }
     }
 
-    /// Stop every service (each gets [`Input::Stopping`]), flush their final packets,
-    /// send `TINY_CLOSE` and wait for the host to finish.
-    pub async fn shutdown(mut self) -> Result<(), AppError> {
+    /// Stop every service (each gets [`Input::Stopping`]), flush their final
+    /// packets, send `TINY_CLOSE` and wait for the host to finish.
+    pub async fn shutdown(mut self) -> Result<(), HostError> {
         let (reply, result) = oneshot::channel();
         if self
             .commands
@@ -194,8 +194,8 @@ pub struct ServiceHandle {
 }
 
 impl ServiceHandle {
-    /// Stop the service: it gets [`Input::Stopping`], its final packets are sent, and
-    /// its timers and tasks are dropped. Returns once it has stopped.
+    /// Stop the service. It gets [`Input::Stopping`], its final packets are
+    /// sent, and its timers and tasks are dropped.
     pub async fn stop(mut self) {
         let (reply, stopped) = oneshot::channel();
         if self
@@ -209,8 +209,8 @@ impl ServiceHandle {
         self.finished().await;
     }
 
-    /// Wait until the service stops, whether it stopped itself
-    /// ([`Effects::stop`]), was stopped, or the connection ended.
+    /// Wait until the service stops: by [`Effects::stop`], by being stopped, or
+    /// because the connection ended.
     pub async fn finished(&mut self) {
         if let Some(done) = self.done.as_mut() {
             let _ = done.await;
@@ -256,7 +256,7 @@ impl Loop {
         mut self,
         mut commands: mpsc::Receiver<Command>,
         mut results: mpsc::UnboundedReceiver<(u64, AnyMsg)>,
-    ) -> Result<(), AppError> {
+    ) -> Result<(), HostError> {
         loop {
             let deadline = self
                 .services
@@ -296,7 +296,7 @@ impl Loop {
                         let _ = reply.send(self.connection.shutdown().await);
                         return Ok(());
                     },
-                    // Every `Host` handle is gone: nothing can start or stop services.
+                    // Every `Host` handle is gone, so nothing can start or stop services.
                     None => {
                         self.stop_all().await;
                         let _ = self.connection.shutdown().await;
@@ -349,7 +349,7 @@ impl Loop {
         }
     }
 
-    /// When buttons should next be redrawn, if anything changed.
+    /// When to next redraw, if anything changed.
     fn render_at(&self) -> Option<Instant> {
         self.services
             .iter()
@@ -379,7 +379,7 @@ impl Loop {
         }
     }
 
-    // Returns by value so no iterator over `services` is held across an await.
+    // By index, so no borrow of `services` is held across an await.
     fn index_of(&self, id: u64) -> Option<usize> {
         self.services.iter().position(|m| m.id == id)
     }
@@ -390,7 +390,7 @@ impl Loop {
             let mut world = self.world.write();
             (world.apply_packet(&packet), world.take_requests())
         };
-        // Whatever the world needs to stay in step, such as the session requests.
+        // Requests the world needs to stay in step.
         for request in requests {
             if let Err(error) = self.connection.send(request).await {
                 tracing::warn!(%error, "failed to send a request for the world");
@@ -409,8 +409,7 @@ impl Loop {
             }
         }
         if let Packet::Cnl(cnl) = &packet {
-            // Click ids are per connection; the next player with this id starts
-            // with an empty pool.
+            // Click ids are per connection, so a reused UCID starts fresh.
             let _ = self.pools.remove(&cnl.ucid);
         }
     }
@@ -423,7 +422,6 @@ impl Loop {
         }
     }
 
-    /// Run one update and carry out its effects.
     async fn deliver(&mut self, index: usize, input: Input<AnyMsg>) {
         let now = Instant::now();
         let effects = {
@@ -479,7 +477,7 @@ impl Loop {
                         let cx = Context::new(&world, now);
                         self.services[index].service.send(ucid, &*key, &*msg, &cx)
                     };
-                    // Messages reported back by components run before what follows.
+                    // Component replies run before the remaining effects.
                     for effect in more.items.into_iter().rev() {
                         queue.push_front(effect);
                     }
@@ -495,7 +493,6 @@ impl Loop {
         tasks.push(task);
     }
 
-    /// Give the service its final update, carry out the effects, then drop it.
     async fn stop(&mut self, index: usize) {
         self.services[index].stopping = true;
         self.deliver(index, Input::Stopping).await;
@@ -520,12 +517,11 @@ impl Loop {
     }
 }
 
-/// Tracks the startup requests so [`WorldEvent::Ready`] is delivered only after
-/// every reply to them has been folded into the world.
+/// Holds back [`WorldEvent::Ready`] until every startup reply is in the world.
 ///
 /// A reply future resolves when its packets are *decoded*, which can be before
-/// the host has processed them, so the host counts the packets it folds for each
-/// ReqI and compares them with the replies once they are known.
+/// the host has folded them. So the host counts folded packets per ReqI and
+/// compares them with the replies once known.
 struct Ready {
     task: Option<JoinHandle<insim::Result<Vec<Packet>>>>,
     seen: [usize; 256],
@@ -567,7 +563,7 @@ impl Ready {
         }
         self.expected = Some(expected);
     }
-    /// True exactly once, when every startup reply has been folded.
+    /// True exactly once, when every startup reply is folded.
     fn take(&mut self) -> bool {
         let done = self
             .expected
@@ -683,10 +679,10 @@ mod tests {
             service.finished().await;
             // The connection ended rather than being shut down.
             let _ = host.closed().await;
-            assert!(matches!(host.closed().await, Err(AppError::Closed)));
+            assert!(matches!(host.closed().await, Err(HostError::Closed)));
             assert!(matches!(
                 host.start(Probe("late")).await,
-                Err(AppError::Closed)
+                Err(HostError::Closed)
             ));
         })
         .await

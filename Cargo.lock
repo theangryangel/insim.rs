@@ -824,6 +824,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "kitcar-router-bot"
+version = "0.1.0+unreleased"
+dependencies = [
+ "clap",
+ "insim",
+ "insim_extra",
+ "tokio",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "kitcar-smoke"
 version = "0.1.0+unreleased"
 dependencies = [
@@ -832,6 +843,17 @@ dependencies = [
  "insim_extra",
  "tokio",
  "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "kitcar-zinc"
+version = "0.1.0+unreleased"
+dependencies = [
+ "clap",
+ "insim",
+ "insim_extra",
+ "tokio",
  "tracing-subscriber",
 ]
 

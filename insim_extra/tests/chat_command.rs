@@ -19,6 +19,9 @@ enum Cmd {
     Echo {
         msg: Option<String>,
     },
+    /// Restart the server.
+    #[chat(admin)]
+    Restart,
     Say {
         to: String,
         msg: String,
@@ -146,6 +149,7 @@ fn usage() {
             "kick",
             "ban",
             "echo",
+            "restart",
             "say",
             "tp",
             "list_players",
@@ -166,4 +170,6 @@ fn usage() {
     );
     assert_eq!(Cmd::usage("echo").unwrap().help(), "");
     assert!(Cmd::usage("nope").is_none());
+    assert!(Cmd::usage("restart").unwrap().admin());
+    assert!(!Cmd::usage("help").unwrap().admin());
 }

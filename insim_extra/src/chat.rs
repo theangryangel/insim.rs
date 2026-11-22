@@ -1,9 +1,9 @@
 //! Generic chat message parser.
 //!
-//! [`ChatParser`] parses every `Mso`/`Iii` packet into a typed value `C` via
-//! [`std::str::FromStr`]. No `Sender` or framework dependency.
+//! [`ChatParser`] parses `Mso`/`Iii` packets into any `C` that implements
+//! [`std::str::FromStr`]. No `Sender` or framework needed.
 //!
-//! `C` can be written by hand, or derived with [`ChatCommand`](macro@ChatCommand):
+//! Write `C` by hand, or derive it with [`ChatCommand`](macro@ChatCommand):
 //!
 //! ```
 //! use insim_extra::chat::ChatCommand;
@@ -53,11 +53,9 @@ where
 
 /// Generic chat message parser.
 ///
-/// Parses every `Mso` (user chat) or `Iii` (in-game text input) packet body
-/// into a typed value `C` via [`FromStr`]. On parse failure no event is emitted
-/// and no error is returned.
-///
-/// Prefix characters are stripped before parsing (e.g. `!`, `/`).
+/// Parses `Mso` (user chat) and `Iii` (text input) packets into `C` via
+/// [`FromStr`], after stripping prefix characters such as `!`. Messages that
+/// don't parse are skipped silently.
 #[derive(Debug, Clone)]
 pub struct ChatParser<C>
 where
@@ -71,8 +69,7 @@ impl<C> ChatParser<C>
 where
     C: FromStr + Any + Send + Sync + 'static,
 {
-    /// Create a new parser that strips the given prefix characters before
-    /// passing the message body to `C::from_str`.
+    /// Create a parser that strips `prefixes` before parsing.
     pub fn new(prefixes: &[char]) -> Self {
         Self {
             prefixes: prefixes.to_vec(),
@@ -80,8 +77,8 @@ where
         }
     }
 
-    /// Parse one raw packet into a [`ChatEvent`], or `None` if the packet is
-    /// not a user chat message or the body fails to parse as `C`.
+    /// Parse a packet into a [`ChatEvent`]. `None` if it isn't user chat or
+    /// doesn't parse.
     pub fn parse(&self, packet: &insim::Packet) -> Option<ChatEvent<C>> {
         let (msg, ucid) = match packet {
             insim::Packet::Mso(mso)
@@ -104,40 +101,43 @@ where
 /// An enum of chat commands, usually derived with
 /// [`#[derive(ChatCommand)]`](macro@ChatCommand).
 ///
-/// Each variant is one command, matched case-insensitively against the first
-/// word of the message:
+/// Each variant is one command, matched case-insensitively against the
+/// message's first word:
 ///
-/// - The name is the variant name in `snake_case`. Change it with
-///   `#[chat(rename = "...")]`, and add others with `#[chat(alias = "...")]`.
-/// - Unit variants take no arguments. Struct variants take one word per field,
-///   in order, each parsed with [`FromStr`].
-/// - `Option<T>` fields are optional. They must come after every required one.
-/// - A last field of type `String` or `Option<String>` takes the rest of the
-///   line, spaces included.
-/// - Anything left over is an error ([`ChatParseError::TooMany`]).
-/// - The variant's doc comment becomes its [`CommandUsage::help`].
+/// - Name: the variant in `snake_case`. Override with `#[chat(rename = "...")]`;
+///   add more with `#[chat(alias = "...")]`.
+/// - Unit variants take no arguments; struct variants take one word per field,
+///   in order, via [`FromStr`].
+/// - `Option<T>` fields are optional and must follow every required one.
+/// - A last `String` or `Option<String>` field takes the rest of the line,
+///   spaces and all.
+/// - Leftover words are an error ([`ChatParseError::TooMany`]).
+/// - The variant's doc comment is its [`CommandUsage::help`].
+/// - `#[chat(admin)]` marks it admin-only ([`CommandUsage::admin`]). Parsing
+///   ignores this; the caller enforces it, as kitcar's `Router::commands` does.
 ///
-/// `Option` and `String` are recognised by name, so type aliases of them are
-/// treated as ordinary arguments. There is no quoting: use a username, not a
-/// player name, to name a player.
+/// `Option` and `String` are matched by name, so type aliases of them are
+/// ordinary arguments. There's no quoting, so name players by username: player
+/// names can contain spaces.
 pub trait ChatCommand: FromStr<Err = ChatParseError> {
     /// Every command, in declaration order.
     const COMMANDS: &'static [CommandUsage];
 
-    /// The command called `name` (or with `name` as an alias), ignoring case.
+    /// Look up a command by name or alias, ignoring case.
     fn usage(name: &str) -> Option<&'static CommandUsage> {
         Self::COMMANDS.iter().find(|c| c.matches(name))
     }
 }
 
-/// Describes one [`ChatCommand`]: its name, arguments and help text. Displays
-/// as a usage line such as `ban <uname> [mins]`.
+/// One [`ChatCommand`]: name, arguments and help. Displays as a usage line,
+/// such as `ban <uname> [mins]`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CommandUsage {
     name: &'static str,
     aliases: &'static [&'static str],
     args: &'static str,
     help: &'static str,
+    admin: bool,
 }
 
 impl CommandUsage {
@@ -147,12 +147,14 @@ impl CommandUsage {
         aliases: &'static [&'static str],
         args: &'static str,
         help: &'static str,
+        admin: bool,
     ) -> Self {
         Self {
             name,
             aliases,
             args,
             help,
+            admin,
         }
     }
     /// The command's name.
@@ -163,16 +165,20 @@ impl CommandUsage {
     pub fn aliases(&self) -> &'static [&'static str] {
         self.aliases
     }
-    /// The arguments, such as `<uname> [mins] [reason...]`: `<required>`,
-    /// `[optional]`, and `...` for the rest of the line.
+    /// The arguments, such as `<uname> [mins] [reason...]`. `...` marks the
+    /// rest of the line.
     pub fn args(&self) -> &'static str {
         self.args
     }
-    /// The variant's doc comment, joined into one line.
+    /// The variant's doc comment, on one line.
     pub fn help(&self) -> &'static str {
         self.help
     }
-    /// Whether `name` is this command's name or one of its aliases, ignoring case.
+    /// Admin-only, via `#[chat(admin)]`.
+    pub fn admin(&self) -> bool {
+        self.admin
+    }
+    /// Whether `name` is this command's name or an alias, ignoring case.
     pub fn matches(&self, name: &str) -> bool {
         std::iter::once(&self.name)
             .chain(self.aliases)
@@ -190,8 +196,8 @@ impl fmt::Display for CommandUsage {
     }
 }
 
-/// Why a message did not parse as a [`ChatCommand`]. Errors about a known
-/// command carry its name, for looking up its [`ChatCommand::usage`].
+/// Why a message didn't parse as a [`ChatCommand`]. Errors about a known
+/// command carry its name, so you can look up its [`ChatCommand::usage`].
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum ChatParseError {
@@ -219,7 +225,7 @@ pub enum ChatParseError {
         /// What was given.
         value: String,
     },
-    /// There was more after the last argument.
+    /// Words were left after the last argument.
     #[error("too many arguments for `{command}`")]
     TooMany {
         /// The command's name.

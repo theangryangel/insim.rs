@@ -21,3 +21,12 @@ Each example is setup as its own crate so its dependencies are clear.
 - `simple-outsim` - Basic outsim usage.
 - `ssg-manual` - Handle split TCP and UDP connection to LFS, manually, allowing you to receive Mci, Nlp, Outsim and Outgauge packets via UDP, and everything else via TCP.
 - `strobe` - Toggle local vehicle lights in a sequence.
+
+## kitcar
+
+Examples built on `insim_extra::kitcar`. kitcar is for multiplayer servers, so host one first.
+
+- `bomb` - A mini-game: hit checkpoints before your timer runs out.
+- `kitcar-router-bot` - A chat bot built from handlers with `Router`.
+- `kitcar-zinc` - ZINC Is Not CTRA: track rotation, points for clean results, and cars unlocked by points.
+- `kitcar-smoke` - A tour of a hand-written `Service`: commands, timers, a view and components.

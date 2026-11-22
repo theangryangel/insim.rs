@@ -1,4 +1,4 @@
-//! A service's pending timers. Driven by supplied time; it never reads the clock.
+//! A service's pending timers. Never reads the clock, so tests control time.
 
 use std::{
     sync::Arc,
@@ -62,12 +62,12 @@ impl<M> Timers<M> {
         self.entries
             .retain(|entry| !entry.key.as_deref().is_some_and(|k| cancel.matches(k)));
     }
-    /// The earliest time a timer fires.
+    /// The next firing time.
     pub(crate) fn deadline(&self) -> Option<Instant> {
         self.entries.iter().map(|entry| entry.at).min()
     }
     /// Remove due timers and return their messages, earliest first. Repeating
-    /// timers are re-armed for their next period after `now`.
+    /// timers re-arm for their next period after `now`.
     pub(crate) fn expire(&mut self, now: Instant) -> Vec<M> {
         let mut due: Vec<(Instant, M)> = Vec::new();
         self.entries.retain_mut(|entry| {

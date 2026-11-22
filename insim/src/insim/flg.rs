@@ -1,7 +1,7 @@
 use crate::identifiers::{PlayerId, RequestId};
 
 /// Flag type reported by [Flg].
-#[derive(Default, Debug, Clone, insim_core::Decode, insim_core::Encode)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, insim_core::Decode, insim_core::Encode)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 #[non_exhaustive]

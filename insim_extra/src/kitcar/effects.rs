@@ -1,9 +1,8 @@
 //! [`Effects`]: what a [`Service`](crate::kitcar::Service) asks the runtime to do.
 //!
-//! A service never performs I/O itself. It returns effects, and the [`Host`](crate::kitcar::Host)
-//! carries them out: packets are sent in order, timers are kept until they fire,
-//! and tasks run off the dispatch loop with their results delivered back as
-//! messages.
+//! Services never do I/O themselves. The [`Host`](crate::kitcar::Host) sends
+//! packets in order, holds timers until they fire, and runs tasks off the
+//! dispatch loop, delivering their results as messages.
 
 use std::{
     any::{Any, TypeId},
@@ -18,9 +17,9 @@ use insim::{Packet, identifiers::ConnectionId};
 
 use crate::ui::Key;
 
-/// Identifies a timer so that scheduling it again replaces it, and so it can be
-/// cancelled. Implemented for any `Debug + PartialEq + Send + 'static` type; a
-/// small newtype per purpose (`struct Boom(PlayerId)`) keeps keys distinct.
+/// Names a timer, so scheduling it again replaces it and it can be cancelled.
+/// Implemented for any `Debug + PartialEq + Send + 'static` type. A newtype per
+/// purpose (`struct Boom(PlayerId)`) keeps keys distinct.
 pub trait TimerKey: Any + Send + fmt::Debug {
     #[doc(hidden)]
     fn same(&self, other: &dyn TimerKey) -> bool;
@@ -36,7 +35,6 @@ impl<T: Any + Send + fmt::Debug + PartialEq> TimerKey for T {
     }
 }
 
-/// When a one-shot timer fires.
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum When {
     At(Instant),
@@ -51,7 +49,6 @@ impl When {
     }
 }
 
-/// Which timers a cancellation removes.
 #[derive(Debug)]
 pub(crate) enum Cancel {
     Key(Box<dyn TimerKey>),
@@ -91,7 +88,7 @@ pub(crate) enum Effect<M> {
 
 /// A list of things for the runtime to do, in order.
 ///
-/// Built with chained calls and returned from [`Service::update`](crate::kitcar::Service::update):
+/// Chain calls and return it from [`Service::update`](crate::kitcar::Service::update):
 ///
 /// ```ignore
 /// Effects::new()
@@ -134,7 +131,7 @@ impl<M: Send + 'static> Effects<M> {
     pub fn none() -> Self {
         Self::default()
     }
-    /// An empty list to build on.
+    /// Start a chain.
     pub fn new() -> Self {
         Self::default()
     }
@@ -143,18 +140,18 @@ impl<M: Send + 'static> Effects<M> {
         self
     }
 
-    /// Send a packet to LFS.
+    /// Send a packet.
     pub fn packet(self, packet: impl Into<Packet>) -> Self {
         self.push(Effect::Packet(packet.into()))
     }
-    /// Send packets to LFS, in order.
+    /// Send packets, in order.
     pub fn packets<P: Into<Packet>>(mut self, packets: impl IntoIterator<Item = P>) -> Self {
         self.items
             .extend(packets.into_iter().map(|p| Effect::Packet(p.into())));
         self
     }
-    /// Send a chat message to one connection, or everyone with
-    /// [`ConnectionId::ALL`]. Long text is split into several messages.
+    /// Chat to one connection, or everyone with [`ConnectionId::ALL`]. Long
+    /// text is split across messages.
     pub fn message(self, text: impl Into<String>, ucid: ConnectionId) -> Self {
         self.packets(crate::util::mtc(text, Some(ucid)))
     }
@@ -191,8 +188,8 @@ impl<M: Send + 'static> Effects<M> {
             msg,
         })
     }
-    /// Deliver `msg` every `period` until cancelled, replacing any timer with the
-    /// same key. Missed ticks are skipped rather than delivered in a burst.
+    /// Deliver `msg` every `period` until cancelled, replacing any timer with
+    /// the same key. Missed ticks are skipped, not delivered in a burst.
     pub fn every(self, key: impl TimerKey, period: Duration, msg: M) -> Self
     where
         M: Clone + Sync,
@@ -203,7 +200,7 @@ impl<M: Send + 'static> Effects<M> {
             make: Arc::new(move || msg.clone()),
         })
     }
-    /// Cancel the timer with this key, if any.
+    /// Cancel the timer with this key.
     pub fn cancel(self, key: impl TimerKey) -> Self {
         self.push(Effect::Cancel(Cancel::Key(Box::new(key))))
     }
@@ -213,18 +210,18 @@ impl<M: Send + 'static> Effects<M> {
     }
 
     /// Run a future off the dispatch loop and deliver its output as a message.
-    /// Use this for database and network work. Aborted if the service stops first.
+    /// For database and network work. Aborted if the service stops first.
     pub fn task(self, future: impl Future<Output = M> + Send + 'static) -> Self {
         self.push(Effect::Task(future.boxed()))
     }
-    /// Deliver every item of a stream as a message, such as UI clicks from
-    /// `Ui::messages()`. Dropped when the service stops.
+    /// Deliver each item of a stream as a message. Dropped when the service
+    /// stops.
     pub fn stream(self, stream: impl Stream<Item = M> + Send + 'static) -> Self {
         self.push(Effect::Stream(stream.boxed()))
     }
     /// Send `msg` to one player's component placed with `key`
-    /// ([`Child::key`](crate::ui::Child::key)), as if it came from one of
-    /// its buttons. For example, open a player's help dialog from a chat command.
+    /// ([`Child::key`](crate::ui::Child::key)), as if from its own buttons.
+    /// Handy for opening a dialog from a chat command.
     pub fn send(self, ucid: ConnectionId, key: impl Key, msg: impl Any + Send + Sync) -> Self {
         self.push(Effect::Send {
             ucid: Some(ucid),
@@ -232,7 +229,7 @@ impl<M: Send + 'static> Effects<M> {
             msg: Box::new(msg),
         })
     }
-    /// Like [`send`](Self::send), to the component with `key` for every player.
+    /// Like [`send`](Self::send), for every player.
     pub fn send_all(self, key: impl Key, msg: impl Any + Send + Sync) -> Self {
         self.push(Effect::Send {
             ucid: None,
@@ -240,18 +237,18 @@ impl<M: Send + 'static> Effects<M> {
             msg: Box::new(msg),
         })
     }
-    /// Stop this service once these effects have been carried out.
+    /// Stop this service once these effects are carried out.
     pub fn stop(self) -> Self {
         self.push(Effect::Stop)
     }
 
-    /// Append another list of effects.
+    /// Append `other`.
     pub fn and(mut self, other: Self) -> Self {
         self.items.extend(other.items);
         self
     }
-    /// Convert the messages of a component's effects into its parent's message
-    /// type, typically an enum variant: `self.clearer.update(..).map(Msg::Penalty)`.
+    /// Lift a component's messages into its parent's:
+    /// `self.part.update(..).map(Msg::Part)`.
     pub fn map<N: Send + 'static>(self, f: impl Fn(M) -> N + Send + Sync + 'static) -> Effects<N> {
         let f = Arc::new(f);
         Effects {
@@ -289,26 +286,40 @@ impl<M: Send + 'static> Effects<M> {
         }
     }
 
-    /// The packets these effects would send, in order. Useful in tests.
+    /// Packets to send, in order. For tests.
     pub fn packets_sent(&self) -> impl Iterator<Item = &Packet> {
         self.items.iter().filter_map(|item| match item {
             Effect::Packet(packet) => Some(packet),
             _ => None,
         })
     }
-    /// The messages of one-shot timers these effects would schedule, with their
-    /// keys. Useful in tests.
+    /// One-shot timers to schedule, with their keys. For tests.
     pub fn timers(&self) -> impl Iterator<Item = (Option<&dyn TimerKey>, &M)> {
         self.items.iter().filter_map(|item| match item {
             Effect::Timer { key, msg, .. } => Some((key.as_deref(), msg)),
             _ => None,
         })
     }
-    /// Whether these effects stop the service. Useful in tests.
+    /// Take the tasks out to run by hand. For tests: await each and pass its
+    /// message back to `update`.
+    pub fn take_tasks(&mut self) -> Vec<BoxFuture<'static, M>> {
+        let mut tasks = Vec::new();
+        self.items.retain_mut(|item| match item {
+            Effect::Task(_) => {
+                if let Effect::Task(task) = std::mem::replace(item, Effect::Stop) {
+                    tasks.push(task);
+                }
+                false
+            },
+            _ => true,
+        });
+        tasks
+    }
+    /// Whether these effects stop the service. For tests.
     pub fn stops(&self) -> bool {
         self.items.iter().any(|item| matches!(item, Effect::Stop))
     }
-    /// Whether there is nothing to do.
+    /// Nothing to do.
     pub fn is_empty(&self) -> bool {
         self.items.is_empty()
     }

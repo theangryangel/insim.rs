@@ -24,6 +24,8 @@ struct Variant {
     rename: Option<String>,
     #[darling(multiple)]
     alias: Vec<String>,
+    #[darling(default)]
+    admin: bool,
 }
 
 #[derive(Debug, FromField)]
@@ -89,7 +91,7 @@ fn snake_case(ident: &str) -> String {
     out
 }
 
-/// Doc comment lines joined into one line.
+/// Doc comment lines, joined into one.
 fn doc_text(attrs: &[syn::Attribute]) -> String {
     let mut lines = Vec::new();
     for attr in attrs {
@@ -262,8 +264,9 @@ impl Variant {
             .join(" ");
         let aliases = &self.alias;
         let help = doc_text(&self.attrs);
+        let admin = self.admin;
         let usage = quote! {
-            ::insim_extra::chat::CommandUsage::__new(#name, &[#(#aliases),*], #usage_args, #help)
+            ::insim_extra::chat::CommandUsage::__new(#name, &[#(#aliases),*], #usage_args, #help, #admin)
         };
 
         Ok((arm, usage))
