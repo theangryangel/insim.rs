@@ -1,18 +1,14 @@
 //! Crate-wide error type.
 
-/// Errors produced by the `kitcar` runtime and surfaced to handlers/middleware/spawned tasks.
+/// Errors from a [`Host`](crate::Host).
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum AppError {
-    /// Underlying InSim connection error.
+    /// The connection failed.
     #[error(transparent)]
     Insim(#[from] insim::Error),
 
-    /// The dispatcher's back-channel is closed (the runtime is shutting down).
-    #[error("dispatcher channel closed")]
+    /// The host has stopped, so services can no longer be started or stopped.
+    #[error("host closed")]
     Closed,
-
-    /// A user-supplied handler returned an error.
-    #[error("handler: {0}")]
-    Handler(#[source] Box<dyn std::error::Error + Send + Sync>),
 }

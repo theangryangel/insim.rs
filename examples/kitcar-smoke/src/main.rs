@@ -1,12 +1,13 @@
 //! End-to-end smoke test / getting-started example for `kitcar`.
 //!
-//! Demonstrates:
-//! - Wire-packet handlers (`Packet<Ncn>`, `Packet<Mso>`)
-//! - Synthetic-event handlers (`Event<Connected>`, `Event<Disconnected>`)
-//! - Typed chat commands via `ChatParser<C>` middleware + `Event<ChatEvent<C>>`
-//! - A struct-based handler (`MsoCounter`) carrying its own state
-//! - Background work spawned from a one-shot `Event<Startup>` handler
-//! - The `ui` subsystem: global state, per-player state, clickable buttons
+//! One [`Service`] demonstrating:
+//! - Packets and world events as inputs (`Mso`, `Connected`, `WorldEvent::Ready`)
+//! - Typed chat commands via `ChatParser<C>`
+//! - A repeating keyed timer (the heartbeat)
+//! - A view drawn straight from the service's state: nothing to keep in sync
+//! - Self-contained components with per-player state: a click counter that
+//!   reports each click to the service, and a help dialog opened by `!help`
+//! - A service stopping itself (`!quit`), after which the host shuts down
 //!
 //! Run with:
 //!     cargo run -p kitcar-smoke -- --addr 127.0.0.1:29999
@@ -14,82 +15,25 @@
 
 #![allow(missing_docs)]
 
-use std::{
-    sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    },
-    time::Duration,
-};
+use std::time::Duration;
 
 use clap::Parser;
 use insim::{
     Session,
     identifiers::{ConnectionId, RequestId},
-    insim::{BtnStyle, Isi, Mso, Ncn},
+    insim::{BtnStyle, Isi},
 };
 use kitcar::{
-    App, AppError, ChatEvent, ChatParser, Connected, Disconnected, Event, ExtractCx, FromContext,
-    Handler, Packet, Sender, Startup, State, World, mtc, run_connection,
-    ui::{self, Component, Ui, View, ViewHandle},
+    AppError, ChatParser, Context, Effects, Host, Input, Service, WorldEvent,
+    ui::{self, Child, Component, Node, Ui},
+    world::Connected,
 };
-use tokio_util::sync::CancellationToken;
 
-#[derive(Clone)]
-struct AppState {
-    joins: Arc<AtomicUsize>,
-}
-
-async fn log_ncn(Packet(ncn): Packet<Ncn>, State(state): State<AppState>) -> Result<(), AppError> {
-    let n = state.joins.fetch_add(1, Ordering::Relaxed) + 1;
-    tracing::info!(ucid = %ncn.ucid, uname = %ncn.uname, total = n, "ncn");
-    Ok(())
-}
-
-async fn welcome(
-    Event(Connected(info)): Event<Connected>,
-    world: World,
-    sender: Sender,
-) -> Result<(), AppError> {
-    let total = world.count();
-    sender
-        .packets(mtc(
-            format!("^2Welcome ^7{} ^8(now {total} online)", info.uname),
-            Some(info.ucid),
-        ))
-        .await
-}
-
-async fn echo_mso(Packet(mso): Packet<Mso>) -> Result<(), AppError> {
-    tracing::debug!(ucid = %mso.ucid, msg = %mso.msg, "mso");
-    Ok(())
-}
-
-// Typed-enum chat: parser middleware + Event<C> handler.
-//
-// `ChatParser<C>` is a middleware that runs `C::from_str` exactly once per
-// `Mso` and emits the parsed value as a synthetic event. Any number of
-// `Event<C>` handlers can react to the result without re-parsing.
-//
-// Pairs naturally with `insim_extras::chat::Parse` - if you had that derive,
-// you'd write:
-//
-//     #[derive(Debug, Clone, insim_extras::chat::Parse)]
-//     #[chat(prefix = '!')]
-//     enum Cmd { Hello, Echo { message: String } }
-//
-//     impl std::str::FromStr for Cmd {
-//         type Err = insim_extras::chat::ParseError;
-//         fn from_str(s: &str) -> Result<Self, Self::Err> {
-//             <Self as insim_extras::chat::Parse>::parse(s)
-//         }
-//     }
-//
-// For this self-contained example we hand-roll a tiny FromStr below.
+// Typed chat commands. `ChatParser<C>` runs `C::from_str` on each chat message.
 #[derive(Debug, Clone)]
 enum Cmd {
     Hello,
-    Ping,
+    Help,
     Echo { message: String },
     Quit,
 }
@@ -97,11 +41,11 @@ enum Cmd {
 impl std::str::FromStr for Cmd {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let body = s.strip_prefix('!').ok_or(())?;
-        let (head, rest) = body.split_once(char::is_whitespace).unwrap_or((body, ""));
+        // ChatParser has already stripped the `!` prefix.
+        let (head, rest) = s.split_once(char::is_whitespace).unwrap_or((s, ""));
         match head {
             "hello" => Ok(Cmd::Hello),
-            "ping" => Ok(Cmd::Ping),
+            "help" => Ok(Cmd::Help),
             "echo" if !rest.trim().is_empty() => Ok(Cmd::Echo {
                 message: rest.trim().to_string(),
             }),
@@ -111,223 +55,190 @@ impl std::str::FromStr for Cmd {
     }
 }
 
-async fn handle_typed_chat(
-    Event(cmd): Event<ChatEvent<Cmd>>,
-    sender: Sender,
-    cancel: CancellationToken,
-) -> Result<(), AppError> {
-    match cmd.parsed {
-        Cmd::Hello => {
-            sender
-                .packets(mtc("hi from typed handler!", Some(ConnectionId::ALL)))
-                .await?;
-        },
-        Cmd::Ping => {
-            sender.packets(mtc("pong", Some(ConnectionId::ALL))).await?;
-        },
-        Cmd::Echo { message } => {
-            sender
-                .packets(mtc(
-                    format!("typed-echo: {message}"),
-                    Some(ConnectionId::ALL),
-                ))
-                .await?;
-        },
-        Cmd::Quit => {
-            sender
-                .packets(mtc("shutting down...", Some(ConnectionId::ALL)))
-                .await?;
-            cancel.cancel();
-        },
-    }
-    Ok(())
-}
-
-// A *non-function* handler: a named struct that owns its own state and
-// implements `Handler<S, T>` directly. Useful when:
-//   - you want a named, testable handler unit instead of an anonymous closure;
-//   - the handler carries state that doesn't belong in the global `S` (e.g. a
-//     local counter, a small LRU cache, a per-handler debouncer);
-//   - you want to package extractor logic and behaviour together for reuse.
-struct MsoCounter {
-    seen: usize,
-}
-
-impl MsoCounter {
-    fn new() -> Self {
-        Self { seen: 0 }
-    }
-}
-
-impl<S: Send + Sync + 'static, V: View + 'static> Handler<(Packet<Mso>,), S, V> for MsoCounter {
-    async fn call(&mut self, cx: &ExtractCx<'_, S, V>) -> Result<(), AppError> {
-        let Some(Packet(mso)) = <Packet<Mso> as FromContext<S, V>>::from_context(cx) else {
-            return Ok(());
-        };
-        self.seen += 1;
-        tracing::info!(ucid = %mso.ucid, total = self.seen, "MsoCounter saw chat");
-        Ok(())
-    }
-}
-
-// A tiny `ui` example: a 3-row in-game button panel per player.
-//
-//   row 1 - "Online: N"   (global state, refreshed when anyone joins/leaves)
-//   row 2 - "Your clicks: N" (per-player state, owned by the SmokeView)
-//   row 3 - clickable "Click me" button (emits SmokeUiMsg::ButtonClicked)
-//
-// The UI is registered once as an extension. It owns a background LocalSet
-// thread that runs view tasks per connection. Handlers pull the `Ui` extractor
-// to push global updates (`ui.assign(...)`); the SmokeView handles its own
-// per-player state via `Component::update`.
-#[derive(Clone, Default, Debug)]
-struct UiGlobal {
-    online: u64,
-    /// Heartbeat count - updated by the ticker every 30s. Drives the right-
-    /// hand `[STATUS]` line in the smoke view, demonstrating partial-update
-    /// composition: the ticker pushes `beats` via `ui.modify`, the connect
-    /// handlers push `online` via `ui.modify`, neither clobbers the other.
-    beats: u32,
-}
-
-#[derive(Clone, Debug)]
-enum SmokeUiMsg {
-    ButtonClicked,
-}
-
-struct SmokeView {
-    ucid: ConnectionId,
+// A self-contained component: each player gets their own count, kept by the
+// host between renders. It reports every click to its parent.
+#[derive(Default)]
+struct ClickCounter {
     clicks: u32,
 }
 
-impl Component for SmokeView {
-    type Message = SmokeUiMsg;
-    type Props<'a> = (&'a UiGlobal, &'a ());
+#[derive(Clone, Debug)]
+struct Clicked;
 
-    fn render(&self, (global, _): Self::Props<'_>) -> ui::Node<Self::Message> {
-        let left_column = ui::container()
-            .flex()
-            .flex_col()
-            .with_child(
-                ui::text(format!("Online: {}", global.online), BtnStyle::default())
-                    .w(40.0)
-                    .h(5.0),
-            )
-            .with_child(
-                ui::text(format!("Your clicks: {}", self.clicks), BtnStyle::default())
-                    .w(40.0)
-                    .h(5.0),
-            )
-            .with_child(
-                ui::clickable("Click me", BtnStyle::default(), SmokeUiMsg::ButtonClicked)
-                    .w(40.0)
-                    .h(5.0),
-            );
+impl Component for ClickCounter {
+    type Msg = Clicked;
+    type Out = u32;
+    type Props<'a> = ();
 
-        ui::container()
-            .flex()
-            .flex_row()
-            .justify_between()
-            .w(200.0)
-            .with_child(left_column)
-            .with_child(
+    fn update(&mut self, Clicked: Clicked) -> Option<u32> {
+        self.clicks += 1;
+        Some(self.clicks)
+    }
+
+    fn render(&self, (): (), _: &mut Ui<'_, Clicked>) -> Node<Clicked> {
+        ui::col([
+            ui::text(format!("Your clicks: {}", self.clicks), BtnStyle::default())
+                .w(40)
+                .h(5),
+            ui::clickable("Click me", BtnStyle::default(), Clicked)
+                .w(40)
+                .h(5),
+        ])
+    }
+}
+
+// Another self-contained component: opened by the service with
+// `Effects::send(ucid, "help", DialogMsg::Show)`, closed by its own button.
+#[derive(Default)]
+struct HelpDialog {
+    open: bool,
+}
+
+#[derive(Clone, Debug)]
+enum DialogMsg {
+    Show,
+    Close,
+}
+
+impl Component for HelpDialog {
+    type Msg = DialogMsg;
+    type Out = ();
+    type Props<'a> = ();
+
+    fn update(&mut self, msg: DialogMsg) -> Option<()> {
+        self.open = matches!(msg, DialogMsg::Show);
+        None
+    }
+
+    fn render(&self, (): (), _: &mut Ui<'_, DialogMsg>) -> Node<DialogMsg> {
+        if !self.open {
+            return ui::empty();
+        }
+        ui::col([
+            ui::text("^3Commands", BtnStyle::default().dark())
+                .w(50)
+                .h(6),
+            ui::text("!hello  !echo <text>  !quit", BtnStyle::default().dark())
+                .w(50)
+                .h(5),
+            ui::clickable("Close", BtnStyle::default().dark(), DialogMsg::Close)
+                .w(50)
+                .h(5),
+        ])
+        .position_absolute()
+        .top(60)
+        .left(75)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+struct Heartbeat;
+
+#[derive(Debug, Clone)]
+enum Msg {
+    Beat,
+    Clicked { ucid: ConnectionId, total: u32 },
+}
+
+struct Smoke {
+    chat: ChatParser<Cmd>,
+    beats: u32,
+    clicks: u32,
+}
+
+impl Smoke {
+    fn command(&mut self, cmd: Cmd, ucid: ConnectionId) -> Effects<Msg> {
+        let all = ConnectionId::ALL;
+        match cmd {
+            Cmd::Hello => Effects::new().message("hi from the smoke service!", all),
+            Cmd::Help => Effects::new().send(ucid, "help", DialogMsg::Show),
+            Cmd::Echo { message } => Effects::new().message(format!("echo: {message}"), all),
+            Cmd::Quit => Effects::new().stop(),
+        }
+    }
+}
+
+impl Service for Smoke {
+    type Msg = Msg;
+
+    fn update(&mut self, input: Input<Msg>, cx: &Context<'_>) -> Effects<Msg> {
+        match input {
+            Input::Started => Effects::new().every(Heartbeat, Duration::from_secs(30), Msg::Beat),
+            Input::World(WorldEvent::Ready(_)) => {
+                tracing::info!(online = cx.world().connection_count(), "world ready");
+                Effects::none()
+            },
+            // Only greet people who join now, not those already connected.
+            Input::World(WorldEvent::Connected(Connected {
+                info,
+                existing: false,
+            })) => {
+                let online = cx.world().connection_count();
+                Effects::new().message(
+                    format!(
+                        "^2Welcome ^7{} ^8(now {online} online) - try !help",
+                        info.uname
+                    ),
+                    info.ucid,
+                )
+            },
+            Input::Packet(packet) => match self.chat.parse(&packet) {
+                Some(event) => self.command(event.parsed, event.ucid),
+                None => Effects::none(),
+            },
+            Input::Msg(Msg::Beat) => {
+                self.beats += 1;
+                Effects::new().message(format!("[heartbeat] {}", self.beats), ConnectionId::ALL)
+            },
+            Input::Msg(Msg::Clicked { ucid, total }) => {
+                self.clicks += 1;
+                tracing::info!(%ucid, total, everyone = self.clicks, "clicked");
+                Effects::none()
+            },
+            Input::Stopping => Effects::new().message("shutting down...", ConnectionId::ALL),
+            _ => Effects::none(),
+        }
+    }
+
+    // Drawn from the service's own state on every change.
+    fn view(
+        &self,
+        ucid: ConnectionId,
+        ui: &mut Ui<'_, Msg>,
+        cx: &Context<'_>,
+    ) -> Option<Node<Msg>> {
+        let status = ui::col([
+            ui::text(
+                format!("Online: {}", cx.world().connection_count()),
+                BtnStyle::default(),
+            )
+            .w(40)
+            .h(5),
+            ui::text(
+                format!("Everyone's clicks: {}", self.clicks),
+                BtnStyle::default(),
+            )
+            .w(40)
+            .h(5),
+            ui.child(
+                Child::new(ClickCounter::default).on(move |total| Msg::Clicked { ucid, total }),
+            ),
+        ]);
+        Some(
+            ui::row([
+                status,
                 ui::text(
-                    format!("[STATUS] beats: {}", global.beats),
+                    format!("[STATUS] beats: {}", self.beats),
                     BtnStyle::default(),
                 )
-                .w(40.0)
-                .h(5.0),
-            )
+                .w(40)
+                .h(5),
+                ui.child(Child::new(HelpDialog::default).key("help")),
+            ])
+            .w(200)
+            .justify_between(),
+        )
     }
-
-    fn update(&mut self, msg: Self::Message) {
-        match msg {
-            SmokeUiMsg::ButtonClicked => {
-                self.clicks += 1;
-                tracing::info!(ucid = %self.ucid, clicks = self.clicks, "ui button clicked");
-            },
-        }
-    }
-}
-
-impl View for SmokeView {
-    type Global = UiGlobal;
-    type Connection = ();
-
-    fn mount(ucid: ConnectionId, _handle: ViewHandle<Self::Message>) -> Self {
-        SmokeView { ucid, clicks: 0 }
-    }
-
-    fn props<'a>(global: &'a UiGlobal, connection: &'a ()) -> Self::Props<'a> {
-        (global, connection)
-    }
-}
-
-async fn refresh_ui_count(world: World, ui: Ui<SmokeView>) -> Result<(), AppError> {
-    // Partial update: only touch `online`. `beats` is owned by the ticker
-    // and would be clobbered by an `assign(UiGlobal { online, ..default })`.
-    ui.modify(|g| g.online = world.count() as u64);
-    Ok(())
-}
-
-async fn refresh_on_connect(
-    _: Event<Connected>,
-    world: World,
-    ui: Ui<SmokeView>,
-) -> Result<(), AppError> {
-    refresh_ui_count(world, ui).await
-}
-
-async fn refresh_on_disconnect(
-    _: Event<Disconnected>,
-    world: World,
-    ui: Ui<SmokeView>,
-) -> Result<(), AppError> {
-    refresh_ui_count(world, ui).await
-}
-
-async fn on_ui_click(Event(msg): Event<SmokeUiMsg>, sender: Sender) -> Result<(), AppError> {
-    match msg {
-        SmokeUiMsg::ButtonClicked => {
-            sender
-                .packets(mtc("button clicked!", Some(ConnectionId::ALL)))
-                .await?;
-        },
-    }
-    Ok(())
-}
-
-// Long-running background work: react to the one-shot `Startup` event and
-// spawn a task. The task keeps a clone of `Sender` so it can send packets /
-// emit events; when the runtime shuts down, the back-channel closes and the
-// `send` call returns an error - the loop exits naturally.
-async fn install_ticker(
-    _: Event<Startup>,
-    sender: Sender,
-    ui: Ui<SmokeView>,
-) -> Result<(), AppError> {
-    let _ticker = tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(30));
-        let _ = interval.tick().await; // skip immediate fire
-        let mut beat: u32 = 0;
-        loop {
-            let _ = interval.tick().await;
-            beat += 1;
-            println!("[ticker] beat {beat}");
-            ui.modify(|g| g.beats = beat);
-            if sender
-                .packets(mtc(
-                    format!("[ticker] beat {beat}"),
-                    Some(ConnectionId::ALL),
-                ))
-                .await
-                .is_err()
-            {
-                return;
-            }
-        }
-    });
-    Ok(())
 }
 
 #[derive(Parser, Debug)]
@@ -347,21 +258,6 @@ async fn main() -> Result<(), AppError> {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
 
-    let app = App::with_state(AppState {
-        joins: Arc::new(AtomicUsize::new(0)),
-    })
-    .with_ui::<SmokeView>(UiGlobal::default())
-    .handle(ChatParser::<Cmd>::new(&['!']))
-    .handle(install_ticker)
-    .handle(log_ncn)
-    .handle(welcome)
-    .handle(refresh_on_connect)
-    .handle(refresh_on_disconnect)
-    .handle(on_ui_click)
-    .handle(handle_typed_chat)
-    .handle(echo_mso)
-    .handle(MsoCounter::new());
-
     let stream = tokio::time::timeout(
         Duration::from_secs(10),
         tokio::net::TcpStream::connect(args.addr.as_str()),
@@ -377,6 +273,20 @@ async fn main() -> Result<(), AppError> {
         admin: args.admin_password.unwrap_or_default(),
         ..Isi::default()
     };
-    let connection = Session::tcp(stream)?.handshake(isi).await?;
-    run_connection(connection, app).await
+    let session = Session::tcp(stream)?.handshake(isi).await?;
+
+    let mut host = Host::spawn(session);
+    let mut service = host
+        .start(Smoke {
+            chat: ChatParser::new(&['!']),
+            beats: 0,
+            clicks: 0,
+        })
+        .await?;
+
+    tokio::select! {
+        // `!quit` stops the service; then close the connection politely.
+        () = service.finished() => host.shutdown().await,
+        result = host.closed() => result,
+    }
 }

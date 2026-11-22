@@ -24,9 +24,16 @@ use crate::world::{
 #[non_exhaustive]
 pub struct WorldReady;
 
-/// A new connection joined.
+/// A connection the world did not know about. `existing` if it was already
+/// there before we connected (it arrived in reply to a request) rather than
+/// joining now: greet only those with `existing: false`.
 #[derive(Debug, Clone)]
-pub struct Connected(pub ConnectionInfo);
+pub struct Connected {
+    /// The connection.
+    pub info: ConnectionInfo,
+    /// It was already connected before we were.
+    pub existing: bool,
+}
 
 /// A connection left.
 #[derive(Debug, Clone)]
@@ -61,9 +68,15 @@ pub struct Renamed {
     pub new_pname: String,
 }
 
-/// A player joined the track.
+/// A player the world did not know about joined the track, or rejoined it.
+/// `existing` if they were already on track before we connected.
 #[derive(Debug, Clone)]
-pub struct PlayerJoined(pub PlayerInfo);
+pub struct PlayerJoined {
+    /// The player.
+    pub info: PlayerInfo,
+    /// They were already on track before we connected.
+    pub existing: bool,
+}
 
 /// A player left the track.
 #[derive(Debug, Clone)]

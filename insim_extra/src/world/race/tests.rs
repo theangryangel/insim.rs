@@ -195,7 +195,7 @@ fn rst_untimed() -> insim::Packet {
 }
 
 /// Apply a packet and return only the race events it produced.
-fn race_events(world: &World, packet: insim::Packet) -> Vec<RaceEvent> {
+fn race_events(world: &mut World, packet: insim::Packet) -> Vec<RaceEvent> {
     world
         .apply_packet(&packet)
         .into_iter()
@@ -207,80 +207,80 @@ fn race_events(world: &World, packet: insim::Packet) -> Vec<RaceEvent> {
 }
 
 /// Apply a packet, discarding all events.
-fn apply(world: &World, packet: insim::Packet) {
+fn apply(world: &mut World, packet: insim::Packet) {
     let _ = world.apply_packet(&packet);
 }
 
 #[test]
 fn no_session_means_no_race_tracking() {
-    let world = World::new();
-    apply(&world, ncn(1, "alice", "Alice"));
+    let mut world = World::new();
+    apply(&mut world, ncn(1, "alice", "Alice"));
     // No Rst: session_kind is None.
-    assert!(race_events(&world, npl(1, 1, "Alice")).is_empty());
-    assert!(race_events(&world, spx(1, 1, 30_000)).is_empty());
-    assert!(race_events(&world, lap(1, 1, 90_000)).is_empty());
-    assert!(race_events(&world, pit(1, 1)).is_empty());
-    assert!(race_events(&world, pen(1, PenaltyInfo::Dt, PenaltyReason::Speeding)).is_empty());
-    assert!(world.entrants().is_empty());
+    assert!(race_events(&mut world, npl(1, 1, "Alice")).is_empty());
+    assert!(race_events(&mut world, spx(1, 1, 30_000)).is_empty());
+    assert!(race_events(&mut world, lap(1, 1, 90_000)).is_empty());
+    assert!(race_events(&mut world, pit(1, 1)).is_empty());
+    assert!(race_events(&mut world, pen(1, PenaltyInfo::Dt, PenaltyReason::Speeding)).is_empty());
+    assert!(world.entrants().next().is_none());
 }
 
 #[test]
 fn practice_session_tracks_nothing() {
-    let world = World::new();
-    apply(&world, rst_practice());
-    apply(&world, ncn(1, "alice", "Alice"));
-    assert!(race_events(&world, npl(1, 1, "Alice")).is_empty());
-    assert!(race_events(&world, lap(1, 1, 90_000)).is_empty());
-    assert!(world.entrants().is_empty());
+    let mut world = World::new();
+    apply(&mut world, rst_practice());
+    apply(&mut world, ncn(1, "alice", "Alice"));
+    assert!(race_events(&mut world, npl(1, 1, "Alice")).is_empty());
+    assert!(race_events(&mut world, lap(1, 1, 90_000)).is_empty());
+    assert!(world.entrants().next().is_none());
 }
 
 #[test]
 fn untimed_session_tracks_nothing() {
-    let world = World::new();
-    apply(&world, rst_untimed());
-    apply(&world, ncn(1, "alice", "Alice"));
-    assert!(race_events(&world, npl(1, 1, "Alice")).is_empty());
-    assert!(race_events(&world, lap(1, 1, 90_000)).is_empty());
-    assert!(world.entrants().is_empty());
+    let mut world = World::new();
+    apply(&mut world, rst_untimed());
+    apply(&mut world, ncn(1, "alice", "Alice"));
+    assert!(race_events(&mut world, npl(1, 1, "Alice")).is_empty());
+    assert!(race_events(&mut world, lap(1, 1, 90_000)).is_empty());
+    assert!(world.entrants().next().is_none());
 }
 
 #[test]
 fn qualifying_tracks_laps_but_fin_does_not_finish() {
-    let world = World::new();
-    apply(&world, rst_qualifying(10));
-    apply(&world, ncn(1, "alice", "Alice"));
+    let mut world = World::new();
+    apply(&mut world, rst_qualifying(10));
+    apply(&mut world, ncn(1, "alice", "Alice"));
     assert!(matches!(
-        race_events(&world, npl(1, 1, "Alice")).as_slice(),
+        race_events(&mut world, npl(1, 1, "Alice")).as_slice(),
         [RaceEvent::EntrantJoined { .. }]
     ));
     // Laps are tracked in qualifying.
-    assert!(!race_events(&world, lap(1, 1, 90_000)).is_empty());
+    assert!(!race_events(&mut world, lap(1, 1, 90_000)).is_empty());
     // Fin does NOT finish in qualifying.
-    assert!(race_events(&world, fin(1, 90_000, 90_000)).is_empty());
+    assert!(race_events(&mut world, fin(1, 90_000, 90_000)).is_empty());
     let e = world.entrant_by_plid(PlayerId(1)).unwrap();
     assert!(matches!(e.status, FinishStatus::Racing));
 }
 
 #[test]
 fn join_split_lap_emits_ordered_events_and_records_splits() {
-    let world = World::new();
-    apply(&world, rst_race(5));
-    apply(&world, ncn(1, "alice", "Alice"));
+    let mut world = World::new();
+    apply(&mut world, rst_race(5));
+    apply(&mut world, ncn(1, "alice", "Alice"));
     assert!(matches!(
-        race_events(&world, npl(1, 1, "Alice")).as_slice(),
+        race_events(&mut world, npl(1, 1, "Alice")).as_slice(),
         [RaceEvent::EntrantJoined { .. }]
     ));
 
     assert!(matches!(
-        race_events(&world, spx(1, 1, 30_000)).as_slice(),
+        race_events(&mut world, spx(1, 1, 30_000)).as_slice(),
         [RaceEvent::SplitCompleted { split: 1, .. }]
     ));
     assert!(matches!(
-        race_events(&world, spx(1, 2, 33_000)).as_slice(),
+        race_events(&mut world, spx(1, 2, 33_000)).as_slice(),
         [RaceEvent::SplitCompleted { split: 2, .. }]
     ));
 
-    let events = race_events(&world, lap(1, 1, 90_000));
+    let events = race_events(&mut world, lap(1, 1, 90_000));
     // First completed lap: LapCompleted, then PersonalBest, then FastestLap.
     match events.as_slice() {
         [
@@ -319,11 +319,11 @@ fn join_split_lap_emits_ordered_events_and_records_splits() {
 
 #[test]
 fn slower_second_lap_is_not_a_personal_best() {
-    let world = World::new();
-    apply(&world, rst_race(5));
-    apply(&world, npl(1, 1, "Alice"));
-    let _ = race_events(&world, lap(1, 1, 90_000));
-    let events = race_events(&world, lap(1, 2, 95_000));
+    let mut world = World::new();
+    apply(&mut world, rst_race(5));
+    apply(&mut world, npl(1, 1, "Alice"));
+    let _ = race_events(&mut world, lap(1, 1, 90_000));
+    let events = race_events(&mut world, lap(1, 2, 95_000));
     assert!(
         matches!(events.as_slice(), [RaceEvent::LapCompleted { .. }]),
         "a slower lap only emits LapCompleted: {events:?}"
@@ -332,13 +332,13 @@ fn slower_second_lap_is_not_a_personal_best() {
 
 #[test]
 fn fastest_lap_tracks_across_entrants() {
-    let world = World::new();
-    apply(&world, rst_race(5));
-    apply(&world, npl(1, 1, "Alice"));
-    apply(&world, npl(2, 2, "Bob"));
-    let _ = race_events(&world, lap(1, 1, 90_000));
+    let mut world = World::new();
+    apply(&mut world, rst_race(5));
+    apply(&mut world, npl(1, 1, "Alice"));
+    apply(&mut world, npl(2, 2, "Bob"));
+    let _ = race_events(&mut world, lap(1, 1, 90_000));
     // Bob goes faster -> new FastestLap.
-    let events = race_events(&world, lap(2, 1, 89_000));
+    let events = race_events(&mut world, lap(2, 1, 89_000));
     assert!(
         events
             .iter()
@@ -352,35 +352,35 @@ fn fastest_lap_tracks_across_entrants() {
 
 #[test]
 fn leaving_during_a_race_is_a_dnf() {
-    let world = World::new();
-    apply(&world, rst_race(5));
-    apply(&world, npl(1, 1, "Alice"));
+    let mut world = World::new();
+    apply(&mut world, rst_race(5));
+    apply(&mut world, npl(1, 1, "Alice"));
     assert!(matches!(
-        race_events(&world, pll(1)).as_slice(),
+        race_events(&mut world, pll(1)).as_slice(),
         [RaceEvent::Dnf { .. }]
     ));
-    let e = world.entrants().into_iter().next().unwrap();
+    let e = world.entrants().next().unwrap();
     assert!(matches!(e.status, FinishStatus::Dnf));
 }
 
 #[test]
 fn disconnect_during_a_race_is_a_dnf() {
-    let world = World::new();
-    apply(&world, rst_race(5));
-    apply(&world, ncn(1, "alice", "Alice"));
-    apply(&world, npl(1, 1, "Alice"));
+    let mut world = World::new();
+    apply(&mut world, rst_race(5));
+    apply(&mut world, ncn(1, "alice", "Alice"));
+    apply(&mut world, npl(1, 1, "Alice"));
     assert!(matches!(
-        race_events(&world, cnl(1)).as_slice(),
+        race_events(&mut world, cnl(1)).as_slice(),
         [RaceEvent::Dnf { .. }]
     ));
 }
 
 #[test]
 fn leaving_during_qualifying_is_not_a_dnf() {
-    let world = World::new();
-    apply(&world, rst_qualifying(10));
-    apply(&world, npl(1, 1, "Alice"));
-    assert!(race_events(&world, pll(1)).is_empty());
+    let mut world = World::new();
+    apply(&mut world, rst_qualifying(10));
+    apply(&mut world, npl(1, 1, "Alice"));
+    assert!(race_events(&mut world, pll(1)).is_empty());
 }
 
 #[test]
@@ -388,17 +388,17 @@ fn duplicate_npl_does_not_panic_or_duplicate_entrant() {
     // LFS re-announces existing players in reply to TINY_NPL. The repeated Npl
     // for an already-live plid must be a no-op at the race layer (and must not
     // panic on the unique-plid players index).
-    let world = World::new();
-    apply(&world, rst_race(5));
+    let mut world = World::new();
+    apply(&mut world, rst_race(5));
     assert!(matches!(
-        race_events(&world, npl(1, 1, "Alice")).as_slice(),
+        race_events(&mut world, npl(1, 1, "Alice")).as_slice(),
         [RaceEvent::EntrantJoined { .. }]
     ));
     assert!(
-        race_events(&world, npl(1, 1, "Alice")).is_empty(),
+        race_events(&mut world, npl(1, 1, "Alice")).is_empty(),
         "re-announced plid produces no fresh race event"
     );
-    assert_eq!(world.entrants().len(), 1);
+    assert_eq!(world.entrants().count(), 1);
     assert_eq!(world.player_count(), 1, "no duplicate player entry");
 }
 
@@ -407,29 +407,29 @@ fn npl_after_restart_recreates_entrant() {
     // The players map persists across a session restart while race state is
     // cleared; the re-announced Npl must recreate the entrant for the new
     // session.
-    let world = World::new();
-    apply(&world, rst_race(5));
-    apply(&world, npl(1, 1, "Alice"));
-    apply(&world, lap(1, 1, 90_000));
-    apply(&world, rst_race(5)); // new session: prior race state pending clear
+    let mut world = World::new();
+    apply(&mut world, rst_race(5));
+    apply(&mut world, npl(1, 1, "Alice"));
+    apply(&mut world, lap(1, 1, 90_000));
+    apply(&mut world, rst_race(5)); // new session: prior race state pending clear
     // The re-announced Npl clears the deferred prior session, then recreates the
     // entrant fresh for the new session.
     assert!(matches!(
-        race_events(&world, npl(1, 1, "Alice")).as_slice(),
+        race_events(&mut world, npl(1, 1, "Alice")).as_slice(),
         [RaceEvent::EntrantJoined { .. }]
     ));
-    assert_eq!(world.entrants().len(), 1);
+    assert_eq!(world.entrants().count(), 1);
     assert_eq!(world.entrant_by_plid(PlayerId(1)).unwrap().laps_done, 0);
 }
 
 #[test]
 fn pending_grid_is_applied_on_join() {
-    let world = World::new();
-    apply(&world, rst_race(5));
+    let mut world = World::new();
+    apply(&mut world, rst_race(5));
     // Reo arrives before the player joins: positions are buffered.
-    apply(&world, reo(&[2, 1]));
-    apply(&world, npl(1, 1, "Alice")); // grid pos 2
-    apply(&world, npl(2, 2, "Bob")); // grid pos 1
+    apply(&mut world, reo(&[2, 1]));
+    apply(&mut world, npl(1, 1, "Alice")); // grid pos 2
+    apply(&mut world, npl(2, 2, "Bob")); // grid pos 1
     assert_eq!(
         world.entrant_by_plid(PlayerId(1)).unwrap().grid_position,
         Some(2)
@@ -442,14 +442,14 @@ fn pending_grid_is_applied_on_join() {
 
 #[test]
 fn takeover_appends_driver_record_with_from_lap() {
-    let world = World::new();
-    apply(&world, rst_race(5));
-    apply(&world, ncn(1, "alice", "Alice"));
-    apply(&world, ncn(2, "bob", "Bob"));
-    apply(&world, npl(1, 1, "Alice"));
-    apply(&world, lap(1, 1, 90_000)); // laps_done = 1
+    let mut world = World::new();
+    apply(&mut world, rst_race(5));
+    apply(&mut world, ncn(1, "alice", "Alice"));
+    apply(&mut world, ncn(2, "bob", "Bob"));
+    apply(&mut world, npl(1, 1, "Alice"));
+    apply(&mut world, lap(1, 1, 90_000)); // laps_done = 1
     assert!(matches!(
-        race_events(&world, toc(1, 1, 2)).as_slice(),
+        race_events(&mut world, toc(1, 1, 2)).as_slice(),
         [RaceEvent::DriverSwap {
             new_ucid: ConnectionId(2),
             ..
@@ -465,20 +465,20 @@ fn takeover_appends_driver_record_with_from_lap() {
 
 #[test]
 fn rejoin_resumes_same_entrant_with_lap_offset() {
-    let world = World::with_rejoin();
-    apply(&world, ncn(1, "alice", "Alice"));
-    apply(&world, rst_race(20));
-    let joined = race_events(&world, npl(1, 1, "Alice"));
+    let mut world = World::with_rejoin();
+    apply(&mut world, ncn(1, "alice", "Alice"));
+    apply(&mut world, rst_race(20));
+    let joined = race_events(&mut world, npl(1, 1, "Alice"));
     let original_id = match joined.as_slice() {
         [RaceEvent::EntrantJoined { id, .. }] => *id,
         other => panic!("expected EntrantJoined: {other:?}"),
     };
-    apply(&world, lap(1, 1, 90_000)); // laps_done = 1
+    apply(&mut world, lap(1, 1, 90_000)); // laps_done = 1
     // Disconnect.
-    apply(&world, cnl(1));
+    apply(&mut world, cnl(1));
     // Reconnect under a fresh connection + player id, same uname.
-    apply(&world, ncn(2, "alice", "Alice"));
-    let rejoined = race_events(&world, npl(2, 2, "Alice"));
+    apply(&mut world, ncn(2, "alice", "Alice"));
+    let rejoined = race_events(&mut world, npl(2, 2, "Alice"));
     match rejoined.as_slice() {
         [
             RaceEvent::EntrantRejoined {
@@ -494,17 +494,17 @@ fn rejoin_resumes_same_entrant_with_lap_offset() {
     assert_eq!(e.id, original_id);
     assert_eq!(e.lap_offset, 1, "offset bumped by prior laps_done");
     // A fresh lap (LFS counter reset to 1) now lands at effective lap 2.
-    let _ = race_events(&world, lap(2, 1, 88_000));
+    let _ = race_events(&mut world, lap(2, 1, 88_000));
     let e = world.entrant_by_plid(PlayerId(2)).unwrap();
     assert_eq!(e.laps.last().unwrap().lap, 2);
 }
 
 #[test]
 fn rejoin_with_no_match_creates_fresh_entrant() {
-    let world = World::with_rejoin();
-    apply(&world, rst_race(20));
-    apply(&world, ncn(1, "alice", "Alice"));
-    let events = race_events(&world, npl(1, 1, "Alice"));
+    let mut world = World::with_rejoin();
+    apply(&mut world, rst_race(20));
+    apply(&mut world, ncn(1, "alice", "Alice"));
+    let events = race_events(&mut world, npl(1, 1, "Alice"));
     assert!(
         matches!(events.as_slice(), [RaceEvent::EntrantJoined { .. }]),
         "no prior entrant to match -> fresh join: {events:?}"
@@ -513,12 +513,12 @@ fn rejoin_with_no_match_creates_fresh_entrant() {
 
 #[test]
 fn pit_then_psf_pairs_into_a_pit_record() {
-    let world = World::new();
-    apply(&world, rst_race(5));
-    apply(&world, npl(1, 1, "Alice"));
+    let mut world = World::new();
+    apply(&mut world, rst_race(5));
+    apply(&mut world, npl(1, 1, "Alice"));
     // Pit alone produces no event (waiting for Psf).
-    assert!(race_events(&world, pit(1, 1)).is_empty());
-    match race_events(&world, psf(1, 25_000)).as_slice() {
+    assert!(race_events(&mut world, pit(1, 1)).is_empty());
+    match race_events(&mut world, psf(1, 25_000)).as_slice() {
         [RaceEvent::PitStopComplete { record, .. }] => {
             assert_eq!(record.stop_time, Some(Duration::from_millis(25_000)));
             assert_eq!(record.stop_number, 1);
@@ -533,12 +533,12 @@ fn pit_then_psf_pairs_into_a_pit_record() {
 
 #[test]
 fn result_arriving_after_player_left_is_still_applied() {
-    let world = World::new();
-    apply(&world, rst_race(5));
-    apply(&world, npl(1, 1, "Alice"));
-    apply(&world, fin(1, 450_000, 88_000)); // status -> Finished
-    apply(&world, pll(1)); // leaves track; no longer live
-    match race_events(&world, res(1, 0, 1)).as_slice() {
+    let mut world = World::new();
+    apply(&mut world, rst_race(5));
+    apply(&mut world, npl(1, 1, "Alice"));
+    apply(&mut world, fin(1, 450_000, 88_000)); // status -> Finished
+    apply(&mut world, pll(1)); // leaves track; no longer live
+    match race_events(&mut world, res(1, 0, 1)).as_slice() {
         [
             RaceEvent::ResultConfirmed {
                 result_num: 0,
@@ -548,23 +548,19 @@ fn result_arriving_after_player_left_is_still_applied() {
         ] => {},
         other => panic!("expected ResultConfirmed: {other:?}"),
     }
-    let e = world
-        .entrants()
-        .into_iter()
-        .find(|e| e.plid == PlayerId(1))
-        .unwrap();
-    match e.status {
-        FinishStatus::Finished { result_num, .. } => assert_eq!(result_num, Some(0)),
+    let e = world.entrants().find(|e| e.plid == PlayerId(1)).unwrap();
+    match &e.status {
+        FinishStatus::Finished { result_num, .. } => assert_eq!(*result_num, Some(0)),
         other => panic!("expected Finished status: {other:?}"),
     }
 }
 
 #[test]
 fn penalty_change_is_recorded() {
-    let world = World::new();
-    apply(&world, rst_race(5));
-    apply(&world, npl(1, 1, "Alice"));
-    match race_events(&world, pen(1, PenaltyInfo::Dt, PenaltyReason::Speeding)).as_slice() {
+    let mut world = World::new();
+    apply(&mut world, rst_race(5));
+    apply(&mut world, npl(1, 1, "Alice"));
+    match race_events(&mut world, pen(1, PenaltyInfo::Dt, PenaltyReason::Speeding)).as_slice() {
         [
             RaceEvent::PenaltyChanged {
                 newpen: PenaltyInfo::Dt,
@@ -581,11 +577,11 @@ fn penalty_change_is_recorded() {
 
 #[test]
 fn telepit_discards_in_progress_lap() {
-    let world = World::new();
-    apply(&world, rst_race(5));
-    apply(&world, npl(1, 1, "Alice"));
-    apply(&world, spx(1, 1, 30_000));
-    match race_events(&world, plp(1)).as_slice() {
+    let mut world = World::new();
+    apply(&mut world, rst_race(5));
+    apply(&mut world, npl(1, 1, "Alice"));
+    apply(&mut world, spx(1, 1, 30_000));
+    match race_events(&mut world, plp(1)).as_slice() {
         [RaceEvent::TeleportedToPits { .. }] => {},
         other => panic!("expected TeleportedToPits: {other:?}"),
     }
@@ -601,11 +597,11 @@ fn telepit_discards_in_progress_lap() {
 
 #[test]
 fn restart_ends_prior_session_and_defers_clear() {
-    let world = World::new();
-    apply(&world, rst_race(5));
-    apply(&world, npl(1, 1, "Alice"));
-    apply(&world, lap(1, 1, 90_000));
-    assert!(!world.entrants().is_empty());
+    let mut world = World::new();
+    apply(&mut world, rst_race(5));
+    apply(&mut world, npl(1, 1, "Alice"));
+    apply(&mut world, lap(1, 1, 90_000));
+    assert!(world.entrants().next().is_some());
     assert!(world.fastest_lap().is_some());
 
     // A restart (Rst while a session is active) ends the prior session without
@@ -623,15 +619,15 @@ fn restart_ends_prior_session_and_defers_clear() {
     assert_eq!(kinds, ["ended", "started"]);
     // The clear is deferred: the prior session's results stay readable while a
     // consumer handles SessionEnded.
-    assert!(!world.entrants().is_empty());
+    assert!(world.entrants().next().is_some());
     assert!(world.fastest_lap().is_some());
 
     // The next packet performs the deferred clear before it is applied, so the
     // new session starts fresh.
-    apply(&world, npl(2, 2, "Bob"));
+    apply(&mut world, npl(2, 2, "Bob"));
     assert!(world.fastest_lap().is_none());
     assert!(world.entrant_by_plid(PlayerId(1)).is_none());
-    assert_eq!(world.entrants().len(), 1);
+    assert_eq!(world.entrants().count(), 1);
     assert!(world.entrant_by_plid(PlayerId(2)).is_some());
 }
 
@@ -639,7 +635,7 @@ fn restart_ends_prior_session_and_defers_clear() {
 fn first_session_start_does_not_emit_session_ended() {
     // Starting from the lobby (no active session), the opening Rst must emit
     // only SessionStarted - not a spurious SessionEnded.
-    let world = World::new();
+    let mut world = World::new();
     let events = world.apply_packet(&rst_race(5));
     assert!(
         events

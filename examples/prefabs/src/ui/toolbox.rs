@@ -2,7 +2,7 @@ use insim::{
     core::heading::ObjectHeading,
     insim::{BtnStyle, ObjectInfo},
 };
-use insim_extra::{ui, ui::Component as _};
+use insim_extra::ui;
 
 use super::{OptionsMsg, PrefabSummary, ToolboxProps, options, scroll_list};
 use crate::{Command, SpawnOrigin, State, tools};
@@ -81,11 +81,9 @@ pub struct Toolbox {
     prefab_scroll: scroll_list::ScrollList<super::PrefabSummary>,
 }
 
-impl ui::Component for Toolbox {
-    type Props<'a> = ToolboxProps;
-    type Message = ToolboxMsg;
-
-    fn update(&mut self, msg: Self::Message) {
+// The root, drawn on a bare `Canvas` by main (a local tool, so no host).
+impl Toolbox {
+    pub fn update(&mut self, msg: ToolboxMsg) {
         match msg {
             ToolboxMsg::OpenInspector(tool) => {
                 self.screen = match self.screen {
@@ -103,7 +101,7 @@ impl ui::Component for Toolbox {
         }
     }
 
-    fn render(&self, props: Self::Props<'_>) -> ui::Node<Self::Message> {
+    pub fn render(&self, props: ToolboxProps) -> ui::Node<ToolboxMsg> {
         if !props.ui_visible {
             return ui::empty();
         }
