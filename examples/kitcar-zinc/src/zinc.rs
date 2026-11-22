@@ -3,7 +3,7 @@
 //!
 //! Built as a `Router`: one handler per input.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use insim::{
     core::vehicle::Vehicle,
@@ -16,8 +16,11 @@ use insim_extra::{
         Context, Effects,
         services::router::{Caller, Router},
     },
-    world::{Connected, TrackChanged, World},
+    ui::{Child, Node, Ui},
+    world::{Connected, Disconnected, TrackChanged, World},
 };
+
+use crate::rank::RankCard;
 
 /// The licence ladder. Rung `n` needs `n` points, and rungs stack: 3 points
 /// unlocks the UF1, XFR, XRG, XRT, RB4 and FXO. Add rungs to extend it.
@@ -62,7 +65,7 @@ impl Driver {
         cars
     }
 
-    fn car_list(&self) -> String {
+    pub(crate) fn car_list(&self) -> String {
         self.cars()
             .map(|car| car.to_string())
             .collect::<Vec<_>>()
@@ -76,6 +79,8 @@ pub enum Cmd {
     Stats,
     /// The drivers with the most points.
     Top,
+    /// Your rank, in a panel. Again to close.
+    Rank,
     /// List the commands.
     Help,
 }
@@ -84,6 +89,14 @@ pub enum Cmd {
 #[derive(Debug, Default)]
 pub struct Zinc {
     drivers: HashMap<String, Driver>,
+    /// Who has their rank card open.
+    rank_open: HashSet<ConnectionId>,
+}
+
+#[derive(Debug, Clone)]
+pub enum Msg {
+    /// A player closed their rank card.
+    CloseRank(ConnectionId),
 }
 
 impl Zinc {
@@ -92,8 +105,19 @@ impl Zinc {
         self.drivers.get(uname).copied().unwrap_or_default()
     }
 
+    /// Every driver, most points first.
+    pub(crate) fn ranked(&self) -> Vec<(&str, Driver)> {
+        let mut drivers: Vec<_> = self
+            .drivers
+            .iter()
+            .map(|(uname, driver)| (uname.as_str(), *driver))
+            .collect();
+        drivers.sort_by(|a, b| b.1.points.cmp(&a.1.points).then(a.0.cmp(b.0)));
+        drivers
+    }
+
     /// Restrict a connection to its driver's unlocked cars.
-    fn licence(&self, ucid: ConnectionId, uname: &str) -> Effects<()> {
+    fn licence(&self, ucid: ConnectionId, uname: &str) -> Effects<Msg> {
         Effects::new().packet(Plc {
             ucid,
             cars: self.driver(uname).allowed(),
@@ -118,17 +142,20 @@ impl Zinc {
 /// ordering or race-phase guards. Once rules depend on each other or on the
 /// race phase (say, yellows only counting while racing), a hand-written
 /// `Service::update` is clearer.
-pub fn service() -> Router<Zinc> {
-    Router::new(Zinc::default())
+pub fn service() -> Router<Zinc, Msg> {
+    Router::<_, Msg>::with_messages(Zinc::default())
         .on(joined)
+        .on(left)
         .on(track_changed)
         .on(result)
         .on(flagged)
+        .on_msg(message)
         .commands(command)
+        .view(view)
 }
 
 /// Licence each driver as they join, including those already connected.
-fn joined(zinc: &mut Zinc, event: &Connected, _: &Context<'_>) -> Effects<()> {
+fn joined(zinc: &mut Zinc, event: &Connected, _: &Context<'_>) -> Effects<Msg> {
     let driver = zinc.driver(&event.info.uname);
     let effects = zinc.licence(event.info.ucid, &event.info.uname);
     if event.existing {
@@ -144,8 +171,37 @@ fn joined(zinc: &mut Zinc, event: &Connected, _: &Context<'_>) -> Effects<()> {
     )
 }
 
+fn left(zinc: &mut Zinc, event: &Disconnected, _: &Context<'_>) {
+    let _ = zinc.rank_open.remove(&event.ucid);
+}
+
+fn message(zinc: &mut Zinc, msg: Msg, _: &Context<'_>) {
+    match msg {
+        Msg::CloseRank(ucid) => {
+            let _ = zinc.rank_open.remove(&ucid);
+        },
+    }
+}
+
+/// The rank card is placed only while open, so each opening mounts it afresh
+/// with a new snapshot.
+fn view(
+    zinc: &Zinc,
+    ucid: ConnectionId,
+    ui: &mut Ui<'_, Msg>,
+    cx: &Context<'_>,
+) -> Option<Node<Msg>> {
+    if !zinc.rank_open.contains(&ucid) {
+        return None;
+    }
+    let uname = cx.world().connection(ucid)?.uname.as_str();
+    Some(ui.child(
+        Child::with_props((zinc, uname), RankCard::default).on(move |()| Msg::CloseRank(ucid)),
+    ))
+}
+
 /// Reapply every licence on a track change, in case anything reset them.
-fn track_changed(zinc: &mut Zinc, _: &TrackChanged, cx: &Context<'_>) -> Effects<()> {
+fn track_changed(zinc: &mut Zinc, _: &TrackChanged, cx: &Context<'_>) -> Effects<Msg> {
     cx.world()
         .connections()
         .fold(Effects::new(), |effects, conn| {
@@ -158,7 +214,7 @@ fn track_changed(zinc: &mut Zinc, _: &TrackChanged, cx: &Context<'_>) -> Effects
 /// LFS sends `Res` unprompted (`reqi` 0) once a result is confirmed. Replies
 /// to `TINY_RES` repeat old results, so only the unprompted one counts. `Res`
 /// carries the username, so the point counts even if the driver has left.
-fn result(zinc: &mut Zinc, res: &Res, cx: &Context<'_>) -> Effects<()> {
+fn result(zinc: &mut Zinc, res: &Res, cx: &Context<'_>) -> Effects<Msg> {
     let counts = res.reqi.0 == 0
         && res.confirm.contains(RaceConfirmFlags::CONFIRMED)
         && !res.confirm.intersects(DISQUALIFIED)
@@ -214,7 +270,7 @@ fn flagged(zinc: &mut Zinc, flg: &Flg, cx: &Context<'_>) {
     }
 }
 
-fn command(zinc: &mut Zinc, caller: Caller, cmd: Cmd, _: &Context<'_>) -> Effects<()> {
+fn command(zinc: &mut Zinc, caller: Caller, cmd: Cmd, _: &Context<'_>) -> Effects<Msg> {
     match cmd {
         Cmd::Stats => {
             let driver = zinc.driver(&caller.uname);
@@ -226,10 +282,15 @@ fn command(zinc: &mut Zinc, caller: Caller, cmd: Cmd, _: &Context<'_>) -> Effect
                 driver.car_list()
             ))
         },
+        Cmd::Rank => {
+            if !zinc.rank_open.remove(&caller.ucid) {
+                let _ = zinc.rank_open.insert(caller.ucid);
+            }
+            Effects::none()
+        },
         Cmd::Top => {
-            let mut drivers: Vec<_> = zinc.drivers.iter().collect();
-            drivers.sort_by(|a, b| b.1.points.cmp(&a.1.points).then(a.0.cmp(b.0)));
-            let lines: Vec<String> = drivers
+            let lines: Vec<String> = zinc
+                .ranked()
                 .into_iter()
                 .take(5)
                 .enumerate()
@@ -296,11 +357,11 @@ mod tests {
         }
     }
 
-    fn input(res: Res) -> Input<()> {
+    fn input(res: Res) -> Input<Msg> {
         Input::Packet(res.into())
     }
 
-    fn licences(effects: &Effects<()>) -> Vec<Vec<Vehicle>> {
+    fn licences(effects: &Effects<Msg>) -> Vec<Vec<Vehicle>> {
         effects
             .packets_sent()
             .filter_map(|p| match p {
@@ -310,7 +371,7 @@ mod tests {
             .collect()
     }
 
-    fn chat(effects: &Effects<()>) -> Vec<String> {
+    fn chat(effects: &Effects<Msg>) -> Vec<String> {
         effects
             .packets_sent()
             .filter_map(|p| match p {
@@ -443,5 +504,89 @@ mod tests {
             &cx,
         );
         assert_eq!(licences(&effects), [vec![Vehicle::Uf1]]);
+    }
+
+    fn command_from(ucid: u8, text: &str) -> Input<Msg> {
+        Input::Packet(
+            insim::insim::Mso {
+                ucid: ConnectionId(ucid),
+                usertype: insim::insim::MsoUserType::Prefix,
+                msg: text.into(),
+                ..Default::default()
+            }
+            .into(),
+        )
+    }
+
+    #[test]
+    fn rank_toggles_the_card_and_closing_or_leaving_clears_it() {
+        let world = world();
+        let cx = Context::new(&world, Instant::now());
+        let mut zinc = service();
+        let bob = ConnectionId(2);
+
+        let _ = zinc.update(command_from(2, "!rank"), &cx);
+        assert!(zinc.state().rank_open.contains(&bob));
+        let _ = zinc.update(command_from(2, "!rank"), &cx);
+        assert!(!zinc.state().rank_open.contains(&bob));
+
+        let _ = zinc.update(command_from(2, "!rank"), &cx);
+        let _ = zinc.update(Input::Msg(Msg::CloseRank(bob)), &cx);
+        assert!(!zinc.state().rank_open.contains(&bob));
+    }
+
+    #[test]
+    fn standings_rank_by_points_then_name() {
+        let mut zinc = Zinc::default();
+        for (uname, points) in [("bob", 2), ("amy", 2), ("cat", 5)] {
+            let _ = zinc
+                .drivers
+                .insert(uname.into(), Driver { points, yellows: 0 });
+        }
+        let standing = crate::rank::Standing::of(&zinc, "bob");
+        assert_eq!(standing.position, Some(3));
+        assert_eq!(standing.of, 3);
+        assert_eq!(crate::rank::Standing::of(&zinc, "amy").position, Some(2));
+        assert_eq!(crate::rank::Standing::of(&zinc, "new").position, None);
+    }
+
+    #[test]
+    fn the_card_snapshots_the_standing_when_opened() {
+        use insim_extra::ui::{Screen, id_pool::ClickIdPool};
+
+        let mut zinc = Zinc::default();
+        let _ = zinc.drivers.insert(
+            "bob".into(),
+            Driver {
+                points: 1,
+                yellows: 0,
+            },
+        );
+        let mut pool = ClickIdPool::new();
+        let mut screen = Screen::<Msg>::new(ConnectionId(2));
+        let now = Instant::now();
+        let texts = |packets: Vec<Packet>| -> Vec<String> {
+            packets
+                .into_iter()
+                .filter_map(|p| match p {
+                    Packet::Btn(btn) => Some(btn.text),
+                    _ => None,
+                })
+                .collect()
+        };
+        fn card(zinc: &Zinc) -> impl FnOnce(&mut Ui<'_, Msg>) -> Option<Node<Msg>> + '_ {
+            move |ui| Some(ui.child(Child::with_props((zinc, "bob"), RankCard::default)))
+        }
+
+        let opened = texts(screen.render(&mut pool, now, card(&zinc)));
+        assert!(
+            opened.iter().any(|t| t.contains("1 point(s)")),
+            "{opened:?}"
+        );
+
+        // A point scored while it's open doesn't change the snapshot.
+        zinc.drivers.get_mut("bob").unwrap().points = 2;
+        let open = texts(screen.render(&mut pool, now, card(&zinc)));
+        assert!(open.is_empty(), "nothing changed on screen: {open:?}");
     }
 }

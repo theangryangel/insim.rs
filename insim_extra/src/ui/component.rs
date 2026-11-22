@@ -53,6 +53,18 @@ pub trait Component: Send + 'static {
     /// see [`Child::with_props`]. Use `()` when there is none.
     type Props<'a>;
 
+    /// Runs once when the component is first placed for a player, before its
+    /// first render. Set up from props here; `init` never sees them. Placed
+    /// again after being dropped, it mounts afresh.
+    fn mounted(&mut self, props: &Self::Props<'_>) {
+        let _ = props;
+    }
+
+    /// Runs once when the component goes: no longer placed, replaced by a
+    /// different component, or its player's screen cleared (they left, or the
+    /// service stopped). Its state is dropped straight after.
+    fn unmounted(&mut self) {}
+
     /// Handle one of its own messages, optionally reporting to the parent.
     fn update(&mut self, msg: Self::Msg) -> Option<Self::Out>;
 
@@ -153,10 +165,14 @@ impl<'p, C: Component, M> Child<'p, C, M> {
 trait Erased: Send {
     fn as_any(&self) -> &dyn Any;
     fn update_any(&mut self, msg: &dyn Any) -> Option<AnyMsg>;
+    fn unmounted(&mut self);
 }
 impl<C: Component> Erased for C {
     fn as_any(&self) -> &dyn Any {
         self
+    }
+    fn unmounted(&mut self) {
+        Component::unmounted(self);
     }
     fn update_any(&mut self, msg: &dyn Any) -> Option<AnyMsg> {
         let msg = msg.downcast_ref::<C::Msg>()?.clone();
@@ -170,6 +186,14 @@ struct Instance {
     key: Option<Box<dyn Key>>,
     on: Option<OnOut>,
     seen: u64,
+}
+
+/// Every way an instance goes ends here: not placed in a render, replaced, or its
+/// screen cleared or dropped.
+impl Drop for Instance {
+    fn drop(&mut self) {
+        self.component.unmounted();
+    }
 }
 
 /// The view's own messages come from the root.
@@ -272,8 +296,10 @@ impl<M> Ui<'_, M> {
                         "a different component was placed where another was; it starts afresh"
                     );
                 }
+                let mut component = (child.init)();
+                component.mounted(&child.props);
                 Instance {
-                    component: Box::new((child.init)()),
+                    component: Box::new(component),
                     parent: self.owner,
                     key: None,
                     on: None,
@@ -607,5 +633,82 @@ mod tests {
         let removed = b.clear(&mut pool);
         assert_eq!(removed.len(), 2);
         assert_eq!(pool.available_count(), 239 - 2);
+    }
+
+    /// Remembers the props it was mounted with, and counts its mounts and
+    /// unmounts.
+    struct Snapshot {
+        taken: u32,
+        mounts: std::sync::Arc<std::sync::atomic::AtomicU32>,
+        unmounts: std::sync::Arc<std::sync::atomic::AtomicU32>,
+    }
+    impl Component for Snapshot {
+        type Msg = ();
+        type Out = ();
+        type Props<'a> = u32;
+        fn mounted(&mut self, props: &u32) {
+            self.taken = *props;
+            let _ = self
+                .mounts
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+        fn unmounted(&mut self) {
+            let _ = self
+                .unmounts
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+        fn update(&mut self, (): ()) -> Option<()> {
+            None
+        }
+        fn render(&self, live: u32, _: &mut Ui<'_, ()>) -> Node<()> {
+            Node::text(format!("{} {live}", self.taken), BtnStyle::default())
+                .w(20)
+                .h(5)
+        }
+    }
+
+    #[test]
+    fn components_mount_and_unmount_once_per_placement() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicU32, Ordering},
+        };
+
+        let mut pool = ClickIdPool::new();
+        let mut screen = Screen::<()>::new(ConnectionId(3));
+        let now = Instant::now();
+        let mounts = Arc::new(AtomicU32::new(0));
+        let unmounts = Arc::new(AtomicU32::new(0));
+        let view = |live: u32, shown: bool| {
+            let (mounts, unmounts) = (mounts.clone(), unmounts.clone());
+            move |ui: &mut Ui<'_, ()>| {
+                shown.then(|| {
+                    ui.child(Child::with_props(live, move || Snapshot {
+                        taken: 0,
+                        mounts,
+                        unmounts,
+                    }))
+                })
+            }
+        };
+
+        let first = texts(&screen.render(&mut pool, now, view(1, true)));
+        assert_eq!(first[0].1, "1 1");
+        // Later renders see new props, but the mount-time snapshot stays.
+        let second = texts(&screen.render(&mut pool, now, view(2, true)));
+        assert_eq!(second[0].1, "1 2");
+        assert_eq!(mounts.load(Ordering::Relaxed), 1);
+        assert_eq!(unmounts.load(Ordering::Relaxed), 0);
+
+        // Not placed: it unmounts. Placed again: it mounts afresh.
+        let _ = screen.render(&mut pool, now, view(3, false));
+        assert_eq!(unmounts.load(Ordering::Relaxed), 1);
+        let again = texts(&screen.render(&mut pool, now, view(4, true)));
+        assert_eq!(again[0].1, "4 4");
+        assert_eq!(mounts.load(Ordering::Relaxed), 2);
+
+        // Clearing the screen (the player left, or the service stopped) unmounts too.
+        let _ = screen.clear(&mut pool);
+        assert_eq!(unmounts.load(Ordering::Relaxed), 2);
     }
 }

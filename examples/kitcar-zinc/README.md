@@ -24,4 +24,4 @@ kitcar is for multiplayer servers, so host a server (or use a dedicated host) fi
 - `cargo run -p kitcar-zinc -- --addr 127.0.0.1:29999`
 - Add `--admin-password <password>` if your host has one. The director needs it to change track.
 - Join, type `/ready` in the lobby, and race.
-- `!stats` shows your points, yellows and cars. `!top` shows the leaders.
+- `!stats` shows your points, yellows and cars. `!top` shows the leaders. `!rank` opens a card with your standing.
