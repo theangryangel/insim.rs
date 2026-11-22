@@ -5,7 +5,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::effects::{Cancel, TimerKey};
+use crate::kitcar::effects::{Cancel, TimerKey};
 
 struct Entry<M> {
     key: Option<Box<dyn TimerKey>>,

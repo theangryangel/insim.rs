@@ -40,7 +40,10 @@
 //! kitcar targets multiplayer servers. The local connection (UCID 0) is always
 //! the server, never a player: views are never drawn for it, and
 //! [`World::connections`] leaves it out. Local and single-player tools can drive
-//! an [`insim_extra::ui::Canvas`] or [`insim_extra::ui::Screen`] directly.
+//! an [`crate::ui::Canvas`] or [`crate::ui::Screen`] directly.
+//!
+//! [`World`]: crate::world::World
+//! [`World::connections`]: crate::world::World::connections
 
 mod effects;
 mod error;
@@ -53,12 +56,6 @@ mod timers;
 pub use effects::{Effects, TimerKey};
 pub use error::AppError;
 pub use host::{Host, ServiceHandle};
-pub use insim_extra::{
-    chat::{ChatEvent, ChatParser},
-    ui,
-    util::{host_command, mtc},
-    world::{self, World, WorldEvent, WorldReady},
-};
 pub use lifecycle::{Layout, Lifecycle, Phase, Setup, Transition};
 pub use penalty_clearer::{ClearPenalty, PenaltyClearer};
 pub use service::{Context, Input, Service};

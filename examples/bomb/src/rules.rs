@@ -7,7 +7,7 @@ use std::{
 };
 
 use insim::{identifiers::PlayerId, insim::PlayerType};
-use kitcar::world::PlayerInfo;
+use insim_extra::world::PlayerInfo;
 
 /// Collisions at or above this closing speed cost the full collision penalty.
 const COLLISION_THRESHOLD_MPS: f32 = 30.0;

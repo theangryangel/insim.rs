@@ -96,9 +96,7 @@ You might also find these related crates useful:
 - `outsim` - "sans-io" implementation of the LFS outsim protocol.
 - `insim_extra` - an unreleased, unstable suite of micro libraries to help with common
   LFS tasks: presence, game state, advanced button/ui abstraction inspired by Phoenix
-  Liveview.
-- `kitcar` - an unreleased library designed to make mini-games for LFS quickly, with an
-  API inspired by Axum and Bevy.
+  Liveview, and `kitcar`, a runtime for building LFS mini-games and services quickly.
 
 They follow the same design focus and can be found in the same GitHub repository, or on
 crates.io.

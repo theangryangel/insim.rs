@@ -11,10 +11,13 @@ use insim::{
     identifiers::{ConnectionId, PlayerId},
     insim::{Axm, Con, PmoAction, PmoFlags, Uco, UcoAction},
 };
-use kitcar::{
-    ChatParser, ClearPenalty, Context, Effects, Input, Layout, Lifecycle, PenaltyClearer, Phase,
-    Service, Setup, Transition, WorldEvent,
-    world::{Connected, PlayerLeft, PlayerTeleportedToPits},
+use insim_extra::{
+    chat::{ChatCommand, ChatParser},
+    kitcar::{
+        ClearPenalty, Context, Effects, Input, Layout, Lifecycle, PenaltyClearer, Phase, Service,
+        Setup, Transition,
+    },
+    world::{Connected, PlayerLeft, PlayerTeleportedToPits, WorldEvent},
 };
 
 use crate::{
@@ -47,21 +50,10 @@ struct Fuse(PlayerId);
 #[derive(Debug, PartialEq)]
 struct Repaint;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, ChatCommand)]
 enum Cmd {
     Help,
     About,
-}
-
-impl std::str::FromStr for Cmd {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.split_whitespace().next() {
-            Some("help") => Ok(Self::Help),
-            Some("about") => Ok(Self::About),
-            _ => Err(()),
-        }
-    }
 }
 
 /// A finished run, as shown on the leaderboard.
@@ -361,9 +353,9 @@ impl Service for Bomb {
     fn view(
         &self,
         ucid: ConnectionId,
-        ui: &mut kitcar::ui::Ui<'_, Msg>,
+        ui: &mut insim_extra::ui::Ui<'_, Msg>,
         cx: &Context<'_>,
-    ) -> Option<kitcar::ui::Node<Msg>> {
+    ) -> Option<insim_extra::ui::Node<Msg>> {
         Some(crate::view::view(self, ucid, ui, cx))
     }
 }
@@ -375,7 +367,7 @@ mod tests {
         insim::{Bfn, BfnType, Btc, Btn, Mso, MsoUserType, Ncn, Tiny},
         test::{Lfs, pair},
     };
-    use kitcar::Host;
+    use insim_extra::kitcar::Host;
 
     use super::*;
 

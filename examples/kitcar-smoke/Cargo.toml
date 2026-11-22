@@ -9,7 +9,7 @@ publish = false
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
 insim = { path = "../../insim", features = ["tokio"] }
-kitcar = { path = "../../kitcar" }
+insim_extra = { path = "../../insim_extra" }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }

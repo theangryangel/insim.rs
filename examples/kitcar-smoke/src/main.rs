@@ -23,36 +23,26 @@ use insim::{
     identifiers::{ConnectionId, RequestId},
     insim::{BtnStyle, Isi},
 };
-use kitcar::{
-    AppError, ChatParser, Context, Effects, Host, Input, Service, WorldEvent,
+use insim_extra::{
+    chat::{ChatCommand, ChatParser},
+    kitcar::{AppError, Context, Effects, Host, Input, Service},
     ui::{self, Child, Component, Node, Ui},
-    world::Connected,
+    world::{Connected, WorldEvent},
 };
 
-// Typed chat commands. `ChatParser<C>` runs `C::from_str` on each chat message.
-#[derive(Debug, Clone)]
+// Typed chat commands. `ChatParser<C>` parses each chat message into `C`,
+// after stripping the `!` prefix. The derive writes the parser, and each
+// variant's doc comment becomes its help text.
+#[derive(Debug, Clone, ChatCommand)]
 enum Cmd {
+    /// Say hello to everyone.
     Hello,
+    /// Show this dialog.
     Help,
+    /// Repeat a message to everyone.
     Echo { message: String },
+    /// Stop the service.
     Quit,
-}
-
-impl std::str::FromStr for Cmd {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // ChatParser has already stripped the `!` prefix.
-        let (head, rest) = s.split_once(char::is_whitespace).unwrap_or((s, ""));
-        match head {
-            "hello" => Ok(Cmd::Hello),
-            "help" => Ok(Cmd::Help),
-            "echo" if !rest.trim().is_empty() => Ok(Cmd::Echo {
-                message: rest.trim().to_string(),
-            }),
-            "quit" => Ok(Cmd::Quit),
-            _ => Err(()),
-        }
-    }
 }
 
 // A self-contained component: each player gets their own count, kept by the
@@ -118,9 +108,15 @@ impl Component for HelpDialog {
             ui::text("^3Commands", BtnStyle::default().dark())
                 .w(50)
                 .h(6),
-            ui::text("!hello  !echo <text>  !quit", BtnStyle::default().dark())
+            // One line per command, straight from `Cmd`.
+            ui::col(Cmd::COMMANDS.iter().map(|cmd| {
+                ui::text(
+                    format!("^7!{cmd} ^8- {}", cmd.help()),
+                    BtnStyle::default().dark().align_left(),
+                )
                 .w(50)
-                .h(5),
+                .h(5)
+            })),
             ui::clickable("Close", BtnStyle::default().dark(), DialogMsg::Close)
                 .w(50)
                 .h(5),

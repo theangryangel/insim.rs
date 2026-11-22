@@ -9,17 +9,19 @@ use insim::{
     Packet,
     net::{self, Session, Tokio},
 };
-use insim_extra::world::{SharedWorld, World, WorldEvent, WorldReady};
 use tokio::{
     sync::{mpsc, oneshot},
     task::{AbortHandle, JoinHandle},
 };
 
 use crate::{
-    AppError, Effects,
-    effects::Effect,
-    service::{AnyMsg, Context, ErasedService, Input, Pools, Service, Typed},
-    timers::Timers,
+    kitcar::{
+        AppError, Effects,
+        effects::Effect,
+        service::{AnyMsg, Context, ErasedService, Input, Pools, Service, Typed},
+        timers::Timers,
+    },
+    world::{SharedWorld, World, WorldEvent, WorldReady},
 };
 
 /// Bound on the connection's outgoing queue and on packets waiting for the host.
@@ -693,9 +695,9 @@ mod tests {
 
     mod ui {
         use insim::insim::{Bfn, BfnType, Btc, Btn, BtnStyle, Ncn};
-        use insim_extra::ui::{Child, Component, Node, Ui};
 
         use super::*;
+        use crate::ui::{Child, Component, Node, Ui};
 
         /// A self-contained dialog: opens on request, closes itself when clicked.
         struct Dialog {
