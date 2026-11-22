@@ -16,6 +16,7 @@
 
 #![allow(missing_docs)]
 
+mod rank;
 mod zinc;
 
 use std::time::Duration;
