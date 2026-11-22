@@ -32,11 +32,10 @@ pub struct ScrollListProps<'a, Item> {
     pub filter_item: FilterItemFn<Item>,
 }
 
-impl<Item: 'static> ui::Component for ScrollList<Item> {
-    type Message = ScrollMsg;
-    type Props<'a> = ScrollListProps<'a, Item>;
-
-    fn update(&mut self, msg: ScrollMsg) {
+// An owned child: the toolbox holds it as a field, maps its messages with
+// `Node::map` and forwards them here.
+impl<Item: 'static> ScrollList<Item> {
+    pub fn update(&mut self, msg: ScrollMsg) {
         match msg {
             ScrollMsg::Up => self.offset = self.offset.saturating_sub(1),
             ScrollMsg::Down => {
@@ -52,7 +51,7 @@ impl<Item: 'static> ui::Component for ScrollList<Item> {
         }
     }
 
-    fn render(&self, props: Self::Props<'_>) -> ui::Node<ScrollMsg> {
+    pub fn render(&self, props: ScrollListProps<'_, Item>) -> ui::Node<ScrollMsg> {
         let filtered: Vec<(usize, &Item)> = props
             .items
             .iter()

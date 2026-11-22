@@ -8,7 +8,7 @@ use insim::{
     identifiers::{ConnectionId, RequestId},
     insim::{Axm, BfnType, Cpp, Isi, IsiFlags, ObjectInfo, PmoAction, PmoFlags, TinyType, TtcType},
 };
-use insim_extra::ui::{Canvas, Component};
+use insim_extra::ui::{Action, Canvas};
 use tokio::time::{MissedTickBehavior, sleep};
 
 mod tools;
@@ -523,7 +523,7 @@ async fn main() -> anyhow::Result<()> {
                         None
                     },
                     Packet::Btc(btc) => {
-                        if let Some(msg) = canvas.translate_clickid(&btc.clickid) {
+                        if let Some(Action::Own(msg)) = canvas.translate_clickid(&btc.clickid) {
                             ui_root.update(msg.clone());
                             dirty = true;
                             Some(msg)
@@ -533,7 +533,7 @@ async fn main() -> anyhow::Result<()> {
 
                     },
                     Packet::Btt(btt) => {
-                        if let Some(msg) = canvas.translate_typein_clickid(&btt.clickid, btt.text) {
+                        if let Some(Action::Own(msg)) = canvas.translate_typein_clickid(&btt.clickid, btt.text) {
                             ui_root.update(msg.clone());
                             dirty = true;
                             Some(msg)

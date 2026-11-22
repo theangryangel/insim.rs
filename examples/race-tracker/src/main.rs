@@ -1,4 +1,4 @@
-//! Bare-insim race tracker example using [`World::attach`].
+//! Bare-insim race tracker example using [`SharedWorld::attach`].
 //!
 //! - The session is split, and the world follows it on its own: it requests the
 //!   server's state on startup and again on each `SessionStarted`, so the tracker
@@ -18,7 +18,8 @@ use std::time::Duration;
 use clap::Parser;
 use insim::{Session, identifiers::RequestId, insim::Isi};
 use insim_extra::world::{
-    EntrantState, FinishStatus, RaceEvent, SessionEnded, SessionStarted, World, WorldEvent,
+    EntrantState, FinishStatus, RaceEvent, SessionEnded, SessionStarted, SharedWorld, World,
+    WorldEvent,
 };
 use tabled::{Table, Tabled, settings::Style};
 
@@ -67,20 +68,20 @@ async fn main() -> insim::Result<()> {
     let (sender, _, driver) = conn.into_split(256);
     let driver = tokio::spawn(driver);
 
-    let world = World::new();
+    let world = SharedWorld::default();
     let mut events = world.attach(&sender).await?;
 
     while let Some(event) = events.recv().await {
         match event {
             WorldEvent::Ready(_) => {
-                tracing::info!(entrants = world.entrants().len(), "world ready");
+                tracing::info!(entrants = world.read().entrants().count(), "world ready");
             },
             WorldEvent::SessionStarted(SessionStarted { kind }) => {
                 tracing::info!(?kind, "session started");
             },
             WorldEvent::SessionEnded(SessionEnded) => {
                 tracing::info!("session ended");
-                print_results(&world, "Final Race Results");
+                print_results(&world.read(), "Final Race Results");
             },
             WorldEvent::Race(ref e) => {
                 match e {
@@ -92,6 +93,7 @@ async fn main() -> insim::Result<()> {
                         ..
                     } => {
                         let driver = world
+                            .read()
                             .entrant(*id)
                             .and_then(|e| e.drivers.last().map(|d| d.pname.clone()))
                             .unwrap_or_else(|| "?".to_string());
@@ -108,6 +110,7 @@ async fn main() -> insim::Result<()> {
                     },
                     RaceEvent::FastestLap { id, lap, time, .. } => {
                         let driver = world
+                            .read()
                             .entrant(*id)
                             .and_then(|e| e.drivers.last().map(|d| d.pname.clone()))
                             .unwrap_or_else(|| "?".to_string());
@@ -122,7 +125,7 @@ async fn main() -> insim::Result<()> {
                         ..
                     } => {
                         print_results(
-                            &world,
+                            &world.read(),
                             &format!("Results ({}/{} classified)", result_num + 1, num_results),
                         );
                     },
@@ -160,8 +163,8 @@ struct ResultRow {
 }
 
 fn print_results(world: &World, title: &str) {
-    let mut entrants = world.entrants();
-    entrants.sort_by_key(position_key);
+    let mut entrants: Vec<&EntrantState> = world.entrants().collect();
+    entrants.sort_by_key(|e| position_key(e));
 
     let fl_id = world.fastest_lap().map(|(id, _, _)| id);
 

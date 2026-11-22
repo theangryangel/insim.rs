@@ -1,15 +1,56 @@
-use std::sync::Arc;
+use std::{any::Any, sync::Arc};
 
 use insim::insim::BtnStyle;
 
-pub type TypeInMapper<Msg> = Arc<dyn Fn(String) -> Msg + 'static>;
+pub type TypeInMapper<Msg> = Arc<dyn Fn(String) -> Msg + Send + Sync + 'static>;
 
-fn map_typein_mapper<Msg, ParentMsg, F>(mapper: TypeInMapper<Msg>, f: F) -> TypeInMapper<ParentMsg>
-where
-    F: Fn(Msg) -> ParentMsg + Clone + 'static,
-    Msg: 'static,
-{
-    Arc::new(move |text| f(mapper(text)))
+/// What a button does when used: produce its owner's message, or a message for a
+/// component placed with [`Ui::component`](super::Ui::component), routed to
+/// that component's instance.
+#[derive(Clone)]
+pub enum Action<Msg> {
+    /// A message for whoever rendered the button.
+    Own(Msg),
+    /// A message for a component instance.
+    #[doc(hidden)]
+    Routed(Routed),
+}
+
+/// A component's message, addressed to its instance.
+#[derive(Clone)]
+#[doc(hidden)]
+#[allow(missing_debug_implementations)]
+pub struct Routed {
+    pub(crate) path: u64,
+    pub(crate) msg: Arc<dyn Any + Send + Sync>,
+}
+
+impl<Msg> Action<Msg> {
+    fn map<P>(self, f: impl FnOnce(Msg) -> P) -> Action<P> {
+        match self {
+            Self::Own(msg) => Action::Own(f(msg)),
+            Self::Routed(routed) => Action::Routed(routed),
+        }
+    }
+}
+
+impl<Msg: std::fmt::Debug> std::fmt::Debug for Action<Msg> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Own(msg) => f.debug_tuple("Own").field(msg).finish(),
+            Self::Routed(routed) => f.debug_tuple("Routed").field(&routed.path).finish(),
+        }
+    }
+}
+
+impl<Msg: PartialEq> PartialEq for Action<Msg> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Own(a), Self::Own(b)) => a == b,
+            (Self::Routed(a), Self::Routed(b)) => a.path == b.path && Arc::ptr_eq(&a.msg, &b.msg),
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -21,10 +62,10 @@ pub enum NodeKind<Msg> {
     },
     Button {
         text: String,
-        msg: Option<Msg>,
+        msg: Option<Action<Msg>>,
         key: Option<String>,
         bstyle: BtnStyle,
-        typein: Option<(u8, TypeInMapper<Msg>)>,
+        typein: Option<(u8, TypeInMapper<Action<Msg>>)>,
     },
     Empty,
 }
@@ -104,7 +145,7 @@ impl<Msg> Node<Msg> {
             style: Default::default(),
             kind: NodeKind::Button {
                 text: text.into(),
-                msg: Some(msg),
+                msg: Some(Action::Own(msg)),
                 key: None,
                 bstyle,
                 typein: None,
@@ -129,7 +170,7 @@ impl<Msg> Node<Msg> {
     /// A type-in-able button
     pub fn typein<F>(text: impl Into<String>, mut bstyle: BtnStyle, limit: u8, mapper: F) -> Self
     where
-        F: Fn(String) -> Msg + 'static,
+        F: Fn(String) -> Msg + Send + Sync + 'static,
     {
         bstyle = bstyle.clickable();
 
@@ -140,7 +181,7 @@ impl<Msg> Node<Msg> {
                 msg: None,
                 key: None,
                 bstyle,
-                typein: Some((limit, Arc::new(mapper))),
+                typein: Some((limit, Arc::new(move |text| Action::Own(mapper(text))))),
             },
         }
     }
@@ -779,11 +820,40 @@ impl<Msg> Node<Msg> {
         self.w_fit_content().h_fit_content()
     }
 
-    // Maps/wraps child msg -> parent msg
-    // Usage: component.render(ctx).map(RootMsg::ParentVariant)
+    /// Convert this node's messages into a parent's, typically an enum variant.
+    ///
+    /// For **owned** children: a struct the parent holds as a field because it
+    /// needs to see or control the child's state, rendered with
+    /// `self.list.render(props).map(ParentMsg::List)` and updated by the parent
+    /// forwarding those messages. Self-contained pieces don't need this: place
+    /// them as [`Component`](super::Component)s with
+    /// [`Ui::component`](super::Ui::component), and their clicks reach them
+    /// directly.
     pub fn map<F, ParentMsg>(self, f: F) -> Node<ParentMsg>
     where
-        F: Fn(Msg) -> ParentMsg + Clone + 'static,
+        F: Fn(Msg) -> ParentMsg + Clone + Send + Sync + 'static,
+        Msg: 'static,
+    {
+        self.actions(move |action| action.map(&f))
+    }
+
+    /// Address this node's own messages to the component instance at `path`.
+    pub(crate) fn route<ParentMsg>(self, path: u64) -> Node<ParentMsg>
+    where
+        Msg: Send + Sync + 'static,
+    {
+        self.actions(move |action| match action {
+            Action::Own(msg) => Action::Routed(Routed {
+                path,
+                msg: Arc::new(msg),
+            }),
+            Action::Routed(routed) => Action::Routed(routed),
+        })
+    }
+
+    fn actions<F, ParentMsg>(self, f: F) -> Node<ParentMsg>
+    where
+        F: Fn(Action<Msg>) -> Action<ParentMsg> + Clone + Send + Sync + 'static,
         Msg: 'static,
     {
         let kind = match self.kind {
@@ -792,7 +862,7 @@ impl<Msg> Node<Msg> {
                 visible,
                 bstyle,
             } => NodeKind::Container {
-                children: children.map(|c| c.into_iter().map(|k| k.map(f.clone())).collect()),
+                children: children.map(|c| c.into_iter().map(|k| k.actions(f.clone())).collect()),
                 visible,
                 bstyle,
             },
@@ -807,7 +877,12 @@ impl<Msg> Node<Msg> {
                 msg: msg.map(&f),
                 key,
                 bstyle,
-                typein: typein.map(|(limit, mapper)| (limit, map_typein_mapper(mapper, f.clone()))),
+                typein: typein.map(|(limit, mapper)| {
+                    let f = f.clone();
+                    let mapper: TypeInMapper<Action<ParentMsg>> =
+                        Arc::new(move |text| f(mapper(text)));
+                    (limit, mapper)
+                }),
             },
             NodeKind::Empty => NodeKind::Empty,
         };
@@ -816,19 +891,6 @@ impl<Msg> Node<Msg> {
             kind,
             style: self.style,
         }
-    }
-}
-
-impl Node<std::convert::Infallible> {
-    /// Lift a node that provably emits no messages into any message type.
-    ///
-    /// A `Node<Infallible>` can never carry a message (no value of
-    /// [`Infallible`](std::convert::Infallible) exists), so this is a total,
-    /// panic-free cast - use it to embed a pure display component (one whose
-    /// `Message = Infallible`) into a parent of any message type, instead of
-    /// `.map(|_| unreachable!())`.
-    pub fn cast<Msg: 'static>(self) -> Node<Msg> {
-        self.map(|never| match never {})
     }
 }
 
@@ -897,7 +959,7 @@ mod tests {
         match node.kind {
             NodeKind::Button { text, msg, key, .. } => {
                 assert_eq!(text, "Click me");
-                assert_eq!(msg, Some(TestMsg::Click));
+                assert_eq!(msg, Some(Action::Own(TestMsg::Click)));
                 assert!(key.is_none());
             },
             _ => panic!("Expected Button node"),
@@ -1067,7 +1129,7 @@ mod tests {
 
         match mapped.kind {
             NodeKind::Button { msg, .. } => {
-                assert_eq!(msg, Some(ParentMsg::Child(TestMsg::Click)));
+                assert_eq!(msg, Some(Action::Own(ParentMsg::Child(TestMsg::Click))));
             },
             _ => panic!("Expected Button node"),
         }

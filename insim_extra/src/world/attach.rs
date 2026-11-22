@@ -1,13 +1,12 @@
 //! Keeping a [`World`] in step with a split session.
 
 use insim::{
-    Packet, WithRequestId,
-    identifiers::RequestId,
+    Packet,
     net::{Policy, Sender},
 };
 use tokio::sync::mpsc;
 
-use super::{World, WorldEvent, WorldReady};
+use super::{SharedWorld, World, WorldEvent, WorldReady};
 
 impl World {
     /// Send every [`STARTUP_REQUESTS`](Self::STARTUP_REQUESTS) at once and return
@@ -25,21 +24,23 @@ impl World {
         }
         Ok(replies)
     }
+}
 
+impl SharedWorld {
     /// Keep this world in step with a split session from a background task, and
     /// report what changes.
     ///
     /// The task copies every InSim packet with a tap (nothing is taken from the
-    /// session's receiver), sends the startup requests, re-sends
-    /// [`SESSION_REQUESTS`](Self::SESSION_REQUESTS) when a session starts, and
-    /// folds packets in the order they were read. The returned channel carries each
+    /// session's receiver), sends the startup requests and anything else the world
+    /// asks for ([`World::take_requests`]), and folds packets in the order they
+    /// were read. The returned channel carries each
     /// resulting [`WorldEvent`], then [`WorldEvent::Ready`] once every startup
     /// reply has been folded. It closes when the session ends. Drain it or drop it.
     ///
     /// Folding runs alongside your own reads rather than in step with them: a
     /// packet you have just received may not be in the world yet. For handlers
-    /// that need settled state, fold with [`apply_packet`](Self::apply_packet)
-    /// in your own loop instead (as kitcar does).
+    /// that need settled state, fold with [`World::apply_packet`] in your own
+    /// loop instead (as kitcar does).
     ///
     /// Must be called within a Tokio runtime.
     pub async fn attach(
@@ -54,7 +55,7 @@ impl World {
         let world = self.clone();
         let sender = sender.clone();
         drop(tokio::spawn(async move {
-            let startup = Self::request_startup(&sender);
+            let startup = World::request_startup(&sender);
             tokio::pin!(startup);
             let mut tap = tap;
             let mut starting = true;
@@ -75,7 +76,9 @@ impl World {
                         while let Some(packet) = tap.try_recv() {
                             world.fold(&packet, &sender, &events).await;
                         }
-                        let _ = events.send(WorldEvent::Ready(WorldReady));
+                        if world.write().mark_ready() {
+                            let _ = events.send(WorldEvent::Ready(WorldReady));
+                        }
                     },
                 }
             }
@@ -89,14 +92,17 @@ impl World {
         sender: &Sender,
         events: &mpsc::UnboundedSender<WorldEvent>,
     ) {
-        for event in self.apply_packet(packet) {
-            if matches!(event, WorldEvent::SessionStarted(_)) {
-                for t in Self::SESSION_REQUESTS {
-                    if let Err(error) = sender.send(t.clone().with_request_id(RequestId(1))).await {
-                        tracing::warn!(%error, "failed to send session requests");
-                    }
-                }
+        // Never hold the lock across an await.
+        let (changes, requests) = {
+            let mut world = self.write();
+            (world.apply_packet(packet), world.take_requests())
+        };
+        for request in requests {
+            if let Err(error) = sender.send(request).await {
+                tracing::warn!(%error, "failed to send a request for the world");
             }
+        }
+        for event in changes {
             let _ = events.send(event);
         }
     }
@@ -119,7 +125,7 @@ mod tests {
             let (session, mut lfs) = insim::test::pair().await;
             let (sender, mut receiver, driver) = session.into_split(16);
             let _driver = tokio::spawn(driver);
-            let world = World::new();
+            let world = SharedWorld::default();
             let mut events = world.attach(&sender).await.unwrap();
 
             for _ in World::STARTUP_REQUESTS {
@@ -137,13 +143,15 @@ mod tests {
             let mut connected = false;
             loop {
                 match events.recv().await.unwrap() {
-                    WorldEvent::Connected(_) => connected = true,
+                    // A reply: the connection was there before us.
+                    WorldEvent::Connected(c) => connected = c.existing,
                     WorldEvent::Ready(_) => break,
                     _ => {},
                 }
             }
             assert!(connected, "the startup reply is folded before Ready");
-            assert!(world.connection(ConnectionId(3)).is_some());
+            assert!(world.read().connection(ConnectionId(3)).is_some());
+            assert!(world.read().is_ready());
             // The session's own receiver still gets the reply.
             assert!(matches!(receiver.recv().await, Some(Ok(Packet::Ncn(_)))));
         })

@@ -113,6 +113,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "bomb"
+version = "0.1.0+unreleased"
+dependencies = [
+ "clap",
+ "insim",
+ "insim_lyt",
+ "kitcar",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "btn-clickid-mangled-mvp"
 version = "0.1.0+unreleased"
 dependencies = [
@@ -803,16 +816,12 @@ dependencies = [
 name = "kitcar"
 version = "0.1.0+unreleased"
 dependencies = [
- "clap",
  "futures",
  "insim",
  "insim_extra",
- "parking_lot 0.13.0",
  "thiserror",
  "tokio",
- "tokio-util",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -823,7 +832,6 @@ dependencies = [
  "insim",
  "kitcar",
  "tokio",
- "tokio-util",
  "tracing",
  "tracing-subscriber",
 ]
@@ -1754,19 +1762,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
-]
-
-[[package]]
-name = "tokio-util"
-version = "0.7.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ae9cec805b01e8fc3fd2fe289f89149a9b66dd16786abd8b19cfa7b48cb0098"
-dependencies = [
- "bytes",
- "futures-core",
- "futures-sink",
- "pin-project-lite",
- "tokio",
 ]
 
 [[package]]

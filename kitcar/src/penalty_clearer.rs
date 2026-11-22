@@ -1,116 +1,127 @@
-//! [`PenaltyClearer`] - queues deferred penalty clears and drains them once
-//! a configurable delay has elapsed.
+//! [`PenaltyClearer`]: clears a penalty a fixed time after it is given.
 //!
-//! Register like any other handler:
+//! A component: hold it as a field of your service, pass it every input, and route
+//! its message back to it.
 //!
 //! ```ignore
-//! app.handle(PenaltyClearer::new(Duration::from_secs(15)))
-//! ```
+//! enum Msg { Penalty(ClearPenalty), /* ... */ }
 //!
-//! The `Handler` impl:
-//! - Queues a deferred clear when a `Pen` packet arrives with a non-`Unknown`
-//!   reason, resolved to a `ConnectionId` via [`World`].
-//! - Schedules a private synthetic tick for the deadline, so clearing does not
-//!   depend on unrelated traffic arriving later.
-//! - Discards pending clears when a session ends or a new one starts.
+//! fn update(&mut self, input: Input<Msg>, cx: &Context) -> Effects<Msg> {
+//!     let fx = self.clearer.update(&input, cx).map(Msg::Penalty);
+//!     fx.and(match input {
+//!         Input::Msg(Msg::Penalty(clear)) => self.clearer.clear(clear, cx),
+//!         // ...
+//!         _ => Effects::none(),
+//!     })
+//! }
+//! ```
 
-use std::{
-    collections::HashMap,
-    future::Future,
-    time::{Duration, Instant},
-};
+use std::time::Duration;
 
-use insim::{identifiers::ConnectionId, insim::PenaltyReason};
+use insim::{Packet, identifiers::ConnectionId, insim::PenaltyReason};
+use insim_extra::world::WorldEvent;
 
-use crate::{AppError, Dispatch, ExtractCx, Handler, SessionEnded, SessionStarted};
+use crate::{Context, Effects, Input};
 
-#[derive(Clone, Copy, Debug)]
-struct PenaltyClearTick;
+/// The clear for one connection is due. Hand it to [`PenaltyClearer::clear`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ClearPenalty(pub ConnectionId);
 
-/// Mutable handler that queues deferred penalty clears and drains them after a
-/// fixed delay.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
+struct Pending(ConnectionId);
+
+/// Clears each penalty `delay` after it is given. A new penalty restarts the
+/// delay, and pending clears are dropped when a session starts or ends.
+#[derive(Debug, Clone, Copy)]
 pub struct PenaltyClearer {
-    pending: HashMap<ConnectionId, Instant>,
     delay: Duration,
 }
 
 impl PenaltyClearer {
-    /// Create a new clearer. Queued entries will be drained and cleared after
-    /// `delay` has elapsed.
+    /// Clear penalties `delay` after they are given.
     pub fn new(delay: Duration) -> Self {
-        Self {
-            pending: HashMap::new(),
-            delay,
+        Self { delay }
+    }
+
+    /// Schedule or discard clears. Pass every input.
+    pub fn update<M>(&mut self, input: &Input<M>, cx: &Context<'_>) -> Effects<ClearPenalty> {
+        match input {
+            Input::Packet(Packet::Pen(pen)) if !matches!(pen.reason, PenaltyReason::Unknown) => {
+                match cx.world().connection_by_player(pen.plid) {
+                    Some(conn) => Effects::new().schedule_after(
+                        Pending(conn.ucid),
+                        self.delay,
+                        ClearPenalty(conn.ucid),
+                    ),
+                    None => Effects::none(),
+                }
+            },
+            Input::World(WorldEvent::SessionStarted(_) | WorldEvent::SessionEnded(_)) => {
+                Effects::new().cancel_all::<Pending>()
+            },
+            _ => Effects::none(),
         }
     }
 
-    fn drain_expired(&mut self, now: Instant) -> Vec<ConnectionId> {
-        let expired: Vec<ConnectionId> = self
-            .pending
-            .iter()
-            .filter(|(_, t)| now.duration_since(**t) >= self.delay)
-            .map(|(ucid, _)| *ucid)
-            .collect();
-        for ucid in &expired {
-            let _ = self.pending.remove(ucid);
+    /// Carry out a due clear, if the connection is still there.
+    pub fn clear<M: Send + 'static>(&self, due: ClearPenalty, cx: &Context<'_>) -> Effects<M> {
+        match cx.world().connection(due.0) {
+            Some(conn) => Effects::new().packet(conn.clear_penalty()),
+            None => Effects::none(),
         }
-        expired
     }
 }
 
-impl<S: Send + Sync + 'static, V: crate::ui::View + 'static> Handler<(), S, V> for PenaltyClearer {
-    fn call(
-        &mut self,
-        cx: &ExtractCx<'_, S, V>,
-    ) -> impl Future<Output = Result<(), AppError>> + Send {
-        let world = cx.world.clone();
-        let sender = cx.sender.clone();
-        let cancel = cx.cancel.clone();
+#[cfg(test)]
+mod tests {
+    use std::time::Instant;
 
-        if let Dispatch::Synthetic(event) = cx.dispatch
-            && (event.is::<SessionEnded>() || event.is::<SessionStarted>())
-        {
-            self.pending.clear();
-        }
+    use insim::{
+        identifiers::PlayerId,
+        insim::{Ncn, Npl, Pen},
+    };
+    use insim_extra::world::World;
 
-        if let Dispatch::Packet(insim::Packet::Pen(pen)) = cx.dispatch
-            && !matches!(pen.reason, PenaltyReason::Unknown)
-            && let Some(conn) = world.connection_by_player(pen.plid)
-        {
-            use std::collections::hash_map::Entry;
-            if let Entry::Vacant(entry) = self.pending.entry(conn.ucid) {
-                let _ = entry.insert(Instant::now());
-                let sender = sender.clone();
-                let delay = self.delay;
-                drop(tokio::spawn(async move {
-                    tokio::select! {
-                        _ = cancel.cancelled() => {},
-                        _ = tokio::time::sleep(delay) => {
-                            let _ = sender.event(PenaltyClearTick);
-                        },
-                    }
-                }));
+    use super::*;
+
+    #[test]
+    fn a_penalty_schedules_one_clear_that_sends_p_clear() {
+        let mut world = World::new();
+        let _ = world.apply_packet(
+            &Ncn {
+                ucid: ConnectionId(4),
+                uname: "driver".into(),
+                ..Default::default()
             }
-        }
-
-        let should_drain = matches!(
-            cx.dispatch,
-            Dispatch::Synthetic(event) if event.is::<PenaltyClearTick>()
+            .into(),
         );
-        let expired = if should_drain {
-            self.drain_expired(Instant::now())
-        } else {
-            Vec::new()
-        };
-
-        async move {
-            for ucid in expired {
-                if let Some(packet) = world.connection(ucid).map(|c| c.clear_penalty()) {
-                    let _ = sender.packet(packet).await;
-                }
+        let _ = world.apply_packet(
+            &Npl {
+                ucid: ConnectionId(4),
+                plid: PlayerId(9),
+                nump: 1,
+                ..Default::default()
             }
-            Ok(())
-        }
+            .into(),
+        );
+        let cx = Context::new(&world, Instant::now());
+        let mut clearer = PenaltyClearer::new(Duration::from_secs(15));
+        let pen = Input::<()>::Packet(
+            Pen {
+                plid: PlayerId(9),
+                reason: PenaltyReason::FalseStart,
+                ..Default::default()
+            }
+            .into(),
+        );
+        let effects = clearer.update(&pen, &cx);
+        let timers: Vec<_> = effects.timers().map(|(_, msg)| *msg).collect();
+        assert_eq!(timers, [ClearPenalty(ConnectionId(4))]);
+
+        let cleared: Effects<()> = clearer.clear(ClearPenalty(ConnectionId(4)), &cx);
+        assert!(matches!(
+            cleared.packets_sent().next(),
+            Some(Packet::Mst(mst)) if mst.msg == "/p_clear driver"
+        ));
     }
 }

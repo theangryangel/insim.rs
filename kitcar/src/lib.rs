@@ -1,99 +1,64 @@
-//! System-style handlers over an InSim packet/event stream.
+//! Run games and services on an InSim connection.
 //!
-//! `kitcar` lets you write handlers as plain async functions with typed
-//! "magic-extractor" parameters ([`Packet`], [`Event`], [`Sender`],
-//! [`State`]). Handlers can also be implemented manually on a
-//! struct that owns state; see [`Handler`].
+//! A [`Host`] owns one connection for as long as it lasts and keeps a [`World`]
+//! in step with the server. It runs any number of [`Service`]s: a game such as a
+//! time trial, the idle screen between events, or a long-lived service. Services can
+//! be started and stopped at any time without reconnecting.
 //!
-//! The function-with-extractor surface is borrowed from axum. Handlers are
-//! gated implicitly by extractor type and explicitly via
-//! [`HandlerExt::run_if`].
+//! A service is one update function over its own state:
 //!
-//! ## State vs handlers
+//! ```ignore
+//! enum Msg { Boom(PlayerId) }
 //!
-//! Two state shapes:
+//! impl Service for Bomb {
+//!     type Msg = Msg;
+//!     fn update(&mut self, input: Input<Msg>, cx: &Context) -> Effects<Msg> {
+//!         match input {
+//!             Input::Packet(Packet::Uco(uco)) => self.checkpoint(&uco, cx),
+//!             Input::Msg(Msg::Boom(plid)) => self.explode(plid, cx),
+//!             _ => Effects::none(),
+//!         }
+//!     }
+//! }
+//! ```
 //!
-//! - **[`State<S>`]** is the bot's *primary* state - one value, type-checked
-//!   at the [`App`] level. Build with [`App::with_state(value)`](App::with_state)
-//!   and extract via [`State<S>`]. The framework holds the value in an
-//!   clone of `S`; applications choose any interior mutability they need.
-//!   Bots without a primary state use
-//!   [`App::new`] (which yields `App<()>`) and never touch `State`.
-//! - **Handlers** may own private state. Each registered handler is uniquely
-//!   owned by the runtime and called through `&mut self`; handlers are not a
-//!   service registry and cannot be extracted by other handlers.
+//! - **Ordered.** The host folds each packet into the [`World`] first, then gives
+//!   it to every service, followed by the world events it caused. Inputs arrive one
+//!   at a time, so state needs no locks.
+//! - **No I/O in updates.** `update` is synchronous and returns [`Effects`]:
+//!   packets to send, timers (keyed, so they can be replaced or cancelled), and
+//!   tasks for slow work such as database queries, whose results come back as
+//!   messages. This keeps services deterministic and easy to test: call `update`
+//!   with an input and a [`Context`], and inspect the effects.
+//! - **Components, not handlers.** Reusable behaviour such as [`Lifecycle`] and
+//!   [`PenaltyClearer`] is a plain struct held as a field, with its own update
+//!   method. Combine effects with [`Effects::and`], and lift a component's
+//!   messages into your own with [`Effects::map`].
 //!
-//! Rule of thumb: if it's *the* thing the bot revolves around, use
-//! `with_state`. State private to one registration can live directly in that
-//! handler.
+//! # Multiplayer only
 //!
-//! ## Dispatch model
-//!
-//! The intrinsic [`World`] mirror is folded first, then handlers run
-//! sequentially in registration order. Register state-maintaining handlers
-//! before consumers that must observe their effects.
-//!
-//! Handlers can emit synthetic events via [`Sender::event`]; those events
-//! fire in a *subsequent* cycle, where the Pre-first ordering applies
-//! again.
-//!
-//! Handlers that need independent concurrency can spawn background work and
-//! communicate back through [`Sender`]. Kitcar does not add a lock around
-//! [`State<S>`].
-//!
-//! ## Emission semantics
-//!
-//! One emission API: [`Sender`]. From anywhere (handler, spawned task, UI
-//! thread) `sender.packet(p).await` writes a single packet out, `sender.packets(iter).await` writes
-//! multiple, `sender.request(p).await` waits for a reply, `sender.event(e)` injects
-//! a synthetic event. **Events fire in a subsequent dispatch cycle, not the
-//! current one** - the back-channel is drained by the main runtime loop
-//! between cycles.
-//!
-//! ## Shutdown
-//!
-//! [`ExtractCx`] exposes `shutdown()` / `is_shutdown()`. Calling
-//! `cx.shutdown()` from a handler signals the runtime to exit at the next
-//! select; the `Sender`'s back-channel and the framed connection are dropped
-//! after the current cycle finishes.
-//!
-//! See `examples/smoke.rs` for an end-to-end example.
+//! kitcar targets multiplayer servers. The local connection (UCID 0) is always
+//! the server, never a player: views are never drawn for it, and
+//! [`World::connections`] leaves it out. Local and single-player tools can drive
+//! an [`insim_extra::ui::Canvas`] or [`insim_extra::ui::Screen`] directly.
 
-mod app;
-mod chat;
+mod effects;
 mod error;
-mod game;
+mod host;
+mod lifecycle;
 mod penalty_clearer;
-mod presence;
-#[allow(missing_docs)]
-pub mod ui;
-mod world;
+mod service;
+mod timers;
 
-#[allow(deprecated)]
-pub use app::runtime::run;
-pub use app::{
-    App, Installable,
-    event::{Dispatch, Shutdown, Startup},
-    extract::{Event, ExtractCx, FromContext, Packet, State},
-    handler::Handler,
-    run_if,
-    run_if::{HandlerExt, RunIf},
-    runtime::{Sender, run_connection},
-};
-pub use chat::{ChatEvent, ChatParser};
+pub use effects::{Effects, TimerKey};
 pub use error::AppError;
-pub use game::{
-    AllowedCarsChanged, AllowedModsChanged, GameInfo, LayoutChanged, LobbyEntered, LobbyNotReady,
-    LobbyReady, MultiplayerJoined, MultiplayerLeft, SessionEnded, SessionKind, SessionStarted,
-    TrackChanged, VersionInfo, VersionReceived,
-};
+pub use host::{Host, ServiceHandle};
 pub use insim_extra::{
+    chat::{ChatEvent, ChatParser},
+    ui,
     util::{host_command, mtc},
-    world::{DriverRecord, EntrantId, EntrantState, FinishStatus, LapRecord, PitRecord, RaceEvent},
+    world::{self, World, WorldEvent, WorldReady},
 };
-pub use penalty_clearer::PenaltyClearer;
-pub use presence::{
-    Connected, ConnectionDetails, ConnectionInfo, Disconnected, PlayerInfo, PlayerJoined,
-    PlayerLeft, PlayerTeleportedToPits, Renamed, TakingOver, VehicleSelected,
-};
-pub use world::{World, WorldEvent, WorldReady};
+pub use lifecycle::{Layout, Lifecycle, Phase, Setup, Transition};
+pub use penalty_clearer::{ClearPenalty, PenaltyClearer};
+pub use service::{Context, Input, Service};

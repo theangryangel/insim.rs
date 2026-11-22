@@ -3,7 +3,7 @@
 //! This module is private to [`crate::world`]. [`RaceState`] holds the
 //! cohesive race data (entrants, the live plid→entrant index, pending grid
 //! positions, fastest lap); the packet **handlers** are implemented on
-//! [`WorldInner`](crate::world::WorldInner) so they can read sibling state
+//! [`World`](crate::world::World) so they can read sibling state
 //! (`game.session_kind`, `connections`) directly via disjoint field borrows,
 //! rather than threading it through as parameters. The public API surface is
 //! the query methods on [`crate::world::World`].
@@ -17,7 +17,7 @@ use insim::{
 
 use super::{DriverRecord, EntrantId, EntrantState, FinishStatus, LapRecord, PitRecord, RaceEvent};
 use crate::world::{
-    WorldInner,
+    World,
     connection::{ConnectionInfo, PlayerInfo},
 };
 
@@ -92,11 +92,11 @@ impl RaceState {
 
 /// Race packet handlers, driven by the unified dispatch in [`crate::world`].
 ///
-/// These live on [`WorldInner`] (rather than [`RaceState`]) so they can read
+/// These live on [`World`] (rather than [`RaceState`]) so they can read
 /// `self.game.session_kind` and `self.connections` directly while mutating
 /// `self.race` - the session/connection context they depend on lives a layer
 /// up, and disjoint field borrows let one method touch all three.
-impl WorldInner {
+impl World {
     /// The live entrant for `plid`, but only while a tracking session is
     /// active. `None` if not tracking or the plid is not currently on track.
     fn live_entrant_mut(&mut self, plid: PlayerId) -> Option<&mut EntrantState> {

@@ -9,7 +9,7 @@ use insim::{
     insim::{Bfn, BfnType, Btn, BtnStyleFlags},
 };
 
-use super::{Node, NodeKind, TypeInMapper, id_pool::ClickIdPool};
+use super::{Action, Node, NodeKind, TypeInMapper, id_pool::ClickIdPool};
 
 #[derive(Debug, Default)]
 pub struct CanvasDiff {
@@ -37,8 +37,8 @@ struct ButtonState {
 
 #[derive(Clone)]
 struct ButtonBinding<Msg> {
-    click: Option<Msg>,
-    typein: Option<TypeInMapper<Msg>>,
+    click: Option<Action<Msg>>,
+    typein: Option<TypeInMapper<Action<Msg>>>,
 }
 
 #[allow(missing_debug_implementations)]
@@ -70,10 +70,22 @@ impl<M: Clone + 'static> Canvas<M> {
         }
     }
 
+    /// Diff `root` against what was last drawn, leasing click ids from this
+    /// canvas's own pool.
     pub fn reconcile(&mut self, root: Node<M>) -> Option<CanvasDiff> {
+        let mut pool = std::mem::replace(&mut self.pool, ClickIdPool::new());
+        let diff = self.reconcile_in(root, &mut pool);
+        self.pool = pool;
+        diff
+    }
+
+    /// Diff `root` against what was last drawn, leasing click ids from `shared`.
+    /// Use one pool per connection for every canvas drawing on it, so that their
+    /// click ids never collide. The pool is left unchanged if layout fails.
+    pub fn reconcile_in(&mut self, root: Node<M>, shared: &mut ClickIdPool) -> Option<CanvasDiff> {
         let mut click_map = HashMap::new();
         let mut new_buttons = HashMap::new();
-        let mut pool = self.pool.clone();
+        let mut pool = shared.clone();
 
         let mut tree = taffy::TaffyTree::new();
         let mut node_map = Vec::new();
@@ -193,7 +205,7 @@ impl<M: Clone + 'static> Canvas<M> {
         }));
 
         self.buttons = new_buttons;
-        self.pool = pool;
+        *shared = pool;
 
         if updates.is_empty() && removals.is_empty() {
             None
@@ -446,20 +458,31 @@ impl<M: Clone + 'static> Canvas<M> {
         }
     }
 
-    // should be called if the user clears buttons
+    /// Forget every button, as after the user clears them, returning their click
+    /// ids to this canvas's own pool.
     pub fn clear(&mut self) {
-        self.buttons.clear();
-        self.click_map.clear();
-        self.pool.release_all();
+        let mut pool = std::mem::replace(&mut self.pool, ClickIdPool::new());
+        self.clear_in(&mut pool);
+        self.pool = pool;
     }
 
-    pub fn translate_clickid(&self, clickid: &ClickId) -> Option<M> {
+    /// Forget every button, returning only this canvas's click ids to `shared`.
+    pub fn clear_in(&mut self, shared: &mut ClickIdPool) {
+        let ids: Vec<ClickId> = self.buttons.values().map(|state| state.click_id).collect();
+        shared.release(&ids);
+        self.buttons.clear();
+        self.click_map.clear();
+    }
+
+    /// What clicking `clickid` does, if it is one of this canvas's buttons.
+    pub fn translate_clickid(&self, clickid: &ClickId) -> Option<Action<M>> {
         self.click_map
             .get(clickid)
             .and_then(|binding| binding.click.clone())
     }
 
-    pub fn translate_typein_clickid(&self, clickid: &ClickId, text: String) -> Option<M> {
+    /// What typing `text` into `clickid` does, if it is one of this canvas's buttons.
+    pub fn translate_typein_clickid(&self, clickid: &ClickId, text: String) -> Option<Action<M>> {
         self.click_map
             .get(clickid)
             .and_then(|binding| binding.typein.as_ref())
@@ -915,7 +938,7 @@ mod tests {
 
         let click_id = ClickId(1);
         let msg = canvas.translate_clickid(&click_id);
-        assert_eq!(msg, Some(TestMsg::Click));
+        assert_eq!(msg, Some(Action::Own(TestMsg::Click)));
     }
 
     #[test]
@@ -941,7 +964,7 @@ mod tests {
 
         let click_id = ClickId(1);
         let msg = canvas.translate_typein_clickid(&click_id, "hello".to_string());
-        assert_eq!(msg, Some(TestMsg::TypeIn("hello".to_string())));
+        assert_eq!(msg, Some(Action::Own(TestMsg::TypeIn("hello".to_string()))));
     }
 
     #[test]

@@ -1,0 +1,22 @@
+[package]
+name = "bomb"
+version = "0.1.0+unreleased"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+clap = { workspace = true, features = ["derive"] }
+insim = { path = "../../insim", features = ["tokio"] }
+insim_lyt = { path = "../../insim_lyt" }
+kitcar = { path = "../../kitcar" }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "time", "signal"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+insim = { path = "../../insim", features = ["tokio", "test-util"] }
