@@ -1,54 +1,42 @@
-//! UI component system.
+//! Button UIs built from views.
 //!
 //! A view is a function from state to a tree of [`Node`]s. [`Canvas`] lays the
 //! tree out and diffs it against what each player already has, so only changed
-//! buttons are sent. Self-contained pieces with their own per-player state are
-//! [`Component`]s, placed with [`Ui::component`] and kept for each player by a
-//! [`Screen`]. Components nest, and clicks on their buttons go straight to them.
+//! buttons go over the wire. A [`Component`] is a self-contained piece with its
+//! own per-player state: place it with [`Ui::component`] and a [`Screen`] keeps
+//! one per player. Components nest, and their clicks go straight to them.
 //!
-//! kitcar's `Host` drives this for a service's `view`; a [`Screen`] can also be
-//! driven directly.
+//! kitcar's `Host` drives a service's `view` for you, or drive a [`Screen`]
+//! yourself.
+//!
+//! Sizes and offsets are UI units on LFS's 200 x 200 button grid. Numeric
+//! builders take integers or floats, so `.w(30).h(6).p(2).top(5)` works.
 //!
 //! # Positioning
 //!
-//! Nodes default to static positioning: insets are ignored. Use
-//! [`Node::position_relative`] to apply insets in normal flow or establish a
-//! containing block for absolute descendants. [`Node::position_absolute`] and
-//! [`Node::position_fixed`] remove a node from normal flow; fixed nodes use the
-//! 200 × 200 UI viewport even when the root is smaller or offset.
-//! When migrating from Taffy 0.13, explicitly select relative positioning for
-//! nodes that previously relied on the default position applying insets.
+//! Nodes are static by default, so insets do nothing. Call
+//! [`Node::position_relative`] to apply them, or to anchor absolute
+//! descendants. [`Node::position_absolute`] and [`Node::position_fixed`] take a
+//! node out of flow; fixed nodes use the full 200 x 200 viewport, even when the
+//! root is smaller or offset.
 //!
 //! # Layout builders
 //!
-//! Flex direction helpers enable flex layout, including after `block()`.
-//! Use `gap`, `gap_x`, and `gap_y` for spacing between items. Horizontal and
-//! vertical gap axes do not change with flex direction. Use `with_style` to
-//! configure additional Taffy properties without leaving the builder chain.
-//! Numeric builders accept integers and floats via `Into<f64>`, for example
-//! `.w(30).h(6).p(2).top(5)`. Values are converted to Taffy's `f32` layout
-//! units internally; fractional and negative offsets remain supported.
+//! Layout is Taffy, so it follows CSS block, flex and grid rules. Reach for
+//! `with_style` when a builder is missing. `gap_x` and `gap_y` stay horizontal and vertical
+//! whatever the flex direction.
 //!
-//! Use `.when(condition, |node| node.with_children(children))` to toggle a
-//! group, constructing children inside the closure to skip building them when
-//! false. `with_child_if` and `with_children_if` are deprecated in favor of
-//! `when` or optional children.
+//! Percentage heights need a definite height on the container; an `auto`
+//! height gives `h_percent` nothing to work from. Content sizing (`fit_content` and
+//! friends) looks at children only: button text is not measured.
 //!
-//! `size(width, height)` and `square(size)` set dimensions in UI units.
-//! `w_percent(50)` and `h_percent(50)` mean 50% of the containing block's
-//! corresponding dimension; percentage heights need a definite containing
-//! height. Use `min_w`, `max_w`, `min_h`, and `max_h` for size limits in UI units.
-//! `items_stretch()` fills children's automatic cross sizes; `self_auto()`
-//! resets a child's alignment to follow its container.
-//!
-//! `fit_content()` now sets CSS `fit-content` sizing. Use `size_auto()` for
-//! its pre-0.2 behavior of resetting both dimensions to `auto`. Content sizing
-//! uses the layout of children; button text is not measured automatically.
+//! Toggle a group with `.when(condition, |node| node.with_children(...))`.
+//! Children built inside the closure are skipped when the condition is false.
 //!
 //! # Multiplayer only
 //!
-//! Screens are meant for **dedicated multiplayer servers**: kitcar never draws
-//! for the host/local connection ([`ConnectionId::LOCAL`](insim::identifiers::ConnectionId::LOCAL) / UCID 0). For a local
+//! Screens are for dedicated servers: kitcar never draws for the local
+//! connection ([`ConnectionId::LOCAL`](insim::identifiers::ConnectionId::LOCAL) / UCID 0). For a local
 //! tool, drive a [`Canvas`] yourself.
 
 pub mod canvas;
@@ -58,15 +46,14 @@ mod node;
 
 pub use canvas::{Canvas, CanvasDiff};
 pub use component::{Child, Component, Key, Screen, Ui};
-pub use node::*;
+pub use node::{Action, Node};
 
-/// Empty container node - useful as a layout root.
+/// Empty container, handy as a layout root.
 pub fn container<Msg>() -> node::Node<Msg> {
     node::Node::container()
 }
 
-/// Horizontal flex container holding `children`. Shorthand for
-/// `container().flex().flex_row().with_children(children)`.
+/// Horizontal flex container: `container().flex_row().with_children(children)`.
 pub fn row<Msg>(children: impl IntoIterator<Item = node::Node<Msg>>) -> node::Node<Msg> {
     node::Node::container()
         .flex()
@@ -74,8 +61,7 @@ pub fn row<Msg>(children: impl IntoIterator<Item = node::Node<Msg>>) -> node::No
         .with_children(children)
 }
 
-/// Vertical flex container holding `children`. Shorthand for
-/// `container().flex().flex_col().with_children(children)`.
+/// Vertical flex container: `container().flex_col().with_children(children)`.
 pub fn col<Msg>(children: impl IntoIterator<Item = node::Node<Msg>>) -> node::Node<Msg> {
     node::Node::container()
         .flex()
@@ -83,12 +69,12 @@ pub fn col<Msg>(children: impl IntoIterator<Item = node::Node<Msg>>) -> node::No
         .with_children(children)
 }
 
-/// Filled background node (no text).
+/// Filled background with no text.
 pub fn background<Msg>(bstyle: insim::insim::BtnStyle) -> node::Node<Msg> {
     node::Node::background(bstyle)
 }
 
-/// Clickable button that emits `msg` when pressed.
+/// Button that sends `msg` when clicked.
 pub fn clickable<Msg>(
     text: impl Into<String>,
     bstyle: insim::insim::BtnStyle,
@@ -97,12 +83,12 @@ pub fn clickable<Msg>(
     node::Node::clickable(text, bstyle, msg)
 }
 
-/// Static text node.
+/// Text label.
 pub fn text<Msg>(text: impl Into<String>, bstyle: insim::insim::BtnStyle) -> node::Node<Msg> {
     node::Node::text(text, bstyle)
 }
 
-/// Typeable input node - `mapper` converts the typed string to a message.
+/// Type-in button; `mapper` turns the typed text into a message.
 pub fn typein<Msg, F>(
     text: impl Into<String>,
     bstyle: insim::insim::BtnStyle,
@@ -115,7 +101,7 @@ where
     node::Node::typein(text, bstyle, limit, mapper)
 }
 
-/// Zero-sized placeholder node.
+/// Renders nothing.
 pub fn empty<Msg>() -> node::Node<Msg> {
     node::Node::empty()
 }

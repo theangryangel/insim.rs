@@ -1,4 +1,4 @@
-//! [`RaceEvent`] - output events emitted by race-tracking functions.
+//! [`RaceEvent`]: what race tracking reports.
 
 use std::time::Duration;
 
@@ -9,52 +9,52 @@ use insim::{
 
 use super::entrant::{EntrantId, LapRecord, PitRecord};
 
-/// Events emitted by race-tracking `apply_*` functions in [`crate::world`].
+/// What race tracking in [`crate::world`] reports.
 ///
-/// Session start is reported by [`crate::world::WorldEvent::SessionStarted`],
-/// not here.
+/// Session starts arrive as [`crate::world::WorldEvent::SessionStarted`], not
+/// here.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum RaceEvent {
-    /// A new entrant joined the track.
+    /// An entrant joined the track.
     EntrantJoined {
-        /// Stable entrant identifier.
+        /// The entrant.
         id: EntrantId,
-        /// LFS player ID at the time of joining.
+        /// LFS player ID on joining.
         plid: PlayerId,
     },
-    /// A lap was completed.
+    /// An entrant completed a lap.
     LapCompleted {
-        /// Stable entrant identifier.
+        /// The entrant.
         id: EntrantId,
         /// LFS player ID.
         plid: PlayerId,
-        /// The completed lap record.
+        /// The lap.
         record: LapRecord,
     },
-    /// A split was crossed.
+    /// An entrant crossed a split.
     SplitCompleted {
-        /// Stable entrant identifier.
+        /// The entrant.
         id: EntrantId,
         /// LFS player ID.
         plid: PlayerId,
-        /// Split index (1–3).
+        /// Split index (1 to 3).
         split: u8,
         /// Split time.
         time: Duration,
     },
-    /// A pit stop was completed (`Pit` and `Psf` both received).
+    /// A pit stop finished: both `Pit` and `Psf` arrived.
     PitStopComplete {
-        /// Stable entrant identifier.
+        /// The entrant.
         id: EntrantId,
         /// LFS player ID.
         plid: PlayerId,
-        /// The completed pit stop record.
+        /// The pit stop.
         record: PitRecord,
     },
-    /// A penalty state changed.
+    /// A penalty changed.
     PenaltyChanged {
-        /// Stable entrant identifier.
+        /// The entrant.
         id: EntrantId,
         /// LFS player ID.
         plid: PlayerId,
@@ -62,104 +62,102 @@ pub enum RaceEvent {
         oldpen: PenaltyInfo,
         /// New penalty.
         newpen: PenaltyInfo,
-        /// Reason for the change.
+        /// Why it changed.
         reason: PenaltyReason,
     },
-    /// A driver swap occurred.
+    /// A driver swap. The entrant and player ID stay the same.
     DriverSwap {
-        /// Stable entrant identifier.
+        /// The entrant.
         id: EntrantId,
-        /// LFS player ID (unchanged across swaps).
+        /// LFS player ID.
         plid: PlayerId,
-        /// The incoming driver's connection ID.
+        /// The incoming driver's connection.
         new_ucid: ConnectionId,
     },
-    /// A player crossed the finish line (provisional).
+    /// An entrant crossed the finish line. Provisional until
+    /// [`ResultConfirmed`](Self::ResultConfirmed).
     Finished {
-        /// Stable entrant identifier.
+        /// The entrant.
         id: EntrantId,
         /// LFS player ID.
         plid: PlayerId,
         /// Total race time.
         ttime: Duration,
-        /// Best lap time.
+        /// Best lap.
         btime: Duration,
         /// Confirmation flags.
         confirm: RaceConfirmFlags,
     },
-    /// A confirmed result arrived.
+    /// LFS confirmed a result (`Res`).
     ResultConfirmed {
-        /// Stable entrant identifier.
+        /// The entrant.
         id: EntrantId,
         /// LFS player ID.
         plid: PlayerId,
-        /// Classified position (0-indexed).
+        /// Classified position, from 0.
         result_num: u8,
-        /// Total number of classified results.
+        /// How many results are classified.
         num_results: u8,
     },
-    /// A player left the track without finishing while a race was active.
+    /// An entrant left the track mid-race without finishing.
     Dnf {
-        /// Stable entrant identifier.
+        /// The entrant.
         id: EntrantId,
         /// LFS player ID.
         plid: PlayerId,
     },
-    /// A disconnected player rejoined and was matched to their prior
+    /// A disconnected driver came back and was matched to their old
     /// [`super::EntrantState`] by LFS.net username.
     ///
-    /// The existing [`EntrantId`] is reused and all prior lap history is
-    /// preserved. A [`lap_offset`](super::EntrantState::lap_offset) is applied
-    /// so subsequent [`RaceEvent::LapCompleted`] records carry the true
-    /// running lap total rather than LFS's reset-to-1 counter.
+    /// They keep their [`EntrantId`] and lap history. A
+    /// [`lap_offset`](super::EntrantState::lap_offset) makes later
+    /// [`RaceEvent::LapCompleted`] records carry the true lap total, not LFS's
+    /// counter, which restarts at 1.
     ///
-    /// Only emitted when a world was created with [`crate::world::World::with_rejoin`].
+    /// Only emitted by a world built with [`crate::world::World::with_rejoin`].
     EntrantRejoined {
-        /// Stable entrant identifier (same as before the disconnect).
+        /// The entrant, same as before the disconnect.
         id: EntrantId,
-        /// New LFS player ID assigned after reconnect.
+        /// New LFS player ID.
         plid: PlayerId,
     },
-    /// A driver improved their own best lap time.
+    /// An entrant beat their own best lap.
     ///
-    /// Emitted immediately after [`RaceEvent::LapCompleted`] whenever the
-    /// completed lap beats that entrant's previous best. Also fires for their
-    /// very first completed lap (since any time beats nothing).
+    /// Follows the [`RaceEvent::LapCompleted`] that set it. Their first lap
+    /// always counts.
     PersonalBest {
-        /// Stable entrant identifier.
+        /// The entrant.
         id: EntrantId,
         /// LFS player ID.
         plid: PlayerId,
-        /// Lap number on which the personal best was set.
+        /// Lap it was set on.
         lap: u16,
-        /// The new personal best time.
+        /// The new best.
         time: Duration,
-        /// The previous personal best, if one existed.
+        /// The previous best, if any.
         previous: Option<Duration>,
     },
-    /// A new session fastest lap was set.
+    /// A new fastest lap of the session, across all entrants.
     ///
-    /// Emitted immediately after [`RaceEvent::LapCompleted`] whenever the
-    /// completed lap beats the previous best time across all entrants. Also
-    /// fires for the very first completed lap of the session (since any time
-    /// beats nothing).
+    /// Follows the [`RaceEvent::LapCompleted`] that set it. The session's first
+    /// lap always counts.
     FastestLap {
-        /// Stable entrant identifier.
+        /// The entrant.
         id: EntrantId,
         /// LFS player ID.
         plid: PlayerId,
-        /// Lap number on which the fastest lap was set (corrected by any
-        /// [`lap_offset`](super::EntrantState::lap_offset)).
+        /// Lap it was set on, including any
+        /// [`lap_offset`](super::EntrantState::lap_offset).
         lap: u16,
-        /// The fastest lap time.
+        /// Lap time.
         time: Duration,
     },
-    /// A player teleported to the pits (Shift+P / `Plp` packet).
+    /// An entrant teleported to the pits (Shift+P, `Plp`).
     ///
-    /// The in-progress lap is discarded but the running lap total is left
-    /// untouched - LFS does not reset the lap counter on a telepit.
+    /// The lap in progress is dropped, but the lap total stays: LFS doesn't
+    /// reset its counter on a telepit.
     TeleportedToPits {
-        /// Stable entrant identifier.
+        /// The entrant.
         id: EntrantId,
         /// LFS player ID.
         plid: PlayerId,

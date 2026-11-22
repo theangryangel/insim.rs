@@ -22,7 +22,7 @@ use crate::{
         service::{AnyMsg, Context, ErasedService, Input, Pools, Service, Typed},
         timers::Timers,
     },
-    world::{SharedWorld, World, WorldEvent, WorldReady},
+    world::{Applied, SharedWorld, World, WorldEvent, event::WorldReady},
 };
 
 /// Bound on the outgoing queue and on packets waiting for the host.
@@ -386,10 +386,7 @@ impl Loop {
 
     async fn on_packet(&mut self, packet: Packet) {
         self.ready.dispatched(&packet);
-        let (events, requests) = {
-            let mut world = self.world.write();
-            (world.apply_packet(&packet), world.take_requests())
-        };
+        let Applied { events, requests } = self.world.write().apply(&packet);
         // Requests the world needs to stay in step.
         for request in requests {
             if let Err(error) = self.connection.send(request).await {

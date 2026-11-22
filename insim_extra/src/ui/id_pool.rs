@@ -1,25 +1,28 @@
-//! Click ID Pool Manager - handles allocation and deallocation of unique IDs
+//! Click ids for buttons.
+//!
+//! LFS gives each connection click ids 0 to 239, and a new button with a live id
+//! replaces the old one. So every screen drawing on a connection leases from one
+//! shared pool, or their buttons overwrite each other.
 
 use fixedbitset::FixedBitSet;
 use insim::identifiers::ClickId;
 
-/// Helper alias for a Btn ClickId Pool
+/// One connection's button click ids, 1 to 239.
 pub type ClickIdPool = IdPool<1, 239>;
 
 #[derive(Clone, Debug)]
-/// ClickId Pool - handles allocation and deallocation of unique IDs for buttons
+/// Leases unique ids in `MIN..=MAX`, lowest first.
 pub struct IdPool<const MIN: u8, const MAX: u8> {
-    // Bit set where 1 = available, 0 = allocated
+    // 1 = available.
     available_ids: FixedBitSet,
 }
 
 impl<const MIN: u8, const MAX: u8> IdPool<MIN, MAX> {
-    /// New!
+    /// A pool with every id available.
     #[allow(clippy::new_without_default)] // We have no interest in Default clippy
     pub fn new() -> Self {
         let mut available_ids = FixedBitSet::with_capacity(MAX.saturating_add(1) as usize);
-        // Set bits MIN-MAX to indicate they are available (skip 0)
-        // sadly cannot use set_range since we want it inclusive
+        // Inclusive, so not `set_range`.
         (MIN..=MAX).for_each(|i| {
             available_ids.set(i as usize, true);
         });
@@ -27,19 +30,18 @@ impl<const MIN: u8, const MAX: u8> IdPool<MIN, MAX> {
         Self { available_ids }
     }
 
-    /// Lease/allocate a click ID with the configured strategy
+    /// Lease the lowest free id, or `None` if all are taken.
     pub fn lease(&mut self) -> Option<ClickId> {
-        // Find the first available ID by iterating from the beginning.
         if let Some(id) = self.available_ids.ones().next() {
             let click_id = id as u8;
             self.available_ids.set(id, false);
             Some(click_id.into())
         } else {
-            None // Pool exhausted
+            None
         }
     }
 
-    /// Release/deallocate one or more ClickIds
+    /// Return ids to the pool. Ids outside `MIN..=MAX` are ignored.
     pub fn release<'a, I>(&mut self, click_ids: &'a I)
     where
         &'a I: IntoIterator<Item = &'a ClickId>,
@@ -51,14 +53,14 @@ impl<const MIN: u8, const MAX: u8> IdPool<MIN, MAX> {
         }
     }
 
-    /// Release all
+    /// Return every id.
     pub fn release_all(&mut self) {
         (MIN..=MAX).for_each(|i| {
             self.available_ids.set(i as usize, true);
         });
     }
 
-    /// Get pool statistics
+    /// `(capacity, available, allocated)`.
     pub fn stats(&self) -> (usize, usize, usize) {
         let total_capacity = MAX as usize - MIN as usize + 1;
         let available = self.available_ids.count_ones(..);
@@ -66,7 +68,7 @@ impl<const MIN: u8, const MAX: u8> IdPool<MIN, MAX> {
         (total_capacity, available, allocated)
     }
 
-    /// Get available count
+    /// How many ids are free.
     pub fn available_count(&self) -> usize {
         self.available_ids.count_ones(..)
     }

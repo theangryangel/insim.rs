@@ -28,6 +28,18 @@ pub struct Mtc {
 
 impl_typical_with_request_id!(Mtc);
 
+impl Mtc {
+    /// A silent message to one connection, or everyone with
+    /// [`ConnectionId::ALL`].
+    pub fn new(ucid: ConnectionId, text: impl Into<String>) -> Self {
+        Self {
+            ucid,
+            text: text.into(),
+            ..Default::default()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

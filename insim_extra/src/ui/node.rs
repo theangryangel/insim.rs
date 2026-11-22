@@ -2,11 +2,10 @@ use std::{any::Any, sync::Arc};
 
 use insim::insim::BtnStyle;
 
-pub type TypeInMapper<Msg> = Arc<dyn Fn(String) -> Msg + Send + Sync + 'static>;
+pub(crate) type TypeInMapper<Msg> = Arc<dyn Fn(String) -> Msg + Send + Sync + 'static>;
 
-/// What a button does when used: produce its owner's message, or a message for a
-/// component placed with [`Ui::component`](super::Ui::component), routed to
-/// that component's instance.
+/// What a button sends when used: a message for its owner, or one routed to a
+/// component placed with [`Ui::component`](super::Ui::component).
 #[derive(Clone)]
 pub enum Action<Msg> {
     /// A message for whoever rendered the button.
@@ -54,7 +53,7 @@ impl<Msg: PartialEq> PartialEq for Action<Msg> {
 }
 
 #[derive(Clone)]
-pub enum NodeKind<Msg> {
+pub(crate) enum NodeKind<Msg> {
     Container {
         children: Option<Vec<Node<Msg>>>,
         visible: bool,
@@ -114,7 +113,7 @@ pub struct Node<Msg> {
 }
 
 impl<Msg> Node<Msg> {
-    /// Container node: Usually some sort flexbox
+    /// Invisible container for laying out children.
     pub fn container() -> Self {
         Self {
             style: Default::default(),
@@ -126,7 +125,7 @@ impl<Msg> Node<Msg> {
         }
     }
 
-    /// Visible container rendered as a non-interactive background button.
+    /// Visible container, drawn as a non-clickable background button.
     pub fn background(bstyle: BtnStyle) -> Self {
         Self {
             style: Default::default(),
@@ -138,7 +137,7 @@ impl<Msg> Node<Msg> {
         }
     }
 
-    /// A clickable button
+    /// Button that sends `msg` when clicked.
     pub fn clickable(text: impl Into<String>, mut bstyle: BtnStyle, msg: Msg) -> Self {
         bstyle = bstyle.clickable();
         Self {
@@ -153,7 +152,7 @@ impl<Msg> Node<Msg> {
         }
     }
 
-    /// A text only button, non-clickable
+    /// Text label.
     pub fn text(text: impl Into<String>, bstyle: BtnStyle) -> Self {
         Self {
             style: Default::default(),
@@ -167,7 +166,7 @@ impl<Msg> Node<Msg> {
         }
     }
 
-    /// A type-in-able button
+    /// Type-in button; `mapper` turns the typed text into a message.
     pub fn typein<F>(text: impl Into<String>, mut bstyle: BtnStyle, limit: u8, mapper: F) -> Self
     where
         F: Fn(String) -> Msg + Send + Sync + 'static,
@@ -186,8 +185,7 @@ impl<Msg> Node<Msg> {
         }
     }
 
-    /// No output. Effectively this is the same as `Option<Node>`, however we don't use Option for
-    /// convenience.
+    /// Renders nothing. A stand-in for `None` where an `Option` would be awkward.
     pub fn empty() -> Self {
         Self {
             style: Default::default(),
@@ -195,9 +193,8 @@ impl<Msg> Node<Msg> {
         }
     }
 
-    /// For buttons that perhaps have changable text, or siblings, or things in a loop, we ideally
-    /// want to manually set a key to ensure that the system knows what buttons to update more
-    /// sensibly.
+    /// Give a button a stable identity across renders. Use it for buttons in
+    /// loops or with changing text or siblings, so updates hit the right button.
     pub fn key<K: Into<String>>(mut self, val: K) -> Self {
         if let NodeKind::Button { ref mut key, .. } = self.kind {
             *key = Some(val.into());
@@ -223,22 +220,10 @@ impl<Msg> Node<Msg> {
         self
     }
 
-    /// Append a child only when `condition` is true.
-    #[deprecated(
-        since = "0.2.0",
-        note = "use .when(condition, |node| node.with_child(child)) or .with_child(condition.then(|| child))"
-    )]
-    pub fn with_child_if(mut self, val: Self, condition: bool) -> Self {
-        if condition {
-            self = self.with_child(val);
-        }
-        self
-    }
-
-    /// Append nodes or optional nodes, skipping `None` entries.
+    /// Append children, skipping `None`.
     ///
-    /// Items in a collection must share a type; wrap unconditional nodes in
-    /// `Some` when mixing them with optional nodes.
+    /// Items must share a type, so wrap plain nodes in `Some` when mixing them
+    /// with optional ones.
     ///
     /// ```
     /// use insim::insim::BtnStyle;
@@ -261,26 +246,8 @@ impl<Msg> Node<Msg> {
         self
     }
 
-    /// Append nodes or optional nodes only when `condition` is true.
-    #[deprecated(
-        since = "0.2.0",
-        note = "use .when(condition, |node| node.with_children(children))"
-    )]
-    pub fn with_children_if<I, E>(mut self, children: I, condition: bool) -> Self
-    where
-        I: IntoIterator<Item = E>,
-        E: Into<Option<Self>>,
-    {
-        if condition {
-            self = self.with_children(children);
-        }
-        self
-    }
-
-    /// Conditionally apply a run of builder steps, staying in the fluent chain.
-    /// `f` is invoked with `self` only when `condition` holds; otherwise `self`
-    /// is returned untouched. Construct children inside the closure to avoid
-    /// building them when the condition is false.
+    /// Apply `f` only when `condition` holds. Build children inside the closure
+    /// and they are never constructed when it doesn't.
     ///
     /// ```
     /// use insim::insim::BtnStyle;
@@ -322,104 +289,103 @@ impl<Msg> Node<Msg> {
         self.style.get_or_insert_with(Default::default)
     }
 
-    /// Configure Taffy properties while staying in the builder chain.
-    ///
-    /// The closure receives the existing style, preserving earlier builder steps.
+    /// Edit the Taffy style directly, for anything without a builder. Earlier
+    /// builder steps are kept.
     pub fn with_style(mut self, f: impl FnOnce(&mut taffy::Style)) -> Self {
         f(self.style_mut());
         self
     }
 
-    /// Keep this node in normal flow and ignore its insets (the default).
+    /// In normal flow, insets ignored. The default.
     pub fn position_static(mut self) -> Self {
         self.style_mut().position = taffy::Position::Static;
         self
     }
 
-    /// Offset this node in normal flow and anchor absolute descendants to it.
+    /// In normal flow, offset by insets. Anchors absolute descendants.
     pub fn position_relative(mut self) -> Self {
         self.style_mut().position = taffy::Position::Relative;
         self
     }
 
-    /// Remove this node from normal flow and anchor it to its containing block.
+    /// Out of flow, placed against the containing block.
     pub fn position_absolute(mut self) -> Self {
         self.style_mut().position = taffy::Position::Absolute;
         self
     }
 
-    /// Remove this node from normal flow and anchor it to the 200 × 200 viewport.
+    /// Out of flow, placed against the 200 x 200 viewport.
     pub fn position_fixed(mut self) -> Self {
         self.style_mut().position = taffy::Position::Fixed;
         self
     }
 
-    /// Set all four insets in UI units. Static nodes ignore insets.
+    /// All four insets. Ignored on static nodes.
     pub fn inset(mut self, val: impl Into<f64>) -> Self {
         let val = val.into() as f32;
         self.style_mut().inset = taffy::Rect::length(val);
         self
     }
 
-    /// Set left and right insets in UI units. Static nodes ignore insets.
+    /// Left and right insets.
     pub fn inset_x(self, val: impl Into<f64>) -> Self {
         let val = val.into() as f32;
         self.left(val).right(val)
     }
 
-    /// Set top and bottom insets in UI units. Static nodes ignore insets.
+    /// Top and bottom insets.
     pub fn inset_y(self, val: impl Into<f64>) -> Self {
         let val = val.into() as f32;
         self.top(val).bottom(val)
     }
 
-    /// Set the top inset in UI units. Static nodes ignore insets.
+    /// Top inset.
     pub fn top(mut self, val: impl Into<f64>) -> Self {
         let val = val.into() as f32;
         self.style_mut().inset.top = taffy::LengthPercentageAuto::length(val);
         self
     }
 
-    /// Reset the top inset to automatic positioning.
+    /// Clear the top inset.
     pub fn top_auto(mut self) -> Self {
         self.style_mut().inset.top = taffy::LengthPercentageAuto::auto();
         self
     }
 
-    /// Set the right inset in UI units. Static nodes ignore insets.
+    /// Right inset.
     pub fn right(mut self, val: impl Into<f64>) -> Self {
         let val = val.into() as f32;
         self.style_mut().inset.right = taffy::LengthPercentageAuto::length(val);
         self
     }
 
-    /// Reset the right inset to automatic positioning.
+    /// Clear the right inset.
     pub fn right_auto(mut self) -> Self {
         self.style_mut().inset.right = taffy::LengthPercentageAuto::auto();
         self
     }
 
-    /// Set the bottom inset in UI units. Static nodes ignore insets.
+    /// Bottom inset.
     pub fn bottom(mut self, val: impl Into<f64>) -> Self {
         let val = val.into() as f32;
         self.style_mut().inset.bottom = taffy::LengthPercentageAuto::length(val);
         self
     }
 
-    /// Reset the bottom inset to automatic positioning.
+    /// Clear the bottom inset.
     pub fn bottom_auto(mut self) -> Self {
         self.style_mut().inset.bottom = taffy::LengthPercentageAuto::auto();
         self
     }
 
-    /// Set the left inset in UI units. Static nodes ignore insets.
+    /// Left inset.
     pub fn left(mut self, val: impl Into<f64>) -> Self {
         let val = val.into() as f32;
         self.style_mut().inset.left = taffy::LengthPercentageAuto::length(val);
         self
     }
 
-    /// Reset the left inset to automatic positioning.
+    /// Clear the left inset.
     pub fn left_auto(mut self) -> Self {
         self.style_mut().inset.left = taffy::LengthPercentageAuto::auto();
         self
@@ -447,50 +413,49 @@ impl<Msg> Node<Msg> {
         self
     }
 
-    /// Set width and height in UI units.
+    /// Width and height.
     pub fn size(self, width: impl Into<f64>, height: impl Into<f64>) -> Self {
         self.w(width).h(height)
     }
 
-    /// Set equal width and height in UI units.
+    /// Equal width and height.
     pub fn square(self, size: impl Into<f64>) -> Self {
         let size = size.into();
         self.size(size, size)
     }
 
-    /// Set width as a percentage of the containing block's width.
-    /// Uses CSS percentage values: `50` means 50%, `100` means 100%.
+    /// Width as a percentage of the container's: `50` is 50%.
     pub fn w_percent(mut self, val: impl Into<f64>) -> Self {
         self.style_mut().size.width = taffy::Dimension::percent((val.into() / 100.0) as f32);
         self
     }
 
-    /// Set the minimum width in UI units.
+    /// Minimum width.
     pub fn min_w(mut self, val: impl Into<f64>) -> Self {
         self.style_mut().min_size.width = taffy::LengthPercentageAuto::length(val.into() as f32);
         self
     }
 
-    /// Set the maximum width in UI units.
+    /// Maximum width.
     pub fn max_w(mut self, val: impl Into<f64>) -> Self {
         self.style_mut().max_size.width = taffy::LengthPercentageAuto::length(val.into() as f32);
         self
     }
 
-    /// Set height as a percentage of the containing block's height.
-    /// Uses CSS percentage values: `50` means 50%, `100` means 100%.
+    /// Height as a percentage of the container's: `50` is 50%. The container
+    /// needs a definite height.
     pub fn h_percent(mut self, val: impl Into<f64>) -> Self {
         self.style_mut().size.height = taffy::Dimension::percent((val.into() / 100.0) as f32);
         self
     }
 
-    /// Set the minimum height in UI units.
+    /// Minimum height.
     pub fn min_h(mut self, val: impl Into<f64>) -> Self {
         self.style_mut().min_size.height = taffy::LengthPercentageAuto::length(val.into() as f32);
         self
     }
 
-    /// Set the maximum height in UI units.
+    /// Maximum height.
     pub fn max_h(mut self, val: impl Into<f64>) -> Self {
         self.style_mut().max_size.height = taffy::LengthPercentageAuto::length(val.into() as f32);
         self
@@ -506,49 +471,49 @@ impl<Msg> Node<Msg> {
         self
     }
 
-    /// Enable flex layout with col direction.
+    /// Flex, column.
     pub fn flex_col(mut self) -> Self {
         self.style_mut().display = taffy::Display::Flex;
         self.style_mut().flex_direction = taffy::FlexDirection::Column;
         self
     }
 
-    /// Enable flex layout with row direction.
+    /// Flex, row.
     pub fn flex_row(mut self) -> Self {
         self.style_mut().display = taffy::Display::Flex;
         self.style_mut().flex_direction = taffy::FlexDirection::Row;
         self
     }
 
-    /// Enable flex layout with col reverse direction.
+    /// Flex, column reversed.
     pub fn flex_col_reverse(mut self) -> Self {
         self.style_mut().display = taffy::Display::Flex;
         self.style_mut().flex_direction = taffy::FlexDirection::ColumnReverse;
         self
     }
 
-    /// Enable flex layout with row reverse direction.
+    /// Flex, row reversed.
     pub fn flex_row_reverse(mut self) -> Self {
         self.style_mut().display = taffy::Display::Flex;
         self.style_mut().flex_direction = taffy::FlexDirection::RowReverse;
         self
     }
 
-    /// Set horizontal and vertical spacing between flex or grid items.
+    /// Space between items, both axes.
     pub fn gap(mut self, val: impl Into<f64>) -> Self {
         let val = val.into() as f32;
         self.style_mut().gap = taffy::Size::length(val);
         self
     }
 
-    /// Set horizontal spacing between columns, independent of flex direction.
+    /// Horizontal space between items, whatever the flex direction.
     pub fn gap_x(mut self, val: impl Into<f64>) -> Self {
         let val = val.into() as f32;
         self.style_mut().gap.width = taffy::LengthPercentage::length(val);
         self
     }
 
-    /// Set vertical spacing between rows, independent of flex direction.
+    /// Vertical space between items, whatever the flex direction.
     pub fn gap_y(mut self, val: impl Into<f64>) -> Self {
         let val = val.into() as f32;
         self.style_mut().gap.height = taffy::LengthPercentage::length(val);
@@ -597,7 +562,7 @@ impl<Msg> Node<Msg> {
         self
     }
 
-    /// Stretch children with automatic cross sizes to fill the cross axis.
+    /// Stretch `auto`-sized children across the cross axis.
     pub fn items_stretch(mut self) -> Self {
         self.style_mut().align_items = taffy::AlignItems::STRETCH;
         self
@@ -663,7 +628,7 @@ impl<Msg> Node<Msg> {
         self
     }
 
-    /// Reset self alignment to `auto`, following the container's item alignment.
+    /// Follow the container's item alignment.
     pub fn self_auto(mut self) -> Self {
         self.style_mut().align_self = None;
         self
@@ -794,40 +759,36 @@ impl<Msg> Node<Msg> {
         self
     }
 
-    /// Reset width and height to `auto` (the behavior of `fit_content` before 0.2).
+    /// Width and height `auto`.
     pub fn size_auto(self) -> Self {
         self.w_auto().h_auto()
     }
 
-    /// Set width to CSS `fit-content`, clamped between intrinsic content sizes
-    /// according to the available space. This does not measure button text.
+    /// CSS `fit-content` width. Sizes to children; button text is not measured.
     pub fn w_fit_content(mut self) -> Self {
         self.style_mut().size.width = taffy::Dimension::fit_content();
         self
     }
 
-    /// Set height to CSS `fit-content`. This does not measure button text.
+    /// CSS `fit-content` height. Button text is not measured.
     pub fn h_fit_content(mut self) -> Self {
         self.style_mut().size.height = taffy::Dimension::fit_content();
         self
     }
 
-    /// Set both dimensions to CSS `fit-content`.
-    ///
-    /// Before 0.2 this set both dimensions to `auto`; use [`Self::size_auto`]
-    /// to retain that behavior. Button text is not measured automatically.
+    /// CSS `fit-content` in both dimensions. Button text is not measured; for
+    /// plain `auto`, use [`Self::size_auto`].
     pub fn fit_content(self) -> Self {
         self.w_fit_content().h_fit_content()
     }
 
-    /// Convert this node's messages into a parent's, typically an enum variant.
+    /// Wrap this node's messages in a parent's, usually an enum variant.
     ///
-    /// For **owned** children: a struct the parent holds as a field because it
-    /// needs to see or control the child's state, rendered with
-    /// `self.list.render(props).map(ParentMsg::List)` and updated by the parent
-    /// forwarding those messages. Self-contained pieces don't need this: place
-    /// them as [`Component`](super::Component)s with
-    /// [`Ui::component`](super::Ui::component), and their clicks reach them
+    /// Use it for children the parent owns because it needs their state:
+    /// `self.list.render(props).map(ParentMsg::List)`, then forward the
+    /// messages back. Self-contained pieces don't need this; make them
+    /// [`Component`](super::Component)s with
+    /// [`Ui::component`](super::Ui::component) and their clicks reach them
     /// directly.
     pub fn map<F, ParentMsg>(self, f: F) -> Node<ParentMsg>
     where
@@ -998,39 +959,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)] // Verify compatibility until the deprecated helper is removed.
-    fn test_with_child_if_true() {
-        let child = Node::text("child", BtnStyle::default());
-        let container: Node<TestMsg> = Node::container().with_child_if(child, true);
-
-        match container.kind {
-            NodeKind::Container {
-                children: Some(children),
-                ..
-            } => {
-                assert_eq!(children.len(), 1);
-            },
-            _ => panic!("Expected Container with children"),
-        }
-    }
-
-    #[test]
-    #[allow(deprecated)] // Verify compatibility until the deprecated helper is removed.
-    fn test_with_child_if_false() {
-        let child: Node<TestMsg> = Node::text("child", BtnStyle::default());
-        let container: Node<TestMsg> = Node::container().with_child_if(child, false);
-
-        assert!(matches!(
-            container.kind,
-            NodeKind::Container {
-                children: None,
-                visible: false,
-                ..
-            }
-        ));
-    }
-
-    #[test]
     fn test_with_children() {
         let children = vec![
             Some(Node::text("a", BtnStyle::default())),
@@ -1057,45 +985,6 @@ mod tests {
             },
             _ => panic!("Expected Container with children"),
         }
-    }
-
-    #[test]
-    #[allow(deprecated)] // Verify compatibility until the deprecated helper is removed.
-    fn test_with_children_if_true() {
-        let children = vec![
-            Node::text("a", BtnStyle::default()),
-            Node::text("b", BtnStyle::default()),
-        ];
-        let container: Node<TestMsg> = Node::container().with_children_if(children, true);
-
-        match container.kind {
-            NodeKind::Container {
-                children: Some(children),
-                ..
-            } => {
-                assert_eq!(children.len(), 2);
-            },
-            _ => panic!("Expected Container with children"),
-        }
-    }
-
-    #[test]
-    #[allow(deprecated)] // Verify compatibility until the deprecated helper is removed.
-    fn test_with_children_if_false() {
-        let children: Vec<Node<TestMsg>> = vec![
-            Node::text("a", BtnStyle::default()),
-            Node::text("b", BtnStyle::default()),
-        ];
-        let container: Node<TestMsg> = Node::container().with_children_if(children, false);
-
-        assert!(matches!(
-            container.kind,
-            NodeKind::Container {
-                children: None,
-                visible: false,
-                ..
-            }
-        ));
     }
 
     #[test]

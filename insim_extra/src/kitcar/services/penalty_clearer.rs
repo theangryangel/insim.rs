@@ -81,7 +81,7 @@ mod tests {
     #[test]
     fn a_penalty_schedules_one_clear_that_sends_p_clear() {
         let mut world = World::new();
-        let _ = world.apply_packet(
+        let _ = world.apply(
             &Ncn {
                 ucid: ConnectionId(4),
                 uname: "driver".into(),
@@ -89,7 +89,7 @@ mod tests {
             }
             .into(),
         );
-        let _ = world.apply_packet(
+        let _ = world.apply(
             &Npl {
                 ucid: ConnectionId(4),
                 plid: PlayerId(9),

@@ -5,11 +5,15 @@ use insim::Packet;
 use crate::{
     kitcar::Input,
     world::{
-        AllowedCarsChanged, AllowedModsChanged, Connected, ConnectionDetails, Disconnected,
-        LayoutChanged, LobbyEntered, LobbyNotReady, LobbyReady, MultiplayerJoined, MultiplayerLeft,
-        PlayerJoined, PlayerLeft, PlayerTeleportedToPits, RaceEvent, Renamed, SessionEnded,
-        SessionStarted, TakingOver, TrackChanged, VehicleSelected, VersionReceived, WorldEvent,
-        WorldReady,
+        WorldEvent,
+        event::{
+            AllowedCarsChanged, AllowedModsChanged, Connected, ConnectionDetails, Disconnected,
+            LayoutChanged, LobbyEntered, LobbyNotReady, LobbyReady, MultiplayerJoined,
+            MultiplayerLeft, PlayerJoined, PlayerLeft, PlayerTeleportedToPits, Renamed,
+            SessionEnded, SessionStarted, TakingOver, TrackChanged, VehicleSelected,
+            VersionReceived, WorldReady,
+        },
+        race::RaceEvent,
     },
 };
 

@@ -1,32 +1,34 @@
-//! [`World`] is the unified state mirror combining connection/player tracking,
-//! game-state mirroring, and race tracking in a single structure.
+//! A [`World`] mirrors what the server knows: connections, players, game state
+//! and the race, all in one place.
 //!
-//! Feed packets with [`apply_packet`](World::apply_packet) to update state and
-//! collect change events, then send whatever it asks for with
-//! [`take_requests`](World::take_requests). Or let
-//! [`SharedWorld::attach`] keep one in step with a split session. Query
-//! connection/player/game state with borrowing getters, and issue admin
-//! commands that return [`insim::Packet`] values for the caller to send.
+//! Feed it packets with [`apply`](World::apply): act on the
+//! events, and send the requests it needs to stay in step. Or let [`SharedWorld::attach`] do all of that for a split session.
+//! Per-connection commands (kick, spec, penalties, car restrictions) live on
+//! [`ConnectionInfo`].
 //!
-//! Replies to requests are told apart from live changes: a connection or player
+//! Event payloads live in [`event`], game types in [`game`] and race types in
+//! [`race`].
+//!
+//! Replies to requests are told apart from live changes. A connection or player
 //! that was already there arrives with `existing: true`, and a reply that only
-//! repeats what the world knows produces no event at all.
+//! repeats what the world knows produces no event.
 //!
 //! ```ignore
 //! let mut world = World::new();
 //!
 //! loop {
 //!     let packet = session.read().await?;
-//!     for event in world.apply_packet(&packet) {
+//!     let Applied { events, requests } = world.apply(&packet);
+//!     for request in requests {
+//!         session.write(request).await?;
+//!     }
+//!     for event in events {
 //!         match event {
 //!             WorldEvent::Connected(Connected { info, existing: false }) => { /* greet */ }
 //!             WorldEvent::SessionStarted(SessionStarted { kind }) => { /* ... */ }
 //!             WorldEvent::Race(re) => { /* ... */ }
 //!             _ => {}
 //!         }
-//!     }
-//!     for request in world.take_requests() {
-//!         session.write(request).await?;
 //!     }
 //! }
 //! ```
@@ -45,67 +47,55 @@ use insim::{
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 mod attach;
-mod commands;
 mod connection;
-mod event;
-mod game;
-mod race;
+pub mod event;
+pub mod game;
+pub mod race;
 
 use connection::MultiIndexPlayerInfoMap;
 pub use connection::{ConnectionInfo, PlayerInfo};
-pub use event::{
+pub use event::WorldEvent;
+use event::{
     AllowedCarsChanged, AllowedModsChanged, Connected, ConnectionDetails, Disconnected,
     LayoutChanged, LobbyEntered, LobbyNotReady, LobbyReady, MultiplayerJoined, MultiplayerLeft,
     PlayerJoined, PlayerLeft, PlayerTeleportedToPits, Renamed, SessionEnded, SessionStarted,
-    TakingOver, TrackChanged, VehicleSelected, VersionReceived, WorldEvent, WorldReady,
+    TakingOver, TrackChanged, VehicleSelected, VersionReceived, WorldReady,
 };
-pub use game::{
-    GameInfo, GridMode, Month, MultiplayerState, SessionKind, TimeDemoPreset, TimeSet, VersionInfo,
-};
-use race::RaceState;
-pub use race::{
-    DriverRecord, EntrantId, EntrantState, FinishStatus, LapRecord, PitRecord, RaceEvent,
-};
+use game::{GameInfo, MultiplayerState, SessionKind, VersionInfo};
+use race::{EntrantId, EntrantState, RaceState};
 
-/// Unified state mirror combining connection/player tracking, game-state
-/// mirroring, and race tracking.
+/// Connections, players, game state and race, kept in step with the server.
 ///
-/// Fold packets in with [`apply_packet`](Self::apply_packet) and read it with
-/// borrowing getters. kitcar hands services a `&World` for each input, settled as
-/// of that input. To share one between tasks, wrap it in a [`SharedWorld`].
+/// kitcar hands services a `&World` for each input, settled as of that input.
+/// To share one between tasks, wrap it in a [`SharedWorld`].
 ///
-/// Use [`World::new()`] for short-form races and qualifying, where every player
-/// join is a fresh entrant. Use [`World::with_rejoin()`] for long-form races
-/// (endurance / multi-hour) where a player may briefly disconnect and reconnect.
+/// Use [`World::new()`] for sprints and qualifying, where every join is a fresh
+/// entrant. Use [`World::with_rejoin()`] for endurance races, where a driver may
+/// drop out and reconnect.
 ///
-/// Multiplayer only: the local connection (UCID 0) is the server, never a player,
-/// so [`connections`](Self::connections) leaves it out.
+/// Multiplayer only: UCID 0 is the server itself, never a player, so
+/// [`connections`](Self::connections) leaves it out.
 #[derive(Default)]
 pub struct World {
-    // Presence:
     pub(crate) connections: HashMap<ConnectionId, ConnectionInfo>,
     players: MultiIndexPlayerInfoMap,
-    /// Survives `Cnl`: maps LFS.net username to last seen display name.
+    /// LFS.net username to last seen display name. Survives `Cnl`.
     last_known_names: HashMap<String, String>,
 
-    /// Game state snapshot, including the current `session_kind`.
     pub(crate) game: GameInfo,
-    /// Whether at least one STA game-state snapshot has been received.
-    /// Until then, `session_kind == None` means unknown rather than lobby.
+    /// Until the first `Sta`, `session_kind == None` means unknown, not lobby.
     sta_received: bool,
 
-    /// Every reply to the startup requests has been folded.
+    /// Every startup reply has been folded.
     ready: bool,
 
-    /// Requests the world needs sent; see [`World::take_requests`].
+    /// Queued while a packet is folded; handed back in [`Applied`].
     requests: Vec<insim::Packet>,
 
-    /// Race tracking state.
     pub(crate) race: RaceState,
 
-    /// When `true`, a joining player first attempts to resume a prior
-    /// disconnected entrant (matched by LFS.net username) before falling back
-    /// to a fresh entrant. Set once at construction.
+    /// Resume a disconnected entrant (by LFS.net username) before creating a
+    /// fresh one. Set once at construction.
     pub(crate) rejoin: bool,
 }
 
@@ -172,13 +162,10 @@ impl World {
             in_pitlane: false,
             pname: npl.pname.clone(),
         };
-        // Upsert: LFS re-announces existing players (e.g. in reply to the
-        // `TINY_NPL` that `STARTUP_REQUESTS`/`SESSION_REQUESTS` issue), so the
-        // same `plid` can arrive again. The `plid` index is unique, so a blind
-        // `insert` would panic - replace any existing entry instead. We still
-        // return `Some` for a re-announce: after a session restart the race
-        // state is cleared while this map persists, and the race layer must see
-        // the join to recreate the entrant (it dedupes via its own `live` map).
+        // Upsert: LFS re-announces players in reply to `TINY_NPL`, and the
+        // unique `plid` index would panic on a blind `insert`. Still return
+        // `Some` for a re-announce: a session restart clears race state but not
+        // this map, so the race layer needs the join to recreate the entrant.
         let _ = self.players.remove_by_plid(&npl.plid);
         let _ = self.players.insert(player.clone());
         if npl.nump == 0 { None } else { Some(player) }
@@ -325,18 +312,14 @@ impl World {
     }
 }
 
-/// Apply one packet to `inner`, pushing any resulting [`WorldEvent`]s.
+/// Apply one packet, pushing any resulting [`WorldEvent`]s.
 ///
-/// A single match over the packet type drives all three state mirrors
-/// (connections/players, game state, race tracking) in one pass. Race-relevant
-/// connection and session packets call into [`RaceState`] inline so race events
-/// are interleaved in causal order with the presence/game events that triggered
-/// them.
+/// Race handlers run inline so race events land in causal order alongside the
+/// presence and game events that caused them.
 fn dispatch(inner: &mut World, packet: &insim::Packet, events: &mut Vec<WorldEvent>) {
     use insim::Packet;
 
-    // Wrap a race-handler call, pushing each emitted [`RaceEvent`]. The handlers
-    // live on `World` and read `session_kind`/`connections` themselves.
+    // Push each race event a handler returns.
     macro_rules! push_race {
         ($call:expr) => {{
             for re in $call {
@@ -345,18 +328,16 @@ fn dispatch(inner: &mut World, packet: &insim::Packet, events: &mut Vec<WorldEve
         }};
     }
 
-    // Deferred reset: a session-starting `Rst` marks the prior session's race
-    // data for clearing but leaves it intact so `SessionEnded` consumers can
-    // read the final results. Clear it now, before applying the first packet of
-    // the new session.
+    // A session-starting `Rst` defers clearing race data so `SessionEnded`
+    // consumers can still read the results. Clear it before the next packet.
     if std::mem::take(&mut inner.race.pending_reset) {
         inner.race.clear_for_session();
     }
 
     match packet {
         Packet::Ncn(ncn) => {
-            // A reply describes a connection that was already there. If we know
-            // it already, it changes nothing worth reporting.
+            // A reply describes a connection that was already there. If we
+            // know it, there is nothing to report.
             let existing = ncn.reqi.0 != 0;
             let known = inner.connections.contains_key(&ncn.ucid);
             let info = inner.apply_ncn(ncn);
@@ -424,7 +405,6 @@ fn dispatch(inner: &mut World, packet: &insim::Packet, events: &mut Vec<WorldEve
         Packet::Pfl(pfl) => inner.apply_pfl(pfl),
         Packet::Pla(pla) => inner.apply_pla(pla),
         Packet::Plp(plp) => {
-            // Presence-level and race-level views of the same tele-pit.
             if let Some(p) = inner.players.get_by_plid(&plp.plid).cloned() {
                 events.push(WorldEvent::PlayerTeleportedToPits(PlayerTeleportedToPits(
                     p,
@@ -460,11 +440,9 @@ fn dispatch(inner: &mut World, packet: &insim::Packet, events: &mut Vec<WorldEve
         },
         Packet::Rst(rst) => {
             if let Some(kind) = inner.apply_rst(rst) {
-                // A `Rst` while a session is already active (e.g. a `/restart`)
-                // ends that session without passing through the lobby, so the
-                // `Sta`-driven `SessionEnded` never fires. Surface it here -
-                // before deferring the clear - so consumers can read the final
-                // results just like on the `/end` path.
+                // A `/restart` skips the lobby, so the `Sta`-driven
+                // `SessionEnded` never fires. Emit it here, while the results
+                // are still readable.
                 if inner.game.session_kind.is_some() {
                     events.push(WorldEvent::SessionEnded(SessionEnded));
                 }
@@ -554,8 +532,8 @@ impl std::fmt::Debug for World {
 }
 
 impl World {
-    /// Tiny requests to send once on connect to sync connection/player lists
-    /// and game/session state. LFS does not send these automatically on connect.
+    /// Sent once on connect. LFS does not volunteer existing connections,
+    /// players or game state.
     pub const STARTUP_REQUESTS: &[TinyType] = &[
         TinyType::Ncn,
         TinyType::Npl,
@@ -566,23 +544,19 @@ impl World {
         TinyType::Mal,
     ];
 
-    /// Tiny requests to re-send on each [`WorldEvent::SessionStarted`], since a
-    /// new session can change the allowed cars/mods, the player list, and the
-    /// starting grid order.
+    /// Re-sent on each [`WorldEvent::SessionStarted`]: a new session can change
+    /// allowed cars and mods, players and grid order.
     pub const SESSION_REQUESTS: &[TinyType] =
         &[TinyType::Alc, TinyType::Mal, TinyType::Npl, TinyType::Reo];
 
-    /// Create a new world with empty state. Every player join creates a fresh
-    /// entrant - correct for sprints, qualifying, and practice.
+    /// Every join is a fresh entrant. Right for sprints, qualifying and practice.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Create a new world in rejoin mode. When a player joins, the tracker
-    /// first attempts to resume a prior disconnected entrant (matched by LFS.net
-    /// username), falling back to a fresh entrant if none is found. Use this for
-    /// endurance / multi-hour races where mid-race reconnects should not create
-    /// phantom duplicate entrants.
+    /// A joining player resumes their disconnected entrant (by LFS.net
+    /// username) if there is one. Use for endurance races, so a reconnect does
+    /// not create a duplicate entrant.
     pub fn with_rejoin() -> Self {
         Self {
             rejoin: true,
@@ -590,14 +564,11 @@ impl World {
         }
     }
 
-    /// Apply one raw packet, update all state, and return any events.
+    /// Fold in one packet: what changed, and what to send to stay in step.
     ///
-    /// A single match over the packet type drives the connection/player, game,
-    /// and race mirrors in one pass. Replies to requests (a nonzero ReqI) that
-    /// only repeat what the world already knows produce no events; those that
-    /// introduce something are marked `existing`. Afterwards,
-    /// [`take_requests`](Self::take_requests) has anything the world needs sent.
-    pub fn apply_packet(&mut self, packet: &insim::Packet) -> Vec<WorldEvent> {
+    /// Replies (non-zero ReqI) that repeat what the world knows produce no
+    /// events; those that add something are marked `existing`.
+    pub fn apply(&mut self, packet: &insim::Packet) -> Applied {
         let mut events = Vec::new();
         let was_lobby_ready = lobby_ready(self);
         dispatch(self, packet, &mut events);
@@ -606,27 +577,21 @@ impl World {
             (true, false) => events.push(WorldEvent::LobbyNotReady(LobbyNotReady)),
             _ => {},
         }
-        events
+        Applied {
+            events,
+            requests: std::mem::take(&mut self.requests),
+        }
     }
 
-    /// Requests the world needs sent to stay in step, such as
-    /// [`SESSION_REQUESTS`](Self::SESSION_REQUESTS) after a session starts.
-    /// Whoever folds packets in sends these.
-    pub fn take_requests(&mut self) -> Vec<insim::Packet> {
-        std::mem::take(&mut self.requests)
-    }
-
-    /// Whether the world has caught up with the server: every reply to
-    /// [`STARTUP_REQUESTS`](Self::STARTUP_REQUESTS) has been folded, so it
-    /// mirrors the connections, players and track that existed before you
-    /// connected. Something started after this point never sees
-    /// [`WorldEvent::Ready`], so it should check this instead.
+    /// Every reply to [`STARTUP_REQUESTS`](Self::STARTUP_REQUESTS) has been
+    /// folded, so the world knows what existed before you connected. Anything
+    /// started later misses [`WorldEvent::Ready`] and should check this instead.
     pub fn is_ready(&self) -> bool {
         self.ready
     }
 
-    /// Record that the world has caught up. Called by whatever keeps it in step
-    /// ([`SharedWorld::attach`], or kitcar's host) just before it reports
+    /// Record that the world has caught up. Whatever keeps it in step
+    /// ([`SharedWorld::attach`], kitcar's host) calls this just before reporting
     /// [`WorldEvent::Ready`]. Returns `true` the first time.
     pub fn mark_ready(&mut self) -> bool {
         !std::mem::replace(&mut self.ready, true)
@@ -637,27 +602,27 @@ impl World {
         self.connections.values().filter(|c| !c.ucid.local())
     }
 
-    /// Number of players' connections, leaving out the server's own.
+    /// Count of [`connections`](Self::connections).
     pub fn connection_count(&self) -> usize {
         self.connections().count()
     }
 
-    /// Look up one connection by UCID, including the server's own.
+    /// One connection by UCID, including the server's own.
     pub fn connection(&self, ucid: ConnectionId) -> Option<&ConnectionInfo> {
         self.connections.get(&ucid)
     }
 
-    /// All tracked players.
+    /// All players.
     pub fn players(&self) -> impl Iterator<Item = &PlayerInfo> {
         self.players.iter().map(|(_, p)| p)
     }
 
-    /// Number of tracked players.
+    /// Number of players.
     pub fn player_count(&self) -> usize {
         self.players.len()
     }
 
-    /// Look up one player by `PlayerId`.
+    /// One player by PLID.
     pub fn player(&self, plid: PlayerId) -> Option<&PlayerInfo> {
         self.players.get_by_plid(&plid)
     }
@@ -667,7 +632,7 @@ impl World {
         self.players().filter(move |p| p.ucid == ucid)
     }
 
-    /// Look up the connection that currently controls a given player.
+    /// The connection currently controlling a player.
     pub fn connection_by_player(&self, plid: PlayerId) -> Option<&ConnectionInfo> {
         self.connections.get(&self.player(plid)?.ucid)
     }
@@ -677,83 +642,82 @@ impl World {
         self.last_known_names.get(uname).map(String::as_str)
     }
 
-    /// Currently selected track, if known.
+    /// Current track, if known.
     pub fn track(&self) -> Option<Track> {
         self.game.track
     }
 
-    /// Currently loaded layout, if known.
+    /// Loaded layout, if known.
     pub fn layout(&self) -> Option<&str> {
         self.game.layout.as_deref()
     }
 
-    /// Weather identifier (0..=2 typically).
+    /// Weather, usually 0..=2.
     pub fn weather(&self) -> Option<u8> {
         self.game.weather
     }
 
-    /// Wind conditions.
+    /// Wind, if known.
     pub fn wind(&self) -> Option<Wind> {
         self.game.wind
     }
 
-    /// Current session kind. `None` means no active session, or that the
-    /// initial `STA` game-state snapshot has not arrived yet.
+    /// Current session. `None` means none active, or no `Sta` yet.
     pub fn session(&self) -> Option<SessionKind> {
         self.game.session_kind
     }
 
-    /// Overall game flags.
+    /// Game flags from `Sta`.
     pub fn flags(&self) -> StaFlags {
         self.game.flags
     }
 
-    /// Current multiplayer state.
+    /// Local or multiplayer.
     pub fn multiplayer(&self) -> &MultiplayerState {
         &self.game.multiplayer
     }
 
-    /// Server's allowed-cars set, if a `Small`/`Alc` has been received.
+    /// Allowed cars, once a `Small`/`Alc` arrives.
     pub fn allowed_cars(&self) -> Option<&PlcAllowedCarsSet> {
         self.game.allowed_cars.as_ref()
     }
 
-    /// Server's allowed-mods list, if a `Mal` has been received.
+    /// Allowed mods, once a `Mal` arrives.
     pub fn allowed_mods(&self) -> &[Vehicle] {
         &self.game.allowed_mods
     }
 
-    /// Version information about the connected LFS instance.
+    /// LFS version, once a `Ver` arrives.
     pub fn version(&self) -> Option<&VersionInfo> {
         self.game.version.as_ref()
     }
 
-    /// The current game state.
+    /// All game state at once.
     pub fn game_info(&self) -> &GameInfo {
         &self.game
     }
 
-    /// The current session fastest lap: entrant, player ID, and time.
+    /// Fastest lap this session: entrant, player and time.
     pub fn fastest_lap(&self) -> Option<(EntrantId, PlayerId, Duration)> {
         self.race.fastest_lap
     }
 
-    /// Whether a race session (not qualifying or practice) is currently active.
+    /// A race (not qualifying or practice) is running.
     pub fn race_active(&self) -> bool {
         self.game.session_kind.is_some_and(|k| k.is_race())
     }
 
-    /// Look up an entrant by their stable [`EntrantId`].
+    /// One entrant by their stable [`EntrantId`].
     pub fn entrant(&self, id: EntrantId) -> Option<&EntrantState> {
         self.race.entrants.get(&id)
     }
 
-    /// Look up the currently-live entrant for a [`PlayerId`].
+    /// The live entrant for a [`PlayerId`].
     pub fn entrant_by_plid(&self, plid: PlayerId) -> Option<&EntrantState> {
         self.race.entrants.get(self.race.live.get(&plid)?)
     }
 
-    /// All entrants (racing, finished, and DNF).
+    /// All entrants: racing, finished and DNF.
     pub fn entrants(&self) -> impl Iterator<Item = &EntrantState> {
         self.race.entrants.values()
     }
@@ -767,10 +731,29 @@ impl World {
     }
 }
 
-/// A [`World`] shared between tasks: a cheap, cloneable handle. Use it where
-/// several places read one world, such as [`SharedWorld::attach`] or kitcar's
-/// `Host::world()`. Lock it briefly with [`read`](Self::read); never hold the
-/// guard across an `.await`.
+/// What [`World::apply`] found. Iterate it for the events.
+#[derive(Debug, Default)]
+#[must_use = "send the requests, or the world won't hear back what it asked for"]
+pub struct Applied {
+    /// What changed.
+    pub events: Vec<WorldEvent>,
+    /// Packets to send to stay in step, such as
+    /// [`World::SESSION_REQUESTS`] after a session starts.
+    pub requests: Vec<insim::Packet>,
+}
+
+impl IntoIterator for Applied {
+    type Item = WorldEvent;
+    type IntoIter = std::vec::IntoIter<WorldEvent>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.events.into_iter()
+    }
+}
+
+/// A cheap, cloneable handle to a [`World`] shared between tasks, as used by
+/// [`SharedWorld::attach`] and kitcar's `Host::world()`. Lock briefly with
+/// [`read`](Self::read) and never hold the guard across an `.await`.
 #[derive(Clone, Default)]
 pub struct SharedWorld {
     inner: Arc<RwLock<World>>,
@@ -787,7 +770,7 @@ impl SharedWorld {
     pub fn read(&self) -> RwLockReadGuard<'_, World> {
         self.inner.read()
     }
-    /// Change the world, as whoever folds packets into it does.
+    /// Write access, for whoever folds packets in.
     pub fn write(&self) -> RwLockWriteGuard<'_, World> {
         self.inner.write()
     }
@@ -826,10 +809,12 @@ mod emission_tests {
     #[test]
     fn rst_emits_session_started() {
         let mut world = World::new();
-        let events = world.apply_packet(&insim::Packet::Rst(Rst {
-            racelaps: RaceLaps::Laps(5),
-            ..Default::default()
-        }));
+        let events = world
+            .apply(&insim::Packet::Rst(Rst {
+                racelaps: RaceLaps::Laps(5),
+                ..Default::default()
+            }))
+            .events;
         assert_eq!(
             count(&events, |e| matches!(e, WorldEvent::SessionStarted(_))),
             1,
@@ -840,7 +825,7 @@ mod emission_tests {
     #[test]
     fn tiny_clr_reconciles_players_and_live_race_entrants() {
         let mut world = World::new();
-        let _ = world.apply_packet(
+        let _ = world.apply(
             &Ncn {
                 ucid: ConnectionId(1),
                 uname: "user".into(),
@@ -849,14 +834,14 @@ mod emission_tests {
             }
             .into(),
         );
-        let _ = world.apply_packet(
+        let _ = world.apply(
             &Rst {
                 racelaps: RaceLaps::Laps(5),
                 ..Default::default()
             }
             .into(),
         );
-        let _ = world.apply_packet(
+        let _ = world.apply(
             &Npl {
                 plid: PlayerId(1),
                 ucid: ConnectionId(1),
@@ -867,13 +852,15 @@ mod emission_tests {
             .into(),
         );
 
-        let events = world.apply_packet(
-            &Tiny {
-                subt: TinyType::Clr,
-                ..Default::default()
-            }
-            .into(),
-        );
+        let events = world
+            .apply(
+                &Tiny {
+                    subt: TinyType::Clr,
+                    ..Default::default()
+                }
+                .into(),
+            )
+            .events;
 
         assert_eq!(world.player_count(), 0);
         assert!(world.live_entrants().next().is_none());
@@ -885,7 +872,7 @@ mod emission_tests {
         assert!(
             events
                 .iter()
-                .any(|event| matches!(event, WorldEvent::Race(super::RaceEvent::Dnf { .. })))
+                .any(|event| matches!(event, WorldEvent::Race(super::race::RaceEvent::Dnf { .. })))
         );
     }
 
@@ -894,20 +881,24 @@ mod emission_tests {
         let mut world = World::new();
 
         // Racing in progress: no SessionEnded.
-        let events = world.apply_packet(&insim::Packet::Sta(Sta {
-            raceinprog: RaceInProgress::Racing,
-            ..Default::default()
-        }));
+        let events = world
+            .apply(&insim::Packet::Sta(Sta {
+                raceinprog: RaceInProgress::Racing,
+                ..Default::default()
+            }))
+            .events;
         assert_eq!(
             count(&events, |e| matches!(e, WorldEvent::SessionEnded(_))),
             0
         );
 
         // Back to no race: SessionEnded fires once.
-        let events = world.apply_packet(&insim::Packet::Sta(Sta {
-            raceinprog: RaceInProgress::No,
-            ..Default::default()
-        }));
+        let events = world
+            .apply(&insim::Packet::Sta(Sta {
+                raceinprog: RaceInProgress::No,
+                ..Default::default()
+            }))
+            .events;
         assert_eq!(
             count(&events, |e| matches!(e, WorldEvent::SessionEnded(_))),
             1,
@@ -923,9 +914,9 @@ mod emission_tests {
     #[test]
     fn lobby_becomes_ready_when_entered_with_a_client_present() {
         let mut world = World::new();
-        let _ = world.apply_packet(&connection(0));
-        let _ = world.apply_packet(&connection(1));
-        let _ = world.apply_packet(
+        let _ = world.apply(&connection(0));
+        let _ = world.apply(&connection(1));
+        let _ = world.apply(
             &Rst {
                 racelaps: RaceLaps::Laps(5),
                 ..Default::default()
@@ -933,13 +924,15 @@ mod emission_tests {
             .into(),
         );
 
-        let events = world.apply_packet(
-            &Sta {
-                raceinprog: RaceInProgress::No,
-                ..Default::default()
-            }
-            .into(),
-        );
+        let events = world
+            .apply(
+                &Sta {
+                    raceinprog: RaceInProgress::No,
+                    ..Default::default()
+                }
+                .into(),
+            )
+            .events;
 
         assert_eq!(world.connection_count(), 1);
         assert!(
@@ -957,7 +950,7 @@ mod emission_tests {
     #[test]
     fn lobby_becomes_ready_when_a_client_joins_in_the_lobby() {
         let mut world = World::new();
-        let server_events = world.apply_packet(&connection(0));
+        let server_events = world.apply(&connection(0)).events;
         assert_eq!(world.connection_count(), 0);
         assert!(
             !server_events
@@ -965,20 +958,22 @@ mod emission_tests {
                 .any(|e| matches!(e, WorldEvent::LobbyReady(_)))
         );
 
-        let sta_events = world.apply_packet(
-            &Sta {
-                raceinprog: RaceInProgress::No,
-                ..Default::default()
-            }
-            .into(),
-        );
+        let sta_events = world
+            .apply(
+                &Sta {
+                    raceinprog: RaceInProgress::No,
+                    ..Default::default()
+                }
+                .into(),
+            )
+            .events;
         assert!(
             !sta_events
                 .iter()
                 .any(|e| matches!(e, WorldEvent::LobbyReady(_)))
         );
 
-        let events = world.apply_packet(&connection(1));
+        let events = world.apply(&connection(1)).events;
         assert_eq!(world.connection_count(), 1);
         assert!(
             events
@@ -986,13 +981,15 @@ mod emission_tests {
                 .any(|e| matches!(e, WorldEvent::LobbyReady(_)))
         );
 
-        let events = world.apply_packet(
-            &Cnl {
-                ucid: ConnectionId(1),
-                ..Default::default()
-            }
-            .into(),
-        );
+        let events = world
+            .apply(
+                &Cnl {
+                    ucid: ConnectionId(1),
+                    ..Default::default()
+                }
+                .into(),
+            )
+            .events;
         assert!(
             events
                 .iter()
@@ -1004,7 +1001,7 @@ mod emission_tests {
     fn client_before_initial_sta_does_not_imply_lobby_ready() {
         let mut world = World::new();
 
-        let events = world.apply_packet(&connection(1));
+        let events = world.apply(&connection(1)).events;
         assert_eq!(world.connection_count(), 1);
         assert!(
             !events
@@ -1012,13 +1009,15 @@ mod emission_tests {
                 .any(|e| matches!(e, WorldEvent::LobbyReady(_)))
         );
 
-        let events = world.apply_packet(
-            &Sta {
-                raceinprog: RaceInProgress::No,
-                ..Default::default()
-            }
-            .into(),
-        );
+        let events = world
+            .apply(
+                &Sta {
+                    raceinprog: RaceInProgress::No,
+                    ..Default::default()
+                }
+                .into(),
+            )
+            .events;
         assert!(
             events
                 .iter()
@@ -1035,9 +1034,9 @@ mod emission_tests {
                 ..Default::default()
             })
         };
-        let _ = world.apply_packet(&rst());
+        let _ = world.apply(&rst());
 
-        let events = world.apply_packet(&rst());
+        let events = world.apply(&rst()).events;
         assert!(
             events
                 .iter()
@@ -1075,20 +1074,20 @@ mod emission_tests {
                 .collect()
         };
 
-        let changes = track_changes(&world.apply_packet(&sta(track_a)));
+        let changes = track_changes(&world.apply(&sta(track_a)).events);
         assert_eq!(
             changes,
             vec![(None, track_a)],
             "first Sta emits TrackChanged"
         );
 
-        let changes = track_changes(&world.apply_packet(&sta(track_a)));
+        let changes = track_changes(&world.apply(&sta(track_a)).events);
         assert!(
             changes.is_empty(),
             "same track should not emit TrackChanged"
         );
 
-        let changes = track_changes(&world.apply_packet(&sta(track_b)));
+        let changes = track_changes(&world.apply(&sta(track_b)).events);
         assert_eq!(changes, vec![(Some(track_a), track_b)]);
     }
 
@@ -1114,20 +1113,20 @@ mod emission_tests {
                 .collect()
         };
 
-        let changes = layout_changes(&world.apply_packet(&axi(&layout_a)));
+        let changes = layout_changes(&world.apply(&axi(&layout_a)).events);
         assert_eq!(
             changes,
             vec![(None, Some(layout_a.clone()))],
             "first Axi emits LayoutChanged"
         );
 
-        let changes = layout_changes(&world.apply_packet(&axi(&layout_a)));
+        let changes = layout_changes(&world.apply(&axi(&layout_a)).events);
         assert!(
             changes.is_empty(),
             "same layout should not emit LayoutChanged"
         );
 
-        let changes = layout_changes(&world.apply_packet(&axi(&layout_b)));
+        let changes = layout_changes(&world.apply(&axi(&layout_b)).events);
         assert_eq!(changes, vec![(Some(layout_a), Some(layout_b))]);
     }
 }
@@ -1184,27 +1183,26 @@ mod reply_tests {
     fn replies_mark_what_was_already_there_and_repeat_nothing() {
         let mut world = World::new();
         // A startup reply introduces someone who was already connected.
-        assert_eq!(connected(&world.apply_packet(&ncn(130, 1))), [true]);
+        assert_eq!(connected(&world.apply(&ncn(130, 1)).events), [true]);
         // The same reply again (e.g. another request) reports nothing.
-        assert!(connected(&world.apply_packet(&ncn(131, 1))).is_empty());
+        assert!(connected(&world.apply(&ncn(131, 1)).events).is_empty());
         // Someone joining now is not existing.
-        assert_eq!(connected(&world.apply_packet(&ncn(0, 2))), [false]);
+        assert_eq!(connected(&world.apply(&ncn(0, 2)).events), [false]);
 
-        assert_eq!(joined(&world.apply_packet(&npl(130, 7))), [true]);
+        assert_eq!(joined(&world.apply(&npl(130, 7)).events), [true]);
         // A re-announcement in reply to a session request is silent...
-        assert!(joined(&world.apply_packet(&npl(1, 7))).is_empty());
+        assert!(joined(&world.apply(&npl(1, 7)).events).is_empty());
         // ...but a live rejoin is reported.
-        assert_eq!(joined(&world.apply_packet(&npl(0, 7))), [false]);
+        assert_eq!(joined(&world.apply(&npl(0, 7)).events), [false]);
         assert_eq!(world.connection_count(), 2);
     }
 
     #[test]
     fn a_new_session_asks_for_the_session_requests() {
         let mut world = World::new();
-        assert!(world.take_requests().is_empty());
-        let _ = world.apply_packet(&Rst::default().into());
         let requested: Vec<TinyType> = world
-            .take_requests()
+            .apply(&Rst::default().into())
+            .requests
             .into_iter()
             .filter_map(|p| match p {
                 Packet::Tiny(tiny) => Some(tiny.subt),
@@ -1212,6 +1210,7 @@ mod reply_tests {
             })
             .collect();
         assert_eq!(requested, World::SESSION_REQUESTS);
-        assert!(world.take_requests().is_empty(), "taken once");
+        // Handed back once, not again with the next packet.
+        assert!(world.apply(&ncn(0, 1)).requests.is_empty());
     }
 }

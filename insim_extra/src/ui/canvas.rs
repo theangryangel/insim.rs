@@ -9,7 +9,11 @@ use insim::{
     insim::{Bfn, BfnType, Btn, BtnStyleFlags},
 };
 
-use super::{Action, Node, NodeKind, TypeInMapper, id_pool::ClickIdPool};
+use super::{
+    Action, Node,
+    id_pool::ClickIdPool,
+    node::{NodeKind, TypeInMapper},
+};
 
 #[derive(Debug, Default)]
 pub struct CanvasDiff {
@@ -45,7 +49,7 @@ struct ButtonBinding<Msg> {
 pub struct Canvas<M: Clone + 'static> {
     ucid: ConnectionId,
     pool: ClickIdPool,
-    // map stable hash -> button state (click id + rendered hash for diffing)
+    // Stable hash -> click id and last rendered hash.
     buttons: HashMap<u64, ButtonState>,
     click_map: HashMap<ClickId, ButtonBinding<M>>,
 }
@@ -80,8 +84,8 @@ impl<M: Clone + 'static> Canvas<M> {
     }
 
     /// Diff `root` against what was last drawn, leasing click ids from `shared`.
-    /// Use one pool per connection for every canvas drawing on it, so that their
-    /// click ids never collide. The pool is left unchanged if layout fails.
+    /// Share one pool between every canvas on a connection so their click ids
+    /// never collide. The pool is untouched if layout fails.
     pub fn reconcile_in(&mut self, root: Node<M>, shared: &mut ClickIdPool) -> Option<CanvasDiff> {
         let mut click_map = HashMap::new();
         let mut new_buttons = HashMap::new();
@@ -90,7 +94,6 @@ impl<M: Clone + 'static> Canvas<M> {
         let mut tree = taffy::TaffyTree::new();
         let mut node_map = Vec::new();
 
-        // start traversal with a seed hash (0)
         let root_id = Self::visit(
             root,
             0,
@@ -121,7 +124,7 @@ impl<M: Clone + 'static> Canvas<M> {
             },
         };
 
-        // identify ids that were allocated in previous frames but not seen in this one
+        // Ids drawn last frame but not this one.
         let dead_ids: Vec<ClickId> = self
             .buttons
             .iter()
@@ -129,7 +132,6 @@ impl<M: Clone + 'static> Canvas<M> {
             .map(|(_, state)| state.click_id)
             .collect();
 
-        // release dead ids
         if !dead_ids.is_empty() {
             pool.release(&dead_ids);
         }
@@ -160,7 +162,7 @@ impl<M: Clone + 'static> Canvas<M> {
             btn.w = layout.size.width as u8;
             btn.h = layout.size.height as u8;
 
-            // hash the relevant fields for diffing
+            // Only what LFS draws; unchanged buttons aren't resent.
             let mut hasher = DefaultHasher::new();
             btn.text.hash(&mut hasher);
             btn.l.hash(&mut hasher);
@@ -170,11 +172,10 @@ impl<M: Clone + 'static> Canvas<M> {
             btn.bstyle.hash(&mut hasher);
             let rendered_hash = hasher.finish();
 
-            // only update if changed
             let prev_state = self.buttons.get(&stable_hash);
 
-            // LFS quirk: transitioning an existing click id from clickable -> non-clickable can
-            // leave the mouse cursor in pointer mode unless we delete that click id first.
+            // LFS quirk: turning a clickable button non-clickable can leave the cursor
+            // as a pointer unless we delete the click id first.
             let is_clickable = btn.bstyle.flags.contains(BtnStyleFlags::CLICK);
             if prev_state.is_some_and(|state| state.clickable && !is_clickable) {
                 transition_removals.push(Bfn {
@@ -189,7 +190,6 @@ impl<M: Clone + 'static> Canvas<M> {
                 updates.push(btn);
             }
 
-            // update the rendered state in new_buttons
             if let Some(state) = new_buttons.get_mut(&stable_hash) {
                 state.rendered_hash = rendered_hash;
                 state.clickable = is_clickable;
@@ -387,29 +387,25 @@ impl<M: Clone + 'static> Canvas<M> {
                 bstyle,
                 typein,
             } => {
-                // calculate stable identity
                 let mut hasher = DefaultHasher::new();
                 parent_hash.hash(&mut hasher);
 
                 if let Some(ref k) = key {
-                    // strong identity: user provided a key (e.g. "user-123")
-                    // we do not hash the index here, allowing the item to move
-                    // in the list while keeping the same id.
+                    // Keyed: identity ignores position, so the button keeps its
+                    // click id when it moves in a list.
                     k.hash(&mut hasher);
                 } else {
-                    // weak identity: fallback to structural position only.
-                    // note: in a container, parent_hash already includes sibling index,
-                    // so this is stable across text updates.
+                    // Unkeyed: identity is position alone (parent_hash includes the
+                    // sibling index), so it survives text changes.
                     "btn".hash(&mut hasher);
                 }
 
                 let stable_hash = hasher.finish();
 
-                // allocate or reuse click id
                 let click_id =
                     Self::allocate_click_id(stable_hash, ucid, buttons, new_buttons, pool)?;
 
-                // track this button (rendered_hash will be set after layout)
+                // rendered_hash is filled in after layout.
                 let _ = new_buttons.insert(
                     stable_hash,
                     ButtonState {
@@ -490,8 +486,8 @@ impl<M: Clone + 'static> Canvas<M> {
     }
 }
 
-// Follow the same containing-block traversal as Taffy's rounding pass. Hoisted
-// boxes have locations relative to their containing block, not their tree parent.
+// Mirrors Taffy's rounding pass: hoisted boxes sit relative to their containing
+// block, not their tree parent.
 fn screen_positions(
     tree: &taffy::TaffyTree,
     root: taffy::NodeId,

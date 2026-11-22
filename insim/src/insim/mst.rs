@@ -17,6 +17,18 @@ pub struct Mst {
 
 impl_typical_with_request_id!(Mst);
 
+impl Mst {
+    /// Send `msg` as if typed by the host: chat, or a command such as `/end`.
+    /// LFS takes at most 63 characters here; use [`Msx`](super::Msx) for
+    /// longer messages.
+    pub fn new(msg: impl Into<String>) -> Self {
+        Self {
+            msg: msg.into(),
+            ..Default::default()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use bytes::{BufMut, BytesMut};

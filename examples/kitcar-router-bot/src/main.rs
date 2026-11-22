@@ -20,7 +20,7 @@ use clap::Parser;
 use insim::{
     Session,
     identifiers::{ConnectionId, RequestId},
-    insim::{BtnStyle, Isi},
+    insim::{BtnStyle, Isi, Mst},
 };
 use insim_extra::{
     chat::ChatCommand,
@@ -34,8 +34,7 @@ use insim_extra::{
         },
     },
     ui::{self, Node, Ui},
-    util::host_command,
-    world::Connected,
+    world::event::Connected,
 };
 
 /// Typed `!` commands. Doc comments are the help text.
@@ -121,7 +120,7 @@ fn command(bot: &mut Bot, caller: Caller, cmd: Cmd, _: &Context<'_>) -> Effects<
             "greeted {}, waved at {} times",
             bot.greeted, bot.waves
         )),
-        Cmd::Kick { uname } => Effects::new().packet(host_command(format!("/kick {uname}"))),
+        Cmd::Kick { uname } => Effects::new().packet(Mst::new(format!("/kick {uname}"))),
     }
 }
 

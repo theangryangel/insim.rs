@@ -18,7 +18,10 @@ use insim::{
 use insim_extra::{
     chat::{ChatCommand, ChatParser},
     kitcar::{Context, Effects, Input, Service},
-    world::{Connected, PlayerLeft, PlayerTeleportedToPits, WorldEvent},
+    world::{
+        WorldEvent,
+        event::{Connected, PlayerLeft, PlayerTeleportedToPits},
+    },
 };
 
 use crate::{
@@ -382,7 +385,7 @@ mod tests {
     /// Apply a packet to the world, then feed it and its events to Bomb, as
     /// the host does.
     fn feed(world: &mut insim_extra::world::World, bomb: &mut Bomb, packet: Packet) -> Vec<Packet> {
-        let events = world.apply_packet(&packet);
+        let events = world.apply(&packet);
         let cx = Context::new(world, Instant::now());
         let inputs =
             std::iter::once(Input::Packet(packet)).chain(events.into_iter().map(Input::World));
@@ -504,7 +507,7 @@ mod tests {
         use insim_extra::world::World;
 
         let mut world = World::new();
-        let _ = world.apply_packet(
+        let _ = world.apply(
             &Ncn {
                 ucid: ConnectionId(2),
                 uname: "driver".into(),
@@ -512,7 +515,7 @@ mod tests {
             }
             .into(),
         );
-        let _ = world.apply_packet(
+        let _ = world.apply(
             &Npl {
                 ucid: ConnectionId(2),
                 plid: PlayerId(5),
