@@ -13,7 +13,7 @@ use std::{
 };
 
 use futures::{FutureExt, Stream, StreamExt, future::BoxFuture, stream::BoxStream};
-use insim::{Packet, identifiers::ConnectionId};
+use insim::{Packet, identifiers::ConnectionId, insim::Mtc};
 
 use crate::ui::Key;
 
@@ -153,7 +153,8 @@ impl<M: Send + 'static> Effects<M> {
     /// Chat to one connection, or everyone with [`ConnectionId::ALL`]. Long
     /// text is split across messages.
     pub fn message(self, text: impl Into<String>, ucid: ConnectionId) -> Self {
-        self.packets(crate::util::mtc(text, Some(ucid)))
+        let text = text.into();
+        self.packets(text.lines().map(|line| Mtc::new(ucid, line)))
     }
 
     /// Deliver `msg` after `delay`.

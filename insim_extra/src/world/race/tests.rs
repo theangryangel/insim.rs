@@ -1,11 +1,9 @@
-//! Characterization tests for the race state machine.
+//! Characterisation tests for the race state machine.
 //!
-//! These drive a [`World`] through synthesized packets and assert on the
-//! emitted [`RaceEvent`]s and the queryable entrant state. They pin the
-//! *current* behavior so that refactors of the dispatch/handler layer can be
-//! shown to be behavior-preserving. They assert only on the public surface
-//! (`apply_packet` output + query methods), so they remain valid across
-//! internal restructuring.
+//! Each drives a [`World`] with synthesised packets and checks the emitted
+//! [`RaceEvent`]s and entrant state. They pin *current* behaviour through the
+//! public surface only (`apply` output and queries), so a refactor can
+//! show it changes nothing.
 
 use std::time::Duration;
 
@@ -17,7 +15,10 @@ use insim::{
     },
 };
 
-use crate::world::{FinishStatus, RaceEvent, World, WorldEvent};
+use crate::world::{
+    World, WorldEvent,
+    race::{FinishStatus, RaceEvent},
+};
 
 fn ncn(ucid: u8, uname: &str, pname: &str) -> insim::Packet {
     Ncn {
@@ -194,10 +195,11 @@ fn rst_untimed() -> insim::Packet {
     .into()
 }
 
-/// Apply a packet and return only the race events it produced.
+/// Apply a packet and return only its race events.
 fn race_events(world: &mut World, packet: insim::Packet) -> Vec<RaceEvent> {
     world
-        .apply_packet(&packet)
+        .apply(&packet)
+        .events
         .into_iter()
         .filter_map(|e| match e {
             WorldEvent::Race(r) => Some(r),
@@ -206,9 +208,9 @@ fn race_events(world: &mut World, packet: insim::Packet) -> Vec<RaceEvent> {
         .collect()
 }
 
-/// Apply a packet, discarding all events.
+/// Apply a packet and ignore its events.
 fn apply(world: &mut World, packet: insim::Packet) {
-    let _ = world.apply_packet(&packet);
+    let _ = world.apply(&packet);
 }
 
 #[test]
@@ -255,7 +257,7 @@ fn qualifying_tracks_laps_but_fin_does_not_finish() {
     ));
     // Laps are tracked in qualifying.
     assert!(!race_events(&mut world, lap(1, 1, 90_000)).is_empty());
-    // Fin does NOT finish in qualifying.
+    // In qualifying, Fin is not a finish.
     assert!(race_events(&mut world, fin(1, 90_000, 90_000)).is_empty());
     let e = world.entrant_by_plid(PlayerId(1)).unwrap();
     assert!(matches!(e.status, FinishStatus::Racing));
@@ -385,9 +387,8 @@ fn leaving_during_qualifying_is_not_a_dnf() {
 
 #[test]
 fn duplicate_npl_does_not_panic_or_duplicate_entrant() {
-    // LFS re-announces existing players in reply to TINY_NPL. The repeated Npl
-    // for an already-live plid must be a no-op at the race layer (and must not
-    // panic on the unique-plid players index).
+    // LFS re-announces players in reply to TINY_NPL. A repeated Npl for a live
+    // plid must be a no-op here, and must not panic on the unique-plid index.
     let mut world = World::new();
     apply(&mut world, rst_race(5));
     assert!(matches!(
@@ -404,16 +405,14 @@ fn duplicate_npl_does_not_panic_or_duplicate_entrant() {
 
 #[test]
 fn npl_after_restart_recreates_entrant() {
-    // The players map persists across a session restart while race state is
-    // cleared; the re-announced Npl must recreate the entrant for the new
-    // session.
+    // Players survive a restart but race state doesn't, so the re-announced
+    // Npl must recreate the entrant.
     let mut world = World::new();
     apply(&mut world, rst_race(5));
     apply(&mut world, npl(1, 1, "Alice"));
     apply(&mut world, lap(1, 1, 90_000));
     apply(&mut world, rst_race(5)); // new session: prior race state pending clear
-    // The re-announced Npl clears the deferred prior session, then recreates the
-    // entrant fresh for the new session.
+    // The re-announced Npl runs the deferred clear, then recreates the entrant.
     assert!(matches!(
         race_events(&mut world, npl(1, 1, "Alice")).as_slice(),
         [RaceEvent::EntrantJoined { .. }]
@@ -604,10 +603,9 @@ fn restart_ends_prior_session_and_defers_clear() {
     assert!(world.entrants().next().is_some());
     assert!(world.fastest_lap().is_some());
 
-    // A restart (Rst while a session is active) ends the prior session without
-    // passing through the lobby, so it must emit SessionEnded then
-    // SessionStarted - mirroring the /end (Sta -> No) path.
-    let events = world.apply_packet(&rst_race(5));
+    // A restart (Rst mid-session) skips the lobby, so it must emit SessionEnded
+    // then SessionStarted, like the /end (Sta -> No) path.
+    let events = world.apply(&rst_race(5)).events;
     let kinds: Vec<&str> = events
         .iter()
         .map(|e| match e {
@@ -617,13 +615,12 @@ fn restart_ends_prior_session_and_defers_clear() {
         })
         .collect();
     assert_eq!(kinds, ["ended", "started"]);
-    // The clear is deferred: the prior session's results stay readable while a
-    // consumer handles SessionEnded.
+    // The clear is deferred, so the old results stay readable while
+    // SessionEnded is handled.
     assert!(world.entrants().next().is_some());
     assert!(world.fastest_lap().is_some());
 
-    // The next packet performs the deferred clear before it is applied, so the
-    // new session starts fresh.
+    // The next packet runs the clear first, so the new session starts fresh.
     apply(&mut world, npl(2, 2, "Bob"));
     assert!(world.fastest_lap().is_none());
     assert!(world.entrant_by_plid(PlayerId(1)).is_none());
@@ -633,10 +630,10 @@ fn restart_ends_prior_session_and_defers_clear() {
 
 #[test]
 fn first_session_start_does_not_emit_session_ended() {
-    // Starting from the lobby (no active session), the opening Rst must emit
-    // only SessionStarted - not a spurious SessionEnded.
+    // From the lobby, the opening Rst emits only SessionStarted, with no stray
+    // SessionEnded.
     let mut world = World::new();
-    let events = world.apply_packet(&rst_race(5));
+    let events = world.apply(&rst_race(5)).events;
     assert!(
         events
             .iter()

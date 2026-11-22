@@ -1,8 +1,8 @@
-//! Game-state types used by [`crate::world::World`].
+//! What the game is doing: the kind of session, the track and conditions,
+//! multiplayer, and what the server allows.
 //!
-//! The [`SessionKind`], [`MultiplayerState`], [`GameInfo`], and related types
-//! are defined here. The actual state is owned by
-//! [`World`](crate::world::World), which exposes query methods directly.
+//! [`World`](crate::world::World) owns this state. [`GameInfo`] is the snapshot
+//! it hands out, and [`SessionKind`] decides how race packets are read.
 
 use std::time::Duration;
 
@@ -11,75 +11,68 @@ use insim::{
     insim::{PlcAllowedCarsSet, RaceFlags, RaceLaps, StaFlags},
 };
 
-/// The kind of session that an `Rst` packet started.
+/// The kind of session an `Rst` started.
 ///
-/// Carried by session-started events so consumers (notably the race
-/// tracker) can interpret subsequent packets correctly - most importantly
-/// `Fin`, which marks a finish in a race but fires after every lap in
-/// qualifying.
+/// It decides how later packets read. Above all `Fin`: a finish in a race, but
+/// a per-lap signal in every other kind.
 #[derive(Debug, Clone, Copy)]
 pub enum SessionKind {
-    /// A race session (`Rst` with `qualmins == 0` and a lap/hour count).
+    /// A race (`Rst` with `qualmins == 0` and a lap or hour count).
     Race {
-        /// Race length configuration.
+        /// Race length.
         laps: RaceLaps,
-        /// Race flags from the `Rst` packet.
+        /// Race flags from the `Rst`.
         flags: RaceFlags,
     },
     /// A qualifying session (`Rst` with `qualmins > 0`).
     Qualifying {
-        /// Qualifying duration.
+        /// Qualifying length.
         duration: Duration,
-        /// Race flags from the `Rst` packet.
+        /// Race flags from the `Rst`.
         flags: RaceFlags,
     },
     /// A practice session (`Rst` with `qualmins == 0` and
     /// [`RaceLaps::Practice`], i.e. 0 laps).
     ///
-    /// LFS reports no race in progress, so this is only distinguishable from
-    /// the `Rst` packet. Like qualifying, `Fin` here is a per-lap signal rather
-    /// than a finish.
+    /// LFS reports no race in progress, so only the `Rst` tells this apart.
     Practice,
-    /// An untimed open/cruise session (`Rst` with `qualmins == 0` and
+    /// An untimed open or cruise session (`Rst` with `qualmins == 0` and
     /// [`RaceLaps::Untimed`]).
     ///
-    /// Like [`Practice`](Self::Practice) LFS reports no race in progress, and
-    /// `Fin` is a per-lap signal rather than a finish.
+    /// As with [`Practice`](Self::Practice), LFS reports no race in progress.
     Untimed,
 }
 
 impl SessionKind {
-    /// Whether this is a race session (DNF semantics apply, `Fin` marks a finish).
+    /// Whether this is a race, where `Fin` is a finish and leaving early is a DNF.
     pub fn is_race(self) -> bool {
         matches!(self, Self::Race { .. })
     }
 
-    /// Whether this session kind warrants lap and entrant tracking.
-    ///
-    /// Returns `true` for [`Race`](Self::Race) and [`Qualifying`](Self::Qualifying).
-    /// Returns `false` for [`Practice`](Self::Practice) and
-    /// [`Untimed`](Self::Untimed) (sessions where race tracking is meaningless).
+    /// Whether laps and entrants are tracked: yes for [`Race`](Self::Race) and
+    /// [`Qualifying`](Self::Qualifying), no for [`Practice`](Self::Practice) and
+    /// [`Untimed`](Self::Untimed).
     pub fn is_tracking(self) -> bool {
         matches!(self, Self::Race { .. } | Self::Qualifying { .. })
     }
 }
 
-/// Whether LFS is currently running in local or multiplayer mode.
+/// Whether LFS is offline or in multiplayer.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub enum MultiplayerState {
-    /// LFS is in single-player / offline mode.
+    /// Single-player or offline.
     #[default]
     Local,
-    /// LFS is connected to a multiplayer session.
+    /// In a multiplayer session.
     Multiplayer {
-        /// Host name of the server.
+        /// Server host name.
         host_name: String,
-        /// `true` if this instance is the host; `false` if a guest.
+        /// Whether this instance is the host rather than a guest.
         is_host: bool,
     },
 }
 
-/// Version information about the connected LFS instance, from a `Ver` packet.
+/// The connected LFS instance's version, from `Ver`.
 #[derive(Debug, Default, Clone)]
 pub struct VersionInfo {
     /// Product name (e.g. `"S3"`).
@@ -88,11 +81,10 @@ pub struct VersionInfo {
     pub version: GameVersion,
 }
 
-/// Snapshot of the game state, produced by [`World::game_info()`](crate::world::World::game_info).
+/// Snapshot of the game state, from [`World::game_info()`](crate::world::World::game_info).
 #[derive(Debug, Default, Clone)]
 pub struct GameInfo {
-    /// Kind of the current session. `None` means no active session, or that the
-    /// initial `STA` game-state snapshot has not arrived yet.
+    /// `None` outside a session, or before the first `STA`.
     pub(crate) session_kind: Option<SessionKind>,
     pub(crate) track: Option<Track>,
     pub(crate) layout: Option<String>,
@@ -100,33 +92,32 @@ pub struct GameInfo {
     pub(crate) wind: Option<Wind>,
     pub(crate) flags: StaFlags,
     pub(crate) multiplayer: MultiplayerState,
-    /// Server's allowed-cars set, from a `Small`/`Alc` reply. `None` until seen.
+    /// From `Small`/`Alc`. `None` until seen.
     pub(crate) allowed_cars: Option<PlcAllowedCarsSet>,
-    /// Server's allowed-mods list, from a `Mal` packet. Empty = unrestricted or
-    /// not yet received.
+    /// From `Mal`. Empty means unrestricted, or not yet received.
     pub(crate) allowed_mods: Vec<Vehicle>,
-    /// Version information, from a `Ver` packet. `None` until received.
+    /// From `Ver`. `None` until received.
     pub(crate) version: Option<VersionInfo>,
 }
 
 impl GameInfo {
-    /// Current session kind. `None` means no active session, or that the
-    /// initial `STA` game-state snapshot has not arrived yet.
+    /// Current session kind. `None` outside a session, or before the first
+    /// `STA` arrives.
     pub fn session(&self) -> Option<SessionKind> {
         self.session_kind
     }
 
-    /// Currently selected track, if known.
+    /// Selected track, if known.
     pub fn current_track(&self) -> Option<&Track> {
         self.track.as_ref()
     }
 
-    /// Currently loaded layout, if known.
+    /// Loaded layout, if known.
     pub fn current_layout(&self) -> Option<&String> {
         self.layout.as_ref()
     }
 
-    /// Weather identifier (0..=2 typically).
+    /// Weather identifier, usually 0..=2.
     pub fn weather(&self) -> Option<u8> {
         self.weather
     }
@@ -136,156 +127,32 @@ impl GameInfo {
         self.wind.as_ref()
     }
 
-    /// Overall game flags.
+    /// Game flags.
     pub fn flags(&self) -> &StaFlags {
         &self.flags
     }
 
-    /// Current multiplayer state.
-    ///
-    /// [`MultiplayerState::Local`] until an `ISM` packet is received or when
-    /// LFS is not in multiplayer mode (empty host name in the `ISM`).
+    /// Multiplayer state. [`MultiplayerState::Local`] until an `ISM` arrives,
+    /// or when its host name is empty.
     pub fn multiplayer(&self) -> &MultiplayerState {
         &self.multiplayer
     }
 
-    /// Server's allowed-cars set, if a `Small`/`Alc` has been received.
-    ///
-    /// Populated by requesting `TinyType::Alc`, or when the host changes the
-    /// allowed cars mid-session.
+    /// Server's allowed cars, once a `Small`/`Alc` arrives: in reply to
+    /// `TinyType::Alc`, or when the host changes them.
     pub fn allowed_cars(&self) -> Option<&PlcAllowedCarsSet> {
         self.allowed_cars.as_ref()
     }
 
-    /// Server's allowed-mods list, if a `Mal` has been received. Empty means
-    /// unrestricted (any mod) or not yet received.
-    ///
-    /// Populated by requesting `TinyType::Mal`, or when the host changes the
-    /// allowed mods mid-session.
+    /// Server's allowed mods, from `Mal`: in reply to `TinyType::Mal`, or when
+    /// the host changes them. Empty means any mod, or not yet received.
     pub fn allowed_mods(&self) -> &[Vehicle] {
         &self.allowed_mods
     }
 
-    /// Version information about the connected LFS instance, if a `Ver` has
-    /// been received. LFS sends this on connect when `Isi::reqi` is non-zero,
-    /// or in reply to `TinyType::Ver`.
+    /// LFS version, once a `Ver` arrives. LFS sends one on connect when
+    /// `Isi::reqi` is non-zero, or in reply to `TinyType::Ver`.
     pub fn version(&self) -> Option<&VersionInfo> {
         self.version.as_ref()
-    }
-}
-
-/// Grid access mode for [`World::change_grid`](crate::world::World::change_grid).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GridMode {
-    /// Non-admins can freely join, leave, and move others on the grid.
-    Open,
-    /// Non-admins can only move themselves on the grid.
-    Slf,
-    /// Only admins can modify the grid.
-    Lock,
-}
-
-impl std::fmt::Display for GridMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            GridMode::Open => "open",
-            GridMode::Slf => "self",
-            GridMode::Lock => "lock",
-        };
-        write!(f, "{s}")
-    }
-}
-
-/// Month of the year, used in [`TimeSet`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Month {
-    /// January
-    Jan,
-    /// February
-    Feb,
-    /// March
-    Mar,
-    /// April
-    Apr,
-    /// May
-    May,
-    /// June
-    Jun,
-    /// July
-    Jul,
-    /// August
-    Aug,
-    /// September
-    Sep,
-    /// October
-    Oct,
-    /// November
-    Nov,
-    /// December
-    Dec,
-}
-
-impl std::fmt::Display for Month {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            Month::Jan => "Jan",
-            Month::Feb => "Feb",
-            Month::Mar => "Mar",
-            Month::Apr => "Apr",
-            Month::May => "May",
-            Month::Jun => "Jun",
-            Month::Jul => "Jul",
-            Month::Aug => "Aug",
-            Month::Sep => "Sep",
-            Month::Oct => "Oct",
-            Month::Nov => "Nov",
-            Month::Dec => "Dec",
-        };
-        write!(f, "{s}")
-    }
-}
-
-/// Parameters for [`World::time_set`](crate::world::World::time_set).
-///
-/// All fields are optional; only the parts that are `Some` are included in the
-/// `/time set` command string.
-///
-/// # Example
-/// ```rust,ignore
-/// world.time_set(TimeSet {
-///     date: Some((23, Month::Jan)),
-///     time: Some((16, 0)),
-///     utc_offset: Some(5),
-/// })
-/// ```
-#[derive(Debug, Default, Clone)]
-pub struct TimeSet {
-    /// Day and month `(1..=31, Month)`. Both must be provided together.
-    pub date: Option<(u8, Month)>,
-    /// Hour and minute `(0..=23, 0..=59)`.
-    pub time: Option<(u8, u8)>,
-    /// UTC offset in whole hours (e.g. `5` -> `utc+5`, `-3` -> `utc-3`).
-    pub utc_offset: Option<i8>,
-}
-
-/// Preset time-of-day for [`World::time_demo`](crate::world::World::time_demo).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TimeDemoPreset {
-    /// Morning preset.
-    Morning,
-    /// Afternoon preset.
-    Afternoon,
-    /// Sunset preset.
-    Sunset,
-}
-
-impl std::fmt::Display for TimeDemoPreset {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            TimeDemoPreset::Morning => "morning",
-            TimeDemoPreset::Afternoon => "afternoon",
-            TimeDemoPreset::Sunset => "sunset",
-        };
-        write!(f, "{s}")
     }
 }

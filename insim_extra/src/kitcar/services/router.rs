@@ -21,7 +21,7 @@
 //! fn command(bot: &mut Bot, caller: Caller, cmd: Cmd, _: &Context) -> Effects<()> {
 //!     match cmd {
 //!         Cmd::Hello => caller.reply(format!("hi {}", caller.uname)),
-//!         Cmd::Kick { uname } => Effects::new().packet(host_command(format!("/kick {uname}"))),
+//!         Cmd::Kick { uname } => Effects::new().packet(Mst::new(format!("/kick {uname}"))),
 //!     }
 //! }
 //!
@@ -117,7 +117,7 @@ impl<S: Send + 'static, M: Clone + Send + 'static> Router<S, M> {
 
     /// Run `handler` for every input that carries a `T`: a packet type such as
     /// [`Uco`](insim::insim::Uco), a world event such as
-    /// [`Connected`](crate::world::Connected), or [`Started`](crate::kitcar::input::Started)
+    /// [`Connected`](crate::world::event::Connected), or [`Started`](crate::kitcar::input::Started)
     /// and [`Stopping`](crate::kitcar::input::Stopping). See [`FromInput`].
     pub fn on<T, R>(
         self,
@@ -294,7 +294,7 @@ mod tests {
     use super::*;
     use crate::{
         kitcar::input::Started,
-        world::{Connected, World},
+        world::{World, event::Connected},
     };
 
     // Fields are only read through `Debug`, in the log.
@@ -332,7 +332,7 @@ mod tests {
     fn world() -> World {
         let mut world = World::new();
         for (ucid, uname, admin) in [(2, "bob", false), (3, "root", true)] {
-            let _ = world.apply_packet(
+            let _ = world.apply(
                 &Ncn {
                     ucid: ConnectionId(ucid),
                     uname: uname.into(),

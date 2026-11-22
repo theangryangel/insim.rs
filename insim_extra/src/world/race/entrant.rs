@@ -1,4 +1,4 @@
-//! Per-entrant state types stored by [`crate::world::World`].
+//! Per-entrant race state: laps, pit stops, drivers and result.
 
 use std::time::Duration;
 
@@ -7,10 +7,10 @@ use insim::{
     insim::{PenaltyInfo, PitStopWorkFlags, RaceConfirmFlags},
 };
 
-/// Stable identity for one race entry (one `Npl` -> leave lifecycle).
+/// Stable identity for one race entry, from its `Npl` until it leaves.
 ///
-/// Never reused within a [`crate::world::World`] instance, even if LFS
-/// reuses the same [`PlayerId`].
+/// Survives driver swaps, and is never reused within a [`crate::world::World`]
+/// even when LFS reuses the [`PlayerId`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct EntrantId(pub(crate) u64);
 
@@ -20,105 +20,104 @@ impl std::fmt::Display for EntrantId {
     }
 }
 
-/// Per-lap record stored in [`EntrantState`].
+/// One completed lap in an [`EntrantState`].
 #[derive(Debug, Clone)]
 pub struct LapRecord {
-    /// Lap number (1-indexed).
+    /// Lap number, from 1.
     pub lap: u16,
     /// Lap time.
     pub time: Duration,
-    /// Split times recorded during this lap (up to 3).
+    /// Splits crossed this lap (up to 3).
     pub splits: Vec<Duration>,
-    /// Pit stop count at the time this lap completed.
+    /// Pit stops so far.
     pub numstops: u8,
-    /// Penalty state at the time this lap completed.
+    /// Penalty at the end of the lap.
     pub penalty: PenaltyInfo,
 }
 
-/// Per-pit-stop record stored in [`EntrantState`].
+/// One pit stop in an [`EntrantState`].
 #[derive(Debug, Clone)]
 pub struct PitRecord {
     /// Cumulative stop number.
     pub stop_number: u8,
-    /// Lap on which the stop occurred.
+    /// Lap the stop happened on.
     pub lap: u16,
-    /// Work carried out.
+    /// Work done.
     pub work: PitStopWorkFlags,
-    /// Total time in the pit box. `None` if the `Psf` packet never arrived.
+    /// Time in the pit box. `None` if the `Psf` never arrived.
     pub stop_time: Option<Duration>,
 }
 
-/// Finish status for an [`EntrantState`].
+/// How an [`EntrantState`]'s race ended, if it has.
 #[derive(Debug, Clone, Default)]
 pub enum FinishStatus {
     /// Still racing.
     #[default]
     Racing,
-    /// Crossed the finish line (provisional result from `Fin`).
+    /// Crossed the line. Provisional from `Fin` until `Res` confirms it.
     Finished {
         /// Total race time.
         ttime: Duration,
-        /// Best lap time.
+        /// Best lap.
         btime: Duration,
-        /// Number of pit stops.
+        /// Pit stops.
         numstops: u8,
         /// Confirmation flags (penalties, DQ, etc.).
         confirm: RaceConfirmFlags,
-        /// Classified position. Populated when the `Res` packet arrives.
+        /// Classified position, once `Res` arrives.
         result_num: Option<u8>,
     },
-    /// Left the track without finishing while the race was active.
+    /// Left the track mid-race without finishing.
     Dnf,
 }
 
-/// Record of one driver who controlled a car during a race entry.
+/// A driver who took the wheel during a race entry.
 #[derive(Debug, Clone)]
 pub struct DriverRecord {
-    /// Connection ID at the time this driver took the wheel.
+    /// Their connection when they took over.
     pub ucid: ConnectionId,
-    /// Display name at the time this driver took the wheel.
+    /// Their display name when they took over.
     pub pname: String,
-    /// LFS.net username, if connection details were available.
+    /// LFS.net username, if known.
     pub uname: Option<String>,
-    /// Lap number when this driver started driving (0 = from the start).
+    /// Lap they took over on (0 = from the start).
     pub from_lap: u16,
 }
 
-/// Per-entrant race state stored by [`crate::world::World`].
+/// Race state for one entrant, kept by [`crate::world::World`].
 #[derive(Debug, Clone)]
 pub struct EntrantState {
-    /// Stable synthetic identifier.
+    /// Stable identifier.
     pub id: EntrantId,
-    /// [`PlayerId`] assigned by LFS at join time. May be reused by other
-    /// entrants in future races.
+    /// Assigned by LFS on join. Later entrants may reuse it.
     pub plid: PlayerId,
-    /// Laps completed so far (corrected by [`lap_offset`](Self::lap_offset)).
+    /// Laps completed, including [`lap_offset`](Self::lap_offset).
     pub laps_done: u16,
-    /// Added to the raw LFS lap counter to produce the true running total.
+    /// Added to LFS's lap counter to give the true total.
     ///
-    /// Non-zero after a player rejoins (via [`crate::world::World::with_rejoin`]),
-    /// where LFS issues a fresh `Npl` and resets its internal lap counter to 1
-    /// but we want to preserve continuity across the reconnect.
+    /// Non-zero after a rejoin (see [`crate::world::World::with_rejoin`]). LFS
+    /// sends a fresh `Npl` and restarts its counter at 1, but the entrant's laps
+    /// carry on.
     pub lap_offset: u16,
-    /// Fastest lap time recorded.
+    /// Fastest lap.
     pub best_lap: Option<Duration>,
-    /// Lap number on which [`best_lap`](Self::best_lap) was set.
+    /// Lap [`best_lap`](Self::best_lap) was set on.
     pub best_lap_num: Option<u16>,
-    /// Completed lap records, in order.
+    /// Completed laps, in order.
     pub laps: Vec<LapRecord>,
-    /// Split times for the lap currently in progress.
+    /// Splits for the lap in progress.
     pub current_splits: Vec<Duration>,
     /// Completed pit stops.
     pub pit_stops: Vec<PitRecord>,
     /// Finish status.
     pub status: FinishStatus,
-    /// Driver history. The current driver is the last entry.
+    /// Everyone who has driven this entry. The current driver is last.
     pub drivers: Vec<DriverRecord>,
-    /// Starting grid position (1-indexed), from the `Reo` packet. `None` until
-    /// a grid order has been received for this entrant.
+    /// Grid slot (from 1), from `Reo`. `None` until a grid order covers this
+    /// entrant.
     pub grid_position: Option<u8>,
-    /// Pending pit stop: `Pit` received, waiting for matching `Psf`.
+    /// `Pit` received, waiting for its `Psf`.
     pub(crate) pending_pit: Option<PitRecord>,
-    /// Active penalty.
+    /// Current penalty.
     pub penalty: PenaltyInfo,
 }

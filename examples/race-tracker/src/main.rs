@@ -18,8 +18,9 @@ use std::time::Duration;
 use clap::Parser;
 use insim::{Session, identifiers::RequestId, insim::Isi};
 use insim_extra::world::{
-    EntrantState, FinishStatus, RaceEvent, SessionEnded, SessionStarted, SharedWorld, World,
-    WorldEvent,
+    SharedWorld, World, WorldEvent,
+    event::{SessionEnded, SessionStarted},
+    race::{EntrantState, FinishStatus, RaceEvent},
 };
 use tabled::{Table, Tabled, settings::Style};
 

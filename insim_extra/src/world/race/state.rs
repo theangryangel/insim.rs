@@ -1,12 +1,10 @@
-//! Race-tracking logic.
+//! Race-tracking logic, private to [`crate::world`].
 //!
-//! This module is private to [`crate::world`]. [`RaceState`] holds the
-//! cohesive race data (entrants, the live plid→entrant index, pending grid
-//! positions, fastest lap); the packet **handlers** are implemented on
-//! [`World`](crate::world::World) so they can read sibling state
-//! (`game.session_kind`, `connections`) directly via disjoint field borrows,
-//! rather than threading it through as parameters. The public API surface is
-//! the query methods on [`crate::world::World`].
+//! [`RaceState`] holds the race data: entrants, the live plid-to-entrant index,
+//! pending grid positions and the fastest lap. The packet handlers live on
+//! [`World`](crate::world::World) instead, so they can read sibling state
+//! (`game.session_kind`, `connections`) through disjoint field borrows rather
+//! than parameters. Callers use the query methods on [`crate::world::World`].
 
 use std::{collections::HashMap, time::Duration};
 
@@ -21,7 +19,7 @@ use crate::world::{
     connection::{ConnectionInfo, PlayerInfo},
 };
 
-/// LFS uses 1:00:00.000 as a placeholder for an invalid/missing split time.
+/// LFS sends 1:00:00.000 for a missing split.
 const INVALID_SPLIT: Duration = Duration::from_secs(3600);
 
 fn uname_for(
@@ -45,10 +43,9 @@ pub(crate) struct RaceState {
     pub(crate) live: HashMap<PlayerId, EntrantId>,
     pending_grid: HashMap<PlayerId, u8>,
     pub(crate) fastest_lap: Option<(EntrantId, PlayerId, Duration)>,
-    /// Set by a session-starting `Rst`; the actual clear of the prior session's
-    /// data is deferred until the next packet so that the just-ended session's
-    /// results stay readable while consumers handle `SessionEnded`. See the
-    /// dispatch loop in [`crate::world`].
+    /// Set by a session-starting `Rst`. The clear waits for the next packet so
+    /// the ended session's results stay readable while consumers handle
+    /// `SessionEnded`. See the dispatch loop in [`crate::world`].
     pub(crate) pending_reset: bool,
 }
 
@@ -59,8 +56,8 @@ impl RaceState {
         id
     }
 
-    /// Returns the [`EntrantId`] of a disconnected entrant (in `entrants` but
-    /// not `live`) whose last [`DriverRecord`] has the given `uname`.
+    /// A disconnected entrant (in `entrants`, not `live`) whose last
+    /// [`DriverRecord`] has this `uname`.
     fn find_disconnected_by_uname(&self, uname: &str) -> Option<EntrantId> {
         self.entrants
             .iter()
@@ -69,9 +66,8 @@ impl RaceState {
             .map(|(id, _)| *id)
     }
 
-    /// Returns the [`EntrantId`] of a non-live entrant whose last-known
-    /// [`PlayerId`] matches `plid`. Used to apply a `Res` that arrives after the
-    /// player has left the track.
+    /// A non-live entrant whose last [`PlayerId`] was `plid`. Lets a `Res`
+    /// land after the player has left the track.
     fn find_entrant_by_plid(&self, plid: PlayerId) -> Option<EntrantId> {
         self.entrants
             .iter()
@@ -80,8 +76,7 @@ impl RaceState {
             .map(|(id, _)| *id)
     }
 
-    /// Clear all per-session race state. Called when a new session starts
-    /// (`Rst`), before the new session's entrants are tracked.
+    /// Clear per-session race state when a new session starts (`Rst`).
     pub(crate) fn clear_for_session(&mut self) {
         self.entrants.clear();
         self.live.clear();
@@ -90,15 +85,15 @@ impl RaceState {
     }
 }
 
-/// Race packet handlers, driven by the unified dispatch in [`crate::world`].
+/// Race packet handlers, called from the dispatch in [`crate::world`].
 ///
-/// These live on [`World`] (rather than [`RaceState`]) so they can read
-/// `self.game.session_kind` and `self.connections` directly while mutating
-/// `self.race` - the session/connection context they depend on lives a layer
-/// up, and disjoint field borrows let one method touch all three.
+/// They live on [`World`] rather than [`RaceState`] because the session and
+/// connection context they need sits a layer up. Disjoint field borrows let
+/// them read `self.game.session_kind` and `self.connections` while mutating
+/// `self.race`.
 impl World {
-    /// The live entrant for `plid`, but only while a tracking session is
-    /// active. `None` if not tracking or the plid is not currently on track.
+    /// The live entrant for `plid`. `None` outside a tracking session, or if
+    /// `plid` isn't on track.
     fn live_entrant_mut(&mut self, plid: PlayerId) -> Option<&mut EntrantState> {
         if !self.game.session_kind.is_some_and(|k| k.is_tracking()) {
             return None;
@@ -107,9 +102,9 @@ impl World {
         self.race.entrants.get_mut(&id)
     }
 
-    /// Allocate a fresh entrant for `info`, resolving its display/LFS.net names
-    /// from `connections` and applying any buffered grid position. Returns the
-    /// new [`EntrantId`]. Shared by the fresh-join and rejoin-no-match paths.
+    /// Allocate an entrant for `info`, taking its names from `connections` and
+    /// applying any buffered grid position. Shared by the fresh-join and
+    /// unmatched-rejoin paths.
     fn insert_fresh_entrant(&mut self, info: &PlayerInfo) -> EntrantId {
         let id = self.race.alloc_id();
         let uname = uname_for(&self.connections, info.ucid);
@@ -153,11 +148,9 @@ impl World {
         if !self.game.session_kind.is_some_and(|k| k.is_tracking()) {
             return vec![];
         }
-        // Idempotent per live plid: LFS announces each player with an `Npl` at
-        // grid formation *and* again in reply to a `TINY_NPL` request, so the
-        // same plid can arrive twice. If it is already live, fold in any pending
-        // grid position and ignore the duplicate rather than creating a phantom
-        // second entrant.
+        // LFS sends an `Npl` at grid formation *and* in reply to `TINY_NPL`, so
+        // a plid can arrive twice. If it's already live, fold in any pending
+        // grid position and skip the duplicate rather than create a phantom.
         if let Some(&id) = self.race.live.get(&info.plid) {
             if let Some(grid) = self.race.pending_grid.remove(&info.plid)
                 && let Some(entrant) = self.race.entrants.get_mut(&id)
@@ -223,8 +216,7 @@ impl World {
         if !self.game.session_kind.is_some_and(|k| k.is_tracking()) {
             return vec![];
         }
-        // Idempotent per live plid: ignore a duplicate `Npl` for an entrant
-        // already on track.
+        // Ignore a duplicate `Npl` for an entrant already on track.
         if let Some(&id) = self.race.live.get(&info.plid) {
             if let Some(grid) = self.race.pending_grid.remove(&info.plid)
                 && let Some(entrant) = self.race.entrants.get_mut(&id)
@@ -259,7 +251,6 @@ impl World {
                 plid: info.plid,
             }];
         }
-        // No match - fresh join
         let id = self.insert_fresh_entrant(info);
         vec![RaceEvent::EntrantJoined {
             id,

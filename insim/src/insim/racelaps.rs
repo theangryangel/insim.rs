@@ -35,6 +35,18 @@ impl From<u8> for RaceLaps {
     }
 }
 
+impl RaceLaps {
+    /// The host command that sets this race length, such as `/laps 5`.
+    pub fn to_command(&self) -> String {
+        match self {
+            Self::Untimed => "/laps no".to_string(),
+            Self::Practice => "/laps 0".to_string(),
+            Self::Laps(laps) => format!("/laps {laps}"),
+            Self::Hours(hours) => format!("/hours {hours}"),
+        }
+    }
+}
+
 impl From<RaceLaps> for u8 {
     fn from(item: RaceLaps) -> u8 {
         let data = match item {
@@ -106,5 +118,15 @@ mod tests {
     fn as_hours() {
         assert_eq!(Into::<u8>::into(RaceLaps::Hours(1)), 191);
         assert_eq!(191, Into::<u8>::into(RaceLaps::Hours(1)));
+    }
+
+    #[test]
+    fn to_command_uses_the_count_a_person_would_type() {
+        assert_eq!(RaceLaps::Untimed.to_command(), "/laps no");
+        assert_eq!(RaceLaps::Practice.to_command(), "/laps 0");
+        assert_eq!(RaceLaps::Laps(5).to_command(), "/laps 5");
+        // Not the compressed wire encoding (150 laps is sent as 105).
+        assert_eq!(RaceLaps::Laps(150).to_command(), "/laps 150");
+        assert_eq!(RaceLaps::Hours(2).to_command(), "/hours 2");
     }
 }

@@ -1,9 +1,9 @@
-//! Events produced by [`World::apply_packet`](crate::world::World::apply_packet).
+//! What changed, as reported by
+//! [`World::apply`](crate::world::World::apply).
 //!
-//! [`WorldEvent`] is the single aggregate event type. Each variant wraps a
-//! distinct payload struct (defined here) so that frameworks dispatching by
-//! concrete type - notably `kitcar`'s `Event<T>` extractor - can re-export and
-//! match on the individual structs.
+//! [`WorldEvent`] wraps one payload struct per variant. The structs stand on
+//! their own so code can ask for exactly the one it cares about, as kitcar's
+//! [`Router::on`](crate::kitcar::services::router::Router::on) does.
 
 use insim::{
     core::{game_version::GameVersion, track::Track, vehicle::Vehicle},
@@ -17,21 +17,21 @@ use crate::world::{
     race::RaceEvent,
 };
 
-/// The world has caught up with the server: every reply to the startup requests
-/// has been folded. From here it mirrors the connections, players, track, layout
-/// and allowed cars that existed before you connected.
+/// The world has caught up with the server. Every startup reply is in, so it
+/// knows the connections, players, track, layout and allowed cars that were
+/// there before you connected.
 #[derive(Debug, Clone, Copy, Default)]
 #[non_exhaustive]
 pub struct WorldReady;
 
-/// A connection the world did not know about. `existing` if it was already
-/// there before we connected (it arrived in reply to a request) rather than
-/// joining now: greet only those with `existing: false`.
+/// A connection the world hadn't seen. `existing` marks one that was already
+/// there before we connected (a reply to a startup request), so greet only
+/// those with `existing: false`.
 #[derive(Debug, Clone)]
 pub struct Connected {
     /// The connection.
     pub info: ConnectionInfo,
-    /// It was already connected before we were.
+    /// Already connected before we were.
     pub existing: bool,
 }
 
@@ -40,11 +40,11 @@ pub struct Connected {
 pub struct Disconnected {
     /// The connection that left.
     pub ucid: ConnectionId,
-    /// Last known info (cloned before removal).
+    /// Last known details, if any.
     pub info: Option<ConnectionInfo>,
 }
 
-/// Extra connection details arrived via `Nci`.
+/// Extra connection details, from `Nci`.
 #[derive(Debug, Clone)]
 pub struct ConnectionDetails(pub ConnectionInfo);
 
@@ -60,21 +60,21 @@ pub struct VehicleSelected {
 /// A connection changed their display name.
 #[derive(Debug, Clone)]
 pub struct Renamed {
-    /// Connection ID.
+    /// The connection.
     pub ucid: ConnectionId,
-    /// Stable LFS.net username.
+    /// LFS.net username, which never changes.
     pub uname: String,
     /// New display name.
     pub new_pname: String,
 }
 
-/// A player the world did not know about joined the track, or rejoined it.
-/// `existing` if they were already on track before we connected.
+/// A player the world hadn't seen joined the track, or rejoined it. `existing`
+/// marks one already on track before we connected.
 #[derive(Debug, Clone)]
 pub struct PlayerJoined {
     /// The player.
     pub info: PlayerInfo,
-    /// They were already on track before we connected.
+    /// Already on track before we connected.
     pub existing: bool,
 }
 
@@ -82,12 +82,12 @@ pub struct PlayerJoined {
 #[derive(Debug, Clone)]
 pub struct PlayerLeft(pub PlayerInfo);
 
-/// A driver swap occurred.
+/// A driver swap.
 #[derive(Debug, Clone)]
 pub struct TakingOver {
-    /// Player state before the swap.
+    /// Before the swap.
     pub before: PlayerInfo,
-    /// Player state after the swap.
+    /// After the swap.
     pub after: PlayerInfo,
 }
 
@@ -95,22 +95,23 @@ pub struct TakingOver {
 #[derive(Debug, Clone)]
 pub struct PlayerTeleportedToPits(pub PlayerInfo);
 
-/// An `Rst` packet started a new race, qualifying, practice or untimed session.
+/// An `Rst` started a race, qualifying, practice or untimed session.
 #[derive(Debug, Clone)]
 pub struct SessionStarted {
     /// The kind of session that started.
     pub kind: SessionKind,
 }
 
-/// LFS returned to the entry/lobby screen.
+/// The session ended: LFS went back to the lobby, or a `/restart` is about to
+/// start a new one (a [`SessionStarted`] follows).
 #[derive(Debug, Clone)]
 pub struct SessionEnded;
 
-/// LFS transitioned from an active session to the lobby.
+/// LFS moved from an active session to the lobby.
 #[derive(Debug, Clone)]
 pub struct LobbyEntered;
 
-/// The lobby became actionable because at least one non-server client is connected.
+/// The lobby is actionable: at least one non-server client is connected.
 #[derive(Debug, Clone)]
 pub struct LobbyReady;
 
@@ -118,10 +119,10 @@ pub struct LobbyReady;
 #[derive(Debug, Clone)]
 pub struct LobbyNotReady;
 
-/// Track changed (also fired for the first `Sta` when `from` is `None`).
+/// The track changed. The first `Sta` fires this with `from: None`.
 #[derive(Debug, Clone)]
 pub struct TrackChanged {
-    /// Previously known track.
+    /// Previous track, if known.
     pub from: Option<Track>,
     /// New track.
     pub to: Track,
@@ -130,7 +131,7 @@ pub struct TrackChanged {
 /// Layout changed or cleared.
 #[derive(Debug, Clone)]
 pub struct LayoutChanged {
-    /// Previously known layout.
+    /// Previous layout, if known.
     pub from: Option<String>,
     /// New layout, or `None` if cleared.
     pub to: Option<String>,
@@ -141,29 +142,29 @@ pub struct LayoutChanged {
 pub struct MultiplayerJoined {
     /// Multiplayer host name.
     pub host_name: String,
-    /// `true` if this instance is the host.
+    /// Whether this instance is the host.
     pub is_host: bool,
 }
 
-/// LFS left multiplayer (received an `ISM` with an empty host name).
+/// LFS left multiplayer (an `ISM` with an empty host name).
 #[derive(Debug, Clone)]
 pub struct MultiplayerLeft;
 
-/// The server's allowed-cars set changed (from a `Small`/`Alc`).
+/// The server's allowed cars changed (from `Small`/`Alc`).
 #[derive(Debug, Clone)]
 pub struct AllowedCarsChanged {
-    /// The new allowed-cars set.
+    /// The new set.
     pub cars: PlcAllowedCarsSet,
 }
 
-/// The server's allowed-mods list changed (from a `Mal`).
+/// The server's allowed mods changed (from `Mal`).
 #[derive(Debug, Clone)]
 pub struct AllowedModsChanged {
-    /// The new allowed-mods list (empty means unrestricted).
+    /// The new list. Empty means unrestricted.
     pub mods: Vec<Vehicle>,
 }
 
-/// Version information was received (from a `Ver`).
+/// LFS version info arrived (from `Ver`).
 #[derive(Debug, Clone)]
 pub struct VersionReceived {
     /// Product name (e.g. `"S3"`).
@@ -172,58 +173,58 @@ pub struct VersionReceived {
     pub version: GameVersion,
 }
 
-/// Aggregate event produced by [`World::apply_packet`](crate::world::World::apply_packet).
+/// Everything [`World::apply`](crate::world::World::apply) can report.
 ///
-/// Each variant wraps the matching payload struct from this module; race events
-/// travel as the nested [`RaceEvent`] enum.
+/// Each variant wraps the payload struct of the same name. Race events nest as
+/// [`RaceEvent`].
 #[derive(Debug, Clone)]
 pub enum WorldEvent {
-    /// A new connection joined.
+    /// A connection joined.
     Connected(Connected),
     /// A connection left.
     Disconnected(Disconnected),
-    /// Extra connection details arrived via `Nci`.
+    /// Extra connection details arrived.
     ConnectionDetails(ConnectionDetails),
-    /// A connection selected a vehicle in the garage.
+    /// A connection picked a vehicle.
     VehicleSelected(VehicleSelected),
-    /// A connection changed their display name.
+    /// A connection changed their name.
     Renamed(Renamed),
     /// A player joined the track.
     PlayerJoined(PlayerJoined),
     /// A player left the track.
     PlayerLeft(PlayerLeft),
-    /// A driver swap occurred.
+    /// A driver swap.
     TakingOver(TakingOver),
-    /// A player tele-pitted (Shift+P).
+    /// A player tele-pitted.
     PlayerTeleportedToPits(PlayerTeleportedToPits),
     /// A new session started.
     SessionStarted(SessionStarted),
-    /// LFS returned to the entry/lobby screen.
+    /// A session ended.
     SessionEnded(SessionEnded),
-    /// LFS transitioned from an active session to the lobby.
+    /// LFS moved from a session to the lobby.
     LobbyEntered(LobbyEntered),
-    /// LFS is in the lobby with at least one non-server client connected.
+    /// The lobby became actionable.
     LobbyReady(LobbyReady),
-    /// LFS is no longer in the lobby with a non-server client connected.
+    /// The lobby stopped being actionable.
     LobbyNotReady(LobbyNotReady),
     /// Track changed.
     TrackChanged(TrackChanged),
     /// Layout changed or cleared.
     LayoutChanged(LayoutChanged),
-    /// LFS joined or started a multiplayer session.
+    /// LFS joined or started multiplayer.
     MultiplayerJoined(MultiplayerJoined),
     /// LFS left multiplayer.
     MultiplayerLeft(MultiplayerLeft),
-    /// The server's allowed-cars set changed.
+    /// The server's allowed cars changed.
     AllowedCarsChanged(AllowedCarsChanged),
-    /// The server's allowed-mods list changed.
+    /// The server's allowed mods changed.
     AllowedModsChanged(AllowedModsChanged),
-    /// Version information was received.
+    /// LFS version info arrived.
     VersionReceived(VersionReceived),
-    /// A race event (entrant joined, lap completed, finished, etc.).
+    /// Something happened in the race: a lap, a pit stop, a finish.
     Race(RaceEvent),
     /// Every reply to [`World::STARTUP_REQUESTS`](crate::world::World::STARTUP_REQUESTS)
-    /// has been folded. Never produced by `apply_packet`; emitted by whatever
-    /// drives the world (`World::attach`, or kitcar's runtime).
+    /// is in. `apply` never emits this; whatever drives the world does
+    /// (`World::attach`, or kitcar's runtime).
     Ready(WorldReady),
 }

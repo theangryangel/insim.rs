@@ -25,12 +25,15 @@ use futures::{
 use insim::{
     core::{object::ObjectInfo, track::Track, vehicle::Vehicle},
     identifiers::ConnectionId,
-    insim::{Axm, PmoAction, PmoFlags, RaceLaps},
+    insim::{Axm, Mal, Mst, Plc, PlcAllowedCarsSet, PmoAction, PmoFlags, RaceLaps},
 };
 
 use crate::{
     kitcar::{Context, Effects, Input, Service},
-    world::{FinishStatus, RaceEvent, World, WorldEvent},
+    world::{
+        World, WorldEvent,
+        race::{FinishStatus, RaceEvent},
+    },
 };
 
 /// Where the round is.
@@ -468,22 +471,22 @@ impl RaceDirector {
             .live_entrants()
             .all(|entrant| matches!(entrant.status, FinishStatus::Finished { .. }));
         if self.finishing && home {
-            effects.and(self.move_on(world))
+            effects.and(self.move_on())
         } else {
             effects
         }
     }
 
     /// Restart, or return to the lobby if the next combo is due.
-    fn move_on(&mut self, world: &World) -> Effects<RaceDirectorMsg> {
+    fn move_on(&mut self) -> Effects<RaceDirectorMsg> {
         self.finishing = false;
         self.moved_on = true;
         // The race being ended counts towards `Every::Races`.
         let due = matches!(self.every, Some(Every::Races(races)) if self.races + 1 >= races);
         let next = if due || self.loading || !self.configured {
-            world.end()
+            Mst::new("/end")
         } else {
-            world.restart()
+            Mst::new("/restart")
         };
         Effects::new().cancel(Grace).packet(next)
     }
@@ -496,7 +499,7 @@ impl RaceDirector {
         let effects = self.load_next(world);
         match self.phase {
             // The lobby that follows waits for the next combo.
-            Phase::Racing => effects.packet(world.end()),
+            Phase::Racing => effects.packet(Mst::new("/end")),
             Phase::SettingUp | Phase::Waiting => effects,
         }
     }
@@ -531,7 +534,7 @@ impl RaceDirector {
                 self.phase = Phase::Waiting;
                 return match was {
                     Phase::Racing => (
-                        Effects::new().packet(world.end()),
+                        Effects::new().packet(Mst::new("/end")),
                         Some(Transition::Ended { shortfall: true }),
                     ),
                     _ => (Effects::none(), None),
@@ -562,7 +565,7 @@ impl RaceDirector {
             self.ending_session = true;
             self.phase = Phase::SettingUp;
             return (
-                Effects::new().packet(world.end()),
+                Effects::new().packet(Mst::new("/end")),
                 Some(Transition::SetupStarted),
             );
         }
@@ -594,22 +597,22 @@ impl RaceDirector {
         if world.track() != Some(combo.track) {
             return (
                 Effects::new()
-                    .packet(world.clear())
-                    .packet(world.change_track(combo.track)),
+                    .packet(Mst::new("/clear"))
+                    .packet(Mst::new(format!("/track {}", combo.track))),
                 false,
             );
         }
         let effects = Effects::new()
-            .packet(world.change_laps(combo.laps))
-            .packet(world.change_wind(combo.wind))
+            .packet(Mst::new(combo.laps.to_command()))
+            .packet(Mst::new(format!("/wind {}", combo.wind)))
             .packets(
                 combo
                     .vehicles
                     .as_deref()
-                    .map(|vehicles| world.restrict_vehicles(vehicles))
+                    .map(restrict_everyone)
                     .unwrap_or_default(),
             )
-            .packet(world.ax_clear());
+            .packet(Mst::new("/axclear"));
         let effects = match &combo.layout {
             None => effects,
             Some(Layout::Axload(name)) => effects
@@ -617,7 +620,7 @@ impl RaceDirector {
                     "^3Setting up - loading layout, please wait...",
                     ConnectionId::ALL,
                 )
-                .packet(world.ax_load(name.clone())),
+                .packet(Mst::new(format!("/axload {name}"))),
             Some(Layout::Objects(objects)) => {
                 let chunks = objects.chunks(60);
                 let last = chunks.len().saturating_sub(1);
@@ -635,6 +638,37 @@ impl RaceDirector {
         };
         (effects, true)
     }
+}
+
+/// Restrict everyone to `vehicles`, or allow everything if empty. Standard
+/// cars go in a `Plc` to every connection; mods in a server-wide `Mal`.
+fn restrict_everyone(vehicles: &[Vehicle]) -> Vec<insim::Packet> {
+    let mut mods = Mal::default();
+    let cars = if vehicles.is_empty() {
+        PlcAllowedCarsSet::all()
+    } else {
+        let mut cars = PlcAllowedCarsSet::default();
+        for vehicle in vehicles {
+            match vehicle {
+                Vehicle::Mod(_) => {
+                    let _ = mods.insert(*vehicle);
+                },
+                _ => {
+                    let _ = cars.insert(*vehicle);
+                },
+            }
+        }
+        cars
+    };
+    vec![
+        Plc {
+            ucid: ConnectionId::ALL,
+            cars,
+            ..Default::default()
+        }
+        .into(),
+        mods.into(),
+    ]
 }
 
 impl Service for RaceDirector {
@@ -655,7 +689,7 @@ impl Service for RaceDirector {
             Input::Msg(RaceDirectorMsg(DirectorMsg::Loaded(result))) => self.loaded(result, world),
             Input::Msg(RaceDirectorMsg(DirectorMsg::GraceUp)) => {
                 if self.finishing && self.phase == Phase::Racing {
-                    self.move_on(world)
+                    self.move_on()
                 } else {
                     Effects::none()
                 }
@@ -698,7 +732,7 @@ mod tests {
         director: &mut RaceDirector,
         packet: Packet,
     ) -> (Vec<String>, Vec<Transition>) {
-        let events = world.apply_packet(&packet);
+        let events = world.apply(&packet);
         let world = &*world;
         let cx = Context::new(world, Instant::now());
         let mut commands = Vec::new();
@@ -909,7 +943,7 @@ mod tests {
     ) -> Seen {
         let mut queue: std::collections::VecDeque<_> = match input {
             Input::Packet(packet) => {
-                let events = world.apply_packet(&packet);
+                let events = world.apply(&packet);
                 std::iter::once(Input::Packet(packet))
                     .chain(events.into_iter().map(Input::World))
                     .collect()

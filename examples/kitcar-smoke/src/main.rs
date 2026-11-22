@@ -27,7 +27,7 @@ use insim_extra::{
     chat::{ChatCommand, ChatParser},
     kitcar::{Context, Effects, Host, Input, Service, error::HostError},
     ui::{self, Child, Component, Node, Ui},
-    world::{Connected, WorldEvent},
+    world::{WorldEvent, event::Connected},
 };
 
 // `ChatParser<C>` strips the `!` prefix and parses the rest into `C`. Each

@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 use insim::{
     core::vehicle::Vehicle,
     identifiers::{ConnectionId, PlayerId},
-    insim::{Flg, FlgType, PlayerType, Plc, PlcAllowedCarsSet, RaceConfirmFlags, Res},
+    insim::{Flg, FlgType, PlayerType, RaceConfirmFlags, Res},
 };
 use insim_extra::{
     chat::ChatCommand,
@@ -17,7 +17,10 @@ use insim_extra::{
         services::router::{Caller, Router},
     },
     ui::{Child, Node, Ui},
-    world::{Connected, Disconnected, TrackChanged, World},
+    world::{
+        ConnectionInfo, World,
+        event::{Connected, Disconnected, TrackChanged},
+    },
 };
 
 use crate::rank::RankCard;
@@ -55,14 +58,6 @@ impl Driver {
             .iter()
             .take(self.points as usize + 1)
             .flat_map(|rung| rung.iter().copied())
-    }
-
-    fn allowed(&self) -> PlcAllowedCarsSet {
-        let mut cars = PlcAllowedCarsSet::default();
-        for car in self.cars() {
-            let _ = cars.insert(car);
-        }
-        cars
     }
 
     pub(crate) fn car_list(&self) -> String {
@@ -117,12 +112,8 @@ impl Zinc {
     }
 
     /// Restrict a connection to its driver's unlocked cars.
-    fn licence(&self, ucid: ConnectionId, uname: &str) -> Effects<Msg> {
-        Effects::new().packet(Plc {
-            ucid,
-            cars: self.driver(uname).allowed(),
-            ..Default::default()
-        })
+    fn licence(&self, conn: &ConnectionInfo) -> Effects<Msg> {
+        Effects::new().packet(conn.restrict_vehicles(self.driver(&conn.uname).cars()))
     }
 
     /// The connection and username behind a human player.
@@ -157,7 +148,7 @@ pub fn service() -> Router<Zinc, Msg> {
 /// Licence each driver as they join, including those already connected.
 fn joined(zinc: &mut Zinc, event: &Connected, _: &Context<'_>) -> Effects<Msg> {
     let driver = zinc.driver(&event.info.uname);
-    let effects = zinc.licence(event.info.ucid, &event.info.uname);
+    let effects = zinc.licence(&event.info);
     if event.existing {
         return effects;
     }
@@ -205,7 +196,7 @@ fn track_changed(zinc: &mut Zinc, _: &TrackChanged, cx: &Context<'_>) -> Effects
     cx.world()
         .connections()
         .fold(Effects::new(), |effects, conn| {
-            effects.and(zinc.licence(conn.ucid, &conn.uname))
+            effects.and(zinc.licence(conn))
         })
 }
 
@@ -233,14 +224,14 @@ fn result(zinc: &mut Zinc, res: &Res, cx: &Context<'_>) -> Effects<Msg> {
     let after = *driver;
 
     // Tell them and update their cars, if they're still here.
-    let Some(ucid) = cx
+    let Some(conn) = cx
         .world()
         .connections()
         .find(|conn| conn.uname == res.uname)
-        .map(|conn| conn.ucid)
     else {
         return Effects::none();
     };
+    let ucid = conn.ucid;
     let effects =
         Effects::new().message(format!("^2+1 point^7 - you have ^2{}", after.points), ucid);
     let unlocked: Vec<String> = after
@@ -251,7 +242,7 @@ fn result(zinc: &mut Zinc, res: &Res, cx: &Context<'_>) -> Effects<Msg> {
     if unlocked.is_empty() {
         return effects;
     }
-    effects.and(zinc.licence(ucid, &res.uname)).message(
+    effects.and(zinc.licence(conn)).message(
         format!(
             "^3Licence upgraded^7 - you can now drive ^3{}",
             unlocked.join(" ")
@@ -327,7 +318,7 @@ mod tests {
     /// A world with one human driver, `bob`, on track as player 5.
     fn world() -> World {
         let mut world = World::new();
-        let _ = world.apply_packet(
+        let _ = world.apply(
             &Ncn {
                 ucid: ConnectionId(2),
                 uname: "bob".into(),
@@ -335,7 +326,7 @@ mod tests {
             }
             .into(),
         );
-        let _ = world.apply_packet(
+        let _ = world.apply(
             &Npl {
                 ucid: ConnectionId(2),
                 plid: PlayerId(5),

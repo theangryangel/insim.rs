@@ -1,12 +1,12 @@
 //! Components that keep their own per-player state, and the [`Screen`] that
 //! draws one connection's buttons.
 //!
-//! A view is rendered from scratch each time. Components placed with
-//! [`Ui::component`] or [`Ui::child`] are not stored by their parent; the screen
-//! keeps one instance per player, identified by where it is placed (the call
-//! site, plus a [`Key`] if given). Clicks on a component's buttons go straight to
-//! its instance, and what it reports back ([`Component::Out`]) can be turned into
-//! its parent's message with [`Child::on`].
+//! A view is rendered afresh each time. Components placed with [`Ui::component`]
+//! or [`Ui::child`] aren't stored by their parent: the screen keeps one instance
+//! per player, identified by its parent, call site and [`Key`] (if any). It lives
+//! only while it keeps being placed. Clicks on its buttons go straight to it, and
+//! [`Child::on`] turns what it reports ([`Component::Out`]) into a message for
+//! its parent.
 
 use std::{
     any::{Any, TypeId},
@@ -44,38 +44,36 @@ use super::{Action, Canvas, CanvasDiff, Node, id_pool::ClickIdPool};
 /// }
 /// ```
 pub trait Component: Send + 'static {
-    /// What this component's buttons produce. Delivered to [`update`](Self::update).
+    /// What its buttons produce, delivered to [`update`](Self::update).
     type Msg: Clone + Send + Sync + 'static;
-    /// What it reports to its parent, if anything; see [`Child::on`]. Use `()`
-    /// when it reports nothing.
+    /// What it reports to its parent (see [`Child::on`]), or `()`.
     type Out: Send + 'static;
-    /// Data passed in by the parent on every render, which may borrow from it;
-    /// see [`Child::with_props`]. Use `()` when there is none.
+    /// Data from the parent on every render, possibly borrowed (see
+    /// [`Child::with_props`]), or `()`.
     type Props<'a>;
 
-    /// Runs once when the component is first placed for a player, before its
-    /// first render. Set up from props here; `init` never sees them. Placed
-    /// again after being dropped, it mounts afresh.
+    /// Runs once, before the first render, with the first props. `init` never
+    /// sees props, so set up from them here. Placed again after being dropped,
+    /// it mounts afresh.
     fn mounted(&mut self, props: &Self::Props<'_>) {
         let _ = props;
     }
 
-    /// Runs once when the component goes: no longer placed, replaced by a
-    /// different component, or its player's screen cleared (they left, or the
-    /// service stopped). Its state is dropped straight after.
+    /// Runs once when it is dropped: not placed in a render, replaced by a
+    /// different component, or its screen cleared (the player left, or the
+    /// service stopped).
     fn unmounted(&mut self) {}
 
-    /// Handle one of its own messages, optionally reporting to the parent.
+    /// Handle one of its messages, optionally reporting to the parent.
     fn update(&mut self, msg: Self::Msg) -> Option<Self::Out>;
 
-    /// Draw it. `ui` places nested components.
+    /// Draw it, placing any nested components with `ui`.
     fn render(&self, props: Self::Props<'_>, ui: &mut Ui<'_, Self::Msg>) -> Node<Self::Msg>;
 }
 
-/// Names a component so it can be told apart from others placed at the same
-/// call site (such as in a loop), and addressed from outside. Implemented for
-/// any `Hash + PartialEq + Debug + Send + Sync + 'static` type, including
-/// `&'static str` and ids such as `PlayerId`.
+/// Tells apart components placed by one call site (in a loop, say), and
+/// addresses them from outside. Implemented for any `Hash + PartialEq + Debug +
+/// Send + Sync + 'static` type, such as `&'static str` or `PlayerId`.
 pub trait Key: Any + Send + Sync + fmt::Debug {
     #[doc(hidden)]
     fn same(&self, other: &dyn Key) -> bool;
@@ -102,7 +100,7 @@ impl<T: Any + Send + Sync + fmt::Debug + Hash + PartialEq> Key for T {
 type AnyMsg = Box<dyn Any + Send>;
 type OnOut = Arc<dyn Fn(AnyMsg) -> Option<AnyMsg> + Send + Sync>;
 
-/// How to place a component: what creates it, its props, key and parent mapping.
+/// How to place a component: its constructor, props, key and parent mapping.
 #[must_use = "place it with Ui::child"]
 pub struct Child<'p, C: Component, M> {
     props: C::Props<'p>,
@@ -132,7 +130,7 @@ where
 }
 
 impl<'p, C: Component, M> Child<'p, C, M> {
-    /// A component that is given `props` on every render.
+    /// A component given `props` on every render.
     pub fn with_props(props: C::Props<'p>, init: impl FnOnce() -> C + 'p) -> Self {
         Self {
             props,
@@ -142,8 +140,8 @@ impl<'p, C: Component, M> Child<'p, C, M> {
             _parent: PhantomData,
         }
     }
-    /// Tell this instance apart from others placed by the same line, and let
-    /// it be addressed from outside.
+    /// Tell this instance apart from others placed by the same line, and
+    /// address it from outside.
     pub fn key(mut self, key: impl Key) -> Self {
         self.key = Some(Box::new(key));
         self
@@ -188,15 +186,14 @@ struct Instance {
     seen: u64,
 }
 
-/// Every way an instance goes ends here: not placed in a render, replaced, or its
-/// screen cleared or dropped.
+/// Every unmount ends here: unplaced, replaced, or its screen cleared or dropped.
 impl Drop for Instance {
     fn drop(&mut self) {
         self.component.unmounted();
     }
 }
 
-/// The view's own messages come from the root.
+/// The view itself, rather than a component.
 const ROOT: u64 = 0;
 
 #[derive(Default)]
@@ -206,7 +203,7 @@ struct Store {
 }
 
 impl Store {
-    /// Deliver a message to an instance and pass what it reports up through its
+    /// Deliver `msg` to an instance and pass what it reports up through its
     /// parents. Returns the root's message, if it gets that far.
     fn deliver(&mut self, mut path: u64, msg: &dyn Any) -> Option<AnyMsg> {
         let mut out = self.instances.get_mut(&path)?.component.update_any(msg)?;
@@ -249,11 +246,10 @@ impl<M> Ui<'_, M> {
         self.now
     }
 
-    /// Place a self-contained component with no props. Its instance is created
-    /// the first time this line places it for a player, then kept across renders
-    /// until it is no longer placed. A loop that places several from one line
-    /// needs [`Child::key`]; use [`child`](Self::child) for that, for props, or
-    /// to receive what it reports.
+    /// Place a component with no props. It is created the first time this line
+    /// places it for a player, and kept while it keeps being placed. For props,
+    /// its reports, or a [`Child::key`] (needed to place several from one line),
+    /// use [`child`](Self::child).
     #[track_caller]
     pub fn component<C>(&mut self, init: impl FnOnce() -> C) -> Node<M>
     where
@@ -330,11 +326,11 @@ impl<M> Ui<'_, M> {
     }
 }
 
-/// One connection's buttons for one view: what is drawn, the component instances
-/// behind it, and whether the player has hidden the buttons.
+/// One connection's buttons for one view: what is drawn, the components behind
+/// it, and whether the player has hidden them.
 ///
-/// Click ids are leased from a pool shared by every screen on the connection, so
-/// several views can draw on one connection without colliding.
+/// Click ids come from a pool shared by every screen on the connection, so
+/// several views can draw on it without colliding.
 pub struct Screen<M: Clone + 'static> {
     ucid: ConnectionId,
     canvas: Canvas<M>,
@@ -372,8 +368,8 @@ impl<M: Clone + Send + 'static> Screen<M> {
     }
 
     /// Draw `view` and return the packets that bring the player's buttons up to
-    /// date. Components no longer placed are dropped. Draws nothing while the
-    /// player has hidden the buttons.
+    /// date. Unplaced components are dropped. Draws nothing while the player has
+    /// hidden the buttons.
     pub fn render(
         &mut self,
         pool: &mut ClickIdPool,
@@ -441,8 +437,9 @@ impl<M: Clone + Send + 'static> Screen<M> {
         }
     }
 
-    /// Send `msg` to every component placed with `key`, as if it came from one of
-    /// its buttons. Returns the view's own messages that result.
+    /// Send `msg` to every component placed with `key`, as if from one of its
+    /// buttons, and return any messages for the view. If none is placed, `msg` is
+    /// dropped with a warning.
     pub fn send(&mut self, key: &dyn Key, msg: &dyn Any) -> Vec<M> {
         let targets: Vec<u64> = self
             .store
@@ -468,8 +465,8 @@ impl<M: Clone + Send + 'static> Screen<M> {
             .unwrap_or_default()
     }
 
-    /// Remove every button and component, returning the packets that delete the
-    /// buttons and releasing their click ids.
+    /// Remove every button and component, releasing their click ids. Returns the
+    /// packets that delete the buttons.
     pub fn clear(&mut self, pool: &mut ClickIdPool) -> Vec<Packet> {
         self.store.instances.clear();
         self.canvas

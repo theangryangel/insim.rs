@@ -6,13 +6,13 @@ use insim::{
 };
 use tokio::sync::mpsc;
 
-use super::{SharedWorld, World, WorldEvent, WorldReady};
+use super::{Applied, SharedWorld, World, WorldEvent, WorldReady};
 
 impl World {
-    /// Send every [`STARTUP_REQUESTS`](Self::STARTUP_REQUESTS) at once and return
-    /// all replies once each request has gone quiet. The replies are still read
-    /// as ordinary packets; whoever folds them uses this to know when the world
-    /// has caught up.
+    /// Send every [`STARTUP_REQUESTS`](Self::STARTUP_REQUESTS) at once and
+    /// return the replies once each has gone quiet. The replies still arrive as
+    /// ordinary packets too; this tells whoever folds them when the world has
+    /// caught up.
     pub async fn request_startup(sender: &Sender) -> insim::Result<Vec<Packet>> {
         let mut requests = Vec::with_capacity(Self::STARTUP_REQUESTS.len());
         for t in Self::STARTUP_REQUESTS {
@@ -30,24 +30,22 @@ impl SharedWorld {
     /// Keep this world in step with a split session from a background task, and
     /// report what changes.
     ///
-    /// The task copies every InSim packet with a tap (nothing is taken from the
-    /// session's receiver), sends the startup requests and anything else the world
-    /// asks for ([`World::take_requests`]), and folds packets in the order they
-    /// were read. The returned channel carries each
-    /// resulting [`WorldEvent`], then [`WorldEvent::Ready`] once every startup
-    /// reply has been folded. It closes when the session ends. Drain it or drop it.
+    /// The task taps every InSim packet (your receiver still gets them all),
+    /// sends the startup requests and any that [`World::apply`] asks for,
+    /// and folds packets in the order they were read. The channel carries each
+    /// [`WorldEvent`], then [`WorldEvent::Ready`] once the startup replies are
+    /// in. It closes when the session ends. Drain it or drop it.
     ///
-    /// Folding runs alongside your own reads rather than in step with them: a
-    /// packet you have just received may not be in the world yet. For handlers
-    /// that need settled state, fold with [`World::apply_packet`] in your own
-    /// loop instead (as kitcar does).
+    /// Folding runs alongside your own reads, so a packet you just received may
+    /// not be in the world yet. If you need settled state, call
+    /// [`World::apply`] in your own loop instead, as kitcar does.
     ///
     /// Must be called within a Tokio runtime.
     pub async fn attach(
         &self,
         sender: &Sender,
     ) -> insim::Result<mpsc::UnboundedReceiver<WorldEvent>> {
-        // Every InSim packet; telemetry has no ReqI and the world ignores it.
+        // InSim packets only: telemetry has no ReqI and the world ignores it.
         let tap = sender
             .tap(|p| p.request_id().is_some(), Policy::Queue)
             .await?;
@@ -93,10 +91,10 @@ impl SharedWorld {
         events: &mpsc::UnboundedSender<WorldEvent>,
     ) {
         // Never hold the lock across an await.
-        let (changes, requests) = {
-            let mut world = self.write();
-            (world.apply_packet(packet), world.take_requests())
-        };
+        let Applied {
+            events: changes,
+            requests,
+        } = self.write().apply(packet);
         for request in requests {
             if let Err(error) = sender.send(request).await {
                 tracing::warn!(%error, "failed to send a request for the world");
