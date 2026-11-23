@@ -29,11 +29,17 @@
 //!   messages. Services stay deterministic, so a test is just `update` with an
 //!   input and a [`Context`].
 //! - **Services side by side.** Behaviour that needs nothing from a game, such
-//!   as [`RaceDirector`] and [`PenaltyClearer`], runs as its own service. The
-//!   game follows the session through the [`World`], so it doesn't matter who
-//!   started a race. Behaviour that needs a service's state is a struct field
-//!   with its own update method: combine with [`Effects::and`], lift messages
-//!   with [`Effects::map`].
+//!   as [`PenaltyClearer`], runs as its own service. The game follows the
+//!   session through the [`World`], so it doesn't matter who started a race.
+//!   Behaviour that needs a service's state is a struct field with its own
+//!   update method: combine with [`Effects::and`], lift messages with
+//!   [`Effects::map`].
+//! - **One director.** A [`RaceDirector`] runs the races themselves: lobby
+//!   setup, restarts and the combo rotation. It isn't a service. The host owns
+//!   at most one, given with [`Host::start_director`], runs it before every
+//!   service, and lets every service read it with [`Context::director`].
+//!   Read it to show what's coming: races left, the restart countdown, the
+//!   next track.
 //!
 //! # Routers
 //!
@@ -60,10 +66,11 @@
 //!
 //! [`World`]: crate::world::World
 //! [`Router`]: services::router::Router
-//! [`RaceDirector`]: services::race_director::RaceDirector
+//! [`RaceDirector`]: director::RaceDirector
 //! [`PenaltyClearer`]: services::penalty_clearer::PenaltyClearer
 //! [`World::connections`]: crate::world::World::connections
 
+pub mod director;
 pub mod effects;
 pub mod error;
 pub mod host;

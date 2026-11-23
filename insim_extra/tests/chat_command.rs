@@ -1,5 +1,9 @@
 //! Tests for `#[derive(ChatCommand)]`.
 
+// An integration test is its own crate, but Cargo gives it every dependency
+// of `insim_extra`. The library uses them; this test needn't.
+#![allow(unused_crate_dependencies)]
+
 use insim_extra::chat::{ChatCommand, ChatParseError};
 
 #[derive(Debug, PartialEq, ChatCommand)]

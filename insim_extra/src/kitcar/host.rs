@@ -17,6 +17,7 @@ use tokio::{
 use crate::{
     kitcar::{
         Effects,
+        director::{DirectorCommand, RaceDirector, RaceDirectorMsg},
         effects::Effect,
         error::HostError,
         service::{AnyMsg, Context, ErasedService, Input, Pools, Service, Typed},
@@ -39,6 +40,10 @@ enum Command {
     },
     Stop {
         id: u64,
+        reply: oneshot::Sender<()>,
+    },
+    Direct {
+        director: Box<RaceDirector>,
         reply: oneshot::Sender<()>,
     },
     Shutdown {
@@ -97,6 +102,8 @@ impl Host {
             connection: sender.clone(),
             receiver,
             world: world.clone(),
+            director: None,
+            commands: Vec::new(),
             services: Vec::new(),
             results_tx,
             ready: Ready::new(startup),
@@ -151,6 +158,22 @@ impl Host {
             commands: self.commands.clone(),
             done: Some(done_rx),
         })
+    }
+
+    /// Hand the races to `director`: lobby setup, restarts and the combo
+    /// rotation. It runs before every service, which can read it with
+    /// [`Context::director`]. There is only ever one, so this replaces any
+    /// director already running (which gets [`Input::Stopping`] first).
+    pub async fn start_director(&self, director: RaceDirector) -> Result<(), HostError> {
+        let (reply, started) = oneshot::channel();
+        self.commands
+            .send(Command::Direct {
+                director: Box::new(director),
+                reply,
+            })
+            .await
+            .map_err(|_| HostError::Closed)?;
+        started.await.map_err(|_| HostError::Closed)
     }
 
     /// Wait until the connection ends, returning its error if it failed.
@@ -219,30 +242,67 @@ impl ServiceHandle {
     }
 }
 
-struct Running {
+/// Timers and tasks, kept for anything the host runs.
+struct Slot {
     id: u64,
-    service: Box<dyn ErasedService>,
     timers: Timers<AnyMsg>,
     tasks: Vec<AbortHandle>,
-    done: Option<oneshot::Sender<()>>,
     stopping: bool,
 }
 
-impl Drop for Running {
+impl Slot {
+    fn new(id: u64) -> Self {
+        Self {
+            id,
+            timers: Timers::default(),
+            tasks: Vec::new(),
+            stopping: false,
+        }
+    }
+}
+
+impl Drop for Slot {
     fn drop(&mut self) {
         for task in &self.tasks {
             task.abort();
         }
+    }
+}
+
+struct Running {
+    slot: Slot,
+    service: Box<dyn ErasedService>,
+    done: Option<oneshot::Sender<()>>,
+}
+
+impl Drop for Running {
+    fn drop(&mut self) {
         if let Some(done) = self.done.take() {
             let _ = done.send(());
         }
     }
 }
 
+/// The host's one director.
+struct Directing {
+    slot: Slot,
+    director: RaceDirector,
+}
+
+/// Who an input is for.
+#[derive(Debug, Clone, Copy)]
+enum Target {
+    Director,
+    Service(usize),
+}
+
 struct Loop {
     connection: net::Sender,
     receiver: net::Receiver,
     world: SharedWorld,
+    director: Option<Directing>,
+    /// Commands from services, for the director once their effects are done.
+    commands: Vec<DirectorCommand>,
     services: Vec<Running>,
     results_tx: mpsc::UnboundedSender<(u64, AnyMsg)>,
     ready: Ready,
@@ -261,7 +321,9 @@ impl Loop {
             let deadline = self
                 .services
                 .iter()
-                .filter_map(|m| m.timers.deadline())
+                .map(|m| &m.slot)
+                .chain(self.director.as_ref().map(|d| &d.slot))
+                .filter_map(|slot| slot.timers.deadline())
                 .min();
             let waiting = self.ready.task.is_some();
             let wake = match (deadline, self.render_at()) {
@@ -273,23 +335,33 @@ impl Loop {
                 command = commands.recv() => match command {
                     Some(Command::Start { service, done, reply }) => {
                         let id = self.next_id;
+                        tracing::info!(service = service.name(), "service started");
                         self.next_id += 1;
                         self.services.push(Running {
-                            id,
+                            slot: Slot::new(id),
                             service,
-                            timers: Timers::default(),
-                            tasks: Vec::new(),
                             done: Some(done),
-                            stopping: false,
                         });
                         let _ = reply.send(id);
-                        self.deliver(self.services.len() - 1, Input::Started).await;
+                        self.deliver(Target::Service(self.services.len() - 1), Input::Started).await;
                     },
                     Some(Command::Stop { id, reply }) => {
                         if let Some(index) = self.index_of(id) {
                             self.stop(index).await;
                         }
                         let _ = reply.send(());
+                    },
+                    Some(Command::Direct { director, reply }) => {
+                        tracing::info!("director started");
+                        self.stop_director().await;
+                        let id = self.next_id;
+                        self.next_id += 1;
+                        self.director = Some(Directing {
+                            slot: Slot::new(id),
+                            director: *director,
+                        });
+                        let _ = reply.send(());
+                        self.deliver(Target::Director, Input::Started).await;
                     },
                     Some(Command::Shutdown { reply }) => {
                         self.stop_all().await;
@@ -313,21 +385,22 @@ impl Loop {
                         return Err(error.into());
                     },
                     None => {
+                        tracing::info!("connection closed");
                         self.stop_all().await;
                         return Ok(());
                     },
                 },
                 Some((id, msg)) = results.recv() => {
-                    if let Some(index) = self.index_of(id).filter(|&i| !self.services[i].stopping) {
-                        self.deliver(index, Input::Msg(msg)).await;
+                    if let Some(target) = self.target_of(id).filter(|&t| self.live(t)) {
+                        self.deliver(target, Input::Msg(msg)).await;
                     }
                 },
                 () = tokio::time::sleep_until(wake.unwrap_or_else(Instant::now).into()), if wake.is_some() => {
                     let now = Instant::now();
-                    for index in 0..self.services.len() {
-                        for msg in self.services[index].timers.expire(now) {
-                            if !self.services[index].stopping {
-                                self.deliver(index, Input::Msg(msg)).await;
+                    for target in self.targets() {
+                        for msg in self.slot_mut(target).timers.expire(now) {
+                            if self.live(target) {
+                                self.deliver(target, Input::Msg(msg)).await;
                             }
                         }
                     }
@@ -349,12 +422,18 @@ impl Loop {
         }
     }
 
-    /// When to next redraw, if anything changed.
+    /// When to next redraw: a frame after the last if anything changed, or
+    /// when a view asked to be drawn again.
     fn render_at(&self) -> Option<Instant> {
+        let frame = self.last_render + FRAME;
+        if self.services.iter().any(|s| s.service.needs_render()) {
+            return Some(frame);
+        }
         self.services
             .iter()
-            .any(|s| s.service.needs_render())
-            .then_some(self.last_render + FRAME)
+            .filter_map(|s| s.service.redraw_at())
+            .min()
+            .map(|at| at.max(frame))
     }
 
     async fn render(&mut self) {
@@ -363,7 +442,8 @@ impl Loop {
         let mut packets = Vec::new();
         {
             let world = self.world.read();
-            let cx = Context::new(&world, now);
+            let cx = Context::new(&world, now)
+                .with_director_opt(self.director.as_ref().map(|d| d.director.status()));
             for running in &mut self.services {
                 packets.extend(running.service.render(&cx, &mut self.pools));
             }
@@ -381,7 +461,45 @@ impl Loop {
 
     // By index, so no borrow of `services` is held across an await.
     fn index_of(&self, id: u64) -> Option<usize> {
-        self.services.iter().position(|m| m.id == id)
+        self.services.iter().position(|m| m.slot.id == id)
+    }
+
+    fn target_of(&self, id: u64) -> Option<Target> {
+        if self.director.as_ref().is_some_and(|d| d.slot.id == id) {
+            return Some(Target::Director);
+        }
+        self.index_of(id).map(Target::Service)
+    }
+
+    /// The director first, then every service in start order.
+    fn targets(&self) -> Vec<Target> {
+        self.director
+            .as_ref()
+            .map(|_| Target::Director)
+            .into_iter()
+            .chain((0..self.services.len()).map(Target::Service))
+            .collect()
+    }
+
+    fn slot_mut(&mut self, target: Target) -> &mut Slot {
+        match target {
+            Target::Director => {
+                &mut self
+                    .director
+                    .as_mut()
+                    .expect("targets only name a director that is running")
+                    .slot
+            },
+            Target::Service(index) => &mut self.services[index].slot,
+        }
+    }
+
+    /// Running and not stopping.
+    fn live(&self, target: Target) -> bool {
+        match target {
+            Target::Director => self.director.as_ref().is_some_and(|d| !d.slot.stopping),
+            Target::Service(index) => self.services.get(index).is_some_and(|s| !s.slot.stopping),
+        }
     }
 
     async fn on_packet(&mut self, packet: Packet) {
@@ -393,16 +511,17 @@ impl Loop {
                 tracing::warn!(%error, "failed to send a request for the world");
             }
         }
-        for index in 0..self.services.len() {
-            if self.services[index].stopping {
+        // The director goes first, so every service reads where it got to.
+        for target in self.targets() {
+            if !self.live(target) {
                 continue;
             }
-            self.deliver(index, Input::Packet(packet.clone())).await;
+            self.deliver(target, Input::Packet(packet.clone())).await;
             for event in &events {
-                if self.services[index].stopping {
+                if !self.live(target) {
                     break;
                 }
-                self.deliver(index, Input::World(event.clone())).await;
+                self.deliver(target, Input::World(event.clone())).await;
             }
         }
         if let Packet::Cnl(cnl) = &packet {
@@ -412,27 +531,68 @@ impl Loop {
     }
 
     async fn broadcast(&mut self, input: impl Fn() -> Input<AnyMsg>) {
-        for index in 0..self.services.len() {
-            if !self.services[index].stopping {
-                self.deliver(index, input()).await;
+        for target in self.targets() {
+            if self.live(target) {
+                self.deliver(target, input()).await;
             }
         }
     }
 
-    async fn deliver(&mut self, index: usize, input: Input<AnyMsg>) {
+    async fn deliver(&mut self, target: Target, input: Input<AnyMsg>) {
         let now = Instant::now();
         let effects = {
             let world = self.world.read();
             let cx = Context::new(&world, now);
-            self.services[index]
-                .service
-                .update(input, &cx, &mut self.pools)
+            match target {
+                Target::Director => {
+                    let Some(directing) = self.director.as_mut() else {
+                        return;
+                    };
+                    let input = input.map(|msg| {
+                        *msg.downcast::<RaceDirectorMsg>()
+                            .expect("the host only delivers the director its own messages")
+                    });
+                    directing
+                        .director
+                        .update(input, &cx)
+                        .map(|msg| Box::new(msg) as AnyMsg)
+                },
+                Target::Service(index) => {
+                    let cx =
+                        cx.with_director_opt(self.director.as_ref().map(|d| d.director.status()));
+                    self.services[index]
+                        .service
+                        .update(input, &cx, &mut self.pools)
+                },
+            }
         };
-        self.apply(index, effects, now).await;
+        self.apply(target, effects, now).await;
+        self.direct(now).await;
     }
 
-    async fn apply(&mut self, index: usize, effects: Effects<AnyMsg>, now: Instant) {
-        let id = self.services[index].id;
+    /// Hand the director the commands services just gave it.
+    async fn direct(&mut self, now: Instant) {
+        for command in std::mem::take(&mut self.commands) {
+            if !self.live(Target::Director) {
+                tracing::warn!(?command, "no director to take this command");
+                continue;
+            }
+            let effects = {
+                let world = self.world.read();
+                let cx = Context::new(&world, now);
+                self.director
+                    .as_mut()
+                    .expect("checked live")
+                    .director
+                    .command(command, &cx)
+                    .map(|msg| Box::new(msg) as AnyMsg)
+            };
+            self.apply(Target::Director, effects, now).await;
+        }
+    }
+
+    async fn apply(&mut self, target: Target, effects: Effects<AnyMsg>, now: Instant) {
+        let id = self.slot_mut(target).id;
         let mut queue: VecDeque<_> = effects.items.into();
         while let Some(effect) = queue.pop_front() {
             match effect {
@@ -442,20 +602,20 @@ impl Loop {
                     }
                 },
                 Effect::Timer { key, when, msg } => {
-                    self.services[index]
+                    self.slot_mut(target)
                         .timers
                         .once(key, when.resolve(now), msg);
                 },
                 Effect::Every { key, period, make } => {
-                    self.services[index].timers.every(key, period, make, now);
+                    self.slot_mut(target).timers.every(key, period, make, now);
                 },
-                Effect::Cancel(cancel) => self.services[index].timers.cancel(&cancel),
+                Effect::Cancel(cancel) => self.slot_mut(target).timers.cancel(&cancel),
                 Effect::Task(task) => {
                     let results = self.results_tx.clone();
                     let handle = tokio::spawn(async move {
                         let _ = results.send((id, task.await));
                     });
-                    self.track(index, handle.abort_handle());
+                    self.track(target, handle.abort_handle());
                 },
                 Effect::Stream(mut stream) => {
                     let results = self.results_tx.clone();
@@ -466,12 +626,17 @@ impl Loop {
                             }
                         }
                     });
-                    self.track(index, handle.abort_handle());
+                    self.track(target, handle.abort_handle());
                 },
                 Effect::Send { ucid, key, msg } => {
+                    // The director has no view, so nothing to send to.
+                    let Target::Service(index) = target else {
+                        continue;
+                    };
                     let more = {
                         let world = self.world.read();
-                        let cx = Context::new(&world, now);
+                        let cx = Context::new(&world, now)
+                            .with_director_opt(self.director.as_ref().map(|d| d.director.status()));
                         self.services[index].service.send(ucid, &*key, &*msg, &cx)
                     };
                     // Component replies run before the remaining effects.
@@ -479,34 +644,58 @@ impl Loop {
                         queue.push_front(effect);
                     }
                 },
-                Effect::Stop => self.services[index].stopping = true,
+                Effect::Stop => self.slot_mut(target).stopping = true,
+                Effect::Director(command) => self.commands.push(command),
             }
         }
     }
 
-    fn track(&mut self, index: usize, task: AbortHandle) {
-        let tasks = &mut self.services[index].tasks;
+    fn track(&mut self, target: Target, task: AbortHandle) {
+        let tasks = &mut self.slot_mut(target).tasks;
         tasks.retain(|t| !t.is_finished());
         tasks.push(task);
     }
 
     async fn stop(&mut self, index: usize) {
-        self.services[index].stopping = true;
-        self.deliver(index, Input::Stopping).await;
+        tracing::info!(
+            service = self.services[index].service.name(),
+            "service stopped"
+        );
+        self.services[index].slot.stopping = true;
+        self.deliver(Target::Service(index), Input::Stopping).await;
         let buttons = self.services[index].service.clear(&mut self.pools);
         self.send_all(buttons).await;
         drop(self.services.remove(index));
     }
 
+    async fn stop_director(&mut self) {
+        let Some(directing) = self.director.as_mut() else {
+            return;
+        };
+        tracing::info!("director stopped");
+        directing.slot.stopping = true;
+        self.deliver(Target::Director, Input::Stopping).await;
+        self.director = None;
+    }
+
+    /// Services first, then the director they read.
     async fn stop_all(&mut self) {
         while !self.services.is_empty() {
             self.stop(self.services.len() - 1).await;
         }
+        self.stop_director().await;
     }
 
     async fn remove_stopped(&mut self) {
+        self.remove_stopped_services().await;
+        if self.director.as_ref().is_some_and(|d| d.slot.stopping) {
+            self.stop_director().await;
+        }
+    }
+
+    async fn remove_stopped_services(&mut self) {
         loop {
-            let Some(index) = self.services.iter().position(|m| m.stopping) else {
+            let Some(index) = self.services.iter().position(|m| m.slot.stopping) else {
                 return;
             };
             self.stop(index).await;
@@ -684,6 +873,141 @@ mod tests {
         })
         .await
         .unwrap();
+    }
+
+    mod director {
+        use insim::insim::{Ncn, RaceInProgress, Sta};
+
+        use super::*;
+        use crate::kitcar::director::{Combo, Cycle, DirectorCommand};
+
+        /// Reports what it reads of the director.
+        struct Watcher;
+
+        impl Service for Watcher {
+            type Msg = ();
+            fn update(&mut self, input: Input<()>, cx: &Context<'_>) -> Effects<()> {
+                let say = |text: String| Effects::new().message(text, ConnectionId::ALL);
+                match input {
+                    Input::Started => say(format!("watch {}", cx.director().is_some())),
+                    Input::Packet(Packet::Tiny(Tiny {
+                        subt: TinyType::Ping,
+                        ..
+                    })) => say(format!(
+                        "watch loading {:?}",
+                        cx.director().map(|director| director.loading)
+                    )),
+                    Input::World(WorldEvent::TrackChanged(_)) => say(format!(
+                        "watch ready {:?}",
+                        cx.director().map(|director| director.ready)
+                    )),
+                    _ => Effects::none(),
+                }
+            }
+        }
+
+        /// The next chat line from the watcher, skipping the director's own
+        /// commands and announcements.
+        async fn watched(lfs: &mut Lfs) -> String {
+            loop {
+                if let Packet::Mtc(Mtc { text, .. }) =
+                    lfs.recv().await.expect("host closed the connection")
+                    && text.starts_with("watch")
+                {
+                    return text;
+                }
+            }
+        }
+
+        #[tokio::test]
+        async fn services_read_the_director_after_it_has_seen_each_input() {
+            tokio::time::timeout(Duration::from_secs(10), async {
+                let (session, mut lfs) = pair().await;
+                let host = Host::spawn(session);
+                let _watcher = host.start(Watcher).await.unwrap();
+                assert_eq!(watched(&mut lfs).await, "watch false");
+
+                let fe1x = "FE1X".parse().unwrap();
+                host.start_director(RaceDirector::new(Combo::untimed(fe1x)))
+                    .await
+                    .unwrap();
+                let _late = host.start(Watcher).await.unwrap();
+                assert_eq!(watched(&mut lfs).await, "watch true");
+
+                // Wait for the first combo to load.
+                loop {
+                    lfs.send(TinyType::Ping).await;
+                    let both = [watched(&mut lfs).await, watched(&mut lfs).await];
+                    if both.iter().all(|line| line == "watch loading Some(false)") {
+                        break;
+                    }
+                }
+
+                // A player, then the lobby: the director sets it up, and both
+                // watchers see it ready on the same input.
+                lfs.send(Ncn {
+                    ucid: ConnectionId(1),
+                    uname: "driver".into(),
+                    ..Default::default()
+                })
+                .await;
+                lfs.send(Sta {
+                    track: fe1x,
+                    raceinprog: RaceInProgress::No,
+                    ..Default::default()
+                })
+                .await;
+                assert_eq!(watched(&mut lfs).await, "watch ready Some(true)");
+                assert_eq!(watched(&mut lfs).await, "watch ready Some(true)");
+
+                host.shutdown().await.unwrap();
+            })
+            .await
+            .unwrap();
+        }
+
+        /// Asks the director to rotate when pinged.
+        struct Rotator;
+
+        impl Service for Rotator {
+            type Msg = ();
+            fn update(&mut self, input: Input<()>, _: &Context<'_>) -> Effects<()> {
+                match input {
+                    Input::Packet(Packet::Tiny(Tiny {
+                        subt: TinyType::Ping,
+                        ..
+                    })) => Effects::new().director(DirectorCommand::Rotate),
+                    _ => Effects::none(),
+                }
+            }
+        }
+
+        #[tokio::test]
+        async fn services_steer_the_director() {
+            tokio::time::timeout(Duration::from_secs(10), async {
+                let (session, mut lfs) = pair().await;
+                let host = Host::spawn(session);
+                let combo = |track: &str| Combo::untimed(track.parse().unwrap());
+                host.start_director(RaceDirector::new(Cycle::new([combo("FE1"), combo("BL1")])))
+                    .await
+                    .unwrap();
+                let _rotator = host.start(Rotator).await.unwrap();
+
+                lfs.send(TinyType::Ping).await;
+                loop {
+                    if let Packet::Mtc(Mtc { text, .. }) =
+                        lfs.recv().await.expect("host closed the connection")
+                        && text.contains("Next track")
+                    {
+                        assert_eq!(text, "^3Next track: ^7BL1");
+                        break;
+                    }
+                }
+                host.shutdown().await.unwrap();
+            })
+            .await
+            .unwrap();
+        }
     }
 
     mod ui {

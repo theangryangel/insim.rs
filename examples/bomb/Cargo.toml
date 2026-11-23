@@ -12,7 +12,6 @@ insim = { path = "../../insim", features = ["tokio"] }
 insim_lyt = { path = "../../insim_lyt" }
 insim_extra = { path = "../../insim_extra" }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "time", "signal"] }
-tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 [lints]
