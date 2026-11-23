@@ -218,15 +218,29 @@ impl World {
     fn apply_sta(&mut self, sta: &Sta) -> (bool, bool, Option<Track>, Track) {
         let was_in_session = self.game.session_kind.is_some();
         let prev_track = self.game.track;
+        // `Sta` carries no race flags, and LFS sends it all through a session,
+        // so keep the flags the `Rst` gave this session.
+        let known = match self.game.session_kind {
+            Some(SessionKind::Race { flags, .. } | SessionKind::Qualifying { flags, .. }) => flags,
+            _ => RaceFlags::empty(),
+        };
         self.game.session_kind = match sta.raceinprog {
             RaceInProgress::No => None,
             RaceInProgress::Racing => Some(SessionKind::Race {
                 laps: sta.racelaps,
-                flags: RaceFlags::empty(),
+                flags: if matches!(self.game.session_kind, Some(SessionKind::Race { .. })) {
+                    known
+                } else {
+                    RaceFlags::empty()
+                },
             }),
             RaceInProgress::Qualifying => Some(SessionKind::Qualifying {
                 duration: Duration::from_secs(sta.qualmins as u64 * 60),
-                flags: RaceFlags::empty(),
+                flags: if matches!(self.game.session_kind, Some(SessionKind::Qualifying { .. })) {
+                    known
+                } else {
+                    RaceFlags::empty()
+                },
             }),
             _ => self.game.session_kind,
         };
@@ -820,6 +834,34 @@ mod emission_tests {
             1,
             "SessionStarted should fire once on Rst"
         );
+    }
+
+    #[test]
+    fn a_racing_sta_keeps_the_race_flags_from_the_rst() {
+        use insim::insim::RaceFlags;
+
+        use crate::world::game::SessionKind;
+
+        let mut world = World::new();
+        let track: Track = "FE1".parse().unwrap();
+        let _ = world.apply(&insim::Packet::Rst(Rst {
+            track,
+            racelaps: RaceLaps::Laps(3),
+            flags: RaceFlags::MUST_PIT,
+            ..Default::default()
+        }));
+        // LFS sends `Sta` all through a race; it carries no race flags.
+        let _ = world.apply(&insim::Packet::Sta(Sta {
+            track,
+            racelaps: RaceLaps::Laps(3),
+            raceinprog: RaceInProgress::Racing,
+            ..Default::default()
+        }));
+        let Some(SessionKind::Race { laps, flags }) = world.session() else {
+            panic!("still racing: {:?}", world.session());
+        };
+        assert!(matches!(laps, RaceLaps::Laps(3)), "{laps:?}");
+        assert!(flags.contains(RaceFlags::MUST_PIT), "{flags:?}");
     }
 
     #[test]

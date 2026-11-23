@@ -5,7 +5,7 @@ use std::{any::Any, collections::HashMap, time::Instant};
 use insim::{Packet, identifiers::ConnectionId};
 
 use crate::{
-    kitcar::effects::Effects,
+    kitcar::{director::RaceDirectorStatus, effects::Effects},
     ui::{Key, Node, Screen, Ui, id_pool::ClickIdPool},
     world::{World, WorldEvent},
 };
@@ -91,17 +91,40 @@ impl<M> Input<M> {
     }
 }
 
-/// Read-only context for one [`Service::update`].
+/// Read-only context for one [`Service::update`] or [`Service::view`].
 #[derive(Debug, Clone, Copy)]
 pub struct Context<'a> {
     world: &'a World,
+    director: Option<RaceDirectorStatus<'a>>,
     now: Instant,
 }
 
 impl<'a> Context<'a> {
     /// For calling `update` directly, as tests do.
     pub fn new(world: &'a World, now: Instant) -> Self {
-        Self { world, now }
+        Self {
+            world,
+            director: None,
+            now,
+        }
+    }
+    /// With a director's status to read, as the host gives every service once
+    /// one is started with
+    /// [`Host::start_director`](crate::kitcar::Host::start_director). Tests
+    /// build a [`RaceDirectorStatus`] directly.
+    pub fn with_director(self, director: RaceDirectorStatus<'a>) -> Self {
+        self.with_director_opt(Some(director))
+    }
+    pub(crate) fn with_director_opt(mut self, director: Option<RaceDirectorStatus<'a>>) -> Self {
+        self.director = director;
+        self
+    }
+    /// What the host's [`RaceDirector`](crate::kitcar::director::RaceDirector)
+    /// is doing, if it has one: the round's phase, the combo on the server,
+    /// and when the next restart or rotation is due. `None` inside the
+    /// director's own update.
+    pub fn director(&self) -> Option<RaceDirectorStatus<'a>> {
+        self.director
     }
     /// The server mirror, already updated for this input.
     pub fn world(&self) -> &'a World {
@@ -137,6 +160,11 @@ pub(crate) trait ErasedService: Send {
         cx: &Context<'_>,
     ) -> Effects<AnyMsg>;
     fn needs_render(&self) -> bool;
+    /// The earliest redraw a view asked for with
+    /// [`Ui::redraw_at`](crate::ui::Ui::redraw_at).
+    fn redraw_at(&self) -> Option<Instant>;
+    /// The service's type, for logs.
+    fn name(&self) -> &'static str;
     fn render(&mut self, cx: &Context<'_>, pools: &mut Pools) -> Vec<Packet>;
     /// Remove every button this service has drawn.
     fn clear(&mut self, pools: &mut Pools) -> Vec<Packet>;
@@ -217,6 +245,14 @@ impl<S: Service> ErasedService for Typed<S> {
         self.dirty || self.screens.values().any(Screen::is_dirty)
     }
 
+    fn name(&self) -> &'static str {
+        std::any::type_name::<S>()
+    }
+
+    fn redraw_at(&self) -> Option<Instant> {
+        self.screens.values().filter_map(Screen::redraw_at).min()
+    }
+
     fn render(&mut self, cx: &Context<'_>, pools: &mut Pools) -> Vec<Packet> {
         // Excludes the server's own connection (UCID 0).
         let connections: Vec<ConnectionId> = cx.world().connections().map(|c| c.ucid).collect();
@@ -228,7 +264,8 @@ impl<S: Service> ErasedService for Typed<S> {
                 .screens
                 .entry(ucid)
                 .or_insert_with(|| Screen::new(ucid));
-            if !(self.dirty || screen.is_dirty()) {
+            let due = screen.redraw_at().is_some_and(|at| at <= cx.now());
+            if !(self.dirty || screen.is_dirty() || due) {
                 continue;
             }
             let pool = pools.entry(ucid).or_insert_with(ClickIdPool::new);

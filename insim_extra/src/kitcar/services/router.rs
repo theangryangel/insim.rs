@@ -199,7 +199,7 @@ impl<S: Send + 'static, M: Clone + Send + 'static> Router<S, M> {
 }
 
 /// The sender, the prefix typed (for usage messages) and the command text.
-fn command_text<M>(input: &Input<M>) -> Option<(ConnectionId, String, &str)> {
+pub(crate) fn command_text<M>(input: &Input<M>) -> Option<(ConnectionId, String, &str)> {
     match input.get::<Packet>()? {
         Packet::Mso(mso) if mso.usertype == MsoUserType::Prefix => {
             let msg = mso.msg_from_textstart().trim_start();

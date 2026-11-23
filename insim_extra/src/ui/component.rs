@@ -16,7 +16,7 @@ use std::{
     marker::PhantomData,
     panic::Location,
     sync::Arc,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use insim::{
@@ -200,6 +200,8 @@ const ROOT: u64 = 0;
 struct Store {
     instances: HashMap<u64, Instance>,
     generation: u64,
+    /// The earliest redraw asked for during the last render.
+    redraw_at: Option<Instant>,
 }
 
 impl Store {
@@ -244,6 +246,40 @@ impl<M> Ui<'_, M> {
     /// The time of this render, for countdowns and animation.
     pub fn now(&self) -> Instant {
         self.now
+    }
+
+    /// Draw again at `at`, even if nothing changes. Views are otherwise only
+    /// redrawn after an update, so anything drawn from the clock (a countdown,
+    /// an animation) asks for its next frame here. The earliest request in a
+    /// render wins; each render starts with none.
+    pub fn redraw_at(&mut self, at: Instant) {
+        let at = at.max(self.now);
+        self.store.redraw_at = Some(self.store.redraw_at.map_or(at, |earlier| earlier.min(at)));
+    }
+
+    /// Like [`redraw_at`](Self::redraw_at), `after` from now.
+    pub fn redraw_after(&mut self, after: Duration) {
+        self.redraw_at(self.now + after);
+    }
+
+    /// Whole seconds left until `deadline`, rounded up, and a redraw for when
+    /// the number changes. Zero once it has passed.
+    ///
+    /// ```ignore
+    /// if let Some(at) = cx.director().and_then(|d| d.restart_at) {
+    ///     let secs = ui.countdown(at);
+    ///     ui::text(format!("Next race in {secs}s"), style)
+    /// }
+    /// ```
+    pub fn countdown(&mut self, deadline: Instant) -> u64 {
+        let left = deadline.saturating_duration_since(self.now);
+        if left.is_zero() {
+            return 0;
+        }
+        let secs = left.as_secs() + u64::from(left.subsec_nanos() > 0);
+        // The number drops when `secs - 1` whole seconds are left.
+        self.redraw_at(deadline - Duration::from_secs(secs - 1));
+        secs
     }
 
     /// Place a component with no props. It is created the first time this line
@@ -367,6 +403,16 @@ impl<M: Clone + Send + 'static> Screen<M> {
         self.dirty
     }
 
+    /// When the last render asked to be drawn again, if it did. See
+    /// [`Ui::redraw_at`].
+    pub fn redraw_at(&self) -> Option<Instant> {
+        if self.hidden {
+            None
+        } else {
+            self.store.redraw_at
+        }
+    }
+
     /// Draw `view` and return the packets that bring the player's buttons up to
     /// date. Unplaced components are dropped. Draws nothing while the player has
     /// hidden the buttons.
@@ -377,6 +423,7 @@ impl<M: Clone + Send + 'static> Screen<M> {
         view: impl FnOnce(&mut Ui<'_, M>) -> Option<Node<M>>,
     ) -> Vec<Packet> {
         self.dirty = false;
+        self.store.redraw_at = None;
         if self.hidden {
             return Vec::new();
         }
@@ -707,5 +754,37 @@ mod tests {
         // Clearing the screen (the player left, or the service stopped) unmounts too.
         let _ = screen.clear(&mut pool);
         assert_eq!(unmounts.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn countdowns_ask_to_be_redrawn_when_the_number_changes() {
+        let mut pool = ClickIdPool::new();
+        let mut screen = Screen::<()>::new(ConnectionId(1));
+        let now = Instant::now();
+        let deadline = now + Duration::from_millis(2_500);
+
+        let mut secs = None;
+        let _ = screen.render(&mut pool, now, |ui| {
+            secs = Some(ui.countdown(deadline));
+            None
+        });
+        assert_eq!(secs, Some(3));
+        assert_eq!(screen.redraw_at(), Some(now + Duration::from_millis(500)));
+
+        // Each render starts with no request; a passed deadline makes none.
+        let _ = screen.render(&mut pool, deadline, |ui| {
+            secs = Some(ui.countdown(deadline));
+            None
+        });
+        assert_eq!(secs, Some(0));
+        assert_eq!(screen.redraw_at(), None);
+
+        // The earliest request wins.
+        let _ = screen.render(&mut pool, now, |ui| {
+            ui.redraw_after(Duration::from_secs(5));
+            ui.redraw_after(Duration::from_secs(1));
+            None
+        });
+        assert_eq!(screen.redraw_at(), Some(now + Duration::from_secs(1)));
     }
 }

@@ -15,7 +15,7 @@ use std::{
 use futures::{FutureExt, Stream, StreamExt, future::BoxFuture, stream::BoxStream};
 use insim::{Packet, identifiers::ConnectionId, insim::Mtc};
 
-use crate::ui::Key;
+use crate::{kitcar::director::DirectorCommand, ui::Key};
 
 /// Names a timer, so scheduling it again replaces it and it can be cancelled.
 /// Implemented for any `Debug + PartialEq + Send + 'static` type. A newtype per
@@ -84,6 +84,7 @@ pub(crate) enum Effect<M> {
         msg: Box<dyn Any + Send + Sync>,
     },
     Stop,
+    Director(DirectorCommand),
 }
 
 /// A list of things for the runtime to do, in order.
@@ -120,6 +121,7 @@ impl<M> fmt::Debug for Effects<M> {
                 Effect::Stream(_) => list.entry(&"stream"),
                 Effect::Send { ucid, key, .. } => list.entry(&("send", ucid, key)),
                 Effect::Stop => list.entry(&"stop"),
+                Effect::Director(command) => list.entry(&("director", command)),
             };
         }
         list.finish()
@@ -242,6 +244,13 @@ impl<M: Send + 'static> Effects<M> {
     pub fn stop(self) -> Self {
         self.push(Effect::Stop)
     }
+    /// Steer the host's [`RaceDirector`](crate::kitcar::director::RaceDirector),
+    /// say from an admin's chat command. It acts once these effects are carried
+    /// out, before the next service sees the input. Ignored, with a warning,
+    /// if the host has no director.
+    pub fn director(self, command: DirectorCommand) -> Self {
+        self.push(Effect::Director(command))
+    }
 
     /// Append `other`.
     pub fn and(mut self, other: Self) -> Self {
@@ -282,11 +291,19 @@ impl<M: Send + 'static> Effects<M> {
                     },
                     Effect::Send { ucid, key, msg } => Effect::Send { ucid, key, msg },
                     Effect::Stop => Effect::Stop,
+                    Effect::Director(command) => Effect::Director(command),
                 })
                 .collect(),
         }
     }
 
+    /// Commands for the director, in order. For tests.
+    pub fn director_commands(&self) -> impl Iterator<Item = &DirectorCommand> {
+        self.items.iter().filter_map(|item| match item {
+            Effect::Director(command) => Some(command),
+            _ => None,
+        })
+    }
     /// Packets to send, in order. For tests.
     pub fn packets_sent(&self) -> impl Iterator<Item = &Packet> {
         self.items.iter().filter_map(|item| match item {

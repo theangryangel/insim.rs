@@ -5,6 +5,7 @@ extern crate self as insim_extra;
 
 pub mod chat;
 pub mod kitcar;
+pub mod time;
 #[allow(missing_docs)]
 pub mod ui;
 pub mod world;

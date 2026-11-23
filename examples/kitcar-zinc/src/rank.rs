@@ -13,6 +13,7 @@ pub struct Standing {
     pub of: usize,
     pub points: u32,
     pub yellows: u32,
+    pub collisions: u32,
     pub cars: String,
 }
 
@@ -25,7 +26,8 @@ impl Standing {
             of: ranked.len(),
             points: driver.points,
             yellows: driver.yellows,
-            cars: driver.car_list(),
+            collisions: driver.collisions,
+            cars: driver.car_list(zinc.ladder()),
         }
     }
 }
@@ -68,8 +70,8 @@ impl Component for RankCard {
             ui::text(position, style).w(40).h(5),
             ui::text(
                 format!(
-                    "^2{} point(s)^7, ^3{} yellow(s)",
-                    standing.points, standing.yellows
+                    "^2{} point(s)^7, ^3{} yellow(s)^7, ^3{} collision(s)",
+                    standing.points, standing.yellows, standing.collisions
                 ),
                 style,
             )

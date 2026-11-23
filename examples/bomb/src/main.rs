@@ -28,10 +28,8 @@ use insim::{
 };
 use insim_extra::kitcar::{
     Host,
-    services::{
-        penalty_clearer::PenaltyClearer,
-        race_director::{Combo, Layout, RaceDirector},
-    },
+    director::{Combo, Layout, RaceDirector},
+    services::penalty_clearer::PenaltyClearer,
 };
 
 use crate::{game::Bomb, rules::Config};
@@ -103,11 +101,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let session = Session::tcp(stream)?.handshake(isi).await?;
 
     let mut host = Host::spawn(session);
-    // Three services: `RaceDirector` sets up the track and layout (one setup,
-    // so it never rotates), `PenaltyClearer` clears penalties, and Bomb plays
+    // The director sets up the track and layout (one setup, so it never
+    // rotates). Two services: `PenaltyClearer` clears penalties, and Bomb plays
     // whatever race is running.
-    let _director = host
-        .start(RaceDirector::new(Combo::untimed(args.track).layout(layout)))
+    host.start_director(RaceDirector::new(Combo::untimed(args.track).layout(layout)))
         .await?;
     let mut bomb = host.start(Bomb::new(config)).await?;
     let _clearer = host

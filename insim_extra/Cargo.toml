@@ -22,6 +22,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 fixedbitset = { workspace = true }
 taffy = "0.15"
+fastrand = "2"
 multi_index_map = "0.16"
 
 [dev-dependencies]
