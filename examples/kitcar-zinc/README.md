@@ -27,4 +27,4 @@ kitcar is for multiplayer servers, so host a server (or use a dedicated host) fi
 - Add `--admin-password <password>` if your host has one. The director needs it to change track.
 - ZINC answers LFS's join requests, and LFS waits for its answer, so joins stall if ZINC stops responding.
 - Join, type `/ready` in the lobby, and race.
-- `!stats` shows your points, yellows and cars. `!top` shows the leaders. `!rank` opens a card with your standing.
+- `!stats` shows your points, yellows and cars. `!top` opens the leaderboard, a page at a time. `!rank` opens a card with your standing. `!clock` shows a clock mid-screen; click it to close.

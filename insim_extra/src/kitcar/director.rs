@@ -38,8 +38,8 @@ use insim::{
 };
 
 use crate::{
+    commands::time::TimeOfDay,
     kitcar::{Context, Effects, Input},
-    time::TimeOfDay,
     world::{
         World, WorldEvent,
         race::{FinishStatus, RaceEvent},
@@ -1783,7 +1783,7 @@ mod tests {
 
     #[test]
     fn sets_the_time_of_day_with_the_lobby() {
-        use crate::time::TimeOfDay;
+        use crate::commands::time::TimeOfDay;
 
         let commands = set_up_commands(Combo::untimed(fe1x()).time(TimeOfDay::fixed(17, 30)));
         let wind = commands.iter().position(|c| c.starts_with("/wind"));
@@ -1852,7 +1852,7 @@ mod tests {
 
     #[test]
     fn picks_one_of_several_times_each_time_a_combo_comes_up() {
-        use crate::time::TimeOfDay;
+        use crate::commands::time::TimeOfDay;
 
         let night = "/time set 00:00";
         let noon = "/time set 12:00";

@@ -15,6 +15,8 @@
 //! - A topbar pinned to every screen shows the race, points, rank and the next
 //!   car to unlock.
 //! - A message of the day greets everyone as they connect, until they close it.
+//! - `!top` opens the leaderboard, a page at a time. `!clock` puts a ticking
+//!   clock mid-screen until it's clicked.
 //! - Each point unlocks more cars: UF1 and XFG to start, then the 1DFF72 mod,
 //!   XFR, XRG, the TBO class (XRT, RB4, FXO), and LX4. Drivers keep every car
 //!   they unlock. See `LICENCES`, which the track limits share cars with.
@@ -27,7 +29,9 @@
 
 #![allow(missing_docs)]
 
+mod clock;
 mod rank;
+mod top;
 mod topbar;
 mod zinc;
 
@@ -41,13 +45,13 @@ use insim::{
     insim::{Isi, IsiFlags, RaceLaps},
 };
 use insim_extra::{
+    commands::time::{Month, TimeOfDay},
     kitcar::{
         Host,
         director::{Combo, Cycle, Every, Layout, RaceDirector, StartOrder},
         error::HostError,
         services::motd::Motd,
     },
-    time::{Month, TimeOfDay},
 };
 
 /// The 1DFF72 mod, by its id. The server must allow mods for it to be

@@ -20,7 +20,7 @@ use clap::Parser;
 use insim::{
     Session,
     identifiers::{ConnectionId, RequestId},
-    insim::{BtnStyle, Isi, Mst},
+    insim::{Isi, Mst},
 };
 use insim_extra::{
     chat::ChatCommand,
@@ -128,7 +128,7 @@ fn view(bot: &Bot, ucid: ConnectionId, _: &mut Ui<'_, Msg>, _: &Context<'_>) -> 
     Some(
         ui::clickable(
             format!("Wave ^8({})", bot.waves),
-            BtnStyle::default().dark(),
+            ui::components::style::panel(),
             Msg::Waved(ucid),
         )
         .w(20)

@@ -1,9 +1,12 @@
 //! What each player sees, drawn straight from the game's state.
 
-use insim::{Colour, identifiers::ConnectionId, insim::BtnStyle};
+use insim::{Colour, identifiers::ConnectionId};
 use insim_extra::{
     kitcar::Context,
-    ui::{self, Child, Component, Node, Ui},
+    ui::{
+        self, Child, Component, Node, Ui,
+        components::style::{active, muted, text, title},
+    },
 };
 
 use crate::game::{Bomb, Msg};
@@ -32,19 +35,6 @@ const ABOUT_LINES: &[&str] = &[
     "Type ^2!help^7 for the rules, or click ^3?^7 at the top.",
 ];
 
-fn title() -> BtnStyle {
-    BtnStyle::default().dark().yellow()
-}
-fn text() -> BtnStyle {
-    BtnStyle::default().dark().light_grey()
-}
-fn active() -> BtnStyle {
-    BtnStyle::default().dark().white()
-}
-fn muted() -> BtnStyle {
-    BtnStyle::default().dark().grey()
-}
-
 /// A dialog that opens on `Show` and closes itself. The host keeps one per
 /// player, so the game never tracks whether it's open.
 #[derive(Default)]
@@ -68,38 +58,23 @@ impl Component for Dialog {
     type Out = ();
     type Props<'a> = DialogProps<'a>;
 
-    fn update(&mut self, msg: DialogMsg) -> Option<()> {
+    fn update(&mut self, msg: DialogMsg) -> ui::Effects<DialogMsg> {
         self.open = matches!(msg, DialogMsg::Show);
-        None
+        ui::Effects::none()
     }
 
     fn render(&self, props: DialogProps<'_>, _: &mut Ui<'_, DialogMsg>) -> Node<DialogMsg> {
         if !self.open {
             return ui::empty();
         }
-        ui::col([
-            ui::background(BtnStyle::default().dark().light_grey())
-                .w(100)
-                .flex()
-                .flex_col()
-                .p(1)
-                .with_child(
-                    ui::text(props.title, BtnStyle::default().align_left().yellow())
-                        .h(8)
-                        .mb(2)
-                        .w_auto(),
-                )
-                .with_children(props.lines.iter().map(|line| {
-                    ui::text(*line, BtnStyle::default().align_left().white())
-                        .w_auto()
-                        .h(6)
-                })),
-            ui::clickable("Close", BtnStyle::default().green().dark(), DialogMsg::Hide)
-                .self_end()
-                .w(12)
-                .h(8)
-                .mt(2),
-        ])
+        ui::components::dialog(props.title)
+            .lines(props.lines.iter().copied())
+            .button(ui::clickable(
+                "Close",
+                ui::components::style::action(),
+                DialogMsg::Hide,
+            ))
+            .build()
     }
 }
 

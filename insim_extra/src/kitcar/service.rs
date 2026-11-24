@@ -6,7 +6,7 @@ use insim::{Packet, identifiers::ConnectionId};
 
 use crate::{
     kitcar::{director::RaceDirectorStatus, effects::Effects},
-    ui::{Key, Node, Screen, Ui, id_pool::ClickIdPool},
+    ui::{Delivery, Key, Node, Outbox, Screen, Ui, id_pool::ClickIdPool},
     world::{World, WorldEvent},
 };
 
@@ -159,13 +159,20 @@ pub(crate) trait ErasedService: Send {
         msg: &dyn Any,
         cx: &Context<'_>,
     ) -> Effects<AnyMsg>;
+    /// Where components on this service's screens send their task and timer
+    /// results. Given once, before the service starts.
+    fn set_outbox(&mut self, outbox: Outbox);
+    /// A component's task or timer result, back from the outbox.
+    fn deliver(&mut self, delivery: Delivery, cx: &Context<'_>) -> Effects<AnyMsg>;
     fn needs_render(&self) -> bool;
     /// The earliest redraw a view asked for with
     /// [`Ui::redraw_at`](crate::ui::Ui::redraw_at).
     fn redraw_at(&self) -> Option<Instant>;
     /// The service's type, for logs.
     fn name(&self) -> &'static str;
-    fn render(&mut self, cx: &Context<'_>, pools: &mut Pools) -> Vec<Packet>;
+    /// Redraw what changed. Returns the buttons, and the effects of anything
+    /// components reported to the view as they mounted.
+    fn render(&mut self, cx: &Context<'_>, pools: &mut Pools) -> (Vec<Packet>, Effects<AnyMsg>);
     /// Remove every button this service has drawn.
     fn clear(&mut self, pools: &mut Pools) -> Vec<Packet>;
 }
@@ -175,6 +182,7 @@ pub(crate) struct Typed<S: Service> {
     screens: HashMap<ConnectionId, Screen<S::Msg>>,
     // State changed, so every screen needs redrawing.
     dirty: bool,
+    outbox: Option<Outbox>,
 }
 
 impl<S: Service> Typed<S> {
@@ -183,6 +191,7 @@ impl<S: Service> Typed<S> {
             service,
             screens: HashMap::new(),
             dirty: true,
+            outbox: None,
         }
     }
     fn run(&mut self, input: Input<S::Msg>, cx: &Context<'_>) -> Effects<AnyMsg> {
@@ -241,6 +250,18 @@ impl<S: Service> ErasedService for Typed<S> {
         self.run_all(msgs, cx)
     }
 
+    fn set_outbox(&mut self, outbox: Outbox) {
+        self.outbox = Some(outbox);
+    }
+
+    fn deliver(&mut self, delivery: Delivery, cx: &Context<'_>) -> Effects<AnyMsg> {
+        let msgs = match self.screens.get_mut(&delivery.ucid()) {
+            Some(screen) => screen.deliver(delivery),
+            None => Vec::new(),
+        };
+        self.run_all(msgs, cx)
+    }
+
     fn needs_render(&self) -> bool {
         self.dirty || self.screens.values().any(Screen::is_dirty)
     }
@@ -253,17 +274,19 @@ impl<S: Service> ErasedService for Typed<S> {
         self.screens.values().filter_map(Screen::redraw_at).min()
     }
 
-    fn render(&mut self, cx: &Context<'_>, pools: &mut Pools) -> Vec<Packet> {
+    fn render(&mut self, cx: &Context<'_>, pools: &mut Pools) -> (Vec<Packet>, Effects<AnyMsg>) {
         // Excludes the server's own connection (UCID 0).
         let connections: Vec<ConnectionId> = cx.world().connections().map(|c| c.ucid).collect();
         // Players who left take their buttons with them.
         self.screens.retain(|ucid, _| connections.contains(ucid));
         let mut packets = Vec::new();
+        let mut raised = Vec::new();
         for ucid in connections {
-            let screen = self
-                .screens
-                .entry(ucid)
-                .or_insert_with(|| Screen::new(ucid));
+            let outbox = &self.outbox;
+            let screen = self.screens.entry(ucid).or_insert_with(|| match outbox {
+                Some(outbox) => Screen::with_outbox(ucid, outbox.clone()),
+                None => Screen::new(ucid),
+            });
             let due = screen.redraw_at().is_some_and(|at| at <= cx.now());
             if !(self.dirty || screen.is_dirty() || due) {
                 continue;
@@ -271,9 +294,11 @@ impl<S: Service> ErasedService for Typed<S> {
             let pool = pools.entry(ucid).or_insert_with(ClickIdPool::new);
             let service = &self.service;
             packets.extend(screen.render(pool, cx.now(), |ui| service.view(ucid, ui, cx)));
+            raised.extend(screen.take_messages());
         }
         self.dirty = false;
-        packets
+        let effects = self.run_all(raised, cx);
+        (packets, effects)
     }
 
     fn clear(&mut self, pools: &mut Pools) -> Vec<Packet> {

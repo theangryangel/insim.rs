@@ -1,6 +1,6 @@
 //! [`Motd`]: a message of the day, shown to each player as they connect.
 //!
-//! A panel in the middle of the screen with a green button beneath it. It stays up
+//! A panel in the middle of the screen with a green button at its foot. It stays up
 //! until the player clicks the button, so everyone reads it at least once a
 //! visit. Players reopen it with [`MotdCommand::Motd`] (`!motd`, with your
 //! InSim prefix). Start it next to your game:
@@ -14,14 +14,13 @@
 //! ).await?;
 //! ```
 //!
-//! Everything sits on one panel, with the button joined to its foot:
+//! Everything sits on one panel, the button at its foot:
 //!
 //! ```text
 //!  ┌──────────────────────────────────────────┐
 //!  │ ZINC Is Not CTRA                         │   title
 //!  │ A tribute to clean community racing.     │   lines
 //!  │ Type !help for commands.                 │
-//!  ├──────────────────────────────────────────┤
 //!  │               LET'S RACE                 │   the button, in green
 //!  └──────────────────────────────────────────┘
 //! ```
@@ -30,12 +29,12 @@
 
 use std::collections::HashSet;
 
-use insim::{identifiers::ConnectionId, insim::BtnStyle};
+use insim::identifiers::ConnectionId;
 
 use crate::{
     chat::ChatCommand,
     kitcar::{Context, Effects, Input, Service, services::router::command_text},
-    ui::{self, Node, Ui},
+    ui::{self, Node, Ui, components::style},
     world::WorldEvent,
 };
 
@@ -49,20 +48,6 @@ pub enum MotdCommand {
 
 /// The panel's width, in UI units of the 200 x 200 screen.
 const WIDTH: u16 = 120;
-/// Padding inside the panel.
-const PAD_X: u16 = 2;
-const PAD_Y: u16 = 2;
-/// Height of a line, and of the header and button.
-const ROW: u16 = 5;
-const HEADER: u16 = 8;
-/// Space between the title and the lines.
-const GAP: u16 = 2;
-
-/// The panel and button background. Dark keeps white text readable over a
-/// bright track; `light()` with dark text is LFS's own look.
-fn panel_style() -> BtnStyle {
-    BtnStyle::default().dark()
-}
 
 /// A player closed the message. The [`Motd`]'s own message.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -109,26 +94,17 @@ impl Motd {
         self.open.contains(&ucid)
     }
 
-    /// The title and lines on one panel.
-    fn panel(&self) -> Node<CloseMotd> {
-        let inner = WIDTH - 2 * PAD_X;
-        let plain = BtnStyle::default().align_left();
-        let title = ui::text(self.title.as_str(), plain.yellow())
-            .w(inner)
-            .h(HEADER)
-            .mb(GAP);
-        let lines = self
-            .lines
-            .iter()
-            .map(|line| ui::text(line.as_str(), plain.white()).w(inner).h(ROW));
-        ui::background(panel_style())
-            .w(WIDTH)
-            .flex()
-            .flex_col()
-            .px(PAD_X)
-            .py(PAD_Y)
-            .with_child(title)
-            .with_children(lines)
+    /// The title, lines and button on one panel.
+    fn panel(&self, ucid: ConnectionId) -> Node<CloseMotd> {
+        ui::components::dialog(self.title.as_str())
+            .width(WIDTH)
+            .lines(self.lines.iter().map(String::as_str))
+            .button(ui::clickable(
+                self.button.as_str(),
+                style::action(),
+                CloseMotd(ucid),
+            ))
+            .build()
     }
 }
 
@@ -166,12 +142,8 @@ impl Service for Motd {
         if !self.is_open(ucid) {
             return None;
         }
-        // Joined to the panel's foot, so the two read as one.
-        let button = ui::clickable(self.button.as_str(), panel_style().green(), CloseMotd(ucid))
-            .w(WIDTH)
-            .h(HEADER);
-        // The panel and its button, centred on the screen. The full-screen
-        // container is only for centring: it draws nothing.
+        // Centred on the screen. The full-screen container is only for
+        // centring: it draws nothing.
         Some(
             ui::container()
                 .position_fixed()
@@ -180,8 +152,7 @@ impl Service for Motd {
                 .flex_col()
                 .justify_center()
                 .items_center()
-                .with_child(self.panel())
-                .with_child(button),
+                .with_child(self.panel(ucid)),
         )
     }
 }

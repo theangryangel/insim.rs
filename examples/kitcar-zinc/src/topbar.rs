@@ -7,7 +7,7 @@
 
 use insim::{
     identifiers::ConnectionId,
-    insim::{BtnStyle, RaceFlags, RaceLaps},
+    insim::{RaceFlags, RaceLaps},
 };
 use insim_extra::{
     kitcar::{Context, director::RaceDirectorStatus},
@@ -64,7 +64,7 @@ impl Topbar {
     }
 
     pub fn render(self) -> Node<Msg> {
-        let style = BtnStyle::default().dark();
+        let style = ui::components::style::panel();
         ui::row([ui::text(self.race, style).w(30).h(5)])
             .when(!self.round.is_empty(), |bar| {
                 bar.with_child(ui::text(self.round, style).w(30).h(5))
